@@ -27,3 +27,6 @@ back/prisma/generated/
 # Temp
 .temp
 .tmp
+
+# 3D-модели (тяжёлые, не нужны на сервере / в репо)
+*.glb
