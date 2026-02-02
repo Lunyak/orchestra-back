@@ -1,5 +1,5 @@
 # CI/CD для GitLab
-# Сборка бэкенда, линт, тесты; опционально — деплой
+# На сервер деплоится только бэкенд (API + БД). Electron — десктопное приложение, не разворачивается.
 
 stages:
   - lint
@@ -29,7 +29,7 @@ lint:back:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
-# Линт фронта (Electron)
+# Линт фронта (Electron) — не блокирует пайплайн; на сервер деплоится только бэкенд
 lint:front:
   stage: lint
   image: node:${NODE_VERSION}-alpine
@@ -39,6 +39,7 @@ lint:front:
     - npm run lint
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  allow_failure: true
 
 # Тесты бэкенда
 test:back:
