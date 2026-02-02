@@ -1,0 +1,242 @@
+generator client {
+  // Prisma 7 + Node.js, клиент живёт в @prisma/client
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // сама строка подключения задаётся в prisma.config.ts через env('DATABASE_URL')
+  provider = "postgresql"
+}
+
+model User {
+  id               String             @id @default(cuid())
+  email            String             @unique
+  passwordHash     String
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  subscriptionId   String?
+  subscription     SubscriptionPlan?  @relation(fields: [subscriptionId], references: [id])
+
+  projectsOwned      Project[]        @relation("ProjectOwner")
+  projectMemberships ProjectMember[]
+}
+
+model SubscriptionPlan {
+  id                         String   @id @default(cuid())
+  name                       String   @unique
+  maxProjects                Int?
+  maxCollaboratorsPerProject Int?
+  features                   Json
+
+  users                      User[]
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  slug        String          @unique
+  name        String
+  description String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  deletedAt   DateTime?
+  ownerId     String
+  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+
+  scenes      Scene[]
+  members     ProjectMember[]
+  modelFiles  ProjectModelFile[]
+
+  @@index([ownerId])
+}
+
+model ProjectMember {
+  id        String   @id @default(cuid())
+  projectId String
+  userId    String
+  role      String
+
+  project   Project  @relation(fields: [projectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+}
+
+model Scene {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  rawJson   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  project   Project  @relation(fields: [projectId], references: [id])
+
+  playlist       PlaylistItem[]
+  sounds         Sound[]
+  steps          Step[]
+  lightChannels  GlobalLightChannel[]
+  lightPlot      GlobalLightPlot[]
+  theaterLayout  TheaterLayout?
+}
+
+model PlaylistItem {
+  id        String @id @default(cuid())
+  sceneId   String
+  order     Int
+  sourceId  Int
+  title     String
+  file      String
+  fadeMs    Int
+  loop      Boolean
+
+  scene     Scene  @relation(fields: [sceneId], references: [id])
+}
+
+model Sound {
+  id        String @id @default(cuid())
+  sceneId   String
+  sourceId  Int
+  title     String
+  file      String
+  icon      String?
+  volume    Float
+  fadeMs    Int
+  loop      Boolean
+
+  scene     Scene  @relation(fields: [sceneId], references: [id])
+}
+
+model Step {
+  id           String   @id @default(cuid())
+  sceneId      String
+  sourceId     Int
+  title        String
+  markdown     String?
+  playMarkdown String?
+  order        Int
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  scene        Scene    @relation(fields: [sceneId], references: [id])
+
+  requisites        StepRequisite[]
+  lightPlot         StepLightPlot[]
+  theaterModels     TheaterModel[]
+  theaterSpotlights TheaterSpotlight[]
+}
+
+model StepRequisite {
+  id       String @id @default(cuid())
+  stepId   String
+  sourceId Int
+  label    String
+  checked  Boolean @default(false)
+
+  step     Step   @relation(fields: [stepId], references: [id])
+}
+
+model StepLightPlot {
+  id       String @id @default(cuid())
+  stepId   String
+  sourceId Int
+  label    String
+  channel  String?
+  x        Int
+  y        Int
+  angle    Int
+  length   Int
+
+  step     Step   @relation(fields: [stepId], references: [id])
+}
+
+model TheaterModel {
+  id              String   @id @default(cuid())
+  stepId          String
+  sourceId        Int
+  name            String
+  type            String
+  builtin         String?
+  allowOutOfBounds Boolean @default(false)
+  position        Json
+  rotation        Json
+  scale           Json
+
+  step            Step    @relation(fields: [stepId], references: [id])
+}
+
+model TheaterSpotlight {
+  id        String  @id @default(cuid())
+  stepId    String
+  sourceId  Int
+  label     String
+  position  Json
+  target    Json
+  angleDeg  Int
+  intensity Float
+  color     String
+  enabled   Boolean
+  channel   Int
+  isRgb     Boolean
+
+  step      Step    @relation(fields: [stepId], references: [id])
+}
+
+model GlobalLightChannel {
+  id      String  @id @default(cuid())
+  sceneId String
+  raw     String
+  index   Int
+
+  scene   Scene   @relation(fields: [sceneId], references: [id])
+}
+
+model GlobalLightPlot {
+  id       String @id @default(cuid())
+  sceneId  String
+  sourceId Int
+  label    String
+  channel  String
+  x        Int
+  y        Int
+  angle    Int
+  length   Int
+
+  scene    Scene  @relation(fields: [sceneId], references: [id])
+}
+
+model TheaterLayout {
+  id             String @id @default(cuid())
+  sceneId        String @unique
+  hallWidth      Int
+  hallDepth      Int
+  wallHeight     Int
+  stageWidth     Int
+  stageDepth     Int
+  stageHeight    Int
+  stageZ         Int
+  audienceStartZ Int
+  seatRows       Int
+  seatsPerRow    Int
+  seatSpacing    Float
+  rowSpacing     Float
+  aisleWidth     Float
+  aisleCenterX   Float
+  doorWidth      Float
+  doorHeight     Float
+  doorZ          Float
+  rowRise        Float
+
+  scene          Scene  @relation(fields: [sceneId], references: [id])
+}
+
+model ProjectModelFile {
+  id         String  @id @default(cuid())
+  projectId  String
+  fileName   String
+  path       String
+  uploadedAt DateTime @default(now())
+
+  project    Project @relation(fields: [projectId], references: [id])
+}

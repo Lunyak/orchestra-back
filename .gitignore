@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build / dist
+dist/
+build/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.log
+
+# Electron
+electron-vite-project/out/
+electron-vite-project/dist/
+
+# Prisma generated (back)
+back/prisma/generated/
+
+# Temp
+.temp
+.tmp

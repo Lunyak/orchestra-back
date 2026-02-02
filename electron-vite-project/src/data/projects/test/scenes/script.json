@@ -1,0 +1,24 @@
+{
+  "name": "Проект test",
+  "steps": [
+    {
+      "id": 1,
+      "title": "Шаг 1",
+      "markdown": "",
+      "requisites": []
+    }
+  ],
+  "playlist": [],
+  "sounds": [],
+  "lightChannels": [
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ]
+}

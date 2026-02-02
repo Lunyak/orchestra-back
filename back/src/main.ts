@@ -1,0 +1,37 @@
+import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { json, urlencoded } from 'express';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Разрешаем более крупные тела запросов (для /sync/push с rawJson и шагами)
+  app.use(
+    json({
+      limit: '10mb',
+    }),
+  );
+  app.use(
+    urlencoded({
+      extended: true,
+      limit: '10mb',
+    }),
+  );
+
+  app.enableCors({
+    origin: true, // временно разрешаем все источники (включая http://localhost:5173)
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
+
+  await app.listen(process.env.PORT ?? 3000);
+}
+bootstrap();

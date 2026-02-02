@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: orkestr-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: orkestr
+      POSTGRES_PASSWORD: orkestr_secret
+      POSTGRES_DB: dophamin_orkestr
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orkestr -d dophamin_orkestr"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  back:
+    build:
+      context: ./back
+      dockerfile: Dockerfile
+    container_name: orkestr-back
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: orkestr-dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9999:8080"
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_TAILSIZE: 300
+
+volumes:
+  postgres_data:
