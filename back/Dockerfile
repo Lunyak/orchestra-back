@@ -26,4 +26,5 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 ENV NODE_ENV=production
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+# Миграции под то, что использует оркестр; затем запуск API
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/main.js"]
