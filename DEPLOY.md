@@ -39,19 +39,19 @@ apt install -y git
 # Клонирование (подставьте свой URL и при необходимости токен/SSH-ключ)
 mkdir -p /opt
 cd /opt
-git clone https://gitlab.com/dopamin-service/orcestr.git orkestr
-cd orkestr
+git clone https://gitlab.com/dopamin-service/orchestra-back.git orchestra-back
+cd orchestra-back
 ```
 
 Если репозиторий приватный, настройте доступ:
 
-- **HTTPS:** `git clone https://oauth2:TOKEN@gitlab.com/dopamin-service/orcestr.git orkestr`
-- **SSH:** добавьте свой публичный ключ в GitLab (Settings → SSH Keys) и клонируйте по `git@gitlab.com:dopamin-service/orcestr.git`.
+- **HTTPS:** `git clone https://oauth2:TOKEN@gitlab.com/dopamin-service/orchestra-back.git orchestra-back`
+- **SSH:** добавьте свой публичный ключ в GitLab (Settings → SSH Keys) и клонируйте по `git@gitlab.com:dopamin-service/orchestra-back.git`.
 
 ### 1.4 Файл окружения
 
 ```bash
-cd /opt/orkestr
+cd /opt/orchestra-back
 cp .env.example .env
 nano .env
 ```
@@ -69,7 +69,7 @@ JWT_SECRET=ваш-длинный-секрет-для-jwt-минимум-32-си�
 В продакшене порт 5432 лучше не публиковать. Создайте переопределение:
 
 ```bash
-cd /opt/orkestr
+cd /opt/orchestra-back
 nano docker-compose.override.yml
 ```
 
@@ -88,7 +88,7 @@ services:
 ## 2. Запуск приложения
 
 ```bash
-cd /opt/orkestr
+cd /opt/orchestra-back
 docker compose up -d --build
 ```
 
@@ -111,7 +111,7 @@ API будет доступен по адресу: **http://213.226.126.196:3000
 
 ```bash
 ssh root@213.226.126.196
-cd /opt/orkestr
+cd /opt/orchestra-back
 git pull
 docker compose up -d --build
 ```
@@ -119,7 +119,7 @@ docker compose up -d --build
 Или одной строкой с вашей машины:
 
 ```bash
-ssh root@213.226.126.196 "cd /opt/orkestr && git pull && docker compose up -d --build"
+ssh root@213.226.126.196 "cd /opt/orchestra-back && git pull && docker compose up -d --build"
 ```
 
 ---
@@ -128,7 +128,7 @@ ssh root@213.226.126.196 "cd /opt/orkestr && git pull && docker compose up -d --
 
 При пуше в `master` можно автоматически деплоить на сервер.
 
-**Важно:** перед первым автодеплоем на сервере обязательно выполните **раздел 1** (первоначальная настройка): установка Docker, **клонирование репозитория в `/opt/orkestr`**, создание `.env`. Без этого job `deploy` упадёт с ошибкой `No such file or directory: /opt/orkestr`.
+**Важно:** перед первым автодеплоем на сервере обязательно выполните **раздел 1** (первоначальная настройка): установка Docker, **клонирование репозитория в `/opt/orchestra-back`**, создание `.env`. Без этого job `deploy` упадёт с ошибкой `No such file or directory: /opt/orchestra-back`.
 
 Настройка CI/CD:
 
@@ -177,4 +177,4 @@ rules:
   - if: $CI_COMMIT_BRANCH == "main"
 ```
 
-и на сервере в `/opt/orkestr` переключитесь на эту ветку: `git checkout main`.
+и на сервере в `/opt/orchestra-back` переключитесь на эту ветку: `git checkout main`.
