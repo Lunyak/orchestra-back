@@ -190,29 +190,30 @@ export class SyncService {
     console.log('[sync] Step upsert result', { id: result.id, title: result.title });
   }
 
-  async getChangesSince(userId: string, lastSyncAt: string | null) {
-    const since = lastSyncAt ? new Date(lastSyncAt) : new Date(0);
+  /** Возвращает полный снимок проектов, сцен и шагов, к которым у пользователя есть доступ (владелец или участник). */
+  async getChangesSince(userId: string, _lastSyncAt: string | null) {
+    const projectAccessWhere = {
+      OR: [
+        { ownerId: userId },
+        { members: { some: { userId } } },
+      ],
+    };
 
     const projects = await this.prisma.project.findMany({
-      where: {
-        ownerId: userId,
-        updatedAt: { gt: since },
-      },
+      where: projectAccessWhere,
     });
 
     const scenes = await this.prisma.scene.findMany({
       where: {
-        project: { ownerId: userId },
-        updatedAt: { gt: since },
+        project: projectAccessWhere,
       },
     });
 
     const steps = await this.prisma.step.findMany({
       where: {
         scene: {
-          project: { ownerId: userId },
+          project: projectAccessWhere,
         },
-        updatedAt: { gt: since },
       },
     });
 

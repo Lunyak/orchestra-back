@@ -146,13 +146,24 @@ export class ProjectsService {
     });
   }
 
-  /** Пригласить в проект по email — пользователь должен быть зарегистрирован. Доступ без проверки подписки. */
-  async inviteByEmail(ownerId: string, slug: string, dto: InviteByEmailDto) {
+  /** Пригласить в проект по email — только владелец. Пользователь с email должен быть зарегистрирован. */
+  async inviteByEmail(userId: string, slug: string, dto: InviteByEmailDto) {
     const project = await this.prisma.project.findFirst({
-      where: { slug, ownerId },
+      where: {
+        slug,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } },
+        ],
+      },
     });
     if (!project) {
-      throw new NotFoundException('Project not found or not owned by user');
+      throw new NotFoundException('Project not found');
+    }
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException(
+        'Только владелец проекта может приглашать участников',
+      );
     }
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.trim().toLowerCase() },
@@ -170,11 +181,19 @@ export class ProjectsService {
     });
   }
 
-  getProjectMembers(ownerId: string, slug: string) {
-    return this.prisma.project.findFirst({
-      where: { slug, ownerId },
+  /** Список участников проекта — только владелец может просматривать. */
+  async getProjectMembers(userId: string, slug: string) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        slug,
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } },
+        ],
+      },
       select: {
         id: true,
+        ownerId: true,
         members: {
           select: {
             id: true,
@@ -184,6 +203,18 @@ export class ProjectsService {
         },
       },
     });
+    if (!project) {
+      return null;
+    }
+    if (project.ownerId !== userId) {
+      throw new ForbiddenException(
+        'Только владелец проекта может просматривать список участников',
+      );
+    }
+    return {
+      id: project.id,
+      members: project.members,
+    };
   }
 }
 

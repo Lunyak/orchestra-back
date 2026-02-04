@@ -118,6 +118,12 @@ body {
   font-size: 0.875rem;
 }
 
+.settings-invite-forbidden {
+  color: #94a3b8;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
 .settings-members {
   margin-top: 1rem;
 }

@@ -132,18 +132,14 @@ export interface ProjectMemberInfo {
   user: { id: string; email: string };
 }
 
-/** Список участников проекта (только владелец видит) */
+/** Список участников проекта. Только владелец видит; при 403 — не владелец. */
 export async function getProjectMembers(
   accessToken: string,
   slug: string
-): Promise<{ id: string; members: ProjectMemberInfo[] } | null> {
-  try {
-    const { data } = await axios.get(
-      `${API_BASE}/projects/${encodeURIComponent(slug)}/members`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    return data;
-  } catch {
-    return null;
-  }
+): Promise<{ id: string; members: ProjectMemberInfo[] }> {
+  const { data } = await axios.get(
+    `${API_BASE}/projects/${encodeURIComponent(slug)}/members`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
 }

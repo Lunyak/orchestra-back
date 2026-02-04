@@ -100,6 +100,7 @@ function AppInner() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberInfo[]>([]);
+  const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
 
   const addStep = () => {
     setSteps((prev) => {
@@ -528,9 +529,21 @@ function AppInner() {
 
   useEffect(() => {
     if (location.pathname !== "/settings" || !accessToken || !projectName) return;
-    getProjectMembers(accessToken, projectName).then((res) => {
-      setProjectMembers(res?.members ?? []);
-    });
+    setIsProjectOwner(null);
+    getProjectMembers(accessToken, projectName)
+      .then((res) => {
+        setProjectMembers(res.members ?? []);
+        setIsProjectOwner(true);
+      })
+      .catch((err: any) => {
+        if (err?.response?.status === 403) {
+          setIsProjectOwner(false);
+          setProjectMembers([]);
+        } else {
+          setIsProjectOwner(true);
+          setProjectMembers([]);
+        }
+      });
   }, [location.pathname, accessToken, projectName]);
 
   const handleInvite = useCallback(async () => {
@@ -541,7 +554,7 @@ function AppInner() {
       await inviteToProject(accessToken, projectName, email);
       setInviteEmail("");
       const res = await getProjectMembers(accessToken, projectName);
-      setProjectMembers(res?.members ?? []);
+      setProjectMembers(res.members ?? []);
     } catch (err: any) {
       const msg =
         err?.response?.data?.message ??
@@ -765,44 +778,52 @@ function AppInner() {
                   <h2>Настройки проекта</h2>
                   <p>Текущий проект: {projectName || "—"}</p>
                   <section className="settings-invite">
-                    <h3>Пригласить в проект</h3>
-                    <p className="settings-invite-hint">
-                      Другие пользователи смогут подсоединиться к проекту после
-                      регистрации. Укажите email зарегистрированного пользователя.
-                    </p>
-                    <div className="settings-invite-row">
-                      <input
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => {
-                          setInviteEmail(e.target.value);
-                          setInviteError(null);
-                        }}
-                        placeholder="email@example.com"
-                        className="settings-invite-input"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleInvite}
-                        disabled={!inviteEmail.trim()}
-                      >
-                        Пригласить
-                      </button>
-                    </div>
-                    {inviteError && (
-                      <div className="settings-invite-error">{inviteError}</div>
-                    )}
-                    {projectMembers.length > 0 && (
-                      <div className="settings-members">
-                        <h4>Участники</h4>
-                        <ul>
-                          {projectMembers.map((m) => (
-                            <li key={m.id}>
-                              {m.user.email} — {m.role}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    {isProjectOwner === false ? (
+                      <p className="settings-invite-forbidden">
+                        Только владелец проекта может приглашать участников и просматривать список.
+                      </p>
+                    ) : (
+                      <>
+                        <h3>Пригласить в проект</h3>
+                        <p className="settings-invite-hint">
+                          Другие пользователи смогут подсоединиться к проекту после
+                          регистрации. Укажите email зарегистрированного пользователя.
+                        </p>
+                        <div className="settings-invite-row">
+                          <input
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => {
+                              setInviteEmail(e.target.value);
+                              setInviteError(null);
+                            }}
+                            placeholder="email@example.com"
+                            className="settings-invite-input"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleInvite}
+                            disabled={!inviteEmail.trim()}
+                          >
+                            Пригласить
+                          </button>
+                        </div>
+                        {inviteError && (
+                          <div className="settings-invite-error">{inviteError}</div>
+                        )}
+                        {projectMembers.length > 0 && (
+                          <div className="settings-members">
+                            <h4>Участники</h4>
+                            <ul>
+                              {projectMembers.map((m) => (
+                                <li key={m.id}>
+                                  {m.user.email} — {m.role}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
                     )}
                   </section>
                   <button type="button" onClick={handleLogout}>

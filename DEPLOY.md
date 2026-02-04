@@ -179,3 +179,55 @@ rules:
 ```
 
 и на сервере в `/opt/orchestra-back` переключитесь на эту ветку: `git checkout main`.
+
+---
+
+## 8. Перенос данных БД с локальной машины на сервер
+
+Параметры БД в проекте: пользователь `orkestr`, пароль `orkestr_secret`, база `dophamin_orkestr`.
+
+### Шаг 1: Дамп локальной БД
+
+**Если PostgreSQL запущен в Docker локально** (в папке проекта выполнен `docker compose up -d`):
+
+```bash
+cd /путь/к/orchestra-servises   # или orchestra-back
+docker compose exec postgres pg_dump -U orkestr -d dophamin_orkestr --no-owner --no-acl -F c -f /tmp/dophamin_backup.dump
+docker compose cp postgres:/tmp/dophamin_backup.dump ./dophamin_backup.dump
+```
+
+**Если PostgreSQL установлен на машине** (не в Docker):
+
+```bash
+pg_dump -U orkestr -d dophamin_orkestr -h localhost -p 5432 --no-owner --no-acl -F c -f dophamin_backup.dump
+```
+
+(Пароль запросит; по умолчанию в docker-compose: `orkestr_secret`.)
+
+### Шаг 2: Скопировать дамп на сервер
+
+```bash
+scp dophamin_backup.dump root@213.226.126.196:/tmp/
+```
+
+(Подставьте свой IP/пользователя, если другой.)
+
+### Шаг 3: Восстановить дамп на сервере
+
+На сервере:
+
+```bash
+cd /opt/orchestra-back
+# Положить дамп в контейнер postgres
+docker cp /tmp/dophamin_backup.dump orkestr-postgres:/tmp/
+
+# Восстановить (очищает текущие данные и заливает из дампа)
+docker compose exec postgres pg_restore -U orkestr -d dophamin_orkestr --no-owner --no-acl --clean --if-exists -v /tmp/dophamin_backup.dump
+
+# Удалить файл из контейнера
+docker compose exec postgres rm /tmp/dophamin_backup.dump
+```
+
+На сервере можно удалить копию дампа: `rm /tmp/dophamin_backup.dump`.
+
+**Важно:** `--clean --if-exists` удаляет существующие объекты перед восстановлением. Если на сервере уже есть пользователи/проекты и нужно только добавить данные без удаления — не используйте `--clean`; тогда возможны конфликты по первичным ключам. Для полной замены БД на сервере данным с локальной машины — команда выше подходит.
