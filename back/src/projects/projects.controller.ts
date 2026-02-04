@@ -12,6 +12,11 @@ export class ProjectsController {
     return this.projectsService.getUserProjects(req.user.userId);
   }
 
+  @Get(':slug/members')
+  getMembers(@Req() req: any, @Param('slug') slug: string) {
+    return this.projectsService.getProjectMembers(req.user.userId, slug);
+  }
+
   @Get(':slug')
   getProject(@Req() req: any, @Param('slug') slug: string) {
     return this.projectsService.getProjectBySlug(req.user.userId, slug);
@@ -29,6 +34,15 @@ export class ProjectsController {
     @Body() body: any,
   ) {
     return this.projectsService.addMember(req.user.userId, slug, body);
+  }
+
+  @Post(':slug/invite')
+  inviteByEmail(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Body() body: { email: string; role?: string },
+  ) {
+    return this.projectsService.inviteByEmail(req.user.userId, slug, body);
   }
 }
 

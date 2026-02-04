@@ -1,0 +1,50 @@
+{
+  "name": "Проект bar",
+  "steps": [
+    {
+      "id": 1,
+      "title": "Шаг 1",
+      "markdown": "жили были\nдед и бабка фывфыв sdfsdf ываыва цукцукцук. тбьтбт nmbkbkj kgkgk. б б бь бь бь б бь бь бь бьборлорп оплоплнпло лплплнп лгн пгн цуа цуацуац уацуацуа sdfsdfsdf",
+      "requisites": [],
+      "playMarkdown": "jfgcjgcjfg"
+    },
+    {
+      "id": 2,
+      "title": "Шаг 2",
+      "markdown": "ываыва",
+      "requisites": []
+    },
+    {
+      "id": 3,
+      "title": "Шаг 3",
+      "markdown": "123",
+      "requisites": []
+    }
+  ],
+  "playlist": [
+    {
+      "id": 1,
+      "title": "на звонок спектакля",
+      "file": "image-1769632715337.mp3",
+      "fadeMs": 500
+    }
+  ],
+  "sounds": [],
+  "lightChannels": ["", "", "", "", "", "", "", "", ""],
+  "theaterLayout": {
+    "hallWidth": 9,
+    "hallDepth": 6,
+    "wallHeight": 6,
+    "audienceStartZ": 3,
+    "seatRows": 4,
+    "seatsPerRow": 7,
+    "seatSpacing": 1.1,
+    "rowSpacing": 0.8,
+    "rowRise": 0.25,
+    "aisleWidth": 1.2,
+    "aisleCenterX": 0,
+    "doorWidth": 1.2,
+    "doorHeight": 2.2,
+    "doorZ": -6
+  }
+}

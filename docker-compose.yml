@@ -33,6 +33,19 @@ services:
       postgres:
         condition: service_healthy
 
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: orkestr-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - back
+
   dozzle:
     image: amir20/dozzle:latest
     container_name: orkestr-dozzle

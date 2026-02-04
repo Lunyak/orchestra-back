@@ -12,6 +12,11 @@ export interface AddMemberDto {
   role?: string;
 }
 
+export interface InviteByEmailDto {
+  email: string;
+  role?: string;
+}
+
 @Injectable()
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -137,6 +142,46 @@ export class ProjectsService {
         projectId: project.id,
         userId: dto.userId,
         role,
+      },
+    });
+  }
+
+  /** Пригласить в проект по email — пользователь должен быть зарегистрирован. Доступ без проверки подписки. */
+  async inviteByEmail(ownerId: string, slug: string, dto: InviteByEmailDto) {
+    const project = await this.prisma.project.findFirst({
+      where: { slug, ownerId },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found or not owned by user');
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email.trim().toLowerCase() },
+    });
+    if (!user) {
+      throw new NotFoundException('Пользователь с таким email не найден');
+    }
+    const role = dto.role ?? 'editor';
+    return this.prisma.projectMember.create({
+      data: {
+        projectId: project.id,
+        userId: user.id,
+        role,
+      },
+    });
+  }
+
+  getProjectMembers(ownerId: string, slug: string) {
+    return this.prisma.project.findFirst({
+      where: { slug, ownerId },
+      select: {
+        id: true,
+        members: {
+          select: {
+            id: true,
+            role: true,
+            user: { select: { id: true, email: true } },
+          },
+        },
       },
     });
   }
