@@ -30,10 +30,10 @@ interface HeaderPlayerProps {
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
-  projectName,
-  sceneName,
+  projectName: _projectName,
+  sceneName: _sceneName,
   sounds = [],
-  onSoundsChange,
+  onSoundsChange: _onSoundsChange,
 }) => {
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
@@ -65,28 +65,6 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       })),
     );
   }, [sounds]);
-
-  const removeTrack = (track: LoadedTrack) => {
-    const audio = audioRefs.current[track.id];
-    if (audio) {
-      audio.pause();
-      audio.removeAttribute("src");
-      audio.load();
-    }
-    const nextTracks = tracks.filter((item) => item.id !== track.id);
-    setTracks(nextTracks);
-    if (onSoundsChange) {
-      onSoundsChange(nextTracks.map((t) => ({
-        id: t.id,
-        title: t.name,
-        file: t.url,
-        icon: t.icon,
-        volume: t.volume,
-        fadeMs: t.fadeMs,
-        loop: t.loop,
-      })));
-    }
-  };
 
   const clearFadeTimer = (trackId: number) => {
     const timer = fadeTimers.current[trackId];

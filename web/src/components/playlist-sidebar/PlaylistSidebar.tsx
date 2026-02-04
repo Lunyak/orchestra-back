@@ -18,9 +18,9 @@ interface PlaylistSidebarProps {
 }
 
 export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
-  projectName,
+  projectName: _projectName,
   tracks = [],
-  sceneName = "script",
+  sceneName: _sceneName = "script",
   onRegisterPlayHandler,
   onPlaylistChange,
 }) => {

@@ -321,11 +321,7 @@ function AppInner() {
     try {
       const projectId =
         localStorage.getItem(`projectId:${projectName}`) ??
-        (await ensureRemoteProject(
-          accessToken,
-          projectName,
-          `Проект ${projectName}`,
-        ));
+        (await ensureRemoteProject(accessToken));
       if (!projectId) {
         console.error("deleteProject failed: projectId not found");
         return;
