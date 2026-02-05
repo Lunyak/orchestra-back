@@ -18,6 +18,11 @@ export class AuthController {
     return this.authService.login(dto.email, dto.password);
   }
 
+  @Post('refresh')
+  refresh(@Body() body: { refreshToken: string }) {
+    return this.authService.refresh(body.refreshToken);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Req() req: any) {

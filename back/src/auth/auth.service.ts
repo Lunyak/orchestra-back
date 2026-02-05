@@ -1,4 +1,5 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -8,6 +9,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(email: string, password: string) {
@@ -37,8 +39,48 @@ export class AuthService {
 
   private async buildTokens(userId: string, email: string) {
     const payload = { sub: userId, email };
+
     const accessToken = await this.jwtService.signAsync(payload);
-    return { accessToken };
+
+    const refreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET') ??
+      this.configService.get<string>('JWT_SECRET');
+    const refreshExpires =
+      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ?? '30d';
+
+    const refreshToken = await this.jwtService.signAsync(payload, {
+      secret: refreshSecret,
+      expiresIn: refreshExpires,
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  async refresh(refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token provided');
+    }
+    try {
+      const refreshSecret =
+        this.configService.get<string>('JWT_REFRESH_SECRET') ??
+        this.configService.get<string>('JWT_SECRET');
+
+      const payload = await this.jwtService.verifyAsync<{
+        sub: string;
+        email: string;
+      }>(refreshToken, {
+        secret: refreshSecret,
+      });
+
+      const user = await this.usersService.findById(payload.sub);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      return this.buildTokens(user.id, user.email);
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
   }
 }
 

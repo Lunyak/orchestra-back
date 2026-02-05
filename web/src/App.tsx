@@ -516,6 +516,7 @@ function AppInner() {
   const handleLogout = useCallback(() => {
     setAccessToken(null);
     localStorage.removeItem("accessToken");
+    localStorage.removeItem("refreshToken");
   }, []);
 
   useEffect(() => {
@@ -626,6 +627,7 @@ function AppInner() {
         : await login(email, password);
       setAccessToken(res.accessToken);
       localStorage.setItem("accessToken", res.accessToken);
+      localStorage.setItem("refreshToken", res.refreshToken);
       setAuthPassword("");
       void syncFromServer(res.accessToken);
     } catch (error: any) {
