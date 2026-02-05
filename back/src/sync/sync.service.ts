@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncChangeDto } from './dto/sync-change.dto';
 
 @Injectable()
 export class SyncService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsGateway,
+  ) {}
 
   async applyChanges(userId: string, changes: SyncChangeDto[]) {
     // eslint-disable-next-line no-console
@@ -125,6 +129,10 @@ export class SyncService {
 
     // eslint-disable-next-line no-console
     console.log('[sync] Scene upsert result', { id: result.id, name: result.name });
+
+    if (payload.projectId) {
+      this.notifications.notifySceneUpdated(payload.projectId);
+    }
   }
 
   private async applyStepChange(

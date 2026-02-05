@@ -8,6 +8,7 @@ import {
   type ComponentType,
 } from "react";
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { io, type Socket } from "socket.io-client";
 import "./App.css";
 import { Header } from "./components/header/Header";
 import { type HeaderSound } from "./components/header/HeaderPlayer";
@@ -103,6 +104,7 @@ function AppInner() {
   const [projectMembers, setProjectMembers] = useState<ProjectMemberInfo[]>([]);
   const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
   const initialSyncRef = useRef(false);
+  const socketRef = useRef<Socket | null>(null);
 
   const addStep = () => {
     setSteps((prev) => {
@@ -265,6 +267,43 @@ function AppInner() {
     if (!accessToken) return;
     void loadProjects();
   }, [accessToken, loadProjects]);
+
+  // WebSocket-подписка: при обновлении сцены на сервере (в т.ч. с десктопа)
+  // автоматически тянем свежие данные через syncFromServer.
+  useEffect(() => {
+    if (!accessToken || !projectName) return;
+
+    let cancelled = false;
+
+    const setup = async () => {
+      const projectId = await ensureRemoteProject();
+      if (!projectId || cancelled) return;
+
+      const socket = io("http://213.226.126.196:3000", {
+        transports: ["websocket"],
+      });
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        socket.emit("join-project", { projectId });
+      });
+
+      socket.on("scene-updated", (payload: { projectId: string }) => {
+        if (!payload?.projectId || payload.projectId !== projectId) return;
+        void syncFromServer();
+      });
+    };
+
+    void setup();
+
+    return () => {
+      cancelled = true;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+    };
+  }, [accessToken, projectName, ensureRemoteProject, syncFromServer]);
 
   // Один автоматический pull после появления accessToken и выбранного проекта
   useEffect(() => {

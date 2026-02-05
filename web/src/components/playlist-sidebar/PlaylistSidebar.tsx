@@ -37,6 +37,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const [duration, setDuration] = useState(0);
   const [isCompact, setIsCompact] = useState(true);
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
+  const [loadingTrackId, setLoadingTrackId] = useState<number | null>(null);
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
   const [activeAudioKey, setActiveAudioKey] = useState<"a" | "b">("a");
@@ -80,6 +81,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     const handleLoaded = () => {
       setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
       setProgress(audio.currentTime || 0);
+      setLoadingTrackId(null);
     };
     const handleEnded = () => {
       setProgress(0);
@@ -239,6 +241,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     if (inactiveAudio.src !== src) {
       inactiveAudio.src = src;
     }
+    setLoadingTrackId(track.id);
     inactiveAudio.muted = false;
     inactiveAudio.currentTime = 0;
     inactiveAudio.loop = track.loop ?? false;
@@ -252,6 +255,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     } catch (error) {
       if (requestId !== playRequestId.current) return;
       console.error("Ошибка воспроизведения:", error);
+      setLoadingTrackId(null);
     }
   }, [
     activeAudioKey,
@@ -568,8 +572,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
                     }
                     disabled={!track.remoteUrl}
                   >
-                    {track.title}
-                    {!track.remoteUrl && " ⏳"}
+                    <span className="playlist-track-title">
+                      {track.title}
+                      {!track.remoteUrl && " ⏳"}
+                    </span>
+                    {loadingTrackId === track.id && (
+                      <span className="playlist-track-loading-bar" />
+                    )}
                   </button>
                   {!isCompact && (
                     <div className="playlist-track-actions">
