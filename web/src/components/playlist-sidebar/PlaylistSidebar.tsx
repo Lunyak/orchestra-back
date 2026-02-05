@@ -7,6 +7,8 @@ export interface PlaylistTrack {
   file: string;
   fadeMs?: number;
   loop?: boolean;
+  /** URL на сервере (MinIO), если трек уже выгружен с десктопа */
+  remoteUrl?: string;
 }
 
 interface PlaylistSidebarProps {
@@ -112,7 +114,12 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
   }, [activeAudioKey, currentTrack]);
 
-  const resolveTrackSrc = useCallback((file: string) => file, []);
+  const resolveTrackSrc = useCallback((file: string, remoteUrl?: string) => {
+    // Если трек уже загружен на сервер с десктопа – используем прямой URL
+    if (remoteUrl) return remoteUrl;
+    // Fallback: локальный путь (старые проекты или когда remoteUrl ещё нет)
+    return file;
+  }, []);
 
   const clearFadeTimer = useCallback((key: "a" | "b") => {
     const timer = fadeTimers.current[key];
@@ -177,7 +184,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
     if (isSameTrack && activeAudio.paused) {
       clearFadeTimer(activeAudioKey);
-      const src = resolveTrackSrc(track.file);
+      const src = resolveTrackSrc(track.file, track.remoteUrl);
       if (activeAudio.src !== src) {
         activeAudio.src = src;
       }
@@ -214,7 +221,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       clearFadeTimer(activeAudioKey);
     }
 
-    const src = resolveTrackSrc(track.file);
+    const src = resolveTrackSrc(track.file, track.remoteUrl);
     if (inactiveAudio.src !== src) {
       inactiveAudio.src = src;
     }
