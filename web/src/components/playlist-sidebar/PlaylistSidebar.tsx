@@ -159,6 +159,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [clearFadeTimer]);
 
   const playTrack = useCallback(async (track: PlaylistTrack) => {
+    if (!track.remoteUrl) {
+      console.warn(
+        "[PlaylistSidebar] Нельзя проиграть трек без remoteUrl. Загрузите его с десктопа.",
+        { id: track.id, title: track.title, file: track.file },
+      );
+      return;
+    }
     const activeAudio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
     const inactiveAudio = activeAudioKey === "a" ? audioRefB.current : audioRefA.current;
     const inactiveKey = activeAudioKey === "a" ? "b" : "a";
@@ -222,6 +229,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
 
     const src = resolveTrackSrc(track.file, track.remoteUrl);
+    console.log("[PlaylistSidebar] playTrack src", {
+      id: track.id,
+      title: track.title,
+      file: track.file,
+      remoteUrl: track.remoteUrl,
+      src,
+    });
     if (inactiveAudio.src !== src) {
       inactiveAudio.src = src;
     }
@@ -547,9 +561,15 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
                   <button
                     className="playlist-track-btn"
                     onClick={() => playTrack(track)}
-                    title={track.title}
+                    title={
+                      track.remoteUrl
+                        ? track.title
+                        : `${track.title} (нужно загрузить с десктопа)`
+                    }
+                    disabled={!track.remoteUrl}
                   >
                     {track.title}
+                    {!track.remoteUrl && " ⏳"}
                   </button>
                   {!isCompact && (
                     <div className="playlist-track-actions">
