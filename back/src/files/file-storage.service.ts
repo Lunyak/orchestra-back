@@ -51,7 +51,16 @@ export class FileStorageService {
       }),
     );
 
-    const url = await this.getSignedUrl(key);
+    let url = await this.getSignedUrl(key);
+
+    // Подписанный URL приходит с внутренним hostname (minio:9000).
+    // Для браузера снаружи подменяем его на внешний адрес сервера, если задан.
+    const publicHost =
+      this.config.get<string>('S3_PUBLIC_HOST') ?? 'http://213.226.126.196:9000';
+    if (publicHost) {
+      url = url.replace('http://minio:9000', publicHost.replace(/\/+$/, ''));
+    }
+
     return { bucket: this.bucket, key, url };
   }
 
