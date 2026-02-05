@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { Response } from 'express';
+import type { Response } from 'express';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
