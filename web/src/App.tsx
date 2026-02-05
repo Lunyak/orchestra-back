@@ -102,6 +102,7 @@ function AppInner() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberInfo[]>([]);
   const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
+  const initialSyncRef = useRef(false);
 
   const addStep = () => {
     setSteps((prev) => {
@@ -261,6 +262,14 @@ function AppInner() {
     if (!accessToken) return;
     void loadProjects();
   }, [accessToken, loadProjects]);
+
+  // Один автоматический pull после появления accessToken и выбранного проекта
+  useEffect(() => {
+    if (!accessToken || !projectName) return;
+    if (initialSyncRef.current) return;
+    initialSyncRef.current = true;
+    void syncFromServer();
+  }, [accessToken, projectName, syncFromServer]);
 
   const handleProjectChange = useCallback(
     (name: string) => {
