@@ -205,6 +205,8 @@ function AppInner() {
     }
   }, [accessToken, projectName]);
 
+  // lastSyncAt намеренно не включаем в зависимости, чтобы избежать бесконечного цикла pull
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const syncFromServer = useCallback(async (token?: string | null) => {
     const tokenToUse = token ?? accessToken;
     if (!tokenToUse || !projectName) return;
@@ -260,11 +262,14 @@ function AppInner() {
     void loadProjects();
   }, [accessToken, loadProjects]);
 
-  // Автосинхрон при смене проекта и наличии токена
-  useEffect(() => {
-    if (!accessToken || !projectName) return;
-    void syncFromServer();
-  }, [accessToken, projectName, syncFromServer]);
+  const handleProjectChange = useCallback(
+    (name: string) => {
+      setProjectName(name);
+      if (!accessToken) return;
+      void syncFromServer();
+    },
+    [accessToken, syncFromServer],
+  );
 
   useEffect(() => {
     if (!projectName) return;
@@ -699,7 +704,7 @@ function AppInner() {
               projectName={projectName}
               newProjectName={newProjectName}
               view={activeView}
-              onProjectChange={setProjectName}
+              onProjectChange={handleProjectChange}
               onNewProjectNameChange={setNewProjectName}
               onCreateProject={handleCreateProject}
               onDeleteProject={handleDeleteProject}
