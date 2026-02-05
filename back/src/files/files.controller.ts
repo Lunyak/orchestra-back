@@ -23,7 +23,8 @@ export class FilesController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
   async upload(
-    @UploadedFile() file: Express.Multer.File,
+    // Тип Multer в @types/express@5 отсутствует, поэтому используем any
+    @UploadedFile() file: any,
     @Body() body: UploadFileDto,
   ) {
     if (!file) {
