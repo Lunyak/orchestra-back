@@ -96,6 +96,9 @@ function AppInner() {
   const selectedStepIdRef = useRef<number | null>(null);
   const restoredStepRef = useRef(false);
   const lightPlotSaveTimerRef = useRef<number | null>(null);
+  /** Версия сцены с сервера (updatedAt). Пушим только если есть локальные правки. */
+  const lastKnownServerSceneVersionRef = useRef<string | null>(null);
+  const hasLocalEditsRef = useRef(false);
   const [lightChannels, setLightChannels] = useState<string[]>(
     Array.from({ length: 9 }, () => ""),
   );
@@ -107,6 +110,7 @@ function AppInner() {
   const socketRef = useRef<Socket | null>(null);
 
   const addStep = () => {
+    hasLocalEditsRef.current = true;
     setSteps((prev) => {
       const nextId = prev.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
       const insertIndex = Math.min(currentPage + 1, prev.length);
@@ -131,6 +135,7 @@ function AppInner() {
   };
 
   const deleteStep = (id: number) => {
+    hasLocalEditsRef.current = true;
     const nextSteps = steps.filter((step) => step.id !== id);
     if (nextSteps.length === 0) {
       const fallback = { id: 1, title: "Новый шаг", markdown: "" };
@@ -145,6 +150,7 @@ function AppInner() {
   const reorderSteps = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
     if (fromIndex < 0 || toIndex < 0) return;
+    hasLocalEditsRef.current = true;
     setSteps((prev) => {
       if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
       const next = [...prev];
@@ -232,13 +238,16 @@ function AppInner() {
       const project = projects.find((p) => p.slug === projectName);
       if (!project) return;
 
-      const scene = scenes.find((s: any) => s.projectId === project.id);
+      const scene = scenes.find(
+        (s: { projectId: string; updatedAt?: string | Date; rawJson?: unknown }) =>
+          s.projectId === project.id
+      );
       if (!scene) return;
 
-      const raw = (scene.rawJson as any) ?? {};
+      const raw = (scene.rawJson as Record<string, unknown>) ?? {};
       setSceneData(raw || null);
-      setTheaterLayout(raw.theaterLayout || DEFAULT_THEATER_LAYOUT);
-      setSteps(raw.steps || []);
+      setTheaterLayout((raw.theaterLayout as TheaterLayout) || DEFAULT_THEATER_LAYOUT);
+      setSteps((raw.steps as ScriptStep[]) || []);
       const rawLightChannels =
         Array.isArray(raw.lightChannels) && raw.lightChannels.length > 0
           ? raw.lightChannels
@@ -253,11 +262,18 @@ function AppInner() {
       setLastSyncAt(now);
       localStorage.setItem("lastSyncAt", now);
       localStorage.setItem(perProjectKey, now);
-    } catch (error: any) {
-      if (error?.response?.status === 401) {
-        setAccessToken(null);
-        localStorage.removeItem("accessToken");
-        return;
+
+      lastKnownServerSceneVersionRef.current =
+        scene.updatedAt != null ? String(scene.updatedAt) : null;
+      hasLocalEditsRef.current = false;
+    } catch (error: unknown) {
+      if (error && typeof error === "object" && "response" in error) {
+        const err = error as { response?: { status?: number } };
+        if (err.response?.status === 401) {
+          setAccessToken(null);
+          localStorage.removeItem("accessToken");
+          return;
+        }
       }
       console.error("[sync] pull failed:", error);
     }
@@ -551,6 +567,7 @@ function AppInner() {
           if (changes.length > 0) {
             try {
               await syncPush(token, changes);
+              hasLocalEditsRef.current = false;
             } catch (error) {
               console.error("[sync] push failed:", error);
             }
@@ -611,6 +628,7 @@ function AppInner() {
       return;
     }
     if (!isSceneReady || steps.length === 0) return;
+    if (!hasLocalEditsRef.current) return;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
     }
@@ -817,7 +835,10 @@ function AppInner() {
               title={sceneData?.name}
               steps={steps}
               currentPage={currentPage}
-              onStepsChange={setSteps}
+              onStepsChange={(next) => {
+                hasLocalEditsRef.current = true;
+                setSteps(next);
+              }}
               isEditing={isEditing}
               onTrackLinkClick={handleTrackLinkClick}
               showRequisites={showRequisites}
@@ -826,7 +847,10 @@ function AppInner() {
               canSave={isSceneReady}
               playlist={sceneData?.playlist || []}
               lightChannels={lightChannels}
-              onLightChannelsChange={setLightChannels}
+              onLightChannelsChange={(next) => {
+                hasLocalEditsRef.current = true;
+                setLightChannels(next);
+              }}
             />
           </Suspense>
         </main>
