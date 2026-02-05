@@ -4,7 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { FilesModule } from './files/files.module';
-import { NotificationsGateway } from './notifications/notifications.gateway';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SyncModule } from './sync/sync.module';
@@ -18,10 +18,11 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     ProjectsModule,
     SyncModule,
+    NotificationsModule,
     FilesModule,
   ],
   controllers: [AppController],
-  providers: [AppService, NotificationsGateway],
+  providers: [AppService],
 })
 export class AppModule {}
 
