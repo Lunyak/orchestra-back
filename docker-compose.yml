@@ -28,10 +28,9 @@ services:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       # S3/MinIO storage (variant A)
-      # Внутри docker-сети backend ходит к MinIO по имени сервиса.
-      S3_ENDPOINT: http://minio:9000
-      # Публичный URL MinIO для браузера
-      S3_PUBLIC_BASE_URL: http://213.226.126.196:9000
+      # Backend и браузер ходят к MinIO по одному и тому же адресу,
+      # чтобы пресайнд-URL работали без переподписывания.
+      S3_ENDPOINT: http://213.226.126.196:9000
       S3_REGION: us-east-1
       S3_ACCESS_KEY: orchestra
       S3_SECRET_KEY: orchestra_secret
