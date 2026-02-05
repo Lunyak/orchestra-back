@@ -39,6 +39,11 @@ export interface ProjectSummary {
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
 
+/** Адрес бекенда, к которому идут запросы (логин, sync). Чтобы показывать его в UI. */
+export function getApiBaseUrl(): string {
+  return API_BASE;
+}
+
 export async function syncPush(accessToken: string, changes: SyncChange[]) {
   console.log("[sync/api] syncPush called", { changesCount: changes.length });
   if (!changes.length) {

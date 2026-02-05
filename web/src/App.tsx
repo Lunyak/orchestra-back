@@ -20,6 +20,7 @@ import {
 import {
   ensureProject,
   fetchProjects,
+  getApiBaseUrl,
   getProjectMembers,
   inviteToProject,
   syncPull,
@@ -252,7 +253,7 @@ function AppInner() {
       }
       console.error("[sync] pull failed:", error);
     }
-  }, [accessToken, ensureRemoteProject, lastSyncAt, projectName, setAccessToken]);
+  }, [accessToken, ensureRemoteProject, projectName, setAccessToken]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -496,21 +497,6 @@ function AppInner() {
           if (changes.length > 0) {
             try {
               await syncPush(token, changes);
-              setSceneData((prev) =>
-                prev
-                  ? {
-                    ...prev,
-                    steps,
-                    theaterLayout,
-                    lightChannels,
-                  }
-                  : {
-                    name: payload.name,
-                    steps,
-                    theaterLayout,
-                    lightChannels,
-                  },
-              );
             } catch (error) {
               console.error("[sync] push failed:", error);
             }
@@ -648,6 +634,9 @@ function AppInner() {
       <div className="app-layout login-layout">
         <form className="login-form" onSubmit={handleAuthSubmit}>
           <h1>{isRegisterMode ? "Регистрация" : "Вход"}</h1>
+          <p className="login-form-subtitle">
+            Войди в аккаунт, чтобы работать с проектами и сценарием онлайн.
+          </p>
           <label>
             Email
             <input
@@ -679,6 +668,9 @@ function AppInner() {
           >
             {isRegisterMode ? "У меня уже есть аккаунт" : "Создать новый аккаунт"}
           </button>
+          <p className="login-form-footer">
+            Сервер API: <code>{getApiBaseUrl()}</code>
+          </p>
         </form>
       </div>
     );
