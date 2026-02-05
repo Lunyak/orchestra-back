@@ -1,3 +1,4 @@
+import { type AxiosError } from "axios";
 import {
   lazy,
   Suspense,
@@ -22,6 +23,7 @@ import {
   ensureProject,
   fetchProjects,
   getApiBaseUrl,
+  getPlayUrl,
   getProjectMembers,
   inviteToProject,
   syncPull,
@@ -482,7 +484,7 @@ function AppInner() {
       const baseScene = sceneData ?? {};
       const fullPayload = {
         ...baseScene,
-        name: (baseScene as any).name || `Сцена ${projectName}`,
+        name: baseScene.name || `Сцена ${projectName}`,
         steps,
         theaterLayout,
         lightChannels,
@@ -593,8 +595,9 @@ function AppInner() {
         setProjectMembers(res.members ?? []);
         setIsProjectOwner(true);
       })
-      .catch((err: any) => {
-        if (err?.response?.status === 403) {
+      .catch((err: unknown) => {
+        const axiosError = err as AxiosError<{ message?: string }>;
+        if (axiosError?.response?.status === 403) {
           setIsProjectOwner(false);
           setProjectMembers([]);
         } else {
@@ -613,10 +616,11 @@ function AppInner() {
       setInviteEmail("");
       const res = await getProjectMembers(accessToken, projectName);
       setProjectMembers(res.members ?? []);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const axiosError = err as AxiosError<{ message?: string }>;
       const msg =
-        err?.response?.data?.message ??
-          err?.response?.status === 404
+        axiosError?.response?.data?.message ??
+          axiosError?.response?.status === 404
           ? "Пользователь с таким email не найден"
           : "Не удалось пригласить";
       setInviteError(msg);
@@ -646,12 +650,24 @@ function AppInner() {
   const isSettingsRoute = location.pathname === "/settings";
   const shouldShowStepsSidebar = !isSettingsRoute && activeView === "script";
 
+  const handleGetPlayUrl = useCallback(async (key: string): Promise<string | null> => {
+    const token = accessToken || localStorage.getItem("accessToken");
+    if (!token) return null;
+    try {
+      const { url } = await getPlayUrl(token, key);
+      return url;
+    } catch {
+      return null;
+    }
+  }, [accessToken]);
+
   const playlistNode = showPlaylistSidebar && !isSettingsRoute ? (
     <PlaylistSidebar
       projectName={projectName || "fools"}
       tracks={sceneData?.playlist || []}
       sceneName="script"
       onRegisterPlayHandler={registerPlaylistPlay}
+      onGetPlayUrl={handleGetPlayUrl}
       onPlaylistChange={async (next) => {
         // 1. Обновляем локальное состояние сцены
         setSceneData((prev) =>
@@ -734,9 +750,10 @@ function AppInner() {
       localStorage.setItem("refreshToken", res.refreshToken);
       setAuthPassword("");
       void syncFromServer(res.accessToken);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Auth failed:", error);
-      setAuthError(error?.response?.data?.message ?? "Ошибка");
+      const axiosError = error as AxiosError<{ message?: string }>;
+      setAuthError(axiosError?.response?.data?.message ?? "Ошибка");
     }
   };
 

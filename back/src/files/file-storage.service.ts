@@ -1,5 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -13,10 +12,17 @@ export interface StoredFileInfo {
 export class FileStorageService {
   private readonly s3: S3Client;
   private readonly bucket: string;
+  /** Базовый URL для ссылок (тот, по которому к MinIO ходят из браузера). */
+  private readonly publicBaseUrl: string;
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
     const endpoint =
       this.config.get<string>('S3_ENDPOINT') ?? 'http://localhost:9000';
+    this.publicBaseUrl = (
+      this.config.get<string>('S3_PUBLIC_URL') ??
+      this.config.get<string>('MINIO_PUBLIC_URL') ??
+      endpoint
+    ).replace(/\/$/, '');
     const region = this.config.get<string>('S3_REGION') ?? 'us-east-1';
     const accessKeyId =
       this.config.get<string>('S3_ACCESS_KEY') ?? 'orchestra';
@@ -32,7 +38,12 @@ export class FileStorageService {
     });
   }
 
-  /** Сохранить файл в S3/MinIO и вернуть ключ + временную ссылку для доступа. */
+  /** Постоянная ссылка на объект. Бакет нужно открыть на чтение через MinIO CLI (mc anonymous set download). */
+  getPublicUrl(key: string): string {
+    return `${this.publicBaseUrl}/${this.bucket}/${key}`;
+  }
+
+  /** Сохранить файл в S3/MinIO и вернуть постоянную ссылку (без срока действия). */
   async uploadObject(params: {
     projectId: string;
     type: 'playlist' | 'image' | 'sound' | 'model';
@@ -51,17 +62,8 @@ export class FileStorageService {
       }),
     );
 
-    const url = await this.getSignedUrl(key);
+    const url = this.getPublicUrl(key);
     return { bucket: this.bucket, key, url };
-  }
-
-  /** Получить временную (signed) ссылку на уже сохранённый объект. */
-  async getSignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-    });
-    return getSignedUrl(this.s3, command, { expiresIn: expiresInSeconds });
   }
 
   private buildKey(params: { projectId: string; type: string; fileName: string }): string {

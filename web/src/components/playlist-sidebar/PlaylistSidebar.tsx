@@ -9,6 +9,8 @@ export interface PlaylistTrack {
   loop?: boolean;
   /** URL на сервере (MinIO), если трек уже выгружен с десктопа */
   remoteUrl?: string;
+  /** Ключ в хранилище — для запроса свежей ссылки, когда remoteUrl истёк */
+  remoteKey?: string;
 }
 
 interface PlaylistSidebarProps {
@@ -17,14 +19,15 @@ interface PlaylistSidebarProps {
   sceneName?: string;
   onRegisterPlayHandler?: (handler: (trackId: number) => void) => void;
   onPlaylistChange?: (tracks: PlaylistTrack[]) => void;
+  /** Запросить свежую ссылку для воспроизведения (когда старая истекла) */
+  onGetPlayUrl?: (key: string) => Promise<string | null>;
 }
 
 export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
-  projectName: _projectName,
   tracks = [],
-  sceneName: _sceneName = "script",
   onRegisterPlayHandler,
   onPlaylistChange,
+  onGetPlayUrl,
 }) => {
   const [currentTrack, setCurrentTrack] = useState<PlaylistTrack | null>(null);
   const [playlist, setPlaylist] = useState<PlaylistTrack[]>(tracks);
@@ -160,10 +163,14 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }, 30);
   }, [clearFadeTimer]);
 
+  const isNotSupportedError = (err: unknown) =>
+    err instanceof DOMException && err.name === "NotSupportedError" ||
+    (err instanceof Error && /no supported source|Failed to load/i.test(err.message));
+
   const playTrack = useCallback(async (track: PlaylistTrack) => {
-    if (!track.remoteUrl) {
+    if (!track.remoteUrl && !track.file) {
       console.warn(
-        "[PlaylistSidebar] Нельзя проиграть трек без remoteUrl. Загрузите его с десктопа.",
+        "[PlaylistSidebar] Нельзя проиграть трек без remoteUrl или file.",
         { id: track.id, title: track.title, file: track.file },
       );
       return;
@@ -205,7 +212,24 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         setIsPlaying(true);
       } catch (error) {
         if (requestId !== playRequestId.current) return;
-        console.error("Ошибка воспроизведения:", error);
+        if (isNotSupportedError(error) && track.remoteKey && onGetPlayUrl) {
+          const freshUrl = await onGetPlayUrl(track.remoteKey);
+          if (freshUrl && requestId === playRequestId.current) {
+            activeAudio.src = freshUrl;
+            try {
+              await activeAudio.play();
+              if (requestId !== playRequestId.current) return;
+              runFade(activeAudio, activeAudioKey, activeAudio.volume, volume, fadeMs);
+              setIsPlaying(true);
+            } catch (retryErr) {
+              console.error("Ошибка воспроизведения (повтор):", retryErr);
+            }
+          } else {
+            console.error("Ошибка воспроизведения:", error);
+          }
+        } else {
+          console.error("Ошибка воспроизведения:", error);
+        }
       }
       return;
     }
@@ -254,7 +278,25 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       setIsPlaying(true);
     } catch (error) {
       if (requestId !== playRequestId.current) return;
-      console.error("Ошибка воспроизведения:", error);
+      if (isNotSupportedError(error) && track.remoteKey && onGetPlayUrl) {
+        const freshUrl = await onGetPlayUrl(track.remoteKey);
+        if (freshUrl && requestId === playRequestId.current) {
+          inactiveAudio.src = freshUrl;
+          try {
+            await inactiveAudio.play();
+            if (requestId !== playRequestId.current) return;
+            setActiveAudioKey(inactiveKey);
+            runFade(inactiveAudio, inactiveKey, 0, volume, fadeMs);
+            setIsPlaying(true);
+          } catch (retryErr) {
+            console.error("Ошибка воспроизведения (повтор):", retryErr);
+          }
+        } else {
+          console.error("Ошибка воспроизведения:", error);
+        }
+      } else {
+        console.error("Ошибка воспроизведения:", error);
+      }
       setLoadingTrackId(null);
     }
   }, [
@@ -262,6 +304,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     clearFadeTimer,
     crossfadeEnabled,
     currentTrack,
+    onGetPlayUrl,
     resolveTrackSrc,
     runFade,
     volume,

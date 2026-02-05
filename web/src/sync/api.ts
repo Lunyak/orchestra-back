@@ -222,3 +222,15 @@ export async function getProjectMembers(
   );
   return data;
 }
+
+/** Свежая подписанная ссылка для воспроизведения (когда старая истекла). */
+export async function getPlayUrl(
+  accessToken: string,
+  key: string
+): Promise<{ url: string }> {
+  const { data } = await api.get<{ url: string }>("/files/play-url", {
+    params: { key },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}

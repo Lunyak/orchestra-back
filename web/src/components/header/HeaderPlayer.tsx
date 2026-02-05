@@ -30,10 +30,7 @@ interface HeaderPlayerProps {
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
-  projectName: _projectName,
-  sceneName: _sceneName,
   sounds = [],
-  onSoundsChange: _onSoundsChange,
 }) => {
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
