@@ -13,7 +13,6 @@ export interface StoredFileInfo {
 export class FileStorageService {
   private readonly s3: S3Client;
   private readonly bucket: string;
-  private readonly publicBaseUrl: string | null;
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
     const endpoint =
@@ -24,9 +23,6 @@ export class FileStorageService {
     const secretAccessKey =
       this.config.get<string>('S3_SECRET_KEY') ?? 'orchestra_secret';
     this.bucket = this.config.get<string>('S3_BUCKET') ?? 'orchestra-media';
-    // Публичный базовый URL, по которому браузер сможет достучаться до MinIO
-    this.publicBaseUrl =
-      this.config.get<string>('S3_PUBLIC_BASE_URL') ?? null;
 
     this.s3 = new S3Client({
       endpoint,
@@ -55,14 +51,7 @@ export class FileStorageService {
       }),
     );
 
-    let url: string;
-    if (this.publicBaseUrl) {
-      const base = this.publicBaseUrl.replace(/\/+$/, '');
-      url = `${base}/${this.bucket}/${key}`;
-    } else {
-      url = await this.getSignedUrl(key);
-    }
-
+    const url = await this.getSignedUrl(key);
     return { bucket: this.bucket, key, url };
   }
 

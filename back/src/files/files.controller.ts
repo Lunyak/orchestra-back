@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Post,
+    Query,
     UploadedFile,
     UseGuards,
     UseInterceptors,
@@ -26,14 +27,21 @@ export class FilesController {
     // Тип Multer в @types/express@5 отсутствует, поэтому используем any
     @UploadedFile() file: any,
     @Body() body: UploadFileDto,
+    @Query() query: Partial<UploadFileDto>,
   ) {
     if (!file) {
       throw new Error('Файл не передан');
     }
 
+    const projectId = body?.projectId ?? query?.projectId;
+    const type = body?.type ?? query?.type;
+    if (!projectId || !type) {
+      throw new Error('projectId и type обязательны');
+    }
+
     const result = await this.storage.uploadObject({
-      projectId: body.projectId,
-      type: body.type,
+      projectId,
+      type,
       fileName: file.originalname,
       buffer: file.buffer,
       contentType: file.mimetype,
