@@ -185,26 +185,29 @@ function AppInner() {
     [accessToken],
   );
 
-  const ensureRemoteProject = useCallback(async (token?: string | null) => {
-    const tokenToUse = token ?? accessToken;
-    if (!tokenToUse || !projectName) return null;
-    const key = `projectId:${projectName}`;
-    const existing = localStorage.getItem(key);
-    if (existing) return existing;
+  const ensureRemoteProject = useCallback(
+    async (token?: string | null) => {
+      const tokenToUse = token ?? accessToken;
+      if (!tokenToUse || !projectName) return null;
+      const key = `projectId:${projectName}`;
+      const existing = localStorage.getItem(key);
+      if (existing) return existing;
 
-    try {
-      const project = await ensureProject(
-        tokenToUse,
-        projectName,
-        `Проект ${projectName}`,
-      );
-      localStorage.setItem(key, project.id);
-      return project.id;
-    } catch (error) {
-      console.error("[sync] ensureProject failed:", error);
-      return null;
-    }
-  }, [accessToken, projectName]);
+      try {
+        const project = await ensureProject(
+          tokenToUse,
+          projectName,
+          `Проект ${projectName}`,
+        );
+        localStorage.setItem(key, project.id);
+        return project.id;
+      } catch (error) {
+        console.error("[sync] ensureProject failed:", error);
+        return null;
+      }
+    },
+    [accessToken, projectName],
+  );
 
   // lastSyncAt намеренно не включаем в зависимости, чтобы избежать бесконечного цикла pull
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -429,12 +432,10 @@ function AppInner() {
         theaterLayout,
         lightChannels,
       };
-      // Музыку на бэкенд не сохраняем — только для прослушивания в сессии
+      // Теперь сохраняем и плейлист (music) в rawJson,
+      // чтобы web-правки плейлиста не затирали данные с десктопа.
       const payload = {
-        name: fullPayload.name,
-        steps: fullPayload.steps,
-        theaterLayout: fullPayload.theaterLayout,
-        lightChannels: fullPayload.lightChannels,
+        ...fullPayload,
       };
 
       // Отправляем изменения сцены и шагов на сервер, если пользователь авторизован
@@ -594,11 +595,48 @@ function AppInner() {
       tracks={sceneData?.playlist || []}
       sceneName="script"
       onRegisterPlayHandler={registerPlaylistPlay}
-      onPlaylistChange={(next) =>
+      onPlaylistChange={async (next) => {
+        // 1. Обновляем локальное состояние сцены
         setSceneData((prev) =>
           prev ? { ...prev, playlist: next } : { playlist: next },
-        )
-      }
+        );
+
+        // 2. Пытаемся сохранить сцену на сервере, чтобы плейлист не пропадал после перезагрузки
+        const tokenToUse = accessToken || localStorage.getItem("accessToken");
+        if (!tokenToUse || !projectName) return;
+
+        const projectId = await ensureRemoteProject(tokenToUse);
+        if (!projectId) return;
+
+        const sceneId = `${projectId}:script`;
+        const nowIso = new Date().toISOString();
+        const payload = {
+          ...(sceneData || {}),
+          playlist: next,
+        };
+
+        const change: SyncChange = {
+          id: crypto.randomUUID(),
+          entityType: "Scene",
+          entityId: sceneId,
+          operation: "update",
+          payload: {
+            id: sceneId,
+            projectId,
+            name: payload.name || `Сцена ${projectName}`,
+            rawJson: payload,
+            updatedAt: nowIso,
+          },
+          createdAt: nowIso,
+        };
+
+        try {
+          await syncPush(tokenToUse, [change]);
+          console.log("[playlist] web playlist sync push completed");
+        } catch (error) {
+          console.error("[playlist] web playlist sync push failed", error);
+        }
+      }}
     />
   ) : null;
 
