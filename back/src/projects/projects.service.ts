@@ -87,7 +87,8 @@ export class ProjectsService {
     }
 
     const plan = user.subscription;
-    if (plan?.maxProjects != null) {
+    // Проверяем лимит только если он явно установлен и больше 0
+    if (plan?.maxProjects != null && plan.maxProjects > 0) {
       const count = await this.prisma.project.count({
         where: { ownerId },
       });
