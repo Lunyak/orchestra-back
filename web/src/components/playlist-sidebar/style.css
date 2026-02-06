@@ -1,7 +1,10 @@
+.playlist-sidebar-wrapper {
+  position: relative;
+}
+
 .playlist-sidebar {
   width: 100%;
   min-width: 240px;
-  max-width: 320px;
   background: #1f2a37;
   color: #fff;
   padding: 16px;
@@ -10,6 +13,12 @@
   gap: 16px;
   height: 100vh;
   box-sizing: border-box;
+}
+
+.playlist-sidebar-wrapper.mobile .playlist-sidebar {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .playlist-sidebar.drag-over {

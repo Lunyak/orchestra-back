@@ -4,6 +4,9 @@
   align-items: flex-start;
   height: 100%;
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .script-header {
@@ -11,6 +14,13 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* Скрываем script-header на мобильных устройствах */
+@media (max-width: 979px) {
+  .script-header {
+    display: none;
+  }
 }
 
 .script-actions {
@@ -97,6 +107,10 @@
   flex-direction: column;
   justify-content: flex-start;
   height: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .script-step-editor {
@@ -112,6 +126,7 @@
   gap: 12px;
   flex: 1;
   min-height: 0;
+  position: relative;
 }
 
 .script-markdown-pane {
@@ -145,6 +160,9 @@
 }
 
 .requisites-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
   width: 240px;
   min-width: 200px;
   background: #0f172a;
@@ -156,6 +174,7 @@
   flex-direction: column;
   gap: 10px;
   height: fit-content;
+  z-index: 10;
 }
 
 .requisites-header {

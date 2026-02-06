@@ -61,13 +61,16 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   );
   const [selectedLightSlot, setSelectedLightSlot] = useState(1);
   const [newRequisite, setNewRequisite] = useState("");
-  const [markdownMode, setMarkdownMode] = useState<"notes" | "play">("notes");
+  const [markdownMode, setMarkdownMode] = useState<"notes" | "play">(() => {
+    const stored = localStorage.getItem("markdownMode");
+    return (stored === "notes" || stored === "play") ? stored : "play";
+  });
   const requisitesClipboardRef = useRef<ScriptRequisite[] | null>(null);
   const steps = initialSteps ?? localSteps;
   const setSteps = onStepsChange ?? setLocalSteps;
   const currentPage = controlledPage ?? localPage;
   const isEditing = controlledEditing ?? false;
-  const showRequisites = controlledShowRequisites ?? true;
+  const showRequisites = controlledShowRequisites ?? false;
 
   useEffect(() => {
     if (!lightChannelsProp) return;
@@ -89,6 +92,10 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
       setLocalPage((prev) => Math.min(prev, initialSteps.length - 1));
     }
   }, [initialSteps, onStepsChange]);
+
+  useEffect(() => {
+    localStorage.setItem("markdownMode", markdownMode);
+  }, [markdownMode]);
 
   useEffect(() => {
     if (!isEditing) return;

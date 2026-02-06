@@ -78,10 +78,16 @@ function AppInner() {
   );
   const [currentPage, setCurrentPage] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
-  const [showRequisites, setShowRequisites] = useState(true);
+  const [showRequisites, setShowRequisites] = useState(() => {
+    const stored = localStorage.getItem("showRequisites");
+    return stored === "true";
+  });
   const [showPlaylistSidebar, setShowPlaylistSidebar] = useState(true);
   const [showHeaderSounds, setShowHeaderSounds] = useState(true);
   const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
+  const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
+  const [isMobileStepsOpen, setIsMobileStepsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem("accessToken")
   );
@@ -346,12 +352,36 @@ function AppInner() {
   }, [projectName]);
 
   useEffect(() => {
+    localStorage.setItem("showRequisites", String(showRequisites));
+  }, [showRequisites]);
+
+  useEffect(() => {
     if (sceneData && steps.length > 0) {
       setIsSceneReady(true);
     } else {
       setIsSceneReady(false);
     }
   }, [sceneData, steps.length]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 980);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile && (isMobilePlaylistOpen || isMobileStepsOpen)) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, isMobilePlaylistOpen, isMobileStepsOpen]);
 
   const StepsSidebar = ScriptStepsSidebar as ComponentType<
     ScriptStepsSidebarProps & {
@@ -661,79 +691,101 @@ function AppInner() {
     }
   }, [accessToken]);
 
-  const playlistNode = showPlaylistSidebar && !isSettingsRoute ? (
-    <PlaylistSidebar
-      projectName={projectName || "fools"}
-      tracks={sceneData?.playlist || []}
-      sceneName="script"
-      onRegisterPlayHandler={registerPlaylistPlay}
-      onGetPlayUrl={handleGetPlayUrl}
-      onPlaylistChange={async (next) => {
-        // 1. Обновляем локальное состояние сцены
-        setSceneData((prev) =>
-          prev ? { ...prev, playlist: next } : { playlist: next },
-        );
+  const playlistNode = !isSettingsRoute ? (
+    <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}>
+      {isMobile && (
+        <button
+          className="mobile-panel-close"
+          onClick={() => setIsMobilePlaylistOpen(false)}
+          aria-label="Закрыть плейлист"
+        >
+          ×
+        </button>
+      )}
+      <PlaylistSidebar
+        projectName={projectName || "fools"}
+        tracks={sceneData?.playlist || []}
+        sceneName="script"
+        onRegisterPlayHandler={registerPlaylistPlay}
+        onGetPlayUrl={handleGetPlayUrl}
+        onPlaylistChange={async (next) => {
+          // 1. Обновляем локальное состояние сцены
+          setSceneData((prev) =>
+            prev ? { ...prev, playlist: next } : { playlist: next },
+          );
 
-        // 2. Пытаемся сохранить сцену на сервере, чтобы плейлист не пропадал после перезагрузки
-        const tokenToUse = accessToken || localStorage.getItem("accessToken");
-        if (!tokenToUse || !projectName) return;
+          // 2. Пытаемся сохранить сцену на сервере, чтобы плейлист не пропадал после перезагрузки
+          const tokenToUse = accessToken || localStorage.getItem("accessToken");
+          if (!tokenToUse || !projectName) return;
 
-        const projectId = await ensureRemoteProject(tokenToUse);
-        if (!projectId) return;
+          const projectId = await ensureRemoteProject(tokenToUse);
+          if (!projectId) return;
 
-        const sceneId = `${projectId}:script`;
-        const nowIso = new Date().toISOString();
-        const payload = {
-          ...(sceneData || {}),
-          playlist: next,
-        };
+          const sceneId = `${projectId}:script`;
+          const nowIso = new Date().toISOString();
+          const payload = {
+            ...(sceneData || {}),
+            playlist: next,
+          };
 
-        const change: SyncChange = {
-          id: crypto.randomUUID(),
-          entityType: "Scene",
-          entityId: sceneId,
-          operation: "update",
-          payload: {
-            id: sceneId,
-            projectId,
-            name: payload.name || `Сцена ${projectName}`,
-            rawJson: payload,
-            updatedAt: nowIso,
-          },
-          createdAt: nowIso,
-        };
+          const change: SyncChange = {
+            id: crypto.randomUUID(),
+            entityType: "Scene",
+            entityId: sceneId,
+            operation: "update",
+            payload: {
+              id: sceneId,
+              projectId,
+              name: payload.name || `Сцена ${projectName}`,
+              rawJson: payload,
+              updatedAt: nowIso,
+            },
+            createdAt: nowIso,
+          };
 
-        try {
-          await syncPush(tokenToUse, [change]);
-          console.log("[playlist] web playlist sync push completed");
-        } catch (error) {
-          console.error("[playlist] web playlist sync push failed", error);
-        }
-      }}
-    />
+          try {
+            await syncPush(tokenToUse, [change]);
+            console.log("[playlist] web playlist sync push completed");
+          } catch (error) {
+            console.error("[playlist] web playlist sync push failed", error);
+          }
+        }}
+      />
+    </div>
   ) : null;
 
-  const stepsSidebarNode = shouldShowStepsSidebar ? (
-    <StepsSidebar
-      steps={steps}
-      currentIndex={currentPage}
-      onSelect={setCurrentPage}
-      onPrev={() => setCurrentPage(Math.max(0, currentPage - 1))}
-      onNext={() => setCurrentPage(Math.min(steps.length - 1, currentPage + 1))}
-      onDelete={deleteStep}
-      onReorder={reorderSteps}
-      isEditing={isEditing}
-      onToggleEditing={() => setIsEditing((prev) => !prev)}
-      onAddStep={addStep}
-      showRequisites={showRequisites}
-      onToggleRequisites={() => setShowRequisites((prev) => !prev)}
-      showPlaylist={showPlaylistSidebar}
-      onTogglePlaylist={() => setShowPlaylistSidebar((prev) => !prev)}
-      showHeaderSounds={showHeaderSounds}
-      onToggleHeaderSounds={() => setShowHeaderSounds((prev) => !prev)}
-      isCollapsed={isStepsCollapsed}
-      onToggleCollapsed={() => setIsStepsCollapsed((prev) => !prev)}
-    />
+  const stepsSidebarNode = ((!isMobile && shouldShowStepsSidebar) || (isMobile && isMobileStepsOpen && shouldShowStepsSidebar)) ? (
+    <div className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobileStepsOpen ? "open" : ""}`}>
+      {isMobile && (
+        <button
+          className="mobile-panel-close"
+          onClick={() => setIsMobileStepsOpen(false)}
+          aria-label="Закрыть шаги"
+        >
+          ×
+        </button>
+      )}
+      <StepsSidebar
+        steps={steps}
+        currentIndex={currentPage}
+        onSelect={setCurrentPage}
+        onPrev={() => setCurrentPage(Math.max(0, currentPage - 1))}
+        onNext={() => setCurrentPage(Math.min(steps.length - 1, currentPage + 1))}
+        onDelete={deleteStep}
+        onReorder={reorderSteps}
+        isEditing={isEditing}
+        onToggleEditing={() => setIsEditing((prev) => !prev)}
+        onAddStep={addStep}
+        showRequisites={showRequisites}
+        onToggleRequisites={() => setShowRequisites((prev) => !prev)}
+        showPlaylist={showPlaylistSidebar}
+        onTogglePlaylist={() => setShowPlaylistSidebar((prev) => !prev)}
+        showHeaderSounds={showHeaderSounds}
+        onToggleHeaderSounds={() => setShowHeaderSounds((prev) => !prev)}
+        isCollapsed={isStepsCollapsed}
+        onToggleCollapsed={() => setIsStepsCollapsed((prev) => !prev)}
+      />
+    </div>
   ) : null;
 
   const handleAuthSubmit = async (event: React.FormEvent) => {
@@ -839,7 +891,7 @@ function AppInner() {
           projectName={projectName || "fools"}
           sceneName="script"
           sounds={sceneData?.sounds || []}
-          showSounds={showHeaderSounds}
+          showSounds={showHeaderSounds && !isMobile}
           onSoundsChange={(next) =>
             setSceneData((prev) =>
               prev ? { ...prev, sounds: next } : { sounds: next },
@@ -873,6 +925,37 @@ function AppInner() {
         </main>
       </div>
       {stepsSidebarNode}
+      {isMobile && !isSettingsRoute && (
+        <div className="mobile-bottom-buttons">
+          {shouldShowStepsSidebar && (
+            <button
+              className="mobile-bottom-btn"
+              onClick={() => setIsMobileStepsOpen(true)}
+              aria-label="Открыть шаги"
+            >
+              Шаги
+            </button>
+          )}
+          {showPlaylistSidebar && (
+            <button
+              className="mobile-bottom-btn"
+              onClick={() => setIsMobilePlaylistOpen(true)}
+              aria-label="Открыть плейлист"
+            >
+              Плейлист
+            </button>
+          )}
+        </div>
+      )}
+      {isMobile && (isMobilePlaylistOpen || isMobileStepsOpen) && (
+        <div
+          className="mobile-overlay"
+          onClick={() => {
+            setIsMobilePlaylistOpen(false);
+            setIsMobileStepsOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 

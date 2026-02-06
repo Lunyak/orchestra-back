@@ -15,6 +15,15 @@ body {
     sans-serif;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
+}
+
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100vw;
 }
 
 .login-layout {
@@ -152,6 +161,9 @@ body {
 .app-layout {
   display: flex;
   min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 .app-content {
@@ -194,7 +206,11 @@ body {
   display: flex;
   min-height: 0;
   overflow: scroll;
+  overflow-x: hidden;
   background: #0b1220;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .view-loader {
@@ -270,4 +286,279 @@ body {
   padding-left: 1.25rem;
   font-size: 0.875rem;
   color: #94a3b8;
+}
+
+/* Wrapper'ы для панелей */
+.playlist-sidebar-wrapper,
+.steps-sidebar-wrapper {
+  position: relative;
+}
+
+/* Скрытие плейлиста без размонтирования (чтобы музыка продолжала играть) */
+.playlist-sidebar-wrapper.hidden:not(.mobile) {
+  display: none;
+}
+
+.playlist-sidebar-wrapper.mobile.hidden {
+  transform: translateX(-100%);
+}
+
+/* Мобильные панели (выдвигающиеся) */
+.playlist-sidebar-wrapper.mobile,
+.steps-sidebar-wrapper.mobile {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+  max-width: 85vw;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Скрытые мобильные панели не должны создавать прокрутку */
+.playlist-sidebar-wrapper.mobile:not(.open),
+.steps-sidebar-wrapper.mobile:not(.open) {
+  pointer-events: none;
+}
+
+.playlist-sidebar-wrapper.mobile.open {
+  transform: translateX(0);
+}
+
+.steps-sidebar-wrapper.mobile {
+  right: 0;
+  left: auto;
+  transform: translateX(100%);
+}
+
+.steps-sidebar-wrapper.mobile.open {
+  transform: translateX(0);
+}
+
+.mobile-panel-close {
+  position: fixed;
+  top: 12px;
+  z-index: 1001;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+/* Кнопка закрытия для плейлиста (выезжает слева) - в правом верхнем углу экрана */
+.playlist-sidebar-wrapper.mobile .mobile-panel-close {
+  right: 12px;
+  left: auto;
+  transform: translateX(53px);
+}
+
+/* Скрываем кнопку закрытия когда плейлист задвинут */
+.playlist-sidebar-wrapper.mobile:not(.open) .mobile-panel-close {
+  display: none;
+}
+
+/* Кнопка закрытия для панели шагов (выезжает справа) - в левом верхнем углу экрана */
+.steps-sidebar-wrapper.mobile .mobile-panel-close {
+  left: 12px;
+  right: auto;
+  transform: translateX(-53px);
+}
+
+/* Скрываем кнопку закрытия когда панель шагов задвинута */
+.steps-sidebar-wrapper.mobile:not(.open) .mobile-panel-close {
+  display: none;
+}
+
+.mobile-panel-close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.mobile-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.mobile-bottom-buttons {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  z-index: 100;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-bottom-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb, #22c55e);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+/* На экранах меньше 640px кнопки в колонку и на всю ширину */
+@media (max-width: 639px) {
+  .mobile-bottom-buttons {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .mobile-bottom-btn {
+    width: 100%;
+    flex: none;
+  }
+}
+
+.mobile-bottom-btn:active {
+  transform: scale(0.98);
+}
+
+.mobile-bottom-btn:hover {
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+/* Медиа-запросы для мобильных и планшетов */
+@media (max-width: 979px) {
+  .app-layout {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .playlist-sidebar-wrapper:not(.mobile),
+  .steps-sidebar-wrapper:not(.mobile) {
+    display: none;
+  }
+
+  .main-content {
+    padding: 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .app-content {
+    padding-bottom: 60px;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .login-form {
+    padding: 24px 20px 20px;
+  }
+
+  .login-form h1 {
+    font-size: 20px;
+  }
+}
+
+/* Планшеты (980px - 1024px) */
+@media (min-width: 980px) and (max-width: 1024px) {
+
+  .playlist-sidebar-wrapper:not(.mobile),
+  .steps-sidebar-wrapper:not(.mobile) {
+    max-width: 280px;
+  }
+
+  .main-content {
+    padding: 14px;
+  }
+}
+
+/* Мобильные устройства (до 480px) */
+@media (max-width: 480px) {
+
+  .playlist-sidebar-wrapper.mobile,
+  .steps-sidebar-wrapper.mobile {
+    max-width: 90vw;
+    width: 90vw;
+  }
+
+  .mobile-bottom-buttons {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .mobile-bottom-btn {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .main-content {
+    padding: 8px;
+  }
+
+  .mobile-panel-close {
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+  }
+}
+
+/* Очень маленькие экраны (320px+) */
+@media (max-width: 320px) {
+
+  .playlist-sidebar-wrapper.mobile,
+  .steps-sidebar-wrapper.mobile {
+    max-width: 100vw;
+    width: 100vw;
+  }
+
+  .mobile-bottom-btn {
+    font-size: 12px;
+    padding: 8px 10px;
+  }
+
+  .mobile-panel-close {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+    top: 8px;
+    right: 8px;
+  }
+
+  .main-content {
+    padding: 6px;
+  }
 }
