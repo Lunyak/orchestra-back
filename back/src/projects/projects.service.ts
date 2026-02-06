@@ -24,6 +24,7 @@ export class ProjectsService {
   getUserProjects(userId: string) {
     return this.prisma.project.findMany({
       where: {
+        deletedAt: null,
         OR: [
           { ownerId: userId },
           {
@@ -46,6 +47,7 @@ export class ProjectsService {
     return this.prisma.project.findFirst({
       where: {
         slug,
+        deletedAt: null,
         OR: [
           { ownerId: userId },
           {
@@ -90,7 +92,7 @@ export class ProjectsService {
     // Лимит проверяем только если подписка есть и лимит явно задан и > 0
     if (plan?.maxProjects != null && plan.maxProjects > 0) {
       const count = await this.prisma.project.count({
-        where: { ownerId },
+        where: { ownerId, deletedAt: null },
       });
       if (count >= plan.maxProjects) {
         throw new ForbiddenException(
@@ -111,7 +113,7 @@ export class ProjectsService {
 
   async addMember(ownerId: string, slug: string, dto: AddMemberDto) {
     const project = await this.prisma.project.findFirst({
-      where: { slug, ownerId },
+      where: { slug, ownerId, deletedAt: null },
     });
     if (!project) {
       throw new NotFoundException('Project not found or not owned by user');

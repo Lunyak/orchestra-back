@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ADMIN_SECRET: ${ADMIN_SECRET:-change-admin-secret}
       # S3/MinIO storage (variant A)
       # Backend и браузер ходят к MinIO по одному и тому же адресу,
       # чтобы пресайнд-URL работали без переподписывания.
@@ -51,6 +52,19 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+    depends_on:
+      - back
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: orkestr-admin
+    restart: unless-stopped
+    ports:
+      - "8081:80"
     depends_on:
       - back
 
