@@ -100,6 +100,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }, 30);
   };
 
+  // Та же логика, что и у плейлиста: URL приходит с сервера в sound.file, используем как есть
   const resolveSoundSrc = (file: string) => file;
 
   const toggleTrack = (track: LoadedTrack) => {

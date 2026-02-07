@@ -120,9 +120,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [activeAudioKey, currentTrack]);
 
   const resolveTrackSrc = useCallback((file: string, remoteUrl?: string) => {
-    // Если трек уже загружен на сервер с десктопа – используем прямой URL
+    // Та же логика, что и для звуков в шапке: берём URL из данных с сервера (плейлист уже так работает)
     if (remoteUrl) return remoteUrl;
-    // Fallback: локальный путь (старые проекты или когда remoteUrl ещё нет)
     return file;
   }, []);
 
