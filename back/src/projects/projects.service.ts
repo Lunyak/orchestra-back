@@ -1,4 +1,11 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface CreateProjectDto {
@@ -80,6 +87,11 @@ export class ProjectsService {
   }
 
   async createProject(ownerId: string, dto: CreateProjectDto) {
+    const slug = typeof dto?.slug === 'string' ? dto.slug.trim() : '';
+    if (!slug) {
+      throw new BadRequestException('slug is required');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: ownerId },
       include: { subscription: true },
@@ -101,14 +113,43 @@ export class ProjectsService {
       }
     }
 
-    return this.prisma.project.create({
-      data: {
-        slug: dto.slug,
-        name: dto.name ?? dto.slug,
-        description: dto.description ?? null,
-        ownerId,
-      },
+    const name = dto.name ?? slug;
+    const description = dto.description ?? null;
+
+    // Если есть удалённый проект с таким slug у этого владельца — восстанавливаем
+    const existing = await this.prisma.project.findFirst({
+      where: { slug, ownerId },
     });
+    if (existing) {
+      if (existing.deletedAt) {
+        return this.prisma.project.update({
+          where: { id: existing.id },
+          data: {
+            deletedAt: null,
+            name,
+            description,
+            updatedAt: new Date(),
+          },
+        });
+      }
+      throw new ConflictException('Project with this slug already exists');
+    }
+
+    try {
+      return await this.prisma.project.create({
+        data: {
+          slug,
+          name,
+          description,
+          ownerId,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('Project with this slug already exists');
+      }
+      throw error;
+    }
   }
 
   async addMember(ownerId: string, slug: string, dto: AddMemberDto) {
