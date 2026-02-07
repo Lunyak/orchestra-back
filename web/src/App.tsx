@@ -227,14 +227,15 @@ function AppInner() {
 
   // lastSyncAt намеренно не включаем в зависимости, чтобы избежать бесконечного цикла pull
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const syncFromServer = useCallback(async (token?: string | null) => {
+  const syncFromServer = useCallback(async (token?: string | null, projectOverride?: string) => {
     const tokenToUse = token ?? accessToken;
-    if (!tokenToUse || !projectName) return;
+    const effectiveProject = projectOverride ?? projectName;
+    if (!tokenToUse || !effectiveProject) return;
     try {
       const projectId = await ensureRemoteProject(tokenToUse);
       if (!projectId) return;
 
-      const perProjectKey = `lastSyncAt:${projectName}`;
+      const perProjectKey = `lastSyncAt:${effectiveProject}`;
       const effectiveLastSyncAt =
         localStorage.getItem(perProjectKey) ?? lastSyncAt;
 
@@ -243,7 +244,7 @@ function AppInner() {
         effectiveLastSyncAt,
       );
 
-      const project = projects.find((p) => p.slug === projectName);
+      const project = projects.find((p) => p.slug === effectiveProject);
       if (!project) return;
 
       const scene = scenes.find(
@@ -340,8 +341,12 @@ function AppInner() {
   const handleProjectChange = useCallback(
     (name: string) => {
       setProjectName(name);
+      setSceneData(null);
+      setSteps([]);
+      setTheaterLayout(DEFAULT_THEATER_LAYOUT);
+      setLightChannels(Array.from({ length: 9 }, () => ""));
       if (!accessToken) return;
-      void syncFromServer();
+      void syncFromServer(undefined, name);
     },
     [accessToken, syncFromServer],
   );
