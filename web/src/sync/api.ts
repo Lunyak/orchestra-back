@@ -20,6 +20,8 @@ export interface SyncPushRequest {
 
 export interface SyncPullRequest {
   lastSyncAt: string | null;
+  /** Только данные этого проекта (по slug). */
+  projectSlug?: string;
 }
 
 export interface SyncPullResponse {
@@ -142,17 +144,16 @@ export async function syncPush(accessToken: string, changes: SyncChange[]) {
 
 export async function syncPull(
   accessToken: string,
-  lastSyncAt: string | null
+  lastSyncAt: string | null,
+  projectSlug?: string
 ): Promise<SyncPullResponse> {
-  const { data } = await api.post<SyncPullResponse>(
-    "/sync/pull",
-    { lastSyncAt } as SyncPullRequest,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  const body: SyncPullRequest = { lastSyncAt };
+  if (projectSlug) body.projectSlug = projectSlug;
+  const { data } = await api.post<SyncPullResponse>("/sync/pull", body, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
   return data;
 }
 

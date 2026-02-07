@@ -242,6 +242,7 @@ function AppInner() {
       const { now, projects, scenes } = await syncPull(
         tokenToUse,
         effectiveLastSyncAt,
+        effectiveProject,
       );
 
       const project = projects.find((p) => p.slug === effectiveProject);

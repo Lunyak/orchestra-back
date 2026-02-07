@@ -27,7 +27,11 @@ export class SyncController {
 
   @Post('pull')
   pull(@Req() req: any, @Body() body: SyncPullDto) {
-    return this.syncService.getChangesSince(req.user.userId, body.lastSyncAt);
+    return this.syncService.getChangesSince(
+      req.user.userId,
+      body.lastSyncAt,
+      body.projectSlug,
+    );
   }
 
   // Временный debug-эндпоинт, чтобы увидеть, что реально лежит в БД для текущего пользователя

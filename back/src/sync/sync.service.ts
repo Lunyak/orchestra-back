@@ -237,8 +237,12 @@ export class SyncService {
     return null;
   }
 
-  /** Возвращает полный снимок проектов, сцен и шагов, к которым у пользователя есть доступ (владелец или участник). */
-  async getChangesSince(userId: string, _lastSyncAt: string | null) {
+  /** Возвращает снимок проектов, сцен и шагов. Если передан projectSlug — только по этому проекту. */
+  async getChangesSince(
+    userId: string,
+    _lastSyncAt: string | null,
+    projectSlug?: string,
+  ) {
     const projectAccessWhere = {
       OR: [
         { ownerId: userId },
@@ -246,22 +250,28 @@ export class SyncService {
       ],
     };
 
+    const projectWhere = projectSlug
+      ? { ...projectAccessWhere, slug: projectSlug }
+      : projectAccessWhere;
+
     const projects = await this.prisma.project.findMany({
-      where: projectAccessWhere,
+      where: projectWhere,
     });
+
+    if (projects.length === 0) {
+      const now = new Date().toISOString();
+      return { now, projects: [], scenes: [], steps: [] };
+    }
+
+    const projectIds = projects.map((p) => p.id);
 
     const scenes = await this.prisma.scene.findMany({
-      where: {
-        project: projectAccessWhere,
-      },
+      where: { projectId: { in: projectIds } },
     });
 
+    const sceneIds = scenes.map((s) => s.id);
     const steps = await this.prisma.step.findMany({
-      where: {
-        scene: {
-          project: projectAccessWhere,
-        },
-      },
+      where: { sceneId: { in: sceneIds } },
     });
 
     const now = new Date().toISOString();

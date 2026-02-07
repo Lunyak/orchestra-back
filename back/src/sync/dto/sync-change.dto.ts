@@ -38,5 +38,10 @@ export class SyncPullDto {
   @IsOptional()
   @IsString()
   lastSyncAt: string | null;
+
+  /** Если задан — вернуть только данные этого проекта (по slug). */
+  @IsOptional()
+  @IsString()
+  projectSlug?: string;
 }
 
