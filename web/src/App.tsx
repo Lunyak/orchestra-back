@@ -8,11 +8,11 @@ import {
   useState,
   type ComponentType,
 } from "react";
-import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
 import "./App.css";
 import { Header } from "./components/header/Header";
-import { type HeaderSound } from "./components/header/HeaderPlayer";
+import { HeaderPlayer, type HeaderSound } from "./components/header/HeaderPlayer";
 import { PlaylistSidebar, type PlaylistTrack } from "./components/playlist-sidebar/PlaylistSidebar";
 import { ProjectPanel } from "./components/project-panel/ProjectPanel";
 import {
@@ -73,9 +73,7 @@ function AppInner() {
   const [projectName, setProjectName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [isSceneReady, setIsSceneReady] = useState(false);
-  const [activeView, setActiveView] = useState<"script" | "theater" | "light-plot">(
-    "script"
-  );
+  const activeView = "script" as const;
   const [currentPage, setCurrentPage] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [showRequisites, setShowRequisites] = useState(() => {
@@ -99,7 +97,6 @@ function AppInner() {
   );
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const playlistPlayRef = useRef<(trackId: number) => void>();
   const selectedStepIdRef = useRef<number | null>(null);
   const restoredStepRef = useRef(false);
@@ -862,48 +859,24 @@ function AppInner() {
     );
   }
 
-  const handleViewChange = (view: "script" | "theater" | "light-plot" | "settings") => {
-    if (view === "settings") {
-      navigate("/settings");
-      return;
-    }
-    if (location.pathname !== "/") {
-      navigate("/");
-    }
-    // В desktop-версии оставляем только сценарий, остальные виды игнорируем
-    setActiveView("script");
-  };
-
   const SpectacleLayout = (
     <div className="app-layout">
       {playlistNode}
       <div className="app-content">
-        <div className="project-panel-container">
-          <div className="project-panel-content">
-            <ProjectPanel
-              projects={projects}
-              projectName={projectName}
-              newProjectName={newProjectName}
-              view={activeView}
-              onProjectChange={handleProjectChange}
-              onNewProjectNameChange={setNewProjectName}
-              onCreateProject={handleCreateProject}
-              onDeleteProject={handleDeleteProject}
-              onViewChange={handleViewChange}
+        {showHeaderSounds && !isMobile && (
+          <div className="sounds-bar">
+            <HeaderPlayer
+              projectName={projectName || "fools"}
+              sceneName="script"
+              sounds={sceneData?.sounds || []}
+              onSoundsChange={(next) =>
+                setSceneData((prev) =>
+                  prev ? { ...prev, sounds: next } : { sounds: next },
+                )
+              }
             />
           </div>
-        </div>
-        <Header
-          projectName={projectName || "fools"}
-          sceneName="script"
-          sounds={sceneData?.sounds || []}
-          showSounds={showHeaderSounds && !isMobile}
-          onSoundsChange={(next) =>
-            setSceneData((prev) =>
-              prev ? { ...prev, sounds: next } : { sounds: next },
-            )
-          }
-        />
+        )}
         <main className="main-content">
           <Suspense fallback={<div className="view-loader">Загрузка сценария…</div>}>
             <ShowScript
@@ -965,92 +938,120 @@ function AppInner() {
     </div>
   );
 
-  return (
-    <Routes>
-      <Route path="/" element={SpectacleLayout} />
-      <Route
-        path="/settings"
-        element={
-          <div className="app-layout">
-            <div className="app-content">
-              <div className="project-panel-container">
-                <div className="project-panel-content">
-                  <ProjectPanel
-                    projects={projects}
-                    projectName={projectName}
-                    newProjectName={newProjectName}
-                    view={"script"}
-                    onProjectChange={setProjectName}
-                    onNewProjectNameChange={setNewProjectName}
-                    onCreateProject={handleCreateProject}
-                    onDeleteProject={handleDeleteProject}
-                    onViewChange={handleViewChange}
-                  />
-                </div>
-              </div>
-              <main className="main-content">
-                <div className="settings-view">
-                  <h2>Настройки проекта</h2>
-                  <p>Текущий проект: {projectName || "—"}</p>
-                  <section className="settings-invite">
-                    {isProjectOwner === false ? (
-                      <p className="settings-invite-forbidden">
-                        Только владелец проекта может приглашать участников и просматривать список.
-                      </p>
-                    ) : (
-                      <>
-                        <h3>Пригласить в проект</h3>
-                        <p className="settings-invite-hint">
-                          Другие пользователи смогут подсоединиться к проекту после
-                          регистрации. Укажите email зарегистрированного пользователя.
-                        </p>
-                        <div className="settings-invite-row">
-                          <input
-                            type="email"
-                            value={inviteEmail}
-                            onChange={(e) => {
-                              setInviteEmail(e.target.value);
-                              setInviteError(null);
-                            }}
-                            placeholder="email@example.com"
-                            className="settings-invite-input"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleInvite}
-                            disabled={!inviteEmail.trim()}
-                          >
-                            Пригласить
-                          </button>
-                        </div>
-                        {inviteError && (
-                          <div className="settings-invite-error">{inviteError}</div>
-                        )}
-                        {projectMembers.length > 0 && (
-                          <div className="settings-members">
-                            <h4>Участники</h4>
-                            <ul>
-                              {projectMembers.map((m) => (
-                                <li key={m.id}>
-                                  {m.user.email} — {m.role}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </section>
-                  <button type="button" onClick={handleLogout}>
-                    Выйти из аккаунта
-                  </button>
-                </div>
-              </main>
-            </div>
+  const TheaterPlaceholder = (
+    <div className="app-layout">
+      <div className="app-content">
+        <main className="main-content">
+          <div className="view-placeholder">
+            <h2>3D театр</h2>
+            <p>Страница в разработке</p>
           </div>
-        }
-      />
-    </Routes>
+        </main>
+      </div>
+    </div>
+  );
+
+  const LightPlotPlaceholder = (
+    <div className="app-layout">
+      <div className="app-content">
+        <main className="main-content">
+          <div className="view-placeholder">
+            <h2>Схема проекторов</h2>
+            <p>Страница в разработке</p>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      <Header />
+      <Routes>
+        <Route path="/" element={SpectacleLayout} />
+        <Route path="/theater" element={TheaterPlaceholder} />
+        <Route path="/light-plot" element={LightPlotPlaceholder} />
+        <Route
+          path="/settings"
+          element={
+            <div className="app-layout">
+              <div className="app-content">
+                <main className="main-content settings-main">
+                  <div className="settings-view">
+                    <section className="settings-project-section">
+                      <h2>Проект</h2>
+                      <ProjectPanel
+                        projects={projects}
+                        projectName={projectName}
+                        newProjectName={newProjectName}
+                        onProjectChange={handleProjectChange}
+                        onNewProjectNameChange={setNewProjectName}
+                        onCreateProject={handleCreateProject}
+                        onDeleteProject={handleDeleteProject}
+                      />
+                    </section>
+                    <h2>Настройки проекта</h2>
+                    <p>Текущий проект: {projectName || "—"}</p>
+                    <section className="settings-invite">
+                      {isProjectOwner === false ? (
+                        <p className="settings-invite-forbidden">
+                          Только владелец проекта может приглашать участников и просматривать список.
+                        </p>
+                      ) : (
+                        <>
+                          <h3>Пригласить в проект</h3>
+                          <p className="settings-invite-hint">
+                            Другие пользователи смогут подсоединиться к проекту после
+                            регистрации. Укажите email зарегистрированного пользователя.
+                          </p>
+                          <div className="settings-invite-row">
+                            <input
+                              type="email"
+                              value={inviteEmail}
+                              onChange={(e) => {
+                                setInviteEmail(e.target.value);
+                                setInviteError(null);
+                              }}
+                              placeholder="email@example.com"
+                              className="settings-invite-input"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleInvite}
+                              disabled={!inviteEmail.trim()}
+                            >
+                              Пригласить
+                            </button>
+                          </div>
+                          {inviteError && (
+                            <div className="settings-invite-error">{inviteError}</div>
+                          )}
+                          {projectMembers.length > 0 && (
+                            <div className="settings-members">
+                              <h4>Участники</h4>
+                              <ul>
+                                {projectMembers.map((m) => (
+                                  <li key={m.id}>
+                                    {m.user.email} — {m.role}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </section>
+                    <button type="button" onClick={handleLogout}>
+                      Выйти из аккаунта
+                    </button>
+                  </div>
+                </main>
+              </div>
+            </div>
+          }
+        />
+      </Routes>
+    </>
   );
 }
 

@@ -219,6 +219,32 @@ html {
   padding: 12px;
 }
 
+.view-placeholder {
+  padding: 2rem;
+  text-align: center;
+  color: #94a3b8;
+}
+
+.view-placeholder h2 {
+  margin-top: 0;
+  color: #e2e8f0;
+}
+
+.settings-main .settings-view {
+  padding: 1rem 0;
+}
+
+.settings-project-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #334155;
+}
+
+.settings-project-section h2 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
 .settings-view {
   max-width: 480px;
   color: #e2e8f0;

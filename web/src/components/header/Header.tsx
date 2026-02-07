@@ -1,33 +1,30 @@
-import React from "react";
-import { HeaderPlayer, HeaderSound } from "./HeaderPlayer";
+import React, { useState } from "react";
+import { HeaderNav } from "./HeaderNav";
 import "./style.css";
 
 interface HeaderProps {
-  projectName: string;
-  sceneName: string;
-  sounds?: HeaderSound[];
-  showSounds?: boolean;
-  onSoundsChange?: (sounds: HeaderSound[]) => void;
+  projectName?: string;
+  sceneName?: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({
-  projectName,
-  sceneName,
-  sounds = [],
-  showSounds = true,
-  onSoundsChange,
-}) => {
+const TRIGGER_WIDTH = 12;
+const HEADER_PANEL_WIDTH = 56;
+
+export const Header: React.FC<HeaderProps> = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <header className="header">
-      {showSounds && (
-        <HeaderPlayer
-          projectName={projectName}
-          sceneName={sceneName}
-          sounds={sounds}
-          onSoundsChange={onSoundsChange}
-        />
-      )}
-    </header>
+    <div
+      className="header-zone header-zone--left"
+      style={{ width: isOpen ? TRIGGER_WIDTH + HEADER_PANEL_WIDTH : TRIGGER_WIDTH }}
+      onMouseEnter={() => setIsOpen(true)}
+      onMouseLeave={() => setIsOpen(false)}
+    >
+      <div className="header-trigger header-trigger--left" aria-hidden />
+      <header className={`header header--left header--slide ${isOpen ? "header--open" : ""}`}>
+        <HeaderNav />
+      </header>
+    </div>
   );
 };
 

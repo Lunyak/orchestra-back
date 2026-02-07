@@ -1,12 +1,62 @@
+/* Зона хедера: слева, выдвигается при наведении на левый край */
+.header-zone {
+  position: fixed;
+  z-index: 1000;
+}
+
+.header-zone--left {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  transition: width 0.2s ease;
+}
+
+.header-trigger {
+  cursor: default;
+}
+
+.header-trigger--left {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 12px;
+  background: linear-gradient(to right, rgba(44, 62, 80, 0.95) 0%, rgba(44, 62, 80, 0.4) 70%, transparent 100%);
+}
+
 .header {
   background-color: #2c3e50;
   color: white;
-  padding: 12px 16px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
   display: flex;
   align-items: center;
-  gap: 16px;
-  justify-content: space-between;
+  justify-content: center;
+}
+
+.header--left {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  bottom: 0;
+  width: 56px;
+  padding: 12px 0;
+  flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+}
+
+.header--left.header--open {
+  transform: translateX(0);
+}
+
+/* Панель со звуками — в потоке страницы, на своём месте под триггером */
+.sounds-bar {
+  padding-top: 12px;
+  background-color: #2c3e50;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-player {
@@ -276,4 +326,45 @@
 .header-player-empty {
   font-size: 12px;
   color: #94a3b8;
+}
+
+/* Навигация в хедере — только иконки, вертикально */
+.header-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.header-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.header-nav-btn.active {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.header-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
 }

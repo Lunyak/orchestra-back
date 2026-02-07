@@ -53,22 +53,3 @@
 .project-panel .project-delete:hover {
   background: #dc2626;
 }
-
-.project-view-toggle {
-  display: inline-flex;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.project-view-toggle button {
-  background: #111827;
-  border: 1px solid #1f2937;
-  color: #e2e8f0;
-  padding: 4px 10px;
-}
-
-.project-view-toggle button[data-active="true"] {
-  background: #22c55e;
-  color: #0b1220;
-  border-color: #16a34a;
-}
