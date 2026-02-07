@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Delete,
+    Get,
+    Param,
+    Patch,
+    Post,
+    Req,
+    UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProjectsService } from './projects.service';
 
@@ -43,6 +53,34 @@ export class ProjectsController {
     @Body() body: { email: string; role?: string },
   ) {
     return this.projectsService.inviteByEmail(req.user.userId, slug, body);
+  }
+
+  @Patch(':slug/members/:memberId')
+  updateMemberRole(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { role: string },
+  ) {
+    return this.projectsService.updateMemberRole(
+      req.user.userId,
+      slug,
+      memberId,
+      body,
+    );
+  }
+
+  @Delete(':slug/members/:memberId')
+  removeMember(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Param('memberId') memberId: string,
+  ) {
+    return this.projectsService.removeMember(
+      req.user.userId,
+      slug,
+      memberId,
+    );
   }
 }
 

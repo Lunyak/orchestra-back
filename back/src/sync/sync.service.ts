@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncChangeDto } from './dto/sync-change.dto';
@@ -27,6 +27,13 @@ export class SyncService {
 
       // eslint-disable-next-line no-console
       console.log('[sync] processing change', { entityType, operation, entityId: change.entityId });
+
+      const projectId = await this.getProjectIdForChange(entityType, payload);
+      if (projectId && !(await this.canUserWriteToProject(userId, projectId))) {
+        throw new ForbiddenException(
+          'Только владелец или участник с правом редактирования может вносить изменения',
+        );
+      }
 
       try {
         if (entityType === 'Project') {
@@ -196,6 +203,38 @@ export class SyncService {
 
     // eslint-disable-next-line no-console
     console.log('[sync] Step upsert result', { id: result.id, title: result.title });
+  }
+
+  /** Проверка: пользователь — владелец или участник с ролью editor. */
+  private async canUserWriteToProject(
+    userId: string,
+    projectId: string,
+  ): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true, members: { where: { userId }, select: { role: true } } },
+    });
+    if (!project) return false;
+    if (project.ownerId === userId) return true;
+    const membership = project.members[0];
+    return membership?.role === 'editor';
+  }
+
+  /** Из change извлекаем projectId для проверки прав. */
+  private async getProjectIdForChange(
+    entityType: string,
+    payload: any,
+  ): Promise<string | null> {
+    if (entityType === 'Project' && payload?.id) return payload.id;
+    if (entityType === 'Scene' && payload?.projectId) return payload.projectId;
+    if (entityType === 'Step' && payload?.sceneId) {
+      const scene = await this.prisma.scene.findUnique({
+        where: { id: payload.sceneId },
+        select: { projectId: true },
+      });
+      return scene?.projectId ?? null;
+    }
+    return null;
   }
 
   /** Возвращает полный снимок проектов, сцен и шагов, к которым у пользователя есть доступ (владелец или участник). */

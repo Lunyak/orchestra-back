@@ -262,5 +262,57 @@ export class ProjectsService {
       members: project.members,
     };
   }
+
+  /** Изменить роль участника (только владелец). Роль: editor | viewer. */
+  async updateMemberRole(
+    userId: string,
+    slug: string,
+    memberId: string,
+    dto: { role: string },
+  ) {
+    const project = await this.prisma.project.findFirst({
+      where: { slug, deletedAt: null, ownerId: userId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found or you are not the owner');
+    }
+    const role = dto?.role === 'viewer' ? 'viewer' : 'editor';
+    const member = await this.prisma.projectMember.updateMany({
+      where: {
+        id: memberId,
+        projectId: project.id,
+      },
+      data: { role },
+    });
+    if (member.count === 0) {
+      throw new NotFoundException('Member not found in this project');
+    }
+    return this.prisma.projectMember.findUniqueOrThrow({
+      where: { id: memberId },
+      include: { user: { select: { id: true, email: true } } },
+    });
+  }
+
+  /** Удалить участника из проекта (только владелец). */
+  async removeMember(userId: string, slug: string, memberId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { slug, deletedAt: null, ownerId: userId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found or you are not the owner');
+    }
+    const result = await this.prisma.projectMember.deleteMany({
+      where: {
+        id: memberId,
+        projectId: project.id,
+      },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Member not found in this project');
+    }
+    return { ok: true };
+  }
 }
 
