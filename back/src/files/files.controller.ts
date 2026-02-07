@@ -97,7 +97,7 @@ export class FilesController {
       if (!st.isFile()) {
         return res.status(404).send('Not found');
       }
-      const ext = key.slice(key.lastIndexOf('.'));
+      const ext = (key.slice(key.lastIndexOf('.')) || '').toLowerCase();
       const contentType =
         ext === '.mp3'
           ? 'audio/mpeg'
@@ -107,7 +107,19 @@ export class FilesController {
               ? 'audio/ogg'
               : ext === '.m4a'
                 ? 'audio/mp4'
-                : 'application/octet-stream';
+                : ext === '.flac'
+                  ? 'audio/flac'
+                  : ext === '.png'
+                    ? 'image/png'
+                    : ext === '.jpg' || ext === '.jpeg'
+                      ? 'image/jpeg'
+                      : ext === '.gif'
+                        ? 'image/gif'
+                        : ext === '.webp'
+                          ? 'image/webp'
+                          : ext === '.svg'
+                            ? 'image/svg+xml'
+                            : 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Length', String(st.size));
       const stream = createReadStream(filePath);
