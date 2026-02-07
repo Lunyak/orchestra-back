@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { ScriptStep } from '../../types/script';
-import { ScriptSidebarOptions } from './ScriptSidebarOptions';
 import './style.css';
 
 export interface ScriptStepsSidebarProps {
@@ -14,14 +13,6 @@ export interface ScriptStepsSidebarProps {
   isEditing: boolean;
   onToggleEditing: () => void;
   onAddStep: () => void;
-  showRequisites: boolean;
-  onToggleRequisites: () => void;
-  showPlaylist: boolean;
-  onTogglePlaylist: () => void;
-  showHeaderSounds: boolean;
-  onToggleHeaderSounds: () => void;
-  isCollapsed: boolean;
-  onToggleCollapsed: () => void;
 }
 
 export const ScriptStepsSidebar = ({
@@ -35,14 +26,6 @@ export const ScriptStepsSidebar = ({
   isEditing,
   onToggleEditing,
   onAddStep,
-  showRequisites,
-  onToggleRequisites,
-  showPlaylist,
-  onTogglePlaylist,
-  showHeaderSounds,
-  onToggleHeaderSounds,
-  isCollapsed,
-  onToggleCollapsed,
 }: ScriptStepsSidebarProps) => {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -77,85 +60,71 @@ export const ScriptStepsSidebar = ({
   };
 
   return (
-    <aside className={`script-sidebar${isCollapsed ? ' collapsed' : ''}`}>
-      <ScriptSidebarOptions
-        showRequisites={showRequisites}
-        onToggleRequisites={onToggleRequisites}
-        showPlaylist={showPlaylist}
-        onTogglePlaylist={onTogglePlaylist}
-        showHeaderSounds={showHeaderSounds}
-        onToggleHeaderSounds={onToggleHeaderSounds}
-        isCollapsed={isCollapsed}
-        onToggleCollapsed={onToggleCollapsed}
-      />
-
-      {!isCollapsed && (
-        <div className="script-sidebar-content">
-          <div className="script-sidebar-header">
-            <button
-              className="script-edit-toggle"
-              onClick={onToggleEditing}
-              title={isEditing ? 'Режим чтения' : 'Режим редактирования'}
-            >
-              {isEditing ? 'Чтение' : 'Редакт.'}
-            </button>
-            <div className="script-sidebar-title">Шаги</div>
-            <button className="script-add-step" onClick={onAddStep}>
-              +
-            </button>
-          </div>
-          <div className="steps-mini-list">
-            {steps.map((step, index) => (
-              <div
-                key={step.id}
-                className={`step-mini-item ${index === currentIndex ? 'active' : ''}${dragOverIndex === index ? ' drag-over' : ''
-                  }${dragIndex === index ? ' dragging' : ''}`}
-                draggable
-                onDragStart={handleDragStart(index)}
-                onDragOver={handleDragOver}
-                onDragEnter={() => setDragOverIndex(index)}
-                onDragLeave={() => setDragOverIndex(null)}
-                onDrop={handleDrop(index)}
-                onDragEnd={handleDragEnd}
-              >
-                <button
-                  className="step-mini-btn"
-                  onClick={() => onSelect(index)}
-                >
-                  {index + 1}. {step.title}
-                </button>
-                <button
-                  className="step-mini-delete"
-                  onClick={() => onDelete(step.id)}
-                  title="Удалить шаг"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="script-navigation">
-            <button
-              className="script-nav-btn"
-              onClick={onPrev}
-              disabled={currentIndex === 0}
-            >
-              ← Предыдущий
-            </button>
-            <span className="page-indicator">
-              Шаг {currentIndex + 1} из {steps.length}
-            </span>
-            <button
-              className="script-nav-btn"
-              onClick={onNext}
-              disabled={currentIndex === steps.length - 1}
-            >
-              Следующий →
-            </button>
-          </div>
+    <aside className="script-sidebar">
+      <div className="script-sidebar-content">
+        <div className="script-sidebar-header">
+          <button
+            className="script-edit-toggle"
+            onClick={onToggleEditing}
+            title={isEditing ? 'Режим чтения' : 'Режим редактирования'}
+          >
+            {isEditing ? 'Чтение' : 'Редакт.'}
+          </button>
+          <div className="script-sidebar-title">Шаги</div>
+          <button className="script-add-step" onClick={onAddStep}>
+            +
+          </button>
         </div>
-      )}
-
+        <div className="steps-mini-list">
+          {steps.map((step, index) => (
+            <div
+              key={step.id}
+              className={`step-mini-item ${index === currentIndex ? 'active' : ''}${dragOverIndex === index ? ' drag-over' : ''
+                }${dragIndex === index ? ' dragging' : ''}`}
+              draggable
+              onDragStart={handleDragStart(index)}
+              onDragOver={handleDragOver}
+              onDragEnter={() => setDragOverIndex(index)}
+              onDragLeave={() => setDragOverIndex(null)}
+              onDrop={handleDrop(index)}
+              onDragEnd={handleDragEnd}
+            >
+              <button
+                className="step-mini-btn"
+                onClick={() => onSelect(index)}
+              >
+                {index + 1}. {step.title}
+              </button>
+              <button
+                className="step-mini-delete"
+                onClick={() => onDelete(step.id)}
+                title="Удалить шаг"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="script-navigation">
+          <button
+            className="script-nav-btn"
+            onClick={onPrev}
+            disabled={currentIndex === 0}
+          >
+            ← Предыдущий
+          </button>
+          <span className="page-indicator">
+            Шаг {currentIndex + 1} из {steps.length}
+          </span>
+          <button
+            className="script-nav-btn"
+            onClick={onNext}
+            disabled={currentIndex === steps.length - 1}
+          >
+            Следующий →
+          </button>
+        </div>
+      </div>
     </aside>
   );
 };

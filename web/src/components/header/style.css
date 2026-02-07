@@ -41,6 +41,8 @@
   width: 56px;
   padding: 12px 0;
   flex-direction: column;
+  justify-content: flex-start;
+  gap: 0;
   transform: translateX(-100%);
   transition: transform 0.2s ease;
 }
@@ -367,4 +369,21 @@
   justify-content: center;
   width: 24px;
   height: 24px;
+}
+
+/* Блок управления состоянием страницы сценария (Шаги, Плейлист, Звуки, Реквизит) */
+.header-script-state-sep {
+  width: 24px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 8px 0;
+  flex-shrink: 0;
+}
+
+.header-script-state-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
 }

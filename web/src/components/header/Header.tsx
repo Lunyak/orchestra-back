@@ -1,17 +1,23 @@
 import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { HeaderNav } from "./HeaderNav";
+import { HeaderScriptStateNav, type HeaderScriptStateProps } from "./HeaderScriptStateNav";
 import "./style.css";
 
 interface HeaderProps {
   projectName?: string;
   sceneName?: string;
+  /** Управление состоянием страницы сценария (Шаги, Плейлист, Звуки, Реквизит). Показывается только на маршруте / */
+  scriptState?: HeaderScriptStateProps;
 }
 
 const TRIGGER_WIDTH = 12;
 const HEADER_PANEL_WIDTH = 56;
 
-export const Header: React.FC<HeaderProps> = () => {
+export const Header: React.FC<HeaderProps> = ({ scriptState }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  const isScriptPage = location.pathname === "/";
 
   return (
     <div
@@ -23,6 +29,12 @@ export const Header: React.FC<HeaderProps> = () => {
       <div className="header-trigger header-trigger--left" aria-hidden />
       <header className={`header header--left header--slide ${isOpen ? "header--open" : ""}`}>
         <HeaderNav />
+        {isScriptPage && scriptState && (
+          <>
+            <div className="header-script-state-sep" aria-hidden />
+            <HeaderScriptStateNav {...scriptState} />
+          </>
+        )}
       </header>
     </div>
   );

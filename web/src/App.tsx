@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type ComponentType,
 } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { io, type Socket } from "socket.io-client";
@@ -15,10 +14,7 @@ import { Header } from "./components/header/Header";
 import { HeaderPlayer, type HeaderSound } from "./components/header/HeaderPlayer";
 import { PlaylistSidebar, type PlaylistTrack } from "./components/playlist-sidebar/PlaylistSidebar";
 import { ProjectPanel } from "./components/project-panel/ProjectPanel";
-import {
-  ScriptStepsSidebar,
-  type ScriptStepsSidebarProps,
-} from "./components/script-steps-sidebar/ScriptStepsSidebar";
+import { ScriptStepsSidebar } from "./components/script-steps-sidebar/ScriptStepsSidebar";
 import {
   ensureProject,
   fetchProjects,
@@ -78,11 +74,20 @@ function AppInner() {
   const [isEditing, setIsEditing] = useState(false);
   const [showRequisites, setShowRequisites] = useState(() => {
     const stored = localStorage.getItem("showRequisites");
-    return stored === "true";
+    return stored !== null ? stored === "true" : true;
   });
-  const [showPlaylistSidebar, setShowPlaylistSidebar] = useState(true);
-  const [showHeaderSounds, setShowHeaderSounds] = useState(true);
-  const [isStepsCollapsed, setIsStepsCollapsed] = useState(false);
+  const [showPlaylistSidebar, setShowPlaylistSidebar] = useState(() => {
+    const stored = localStorage.getItem("showPlaylistSidebar");
+    return stored !== null ? stored === "true" : true;
+  });
+  const [showHeaderSounds, setShowHeaderSounds] = useState(() => {
+    const stored = localStorage.getItem("showHeaderSounds");
+    return stored !== null ? stored === "true" : true;
+  });
+  const [isStepsCollapsed, setIsStepsCollapsed] = useState(() => {
+    const stored = localStorage.getItem("isStepsCollapsed");
+    return stored !== null ? stored === "true" : false;
+  });
   const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
   const [isMobileStepsOpen, setIsMobileStepsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -359,6 +364,18 @@ function AppInner() {
   }, [showRequisites]);
 
   useEffect(() => {
+    localStorage.setItem("showPlaylistSidebar", String(showPlaylistSidebar));
+  }, [showPlaylistSidebar]);
+
+  useEffect(() => {
+    localStorage.setItem("showHeaderSounds", String(showHeaderSounds));
+  }, [showHeaderSounds]);
+
+  useEffect(() => {
+    localStorage.setItem("isStepsCollapsed", String(isStepsCollapsed));
+  }, [isStepsCollapsed]);
+
+  useEffect(() => {
     if (sceneData && steps.length > 0) {
       setIsSceneReady(true);
     } else {
@@ -386,16 +403,7 @@ function AppInner() {
     };
   }, [isMobile, isMobilePlaylistOpen, isMobileStepsOpen]);
 
-  const StepsSidebar = ScriptStepsSidebar as ComponentType<
-    ScriptStepsSidebarProps & {
-      showRequisites: boolean;
-      onToggleRequisites: () => void;
-      showPlaylist: boolean;
-      onTogglePlaylist: () => void;
-      showHeaderSounds: boolean;
-      onToggleHeaderSounds: () => void;
-    }
-  >;
+  const StepsSidebar = ScriptStepsSidebar;
 
   const registerPlaylistPlay = useCallback((handler: (trackId: number) => void) => {
     playlistPlayRef.current = handler;
@@ -757,7 +765,7 @@ function AppInner() {
     </div>
   ) : null;
 
-  const stepsSidebarNode = ((!isMobile && shouldShowStepsSidebar) || (isMobile && isMobileStepsOpen && shouldShowStepsSidebar)) ? (
+  const stepsSidebarNode = ((!isMobile && shouldShowStepsSidebar && !isStepsCollapsed) || (isMobile && isMobileStepsOpen && shouldShowStepsSidebar)) ? (
     <div className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobileStepsOpen ? "open" : ""}`}>
       {isMobile && (
         <button
@@ -779,14 +787,6 @@ function AppInner() {
         isEditing={isEditing}
         onToggleEditing={() => setIsEditing((prev) => !prev)}
         onAddStep={addStep}
-        showRequisites={showRequisites}
-        onToggleRequisites={() => setShowRequisites((prev) => !prev)}
-        showPlaylist={showPlaylistSidebar}
-        onTogglePlaylist={() => setShowPlaylistSidebar((prev) => !prev)}
-        showHeaderSounds={showHeaderSounds}
-        onToggleHeaderSounds={() => setShowHeaderSounds((prev) => !prev)}
-        isCollapsed={isStepsCollapsed}
-        onToggleCollapsed={() => setIsStepsCollapsed((prev) => !prev)}
       />
     </div>
   ) : null;
@@ -966,7 +966,22 @@ function AppInner() {
 
   return (
     <>
-      <Header />
+      <Header
+        scriptState={
+          shouldShowStepsSidebar
+            ? {
+              showRequisites,
+              onToggleRequisites: () => setShowRequisites((prev) => !prev),
+              showPlaylist: showPlaylistSidebar,
+              onTogglePlaylist: () => setShowPlaylistSidebar((prev) => !prev),
+              showHeaderSounds,
+              onToggleHeaderSounds: () => setShowHeaderSounds((prev) => !prev),
+              isStepsCollapsed: isStepsCollapsed,
+              onToggleStepsCollapsed: () => setIsStepsCollapsed((prev) => !prev),
+            }
+            : undefined
+        }
+      />
       <Routes>
         <Route path="/" element={SpectacleLayout} />
         <Route path="/theater" element={TheaterPlaceholder} />
