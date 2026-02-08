@@ -116,8 +116,15 @@ function AppInner() {
   const [accessToken, setAccessToken] = useState<string | null>(() =>
     localStorage.getItem("accessToken")
   );
-  const [authEmail, setAuthEmail] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
+  const [authEmail, setAuthEmail] = useState(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem("authRememberEmail") ?? "" : "",
+  );
+  const [authPassword, setAuthPassword] = useState(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem("authRememberPassword") ?? "" : "",
+  );
+  const [authRememberMe, setAuthRememberMe] = useState(() =>
+    typeof localStorage !== "undefined" ? localStorage.getItem("authRememberMe") === "1" : false,
+  );
   const [authError, setAuthError] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() =>
     localStorage.getItem("lastSyncAt")
@@ -826,6 +833,15 @@ function AppInner() {
       setAccessToken(res.accessToken);
       localStorage.setItem("accessToken", res.accessToken);
       localStorage.setItem("refreshToken", res.refreshToken);
+      if (authRememberMe) {
+        localStorage.setItem("authRememberEmail", email);
+        localStorage.setItem("authRememberPassword", password);
+        localStorage.setItem("authRememberMe", "1");
+      } else {
+        localStorage.removeItem("authRememberEmail");
+        localStorage.removeItem("authRememberPassword");
+        localStorage.removeItem("authRememberMe");
+      }
       setAuthPassword("");
       void syncFromServer(res.accessToken);
     } catch (error: unknown) {
@@ -860,6 +876,14 @@ function AppInner() {
               onChange={(e) => setAuthPassword(e.target.value)}
               required
             />
+          </label>
+          <label className="login-remember">
+            <input
+              type="checkbox"
+              checked={authRememberMe}
+              onChange={(e) => setAuthRememberMe(e.target.checked)}
+            />
+            Запомнить меня
           </label>
           {authError && <div className="login-error">{authError}</div>}
           <button type="submit">

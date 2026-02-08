@@ -97,6 +97,22 @@ html {
   color: #6b7280;
 }
 
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.login-remember input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: #3b82f6;
+}
+
 .login-error {
   margin: 4px 0 10px;
   padding: 6px 8px;
