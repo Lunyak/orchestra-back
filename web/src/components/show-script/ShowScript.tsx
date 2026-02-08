@@ -22,9 +22,6 @@ interface ShowScriptProps {
 
 export const ShowScript: React.FC<ShowScriptProps> = ({
   steps: initialSteps,
-  title = "Сценарий спектакля",
-  projectName: _projectName = "fools",
-  sceneName: _sceneName = "script",
   currentPage: controlledPage,
   onStepsChange,
   isEditing: controlledEditing,
