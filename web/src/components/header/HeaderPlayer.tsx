@@ -6,6 +6,9 @@ export interface HeaderSound {
   title: string;
   file: string;
   icon?: string;
+  /** URL иконки в MinIO — для отображения на вебе */
+  iconRemoteUrl?: string;
+  iconRemoteKey?: string;
   volume?: number;
   fadeMs?: number;
   loop?: boolean;
@@ -20,6 +23,7 @@ interface LoadedTrack {
   name: string;
   url: string;
   icon?: string;
+  iconRemoteUrl?: string;
   volume: number;
   fadeMs: number;
   loop: boolean;
@@ -42,6 +46,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       name: sound.title,
       url: sound.remoteUrl ?? sound.file,
       icon: sound.icon,
+      iconRemoteUrl: sound.iconRemoteUrl,
       volume: sound.volume ?? 0.8,
       fadeMs: sound.fadeMs ?? 500,
       loop: sound.loop ?? false,
@@ -59,6 +64,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         name: sound.title,
         url: sound.remoteUrl ?? sound.file,
         icon: sound.icon,
+        iconRemoteUrl: sound.iconRemoteUrl,
         volume: sound.volume ?? 0.8,
         fadeMs: sound.fadeMs ?? 500,
         loop: sound.loop ?? false,
@@ -173,7 +179,9 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     );
   };
 
-  const resolveIconSrc = (file: string) => file;
+  /** На вебе иконка грузится только по iconRemoteUrl (MinIO). */
+  const getIconSrc = (track: LoadedTrack) =>
+    track.iconRemoteUrl && /^https?:\/\//i.test(track.iconRemoteUrl) ? track.iconRemoteUrl : "";
 
   return (
     <div className="header-player">
@@ -241,10 +249,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                 />
               </div>
             </div>
-            {track.icon ? (
+            {getIconSrc(track) ? (
               <img
                 className="header-player-track-icon"
-                src={resolveIconSrc(track.icon)}
+                src={getIconSrc(track)}
                 alt={track.name}
                 title={track.name}
               />

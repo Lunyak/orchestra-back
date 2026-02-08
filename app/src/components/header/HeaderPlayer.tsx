@@ -7,6 +7,9 @@ export interface HeaderSound {
   title: string;
   file: string;
   icon?: string;
+  /** URL иконки в MinIO — для отображения на вебе */
+  iconRemoteKey?: string;
+  iconRemoteUrl?: string;
   volume?: number;
   fadeMs?: number;
   loop?: boolean;
@@ -24,6 +27,8 @@ interface LoadedTrack {
   /** Короткое имя файла для сохранения в сцене (как в плейлисте) */
   file?: string;
   icon?: string;
+  iconRemoteKey?: string;
+  iconRemoteUrl?: string;
   volume: number;
   fadeMs: number;
   loop: boolean;
@@ -54,6 +59,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       url: sound.remoteUrl ?? sound.file,
       file: sound.file,
       icon: sound.icon,
+      iconRemoteKey: sound.iconRemoteKey,
+      iconRemoteUrl: sound.iconRemoteUrl,
       volume: sound.volume ?? 0.8,
       fadeMs: sound.fadeMs ?? 500,
       loop: sound.loop ?? false,
@@ -75,6 +82,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         url: sound.remoteUrl ?? sound.file,
         file: sound.file,
         icon: sound.icon,
+        iconRemoteKey: sound.iconRemoteKey,
+        iconRemoteUrl: sound.iconRemoteUrl,
         volume: sound.volume ?? 0.8,
         fadeMs: sound.fadeMs ?? 500,
         loop: sound.loop ?? false,
@@ -156,6 +165,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
             title: track.name,
             file: orig?.file ?? track.file ?? track.url,
             icon: track.icon,
+            iconRemoteKey: orig?.iconRemoteKey ?? track.iconRemoteKey,
+            iconRemoteUrl: orig?.iconRemoteUrl ?? track.iconRemoteUrl,
             volume: track.volume,
             fadeMs: track.fadeMs,
             loop: track.loop,
@@ -288,11 +299,19 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     return url.toString();
   };
 
+  /** URL для воспроизведения: при filePath — локальный файл (project-sounds), иначе remoteUrl или project-sounds по имени. */
+  const getPlaybackSrc = (track: LoadedTrack) => {
+    const localName = track.file ?? (track.filePath ? track.filePath.replace(/^.*[/\\]/, "") : null);
+    if (track.filePath && localName) return resolveSoundSrc(localName);
+    if (track.remoteUrl && /^https?:\/\//i.test(track.remoteUrl)) return track.remoteUrl;
+    return resolveSoundSrc(track.file ?? track.url);
+  };
+
   const toggleTrack = (track: LoadedTrack) => {
     const audio = audioRefs.current[track.id];
     if (!audio) return;
     if (audio.paused) {
-      const src = resolveSoundSrc(track.url);
+      const src = getPlaybackSrc(track);
       if (audio.src !== src) {
         audio.src = src;
       }
@@ -358,6 +377,13 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     return url.toString();
   };
 
+  /** URL для отображения иконки: remoteUrl на вебе, иначе project-sound-icons на десктопе. */
+  const getIconSrc = (track: LoadedTrack) => {
+    if (track.iconRemoteUrl && /^https?:\/\//i.test(track.iconRemoteUrl)) return track.iconRemoteUrl;
+    if (track.icon) return resolveIconSrc(track.icon);
+    return "";
+  };
+
   const addIcon = async (track: LoadedTrack) => {
     try {
       const res = await window.api.pickProjectSoundIcon(projectName);
@@ -366,9 +392,39 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         console.error("Failed to pick icon:", res?.error);
         return;
       }
-
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const projectIdKey = `projectId:${projectName}`;
+      let projectId = typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
+      if (accessToken && !projectId) {
+        try {
+          const project = await ensureProject(accessToken, projectName, `Проект ${projectName}`);
+          projectId = project.id;
+          if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
+        } catch (_) {}
+      }
+      let iconRemoteKey: string | undefined;
+      let iconRemoteUrl: string | undefined;
+      const api = typeof window !== "undefined" ? (window as any).api : null;
+      if (api?.invoke && accessToken && projectId) {
+        try {
+          const up = (await api.invoke("upload-project-sound-icon", {
+            projectName,
+            file: res.file,
+            accessToken,
+            projectId,
+          })) as { ok?: boolean; key?: string; url?: string };
+          if (up?.ok && up?.key && up?.url) {
+            iconRemoteKey = up.key;
+            iconRemoteUrl = up.url;
+          }
+        } catch (err) {
+          console.error("[sounds] icon upload failed", err);
+        }
+      }
       const nextTracks = tracks.map((item) =>
-        item.id === track.id ? { ...item, icon: res.file } : item,
+        item.id === track.id
+          ? { ...item, icon: res.file, iconRemoteKey, iconRemoteUrl }
+          : item,
       );
       setTracks(nextTracks);
       await saveSounds(nextTracks);
@@ -443,10 +499,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                 />
               </div>
             </div>
-            {track.icon ? (
+            {track.icon || track.iconRemoteUrl ? (
               <img
                 className="header-player-track-icon"
-                src={resolveIconSrc(track.icon)}
+                src={getIconSrc(track)}
                 alt={track.name}
                 title={track.name}
               />
