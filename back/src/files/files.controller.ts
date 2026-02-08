@@ -84,6 +84,45 @@ export class FilesController {
     return { url: this.storage.getPublicUrl(key) };
   }
 
+  /** Стрим файла с авторизацией (для воспроизведения в браузере через fetch + blob). */
+  @Get('stream')
+  @UseGuards(JwtAuthGuard)
+  async streamFile(@Query('key') key: string, @Res() res: Response) {
+    if (!key || typeof key !== 'string') {
+      return res.status(400).send('key required');
+    }
+    if (this.useLocalStorage()) {
+      try {
+        const decoded = decodeURIComponent(key);
+        const filePath = this.localStorage.pathForKey(decoded);
+        const st = await stat(filePath);
+        if (!st.isFile()) {
+          return res.status(404).send('Not found');
+        }
+        const ext = (decoded.slice(decoded.lastIndexOf('.')) || '').toLowerCase();
+        const contentType =
+          ext === '.mp3'
+            ? 'audio/mpeg'
+            : ext === '.wav'
+              ? 'audio/wav'
+              : ext === '.ogg'
+                ? 'audio/ogg'
+                : ext === '.m4a'
+                  ? 'audio/mp4'
+                  : ext === '.flac'
+                    ? 'audio/flac'
+                    : 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Length', String(st.size));
+        const stream = createReadStream(filePath);
+        return stream.pipe(res);
+      } catch {
+        return res.status(404).send('Not found');
+      }
+    }
+    return res.status(501).send('Stream with auth not implemented for S3');
+  }
+
   /** Раздача файлов из локального хранилища — постоянная ссылка, без авторизации. */
   @Get('play/:key')
   async serveLocalFile(@Param('key') keyParam: string, @Res() res: Response) {

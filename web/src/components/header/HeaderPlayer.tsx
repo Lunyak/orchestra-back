@@ -29,11 +29,14 @@ interface HeaderPlayerProps {
   onSoundsChange?: (sounds: HeaderSound[]) => void;
   /** Запросить URL для воспроизведения по ключу хранилища (как у плейлиста) */
   onGetPlayUrl?: (key: string) => Promise<string | null>;
+  /** Загрузить файл по ключу через fetch с токеном и вернуть blob URL (надёжно работает в браузере) */
+  onFetchSoundBlobUrl?: (key: string) => Promise<string | null>;
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sounds = [],
   onGetPlayUrl,
+  onFetchSoundBlobUrl,
 }) => {
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
@@ -50,6 +53,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
   const fadeTimers = useRef<Record<number, number | null>>({});
+  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     setTracks(
@@ -65,6 +69,13 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       })),
     );
   }, [sounds]);
+
+  useEffect(() => () => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  }, []);
 
   const clearFadeTimer = (trackId: number) => {
     const timer = fadeTimers.current[trackId];
@@ -107,6 +118,15 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     err instanceof DOMException && err.name === "NotSupportedError" ||
     (err instanceof Error && /no supported source|Failed to load/i.test(err.message));
 
+  const getKeyFromFile = (file: string): string | null => {
+    if (!file) return null;
+    if (file.startsWith("http://") || file.startsWith("https://")) {
+      const match = file.match(/\/files\/play\/([^/?#]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+    return file;
+  };
+
   const resolveSoundSrc = async (file: string): Promise<string> => {
     if (file.startsWith("http://") || file.startsWith("https://")) return file;
     if (onGetPlayUrl) {
@@ -116,11 +136,34 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     return file;
   };
 
+  const loadViaBlob = async (key: string): Promise<string | null> => {
+    if (!onFetchSoundBlobUrl) return null;
+    return onFetchSoundBlobUrl(key);
+  };
+
   const toggleTrack = async (track: LoadedTrack) => {
     const audio = audioRefs.current[track.id];
     if (!audio) return;
     if (audio.paused) {
-      let src = await resolveSoundSrc(track.url);
+      const key = getKeyFromFile(track.url);
+      let src: string;
+
+      if (onFetchSoundBlobUrl && key) {
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+          blobUrlRef.current = null;
+        }
+        const blobUrl = await loadViaBlob(key);
+        if (blobUrl) {
+          blobUrlRef.current = blobUrl;
+          src = blobUrl;
+        } else {
+          src = await resolveSoundSrc(track.url);
+        }
+      } else {
+        src = await resolveSoundSrc(track.url);
+      }
+
       if (audio.src !== src) {
         audio.src = src;
       }
@@ -129,27 +172,23 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       try {
         await audio.play();
       } catch (error) {
-        if (!isNotSupportedError(error)) {
-          console.error("Ошибка воспроизведения:", error);
-          return;
-        }
-        if (!onGetPlayUrl) {
-          console.error("Ошибка воспроизведения:", error);
-          return;
-        }
-        const keyToTry = track.url.startsWith("http")
-          ? (() => {
-            const match = track.url.match(/\/files\/play\/([^/?#]+)/);
-            return match ? decodeURIComponent(match[1]) : null;
-          })()
-          : track.url;
-        const freshUrl = keyToTry ? await onGetPlayUrl(keyToTry) : null;
-        if (freshUrl) {
-          audio.src = freshUrl;
-          try {
-            await audio.play();
-          } catch (retryErr) {
-            console.error("Ошибка воспроизведения (повтор):", retryErr);
+        if (isNotSupportedError(error) && key && onFetchSoundBlobUrl) {
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
+          }
+          const blobUrl = await loadViaBlob(key);
+          if (blobUrl) {
+            blobUrlRef.current = blobUrl;
+            audio.src = blobUrl;
+            try {
+              await audio.play();
+            } catch (retryErr) {
+              console.error("Ошибка воспроизведения (повтор):", retryErr);
+              return;
+            }
+          } else {
+            console.error("Ошибка воспроизведения:", error);
             return;
           }
         } else {

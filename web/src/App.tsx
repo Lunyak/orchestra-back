@@ -702,6 +702,22 @@ function AppInner() {
     }
   }, [accessToken]);
 
+  const handleFetchSoundBlobUrl = useCallback(async (key: string): Promise<string | null> => {
+    const token = accessToken || localStorage.getItem("accessToken");
+    if (!token) return null;
+    try {
+      const base = getApiBaseUrl();
+      const res = await fetch(`${base}/files/stream?key=${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      return URL.createObjectURL(blob);
+    } catch {
+      return null;
+    }
+  }, [accessToken]);
+
   const playlistNode = !isSettingsRoute ? (
     <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}>
       {isMobile && (
@@ -870,6 +886,7 @@ function AppInner() {
               sceneName="script"
               sounds={sceneData?.sounds || []}
               onGetPlayUrl={handleGetPlayUrl}
+              onFetchSoundBlobUrl={handleFetchSoundBlobUrl}
               onSoundsChange={async (next) => {
                 setSceneData((prev) =>
                   prev ? { ...prev, sounds: next } : { sounds: next },

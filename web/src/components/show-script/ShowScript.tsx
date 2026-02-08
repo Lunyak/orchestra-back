@@ -463,7 +463,6 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     <div className="show-script">
       <div className="script-content">
         <div className="script-header">
-          <h2>{title}</h2>
           <div className="script-actions">
             {isEditing && (
               <div className="script-track-insert">
@@ -575,7 +574,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                     data-active={markdownMode === 'notes'}
                     onClick={() => setMarkdownMode('notes')}
                   >
-                    Сценарий
+                    Схема
                   </button>
                   <button
                     type="button"
@@ -583,7 +582,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                     data-active={markdownMode === 'play'}
                     onClick={() => setMarkdownMode('play')}
                   >
-                    Пьеса
+                    Текст
                   </button>
                 </div>
                 {isEditing ? (
