@@ -893,8 +893,18 @@ function AppInner() {
               sceneName="script"
               sounds={sceneData?.sounds || []}
               onSoundsChange={async (next) => {
+                const prevSounds = sceneData?.sounds ?? [];
+                const merged = next.map((s) => {
+                  const prev = prevSounds.find((p) => p.id === s.id);
+                  return {
+                    ...s,
+                    file: s.file ?? prev?.file,
+                    remoteKey: s.remoteKey ?? prev?.remoteKey,
+                    remoteUrl: s.remoteUrl ?? prev?.remoteUrl,
+                  };
+                });
                 setSceneData((prev) =>
-                  prev ? { ...prev, sounds: next } : { sounds: next },
+                  prev ? { ...prev, sounds: merged } : { sounds: merged },
                 );
 
                 const tokenToUse = accessToken || localStorage.getItem("accessToken");
@@ -907,7 +917,7 @@ function AppInner() {
                 const nowIso = new Date().toISOString();
                 const payload = {
                   ...(sceneData || {}),
-                  sounds: next,
+                  sounds: merged,
                 };
 
                 const change: SyncChange = {

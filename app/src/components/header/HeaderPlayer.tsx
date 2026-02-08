@@ -74,15 +74,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       const current = await window.api.readProjectScene(projectName, sceneName);
       const payload = {
         ...current,
-        sounds: nextTracks.map((track) => ({
-          id: track.id,
-          title: track.name,
-          file: track.url,
-          icon: track.icon,
-          volume: track.volume,
-          fadeMs: track.fadeMs,
-          loop: track.loop,
-        })),
+        sounds: nextTracks.map((track) => {
+          const orig = sounds.find((s) => s.id === track.id);
+          return {
+            id: track.id,
+            title: track.name,
+            file: orig?.file ?? track.url,
+            icon: track.icon,
+            volume: track.volume,
+            fadeMs: track.fadeMs,
+            loop: track.loop,
+            remoteKey: orig?.remoteKey,
+            remoteUrl: orig?.remoteUrl,
+          };
+        }),
       };
       const result = await window.api.saveProjectScene(
         projectName,
