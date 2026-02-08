@@ -66,8 +66,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   const { projectName, ensureRemoteProject } = useProject();
 
   const [sceneData, setSceneData] = useState<SceneData | null>(null);
-  const [steps, setSteps] = useState<ScriptStep[]>([]);
-  const [theaterLayout, setTheaterLayout] = useState<TheaterLayout>(DEFAULT_THEATER_LAYOUT);
+  const [steps, setStepsState] = useState<ScriptStep[]>([]);
+  const [theaterLayout, setTheaterLayoutState] = useState<TheaterLayout>(DEFAULT_THEATER_LAYOUT);
   const [currentPage, setCurrentPage] = useState(0);
   const [isSceneReady, setIsSceneReady] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(() =>
@@ -78,17 +78,26 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   const selectedStepIdRef = useRef<number | null>(null);
   const restoredStepRef = useRef(false);
   const lightPlotSaveTimerRef = useRef<number | null>(null);
+  const hasLocalEditsRef = useRef(false);
 
   const syncFromServer = useCallback(
     async (token?: string | null, projectOverride?: string) => {
-      const tokenToUse = token ?? accessToken;
+      // Берём актуальный токен из localStorage (интерцептор обновляет его при refresh)
+      const tokenToUse =
+        token ??
+        (typeof localStorage !== "undefined"
+          ? localStorage.getItem("accessToken")
+          : null) ??
+        accessToken;
       const effectiveProject = projectOverride ?? projectName;
       if (!tokenToUse || !effectiveProject) return;
       const projectId = await ensureRemoteProject(tokenToUse);
       if (!projectId) return;
       const perProjectKey = `lastSyncAt:${effectiveProject}`;
       const effectiveLastSyncAt =
-        localStorage.getItem(perProjectKey) ?? lastSyncAt;
+        localStorage.getItem(perProjectKey) ??
+        localStorage.getItem("lastSyncAt") ??
+        null;
       try {
         const { now, projects, scenes } = await syncPull(
           tokenToUse,
@@ -100,9 +109,10 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         const scene = scenes.find((s: any) => s.projectId === project.id);
         if (!scene) return;
         const raw = (scene.rawJson as any) ?? {};
+        hasLocalEditsRef.current = false;
         setSceneData(raw || null);
-        setTheaterLayout(raw.theaterLayout || DEFAULT_THEATER_LAYOUT);
-        setSteps((prev) => (raw.steps?.length ? raw.steps : prev));
+        setTheaterLayoutState(raw.theaterLayout || DEFAULT_THEATER_LAYOUT);
+        setStepsState((prev) => (raw.steps?.length ? raw.steps : prev));
         setLastSyncAt(now);
         localStorage.setItem("lastSyncAt", now);
         localStorage.setItem(perProjectKey, now);
@@ -115,14 +125,14 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         console.error("[sync] pull failed:", error);
       }
     },
-    [accessToken, lastSyncAt, projectName, setAccessToken, ensureRemoteProject]
+    [accessToken, projectName, setAccessToken, ensureRemoteProject]
   );
 
   useEffect(() => {
     if (!projectName) return;
     setSceneData(null);
-    setSteps([]);
-    setTheaterLayout(DEFAULT_THEATER_LAYOUT);
+    setStepsState([]);
+    setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
     setCurrentPage(0);
     selectedStepIdRef.current = null;
     restoredStepRef.current = false;
@@ -133,9 +143,10 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
       try {
         const scene = await window.api.readProjectScene(projectName, "script");
         if (cancelled) return;
+        hasLocalEditsRef.current = false;
         setSceneData(scene || null);
-        setTheaterLayout(scene?.theaterLayout ?? DEFAULT_THEATER_LAYOUT);
-        setSteps(scene?.steps ?? []);
+        setTheaterLayoutState(scene?.theaterLayout ?? DEFAULT_THEATER_LAYOUT);
+        setStepsState(scene?.steps ?? []);
         setCurrentPage(0);
         selectedStepIdRef.current = null;
         restoredStepRef.current = false;
@@ -143,8 +154,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         if (!cancelled) {
           setSceneData(null);
-          setTheaterLayout(DEFAULT_THEATER_LAYOUT);
-          setSteps([]);
+          setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
+          setStepsState([]);
           setCurrentPage(0);
           setIsSceneReady(false);
         }
@@ -156,14 +167,28 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     };
   }, [projectName]);
 
+  // Один sync при появлении (токен, проект); при смене проекта — один sync для новой пары
+  const lastSyncedKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (accessToken && projectName) {
-      void syncFromServer(accessToken, projectName);
-    }
+    if (!accessToken || !projectName) return;
+    const key = `${accessToken}:${projectName}`;
+    if (lastSyncedKeyRef.current === key) return;
+    lastSyncedKeyRef.current = key;
+    void syncFromServer(accessToken, projectName);
   }, [accessToken, projectName, syncFromServer]);
 
+  const setSteps = useCallback((action: React.SetStateAction<ScriptStep[]>) => {
+    hasLocalEditsRef.current = true;
+    setStepsState(action);
+  }, []);
+  const setTheaterLayout = useCallback((action: React.SetStateAction<TheaterLayout>) => {
+    hasLocalEditsRef.current = true;
+    setTheaterLayoutState(action);
+  }, []);
+
   const addStep = useCallback(() => {
-    setSteps((prev) => {
+    hasLocalEditsRef.current = true;
+    setStepsState((prev) => {
       const nextId = prev.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
       const insertIndex = Math.min(currentPage + 1, prev.length);
       const sourceStep = prev[currentPage];
@@ -184,7 +209,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   }, [currentPage]);
 
   const deleteStep = useCallback((id: number) => {
-    setSteps((prev) => {
+    hasLocalEditsRef.current = true;
+    setStepsState((prev) => {
       const next = prev.filter((s) => s.id !== id);
       if (next.length === 0) {
         setCurrentPage(0);
@@ -197,7 +223,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
   const reorderSteps = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
-    setSteps((prev) => {
+    hasLocalEditsRef.current = true;
+    setStepsState((prev) => {
       if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
@@ -213,7 +240,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const saveStepsForLightPlot = useCallback(async () => {
-    if (!projectName) return;
+    if (!projectName || !hasLocalEditsRef.current) return;
     const token = accessToken ?? localStorage.getItem("accessToken");
     try {
       const current = await window.api.readProjectScene(projectName, "script");
@@ -318,6 +345,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           });
           if (changes.length > 0) {
             await syncPush(token, changes);
+            hasLocalEditsRef.current = false;
           }
         }
       }
@@ -437,7 +465,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   }, [projectName, steps, currentPage]);
 
   useEffect(() => {
-    if (!isSceneReady || steps.length === 0) return;
+    if (!isSceneReady || steps.length === 0 || !hasLocalEditsRef.current) return;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
     }

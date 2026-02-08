@@ -150,8 +150,11 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     if (audio.paused) {
       const key = getKeyFromFile(track.url);
       let src: string;
+      const isFullUrl = track.url.startsWith("http://") || track.url.startsWith("https://");
 
-      if (key && onGetPlayUrl) {
+      if (isFullUrl) {
+        src = track.url;
+      } else if (key && onGetPlayUrl) {
         const urlFromKey = await onGetPlayUrl(key);
         if (urlFromKey) src = urlFromKey;
         else if (onFetchSoundBlobUrl) {
@@ -378,7 +381,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           </div>
         ))}
         {tracks.length === 0 && (
-          <div className="header-player-empty">Музыка не загружается</div>
+          <div className="header-player-empty">Нет звуков</div>
         )}
       </div>
     </div>
