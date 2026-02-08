@@ -5,6 +5,13 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared": ["../app/src/shared"],
+      "@shared/*": ["../app/src/shared/*"],
+      "@app": ["../app/src"],
+      "@app/*": ["../app/src/*"]
+    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",
@@ -25,7 +32,8 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
-    "src/types/**/*.d.ts"
+    "../app/src/shared/types/**/*.ts",
+    "../app/src/shared/types/**/*.d.ts"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

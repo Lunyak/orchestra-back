@@ -1,8 +1,7 @@
-import { ScriptRequisite, ScriptStep } from "@shared/types/script";
-import React, { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import { type PlaylistTrack } from "../playlist-sidebar/PlaylistSidebar";
-import "./style.css";
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
+import './style.css';
 
 interface ShowScriptProps {
   steps?: ScriptStep[];
@@ -15,31 +14,28 @@ interface ShowScriptProps {
   onTrackLinkClick?: (trackId: number) => void;
   showRequisites?: boolean;
   canSave?: boolean;
-  playlist?: PlaylistTrack[];
-  lightChannels?: string[];
-  onLightChannelsChange?: (channels: string[]) => void;
 }
 
 export const ShowScript: React.FC<ShowScriptProps> = ({
   steps: initialSteps,
+  title = 'Сценарий спектакля',
+  projectName = 'fools',
+  sceneName = 'script',
   currentPage: controlledPage,
   onStepsChange,
   isEditing: controlledEditing,
   onTrackLinkClick,
   showRequisites: controlledShowRequisites,
   canSave = true,
-  playlist,
-  lightChannels: lightChannelsProp,
-  onLightChannelsChange,
 }) => {
   const [localPage, setLocalPage] = useState(0);
   const [localSteps, setLocalSteps] = useState<ScriptStep[]>(
     initialSteps || [
       {
         id: 1,
-        title: "Шаг 1",
+        title: 'Шаг 1',
         markdown:
-          "Тестовый шаг.\n\n![Свет](./assets/light.png)\n\n[Музыка](./assets/intro.mp3)",
+          'Тестовый шаг.\n\n![Свет](./assets/light.png)\n\n[Музыка](./assets/intro.mp3)',
         requisites: [],
       },
     ]
@@ -51,37 +47,18 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     { id: number; title: string }[]
   >([]);
   const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
-  const [lightChannels, setLightChannelsState] = useState<string[]>(
-    lightChannelsProp && lightChannelsProp.length > 0
-      ? lightChannelsProp
-      : Array.from({ length: 9 }, () => ""),
+  const [lightChannels, setLightChannels] = useState<string[]>(
+    Array.from({ length: 9 }, () => '')
   );
   const [selectedLightSlot, setSelectedLightSlot] = useState(1);
-  const [newRequisite, setNewRequisite] = useState("");
-  const [markdownMode, setMarkdownMode] = useState<"notes" | "play">(() => {
-    const stored = localStorage.getItem("markdownMode");
-    return (stored === "notes" || stored === "play") ? stored : "play";
-  });
+  const [newRequisite, setNewRequisite] = useState('');
+  const [markdownMode, setMarkdownMode] = useState<'notes' | 'play'>('notes');
   const requisitesClipboardRef = useRef<ScriptRequisite[] | null>(null);
   const steps = initialSteps ?? localSteps;
   const setSteps = onStepsChange ?? setLocalSteps;
   const currentPage = controlledPage ?? localPage;
   const isEditing = controlledEditing ?? false;
   const showRequisites = controlledShowRequisites ?? false;
-
-  useEffect(() => {
-    if (!lightChannelsProp) return;
-    setLightChannelsState(
-      lightChannelsProp.length > 0
-        ? lightChannelsProp
-        : Array.from({ length: 9 }, () => ""),
-    );
-  }, [lightChannelsProp]);
-
-  const setLightChannels = (next: string[]) => {
-    setLightChannelsState(next);
-    onLightChannelsChange?.(next);
-  };
 
   useEffect(() => {
     if (!onStepsChange && initialSteps && initialSteps.length > 0) {
@@ -91,23 +68,78 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   }, [initialSteps, onStepsChange]);
 
   useEffect(() => {
-    localStorage.setItem("markdownMode", markdownMode);
-  }, [markdownMode]);
+    if (!isEditing) return;
+    let isCancelled = false;
+    const loadPlaylist = async () => {
+      try {
+        const scene = await window.api.readProjectScene(projectName, sceneName);
+        if (isCancelled) return;
+        const nextOptions = (scene?.playlist || [])
+          .filter((item: { id?: number; title?: string }) => item?.id != null)
+          .map((item: { id: number; title?: string }) => ({
+            id: item.id,
+            title: item.title || `Трек ${item.id}`,
+          }));
+        setPlaylistOptions(nextOptions);
+        if (nextOptions.length > 0 && selectedTrackId == null) {
+          setSelectedTrackId(nextOptions[0].id);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setPlaylistOptions([]);
+        }
+      }
+    };
+    void loadPlaylist();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isEditing, projectName, sceneName, selectedTrackId]);
 
   useEffect(() => {
-    if (!isEditing) return;
-    const nextOptions =
-      (playlist || [])
-        .filter((item) => item?.id != null)
-        .map((item) => ({
-          id: item.id,
-          title: item.title || `Трек ${item.id}`,
-        })) ?? [];
-    setPlaylistOptions(nextOptions);
-    if (nextOptions.length > 0 && selectedTrackId == null) {
-      setSelectedTrackId(nextOptions[0].id);
+    let isCancelled = false;
+    const loadLightChannels = async () => {
+      try {
+        const scene = await window.api.readProjectScene(projectName, sceneName);
+        if (isCancelled) return;
+        const next =
+          Array.isArray(scene?.lightChannels) && scene.lightChannels.length > 0
+            ? scene.lightChannels.map((value: unknown) =>
+              typeof value === 'number' ? String(value) : String(value ?? '')
+            )
+            : [];
+        const normalized = Array.from({ length: 9 }, (_, index) => next[index] ?? '');
+        setLightChannels(normalized);
+      } catch (err) {
+        if (!isCancelled) {
+          setLightChannels(Array.from({ length: 9 }, () => ''));
+        }
+      }
+    };
+    void loadLightChannels();
+    return () => {
+      isCancelled = true;
+    };
+  }, [projectName, sceneName]);
+
+  const saveScene = useCallback(async () => {
+    try {
+      const current = await window.api.readProjectScene(projectName, sceneName);
+      const payload = { ...current, name: title, steps, lightChannels };
+      const result = await window.api.saveProjectScene(
+        projectName,
+        sceneName,
+        payload,
+      );
+      if (!result?.ok) {
+        console.error("Failed to save scene:", result?.error);
+        return;
+      }
+      console.log("Scene saved:", result.path);
+    } catch (err) {
+      console.error("Failed to save scene:", err);
     }
-  }, [isEditing, playlist, selectedTrackId]);
+  }, [projectName, sceneName, steps, title, lightChannels]);
 
   useEffect(() => {
     if (!canSave || steps.length === 0) return;
@@ -119,9 +151,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
       window.clearTimeout(saveTimerRef.current);
     }
     saveTimerRef.current = window.setTimeout(() => {
-      if (onStepsChange) {
-        onStepsChange(steps);
-      }
+      void saveScene();
     }, 600);
 
     return () => {
@@ -129,21 +159,40 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [canSave, onStepsChange, steps]);
+  }, [canSave, saveScene, steps.length]);
 
   const resolveImageSrc = (src?: string) => {
     if (!src) return src;
-    return src;
+
+    let path = src.trim().replace(/^\.?\//, '');
+
+    if (!path.startsWith('images/')) {
+      return src;
+    }
+
+    path = path.replace(/^images\//, '').replace(/^\/+/, '');
+
+    // Кодируем каждый сегмент пути отдельно (самый безопасный способ)
+    const pathSegments = path.split('/').map(segment =>
+      encodeURIComponent(segment)
+    );
+
+    const encodedPath = pathSegments.join('/');
+
+    const baseUrl = new URL(`project-images://${encodeURIComponent(projectName)}/`);
+    baseUrl.pathname = `/${encodedPath}`;
+
+    return baseUrl.toString();
   };
 
   const parseLightChannel = (rawValue: string) => {
     const trimmed = rawValue.trim();
     if (!trimmed) {
-      return { label: "", color: null as string | null };
+      return { label: '', color: null as string | null };
     }
-    const [labelPart, colorPart] = trimmed.split("|", 2);
+    const [labelPart, colorPart] = trimmed.split('|', 2);
     return {
-      label: labelPart?.trim() ?? "",
+      label: labelPart?.trim() ?? '',
       color: colorPart?.trim() ?? null,
     };
   };
@@ -155,45 +204,45 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   ): string | null => {
     const raw = (override ?? channelColor ?? label).trim().toLowerCase();
     if (!raw) return null;
-    if (raw.startsWith("#") || raw.startsWith("rgb") || raw.startsWith("hsl")) {
+    if (raw.startsWith('#') || raw.startsWith('rgb') || raw.startsWith('hsl')) {
       return raw;
     }
     const palette: Record<string, string> = {
-      blue: "#2563eb",
-      red: "#ef4444",
-      green: "#22c55e",
-      yellow: "#f59e0b",
-      white: "#f8fafc",
-      black: "#0f172a",
-      orange: "#f97316",
-      purple: "#a855f7",
-      pink: "#ec4899",
-      cyan: "#22d3ee",
-      magenta: "#d946ef",
-      "синий": "#2563eb",
-      "голубой": "#38bdf8",
-      "красный": "#ef4444",
-      "зеленый": "#22c55e",
-      "желтый": "#f59e0b",
-      "белый": "#f8fafc",
-      "черный": "#0f172a",
-      "оранжевый": "#f97316",
-      "фиолетовый": "#a855f7",
-      "розовый": "#ec4899",
+      blue: '#2563eb',
+      red: '#ef4444',
+      green: '#22c55e',
+      yellow: '#f59e0b',
+      white: '#f8fafc',
+      black: '#0f172a',
+      orange: '#f97316',
+      purple: '#a855f7',
+      pink: '#ec4899',
+      cyan: '#22d3ee',
+      magenta: '#d946ef',
+      'синий': '#2563eb',
+      'голубой': '#38bdf8',
+      'красный': '#ef4444',
+      'зеленый': '#22c55e',
+      'желтый': '#f59e0b',
+      'белый': '#f8fafc',
+      'черный': '#0f172a',
+      'оранжевый': '#f97316',
+      'фиолетовый': '#a855f7',
+      'розовый': '#ec4899',
     };
     return palette[raw] ?? null;
   };
 
   const getReadableTextColor = (color?: string | null): string | undefined => {
     if (!color) return undefined;
-    const hex = color.startsWith("#") ? color.slice(1) : "";
+    const hex = color.startsWith('#') ? color.slice(1) : '';
     if (hex.length !== 6) return undefined;
     const r = parseInt(hex.slice(0, 2), 16);
     const g = parseInt(hex.slice(2, 4), 16);
     const b = parseInt(hex.slice(4, 6), 16);
     if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return undefined;
     const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    return luminance > 0.6 ? "#0f172a" : "#f8fafc";
+    return luminance > 0.6 ? '#0f172a' : '#f8fafc';
   };
 
   const renderLightChip = (
@@ -340,8 +389,8 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     if (!step) return;
     const textarea = markdownRef.current;
     const field: keyof ScriptStep =
-      markdownMode === "play" ? "playMarkdown" : "markdown";
-    const currentValue = (step[field] ?? "") as string;
+      markdownMode === 'play' ? 'playMarkdown' : 'markdown';
+    const currentValue = (step[field] ?? '') as string;
     if (!textarea) {
       updateStep(step.id, field, `${currentValue}${text}`);
       return;
@@ -370,13 +419,18 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
 
     event.preventDefault();
     try {
-      const reader = new FileReader();
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(file);
-      });
-      const markdownSnippet = `\n\n![image](${dataUrl})\n\n`;
+      const buffer = await file.arrayBuffer();
+      const res = await window.api.addProjectImage(
+        projectName,
+        buffer,
+        file.type,
+        file.name,
+      );
+      if (!res?.ok) {
+        console.error("Failed to paste image:", res?.error);
+        return;
+      }
+      const markdownSnippet = `\n\n![image](${res.markdownPath})\n\n`;
       insertAtCursor(markdownSnippet);
     } catch (err) {
       console.error("Failed to paste image:", err);
@@ -400,24 +454,25 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     insertAtCursor(`\n\nСВЕТ — канал {{light:${clamped}}}\n\n`);
   };
 
+
   const currentStep = steps[currentPage];
   const currentRequisites = currentStep?.requisites ?? [];
   const activeMarkdownField: keyof ScriptStep =
-    markdownMode === "play" ? "playMarkdown" : "markdown";
-  const activeMarkdown = (currentStep?.[activeMarkdownField] ?? "") as string;
+    markdownMode === 'play' ? 'playMarkdown' : 'markdown';
+  const activeMarkdown = (currentStep?.[activeMarkdownField] ?? '') as string;
 
   const toggleRequisite = (requisiteId: number) => {
     if (!currentStep) return;
     const nextRequisites = currentRequisites.map((item) =>
       item.id === requisiteId ? { ...item, checked: !item.checked } : item
     );
-    updateStep(currentStep.id, "requisites", nextRequisites);
+    updateStep(currentStep.id, 'requisites', nextRequisites);
   };
 
   const removeRequisite = (requisiteId: number) => {
     if (!currentStep) return;
     const nextRequisites = currentRequisites.filter((item) => item.id !== requisiteId);
-    updateStep(currentStep.id, "requisites", nextRequisites);
+    updateStep(currentStep.id, 'requisites', nextRequisites);
   };
 
   const addRequisite = () => {
@@ -427,8 +482,8 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     const nextId =
       currentRequisites.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
     const nextItem: ScriptRequisite = { id: nextId, label, checked: false };
-    updateStep(currentStep.id, "requisites", [...currentRequisites, nextItem]);
-    setNewRequisite("");
+    updateStep(currentStep.id, 'requisites', [...currentRequisites, nextItem]);
+    setNewRequisite('');
   };
 
   const copyRequisites = () => {
@@ -796,10 +851,10 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                 </aside>
               )}
             </div>
+
           </div>
         )}
       </div>
     </div>
   );
 };
-

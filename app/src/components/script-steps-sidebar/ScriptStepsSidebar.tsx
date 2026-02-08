@@ -1,5 +1,5 @@
-import { ScriptStep } from "@shared/types/script";
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { ScriptStep } from "../../shared/types/script";
 import './style.css';
 
 export interface ScriptStepsSidebarProps {
@@ -128,4 +128,3 @@ export const ScriptStepsSidebar = ({
     </aside>
   );
 };
-

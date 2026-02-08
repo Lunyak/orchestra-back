@@ -17,7 +17,10 @@ const HEADER_PANEL_WIDTH = 56;
 export const Header: React.FC<HeaderProps> = ({ scriptState }) => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
-  const isScriptPage = location.pathname === "/";
+  const isSpectacleRoute =
+    location.pathname === "/" ||
+    location.pathname === "/theater" ||
+    location.pathname === "/light-plot";
 
   return (
     <div
@@ -29,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({ scriptState }) => {
       <div className="header-trigger header-trigger--left" aria-hidden />
       <header className={`header header--left header--slide ${isOpen ? "header--open" : ""}`}>
         <HeaderNav />
-        {isScriptPage && scriptState && (
+        {isSpectacleRoute && scriptState && (
           <>
             <div className="header-script-state-sep" aria-hidden />
             <HeaderScriptStateNav {...scriptState} />

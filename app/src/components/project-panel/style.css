@@ -1,0 +1,55 @@
+.project-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: #0f172a;
+  border-bottom: 1px solid #1f2937;
+  color: #e2e8f0;
+  font-size: 12px;
+}
+
+.project-panel select {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.project-panel select:disabled {
+  opacity: 0.6;
+}
+
+.project-panel input {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  min-width: 160px;
+}
+
+.project-panel button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.project-panel button:hover {
+  background: #1d4ed8;
+}
+
+.project-panel .project-delete {
+  background: #b91c1c;
+}
+
+.project-panel .project-delete:hover {
+  background: #dc2626;
+}

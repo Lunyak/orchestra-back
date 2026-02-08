@@ -1,14 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// src/types/electron.d.ts
+// Electron API (web / stub)
 
 interface API {
-  // IPC-обёртки (безопасно)
   send: (channel: string, ...args: any[]) => void;
   invoke: (channel: string, ...args: any[]) => Promise<any>;
   on: (channel: string, listener: (...args: any[]) => void) => () => void;
   off: (channel: string, listener: (...args: any[]) => void) => void;
 
-  // Специальные команды для файлов
   saveScene: (name: string, data: any) => Promise<any>;
   saveProjectScene: (
     projectName: string,
@@ -38,11 +36,9 @@ interface API {
   ) => Promise<{ ok: boolean; name?: string; error?: string }>;
   deleteProject: (name: string) => Promise<{ ok: boolean; error?: string }>;
 
-  // Тестовый пинг
   ping: () => string;
 }
 
-// Расширяем глобальный Window
 declare global {
   interface Window {
     api: API;

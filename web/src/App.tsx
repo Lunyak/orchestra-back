@@ -1,3 +1,4 @@
+import { ScriptStep, TheaterLayout } from "@shared/types/script";
 import { type AxiosError } from "axios";
 import {
   lazy,
@@ -29,11 +30,22 @@ import {
   type SyncChange,
 } from "./sync/api";
 import { login, register } from "./sync/auth";
-import { ScriptStep, TheaterLayout } from "./types/script";
 
 const ShowScript = lazy(() =>
   import("./components/show-script/ShowScript").then((module) => ({
     default: module.ShowScript,
+  }))
+);
+
+const LightPlotPage = lazy(() =>
+  import("./components/light-plot/LightPlotPage").then((module) => ({
+    default: module.LightPlotPage,
+  }))
+);
+
+const TheaterPlaceholder = lazy(() =>
+  import("./components/theater/TheaterPlaceholder").then((module) => ({
+    default: module.TheaterPlaceholder,
   }))
 );
 
@@ -70,7 +82,13 @@ function AppInner() {
   const [projectName, setProjectName] = useState("");
   const [newProjectName, setNewProjectName] = useState("");
   const [isSceneReady, setIsSceneReady] = useState(false);
-  const activeView = "script" as const;
+  const location = useLocation();
+  const activeView =
+    location.pathname === "/theater"
+      ? "theater"
+      : location.pathname === "/light-plot"
+        ? "light-plot"
+        : "script";
   const [currentPage, setCurrentPage] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const [showRequisites, setShowRequisites] = useState(() => {
@@ -102,7 +120,6 @@ function AppInner() {
     localStorage.getItem("lastSyncAt")
   );
   const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const location = useLocation();
   const playlistPlayRef = useRef<(trackId: number) => void>();
   const selectedStepIdRef = useRef<number | null>(null);
   const restoredStepRef = useRef(false);
@@ -690,7 +707,9 @@ function AppInner() {
   }, [activeView, isSceneReady, saveStepsForLightPlot, steps.length, theaterLayout]);
 
   const isSettingsRoute = location.pathname === "/settings";
-  const shouldShowStepsSidebar = !isSettingsRoute && activeView === "script";
+  const shouldShowStepsSidebar =
+    !isSettingsRoute &&
+    (activeView === "script" || activeView === "light-plot" || activeView === "theater");
 
   const handleGetPlayUrl = useCallback(async (key: string): Promise<string | null> => {
     const token = accessToken || localStorage.getItem("accessToken");
@@ -921,29 +940,48 @@ function AppInner() {
           </div>
         )}
         <main className="main-content">
-          <Suspense fallback={<div className="view-loader">Загрузка сценария…</div>}>
-            <ShowScript
-              title={sceneData?.name}
-              steps={steps}
-              currentPage={currentPage}
-              onStepsChange={(next) => {
-                hasLocalEditsRef.current = true;
-                setSteps(next);
-              }}
-              isEditing={isEditing}
-              onTrackLinkClick={handleTrackLinkClick}
-              showRequisites={showRequisites}
-              projectName={projectName || "fools"}
-              sceneName="script"
-              canSave={isSceneReady}
-              playlist={sceneData?.playlist || []}
-              lightChannels={lightChannels}
-              onLightChannelsChange={(next) => {
-                hasLocalEditsRef.current = true;
-                setLightChannels(next);
-              }}
-            />
-          </Suspense>
+          {activeView === "script" && (
+            <Suspense fallback={<div className="view-loader">Загрузка сценария…</div>}>
+              <ShowScript
+                title={sceneData?.name}
+                steps={steps}
+                currentPage={currentPage}
+                onStepsChange={(next) => {
+                  hasLocalEditsRef.current = true;
+                  setSteps(next);
+                }}
+                isEditing={isEditing}
+                onTrackLinkClick={handleTrackLinkClick}
+                showRequisites={showRequisites}
+                projectName={projectName || "fools"}
+                sceneName="script"
+                canSave={isSceneReady}
+                playlist={sceneData?.playlist || []}
+                lightChannels={lightChannels}
+                onLightChannelsChange={(next) => {
+                  hasLocalEditsRef.current = true;
+                  setLightChannels(next);
+                }}
+              />
+            </Suspense>
+          )}
+          {activeView === "light-plot" && (
+            <Suspense fallback={<div className="view-loader">Загрузка схемы…</div>}>
+              <LightPlotPage
+                steps={steps}
+                currentPage={currentPage}
+                onStepsChange={(next) => {
+                  hasLocalEditsRef.current = true;
+                  setSteps(next);
+                }}
+              />
+            </Suspense>
+          )}
+          {activeView === "theater" && (
+            <Suspense fallback={<div className="view-loader">Загрузка…</div>}>
+              <TheaterPlaceholder />
+            </Suspense>
+          )}
         </main>
       </div>
       {stepsSidebarNode}
@@ -981,32 +1019,6 @@ function AppInner() {
     </div>
   );
 
-  const TheaterPlaceholder = (
-    <div className="app-layout">
-      <div className="app-content">
-        <main className="main-content">
-          <div className="view-placeholder">
-            <h2>3D театр</h2>
-            <p>Страница в разработке</p>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-
-  const LightPlotPlaceholder = (
-    <div className="app-layout">
-      <div className="app-content">
-        <main className="main-content">
-          <div className="view-placeholder">
-            <h2>Схема проекторов</h2>
-            <p>Страница в разработке</p>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
-
   return (
     <>
       <Header
@@ -1027,8 +1039,8 @@ function AppInner() {
       />
       <Routes>
         <Route path="/" element={SpectacleLayout} />
-        <Route path="/theater" element={TheaterPlaceholder} />
-        <Route path="/light-plot" element={LightPlotPlaceholder} />
+        <Route path="/theater" element={SpectacleLayout} />
+        <Route path="/light-plot" element={SpectacleLayout} />
         <Route
           path="/settings"
           element={

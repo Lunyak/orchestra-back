@@ -1,0 +1,231 @@
+import type { ComponentType } from "react";
+import React, { Suspense, useCallback, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Header } from "../../components/header/Header";
+import { HeaderPlayer } from "../../components/header/HeaderPlayer";
+import { PlaylistSidebar } from "../../components/playlist-sidebar/PlaylistSidebar";
+import { ScriptStepsSidebar } from "../../components/script-steps-sidebar/ScriptStepsSidebar";
+import { useProject } from "../../features/project";
+import { useScene } from "../../features/scene";
+import { useScriptUI } from "../../features/script-ui";
+import type { ScriptStep } from "../../shared/types/script";
+
+const LightPlotPage = React.lazy(() =>
+  import("../../components/light-plot/LightPlotPage").then((m) => ({
+    default: m.LightPlotPage,
+  }))
+);
+const ShowScript = React.lazy(() =>
+  import("../../components/show-script/ShowScript").then((m) => ({
+    default: m.ShowScript,
+  }))
+);
+const TheaterScene = React.lazy(() =>
+  import("../../components/theater/TheaterScene").then((m) => ({
+    default: m.TheaterScene,
+  }))
+);
+
+export function SpectaclePage() {
+  const location = useLocation();
+  const { projectName } = useProject();
+  const {
+    sceneData,
+    steps,
+    currentPage,
+    setCurrentPage,
+    setSteps,
+    theaterLayout,
+    setTheaterLayout,
+    isSceneReady,
+    addStep,
+    deleteStep,
+    reorderSteps,
+    registerPlaylistPlay,
+    handleTrackLinkClick,
+    pushSceneAfterSoundsSave,
+  } = useScene();
+  const {
+    showRequisites,
+    toggleRequisites,
+    showPlaylistSidebar,
+    togglePlaylist,
+    showHeaderSounds,
+    toggleHeaderSounds,
+    isStepsCollapsed,
+    toggleStepsCollapsed,
+    isEditing,
+    setIsEditing,
+    swapTheaterPanels: shouldSwapPanels,
+    togglePanels,
+  } = useScriptUI();
+
+  const [theaterControlsHost, setTheaterControlsHost] =
+    useState<HTMLDivElement | null>(null);
+  const setTheaterControlsHostRef = useCallback((node: HTMLDivElement | null) => {
+    setTheaterControlsHost(node);
+  }, []);
+
+  const activeView =
+    location.pathname === "/theater"
+      ? "theater"
+      : location.pathname === "/light-plot"
+        ? "light-plot"
+        : "script";
+
+  React.useEffect(() => {
+    localStorage.setItem("activeView", activeView);
+  }, [activeView]);
+
+  const shouldShowStepsSidebar =
+    activeView === "script" ||
+    activeView === "light-plot" ||
+    activeView === "theater";
+  const isTheaterView = activeView === "theater";
+
+  const LightPlotView = LightPlotPage as ComponentType<{
+    steps: ScriptStep[];
+    currentPage: number;
+    onStepsChange: React.Dispatch<React.SetStateAction<ScriptStep[]>>;
+  }>;
+
+  const projectDisplay = projectName || "fools";
+
+  const playlistNode = (
+    <div
+      className={`playlist-sidebar-wrapper ${!showPlaylistSidebar ? "hidden" : ""}`}
+    >
+      <PlaylistSidebar
+        projectName={projectDisplay}
+        tracks={sceneData?.playlist || []}
+        sceneName="script"
+        onRegisterPlayHandler={registerPlaylistPlay}
+      />
+    </div>
+  );
+
+  const theaterControlsNode = isTheaterView ? (
+    <aside ref={setTheaterControlsHostRef} className="theater-settings-sidebar" />
+  ) : null;
+
+  const stepsSidebarNode =
+    shouldShowStepsSidebar && !isStepsCollapsed ? (
+      <ScriptStepsSidebar
+        steps={steps}
+        currentIndex={currentPage}
+        onSelect={setCurrentPage}
+        onPrev={() => setCurrentPage((p) => Math.max(0, p - 1))}
+        onNext={() =>
+          setCurrentPage((p) => Math.min(steps.length - 1, p + 1))
+        }
+        onDelete={deleteStep}
+        onReorder={reorderSteps}
+        isEditing={isEditing}
+        onToggleEditing={() => setIsEditing((p) => !p)}
+        onAddStep={addStep}
+      />
+    ) : null;
+
+  return (
+    <>
+      <Header
+        scriptState={
+          shouldShowStepsSidebar
+            ? {
+              showRequisites,
+              onToggleRequisites: toggleRequisites,
+              showPlaylist: showPlaylistSidebar,
+              onTogglePlaylist: togglePlaylist,
+              showHeaderSounds,
+              onToggleHeaderSounds: toggleHeaderSounds,
+              isStepsCollapsed,
+              onToggleStepsCollapsed: toggleStepsCollapsed,
+            }
+            : undefined
+        }
+      />
+      <div className="app-layout">
+        {isTheaterView ? (
+          <>
+            {showPlaylistSidebar && (
+              <div style={{ display: shouldSwapPanels ? "none" : "block" }}>
+                {playlistNode}
+              </div>
+            )}
+            {shouldSwapPanels ? theaterControlsNode : null}
+          </>
+        ) : (
+          playlistNode
+        )}
+        <div className="app-content">
+          {showHeaderSounds && (
+            <div className="sounds-bar">
+              <HeaderPlayer
+                projectName={projectDisplay}
+                sceneName="script"
+                sounds={sceneData?.sounds || []}
+                onSoundsSaved={pushSceneAfterSoundsSave}
+              />
+            </div>
+          )}
+          <main
+            className={`main-content${activeView === "theater" ? " main-content-theater" : ""}`}
+          >
+            {activeView === "theater" && (
+              <Suspense
+                fallback={
+                  <div className="view-loader">Загрузка 3D театра…</div>
+                }
+              >
+                <TheaterScene
+                  projectName={projectDisplay}
+                  steps={steps}
+                  currentPage={currentPage}
+                  onStepsChange={setSteps}
+                  theaterLayout={theaterLayout}
+                  onTheaterLayoutChange={setTheaterLayout}
+                  isPanelsSwapped={shouldSwapPanels}
+                  onTogglePanels={togglePanels}
+                  controlsHost={shouldSwapPanels ? theaterControlsHost : null}
+                  controlsInPanel={shouldSwapPanels}
+                />
+              </Suspense>
+            )}
+            {activeView === "light-plot" && (
+              <Suspense
+                fallback={<div className="view-loader">Загрузка схемы…</div>}
+              >
+                <LightPlotView
+                  steps={steps}
+                  currentPage={currentPage}
+                  onStepsChange={setSteps}
+                />
+              </Suspense>
+            )}
+            {activeView === "script" && (
+              <Suspense
+                fallback={
+                  <div className="view-loader">Загрузка сценария…</div>
+                }
+              >
+                <ShowScript
+                  title={sceneData?.name}
+                  steps={steps}
+                  currentPage={currentPage}
+                  onStepsChange={setSteps}
+                  isEditing={isEditing}
+                  onTrackLinkClick={handleTrackLinkClick}
+                  showRequisites={showRequisites}
+                  projectName={projectDisplay}
+                  sceneName="script"
+                  canSave={isSceneReady}
+                />
+              </Suspense>
+            )}
+          </main>
+        </div>
+        {stepsSidebarNode}
+      </div>
+    </>
+  );
+}
