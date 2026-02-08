@@ -3,6 +3,7 @@ import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import {
   adminLogin,
   adminLogout,
+  getApiBaseUrl,
   getPlans,
   getProjects,
   getUsers,
@@ -11,8 +12,42 @@ import {
   setUserSubscription,
   type PlanRow,
   type ProjectRow,
-  type UserRow,
+  type UserRow
 } from "./api";
+
+const WEB_LOCAL = (import.meta as any).env?.VITE_LINK_WEB_LOCAL ?? "http://localhost:5173";
+const WEB_SERVER = (import.meta as any).env?.VITE_LINK_WEB_SERVER ?? "http://213.226.126.196";
+const LINK_MINIO = (import.meta as any).env?.VITE_LINK_MINIO ?? "http://213.226.126.196:9001";
+const LINK_DOZZLE = (import.meta as any).env?.VITE_LINK_DOZZLE ?? "http://213.226.126.196:9999";
+
+function ServicesPage() {
+  const apiBase = getApiBaseUrl();
+  const links = [
+    { label: "Локальный фронт (веб)", href: WEB_LOCAL, desc: "Vite dev-сервер" },
+    { label: "Фронт на сервере (веб)", href: WEB_SERVER, desc: "Продакшен SPA" },
+    { label: "API (бэкенд)", href: apiBase, desc: "NestJS, sync, auth" },
+    { label: "Файлы (раздача)", href: `${apiBase}/files/play`, desc: "GET /files/play/:key" },
+    { label: "Файлы (стрим с авторизацией)", href: `${apiBase}/files/stream`, desc: "GET /files/stream?key=..." },
+    { label: "MinIO (консоль)", href: LINK_MINIO, desc: "S3-хранилище" },
+    { label: "Dozzle", href: LINK_DOZZLE, desc: "Просмотр логов контейнеров" },
+  ];
+  return (
+    <div className="admin-page">
+      <h1>Сервисы</h1>
+      <ul className="admin-links">
+        {links.map((l) => (
+          <li key={l.href}>
+            <a href={l.href} target="_blank" rel="noopener noreferrer" className="admin-link">
+              <span className="admin-link-desc">{l.label}</span>
+              <span className="admin-link-url">{l.href}</span>
+              {l.desc && <small>{l.desc}</small>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function LoginPage({ onLogin }: { onLogin?: () => void }) {
   const [secret, setSecret] = useState("");
@@ -218,6 +253,7 @@ function Layout({
           Пользователи
         </NavLink>
         <NavLink to="/projects">Проекты</NavLink>
+        <NavLink to="/services">Сервисы</NavLink>
         <button type="button" className="logout" onClick={logout}>
           Выйти
         </button>
@@ -260,6 +296,18 @@ export default function App() {
           loggedIn ? (
             <Layout onLogout={() => setLoggedIn(false)}>
               <ProjectsPage />
+            </Layout>
+          ) : (
+            <LoginPage onLogin={() => setLoggedIn(true)} />
+          )
+        }
+      />
+      <Route
+        path="/services"
+        element={
+          loggedIn ? (
+            <Layout onLogout={() => setLoggedIn(false)}>
+              <ServicesPage />
             </Layout>
           ) : (
             <LoginPage onLogin={() => setLoggedIn(true)} />

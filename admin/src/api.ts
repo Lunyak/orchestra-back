@@ -1,6 +1,10 @@
 const base = () =>
   (import.meta.env.VITE_API_BASE_URL ?? "/api").replace(/\/$/, "");
 
+export function getApiBaseUrl(): string {
+  return base();
+}
+
 function headers(): HeadersInit {
   const token = sessionStorage.getItem("adminToken");
   return {
