@@ -4,6 +4,9 @@ import ReactMarkdown from "react-markdown";
 import { type PlaylistTrack } from "../playlist-sidebar/PlaylistSidebar";
 import "./style.css";
 
+/** Картинки из маркдауна (./images/xxx) → URL в MinIO для отображения на вебе */
+export type SceneImagesMap = Record<string, { remoteKey?: string; remoteUrl?: string }>;
+
 interface ShowScriptProps {
   steps?: ScriptStep[];
   title?: string;
@@ -18,6 +21,8 @@ interface ShowScriptProps {
   playlist?: PlaylistTrack[];
   lightChannels?: string[];
   onLightChannelsChange?: (channels: string[]) => void;
+  /** Картинки из сцены: имя файла → remoteUrl для отображения на вебе */
+  images?: SceneImagesMap;
 }
 
 export const ShowScript: React.FC<ShowScriptProps> = ({
@@ -31,6 +36,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   playlist,
   lightChannels: lightChannelsProp,
   onLightChannelsChange,
+  images,
 }) => {
   const [localPage, setLocalPage] = useState(0);
   const [localSteps, setLocalSteps] = useState<ScriptStep[]>(
@@ -133,6 +139,11 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
 
   const resolveImageSrc = (src?: string) => {
     if (!src) return src;
+    if (src.startsWith("data:")) return src;
+    const path = src.trim().replace(/^\.?\//, "").replace(/^images\/?/, "").trim();
+    const basename = path.split("/").pop() || path;
+    const remote = images?.[basename]?.remoteUrl;
+    if (remote && /^https?:\/\//i.test(remote)) return remote;
     return src;
   };
 

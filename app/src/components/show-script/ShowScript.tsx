@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
+import { ensureProject } from "../../sync/api";
 import './style.css';
 
 interface ShowScriptProps {
@@ -430,7 +431,40 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
         console.error("Failed to paste image:", res?.error);
         return;
       }
-      const markdownSnippet = `\n\n![image](${res.markdownPath})\n\n`;
+      const markdownPath = res.markdownPath as string;
+      const filename = markdownPath.replace(/^\.?\//, "").replace(/^images\/?/, "").trim() || markdownPath.split("/").pop() || "image.png";
+      const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const projectIdKey = `projectId:${projectName}`;
+      let projectId = typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
+      if (accessToken && !projectId) {
+        try {
+          const project = await ensureProject(accessToken, projectName, `Проект ${projectName}`);
+          projectId = project.id;
+          if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
+        } catch (_) {}
+      }
+      if (accessToken && projectId) {
+        try {
+          const api = (window as any).api;
+          if (api?.invoke) {
+            const up = (await api.invoke("upload-project-file", {
+              projectName,
+              file: filename,
+              accessToken,
+              projectId,
+              type: "image",
+            })) as { ok?: boolean; key?: string; url?: string };
+            if (up?.ok && up?.url) {
+              const current = await window.api.readProjectScene(projectName, sceneName);
+              const images = { ...(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined), [filename]: { remoteKey: up.key, remoteUrl: up.url } };
+              await window.api.saveProjectScene(projectName, sceneName, { ...current, images });
+            }
+          }
+        } catch (err) {
+          console.error("Markdown image upload failed:", err);
+        }
+      }
+      const markdownSnippet = `\n\n![image](${markdownPath})\n\n`;
       insertAtCursor(markdownSnippet);
     } catch (err) {
       console.error("Failed to paste image:", err);

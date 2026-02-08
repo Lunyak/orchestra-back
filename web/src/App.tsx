@@ -80,6 +80,8 @@ function AppInner() {
     playlist?: PlaylistTrack[];
     sounds?: HeaderSound[];
     theaterLayout?: TheaterLayout;
+    /** Картинки из маркдауна (имя файла → remoteUrl) для отображения на вебе */
+    images?: Record<string, { remoteKey?: string; remoteUrl?: string }>;
   } | null>(null);
   const [projects, setProjects] = useState<string[]>([]);
   const [projectName, setProjectName] = useState("");
@@ -986,6 +988,7 @@ function AppInner() {
                 sceneName="script"
                 canSave={isSceneReady}
                 playlist={sceneData?.playlist || []}
+                images={sceneData?.images}
                 lightChannels={lightChannels}
                 onLightChannelsChange={(next) => {
                   hasLocalEditsRef.current = true;

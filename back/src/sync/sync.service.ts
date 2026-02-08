@@ -157,6 +157,13 @@ export class SyncService {
       });
     }
 
+    const images = rawJson.images;
+    if (images && typeof images === 'object' && !Array.isArray(images)) {
+      Object.values(images).forEach((img: any) => {
+        if (img?.remoteKey) push(String(img.remoteKey));
+      });
+    }
+
     return keys;
   }
 
