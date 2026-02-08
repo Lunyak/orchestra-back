@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
+import { pruneSceneImages } from "../../shared/utils/markdownImages";
 import { ensureProject } from "../../sync/api";
 import './style.css';
 
@@ -126,7 +127,8 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const saveScene = useCallback(async () => {
     try {
       const current = await window.api.readProjectScene(projectName, sceneName);
-      const payload = { ...current, name: title, steps, lightChannels };
+      const images = pruneSceneImages(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined, steps);
+      const payload = { ...current, name: title, steps, lightChannels, images };
       const result = await window.api.saveProjectScene(
         projectName,
         sceneName,

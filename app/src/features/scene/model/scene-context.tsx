@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
+import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import {
   syncPull,
   syncPush,
@@ -244,7 +245,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     const token = accessToken ?? localStorage.getItem("accessToken");
     try {
       const current = await window.api.readProjectScene(projectName, "script");
-      const payload = { ...current, steps, theaterLayout };
+      const images = pruneSceneImages(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined, steps);
+      const payload = { ...current, steps, theaterLayout, images };
       const result = await window.api.saveProjectScene(projectName, "script", payload);
       if (!result?.ok) {
         console.error("Failed to save light plot steps:", result?.error);
