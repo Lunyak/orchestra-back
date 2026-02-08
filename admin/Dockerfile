@@ -12,11 +12,13 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Раздача статики и проксирование API на back
-FROM nginx:alpine
+# Раздача статики и проксирование API (node вместо nginx — обходим rate limit Docker Hub)
+FROM node:22-alpine
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY server.mjs ./
 
+ENV PORT=80
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.mjs"]
