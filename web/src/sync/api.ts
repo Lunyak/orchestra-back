@@ -235,3 +235,29 @@ export async function getPlayUrl(
   });
   return data;
 }
+
+/** Стрим файла по ключу с авторизацией → blob URL для воспроизведения в звуках. */
+export async function fetchSoundStreamBlobUrl(
+  accessToken: string,
+  key: string
+): Promise<string | null> {
+  try {
+    const { data } = await api.get<Blob>("/files/stream", {
+      params: { key },
+      responseType: "blob",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!data || !(data instanceof Blob)) return null;
+    if (data.size === 0) return null;
+    const type = data.type;
+    if (
+      type &&
+      !type.startsWith("audio/") &&
+      type !== "application/octet-stream"
+    )
+      return null;
+    return URL.createObjectURL(data);
+  } catch {
+    return null;
+  }
+}

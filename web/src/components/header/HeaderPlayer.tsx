@@ -148,7 +148,21 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       const key = getKeyFromFile(track.url);
       let src: string;
 
-      if (onFetchSoundBlobUrl && key) {
+      if (key && onGetPlayUrl) {
+        const urlFromKey = await onGetPlayUrl(key);
+        if (urlFromKey) src = urlFromKey;
+        else if (onFetchSoundBlobUrl) {
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
+          }
+          const blobUrl = await loadViaBlob(key);
+          src = blobUrl ?? (await resolveSoundSrc(track.url));
+          if (blobUrl) blobUrlRef.current = blobUrl;
+        } else {
+          src = await resolveSoundSrc(track.url);
+        }
+      } else if (key && onFetchSoundBlobUrl) {
         if (blobUrlRef.current) {
           URL.revokeObjectURL(blobUrlRef.current);
           blobUrlRef.current = null;

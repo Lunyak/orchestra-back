@@ -18,6 +18,7 @@ import { ScriptStepsSidebar } from "./components/script-steps-sidebar/ScriptStep
 import {
   ensureProject,
   fetchProjects,
+  fetchSoundStreamBlobUrl,
   getApiBaseUrl,
   getPlayUrl,
   getProjectMembers,
@@ -705,17 +706,7 @@ function AppInner() {
   const handleFetchSoundBlobUrl = useCallback(async (key: string): Promise<string | null> => {
     const token = accessToken || localStorage.getItem("accessToken");
     if (!token) return null;
-    try {
-      const base = getApiBaseUrl();
-      const res = await fetch(`${base}/files/stream?key=${encodeURIComponent(key)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
-      const blob = await res.blob();
-      return URL.createObjectURL(blob);
-    } catch {
-      return null;
-    }
+    return fetchSoundStreamBlobUrl(token, key);
   }, [accessToken]);
 
   const playlistNode = !isSettingsRoute ? (
