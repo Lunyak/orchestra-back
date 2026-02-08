@@ -18,11 +18,13 @@ COPY app/ ./app/
 WORKDIR /workspace/web
 RUN npm run build
 
-# Раздача статики и проксирование API
-FROM nginx:alpine
+# Раздача статики и проксирование API (node вместо nginx — не тянем образ с Docker Hub, обходим rate limit)
+FROM node:22-alpine
 
-COPY --from=builder /workspace/web/dist /usr/share/nginx/html
-COPY web/nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+COPY --from=builder /workspace/web/dist ./dist
+COPY web/server.mjs ./
 
+ENV PORT=80
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["node", "server.mjs"]
