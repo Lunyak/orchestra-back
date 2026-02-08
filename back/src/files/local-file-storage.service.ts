@@ -67,6 +67,18 @@ export class LocalFileStorageService {
     }
   }
 
+  /** Удалить файл по ключу (освобождение места при удалении из сцены). */
+  async deleteObject(key: string): Promise<void> {
+    try {
+      const p = this.pathForKey(key);
+      await fs.unlink(p);
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') {
+        console.warn('[LocalFileStorage] deleteObject failed:', key, err?.message);
+      }
+    }
+  }
+
   private keyToPath(key: string): string {
     return path.join(this.storagePath, key.replace(/\.\./g, ''));
   }

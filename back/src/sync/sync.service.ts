@@ -1,4 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { FileStorageService } from '../files/file-storage.service';
+import { LocalFileStorageService } from '../files/local-file-storage.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncChangeDto } from './dto/sync-change.dto';
@@ -8,6 +11,9 @@ export class SyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsGateway,
+    private readonly config: ConfigService,
+    private readonly fileStorage: FileStorageService,
+    private readonly localFileStorage: LocalFileStorageService,
   ) {}
 
   async applyChanges(userId: string, changes: SyncChangeDto[]) {
@@ -96,6 +102,63 @@ export class SyncService {
     });
   }
 
+  private useLocalStorage(): boolean {
+    return this.config.get<string>('STORAGE_TYPE') === 'local';
+  }
+
+  private getFileStorage(): FileStorageService | LocalFileStorageService {
+    return this.useLocalStorage() ? this.localFileStorage : this.fileStorage;
+  }
+
+  /** Из значения (URL или ключ) извлечь ключ хранилища для удаления. */
+  private fileValueToStorageKey(value: string, projectId: string): string | null {
+    if (!value || typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      const match = trimmed.match(/\/files\/play\/([^/?#]+)/);
+      if (match) {
+        try {
+          return decodeURIComponent(match[1]);
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    }
+    if (trimmed.startsWith(projectId + '/')) return trimmed;
+    return null;
+  }
+
+  /** Собрать все ключи файлов из rawJson сцены (sounds, playlist). */
+  private collectFileKeysFromScene(rawJson: any, projectId: string): Set<string> {
+    const keys = new Set<string>();
+    if (!rawJson || typeof rawJson !== 'object') return keys;
+
+    const push = (v: string) => {
+      const key = this.fileValueToStorageKey(v, projectId);
+      if (key) keys.add(key);
+    };
+
+    const sounds = rawJson.sounds;
+    if (Array.isArray(sounds)) {
+      sounds.forEach((s: any) => {
+        if (s?.file) push(String(s.file));
+        if (s?.icon) push(String(s.icon));
+      });
+    }
+
+    const playlist = rawJson.playlist;
+    if (Array.isArray(playlist)) {
+      playlist.forEach((p: any) => {
+        if (p?.file) push(String(p.file));
+        if (p?.remoteKey) push(String(p.remoteKey));
+      });
+    }
+
+    return keys;
+  }
+
   private async applySceneChange(
     userId: string,
     operation: string,
@@ -110,6 +173,25 @@ export class SyncService {
         data: { deletedAt: new Date(payload.updatedAt) },
       });
       return;
+    }
+
+    const projectId = payload?.projectId;
+    if (projectId && operation === 'update' && payload?.rawJson) {
+      const existing = await this.prisma.scene.findUnique({
+        where: { id: payload.id },
+        select: { rawJson: true },
+      });
+      const oldKeys = this.collectFileKeysFromScene(existing?.rawJson ?? null, projectId);
+      const newKeys = this.collectFileKeysFromScene(payload.rawJson, projectId);
+      const toDelete = [...oldKeys].filter((k) => !newKeys.has(k));
+      const storage = this.getFileStorage();
+      for (const key of toDelete) {
+        await storage.deleteObject(key);
+      }
+      if (toDelete.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log('[sync] deleted unused files from storage', { count: toDelete.length, keys: toDelete });
+      }
     }
 
     // eslint-disable-next-line no-console

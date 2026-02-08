@@ -9,7 +9,7 @@ import { LocalFileStorageService } from './local-file-storage.service';
   imports: [ConfigModule, AuthModule],
   providers: [FileStorageService, LocalFileStorageService],
   controllers: [FilesController],
-  exports: [FileStorageService],
+  exports: [FileStorageService, LocalFileStorageService],
 })
 export class FilesModule {}
 

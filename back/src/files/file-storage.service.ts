@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -64,6 +64,17 @@ export class FileStorageService {
 
     const url = this.getPublicUrl(key);
     return { bucket: this.bucket, key, url };
+  }
+
+  /** Удалить объект из S3/MinIO (освобождение места при удалении из сцены). */
+  async deleteObject(key: string): Promise<void> {
+    try {
+      await this.s3.send(
+        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+    } catch (err: any) {
+      console.warn('[FileStorage] deleteObject failed:', key, err?.message);
+    }
   }
 
   private buildKey(params: { projectId: string; type: string; fileName: string }): string {
