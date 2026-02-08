@@ -260,19 +260,22 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           if (payloadForServer.sounds?.length && token) {
             const uploadedSounds = [];
             for (const s of payloadForServer.sounds) {
-              let fileUrl = s.file ?? "";
+              let fileVal = s.file ?? "";
               let iconUrl = s.icon ?? "";
-              if (fileUrl && !fileUrl.startsWith("http")) {
+              let remoteKey = s.remoteKey;
+              let remoteUrl = s.remoteUrl;
+              if (fileVal && !fileVal.startsWith("http") && !s.remoteKey) {
                 try {
                   const res = await window.api.uploadProjectSound(
                     projectName,
-                    fileUrl,
+                    fileVal,
                     token,
                     projectId
                   );
-                  if (res?.ok && res.url) fileUrl = res.url;
+                  if (res?.ok && res.key) remoteKey = res.key;
+                  if (res?.ok && res.url) remoteUrl = res.url;
                 } catch (e) {
-                  console.warn("[sync] upload sound failed", fileUrl, e);
+                  console.warn("[sync] upload sound failed", fileVal, e);
                 }
               }
               if (iconUrl && !iconUrl.startsWith("http")) {
@@ -288,7 +291,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
                   console.warn("[sync] upload sound icon failed", iconUrl, e);
                 }
               }
-              uploadedSounds.push({ ...s, file: fileUrl, icon: iconUrl });
+              uploadedSounds.push({ ...s, file: fileVal, icon: iconUrl, remoteKey, remoteUrl });
             }
             payloadForServer = { ...payloadForServer, sounds: uploadedSounds };
           }
@@ -370,19 +373,22 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
       if (Array.isArray(payloadForServer.sounds) && payloadForServer.sounds.length > 0) {
         const uploadedSounds = [];
         for (const s of payloadForServer.sounds) {
-          let fileUrl = s.file ?? "";
+          let fileVal = s.file ?? "";
           let iconUrl = s.icon ?? "";
-          if (fileUrl && !String(fileUrl).startsWith("http")) {
+          let remoteKey = s.remoteKey;
+          let remoteUrl = s.remoteUrl;
+          if (fileVal && !String(fileVal).startsWith("http") && !s.remoteKey) {
             try {
               const res = await window.api.uploadProjectSound(
                 projectName,
-                fileUrl,
+                fileVal,
                 token,
                 projectId
               );
-              if (res?.ok && res.url) fileUrl = res.url;
+              if (res?.ok && res.key) remoteKey = res.key;
+              if (res?.ok && res.url) remoteUrl = res.url;
             } catch (e) {
-              console.warn("[sync] upload sound failed", fileUrl, e);
+              console.warn("[sync] upload sound failed", fileVal, e);
             }
           }
           if (iconUrl && !String(iconUrl).startsWith("http")) {
@@ -398,7 +404,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
               console.warn("[sync] upload sound icon failed", iconUrl, e);
             }
           }
-          uploadedSounds.push({ ...s, file: fileUrl, icon: iconUrl });
+          uploadedSounds.push({ ...s, file: fileVal, icon: iconUrl, remoteKey, remoteUrl });
         }
         payloadForServer = { ...payloadForServer, sounds: uploadedSounds };
       }

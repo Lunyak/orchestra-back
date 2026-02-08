@@ -144,6 +144,7 @@ export class SyncService {
     if (Array.isArray(sounds)) {
       sounds.forEach((s: any) => {
         if (s?.file) push(String(s.file));
+        if (s?.remoteKey) push(String(s.remoteKey));
         if (s?.icon) push(String(s.icon));
       });
     }

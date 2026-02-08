@@ -23,7 +23,6 @@ import { ScriptStepsSidebar } from "./components/script-steps-sidebar/ScriptStep
 import {
   ensureProject,
   fetchProjects,
-  fetchSoundStreamBlobUrl,
   getApiBaseUrl,
   getPlayUrl,
   getProjectMembers,
@@ -726,12 +725,6 @@ function AppInner() {
     }
   }, [accessToken]);
 
-  const handleFetchSoundBlobUrl = useCallback(async (key: string): Promise<string | null> => {
-    const token = accessToken || localStorage.getItem("accessToken");
-    if (!token) return null;
-    return fetchSoundStreamBlobUrl(token, key);
-  }, [accessToken]);
-
   const playlistNode = !isSettingsRoute ? (
     <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}>
       {isMobile && (
@@ -899,7 +892,6 @@ function AppInner() {
               projectName={projectName || "fools"}
               sceneName="script"
               sounds={sceneData?.sounds || []}
-              onFetchSoundBlobUrl={handleFetchSoundBlobUrl}
               onSoundsChange={async (next) => {
                 setSceneData((prev) =>
                   prev ? { ...prev, sounds: next } : { sounds: next },

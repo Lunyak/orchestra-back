@@ -39,8 +39,20 @@ export interface ProjectSummary {
 }
 
 // В React/Vite нельзя использовать process.env в браузере, только import.meta.env
-const API_BASE =
-  (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+// Если страница открыта с того же хоста (порт 80/443), всегда ходим через /api (прокси), чтобы не уходить на :3000
+function getApiBase(): string {
+  const raw = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+  if (typeof window === "undefined") return raw;
+  if (raw === "/api" || (raw.startsWith("/") && !raw.startsWith("//"))) return raw;
+  try {
+    const envUrl = new URL(raw);
+    if (envUrl.hostname === window.location.hostname && envUrl.port === "3000") return "/api";
+  } catch {
+    // ignore
+  }
+  return raw;
+}
+const API_BASE = getApiBase();
 
 // Отдельный axios-инстанс для API, чтобы повесить интерцепторы
 export const api = axios.create({
@@ -234,30 +246,4 @@ export async function getPlayUrl(
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return data;
-}
-
-/** Стрим файла по ключу с авторизацией → blob URL для воспроизведения в звуках. */
-export async function fetchSoundStreamBlobUrl(
-  accessToken: string,
-  key: string
-): Promise<string | null> {
-  try {
-    const { data } = await api.get<Blob>("/files/stream", {
-      params: { key },
-      responseType: "blob",
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!data || !(data instanceof Blob)) return null;
-    if (data.size === 0) return null;
-    const type = data.type;
-    if (
-      type &&
-      !type.startsWith("audio/") &&
-      type !== "application/octet-stream"
-    )
-      return null;
-    return URL.createObjectURL(data);
-  } catch {
-    return null;
-  }
 }

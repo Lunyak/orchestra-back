@@ -9,6 +9,10 @@ export interface HeaderSound {
   volume?: number;
   fadeMs?: number;
   loop?: boolean;
+  /** Прямая ссылка на файл (MinIO/backend), как в плейлисте */
+  remoteUrl?: string;
+  /** Ключ в хранилище — для запроса свежей ссылки при истечении */
+  remoteKey?: string;
 }
 
 interface LoadedTrack {
@@ -27,19 +31,16 @@ interface HeaderPlayerProps {
   sceneName: string;
   sounds?: HeaderSound[];
   onSoundsChange?: (sounds: HeaderSound[]) => void;
-  /** При NotSupportedError (CORS и т.п.) — загрузить по ключу и воспроизвести blob URL */
-  onFetchSoundBlobUrl?: (key: string) => Promise<string | null>;
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sounds = [],
-  onFetchSoundBlobUrl,
 }) => {
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
       id: sound.id,
       name: sound.title,
-      url: sound.file,
+      url: sound.remoteUrl ?? sound.file,
       icon: sound.icon,
       volume: sound.volume ?? 0.8,
       fadeMs: sound.fadeMs ?? 500,
@@ -50,14 +51,13 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
   const fadeTimers = useRef<Record<number, number | null>>({});
-  const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     setTracks(
       sounds.map((sound) => ({
         id: sound.id,
         name: sound.title,
-        url: sound.file,
+        url: sound.remoteUrl ?? sound.file,
         icon: sound.icon,
         volume: sound.volume ?? 0.8,
         fadeMs: sound.fadeMs ?? 500,
@@ -66,27 +66,6 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       })),
     );
   }, [sounds]);
-
-  useEffect(() => () => {
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = null;
-    }
-  }, []);
-
-  const isNotSupportedError = (err: unknown) =>
-    err instanceof DOMException && err.name === "NotSupportedError" ||
-    (err instanceof Error && /no supported source|Failed to load/i.test(err.message));
-
-  /** Ключ хранилища: из URL (/files/play/KEY, /orchestra-media/...) или сам track.url если это не URL */
-  const getKeyFromUrl = (url: string): string | null => {
-    if (!url) return null;
-    if (url.startsWith("http://") || url.startsWith("https://")) {
-      const m = url.match(/\/files\/play\/([^/?#]+)/) || url.match(/\/orchestra-media\/([^?#]+)/);
-      return m ? decodeURIComponent(m[1]) : null;
-    }
-    return url;
-  };
 
   const clearFadeTimer = (trackId: number) => {
     const timer = fadeTimers.current[trackId];
@@ -125,7 +104,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }, 30);
   };
 
-  /** Сначала по ссылке (как плейлист); при NotSupportedError (CORS) — fallback через blob. */
+  /** Воспроизведение по прямой ссылке (play-url с бэка). */
   const toggleTrack = async (track: LoadedTrack) => {
     const audio = audioRefs.current[track.id];
     if (!audio) return;
@@ -134,39 +113,16 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         console.warn("[HeaderPlayer] Нет URL у трека", track.id, track.name);
         return;
       }
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
-      let src = track.url;
-      if (audio.src !== src) {
-        audio.src = src;
+      if (audio.src !== track.url) {
+        audio.src = track.url;
       }
       audio.loop = track.loop;
       audio.volume = 0;
       try {
         await audio.play();
       } catch (error) {
-        if (isNotSupportedError(error) && onFetchSoundBlobUrl) {
-          const key = getKeyFromUrl(track.url) || track.url;
-          const blobUrl = await onFetchSoundBlobUrl(key);
-          if (blobUrl) {
-            blobUrlRef.current = blobUrl;
-            audio.src = blobUrl;
-            try {
-              await audio.play();
-            } catch (retryErr) {
-              console.error("Ошибка воспроизведения (повтор):", retryErr);
-              return;
-            }
-          } else {
-            console.error("Ошибка воспроизведения:", error);
-            return;
-          }
-        } else {
-          console.error("Ошибка воспроизведения:", error);
-          return;
-        }
+        console.error("Ошибка воспроизведения:", error);
+        return;
       }
       runFade(track.id, 0, track.volume, track.fadeMs);
       setTracks((prev) =>

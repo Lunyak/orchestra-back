@@ -9,6 +9,8 @@ export interface HeaderSound {
   volume?: number;
   fadeMs?: number;
   loop?: boolean;
+  remoteUrl?: string;
+  remoteKey?: string;
 }
 
 interface LoadedTrack {
@@ -40,7 +42,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     sounds.map((sound) => ({
       id: sound.id,
       name: sound.title,
-      url: sound.file,
+      url: sound.remoteUrl ?? sound.file,
       icon: sound.icon,
       volume: sound.volume ?? 0.8,
       fadeMs: sound.fadeMs ?? 500,
@@ -57,7 +59,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       sounds.map((sound) => ({
         id: sound.id,
         name: sound.title,
-        url: sound.file,
+        url: sound.remoteUrl ?? sound.file,
         icon: sound.icon,
         volume: sound.volume ?? 0.8,
         fadeMs: sound.fadeMs ?? 500,
