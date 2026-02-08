@@ -121,8 +121,11 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const getKeyFromFile = (file: string): string | null => {
     if (!file) return null;
     if (file.startsWith("http://") || file.startsWith("https://")) {
-      const match = file.match(/\/files\/play\/([^/?#]+)/);
-      return match ? decodeURIComponent(match[1]) : null;
+      const playMatch = file.match(/\/files\/play\/([^/?#]+)/);
+      if (playMatch) return decodeURIComponent(playMatch[1]);
+      const minioMatch = file.match(/\/orchestra-media\/([^?#]+)/);
+      if (minioMatch) return decodeURIComponent(minioMatch[1]);
+      return null;
     }
     return file;
   };
