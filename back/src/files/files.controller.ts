@@ -120,7 +120,34 @@ export class FilesController {
         return res.status(404).send('Not found');
       }
     }
-    return res.status(501).send('Stream with auth not implemented for S3');
+    try {
+      const decoded = decodeURIComponent(key);
+      const { body, contentType: s3ContentType, contentLength } = await this.storage.getObjectStream(decoded);
+      const ext = (decoded.slice(decoded.lastIndexOf('.')) || '').toLowerCase();
+      const contentType =
+        s3ContentType ||
+        (ext === '.mp3'
+          ? 'audio/mpeg'
+          : ext === '.wav'
+            ? 'audio/wav'
+            : ext === '.ogg'
+              ? 'audio/ogg'
+              : ext === '.m4a'
+                ? 'audio/mp4'
+                : ext === '.flac'
+                  ? 'audio/flac'
+                  : 'application/octet-stream');
+      res.setHeader('Content-Type', contentType);
+      if (contentLength != null) {
+        res.setHeader('Content-Length', String(contentLength));
+      }
+      return (body as any).pipe(res);
+    } catch (err: any) {
+      if (err?.name === 'NoSuchKey') {
+        return res.status(404).send('Not found');
+      }
+      throw err;
+    }
   }
 
   /** Раздача файлов из локального хранилища — постоянная ссылка, без авторизации. */

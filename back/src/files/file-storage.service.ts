@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -41,6 +41,25 @@ export class FileStorageService {
   /** Постоянная ссылка на объект. Бакет нужно открыть на чтение через MinIO CLI (mc anonymous set download). */
   getPublicUrl(key: string): string {
     return `${this.publicBaseUrl}/${this.bucket}/${key}`;
+  }
+
+  /** Стрим объекта из S3 (для раздачи с авторизацией). */
+  async getObjectStream(key: string): Promise<{
+    body: NodeJS.ReadableStream;
+    contentType?: string;
+    contentLength?: number;
+  }> {
+    const response = await this.s3.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    if (!response.Body) {
+      throw new Error('Empty body');
+    }
+    return {
+      body: response.Body as NodeJS.ReadableStream,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+    };
   }
 
   /** Сохранить файл в S3/MinIO и вернуть постоянную ссылку (без срока действия). */
