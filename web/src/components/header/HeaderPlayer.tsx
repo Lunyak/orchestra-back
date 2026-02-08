@@ -27,10 +27,13 @@ interface HeaderPlayerProps {
   sceneName: string;
   sounds?: HeaderSound[];
   onSoundsChange?: (sounds: HeaderSound[]) => void;
+  /** Запросить URL для воспроизведения по ключу хранилища (как у плейлиста) */
+  onGetPlayUrl?: (key: string) => Promise<string | null>;
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sounds = [],
+  onGetPlayUrl,
 }) => {
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
@@ -100,22 +103,60 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }, 30);
   };
 
-  // Та же логика, что и у плейлиста: URL приходит с сервера в sound.file, используем как есть
-  const resolveSoundSrc = (file: string) => file;
+  const isNotSupportedError = (err: unknown) =>
+    err instanceof DOMException && err.name === "NotSupportedError" ||
+    (err instanceof Error && /no supported source|Failed to load/i.test(err.message));
 
-  const toggleTrack = (track: LoadedTrack) => {
+  const resolveSoundSrc = async (file: string): Promise<string> => {
+    if (file.startsWith("http://") || file.startsWith("https://")) return file;
+    if (onGetPlayUrl) {
+      const url = await onGetPlayUrl(file);
+      if (url) return url;
+    }
+    return file;
+  };
+
+  const toggleTrack = async (track: LoadedTrack) => {
     const audio = audioRefs.current[track.id];
     if (!audio) return;
     if (audio.paused) {
-      const src = resolveSoundSrc(track.url);
+      let src = await resolveSoundSrc(track.url);
       if (audio.src !== src) {
         audio.src = src;
       }
       audio.loop = track.loop;
       audio.volume = 0;
-      audio.play().catch((error) => {
-        console.error("Ошибка воспроизведения:", error);
-      });
+      try {
+        await audio.play();
+      } catch (error) {
+        if (!isNotSupportedError(error)) {
+          console.error("Ошибка воспроизведения:", error);
+          return;
+        }
+        if (!onGetPlayUrl) {
+          console.error("Ошибка воспроизведения:", error);
+          return;
+        }
+        const keyToTry = track.url.startsWith("http")
+          ? (() => {
+            const match = track.url.match(/\/files\/play\/([^/?#]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+          })()
+          : track.url;
+        const freshUrl = keyToTry ? await onGetPlayUrl(keyToTry) : null;
+        if (freshUrl) {
+          audio.src = freshUrl;
+          try {
+            await audio.play();
+          } catch (retryErr) {
+            console.error("Ошибка воспроизведения (повтор):", retryErr);
+            return;
+          }
+        } else {
+          console.error("Ошибка воспроизведения:", error);
+          return;
+        }
+      }
       runFade(track.id, 0, track.volume, track.fadeMs);
       setTracks((prev) =>
         prev.map((item) =>

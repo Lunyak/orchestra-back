@@ -869,11 +869,46 @@ function AppInner() {
               projectName={projectName || "fools"}
               sceneName="script"
               sounds={sceneData?.sounds || []}
-              onSoundsChange={(next) =>
+              onGetPlayUrl={handleGetPlayUrl}
+              onSoundsChange={async (next) => {
                 setSceneData((prev) =>
                   prev ? { ...prev, sounds: next } : { sounds: next },
-                )
-              }
+                );
+
+                const tokenToUse = accessToken || localStorage.getItem("accessToken");
+                if (!tokenToUse || !projectName) return;
+
+                const projectId = await ensureRemoteProject(tokenToUse);
+                if (!projectId) return;
+
+                const sceneId = `${projectId}:script`;
+                const nowIso = new Date().toISOString();
+                const payload = {
+                  ...(sceneData || {}),
+                  sounds: next,
+                };
+
+                const change: SyncChange = {
+                  id: crypto.randomUUID(),
+                  entityType: "Scene",
+                  entityId: sceneId,
+                  operation: "update",
+                  payload: {
+                    id: sceneId,
+                    projectId,
+                    name: payload.name || `Сцена ${projectName}`,
+                    rawJson: payload,
+                    updatedAt: nowIso,
+                  },
+                  createdAt: nowIso,
+                };
+
+                try {
+                  await syncPush(tokenToUse, [change]);
+                } catch (error) {
+                  console.error("[sounds] web sounds sync push failed", error);
+                }
+              }}
             />
           </div>
         )}
