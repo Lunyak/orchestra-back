@@ -44,8 +44,8 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: web/Dockerfile
       args:
         VITE_API_BASE_URL: /api
     container_name: orkestr-web

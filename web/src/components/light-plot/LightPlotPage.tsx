@@ -56,7 +56,7 @@ export const LightPlotPage = ({
     const label = newLightLabel.trim();
     const channel = newLightChannel.trim();
     const nextId =
-      lightPlot.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
+      lightPlot.reduce((acc: number, item: LightFixture) => Math.max(acc, item.id), 0) + 1;
     const nextItem: LightFixture = {
       id: nextId,
       label: label || `Софит ${nextId}`,
@@ -79,7 +79,7 @@ export const LightPlotPage = ({
     value: LightFixture[K],
   ) => {
     updateCurrentStepPlot(
-      lightPlot.map((item) =>
+      lightPlot.map((item: LightFixture) =>
         item.id === id ? { ...item, [field]: value } : item
       )
     );
@@ -87,7 +87,7 @@ export const LightPlotPage = ({
 
   const updateLightAim = useCallback((id: number, angle: number, length: number) => {
     updateCurrentStepPlot(
-      lightPlot.map((item) =>
+      lightPlot.map((item: LightFixture) =>
         item.id === id ? { ...item, angle, length } : item
       )
     );
@@ -97,12 +97,12 @@ export const LightPlotPage = ({
     if (!currentStep || currentPage <= 0) return;
     const previous = steps[currentPage - 1];
     const source = previous?.lightPlot ?? [];
-    const cloned = source.map((item) => ({ ...item }));
+    const cloned = source.map((item: LightFixture) => ({ ...item }));
     updateCurrentStepPlot(cloned);
   };
 
   const removeLightFixture = (fixtureId: number) => {
-    updateCurrentStepPlot(lightPlot.filter((item) => item.id !== fixtureId));
+    updateCurrentStepPlot(lightPlot.filter((item: LightFixture) => item.id !== fixtureId));
   };
 
   const updateAimFromEvent = (
@@ -152,7 +152,7 @@ export const LightPlotPage = ({
           ) : lightPlot.length === 0 ? (
             <div className="light-plot-empty">Софиты не добавлены</div>
           ) : (
-            lightPlot.map((fixture) => (
+            lightPlot.map((fixture: LightFixture) => (
               <div
                 key={fixture.id}
                 className="light-plot-dot"
@@ -250,7 +250,7 @@ export const LightPlotPage = ({
           </button>
         </div>
         <div className="light-plot-list">
-          {lightPlot.map((fixture) => (
+          {lightPlot.map((fixture: LightFixture) => (
             <div key={fixture.id} className="light-plot-item">
               <input
                 type="text"

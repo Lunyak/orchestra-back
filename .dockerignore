@@ -1,0 +1,10 @@
+# При сборке web (context: .) не копировать лишнее
+node_modules
+**/node_modules
+.git
+dist
+**/dist
+*.log
+.env
+.env.*
+!.env.example

@@ -1,4 +1,8 @@
-import { ScriptStep, TheaterLayout } from "@shared/types/script";
+import {
+  ScriptRequisite,
+  ScriptStep,
+  TheaterLayout,
+} from "@shared/types/script";
 import { type AxiosError } from "axios";
 import {
   lazy,
@@ -144,7 +148,7 @@ function AppInner() {
       const insertIndex = Math.min(currentPage + 1, prev.length);
       const sourceStep = prev[currentPage];
       const nextRequisites = sourceStep?.requisites
-        ? sourceStep.requisites.map((item) => ({
+        ? sourceStep.requisites.map((item: ScriptRequisite) => ({
           ...item,
           checked: false,
         }))
@@ -895,7 +899,6 @@ function AppInner() {
               projectName={projectName || "fools"}
               sceneName="script"
               sounds={sceneData?.sounds || []}
-              onGetPlayUrl={handleGetPlayUrl}
               onFetchSoundBlobUrl={handleFetchSoundBlobUrl}
               onSoundsChange={async (next) => {
                 setSceneData((prev) =>

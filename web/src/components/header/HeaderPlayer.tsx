@@ -27,15 +27,12 @@ interface HeaderPlayerProps {
   sceneName: string;
   sounds?: HeaderSound[];
   onSoundsChange?: (sounds: HeaderSound[]) => void;
-  /** Запросить URL для воспроизведения по ключу хранилища (как у плейлиста) */
-  onGetPlayUrl?: (key: string) => Promise<string | null>;
-  /** Загрузить файл по ключу через fetch с токеном и вернуть blob URL (надёжно работает в браузере) */
+  /** При NotSupportedError (CORS и т.п.) — загрузить по ключу и воспроизвести blob URL */
   onFetchSoundBlobUrl?: (key: string) => Promise<string | null>;
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sounds = [],
-  onGetPlayUrl,
   onFetchSoundBlobUrl,
 }) => {
   const [tracks, setTracks] = useState<LoadedTrack[]>(
@@ -77,6 +74,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }
   }, []);
 
+  const isNotSupportedError = (err: unknown) =>
+    err instanceof DOMException && err.name === "NotSupportedError" ||
+    (err instanceof Error && /no supported source|Failed to load/i.test(err.message));
+
+  /** Ключ хранилища: из URL (/files/play/KEY, /orchestra-media/...) или сам track.url если это не URL */
+  const getKeyFromUrl = (url: string): string | null => {
+    if (!url) return null;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      const m = url.match(/\/files\/play\/([^/?#]+)/) || url.match(/\/orchestra-media\/([^?#]+)/);
+      return m ? decodeURIComponent(m[1]) : null;
+    }
+    return url;
+  };
+
   const clearFadeTimer = (trackId: number) => {
     const timer = fadeTimers.current[trackId];
     if (timer) {
@@ -114,76 +125,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }, 30);
   };
 
-  const isNotSupportedError = (err: unknown) =>
-    err instanceof DOMException && err.name === "NotSupportedError" ||
-    (err instanceof Error && /no supported source|Failed to load/i.test(err.message));
-
-  const getKeyFromFile = (file: string): string | null => {
-    if (!file) return null;
-    if (file.startsWith("http://") || file.startsWith("https://")) {
-      const playMatch = file.match(/\/files\/play\/([^/?#]+)/);
-      if (playMatch) return decodeURIComponent(playMatch[1]);
-      const minioMatch = file.match(/\/orchestra-media\/([^?#]+)/);
-      if (minioMatch) return decodeURIComponent(minioMatch[1]);
-      return null;
-    }
-    return file;
-  };
-
-  const resolveSoundSrc = async (file: string): Promise<string> => {
-    if (file.startsWith("http://") || file.startsWith("https://")) return file;
-    if (onGetPlayUrl) {
-      const url = await onGetPlayUrl(file);
-      if (url) return url;
-    }
-    return file;
-  };
-
-  const loadViaBlob = async (key: string): Promise<string | null> => {
-    if (!onFetchSoundBlobUrl) return null;
-    return onFetchSoundBlobUrl(key);
-  };
-
+  /** Сначала по ссылке (как плейлист); при NotSupportedError (CORS) — fallback через blob. */
   const toggleTrack = async (track: LoadedTrack) => {
     const audio = audioRefs.current[track.id];
     if (!audio) return;
     if (audio.paused) {
-      const key = getKeyFromFile(track.url);
-      let src: string;
-      const isFullUrl = track.url.startsWith("http://") || track.url.startsWith("https://");
-
-      if (isFullUrl) {
-        src = track.url;
-      } else if (key && onGetPlayUrl) {
-        const urlFromKey = await onGetPlayUrl(key);
-        if (urlFromKey) src = urlFromKey;
-        else if (onFetchSoundBlobUrl) {
-          if (blobUrlRef.current) {
-            URL.revokeObjectURL(blobUrlRef.current);
-            blobUrlRef.current = null;
-          }
-          const blobUrl = await loadViaBlob(key);
-          src = blobUrl ?? (await resolveSoundSrc(track.url));
-          if (blobUrl) blobUrlRef.current = blobUrl;
-        } else {
-          src = await resolveSoundSrc(track.url);
-        }
-      } else if (key && onFetchSoundBlobUrl) {
-        if (blobUrlRef.current) {
-          URL.revokeObjectURL(blobUrlRef.current);
-          blobUrlRef.current = null;
-        }
-        const blobUrl = await loadViaBlob(key);
-        if (blobUrl) {
-          blobUrlRef.current = blobUrl;
-          src = blobUrl;
-        } else {
-          src = await resolveSoundSrc(track.url);
-        }
-      } else {
-        src = await resolveSoundSrc(track.url);
+      if (!track.url) {
+        console.warn("[HeaderPlayer] Нет URL у трека", track.id, track.name);
+        return;
       }
-
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      let src = track.url;
       if (audio.src !== src) {
         audio.src = src;
       }
@@ -192,12 +147,9 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       try {
         await audio.play();
       } catch (error) {
-        if (isNotSupportedError(error) && key && onFetchSoundBlobUrl) {
-          if (blobUrlRef.current) {
-            URL.revokeObjectURL(blobUrlRef.current);
-            blobUrlRef.current = null;
-          }
-          const blobUrl = await loadViaBlob(key);
+        if (isNotSupportedError(error) && onFetchSoundBlobUrl) {
+          const key = getKeyFromUrl(track.url) || track.url;
+          const blobUrl = await onFetchSoundBlobUrl(key);
           if (blobUrl) {
             blobUrlRef.current = blobUrl;
             audio.src = blobUrl;

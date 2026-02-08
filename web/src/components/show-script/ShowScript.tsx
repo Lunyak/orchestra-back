@@ -408,7 +408,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
 
   const toggleRequisite = (requisiteId: number) => {
     if (!currentStep) return;
-    const nextRequisites = currentRequisites.map((item) =>
+    const nextRequisites = currentRequisites.map((item: ScriptRequisite) =>
       item.id === requisiteId ? { ...item, checked: !item.checked } : item
     );
     updateStep(currentStep.id, "requisites", nextRequisites);
@@ -416,7 +416,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
 
   const removeRequisite = (requisiteId: number) => {
     if (!currentStep) return;
-    const nextRequisites = currentRequisites.filter((item) => item.id !== requisiteId);
+    const nextRequisites = currentRequisites.filter((item: ScriptRequisite) => item.id !== requisiteId);
     updateStep(currentStep.id, "requisites", nextRequisites);
   };
 
@@ -425,7 +425,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     const label = newRequisite.trim();
     if (!label) return;
     const nextId =
-      currentRequisites.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
+      currentRequisites.reduce((acc: number, item: ScriptRequisite) => Math.max(acc, item.id), 0) + 1;
     const nextItem: ScriptRequisite = { id: nextId, label, checked: false };
     updateStep(currentStep.id, "requisites", [...currentRequisites, nextItem]);
     setNewRequisite("");
@@ -433,14 +433,14 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
 
   const copyRequisites = () => {
     if (!currentStep) return;
-    requisitesClipboardRef.current = currentRequisites.map((item) => ({ ...item }));
+    requisitesClipboardRef.current = currentRequisites.map((item: ScriptRequisite) => ({ ...item }));
   };
 
   const resetRequisites = () => {
     setSteps(
       steps.map((step) => ({
         ...step,
-        requisites: (step.requisites ?? []).map((item) => ({
+        requisites: (step.requisites ?? []).map((item: ScriptRequisite) => ({
           ...item,
           checked: false,
         })),
@@ -608,39 +608,39 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                       <ReactMarkdown
                         urlTransform={urlTransform}
                         components={{
-                          p: ({ children }: { children: React.ReactNode }) => (
+                          p: ({ children }: { children?: React.ReactNode }) => (
                             <p>{renderLightTokens(children)}</p>
                           ),
-                          li: ({ children }: { children: React.ReactNode }) => (
+                          li: ({ children }: { children?: React.ReactNode }) => (
                             <li>{renderLightTokens(children)}</li>
                           ),
-                          h1: ({ children }: { children: React.ReactNode }) => (
+                          h1: ({ children }: { children?: React.ReactNode }) => (
                             <h1>{renderLightTokens(children)}</h1>
                           ),
-                          h2: ({ children }: { children: React.ReactNode }) => (
+                          h2: ({ children }: { children?: React.ReactNode }) => (
                             <h2>{renderLightTokens(children)}</h2>
                           ),
-                          h3: ({ children }: { children: React.ReactNode }) => (
+                          h3: ({ children }: { children?: React.ReactNode }) => (
                             <h3>{renderLightTokens(children)}</h3>
                           ),
-                          h4: ({ children }: { children: React.ReactNode }) => (
+                          h4: ({ children }: { children?: React.ReactNode }) => (
                             <h4>{renderLightTokens(children)}</h4>
                           ),
-                          h5: ({ children }: { children: React.ReactNode }) => (
+                          h5: ({ children }: { children?: React.ReactNode }) => (
                             <h5>{renderLightTokens(children)}</h5>
                           ),
-                          h6: ({ children }: { children: React.ReactNode }) => (
+                          h6: ({ children }: { children?: React.ReactNode }) => (
                             <h6>{renderLightTokens(children)}</h6>
                           ),
                           blockquote: ({
                             children,
                           }: {
-                            children: React.ReactNode;
+                            children?: React.ReactNode;
                           }) => <blockquote>{renderLightTokens(children)}</blockquote>,
-                          td: ({ children }: { children: React.ReactNode }) => (
+                          td: ({ children }: { children?: React.ReactNode }) => (
                             <td>{renderLightTokens(children)}</td>
                           ),
-                          th: ({ children }: { children: React.ReactNode }) => (
+                          th: ({ children }: { children?: React.ReactNode }) => (
                             <th>{renderLightTokens(children)}</th>
                           ),
                           a: ({
@@ -772,7 +772,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                     {currentRequisites.length === 0 ? (
                       <div className="requisites-empty">Нет реквизита</div>
                     ) : (
-                      currentRequisites.map((item) => (
+                      currentRequisites.map((item: ScriptRequisite) => (
                         <label key={item.id} className="requisite-item">
                           <input
                             type="checkbox"
