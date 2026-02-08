@@ -257,43 +257,25 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           const sceneId = `${projectId}:script`;
           const nowIso = new Date().toISOString();
           let payloadForServer: any = { ...payload };
-          if (payloadForServer.sounds?.length && token) {
-            const uploadedSounds = [];
-            for (const s of payloadForServer.sounds) {
-              let fileVal = s.file ?? "";
-              let iconUrl = s.icon ?? "";
-              let remoteKey = s.remoteKey;
-              let remoteUrl = s.remoteUrl;
-              if (fileVal && !fileVal.startsWith("http") && !s.remoteKey) {
-                try {
-                  const res = await window.api.uploadProjectSound(
-                    projectName,
-                    fileVal,
-                    token,
-                    projectId
-                  );
-                  if (res?.ok && res.key) remoteKey = res.key;
-                  if (res?.ok && res.url) remoteUrl = res.url;
-                } catch (e) {
-                  console.warn("[sync] upload sound failed", fileVal, e);
-                }
+
+          let serverSounds: any[] = [];
+          try {
+            const pull = await syncPull(token, null, projectName);
+            const serverScene = pull.scenes?.find((sc: any) => sc.id === sceneId);
+            if (serverScene?.rawJson?.sounds) serverSounds = serverScene.rawJson.sounds;
+          } catch (_) {}
+
+          if (payloadForServer.sounds?.length) {
+            payloadForServer.sounds = payloadForServer.sounds.map((s: any) => {
+              const { filePath: _fp, ...rest } = s;
+              const sound = { ...rest };
+              if ((!sound.remoteKey || !sound.remoteUrl) && serverSounds.length > 0) {
+                const server = serverSounds.find((ss: any) => ss.id === s.id);
+                if (server?.remoteKey) sound.remoteKey = server.remoteKey;
+                if (server?.remoteUrl) sound.remoteUrl = server.remoteUrl;
               }
-              if (iconUrl && !iconUrl.startsWith("http")) {
-                try {
-                  const res = await window.api.uploadProjectSoundIcon(
-                    projectName,
-                    iconUrl,
-                    token,
-                    projectId
-                  );
-                  if (res?.ok && res.url) iconUrl = res.url;
-                } catch (e) {
-                  console.warn("[sync] upload sound icon failed", iconUrl, e);
-                }
-              }
-              uploadedSounds.push({ ...s, file: fileVal, icon: iconUrl, remoteKey, remoteUrl });
-            }
-            payloadForServer = { ...payloadForServer, sounds: uploadedSounds };
+              return sound;
+            });
           }
           const changes: SyncChange[] = [
             {
@@ -357,6 +339,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     }
   }, [accessToken, projectName, steps, theaterLayout, ensureRemoteProject]);
 
+  /** Как в плейлисте: звуки уже с remoteKey/remoteUrl (загружаются при добавлении). Просто пушим сцену с диска. */
   const pushSceneAfterSoundsSave = useCallback(async () => {
     const token = accessToken ?? localStorage.getItem("accessToken");
     if (!token || !projectName) return;
@@ -367,47 +350,17 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         localStorage.getItem(`projectId:${projectName}`) ??
         (await ensureRemoteProject(token));
       if (!projectId) return;
+
       const sceneId = `${projectId}:script`;
       const nowIso = new Date().toISOString();
-      let payloadForServer: any = { ...scene };
-      if (Array.isArray(payloadForServer.sounds) && payloadForServer.sounds.length > 0) {
-        const uploadedSounds = [];
-        for (const s of payloadForServer.sounds) {
-          let fileVal = s.file ?? "";
-          let iconUrl = s.icon ?? "";
-          let remoteKey = s.remoteKey;
-          let remoteUrl = s.remoteUrl;
-          if (fileVal && !String(fileVal).startsWith("http") && !s.remoteKey) {
-            try {
-              const res = await window.api.uploadProjectSound(
-                projectName,
-                fileVal,
-                token,
-                projectId
-              );
-              if (res?.ok && res.key) remoteKey = res.key;
-              if (res?.ok && res.url) remoteUrl = res.url;
-            } catch (e) {
-              console.warn("[sync] upload sound failed", fileVal, e);
-            }
-          }
-          if (iconUrl && !String(iconUrl).startsWith("http")) {
-            try {
-              const res = await window.api.uploadProjectSoundIcon(
-                projectName,
-                iconUrl,
-                token,
-                projectId
-              );
-              if (res?.ok && res.url) iconUrl = res.url;
-            } catch (e) {
-              console.warn("[sync] upload sound icon failed", iconUrl, e);
-            }
-          }
-          uploadedSounds.push({ ...s, file: fileVal, icon: iconUrl, remoteKey, remoteUrl });
-        }
-        payloadForServer = { ...payloadForServer, sounds: uploadedSounds };
-      }
+      const soundsForServer = Array.isArray(scene.sounds)
+        ? scene.sounds.map((s: any) => {
+            const { filePath: _fp, ...rest } = s;
+            return rest;
+          })
+        : scene.sounds;
+      const payloadForServer = { ...scene, sounds: soundsForServer };
+
       await syncPush(token, [
         {
           id: crypto.randomUUID(),

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { ensureProject } from "../../sync/api";
 import "./style.css";
 
 export interface HeaderSound {
@@ -11,17 +12,25 @@ export interface HeaderSound {
   loop?: boolean;
   remoteUrl?: string;
   remoteKey?: string;
+  /** Полный путь к файлу на диске (только локально, для загрузки на сервер) */
+  filePath?: string;
 }
 
 interface LoadedTrack {
   id: number;
   name: string;
+  /** URL для воспроизведения (remoteUrl или локальный file) */
   url: string;
+  /** Короткое имя файла для сохранения в сцене (как в плейлисте) */
+  file?: string;
   icon?: string;
   volume: number;
   fadeMs: number;
   loop: boolean;
   isPlaying: boolean;
+  filePath?: string;
+  remoteKey?: string;
+  remoteUrl?: string;
 }
 
 interface HeaderPlayerProps {
@@ -43,11 +52,15 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       id: sound.id,
       name: sound.title,
       url: sound.remoteUrl ?? sound.file,
+      file: sound.file,
       icon: sound.icon,
       volume: sound.volume ?? 0.8,
       fadeMs: sound.fadeMs ?? 500,
       loop: sound.loop ?? false,
       isPlaying: false,
+      filePath: sound.filePath,
+      remoteKey: sound.remoteKey,
+      remoteUrl: sound.remoteUrl,
     })),
   );
   const [showSettings, setShowSettings] = useState(false);
@@ -60,14 +73,76 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         id: sound.id,
         name: sound.title,
         url: sound.remoteUrl ?? sound.file,
+        file: sound.file,
         icon: sound.icon,
         volume: sound.volume ?? 0.8,
         fadeMs: sound.fadeMs ?? 500,
         loop: sound.loop ?? false,
         isPlaying: false,
+        filePath: sound.filePath,
+        remoteKey: sound.remoteKey,
+        remoteUrl: sound.remoteUrl,
       })),
     );
   }, [sounds]);
+
+  /** Как в плейлисте: загружаем файлы на сервер сразу и получаем remoteKey/remoteUrl. */
+  const uploadSoundsToServer = async (
+    soundsToUpload: Array<{ id: number; title: string; file: string; filePath?: string }>,
+  ): Promise<HeaderSound[]> => {
+    const accessToken =
+      typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+    if (!accessToken) return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
+
+    const projectIdKey = `projectId:${projectName}`;
+    let projectId = typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
+    if (!projectId) {
+      try {
+        const project = await ensureProject(accessToken, projectName, `Проект ${projectName}`);
+        projectId = project.id;
+        if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
+      } catch (err) {
+        console.error("[sounds] ensureProject failed", err);
+        return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
+      }
+    }
+
+    const result: HeaderSound[] = [];
+    const api = typeof window !== "undefined" ? (window as any).api : null;
+    if (!api?.invoke) {
+      console.warn("[sounds] No desktop API — upload skipped, sounds will have no remoteKey/remoteUrl");
+      return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
+    }
+    for (const s of soundsToUpload) {
+      try {
+        const res = (await api.invoke("upload-project-sound", {
+          projectName,
+          file: s.filePath || s.file,
+          accessToken,
+          projectId: projectId!,
+        })) as { ok?: boolean; key?: string; url?: string; error?: string };
+        if (res?.ok && res?.key && res?.url) {
+          result.push({
+            id: s.id,
+            title: s.title,
+            file: s.file,
+            volume: 0.8,
+            fadeMs: 500,
+            loop: false,
+            remoteKey: res.key,
+            remoteUrl: res.url,
+          });
+        } else {
+          console.error("[sounds] upload failed (no key/url)", res?.error ?? res);
+          result.push({ ...s, volume: 0.8, fadeMs: 500, loop: false });
+        }
+      } catch (err) {
+        console.error("[sounds] upload error", err);
+        result.push({ ...s, volume: 0.8, fadeMs: 500, loop: false });
+      }
+    }
+    return result;
+  };
 
   const saveSounds = async (nextTracks: LoadedTrack[]) => {
     try {
@@ -79,13 +154,14 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           return {
             id: track.id,
             title: track.name,
-            file: orig?.file ?? track.url,
+            file: orig?.file ?? track.file ?? track.url,
             icon: track.icon,
             volume: track.volume,
             fadeMs: track.fadeMs,
             loop: track.loop,
-            remoteKey: orig?.remoteKey,
-            remoteUrl: orig?.remoteUrl,
+            remoteKey: orig?.remoteKey ?? track.remoteKey,
+            remoteUrl: orig?.remoteUrl ?? track.remoteUrl,
+            filePath: orig?.filePath ?? track.filePath,
           };
         }),
       };
@@ -114,18 +190,29 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       }
 
       const maxId = tracks.reduce((acc, t) => Math.max(acc, t.id), 0);
-      const newTracks: LoadedTrack[] = res.tracks.map(
-        (track: { title: string; file: string }, index: number) => ({
+      const rawNewSounds = res.tracks.map(
+        (track: { title: string; file: string; filePath?: string }, index: number) => ({
           id: maxId + index + 1,
-          name: track.title,
-          url: track.file,
-          icon: undefined,
-          volume: 0.8,
-          fadeMs: 500,
-          loop: false,
-          isPlaying: false,
+          title: track.title,
+          file: track.file,
+          filePath: track.filePath,
         }),
       );
+      const uploadedSounds = await uploadSoundsToServer(rawNewSounds);
+      const newTracks: LoadedTrack[] = uploadedSounds.map((s) => ({
+        id: s.id,
+        name: s.title,
+        url: s.remoteUrl ?? s.file,
+        file: s.file,
+        icon: undefined,
+        volume: s.volume ?? 0.8,
+        fadeMs: s.fadeMs ?? 500,
+        loop: s.loop ?? false,
+        isPlaying: false,
+        filePath: s.filePath,
+        remoteKey: s.remoteKey,
+        remoteUrl: s.remoteUrl,
+      }));
       const nextTracks = [...tracks, ...newTracks];
       setTracks(nextTracks);
       await saveSounds(nextTracks);
@@ -136,7 +223,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
 
   const removeTrack = async (track: LoadedTrack) => {
     try {
-      const res = await window.api.deleteProjectSound(projectName, track.url);
+      const res = await window.api.deleteProjectSound(
+        projectName,
+        track.file ?? track.filePath ?? track.url,
+      );
       if (!res?.ok) {
         console.error("Failed to delete sound:", res?.error);
       }
