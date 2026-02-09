@@ -8,7 +8,14 @@ function getApiBase(): string {
   if (raw === "/api" || (raw.startsWith("/") && !raw.startsWith("//"))) return raw;
   try {
     const envUrl = new URL(raw);
-    if (envUrl.hostname === window.location.hostname && envUrl.port === "3000") return "/api";
+    // Используем /api только если hostname И порт совпадают, или если мы на стандартном порту (80/443)
+    // и есть nginx прокси на /api
+    const currentPort = window.location.port || (window.location.protocol === "https:" ? "443" : "80");
+    if (envUrl.hostname === window.location.hostname && 
+        envUrl.port === currentPort && 
+        currentPort !== "3000") {
+      return "/api";
+    }
   } catch {
     // ignore
   }
