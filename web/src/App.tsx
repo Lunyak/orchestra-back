@@ -559,6 +559,10 @@ function AppInner() {
         steps,
         theaterLayout,
         lightChannels,
+        // ВАЖНО: явно сохраняем sounds и playlist, чтобы не потерять их при автосохранении
+        sounds: baseScene.sounds,
+        playlist: baseScene.playlist,
+        images: baseScene.images,
       };
       // Теперь сохраняем и плейлист (music) в rawJson,
       // чтобы web-правки плейлиста не затирали данные с десктопа.

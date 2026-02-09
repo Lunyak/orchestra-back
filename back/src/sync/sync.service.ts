@@ -116,10 +116,20 @@ export class SyncService {
     const trimmed = value.trim();
     if (!trimmed) return null;
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      const match = trimmed.match(/\/files\/play\/([^/?#]+)/);
-      if (match) {
+      // Паттерн для /files/play/... (backend API)
+      const playMatch = trimmed.match(/\/files\/play\/([^/?#]+)/);
+      if (playMatch) {
         try {
-          return decodeURIComponent(match[1]);
+          return decodeURIComponent(playMatch[1]);
+        } catch {
+          return null;
+        }
+      }
+      // Паттерн для прямых ссылок MinIO: /orchestra-media/projectId/type/filename
+      const minioMatch = trimmed.match(/\/orchestra-media\/([^/?#]+\/[^/?#]+\/[^/?#]+)/);
+      if (minioMatch) {
+        try {
+          return decodeURIComponent(minioMatch[1]);
         } catch {
           return null;
         }
@@ -193,6 +203,21 @@ export class SyncService {
       const oldKeys = this.collectFileKeysFromScene(existing?.rawJson ?? null, projectId);
       const newKeys = this.collectFileKeysFromScene(payload.rawJson, projectId);
       const toDelete = [...oldKeys].filter((k) => !newKeys.has(k));
+      
+      // Дополнительное логирование для отладки
+      if (toDelete.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log('[sync] detected unused files', {
+          sceneId: payload.id,
+          oldKeysCount: oldKeys.size,
+          newKeysCount: newKeys.size,
+          toDeleteCount: toDelete.length,
+          oldKeys: [...oldKeys],
+          newKeys: [...newKeys],
+          toDelete,
+        });
+      }
+      
       const storage = this.getFileStorage();
       for (const key of toDelete) {
         await storage.deleteObject(key);
