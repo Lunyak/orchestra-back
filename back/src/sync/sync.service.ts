@@ -146,6 +146,7 @@ export class SyncService {
         if (s?.file) push(String(s.file));
         if (s?.remoteKey) push(String(s.remoteKey));
         if (s?.icon) push(String(s.icon));
+        if (s?.iconRemoteKey) push(String(s.iconRemoteKey));
       });
     }
 

@@ -165,13 +165,15 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
             title: track.name,
             file: orig?.file ?? track.file ?? track.url,
             icon: track.icon,
-            iconRemoteKey: orig?.iconRemoteKey ?? track.iconRemoteKey,
-            iconRemoteUrl: orig?.iconRemoteUrl ?? track.iconRemoteUrl,
+            // Приоритет у новых значений (track), чтобы при повторном добавлении обновлялись ссылки
+            iconRemoteKey: track.iconRemoteKey ?? orig?.iconRemoteKey,
+            iconRemoteUrl: track.iconRemoteUrl ?? orig?.iconRemoteUrl,
             volume: track.volume,
             fadeMs: track.fadeMs,
             loop: track.loop,
-            remoteKey: orig?.remoteKey ?? track.remoteKey,
-            remoteUrl: orig?.remoteUrl ?? track.remoteUrl,
+            // Приоритет у новых значений (track), чтобы при повторном добавлении обновлялись ссылки
+            remoteKey: track.remoteKey ?? orig?.remoteKey,
+            remoteUrl: track.remoteUrl ?? orig?.remoteUrl,
             filePath: orig?.filePath ?? track.filePath,
           };
         }),
