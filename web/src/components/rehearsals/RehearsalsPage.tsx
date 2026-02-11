@@ -42,12 +42,6 @@ function formatMemberLabel(m: MemberInfo): string {
   return name ? `${name} (${m.email})` : m.email;
 }
 
-function parseTime(v: string): string {
-  const t = String(v ?? "").trim();
-  if (!/^\d{2}:\d{2}$/.test(t)) return "19:00";
-  return t;
-}
-
 export function RehearsalsPage({
   accessToken,
   projectSlug,
@@ -124,7 +118,7 @@ export function RehearsalsPage({
     Promise.all(
       missing.slice(0, 20).map(async (id) => {
         const data = await planRehearsal(accessToken, id);
-        const notReady = (data.items ?? []).filter((x) => !x.ready).length;
+        const notReady = (data.items ?? []).filter((x: { ready: boolean }) => !x.ready).length;
         return { id, notReady };
       })
     )

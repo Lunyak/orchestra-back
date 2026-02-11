@@ -123,14 +123,14 @@ export function SpectaclePage() {
         steps={steps}
         currentIndex={currentPage}
         onSelect={setCurrentPage}
-        onPrev={() => setCurrentPage((p) => Math.max(0, p - 1))}
+        onPrev={() => setCurrentPage((p: number) => Math.max(0, p - 1))}
         onNext={() =>
-          setCurrentPage((p) => Math.min(steps.length - 1, p + 1))
+          setCurrentPage((p: number) => Math.min(steps.length - 1, p + 1))
         }
         onDelete={deleteStep}
         onReorder={reorderSteps}
         isEditing={isEditing}
-        onToggleEditing={() => setIsEditing((p) => !p)}
+        onToggleEditing={() => setIsEditing((p: boolean) => !p)}
         onAddStep={addStep}
       />
     ) : null;

@@ -1,4 +1,4 @@
-import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
+import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
 import { refreshToken } from "./auth";
 
 export type SyncOperation = "create" | "update" | "delete";
@@ -57,7 +57,7 @@ function notifyTokenRefreshed(token: string | null) {
 }
 
 api.interceptors.response.use(
-  (response) => response,
+  (response: AxiosResponse) => response,
   async (error: AxiosError) => {
     const status = error.response?.status;
     const originalConfig = error.config as
