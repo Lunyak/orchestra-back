@@ -1,4 +1,8 @@
-import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
+import axios, {
+  type AxiosError,
+  type AxiosRequestConfig,
+  type AxiosResponse,
+} from "axios";
 import { refreshToken } from "./auth";
 
 export type SyncOperation = "create" | "update" | "delete";
@@ -99,9 +103,8 @@ api.interceptors.response.use(
       notifyTokenRefreshed(tokens.accessToken);
 
       originalConfig.headers = originalConfig.headers ?? {};
-      (
-        originalConfig.headers as any
-      ).Authorization = `Bearer ${tokens.accessToken}`;
+      (originalConfig.headers as any).Authorization =
+        `Bearer ${tokens.accessToken}`;
       return api(originalConfig);
     } catch (e) {
       notifyTokenRefreshed(null);
@@ -115,7 +118,7 @@ api.interceptors.response.use(
     } finally {
       isRefreshing = false;
     }
-  }
+  },
 );
 
 export function getApiBaseUrl(): string {
@@ -132,7 +135,7 @@ export async function syncPush(accessToken: string, changes: SyncChange[]) {
 export async function syncPull(
   accessToken: string,
   lastSyncAt: string | null,
-  projectSlug?: string
+  projectSlug?: string,
 ): Promise<SyncPullResponse> {
   const body: SyncPullRequest = { lastSyncAt };
   if (projectSlug) body.projectSlug = projectSlug;
@@ -143,7 +146,7 @@ export async function syncPull(
 }
 
 export async function fetchProjects(
-  accessToken: string
+  accessToken: string,
 ): Promise<ProjectSummary[]> {
   const { data } = await api.get<ProjectSummary[]>("/projects", {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -154,7 +157,7 @@ export async function fetchProjects(
 export async function ensureProject(
   accessToken: string,
   slug: string,
-  name?: string
+  name?: string,
 ): Promise<ProjectSummary> {
   const projects = await fetchProjects(accessToken);
   const existing = projects.find((p) => p.slug === slug);
@@ -166,7 +169,7 @@ export async function ensureProject(
       { slug, name: name ?? slug },
       {
         headers: { Authorization: `Bearer ${accessToken}` },
-      }
+      },
     );
     return data;
   } catch (error: any) {
@@ -184,14 +187,14 @@ export async function inviteToProject(
   accessToken: string,
   slug: string,
   email: string,
-  role?: string
+  role?: string,
 ): Promise<{ id: string; projectId: string; userId: string; role: string }> {
   const { data } = await api.post(
     `/projects/${encodeURIComponent(slug)}/invite`,
     { email: email.trim(), role: role ?? "editor" },
     {
       headers: { Authorization: `Bearer ${accessToken}` },
-    }
+    },
   );
   return data;
 }
@@ -204,11 +207,11 @@ export interface ProjectMemberInfo {
 
 export async function getProjectMembers(
   accessToken: string,
-  slug: string
+  slug: string,
 ): Promise<{ id: string; members: ProjectMemberInfo[] }> {
   const { data } = await api.get(
     `/projects/${encodeURIComponent(slug)}/members`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
 }
@@ -232,7 +235,7 @@ export async function getMyProfile(accessToken: string): Promise<MyProfile> {
 
 export async function updateMyProfile(
   accessToken: string,
-  patch: Partial<MyProfile>
+  patch: Partial<MyProfile>,
 ): Promise<MyProfile> {
   const { data } = await api.patch<MyProfile>("/profile", patch, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -261,8 +264,11 @@ export async function listRehearsals(
   accessToken: string,
   projectSlug: string,
   from?: string,
-  to?: string
-): Promise<{ project: { id: string; slug: string; name: string }; rehearsals: Rehearsal[] }> {
+  to?: string,
+): Promise<{
+  project: { id: string; slug: string; name: string };
+  rehearsals: Rehearsal[];
+}> {
   const { data } = await api.get("/rehearsals", {
     params: { projectSlug, from, to },
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -272,7 +278,13 @@ export async function listRehearsals(
 
 export async function createRehearsal(
   accessToken: string,
-  body: { projectSlug: string; title: string; startsAt: string; durationMin?: number; notes?: string }
+  body: {
+    projectSlug: string;
+    title: string;
+    startsAt: string;
+    durationMin?: number;
+    notes?: string;
+  },
 ): Promise<Rehearsal> {
   const { data } = await api.post("/rehearsals", body, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -283,21 +295,30 @@ export async function createRehearsal(
 export async function setRehearsalParticipants(
   accessToken: string,
   rehearsalId: string,
-  body: { participants: Array<{ email: string; status: RehearsalParticipantStatus; roles?: any }> }
+  body: {
+    participants: Array<{
+      email: string;
+      status: RehearsalParticipantStatus;
+      roles?: any;
+    }>;
+  },
 ): Promise<Rehearsal> {
   const { data } = await api.post(
     `/rehearsals/${encodeURIComponent(rehearsalId)}/participants`,
     body,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
 }
 
-export async function planRehearsal(accessToken: string, rehearsalId: string): Promise<any> {
+export async function planRehearsal(
+  accessToken: string,
+  rehearsalId: string,
+): Promise<any> {
   const { data } = await api.post(
     `/rehearsals/${encodeURIComponent(rehearsalId)}/plan`,
     null,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
 }
@@ -306,14 +327,14 @@ export async function updateProjectMemberRole(
   accessToken: string,
   slug: string,
   memberId: string,
-  role: "editor" | "viewer"
+  role: "editor" | "viewer",
 ): Promise<ProjectMemberInfo> {
   const { data } = await api.patch(
     `/projects/${encodeURIComponent(slug)}/members/${encodeURIComponent(
-      memberId
+      memberId,
     )}`,
     { role },
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
 }
@@ -321,19 +342,19 @@ export async function updateProjectMemberRole(
 export async function removeProjectMember(
   accessToken: string,
   slug: string,
-  memberId: string
+  memberId: string,
 ): Promise<void> {
   await api.delete(
     `/projects/${encodeURIComponent(slug)}/members/${encodeURIComponent(
-      memberId
+      memberId,
     )}`,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
 }
 
 export async function getPlayUrl(
   accessToken: string,
-  key: string
+  key: string,
 ): Promise<{ url: string }> {
   const { data } = await api.get<{ url: string }>("/files/play-url", {
     params: { key },
@@ -344,7 +365,7 @@ export async function getPlayUrl(
 
 export async function fetchSoundStreamBlobUrl(
   accessToken: string,
-  key: string
+  key: string,
 ): Promise<string | null> {
   try {
     const { data } = await api.get<Blob>("/files/stream", {

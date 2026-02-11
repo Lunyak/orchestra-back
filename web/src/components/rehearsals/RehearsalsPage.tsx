@@ -130,8 +130,8 @@ export function RehearsalsPage({
           return next;
         });
       })
-      .catch(() => {})
-      .finally(() => {});
+      .catch(() => { })
+      .finally(() => { });
     return () => {
       cancelled = true;
     };
@@ -239,9 +239,8 @@ export function RehearsalsPage({
                   <button
                     key={r.id}
                     type="button"
-                    className={`rehearsals-item ${activeRehearsal?.id === r.id ? "active" : ""} ${
-                      isBad ? "bad" : ""
-                    }`}
+                    className={`rehearsals-item ${activeRehearsal?.id === r.id ? "active" : ""} ${isBad ? "bad" : ""
+                      }`}
                     onClick={() => setActiveRehearsalId(r.id)}
                     title={isBad ? `Не собирается шагов: ${notReady}` : undefined}
                   >

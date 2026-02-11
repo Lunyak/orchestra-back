@@ -80,7 +80,7 @@ export function SpectaclePage() {
         ? "light-plot"
         : location.pathname === "/board"
           ? "board"
-        : "script";
+          : "script";
 
   React.useEffect(() => {
     localStorage.setItem("activeView", activeView);
