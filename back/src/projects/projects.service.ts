@@ -244,7 +244,12 @@ export class ProjectsService {
           select: {
             id: true,
             role: true,
-            user: { select: { id: true, email: true } },
+            user: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
           },
         },
       },
@@ -257,9 +262,27 @@ export class ProjectsService {
         'Только владелец проекта может просматривать список участников',
       );
     }
+
+    const emails = project.members
+      .map((m) => m.user.email)
+      .filter(Boolean)
+      .map((e) => e.trim().toLowerCase());
+    const profiles = await this.prisma.userProfile.findMany({
+      where: { email: { in: emails } },
+      select: { email: true, displayName: true },
+    });
+    const displayNameByEmail = new Map(profiles.map((p) => [p.email, p.displayName]));
+
     return {
       id: project.id,
-      members: project.members,
+      members: project.members.map((m) => ({
+        ...m,
+        user: {
+          ...m.user,
+          displayName:
+            displayNameByEmail.get(m.user.email.trim().toLowerCase()) ?? null,
+        },
+      })),
     };
   }
 

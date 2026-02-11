@@ -1,0 +1,48 @@
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
+import { SetParticipantsDto } from './dto/set-participants.dto';
+import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
+import { RehearsalsService } from './rehearsals.service';
+
+@UseGuards(JwtAuthGuard)
+@Controller('rehearsals')
+export class RehearsalsController {
+  constructor(private readonly rehearsals: RehearsalsService) {}
+
+  @Get()
+  list(
+    @Req() req: any,
+    @Query('projectSlug') projectSlug: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.rehearsals.list(req.user.userId, projectSlug, from, to);
+  }
+
+  @Post()
+  create(@Req() req: any, @Body() body: CreateRehearsalDto) {
+    return this.rehearsals.create(req.user.userId, body, 'web');
+  }
+
+  @Get(':id')
+  get(@Req() req: any, @Param('id') id: string) {
+    return this.rehearsals.get(req.user.userId, id);
+  }
+
+  @Patch(':id')
+  update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateRehearsalDto) {
+    return this.rehearsals.update(req.user.userId, id, body);
+  }
+
+  @Post(':id/participants')
+  setParticipants(@Req() req: any, @Param('id') id: string, @Body() body: SetParticipantsDto) {
+    return this.rehearsals.setParticipants(req.user.userId, id, body);
+  }
+
+  @Post(':id/plan')
+  plan(@Req() req: any, @Param('id') id: string) {
+    return this.rehearsals.plan(req.user.userId, id);
+  }
+}
+

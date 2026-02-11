@@ -236,7 +236,12 @@ export function SpectaclePage() {
                 <KanbanBoardPage
                   steps={steps}
                   onStepsChange={setSteps}
-                  memberEmails={(projectMembers ?? []).map((m: any) => m.user?.email).filter(Boolean)}
+                  members={(projectMembers ?? [])
+                    .map((m: any) => ({
+                      email: m.user?.email,
+                      displayName: m.user?.displayName ?? null,
+                    }))
+                    .filter((x: any) => Boolean(x.email))}
                 />
               </Suspense>
             )}

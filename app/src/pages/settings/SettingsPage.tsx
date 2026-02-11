@@ -136,7 +136,9 @@ export function SettingsPage() {
                         {projectMembers.map((m) => (
                           <li key={m.id} className="settings-member-row">
                             <span className="settings-member-email">
-                              {m.user.email}
+                              {m.user.displayName
+                                ? `${m.user.displayName} (${m.user.email})`
+                                : m.user.email}
                             </span>
                             <div className="settings-member-actions">
                               <label className="settings-member-role">

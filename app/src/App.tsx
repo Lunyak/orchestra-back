@@ -5,6 +5,8 @@ import { ProjectProvider } from "./features/project";
 import { SceneProvider } from "./features/scene";
 import { ScriptUIProvider } from "./features/script-ui";
 import { LoginPage } from "./pages/login/LoginPage";
+import { ProfilePage } from "./pages/profile/ProfilePage";
+import { RehearsalsPage } from "./pages/rehearsals/RehearsalsPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import { SpectaclePage } from "./pages/spectacle/SpectaclePage";
 import { PlatformProvider } from "./PlatformContext";
@@ -32,6 +34,8 @@ function AppRoutes() {
             <Route path="/theater" element={<SpectaclePage />} />
             <Route path="/light-plot" element={<SpectaclePage />} />
             <Route path="/board" element={<SpectaclePage />} />
+            <Route path="/rehearsals" element={<RehearsalsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </ScriptUIProvider>

@@ -23,6 +23,7 @@ import { ScriptStepsSidebar } from "./components/script-steps-sidebar/ScriptStep
 import {
   ensureProject,
   fetchProjects,
+  getMyProfile,
   getApiBaseUrl,
   getPlayUrl,
   getProjectMembers,
@@ -31,6 +32,7 @@ import {
   syncPush,
   type ProjectMemberInfo,
   type SyncChange,
+  updateMyProfile,
 } from "./sync/api";
 import { login, register } from "./sync/auth";
 
@@ -55,6 +57,18 @@ const TheaterPlaceholder = lazy(() =>
 const KanbanBoardPage = lazy(() =>
   import("./components/kanban/KanbanBoardPage").then((module) => ({
     default: module.KanbanBoardPage,
+  }))
+);
+
+const ProfilePage = lazy(() =>
+  import("./components/profile/ProfilePage").then((module) => ({
+    default: module.ProfilePage,
+  }))
+);
+
+const RehearsalsPage = lazy(() =>
+  import("./components/rehearsals/RehearsalsPage").then((module) => ({
+    default: module.RehearsalsPage,
   }))
 );
 
@@ -150,6 +164,7 @@ function AppInner() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [projectMembers, setProjectMembers] = useState<ProjectMemberInfo[]>([]);
+  const [myProfile, setMyProfile] = useState<Awaited<ReturnType<typeof getMyProfile>> | null>(null);
   const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
   const initialSyncRef = useRef(false);
   const socketRef = useRef<Socket | null>(null);
@@ -664,11 +679,21 @@ function AppInner() {
     setAccessToken(null);
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
+    setMyProfile(null);
   }, []);
 
   useEffect(() => {
+    if (!accessToken) return;
+    getMyProfile(accessToken)
+      .then((p) => setMyProfile(p))
+      .catch(() => setMyProfile(null));
+  }, [accessToken]);
+
+  useEffect(() => {
     if (
-      (location.pathname !== "/settings" && location.pathname !== "/board") ||
+      (location.pathname !== "/settings" &&
+        location.pathname !== "/board" &&
+        location.pathname !== "/rehearsals") ||
       !accessToken ||
       !projectName
     ) {
@@ -739,7 +764,9 @@ function AppInner() {
 
   const isSettingsRoute = location.pathname === "/settings";
   const isBoardRoute = location.pathname === "/board";
-  const isAuxRoute = isSettingsRoute || isBoardRoute;
+  const isProfileRoute = location.pathname === "/profile";
+  const isRehearsalsRoute = location.pathname === "/rehearsals";
+  const isAuxRoute = isSettingsRoute || isBoardRoute || isProfileRoute || isRehearsalsRoute;
   const shouldShowStepsSidebar =
     !isAuxRoute &&
     (activeView === "script" || activeView === "light-plot" || activeView === "theater");
@@ -1043,7 +1070,10 @@ function AppInner() {
                   hasLocalEditsRef.current = true;
                   setSteps(next);
                 }}
-                memberEmails={projectMembers.map((m) => m.user.email)}
+                members={projectMembers.map((m) => ({
+                  email: m.user.email,
+                  displayName: m.user.displayName ?? null,
+                }))}
               />
             </Suspense>
           )}
@@ -1108,6 +1138,54 @@ function AppInner() {
         <Route path="/light-plot" element={SpectacleLayout} />
         <Route path="/board" element={SpectacleLayout} />
         <Route
+          path="/rehearsals"
+          element={
+            <div className="app-layout">
+              <div className="app-content">
+                <main className="main-content settings-main">
+                  <div className="settings-view">
+                    <Suspense fallback={<div>Загрузка...</div>}>
+                      <RehearsalsPage
+                        accessToken={accessToken}
+                        projectSlug={projectName || "fools"}
+                        members={projectMembers.map((m) => ({
+                          email: m.user.email,
+                          displayName: m.user.displayName ?? null,
+                        }))}
+                      />
+                    </Suspense>
+                  </div>
+                </main>
+              </div>
+            </div>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <div className="app-layout">
+              <div className="app-content">
+                <main className="main-content settings-main">
+                  <div className="settings-view">
+                    <Suspense fallback={<div>Загрузка...</div>}>
+                      <ProfilePage
+                        accessToken={accessToken}
+                        profile={myProfile}
+                        onProfileChange={setMyProfile}
+                        onSave={async (patch) => {
+                          if (!accessToken) return;
+                          const next = await updateMyProfile(accessToken, patch);
+                          setMyProfile(next);
+                        }}
+                      />
+                    </Suspense>
+                  </div>
+                </main>
+              </div>
+            </div>
+          }
+        />
+        <Route
           path="/settings"
           element={
             <div className="app-layout">
@@ -1168,7 +1246,7 @@ function AppInner() {
                               <ul>
                                 {projectMembers.map((m) => (
                                   <li key={m.id}>
-                                    {m.user.email} — {m.role}
+                                    {(m.user.displayName || m.user.email)} — {m.role}
                                   </li>
                                 ))}
                               </ul>

@@ -85,6 +85,21 @@
   align-items: start;
 }
 
+.kanban-role-input-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.kanban-role-hint {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.kanban-role-hint.warn {
+  color: rgba(255, 190, 120, 0.95);
+  opacity: 1;
+}
+
 .kanban-col {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);

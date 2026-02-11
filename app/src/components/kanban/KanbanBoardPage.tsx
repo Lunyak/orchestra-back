@@ -64,6 +64,34 @@ function extractRolesSmart(text?: string): string[] {
   return Array.from(new Set([...a, ...b]));
 }
 
+type MemberInfo = { email: string; displayName?: string | null };
+
+function normalizeEmail(v: string): string {
+  return String(v ?? "").trim().toLowerCase();
+}
+
+function looksLikeEmail(v: string): boolean {
+  return /.+@.+\..+/.test(v);
+}
+
+function resolveActorEmail(value: string, members: MemberInfo[]): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (looksLikeEmail(raw)) return normalizeEmail(raw);
+  const lower = raw.toLowerCase();
+  const hits = members.filter(
+    (m) => (m.displayName ?? "").trim().toLowerCase() === lower,
+  );
+  if (hits.length === 1) return normalizeEmail(hits[0].email);
+  return null;
+}
+
+function formatMemberLabel(m: MemberInfo): string {
+  const name = String(m.displayName ?? "").trim();
+  if (!name) return m.email;
+  return `${name} (${m.email})`;
+}
+
 function normalizeMissingOrders(steps: ScriptStep[]): ScriptStep[] {
   let changed = false;
   const next = steps.map((s, idx) => {
@@ -149,11 +177,11 @@ function applyMove(
 export function KanbanBoardPage({
   steps,
   onStepsChange,
-  memberEmails,
+  members,
 }: {
   steps: ScriptStep[];
   onStepsChange: React.Dispatch<React.SetStateAction<ScriptStep[]>>;
-  memberEmails?: string[];
+  members?: MemberInfo[];
 }) {
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [openedStepId, setOpenedStepId] = useState<number | null>(null);
@@ -161,6 +189,19 @@ export function KanbanBoardPage({
   const [roleFilter, setRoleFilter] = useState<string>("");
   const [actorFilter, setActorFilter] = useState<string>("");
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
+
+  const normalizedMembers: MemberInfo[] = useMemo(() => {
+    const ms = Array.isArray(members) ? members : [];
+    const uniq = new Map<string, MemberInfo>();
+    for (const m of ms) {
+      const email = normalizeEmail(m.email);
+      if (!email) continue;
+      uniq.set(email, { email, displayName: m.displayName ?? null });
+    }
+    return Array.from(uniq.values()).sort((a, b) =>
+      formatMemberLabel(a).localeCompare(formatMemberLabel(b), "ru"),
+    );
+  }, [members]);
 
   const normalizedSteps = useMemo(() => normalizeMissingOrders(steps), [steps]);
 
@@ -474,22 +515,47 @@ export function KanbanBoardPage({
                     {openedRoles.map((role) => (
                       <label key={role} className="kanban-role-row">
                         <span className="kanban-role-name">{role}</span>
-                        <input
-                          value={(openedStep.cast?.[role] ?? "") as string}
-                          onChange={(e) => setRoleActor(openedStep.id, role, e.target.value)}
-                          placeholder="исполнитель (имя/почта)"
-                          list={memberEmails && memberEmails.length ? "kanban-members" : undefined}
-                        />
+                        <div className="kanban-role-input-wrap">
+                          <input
+                            value={(openedStep.cast?.[role] ?? "") as string}
+                            onChange={(e) => setRoleActor(openedStep.id, role, e.target.value)}
+                            placeholder="исполнитель (лучше email)"
+                            list={
+                              normalizedMembers.length ? "kanban-members" : undefined
+                            }
+                          />
+                          {(() => {
+                            const raw = String(openedStep.cast?.[role] ?? "").trim();
+                            if (!raw) return null;
+                            const email = resolveActorEmail(raw, normalizedMembers);
+                            if (!email) {
+                              return (
+                                <div className="kanban-role-hint warn">
+                                  Не удалось сопоставить с участником проекта
+                                </div>
+                              );
+                            }
+                            const m = normalizedMembers.find(
+                              (x) => normalizeEmail(x.email) === email,
+                            );
+                            if (!m) return null;
+                            return (
+                              <div className="kanban-role-hint">{formatMemberLabel(m)}</div>
+                            );
+                          })()}
+                        </div>
                       </label>
                     ))}
                   </div>
                 )}
               </div>
 
-              {memberEmails && memberEmails.length > 0 && (
+              {normalizedMembers.length > 0 && (
                 <datalist id="kanban-members">
-                  {memberEmails.map((email) => (
-                    <option key={email} value={email} />
+                  {normalizedMembers.map((m) => (
+                    <option key={m.email} value={m.email}>
+                      {formatMemberLabel(m)}
+                    </option>
                   ))}
                 </datalist>
               )}

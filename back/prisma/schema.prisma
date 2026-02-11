@@ -21,6 +21,21 @@ model User {
   projectMemberships ProjectMember[]
 }
 
+model UserProfile {
+  /// Профиль по email.
+  /// ВАЖНО: не привязываем FK к User, чтобы бот мог заливать профили
+  /// даже для тех, кто ещё не зарегистрирован в сервисе.
+  email            String   @id
+  displayName      String?
+  firstName        String?
+  lastName         String?
+  telegramUsername String?
+  telegramId       String?
+  avatarUrl        String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model SubscriptionPlan {
   id                         String   @id @default(cuid())
   name                       String   @unique
@@ -45,8 +60,48 @@ model Project {
   scenes      Scene[]
   members     ProjectMember[]
   modelFiles  ProjectModelFile[]
+  rehearsals  Rehearsal[]
 
   @@index([ownerId])
+}
+
+enum RehearsalParticipantStatus {
+  unknown
+  present
+  absent
+}
+
+model Rehearsal {
+  id            String   @id @default(cuid())
+  projectId     String
+  title         String
+  startsAt      DateTime
+  durationMin   Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?
+  createdVia    String?  // "web" | "bot" и т.п.
+
+  project       Project  @relation(fields: [projectId], references: [id])
+  participants  RehearsalParticipant[]
+
+  @@index([projectId, startsAt])
+}
+
+model RehearsalParticipant {
+  id           String                     @id @default(cuid())
+  rehearsalId  String
+  email        String
+  status       RehearsalParticipantStatus @default(unknown)
+  roles        Json?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  rehearsal    Rehearsal                  @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+
+  @@unique([rehearsalId, email])
+  @@index([email])
 }
 
 model ProjectMember {

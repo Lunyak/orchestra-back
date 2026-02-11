@@ -21,7 +21,9 @@ export function useTeam() {
 
   useEffect(() => {
     if (
-      (location.pathname !== "/settings" && location.pathname !== "/board") ||
+      (location.pathname !== "/settings" &&
+        location.pathname !== "/board" &&
+        location.pathname !== "/rehearsals") ||
       !accessToken ||
       !projectName
     )

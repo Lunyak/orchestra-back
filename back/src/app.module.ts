@@ -10,6 +10,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProjectsModule } from './projects/projects.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
+import { BotModule } from './bot/bot.module';
+import { ProfileModule } from './profile/profile.module';
+import { RehearsalsModule } from './rehearsals/rehearsals.module';
 
 @Module({
   imports: [
@@ -19,9 +22,12 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     ProjectsModule,
     SyncModule,
+    ProfileModule,
+    RehearsalsModule,
     NotificationsModule,
     FilesModule,
     AdminModule,
+    BotModule,
   ],
   controllers: [AppController],
   providers: [AppService],

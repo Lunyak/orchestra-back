@@ -228,7 +228,7 @@ export async function inviteToProject(
 export interface ProjectMemberInfo {
   id: string;
   role: string;
-  user: { id: string; email: string };
+  user: { id: string; email: string; displayName?: string | null };
 }
 
 /** Список участников проекта. Только владелец видит; при 403 — не владелец. */
@@ -240,6 +240,91 @@ export async function getProjectMembers(
     `/projects/${encodeURIComponent(slug)}/members`,
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
+  return data;
+}
+
+export interface MyProfile {
+  email: string;
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  telegramUsername?: string | null;
+  telegramId?: string | null;
+  avatarUrl?: string | null;
+}
+
+export async function getMyProfile(accessToken: string): Promise<MyProfile> {
+  const { data } = await api.get<MyProfile>("/profile", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function updateMyProfile(
+  accessToken: string,
+  patch: Partial<MyProfile>
+): Promise<MyProfile> {
+  const { data } = await api.patch<MyProfile>("/profile", patch, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export type RehearsalParticipantStatus = "unknown" | "present" | "absent";
+
+export interface RehearsalParticipant {
+  id: string;
+  email: string;
+  status: RehearsalParticipantStatus;
+}
+
+export interface Rehearsal {
+  id: string;
+  title: string;
+  startsAt: string;
+  durationMin?: number | null;
+  notes?: string | null;
+  participants?: RehearsalParticipant[];
+}
+
+export async function listRehearsals(
+  accessToken: string,
+  projectSlug: string,
+  from?: string,
+  to?: string
+): Promise<{ project: { id: string; slug: string; name: string }; rehearsals: Rehearsal[] }> {
+  const { data } = await api.get("/rehearsals", {
+    params: { projectSlug, from, to },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function createRehearsal(
+  accessToken: string,
+  body: { projectSlug: string; title: string; startsAt: string; durationMin?: number; notes?: string }
+): Promise<Rehearsal> {
+  const { data } = await api.post("/rehearsals", body, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function setRehearsalParticipants(
+  accessToken: string,
+  rehearsalId: string,
+  body: { participants: Array<{ email: string; status: RehearsalParticipantStatus; roles?: any }> }
+): Promise<Rehearsal> {
+  const { data } = await api.post(`/rehearsals/${encodeURIComponent(rehearsalId)}/participants`, body, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function planRehearsal(accessToken: string, rehearsalId: string): Promise<any> {
+  const { data } = await api.post(`/rehearsals/${encodeURIComponent(rehearsalId)}/plan`, null, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   return data;
 }
 
