@@ -71,7 +71,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   const [theaterLayout, setTheaterLayoutState] = useState<TheaterLayout>(DEFAULT_THEATER_LAYOUT);
   const [currentPage, setCurrentPage] = useState(0);
   const [isSceneReady, setIsSceneReady] = useState(false);
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(() =>
+  const [, setLastSyncAt] = useState<string | null>(() =>
     localStorage.getItem("lastSyncAt")
   );
 
