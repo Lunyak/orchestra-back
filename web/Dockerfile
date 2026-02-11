@@ -7,9 +7,11 @@ WORKDIR /workspace
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-# Сначала зависимости web
+# Сначала зависимости web и app
 COPY web/package.json web/package-lock.json ./web/
+COPY app/package.json app/package-lock.json ./app/
 RUN cd web && npm ci
+RUN cd app && npm ci
 
 # Код web и app (для алиасов @shared, @app)
 COPY web/ ./web/
