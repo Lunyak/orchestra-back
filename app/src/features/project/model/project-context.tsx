@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
-import { ensureProject, syncPush } from "../../../sync/api";
+import { ensureProject, fetchProjects, syncPush } from "../../../sync/api";
 import { useAuth } from "../../auth/model/auth-context";
 
 export interface ProjectContextValue {
@@ -20,9 +20,34 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<string[]>([]);
   const [projectName, setProjectName] = useState("");
 
+  const getDesktopApi = useCallback(() => {
+    if (typeof window === "undefined") return null;
+    const api = (window as any).api;
+    if (!api) return null;
+    if (
+      typeof api.listProjects !== "function" ||
+      typeof api.createProject !== "function" ||
+      typeof api.deleteProject !== "function"
+    ) {
+      return null;
+    }
+    return api as {
+      listProjects: () => Promise<string[]>;
+      createProject: (
+        name: string
+      ) => Promise<{ ok: boolean; name?: string; error?: string }>;
+      deleteProject: (name: string) => Promise<{ ok: boolean; error?: string }>;
+    };
+  }, []);
+
   const loadProjects = useCallback(async (prefer?: string) => {
     try {
-      const list = await window.api.listProjects();
+      const desktopApi = getDesktopApi();
+      const list = desktopApi
+        ? await desktopApi.listProjects()
+        : accessToken
+          ? (await fetchProjects(accessToken)).map((project) => project.slug)
+          : [];
       setProjects(list);
       const stored = localStorage.getItem("selectedProject") || "";
       const initial =
@@ -38,7 +63,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       console.error("[projects] failed to load:", error);
       setProjects([]);
     }
-  }, []);
+  }, [accessToken, getDesktopApi]);
 
   const ensureRemoteProject = useCallback(
     async (token?: string | null) => {
@@ -75,23 +100,39 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     async (name: string) => {
       const value = name.trim();
       if (!value) return;
-      const result = await window.api.createProject(value);
-      if (!result?.ok || !result.name) {
-        console.error("createProject failed:", result?.error);
+      const desktopApi = getDesktopApi();
+      if (desktopApi) {
+        const result = await desktopApi.createProject(value);
+        if (!result?.ok || !result.name) {
+          console.error("createProject failed:", result?.error);
+          return;
+        }
+        await loadProjects(result.name);
         return;
       }
-      await loadProjects(result.name);
+      if (!accessToken) return;
+      try {
+        await ensureProject(accessToken, value, `Проект ${value}`);
+        await loadProjects(value);
+      } catch (error) {
+        console.error("createProject failed:", error);
+      }
     },
-    [loadProjects]
+    [accessToken, ensureProject, getDesktopApi, loadProjects]
   );
 
   const deleteProject = useCallback(
     async (name: string) => {
       if (!name) return;
+      const desktopApi = getDesktopApi();
+      if (!desktopApi) {
+        console.warn("deleteProject is available only in desktop mode");
+        return;
+      }
       const projectId = accessToken
         ? localStorage.getItem(`projectId:${name}`)
         : null;
-      const result = await window.api.deleteProject(name);
+      const result = await desktopApi.deleteProject(name);
       if (!result?.ok) {
         console.error("deleteProject failed:", result?.error);
         return;
@@ -116,7 +157,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       await loadProjects();
     },
-    [accessToken, loadProjects]
+    [accessToken, getDesktopApi, loadProjects]
   );
 
   useEffect(() => {
