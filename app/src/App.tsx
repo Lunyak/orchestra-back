@@ -31,6 +31,7 @@ function AppRoutes() {
             <Route path="/" element={<SpectaclePage />} />
             <Route path="/theater" element={<SpectaclePage />} />
             <Route path="/light-plot" element={<SpectaclePage />} />
+            <Route path="/board" element={<SpectaclePage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </ScriptUIProvider>

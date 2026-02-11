@@ -9,6 +9,15 @@ export interface ScriptStep {
   theaterActiveSpotlightId?: number;
   theaterModels?: TheaterModel[];
   theaterActiveModelId?: number;
+  /**
+   * Канбан-статус готовности "сцены" (шаг сценария).
+   * Хранится в rawJson сцены и синкается как часть steps.
+   */
+  kanbanStatus?: "raw" | "text-learned" | "almost-ready" | "ready";
+  /** Порядок карточки в колонке канбана (не влияет на порядок шагов в сценарии). */
+  kanbanOrder?: number;
+  /** Назначения ролей: роль -> исполнитель (любая строка: имя/почта). */
+  cast?: Record<string, string>;
 }
 
 export interface ScriptRequisite {

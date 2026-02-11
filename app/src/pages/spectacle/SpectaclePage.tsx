@@ -8,6 +8,7 @@ import { ScriptStepsSidebar } from "../../components/script-steps-sidebar/Script
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useScriptUI } from "../../features/script-ui";
+import { useTeam } from "../../features/team";
 import type { ScriptStep } from "../../shared/types/script";
 
 const LightPlotPage = React.lazy(() =>
@@ -25,10 +26,16 @@ const TheaterScene = React.lazy(() =>
     default: m.TheaterScene,
   }))
 );
+const KanbanBoardPage = React.lazy(() =>
+  import("../../components/kanban/KanbanBoardPage").then((m) => ({
+    default: m.KanbanBoardPage,
+  }))
+);
 
 export function SpectaclePage() {
   const location = useLocation();
   const { projectName } = useProject();
+  const { projectMembers } = useTeam();
   const {
     sceneData,
     steps,
@@ -71,6 +78,8 @@ export function SpectaclePage() {
       ? "theater"
       : location.pathname === "/light-plot"
         ? "light-plot"
+        : location.pathname === "/board"
+          ? "board"
         : "script";
 
   React.useEffect(() => {
@@ -219,6 +228,15 @@ export function SpectaclePage() {
                   projectName={projectDisplay}
                   sceneName="script"
                   canSave={isSceneReady}
+                />
+              </Suspense>
+            )}
+            {activeView === "board" && (
+              <Suspense fallback={<div className="view-loader">Загрузка доски…</div>}>
+                <KanbanBoardPage
+                  steps={steps}
+                  onStepsChange={setSteps}
+                  memberEmails={(projectMembers ?? []).map((m: any) => m.user?.email).filter(Boolean)}
                 />
               </Suspense>
             )}

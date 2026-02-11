@@ -52,6 +52,12 @@ const TheaterPlaceholder = lazy(() =>
   }))
 );
 
+const KanbanBoardPage = lazy(() =>
+  import("./components/kanban/KanbanBoardPage").then((module) => ({
+    default: module.KanbanBoardPage,
+  }))
+);
+
 const DEFAULT_THEATER_LAYOUT: TheaterLayout = {
   hallWidth: 9,
   hallDepth: 6,
@@ -93,6 +99,8 @@ function AppInner() {
       ? "theater"
       : location.pathname === "/light-plot"
         ? "light-plot"
+        : location.pathname === "/board"
+          ? "board"
         : "script";
   const [currentPage, setCurrentPage] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
@@ -128,9 +136,6 @@ function AppInner() {
     typeof localStorage !== "undefined" ? localStorage.getItem("authRememberMe") === "1" : false,
   );
   const [authError, setAuthError] = useState<string | null>(null);
-  const [lastSyncAt, setLastSyncAt] = useState<string | null>(() =>
-    localStorage.getItem("lastSyncAt")
-  );
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const playlistPlayRef = useRef<(trackId: number) => void>();
   const selectedStepIdRef = useRef<number | null>(null);
@@ -257,8 +262,6 @@ function AppInner() {
     [accessToken, projectName],
   );
 
-  // lastSyncAt намеренно не включаем в зависимости, чтобы избежать бесконечного цикла pull
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const syncFromServer = useCallback(async (token?: string | null, projectOverride?: string) => {
     const tokenToUse = token ?? accessToken;
     const effectiveProject = projectOverride ?? projectName;
@@ -269,7 +272,9 @@ function AppInner() {
 
       const perProjectKey = `lastSyncAt:${effectiveProject}`;
       const effectiveLastSyncAt =
-        localStorage.getItem(perProjectKey) ?? lastSyncAt;
+        localStorage.getItem(perProjectKey) ??
+        localStorage.getItem("lastSyncAt") ??
+        null;
 
       const { now, projects, scenes } = await syncPull(
         tokenToUse,
@@ -301,7 +306,6 @@ function AppInner() {
       );
       setLightChannels(normalizedLightChannels);
 
-      setLastSyncAt(now);
       localStorage.setItem("lastSyncAt", now);
       localStorage.setItem(perProjectKey, now);
 
@@ -663,7 +667,13 @@ function AppInner() {
   }, []);
 
   useEffect(() => {
-    if (location.pathname !== "/settings" || !accessToken || !projectName) return;
+    if (
+      (location.pathname !== "/settings" && location.pathname !== "/board") ||
+      !accessToken ||
+      !projectName
+    ) {
+      return;
+    }
     setIsProjectOwner(null);
     getProjectMembers(accessToken, projectName)
       .then((res) => {
@@ -703,7 +713,12 @@ function AppInner() {
   }, [accessToken, inviteEmail, projectName]);
 
   useEffect(() => {
-    if (activeView !== "script" && activeView !== "light-plot" && activeView !== "theater") {
+    if (
+      activeView !== "script" &&
+      activeView !== "light-plot" &&
+      activeView !== "theater" &&
+      activeView !== "board"
+    ) {
       return;
     }
     if (!isSceneReady || steps.length === 0) return;
@@ -723,8 +738,10 @@ function AppInner() {
   }, [activeView, isSceneReady, saveStepsForLightPlot, steps.length, theaterLayout]);
 
   const isSettingsRoute = location.pathname === "/settings";
+  const isBoardRoute = location.pathname === "/board";
+  const isAuxRoute = isSettingsRoute || isBoardRoute;
   const shouldShowStepsSidebar =
-    !isSettingsRoute &&
+    !isAuxRoute &&
     (activeView === "script" || activeView === "light-plot" || activeView === "theater");
 
   const handleGetPlayUrl = useCallback(async (key: string): Promise<string | null> => {
@@ -738,7 +755,7 @@ function AppInner() {
     }
   }, [accessToken]);
 
-  const playlistNode = !isSettingsRoute ? (
+  const playlistNode = !isAuxRoute ? (
     <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}>
       {isMobile && (
         <button
@@ -916,7 +933,7 @@ function AppInner() {
     <div className="app-layout">
       {playlistNode}
       <div className="app-content">
-        {showHeaderSounds && !isMobile && (
+        {showHeaderSounds && !isMobile && !isAuxRoute && (
           <div className="sounds-bar">
             <HeaderPlayer
               projectName={projectName || "fools"}
@@ -1018,10 +1035,22 @@ function AppInner() {
               <TheaterPlaceholder />
             </Suspense>
           )}
+          {activeView === "board" && (
+            <Suspense fallback={<div className="view-loader">Загрузка доски…</div>}>
+              <KanbanBoardPage
+                steps={steps}
+                onStepsChange={(next) => {
+                  hasLocalEditsRef.current = true;
+                  setSteps(next);
+                }}
+                memberEmails={projectMembers.map((m) => m.user.email)}
+              />
+            </Suspense>
+          )}
         </main>
       </div>
       {stepsSidebarNode}
-      {isMobile && !isSettingsRoute && (
+      {isMobile && !isAuxRoute && (
         <div className="mobile-bottom-buttons">
           {shouldShowStepsSidebar && (
             <button
@@ -1077,6 +1106,7 @@ function AppInner() {
         <Route path="/" element={SpectacleLayout} />
         <Route path="/theater" element={SpectacleLayout} />
         <Route path="/light-plot" element={SpectacleLayout} />
+        <Route path="/board" element={SpectacleLayout} />
         <Route
           path="/settings"
           element={

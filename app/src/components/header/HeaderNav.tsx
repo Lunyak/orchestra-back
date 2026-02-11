@@ -41,6 +41,17 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    path: "/board",
+    label: "Доска",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="3" y="4" width="6" height="16" rx="1" />
+        <rect x="10" y="4" width="6" height="16" rx="1" />
+        <rect x="17" y="4" width="4" height="16" rx="1" />
+      </svg>
+    ),
+  },
+  {
     path: "/settings",
     label: "Настройки",
     icon: (

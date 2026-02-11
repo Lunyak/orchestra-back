@@ -20,7 +20,11 @@ export function useTeam() {
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (location.pathname !== "/settings" || !accessToken || !projectName)
+    if (
+      (location.pathname !== "/settings" && location.pathname !== "/board") ||
+      !accessToken ||
+      !projectName
+    )
       return;
     setIsProjectOwner(null);
     getProjectMembers(accessToken, projectName)
