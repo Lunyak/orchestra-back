@@ -82,7 +82,7 @@ export class BotService {
       throw new BadRequestException('profiles is required');
     }
 
-    const results = [];
+    const results: Array<{ email: string; ok: boolean }> = [];
     for (const p of profiles) {
       const email = p.email.trim().toLowerCase();
       await this.prisma.userProfile.upsert({
