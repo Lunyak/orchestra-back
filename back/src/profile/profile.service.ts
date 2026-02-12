@@ -8,6 +8,22 @@ function clean(v: unknown): string | null {
   return t.length ? t : null;
 }
 
+function sanitizeAvailabilityCalendar(
+  value: unknown,
+): Record<string, 'present' | 'absent'> | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+
+  const out: Record<string, 'present' | 'absent'> = {};
+  for (const [date, rawStatus] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (rawStatus === 'present' || rawStatus === 'absent') {
+      out[date] = rawStatus;
+    }
+  }
+  return out;
+}
+
 @Injectable()
 export class ProfileService {
   constructor(private readonly prisma: PrismaService) {}
@@ -32,6 +48,7 @@ export class ProfileService {
         telegramUsername: clean(dto.telegramUsername),
         telegramId: clean(dto.telegramId),
         avatarUrl: clean(dto.avatarUrl),
+        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
       },
       create: {
         email: normalized,
@@ -41,6 +58,7 @@ export class ProfileService {
         telegramUsername: clean(dto.telegramUsername),
         telegramId: clean(dto.telegramId),
         avatarUrl: clean(dto.avatarUrl),
+        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
       },
     });
   }

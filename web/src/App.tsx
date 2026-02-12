@@ -1172,6 +1172,7 @@ function AppInner() {
                         accessToken={accessToken}
                         profile={myProfile}
                         onProfileChange={setMyProfile}
+                        projectSlug={projectName || "fools"}
                         onSave={async (patch) => {
                           if (!accessToken) return;
                           const next = await updateMyProfile(accessToken, patch);

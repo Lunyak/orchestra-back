@@ -70,6 +70,22 @@ function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
 }
 
+type AvailabilityCalendar = Record<string, 'present' | 'absent'>;
+
+function getDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function parseAvailabilityCalendar(value: unknown): AvailabilityCalendar {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const out: AvailabilityCalendar = {};
+  for (const [date, rawStatus] of Object.entries(value as Record<string, unknown>)) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (rawStatus === 'present' || rawStatus === 'absent') out[date] = rawStatus;
+  }
+  return out;
+}
+
 @Injectable()
 export class RehearsalsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -238,6 +254,36 @@ export class RehearsalsService {
       select: { id: true, name: true, rawJson: true },
     });
 
+    const castEmails = new Set<string>();
+    for (const scene of scenes) {
+      const raw = scene.rawJson as any;
+      const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+      for (const step of steps) {
+        const cast = step.cast ?? {};
+        for (const rawAssigned of Object.values(cast)) {
+          const assigned = String(rawAssigned ?? '').trim();
+          if (!looksLikeEmail(assigned)) continue;
+          castEmails.add(normEmail(assigned));
+        }
+      }
+    }
+
+    const castEmailList = Array.from(castEmails);
+    const profiles =
+      castEmailList.length > 0
+        ? await this.prisma.userProfile.findMany({
+            where: { email: { in: castEmailList } },
+            select: { email: true, availabilityCalendar: true },
+          })
+        : [];
+    const availabilityByEmail = new Map<string, AvailabilityCalendar>(
+      profiles.map((profile) => [
+        normEmail(profile.email),
+        parseAvailabilityCalendar(profile.availabilityCalendar),
+      ]),
+    );
+    const rehearsalDateKey = getDateKey(reh.startsAt);
+
     const items: Array<{
       sceneId: string;
       sceneName: string;
@@ -269,6 +315,10 @@ export class RehearsalsService {
           }
           const email = normEmail(assigned);
           if (!presentEmails.has(email)) missing.push(`${role}: нет (${email})`);
+          const calendar = availabilityByEmail.get(email);
+          if (calendar?.[rehearsalDateKey] === 'absent') {
+            missing.push(`${role}: занят (${email})`);
+          }
         }
 
         items.push({

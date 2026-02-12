@@ -224,6 +224,7 @@ export interface MyProfile {
   telegramUsername?: string | null;
   telegramId?: string | null;
   avatarUrl?: string | null;
+  availabilityCalendar?: Record<string, "present" | "absent"> | null;
 }
 
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {

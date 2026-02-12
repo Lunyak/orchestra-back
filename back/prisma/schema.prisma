@@ -32,6 +32,8 @@ model UserProfile {
   telegramUsername String?
   telegramId       String?
   avatarUrl        String?
+  /// Календарь занятости по датам: { "YYYY-MM-DD": "present" | "absent" }
+  availabilityCalendar Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
