@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { getDesktopApi } from "../../shared/platform/desktop-api";
 import { ensureProject } from "../../sync/api";
 import "./style.css";
 
@@ -117,7 +118,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }
 
     const result: HeaderSound[] = [];
-    const api = typeof window !== "undefined" ? (window as any).api : null;
+    const api = getDesktopApi();
     if (!api?.invoke) {
       console.warn("[sounds] No desktop API — upload skipped, sounds will have no remoteKey/remoteUrl");
       return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
@@ -154,8 +155,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const saveSounds = async (nextTracks: LoadedTrack[]) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const current = await window.api.readProjectScene(projectName, sceneName);
+      const current = await desktopApi.readProjectScene(projectName, sceneName);
       const payload = {
         ...current,
         sounds: nextTracks.map((track) => {
@@ -178,7 +181,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           };
         }),
       };
-      const result = await window.api.saveProjectScene(
+      const result = await desktopApi.saveProjectScene(
         projectName,
         sceneName,
         payload,
@@ -194,8 +197,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const addTracks = async () => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const res = await window.api.pickProjectSound(projectName);
+      const res = await desktopApi.pickProjectSound(projectName);
       if (!res?.ok) {
         if (res?.canceled) return;
         console.error("Failed to pick sound:", res?.error);
@@ -235,8 +240,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const removeTrack = async (track: LoadedTrack) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const res = await window.api.deleteProjectSound(
+      const res = await desktopApi.deleteProjectSound(
         projectName,
         track.file ?? track.filePath ?? track.url,
       );
@@ -387,8 +394,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const addIcon = async (track: LoadedTrack) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const res = await window.api.pickProjectSoundIcon(projectName);
+      const res = await desktopApi.pickProjectSoundIcon(projectName);
       if (!res?.ok) {
         if (res?.canceled) return;
         console.error("Failed to pick icon:", res?.error);
@@ -406,7 +415,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       }
       let iconRemoteKey: string | undefined;
       let iconRemoteUrl: string | undefined;
-      const api = typeof window !== "undefined" ? (window as any).api : null;
+      const api = getDesktopApi();
       if (api?.invoke && accessToken && projectId) {
         try {
           const up = (await api.invoke("upload-project-sound-icon", {

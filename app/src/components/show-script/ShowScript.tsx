@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
+import { getDesktopApi } from "../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../shared/utils/markdownImages";
 import { ensureProject } from "../../sync/api";
 import './style.css';
@@ -73,8 +74,13 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     if (!isEditing) return;
     let isCancelled = false;
     const loadPlaylist = async () => {
+      const desktopApi = getDesktopApi();
+      if (!desktopApi) {
+        setPlaylistOptions([]);
+        return;
+      }
       try {
-        const scene = await window.api.readProjectScene(projectName, sceneName);
+        const scene = await desktopApi.readProjectScene(projectName, sceneName);
         if (isCancelled) return;
         const nextOptions = (scene?.playlist || [])
           .filter((item: { id?: number; title?: string }) => item?.id != null)
@@ -101,8 +107,13 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   useEffect(() => {
     let isCancelled = false;
     const loadLightChannels = async () => {
+      const desktopApi = getDesktopApi();
+      if (!desktopApi) {
+        setLightChannels(Array.from({ length: 9 }, () => ''));
+        return;
+      }
       try {
-        const scene = await window.api.readProjectScene(projectName, sceneName);
+        const scene = await desktopApi.readProjectScene(projectName, sceneName);
         if (isCancelled) return;
         const next =
           Array.isArray(scene?.lightChannels) && scene.lightChannels.length > 0
@@ -125,11 +136,13 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   }, [projectName, sceneName]);
 
   const saveScene = useCallback(async () => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const current = await window.api.readProjectScene(projectName, sceneName);
+      const current = await desktopApi.readProjectScene(projectName, sceneName);
       const images = pruneSceneImages(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined, steps);
       const payload = { ...current, name: title, steps, lightChannels, images };
-      const result = await window.api.saveProjectScene(
+      const result = await desktopApi.saveProjectScene(
         projectName,
         sceneName,
         payload,
@@ -413,6 +426,8 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const handlePasteImage = async (
     event: React.ClipboardEvent<HTMLTextAreaElement>,
   ) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     if (!event.clipboardData) return;
     const items = Array.from(event.clipboardData.items || []);
     const imageItem = items.find((item) => item.type.startsWith("image/"));
@@ -423,7 +438,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     event.preventDefault();
     try {
       const buffer = await file.arrayBuffer();
-      const res = await window.api.addProjectImage(
+      const res = await desktopApi.addProjectImage(
         projectName,
         buffer,
         file.type,
@@ -447,7 +462,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
       }
       if (accessToken && projectId) {
         try {
-          const api = (window as any).api;
+          const api = getDesktopApi();
           if (api?.invoke) {
             const up = (await api.invoke("upload-project-file", {
               projectName,
@@ -457,9 +472,9 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
               type: "image",
             })) as { ok?: boolean; key?: string; url?: string };
             if (up?.ok && up?.url) {
-              const current = await window.api.readProjectScene(projectName, sceneName);
+              const current = await desktopApi.readProjectScene(projectName, sceneName);
               const images = { ...(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined), [filename]: { remoteKey: up.key, remoteUrl: up.url } };
-              await window.api.saveProjectScene(projectName, sceneName, { ...current, images });
+              await desktopApi.saveProjectScene(projectName, sceneName, { ...current, images });
             }
           }
         } catch (err) {

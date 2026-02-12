@@ -10,6 +10,18 @@ export class AppErrorBoundary extends React.Component<
 > {
   state: AppErrorBoundaryState = { error: null };
 
+  componentDidMount() {
+    if (typeof window === "undefined") return;
+    window.addEventListener("error", this.handleGlobalError);
+    window.addEventListener("unhandledrejection", this.handleUnhandledRejection);
+  }
+
+  componentWillUnmount() {
+    if (typeof window === "undefined") return;
+    window.removeEventListener("error", this.handleGlobalError);
+    window.removeEventListener("unhandledrejection", this.handleUnhandledRejection);
+  }
+
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
     return { error };
   }
@@ -18,6 +30,29 @@ export class AppErrorBoundary extends React.Component<
     // Keep full details in console for production debugging.
     console.error("[web] Unhandled render error", error, errorInfo);
   }
+
+  private handleGlobalError = (event: ErrorEvent) => {
+    const nextError =
+      event.error instanceof Error
+        ? event.error
+        : new Error(event.message || "Unhandled window error");
+    this.setState({ error: nextError });
+    console.error("[web] Global window error", nextError, event);
+  };
+
+  private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+    const reason = event.reason;
+    const nextError =
+      reason instanceof Error
+        ? reason
+        : new Error(
+            typeof reason === "string"
+              ? reason
+              : "Unhandled promise rejection",
+          );
+    this.setState({ error: nextError });
+    console.error("[web] Unhandled promise rejection", reason);
+  };
 
   private handleReload = () => {
     window.location.reload();

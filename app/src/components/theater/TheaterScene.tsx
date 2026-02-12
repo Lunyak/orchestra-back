@@ -22,6 +22,7 @@ import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import grassTexture from "../../shared/assets/grass.jpg";
+import { getDesktopApi } from "../../shared/platform/desktop-api";
 import {
   ScriptStep,
   TheaterLayout,
@@ -1251,13 +1252,14 @@ export const TheaterScene = ({
   const addModel = async () => {
     if (!currentStep) return;
     try {
-      if (!window.api?.pickProjectModel) {
+      const desktopApi = getDesktopApi();
+      if (!desktopApi?.pickProjectModel) {
         console.error(
           "pickProjectModel is not available. Restart the Electron process to reload preload."
         );
         return;
       }
-      const result = await window.api.pickProjectModel(projectName);
+      const result = await desktopApi.pickProjectModel(projectName);
       if (!result?.ok) {
         if (result?.canceled) return;
         console.error("Failed to pick model:", result?.error);

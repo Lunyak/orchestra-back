@@ -12,7 +12,15 @@ export default defineConfig({
     alias: {
       "@shared": path.resolve(__dirname, "../app/src/shared"),
       "@app": path.resolve(__dirname, "../app/src"),
+      react: path.resolve(__dirname, "node_modules/react"),
+      "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "node_modules/react/jsx-runtime.js"),
+      "react/jsx-dev-runtime": path.resolve(
+        __dirname,
+        "node_modules/react/jsx-dev-runtime.js",
+      ),
     },
+    dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
   },
   plugins: [react(), tsconfigPaths()],
 });

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
 import { ensureProject, fetchProjects, syncPush } from "../../../sync/api";
+import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
 import { useAuth } from "../../auth/model/auth-context";
 
 export interface ProjectContextValue {
@@ -21,8 +22,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projectName, setProjectName] = useState("");
 
   const getDesktopApi = useCallback(() => {
-    if (typeof window === "undefined") return null;
-    const api = (window as any).api;
+    const api = getPlatformDesktopApi();
     if (!api) return null;
     if (
       typeof api.listProjects !== "function" ||

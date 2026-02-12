@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import playlistBg from "../../shared/assets/fon_playlist.png";
+import { getDesktopApi } from "../../shared/platform/desktop-api";
 import {
   type SyncChange,
   ensureProject,
@@ -330,10 +331,12 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   };
 
   const savePlaylist = async (nextTracks: PlaylistTrack[]) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const current = await window.api.readProjectScene(projectName, sceneName);
+      const current = await desktopApi.readProjectScene(projectName, sceneName);
       const payload = { ...current, playlist: nextTracks };
-      const result = await window.api.saveProjectScene(
+      const result = await desktopApi.saveProjectScene(
         projectName,
         sceneName,
         payload,
@@ -412,6 +415,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const uploadTracksToServer = async (
     tracksToUpload: PlaylistTrack[],
   ): Promise<PlaylistTrack[]> => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return tracksToUpload;
     const accessToken =
       typeof window !== "undefined"
         ? localStorage.getItem("accessToken")
@@ -454,7 +459,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       // Загружаем треки по одному, чтобы не завалить сервер
       for (const track of tracksToUpload) {
         try {
-          const res = (await window.api.invoke("upload-project-audio", {
+          const res = (await desktopApi.invoke("upload-project-audio", {
             projectName,
             file: track.file,
             accessToken,
@@ -487,8 +492,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   };
 
   const addTracks = async () => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const res = await window.api.pickProjectAudio(projectName);
+      const res = await desktopApi.pickProjectAudio(projectName);
       if (!res?.ok) {
         if (res?.canceled) return;
         console.error("Failed to pick audio:", res?.error);
@@ -513,8 +520,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   };
 
   const addTracksFromPaths = async (filePaths: string[]) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const res = await window.api.addProjectAudio(projectName, filePaths);
+      const res = await desktopApi.addProjectAudio(projectName, filePaths);
       if (!res?.ok) {
         console.error("Failed to add audio:", res?.error);
         return;
@@ -571,8 +580,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   };
 
   const deleteTrack = async (track: PlaylistTrack) => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     try {
-      const res = await window.api.deleteProjectAudio(projectName, track.file);
+      const res = await desktopApi.deleteProjectAudio(projectName, track.file);
       if (!res?.ok) {
         console.error("Failed to delete audio:", res?.error);
       }

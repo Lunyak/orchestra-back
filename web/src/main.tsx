@@ -7,10 +7,10 @@ import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <HashRouter>
-      <AppErrorBoundary>
+    <AppErrorBoundary>
+      <HashRouter>
         <App />
-      </AppErrorBoundary>
-    </HashRouter>
+      </HashRouter>
+    </AppErrorBoundary>
   </React.StrictMode>,
 );

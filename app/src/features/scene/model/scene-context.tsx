@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
+import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import {
   syncPull,
@@ -141,8 +142,18 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
     let cancelled = false;
     const loadScene = async () => {
+      const desktopApi = getDesktopApi();
+      if (!desktopApi) {
+        if (cancelled) return;
+        setSceneData(null);
+        setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
+        setStepsState([]);
+        setCurrentPage(0);
+        setIsSceneReady(true);
+        return;
+      }
       try {
-        const scene = await window.api.readProjectScene(projectName, "script");
+        const scene = await desktopApi.readProjectScene(projectName, "script");
         if (cancelled) return;
         hasLocalEditsRef.current = false;
         setSceneData(scene || null);
@@ -242,12 +253,14 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
   const saveStepsForLightPlot = useCallback(async () => {
     if (!projectName || !hasLocalEditsRef.current) return;
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     const token = accessToken ?? localStorage.getItem("accessToken");
     try {
-      const current = await window.api.readProjectScene(projectName, "script");
+      const current = await desktopApi.readProjectScene(projectName, "script");
       const images = pruneSceneImages(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined, steps);
       const payload = { ...current, steps, theaterLayout, images };
-      const result = await window.api.saveProjectScene(projectName, "script", payload);
+      const result = await desktopApi.saveProjectScene(projectName, "script", payload);
       if (!result?.ok) {
         console.error("Failed to save light plot steps:", result?.error);
       }
@@ -343,10 +356,12 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
   /** Как в плейлисте: звуки уже с remoteKey/remoteUrl (загружаются при добавлении). Просто пушим сцену с диска. */
   const pushSceneAfterSoundsSave = useCallback(async () => {
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) return;
     const token = accessToken ?? localStorage.getItem("accessToken");
     if (!token || !projectName) return;
     try {
-      const scene = await window.api.readProjectScene(projectName, "script");
+      const scene = await desktopApi.readProjectScene(projectName, "script");
       if (!scene) return;
       const projectId =
         localStorage.getItem(`projectId:${projectName}`) ??
