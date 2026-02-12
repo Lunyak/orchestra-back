@@ -17,7 +17,7 @@ export interface ProjectContextValue {
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
-  const { accessToken } = useAuth();
+  const { accessToken, logout } = useAuth();
   const [projects, setProjects] = useState<string[]>([]);
   const [projectName, setProjectName] = useState("");
 
@@ -59,11 +59,18 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (initial) {
         setProjectName(initial);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[projects] failed to load:", error);
+      
+      // При 401 — токен невалидный, нужен повторный логин
+      if (error?.response?.status === 401) {
+        console.warn("[projects] Unauthorized (401) — logging out");
+        logout();
+      }
+      
       setProjects([]);
     }
-  }, [accessToken, getDesktopApi]);
+  }, [accessToken, getDesktopApi, logout]);
 
   const ensureRemoteProject = useCallback(
     async (token?: string | null) => {

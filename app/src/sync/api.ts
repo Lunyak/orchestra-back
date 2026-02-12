@@ -48,6 +48,29 @@ export const api = axios.create({
   baseURL: API_BASE,
 });
 
+/**
+ * Глобальный обработчик 401 ошибок.
+ * Вызывает logout при получении Unauthorized.
+ */
+let globalLogoutHandler: (() => void) | null = null;
+
+export function setupApiInterceptors(logout: () => void) {
+  globalLogoutHandler = logout;
+
+  // Интерцептор для обработки ответов
+  api.interceptors.response.use(
+    (response) => response,
+    (error: AxiosError) => {
+      // При 401 — токен невалидный или истёк
+      if (error.response?.status === 401 && globalLogoutHandler) {
+        console.warn("[api] Unauthorized (401) — logging out");
+        globalLogoutHandler();
+      }
+      return Promise.reject(error);
+    }
+  );
+}
+
 let isRefreshing = false;
 let refreshQueue: Array<(token: string | null) => void> = [];
 

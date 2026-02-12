@@ -1,5 +1,6 @@
-import React, { createContext, useCallback, useState } from "react";
+import React, { createContext, useCallback, useEffect, useState } from "react";
 import { login, register } from "../../../sync/auth";
+import { setupApiInterceptors } from "../../../sync/api";
 
 export interface AuthContextValue {
   accessToken: string | null;
@@ -54,6 +55,11 @@ export function AuthProvider({ children, onAfterLogin }: AuthProviderProps) {
   const logout = useCallback(() => {
     setAccessToken(null);
   }, [setAccessToken]);
+
+  // Настраиваем глобальный обработчик 401 ошибок
+  useEffect(() => {
+    setupApiInterceptors(logout);
+  }, [logout]);
 
   const value: AuthContextValue = {
     accessToken: accessToken ?? null,
