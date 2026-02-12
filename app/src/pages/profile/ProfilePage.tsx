@@ -8,6 +8,7 @@ import {
 } from "../../sync/api";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
+import "./style.css";
 
 type AvailabilityStatus = "present" | "absent";
 
@@ -157,8 +158,11 @@ export function ProfilePage() {
   if (!accessToken) return <div>Нужно войти, чтобы редактировать профиль.</div>;
 
   return (
-    <div className="settings-view">
-      <h2>Профиль</h2>
+    <div className="app-layout">
+      <div className="app-content">
+        <main className="main-content">
+          <div className="profile-view">
+            <h2>Профиль</h2>
       <p style={{ opacity: 0.8, fontSize: 13, marginTop: 6 }}>
         Email: <b>{profile?.email ?? "—"}</b>
       </p>
@@ -348,6 +352,9 @@ export function ProfilePage() {
             {saving ? "Сохранение..." : "Сохранить"}
           </button>
         </div>
+      </div>
+          </div>
+        </main>
       </div>
     </div>
   );

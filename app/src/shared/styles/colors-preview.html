@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orchestra - Палитра цветов</title>
+  <link rel="stylesheet" href="./variables.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--color-bg-primary);
+      color: var(--color-text-primary);
+      padding: 40px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+      color: var(--color-text-bright);
+    }
+
+    .subtitle {
+      color: var(--color-text-muted);
+      margin-bottom: 40px;
+    }
+
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--color-text-bright);
+      border-bottom: 2px solid var(--color-border-light);
+      padding-bottom: 8px;
+    }
+
+    .colors-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 16px;
+    }
+
+    .color-card {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    .color-preview {
+      height: 80px;
+      width: 100%;
+    }
+
+    .color-info {
+      padding: 12px;
+    }
+
+    .color-name {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--color-text-bright);
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .color-value {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 11px;
+      color: var(--color-text-muted);
+    }
+
+    .sizes-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .size-item {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 200px 1fr 100px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .size-name {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--color-text-bright);
+    }
+
+    .size-preview {
+      height: 24px;
+      background: var(--color-primary);
+      border-radius: 4px;
+    }
+
+    .size-value {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 11px;
+      color: var(--color-text-muted);
+      text-align: right;
+    }
+
+    .button-examples {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: var(--spacing-3) var(--spacing-5);
+      border-radius: var(--radius-sm);
+      border: none;
+      font-size: var(--font-size-base);
+      cursor: pointer;
+      transition: var(--transition-normal);
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--color-primary);
+      color: var(--color-text-white);
+    }
+
+    .btn-primary:hover {
+      background: var(--color-primary-dark);
+    }
+
+    .btn-success {
+      background: var(--color-success);
+      color: var(--color-bg-primary);
+    }
+
+    .btn-danger {
+      background: var(--color-danger);
+      color: var(--color-text-white);
+    }
+
+    .btn-danger:hover {
+      background: var(--color-danger-hover);
+    }
+
+    .card-example {
+      background: var(--color-bg-transparent-2);
+      border: 1px solid var(--color-border-medium);
+      border-radius: var(--radius-xl);
+      padding: var(--spacing-6);
+      margin-bottom: 16px;
+    }
+
+    .input-example {
+      width: 100%;
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border-light);
+      border-radius: var(--radius-sm);
+      padding: var(--spacing-3);
+      color: var(--color-text-primary);
+      font-size: var(--font-size-base);
+      transition: var(--transition-all-smooth);
+      font-family: inherit;
+      margin-bottom: 12px;
+    }
+
+    .input-example:focus {
+      outline: none;
+      border-color: var(--color-primary-light);
+      box-shadow: var(--shadow-focus);
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 Orchestra Design System</h1>
+  <p class="subtitle">Палитра цветов и компонентов проекта</p>
+
+  <!-- Основные цвета -->
+  <div class="section">
+    <h2 class="section-title">Основные цвета</h2>
+    <div class="colors-grid">
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-primary);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-primary</div>
+          <div class="color-value">#2563eb</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-primary-dark);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-primary-dark</div>
+          <div class="color-value">#1d4ed8</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-success);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-success</div>
+          <div class="color-value">#10b981</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-danger);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-danger</div>
+          <div class="color-value">#b91c1c</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-warning);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-warning</div>
+          <div class="color-value">#fbbf24</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Фоновые цвета -->
+  <div class="section">
+    <h2 class="section-title">Фоновые цвета</h2>
+    <div class="colors-grid">
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-bg-primary);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-bg-primary</div>
+          <div class="color-value">#0b1220</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-bg-secondary);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-bg-secondary</div>
+          <div class="color-value">#1f2a37</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-bg-tertiary);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-bg-tertiary</div>
+          <div class="color-value">#2c3e50</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-surface-1);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-surface-1</div>
+          <div class="color-value">#0f172a</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-surface-2);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-surface-2</div>
+          <div class="color-value">#1f2937</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-surface-3);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-surface-3</div>
+          <div class="color-value">#111827</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Текстовые цвета -->
+  <div class="section">
+    <h2 class="section-title">Текстовые цвета</h2>
+    <div class="colors-grid">
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-text-primary);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-text-primary</div>
+          <div class="color-value">#e2e8f0</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-text-bright);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-text-bright</div>
+          <div class="color-value">#f8fafc</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-text-muted);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-text-muted</div>
+          <div class="color-value">#94a3b8</div>
+        </div>
+      </div>
+      <div class="color-card">
+        <div class="color-preview" style="background: var(--color-text-white);"></div>
+        <div class="color-info">
+          <div class="color-name">--color-text-white</div>
+          <div class="color-value">#ffffff</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Примеры компонентов -->
+  <div class="section">
+    <h2 class="section-title">Примеры компонентов</h2>
+    
+    <h3 style="color: var(--color-text-bright); margin-bottom: 12px;">Кнопки</h3>
+    <div class="button-examples">
+      <button class="btn btn-primary">Primary Button</button>
+      <button class="btn btn-success">Success Button</button>
+      <button class="btn btn-danger">Danger Button</button>
+    </div>
+
+    <h3 style="color: var(--color-text-bright); margin: 24px 0 12px;">Карточки</h3>
+    <div class="card-example">
+      <h4 style="margin: 0 0 8px; color: var(--color-text-bright);">Заголовок карточки</h4>
+      <p style="margin: 0; color: var(--color-text-muted); font-size: 12px;">
+        Пример карточки с использованием CSS переменных для фона, границ и текста.
+      </p>
+    </div>
+
+    <h3 style="color: var(--color-text-bright); margin-bottom: 12px;">Формы</h3>
+    <input type="text" class="input-example" placeholder="Введите текст..." />
+    <input type="text" class="input-example" placeholder="Еще один инпут..." />
+  </div>
+
+  <!-- Border Radius -->
+  <div class="section">
+    <h2 class="section-title">Border Radius</h2>
+    <div class="sizes-grid">
+      <div class="size-item">
+        <div class="size-name">--radius-xs</div>
+        <div class="size-preview" style="height: 40px; border-radius: var(--radius-xs);"></div>
+        <div class="size-value">4px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--radius-sm</div>
+        <div class="size-preview" style="height: 40px; border-radius: var(--radius-sm);"></div>
+        <div class="size-value">6px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--radius-md</div>
+        <div class="size-preview" style="height: 40px; border-radius: var(--radius-md);"></div>
+        <div class="size-value">8px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--radius-lg</div>
+        <div class="size-preview" style="height: 40px; border-radius: var(--radius-lg);"></div>
+        <div class="size-value">10px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--radius-xl</div>
+        <div class="size-preview" style="height: 40px; border-radius: var(--radius-xl);"></div>
+        <div class="size-value">12px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--radius-full</div>
+        <div class="size-preview" style="height: 40px; border-radius: var(--radius-full);"></div>
+        <div class="size-value">999px</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spacing -->
+  <div class="section">
+    <h2 class="section-title">Spacing (отступы)</h2>
+    <div class="sizes-grid">
+      <div class="size-item">
+        <div class="size-name">--spacing-2</div>
+        <div class="size-preview" style="width: var(--spacing-2); height: 24px;"></div>
+        <div class="size-value">4px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--spacing-3</div>
+        <div class="size-preview" style="width: var(--spacing-3); height: 24px;"></div>
+        <div class="size-value">6px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--spacing-4</div>
+        <div class="size-preview" style="width: var(--spacing-4); height: 24px;"></div>
+        <div class="size-value">8px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--spacing-6</div>
+        <div class="size-preview" style="width: var(--spacing-6); height: 24px;"></div>
+        <div class="size-value">12px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--spacing-8</div>
+        <div class="size-preview" style="width: var(--spacing-8); height: 24px;"></div>
+        <div class="size-value">16px</div>
+      </div>
+      <div class="size-item">
+        <div class="size-name">--spacing-12</div>
+        <div class="size-preview" style="width: var(--spacing-12); height: 24px;"></div>
+        <div class="size-value">24px</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--color-border-light); color: var(--color-text-muted); font-size: 12px;">
+    <p>📚 Полная документация: <code>shared/styles/README.md</code></p>
+    <p>⚡ Шпаргалка: <code>shared/styles/CHEATSHEET.md</code></p>
+    <p>🔧 Руководство по внедрению: <code>shared/styles/IMPLEMENTATION.md</code></p>
+  </div>
+</body>
+</html>

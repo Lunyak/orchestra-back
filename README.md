@@ -82,30 +82,6 @@ orchestra-servises/
 
 **Подробнее:** см. [AUTOMATION.md](./AUTOMATION.md)
 
-## 🛠 Настройка автодеплоя
-
-### 1. Создайте SSH-ключ
-
-```bash
-ssh-keygen -t ed25519 -C "gitlab-ci@orchestra"
-ssh-copy-id root@213.226.126.196
-```
-
-### 2. Добавьте в GitLab
-
-**Settings → CI/CD → Variables:**
-
-- **Key:** `SSH_PRIVATE_KEY`
-- **Value:** (содержимое `~/.ssh/id_ed25519`)
-- **Flags:** ✅ Mask variable
-
-### 3. Готово!
-
-Теперь каждый push в `master` автоматически:
-1. Прогоняет тесты
-2. Собирает образы
-3. Деплоит на сервер
-
 ## 📊 Мониторинг
 
 ### Dozzle (веб-интерфейс для логов)
@@ -143,20 +119,6 @@ make shell-postgres
 psql postgresql://orkestr:orkestr_secret@localhost:5432/dophamin_orkestr
 ```
 
-## 🔐 Безопасность
-
-⚠️ **Обязательно:**
-
-1. Создайте `.env` и задайте надежные пароли:
-   ```env
-   JWT_SECRET=ваш-длинный-секрет-минимум-32-символа
-   ADMIN_SECRET=ваш-админ-секрет
-   ```
-
-2. Не коммитьте `.env` в Git
-
-3. На production не публикуйте порт PostgreSQL (используйте `docker-compose.override.yml`)
-
 ## 📚 Документация
 
 - **[AUTOMATION.md](./AUTOMATION.md)** - Полное руководство по автоматизации
@@ -164,43 +126,6 @@ psql postgresql://orkestr:orkestr_secret@localhost:5432/dophamin_orkestr
 - **[back/README.md](./back/README.md)** - Backend API
 - **[admin/README.md](./admin/README.md)** - Админ-панель
 
-## 🐛 Troubleshooting
-
-### Hot-reload не работает
-
-```bash
-make stop
-make dev
-```
-
-### Контейнер не запускается
-
-```bash
-docker compose logs [service_name]
-make status
-```
-
-### GitLab CI/CD не деплоит
-
-1. Проверьте переменные: Settings → CI/CD → Variables
-2. Проверьте SSH-доступ: `ssh root@213.226.126.196`
-3. Смотрите логи pipeline: CI/CD → Pipelines
-
-### Очистка дискового пространства
-
-```bash
-docker system prune -a --volumes  # ОСТОРОЖНО: удалит все данные!
-```
-
 ## 📝 Лицензия
 
 Приватный проект.
-
----
-
-**Теперь управление контейнерами полностью автоматизировано! 🎉**
-
-- ✅ Dev: `make dev` → hot-reload
-- ✅ Prod: push в master → автоматический деплой
-- ✅ Мониторинг: Dozzle + health checks
-- ✅ Простые команды: `make help`

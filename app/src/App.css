@@ -267,6 +267,8 @@ body {
   text-align: left;
   color: #e2e8f0;
   padding: 24px;
+
+  background-color: var(--color-bg-secondary);
 }
 
 .settings-view h2 {

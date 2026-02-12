@@ -1,7 +1,10 @@
+/* Импорт CSS переменных */
+@import './shared/styles/index.css';
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+  line-height: var(--line-height-relaxed);
+  font-weight: var(--font-weight-normal);
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
@@ -14,12 +17,12 @@
 }
 
 a {
-  font-weight: 500;
-  color: #646cff;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-link);
   text-decoration: inherit;
 }
 a:hover {
-  color: #535bf2;
+  color: var(--color-link-hover);
 }
 
 body, h1, h2, h3, h4, h5, h6 {
@@ -29,7 +32,7 @@ body, h1, h2, h3, h4, h5, h6 {
 
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
+    color: var(--color-text-dark);
+    background-color: var(--color-text-white);
   }
 }

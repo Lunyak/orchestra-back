@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import React, { Suspense, useCallback, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Header } from "../../components/header/Header";
 import { HeaderPlayer } from "../../components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../components/script-steps-sidebar/ScriptStepsSidebar";
@@ -91,6 +90,7 @@ export function SpectaclePage() {
     activeView === "light-plot" ||
     activeView === "theater";
   const isTheaterView = activeView === "theater";
+  const isBoardView = activeView === "board";
 
   const LightPlotView = LightPlotPage as ComponentType<{
     steps: ScriptStep[];
@@ -100,7 +100,7 @@ export function SpectaclePage() {
 
   const projectDisplay = projectName || "fools";
 
-  const playlistNode = (
+  const playlistNode = !isBoardView ? (
     <div
       className={`playlist-sidebar-wrapper ${!showPlaylistSidebar ? "hidden" : ""}`}
     >
@@ -111,7 +111,7 @@ export function SpectaclePage() {
         onRegisterPlayHandler={registerPlaylistPlay}
       />
     </div>
-  );
+  ) : null;
 
   const theaterControlsNode = isTheaterView ? (
     <aside ref={setTheaterControlsHostRef} className="theater-settings-sidebar" />
@@ -136,24 +136,7 @@ export function SpectaclePage() {
     ) : null;
 
   return (
-    <>
-      <Header
-        scriptState={
-          shouldShowStepsSidebar
-            ? {
-              showRequisites,
-              onToggleRequisites: toggleRequisites,
-              showPlaylist: showPlaylistSidebar,
-              onTogglePlaylist: togglePlaylist,
-              showHeaderSounds,
-              onToggleHeaderSounds: toggleHeaderSounds,
-              isStepsCollapsed,
-              onToggleStepsCollapsed: toggleStepsCollapsed,
-            }
-            : undefined
-        }
-      />
-      <div className="app-layout">
+    <div className="app-layout">
         {isTheaterView ? (
           <>
             {showPlaylistSidebar && (
@@ -167,7 +150,7 @@ export function SpectaclePage() {
           playlistNode
         )}
         <div className="app-content">
-          {showHeaderSounds && (
+          {showHeaderSounds && !isBoardView && (
             <div className="sounds-bar">
               <HeaderPlayer
                 projectName={projectDisplay}
@@ -249,6 +232,5 @@ export function SpectaclePage() {
         </div>
         {stepsSidebarNode}
       </div>
-    </>
   );
 }

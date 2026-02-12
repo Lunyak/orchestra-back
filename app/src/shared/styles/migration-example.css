@@ -1,0 +1,293 @@
+/* 
+  ПРИМЕР МИГРАЦИИ: как переписать существующий CSS с использованием переменных
+  
+  Этот файл показывает, как преобразовать hardcoded значения в переменные
+*/
+
+/* ============================================ */
+/* ПРИМЕР 1: Кнопка (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО: Hardcoded значения */
+.old-button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.12s ease;
+}
+
+.old-button:hover {
+  background: #1d4ed8;
+}
+
+/* ПОСЛЕ: Использование переменных */
+.new-button {
+  background: var(--color-primary);
+  color: var(--color-text-white);
+  border: none;
+  padding: var(--spacing-3) var(--spacing-5);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  transition: var(--transition-normal);
+}
+
+.new-button:hover {
+  background: var(--color-primary-dark);
+}
+
+/* ============================================ */
+/* ПРИМЕР 2: Карточка (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО */
+.old-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  padding: 12px;
+  color: #e2e8f0;
+}
+
+/* ПОСЛЕ */
+.new-card {
+  background: var(--color-bg-transparent-2);
+  border: 1px solid var(--color-border-medium);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-6);
+  color: var(--color-text-primary);
+}
+
+/* ============================================ */
+/* ПРИМЕР 3: Инпут с фокусом (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО */
+.old-input {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: 1px solid #1f2937;
+  background: #020617;
+  color: #e5e7eb;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.old-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.6);
+}
+
+.old-input::placeholder {
+  color: #6b7280;
+}
+
+/* ПОСЛЕ */
+.new-input {
+  width: 100%;
+  padding: var(--spacing-5) var(--spacing-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-dark);
+  color: var(--color-text-almost-white);
+  font-size: var(--font-size-md);
+  outline: none;
+  transition: var(--transition-all-smooth);
+}
+
+.new-input:focus {
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-focus);
+}
+
+.new-input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+/* ============================================ */
+/* ПРИМЕР 4: Сайдбар (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО */
+.old-sidebar {
+  width: 100%;
+  min-width: 240px;
+  max-width: 320px;
+  background: #1f2a37;
+  color: #fff;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+/* ПОСЛЕ */
+.new-sidebar {
+  width: 100%;
+  min-width: var(--width-sidebar);
+  max-width: var(--width-panel);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-white);
+  padding: var(--spacing-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+/* ============================================ */
+/* ПРИМЕР 5: Модальное окно (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО */
+.old-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  z-index: 50;
+}
+
+.old-modal-content {
+  background: rgba(16, 16, 18, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  padding: 14px;
+}
+
+/* ПОСЛЕ */
+.new-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--color-shadow-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-9);
+  z-index: var(--z-index-modal);
+}
+
+.new-modal-content {
+  background: var(--color-bg-modal);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-2xl);
+  padding: var(--spacing-7);
+}
+
+/* ============================================ */
+/* ПРИМЕР 6: Статусы и состояния (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО */
+.old-success {
+  background: #10b981;
+  color: #0b1220;
+}
+
+.old-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fecaca;
+}
+
+.old-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ПОСЛЕ */
+.new-success {
+  background: var(--color-success);
+  color: var(--color-bg-primary);
+}
+
+.new-error {
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  color: var(--color-danger-lighter);
+}
+
+.new-disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* ============================================ */
+/* ПРИМЕР 7: Hover эффекты (ДО и ПОСЛЕ) */
+/* ============================================ */
+
+/* ДО */
+.old-hoverable {
+  background: #2c3e50;
+  transition: transform 0.08s ease, background 0.12s ease;
+}
+
+.old-hoverable:hover {
+  background: #3a4b61;
+  transform: translateY(-1px);
+}
+
+/* ПОСЛЕ */
+.new-hoverable {
+  background: var(--color-bg-tertiary);
+  transition: var(--transition-transform), var(--transition-colors);
+}
+
+.new-hoverable:hover {
+  background: var(--color-bg-hover);
+  transform: translateY(-1px);
+}
+
+/* ============================================ */
+/* БЫСТРАЯ ШПАРГАЛКА ПО ЗАМЕНЕ */
+/* ============================================ */
+
+/*
+ЦВЕТА:
+  #0b1220 → var(--color-bg-primary)
+  #1f2a37 → var(--color-bg-secondary)
+  #2c3e50 → var(--color-bg-tertiary)
+  #2563eb → var(--color-primary)
+  #1d4ed8 → var(--color-primary-dark)
+  #10b981 → var(--color-success)
+  #22c55e → var(--color-success-accent)
+  #b91c1c → var(--color-danger)
+  #e2e8f0 → var(--color-text-primary)
+  #fff, white → var(--color-text-white)
+  #94a3b8 → var(--color-text-muted)
+
+РАЗМЕРЫ:
+  4px → var(--radius-xs) или var(--spacing-2)
+  6px → var(--radius-sm) или var(--spacing-3)
+  8px → var(--radius-md) или var(--spacing-4)
+  10px → var(--radius-lg) или var(--spacing-5)
+  12px → var(--radius-xl) или var(--spacing-6) или var(--font-size-base)
+  16px → var(--spacing-8)
+  24px → var(--spacing-12)
+
+TRANSITIONS:
+  0.08s ease → var(--transition-fast)
+  0.12s ease → var(--transition-normal)
+  0.15s ease → var(--transition-smooth)
+  0.2s ease → var(--transition-slow)
+
+OPACITY:
+  0.5 → var(--opacity-disabled)
+  0.75 → var(--opacity-medium)
+  0.8 → var(--opacity-visible)
+  0.85 → var(--opacity-bright)
+*/

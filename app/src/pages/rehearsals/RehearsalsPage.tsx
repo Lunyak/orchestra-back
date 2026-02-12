@@ -187,7 +187,10 @@ export function RehearsalsPage() {
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
 
   return (
-    <div className="rehearsals-page">
+    <div className="app-layout">
+      <div className="app-content">
+        <main className="main-content">
+          <div className="rehearsals-page">
       <div className="rehearsals-head">
         <h2 className="rehearsals-title">Репетиции</h2>
         <div className="rehearsals-meta">Проект: {projectSlug || "—"}</div>
@@ -311,6 +314,9 @@ export function RehearsalsPage() {
             </div>
           )}
         </aside>
+      </div>
+          </div>
+        </main>
       </div>
     </div>
   );

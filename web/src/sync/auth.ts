@@ -3,9 +3,11 @@ import axios from "axios";
 // В React/Vite используем import.meta.env вместо process.env
 // Совпадать с web/src/sync/api.ts: при открытии с того же хоста (порт 80) используем /api
 function getApiBase(): string {
-  const raw = (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
+  const raw =
+    (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
   if (typeof window === "undefined") return raw;
-  if (raw === "/api" || (raw.startsWith("/") && !raw.startsWith("//"))) return raw;
+  if (raw === "/api" || (raw.startsWith("/") && !raw.startsWith("//")))
+    return raw;
   try {
     const envUrl = new URL(raw);
     // В проде фронт обычно на 80/443, бэк может быть на :3000 того же хоста.
@@ -16,7 +18,10 @@ function getApiBase(): string {
     const sameHost = envUrl.hostname === window.location.hostname;
     const isDefaultWebPort = currentPort === "80" || currentPort === "443";
     const samePort = envUrl.port === currentPort;
-    if (sameHost && (isDefaultWebPort || (samePort && currentPort !== "3000"))) {
+    if (
+      sameHost &&
+      (isDefaultWebPort || (samePort && currentPort !== "3000"))
+    ) {
       return "/api";
     }
   } catch {
