@@ -1,0 +1,60 @@
+# Конфигурация для локальной разработки с hot-reload
+# Использование: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # PostgreSQL наследуется из docker-compose.yml без изменений
+  
+  back:
+    build:
+      context: ./back
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./back/src:/app/src
+      - ./back/prisma:/app/prisma
+      - ./back/test:/app/test
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      # Остальные переменные наследуются из docker-compose.yml
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Debug port для Node.js
+    command: sh -c "npx prisma generate && npm run start:dev"
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+      - ./web/index.html:/app/index.html
+      - ./web/vite.config.ts:/app/vite.config.ts
+      - ./web/tsconfig.json:/app/tsconfig.json
+      - /app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    ports:
+      - "5173:5173" # Vite dev server
+    depends_on:
+      - back
+
+  admin:
+    build:
+      context: ./admin
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./admin/src:/app/src
+      - ./admin/public:/app/public
+      - ./admin/index.html:/app/index.html
+      - ./admin/vite.config.ts:/app/vite.config.ts
+      - ./admin/tsconfig.json:/app/tsconfig.json
+      - /app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    ports:
+      - "5174:5173" # Vite dev server (другой внешний порт)
+    depends_on:
+      - back
+
+  # MinIO и Dozzle наследуются из docker-compose.yml без изменений

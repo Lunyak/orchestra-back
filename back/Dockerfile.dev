@@ -1,0 +1,19 @@
+FROM node:22-alpine AS development
+
+WORKDIR /app
+
+# Установка зависимостей
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
+
+# Копируем prisma schema для генерации клиента
+COPY prisma ./prisma
+
+# Генерируем Prisma Client
+RUN npx prisma generate
+
+# Expose ports
+EXPOSE 3000 9229
+
+# Hot reload через nodemon/nest start:dev
+CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:dev"]
