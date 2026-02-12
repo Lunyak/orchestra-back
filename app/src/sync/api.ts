@@ -49,6 +49,20 @@ export const api = axios.create({
 });
 
 /**
+ * Request interceptor: всегда используем актуальный токен из localStorage
+ */
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("accessToken");
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+/**
  * Глобальный обработчик 401 ошибок.
  * Вызывает logout при получении Unauthorized.
  */

@@ -69,6 +69,20 @@ export const api = axios.create({
   baseURL: API_BASE,
 });
 
+/**
+ * Request interceptor: всегда используем актуальный токен из localStorage
+ */
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("accessToken");
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 let isRefreshing = false;
 let refreshQueue: Array<(token: string | null) => void> = [];
 

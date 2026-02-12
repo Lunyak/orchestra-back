@@ -61,6 +61,31 @@ export function AuthProvider({ children, onAfterLogin }: AuthProviderProps) {
     setupApiInterceptors(logout);
   }, [logout]);
 
+  // Синхронизация состояния токена с localStorage
+  // (на случай, если interceptor обновил токен)
+  useEffect(() => {
+    const syncTokenFromStorage = () => {
+      const storedToken = localStorage.getItem("accessToken");
+      if (storedToken !== accessToken) {
+        setAccessTokenState(storedToken);
+      }
+    };
+
+    // Проверяем при монтировании
+    syncTokenFromStorage();
+
+    // Слушаем изменения в localStorage (для синхронизации между вкладками)
+    window.addEventListener("storage", syncTokenFromStorage);
+
+    // Периодическая проверка (на случай обновления токена interceptor'ом)
+    const interval = setInterval(syncTokenFromStorage, 1000);
+
+    return () => {
+      window.removeEventListener("storage", syncTokenFromStorage);
+      clearInterval(interval);
+    };
+  }, [accessToken]);
+
   const value: AuthContextValue = {
     accessToken: accessToken ?? null,
     setAccessToken,
