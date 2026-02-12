@@ -1,15 +1,11 @@
-import { Route, Routes } from "react-router-dom";
 import "./App.css";
 import { AuthProvider, useAuth } from "./features/auth";
 import { ProjectProvider } from "./features/project";
 import { SceneProvider } from "./features/scene";
 import { ScriptUIProvider } from "./features/script-ui";
 import { LoginPage } from "./pages/login/LoginPage";
-import { ProfilePage } from "./pages/profile/ProfilePage";
-import { RehearsalsPage } from "./pages/rehearsals/RehearsalsPage";
-import { SettingsPage } from "./pages/settings/SettingsPage";
-import { SpectaclePage } from "./pages/spectacle/SpectaclePage";
 import { PlatformProvider } from "./PlatformContext";
+import { AppRoutes } from "./routes";
 
 export interface AppProps {
   /** После логина/регистрации (только desktop — выгрузка локальных данных). */
@@ -18,7 +14,7 @@ export interface AppProps {
   onPushAllLocal?: () => Promise<void>;
 }
 
-function AppRoutes() {
+function AuthenticatedApp() {
   const { accessToken } = useAuth();
 
   if (!accessToken) {
@@ -29,15 +25,7 @@ function AppRoutes() {
     <ProjectProvider>
       <SceneProvider>
         <ScriptUIProvider>
-          <Routes>
-            <Route path="/" element={<SpectaclePage />} />
-            <Route path="/theater" element={<SpectaclePage />} />
-            <Route path="/light-plot" element={<SpectaclePage />} />
-            <Route path="/board" element={<SpectaclePage />} />
-            <Route path="/rehearsals" element={<RehearsalsPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
+          <AppRoutes />
         </ScriptUIProvider>
       </SceneProvider>
     </ProjectProvider>
@@ -48,7 +36,7 @@ export default function App({ onAfterLogin, onPushAllLocal }: AppProps) {
   return (
     <PlatformProvider value={{ onPushAllLocal }}>
       <AuthProvider onAfterLogin={onAfterLogin}>
-        <AppRoutes />
+        <AuthenticatedApp />
       </AuthProvider>
     </PlatformProvider>
   );
