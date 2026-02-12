@@ -64,8 +64,8 @@ services:
 
   admin:
     build:
-      context: ./admin
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: admin/Dockerfile
       args:
         VITE_API_BASE_URL: /api
     container_name: orkestr-admin

@@ -4,45 +4,6 @@
 
 ---
 
-## 1. Первоначальная настройка сервера (один раз)
-
-### 1.1 Подключение
-
-```bash
-ssh root@213.226.126.196
-```
-
-### 1.2 Установка Docker и Docker Compose
-
-```bash
-# Ubuntu/Debian
-apt update && apt install -y ca-certificates curl
-install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-apt update && apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Проверка
-docker --version
-docker compose version
-```
-
-Если у вас другой дистрибутив, см. [Install Docker Engine](https://docs.docker.com/engine/install/).
-
-### 1.3 Клонирование репозитория
-
-```bash
-# Установка git, если нет
-apt install -y git
-
-# Клонирование (подставьте свой URL и при необходимости токен/SSH-ключ)
-mkdir -p /opt
-cd /opt
-git clone https://gitlab.com/dopamin-service/orchestra-back.git orchestra-back
-cd orchestra-back
-```
-
 Если репозиторий приватный, настройте доступ:
 
 - **HTTPS:** `git clone https://oauth2:TOKEN@gitlab.com/dopamin-service/orchestra-back.git orchestra-back`
