@@ -52,9 +52,11 @@ build:back:
   stage: build
   image: docker:24
   services:
-    - docker:24-dind
+    - name: docker:24-dind
+      command: ["--tls=false"]
   variables:
-    DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   script:
     - cd back
     - docker build -t orkestr-back:$CI_COMMIT_SHORT_SHA -t orkestr-back:latest .
