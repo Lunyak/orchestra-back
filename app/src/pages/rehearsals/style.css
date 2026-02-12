@@ -2,6 +2,8 @@
   padding: 18px 18px 28px;
   height: 100%;
   overflow: auto;
+  margin: 0 auto;
+  color: var(--color-text-lighter);
 }
 
 .rehearsals-head {
@@ -14,9 +16,9 @@
   letter-spacing: 0.2px;
 }
 
-.rehearsals-meta {
+.rehearsals-meta {  
   margin-top: 6px;
-  font-size: 13px;
+  font-size: 24px;
   opacity: 0.8;
 }
 
@@ -239,8 +241,8 @@
   .rehearsals-layout {
     grid-template-columns: 1fr;
   }
+
   .rehearsals-side {
     position: static;
   }
 }
-

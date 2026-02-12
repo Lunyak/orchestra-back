@@ -250,6 +250,7 @@ body {
 /* Настройки */
 .settings-main .settings-view {
   padding: 1rem 24px;
+  margin: 0 auto;
 }
 
 .settings-project-section {
