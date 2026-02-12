@@ -53,13 +53,9 @@ export function SpectaclePage() {
   } = useScene();
   const {
     showRequisites,
-    toggleRequisites,
     showPlaylistSidebar,
-    togglePlaylist,
     showHeaderSounds,
-    toggleHeaderSounds,
     isStepsCollapsed,
-    toggleStepsCollapsed,
     isEditing,
     setIsEditing,
     swapTheaterPanels: shouldSwapPanels,
