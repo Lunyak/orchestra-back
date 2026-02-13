@@ -1,4 +1,10 @@
-import { IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -44,6 +50,11 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(100)
   role?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  characters?: string[];
 
   @IsOptional()
   @IsString()

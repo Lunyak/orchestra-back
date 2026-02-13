@@ -13,6 +13,7 @@ import { UsersModule } from './users/users.module';
 import { BotModule } from './bot/bot.module';
 import { ProfileModule } from './profile/profile.module';
 import { RehearsalsModule } from './rehearsals/rehearsals.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RehearsalsModule } from './rehearsals/rehearsals.module';
     FilesModule,
     AdminModule,
     BotModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService],
