@@ -95,7 +95,7 @@ export class AttendanceService {
   }
 
   private isOwner(userId: number): boolean {
-    return this.ownerId && String(userId) === String(this.ownerId);
+    return Boolean(this.ownerId && String(userId) === String(this.ownerId));
   }
 
   private async getBotSettings() {

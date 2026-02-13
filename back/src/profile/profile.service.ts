@@ -73,7 +73,7 @@ export class ProfileService {
         ),
         sex: clean(dto.sex),
         role: clean(dto.role),
-        characters: dto.characters || null,
+        characters: dto.characters !== undefined ? dto.characters : undefined,
         phone: clean(dto.phone),
         birthday: clean(dto.birthday),
       },
