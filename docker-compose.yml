@@ -28,6 +28,9 @@ services:
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-admin-secret}
+      # Telegram Bot
+      BOT_TOKEN: ${BOT_TOKEN}
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID}
       # S3/MinIO storage (variant A)
       # Backend и браузер ходят к MinIO по одному и тому же адресу,
       # чтобы пресайнд-URL работали без переподписывания.
@@ -67,7 +70,11 @@ services:
       context: .
       dockerfile: admin/Dockerfile
       args:
-        VITE_API_BASE_URL: /api
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_LINK_WEB_LOCAL: ${VITE_LINK_WEB_LOCAL:-http://localhost:5173}
+        VITE_LINK_WEB_SERVER: ${VITE_LINK_WEB_SERVER:-http://213.226.126.196}
+        VITE_LINK_MINIO: ${VITE_LINK_MINIO:-http://213.226.126.196:9001}
+        VITE_LINK_DOZZLE: ${VITE_LINK_DOZZLE:-http://213.226.126.196:9999}
     container_name: orkestr-admin
     restart: unless-stopped
     ports:

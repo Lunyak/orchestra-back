@@ -3,9 +3,18 @@ FROM node:22-alpine AS builder
 
 WORKDIR /workspace
 
-# API в продакшене идёт через тот же хост по /api (nginx проксирует на back)
+# Переменные окружения для Vite (передаются через docker-compose build args)
 ARG VITE_API_BASE_URL=/api
+ARG VITE_LINK_WEB_LOCAL
+ARG VITE_LINK_WEB_SERVER
+ARG VITE_LINK_MINIO
+ARG VITE_LINK_DOZZLE
+
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_LINK_WEB_LOCAL=$VITE_LINK_WEB_LOCAL
+ENV VITE_LINK_WEB_SERVER=$VITE_LINK_WEB_SERVER
+ENV VITE_LINK_MINIO=$VITE_LINK_MINIO
+ENV VITE_LINK_DOZZLE=$VITE_LINK_DOZZLE
 
 # Сначала зависимости admin и app
 COPY admin/package.json admin/package-lock.json ./admin/
