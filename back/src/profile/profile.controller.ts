@@ -18,4 +18,3 @@ export class ProfileController {
     return this.profileService.updateByEmail(req.user.email, body);
   }
 }
-

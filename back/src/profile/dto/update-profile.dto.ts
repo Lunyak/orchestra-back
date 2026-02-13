@@ -34,5 +34,23 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsObject()
   availabilityCalendar?: Record<string, unknown>;
-}
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  sex?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  birthday?: string;
+}

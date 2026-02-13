@@ -34,6 +34,10 @@ model UserProfile {
   avatarUrl        String?
   /// Календарь занятости по датам: { "YYYY-MM-DD": "present" | "absent" }
   availabilityCalendar Json?
+  sex              String?
+  role             String?
+  phone            String?
+  birthday         String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }

@@ -12,10 +12,13 @@ function sanitizeAvailabilityCalendar(
   value: unknown,
 ): Record<string, 'present' | 'absent'> | undefined {
   if (value === undefined) return undefined;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined;
 
   const out: Record<string, 'present' | 'absent'> = {};
-  for (const [date, rawStatus] of Object.entries(value as Record<string, unknown>)) {
+  for (const [date, rawStatus] of Object.entries(
+    value as Record<string, unknown>,
+  )) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
     if (rawStatus === 'present' || rawStatus === 'absent') {
       out[date] = rawStatus;
@@ -48,7 +51,13 @@ export class ProfileService {
         telegramUsername: clean(dto.telegramUsername),
         telegramId: clean(dto.telegramId),
         avatarUrl: clean(dto.avatarUrl),
-        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
+        availabilityCalendar: sanitizeAvailabilityCalendar(
+          dto.availabilityCalendar,
+        ),
+        sex: clean(dto.sex),
+        role: clean(dto.role),
+        phone: clean(dto.phone),
+        birthday: clean(dto.birthday),
       },
       create: {
         email: normalized,
@@ -58,9 +67,14 @@ export class ProfileService {
         telegramUsername: clean(dto.telegramUsername),
         telegramId: clean(dto.telegramId),
         avatarUrl: clean(dto.avatarUrl),
-        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
+        availabilityCalendar: sanitizeAvailabilityCalendar(
+          dto.availabilityCalendar,
+        ),
+        sex: clean(dto.sex),
+        role: clean(dto.role),
+        phone: clean(dto.phone),
+        birthday: clean(dto.birthday),
       },
     });
   }
 }
-
