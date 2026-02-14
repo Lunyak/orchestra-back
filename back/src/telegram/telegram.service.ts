@@ -63,6 +63,16 @@ export class TelegramService implements OnModuleInit {
     this.initServices();
 
     console.log('🚀 Launching Telegram bot...');
+    
+    // Запускаем бот асинхронно без блокировки приложения
+    this.launchBotAsync();
+
+    // Graceful stop
+    process.once('SIGINT', () => this.bot?.stop('SIGINT'));
+    process.once('SIGTERM', () => this.bot?.stop('SIGTERM'));
+  }
+
+  private async launchBotAsync() {
     try {
       // Добавляем timeout для bot.launch чтобы не зависать
       const launchPromise = this.bot.launch();
@@ -82,11 +92,8 @@ export class TelegramService implements OnModuleInit {
       console.warn('   - BOT_TOKEN неверный или истек');
       console.warn('   - Нет доступа к api.telegram.org (проверьте сеть/firewall)');
       console.warn('   - Токен уже используется в другом процессе');
+      console.warn('   - Long polling блокируется внутри Docker контейнера');
     }
-
-    // Graceful stop
-    process.once('SIGINT', () => this.bot?.stop('SIGINT'));
-    process.once('SIGTERM', () => this.bot?.stop('SIGTERM'));
   }
 
   private isOwner(ctx: any): boolean {
