@@ -95,6 +95,7 @@ const updateUserData = async (telegramId, userData) => {
     sex: userData.sex,
     birthday: userData.birthday,
     role: userData.role,
+    characters: userData.characters,
     displayName: userData.displayName,
   };
 

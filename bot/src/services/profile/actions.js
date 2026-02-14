@@ -58,6 +58,17 @@ module.exports = (bot, userStates) => {
     await editProfileHandler.setChangeState(ctx, userStates, "birthday");
   });
 
+  // Обработчик для кнопки "Изменить роль в театре"
+  bot.action("change_profile_theater_role", async (ctx) => {
+    await editProfileHandler.setTheaterRoleSelection(ctx, userStates);
+  });
+
+  // Обработчик выбора роли в театре
+  bot.action(/^theater_role_(.+)$/, async (ctx) => {
+    const role = ctx.match[1];
+    await editProfileHandler.saveTheaterRole(ctx, userStates, role);
+  });
+
   bot.action("profile_roles", async (ctx) => {
     roleHendlers.myRoles(ctx, userStates);
   });

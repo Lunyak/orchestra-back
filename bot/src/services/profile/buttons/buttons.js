@@ -24,6 +24,7 @@ const ButtonsProfile = {
         "change_profile_birthday",
       ),
     ],
+    [Markup.button.callback("Изменить роль в театре", "change_profile_theater_role")],
     [Markup.button.callback("« Назад", "back_to_profile")],
   ]),
 

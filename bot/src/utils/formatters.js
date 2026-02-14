@@ -4,7 +4,17 @@
  * @returns {string} - HTML-форматированное сообщение
  */
 const formatProfileMessage = (user) => {
-  const characters = user?.characters || [];
+  // Обрабатываем characters и role
+  let characters = user?.characters || [];
+  let theaterRole = user.role;
+  
+  // Если role - это массив, то это на самом деле персонажи (ошибка в данных)
+  if (Array.isArray(user.role)) {
+    // Если role - массив, используем его как characters
+    characters = user.role;
+    theaterRole = "Не указана";
+  }
+  
   const charactersList =
     characters.length > 0
       ? characters.map((char) => `• ${char}`).join("\n")
@@ -24,7 +34,7 @@ const formatProfileMessage = (user) => {
     `<b>Телефон:</b> ${user.phone || "Не указан"}\n` +
     `<b>Пол:</b> ${user.sex || "Не указан"}\n` +
     `<b>День рождения:</b> ${user?.birthday || "Не указан"}\n` +
-    `<b>Роль в театре:</b> ${user.role || "Не указана"}\n` +
+    `<b>Роль в театре:</b> ${theaterRole || "Не указана"}\n` +
     `<b>Роли/персонажи:</b>\n${charactersList}\n\n` +
     `Используйте кнопки ниже для управления профилем.`
   );
@@ -55,19 +65,30 @@ function formatUsersTable(users) {
     "Роль",
     "ДР",
     "TG ID",
-    "Роли",
+    "Персонажи",
   ];
-  const rows = users.map((u, i) => [
-    i + 1,
-    cell(u.firstName || u.name),
-    cell(u.lastName || u.surname),
-    cell(u.email),
-    cell(u.phone),
-    cell(u.role),
-    cell(u.birthday),
-    cell(u.telegramId || u.telegram_id),
-    cell(u.characters),
-  ]);
+  const rows = users.map((u, i) => {
+    // Обрабатываем случай, когда role - это массив
+    let theaterRole = u.role;
+    let characters = u.characters || [];
+    
+    if (Array.isArray(u.role)) {
+      characters = u.role;
+      theaterRole = "—";
+    }
+    
+    return [
+      i + 1,
+      cell(u.firstName || u.name),
+      cell(u.lastName || u.surname),
+      cell(u.email),
+      cell(u.phone),
+      cell(theaterRole),
+      cell(u.birthday),
+      cell(u.telegramId || u.telegram_id),
+      cell(characters),
+    ];
+  });
   const colWidths = headers.map((h, c) =>
     Math.max(h.length, ...rows.map((r) => String(r[c]).length), 2),
   );
