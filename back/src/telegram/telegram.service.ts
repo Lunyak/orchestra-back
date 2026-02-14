@@ -37,10 +37,12 @@ export class TelegramService implements OnModuleInit {
   ) {
     const token = process.env.BOT_TOKEN?.trim();
     if (!token) {
-      console.warn('⚠️ BOT_TOKEN not set, telegram bot will not start');
+      console.warn('⚠️ BOT_TOKEN not set or empty, telegram bot will not start');
+      console.warn(`   BOT_TOKEN value: "${process.env.BOT_TOKEN}"`);
       return;
     }
 
+    console.log(`🤖 Initializing Telegram bot (token: ${token.substring(0, 10)}...)`);
     this.bot = new Telegraf(token);
     this.ownerId = process.env.OWNER_TELEGRAM_ID || '';
 
@@ -60,18 +62,26 @@ export class TelegramService implements OnModuleInit {
     this.registerBotCommands();
     this.initServices();
 
+    console.log('🚀 Launching Telegram bot...');
     try {
       // Добавляем timeout для bot.launch чтобы не зависать
       const launchPromise = this.bot.launch();
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Bot launch timeout')), 10000)
+        setTimeout(() => reject(new Error('Bot launch timeout (10s)')), 10000)
       );
       
       await Promise.race([launchPromise, timeoutPromise]);
-      console.log('✅ Telegram бот запущен');
+      console.log('✅ Telegram бот запущен успешно');
     } catch (err) {
       console.error('❌ Ошибка запуска Telegram бота:', err?.message || err);
+      if (err?.response?.error_code) {
+        console.error(`   Telegram API error: ${err.response.error_code} - ${err.response.description}`);
+      }
       console.warn('⚠️ Приложение продолжит работу без Telegram бота');
+      console.warn('   Возможные причины:');
+      console.warn('   - BOT_TOKEN неверный или истек');
+      console.warn('   - Нет доступа к api.telegram.org (проверьте сеть/firewall)');
+      console.warn('   - Токен уже используется в другом процессе');
     }
 
     // Graceful stop
