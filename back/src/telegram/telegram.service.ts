@@ -35,7 +35,7 @@ export class TelegramService implements OnModuleInit {
     private readonly attendance: AttendanceService,
     private readonly telegramProfile: TelegramProfileService,
   ) {
-    const token = process.env.BOT_TOKEN;
+    const token = process.env.BOT_TOKEN?.trim();
     if (!token) {
       console.warn('⚠️ BOT_TOKEN not set, telegram bot will not start');
       return;
@@ -50,7 +50,10 @@ export class TelegramService implements OnModuleInit {
   }
 
   async onModuleInit() {
-    if (!this.bot) return;
+    if (!this.bot) {
+      console.log('⚠️ Telegram bot disabled (no token)');
+      return;
+    }
 
     this.setupCommands();
     this.setupMenuHandler();
@@ -58,15 +61,22 @@ export class TelegramService implements OnModuleInit {
     this.initServices();
 
     try {
-      await this.bot.launch();
+      // Добавляем timeout для bot.launch чтобы не зависать
+      const launchPromise = this.bot.launch();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Bot launch timeout')), 10000)
+      );
+      
+      await Promise.race([launchPromise, timeoutPromise]);
       console.log('✅ Telegram бот запущен');
     } catch (err) {
-      console.error('❌ Ошибка запуска Telegram бота:', err);
+      console.error('❌ Ошибка запуска Telegram бота:', err?.message || err);
+      console.warn('⚠️ Приложение продолжит работу без Telegram бота');
     }
 
     // Graceful stop
-    process.once('SIGINT', () => this.bot.stop('SIGINT'));
-    process.once('SIGTERM', () => this.bot.stop('SIGTERM'));
+    process.once('SIGINT', () => this.bot?.stop('SIGINT'));
+    process.once('SIGTERM', () => this.bot?.stop('SIGTERM'));
   }
 
   private isOwner(ctx: any): boolean {
