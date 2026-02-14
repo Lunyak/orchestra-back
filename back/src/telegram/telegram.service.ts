@@ -67,7 +67,7 @@ export class TelegramService implements OnModuleInit {
       // Добавляем timeout для bot.launch чтобы не зависать
       const launchPromise = this.bot.launch();
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Bot launch timeout (10s)')), 10000)
+        setTimeout(() => reject(new Error('Bot launch timeout (30s)')), 30000)
       );
       
       await Promise.race([launchPromise, timeoutPromise]);
