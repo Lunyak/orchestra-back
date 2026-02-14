@@ -30,7 +30,7 @@ function startHealthServer() {
 
 // Импорт обработчиков команд
 const ProfileService = require("./src/services/profile/ProfileService");
-const GoogleSheetsService = require("./src/services/googleSheets/googleSheetsService");
+// const GoogleSheetsService = require("./src/services/googleSheets/googleSheetsService"); // Отключено
 const BirthdayService = require("./src/services/birthdayService");
 const AttendanceService = require("./src/services/attendanceService");
 const AnonymousQuestionService = require("./src/services/anonymousQuestionService");
@@ -42,7 +42,7 @@ class BotManager {
     this.bot = bot;
     this.userStates = new Map();
     this.commandHandlers = require("./src/handlers/commandHendlers");
-    this.googleSheets = new GoogleSheetsService(this.bot, this.userStates);
+    // this.googleSheets = new GoogleSheetsService(this.bot, this.userStates); // Отключено
     this.profile = new ProfileService(this.bot, this.userStates);
     this.birthdayService = new BirthdayService(bot);
     this.attendance = new AttendanceService(bot, this.userStates);
@@ -141,9 +141,9 @@ class BotManager {
       profile: () => this.profile.initMainProfileHendler(ctx, this.userStates),
       me: () => this.profile.initMainProfileHendler(ctx, this.userStates),
       register: () => this.profile.registerUser(ctx, this.userStates),
-      addguest: () => this.googleSheets.initGuestCommands(ctx, this.userStates),
-      guests: () => this.googleSheets.startGetList(ctx),
-      newpage: () => this.googleSheets.initNewPageCommands(ctx),
+      // addguest: () => this.googleSheets.initGuestCommands(ctx, this.userStates), // Отключено
+      // guests: () => this.googleSheets.startGetList(ctx), // Отключено
+      // newpage: () => this.googleSheets.initNewPageCommands(ctx), // Отключено
       checkbirthdays: () => this.birthdayService.showBirthdaysTable(ctx),
       question: () => this.anonymousQuestion.initQuestion(ctx),
       setrehearsal: () => this.attendance.startSetRehearsal(ctx),
@@ -230,15 +230,15 @@ class BotManager {
     this.bot.command("register", (ctx) =>
       this.profile.registerUser(ctx, this.userStates),
     );
-    this.bot.command("addguest", (ctx) =>
-      this.googleSheets.initGuestCommands(ctx, this.userStates),
-    );
-    this.bot.command("guests", async (ctx) => {
-      this.googleSheets.startGetList(ctx);
-    });
-    this.bot.command("newpage", (ctx) => {
-      this.googleSheets.initNewPageCommands(ctx);
-    });
+    // this.bot.command("addguest", (ctx) =>
+    //   this.googleSheets.initGuestCommands(ctx, this.userStates),
+    // ); // Отключено
+    // this.bot.command("guests", async (ctx) => {
+    //   this.googleSheets.startGetList(ctx);
+    // }); // Отключено
+    // this.bot.command("newpage", (ctx) => {
+    //   this.googleSheets.initNewPageCommands(ctx);
+    // }); // Отключено
     this.bot.command("checkbirthdays", async (ctx) => {
       await this.birthdayService.showBirthdaysTable(ctx);
     });
@@ -293,7 +293,7 @@ class BotManager {
   _initServices() {
     this.anonymousQuestion.init();
     this.profile.init();
-    this.googleSheets.init();
+    // this.googleSheets.init(); // Отключено
     this.birthdayService.init();
     this.attendance.init();
     this.dumpService.init();
@@ -301,7 +301,7 @@ class BotManager {
   }
 
   _initMassegeHendlers() {
-    this.googleSheets.initMessageHendlers();
+    // this.googleSheets.initMessageHendlers(); // Отключено
     this.profile.initMessageHendlers();
   }
 
