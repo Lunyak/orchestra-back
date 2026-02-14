@@ -74,14 +74,30 @@ export class TelegramService implements OnModuleInit {
 
   private async launchBotAsync() {
     try {
+      // Настраиваем polling с явными опциями для работы в Docker
+      const launchOptions = {
+        dropPendingUpdates: true,
+        allowedUpdates: [
+          'message',
+          'callback_query',
+          'inline_query',
+        ] as const,
+      };
+
+      console.log('   Polling options:', JSON.stringify(launchOptions));
+      
       // Добавляем timeout для bot.launch чтобы не зависать
-      const launchPromise = this.bot.launch();
+      const launchPromise = this.bot.launch(launchOptions);
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Bot launch timeout (30s)')), 30000)
       );
       
       await Promise.race([launchPromise, timeoutPromise]);
       console.log('✅ Telegram бот запущен успешно');
+      
+      // Проверяем что бот действительно работает
+      const me = await this.bot.telegram.getMe();
+      console.log(`   Bot info: @${me.username} (${me.first_name})`);
     } catch (err) {
       console.error('❌ Ошибка запуска Telegram бота:', err?.message || err);
       if (err?.response?.error_code) {
@@ -93,6 +109,9 @@ export class TelegramService implements OnModuleInit {
       console.warn('   - Нет доступа к api.telegram.org (проверьте сеть/firewall)');
       console.warn('   - Токен уже используется в другом процессе');
       console.warn('   - Long polling блокируется внутри Docker контейнера');
+      
+      // Временное решение - отключите бот в .env если он не нужен срочно
+      console.warn('   💡 Временное решение: закомментируйте BOT_TOKEN в .env');
     }
   }
 
