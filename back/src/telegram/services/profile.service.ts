@@ -79,6 +79,17 @@ export class ProfileService {
   async startRegistration(ctx: any) {
     const userId = ctx.from.id;
 
+    // Проверяем, не зарегистрирован ли уже пользователь
+    const existingProfile = await this.prisma.userProfile.findFirst({
+      where: { telegramId: String(userId) },
+    });
+
+    if (existingProfile) {
+      return ctx.reply(
+        'Вы уже зарегистрированы! ✅\n\nПосмотреть профиль: /profile',
+      );
+    }
+
     this.userStates.set(userId, {
       step: 'register_email',
       data: {
