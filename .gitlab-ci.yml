@@ -62,7 +62,7 @@ build:back:
     - docker build -t orkestr-back:$CI_COMMIT_SHORT_SHA -t orkestr-back:latest .
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-# Деплой на VPS: только postgres + back (Dozzle и прочее не поднимаем)
+# Деплой на VPS: postgres + back + bot + dozzle
 deploy:
   stage: deploy
   image: alpine:latest
@@ -73,7 +73,7 @@ deploy:
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
   script:
-    - ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} "cd /opt/orchestra-back && git pull && docker compose up -d --build postgres back dozzle"
+    - ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} "cd /opt/orchestra-back && git pull && docker compose up -d --build postgres back bot dozzle"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   variables:

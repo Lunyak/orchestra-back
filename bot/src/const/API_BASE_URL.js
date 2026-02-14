@@ -1,0 +1,1 @@
+module.exports = `http://${process.env.SERVER_URL}`

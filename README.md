@@ -1,6 +1,6 @@
 # Orchestra Services
 
-Монорепозиторий сервисов проекта Orchestra: бэкенд (NestJS + PostgreSQL), веб-фронтенд, админ-панель, хранилище (MinIO).
+Монорепозиторий сервисов проекта Orchestra: бэкенд (NestJS + PostgreSQL), веб-фронтенд, админ-панель, Telegram бот, хранилище (MinIO).
 
 ## 🚀 Быстрый старт
 
@@ -46,9 +46,12 @@ make backup-db      # Бэкап базы данных
 ```
 orchestra-servises/
 ├── back/              # NestJS API + Prisma ORM
+├── bot/               # Telegram бот (Node.js + Telegraf)
 ├── web/               # Веб-фронтенд
 ├── admin/             # Админ-панель
 ├── desktop/           # Electron-приложение (отдельный репо)
+├── docs/              # Документация
+│   └── LOGS.md       # Руководство по логам
 ├── scripts/           # Скрипты автоматизации
 │   ├── dev.sh        # Запуск dev с hot-reload
 │   ├── prod.sh       # Запуск production
@@ -58,6 +61,7 @@ orchestra-servises/
 ├── docker-compose.dev.yml   # Dev конфигурация (hot-reload)
 ├── Makefile                 # Удобные команды
 ├── AUTOMATION.md            # 📖 Полное руководство по автоматизации
+├── DEPLOYMENT.md            # 📖 Полный гайд по деплою
 └── DEPLOY.md                # Инструкции по развертыванию на VPS
 ```
 
@@ -122,8 +126,12 @@ psql postgresql://orkestr:orkestr_secret@localhost:5432/dophamin_orkestr
 ## 📚 Документация
 
 - **[AUTOMATION.md](./AUTOMATION.md)** - Полное руководство по автоматизации
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Полный гайд по деплою и управлению
 - **[DEPLOY.md](./DEPLOY.md)** - Развертывание на VPS
+- **[docs/LOGS.md](./docs/LOGS.md)** - Руководство по просмотру логов
+- **[BOT_CHECKLIST.md](./BOT_CHECKLIST.md)** - Чек-лист деплоя бота
 - **[back/README.md](./back/README.md)** - Backend API
+- **[bot/README.md](./bot/README.md)** - Telegram бот
 - **[admin/README.md](./admin/README.md)** - Админ-панель
 
 ## 📝 Лицензия

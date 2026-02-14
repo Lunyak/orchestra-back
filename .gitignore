@@ -30,3 +30,7 @@ back/prisma/generated/
 
 # 3D-модели (тяжёлые, не нужны на сервере / в репо)
 *.glb
+
+/BOT_CHECKLIST.md
+/BOT_MIGRATION_SUMMARY.md
+/DEPLOYMENT.md

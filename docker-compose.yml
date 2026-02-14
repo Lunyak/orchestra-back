@@ -51,6 +51,32 @@ services:
       retries: 5
       start_period: 10s
 
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: orkestr-bot
+    restart: unless-stopped
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_ID: ${OWNER_TELEGRAM_ID}
+      OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID}
+      GROUP_CHAT_ID: ${GROUP_CHAT_ID}
+      GROUP_CHAT_ID_ATTENTION: ${GROUP_CHAT_ID_ATTENTION:-41051}
+      ANNOUNCEMENTS_THREAD_ID: ${ANNOUNCEMENTS_THREAD_ID:-14434}
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      SERVER_URL: back:3000
+      HEALTH_PORT: 3001
+    depends_on:
+      back:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
   web:
     build:
       context: .
