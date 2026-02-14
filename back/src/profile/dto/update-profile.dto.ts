@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsEmail,
   IsObject,
   IsOptional,
   IsString,
@@ -7,6 +8,11 @@ import {
 } from 'class-validator';
 
 export class UpdateProfileDto {
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(120)
+  email?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(80)

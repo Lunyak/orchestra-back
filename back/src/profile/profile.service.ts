@@ -40,6 +40,63 @@ export class ProfileService {
     });
   }
 
+  async getByTelegramId(telegramId: string) {
+    return this.prisma.userProfile.findUnique({
+      where: { telegramId },
+    });
+  }
+
+  async createByTelegramId(telegramId: string, dto: UpdateProfileDto) {
+    // Используем email по умолчанию если не указан
+    const email = dto.email || `telegram_${telegramId}@temp.local`;
+    return this.prisma.userProfile.create({
+      data: {
+        email: email.trim().toLowerCase(),
+        telegramId,
+        displayName: clean(dto.displayName),
+        firstName: clean(dto.firstName),
+        lastName: clean(dto.lastName),
+        telegramUsername: clean(dto.telegramUsername),
+        avatarUrl: clean(dto.avatarUrl),
+        sex: clean(dto.sex),
+        role: clean(dto.role),
+        characters: dto.characters,
+        phone: clean(dto.phone),
+        birthday: clean(dto.birthday),
+        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
+      },
+    });
+  }
+
+  async updateByTelegramId(telegramId: string, dto: UpdateProfileDto) {
+    const existing = await this.prisma.userProfile.findUnique({
+      where: { telegramId },
+    });
+    
+    if (!existing) {
+      // Если профиль не существует, создаем его
+      return this.createByTelegramId(telegramId, dto);
+    }
+
+    return this.prisma.userProfile.update({
+      where: { telegramId },
+      data: {
+        email: dto.email ? dto.email.trim().toLowerCase() : undefined,
+        displayName: clean(dto.displayName),
+        firstName: clean(dto.firstName),
+        lastName: clean(dto.lastName),
+        telegramUsername: clean(dto.telegramUsername),
+        avatarUrl: clean(dto.avatarUrl),
+        sex: clean(dto.sex),
+        role: clean(dto.role),
+        characters: dto.characters !== undefined ? dto.characters : undefined,
+        phone: clean(dto.phone),
+        birthday: clean(dto.birthday),
+        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
+      },
+    });
+  }
+
   async updateByEmail(email: string, dto: UpdateProfileDto) {
     const normalized = email.trim().toLowerCase();
     return this.prisma.userProfile.upsert({

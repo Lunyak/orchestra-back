@@ -1,13 +1,22 @@
 const axios = require("axios");
 const API_BASE_URL = require("../const/API_BASE_URL");
 
-const getUserData = async (userId) => {
+/**
+ * Получает профиль пользователя по Telegram ID
+ * @param {string|number} telegramId - Telegram ID пользователя
+ * @returns {Promise} - Профиль пользователя или null если не найден
+ */
+const getUserData = async (telegramId) => {
   try {
     const response = await axios.get(
-      `${API_BASE_URL}/users/telegram/${userId}`
+      `${API_BASE_URL}/profile/telegram/${telegramId}`
     );
     return response.data;
   } catch (error) {
+    if (error.response?.status === 404) {
+      // Пользователь не найден - это нормально для незарегистрированных
+      return null;
+    }
     console.error(
       "Error getting user data:",
       error.response?.data || error.message
@@ -31,35 +40,73 @@ const getUsersData = async () => {
 };
 
 /**
- * Создает нового пользователя
- * @param {Object} userData - Данные пользователя
- * @returns {Promise} - Результат запроса
+ * Создает профиль пользователя по Telegram ID
+ * @param {Object} userData - Данные профиля пользователя
+ * @param {string} userData.telegram_id - Telegram ID (обязательно)
+ * @returns {Promise} - Созданный профиль
  */
 const createUserData = async (userData) => {
-  console.log(userData);
+  const telegramId = userData.telegram_id;
+  if (!telegramId) {
+    throw new Error("telegram_id is required");
+  }
+
+  // Преобразуем поля для нового API
+  const profileData = {
+    email: userData.email,
+    firstName: userData.name,
+    lastName: userData.surname,
+    telegramUsername: userData.telegram_username,
+    phone: userData.phone,
+    sex: userData.sex,
+    birthday: userData.birthday,
+    role: userData.role,
+  };
 
   try {
-    const response = await axios.post(`${API_BASE_URL}/users`, userData);
+    const response = await axios.post(
+      `${API_BASE_URL}/profile/telegram/${telegramId}`,
+      profileData
+    );
     return response.data;
   } catch (error) {
     console.error(
-      "Error creating user:",
+      "Error creating user profile:",
       error.response?.data || error.message
     );
     throw error;
   }
 };
 
+/**
+ * Обновляет профиль пользователя по Telegram ID
+ * @param {string|number} telegramId - Telegram ID
+ * @param {Object} userData - Данные для обновления
+ * @returns {Promise} - Обновленный профиль
+ */
 const updateUserData = async (telegramId, userData) => {
+  // Преобразуем поля для нового API если нужно
+  const profileData = {
+    email: userData.email,
+    firstName: userData.name || userData.firstName,
+    lastName: userData.surname || userData.lastName,
+    telegramUsername: userData.telegram_username || userData.telegramUsername,
+    phone: userData.phone,
+    sex: userData.sex,
+    birthday: userData.birthday,
+    role: userData.role,
+    displayName: userData.displayName,
+  };
+
   try {
     const response = await axios.patch(
-      `${API_BASE_URL}/users/telegram/${telegramId}`,
-      userData
+      `${API_BASE_URL}/profile/telegram/${telegramId}`,
+      profileData
     );
     return response.data;
   } catch (error) {
     console.error(
-      "Error updating user data:",
+      "Error updating user profile:",
       error.response?.data || error.message
     );
     throw error;

@@ -34,13 +34,15 @@ class ProfileService {
     try {
       const user = await this.getUser(userId);
       if (user) {
-        return ctx.reply("Вы уже зарегистрированы!");
+        return ctx.reply("Вы уже зарегистрированы! Используйте /profile для просмотра профиля.");
       }
 
       // Шаг согласия на обработку персональных данных
       this.userStates.set(userId, {
         step: "registerUser_consent",
-        data: {},
+        data: {
+          telegram_username: ctx.from.username,
+        },
       });
       const consentText =
         "Для продолжения регистрации необходимо дать согласие на обработку и хранение персональных данных в соответствии с законодательством Российской Федерации (152-ФЗ «О персональных данных»).\n\nНажимая кнопку ниже, вы подтверждаете своё согласие.";
@@ -133,8 +135,13 @@ class ProfileService {
     const value = ctx.message.text;
     const userId = ctx.from.id;
 
-    // Сохраняем данные в state
-    state.data[field] = value;
+    // Обработка пропуска для опциональных полей
+    if (field === "email" && value.toLowerCase() === "пропустить") {
+      state.data[field] = null;
+    } else {
+      state.data[field] = value;
+    }
+    
     this.userStates.set(userId, state);
 
     // Определяем следующий шаг
@@ -154,12 +161,8 @@ class ProfileService {
 
   getNextRegistrationStep(currentStep) {
     const steps = [
-      "registerUser_name",
-      "registerUser_surname",
-      "registerUser_email",
-      "registerUser_phone",
-      "registerUser_sex",
-      "registerUser_birthday",
+      "registerUser_name", // Имя (обязательно)
+      "registerUser_email", // Email (опционально, но полезно)
     ];
     const currentIndex = steps.indexOf(currentStep);
     return steps[currentIndex + 1];
@@ -168,11 +171,7 @@ class ProfileService {
   getStepMessage(step) {
     const messages = {
       registerUser_name: "Введите ваше имя:",
-      registerUser_surname: "Введите вашу фамилию:",
-      registerUser_email: "Введите ваш email:",
-      registerUser_phone: "Введите ваш телефон:",
-      registerUser_sex: "Ваш пол",
-      registerUser_birthday: "Введите вашу дату рождения (ДД.ММ.ГГГГ):",
+      registerUser_email: "Введите ваш email (или напишите 'пропустить'):",
     };
     return messages[step];
   }
@@ -181,14 +180,21 @@ class ProfileService {
     const userId = ctx.from.id;
     try {
       await createUserData({
-        ...userData,
-        role: "user",
         telegram_id: String(userId),
+        name: userData.name,
+        email: userData.email || undefined,
+        telegram_username: userData.telegram_username || ctx.from.username,
       });
-      ctx.reply("Регистрация успешно завершена!");
+      
+      await ctx.reply(
+        "✅ Регистрация успешно завершена!\n\n" +
+        "Вы можете заполнить дополнительную информацию в профиле командой /profile"
+      );
     } catch (error) {
       console.error("Ошибка при создании пользователя:", error);
-      ctx.reply("Произошла ошибка при регистрации. Попробуйте снова.");
+      await ctx.reply(
+        "Произошла ошибка при регистрации. Попробуйте снова позже или обратитесь к администратору."
+      );
     }
   }
 

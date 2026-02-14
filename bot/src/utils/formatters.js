@@ -1,6 +1,6 @@
 /**
  * Форматирует данные пользователя в HTML-сообщение о профиле
- * @param {Object} user - Данные пользователя
+ * @param {Object} user - Данные пользователя (UserProfile)
  * @returns {string} - HTML-форматированное сообщение
  */
 const formatProfileMessage = (user) => {
@@ -10,15 +10,22 @@ const formatProfileMessage = (user) => {
       ? characters.map((char) => `• ${char}`).join("\n")
       : "Нет ролей";
 
+  // Поддерживаем как новую структуру (firstName/lastName), так и старую (name/surname)
+  const firstName = user.firstName || user.name || "Не указано";
+  const lastName = user.lastName || user.surname || "Не указано";
+  const displayName = user.displayName;
+
   return (
     `<b>Ваш профиль в Дофамин</b>\n\n` +
-    `<b>Имя:</b> ${user.name || "Не указано"}\n` +
-    `<b>Фамилия:</b> ${user.surname || "Не указано"}\n` +
+    (displayName ? `<b>Отображаемое имя:</b> ${displayName}\n` : "") +
+    `<b>Имя:</b> ${firstName}\n` +
+    `<b>Фамилия:</b> ${lastName}\n` +
     `<b>Email:</b> ${user.email || "Не указан"}\n` +
     `<b>Телефон:</b> ${user.phone || "Не указан"}\n` +
     `<b>Пол:</b> ${user.sex || "Не указан"}\n` +
     `<b>День рождения:</b> ${user?.birthday || "Не указан"}\n` +
-    `<b>Роли:</b>\n${charactersList}\n\n` +
+    `<b>Роль в театре:</b> ${user.role || "Не указана"}\n` +
+    `<b>Роли/персонажи:</b>\n${charactersList}\n\n` +
     `Используйте кнопки ниже для управления профилем.`
   );
 };
@@ -52,13 +59,13 @@ function formatUsersTable(users) {
   ];
   const rows = users.map((u, i) => [
     i + 1,
-    cell(u.name),
-    cell(u.surname),
+    cell(u.firstName || u.name),
+    cell(u.lastName || u.surname),
     cell(u.email),
     cell(u.phone),
     cell(u.role),
     cell(u.birthday),
-    cell(u.telegram_id),
+    cell(u.telegramId || u.telegram_id),
     cell(u.characters),
   ]);
   const colWidths = headers.map((h, c) =>
