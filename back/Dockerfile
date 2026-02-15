@@ -28,4 +28,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # Миграции под то, что использует оркестр; затем запуск API
-CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/src/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && exec node dist/main.js"]
