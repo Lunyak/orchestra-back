@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileService } from './profile.service';
@@ -29,7 +38,7 @@ export class ProfileController {
   @Post('telegram/:telegramId')
   createProfileByTelegramId(
     @Param('telegramId') telegramId: string,
-    @Body() body: UpdateProfileDto
+    @Body() body: UpdateProfileDto,
   ) {
     return this.profileService.createByTelegramId(telegramId, body);
   }
@@ -37,7 +46,7 @@ export class ProfileController {
   @Patch('telegram/:telegramId')
   updateProfileByTelegramId(
     @Param('telegramId') telegramId: string,
-    @Body() body: UpdateProfileDto
+    @Body() body: UpdateProfileDto,
   ) {
     return this.profileService.updateByTelegramId(telegramId, body);
   }
