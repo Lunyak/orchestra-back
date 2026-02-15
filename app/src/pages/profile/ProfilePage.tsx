@@ -9,37 +9,53 @@ import {
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import "./style.css";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
+import "dayjs/locale/ru";
+
+dayjs.extend(isoWeek);
+dayjs.locale("ru");
 
 type AvailabilityStatus = "present" | "absent";
 
 function isoDate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return dayjs(d).format("YYYY-MM-DD");
 }
 
-function startOfWeekMonday(now: Date): Date {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const jsDay = d.getDay();
-  const diff = jsDay === 0 ? -6 : 1 - jsDay;
-  d.setDate(d.getDate() + diff);
-  return d;
+function startOfMonth(date: Date): Date {
+  return dayjs(date).startOf("month").toDate();
+}
+
+function endOfMonth(date: Date): Date {
+  return dayjs(date).endOf("month").toDate();
+}
+
+function addMonths(base: Date, months: number): Date {
+  return dayjs(base).add(months, "month").toDate();
 }
 
 function addDays(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
+  return dayjs(base).add(days, "day").toDate();
 }
 
-function formatDateLabel(date: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    weekday: "short",
-    day: "2-digit",
-    month: "2-digit",
-  }).format(date);
+function getMonthCalendarDays(date: Date): Date[] {
+  const start = dayjs(date).startOf("month");
+  const end = dayjs(date).endOf("month");
+  
+  // Начинаем с понедельника недели, в которой начинается месяц
+  const startDay = start.startOf("isoWeek");
+  // Заканчиваем воскресеньем недели, в которой заканчивается месяц
+  const endDay = end.endOf("isoWeek");
+  
+  const days: Date[] = [];
+  let current = startDay;
+  
+  while (current.isBefore(endDay) || current.isSame(endDay, "day")) {
+    days.push(current.toDate());
+    current = current.add(1, "day");
+  }
+  
+  return days;
 }
 
 export function ProfilePage() {
@@ -50,12 +66,26 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
-  const [calendarWeekStart, setCalendarWeekStart] = useState(() =>
-    isoDate(startOfWeekMonday(new Date())),
-  );
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const saved = localStorage.getItem("profile-calendar-month");
+    if (saved) {
+      try {
+        const date = new Date(saved);
+        if (!isNaN(date.getTime())) return date;
+      } catch {
+        // ignore
+      }
+    }
+    return new Date();
+  });
   const [selectedDate, setSelectedDate] = useState(() => isoDate(new Date()));
-  const [weekRehearsals, setWeekRehearsals] = useState<Rehearsal[]>([]);
+  const [monthRehearsals, setMonthRehearsals] = useState<Rehearsal[]>([]);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+
+  // Сохраняем выбранный месяц в localStorage
+  useEffect(() => {
+    localStorage.setItem("profile-calendar-month", currentMonth.toISOString());
+  }, [currentMonth]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -99,26 +129,24 @@ export function ProfilePage() {
     } as Partial<MyProfile>;
   }, [form]);
 
-  const weekStartDate = useMemo(() => {
-    const [y, m, d] = calendarWeekStart.split("-").map((x) => Number(x));
-    const dt = y && m && d ? new Date(y, m - 1, d) : startOfWeekMonday(new Date());
-    dt.setHours(0, 0, 0, 0);
-    return dt;
-  }, [calendarWeekStart]);
-
-  const fromIso = useMemo(() => weekStartDate.toISOString(), [weekStartDate]);
-  const toIso = useMemo(() => addDays(weekStartDate, 7).toISOString(), [weekStartDate]);
+  const monthStartDate = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
+  const monthEndDate = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
+  
+  const fromIso = useMemo(() => monthStartDate.toISOString(), [monthStartDate]);
+  const toIso = useMemo(() => monthEndDate.toISOString(), [monthEndDate]);
+  
+  const calendarDays = useMemo(() => getMonthCalendarDays(currentMonth), [currentMonth]);
 
   useEffect(() => {
     if (!accessToken || !projectName) {
-      setWeekRehearsals([]);
+      setMonthRehearsals([]);
       return;
     }
     setCalendarError(null);
     listRehearsals(accessToken, projectName, fromIso, toIso)
-      .then((res) => setWeekRehearsals(res.rehearsals ?? []))
+      .then((res) => setMonthRehearsals(res.rehearsals ?? []))
       .catch(() => {
-        setWeekRehearsals([]);
+        setMonthRehearsals([]);
         setCalendarError("Не удалось загрузить события репетиций");
       });
   }, [accessToken, fromIso, projectName, toIso]);
@@ -130,14 +158,14 @@ export function ProfilePage() {
 
   const rehearsalsByDate = useMemo(() => {
     const grouped = new Map<string, Rehearsal[]>();
-    for (const rehearsal of weekRehearsals) {
+    for (const rehearsal of monthRehearsals) {
       const date = isoDate(new Date(rehearsal.startsAt));
       const arr = grouped.get(date);
       if (arr) arr.push(rehearsal);
       else grouped.set(date, [rehearsal]);
     }
     return grouped;
-  }, [weekRehearsals]);
+  }, [monthRehearsals]);
 
   const selectedDayRehearsals = rehearsalsByDate.get(selectedDate) ?? [];
 
@@ -239,33 +267,81 @@ export function ProfilePage() {
         <div style={{ marginTop: 8 }}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Календарь занятости</div>
           <p style={{ margin: "0 0 10px", opacity: 0.75, fontSize: 12 }}>
-            Клик по дню: свободен → занят → не отмечено. События репетиций подтягиваются снизу.
+            Клик по дню: свободен → занят → не отмечено. Репетиции показываются точками.
           </p>
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <label style={{ display: "grid", gap: 4, fontSize: 12, opacity: 0.8 }}>
-              <span>Неделя с</span>
-              <input
-                className="settings-invite-input"
-                value={calendarWeekStart}
-                onChange={(e) => setCalendarWeekStart(e.target.value)}
-                style={{ maxWidth: 180 }}
-              />
-            </label>
+          
+          {/* Навигация по месяцам */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.14)",
+                background: "rgba(255, 255, 255, 0.04)",
+                color: "inherit",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              ← Назад
+            </button>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>
+              {dayjs(currentMonth).format("MMMM YYYY")}
+            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(255, 255, 255, 0.14)",
+                background: "rgba(255, 255, 255, 0.04)",
+                color: "inherit",
+                cursor: "pointer",
+                fontSize: 13,
+              }}
+            >
+              Вперед →
+            </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 8 }}>
-            {Array.from({ length: 7 }, (_, idx) => {
-              const dateObj = addDays(weekStartDate, idx);
+          {/* Заголовки дней недели */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6, marginBottom: 6 }}>
+            {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day) => (
+              <div
+                key={day}
+                style={{
+                  textAlign: "center",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  opacity: 0.6,
+                  padding: "4px 0",
+                }}
+              >
+                {day}
+              </div>
+            ))}
+          </div>
+
+          {/* Сетка календаря */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
+            {calendarDays.map((dateObj) => {
               const date = isoDate(dateObj);
               const status = availabilityCalendar[date];
               const dayRehearsals = rehearsalsByDate.get(date) ?? [];
               const active = date === selectedDate;
+              const isCurrentMonth = dayjs(dateObj).month() === dayjs(currentMonth).month();
+              const isToday = date === isoDate(new Date());
+              
               const baseBg =
                 status === "present"
                   ? "rgba(96, 255, 140, 0.15)"
                   : status === "absent"
                     ? "rgba(255, 120, 120, 0.16)"
                     : "rgba(255, 255, 255, 0.04)";
+              
               return (
                 <button
                   key={date}
@@ -276,24 +352,57 @@ export function ProfilePage() {
                   }}
                   title={date}
                   style={{
-                    borderRadius: 10,
-                    border: active ? "1px solid rgba(120, 180, 255, 0.7)" : "1px solid rgba(255, 255, 255, 0.14)",
-                    padding: "8px 6px",
+                    borderRadius: 8,
+                    border: active 
+                      ? "2px solid rgba(120, 180, 255, 0.8)" 
+                      : isToday
+                        ? "2px solid rgba(120, 180, 255, 0.4)"
+                        : "1px solid rgba(255, 255, 255, 0.1)",
+                    padding: "6px 4px",
                     background: baseBg,
-                    color: "inherit",
+                    color: isCurrentMonth ? "inherit" : "rgba(255, 255, 255, 0.3)",
                     cursor: "pointer",
-                    display: "grid",
-                    gap: 4,
-                    textAlign: "center",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 2,
+                    minHeight: 50,
+                    position: "relative",
                   }}
                 >
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{formatDateLabel(dateObj)}</div>
-                  <div style={{ fontSize: 11, opacity: 0.85 }}>
-                    {status === "present" ? "свободен" : status === "absent" ? "занят" : "—"}
+                  <div style={{ fontSize: 13, fontWeight: isToday ? 700 : 600 }}>
+                    {dayjs(dateObj).date()}
                   </div>
-                  <div style={{ fontSize: 11, opacity: 0.7 }}>
-                    {dayRehearsals.length ? `репетиций: ${dayRehearsals.length}` : "репетиций нет"}
-                  </div>
+                  {dayRehearsals.length > 0 && (
+                    <div style={{ 
+                      display: "flex", 
+                      gap: 2,
+                      flexWrap: "wrap",
+                      justifyContent: "center",
+                    }}>
+                      {Array.from({ length: Math.min(dayRehearsals.length, 3) }).map((_, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            width: 4,
+                            height: 4,
+                            borderRadius: "50%",
+                            background: "rgba(120, 180, 255, 0.8)",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {status && (
+                    <div style={{ 
+                      fontSize: 9, 
+                      opacity: 0.7,
+                      position: "absolute",
+                      bottom: 2,
+                    }}>
+                      {status === "present" ? "✓" : "✗"}
+                    </div>
+                  )}
                 </button>
               );
             })}

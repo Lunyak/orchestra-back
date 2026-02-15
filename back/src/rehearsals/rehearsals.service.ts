@@ -3,15 +3,21 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
 import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+import 'dayjs/locale/ru';
+
+dayjs.extend(customParseFormat);
+dayjs.locale('ru');
 
 function normEmail(v: string): string {
   return String(v ?? '').trim().toLowerCase();
 }
 
 function parseIsoDate(v: string): Date {
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) throw new BadRequestException('Invalid date');
-  return d;
+  const d = dayjs(v, ['YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss.SSSZ', 'YYYY-MM-DDTHH:mm:ss'], true);
+  if (!d.isValid()) throw new BadRequestException('Invalid date');
+  return d.toDate();
 }
 
 type RawStepLike = {
@@ -73,7 +79,7 @@ function looksLikeEmail(v: string): boolean {
 type AvailabilityCalendar = Record<string, 'present' | 'absent'>;
 
 function getDateKey(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return dayjs(date).format('YYYY-MM-DD');
 }
 
 function parseAvailabilityCalendar(value: unknown): AvailabilityCalendar {

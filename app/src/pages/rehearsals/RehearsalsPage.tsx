@@ -11,27 +11,23 @@ import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useTeam } from "../../features/team";
 import "./style.css";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
+import "dayjs/locale/ru";
+
+dayjs.extend(isoWeek);
+dayjs.locale("ru");
 
 function isoDate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return dayjs(d).format("YYYY-MM-DD");
 }
 
 function startOfWeekMonday(now: Date): Date {
-  const d = new Date(now);
-  d.setHours(0, 0, 0, 0);
-  const jsDay = d.getDay();
-  const diff = jsDay === 0 ? -6 : 1 - jsDay;
-  d.setDate(d.getDate() + diff);
-  return d;
+  return dayjs(now).startOf("isoWeek").toDate();
 }
 
 function addDays(base: Date, days: number): Date {
-  const d = new Date(base);
-  d.setDate(d.getDate() + days);
-  return d;
+  return dayjs(base).add(days, "day").toDate();
 }
 
 function normalizeEmail(v: string): string {
@@ -58,10 +54,19 @@ export function RehearsalsPage() {
     [projectMembers],
   );
 
-  const [weekStart, setWeekStart] = useState(() =>
-    isoDate(startOfWeekMonday(new Date())),
-  );
+  const [weekStart, setWeekStart] = useState(() => {
+    const saved = localStorage.getItem("rehearsals-calendar-week");
+    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) {
+      return saved;
+    }
+    return isoDate(startOfWeekMonday(new Date()));
+  });
   const [activeDay, setActiveDay] = useState(0);
+
+  // Сохраняем выбранную неделю в localStorage
+  useEffect(() => {
+    localStorage.setItem("rehearsals-calendar-week", weekStart);
+  }, [weekStart]);
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
