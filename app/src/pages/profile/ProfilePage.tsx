@@ -34,10 +34,6 @@ function addMonths(base: Date, months: number): Date {
   return dayjs(base).add(months, "month").toDate();
 }
 
-function addDays(base: Date, days: number): Date {
-  return dayjs(base).add(days, "day").toDate();
-}
-
 function getMonthCalendarDays(date: Date): Date[] {
   const start = dayjs(date).startOf("month");
   const end = dayjs(date).endOf("month");
