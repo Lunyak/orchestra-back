@@ -3,6 +3,8 @@ export interface ScriptStep {
   title: string;
   markdown: string;
   playMarkdown?: string;
+  /** Длительность шага в минутах (для планирования репетиции). */
+  durationMin?: number;
   requisites?: ScriptRequisite[];
   lightPlot?: LightFixture[];
   theaterSpotlights?: TheaterSpotlight[];

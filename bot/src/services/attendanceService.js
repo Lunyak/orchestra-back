@@ -38,6 +38,46 @@ class AttendanceService {
     this.ownerId = process.env.OWNER_TELEGRAM_ID;
   }
 
+  _extractTimeLike(text) {
+    const t = String(text || "").trim();
+    if (!t) return null;
+    // Try to extract HH:MM from arbitrary text like "приду к 20:00"
+    const m = t.match(/\b([01]?\d|2[0-3])[:.](\d{2})\b/);
+    if (!m) return null;
+    const hh = String(m[1]).padStart(2, "0");
+    const mm = String(m[2]).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+
+  async _updateBackendRehearsalMessage(rehearsalId) {
+    const rehearsal = await orchestraBotApi.getRehearsal(rehearsalId);
+    const title = escapeHtml(rehearsal?.title || "Репетиция");
+    const startsAt = rehearsal?.startsAt ? formatRuDateTime(rehearsal.startsAt) : "";
+    const place = rehearsal?.place ? `\n${escapeHtml(rehearsal.place)}` : "";
+    const listText = this._formatBackendAttendanceList(rehearsal);
+    const text = `<b>${title}</b>\n${escapeHtml(startsAt)}${place}\n\nПодтверждение присутствия\n\n${listText}`;
+
+    const chatId = rehearsal?.telegramChatId != null ? String(rehearsal.telegramChatId).trim() : "";
+    const messageIdRaw =
+      rehearsal?.telegramMessageId != null ? String(rehearsal.telegramMessageId).trim() : "";
+    const messageId = messageIdRaw && /^\d+$/.test(messageIdRaw) ? parseInt(messageIdRaw, 10) : null;
+
+    if (!chatId || !messageId) return;
+
+    try {
+      await this.bot.telegram.editMessageText(chatId, messageId, undefined, text, {
+        parse_mode: "HTML",
+        ...this._backendKeyboard(rehearsalId),
+      });
+    } catch (e) {
+      const desc = e?.response?.description || "";
+      if (e?.response?.error_code === 400 && /message is not modified/i.test(desc)) {
+        return;
+      }
+      console.error("Ошибка обновления сообщения репетиции (backend):", e?.message || e);
+    }
+  }
+
   /**
    * ID супергруппы (chat_id). В .env: GROUP_CHAT_ID (с минусом, напр. -1001494331205).
    * Нормализует короткий вид -1494331205 в полный -1001494331205 (Telegram требует -100...).
@@ -593,6 +633,70 @@ class AttendanceService {
   }
 
   /**
+   * Обработка ввода времени для "Свое время" (backend rehearsal): сохраняем lateTime и обновляем сообщение в группе.
+   */
+  async handleBackendLateMessage(ctx) {
+    if (ctx.chat?.type !== "private") return false;
+    const userId = ctx.from?.id;
+    const state = this.userStates.get(userId);
+    if (!state || state.step !== "backend_attendance_late") return false;
+
+    const text = (ctx.message?.text || "").trim();
+    if (/^\/cancel$/i.test(text)) {
+      this.userStates.delete(userId);
+      await ctx.reply("Ок, отменил ввод времени.");
+      return true;
+    }
+    if (!text) {
+      await ctx.reply("Напишите, к которому времени вы придёте (например: 20:00).");
+      return true;
+    }
+
+    const { rehearsalId } = state.data || {};
+    this.userStates.delete(userId);
+    if (!rehearsalId) return true;
+
+    const userName =
+      (ctx.from?.username && String(ctx.from.username).trim()) ||
+      [ctx.from?.first_name, ctx.from?.last_name]
+        .map((x) => String(x || "").trim())
+        .filter(Boolean)
+        .join(" ")
+        .trim() ||
+      undefined;
+
+    const extracted = this._extractTimeLike(text);
+    const lateTime = extracted || text;
+
+    try {
+      await orchestraBotApi.setRehearsalAttendance(rehearsalId, {
+        telegramId: String(userId),
+        status: "late",
+        userName,
+        lateTime,
+      });
+      await ctx.reply(`Отметил: вы будете к ${lateTime}.`);
+    } catch (e) {
+      console.error("Ошибка сохранения lateTime (backend):", e?.message || e);
+      await ctx.reply("Не удалось сохранить время. Попробуйте ещё раз позже.");
+      return true;
+    }
+
+    // Обновляем опубликованное сообщение в группе (если оно уже опубликовано)
+    try {
+      await this._updateBackendRehearsalMessage(rehearsalId);
+    } catch (e) {
+      // Не критично: время уже сохранено
+      console.warn(
+        "Не удалось обновить сообщение репетиции в группе (backend):",
+        e?.message || e,
+      );
+    }
+
+    return true;
+  }
+
+  /**
    * Обработка нажатия кнопки явки (кнопки «Буду» / «Не буду» / «Опаздываю»; в тексте — «Присутствие» / «Отсутствие» / «Опаздываю»)
    */
   async handleAttendanceCallback(ctx) {
@@ -1037,6 +1141,33 @@ class AttendanceService {
         userName,
       });
 
+      if (status === "late") {
+        // Попросим время в личке и после ввода сохраним lateTime
+        try {
+          await this.bot.telegram.sendMessage(
+            String(ctx.from.id),
+            "Вы выбрали «Свое время». Напишите, к которому времени вы придёте (например: 20:00).\n\nОтмена: /cancel",
+          );
+          this.userStates.set(ctx.from.id, {
+            step: "backend_attendance_late",
+            data: { rehearsalId },
+          });
+        } catch (e) {
+          const desc = e?.response?.description || "";
+          const code = e?.response?.error_code;
+          if (code === 403 && /can't initiate conversation with a user/i.test(desc)) {
+            try {
+              await ctx.answerCbQuery(
+                "Я не могу написать вам в личку. Откройте чат со мной, нажмите /start и потом ещё раз нажмите «Свое время».",
+                { show_alert: true },
+              );
+            } catch {}
+          } else {
+            console.error("Ошибка отправки ЛС для lateTime (backend):", e);
+          }
+        }
+      }
+
       const rehearsal = await orchestraBotApi.getRehearsal(rehearsalId);
       const title = escapeHtml(rehearsal?.title || "Репетиция");
       const startsAt = rehearsal?.startsAt ? formatRuDateTime(rehearsal.startsAt) : "";
@@ -1061,6 +1192,8 @@ class AttendanceService {
   middleware() {
     return async (ctx, next) => {
       if (ctx.message?.text === undefined) return next();
+      const handledBackendLate = await this.handleBackendLateMessage(ctx);
+      if (handledBackendLate) return;
       const handledLate = await this.handleLateMessage(ctx);
       if (handledLate) return;
       const handledSetGroup = await this.handleSetGroupMessage(ctx);

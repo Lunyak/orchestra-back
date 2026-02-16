@@ -49,10 +49,32 @@ type RawStepLike = {
   markdown?: string;
   playMarkdown?: string;
   cast?: Record<string, string>;
+  durationMin?: number;
+  kanbanStatus?: string;
+  kanbanOrder?: number;
 };
 
 function uniq<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
+}
+
+function extractTimeHHMM(text?: string | null): { hh: number; mm: number } | null {
+  const t = String(text ?? '').trim();
+  if (!t) return null;
+  const m = t.match(/\b([01]?\d|2[0-3])[:.](\d{2})\b/);
+  if (!m) return null;
+  const hh = parseInt(m[1]!, 10);
+  const mm = parseInt(m[2]!, 10);
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return { hh, mm };
+}
+
+function minutesToHHMM(min: number): string {
+  const m = Math.max(0, Math.min(24 * 60 - 1, Math.floor(min)));
+  const hh = String(Math.floor(m / 60)).padStart(2, '0');
+  const mm = String(m % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
 function extractRolesByBrackets(text?: string): string[] {
@@ -281,6 +303,30 @@ export class RehearsalsService {
         .filter(Boolean),
     );
 
+    // Время доступности участника: present -> с начала, late -> с указанного времени (если распарсили HH:MM), иначе с начала.
+    const rehearsalStart = dayjs(reh.startsAt);
+    const rehearsalStartMin = rehearsalStart.hour() * 60 + rehearsalStart.minute();
+    const rehearsalDurationMin = reh.durationMin ?? 120;
+    const rehearsalEndMin = rehearsalStartMin + rehearsalDurationMin;
+    const availableFromByEmail = new Map<string, number>();
+    for (const p of reh.participants) {
+      const email = normEmail(p.email);
+      if (!email) continue;
+      if (p.status === 'absent') continue;
+      if (p.status !== 'present' && p.status !== 'late') continue;
+      if (p.status === 'present') {
+        availableFromByEmail.set(email, rehearsalStartMin);
+        continue;
+      }
+      const parsed = extractTimeHHMM((p as any)?.lateTime);
+      if (!parsed) {
+        availableFromByEmail.set(email, rehearsalStartMin);
+        continue;
+      }
+      const mins = parsed.hh * 60 + parsed.mm;
+      availableFromByEmail.set(email, Math.max(rehearsalStartMin, mins));
+    }
+
     const scenes = await this.prisma.scene.findMany({
       where: { projectId: reh.projectId, deletedAt: null },
       select: { id: true, name: true, rawJson: true },
@@ -324,6 +370,10 @@ export class RehearsalsService {
       requiredRoles: string[];
       missing: string[];
       ready: boolean;
+      availableFromMin: number;
+      availableFromTime: string;
+      lateConstraints: Array<{ role: string; email: string; availableFromTime: string }>;
+      durationMin: number | null;
     }> = [];
 
     for (const scene of scenes) {
@@ -333,8 +383,15 @@ export class RehearsalsService {
         const text = (step.playMarkdown ?? step.markdown ?? '') as string;
         const roles = extractRolesSmart(text);
         const cast = step.cast ?? {};
+        const rawDuration = typeof step.durationMin === 'number' ? step.durationMin : null;
+        const durationMin =
+          rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
+            ? Math.max(1, Math.min(480, Math.trunc(rawDuration)))
+            : null;
 
         const missing: string[] = [];
+        let availableFromMin = rehearsalStartMin;
+        const lateConstraints: Array<{ role: string; email: string; availableFromTime: string }> = [];
         for (const role of roles) {
           const assigned = String(cast[role] ?? '').trim();
           if (!assigned) {
@@ -351,6 +408,16 @@ export class RehearsalsService {
           if (calendar?.[rehearsalDateKey] === 'absent') {
             missing.push(`${role}: занят (${email})`);
           }
+
+          const fromMin = availableFromByEmail.get(email) ?? rehearsalStartMin;
+          if (fromMin > availableFromMin) availableFromMin = fromMin;
+          if (fromMin > rehearsalStartMin) {
+            lateConstraints.push({
+              role,
+              email,
+              availableFromTime: minutesToHHMM(fromMin),
+            });
+          }
         }
 
         items.push({
@@ -361,20 +428,77 @@ export class RehearsalsService {
           requiredRoles: roles,
           missing,
           ready: missing.length === 0,
+          availableFromMin,
+          availableFromTime: minutesToHHMM(availableFromMin),
+          lateConstraints,
+          durationMin,
         });
       }
     }
 
     items.sort((a, b) => {
       if (a.ready !== b.ready) return a.ready ? -1 : 1;
+      // Для готовых сцен: раньше доступны -> выше
+      if (a.ready && b.ready && a.availableFromMin !== b.availableFromMin) {
+        return a.availableFromMin - b.availableFromMin;
+      }
       if (a.missing.length !== b.missing.length) return a.missing.length - b.missing.length;
       return `${a.sceneName} ${a.stepTitle}`.localeCompare(`${b.sceneName} ${b.stepTitle}`, 'ru');
     });
+
+    // Таймлайн: берём только готовые шаги с заданной длительностью, сортируем по доступности и приоритету канбана.
+    const readyForTimeline = items
+      .filter((x) => x.ready && x.durationMin != null && x.durationMin > 0)
+      .slice()
+      .sort((a, b) => {
+        if (a.availableFromMin !== b.availableFromMin) return a.availableFromMin - b.availableFromMin;
+        return `${a.sceneName} ${a.stepTitle}`.localeCompare(`${b.sceneName} ${b.stepTitle}`, 'ru');
+      });
+
+    let cursorMin = rehearsalStartMin;
+    const timeline: Array<{
+      sceneId: string;
+      sceneName: string;
+      stepId: number | null;
+      stepTitle: string;
+      startTime: string;
+      endTime: string;
+      startMin: number;
+      endMin: number;
+      durationMin: number;
+      availableFromTime: string;
+    }> = [];
+
+    for (const x of readyForTimeline) {
+      const startMin = Math.max(cursorMin, x.availableFromMin);
+      const endMin = startMin + (x.durationMin ?? 0);
+      if (endMin > rehearsalEndMin) break;
+      timeline.push({
+        sceneId: x.sceneId,
+        sceneName: x.sceneName,
+        stepId: x.stepId,
+        stepTitle: x.stepTitle,
+        startTime: minutesToHHMM(startMin),
+        endTime: minutesToHHMM(endMin),
+        startMin,
+        endMin,
+        durationMin: x.durationMin ?? 0,
+        availableFromTime: x.availableFromTime,
+      });
+      cursorMin = endMin;
+    }
 
     return {
       rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt, project: reh.project },
       presentEmails: Array.from(presentEmails),
       items,
+      timeline: {
+        rehearsalStartTime: minutesToHHMM(rehearsalStartMin),
+        rehearsalEndTime: minutesToHHMM(rehearsalEndMin),
+        durationMin: rehearsalDurationMin,
+        scheduledMin: Math.max(0, cursorMin - rehearsalStartMin),
+        steps: timeline,
+      },
     };
   }
 

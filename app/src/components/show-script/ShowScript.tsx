@@ -663,6 +663,32 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                   onChange={(e) => updateStep(currentStep.id, 'title', e.target.value)}
                   placeholder="Введите название шага"
                 />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 10, marginTop: 10 }}>
+                  <div />
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>Длительность (мин)</div>
+                    <input
+                      type="number"
+                      min={1}
+                      max={480}
+                      step={1}
+                      className="form-input"
+                      value={currentStep.durationMin ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (!raw) {
+                          updateStep(currentStep.id, "durationMin", undefined);
+                          return;
+                        }
+                        const n = Number(raw);
+                        if (!Number.isFinite(n)) return;
+                        const clamped = Math.max(1, Math.min(480, Math.trunc(n)));
+                        updateStep(currentStep.id, "durationMin", clamped);
+                      }}
+                      placeholder="например 10"
+                    />
+                  </label>
+                </div>
               </div>
             ) : (
               <div className="script-step-title">{currentStep.title}</div>
