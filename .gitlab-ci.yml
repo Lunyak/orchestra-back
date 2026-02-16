@@ -73,7 +73,7 @@ deploy:
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
   script:
-    - ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} "cd /opt/orchestra-back && git pull && docker compose up -d --build postgres back bot dozzle"
+    - ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose up -d --build postgres back bot dozzle"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   variables:
