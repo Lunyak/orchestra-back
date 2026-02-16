@@ -11,6 +11,8 @@ variables:
 
 # Кэш node_modules
 default:
+  tags:
+    - orchestra
   cache:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
