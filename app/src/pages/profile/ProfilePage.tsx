@@ -12,6 +12,7 @@ import "./style.css";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import "dayjs/locale/ru";
+import { CalendarSection, type CalendarSectionState } from "../../components/calendar/CalendarSection";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");
@@ -22,38 +23,6 @@ function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
 
-function startOfMonth(date: Date): Date {
-  return dayjs(date).startOf("month").toDate();
-}
-
-function endOfMonth(date: Date): Date {
-  return dayjs(date).endOf("month").toDate();
-}
-
-function addMonths(base: Date, months: number): Date {
-  return dayjs(base).add(months, "month").toDate();
-}
-
-function getMonthCalendarDays(date: Date): Date[] {
-  const start = dayjs(date).startOf("month");
-  const end = dayjs(date).endOf("month");
-  
-  // Начинаем с понедельника недели, в которой начинается месяц
-  const startDay = start.startOf("isoWeek");
-  // Заканчиваем воскресеньем недели, в которой заканчивается месяц
-  const endDay = end.endOf("isoWeek");
-  
-  const days: Date[] = [];
-  let current = startDay;
-  
-  while (current.isBefore(endDay) || current.isSame(endDay, "day")) {
-    days.push(current.toDate());
-    current = current.add(1, "day");
-  }
-  
-  return days;
-}
-
 export function ProfilePage() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
@@ -62,26 +31,21 @@ export function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    const saved = localStorage.getItem("profile-calendar-month");
-    if (saved) {
-      try {
-        const date = new Date(saved);
-        if (!isNaN(date.getTime())) return date;
-      } catch {
-        // ignore
-      }
-    }
-    return new Date();
+  const [calendarState, setCalendarState] = useState<CalendarSectionState>(() => {
+    const now = new Date();
+    const monthStartDate = dayjs(now).startOf("month").toDate();
+    const monthEndDate = dayjs(now).endOf("month").toDate();
+    return {
+      currentMonth: now,
+      selectedDate: isoDate(now),
+      monthStartDate,
+      monthEndDate,
+      fromIso: monthStartDate.toISOString(),
+      toIso: monthEndDate.toISOString(),
+    };
   });
-  const [selectedDate, setSelectedDate] = useState(() => isoDate(new Date()));
   const [monthRehearsals, setMonthRehearsals] = useState<Rehearsal[]>([]);
   const [calendarError, setCalendarError] = useState<string | null>(null);
-
-  // Сохраняем выбранный месяц в localStorage
-  useEffect(() => {
-    localStorage.setItem("profile-calendar-month", currentMonth.toISOString());
-  }, [currentMonth]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -125,27 +89,19 @@ export function ProfilePage() {
     } as Partial<MyProfile>;
   }, [form]);
 
-  const monthStartDate = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
-  const monthEndDate = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
-  
-  const fromIso = useMemo(() => monthStartDate.toISOString(), [monthStartDate]);
-  const toIso = useMemo(() => monthEndDate.toISOString(), [monthEndDate]);
-  
-  const calendarDays = useMemo(() => getMonthCalendarDays(currentMonth), [currentMonth]);
-
   useEffect(() => {
     if (!accessToken || !projectName) {
       setMonthRehearsals([]);
       return;
     }
     setCalendarError(null);
-    listRehearsals(accessToken, projectName, fromIso, toIso)
+    listRehearsals(accessToken, projectName, calendarState.fromIso, calendarState.toIso)
       .then((res) => setMonthRehearsals(res.rehearsals ?? []))
       .catch(() => {
         setMonthRehearsals([]);
         setCalendarError("Не удалось загрузить события репетиций");
       });
-  }, [accessToken, fromIso, projectName, toIso]);
+  }, [accessToken, calendarState.fromIso, projectName, calendarState.toIso]);
 
   const availabilityCalendar = useMemo(
     () => (form.availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>,
@@ -163,7 +119,33 @@ export function ProfilePage() {
     return grouped;
   }, [monthRehearsals]);
 
-  const selectedDayRehearsals = rehearsalsByDate.get(selectedDate) ?? [];
+  const selectedDayRehearsalsAll = rehearsalsByDate.get(calendarState.selectedDate) ?? [];
+  const selectedDayRehearsalsMy = useMemo(() => {
+    const email = String(profile?.email ?? "").trim().toLowerCase();
+    if (!email) return [];
+    return selectedDayRehearsalsAll.filter((r) =>
+      (r.participants ?? []).some((p) => String(p.email ?? "").trim().toLowerCase() === email),
+    );
+  }, [profile?.email, selectedDayRehearsalsAll]);
+
+  const myMonthRehearsals = useMemo(() => {
+    const email = String(profile?.email ?? "").trim().toLowerCase();
+    if (!email) return [];
+    return (monthRehearsals ?? [])
+      .filter((r) =>
+        (r.participants ?? []).some((p) => String(p.email ?? "").trim().toLowerCase() === email),
+      )
+      .slice()
+      .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+  }, [monthRehearsals, profile?.email]);
+
+  const dotsByDate = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [date, list] of rehearsalsByDate.entries()) {
+      out[date] = list.length;
+    }
+    return out;
+  }, [rehearsalsByDate]);
 
   const toggleDayStatus = (date: string) => {
     const current = availabilityCalendar[date];
@@ -265,153 +247,49 @@ export function ProfilePage() {
           <p style={{ margin: "0 0 10px", opacity: 0.75, fontSize: 12 }}>
             Клик по дню: свободен → занят → не отмечено. Репетиции показываются точками.
           </p>
-          
-          {/* Навигация по месяцам */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-            <button
-              type="button"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, -1))}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                background: "rgba(255, 255, 255, 0.04)",
-                color: "inherit",
-                cursor: "pointer",
-                fontSize: 13,
-              }}
-            >
-              ← Назад
-            </button>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>
-              {dayjs(currentMonth).format("MMMM YYYY")}
-            </div>
-            <button
-              type="button"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-              style={{
-                padding: "6px 12px",
-                borderRadius: 8,
-                border: "1px solid rgba(255, 255, 255, 0.14)",
-                background: "rgba(255, 255, 255, 0.04)",
-                color: "inherit",
-                cursor: "pointer",
-                fontSize: 13,
-              }}
-            >
-              Вперед →
-            </button>
-          </div>
 
-          {/* Заголовки дней недели */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6, marginBottom: 6 }}>
-            {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day) => (
-              <div
-                key={day}
-                style={{
-                  textAlign: "center",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  opacity: 0.6,
-                  padding: "4px 0",
-                }}
-              >
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Сетка календаря */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gap: 6 }}>
-            {calendarDays.map((dateObj) => {
-              const date = isoDate(dateObj);
-              const status = availabilityCalendar[date];
-              const dayRehearsals = rehearsalsByDate.get(date) ?? [];
-              const active = date === selectedDate;
-              const isCurrentMonth = dayjs(dateObj).month() === dayjs(currentMonth).month();
-              const isToday = date === isoDate(new Date());
-              
-              const baseBg =
-                status === "present"
-                  ? "rgba(96, 255, 140, 0.15)"
-                  : status === "absent"
-                    ? "rgba(255, 120, 120, 0.16)"
-                    : "rgba(255, 255, 255, 0.04)";
-              
-              return (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(date);
-                    toggleDayStatus(date);
-                  }}
-                  title={date}
-                  style={{
-                    borderRadius: 8,
-                    border: active 
-                      ? "2px solid rgba(120, 180, 255, 0.8)" 
-                      : isToday
-                        ? "2px solid rgba(120, 180, 255, 0.4)"
-                        : "1px solid rgba(255, 255, 255, 0.1)",
-                    padding: "6px 4px",
-                    background: baseBg,
-                    color: isCurrentMonth ? "inherit" : "rgba(255, 255, 255, 0.3)",
-                    cursor: "pointer",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    gap: 2,
-                    minHeight: 50,
-                    position: "relative",
-                  }}
-                >
-                  <div style={{ fontSize: 13, fontWeight: isToday ? 700 : 600 }}>
-                    {dayjs(dateObj).date()}
-                  </div>
-                  {dayRehearsals.length > 0 && (
-                    <div style={{ 
-                      display: "flex", 
-                      gap: 2,
-                      flexWrap: "wrap",
-                      justifyContent: "center",
-                    }}>
-                      {Array.from({ length: Math.min(dayRehearsals.length, 3) }).map((_, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            width: 4,
-                            height: 4,
-                            borderRadius: "50%",
-                            background: "rgba(120, 180, 255, 0.8)",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  {status && (
-                    <div style={{ 
-                      fontSize: 9, 
-                      opacity: 0.7,
-                      position: "absolute",
-                      bottom: 2,
-                    }}>
-                      {status === "present" ? "✓" : "✗"}
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <CalendarSection
+            storageMonthKey="profile-calendar-month"
+            onStateChange={setCalendarState}
+            onDayClick={(date) => toggleDayStatus(date)}
+            statusByDate={availabilityCalendar}
+            dotsByDate={dotsByDate}
+          />
           {calendarError && <div className="settings-invite-error" style={{ marginTop: 8 }}>{calendarError}</div>}
           <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-            События на {selectedDate}:
+            Мои репетиции на {calendarState.selectedDate}:
           </div>
           <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-            {selectedDayRehearsals.length === 0 ? (
+            {selectedDayRehearsalsMy.length === 0 ? (
               <div style={{ fontSize: 12, opacity: 0.7 }}>Нет репетиций в этот день.</div>
             ) : (
-              selectedDayRehearsals.map((r) => (
+              selectedDayRehearsalsMy.map((r) => (
+                <div
+                  key={r.id}
+                  style={{
+                    border: "1px solid rgba(255,255,255,0.12)",
+                    borderRadius: 10,
+                    padding: "8px 10px",
+                    background: "rgba(255,255,255,0.04)",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{r.title}</div>
+                  <div style={{ fontSize: 11, opacity: 0.75 }}>
+                    {new Date(r.startsAt).toLocaleString("ru-RU")}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ marginTop: 12, fontSize: 12, opacity: 0.8 }}>
+            Мои репетиции в этом месяце:
+          </div>
+          <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+            {myMonthRehearsals.length === 0 ? (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>Пока нет репетиций в этом месяце.</div>
+            ) : (
+              myMonthRehearsals.slice(0, 40).map((r) => (
                 <div
                   key={r.id}
                   style={{

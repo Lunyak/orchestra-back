@@ -91,6 +91,7 @@ model Rehearsal {
   telegramChatId       String?  // ID группы в Telegram
   telegramMessageId    String?  // ID сообщения опроса в Telegram
   telegramThreadId     String?  // ID топика в группе
+  publishedAt   DateTime? // Когда репетиция была опубликована в чат
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   createdBy     String?
@@ -111,6 +112,7 @@ model RehearsalParticipant {
   status       RehearsalParticipantStatus @default(unknown)
   roles        Json?
   lateTime     String?  // Время когда придет (для опаздывающих)
+  respondedAt  DateTime? // Когда участник последний раз отметился по этой репетиции
   createdAt    DateTime                   @default(now())
   updatedAt    DateTime                   @updatedAt
 

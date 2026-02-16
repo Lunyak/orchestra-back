@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
@@ -6,6 +7,7 @@ import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/ru';
+import axios from 'axios';
 
 dayjs.extend(customParseFormat);
 dayjs.locale('ru');
@@ -115,7 +117,10 @@ function parseAvailabilityCalendar(value: unknown): AvailabilityCalendar {
 
 @Injectable()
 export class RehearsalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   private async assertUserHasProjectAccess(userId: string, projectId: string, write: boolean) {
     if (userId === 'bot') return;
@@ -271,7 +276,7 @@ export class RehearsalsService {
 
     const presentEmails = new Set(
       reh.participants
-        .filter((p) => p.status === 'present')
+        .filter((p) => p.status === 'present' || p.status === 'late')
         .map((p) => normEmail(p.email))
         .filter(Boolean),
     );
@@ -371,6 +376,121 @@ export class RehearsalsService {
       presentEmails: Array.from(presentEmails),
       items,
     };
+  }
+
+  /**
+   * Запросить публикацию репетиции в Telegram (внешний bot-сервис отправит сообщение).
+   * Возвращает { ok, published?: rehearsal }.
+   */
+  async publish(userId: string, rehearsalId: string) {
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+      include: { project: { select: { id: true, slug: true, name: true } } },
+    });
+    if (!reh) throw new NotFoundException('Rehearsal not found');
+    await this.assertUserHasProjectAccess(userId, reh.projectId, true);
+
+    // Уже опубликовано — не дёргаем бота второй раз.
+    if (reh.telegramMessageId) {
+      return { ok: true, published: reh };
+    }
+
+    const botUrl = this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
+    const secret = this.config.get<string>('BOT_INTERNAL_SECRET');
+    if (!secret) {
+      throw new BadRequestException('BOT_INTERNAL_SECRET is not configured');
+    }
+
+    await axios.post(
+      `${botUrl.replace(/\/$/, '')}/internal/publish-rehearsal`,
+      { rehearsalId },
+      { headers: { 'X-Internal-Secret': secret } },
+    );
+
+    // Бот сам пометит published через /bot/rehearsals/:id/published.
+    return { ok: true };
+  }
+
+  /** Сохранить данные опубликованного сообщения Telegram в репетиции */
+  async markTelegramPublished(
+    userId: string,
+    rehearsalId: string,
+    dto: { chatId: string; messageId: string; threadId?: string },
+  ) {
+    const reh = await this.prisma.rehearsal.findUnique({ where: { id: rehearsalId } });
+    if (!reh) throw new NotFoundException('Rehearsal not found');
+    await this.assertUserHasProjectAccess(userId, reh.projectId, true);
+
+    return this.prisma.rehearsal.update({
+      where: { id: rehearsalId },
+      data: {
+        telegramChatId: String(dto.chatId ?? '').trim() || null,
+        telegramMessageId: String(dto.messageId ?? '').trim() || null,
+        telegramThreadId: dto.threadId != null ? String(dto.threadId).trim() || null : undefined,
+        publishedAt: new Date(),
+      },
+      include: { participants: true },
+    });
+  }
+
+  /**
+   * Upsert явки участника из Telegram (по telegramId).
+   * Важно: это "attendance" для репетиции, не calendar availability в профиле.
+   */
+  async upsertParticipantStatusFromBot(
+    rehearsalId: string,
+    dto: { telegramId: string; status: 'present' | 'absent' | 'late' | 'unknown'; userName?: string; lateTime?: string },
+  ) {
+    const reh = await this.prisma.rehearsal.findUnique({ where: { id: rehearsalId } });
+    if (!reh) throw new NotFoundException('Rehearsal not found');
+
+    const telegramId = String(dto.telegramId ?? '').trim();
+    if (!telegramId) throw new BadRequestException('telegramId is required');
+
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { telegramId },
+      select: { email: true, displayName: true, firstName: true, lastName: true },
+    });
+    if (!profile?.email) {
+      throw new NotFoundException('Profile not found for telegramId');
+    }
+
+    const email = normEmail(profile.email);
+    const nameFromProfile =
+      String(profile.displayName ?? '').trim() ||
+      [profile.firstName, profile.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ') ||
+      null;
+    const userName = dto.userName != null ? String(dto.userName).trim() || null : nameFromProfile;
+
+    const status = dto.status;
+    if (!['present', 'absent', 'late', 'unknown'].includes(status)) {
+      throw new BadRequestException('Invalid status');
+    }
+
+    await this.prisma.rehearsalParticipant.upsert({
+      where: { rehearsalId_email: { rehearsalId, email } },
+      update: {
+        status: status as any,
+        telegramId,
+        userName,
+        lateTime: dto.lateTime != null ? String(dto.lateTime).trim() || null : undefined,
+        respondedAt: new Date(),
+      },
+      create: {
+        rehearsalId,
+        email,
+        status: status as any,
+        telegramId,
+        userName,
+        lateTime: dto.lateTime != null ? String(dto.lateTime).trim() || null : null,
+        respondedAt: new Date(),
+      },
+    });
+
+    return this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+      include: { participants: true, project: { select: { id: true, slug: true, name: true } } },
+    });
   }
 }
 

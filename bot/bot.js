@@ -12,19 +12,78 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 const HEALTH_PORT = Number(process.env.HEALTH_PORT) || 3001;
 
-function startHealthServer() {
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    req.on("data", (chunk) => {
+      chunks.push(chunk);
+      size += chunk.length;
+      if (size > 1024 * 1024) {
+        reject(new Error("Payload too large"));
+        try {
+          req.destroy();
+        } catch {}
+      }
+    });
+    req.on("end", () => {
+      try {
+        const raw = Buffer.concat(chunks).toString("utf8");
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch (e) {
+        reject(e);
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function startHttpServer({ onPublishRehearsal }) {
   http
-    .createServer((req, res) => {
-      if (req.url === "/health" || req.url === "/") {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end("ok");
-      } else {
+    .createServer(async (req, res) => {
+      try {
+        const url = req.url || "/";
+        const method = (req.method || "GET").toUpperCase();
+
+        if (url === "/health" || url === "/") {
+          res.writeHead(200, { "Content-Type": "text/plain" });
+          res.end("ok");
+          return;
+        }
+
+        if (url === "/internal/publish-rehearsal" && method === "POST") {
+          const secret = process.env.INTERNAL_API_SECRET;
+          const got = req.headers["x-internal-secret"];
+          if (!secret || String(got || "") !== String(secret)) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+            return;
+          }
+
+          const body = await readJson(req);
+          const rehearsalId = String(body?.rehearsalId || "").trim();
+          if (!rehearsalId) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "rehearsalId is required" }));
+            return;
+          }
+
+          await onPublishRehearsal(rehearsalId);
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+
         res.writeHead(404);
         res.end();
+      } catch (e) {
+        console.error("HTTP server error:", e?.message || e);
+        res.writeHead(500, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: false, error: "internal_error" }));
       }
     })
     .listen(HEALTH_PORT, "0.0.0.0", () => {
-      console.log(`Health check: http://0.0.0.0:${HEALTH_PORT}/health`);
+      console.log(`HTTP: http://0.0.0.0:${HEALTH_PORT}/health`);
     });
 }
 
@@ -58,7 +117,11 @@ class BotManager {
    * Инициализация бота
    */
   init() {
-    startHealthServer();
+    startHttpServer({
+      onPublishRehearsal: async (rehearsalId) => {
+        await this.attendance.publishRehearsalFromBackend(rehearsalId);
+      },
+    });
     this._setupStartCommand();
     this._setupMenuHandler();
     this._setupCommands();
@@ -146,7 +209,7 @@ class BotManager {
       // newpage: () => this.googleSheets.initNewPageCommands(ctx), // Отключено
       checkbirthdays: () => this.birthdayService.showBirthdaysTable(ctx),
       question: () => this.anonymousQuestion.initQuestion(ctx),
-      setrehearsal: () => this.attendance.startSetRehearsal(ctx),
+      // setrehearsal: () => this.attendance.startSetRehearsal(ctx), // Старый формат (локальное хранилище)
       setgroup: () => this.attendance.startSetGroup(ctx),
       who: () => this.attendance.showWhoIsComing(ctx),
       rehearsable: () => this.attendance.showRehearsableScenes(ctx),

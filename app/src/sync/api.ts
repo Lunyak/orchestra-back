@@ -281,12 +281,16 @@ export async function updateMyProfile(
   return data;
 }
 
-export type RehearsalParticipantStatus = "unknown" | "present" | "absent";
+export type RehearsalParticipantStatus = "unknown" | "present" | "absent" | "late";
 
 export interface RehearsalParticipant {
   id: string;
   email: string;
   status: RehearsalParticipantStatus;
+  telegramId?: string | null;
+  userName?: string | null;
+  lateTime?: string | null;
+  respondedAt?: string | null;
 }
 
 export interface Rehearsal {
@@ -295,6 +299,11 @@ export interface Rehearsal {
   startsAt: string;
   durationMin?: number | null;
   notes?: string | null;
+  place?: string | null;
+  telegramChatId?: string | null;
+  telegramMessageId?: string | null;
+  telegramThreadId?: string | null;
+  publishedAt?: string | null;
   participants?: RehearsalParticipant[];
 }
 
@@ -330,6 +339,16 @@ export async function createRehearsal(
   return data;
 }
 
+export async function getRehearsal(
+  accessToken: string,
+  rehearsalId: string,
+): Promise<Rehearsal> {
+  const { data } = await api.get(`/rehearsals/${encodeURIComponent(rehearsalId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function setRehearsalParticipants(
   accessToken: string,
   rehearsalId: string,
@@ -344,6 +363,18 @@ export async function setRehearsalParticipants(
   const { data } = await api.post(
     `/rehearsals/${encodeURIComponent(rehearsalId)}/participants`,
     body,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function publishRehearsal(
+  accessToken: string,
+  rehearsalId: string,
+): Promise<{ ok: boolean; published?: Rehearsal }> {
+  const { data } = await api.post(
+    `/rehearsals/${encodeURIComponent(rehearsalId)}/publish`,
+    null,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;

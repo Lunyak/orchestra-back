@@ -5,8 +5,8 @@ export class RehearsalParticipantInputDto {
   @IsEmail()
   email: string;
 
-  @IsIn(['unknown', 'present', 'absent'])
-  status: 'unknown' | 'present' | 'absent';
+  @IsIn(['unknown', 'present', 'absent', 'late'])
+  status: 'unknown' | 'present' | 'absent' | 'late';
 
   @IsOptional()
   roles?: any;

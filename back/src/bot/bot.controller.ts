@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { BotGuard } from './bot.guard';
 import { BotProfilesUpsertDto } from './dto/bot-profiles.dto';
 import { RehearsalPlanRequestDto } from './dto/rehearsal-plan.dto';
@@ -6,6 +6,8 @@ import { BotService } from './bot.service';
 import { CreateRehearsalDto } from '../rehearsals/dto/create-rehearsal.dto';
 import { SetParticipantsDto } from '../rehearsals/dto/set-participants.dto';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
+import { RehearsalPublishedDto } from './dto/rehearsal-published.dto';
+import { RehearsalAttendanceDto } from './dto/rehearsal-attendance.dto';
 
 @UseGuards(BotGuard)
 @Controller('bot')
@@ -47,6 +49,24 @@ export class BotController {
   @Post('rehearsals/:id/plan')
   planForRehearsal(@Param('id') id: string) {
     return this.rehearsals.plan('bot', id);
+  }
+
+  /** Получить репетицию (для публикации/обновления таблицы явок) */
+  @Get('rehearsals/:id')
+  getRehearsal(@Param('id') id: string) {
+    return this.rehearsals.get('bot', id);
+  }
+
+  /** Сохранить информацию о публикации репетиции в Telegram */
+  @Post('rehearsals/:id/published')
+  markPublished(@Param('id') id: string, @Body() body: RehearsalPublishedDto) {
+    return this.rehearsals.markTelegramPublished('bot', id, body);
+  }
+
+  /** Обновить явку одного участника по Telegram ID */
+  @Post('rehearsals/:id/attendance')
+  setAttendance(@Param('id') id: string, @Body() body: RehearsalAttendanceDto) {
+    return this.rehearsals.upsertParticipantStatusFromBot(id, body);
   }
 }
 

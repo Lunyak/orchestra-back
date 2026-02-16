@@ -4,9 +4,32 @@ const rehearsalStorage = require("./rehearsalStorage");
 const settingsStorage = require("./settingsStorage");
 const { normalizeSupergroupId } = require("../utils/telegramUtils");
 const { getUserData, getUsersData } = require("../api/userApi");
+const orchestraBotApi = require("../api/orchestraBotApi");
 const escapeHtml = require("../utils/escapeHtml");
 const PLAYS = require("../const/PLAYS");
 const PLAY_SCENES = require("../const/PLAY_SCENES");
+
+function formatRuDateTime(iso) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso || "");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
+  } catch {
+    return String(iso || "");
+  }
+}
+
+function statusIcon(status) {
+  if (status === "present") return "✅";
+  if (status === "absent") return "❌";
+  if (status === "late") return "⏰";
+  return "❔";
+}
 
 class AttendanceService {
   constructor(bot, userStates) {
@@ -921,6 +944,120 @@ class AttendanceService {
     }
   }
 
+  /**
+   * Публикация репетиции из backend (по rehearsalId).
+   * Backend вызывает /internal/publish-rehearsal, а бот отправляет сообщение в группу и фиксирует published в БД.
+   */
+  async publishRehearsalFromBackend(rehearsalId) {
+    const groupChatId = this.getEffectiveGroupChatId();
+    const threadId = this.getEffectiveThreadId();
+
+    if (!groupChatId) {
+      throw new Error("Group chat is not configured (GROUP_CHAT_ID / /setgroup)");
+    }
+
+    const rehearsal = await orchestraBotApi.getRehearsal(rehearsalId);
+    const title = escapeHtml(rehearsal?.title || "Репетиция");
+    const startsAt = rehearsal?.startsAt ? formatRuDateTime(rehearsal.startsAt) : "";
+    const place = rehearsal?.place ? `\n${escapeHtml(rehearsal.place)}` : "";
+    const listText = this._formatBackendAttendanceList(rehearsal);
+
+    const text = `<b>${title}</b>\n${escapeHtml(startsAt)}${place}\n\nПодтверждение присутствия\n\n${listText}`;
+
+    const opts = { parse_mode: "HTML" };
+    const tid = threadId != null && String(threadId).trim() !== "" ? parseInt(threadId, 10) : null;
+    if (tid && !Number.isNaN(tid)) {
+      opts.message_thread_id = tid;
+    }
+
+    const sent = await this.bot.telegram.sendMessage(
+      groupChatId,
+      text,
+      Object.assign({}, opts, this._backendKeyboard(rehearsalId)),
+    );
+
+    await orchestraBotApi.markRehearsalPublished(rehearsalId, {
+      chatId: String(sent.chat?.id),
+      messageId: String(sent.message_id),
+      threadId: opts.message_thread_id != null ? String(opts.message_thread_id) : undefined,
+    });
+
+    return sent;
+  }
+
+  _backendKeyboard(rehearsalId) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback("Буду", `reh:${rehearsalId}:present`),
+        Markup.button.callback("Не буду", `reh:${rehearsalId}:absent`),
+        Markup.button.callback("Свое время", `reh:${rehearsalId}:late`),
+      ],
+    ]);
+  }
+
+  _formatBackendAttendanceList(rehearsal) {
+    const participants = Array.isArray(rehearsal?.participants)
+      ? rehearsal.participants
+      : [];
+    if (participants.length === 0) {
+      return "Пока нет участников в репетиции.";
+    }
+    const lines = participants.map((p) => {
+      const status = String(p?.status || "unknown");
+      const email = escapeHtml(String(p?.email || "").trim() || "—");
+      const name = escapeHtml(String(p?.userName || "").trim());
+      const label = name ? `${name} · ${email}` : email;
+      const lateTime = String(p?.lateTime || "").trim();
+      const extra = status === "late" && lateTime ? ` (${escapeHtml(lateTime)})` : "";
+      return `${statusIcon(status)} ${label}${extra}`;
+    });
+    return lines.join("\n");
+  }
+
+  async handleBackendAttendanceCallback(ctx) {
+    try {
+      const data = String(ctx.callbackQuery?.data || "");
+      const m = data.match(/^reh:([a-z0-9]+):(present|absent|late)$/i);
+      if (!m) return;
+      const rehearsalId = m[1];
+      const status = m[2];
+
+      const userName =
+        (ctx.from?.username && String(ctx.from.username).trim()) ||
+        [ctx.from?.first_name, ctx.from?.last_name]
+          .map((x) => String(x || "").trim())
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        undefined;
+
+      await orchestraBotApi.setRehearsalAttendance(rehearsalId, {
+        telegramId: String(ctx.from.id),
+        status,
+        userName,
+      });
+
+      const rehearsal = await orchestraBotApi.getRehearsal(rehearsalId);
+      const title = escapeHtml(rehearsal?.title || "Репетиция");
+      const startsAt = rehearsal?.startsAt ? formatRuDateTime(rehearsal.startsAt) : "";
+      const place = rehearsal?.place ? `\n${escapeHtml(rehearsal.place)}` : "";
+      const listText = this._formatBackendAttendanceList(rehearsal);
+      const text = `<b>${title}</b>\n${escapeHtml(startsAt)}${place}\n\nПодтверждение присутствия\n\n${listText}`;
+
+      await ctx.editMessageText(text, {
+        parse_mode: "HTML",
+        ...this._backendKeyboard(rehearsalId),
+      });
+
+      await ctx.answerCbQuery("Готово");
+    } catch (e) {
+      console.error("Backend attendance callback error:", e?.message || e);
+      try {
+        await ctx.answerCbQuery("Не удалось сохранить", { show_alert: false });
+      } catch {}
+    }
+  }
+
   middleware() {
     return async (ctx, next) => {
       if (ctx.message?.text === undefined) return next();
@@ -943,6 +1080,11 @@ class AttendanceService {
         await this.handleAttendanceCallback(ctx);
       },
     );
+
+    // Новый формат: attendance для конкретной репетиции из Orchestra backend
+    this.bot.action(/^reh:([a-z0-9]+):(present|absent|late)$/i, async (ctx) => {
+      await this.handleBackendAttendanceCallback(ctx);
+    });
 
     this.bot.action(
       /^rehearsal_send_to_group_(\d{4}-\d{2}-\d{2})$/,

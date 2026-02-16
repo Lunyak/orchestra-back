@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   createRehearsal,
+  getRehearsal,
   listRehearsals,
   planRehearsal,
+  publishRehearsal,
   setRehearsalParticipants,
   type Rehearsal,
   type RehearsalParticipantStatus,
@@ -14,46 +16,13 @@ import "./style.css";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import "dayjs/locale/ru";
+import { CalendarSection, type CalendarSectionState } from "../../components/calendar/CalendarSection";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");
 
 function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
-}
-
-function ruDateFromIsoYmd(isoYmd: string): string {
-  const d = dayjs(isoYmd, "YYYY-MM-DD", true);
-  return d.isValid() ? d.format("DD.MM.YYYY") : isoYmd;
-}
-
-function ruShortFromIsoYmd(isoYmd: string): string {
-  const d = dayjs(isoYmd, "YYYY-MM-DD", true);
-  return d.isValid() ? d.format("DD.MM") : isoYmd;
-}
-
-function parseRuOrIsoYmdToIsoYmd(input: string): string | null {
-  const s = String(input ?? "").trim();
-  if (!s) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-  if (!m) return null;
-  const dd = Number(m[1]);
-  const mm = Number(m[2]);
-  const yyyy = Number(m[3]);
-  if (!yyyy || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
-  const iso = `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
-  const dt = dayjs(iso, "YYYY-MM-DD", true);
-  if (!dt.isValid()) return null;
-  return dt.format("YYYY-MM-DD");
-}
-
-function startOfWeekMonday(now: Date): Date {
-  return dayjs(now).startOf("isoWeek").toDate();
-}
-
-function addDays(base: Date, days: number): Date {
-  return dayjs(base).add(days, "day").toDate();
 }
 
 function normalizeEmail(v: string): string {
@@ -80,19 +49,20 @@ export function RehearsalsPage() {
     [projectMembers],
   );
 
-  const [{ weekStart, weekStartText }, setWeekState] = useState(() => {
-    const saved = localStorage.getItem("rehearsals-calendar-week");
-    const iso =
-      (saved ? parseRuOrIsoYmdToIsoYmd(saved) : null) ??
-      isoDate(startOfWeekMonday(new Date()));
-    return { weekStart: iso, weekStartText: ruDateFromIsoYmd(iso) };
+  const [calendarState, setCalendarState] = useState<CalendarSectionState>(() => {
+    const now = new Date();
+    const monthStartDate = dayjs(now).startOf("month").toDate();
+    const monthEndDate = dayjs(now).endOf("month").toDate();
+    return {
+      currentMonth: now,
+      selectedDate: isoDate(now),
+      monthStartDate,
+      monthEndDate,
+      fromIso: monthStartDate.toISOString(),
+      toIso: monthEndDate.toISOString(),
+    };
   });
-  const [activeDay, setActiveDay] = useState(0);
-
-  // Сохраняем выбранную неделю в localStorage
-  useEffect(() => {
-    localStorage.setItem("rehearsals-calendar-week", weekStart);
-  }, [weekStart]);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
   const [rehearsals, setRehearsals] = useState<Rehearsal[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,28 +73,27 @@ export function RehearsalsPage() {
     [activeRehearsalId, rehearsals],
   );
 
-  const weekStartDate = useMemo(() => {
-    const [y, m, d] = weekStart.split("-").map((x) => Number(x));
-    const dt = y && m && d ? new Date(y, m - 1, d) : startOfWeekMonday(new Date());
-    dt.setHours(0, 0, 0, 0);
-    return dt;
-  }, [weekStart]);
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
-  const fromIso = useMemo(() => new Date(weekStartDate).toISOString(), [weekStartDate]);
-  const toIso = useMemo(() => new Date(addDays(weekStartDate, 7)).toISOString(), [weekStartDate]);
+  const rehearsalsByDate = useMemo(() => {
+    const grouped = new Map<string, Rehearsal[]>();
+    for (const rehearsal of rehearsals) {
+      const date = isoDate(new Date(rehearsal.startsAt));
+      const arr = grouped.get(date);
+      if (arr) arr.push(rehearsal);
+      else grouped.set(date, [rehearsal]);
+    }
+    return grouped;
+  }, [rehearsals]);
 
-  const dayLabels = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const dotsByDate = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [date, list] of rehearsalsByDate.entries()) out[date] = list.length;
+    return out;
+  }, [rehearsalsByDate]);
 
-  const rehearsalsForActiveDay = useMemo(() => {
-    const dayStart = addDays(weekStartDate, activeDay);
-    const nextDay = addDays(weekStartDate, activeDay + 1);
-    const a = dayStart.getTime();
-    const b = nextDay.getTime();
-    return rehearsals.filter((r) => {
-      const t = new Date(r.startsAt).getTime();
-      return t >= a && t < b;
-    });
-  }, [activeDay, rehearsals, weekStartDate]);
+  const rehearsalsForSelectedDay = rehearsalsByDate.get(calendarState.selectedDate) ?? [];
 
   const participantsMap = useMemo(() => {
     const map = new Map<string, RehearsalParticipantStatus>();
@@ -139,14 +108,18 @@ export function RehearsalsPage() {
     if (!accessToken || !projectSlug) return;
     setLoading(true);
     setError(null);
-    listRehearsals(accessToken, projectSlug, fromIso, toIso)
+    setCalendarError(null);
+    listRehearsals(accessToken, projectSlug, calendarState.fromIso, calendarState.toIso)
       .then((res) => {
         setRehearsals(res.rehearsals ?? []);
         setActiveRehearsalId((prev) => prev ?? (res.rehearsals?.[0]?.id ?? null));
       })
-      .catch(() => setError("Не удалось загрузить репетиции"))
+      .catch(() => {
+        setError("Не удалось загрузить репетиции");
+        setCalendarError("Не удалось загрузить события репетиций");
+      })
       .finally(() => setLoading(false));
-  }, [accessToken, fromIso, projectSlug, toIso]);
+  }, [accessToken, calendarState.fromIso, projectSlug, calendarState.toIso]);
 
   // Ленивая подгрузка плана (для подсветки карточек репетиций)
   useEffect(() => {
@@ -177,10 +150,9 @@ export function RehearsalsPage() {
     };
   }, [accessToken, planCache, rehearsals]);
 
-  const createForDay = async () => {
+  const createForSelectedDate = async () => {
     if (!accessToken) return;
-    const date = isoDate(addDays(weekStartDate, activeDay));
-    const startsAt = new Date(`${date}T19:00:00`).toISOString();
+    const startsAt = new Date(`${calendarState.selectedDate}T19:00:00`).toISOString();
     const created = await createRehearsal(accessToken, {
       projectSlug,
       title: "Репетиция",
@@ -215,6 +187,28 @@ export function RehearsalsPage() {
     });
   };
 
+  const doPublish = async () => {
+    if (!accessToken || !activeRehearsal) return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      await publishRehearsal(accessToken, activeRehearsal.id);
+
+      // Публикация асинхронная: бот отметит published через /bot/rehearsals/:id/published.
+      // Подождём немного и подтянем репетицию с telegramMessageId.
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await new Promise((r) => setTimeout(r, 1200));
+        const fresh = await getRehearsal(accessToken, activeRehearsal.id);
+        setRehearsals((prev) => prev.map((x) => (x.id === fresh.id ? fresh : x)));
+        if (fresh.telegramMessageId || fresh.publishedAt) break;
+      }
+    } catch {
+      setPublishError("Не удалось опубликовать репетицию в чат");
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
 
   return (
@@ -231,56 +225,35 @@ export function RehearsalsPage() {
 
       <div className="rehearsals-layout">
         <div className="rehearsals-main">
-          <div className="rehearsals-week">
-            {dayLabels.map((lbl, idx) => {
-              const date = isoDate(addDays(weekStartDate, idx));
-              const count = rehearsals.filter((r) => isoDate(new Date(r.startsAt)) === date).length;
-              const active = idx === activeDay;
-              return (
-                <button
-                  key={lbl}
-                  type="button"
-                  className={`rehearsals-day ${active ? "active" : ""}`}
-                  onClick={() => setActiveDay(idx)}
-                  title={ruDateFromIsoYmd(date)}
-                >
-                  <div className="rehearsals-day-top">{lbl}</div>
-                  <div className="rehearsals-day-bottom">
-                    {ruShortFromIsoYmd(date)}{count ? ` · ${count}` : ""}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
           <div className="rehearsals-toolbar">
-            <label className="rehearsals-tool">
-              <span>Неделя с</span>
-              <input
-                value={weekStartText}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  const iso = parseRuOrIsoYmdToIsoYmd(raw);
-                  setWeekState((prev) => ({
-                    weekStart: iso ?? prev.weekStart,
-                    weekStartText: iso ? ruDateFromIsoYmd(iso) : raw,
-                  }));
-                }}
-                placeholder="ДД.ММ.ГГГГ"
-              />
-            </label>
-            <button type="button" onClick={createForDay} disabled={loading}>
+            <button type="button" onClick={createForSelectedDate} disabled={loading}>
               + Создать репетицию
             </button>
           </div>
 
+          <CalendarSection
+            storageMonthKey="rehearsals-calendar-month"
+            onStateChange={setCalendarState}
+            dotsByDate={dotsByDate}
+            title="Календарь репетиций"
+            subtitle="Клик по дню: выбрать дату. Репетиции на дате показываются точками."
+          />
+          {calendarError && (
+            <div className="rehearsals-error" style={{ marginTop: 10 }}>
+              {calendarError}
+            </div>
+          )}
+
+          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+            Репетиции на {calendarState.selectedDate}:
+          </div>
           <div className="rehearsals-list">
             {loading ? (
               <div className="rehearsals-muted">Загрузка…</div>
-            ) : rehearsalsForActiveDay.length === 0 ? (
+            ) : rehearsalsForSelectedDay.length === 0 ? (
               <div className="rehearsals-muted">На этот день репетиций нет.</div>
             ) : (
-              rehearsalsForActiveDay.map((r) => {
+              rehearsalsForSelectedDay.map((r) => {
                 const t = new Date(r.startsAt);
                 const hh = String(t.getHours()).padStart(2, "0");
                 const mm = String(t.getMinutes()).padStart(2, "0");
@@ -322,13 +295,49 @@ export function RehearsalsPage() {
               </div>
 
               <div className="rehearsals-section">
+                <div className="rehearsals-section-title">Публикация в чат</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={doPublish}
+                    disabled={publishing || !!activeRehearsal.telegramMessageId}
+                    title={
+                      activeRehearsal.telegramMessageId
+                        ? "Уже опубликовано"
+                        : "Опубликовать репетицию в Telegram-чате"
+                    }
+                  >
+                    {activeRehearsal.telegramMessageId
+                      ? "Опубликовано"
+                      : publishing
+                        ? "Публикую…"
+                        : "Опубликовать в чат"}
+                  </button>
+                  {activeRehearsal.publishedAt && (
+                    <div className="rehearsals-muted">
+                      Опубликовано: {dayjs(activeRehearsal.publishedAt).format("DD.MM.YYYY HH:mm")}
+                    </div>
+                  )}
+                  {publishError && <div className="rehearsals-error">{publishError}</div>}
+                </div>
+              </div>
+
+              <div className="rehearsals-section">
                 <div className="rehearsals-section-title">Кто придёт</div>
                 <div className="rehearsals-people">
                   {members.map((m) => {
                     const st = participantsMap.get(normalizeEmail(m.email)) ?? "unknown";
+                    const meta = (activeRehearsal.participants ?? []).find(
+                      (p) => normalizeEmail(p.email) === normalizeEmail(m.email),
+                    );
                     return (
                       <div key={m.email} className="rehearsals-person">
                         <div className="rehearsals-person-label">{formatMemberLabel(m)}</div>
+                        {meta?.respondedAt && (
+                          <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                            ответ: {dayjs(meta.respondedAt).format("DD.MM HH:mm")}
+                          </div>
+                        )}
                         <select
                           value={st}
                           onChange={(e) =>
@@ -338,6 +347,7 @@ export function RehearsalsPage() {
                           <option value="unknown">?</option>
                           <option value="present">придёт</option>
                           <option value="absent">не придёт</option>
+                          <option value="late">свое время</option>
                         </select>
                       </div>
                     );

@@ -44,5 +44,11 @@ export class RehearsalsController {
   plan(@Req() req: any, @Param('id') id: string) {
     return this.rehearsals.plan(req.user.userId, id);
   }
+
+  /** Публикация репетиции в чат (через отдельный bot-сервис) */
+  @Post(':id/publish')
+  publish(@Req() req: any, @Param('id') id: string) {
+    return this.rehearsals.publish(req.user.userId, id);
+  }
 }
 
