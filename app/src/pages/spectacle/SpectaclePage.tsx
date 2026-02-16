@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import React, { Suspense, useCallback, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { HeaderPlayer } from "../../components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../components/playlist-sidebar/PlaylistSidebar";
@@ -56,11 +56,36 @@ export function SpectaclePage() {
     showPlaylistSidebar,
     showHeaderSounds,
     isStepsCollapsed,
+    setIsStepsCollapsed,
     isEditing,
     setIsEditing,
     swapTheaterPanels: shouldSwapPanels,
     togglePanels,
   } = useScriptUI();
+
+  const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
+  const [isMobileStepsOpen, setIsMobileStepsOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 980);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (isMobile && (isMobilePlaylistOpen || isMobileStepsOpen)) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobile, isMobilePlaylistOpen, isMobileStepsOpen]);
 
   const [theaterControlsHost, setTheaterControlsHost] =
     useState<HTMLDivElement | null>(null);
@@ -98,8 +123,17 @@ export function SpectaclePage() {
 
   const playlistNode = !isBoardView ? (
     <div
-      className={`playlist-sidebar-wrapper ${!showPlaylistSidebar ? "hidden" : ""}`}
+      className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}
     >
+      {isMobile && (
+        <button
+          className="mobile-panel-close"
+          onClick={() => setIsMobilePlaylistOpen(false)}
+          aria-label="Закрыть плейлист"
+        >
+          ×
+        </button>
+      )}
       <PlaylistSidebar
         projectName={projectDisplay}
         tracks={sceneData?.playlist || []}
@@ -114,21 +148,35 @@ export function SpectaclePage() {
   ) : null;
 
   const stepsSidebarNode =
-    shouldShowStepsSidebar && !isStepsCollapsed ? (
-      <ScriptStepsSidebar
-        steps={steps}
-        currentIndex={currentPage}
-        onSelect={setCurrentPage}
-        onPrev={() => setCurrentPage((p: number) => Math.max(0, p - 1))}
-        onNext={() =>
-          setCurrentPage((p: number) => Math.min(steps.length - 1, p + 1))
-        }
-        onDelete={deleteStep}
-        onReorder={reorderSteps}
-        isEditing={isEditing}
-        onToggleEditing={() => setIsEditing((p: boolean) => !p)}
-        onAddStep={addStep}
-      />
+    ((!isMobile && shouldShowStepsSidebar && !isStepsCollapsed) ||
+      (isMobile && isMobileStepsOpen && shouldShowStepsSidebar && !isStepsCollapsed)) ? (
+      <div
+        className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobileStepsOpen ? "open" : ""}`}
+      >
+        {isMobile && (
+          <button
+            className="mobile-panel-close"
+            onClick={() => setIsMobileStepsOpen(false)}
+            aria-label="Закрыть шаги"
+          >
+            ×
+          </button>
+        )}
+        <ScriptStepsSidebar
+          steps={steps}
+          currentIndex={currentPage}
+          onSelect={setCurrentPage}
+          onPrev={() => setCurrentPage((p: number) => Math.max(0, p - 1))}
+          onNext={() =>
+            setCurrentPage((p: number) => Math.min(steps.length - 1, p + 1))
+          }
+          onDelete={deleteStep}
+          onReorder={reorderSteps}
+          isEditing={isEditing}
+          onToggleEditing={() => setIsEditing((p: boolean) => !p)}
+          onAddStep={addStep}
+        />
+      </div>
     ) : null;
 
   return (
@@ -146,7 +194,7 @@ export function SpectaclePage() {
           playlistNode
         )}
         <div className="app-content">
-          {showHeaderSounds && !isBoardView && (
+          {showHeaderSounds && !isBoardView && !isMobile && (
             <div className="sounds-bar">
               <HeaderPlayer
                 projectName={projectDisplay}
@@ -227,6 +275,40 @@ export function SpectaclePage() {
           </main>
         </div>
         {stepsSidebarNode}
+        {isMobile && !isBoardView && (
+          <div className="mobile-bottom-buttons">
+            {shouldShowStepsSidebar && (
+              <button
+                className="mobile-bottom-btn"
+                onClick={() => {
+                  setIsStepsCollapsed(false);
+                  setIsMobileStepsOpen(true);
+                }}
+                aria-label="Открыть шаги"
+              >
+                Шаги
+              </button>
+            )}
+            {showPlaylistSidebar && (
+              <button
+                className="mobile-bottom-btn"
+                onClick={() => setIsMobilePlaylistOpen(true)}
+                aria-label="Открыть плейлист"
+              >
+                Плейлист
+              </button>
+            )}
+          </div>
+        )}
+        {isMobile && (isMobilePlaylistOpen || isMobileStepsOpen) && (
+          <div
+            className="mobile-overlay"
+            onClick={() => {
+              setIsMobilePlaylistOpen(false);
+              setIsMobileStepsOpen(false);
+            }}
+          />
+        )}
       </div>
   );
 }

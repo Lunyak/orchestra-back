@@ -35,6 +35,8 @@
   position: static;
   height: 100%;
   max-height: 100vh;
+  max-height: 100dvh;
+  max-height: var(--app-height, 100dvh);
   overflow-y: auto;
   border-radius: 0;
   border: none;

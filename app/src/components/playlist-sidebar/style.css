@@ -9,7 +9,15 @@
   flex-direction: column;
   gap: 16px;
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
   box-sizing: border-box;
+}
+
+.playlist-sidebar-wrapper.mobile .playlist-sidebar {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .playlist-sidebar.drag-over {

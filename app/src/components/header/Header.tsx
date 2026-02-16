@@ -19,7 +19,6 @@ export const Header: React.FC<HeaderProps> = ({ scriptState }) => {
   const [isOpen, setIsOpen] = useState(false);
   const closeTimeoutRef = useRef<number | null>(null);
   const location = useLocation();
-  const isScriptPage = location.pathname === "/";
 
   useEffect(() => {
     return () => {
@@ -57,7 +56,7 @@ export const Header: React.FC<HeaderProps> = ({ scriptState }) => {
       <div className="header-trigger header-trigger--left" aria-hidden />
       <header className={`header header--left header--slide ${isOpen ? "header--open" : ""}`}>
         <HeaderNav />
-        {isScriptPage && scriptState && (
+        {scriptState && (
           <>
             <div className="header-script-state-sep" aria-hidden />
             <HeaderScriptStateNav {...scriptState} />

@@ -8,8 +8,16 @@
   gap: 12px;
   box-sizing: border-box;
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
   position: relative;
   z-index: 1;
+}
+
+.steps-sidebar-wrapper.mobile .script-sidebar,
+.steps-sidebar-wrapper.mobile .script-sidebar-content {
+  width: 100%;
+  max-width: 100%;
 }
 
 .script-sidebar-options {
@@ -17,7 +25,6 @@
   transform: translate(0, -50%);
   z-index: 1;
   top: 50%;
-  display: flex;
   flex-direction: column;
   gap: 6px;
 }
@@ -29,6 +36,8 @@
 
 .script-sidebar-content {
   height: 100vh;
+  height: 100dvh;
+  height: var(--app-height, 100dvh);
   width: 240px;
   min-width: 200px;
   max-width: 280px;
@@ -40,7 +49,6 @@
   flex-direction: column;
   gap: 12px;
   box-sizing: border-box;
-  height: 100vh;
   position: relative;
   z-index: 1;
   overflow: hidden;
