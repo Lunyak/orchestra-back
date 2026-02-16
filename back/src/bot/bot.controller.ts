@@ -41,7 +41,10 @@ export class BotController {
 
   /** Обновить состав (кто придёт/не придёт) */
   @Post('rehearsals/:id/participants')
-  setRehearsalParticipants(@Param('id') id: string, @Body() body: SetParticipantsDto) {
+  setRehearsalParticipants(
+    @Param('id') id: string,
+    @Body() body: SetParticipantsDto,
+  ) {
     return this.rehearsals.setParticipants('bot', id, body);
   }
 
@@ -69,4 +72,3 @@ export class BotController {
     return this.rehearsals.upsertParticipantStatusFromBot(id, body);
   }
 }
-

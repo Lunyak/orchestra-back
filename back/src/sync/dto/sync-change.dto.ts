@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export type SyncOperation = 'create' | 'update' | 'delete';
 
@@ -44,4 +51,3 @@ export class SyncPullDto {
   @IsString()
   projectSlug?: string;
 }
-

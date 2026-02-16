@@ -8,6 +8,11 @@ function clean(v: unknown): string | null {
   return t.length ? t : null;
 }
 
+function cleanOptional(v: unknown): string | null | undefined {
+  if (v === undefined) return undefined;
+  return clean(v);
+}
+
 function sanitizeAvailabilityCalendar(
   value: unknown,
 ): Record<string, 'present' | 'absent'> | undefined {
@@ -75,7 +80,11 @@ export class ProfileService {
     const normalized = Array.from(
       new Set(
         (Array.isArray(emails) ? emails : [])
-          .map((e) => String(e ?? '').trim().toLowerCase())
+          .map((e) =>
+            String(e ?? '')
+              .trim()
+              .toLowerCase(),
+          )
           .filter(Boolean),
       ),
     );
@@ -148,16 +157,19 @@ export class ProfileService {
       where: { telegramId },
       data: {
         email: dto.email ? dto.email.trim().toLowerCase() : undefined,
-        displayName: clean(dto.displayName),
-        firstName: clean(dto.firstName),
-        lastName: clean(dto.lastName),
-        telegramUsername: clean(dto.telegramUsername),
-        avatarUrl: clean(dto.avatarUrl),
-        sex: clean(dto.sex),
-        role: clean(dto.role),
-        characters: dto.characters !== undefined ? dto.characters : undefined,
-        phone: clean(dto.phone),
-        birthday: clean(dto.birthday),
+        displayName: cleanOptional(dto.displayName),
+        firstName: cleanOptional(dto.firstName),
+        lastName: cleanOptional(dto.lastName),
+        telegramUsername: cleanOptional(dto.telegramUsername),
+        avatarUrl: cleanOptional(dto.avatarUrl),
+        sex: cleanOptional(dto.sex),
+        role: cleanOptional(dto.role),
+        characters:
+          dto.characters !== undefined
+            ? sanitizeCharacters(dto.characters)
+            : undefined,
+        phone: cleanOptional(dto.phone),
+        birthday: cleanOptional(dto.birthday),
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
@@ -170,20 +182,24 @@ export class ProfileService {
     return await this.prisma.userProfile.upsert({
       where: { email: normalized },
       update: {
-        displayName: clean(dto.displayName),
-        firstName: clean(dto.firstName),
-        lastName: clean(dto.lastName),
-        telegramUsername: clean(dto.telegramUsername),
-        telegramId: clean(dto.telegramId),
-        avatarUrl: clean(dto.avatarUrl),
+        displayName: cleanOptional(dto.displayName),
+        firstName: cleanOptional(dto.firstName),
+        lastName: cleanOptional(dto.lastName),
+        telegramUsername: cleanOptional(dto.telegramUsername),
+        telegramId:
+          dto.telegramId !== undefined ? clean(dto.telegramId) : undefined,
+        avatarUrl: cleanOptional(dto.avatarUrl),
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
-        sex: clean(dto.sex),
-        role: clean(dto.role),
-        characters: dto.characters !== undefined ? dto.characters : undefined,
-        phone: clean(dto.phone),
-        birthday: clean(dto.birthday),
+        sex: cleanOptional(dto.sex),
+        role: cleanOptional(dto.role),
+        characters:
+          dto.characters !== undefined
+            ? sanitizeCharacters(dto.characters)
+            : undefined,
+        phone: cleanOptional(dto.phone),
+        birthday: cleanOptional(dto.birthday),
       },
       create: {
         email: normalized,
@@ -198,7 +214,7 @@ export class ProfileService {
         ),
         sex: clean(dto.sex),
         role: clean(dto.role),
-        characters: dto.characters !== undefined ? dto.characters : undefined,
+        characters: sanitizeCharacters(dto.characters),
         phone: clean(dto.phone),
         birthday: clean(dto.birthday),
       },

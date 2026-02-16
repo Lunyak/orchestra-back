@@ -1,4 +1,11 @@
-import { IsInt, IsISO8601, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateRehearsalDto {
   @IsString()
@@ -20,4 +27,3 @@ export class CreateRehearsalDto {
   @IsString()
   notes?: string;
 }
-

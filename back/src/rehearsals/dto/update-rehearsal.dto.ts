@@ -48,4 +48,3 @@ export class UpdateRehearsalDto {
   @Type(() => SelectedStepDto)
   selectedSteps?: SelectedStepDto[];
 }
-

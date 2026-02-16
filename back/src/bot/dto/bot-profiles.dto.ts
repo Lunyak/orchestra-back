@@ -1,5 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsEmail,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export class BotProfileDto {
   @IsEmail()
@@ -32,4 +38,3 @@ export class BotProfilesUpsertDto {
   @Type(() => BotProfileDto)
   profiles: BotProfileDto[];
 }
-

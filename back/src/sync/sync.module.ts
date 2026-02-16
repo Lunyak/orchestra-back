@@ -10,4 +10,3 @@ import { SyncService } from './sync.service';
   controllers: [SyncController],
 })
 export class SyncModule {}
-

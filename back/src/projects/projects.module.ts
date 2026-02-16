@@ -7,4 +7,3 @@ import { ProjectsService } from './projects.service';
   controllers: [ProjectsController],
 })
 export class ProjectsModule {}
-

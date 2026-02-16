@@ -10,4 +10,3 @@ import { RehearsalsModule } from '../rehearsals/rehearsals.module';
   providers: [BotService, BotGuard],
 })
 export class BotModule {}
-

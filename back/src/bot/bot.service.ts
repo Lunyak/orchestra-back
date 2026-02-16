@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RehearsalPlanRequestDto } from './dto/rehearsal-plan.dto';
 import { BotProfilesUpsertDto } from './dto/bot-profiles.dto';
@@ -113,7 +117,11 @@ export class BotService {
     const normalized = Array.from(
       new Set(
         (emails ?? [])
-          .map((e) => String(e ?? '').trim().toLowerCase())
+          .map((e) =>
+            String(e ?? '')
+              .trim()
+              .toLowerCase(),
+          )
           .filter(Boolean),
       ),
     );
@@ -147,16 +155,21 @@ export class BotService {
     }
 
     const presentRolesRaw: string[] = [];
-    if (Array.isArray(dto.presentRoles)) presentRolesRaw.push(...dto.presentRoles);
+    if (Array.isArray(dto.presentRoles))
+      presentRolesRaw.push(...dto.presentRoles);
     if (Array.isArray(dto.presentPeople)) {
       dto.presentPeople.forEach((p) => {
         if (Array.isArray(p.roles)) presentRolesRaw.push(...p.roles);
       });
     }
 
-    const presentNorm = new Set(presentRolesRaw.map(normalizeRole).filter(Boolean));
+    const presentNorm = new Set(
+      presentRolesRaw.map(normalizeRole).filter(Boolean),
+    );
     if (presentNorm.size === 0) {
-      throw new BadRequestException('presentRoles or presentPeople.roles must be provided');
+      throw new BadRequestException(
+        'presentRoles or presentPeople.roles must be provided',
+      );
     }
 
     const project = await this.prisma.project.findUnique({
@@ -190,9 +203,11 @@ export class BotService {
 
     for (const scene of project.scenes) {
       const raw = scene.rawJson as any;
-      const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+      const steps = Array.isArray(raw?.steps)
+        ? (raw.steps as RawStepLike[])
+        : [];
       for (const step of steps) {
-        const text = (step.playMarkdown ?? step.markdown ?? '') as string;
+        const text = step.playMarkdown ?? step.markdown ?? '';
         const requiredRoles = extractRolesSmart(text);
 
         // Если ролей нет — такую "сцену" можно репетировать всегда (техничка/ремарки).
@@ -202,7 +217,9 @@ export class BotService {
             sceneId: scene.id,
             sceneName: scene.name,
             stepId: typeof step.id === 'number' ? step.id : null,
-            stepTitle: (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
+            stepTitle:
+              (step.title ?? '').trim() ||
+              `Step ${String(step.id ?? '')}`.trim(),
             requiredRoles: [],
             missingRoles: [],
             ready: true,
@@ -219,7 +236,9 @@ export class BotService {
           if (!roleNormToOriginal.has(n)) roleNormToOriginal.set(n, r);
         });
 
-        const missingNorm = [...roleNormToOriginal.keys()].filter((n) => !presentNorm.has(n));
+        const missingNorm = [...roleNormToOriginal.keys()].filter(
+          (n) => !presentNorm.has(n),
+        );
         const missingRoles = missingNorm
           .map((n) => roleNormToOriginal.get(n) ?? n)
           .sort((a, b) => a.localeCompare(b, 'ru'));
@@ -229,7 +248,8 @@ export class BotService {
           sceneId: scene.id,
           sceneName: scene.name,
           stepId: typeof step.id === 'number' ? step.id : null,
-          stepTitle: (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
+          stepTitle:
+            (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
           requiredRoles: requiredRoles.sort((a, b) => a.localeCompare(b, 'ru')),
           missingRoles,
           ready: missingRoles.length === 0,
@@ -257,4 +277,3 @@ export class BotService {
     };
   }
 }
-

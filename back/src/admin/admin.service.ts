@@ -14,7 +14,12 @@ export class AdminService {
         createdAt: true,
         subscriptionId: true,
         subscription: {
-          select: { id: true, name: true, maxProjects: true, maxCollaboratorsPerProject: true },
+          select: {
+            id: true,
+            name: true,
+            maxProjects: true,
+            maxCollaboratorsPerProject: true,
+          },
         },
         _count: { select: { projectsOwned: true } },
       },
@@ -33,7 +38,12 @@ export class AdminService {
   async getPlans() {
     return this.prisma.subscriptionPlan.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, maxProjects: true, maxCollaboratorsPerProject: true },
+      select: {
+        id: true,
+        name: true,
+        maxProjects: true,
+        maxCollaboratorsPerProject: true,
+      },
     });
   }
 
@@ -61,7 +71,9 @@ export class AdminService {
   }
 
   async setProjectDeleted(projectId: string, deleted: boolean) {
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
     if (!project) throw new NotFoundException('Project not found');
     return this.prisma.project.update({
       where: { id: projectId },

@@ -1,4 +1,9 @@
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -24,8 +29,7 @@ export class FileStorageService {
       endpoint
     ).replace(/\/$/, '');
     const region = this.config.get<string>('S3_REGION') ?? 'us-east-1';
-    const accessKeyId =
-      this.config.get<string>('S3_ACCESS_KEY') ?? 'orchestra';
+    const accessKeyId = this.config.get<string>('S3_ACCESS_KEY') ?? 'orchestra';
     const secretAccessKey =
       this.config.get<string>('S3_SECRET_KEY') ?? 'orchestra_secret';
     this.bucket = this.config.get<string>('S3_BUCKET') ?? 'orchestra-media';
@@ -96,10 +100,13 @@ export class FileStorageService {
     }
   }
 
-  private buildKey(params: { projectId: string; type: string; fileName: string }): string {
+  private buildKey(params: {
+    projectId: string;
+    type: string;
+    fileName: string;
+  }): string {
     const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]+/g, '_');
     const ts = Date.now();
     return `${params.projectId}/${params.type}/${ts}-${safeName}`;
   }
 }
-

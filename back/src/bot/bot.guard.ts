@@ -29,4 +29,3 @@ export class BotGuard implements CanActivate {
     return true;
   }
 }
-

@@ -54,7 +54,10 @@ export class AuthService {
       expiresIn: refreshExpires as any,
     };
 
-    const refreshToken = await this.jwtService.signAsync(payload, refreshOptions);
+    const refreshToken = await this.jwtService.signAsync(
+      payload,
+      refreshOptions,
+    );
 
     return { accessToken, refreshToken };
   }
@@ -86,4 +89,3 @@ export class AuthService {
     }
   }
 }
-

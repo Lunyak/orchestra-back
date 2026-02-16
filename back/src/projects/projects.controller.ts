@@ -1,13 +1,13 @@
 import {
-    Body,
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Req,
-    UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ProjectsService } from './projects.service';
@@ -38,11 +38,7 @@ export class ProjectsController {
   }
 
   @Post(':slug/members')
-  addMember(
-    @Req() req: any,
-    @Param('slug') slug: string,
-    @Body() body: any,
-  ) {
+  addMember(@Req() req: any, @Param('slug') slug: string, @Body() body: any) {
     return this.projectsService.addMember(req.user.userId, slug, body);
   }
 
@@ -76,11 +72,6 @@ export class ProjectsController {
     @Param('slug') slug: string,
     @Param('memberId') memberId: string,
   ) {
-    return this.projectsService.removeMember(
-      req.user.userId,
-      slug,
-      memberId,
-    );
+    return this.projectsService.removeMember(req.user.userId, slug, memberId);
   }
 }
-

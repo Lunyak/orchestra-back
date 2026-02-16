@@ -1,14 +1,14 @@
 import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Post,
-    Query,
-    Res,
-    UploadedFile,
-    UseGuards,
-    UseInterceptors,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -99,7 +99,9 @@ export class FilesController {
         if (!st.isFile()) {
           return res.status(404).send('Not found');
         }
-        const ext = (decoded.slice(decoded.lastIndexOf('.')) || '').toLowerCase();
+        const ext = (
+          decoded.slice(decoded.lastIndexOf('.')) || ''
+        ).toLowerCase();
         const contentType =
           ext === '.mp3'
             ? 'audio/mpeg'
@@ -122,7 +124,11 @@ export class FilesController {
     }
     try {
       const decoded = decodeURIComponent(key);
-      const { body, contentType: s3ContentType, contentLength } = await this.storage.getObjectStream(decoded);
+      const {
+        body,
+        contentType: s3ContentType,
+        contentLength,
+      } = await this.storage.getObjectStream(decoded);
       const ext = (decoded.slice(decoded.lastIndexOf('.')) || '').toLowerCase();
       const contentType =
         s3ContentType ||
@@ -195,4 +201,3 @@ export class FilesController {
     }
   }
 }
-

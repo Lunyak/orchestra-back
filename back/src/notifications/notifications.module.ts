@@ -6,4 +6,3 @@ import { NotificationsGateway } from './notifications.gateway';
   exports: [NotificationsGateway],
 })
 export class NotificationsModule {}
-

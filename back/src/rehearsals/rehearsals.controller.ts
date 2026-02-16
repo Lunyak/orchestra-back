@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
@@ -36,12 +46,20 @@ export class RehearsalsController {
   }
 
   @Patch(':id')
-  update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateRehearsalDto) {
+  update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: UpdateRehearsalDto,
+  ) {
     return this.rehearsals.update(req.user.userId, id, body);
   }
 
   @Post(':id/participants')
-  setParticipants(@Req() req: any, @Param('id') id: string, @Body() body: SetParticipantsDto) {
+  setParticipants(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: SetParticipantsDto,
+  ) {
     return this.rehearsals.setParticipants(req.user.userId, id, body);
   }
 
@@ -56,4 +74,3 @@ export class RehearsalsController {
     return this.rehearsals.publish(req.user.userId, id);
   }
 }
-

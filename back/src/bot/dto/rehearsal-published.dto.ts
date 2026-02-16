@@ -11,4 +11,3 @@ export class RehearsalPublishedDto {
   @IsString()
   threadId?: string;
 }
-

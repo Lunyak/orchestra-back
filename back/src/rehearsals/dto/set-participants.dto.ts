@@ -1,5 +1,12 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsIn, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export class RehearsalParticipantInputDto {
   @IsEmail()
@@ -22,4 +29,3 @@ export class SetParticipantsDto {
   @Type(() => RehearsalParticipantInputDto)
   participants: RehearsalParticipantInputDto[];
 }
-

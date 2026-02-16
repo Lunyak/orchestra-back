@@ -10,16 +10,16 @@ export class SyncController {
 
   @Post('push')
   push(@Req() req: any, @Body() body: SyncPushDto) {
-    // eslint-disable-next-line no-console
     console.log('[sync] POST /sync/push received', {
       userId: req.user?.userId,
       bodyKeys: Object.keys(body),
       changesCount: body.changes?.length ?? 0,
-      changes: body.changes?.map((c) => ({
-        entityType: c.entityType,
-        operation: c.operation,
-        entityId: c.entityId,
-      })) ?? [],
+      changes:
+        body.changes?.map((c) => ({
+          entityType: c.entityType,
+          operation: c.operation,
+          entityId: c.entityId,
+        })) ?? [],
       rawBody: JSON.stringify(body).substring(0, 500), // Первые 500 символов для отладки
     });
     return this.syncService.applyChanges(req.user.userId, body.changes ?? []);
@@ -46,4 +46,3 @@ export class SyncController {
     return this.syncService.debugAll();
   }
 }
-

@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
@@ -13,7 +18,9 @@ dayjs.extend(customParseFormat);
 dayjs.locale('ru');
 
 function normEmail(v: string): string {
-  return String(v ?? '').trim().toLowerCase();
+  return String(v ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function parseIsoDate(v: string): Date {
@@ -58,13 +65,15 @@ function uniq<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
 
-function extractTimeHHMM(text?: string | null): { hh: number; mm: number } | null {
+function extractTimeHHMM(
+  text?: string | null,
+): { hh: number; mm: number } | null {
   const t = String(text ?? '').trim();
   if (!t) return null;
   const m = t.match(/\b([01]?\d|2[0-3])[:.](\d{2})\b/);
   if (!m) return null;
-  const hh = parseInt(m[1]!, 10);
-  const mm = parseInt(m[2]!, 10);
+  const hh = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
   if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
   if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
   return { hh, mm };
@@ -114,7 +123,10 @@ function extractSpeakerRolesFromLines(text?: string): string[] {
 }
 
 function extractRolesSmart(text?: string): string[] {
-  return uniq([...extractRolesByBrackets(text), ...extractSpeakerRolesFromLines(text)]);
+  return uniq([
+    ...extractRolesByBrackets(text),
+    ...extractSpeakerRolesFromLines(text),
+  ]);
 }
 
 function looksLikeEmail(v: string): boolean {
@@ -130,9 +142,12 @@ function getDateKey(date: Date): string {
 function parseAvailabilityCalendar(value: unknown): AvailabilityCalendar {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const out: AvailabilityCalendar = {};
-  for (const [date, rawStatus] of Object.entries(value as Record<string, unknown>)) {
+  for (const [date, rawStatus] of Object.entries(
+    value as Record<string, unknown>,
+  )) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    if (rawStatus === 'present' || rawStatus === 'absent') out[date] = rawStatus;
+    if (rawStatus === 'present' || rawStatus === 'absent')
+      out[date] = rawStatus;
   }
   return out;
 }
@@ -153,9 +168,12 @@ function parseSelectedStepsJson(value: unknown): SelectedStepRef[] {
   const out: SelectedStepRef[] = [];
   for (const item of value) {
     if (!item || typeof item !== 'object') continue;
-    const sceneId = String((item as any).sceneId ?? '').trim();
-    const stepIdRaw = (item as any).stepId;
-    const stepId = typeof stepIdRaw === 'number' ? Math.trunc(stepIdRaw) : parseInt(String(stepIdRaw ?? ''), 10);
+    const sceneId = String(item.sceneId ?? '').trim();
+    const stepIdRaw = item.stepId;
+    const stepId =
+      typeof stepIdRaw === 'number'
+        ? Math.trunc(stepIdRaw)
+        : parseInt(String(stepIdRaw ?? ''), 10);
     if (!sceneId) continue;
     if (!Number.isFinite(stepId) || stepId <= 0) continue;
     out.push({ sceneId, stepId });
@@ -173,7 +191,11 @@ export class RehearsalsService {
     private readonly config: ConfigService,
   ) {}
 
-  private async assertUserHasProjectAccess(userId: string, projectId: string, write: boolean) {
+  private async assertUserHasProjectAccess(
+    userId: string,
+    projectId: string,
+    write: boolean,
+  ) {
     if (userId === 'bot') return;
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -184,7 +206,8 @@ export class RehearsalsService {
     });
     if (!project) throw new NotFoundException('Project not found');
     if (project.ownerId === userId) return;
-    if (!project.members.length) throw new ForbiddenException('No access to project');
+    if (!project.members.length)
+      throw new ForbiddenException('No access to project');
     if (write && project.members[0]?.role !== 'editor') {
       throw new ForbiddenException('No write access to project');
     }
@@ -280,7 +303,9 @@ export class RehearsalsService {
         notes: dto.notes != null ? dto.notes.trim() || null : undefined,
         selectedSceneIds:
           dto.selectedSceneIds != null
-            ? dto.selectedSceneIds.map((x) => String(x ?? '').trim()).filter(Boolean)
+            ? dto.selectedSceneIds
+                .map((x) => String(x ?? '').trim())
+                .filter(Boolean)
             : undefined,
         selectedSteps:
           dto.selectedSteps != null
@@ -305,7 +330,9 @@ export class RehearsalsService {
       orderBy: { createdAt: 'asc' },
     });
 
-    const selectedSceneIds = parseStringArrayJson((reh as any)?.selectedSceneIds);
+    const selectedSceneIds = parseStringArrayJson(
+      (reh as any)?.selectedSceneIds,
+    );
     const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
 
     return {
@@ -313,15 +340,19 @@ export class RehearsalsService {
       selectedSceneIds,
       selectedSteps,
       scenes: scenes.map((s) => {
-        const raw = (s.rawJson as any) ?? {};
-        const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+        const raw = s.rawJson ?? {};
+        const steps = Array.isArray(raw?.steps)
+          ? (raw.steps as RawStepLike[])
+          : [];
         return {
           id: s.id,
           name: s.name,
           steps: steps
             .map((st) => ({
               id: typeof st.id === 'number' ? st.id : null,
-              title: String(st.title ?? '').trim() || (st.id != null ? `Step ${String(st.id)}` : 'Step'),
+              title:
+                String(st.title ?? '').trim() ||
+                (st.id != null ? `Step ${String(st.id)}` : 'Step'),
             }))
             .filter((x) => x.id != null)
             .slice(0, 200),
@@ -330,8 +361,14 @@ export class RehearsalsService {
     };
   }
 
-  async setParticipants(userId: string, rehearsalId: string, dto: SetParticipantsDto) {
-    const reh = await this.prisma.rehearsal.findUnique({ where: { id: rehearsalId } });
+  async setParticipants(
+    userId: string,
+    rehearsalId: string,
+    dto: SetParticipantsDto,
+  ) {
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+    });
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, true);
 
@@ -367,7 +404,10 @@ export class RehearsalsService {
   async plan(userId: string, rehearsalId: string) {
     const reh = await this.prisma.rehearsal.findUnique({
       where: { id: rehearsalId },
-      include: { participants: true, project: { select: { id: true, slug: true, name: true } } },
+      include: {
+        participants: true,
+        project: { select: { id: true, slug: true, name: true } },
+      },
     });
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, false);
@@ -384,7 +424,8 @@ export class RehearsalsService {
 
     // Время доступности участника: present -> с начала, late -> с указанного времени (если распарсили HH:MM), иначе с начала.
     const rehearsalStart = dayjs(reh.startsAt);
-    const rehearsalStartMin = rehearsalStart.hour() * 60 + rehearsalStart.minute();
+    const rehearsalStartMin =
+      rehearsalStart.hour() * 60 + rehearsalStart.minute();
     const rehearsalDurationMin = reh.durationMin ?? 120;
     const rehearsalEndMin = rehearsalStartMin + rehearsalDurationMin;
     const availableFromByEmail = new Map<string, number>();
@@ -397,7 +438,9 @@ export class RehearsalsService {
       availableFromByEmail.set(email, Math.max(rehearsalStartMin, mins));
     }
 
-    const selectedSceneIds = parseStringArrayJson((reh as any)?.selectedSceneIds);
+    const selectedSceneIds = parseStringArrayJson(
+      (reh as any)?.selectedSceneIds,
+    );
     const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
     const allowedStepsBySceneId = new Map<string, Set<number>>();
     for (const x of selectedSteps) {
@@ -405,7 +448,9 @@ export class RehearsalsService {
       set.add(x.stepId);
       allowedStepsBySceneId.set(x.sceneId, set);
     }
-    const allowedSceneIdsFromSteps = new Set<string>(selectedSteps.map((x) => x.sceneId));
+    const allowedSceneIdsFromSteps = new Set<string>(
+      selectedSteps.map((x) => x.sceneId),
+    );
     const effectiveSceneIds =
       selectedSceneIds.length > 0
         ? selectedSceneIds
@@ -415,7 +460,12 @@ export class RehearsalsService {
 
     if (selectedSteps.length === 0) {
       return {
-        rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt, project: reh.project },
+        rehearsal: {
+          id: reh.id,
+          title: reh.title,
+          startsAt: reh.startsAt,
+          project: reh.project,
+        },
         selectionRequired: true,
         availableEmails: [] as string[],
         items: [] as any[],
@@ -440,7 +490,9 @@ export class RehearsalsService {
     const castEmails = new Set<string>();
     for (const scene of scenes) {
       const raw = scene.rawJson as any;
-      const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+      const steps = Array.isArray(raw?.steps)
+        ? (raw.steps as RawStepLike[])
+        : [];
       for (const step of steps) {
         const cast = step.cast ?? {};
         for (const rawAssigned of Object.values(cast)) {
@@ -467,11 +519,17 @@ export class RehearsalsService {
     );
     const rehearsalDateKey = getDateKey(reh.startsAt);
 
-    const availabilityStatusByEmail = new Map<string, 'present' | 'absent' | 'unknown'>();
+    const availabilityStatusByEmail = new Map<
+      string,
+      'present' | 'absent' | 'unknown'
+    >();
     for (const email of castEmailList) {
       const calendar = availabilityByEmail.get(email);
       const st = calendar?.[rehearsalDateKey];
-      availabilityStatusByEmail.set(email, st === 'present' || st === 'absent' ? st : 'unknown');
+      availabilityStatusByEmail.set(
+        email,
+        st === 'present' || st === 'absent' ? st : 'unknown',
+      );
     }
 
     const items: Array<{
@@ -484,21 +542,29 @@ export class RehearsalsService {
       ready: boolean;
       availableFromMin: number;
       availableFromTime: string;
-      lateConstraints: Array<{ role: string; email: string; availableFromTime: string }>;
+      lateConstraints: Array<{
+        role: string;
+        email: string;
+        availableFromTime: string;
+      }>;
       durationMin: number | null;
     }> = [];
 
     for (const scene of scenes) {
       const raw = scene.rawJson as any;
-      const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+      const steps = Array.isArray(raw?.steps)
+        ? (raw.steps as RawStepLike[])
+        : [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.id === 'number' && !allowed.has(step.id)) continue;
+        if (allowed && typeof step.id === 'number' && !allowed.has(step.id))
+          continue;
         if (allowed && typeof step.id !== 'number') continue;
-        const text = (step.playMarkdown ?? step.markdown ?? '') as string;
+        const text = step.playMarkdown ?? step.markdown ?? '';
         const roles = extractRolesSmart(text);
         const cast = step.cast ?? {};
-        const rawDuration = typeof step.durationMin === 'number' ? step.durationMin : null;
+        const rawDuration =
+          typeof step.durationMin === 'number' ? step.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
             ? Math.max(1, Math.min(480, Math.trunc(rawDuration)))
@@ -506,7 +572,11 @@ export class RehearsalsService {
 
         const missing: string[] = [];
         let availableFromMin = rehearsalStartMin;
-        const lateConstraints: Array<{ role: string; email: string; availableFromTime: string }> = [];
+        const lateConstraints: Array<{
+          role: string;
+          email: string;
+          availableFromTime: string;
+        }> = [];
         for (const role of roles) {
           const assigned = String(cast[role] ?? '').trim();
           if (!assigned) {
@@ -518,7 +588,8 @@ export class RehearsalsService {
             continue;
           }
           const email = normEmail(assigned);
-          const availability = availabilityStatusByEmail.get(email) ?? 'unknown';
+          const availability =
+            availabilityStatusByEmail.get(email) ?? 'unknown';
           if (availability === 'absent') {
             missing.push(`${role}: занят (${email})`);
           } else if (availability !== 'present') {
@@ -540,7 +611,8 @@ export class RehearsalsService {
           sceneId: scene.id,
           sceneName: scene.name,
           stepId: typeof step.id === 'number' ? step.id : null,
-          stepTitle: (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
+          stepTitle:
+            (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
           requiredRoles: roles,
           missing,
           ready: missing.length === 0,
@@ -558,8 +630,12 @@ export class RehearsalsService {
       if (a.ready && b.ready && a.availableFromMin !== b.availableFromMin) {
         return a.availableFromMin - b.availableFromMin;
       }
-      if (a.missing.length !== b.missing.length) return a.missing.length - b.missing.length;
-      return `${a.sceneName} ${a.stepTitle}`.localeCompare(`${b.sceneName} ${b.stepTitle}`, 'ru');
+      if (a.missing.length !== b.missing.length)
+        return a.missing.length - b.missing.length;
+      return `${a.sceneName} ${a.stepTitle}`.localeCompare(
+        `${b.sceneName} ${b.stepTitle}`,
+        'ru',
+      );
     });
 
     // Таймлайн: берём только готовые шаги с заданной длительностью, сортируем по доступности и приоритету канбана.
@@ -567,8 +643,12 @@ export class RehearsalsService {
       .filter((x) => x.ready && x.durationMin != null && x.durationMin > 0)
       .slice()
       .sort((a, b) => {
-        if (a.availableFromMin !== b.availableFromMin) return a.availableFromMin - b.availableFromMin;
-        return `${a.sceneName} ${a.stepTitle}`.localeCompare(`${b.sceneName} ${b.stepTitle}`, 'ru');
+        if (a.availableFromMin !== b.availableFromMin)
+          return a.availableFromMin - b.availableFromMin;
+        return `${a.sceneName} ${a.stepTitle}`.localeCompare(
+          `${b.sceneName} ${b.stepTitle}`,
+          'ru',
+        );
       });
 
     let cursorMin = rehearsalStartMin;
@@ -605,8 +685,15 @@ export class RehearsalsService {
     }
 
     return {
-      rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt, project: reh.project },
-      availableEmails: castEmailList.filter((e) => (availabilityStatusByEmail.get(e) ?? 'unknown') === 'present'),
+      rehearsal: {
+        id: reh.id,
+        title: reh.title,
+        startsAt: reh.startsAt,
+        project: reh.project,
+      },
+      availableEmails: castEmailList.filter(
+        (e) => (availabilityStatusByEmail.get(e) ?? 'unknown') === 'present',
+      ),
       items,
       timeline: {
         rehearsalStartTime: minutesToHHMM(rehearsalStartMin),
@@ -640,7 +727,9 @@ export class RehearsalsService {
     // Те, кто отметил absent или не отметил ничего — в опрос не попадают.
     const rehearsalDateKey = getDateKey(reh.startsAt);
 
-    const selectedSceneIds = parseStringArrayJson((reh as any)?.selectedSceneIds);
+    const selectedSceneIds = parseStringArrayJson(
+      (reh as any)?.selectedSceneIds,
+    );
     const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
     const allowedStepsBySceneId = new Map<string, Set<number>>();
     for (const x of selectedSteps) {
@@ -648,7 +737,9 @@ export class RehearsalsService {
       set.add(x.stepId);
       allowedStepsBySceneId.set(x.sceneId, set);
     }
-    const allowedSceneIdsFromSteps = new Set<string>(selectedSteps.map((x) => x.sceneId));
+    const allowedSceneIdsFromSteps = new Set<string>(
+      selectedSteps.map((x) => x.sceneId),
+    );
     const effectiveSceneIds =
       selectedSceneIds.length > 0
         ? selectedSceneIds
@@ -667,19 +758,26 @@ export class RehearsalsService {
       throw new BadRequestException('Выбранные сцены не найдены');
     }
     if (scenes.length === 0) {
-      throw new BadRequestException('Перед публикацией выберите сцены для репетиции');
+      throw new BadRequestException(
+        'Перед публикацией выберите сцены для репетиции',
+      );
     }
     if (selectedSteps.length === 0) {
-      throw new BadRequestException('Перед публикацией выберите сцены (шаги) для репетиции');
+      throw new BadRequestException(
+        'Перед публикацией выберите сцены (шаги) для репетиции',
+      );
     }
 
     const neededEmails = new Set<string>();
     for (const scene of scenes) {
-      const raw = (scene as any).rawJson as any;
-      const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+      const raw = (scene as any).rawJson;
+      const steps = Array.isArray(raw?.steps)
+        ? (raw.steps as RawStepLike[])
+        : [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.id === 'number' && !allowed.has(step.id)) continue;
+        if (allowed && typeof step.id === 'number' && !allowed.has(step.id))
+          continue;
         if (allowed && typeof step.id !== 'number') continue;
         const cast = step.cast ?? {};
         for (const rawAssigned of Object.values(cast)) {
@@ -699,13 +797,26 @@ export class RehearsalsService {
     });
     const memberEmails = uniq([
       normEmail(project?.owner?.email ?? ''),
-      ...((project?.members ?? []).map((m: any) => normEmail(m?.user?.email)).filter(Boolean) as string[]),
+      ...((project?.members ?? [])
+        .map((m: any) => normEmail(m?.user?.email))
+        .filter(Boolean) as string[]),
     ]).filter(Boolean);
     const profiles =
       memberEmails.length > 0
         ? await this.prisma.userProfile.findMany({
-            where: { email: { in: memberEmails.filter((e) => neededEmails.has(normEmail(e))) } },
-            select: { email: true, availabilityCalendar: true, displayName: true, firstName: true, lastName: true, telegramId: true },
+            where: {
+              email: {
+                in: memberEmails.filter((e) => neededEmails.has(normEmail(e))),
+              },
+            },
+            select: {
+              email: true,
+              availabilityCalendar: true,
+              displayName: true,
+              firstName: true,
+              lastName: true,
+              telegramId: true,
+            },
           })
         : [];
     const present = profiles
@@ -716,11 +827,22 @@ export class RehearsalsService {
         if (st !== 'present') return null;
         const userName =
           String(p.displayName ?? '').trim() ||
-          [p.firstName, p.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ') ||
+          [p.firstName, p.lastName]
+            .map((x) => String(x ?? '').trim())
+            .filter(Boolean)
+            .join(' ') ||
           null;
-        return { email, userName, telegramId: p.telegramId ? String(p.telegramId).trim() || null : null };
+        return {
+          email,
+          userName,
+          telegramId: p.telegramId ? String(p.telegramId).trim() || null : null,
+        };
       })
-      .filter(Boolean) as Array<{ email: string; userName: string | null; telegramId: string | null }>;
+      .filter(Boolean) as Array<{
+      email: string;
+      userName: string | null;
+      telegramId: string | null;
+    }>;
 
     if (present.length === 0) {
       throw new BadRequestException(
@@ -728,7 +850,9 @@ export class RehearsalsService {
       );
     }
 
-    await this.prisma.rehearsalParticipant.deleteMany({ where: { rehearsalId } });
+    await this.prisma.rehearsalParticipant.deleteMany({
+      where: { rehearsalId },
+    });
     await this.prisma.rehearsalParticipant.createMany({
       data: present.map((p) => ({
         rehearsalId,
@@ -739,7 +863,8 @@ export class RehearsalsService {
       })),
     });
 
-    const botUrl = this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
+    const botUrl =
+      this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
     const secret =
       this.config.get<string>('BOT_INTERNAL_SECRET') ||
       this.config.get<string>('INTERNAL_API_SECRET');
@@ -778,7 +903,9 @@ export class RehearsalsService {
     rehearsalId: string,
     dto: { chatId: string; messageId: string; threadId?: string },
   ) {
-    const reh = await this.prisma.rehearsal.findUnique({ where: { id: rehearsalId } });
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+    });
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, true);
 
@@ -787,7 +914,10 @@ export class RehearsalsService {
       data: {
         telegramChatId: String(dto.chatId ?? '').trim() || null,
         telegramMessageId: String(dto.messageId ?? '').trim() || null,
-        telegramThreadId: dto.threadId != null ? String(dto.threadId).trim() || null : undefined,
+        telegramThreadId:
+          dto.threadId != null
+            ? String(dto.threadId).trim() || null
+            : undefined,
         publishedAt: new Date(),
       },
       include: { participants: true },
@@ -800,9 +930,16 @@ export class RehearsalsService {
    */
   async upsertParticipantStatusFromBot(
     rehearsalId: string,
-    dto: { telegramId: string; status: 'present' | 'absent' | 'late' | 'unknown'; userName?: string; lateTime?: string },
+    dto: {
+      telegramId: string;
+      status: 'present' | 'absent' | 'late' | 'unknown';
+      userName?: string;
+      lateTime?: string;
+    },
   ) {
-    const reh = await this.prisma.rehearsal.findUnique({ where: { id: rehearsalId } });
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+    });
     if (!reh) throw new NotFoundException('Rehearsal not found');
 
     const telegramId = String(dto.telegramId ?? '').trim();
@@ -810,7 +947,12 @@ export class RehearsalsService {
 
     const profile = await this.prisma.userProfile.findUnique({
       where: { telegramId },
-      select: { email: true, displayName: true, firstName: true, lastName: true },
+      select: {
+        email: true,
+        displayName: true,
+        firstName: true,
+        lastName: true,
+      },
     });
     if (!profile?.email) {
       throw new NotFoundException('Profile not found for telegramId');
@@ -819,9 +961,15 @@ export class RehearsalsService {
     const email = normEmail(profile.email);
     const nameFromProfile =
       String(profile.displayName ?? '').trim() ||
-      [profile.firstName, profile.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ') ||
+      [profile.firstName, profile.lastName]
+        .map((x) => String(x ?? '').trim())
+        .filter(Boolean)
+        .join(' ') ||
       null;
-    const userName = dto.userName != null ? String(dto.userName).trim() || null : nameFromProfile;
+    const userName =
+      dto.userName != null
+        ? String(dto.userName).trim() || null
+        : nameFromProfile;
 
     const status = dto.status;
     if (!['present', 'absent', 'late', 'unknown'].includes(status)) {
@@ -834,7 +982,10 @@ export class RehearsalsService {
         status: status as any,
         telegramId,
         userName,
-        lateTime: dto.lateTime != null ? String(dto.lateTime).trim() || null : undefined,
+        lateTime:
+          dto.lateTime != null
+            ? String(dto.lateTime).trim() || null
+            : undefined,
         respondedAt: new Date(),
       },
       create: {
@@ -843,15 +994,18 @@ export class RehearsalsService {
         status: status as any,
         telegramId,
         userName,
-        lateTime: dto.lateTime != null ? String(dto.lateTime).trim() || null : null,
+        lateTime:
+          dto.lateTime != null ? String(dto.lateTime).trim() || null : null,
         respondedAt: new Date(),
       },
     });
 
     return this.prisma.rehearsal.findUnique({
       where: { id: rehearsalId },
-      include: { participants: true, project: { select: { id: true, slug: true, name: true } } },
+      include: {
+        participants: true,
+        project: { select: { id: true, slug: true, name: true } },
+      },
     });
   }
 }
-

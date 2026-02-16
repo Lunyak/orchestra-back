@@ -16,4 +16,3 @@ export class RehearsalAttendanceDto {
   @IsString()
   lateTime?: string;
 }
-

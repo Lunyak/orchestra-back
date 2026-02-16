@@ -1,9 +1,9 @@
 import {
-    BadRequestException,
-    ConflictException,
-    ForbiddenException,
-    Injectable,
-    NotFoundException,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -145,7 +145,10 @@ export class ProjectsService {
         },
       });
     } catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('Project with this slug already exists');
       }
       throw error;
@@ -169,7 +172,9 @@ export class ProjectsService {
     const features = (plan?.features ?? {}) as any;
 
     if (!features.collaboration) {
-      throw new ForbiddenException('Collaboration is not available on current plan');
+      throw new ForbiddenException(
+        'Collaboration is not available on current plan',
+      );
     }
 
     if (plan?.maxCollaboratorsPerProject != null) {
@@ -177,7 +182,9 @@ export class ProjectsService {
         where: { projectId: project.id },
       });
       if (membersCount >= plan.maxCollaboratorsPerProject) {
-        throw new ForbiddenException('Collaborator limit reached for this project');
+        throw new ForbiddenException(
+          'Collaborator limit reached for this project',
+        );
       }
     }
 
@@ -197,10 +204,7 @@ export class ProjectsService {
     const project = await this.prisma.project.findFirst({
       where: {
         slug,
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } },
-        ],
+        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
       },
     });
     if (!project) {
@@ -232,10 +236,7 @@ export class ProjectsService {
     const project = await this.prisma.project.findFirst({
       where: {
         slug,
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId } } },
-        ],
+        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
       },
       select: {
         id: true,
@@ -271,7 +272,9 @@ export class ProjectsService {
       where: { email: { in: emails } },
       select: { email: true, displayName: true },
     });
-    const displayNameByEmail = new Map(profiles.map((p) => [p.email, p.displayName]));
+    const displayNameByEmail = new Map(
+      profiles.map((p) => [p.email, p.displayName]),
+    );
 
     return {
       id: project.id,
@@ -338,4 +341,3 @@ export class ProjectsService {
     return { ok: true };
   }
 }
-

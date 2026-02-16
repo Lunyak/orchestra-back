@@ -17,7 +17,6 @@ export class SyncService {
   ) {}
 
   async applyChanges(userId: string, changes: SyncChangeDto[]) {
-    // eslint-disable-next-line no-console
     console.log('[sync] applyChanges called', {
       userId,
       changesCount: changes.length,
@@ -31,8 +30,11 @@ export class SyncService {
     for (const change of changes) {
       const { entityType, operation, payload } = change;
 
-      // eslint-disable-next-line no-console
-      console.log('[sync] processing change', { entityType, operation, entityId: change.entityId });
+      console.log('[sync] processing change', {
+        entityType,
+        operation,
+        entityId: change.entityId,
+      });
 
       const projectId = await this.getProjectIdForChange(entityType, payload);
       if (projectId && !(await this.canUserWriteToProject(userId, projectId))) {
@@ -53,7 +55,7 @@ export class SyncService {
         }
       } catch (error) {
         // Временно логируем ошибки синка, чтобы понимать, почему данные не попадают в БД
-        // eslint-disable-next-line no-console
+
         console.error('[sync] failed to apply change', {
           userId,
           entityType,
@@ -111,7 +113,10 @@ export class SyncService {
   }
 
   /** Из значения (URL или ключ) извлечь ключ хранилища для удаления. */
-  private fileValueToStorageKey(value: string, projectId: string): string | null {
+  private fileValueToStorageKey(
+    value: string,
+    projectId: string,
+  ): string | null {
     if (!value || typeof value !== 'string') return null;
     const trimmed = value.trim();
     if (!trimmed) return null;
@@ -126,7 +131,9 @@ export class SyncService {
         }
       }
       // Паттерн для прямых ссылок MinIO: /orchestra-media/projectId/type/filename
-      const minioMatch = trimmed.match(/\/orchestra-media\/([^/?#]+\/[^/?#]+\/[^/?#]+)/);
+      const minioMatch = trimmed.match(
+        /\/orchestra-media\/([^/?#]+\/[^/?#]+\/[^/?#]+)/,
+      );
       if (minioMatch) {
         try {
           return decodeURIComponent(minioMatch[1]);
@@ -141,7 +148,10 @@ export class SyncService {
   }
 
   /** Собрать все ключи файлов из rawJson сцены (sounds, playlist). */
-  private collectFileKeysFromScene(rawJson: any, projectId: string): Set<string> {
+  private collectFileKeysFromScene(
+    rawJson: any,
+    projectId: string,
+  ): Set<string> {
     const keys = new Set<string>();
     if (!rawJson || typeof rawJson !== 'object') return keys;
 
@@ -200,13 +210,15 @@ export class SyncService {
         where: { id: payload.id },
         select: { rawJson: true },
       });
-      const oldKeys = this.collectFileKeysFromScene(existing?.rawJson ?? null, projectId);
+      const oldKeys = this.collectFileKeysFromScene(
+        existing?.rawJson ?? null,
+        projectId,
+      );
       const newKeys = this.collectFileKeysFromScene(payload.rawJson, projectId);
       const toDelete = [...oldKeys].filter((k) => !newKeys.has(k));
-      
+
       // Дополнительное логирование для отладки
       if (toDelete.length > 0) {
-        // eslint-disable-next-line no-console
         console.log('[sync] detected unused files', {
           sceneId: payload.id,
           oldKeysCount: oldKeys.size,
@@ -217,18 +229,19 @@ export class SyncService {
           toDelete,
         });
       }
-      
+
       const storage = this.getFileStorage();
       for (const key of toDelete) {
         await storage.deleteObject(key);
       }
       if (toDelete.length > 0) {
-        // eslint-disable-next-line no-console
-        console.log('[sync] deleted unused files from storage', { count: toDelete.length, keys: toDelete });
+        console.log('[sync] deleted unused files from storage', {
+          count: toDelete.length,
+          keys: toDelete,
+        });
       }
     }
 
-    // eslint-disable-next-line no-console
     console.log('[sync] applying Scene change', {
       operation,
       id: payload.id,
@@ -250,8 +263,10 @@ export class SyncService {
       },
     });
 
-    // eslint-disable-next-line no-console
-    console.log('[sync] Scene upsert result', { id: result.id, name: result.name });
+    console.log('[sync] Scene upsert result', {
+      id: result.id,
+      name: result.name,
+    });
 
     if (payload.projectId) {
       this.notifications.notifySceneUpdated(payload.projectId);
@@ -276,7 +291,6 @@ export class SyncService {
       return;
     }
 
-    // eslint-disable-next-line no-console
     console.log('[sync] applying Step change', {
       operation,
       id: payload.id,
@@ -291,7 +305,6 @@ export class SyncService {
     });
 
     if (!sceneExists) {
-      // eslint-disable-next-line no-console
       console.warn('[sync] Scene does not exist for Step', {
         stepId: payload.id,
         sceneId: payload.sceneId,
@@ -317,8 +330,10 @@ export class SyncService {
       },
     });
 
-    // eslint-disable-next-line no-console
-    console.log('[sync] Step upsert result', { id: result.id, title: result.title });
+    console.log('[sync] Step upsert result', {
+      id: result.id,
+      title: result.title,
+    });
   }
 
   /** Проверка: пользователь — владелец или участник с ролью editor. */
@@ -328,7 +343,10 @@ export class SyncService {
   ): Promise<boolean> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { ownerId: true, members: { where: { userId }, select: { role: true } } },
+      select: {
+        ownerId: true,
+        members: { where: { userId }, select: { role: true } },
+      },
     });
     if (!project) return false;
     if (project.ownerId === userId) return true;
@@ -360,10 +378,7 @@ export class SyncService {
     projectSlug?: string,
   ) {
     const projectAccessWhere = {
-      OR: [
-        { ownerId: userId },
-        { members: { some: { userId } } },
-      ],
+      OR: [{ ownerId: userId }, { members: { some: { userId } } }],
     };
 
     const projectWhere = projectSlug
@@ -407,4 +422,3 @@ export class SyncService {
     return { scenes, steps };
   }
 }
-

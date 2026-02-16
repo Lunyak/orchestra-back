@@ -74,7 +74,11 @@ export class LocalFileStorageService {
       await fs.unlink(p);
     } catch (err: any) {
       if (err?.code !== 'ENOENT') {
-        console.warn('[LocalFileStorage] deleteObject failed:', key, err?.message);
+        console.warn(
+          '[LocalFileStorage] deleteObject failed:',
+          key,
+          err?.message,
+        );
       }
     }
   }
