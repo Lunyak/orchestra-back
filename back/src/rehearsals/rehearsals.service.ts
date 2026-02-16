@@ -698,7 +698,7 @@ export class RehearsalsService {
       },
     });
     const memberEmails = uniq([
-      normEmail(project?.owner?.email),
+      normEmail(project?.owner?.email ?? ''),
       ...((project?.members ?? []).map((m: any) => normEmail(m?.user?.email)).filter(Boolean) as string[]),
     ]).filter(Boolean);
     const profiles =
