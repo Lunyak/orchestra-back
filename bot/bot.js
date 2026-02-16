@@ -52,7 +52,8 @@ function startHttpServer({ onPublishRehearsal }) {
         }
 
         if (url === "/internal/publish-rehearsal" && method === "POST") {
-          const secret = process.env.INTERNAL_API_SECRET;
+          const secret =
+            process.env.INTERNAL_API_SECRET || process.env.BOT_INTERNAL_SECRET;
           const got = req.headers["x-internal-secret"];
           if (!secret || String(got || "") !== String(secret)) {
             res.writeHead(401, { "Content-Type": "application/json" });

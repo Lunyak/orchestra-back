@@ -396,16 +396,33 @@ export class RehearsalsService {
     }
 
     const botUrl = this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
-    const secret = this.config.get<string>('BOT_INTERNAL_SECRET');
+    const secret =
+      this.config.get<string>('BOT_INTERNAL_SECRET') ||
+      this.config.get<string>('INTERNAL_API_SECRET');
     if (!secret) {
-      throw new BadRequestException('BOT_INTERNAL_SECRET is not configured');
+      throw new BadRequestException(
+        'Bot internal secret is not configured (set BOT_INTERNAL_SECRET in back env)',
+      );
     }
 
-    await axios.post(
-      `${botUrl.replace(/\/$/, '')}/internal/publish-rehearsal`,
-      { rehearsalId },
-      { headers: { 'X-Internal-Secret': secret } },
-    );
+    try {
+      await axios.post(
+        `${botUrl.replace(/\/$/, '')}/internal/publish-rehearsal`,
+        { rehearsalId },
+        { headers: { 'X-Internal-Secret': secret } },
+      );
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const msg =
+        e?.response?.data?.error ||
+        e?.response?.data?.message ||
+        e?.response?.data?.description ||
+        e?.message ||
+        'Unknown error';
+      throw new BadRequestException(
+        `Bot publish failed${status ? ` (HTTP ${status})` : ''}: ${String(msg)}`,
+      );
+    }
 
     // Бот сам пометит published через /bot/rehearsals/:id/published.
     return { ok: true };
