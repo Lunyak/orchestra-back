@@ -28,6 +28,15 @@ export const Header: React.FC<HeaderProps> = ({ scriptState }) => {
     };
   }, []);
 
+  // Закрываем панель при смене маршрута
+  useEffect(() => {
+    if (closeTimeoutRef.current !== null) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setIsOpen(false);
+  }, [location.pathname]);
+
   const handleMouseEnter = () => {
     if (closeTimeoutRef.current !== null) {
       clearTimeout(closeTimeoutRef.current);
