@@ -31,6 +31,8 @@ services:
       # Telegram Bot
       BOT_TOKEN: ${BOT_TOKEN}
       OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID}
+      # Bot -> Backend auth (/bot/*)
+      BOT_SECRET: ${BOT_SECRET}
       # Back -> Bot (internal publish)
       BOT_INTERNAL_URL: ${BOT_INTERNAL_URL:-http://bot:3001}
       BOT_INTERNAL_SECRET: ${BOT_INTERNAL_SECRET}
@@ -69,6 +71,8 @@ services:
       ANNOUNCEMENTS_THREAD_ID: ${ANNOUNCEMENTS_THREAD_ID:-14434}
       SPREADSHEET_ID: ${SPREADSHEET_ID}
       SERVER_URL: back:3000
+      # Bot -> Backend auth (/bot/*)
+      BOT_SECRET: ${BOT_SECRET}
       # Back -> Bot auth for /internal/*
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       HEALTH_PORT: 3001

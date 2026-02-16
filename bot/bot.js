@@ -69,9 +69,16 @@ function startHttpServer({ onPublishRehearsal }) {
             return;
           }
 
-          await onPublishRehearsal(rehearsalId);
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ ok: true }));
+          try {
+            await onPublishRehearsal(rehearsalId);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          } catch (e) {
+            const msg = String(e?.message || e || "publish_failed");
+            console.error("publish-rehearsal failed:", msg);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: msg }));
+          }
           return;
         }
 
@@ -80,7 +87,9 @@ function startHttpServer({ onPublishRehearsal }) {
       } catch (e) {
         console.error("HTTP server error:", e?.message || e);
         res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ ok: false, error: "internal_error" }));
+        res.end(
+          JSON.stringify({ ok: false, error: String(e?.message || e || "internal_error") }),
+        );
       }
     })
     .listen(HEALTH_PORT, "0.0.0.0", () => {
