@@ -340,9 +340,14 @@ export class RehearsalsService {
       selectedSceneIds,
       selectedSteps,
       scenes: scenes.map((s) => {
-        const raw = s.rawJson ?? {};
-        const steps = Array.isArray(raw?.steps)
-          ? (raw.steps as RawStepLike[])
+        const rawJson = s.rawJson;
+        const raw =
+          rawJson && typeof rawJson === 'object' && !Array.isArray(rawJson)
+            ? (rawJson as Record<string, unknown>)
+            : {};
+        const stepsValue = raw['steps'];
+        const steps = Array.isArray(stepsValue)
+          ? (stepsValue as RawStepLike[])
           : [];
         return {
           id: s.id,
