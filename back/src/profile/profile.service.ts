@@ -30,38 +30,40 @@ function sanitizeAvailabilityCalendar(
 function sanitizeCharacters(value: unknown): string[] | undefined {
   if (value === undefined) return undefined;
   if (value === null) return undefined;
-  
+
   // Если это уже массив
   if (Array.isArray(value)) {
     return value
-      .map(item => typeof item === 'string' ? item.trim() : String(item))
-      .filter(item => item.length > 0);
+      .map((item) => (typeof item === 'string' ? item.trim() : String(item)))
+      .filter((item) => item.length > 0);
   }
-  
+
   // Если это строка, пытаемся распарсить как JSON
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (trimmed === '') return undefined;
-    
+
     // Если строка начинается с [, пытаемся распарсить как JSON
     if (trimmed.startsWith('[')) {
       try {
         const parsed = JSON.parse(trimmed);
         if (Array.isArray(parsed)) {
           return parsed
-            .map(item => typeof item === 'string' ? item.trim() : String(item))
-            .filter(item => item.length > 0);
+            .map((item) =>
+              typeof item === 'string' ? item.trim() : String(item),
+            )
+            .filter((item) => item.length > 0);
         }
       } catch (e) {
         // Если не получилось распарсить, возвращаем как одноэлементный массив
         return [trimmed];
       }
     }
-    
+
     // Иначе это одна строка
     return [trimmed];
   }
-  
+
   return undefined;
 }
 
@@ -101,7 +103,9 @@ export class ProfileService {
         characters: sanitizeCharacters(dto.characters),
         phone: clean(dto.phone),
         birthday: clean(dto.birthday),
-        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
+        availabilityCalendar: sanitizeAvailabilityCalendar(
+          dto.availabilityCalendar,
+        ),
       },
     });
   }
@@ -110,7 +114,7 @@ export class ProfileService {
     const existing = await this.prisma.userProfile.findUnique({
       where: { telegramId },
     });
-    
+
     if (!existing) {
       // Если профиль не существует, создаем его
       return this.createByTelegramId(telegramId, dto);
@@ -130,7 +134,9 @@ export class ProfileService {
         characters: dto.characters !== undefined ? dto.characters : undefined,
         phone: clean(dto.phone),
         birthday: clean(dto.birthday),
-        availabilityCalendar: sanitizeAvailabilityCalendar(dto.availabilityCalendar),
+        availabilityCalendar: sanitizeAvailabilityCalendar(
+          dto.availabilityCalendar,
+        ),
       },
     });
   }

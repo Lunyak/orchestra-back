@@ -15,7 +15,28 @@ function normEmail(v: string): string {
 }
 
 function parseIsoDate(v: string): Date {
-  const d = dayjs(v, ['YYYY-MM-DD', 'YYYY-MM-DDTHH:mm:ss.SSSZ', 'YYYY-MM-DDTHH:mm:ss'], true);
+  const s = String(v ?? '').trim();
+  if (!s) throw new BadRequestException('Invalid date');
+
+  // Support:
+  // - Date only: 2026-02-16
+  // - Full ISO with offset: 2026-02-16T19:00:00.000+03:00
+  // - Full ISO with Z: 2026-02-16T19:00:00.000Z (toISOString())
+  // Keep strict formats first, then fallback to Dayjs native ISO parsing.
+  const strict = dayjs(
+    s,
+    [
+      'YYYY-MM-DD',
+      'YYYY-MM-DDTHH:mm:ss.SSSZ',
+      'YYYY-MM-DDTHH:mm:ssZ',
+      'YYYY-MM-DDTHH:mm:ss.SSS[Z]',
+      'YYYY-MM-DDTHH:mm:ss[Z]',
+      'YYYY-MM-DDTHH:mm:ss.SSS',
+      'YYYY-MM-DDTHH:mm:ss',
+    ],
+    true,
+  );
+  const d = strict.isValid() ? strict : dayjs(s);
   if (!d.isValid()) throw new BadRequestException('Invalid date');
   return d.toDate();
 }

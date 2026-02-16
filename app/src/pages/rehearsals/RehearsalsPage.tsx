@@ -22,6 +22,32 @@ function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
 
+function ruDateFromIsoYmd(isoYmd: string): string {
+  const d = dayjs(isoYmd, "YYYY-MM-DD", true);
+  return d.isValid() ? d.format("DD.MM.YYYY") : isoYmd;
+}
+
+function ruShortFromIsoYmd(isoYmd: string): string {
+  const d = dayjs(isoYmd, "YYYY-MM-DD", true);
+  return d.isValid() ? d.format("DD.MM") : isoYmd;
+}
+
+function parseRuOrIsoYmdToIsoYmd(input: string): string | null {
+  const s = String(input ?? "").trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return null;
+  const dd = Number(m[1]);
+  const mm = Number(m[2]);
+  const yyyy = Number(m[3]);
+  if (!yyyy || mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  const iso = `${String(yyyy).padStart(4, "0")}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  const dt = dayjs(iso, "YYYY-MM-DD", true);
+  if (!dt.isValid()) return null;
+  return dt.format("YYYY-MM-DD");
+}
+
 function startOfWeekMonday(now: Date): Date {
   return dayjs(now).startOf("isoWeek").toDate();
 }
@@ -54,12 +80,12 @@ export function RehearsalsPage() {
     [projectMembers],
   );
 
-  const [weekStart, setWeekStart] = useState(() => {
+  const [{ weekStart, weekStartText }, setWeekState] = useState(() => {
     const saved = localStorage.getItem("rehearsals-calendar-week");
-    if (saved && /^\d{4}-\d{2}-\d{2}$/.test(saved)) {
-      return saved;
-    }
-    return isoDate(startOfWeekMonday(new Date()));
+    const iso =
+      (saved ? parseRuOrIsoYmdToIsoYmd(saved) : null) ??
+      isoDate(startOfWeekMonday(new Date()));
+    return { weekStart: iso, weekStartText: ruDateFromIsoYmd(iso) };
   });
   const [activeDay, setActiveDay] = useState(0);
 
@@ -216,11 +242,11 @@ export function RehearsalsPage() {
                   type="button"
                   className={`rehearsals-day ${active ? "active" : ""}`}
                   onClick={() => setActiveDay(idx)}
-                  title={date}
+                  title={ruDateFromIsoYmd(date)}
                 >
                   <div className="rehearsals-day-top">{lbl}</div>
                   <div className="rehearsals-day-bottom">
-                    {date.slice(5)}{count ? ` · ${count}` : ""}
+                    {ruShortFromIsoYmd(date)}{count ? ` · ${count}` : ""}
                   </div>
                 </button>
               );
@@ -231,9 +257,16 @@ export function RehearsalsPage() {
             <label className="rehearsals-tool">
               <span>Неделя с</span>
               <input
-                value={weekStart}
-                onChange={(e) => setWeekStart(e.target.value)}
-                placeholder="YYYY-MM-DD"
+                value={weekStartText}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const iso = parseRuOrIsoYmdToIsoYmd(raw);
+                  setWeekState((prev) => ({
+                    weekStart: iso ?? prev.weekStart,
+                    weekStartText: iso ? ruDateFromIsoYmd(iso) : raw,
+                  }));
+                }}
+                placeholder="ДД.ММ.ГГГГ"
               />
             </label>
             <button type="button" onClick={createForDay} disabled={loading}>
@@ -285,7 +318,7 @@ export function RehearsalsPage() {
             <div className="rehearsals-card">
               <div className="rehearsals-card-title">{activeRehearsal.title}</div>
               <div className="rehearsals-card-sub">
-                {new Date(activeRehearsal.startsAt).toLocaleString()}
+                {dayjs(activeRehearsal.startsAt).format("DD.MM.YYYY HH:mm")}
               </div>
 
               <div className="rehearsals-section">
