@@ -137,6 +137,35 @@ function parseAvailabilityCalendar(value: unknown): AvailabilityCalendar {
   return out;
 }
 
+function parseStringArrayJson(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.map((x) => String(x ?? '').trim()).filter(Boolean);
+  }
+  // Prisma JSONB может прийти как объект/строка — но нам нужен только массив
+  return [];
+}
+
+type SelectedStepRef = { sceneId: string; stepId: number };
+
+function parseSelectedStepsJson(value: unknown): SelectedStepRef[] {
+  if (!value || !Array.isArray(value)) return [];
+  const out: SelectedStepRef[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== 'object') continue;
+    const sceneId = String((item as any).sceneId ?? '').trim();
+    const stepIdRaw = (item as any).stepId;
+    const stepId = typeof stepIdRaw === 'number' ? Math.trunc(stepIdRaw) : parseInt(String(stepIdRaw ?? ''), 10);
+    if (!sceneId) continue;
+    if (!Number.isFinite(stepId) || stepId <= 0) continue;
+    out.push({ sceneId, stepId });
+  }
+  // uniq by sceneId+stepId
+  const map = new Map<string, SelectedStepRef>();
+  for (const x of out) map.set(`${x.sceneId}:${x.stepId}`, x);
+  return Array.from(map.values());
+}
+
 @Injectable()
 export class RehearsalsService {
   constructor(
@@ -249,9 +278,56 @@ export class RehearsalsService {
         startsAt: dto.startsAt != null ? parseIsoDate(dto.startsAt) : undefined,
         durationMin: dto.durationMin != null ? dto.durationMin : undefined,
         notes: dto.notes != null ? dto.notes.trim() || null : undefined,
+        selectedSceneIds:
+          dto.selectedSceneIds != null
+            ? dto.selectedSceneIds.map((x) => String(x ?? '').trim()).filter(Boolean)
+            : undefined,
+        selectedSteps:
+          dto.selectedSteps != null
+            ? parseSelectedStepsJson(dto.selectedSteps as any)
+            : undefined,
       },
       include: { participants: true },
     });
+  }
+
+  async getStepsForRehearsal(userId: string, rehearsalId: string) {
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+      include: { project: { select: { id: true, slug: true, name: true } } },
+    });
+    if (!reh) throw new NotFoundException('Rehearsal not found');
+    await this.assertUserHasProjectAccess(userId, reh.projectId, false);
+
+    const scenes = await this.prisma.scene.findMany({
+      where: { projectId: reh.projectId, deletedAt: null },
+      select: { id: true, name: true, rawJson: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const selectedSceneIds = parseStringArrayJson((reh as any)?.selectedSceneIds);
+    const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
+
+    return {
+      rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt },
+      selectedSceneIds,
+      selectedSteps,
+      scenes: scenes.map((s) => {
+        const raw = (s.rawJson as any) ?? {};
+        const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+        return {
+          id: s.id,
+          name: s.name,
+          steps: steps
+            .map((st) => ({
+              id: typeof st.id === 'number' ? st.id : null,
+              title: String(st.title ?? '').trim() || (st.id != null ? `Step ${String(st.id)}` : 'Step'),
+            }))
+            .filter((x) => x.id != null)
+            .slice(0, 200),
+        };
+      }),
+    };
   }
 
   async setParticipants(userId: string, rehearsalId: string, dto: SetParticipantsDto) {
@@ -296,11 +372,14 @@ export class RehearsalsService {
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, false);
 
-    const presentEmails = new Set(
-      reh.participants
-        .filter((p) => p.status === 'present' || p.status === 'late')
-        .map((p) => normEmail(p.email))
-        .filter(Boolean),
+    // Важно: планирование должно опираться на календарь занятости в профиле (availabilityCalendar),
+    // а не на "явку по вызову" (attendance) из participants.
+    // Attendance используем только как доп. информацию (например lateTime для сдвига доступности),
+    // но не как критерий готовности шага.
+    const attendanceByEmail = new Map(
+      (reh.participants ?? [])
+        .map((p) => [normEmail(p.email), p] as const)
+        .filter((x) => x[0]),
     );
 
     // Время доступности участника: present -> с начала, late -> с указанного времени (если распарсили HH:MM), иначе с начала.
@@ -309,26 +388,52 @@ export class RehearsalsService {
     const rehearsalDurationMin = reh.durationMin ?? 120;
     const rehearsalEndMin = rehearsalStartMin + rehearsalDurationMin;
     const availableFromByEmail = new Map<string, number>();
-    for (const p of reh.participants) {
-      const email = normEmail(p.email);
+    for (const [email, p] of attendanceByEmail.entries()) {
       if (!email) continue;
-      if (p.status === 'absent') continue;
-      if (p.status !== 'present' && p.status !== 'late') continue;
-      if (p.status === 'present') {
-        availableFromByEmail.set(email, rehearsalStartMin);
-        continue;
-      }
+      if (p?.status !== 'late') continue;
       const parsed = extractTimeHHMM((p as any)?.lateTime);
-      if (!parsed) {
-        availableFromByEmail.set(email, rehearsalStartMin);
-        continue;
-      }
+      if (!parsed) continue;
       const mins = parsed.hh * 60 + parsed.mm;
       availableFromByEmail.set(email, Math.max(rehearsalStartMin, mins));
     }
 
+    const selectedSceneIds = parseStringArrayJson((reh as any)?.selectedSceneIds);
+    const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
+    const allowedStepsBySceneId = new Map<string, Set<number>>();
+    for (const x of selectedSteps) {
+      const set = allowedStepsBySceneId.get(x.sceneId) ?? new Set<number>();
+      set.add(x.stepId);
+      allowedStepsBySceneId.set(x.sceneId, set);
+    }
+    const allowedSceneIdsFromSteps = new Set<string>(selectedSteps.map((x) => x.sceneId));
+    const effectiveSceneIds =
+      selectedSceneIds.length > 0
+        ? selectedSceneIds
+        : selectedSteps.length > 0
+          ? Array.from(allowedSceneIdsFromSteps)
+          : [];
+
+    if (selectedSteps.length === 0) {
+      return {
+        rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt, project: reh.project },
+        selectionRequired: true,
+        availableEmails: [] as string[],
+        items: [] as any[],
+        timeline: {
+          rehearsalStartTime: minutesToHHMM(rehearsalStartMin),
+          rehearsalEndTime: minutesToHHMM(rehearsalEndMin),
+          durationMin: rehearsalDurationMin,
+          scheduledMin: 0,
+          steps: [] as any[],
+        },
+      };
+    }
     const scenes = await this.prisma.scene.findMany({
-      where: { projectId: reh.projectId, deletedAt: null },
+      where: {
+        projectId: reh.projectId,
+        deletedAt: null,
+        ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
+      },
       select: { id: true, name: true, rawJson: true },
     });
 
@@ -362,6 +467,13 @@ export class RehearsalsService {
     );
     const rehearsalDateKey = getDateKey(reh.startsAt);
 
+    const availabilityStatusByEmail = new Map<string, 'present' | 'absent' | 'unknown'>();
+    for (const email of castEmailList) {
+      const calendar = availabilityByEmail.get(email);
+      const st = calendar?.[rehearsalDateKey];
+      availabilityStatusByEmail.set(email, st === 'present' || st === 'absent' ? st : 'unknown');
+    }
+
     const items: Array<{
       sceneId: string;
       sceneName: string;
@@ -380,6 +492,9 @@ export class RehearsalsService {
       const raw = scene.rawJson as any;
       const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
       for (const step of steps) {
+        const allowed = allowedStepsBySceneId.get(scene.id);
+        if (allowed && typeof step.id === 'number' && !allowed.has(step.id)) continue;
+        if (allowed && typeof step.id !== 'number') continue;
         const text = (step.playMarkdown ?? step.markdown ?? '') as string;
         const roles = extractRolesSmart(text);
         const cast = step.cast ?? {};
@@ -403,10 +518,11 @@ export class RehearsalsService {
             continue;
           }
           const email = normEmail(assigned);
-          if (!presentEmails.has(email)) missing.push(`${role}: нет (${email})`);
-          const calendar = availabilityByEmail.get(email);
-          if (calendar?.[rehearsalDateKey] === 'absent') {
+          const availability = availabilityStatusByEmail.get(email) ?? 'unknown';
+          if (availability === 'absent') {
             missing.push(`${role}: занят (${email})`);
+          } else if (availability !== 'present') {
+            missing.push(`${role}: не отметил присутствие (${email})`);
           }
 
           const fromMin = availableFromByEmail.get(email) ?? rehearsalStartMin;
@@ -490,7 +606,7 @@ export class RehearsalsService {
 
     return {
       rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt, project: reh.project },
-      presentEmails: Array.from(presentEmails),
+      availableEmails: castEmailList.filter((e) => (availabilityStatusByEmail.get(e) ?? 'unknown') === 'present'),
       items,
       timeline: {
         rehearsalStartTime: minutesToHHMM(rehearsalStartMin),
@@ -518,6 +634,110 @@ export class RehearsalsService {
     if (reh.telegramMessageId) {
       return { ok: true, published: reh };
     }
+
+    // Перед публикацией формируем "опрос" (participants) только из тех,
+    // кто (1) нужен по выбранным сценам, и (2) в профиле отметил присутствие (availabilityCalendar: present) на дату репетиции.
+    // Те, кто отметил absent или не отметил ничего — в опрос не попадают.
+    const rehearsalDateKey = getDateKey(reh.startsAt);
+
+    const selectedSceneIds = parseStringArrayJson((reh as any)?.selectedSceneIds);
+    const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
+    const allowedStepsBySceneId = new Map<string, Set<number>>();
+    for (const x of selectedSteps) {
+      const set = allowedStepsBySceneId.get(x.sceneId) ?? new Set<number>();
+      set.add(x.stepId);
+      allowedStepsBySceneId.set(x.sceneId, set);
+    }
+    const allowedSceneIdsFromSteps = new Set<string>(selectedSteps.map((x) => x.sceneId));
+    const effectiveSceneIds =
+      selectedSceneIds.length > 0
+        ? selectedSceneIds
+        : selectedSteps.length > 0
+          ? Array.from(allowedSceneIdsFromSteps)
+          : [];
+    const scenes = await this.prisma.scene.findMany({
+      where: {
+        projectId: reh.projectId,
+        deletedAt: null,
+        ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
+      },
+      select: { id: true, name: true, rawJson: true },
+    });
+    if (effectiveSceneIds.length && scenes.length === 0) {
+      throw new BadRequestException('Выбранные сцены не найдены');
+    }
+    if (scenes.length === 0) {
+      throw new BadRequestException('Перед публикацией выберите сцены для репетиции');
+    }
+    if (selectedSteps.length === 0) {
+      throw new BadRequestException('Перед публикацией выберите сцены (шаги) для репетиции');
+    }
+
+    const neededEmails = new Set<string>();
+    for (const scene of scenes) {
+      const raw = (scene as any).rawJson as any;
+      const steps = Array.isArray(raw?.steps) ? (raw.steps as RawStepLike[]) : [];
+      for (const step of steps) {
+        const allowed = allowedStepsBySceneId.get(scene.id);
+        if (allowed && typeof step.id === 'number' && !allowed.has(step.id)) continue;
+        if (allowed && typeof step.id !== 'number') continue;
+        const cast = step.cast ?? {};
+        for (const rawAssigned of Object.values(cast)) {
+          const assigned = String(rawAssigned ?? '').trim();
+          if (!looksLikeEmail(assigned)) continue;
+          neededEmails.add(normEmail(assigned));
+        }
+      }
+    }
+
+    const project = await this.prisma.project.findUnique({
+      where: { id: reh.projectId },
+      select: {
+        owner: { select: { email: true } },
+        members: { select: { user: { select: { email: true } } } },
+      },
+    });
+    const memberEmails = uniq([
+      normEmail(project?.owner?.email),
+      ...((project?.members ?? []).map((m: any) => normEmail(m?.user?.email)).filter(Boolean) as string[]),
+    ]).filter(Boolean);
+    const profiles =
+      memberEmails.length > 0
+        ? await this.prisma.userProfile.findMany({
+            where: { email: { in: memberEmails.filter((e) => neededEmails.has(normEmail(e))) } },
+            select: { email: true, availabilityCalendar: true, displayName: true, firstName: true, lastName: true, telegramId: true },
+          })
+        : [];
+    const present = profiles
+      .map((p) => {
+        const email = normEmail(p.email);
+        const calendar = parseAvailabilityCalendar(p.availabilityCalendar);
+        const st = calendar?.[rehearsalDateKey];
+        if (st !== 'present') return null;
+        const userName =
+          String(p.displayName ?? '').trim() ||
+          [p.firstName, p.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ') ||
+          null;
+        return { email, userName, telegramId: p.telegramId ? String(p.telegramId).trim() || null : null };
+      })
+      .filter(Boolean) as Array<{ email: string; userName: string | null; telegramId: string | null }>;
+
+    if (present.length === 0) {
+      throw new BadRequestException(
+        `Нельзя опубликовать репетицию: среди нужных по сценам никто не отметил присутствие в профиле на ${rehearsalDateKey}`,
+      );
+    }
+
+    await this.prisma.rehearsalParticipant.deleteMany({ where: { rehearsalId } });
+    await this.prisma.rehearsalParticipant.createMany({
+      data: present.map((p) => ({
+        rehearsalId,
+        email: p.email,
+        status: 'unknown' as any,
+        userName: p.userName,
+        telegramId: p.telegramId,
+      })),
+    });
 
     const botUrl = this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
     const secret =

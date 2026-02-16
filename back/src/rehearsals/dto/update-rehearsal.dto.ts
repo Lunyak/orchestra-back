@@ -1,4 +1,22 @@
-import { IsInt, IsISO8601, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsArray,
+  IsInt,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  ValidateNested,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+
+class SelectedStepDto {
+  @IsString()
+  sceneId!: string;
+
+  @IsInt()
+  stepId!: number;
+}
 
 export class UpdateRehearsalDto {
   @IsOptional()
@@ -18,5 +36,16 @@ export class UpdateRehearsalDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  selectedSceneIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SelectedStepDto)
+  selectedSteps?: SelectedStepDto[];
 }
 

@@ -54,7 +54,7 @@ function sanitizeCharacters(value: unknown): string[] | undefined {
             )
             .filter((item) => item.length > 0);
         }
-      } catch (e) {
+      } catch {
         // Если не получилось распарсить, возвращаем как одноэлементный массив
         return [trimmed];
       }
@@ -71,9 +71,33 @@ function sanitizeCharacters(value: unknown): string[] | undefined {
 export class ProfileService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getManyByEmails(emails: string[]) {
+    const normalized = Array.from(
+      new Set(
+        (Array.isArray(emails) ? emails : [])
+          .map((e) => String(e ?? '').trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+
+    if (normalized.length === 0) return [];
+
+    return await this.prisma.userProfile.findMany({
+      where: { email: { in: normalized } },
+      select: {
+        email: true,
+        displayName: true,
+        firstName: true,
+        lastName: true,
+        telegramId: true,
+        availabilityCalendar: true,
+      },
+    });
+  }
+
   async getOrCreateByEmail(email: string) {
     const normalized = email.trim().toLowerCase();
-    return this.prisma.userProfile.upsert({
+    return await this.prisma.userProfile.upsert({
       where: { email: normalized },
       update: {},
       create: { email: normalized },
@@ -81,7 +105,7 @@ export class ProfileService {
   }
 
   async getByTelegramId(telegramId: string) {
-    return this.prisma.userProfile.findUnique({
+    return await this.prisma.userProfile.findUnique({
       where: { telegramId },
     });
   }
@@ -89,7 +113,7 @@ export class ProfileService {
   async createByTelegramId(telegramId: string, dto: UpdateProfileDto) {
     // Используем email по умолчанию если не указан
     const email = dto.email || `telegram_${telegramId}@temp.local`;
-    return this.prisma.userProfile.create({
+    return await this.prisma.userProfile.create({
       data: {
         email: email.trim().toLowerCase(),
         telegramId,
@@ -120,7 +144,7 @@ export class ProfileService {
       return this.createByTelegramId(telegramId, dto);
     }
 
-    return this.prisma.userProfile.update({
+    return await this.prisma.userProfile.update({
       where: { telegramId },
       data: {
         email: dto.email ? dto.email.trim().toLowerCase() : undefined,
@@ -143,7 +167,7 @@ export class ProfileService {
 
   async updateByEmail(email: string, dto: UpdateProfileDto) {
     const normalized = email.trim().toLowerCase();
-    return this.prisma.userProfile.upsert({
+    return await this.prisma.userProfile.upsert({
       where: { email: normalized },
       update: {
         displayName: clean(dto.displayName),

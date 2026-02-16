@@ -30,6 +30,11 @@ export class RehearsalsController {
     return this.rehearsals.get(req.user.userId, id);
   }
 
+  @Get(':id/steps')
+  steps(@Req() req: any, @Param('id') id: string) {
+    return this.rehearsals.getStepsForRehearsal(req.user.userId, id);
+  }
+
   @Patch(':id')
   update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateRehearsalDto) {
     return this.rehearsals.update(req.user.userId, id, body);

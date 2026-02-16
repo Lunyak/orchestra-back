@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import {
   createRehearsal,
   getRehearsal,
+  getRehearsalSteps,
   listRehearsals,
+  getProfilesBatch,
   planRehearsal,
   publishRehearsal,
-  setRehearsalParticipants,
+  updateRehearsal,
   type Rehearsal,
-  type RehearsalParticipantStatus,
+  type TeamProfile,
+  type RehearsalSelectedStep,
 } from "../../sync/api";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
@@ -75,6 +78,14 @@ export function RehearsalsPage() {
 
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [stepsLoading, setStepsLoading] = useState(false);
+  const [stepsError, setStepsError] = useState<string | null>(null);
+  const [stepsOptions, setStepsOptions] = useState<
+    Array<{ id: string; name: string; steps: Array<{ id: number; title: string }> }>
+  >([]);
+  const [selectedSteps, setSelectedSteps] = useState<RehearsalSelectedStep[]>([]);
+  const [savingSteps, setSavingSteps] = useState(false);
+  const [saveStepsError, setSaveStepsError] = useState<string | null>(null);
 
   const rehearsalsByDate = useMemo(() => {
     const grouped = new Map<string, Rehearsal[]>();
@@ -95,12 +106,39 @@ export function RehearsalsPage() {
 
   const rehearsalsForSelectedDay = rehearsalsByDate.get(calendarState.selectedDate) ?? [];
 
-  const participantsMap = useMemo(() => {
-    const map = new Map<string, RehearsalParticipantStatus>();
-    const ps = activeRehearsal?.participants ?? [];
-    ps.forEach((p) => map.set(normalizeEmail(p.email), p.status));
+  const [teamProfiles, setTeamProfiles] = useState<TeamProfile[]>([]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const emails = members.map((m) => normalizeEmail(m.email)).filter(Boolean);
+    if (emails.length === 0) {
+      setTeamProfiles([]);
+      return;
+    }
+    let cancelled = false;
+    getProfilesBatch(accessToken, emails)
+      .then((rows) => {
+        if (cancelled) return;
+        setTeamProfiles(rows ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTeamProfiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, members]);
+
+  const teamProfileByEmail = useMemo(() => {
+    const map = new Map<string, TeamProfile>();
+    for (const p of teamProfiles ?? []) {
+      const e = normalizeEmail(p.email);
+      if (!e) continue;
+      map.set(e, p);
+    }
     return map;
-  }, [activeRehearsal]);
+  }, [teamProfiles]);
 
   const [planCache, setPlanCache] = useState<Record<string, { notReady: number }>>({});
 
@@ -131,7 +169,9 @@ export function RehearsalsPage() {
     Promise.all(
       missing.slice(0, 20).map(async (id) => {
         const data = await planRehearsal(accessToken, id);
-        const notReady = (data.items ?? []).filter((x: any) => !x.ready).length;
+        const notReady = data?.selectionRequired
+          ? 1
+          : (data.items ?? []).filter((x: any) => !x.ready).length;
         return { id, notReady };
       }),
     )
@@ -163,28 +203,6 @@ export function RehearsalsPage() {
       [...prev, created].sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt)),
     );
     setActiveRehearsalId(created.id);
-
-    await setRehearsalParticipants(accessToken, created.id, {
-      participants: members.map((m) => ({ email: m.email, status: "unknown" as const })),
-    });
-  };
-
-  const setStatus = async (email: string, status: RehearsalParticipantStatus) => {
-    if (!accessToken || !activeRehearsal) return;
-    const nextParticipants = members.map((m) => {
-      const e = normalizeEmail(m.email);
-      const current = participantsMap.get(e) ?? "unknown";
-      return { email: m.email, status: e === normalizeEmail(email) ? status : current };
-    });
-    const updated = await setRehearsalParticipants(accessToken, activeRehearsal.id, {
-      participants: nextParticipants,
-    });
-    setRehearsals((prev) => prev.map((r) => (r.id === updated?.id ? (updated as any) : r)));
-    setPlanCache((p) => {
-      const next = { ...p };
-      delete next[activeRehearsal.id];
-      return next;
-    });
   };
 
   const doPublish = async () => {
@@ -206,6 +224,65 @@ export function RehearsalsPage() {
       setPublishError("Не удалось опубликовать репетицию в чат");
     } finally {
       setPublishing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!accessToken || !activeRehearsal?.id) {
+      setStepsOptions([]);
+      setSelectedSteps([]);
+      return;
+    }
+    setStepsLoading(true);
+    setStepsError(null);
+    let cancelled = false;
+    getRehearsalSteps(accessToken, activeRehearsal.id)
+      .then((res) => {
+        if (cancelled) return;
+        setStepsOptions(res.scenes ?? []);
+        setSelectedSteps(res.selectedSteps ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setStepsOptions([]);
+        setSelectedSteps([]);
+        setStepsError("Не удалось загрузить список сцен");
+      })
+      .finally(() => {
+        if (!cancelled) setStepsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, activeRehearsal?.id]);
+
+  const toggleStep = (sceneId: string, stepId: number) => {
+    setSelectedSteps((prev) => {
+      const key = `${sceneId}:${stepId}`;
+      const has = prev.some((x) => `${x.sceneId}:${x.stepId}` === key);
+      if (has) return prev.filter((x) => `${x.sceneId}:${x.stepId}` !== key);
+      return [...prev, { sceneId, stepId }];
+    });
+  };
+
+  const saveSelectedSteps = async () => {
+    if (!accessToken || !activeRehearsal) return;
+    setSavingSteps(true);
+    setSaveStepsError(null);
+    try {
+      const updated = await updateRehearsal(accessToken, activeRehearsal.id, {
+        selectedSteps,
+      });
+      setRehearsals((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setPlanCache((p) => {
+        const next = { ...p };
+        delete next[activeRehearsal.id];
+        return next;
+      });
+    } catch {
+      setSaveStepsError("Не удалось сохранить выбранные сцены");
+    } finally {
+      setSavingSteps(false);
     }
   };
 
@@ -297,13 +374,22 @@ export function RehearsalsPage() {
               <div className="rehearsals-section">
                 <div className="rehearsals-section-title">Публикация в чат</div>
                 <div style={{ display: "grid", gap: 8 }}>
+                  <div className="rehearsals-muted" style={{ fontSize: 12 }}>
+                    Сначала выбери сцены (шаги) для репетиции. В опрос попадут только те актёры, которые нужны по выбранным сценам и отметили «свободен» в профиле.
+                  </div>
                   <button
                     type="button"
                     onClick={doPublish}
-                    disabled={publishing || !!activeRehearsal.telegramMessageId}
+                    disabled={
+                      publishing ||
+                      !!activeRehearsal.telegramMessageId ||
+                      !(activeRehearsal.selectedSteps?.length ?? 0)
+                    }
                     title={
                       activeRehearsal.telegramMessageId
                         ? "Уже опубликовано"
+                        : !(activeRehearsal.selectedSteps?.length ?? 0)
+                          ? "Сначала выберите и сохраните сцены (шаги)"
                         : "Опубликовать репетицию в Telegram-чате"
                     }
                   >
@@ -323,37 +409,98 @@ export function RehearsalsPage() {
               </div>
 
               <div className="rehearsals-section">
+                <div className="rehearsals-section-title">Сцены на репетицию</div>
+                {stepsLoading ? (
+                  <div className="rehearsals-muted">Загрузка…</div>
+                ) : stepsError ? (
+                  <div className="rehearsals-error">{stepsError}</div>
+                ) : stepsOptions.length === 0 ? (
+                  <div className="rehearsals-muted">Сцен пока нет.</div>
+                ) : (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <div className="rehearsals-muted" style={{ fontSize: 12 }}>
+                      Выбрано: {selectedSteps.length}
+                    </div>
+                    <div style={{ maxHeight: 220, overflow: "auto", paddingRight: 6 }}>
+                      {stepsOptions.slice(0, 10).map((sc) => (
+                        <div key={sc.id} style={{ marginBottom: 10 }}>
+                          <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+                            {sc.name}
+                          </div>
+                          <div style={{ display: "grid", gap: 6 }}>
+                            {sc.steps.slice(0, 200).map((st) => {
+                              const checked = selectedSteps.some(
+                                (x) => x.sceneId === sc.id && x.stepId === st.id,
+                              );
+                              return (
+                                <label
+                                  key={`${sc.id}:${st.id}`}
+                                  style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleStep(sc.id, st.id)}
+                                  />
+                                  <span style={{ fontSize: 12, lineHeight: 1.2 }}>
+                                    {st.id}. {st.title}
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" onClick={saveSelectedSteps} disabled={savingSteps}>
+                      {savingSteps ? "Сохраняю…" : "Сохранить сцены"}
+                    </button>
+                    {saveStepsError && <div className="rehearsals-error">{saveStepsError}</div>}
+                  </div>
+                )}
+              </div>
+
+              <div className="rehearsals-section">
                 <div className="rehearsals-section-title">Кто придёт</div>
                 <div className="rehearsals-people">
                   {members.map((m) => {
-                    const st = participantsMap.get(normalizeEmail(m.email)) ?? "unknown";
                     const meta = (activeRehearsal.participants ?? []).find(
                       (p) => normalizeEmail(p.email) === normalizeEmail(m.email),
                     );
+                    const dateKey = isoDate(new Date(activeRehearsal.startsAt));
+                    const prof = teamProfileByEmail.get(normalizeEmail(m.email));
+                    const availability =
+                      (prof?.availabilityCalendar as any)?.[dateKey] === "present"
+                        ? ("present" as const)
+                        : (prof?.availabilityCalendar as any)?.[dateKey] === "absent"
+                          ? ("absent" as const)
+                          : ("unknown" as const);
                     return (
                       <div key={m.email} className="rehearsals-person">
                         <div className="rehearsals-person-label">{formatMemberLabel(m)}</div>
+                        <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                          занятость:{" "}
+                          {availability === "present"
+                            ? "свободен"
+                            : availability === "absent"
+                              ? "занят"
+                              : "не отмечено"}
+                        </div>
                         {meta?.respondedAt && (
                           <div className="rehearsals-muted" style={{ fontSize: 11 }}>
                             ответ: {dayjs(meta.respondedAt).format("DD.MM HH:mm")}
                           </div>
                         )}
-                        {st === "late" && meta?.lateTime && (
+                        {meta?.status === "late" && meta?.lateTime && (
                           <div className="rehearsals-muted" style={{ fontSize: 11 }}>
                             будет к: {meta.lateTime}
                           </div>
                         )}
-                        <select
-                          value={st}
-                          onChange={(e) =>
-                            setStatus(m.email, e.target.value as RehearsalParticipantStatus)
-                          }
-                        >
-                          <option value="unknown">?</option>
-                          <option value="present">придёт</option>
-                          <option value="absent">не придёт</option>
-                          <option value="late">свое время</option>
-                        </select>
+                        {meta?.status && meta.status !== "unknown" && (
+                          <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                            по вызову: {meta.status === "present" ? "буду" : meta.status === "absent" ? "не буду" : "свое время"}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -399,6 +546,9 @@ function RehearsalPlanBlock({
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
   if (loading) return <div className="rehearsals-muted">Считаю…</div>;
   if (error) return <div className="rehearsals-error">{error}</div>;
+  if (data?.selectionRequired) {
+    return <div className="rehearsals-muted">Сначала выбери сцены (шаги) для этой репетиции.</div>;
+  }
   const items = (data?.items ?? []) as Array<{
     ready: boolean;
     stepTitle: string;

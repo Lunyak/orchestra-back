@@ -88,6 +88,10 @@ model Rehearsal {
   durationMin   Int?
   notes         String?
   place         String?  // Место проведения репетиции
+  /// Выбранные сцены на эту репетицию (массив id сцен). Если null/пусто — значит "не выбрано".
+  selectedSceneIds Json?
+  /// Выбранные "сцены" (шаги) на эту репетицию: [{ sceneId, stepId }]
+  selectedSteps Json?
   telegramChatId       String?  // ID группы в Telegram
   telegramMessageId    String?  // ID сообщения опроса в Telegram
   telegramThreadId     String?  // ID топика в группе

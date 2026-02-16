@@ -19,13 +19,23 @@ export class ProfileController {
   // Защищенные эндпоинты (требуют JWT)
   @UseGuards(JwtAuthGuard)
   @Get()
-  getMyProfile(@Req() req: any) {
+  getMyProfile(@Req() req: { user: { email: string } }) {
     return this.profileService.getOrCreateByEmail(req.user.email);
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('batch')
+  getProfilesBatch(@Body() body: { emails?: string[] }) {
+    const emails = Array.isArray(body?.emails) ? body.emails : [];
+    return this.profileService.getManyByEmails(emails);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch()
-  updateMyProfile(@Req() req: any, @Body() body: UpdateProfileDto) {
+  updateMyProfile(
+    @Req() req: { user: { email: string } },
+    @Body() body: UpdateProfileDto,
+  ) {
     return this.profileService.updateByEmail(req.user.email, body);
   }
 

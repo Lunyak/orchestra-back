@@ -264,11 +264,32 @@ export interface MyProfile {
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
 }
 
+export interface TeamProfile {
+  email: string;
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  telegramId?: string | null;
+  availabilityCalendar?: Record<string, "present" | "absent"> | null;
+}
+
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {
   const { data } = await api.get<MyProfile>("/profile", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return data;
+}
+
+export async function getProfilesBatch(
+  accessToken: string,
+  emails: string[],
+): Promise<TeamProfile[]> {
+  const { data } = await api.post<TeamProfile[]>(
+    "/profile/batch",
+    { emails },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data ?? [];
 }
 
 export async function updateMyProfile(
@@ -293,6 +314,8 @@ export interface RehearsalParticipant {
   respondedAt?: string | null;
 }
 
+export type RehearsalSelectedStep = { sceneId: string; stepId: number };
+
 export interface Rehearsal {
   id: string;
   title: string;
@@ -300,11 +323,47 @@ export interface Rehearsal {
   durationMin?: number | null;
   notes?: string | null;
   place?: string | null;
+  selectedSceneIds?: string[] | null;
+  selectedSteps?: RehearsalSelectedStep[] | null;
   telegramChatId?: string | null;
   telegramMessageId?: string | null;
   telegramThreadId?: string | null;
   publishedAt?: string | null;
   participants?: RehearsalParticipant[];
+}
+
+export async function updateRehearsal(
+  accessToken: string,
+  rehearsalId: string,
+  patch: Partial<
+    Pick<
+      Rehearsal,
+      "title" | "startsAt" | "durationMin" | "notes" | "selectedSceneIds" | "selectedSteps"
+    >
+  >,
+): Promise<Rehearsal> {
+  const { data } = await api.patch(
+    `/rehearsals/${encodeURIComponent(rehearsalId)}`,
+    patch,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function getRehearsalSteps(
+  accessToken: string,
+  rehearsalId: string,
+): Promise<{
+  rehearsal: { id: string; title: string; startsAt: string };
+  selectedSceneIds: string[];
+  selectedSteps: RehearsalSelectedStep[];
+  scenes: Array<{ id: string; name: string; steps: Array<{ id: number; title: string }> }>;
+}> {
+  const { data } = await api.get(
+    `/rehearsals/${encodeURIComponent(rehearsalId)}/steps`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
 }
 
 export async function listRehearsals(
