@@ -166,34 +166,6 @@ function parseCharacters(value: unknown): string[] {
   return [];
 }
 
-function resolveActorEmail(
-  value: string,
-  members: Array<{ email: string; displayName?: string | null }>,
-): string | null {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  const fromText = extractEmailFromText(raw);
-  if (fromText) return fromText;
-
-  if (looksLikeEmail(raw)) return normalizeEmail(raw);
-
-  const q = normalizePersonName(raw);
-  if (!q) return null;
-
-  const exact = members.filter((m) => normalizePersonName(m.displayName ?? "") === q);
-  if (exact.length === 1) return normalizeEmail(exact[0].email);
-
-  // Частичное совпадение (например, "Алёна" vs "Алёна Иванова") — только если уникально.
-  const partial = members.filter((m) => {
-    const n = normalizePersonName(m.displayName ?? "");
-    if (!n) return false;
-    return n.includes(q) || q.includes(n);
-  });
-  if (partial.length === 1) return normalizeEmail(partial[0].email);
-
-  return null;
-}
-
 export function RehearsalsPage() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
@@ -252,7 +224,9 @@ export function RehearsalsPage() {
 
   const [metaTitle, setMetaTitle] = useState("");
   const [metaStartsAtLocal, setMetaStartsAtLocal] = useState("");
+  const [metaEndsAtLocal, setMetaEndsAtLocal] = useState("");
   const [metaDurationMin, setMetaDurationMin] = useState<string>("");
+  const [metaEndTouched, setMetaEndTouched] = useState(false);
   const [metaSaving, setMetaSaving] = useState(false);
   const [metaSaveError, setMetaSaveError] = useState<string | null>(null);
 
@@ -260,30 +234,106 @@ export function RehearsalsPage() {
     if (!activeRehearsal) {
       setMetaTitle("");
       setMetaStartsAtLocal("");
+      setMetaEndsAtLocal("");
       setMetaDurationMin("");
+      setMetaEndTouched(false);
       setMetaSaveError(null);
       return;
     }
     setMetaTitle(activeRehearsal.title ?? "");
-    setMetaStartsAtLocal(dayjs(activeRehearsal.startsAt).format("YYYY-MM-DDTHH:mm"));
-    setMetaDurationMin(
-      activeRehearsal.durationMin != null ? String(activeRehearsal.durationMin) : "",
+    const startLocal = dayjs(activeRehearsal.startsAt).format("YYYY-MM-DDTHH:mm");
+    setMetaStartsAtLocal(startLocal);
+    const dur =
+      activeRehearsal.durationMin != null ? Math.max(0, Math.floor(activeRehearsal.durationMin)) : null;
+    setMetaDurationMin(dur != null ? String(dur) : "");
+    setMetaEndsAtLocal(
+      dur != null ? dayjs(activeRehearsal.startsAt).add(dur, "minute").format("YYYY-MM-DDTHH:mm") : "",
     );
+    setMetaEndTouched(false);
     setMetaSaveError(null);
   }, [activeRehearsal?.id]);
+
+  const computedDuration = useMemo(() => {
+    const startSrc = metaStartsAtLocal.trim();
+    const endSrc = metaEndsAtLocal.trim();
+    if (!startSrc || !endSrc) return null;
+    const start = dayjs(startSrc);
+    const end = dayjs(endSrc);
+    if (!start.isValid() || !end.isValid()) return null;
+    return Math.max(0, end.diff(start, "minute"));
+  }, [metaEndsAtLocal, metaStartsAtLocal]);
+
+  const computedDurationLabel = useMemo(() => {
+    const m = computedDuration;
+    if (m == null) return "—";
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    if (h <= 0) return `${mm} мин`;
+    if (mm === 0) return `${h} ч`;
+    return `${h} ч ${mm} мин`;
+  }, [computedDuration]);
+
+  const onChangeStart = (next: string) => {
+    setMetaStartsAtLocal(next);
+    const start = dayjs(next);
+    if (!start.isValid()) return;
+
+    if (!metaEndTouched) {
+      const raw = metaDurationMin.trim();
+      const dur = raw === "" ? null : Math.max(0, Math.floor(Number(raw)));
+      if (dur != null) {
+        setMetaEndsAtLocal(start.add(dur, "minute").format("YYYY-MM-DDTHH:mm"));
+      }
+    } else {
+      const endSrc = metaEndsAtLocal.trim();
+      if (!endSrc) return;
+      const end = dayjs(endSrc);
+      if (!end.isValid()) return;
+      const diff = Math.max(0, end.diff(start, "minute"));
+      setMetaDurationMin(String(diff));
+    }
+  };
+
+  const onChangeEnd = (next: string) => {
+    setMetaEndTouched(true);
+    setMetaEndsAtLocal(next);
+    const startSrc = metaStartsAtLocal.trim();
+    if (!startSrc || !next.trim()) return;
+    const start = dayjs(startSrc);
+    const end = dayjs(next);
+    if (!start.isValid() || !end.isValid()) return;
+    const diff = Math.max(0, end.diff(start, "minute"));
+    setMetaDurationMin(String(diff));
+  };
+
+  const applyPresetDuration = (minutes: number) => {
+    const startSrc = metaStartsAtLocal.trim();
+    if (!startSrc) return;
+    const start = dayjs(startSrc);
+    if (!start.isValid()) return;
+    const dur = Math.max(0, Math.floor(minutes));
+    setMetaDurationMin(String(dur));
+    setMetaEndTouched(false);
+    setMetaEndsAtLocal(start.add(dur, "minute").format("YYYY-MM-DDTHH:mm"));
+  };
 
   const saveMeta = async () => {
     if (!accessToken || !activeRehearsal) return;
     setMetaSaving(true);
     setMetaSaveError(null);
     try {
-      const durationRaw = metaDurationMin.trim();
-      const duration =
-        durationRaw === "" ? null : Math.max(0, Math.floor(Number(durationRaw)));
+      const startLocal = metaStartsAtLocal.trim();
+      const endLocal = metaEndsAtLocal.trim();
+
       const nextStartsAt =
-        metaStartsAtLocal.trim() === ""
-          ? activeRehearsal.startsAt
-          : new Date(metaStartsAtLocal).toISOString();
+        startLocal === "" ? activeRehearsal.startsAt : dayjs(startLocal).toDate().toISOString();
+
+      const duration =
+        endLocal !== "" && dayjs(startLocal || activeRehearsal.startsAt).isValid() && dayjs(endLocal).isValid()
+          ? Math.max(0, dayjs(endLocal).diff(dayjs(startLocal || activeRehearsal.startsAt), "minute"))
+          : metaDurationMin.trim() === ""
+            ? null
+            : Math.max(0, Math.floor(Number(metaDurationMin)));
       const updated = await updateRehearsal(accessToken, activeRehearsal.id, {
         title: metaTitle.trim() || "Репетиция",
         startsAt: nextStartsAt,
@@ -329,35 +379,6 @@ export function RehearsalsPage() {
     if (!email) return null;
     return { email, displayName: myProfile?.displayName ?? null };
   }, [myProfile?.displayName, myProfile?.email]);
-
-  const knownPeople = useMemo(() => {
-    const map = new Map<string, { email: string; displayName?: string | null }>();
-    for (const m of members) {
-      const e = normalizeEmail(m.email);
-      if (!e) continue;
-      map.set(e, { email: m.email, displayName: m.displayName ?? null });
-    }
-    for (const p of teamProfiles ?? []) {
-      const e = normalizeEmail(p.email);
-      if (!e) continue;
-      const existing = map.get(e);
-      if (existing) {
-        map.set(e, {
-          email: existing.email,
-          displayName: existing.displayName ?? p.displayName ?? null,
-        });
-      } else {
-        map.set(e, { email: p.email, displayName: p.displayName ?? null });
-      }
-    }
-    if (myProfile?.email) {
-      const e = normalizeEmail(myProfile.email);
-      if (e && !map.has(e)) {
-        map.set(e, { email: myProfile.email, displayName: myProfile.displayName ?? null });
-      }
-    }
-    return Array.from(map.values());
-  }, [members, myProfile?.displayName, myProfile?.email, teamProfiles]);
 
   const membersWithMe = useMemo(() => {
     const map = new Map<string, { email: string; displayName?: string | null }>();
@@ -496,10 +517,6 @@ export function RehearsalsPage() {
     );
     return out;
   }, [calendarState.selectedDate, membersWithMe, teamProfileByEmail]);
-
-  const freeActorEmailSetForSelectedDate = useMemo(() => {
-    return new Set(freeActorsForSelectedDate.map((a) => normalizeEmail(a.email)));
-  }, [freeActorsForSelectedDate]);
 
   const [planCache, setPlanCache] = useState<Record<string, { notReady: number }>>({});
 
@@ -750,6 +767,8 @@ export function RehearsalsPage() {
                 const t = new Date(r.startsAt);
                 const hh = String(t.getHours()).padStart(2, "0");
                 const mm = String(t.getMinutes()).padStart(2, "0");
+                const end = r.durationMin != null ? dayjs(r.startsAt).add(r.durationMin, "minute") : null;
+                const endLabel = end ? end.format("HH:mm") : null;
                 const notReady = planCache[r.id]?.notReady ?? null;
                 const isBad = notReady != null && notReady > 0;
                 return (
@@ -763,7 +782,8 @@ export function RehearsalsPage() {
                     title={isBad ? `Не собирается шагов: ${notReady}` : undefined}
                   >
                     <div className="rehearsals-item-title">
-                      {hh}:{mm} · {r.title}
+                      {hh}:{mm}
+                      {endLabel ? `–${endLabel}` : ""} · {r.title}
                     </div>
                     <div className="rehearsals-item-meta">
                       {notReady == null ? "План…" : isBad ? `Не собирается: ${notReady}` : "Собирается"}
@@ -877,7 +897,14 @@ export function RehearsalsPage() {
             <div className="rehearsals-card">
               <div className="rehearsals-card-title">{activeRehearsal.title}</div>
               <div className="rehearsals-card-sub">
-                {dayjs(activeRehearsal.startsAt).format("DD.MM.YYYY HH:mm")}
+                {(() => {
+                  const start = dayjs(activeRehearsal.startsAt);
+                  const end =
+                    activeRehearsal.durationMin != null
+                      ? start.add(activeRehearsal.durationMin, "minute")
+                      : null;
+                  return `${start.format("DD.MM.YYYY HH:mm")}${end ? `–${end.format("HH:mm")}` : ""}`;
+                })()}
               </div>
 
               <div className="rehearsals-section">
@@ -900,31 +927,31 @@ export function RehearsalsPage() {
                     <input
                       type="datetime-local"
                       value={metaStartsAtLocal}
-                      onChange={(e) => setMetaStartsAtLocal(e.target.value)}
+                      onChange={(e) => onChangeStart(e.target.value)}
                     />
                   </label>
                   <label style={{ display: "grid", gap: 6 }}>
                     <span className="rehearsals-muted" style={{ fontSize: 12 }}>
-                      Длительность (мин)
+                      Дата и время окончания
                     </span>
                     <input
-                      type="number"
-                      min={0}
-                      step={5}
-                      value={metaDurationMin}
-                      onChange={(e) => setMetaDurationMin(e.target.value)}
-                      placeholder="например, 90"
+                      type="datetime-local"
+                      value={metaEndsAtLocal}
+                      onChange={(e) => onChangeEnd(e.target.value)}
                     />
                   </label>
+                  <div className="rehearsals-muted" style={{ fontSize: 12 }}>
+                    Длительность: {computedDurationLabel}
+                  </div>
 
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button type="button" onClick={() => setMetaDurationMin("90")} disabled={metaSaving}>
+                    <button type="button" onClick={() => applyPresetDuration(90)} disabled={metaSaving}>
                       90 мин
                     </button>
-                    <button type="button" onClick={() => setMetaDurationMin("120")} disabled={metaSaving}>
+                    <button type="button" onClick={() => applyPresetDuration(120)} disabled={metaSaving}>
                       120 мин
                     </button>
-                    <button type="button" onClick={() => setMetaDurationMin("150")} disabled={metaSaving}>
+                    <button type="button" onClick={() => applyPresetDuration(150)} disabled={metaSaving}>
                       150 мин
                     </button>
                     <button type="button" onClick={saveMeta} disabled={metaSaving}>
