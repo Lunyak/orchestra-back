@@ -39,11 +39,14 @@ export interface SceneData {
   playlist?: any[];
   sounds?: any[];
   theaterLayout?: TheaterLayout;
+  /** Глобальное распределение: роль -> актёры (email/имя). Истина для назначений. */
+  roleAssignments?: Record<string, string[]>;
 }
 
 export interface SceneContextValue {
   sceneData: SceneData | null;
   setSceneData: React.Dispatch<React.SetStateAction<SceneData | null>>;
+  setRoleAssignments: (next: Record<string, string[]>) => void;
   steps: ScriptStep[];
   setSteps: React.Dispatch<React.SetStateAction<ScriptStep[]>>;
   theaterLayout: TheaterLayout;
@@ -197,6 +200,10 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     hasLocalEditsRef.current = true;
     setTheaterLayoutState(action);
   }, []);
+  const setRoleAssignments = useCallback((next: Record<string, string[]>) => {
+    hasLocalEditsRef.current = true;
+    setSceneData((prev) => ({ ...(prev ?? {}), roleAssignments: next }));
+  }, []);
 
   const addStep = useCallback(() => {
     hasLocalEditsRef.current = true;
@@ -254,15 +261,27 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   const saveStepsForLightPlot = useCallback(async () => {
     if (!projectName || !hasLocalEditsRef.current) return;
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
     const token = accessToken ?? localStorage.getItem("accessToken");
     try {
-      const current = await desktopApi.readProjectScene(projectName, "script");
-      const images = pruneSceneImages(current?.images as Record<string, { remoteKey?: string; remoteUrl?: string }> | undefined, steps);
-      const payload = { ...current, steps, theaterLayout, images };
-      const result = await desktopApi.saveProjectScene(projectName, "script", payload);
-      if (!result?.ok) {
-        console.error("Failed to save light plot steps:", result?.error);
+      // В Desktop режиме сохраняем локальный файл, в Web режиме локального файла нет —
+      // но пуш на сервер всё равно должен происходить.
+      const current =
+        desktopApi
+          ? await desktopApi.readProjectScene(projectName, "script")
+          : (sceneData ?? null);
+      const images = pruneSceneImages(
+        (current as any)?.images as
+          | Record<string, { remoteKey?: string; remoteUrl?: string }>
+          | undefined,
+        steps,
+      );
+      const payload: any = { ...(current ?? {}), steps, theaterLayout, images };
+
+      if (desktopApi) {
+        const result = await desktopApi.saveProjectScene(projectName, "script", payload);
+        if (!result?.ok) {
+          console.error("Failed to save scene:", result?.error);
+        }
       }
       if (token) {
         const projectId =
@@ -308,7 +327,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
               createdAt: nowIso,
             },
           ];
-          const existingSteps: ScriptStep[] = (current?.steps as ScriptStep[]) ?? [];
+          const existingSteps: ScriptStep[] =
+            (Array.isArray((current as any)?.steps) ? ((current as any).steps as ScriptStep[]) : []) ?? [];
           const existingIds = new Set(existingSteps.map((s) => s.id));
           const newIds = new Set(steps.map((s) => s.id));
           steps.forEach((step, index) => {
@@ -350,9 +370,9 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (error) {
-      console.error("Failed to save light plot steps:", error);
+      console.error("Failed to save/push scene:", error);
     }
-  }, [accessToken, projectName, steps, theaterLayout, ensureRemoteProject]);
+  }, [accessToken, projectName, sceneData, steps, theaterLayout, ensureRemoteProject]);
 
   /** Как в плейлисте: звуки уже с remoteKey/remoteUrl (загружаются при добавлении). Просто пушим сцену с диска. */
   const pushSceneAfterSoundsSave = useCallback(async () => {
@@ -453,11 +473,19 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         window.clearTimeout(lightPlotSaveTimerRef.current);
       }
     };
-  }, [isSceneReady, steps.length, theaterLayout, saveStepsForLightPlot]);
+  }, [
+    isSceneReady,
+    steps.length,
+    theaterLayout,
+    // важный триггер: изменение глобального распределения ролей тоже должно пушиться
+    JSON.stringify((sceneData as any)?.roleAssignments ?? null),
+    saveStepsForLightPlot,
+  ]);
 
   const value: SceneContextValue = {
     sceneData,
     setSceneData,
+    setRoleAssignments,
     steps,
     setSteps,
     theaterLayout,

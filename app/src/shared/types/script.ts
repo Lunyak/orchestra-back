@@ -18,8 +18,11 @@ export interface ScriptStep {
   kanbanStatus?: "raw" | "text-learned" | "almost-ready" | "ready";
   /** Порядок карточки в колонке канбана (не влияет на порядок шагов в сценарии). */
   kanbanOrder?: number;
-  /** Назначения ролей: роль -> исполнитель (любая строка: имя/почта). */
-  cast?: Record<string, string>;
+  /**
+   * Назначения ролей: роль -> исполнитель(и).
+   * Исторически было 1 значение-строка, теперь поддерживаем и массив строк.
+   */
+  cast?: Record<string, string | string[]>;
 }
 
 export interface ScriptRequisite {

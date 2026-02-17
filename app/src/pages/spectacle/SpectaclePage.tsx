@@ -40,6 +40,7 @@ export function SpectaclePage() {
   const { projectMembers, projectOwner } = useTeam();
   const {
     sceneData,
+    setRoleAssignments,
     steps,
     currentPage,
     setCurrentPage,
@@ -297,6 +298,8 @@ export function SpectaclePage() {
                 <KanbanBoardPage
                   steps={steps}
                   onStepsChange={setSteps}
+                  roleAssignments={sceneData?.roleAssignments}
+                  onRoleAssignmentsChange={setRoleAssignments}
                   members={[
                     ...(myProfile?.email
                       ? [{ email: myProfile.email, displayName: myProfile.displayName ?? null }]

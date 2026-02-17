@@ -73,7 +73,7 @@ type RawStepLike = {
   playMarkdown?: string;
   kanbanStatus?: string;
   kanbanOrder?: number;
-  cast?: Record<string, string>;
+  cast?: Record<string, string | string[]>;
 };
 
 @Injectable()
