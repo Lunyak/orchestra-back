@@ -91,7 +91,7 @@ function resolveActorEmail(value: string, members: MemberInfo[]): string | null 
   const fromText = extractEmailFromText(raw);
   if (fromText) return fromText;
   if (looksLikeEmail(raw)) return normalizeEmail(raw);
-  const lower = raw.toLowerCase();
+  const lower = raw.toLowerCase?.() ?? "";
   const hits = members.filter(
     (m) => (m.displayName ?? "").trim().toLowerCase() === lower,
   );
