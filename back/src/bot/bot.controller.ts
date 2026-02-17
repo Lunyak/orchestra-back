@@ -89,7 +89,11 @@ export class BotController {
     @Param('sessionId') sessionId: string,
     @Body() body: RehearsalPublishedDto,
   ) {
-    return this.directorSessions.markTelegramPublished(projectId, sessionId, body);
+    return this.directorSessions.markTelegramPublished(
+      projectId,
+      sessionId,
+      body,
+    );
   }
 
   @Post('director-sessions/:projectId/:sessionId/attendance')
@@ -98,6 +102,10 @@ export class BotController {
     @Param('sessionId') sessionId: string,
     @Body() body: RehearsalAttendanceDto,
   ) {
-    return this.directorSessions.upsertParticipantStatusFromBot(projectId, sessionId, body);
+    return this.directorSessions.upsertParticipantStatusFromBot(
+      projectId,
+      sessionId,
+      body,
+    );
   }
 }

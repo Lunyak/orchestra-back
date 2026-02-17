@@ -138,8 +138,17 @@ function normalizeCastActors(value: unknown): string[] {
     const out = value.map((x) => String(x ?? '').trim()).filter(Boolean);
     return Array.from(new Set(out));
   }
-  const s = String(value ?? '').trim();
-  return s ? [s] : [];
+  if (value == null) return [];
+  if (typeof value === 'string') {
+    const s = value.trim();
+    return s ? [s] : [];
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    const s = String(value).trim();
+    return s ? [s] : [];
+  }
+  // Avoid stringifying objects (would become "[object Object]")
+  return [];
 }
 
 type AvailabilityCalendar = Record<string, 'present' | 'absent'>;

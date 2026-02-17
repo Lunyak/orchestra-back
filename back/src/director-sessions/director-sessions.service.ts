@@ -42,8 +42,6 @@ type DirectorRehearsalSession = {
   publishedAt?: string | null;
 };
 
-type SessionsSceneRawJson = { sessions?: DirectorRehearsalSession[] };
-
 type RawStepLike = {
   id?: number;
   title?: string;
@@ -66,7 +64,9 @@ function directorSessionsProjectSlug(email: string): string {
 }
 
 function normEmail(v: string): string {
-  return String(v ?? '').trim().toLowerCase();
+  return String(v ?? '')
+    .trim()
+    .toLowerCase();
 }
 
 function looksLikeEmail(v: string): boolean {
@@ -113,9 +113,7 @@ function extractSpeakerRolesFromLines(text?: string): string[] {
     const line = rawLine.trim();
     if (!line) continue;
     if (line.startsWith('==') || line.startsWith('(')) continue;
-    const m1 = line.match(
-      /^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.-]{1,40})\s*[:—-]\s+\S/,
-    );
+    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.-]{1,40})\s*[:—-]\s+\S/);
     if (m1?.[1]) {
       const role = m1[1].replace(/\s+/g, ' ').trim();
       if (role.length >= 2 && role.length <= 40) out.push(role);
@@ -129,7 +127,10 @@ function extractSpeakerRolesFromLines(text?: string): string[] {
 
 function extractRolesSmart(text?: string): string[] {
   return Array.from(
-    new Set([...extractRolesByBrackets(text), ...extractSpeakerRolesFromLines(text)]),
+    new Set([
+      ...extractRolesByBrackets(text),
+      ...extractSpeakerRolesFromLines(text),
+    ]),
   )
     .map((x) => String(x ?? '').trim())
     .filter(Boolean);
@@ -163,14 +164,17 @@ export class DirectorSessionsService {
       where: { id: userId },
       select: { email: true },
     });
-    const email = String(user?.email ?? '').trim().toLowerCase();
+    const email = String(user?.email ?? '')
+      .trim()
+      .toLowerCase();
     if (!email) throw new BadRequestException('User email not found');
     const slug = directorSessionsProjectSlug(email);
     const project = await this.prisma.project.findFirst({
       where: { slug, ownerId: userId, deletedAt: null },
       select: { id: true, slug: true },
     });
-    if (!project) throw new NotFoundException('Director sessions project not found');
+    if (!project)
+      throw new NotFoundException('Director sessions project not found');
     return project;
   }
 
@@ -186,12 +190,20 @@ export class DirectorSessionsService {
     return { sceneId, scene, raw, sessions };
   }
 
-  private async saveSessionsScene(projectId: string, sessions: DirectorRehearsalSession[]) {
+  private async saveSessionsScene(
+    projectId: string,
+    sessions: DirectorRehearsalSession[],
+  ) {
     const sceneId = `${projectId}:sessions`;
     await this.prisma.scene.upsert({
       where: { id: sceneId },
       update: { name: 'sessions', rawJson: { sessions } as any },
-      create: { id: sceneId, name: 'sessions', rawJson: { sessions } as any, projectId },
+      create: {
+        id: sceneId,
+        name: 'sessions',
+        rawJson: { sessions } as any,
+        projectId,
+      },
     });
   }
 
@@ -240,9 +252,13 @@ export class DirectorSessionsService {
     const refs = (session.slots ?? [])
       .map((s) => s.ref)
       .filter(Boolean) as DirectorSlotRef[];
-    const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(Boolean);
+    const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(
+      Boolean,
+    );
     if (slugs.length === 0) {
-      throw new BadRequestException('Перед публикацией выберите материалы (слоты)');
+      throw new BadRequestException(
+        'Перед публикацией выберите материалы (слоты)',
+      );
     }
 
     // gather needed emails from roleAssignments per project
@@ -262,7 +278,9 @@ export class DirectorSessionsService {
       });
       const memberEmails = [
         normEmail(p?.owner?.email ?? ''),
-        ...((p?.members ?? []).map((m: any) => normEmail(m?.user?.email)) as string[]),
+        ...((p?.members ?? []).map((m: any) =>
+          normEmail(m?.user?.email),
+        ) as string[]),
       ].filter(Boolean);
       memberEmails.forEach((e) => allowedEmails.add(normEmail(e)));
 
@@ -290,7 +308,9 @@ export class DirectorSessionsService {
       }
     }
 
-    const effectiveNeeded = Array.from(neededEmails).filter((e) => allowedEmails.has(normEmail(e)));
+    const effectiveNeeded = Array.from(neededEmails).filter((e) =>
+      allowedEmails.has(normEmail(e)),
+    );
     if (effectiveNeeded.length === 0) {
       throw new BadRequestException(
         `Нельзя опубликовать сессию: не нашли emails актёров по roleAssignments (или нет доступа к ним)`,
@@ -312,7 +332,7 @@ export class DirectorSessionsService {
     const present = profiles
       .map((p) => {
         const email = normEmail(p.email);
-        const calendar = (p.availabilityCalendar as any) ?? {};
+        const calendar = p.availabilityCalendar ?? {};
         const st = calendar?.[dateKey];
         if (st !== 'present') return null;
         const userName =
@@ -344,7 +364,9 @@ export class DirectorSessionsService {
     if (!sessId) throw new BadRequestException('session id is required');
 
     const directorProject = await this.getDirectorProjectForUser(userId);
-    const { sessions } = await this.loadSessionsSceneByProjectId(directorProject.id);
+    const { sessions } = await this.loadSessionsSceneByProjectId(
+      directorProject.id,
+    );
     const idx = sessions.findIndex((s) => String(s?.id) === sessId);
     if (idx === -1) throw new NotFoundException('Session not found');
 
@@ -353,7 +375,10 @@ export class DirectorSessionsService {
       return { ok: true, published: session };
     }
 
-    const participants = await this.buildParticipantsForSession(userId, session);
+    const participants = await this.buildParticipantsForSession(
+      userId,
+      session,
+    );
     const nowIso = new Date().toISOString();
     const updated: DirectorRehearsalSession = {
       ...session,
@@ -400,16 +425,21 @@ export class DirectorSessionsService {
   async getForBot(projectId: string, sessionId: string) {
     const pid = String(projectId ?? '').trim();
     const sid = String(sessionId ?? '').trim();
-    if (!pid || !sid) throw new BadRequestException('projectId and sessionId are required');
+    if (!pid || !sid)
+      throw new BadRequestException('projectId and sessionId are required');
     const { sessions } = await this.loadSessionsSceneByProjectId(pid);
-    const session = sessions.find((s) => String(s?.id) === sid) as DirectorRehearsalSession | undefined;
+    const session = sessions.find((s) => String(s?.id) === sid) as
+      | DirectorRehearsalSession
+      | undefined;
     if (!session) throw new NotFoundException('Session not found');
 
     // resolve slot titles
     const refs = (session.slots ?? [])
       .map((s) => s.ref)
       .filter(Boolean) as DirectorSlotRef[];
-    const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(Boolean);
+    const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(
+      Boolean,
+    );
     const projectBySlug = new Map<string, { id: string; slug: string }>();
     const stepsBySlug = new Map<string, Map<number, RawStepLike>>();
 
@@ -476,7 +506,8 @@ export class DirectorSessionsService {
   ) {
     const pid = String(projectId ?? '').trim();
     const sid = String(sessionId ?? '').trim();
-    if (!pid || !sid) throw new BadRequestException('projectId and sessionId are required');
+    if (!pid || !sid)
+      throw new BadRequestException('projectId and sessionId are required');
     const { sessions } = await this.loadSessionsSceneByProjectId(pid);
     const idx = sessions.findIndex((s) => String(s?.id) === sid);
     if (idx === -1) throw new NotFoundException('Session not found');
@@ -508,7 +539,8 @@ export class DirectorSessionsService {
   ) {
     const pid = String(projectId ?? '').trim();
     const sid = String(sessionId ?? '').trim();
-    if (!pid || !sid) throw new BadRequestException('projectId and sessionId are required');
+    if (!pid || !sid)
+      throw new BadRequestException('projectId and sessionId are required');
     const telegramId = String(dto.telegramId ?? '').trim();
     if (!telegramId) throw new BadRequestException('telegramId is required');
 
@@ -518,8 +550,12 @@ export class DirectorSessionsService {
 
     const nowIso = new Date().toISOString();
     const cur = sessions[idx] as DirectorRehearsalSession;
-    const participants = Array.isArray(cur.participants) ? cur.participants : [];
-    const pIdx = participants.findIndex((p) => String(p?.telegramId ?? '') === telegramId);
+    const participants = Array.isArray(cur.participants)
+      ? cur.participants
+      : [];
+    const pIdx = participants.findIndex(
+      (p) => String(p?.telegramId ?? '') === telegramId,
+    );
     if (pIdx === -1) {
       // если участника с telegramId нет (например, telegramId не записан), не падаем
       return { ok: true };
@@ -528,14 +564,25 @@ export class DirectorSessionsService {
     nextParticipants[pIdx] = {
       ...nextParticipants[pIdx],
       status: dto.status ?? 'unknown',
-      userName: dto.userName != null ? String(dto.userName).trim() || null : nextParticipants[pIdx].userName ?? null,
-      lateTime: dto.lateTime != null ? String(dto.lateTime).trim() || null : (dto.status === 'late' ? (nextParticipants[pIdx].lateTime ?? null) : null),
+      userName:
+        dto.userName != null
+          ? String(dto.userName).trim() || null
+          : (nextParticipants[pIdx].userName ?? null),
+      lateTime:
+        dto.lateTime != null
+          ? String(dto.lateTime).trim() || null
+          : dto.status === 'late'
+            ? (nextParticipants[pIdx].lateTime ?? null)
+            : null,
       respondedAt: nowIso,
     };
     const nextSessions = [...sessions];
-    nextSessions[idx] = { ...cur, participants: nextParticipants, updatedAt: nowIso };
+    nextSessions[idx] = {
+      ...cur,
+      participants: nextParticipants,
+      updatedAt: nowIso,
+    };
     await this.saveSessionsScene(pid, nextSessions as any);
     return { ok: true };
   }
 }
-

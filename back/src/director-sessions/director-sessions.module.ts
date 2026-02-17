@@ -11,4 +11,3 @@ import { DirectorSessionsService } from './director-sessions.service';
   exports: [DirectorSessionsService],
 })
 export class DirectorSessionsModule {}
-

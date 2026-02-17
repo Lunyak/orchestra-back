@@ -13,4 +13,3 @@ export class DirectorSessionsController {
     return this.sessions.publish(req.user.userId, id);
   }
 }
-

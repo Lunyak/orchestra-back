@@ -207,7 +207,9 @@ export class ProjectsService {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
           // @@unique([projectId, userId])
-          throw new ConflictException('User is already a member of this project');
+          throw new ConflictException(
+            'User is already a member of this project',
+          );
         }
         if (error.code === 'P2003') {
           // FK constraint (например, userId не существует)
