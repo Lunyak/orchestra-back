@@ -245,7 +245,11 @@ export interface ProjectMemberInfo {
 export async function getProjectMembers(
   accessToken: string,
   slug: string,
-): Promise<{ id: string; members: ProjectMemberInfo[] }> {
+): Promise<{
+  id: string;
+  owner: { id: string; email: string; displayName?: string | null } | null;
+  members: ProjectMemberInfo[];
+}> {
   const { data } = await api.get(
     `/projects/${encodeURIComponent(slug)}/members`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -261,6 +265,7 @@ export interface MyProfile {
   telegramUsername?: string | null;
   telegramId?: string | null;
   avatarUrl?: string | null;
+  characters?: string[] | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
 }
 
@@ -270,6 +275,7 @@ export interface TeamProfile {
   firstName?: string | null;
   lastName?: string | null;
   telegramId?: string | null;
+  characters?: string[] | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
 }
 

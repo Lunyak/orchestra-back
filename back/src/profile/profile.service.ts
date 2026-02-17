@@ -99,6 +99,7 @@ export class ProfileService {
         firstName: true,
         lastName: true,
         telegramId: true,
+        characters: true,
         availabilityCalendar: true,
       },
     });

@@ -61,7 +61,13 @@ function extractSpeakerRolesFromLines(text?: string): string[] {
 function extractRolesSmart(text?: string): string[] {
   const a = extractRolesBrackets(text);
   const b = extractSpeakerRolesFromLines(text);
-  return Array.from(new Set([...a, ...b]));
+  return Array.from(
+    new Set(
+      [...a, ...b]
+        .map((x) => String(x ?? "").trim())
+        .filter((x) => x.length > 0),
+    ),
+  );
 }
 
 type MemberInfo = { email: string; displayName?: string | null };
@@ -74,9 +80,16 @@ function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
 }
 
+function extractEmailFromText(raw: string): string | null {
+  const m = String(raw ?? "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return m?.[0] ? normalizeEmail(m[0]) : null;
+}
+
 function resolveActorEmail(value: string, members: MemberInfo[]): string | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
+  const fromText = extractEmailFromText(raw);
+  if (fromText) return fromText;
   if (looksLikeEmail(raw)) return normalizeEmail(raw);
   const lower = raw.toLowerCase();
   const hits = members.filter(
@@ -194,9 +207,12 @@ export function KanbanBoardPage({
     const ms = Array.isArray(members) ? members : [];
     const uniq = new Map<string, MemberInfo>();
     for (const m of ms) {
-      const email = normalizeEmail(m.email);
+      if (!m || typeof (m as any).email !== "string") continue;
+      const email = normalizeEmail((m as any).email);
       if (!email) continue;
-      uniq.set(email, { email, displayName: m.displayName ?? null });
+      const displayName =
+        (m as any).displayName != null ? String((m as any).displayName) : null;
+      uniq.set(email, { email, displayName });
     }
     return Array.from(uniq.values()).sort((a, b) =>
       formatMemberLabel(a).localeCompare(formatMemberLabel(b), "ru"),
@@ -236,7 +252,9 @@ export function KanbanBoardPage({
     const matchesQuery = (s: ScriptStep, roles: string[]) => {
       if (!normalizedQuery) return true;
       const inTitle = (s.title ?? "").toLowerCase().includes(normalizedQuery);
-      const inRoles = roles.some((r) => r.toLowerCase().includes(normalizedQuery));
+      const inRoles = roles.some((r) =>
+        String(r ?? "").toLowerCase().includes(normalizedQuery),
+      );
       const inActors = Object.values(s.cast ?? {}).some((v) =>
         String(v ?? "").toLowerCase().includes(normalizedQuery)
       );
@@ -327,6 +345,12 @@ export function KanbanBoardPage({
         else cast[role] = v;
         return { ...s, cast };
       })
+    );
+  };
+
+  const setStepDurationMin = (id: number, durationMin: number | undefined) => {
+    onStepsChange((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, durationMin } : s))
     );
   };
 
@@ -456,12 +480,21 @@ export function KanbanBoardPage({
                         </div>
                       )}
                       <div className="kanban-card-footer">
-                        <span className="kanban-card-id">#{s.id}</span>
-                        {roles.length > 0 && (
-                          <span className="kanban-card-assign">
-                            {assignedCount}/{roles.length}
-                          </span>
-                        )}
+                        <div className="kanban-card-footer-left">
+                          <span className="kanban-card-id">#{s.id}</span>
+                          {typeof s.durationMin === "number" &&
+                            Number.isFinite(s.durationMin) &&
+                            s.durationMin > 0 && (
+                              <span className="kanban-card-duration" title="Длительность шага">
+                                {s.durationMin} мин
+                              </span>
+                            )}
+                          {roles.length > 0 && (
+                            <span className="kanban-card-assign">
+                              {assignedCount}/{roles.length}
+                            </span>
+                          )}
+                        </div>
                         <span className="kanban-card-action">Подробнее</span>
                       </div>
                     </div>
@@ -502,6 +535,27 @@ export function KanbanBoardPage({
                     </option>
                   ))}
                 </select>
+              </label>
+
+              <label className="kanban-field">
+                <span className="kanban-field-label">Длительность (мин)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={openedStep.durationMin ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setStepDurationMin(openedStep.id, undefined);
+                      return;
+                    }
+                    const num = Number(raw);
+                    if (!Number.isFinite(num) || num < 0) return;
+                    setStepDurationMin(openedStep.id, num);
+                  }}
+                  placeholder="не указано"
+                />
               </label>
 
               <div className="kanban-section">

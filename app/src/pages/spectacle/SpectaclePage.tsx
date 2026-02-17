@@ -4,11 +4,13 @@ import { useLocation } from "react-router-dom";
 import { HeaderPlayer } from "../../components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../components/script-steps-sidebar/ScriptStepsSidebar";
+import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useScriptUI } from "../../features/script-ui";
 import { useTeam } from "../../features/team";
 import type { ScriptStep } from "../../shared/types/script";
+import { getMyProfile, type MyProfile } from "../../sync/api";
 
 const LightPlotPage = React.lazy(() =>
   import("../../components/light-plot/LightPlotPage").then((m) => ({
@@ -33,8 +35,9 @@ const KanbanBoardPage = React.lazy(() =>
 
 export function SpectaclePage() {
   const location = useLocation();
+  const { accessToken } = useAuth();
   const { projectName } = useProject();
-  const { projectMembers } = useTeam();
+  const { projectMembers, projectOwner } = useTeam();
   const {
     sceneData,
     steps,
@@ -62,6 +65,25 @@ export function SpectaclePage() {
     swapTheaterPanels: shouldSwapPanels,
     togglePanels,
   } = useScriptUI();
+
+  const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
+  useEffect(() => {
+    if (!accessToken) {
+      setMyProfile(null);
+      return;
+    }
+    let cancelled = false;
+    getMyProfile(accessToken)
+      .then((p) => {
+        if (!cancelled) setMyProfile(p ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setMyProfile(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
   const [isMobileStepsOpen, setIsMobileStepsOpen] = useState(false);
@@ -263,12 +285,18 @@ export function SpectaclePage() {
                 <KanbanBoardPage
                   steps={steps}
                   onStepsChange={setSteps}
-                  members={(projectMembers ?? [])
-                    .map((m: any) => ({
+                  members={[
+                    ...(myProfile?.email
+                      ? [{ email: myProfile.email, displayName: myProfile.displayName ?? null }]
+                      : []),
+                    ...(projectOwner?.email
+                      ? [{ email: projectOwner.email, displayName: projectOwner.displayName ?? null }]
+                      : []),
+                    ...(projectMembers ?? []).map((m: any) => ({
                       email: m.user?.email,
                       displayName: m.user?.displayName ?? null,
-                    }))
-                    .filter((x: any) => Boolean(x.email))}
+                    })),
+                  ].filter((x: any) => Boolean(x?.email))}
                 />
               </Suspense>
             )}

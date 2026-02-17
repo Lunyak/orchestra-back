@@ -241,6 +241,7 @@ export class ProjectsService {
       select: {
         id: true,
         ownerId: true,
+        owner: { select: { id: true, email: true } },
         members: {
           select: {
             id: true,
@@ -264,8 +265,11 @@ export class ProjectsService {
       );
     }
 
-    const emails = project.members
-      .map((m) => m.user.email)
+    const ownerEmail = project.owner?.email?.trim().toLowerCase() ?? '';
+    const emails = [
+      ownerEmail,
+      ...project.members.map((m) => m.user.email).filter(Boolean),
+    ]
       .filter(Boolean)
       .map((e) => e.trim().toLowerCase());
     const profiles = await this.prisma.userProfile.findMany({
@@ -278,6 +282,13 @@ export class ProjectsService {
 
     return {
       id: project.id,
+      owner: project.owner?.email
+        ? {
+            id: project.owner.id,
+            email: project.owner.email,
+            displayName: displayNameByEmail.get(ownerEmail) ?? null,
+          }
+        : null,
       members: project.members.map((m) => ({
         ...m,
         user: {
