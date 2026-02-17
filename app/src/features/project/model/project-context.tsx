@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useEffect, useState } from "react";
 import { ensureProject, fetchProjects, syncPush } from "../../../sync/api";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
 import { useAuth } from "../../auth/model/auth-context";
+import { isDirectorSessionsSlug } from "../../director-sessions/directorSessionsSync";
 
 export interface ProjectContextValue {
   projects: string[];
@@ -43,11 +44,12 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const loadProjects = useCallback(async (prefer?: string) => {
     try {
       const desktopApi = getDesktopApi();
-      const list = desktopApi
+      const listRaw = desktopApi
         ? await desktopApi.listProjects()
         : accessToken
           ? (await fetchProjects(accessToken)).map((project) => project.slug)
           : [];
+      const list = listRaw.filter((slug) => !isDirectorSessionsSlug(slug));
       setProjects(list);
       const stored = localStorage.getItem("selectedProject") || "";
       const initial =

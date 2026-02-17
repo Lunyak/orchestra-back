@@ -163,6 +163,11 @@ export class ProjectsService {
       throw new NotFoundException('Project not found or not owned by user');
     }
 
+    const userId = typeof dto?.userId === 'string' ? dto.userId.trim() : '';
+    if (!userId) {
+      throw new BadRequestException('userId is required');
+    }
+
     const owner = await this.prisma.user.findUnique({
       where: { id: ownerId },
       include: { subscription: true },
@@ -190,17 +195,37 @@ export class ProjectsService {
 
     const role = dto.role ?? 'editor';
 
-    return this.prisma.projectMember.create({
-      data: {
-        projectId: project.id,
-        userId: dto.userId,
-        role,
-      },
-    });
+    try {
+      return await this.prisma.projectMember.create({
+        data: {
+          projectId: project.id,
+          userId,
+          role,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          // @@unique([projectId, userId])
+          throw new ConflictException('User is already a member of this project');
+        }
+        if (error.code === 'P2003') {
+          // FK constraint (например, userId не существует)
+          throw new NotFoundException('User not found');
+        }
+      }
+      throw error;
+    }
   }
 
   /** Пригласить в проект по email — только владелец. Пользователь с email должен быть зарегистрирован. */
   async inviteByEmail(userId: string, slug: string, dto: InviteByEmailDto) {
+    const emailRaw = typeof dto?.email === 'string' ? dto.email : '';
+    const email = emailRaw.trim().toLowerCase();
+    if (!email) {
+      throw new BadRequestException('email is required');
+    }
+
     const project = await this.prisma.project.findFirst({
       where: {
         slug,
@@ -215,20 +240,56 @@ export class ProjectsService {
         'Только владелец проекта может приглашать участников',
       );
     }
+
+    // Те же ограничения, что и в addMember (подписка/лимит коллаборации)
+    const owner = await this.prisma.user.findUnique({
+      where: { id: project.ownerId },
+      include: { subscription: true },
+    });
+    const plan = owner?.subscription;
+    const features = (plan?.features ?? {}) as any;
+
+    if (!features.collaboration) {
+      throw new ForbiddenException(
+        'Collaboration is not available on current plan',
+      );
+    }
+    if (plan?.maxCollaboratorsPerProject != null) {
+      const membersCount = await this.prisma.projectMember.count({
+        where: { projectId: project.id },
+      });
+      if (membersCount >= plan.maxCollaboratorsPerProject) {
+        throw new ForbiddenException(
+          'Collaborator limit reached for this project',
+        );
+      }
+    }
+
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.trim().toLowerCase() },
+      where: { email },
     });
     if (!user) {
       throw new NotFoundException('Пользователь с таким email не найден');
     }
     const role = dto.role ?? 'editor';
-    return this.prisma.projectMember.create({
-      data: {
-        projectId: project.id,
-        userId: user.id,
-        role,
-      },
-    });
+    try {
+      return await this.prisma.projectMember.create({
+        data: {
+          projectId: project.id,
+          userId: user.id,
+          role,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            'User is already a member of this project',
+          );
+        }
+      }
+      throw error;
+    }
   }
 
   /** Список участников проекта — только владелец может просматривать. */

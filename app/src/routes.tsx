@@ -16,6 +16,12 @@ const RehearsalsPage = lazy(() =>
   }))
 );
 
+const DirectorSessionsPage = lazy(() =>
+  import("./pages/sessions/DirectorSessionsPage").then((m) => ({
+    default: m.DirectorSessionsPage,
+  }))
+);
+
 const ProfilePage = lazy(() =>
   import("./pages/profile/ProfilePage").then((m) => ({
     default: m.ProfilePage,
@@ -76,6 +82,7 @@ export function AppRoutes() {
           <Route path="/light-plot" element={<SpectaclePage />} />
           <Route path="/board" element={<SpectaclePage />} />
           <Route path="/rehearsals" element={<RehearsalsPage />} />
+          <Route path="/sessions" element={<DirectorSessionsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>

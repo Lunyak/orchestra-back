@@ -1,6 +1,7 @@
 import type { ScriptStep } from "../../shared/types/script";
 import React, { useEffect, useMemo, useState } from "react";
 import "./style.css";
+import { markdownToPlainText } from "../../shared/utils/textPreview";
 
 type KanbanStatus = NonNullable<ScriptStep["kanbanStatus"]>;
 
@@ -836,7 +837,9 @@ export function KanbanBoardPage({
 
               <details className="kanban-details">
                 <summary>Текст сцены</summary>
-                <pre className="kanban-text">{(openedStep.playMarkdown ?? openedStep.markdown ?? "").trim()}</pre>
+                <pre className="kanban-text">
+                  {markdownToPlainText(String(openedStep.playMarkdown ?? openedStep.markdown ?? ""))}
+                </pre>
               </details>
             </div>
           </div>

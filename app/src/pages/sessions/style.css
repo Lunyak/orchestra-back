@@ -1,0 +1,326 @@
+/* Sessions page builds on rehearsals styles */
+
+.sessions-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.sessions-side {
+  position: sticky;
+  top: 12px;
+  align-self: start;
+}
+
+.sessions-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.sessions-main {
+  min-width: 0;
+}
+
+.sessions-panels {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.sessions-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.sessions-help {
+  margin-top: 8px;
+}
+
+.sessions-row {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.sessions-field {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.sessions-check {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  user-select: none;
+}
+
+.sessions-slots {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.sessions-slot {
+  cursor: grab;
+}
+
+.sessions-slot.dragging {
+  opacity: 0.9;
+  transform: scale(0.995);
+}
+
+.sessions-slot:active {
+  cursor: grabbing;
+}
+
+.sessions-slot-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.sessions-slot-title {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.sessions-slot-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sessions-slot-actions button {
+  height: 30px;
+  padding: 0 10px;
+}
+
+.sessions-slot-controls {
+  margin-top: 8px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.sessions-slot-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.sessions-slot-ok {
+  margin-top: 6px;
+}
+
+.sessions-slot-bad {
+  margin-top: 8px;
+}
+
+.sessions-preview {
+  margin-top: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.18);
+  padding: 12px;
+}
+
+.sessions-preview-title {
+  font-weight: 900;
+  font-size: 12px;
+}
+
+.sessions-preview-sub {
+  margin-top: 6px;
+}
+
+.sessions-preview-bad {
+  margin-top: 8px;
+}
+
+.sessions-preview-text {
+  margin-top: 10px;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow: auto;
+  padding-right: 4px;
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.95;
+}
+
+.sessions-material-controls select {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 8px 10px;
+  color: inherit;
+  outline: none;
+}
+
+.sessions-material-controls input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.sessions-material-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.sessions-material-subtools {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sessions-preview-text {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+}
+
+.sessions-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.sessions-modal {
+  width: min(980px, 96vw);
+  max-height: min(86vh, 900px);
+  overflow: hidden;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 12, 12, 0.92);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+
+.sessions-modal-head {
+  padding: 12px 12px 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.sessions-modal-title {
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.sessions-modal-head button {
+  height: 34px;
+  width: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  cursor: pointer;
+}
+
+.sessions-modal-actions {
+  padding: 0 12px 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sessions-modal-text {
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  white-space: pre-wrap;
+  line-height: 1.35;
+  font-size: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rehearsals-item.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sessions-actors {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.sessions-actor-row {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  gap: 10px;
+  align-items: center;
+}
+
+.sessions-actor-name {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sessions-actor-status {
+  text-align: right;
+}
+
+.sessions-insights {
+  display: grid;
+  gap: 8px;
+}
+
+.sessions-insight {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+}
+
+.sessions-insight-title {
+  font-weight: 900;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+@media (max-width: 1100px) {
+  .sessions-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sessions-side {
+    position: static;
+  }
+
+  .sessions-panels {
+    grid-template-columns: 1fr;
+  }
+}
+

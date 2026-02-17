@@ -1118,6 +1118,117 @@ class AttendanceService {
     return lines.join("\n");
   }
 
+  /**
+   * Публикация сборной сессии из backend (projectId + sessionId).
+   * Backend вызывает /internal/publish-director-session, а бот отправляет сообщение в группу
+   * и фиксирует published в rawJson через backend /bot/director-sessions/*.
+   */
+  async publishDirectorSessionFromBackend(projectId, sessionId) {
+    const groupChatId = this.getEffectiveGroupChatId();
+    const threadId = this.getEffectiveThreadId();
+
+    if (!groupChatId) {
+      throw new Error("Group chat is not configured (GROUP_CHAT_ID / /setgroup)");
+    }
+
+    const session = await orchestraBotApi.getDirectorSession(projectId, sessionId);
+    const text = this._buildDirectorSessionText(session);
+
+    const opts = { parse_mode: "HTML" };
+    const tid =
+      threadId != null && String(threadId).trim() !== "" ? parseInt(threadId, 10) : null;
+    if (tid && !Number.isNaN(tid)) {
+      opts.message_thread_id = tid;
+    }
+
+    const sent = await this.bot.telegram.sendMessage(
+      groupChatId,
+      text,
+      Object.assign({}, opts, this._directorKeyboard(projectId, sessionId)),
+    );
+
+    await orchestraBotApi.markDirectorSessionPublished(projectId, sessionId, {
+      chatId: String(sent.chat?.id),
+      messageId: String(sent.message_id),
+      threadId:
+        opts.message_thread_id != null ? String(opts.message_thread_id) : undefined,
+    });
+
+    return sent;
+  }
+
+  _buildDirectorSessionText(session) {
+    const title = escapeHtml(session?.title || "Сессия");
+    const startsAt = session?.startsAt ? formatRuDateTime(session.startsAt) : "";
+    const schedule = this._formatDirectorSchedule(session);
+    const selected = this._formatDirectorSelectedMaterials(session);
+    const invite = this._formatDirectorInviteList(session);
+    const listText = this._formatBackendAttendanceList(session);
+    return `<b>${title}</b>\n${escapeHtml(startsAt)}\n\nПлан репетиции\n${schedule}\n\nВыбрано на сегодня\n${selected}\n\nКого зовём\n${invite}\n\nПодтверждение присутствия\n\n${listText}`;
+  }
+
+  _directorKeyboard(projectId, sessionId) {
+    return Markup.inlineKeyboard([
+      [
+        Markup.button.callback("Буду", `ds:${projectId}:${sessionId}:present`),
+        Markup.button.callback("Не буду", `ds:${projectId}:${sessionId}:absent`),
+        Markup.button.callback("Свое время", `ds:${projectId}:${sessionId}:late`),
+      ],
+    ]);
+  }
+
+  _formatDirectorSchedule(session) {
+    const slots = Array.isArray(session?.slots) ? session.slots : [];
+    if (slots.length === 0) return "—";
+    const sorted = [...slots].sort((a, b) => (a.offsetMin ?? 0) - (b.offsetMin ?? 0));
+    const lines = sorted.slice(0, 60).map((s) => {
+      const t1 = escapeHtml(String(s.timeStart ?? "").trim() || "");
+      const t2 = escapeHtml(String(s.timeEnd ?? "").trim() || "");
+      const t = t1 && t2 ? `${t1}–${t2}` : t1 || t2 || "";
+      const p = escapeHtml(String(s.projectSlug ?? "").trim() || "");
+      const id = s.stepId != null ? `#${escapeHtml(String(s.stepId))}` : "";
+      const title = escapeHtml(String(s.stepTitle ?? "").trim());
+      const notes = escapeHtml(String(s.notes ?? "").trim());
+      const tail = [p, id, title].filter(Boolean).join(" ");
+      const line = t ? `• ${t} — ${tail || "Материал"}` : `• ${tail || "Материал"}`;
+      return notes ? `${line}\n  ↳ ${notes}` : line;
+    });
+    return lines.join("\n");
+  }
+
+  _formatDirectorSelectedMaterials(session) {
+    const slots = Array.isArray(session?.slots) ? session.slots : [];
+    if (slots.length === 0) return "—";
+    const sorted = [...slots].sort((a, b) => (a.offsetMin ?? 0) - (b.offsetMin ?? 0));
+    const uniq = new Set();
+    const lines = [];
+    for (const s of sorted) {
+      const p = String(s.projectSlug ?? "").trim();
+      const stepId = s.stepId != null ? String(s.stepId) : "";
+      const title = String(s.stepTitle ?? "").trim();
+      const key = `${p}:${stepId}:${title}`;
+      if (!p || !stepId) continue;
+      if (uniq.has(key)) continue;
+      uniq.add(key);
+      lines.push(`• ${escapeHtml([p, `#${stepId}`, title].filter(Boolean).join(" "))}`);
+    }
+    return lines.length ? lines.join("\n") : "—";
+  }
+
+  _formatDirectorInviteList(session) {
+    const participants = Array.isArray(session?.participants)
+      ? session.participants
+      : [];
+    if (participants.length === 0) return "—";
+    const lines = participants.slice(0, 120).map((p) => {
+      const email = escapeHtml(String(p?.email || "").trim() || "—");
+      const name = escapeHtml(String(p?.userName || "").trim());
+      const label = name ? `${name} · ${email}` : email;
+      return `• ${label}`;
+    });
+    return lines.join("\n");
+  }
+
   async handleBackendAttendanceCallback(ctx) {
     try {
       const data = String(ctx.callbackQuery?.data || "");
@@ -1204,6 +1315,49 @@ class AttendanceService {
     };
   }
 
+  async handleDirectorSessionAttendanceCallback(ctx) {
+    try {
+      const data = String(ctx.callbackQuery?.data || "");
+      const m = data.match(
+        /^ds:([a-z0-9-]+):([a-z0-9-]+):(present|absent|late)$/i,
+      );
+      if (!m) return;
+      const projectId = m[1];
+      const sessionId = m[2];
+      const status = m[3];
+
+      const userName =
+        (ctx.from?.username && String(ctx.from.username).trim()) ||
+        [ctx.from?.first_name, ctx.from?.last_name]
+          .map((x) => String(x || "").trim())
+          .filter(Boolean)
+          .join(" ")
+          .trim() ||
+        undefined;
+
+      await orchestraBotApi.setDirectorSessionAttendance(projectId, sessionId, {
+        telegramId: String(ctx.from.id),
+        status,
+        userName,
+      });
+
+      try {
+        await ctx.answerCbQuery("Ок");
+      } catch (_) {}
+
+      // обновим сообщение (подтянем список заново)
+      const session = await orchestraBotApi.getDirectorSession(projectId, sessionId);
+      const text = this._buildDirectorSessionText(session);
+
+      await ctx.editMessageText(text, {
+        parse_mode: "HTML",
+        ...this._directorKeyboard(projectId, sessionId),
+      });
+    } catch (e) {
+      console.error("handleDirectorSessionAttendanceCallback error:", e);
+    }
+  }
+
   init() {
     this.bot.use(this.middleware());
 
@@ -1218,6 +1372,14 @@ class AttendanceService {
     this.bot.action(/^reh:([a-z0-9]+):(present|absent|late)$/i, async (ctx) => {
       await this.handleBackendAttendanceCallback(ctx);
     });
+
+    // Новый формат: attendance для сборной сессии (director sessions)
+    this.bot.action(
+      /^ds:([a-z0-9-]+):([a-z0-9-]+):(present|absent|late)$/i,
+      async (ctx) => {
+        await this.handleDirectorSessionAttendanceCallback(ctx);
+      },
+    );
 
     this.bot.action(
       /^rehearsal_send_to_group_(\d{4}-\d{2}-\d{2})$/,
