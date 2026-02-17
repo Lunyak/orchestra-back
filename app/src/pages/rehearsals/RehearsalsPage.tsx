@@ -5,16 +5,19 @@ import {
   getRehearsalSteps,
   listRehearsals,
   getProfilesBatch,
+  getMyProfile,
   planRehearsal,
   publishRehearsal,
   updateRehearsal,
   type Rehearsal,
+  type MyProfile,
   type TeamProfile,
   type RehearsalSelectedStep,
 } from "../../sync/api";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useTeam } from "../../features/team";
+import { useScene } from "../../features/scene";
 import "./style.css";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -37,19 +40,179 @@ function formatMemberLabel(m: { email: string; displayName?: string | null }): s
   return name ? `${name} (${m.email})` : m.email;
 }
 
+function extractRolesBrackets(text?: string): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  const re = /\[\[([^\]]+)\]\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const role = (m[1] ?? "").trim();
+    if (!role) continue;
+    out.push(role);
+  }
+  return Array.from(new Set(out));
+}
+
+function extractSpeakerRolesFromLines(text?: string): string[] {
+  if (!text) return [];
+  const out: string[] = [];
+  const lines = text.split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith("==") || line.startsWith("(")) continue;
+
+    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.\-]{1,40})\s*[:—-]\s+\S/);
+    if (m1?.[1]) {
+      const role = m1[1].replace(/\s+/g, " ").trim();
+      if (role.length >= 2 && role.length <= 40) out.push(role);
+      continue;
+    }
+
+    const m2 = line.match(/^([A-ZА-ЯЁ]{2,40})([.,!?:])\s+/);
+    if (m2?.[1]) {
+      out.push(m2[1].trim());
+      continue;
+    }
+  }
+  return Array.from(new Set(out));
+}
+
+function extractRolesSmart(text?: string): string[] {
+  const a = extractRolesBrackets(text);
+  const b = extractSpeakerRolesFromLines(text);
+  return Array.from(new Set([...a, ...b]));
+}
+
+function looksLikeEmail(v: string): boolean {
+  return /.+@.+\..+/.test(v);
+}
+
+function extractEmailFromText(raw: string): string | null {
+  const m = String(raw ?? "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return m?.[0] ? normalizeEmail(m[0]) : null;
+}
+
+function normalizePersonName(v: string): string {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeRoleName(v: string): string {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isAllCapsRole(raw: string): boolean {
+  const s = String(raw ?? "").trim();
+  if (!s) return false;
+  // Есть буквы, и все буквы — в верхнем регистре (RU/EN)
+  const hasLetters = /[A-Za-zА-ЯЁ]/.test(s);
+  if (!hasLetters) return false;
+  return !/[a-zа-яё]/.test(s);
+}
+
+function titleCaseRole(raw: string): string {
+  const s = String(raw ?? "").trim().replace(/\s+/g, " ");
+  if (!s) return s;
+  return s
+    .split(" ")
+    .map((w) => {
+      const t = w.trim();
+      if (!t) return t;
+      const first = t.slice(0, 1).toUpperCase();
+      const rest = t.slice(1).toLowerCase();
+      return first + rest;
+    })
+    .join(" ");
+}
+
+function parseCharacters(value: unknown): string[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((x) => String(x ?? "").trim())
+      .filter((x) => x.length > 0);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((x) => String(x ?? "").trim())
+            .filter((x) => x.length > 0);
+        }
+      } catch {
+        // fallthrough
+      }
+    }
+    return [trimmed];
+  }
+  return [];
+}
+
+function resolveActorEmail(
+  value: string,
+  members: Array<{ email: string; displayName?: string | null }>,
+): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const fromText = extractEmailFromText(raw);
+  if (fromText) return fromText;
+
+  if (looksLikeEmail(raw)) return normalizeEmail(raw);
+
+  const q = normalizePersonName(raw);
+  if (!q) return null;
+
+  const exact = members.filter((m) => normalizePersonName(m.displayName ?? "") === q);
+  if (exact.length === 1) return normalizeEmail(exact[0].email);
+
+  // Частичное совпадение (например, "Алёна" vs "Алёна Иванова") — только если уникально.
+  const partial = members.filter((m) => {
+    const n = normalizePersonName(m.displayName ?? "");
+    if (!n) return false;
+    return n.includes(q) || q.includes(n);
+  });
+  if (partial.length === 1) return normalizeEmail(partial[0].email);
+
+  return null;
+}
+
 export function RehearsalsPage() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
-  const { projectMembers } = useTeam();
+  const { projectMembers, projectOwner } = useTeam();
+  const { steps: scriptSteps } = useScene();
 
   const projectSlug = projectName || "fools";
   const members = useMemo(
     () =>
-      (projectMembers ?? []).map((m) => ({
-        email: m.user.email,
-        displayName: m.user.displayName ?? null,
-      })),
-    [projectMembers],
+      [
+        ...(projectOwner?.email
+          ? [{ email: projectOwner.email, displayName: projectOwner.displayName ?? null }]
+          : []),
+        ...(projectMembers ?? []).map((m) => ({
+          email: m.user.email,
+          displayName: m.user.displayName ?? null,
+        })),
+      ],
+    [projectMembers, projectOwner?.displayName, projectOwner?.email],
   );
 
   const [calendarState, setCalendarState] = useState<CalendarSectionState>(() => {
@@ -87,6 +250,58 @@ export function RehearsalsPage() {
   const [savingSteps, setSavingSteps] = useState(false);
   const [saveStepsError, setSaveStepsError] = useState<string | null>(null);
 
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaStartsAtLocal, setMetaStartsAtLocal] = useState("");
+  const [metaDurationMin, setMetaDurationMin] = useState<string>("");
+  const [metaSaving, setMetaSaving] = useState(false);
+  const [metaSaveError, setMetaSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!activeRehearsal) {
+      setMetaTitle("");
+      setMetaStartsAtLocal("");
+      setMetaDurationMin("");
+      setMetaSaveError(null);
+      return;
+    }
+    setMetaTitle(activeRehearsal.title ?? "");
+    setMetaStartsAtLocal(dayjs(activeRehearsal.startsAt).format("YYYY-MM-DDTHH:mm"));
+    setMetaDurationMin(
+      activeRehearsal.durationMin != null ? String(activeRehearsal.durationMin) : "",
+    );
+    setMetaSaveError(null);
+  }, [activeRehearsal?.id]);
+
+  const saveMeta = async () => {
+    if (!accessToken || !activeRehearsal) return;
+    setMetaSaving(true);
+    setMetaSaveError(null);
+    try {
+      const durationRaw = metaDurationMin.trim();
+      const duration =
+        durationRaw === "" ? null : Math.max(0, Math.floor(Number(durationRaw)));
+      const nextStartsAt =
+        metaStartsAtLocal.trim() === ""
+          ? activeRehearsal.startsAt
+          : new Date(metaStartsAtLocal).toISOString();
+      const updated = await updateRehearsal(accessToken, activeRehearsal.id, {
+        title: metaTitle.trim() || "Репетиция",
+        startsAt: nextStartsAt,
+        durationMin: duration,
+      });
+      setRehearsals((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
+      setPlanCache((p) => {
+        const next = { ...p };
+        delete next[activeRehearsal.id];
+        return next;
+      });
+    } catch {
+      setMetaSaveError("Не удалось сохранить параметры репетиции");
+    } finally {
+      setMetaSaving(false);
+    }
+  };
+
   const rehearsalsByDate = useMemo(() => {
     const grouped = new Map<string, Rehearsal[]>();
     for (const rehearsal of rehearsals) {
@@ -107,10 +322,68 @@ export function RehearsalsPage() {
   const rehearsalsForSelectedDay = rehearsalsByDate.get(calendarState.selectedDate) ?? [];
 
   const [teamProfiles, setTeamProfiles] = useState<TeamProfile[]>([]);
+  const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
+
+  const myMember = useMemo(() => {
+    const email = String(myProfile?.email ?? "").trim();
+    if (!email) return null;
+    return { email, displayName: myProfile?.displayName ?? null };
+  }, [myProfile?.displayName, myProfile?.email]);
+
+  const knownPeople = useMemo(() => {
+    const map = new Map<string, { email: string; displayName?: string | null }>();
+    for (const m of members) {
+      const e = normalizeEmail(m.email);
+      if (!e) continue;
+      map.set(e, { email: m.email, displayName: m.displayName ?? null });
+    }
+    for (const p of teamProfiles ?? []) {
+      const e = normalizeEmail(p.email);
+      if (!e) continue;
+      const existing = map.get(e);
+      if (existing) {
+        map.set(e, {
+          email: existing.email,
+          displayName: existing.displayName ?? p.displayName ?? null,
+        });
+      } else {
+        map.set(e, { email: p.email, displayName: p.displayName ?? null });
+      }
+    }
+    if (myProfile?.email) {
+      const e = normalizeEmail(myProfile.email);
+      if (e && !map.has(e)) {
+        map.set(e, { email: myProfile.email, displayName: myProfile.displayName ?? null });
+      }
+    }
+    return Array.from(map.values());
+  }, [members, myProfile?.displayName, myProfile?.email, teamProfiles]);
+
+  const membersWithMe = useMemo(() => {
+    const map = new Map<string, { email: string; displayName?: string | null }>();
+    const add = (m: { email: string; displayName?: string | null } | null) => {
+      if (!m?.email) return;
+      const e = normalizeEmail(m.email);
+      if (!e) return;
+      if (!map.has(e)) map.set(e, { email: m.email, displayName: m.displayName ?? null });
+    };
+    (members ?? []).forEach((m) => add(m));
+    add(myMember);
+    return Array.from(map.values());
+  }, [members, myMember]);
+
+  const scriptStepById = useMemo(() => {
+    const map = new Map<number, (typeof scriptSteps)[number]>();
+    for (const st of scriptSteps ?? []) {
+      if (typeof st?.id !== "number") continue;
+      map.set(st.id, st);
+    }
+    return map;
+  }, [scriptSteps]);
 
   useEffect(() => {
     if (!accessToken) return;
-    const emails = members.map((m) => normalizeEmail(m.email)).filter(Boolean);
+    const emails = membersWithMe.map((m) => normalizeEmail(m.email)).filter(Boolean);
     if (emails.length === 0) {
       setTeamProfiles([]);
       return;
@@ -128,7 +401,25 @@ export function RehearsalsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, members]);
+  }, [accessToken, membersWithMe]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setMyProfile(null);
+      return;
+    }
+    let cancelled = false;
+    getMyProfile(accessToken)
+      .then((p) => {
+        if (!cancelled) setMyProfile(p ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setMyProfile(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
 
   const teamProfileByEmail = useMemo(() => {
     const map = new Map<string, TeamProfile>();
@@ -137,8 +428,78 @@ export function RehearsalsPage() {
       if (!e) continue;
       map.set(e, p);
     }
+    const me = myProfile?.email ? normalizeEmail(myProfile.email) : "";
+    // Важно: batch может вернуть профиль без characters (если бэк не перезапущен / старая схема select).
+    // Поэтому всегда подмешиваем myProfile поверх, чтобы хотя бы для себя роли работали.
+    if (me && myProfile) {
+      const existing = map.get(me);
+      map.set(me, {
+        email: existing?.email ?? myProfile.email,
+        displayName: existing?.displayName ?? myProfile.displayName ?? null,
+        firstName: existing?.firstName ?? myProfile.firstName ?? null,
+        lastName: existing?.lastName ?? myProfile.lastName ?? null,
+        telegramId: existing?.telegramId ?? myProfile.telegramId ?? null,
+        characters:
+          (existing as any)?.characters != null
+            ? (existing as any).characters
+            : (myProfile as any)?.characters ?? null,
+        availabilityCalendar:
+          existing?.availabilityCalendar ?? myProfile.availabilityCalendar ?? null,
+      });
+    }
     return map;
-  }, [teamProfiles]);
+  }, [myProfile, teamProfiles]);
+
+  const freeRolesNormSetForSelectedDate = useMemo(() => {
+    const dateKey = calendarState.selectedDate;
+    const set = new Set<string>();
+    for (const m of membersWithMe) {
+      const email = normalizeEmail(m.email);
+      if (!email) continue;
+      const prof = teamProfileByEmail.get(email);
+      const availability = (prof?.availabilityCalendar as any)?.[dateKey];
+      if (availability !== "present") continue;
+      const chars = parseCharacters((prof as any)?.characters);
+      for (const ch of chars) {
+        const norm = normalizeRoleName(String(ch ?? ""));
+        if (norm) set.add(norm);
+      }
+    }
+    return set;
+  }, [calendarState.selectedDate, membersWithMe, teamProfileByEmail]);
+
+  const freeActorsForSelectedDate = useMemo(() => {
+    const dateKey = calendarState.selectedDate;
+    const out: Array<{
+      email: string;
+      displayName?: string | null;
+      roles: string[];
+    }> = [];
+
+    for (const m of membersWithMe) {
+      const email = normalizeEmail(m.email);
+      if (!email) continue;
+      const prof = teamProfileByEmail.get(email);
+      const availability = (prof?.availabilityCalendar as any)?.[dateKey];
+      if (availability !== "present") continue;
+      const chars = parseCharacters((prof as any)?.characters);
+      const roles = chars
+        .map((x) => String(x ?? "").trim())
+        .filter((x) => x.length > 0)
+        .map((x) => (isAllCapsRole(x) ? titleCaseRole(x) : x));
+      roles.sort((a, b) => a.localeCompare(b, "ru"));
+      out.push({ email: m.email, displayName: m.displayName ?? null, roles });
+    }
+
+    out.sort((a, b) =>
+      formatMemberLabel(a).localeCompare(formatMemberLabel(b), "ru"),
+    );
+    return out;
+  }, [calendarState.selectedDate, membersWithMe, teamProfileByEmail]);
+
+  const freeActorEmailSetForSelectedDate = useMemo(() => {
+    return new Set(freeActorsForSelectedDate.map((a) => normalizeEmail(a.email)));
+  }, [freeActorsForSelectedDate]);
 
   const [planCache, setPlanCache] = useState<Record<string, { notReady: number }>>({});
 
@@ -286,6 +647,61 @@ export function RehearsalsPage() {
     }
   };
 
+  const stepAvailabilityByKey = useMemo(() => {
+    const out = new Map<
+      string,
+      {
+        ok: boolean;
+        unknown: boolean;
+        requiredRoles: string[];
+        missingRoles: string[];
+        assignedRoles: string[];
+      }
+    >();
+
+    for (const sc of stepsOptions ?? []) {
+      for (const st of sc.steps ?? []) {
+        const key = `${sc.id}:${st.id}`;
+        const full = scriptStepById.get(st.id);
+        const unknown = !full;
+        const text = (full?.playMarkdown ?? full?.markdown ?? "") as string;
+        const requiredRolesRaw = extractRolesSmart(text);
+        const requiredNorms: Array<{ norm: string; display: string }> = [];
+        const seen = new Set<string>();
+        for (const r of requiredRolesRaw) {
+          const nr = normalizeRoleName(r);
+          if (!nr || seen.has(nr)) continue;
+          seen.add(nr);
+          const disp = isAllCapsRole(r) ? titleCaseRole(r) : String(r ?? "").trim();
+          requiredNorms.push({ norm: nr, display: disp });
+        }
+
+        const assignedRoles: string[] = [];
+        const missingRoles: string[] = [];
+        if (!unknown) {
+          for (const role of requiredNorms) {
+            if (freeRolesNormSetForSelectedDate.has(role.norm)) {
+              assignedRoles.push(role.display);
+            } else {
+              missingRoles.push(role.display);
+            }
+          }
+        }
+
+        const ok = unknown ? true : missingRoles.length === 0;
+        out.set(key, {
+          ok,
+          unknown,
+          requiredRoles: requiredNorms.map((x) => x.display),
+          missingRoles,
+          assignedRoles,
+        });
+      }
+    }
+
+    return out;
+  }, [freeRolesNormSetForSelectedDate, scriptStepById, stepsOptions]);
+
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
 
   return (
@@ -357,6 +773,99 @@ export function RehearsalsPage() {
               })
             )}
           </div>
+
+          <div className="rehearsals-panels">
+            <div className="rehearsals-panel">
+              <div className="rehearsals-panel-title">
+                Свободные актёры на {calendarState.selectedDate}
+              </div>
+              {freeActorsForSelectedDate.length === 0 ? (
+                <div className="rehearsals-muted">Никто не отметил «свободен» на эту дату.</div>
+              ) : (
+                <div className="rehearsals-table-wrap">
+                  <table className="rehearsals-table">
+                    <thead>
+                      <tr>
+                        <th>Актёр</th>
+                        <th>Роли (по назначениям)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {freeActorsForSelectedDate.map((a) => (
+                        <tr key={a.email}>
+                          <td>{formatMemberLabel(a)}</td>
+                          <td className="rehearsals-td-muted">
+                            {a.roles.length ? a.roles.join(", ") : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="rehearsals-panel">
+              <div className="rehearsals-panel-title">
+                Сцены, которые можно выбрать (по ролям свободных актёров)
+              </div>
+              {!activeRehearsal ? (
+                <div className="rehearsals-muted">Выбери (или создай) репетицию, чтобы загрузить список сцен.</div>
+              ) : stepsLoading ? (
+                <div className="rehearsals-muted">Загрузка сцен…</div>
+              ) : stepsError ? (
+                <div className="rehearsals-error">{stepsError}</div>
+              ) : stepsOptions.length === 0 ? (
+                <div className="rehearsals-muted">Сцен пока нет.</div>
+              ) : (
+                <div className="rehearsals-table-wrap">
+                  <table className="rehearsals-table">
+                    <thead>
+                      <tr>
+                        <th>Сцена</th>
+                        <th>Шаг</th>
+                        <th>Статус</th>
+                        <th>Не хватает ролей</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stepsOptions.flatMap((sc) =>
+                        sc.steps.map((st) => {
+                          const key = `${sc.id}:${st.id}`;
+                          const info = stepAvailabilityByKey.get(key);
+                          const unknown = info?.unknown ?? false;
+                          const ok = info?.ok ?? true;
+                          const missing = info?.missingRoles ?? [];
+                          return (
+                            <tr key={`tbl-${key}`} data-ok={!unknown && ok ? "1" : "0"}>
+                              <td>{sc.name}</td>
+                              <td>
+                                {st.id}. {st.title}
+                              </td>
+                              <td
+                                className={
+                                  unknown
+                                    ? "rehearsals-td-muted"
+                                    : ok
+                                      ? "rehearsals-td-ok"
+                                      : "rehearsals-td-bad"
+                                }
+                              >
+                                {unknown ? "неизвестно" : ok ? "можно" : "нельзя"}
+                              </td>
+                              <td className="rehearsals-td-muted">
+                                {unknown ? "нет данных о ролях/назначениях" : missing.length ? missing.join(", ") : "—"}
+                              </td>
+                            </tr>
+                          );
+                        }),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <aside className="rehearsals-side">
@@ -369,6 +878,61 @@ export function RehearsalsPage() {
               <div className="rehearsals-card-title">{activeRehearsal.title}</div>
               <div className="rehearsals-card-sub">
                 {dayjs(activeRehearsal.startsAt).format("DD.MM.YYYY HH:mm")}
+              </div>
+
+              <div className="rehearsals-section">
+                <div className="rehearsals-section-title">Параметры</div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span className="rehearsals-muted" style={{ fontSize: 12 }}>
+                      Название
+                    </span>
+                    <input
+                      value={metaTitle}
+                      onChange={(e) => setMetaTitle(e.target.value)}
+                      placeholder="Репетиция"
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span className="rehearsals-muted" style={{ fontSize: 12 }}>
+                      Дата и время начала
+                    </span>
+                    <input
+                      type="datetime-local"
+                      value={metaStartsAtLocal}
+                      onChange={(e) => setMetaStartsAtLocal(e.target.value)}
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 6 }}>
+                    <span className="rehearsals-muted" style={{ fontSize: 12 }}>
+                      Длительность (мин)
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={metaDurationMin}
+                      onChange={(e) => setMetaDurationMin(e.target.value)}
+                      placeholder="например, 90"
+                    />
+                  </label>
+
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button type="button" onClick={() => setMetaDurationMin("90")} disabled={metaSaving}>
+                      90 мин
+                    </button>
+                    <button type="button" onClick={() => setMetaDurationMin("120")} disabled={metaSaving}>
+                      120 мин
+                    </button>
+                    <button type="button" onClick={() => setMetaDurationMin("150")} disabled={metaSaving}>
+                      150 мин
+                    </button>
+                    <button type="button" onClick={saveMeta} disabled={metaSaving}>
+                      {metaSaving ? "Сохраняю…" : "Сохранить параметры"}
+                    </button>
+                  </div>
+                  {metaSaveError && <div className="rehearsals-error">{metaSaveError}</div>}
+                </div>
               </div>
 
               <div className="rehearsals-section">
@@ -429,6 +993,11 @@ export function RehearsalsPage() {
                           </div>
                           <div style={{ display: "grid", gap: 6 }}>
                             {sc.steps.slice(0, 200).map((st) => {
+                              const key = `${sc.id}:${st.id}`;
+                              const avail = stepAvailabilityByKey.get(key);
+                              const unknown = avail?.unknown ?? false;
+                              const ok = avail?.ok ?? true;
+                              const missing = avail?.missingRoles ?? [];
                               const checked = selectedSteps.some(
                                 (x) => x.sceneId === sc.id && x.stepId === st.id,
                               );
@@ -440,10 +1009,31 @@ export function RehearsalsPage() {
                                   <input
                                     type="checkbox"
                                     checked={checked}
+                                    disabled={!unknown && !ok}
                                     onChange={() => toggleStep(sc.id, st.id)}
+                                    title={
+                                      unknown
+                                        ? "Нет данных о ролях/назначениях для этого шага"
+                                        : ok
+                                          ? "Можно выбрать"
+                                          : missing.length
+                                            ? `Не хватает ролей (по свободным актёрам): ${missing.join(", ")}`
+                                            : "Не хватает ролей (по свободным актёрам)"
+                                    }
                                   />
                                   <span style={{ fontSize: 12, lineHeight: 1.2 }}>
                                     {st.id}. {st.title}
+                                    {!unknown && !ok && missing.length > 0 && (
+                                      <span className="rehearsals-muted" style={{ display: "block", marginTop: 2 }}>
+                                        не хватает: {missing.slice(0, 4).join(", ")}
+                                        {missing.length > 4 ? ` +${missing.length - 4}` : ""}
+                                      </span>
+                                    )}
+                                    {unknown && (
+                                      <span className="rehearsals-muted" style={{ display: "block", marginTop: 2 }}>
+                                        роли: нет данных
+                                      </span>
+                                    )}
                                   </span>
                                 </label>
                               );
@@ -461,7 +1051,7 @@ export function RehearsalsPage() {
               </div>
 
               <div className="rehearsals-section">
-                <div className="rehearsals-section-title">Кто придёт</div>
+                <div className="rehearsals-section-title">Вызов актёров</div>
                 <div className="rehearsals-people">
                   {members.map((m) => {
                     const meta = (activeRehearsal.participants ?? []).find(
@@ -479,7 +1069,7 @@ export function RehearsalsPage() {
                       <div key={m.email} className="rehearsals-person">
                         <div className="rehearsals-person-label">{formatMemberLabel(m)}</div>
                         <div className="rehearsals-muted" style={{ fontSize: 11 }}>
-                          занятость:{" "}
+                          по календарю:{" "}
                           {availability === "present"
                             ? "свободен"
                             : availability === "absent"
@@ -488,7 +1078,7 @@ export function RehearsalsPage() {
                         </div>
                         {meta?.respondedAt && (
                           <div className="rehearsals-muted" style={{ fontSize: 11 }}>
-                            ответ: {dayjs(meta.respondedAt).format("DD.MM HH:mm")}
+                            ответил: {dayjs(meta.respondedAt).format("DD.MM HH:mm")}
                           </div>
                         )}
                         {meta?.status === "late" && meta?.lateTime && (
@@ -498,7 +1088,12 @@ export function RehearsalsPage() {
                         )}
                         {meta?.status && meta.status !== "unknown" && (
                           <div className="rehearsals-muted" style={{ fontSize: 11 }}>
-                            по вызову: {meta.status === "present" ? "буду" : meta.status === "absent" ? "не буду" : "свое время"}
+                            по вызову:{" "}
+                            {meta.status === "present"
+                              ? "подтвердил"
+                              : meta.status === "absent"
+                                ? "отказался"
+                                : "опоздает"}
                           </div>
                         )}
                       </div>

@@ -15,6 +15,9 @@ export function useTeam() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
   const [projectMembers, setProjectMembers] = useState<ProjectMemberInfo[]>([]);
+  const [projectOwner, setProjectOwner] = useState<
+    { id: string; email: string; displayName?: string | null } | null
+  >(null);
   const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -32,15 +35,18 @@ export function useTeam() {
     getProjectMembers(accessToken, projectName)
       .then((res) => {
         setProjectMembers(res.members ?? []);
+        setProjectOwner(res.owner ?? null);
         setIsProjectOwner(true);
       })
       .catch((err: any) => {
         if (err?.response?.status === 403) {
           setIsProjectOwner(false);
           setProjectMembers([]);
+          setProjectOwner(null);
         } else {
           setIsProjectOwner(true);
           setProjectMembers([]);
+          setProjectOwner(null);
         }
       });
   }, [location.pathname, accessToken, projectName]);
@@ -50,8 +56,10 @@ export function useTeam() {
     try {
       const res = await getProjectMembers(accessToken, projectName);
       setProjectMembers(res.members ?? []);
+      setProjectOwner(res.owner ?? null);
     } catch {
       setProjectMembers([]);
+      setProjectOwner(null);
     }
   }, [accessToken, projectName]);
 
@@ -106,6 +114,7 @@ export function useTeam() {
 
   return {
     projectMembers,
+    projectOwner,
     isProjectOwner,
     inviteEmail,
     setInviteEmail,

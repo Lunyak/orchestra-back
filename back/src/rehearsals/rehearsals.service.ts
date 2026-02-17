@@ -107,7 +107,7 @@ function extractSpeakerRolesFromLines(text?: string): string[] {
     const line = rawLine.trim();
     if (!line) continue;
     if (line.startsWith('==') || line.startsWith('(')) continue;
-    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.\-]{1,40})\s*[:—-]\s+\S/);
+    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.-]{1,40})\s*[:—-]\s+\S/);
     if (m1?.[1]) {
       const role = m1[1].replace(/\s+/g, ' ').trim();
       if (role.length >= 2 && role.length <= 40) out.push(role);

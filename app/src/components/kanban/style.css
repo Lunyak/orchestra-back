@@ -187,6 +187,22 @@
   opacity: 0.75;
 }
 
+.kanban-card-footer-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.kanban-card-duration {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  opacity: 0.9;
+  white-space: nowrap;
+}
+
 .kanban-card-assign {
   opacity: 0.9;
 }
