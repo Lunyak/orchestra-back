@@ -84,26 +84,6 @@ function extractRolesSmart(text?: string): string[] {
   return Array.from(new Set([...a, ...b]));
 }
 
-function looksLikeEmail(v: string): boolean {
-  return /.+@.+\..+/.test(v);
-}
-
-function extractEmailFromText(raw: string): string | null {
-  const m = String(raw ?? "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  return m?.[0] ? normalizeEmail(m[0]) : null;
-}
-
-function normalizePersonName(v: string): string {
-  return String(v ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/ё/g, "е")
-    .replace(/[_\-.]+/g, " ")
-    .replace(/[()]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function normalizeRoleName(v: string): string {
   return String(v ?? "")
     .trim()
