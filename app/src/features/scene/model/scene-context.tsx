@@ -8,6 +8,7 @@ import React, {
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../../shared/utils/markdownImages";
+import { createId } from "../../../shared/utils/createId";
 import {
   syncPull,
   syncPush,
@@ -313,7 +314,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           }
           const changes: SyncChange[] = [
             {
-              id: crypto.randomUUID(),
+              id: createId(),
               entityType: "Scene",
               entityId: sceneId,
               operation: "update",
@@ -334,7 +335,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           steps.forEach((step, index) => {
             const stepKey = `${sceneId}:${step.id}`;
             changes.push({
-              id: crypto.randomUUID(),
+              id: createId(),
               entityType: "Step",
               entityId: stepKey,
               operation: existingIds.has(step.id) ? "update" : "create",
@@ -354,7 +355,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           existingIds.forEach((id) => {
             if (!newIds.has(id)) {
               changes.push({
-                id: crypto.randomUUID(),
+                id: createId(),
                 entityType: "Step",
                 entityId: `${sceneId}:${id}`,
                 operation: "delete",
@@ -400,7 +401,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
       await syncPush(token, [
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           entityType: "Scene",
           entityId: sceneId,
           operation: "update",

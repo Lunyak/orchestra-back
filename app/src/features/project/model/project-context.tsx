@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
 import { ensureProject, fetchProjects, syncPush } from "../../../sync/api";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
+import { createId } from "../../../shared/utils/createId";
 import { useAuth } from "../../auth/model/auth-context";
 import { isDirectorSessionsSlug } from "../../director-sessions/directorSessionsSync";
 
@@ -151,7 +152,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
           const nowIso = new Date().toISOString();
           await syncPush(accessToken, [
             {
-              id: crypto.randomUUID(),
+              id: createId(),
               entityType: "Project",
               entityId: projectId,
               operation: "delete",

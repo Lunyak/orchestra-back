@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import playlistBg from "../../shared/assets/fon_playlist.png";
 import { getDesktopApi } from "../../shared/platform/desktop-api";
+import { createId } from "../../shared/utils/createId";
 import {
   type SyncChange,
   ensureProject,
@@ -381,7 +382,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       const nowIso = new Date().toISOString();
       const changes: SyncChange[] = [
         {
-          id: crypto.randomUUID(),
+          id: createId(),
           entityType: "Scene",
           entityId: sceneId,
           operation: "update",

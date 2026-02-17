@@ -1,5 +1,6 @@
 import { ensureProject, syncPull, syncPush } from "../../sync/api";
 import { getMyProfile, type MyProfile } from "../../sync/api";
+import { createId } from "../../shared/utils/createId";
 
 export type DirectorSlotRef = {
   projectSlug: string;
@@ -91,7 +92,7 @@ export async function saveDirectorSessions(
   const nowIso = new Date().toISOString();
   await syncPush(accessToken, [
     {
-      id: crypto.randomUUID(),
+      id: createId(),
       entityType: "Scene",
       entityId: payload.sceneId,
       operation: "update",
