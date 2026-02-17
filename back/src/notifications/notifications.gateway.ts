@@ -25,7 +25,7 @@ export class NotificationsGateway {
   }
 
   @SubscribeMessage('join-project')
-  handleJoinProject(
+  async handleJoinProject(
     @MessageBody() data: { projectId?: string },
     @ConnectedSocket() client: Socket,
   ) {
@@ -35,19 +35,19 @@ export class NotificationsGateway {
       return;
     }
     const room = this.getProjectRoom(projectId);
-    client.join(room);
+    await client.join(room);
     this.logger.debug(`client ${client.id} joined ${room}`);
   }
 
   @SubscribeMessage('leave-project')
-  handleLeaveProject(
+  async handleLeaveProject(
     @MessageBody() data: { projectId?: string },
     @ConnectedSocket() client: Socket,
   ) {
     const projectId = data?.projectId;
     if (!projectId) return;
     const room = this.getProjectRoom(projectId);
-    client.leave(room);
+    await client.leave(room);
     this.logger.debug(`client ${client.id} left ${room}`);
   }
 

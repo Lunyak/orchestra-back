@@ -48,9 +48,38 @@ async function setRehearsalAttendance(rehearsalId, payload) {
   return data;
 }
 
+async function getDirectorSession(projectId, sessionId) {
+  const c = client();
+  const { data } = await c.get(
+    `/bot/director-sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}`,
+  );
+  return data;
+}
+
+async function markDirectorSessionPublished(projectId, sessionId, payload) {
+  const c = client();
+  const { data } = await c.post(
+    `/bot/director-sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}/published`,
+    payload,
+  );
+  return data;
+}
+
+async function setDirectorSessionAttendance(projectId, sessionId, payload) {
+  const c = client();
+  const { data } = await c.post(
+    `/bot/director-sessions/${encodeURIComponent(projectId)}/${encodeURIComponent(sessionId)}/attendance`,
+    payload,
+  );
+  return data;
+}
+
 module.exports = {
   getRehearsal,
   markRehearsalPublished,
   setRehearsalAttendance,
+  getDirectorSession,
+  markDirectorSessionPublished,
+  setDirectorSessionAttendance,
 };
 

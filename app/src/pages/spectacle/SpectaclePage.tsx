@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import React, { Suspense, useCallback, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { HeaderPlayer } from "../../components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../components/playlist-sidebar/PlaylistSidebar";
@@ -40,6 +40,7 @@ export function SpectaclePage() {
   const { projectMembers, projectOwner } = useTeam();
   const {
     sceneData,
+    setRoleAssignments,
     steps,
     currentPage,
     setCurrentPage,
@@ -52,6 +53,7 @@ export function SpectaclePage() {
     reorderSteps,
     registerPlaylistPlay,
     handleTrackLinkClick,
+    saveStepsForLightPlot,
     pushSceneAfterSoundsSave,
   } = useScene();
   const {
@@ -65,6 +67,17 @@ export function SpectaclePage() {
     swapTheaterPanels: shouldSwapPanels,
     togglePanels,
   } = useScriptUI();
+
+  // При выходе из режима редактирования — принудительно сохраняем/пушим последние правки.
+  // Это закрывает кейс: пользователь сделал правку и сразу вышел из edit (таймер дебаунса мог не успеть отработать).
+  const prevIsEditingRef = useRef(isEditing);
+  useEffect(() => {
+    const prev = prevIsEditingRef.current;
+    prevIsEditingRef.current = isEditing;
+    if (prev && !isEditing) {
+      void saveStepsForLightPlot();
+    }
+  }, [isEditing, saveStepsForLightPlot]);
 
   const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
   useEffect(() => {
@@ -285,6 +298,8 @@ export function SpectaclePage() {
                 <KanbanBoardPage
                   steps={steps}
                   onStepsChange={setSteps}
+                  roleAssignments={sceneData?.roleAssignments}
+                  onRoleAssignmentsChange={setRoleAssignments}
                   members={[
                     ...(myProfile?.email
                       ? [{ email: myProfile.email, displayName: myProfile.displayName ?? null }]

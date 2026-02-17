@@ -38,7 +38,7 @@ function readJson(req) {
   });
 }
 
-function startHttpServer({ onPublishRehearsal }) {
+function startHttpServer({ onPublishRehearsal, onPublishDirectorSession }) {
   http
     .createServer(async (req, res) => {
       try {
@@ -76,6 +76,46 @@ function startHttpServer({ onPublishRehearsal }) {
           } catch (e) {
             const msg = String(e?.message || e || "publish_failed");
             console.error("publish-rehearsal failed:", msg);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: msg }));
+          }
+          return;
+        }
+
+        if (url === "/internal/publish-director-session" && method === "POST") {
+          const secret =
+            process.env.INTERNAL_API_SECRET || process.env.BOT_INTERNAL_SECRET;
+          const got = req.headers["x-internal-secret"];
+          if (!secret || String(got || "") !== String(secret)) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+            return;
+          }
+
+          const body = await readJson(req);
+          const projectId = String(body?.projectId || "").trim();
+          const sessionId = String(body?.sessionId || "").trim();
+          if (!projectId || !sessionId) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error: "projectId and sessionId are required",
+              }),
+            );
+            return;
+          }
+
+          try {
+            if (!onPublishDirectorSession) {
+              throw new Error("director session publish is not configured");
+            }
+            await onPublishDirectorSession(projectId, sessionId);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true }));
+          } catch (e) {
+            const msg = String(e?.message || e || "publish_failed");
+            console.error("publish-director-session failed:", msg);
             res.writeHead(500, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: false, error: msg }));
           }
@@ -130,6 +170,9 @@ class BotManager {
     startHttpServer({
       onPublishRehearsal: async (rehearsalId) => {
         await this.attendance.publishRehearsalFromBackend(rehearsalId);
+      },
+      onPublishDirectorSession: async (projectId, sessionId) => {
+        await this.attendance.publishDirectorSessionFromBackend(projectId, sessionId);
       },
     });
     this._setupStartCommand();

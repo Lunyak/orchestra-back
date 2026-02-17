@@ -55,7 +55,7 @@ type RawStepLike = {
   title?: string;
   markdown?: string;
   playMarkdown?: string;
-  cast?: Record<string, string>;
+  cast?: Record<string, string | string[]>;
   durationMin?: number;
   kanbanStatus?: string;
   kanbanOrder?: number;
@@ -131,6 +131,24 @@ function extractRolesSmart(text?: string): string[] {
 
 function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
+}
+
+function normalizeCastActors(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    const out = value.map((x) => String(x ?? '').trim()).filter(Boolean);
+    return Array.from(new Set(out));
+  }
+  if (value == null) return [];
+  if (typeof value === 'string') {
+    const s = value.trim();
+    return s ? [s] : [];
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    const s = String(value).trim();
+    return s ? [s] : [];
+  }
+  // Avoid stringifying objects (would become "[object Object]")
+  return [];
 }
 
 type AvailabilityCalendar = Record<string, 'present' | 'absent'>;
@@ -501,9 +519,10 @@ export class RehearsalsService {
       for (const step of steps) {
         const cast = step.cast ?? {};
         for (const rawAssigned of Object.values(cast)) {
-          const assigned = String(rawAssigned ?? '').trim();
-          if (!looksLikeEmail(assigned)) continue;
-          castEmails.add(normEmail(assigned));
+          for (const assigned of normalizeCastActors(rawAssigned)) {
+            if (!looksLikeEmail(assigned)) continue;
+            castEmails.add(normEmail(assigned));
+          }
         }
       }
     }
@@ -583,32 +602,35 @@ export class RehearsalsService {
           availableFromTime: string;
         }> = [];
         for (const role of roles) {
-          const assigned = String(cast[role] ?? '').trim();
-          if (!assigned) {
+          const assignedList = normalizeCastActors((cast as any)[role]);
+          if (assignedList.length === 0) {
             missing.push(`${role}: не назначено`);
             continue;
           }
-          if (!looksLikeEmail(assigned)) {
-            missing.push(`${role}: "${assigned}" (нужен email)`);
-            continue;
-          }
-          const email = normEmail(assigned);
-          const availability =
-            availabilityStatusByEmail.get(email) ?? 'unknown';
-          if (availability === 'absent') {
-            missing.push(`${role}: занят (${email})`);
-          } else if (availability !== 'present') {
-            missing.push(`${role}: не отметил присутствие (${email})`);
-          }
+          for (const assigned of assignedList) {
+            if (!looksLikeEmail(assigned)) {
+              missing.push(`${role}: "${assigned}" (нужен email)`);
+              continue;
+            }
+            const email = normEmail(assigned);
+            const availability =
+              availabilityStatusByEmail.get(email) ?? 'unknown';
+            if (availability === 'absent') {
+              missing.push(`${role}: занят (${email})`);
+            } else if (availability !== 'present') {
+              missing.push(`${role}: не отметил присутствие (${email})`);
+            }
 
-          const fromMin = availableFromByEmail.get(email) ?? rehearsalStartMin;
-          if (fromMin > availableFromMin) availableFromMin = fromMin;
-          if (fromMin > rehearsalStartMin) {
-            lateConstraints.push({
-              role,
-              email,
-              availableFromTime: minutesToHHMM(fromMin),
-            });
+            const fromMin =
+              availableFromByEmail.get(email) ?? rehearsalStartMin;
+            if (fromMin > availableFromMin) availableFromMin = fromMin;
+            if (fromMin > rehearsalStartMin) {
+              lateConstraints.push({
+                role,
+                email,
+                availableFromTime: minutesToHHMM(fromMin),
+              });
+            }
           }
         }
 
@@ -786,9 +808,10 @@ export class RehearsalsService {
         if (allowed && typeof step.id !== 'number') continue;
         const cast = step.cast ?? {};
         for (const rawAssigned of Object.values(cast)) {
-          const assigned = String(rawAssigned ?? '').trim();
-          if (!looksLikeEmail(assigned)) continue;
-          neededEmails.add(normEmail(assigned));
+          for (const assigned of normalizeCastActors(rawAssigned)) {
+            if (!looksLikeEmail(assigned)) continue;
+            neededEmails.add(normEmail(assigned));
+          }
         }
       }
     }

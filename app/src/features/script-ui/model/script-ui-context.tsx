@@ -81,7 +81,9 @@ export function ScriptUIProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
+      const rawKey = (e as any)?.key;
+      if (typeof rawKey !== "string" || rawKey.length === 0) return;
+      const key = rawKey.toLowerCase();
       const isToggleShortcut =
         key === "r" && (e.metaKey || e.ctrlKey) && !e.shiftKey;
       if (!isToggleShortcut) return;

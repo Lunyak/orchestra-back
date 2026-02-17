@@ -445,6 +445,18 @@ export async function publishRehearsal(
   return data;
 }
 
+export async function publishDirectorSession(
+  accessToken: string,
+  sessionId: string,
+): Promise<{ ok: boolean }> {
+  const { data } = await api.post(
+    `/director-sessions/${encodeURIComponent(sessionId)}/publish`,
+    null,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
 export async function planRehearsal(
   accessToken: string,
   rehearsalId: string,

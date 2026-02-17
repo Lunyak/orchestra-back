@@ -8,6 +8,7 @@ import { SetParticipantsDto } from '../rehearsals/dto/set-participants.dto';
 import { RehearsalsService } from '../rehearsals/rehearsals.service';
 import { RehearsalPublishedDto } from './dto/rehearsal-published.dto';
 import { RehearsalAttendanceDto } from './dto/rehearsal-attendance.dto';
+import { DirectorSessionsService } from '../director-sessions/director-sessions.service';
 
 @UseGuards(BotGuard)
 @Controller('bot')
@@ -15,6 +16,7 @@ export class BotController {
   constructor(
     private readonly botService: BotService,
     private readonly rehearsals: RehearsalsService,
+    private readonly directorSessions: DirectorSessionsService,
   ) {}
 
   @Post('profiles/upsert')
@@ -70,5 +72,40 @@ export class BotController {
   @Post('rehearsals/:id/attendance')
   setAttendance(@Param('id') id: string, @Body() body: RehearsalAttendanceDto) {
     return this.rehearsals.upsertParticipantStatusFromBot(id, body);
+  }
+
+  // ---- Director Sessions (multi-project) for bot ----
+  @Get('director-sessions/:projectId/:sessionId')
+  getDirectorSession(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+  ) {
+    return this.directorSessions.getForBot(projectId, sessionId);
+  }
+
+  @Post('director-sessions/:projectId/:sessionId/published')
+  markDirectorSessionPublished(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() body: RehearsalPublishedDto,
+  ) {
+    return this.directorSessions.markTelegramPublished(
+      projectId,
+      sessionId,
+      body,
+    );
+  }
+
+  @Post('director-sessions/:projectId/:sessionId/attendance')
+  setDirectorSessionAttendance(
+    @Param('projectId') projectId: string,
+    @Param('sessionId') sessionId: string,
+    @Body() body: RehearsalAttendanceDto,
+  ) {
+    return this.directorSessions.upsertParticipantStatusFromBot(
+      projectId,
+      sessionId,
+      body,
+    );
   }
 }

@@ -794,8 +794,8 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                                     if (!resolved.name) return;
                                     const fromCache = playlistOptions.find(
                                       (item) =>
-                                        item.title.toLowerCase() ===
-                                        resolved.name?.toLowerCase?.(),
+                                        String(item?.title ?? "").toLowerCase() ===
+                                        String(resolved.name ?? "").toLowerCase(),
                                     );
                                     if (fromCache?.id != null) {
                                       onTrackLinkClick(Number(fromCache.id));
