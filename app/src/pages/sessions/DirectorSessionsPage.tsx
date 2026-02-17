@@ -10,6 +10,7 @@ import {
 import { publishDirectorSession } from "../../sync/api";
 import type { ScriptStep } from "../../shared/types/script";
 import { markdownToPlainText } from "../../shared/utils/textPreview";
+import { createId } from "../../shared/utils/createId";
 import {
   loadDirectorSessions,
   saveDirectorSessions,
@@ -290,11 +291,11 @@ export function DirectorSessionsPage() {
     const now = new Date();
     const nowIso = now.toISOString();
     const next: DirectorRehearsalSession = {
-      id: crypto.randomUUID(),
+      id: createId(),
       title: `Сессия ${now.toLocaleDateString()}`,
       startsAt: nowIso,
       slots: [
-        { id: crypto.randomUUID(), offsetMin: 0, durationMin: 30 },
+        { id: createId(), offsetMin: 0, durationMin: 30 },
       ],
       updatedAt: nowIso,
     };
@@ -339,7 +340,7 @@ export function DirectorSessionsPage() {
     const last = [...(activeSession.slots ?? [])].sort((a, b) => a.offsetMin - b.offsetMin).slice(-1)[0];
     const nextOffset = last ? last.offsetMin + Math.max(1, last.durationMin) : 0;
     const slot: DirectorSessionSlot = {
-      id: crypto.randomUUID(),
+      id: createId(),
       offsetMin: nextOffset,
       durationMin: 30,
     };
@@ -364,7 +365,7 @@ export function DirectorSessionsPage() {
     const insertOffset = Math.max(0, Math.floor(after.offsetMin + Math.max(1, after.durationMin || 1)));
     const durationMin = 30;
     const nextSlot: DirectorSessionSlot = {
-      id: crypto.randomUUID(),
+      id: createId(),
       offsetMin: insertOffset,
       durationMin,
     };
