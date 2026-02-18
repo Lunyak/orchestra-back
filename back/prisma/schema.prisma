@@ -328,3 +328,50 @@ model BotSettings {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
+
+model ActorNote {
+  id           String   @id @default(cuid())
+  userId       String
+  projectId    String
+  sceneId      String?
+  stepSourceId Int?
+  text         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene   Scene?  @relation(fields: [sceneId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, sceneId, stepSourceId])
+  @@index([projectId])
+  @@index([userId])
+  @@index([sceneId])
+}
+
+enum ActorAnnotationField {
+  markdown
+  playMarkdown
+}
+
+model ActorAnnotation {
+  id           String               @id @default(cuid())
+  userId       String
+  projectId    String
+  sceneId      String
+  stepSourceId Int
+  field        ActorAnnotationField
+  startOffset  Int
+  endOffset    Int
+  selectedText String?
+  noteText     String
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scene   Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sceneId, stepSourceId, field])
+  @@index([projectId])
+}

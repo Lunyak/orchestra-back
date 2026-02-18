@@ -278,6 +278,197 @@
   color: #e2e8f0;
 }
 
+.actor-note-panel {
+  margin-top: 10px;
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.actor-note-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.actor-note-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.actor-note-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.actor-note-textarea {
+  width: 100%;
+  resize: vertical;
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 10px;
+  line-height: 1.35;
+}
+
+.actor-note-error {
+  font-size: 11px;
+  color: #fca5a5;
+}
+
+.actor-annotations-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.actor-annotations-btn {
+  background: #111827;
+  border: 1px solid #1f2937;
+  color: #e2e8f0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.actor-annotations-btn[data-active="true"] {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fde68a;
+}
+
+.actor-annotations-btn-secondary {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actor-annotations-btn-danger {
+  background: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fecaca;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actor-annotations-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.actor-annotations-text-wrap {
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+}
+
+.actor-annotations-text {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  color: #e2e8f0;
+  user-select: text;
+}
+
+.actor-annotations-mark {
+  background: rgba(250, 204, 21, 0.28);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.actor-annotations-mark[data-active="true"] {
+  outline: 1px solid rgba(250, 204, 21, 0.8);
+}
+
+.actor-annotations-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.actor-annotations-panel {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.actor-annotations-card {
+  border: 1px solid #1f2937;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.actor-annotations-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.actor-annotations-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.actor-annotations-x {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.actor-annotations-quote {
+  font-size: 11px;
+  color: #cbd5e1;
+  opacity: 0.9;
+}
+
+.actor-annotations-input {
+  width: 100%;
+  resize: vertical;
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 10px;
+  line-height: 1.35;
+}
+
+.actor-annotations-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actor-annotations-error {
+  font-size: 11px;
+  color: #fca5a5;
+}
+
 .form-group-grow {
   flex: 1;
   min-height: 0;
