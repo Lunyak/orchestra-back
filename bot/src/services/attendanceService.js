@@ -9,6 +9,25 @@ const escapeHtml = require("../utils/escapeHtml");
 const PLAYS = require("../const/PLAYS");
 const PLAY_SCENES = require("../const/PLAY_SCENES");
 
+// Telegram callback_data limit is 64 bytes.
+// Director session IDs are UUID v4 (36 chars with hyphens), which when combined
+// with projectId (CUID, 25 chars), prefix and status exceed the limit.
+// Solution: strip UUID hyphens (36→32 chars) and use single-char status codes.
+function compactUuid(id) {
+  return String(id || "").replace(/-/g, "");
+}
+
+function expandUuid(compact) {
+  const s = String(compact || "");
+  if (s.length === 32 && /^[0-9a-f]+$/i.test(s)) {
+    return `${s.slice(0, 8)}-${s.slice(8, 12)}-${s.slice(12, 16)}-${s.slice(16, 20)}-${s.slice(20)}`;
+  }
+  return s;
+}
+
+const DS_STATUS_COMPACT = { present: "p", absent: "a", late: "l" };
+const DS_STATUS_EXPAND = { p: "present", a: "absent", l: "late" };
+
 function formatRuDateTime(iso) {
   try {
     const d = new Date(iso);
@@ -1168,11 +1187,14 @@ class AttendanceService {
   }
 
   _directorKeyboard(projectId, sessionId) {
+    // Strip UUID hyphens so callback_data stays within Telegram's 64-byte limit.
+    // Format: ds:<projectId(25)>:<sessionId_no_dashes(32)>:<status_char(1)> = 63 bytes max.
+    const sid = compactUuid(sessionId);
     return Markup.inlineKeyboard([
       [
-        Markup.button.callback("Буду", `ds:${projectId}:${sessionId}:present`),
-        Markup.button.callback("Не буду", `ds:${projectId}:${sessionId}:absent`),
-        Markup.button.callback("Свое время", `ds:${projectId}:${sessionId}:late`),
+        Markup.button.callback("Буду", `ds:${projectId}:${sid}:${DS_STATUS_COMPACT.present}`),
+        Markup.button.callback("Не буду", `ds:${projectId}:${sid}:${DS_STATUS_COMPACT.absent}`),
+        Markup.button.callback("Свое время", `ds:${projectId}:${sid}:${DS_STATUS_COMPACT.late}`),
       ],
     ]);
   }
@@ -1318,13 +1340,12 @@ class AttendanceService {
   async handleDirectorSessionAttendanceCallback(ctx) {
     try {
       const data = String(ctx.callbackQuery?.data || "");
-      const m = data.match(
-        /^ds:([a-z0-9-]+):([a-z0-9-]+):(present|absent|late)$/i,
-      );
+      // Compact format: ds:<projectId>:<sessionId_no_dashes>:<p|a|l>
+      const m = data.match(/^ds:([a-z0-9]+):([a-z0-9]+):(p|a|l)$/i);
       if (!m) return;
       const projectId = m[1];
-      const sessionId = m[2];
-      const status = m[3];
+      const sessionId = expandUuid(m[2]); // restore UUID hyphens if needed
+      const status = DS_STATUS_EXPAND[m[3].toLowerCase()] || m[3];
 
       const userName =
         (ctx.from?.username && String(ctx.from.username).trim()) ||
@@ -1374,8 +1395,9 @@ class AttendanceService {
     });
 
     // Новый формат: attendance для сборной сессии (director sessions)
+    // Compact: ds:<projectId>:<sessionId_no_dashes>:<p|a|l>
     this.bot.action(
-      /^ds:([a-z0-9-]+):([a-z0-9-]+):(present|absent|late)$/i,
+      /^ds:([a-z0-9]+):([a-z0-9]+):(p|a|l)$/i,
       async (ctx) => {
         await this.handleDirectorSessionAttendanceCallback(ctx);
       },
