@@ -3,7 +3,17 @@ import ReactMarkdown from 'react-markdown';
 import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
 import { getDesktopApi } from "../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../shared/utils/markdownImages";
-import { ensureProject } from "../../sync/api";
+import {
+  createActorAnnotation,
+  deleteActorAnnotation,
+  ensureProject,
+  getActorStepNote,
+  listActorAnnotations,
+  updateActorAnnotation,
+  upsertActorStepNote,
+  type ActorAnnotation,
+  type ActorAnnotationField,
+} from "../../sync/api";
 import './style.css';
 
 interface ShowScriptProps {
@@ -62,6 +72,29 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const currentPage = controlledPage ?? localPage;
   const isEditing = controlledEditing ?? false;
   const showRequisites = controlledShowRequisites ?? false;
+
+  // Личные заметки актёра (тетрадь) к шагу
+  const [actorNoteText, setActorNoteText] = useState('');
+  const [actorNoteLoading, setActorNoteLoading] = useState(false);
+  const [actorNoteSaving, setActorNoteSaving] = useState(false);
+  const [actorNoteError, setActorNoteError] = useState<string | null>(null);
+  const actorNoteSaveTimerRef = useRef<number | null>(null);
+  const actorNoteLoadedKeyRef = useRef<string | null>(null);
+  const actorNoteLoadedTextRef = useRef<string>('');
+
+  const [annotationsMode, setAnnotationsMode] = useState(false);
+  const [annotations, setAnnotations] = useState<ActorAnnotation[]>([]);
+  const [annotationsLoading, setAnnotationsLoading] = useState(false);
+  const [annotationsError, setAnnotationsError] = useState<string | null>(null);
+  const [newAnnotation, setNewAnnotation] = useState<{
+    start: number;
+    end: number;
+    selectedText: string;
+    noteText: string;
+  } | null>(null);
+  const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const newAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const annotationsRootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!onStepsChange && initialSteps && initialSteps.length > 0) {
@@ -511,6 +544,204 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const activeMarkdownField: keyof ScriptStep =
     markdownMode === 'play' ? 'playMarkdown' : 'markdown';
   const activeMarkdown = (currentStep?.[activeMarkdownField] ?? '') as string;
+  const activeField = (activeMarkdownField === 'playMarkdown'
+    ? 'playMarkdown'
+    : 'markdown') as ActorAnnotationField;
+
+  // Пометки недоступны в режиме редактирования (там textarea).
+  useEffect(() => {
+    if (isEditing && annotationsMode) {
+      setAnnotationsMode(false);
+      setNewAnnotation(null);
+      setActiveAnnotationId(null);
+    }
+  }, [annotationsMode, isEditing]);
+
+  const actorNoteKey =
+    currentStep?.id != null ? `${projectName}:${sceneName}:${currentStep.id}` : null;
+
+  const computeRenderedOffset = (
+    root: HTMLElement,
+    range: Range,
+    atStart: boolean,
+  ) => {
+    const pointRange = document.createRange();
+    pointRange.selectNodeContents(root);
+    if (atStart) {
+      pointRange.setEnd(range.startContainer, range.startOffset);
+    } else {
+      pointRange.setEnd(range.endContainer, range.endOffset);
+    }
+    return pointRange.toString().length;
+  };
+
+  const handleMarkdownMouseUp = () => {
+    if (!annotationsMode) return;
+    const root = annotationsRootRef.current;
+    if (!root) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+    if (!root.contains(range.commonAncestorContainer)) return;
+
+    const start = computeRenderedOffset(root, range, true);
+    const end = computeRenderedOffset(root, range, false);
+    const s = Math.min(start, end);
+    const e = Math.max(start, end);
+    const selectedText = String(sel.toString() ?? "").trim();
+    if (!selectedText) return;
+
+    setNewAnnotation({ start: s, end: e, selectedText, noteText: "" });
+    setActiveAnnotationId(null);
+    setTimeout(() => newAnnotationTextareaRef.current?.focus(), 0);
+  };
+
+  // Аннотации: загрузка для текущего шага + поля (markdown / playMarkdown)
+  useEffect(() => {
+    if (!actorNoteKey || currentStep?.id == null) {
+      setAnnotations([]);
+      setAnnotationsError(null);
+      setAnnotationsLoading(false);
+      setNewAnnotation(null);
+      setActiveAnnotationId(null);
+      return;
+    }
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+      setAnnotations([]);
+      setAnnotationsError(null);
+      setAnnotationsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setAnnotationsLoading(true);
+    setAnnotationsError(null);
+    listActorAnnotations(token, {
+      projectSlug: projectName,
+      sceneName,
+      stepId: currentStep.id,
+      field: activeField,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setAnnotations(res.annotations ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAnnotations([]);
+        setAnnotationsError('Не удалось загрузить пометки');
+      })
+      .finally(() => {
+        if (!cancelled) setAnnotationsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [actorNoteKey, activeField, currentStep?.id, projectName, sceneName]);
+
+  // Загрузка заметки при смене шага
+  useEffect(() => {
+    if (!actorNoteKey || currentStep?.id == null) {
+      actorNoteLoadedKeyRef.current = null;
+      actorNoteLoadedTextRef.current = '';
+      setActorNoteText('');
+      setActorNoteError(null);
+      setActorNoteLoading(false);
+      return;
+    }
+    const token =
+      typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    if (!token) {
+      actorNoteLoadedKeyRef.current = actorNoteKey;
+      actorNoteLoadedTextRef.current = '';
+      setActorNoteText('');
+      setActorNoteError(null);
+      setActorNoteLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setActorNoteLoading(true);
+    setActorNoteError(null);
+    getActorStepNote(token, {
+      projectSlug: projectName,
+      sceneName,
+      stepId: currentStep.id,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const next = String(res?.note?.text ?? '');
+        actorNoteLoadedKeyRef.current = actorNoteKey;
+        actorNoteLoadedTextRef.current = next;
+        setActorNoteText(next);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        actorNoteLoadedKeyRef.current = actorNoteKey;
+        actorNoteLoadedTextRef.current = '';
+        setActorNoteText('');
+        setActorNoteError('Не удалось загрузить заметку');
+      })
+      .finally(() => {
+        if (!cancelled) setActorNoteLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actorNoteKey, currentStep?.id, projectName, sceneName]);
+
+  // Автосохранение заметки (debounce)
+  useEffect(() => {
+    if (!actorNoteKey || currentStep?.id == null) return;
+    if (actorNoteLoadedKeyRef.current !== actorNoteKey) return;
+    if (actorNoteLoading) return;
+
+    const currentLoaded = actorNoteLoadedTextRef.current ?? '';
+    if (actorNoteText === currentLoaded) return;
+
+    if (actorNoteSaveTimerRef.current) {
+      window.clearTimeout(actorNoteSaveTimerRef.current);
+    }
+
+    actorNoteSaveTimerRef.current = window.setTimeout(() => {
+      const token =
+        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+      if (!token) return;
+      setActorNoteSaving(true);
+      setActorNoteError(null);
+      upsertActorStepNote(token, {
+        projectSlug: projectName,
+        sceneName,
+        stepId: currentStep.id,
+        text: actorNoteText,
+      })
+        .then((res) => {
+          const saved = String(res?.note?.text ?? '');
+          actorNoteLoadedTextRef.current = saved;
+          setActorNoteText(saved);
+        })
+        .catch(() => {
+          setActorNoteError('Не удалось сохранить заметку');
+        })
+        .finally(() => setActorNoteSaving(false));
+    }, 600);
+
+    return () => {
+      if (actorNoteSaveTimerRef.current) {
+        window.clearTimeout(actorNoteSaveTimerRef.current);
+      }
+    };
+  }, [
+    actorNoteKey,
+    actorNoteLoading,
+    actorNoteText,
+    currentStep?.id,
+    projectName,
+    sceneName,
+  ]);
 
   const toggleRequisite = (requisiteId: number) => {
     if (!currentStep) return;
@@ -733,12 +964,59 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                       }
                       rows={12}
                     />
+                    <div className="actor-annotations-toolbar" style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        className="actor-annotations-btn"
+                        data-active="false"
+                        disabled
+                        title="Пометки работают в режиме просмотра (выйдите из редактирования шага)"
+                      >
+                        Пометки
+                      </button>
+                      <div className="actor-annotations-meta">
+                        Выйдите из редактирования, чтобы выделять текст и делать пометки
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="form-group">
                     <div className="markdown-preview">
-                      <ReactMarkdown
+                      <div className="actor-annotations-toolbar">
+                        <button
+                          type="button"
+                          className="actor-annotations-btn"
+                          data-active={annotationsMode ? "true" : "false"}
+                          onClick={() => setAnnotationsMode((p) => !p)}
+                          title="Включить режим пометок: выдели текст и добавь заметку"
+                        >
+                          Пометки
+                        </button>
+                        <div className="actor-annotations-meta">
+                          {annotationsLoading
+                            ? "загрузка…"
+                            : annotationsError
+                              ? annotationsError
+                              : `пометок: ${annotations.length}`}
+                        </div>
+                      </div>
+
+                      <div
+                        ref={annotationsRootRef}
+                        onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
+                      >
+                        <ReactMarkdown
                         urlTransform={urlTransform}
+                        rehypePlugins={
+                          annotationsMode
+                            ? [
+                                [
+                                  rehypeActorAnnotations,
+                                  { annotations, activeId: activeAnnotationId },
+                                ],
+                              ]
+                            : []
+                        }
                         components={{
                           p: ({ children }: { children: React.ReactNode }) => (
                             <p>{renderLightTokens(children)}</p>
@@ -838,13 +1116,170 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                               />
                             );
                           },
+                          mark: ({ node, children, ...rest }: any) => {
+                            const id = (node as any)?.properties?.["data-anno-id"] as
+                              | string
+                              | undefined;
+                            return (
+                              <mark
+                                {...rest}
+                                onClick={(e) => {
+                                  if (!id) return;
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setActiveAnnotationId((prev) =>
+                                    prev === id ? null : id,
+                                  );
+                                  setNewAnnotation(null);
+                                }}
+                              >
+                                {children}
+                              </mark>
+                            );
+                          },
                         }}
                       >
                         {activeMarkdown || '*Пусто*'}
                       </ReactMarkdown>
+                      </div>
+
+                      {annotationsMode ? (
+                        <div className="actor-annotations-panel">
+                          {newAnnotation ? (
+                            <div className="actor-annotations-card">
+                              <div className="actor-annotations-card-title">
+                                Новая пометка
+                              </div>
+                              <div className="actor-annotations-quote">
+                                “{newAnnotation.selectedText.slice(0, 240)}”
+                              </div>
+                              <textarea
+                                className="actor-annotations-input"
+                                ref={newAnnotationTextareaRef}
+                                value={newAnnotation.noteText}
+                                onChange={(e) =>
+                                  setNewAnnotation((p) =>
+                                    p ? { ...p, noteText: e.target.value } : p,
+                                  )
+                                }
+                                placeholder="Напиши заметку…"
+                                rows={3}
+                              />
+                              <div className="actor-annotations-actions">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    const token =
+                                      typeof window !== "undefined"
+                                        ? localStorage.getItem("accessToken")
+                                        : null;
+                                    if (!token || !currentStep?.id) return;
+                                    const noteText = newAnnotation.noteText.trim();
+                                    if (!noteText) return;
+                                    try {
+                                      const { annotation } =
+                                        await createActorAnnotation(token, {
+                                          projectSlug: projectName,
+                                          sceneName,
+                                          stepId: currentStep.id,
+                                          field: activeField,
+                                          startOffset: newAnnotation.start,
+                                          endOffset: newAnnotation.end,
+                                          selectedText: newAnnotation.selectedText,
+                                          noteText,
+                                        });
+                                      setAnnotations((prev) =>
+                                        [...prev, annotation].sort(
+                                          (a, b) =>
+                                            a.startOffset - b.startOffset ||
+                                            a.endOffset - b.endOffset,
+                                        ),
+                                      );
+                                      setNewAnnotation(null);
+                                    } catch {
+                                      setAnnotationsError("Не удалось создать пометку");
+                                    }
+                                  }}
+                                >
+                                  Сохранить пометку
+                                </button>
+                                <button
+                                  type="button"
+                                  className="actor-annotations-btn-secondary"
+                                  onClick={() => setNewAnnotation(null)}
+                                >
+                                  Отмена
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {activeAnnotationId ? (
+                            <ActorAnnotationDetails
+                              annotation={
+                                annotations.find((a) => a.id === activeAnnotationId) ??
+                                null
+                              }
+                              onClose={() => setActiveAnnotationId(null)}
+                              onUpdate={async (id, noteText) => {
+                                const token =
+                                  typeof window !== "undefined"
+                                    ? localStorage.getItem("accessToken")
+                                    : null;
+                                if (!token) return;
+                                const { annotation } = await updateActorAnnotation(
+                                  token,
+                                  id,
+                                  { noteText },
+                                );
+                                setAnnotations((prev) =>
+                                  prev.map((a) => (a.id === id ? annotation : a)),
+                                );
+                              }}
+                              onDelete={async (id) => {
+                                const token =
+                                  typeof window !== "undefined"
+                                    ? localStorage.getItem("accessToken")
+                                    : null;
+                                if (!token) return;
+                                await deleteActorAnnotation(token, id);
+                                setAnnotations((prev) => prev.filter((a) => a.id !== id));
+                                setActiveAnnotationId(null);
+                              }}
+                            />
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
+
+                <div className="actor-note-panel">
+                  <div className="actor-note-head">
+                    <div className="actor-note-title">Моя заметка к шагу</div>
+                    <div className="actor-note-meta">
+                      {actorNoteLoading
+                        ? 'загрузка…'
+                        : actorNoteSaving
+                          ? 'сохраняю…'
+                          : actorNoteError
+                            ? 'ошибка'
+                            : actorNoteText.trim()
+                              ? 'сохранено'
+                              : '—'}
+                    </div>
+                  </div>
+                  <textarea
+                    className="actor-note-textarea"
+                    value={actorNoteText}
+                    onChange={(e) => setActorNoteText(e.target.value)}
+                    placeholder="Сюда можно писать свои пометки к этому шагу (видно только вам)"
+                    rows={4}
+                  />
+                  {actorNoteError && (
+                    <div className="actor-note-error">{actorNoteError}</div>
+                  )}
+                </div>
               </div>
               {showRequisites && (
                 <aside className="requisites-panel">
@@ -935,3 +1370,196 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     </div>
   );
 };
+
+function clamp(n: number, a: number, b: number): number {
+  return Math.max(a, Math.min(b, n));
+}
+
+type HastNode =
+  | { type: "root"; children?: HastNode[] }
+  | { type: "element"; tagName: string; properties?: any; children?: HastNode[] }
+  | { type: "text"; value: string }
+  | { type: string; [k: string]: any };
+
+function rehypeActorAnnotations(opts: {
+  annotations: ActorAnnotation[];
+  activeId: string | null;
+}) {
+  const input = (opts.annotations ?? [])
+    .slice()
+    .filter((a) => a && typeof a.id === "string")
+    .map((a) => ({
+      id: a.id,
+      start: Math.max(0, Math.trunc(Number(a.startOffset))),
+      end: Math.max(0, Math.trunc(Number(a.endOffset))),
+    }))
+    .filter((a) => Number.isFinite(a.start) && Number.isFinite(a.end) && a.end > a.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end);
+
+  return function transformer(tree: HastNode) {
+    let pos = 0;
+    let idx = 0;
+
+    const wrap = (id: string, text: string) =>
+      ({
+        type: "element",
+        tagName: "mark",
+        properties: {
+          className: ["actor-annotations-mark"],
+          "data-anno-id": id,
+          "data-active": opts.activeId === id ? "true" : "false",
+        },
+        children: [{ type: "text", value: text }],
+      }) as HastNode;
+
+    const walk = (node: HastNode): HastNode => {
+      if (!node) return node;
+      if (node.type === "text") {
+        const value = String((node as any).value ?? "");
+        const len = value.length;
+        if (len === 0) return node;
+
+        // fast-forward annotations that already ended
+        while (idx < input.length && input[idx].end <= pos) idx += 1;
+        if (idx >= input.length) {
+          pos += len;
+          return node;
+        }
+
+        const startPos = pos;
+        const endPos = pos + len;
+        if (input[idx].start >= endPos) {
+          pos += len;
+          return node;
+        }
+
+        const out: HastNode[] = [];
+        let localCursor = 0;
+        while (idx < input.length) {
+          const a = input[idx];
+          if (a.start >= endPos) break;
+          const s = Math.max(a.start, startPos) - startPos;
+          const e = Math.min(a.end, endPos) - startPos;
+          if (e <= localCursor) {
+            idx += 1;
+            continue;
+          }
+          if (s > localCursor) {
+            out.push({ type: "text", value: value.slice(localCursor, s) } as HastNode);
+          }
+          out.push(wrap(a.id, value.slice(s, e)));
+          localCursor = e;
+          if (a.end <= endPos) idx += 1;
+          // если аннотация заканчивается позже — это overlap, пока игнорируем продолжение
+        }
+        if (localCursor < len) {
+          out.push({ type: "text", value: value.slice(localCursor) } as HastNode);
+        }
+
+        pos += len;
+        if (out.length === 1) return out[0];
+        return { type: "element", tagName: "span", properties: {}, children: out } as HastNode;
+      }
+
+      const children = (node as any).children;
+      if (Array.isArray(children)) {
+        const nextChildren: HastNode[] = [];
+        for (const child of children) {
+          const next = walk(child);
+          // flatten span wrappers we introduced only if safe? keep as-is
+          nextChildren.push(next);
+        }
+        (node as any).children = nextChildren;
+      }
+      return node;
+    };
+
+    walk(tree);
+  };
+}
+
+function ActorAnnotationDetails({
+  annotation,
+  onClose,
+  onUpdate,
+  onDelete,
+}: {
+  annotation: ActorAnnotation | null;
+  onClose: () => void;
+  onUpdate: (id: string, noteText: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+}) {
+  const [text, setText] = useState(annotation?.noteText ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setText(annotation?.noteText ?? "");
+    setError(null);
+    setSaving(false);
+  }, [annotation?.id]);
+
+  if (!annotation) return null;
+
+  return (
+    <div className="actor-annotations-card">
+      <div className="actor-annotations-card-head">
+        <div className="actor-annotations-card-title">Пометка</div>
+        <button type="button" className="actor-annotations-x" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      {annotation.selectedText ? (
+        <div className="actor-annotations-quote">
+          “{String(annotation.selectedText).slice(0, 240)}”
+        </div>
+      ) : null}
+      <textarea
+        className="actor-annotations-input"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={3}
+      />
+      {error ? <div className="actor-annotations-error">{error}</div> : null}
+      <div className="actor-annotations-actions">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            const next = text.trim();
+            if (!next) return;
+            setSaving(true);
+            setError(null);
+            try {
+              await onUpdate(annotation.id, next);
+            } catch {
+              setError("Не удалось сохранить");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          {saving ? "Сохраняю…" : "Сохранить"}
+        </button>
+        <button
+          type="button"
+          className="actor-annotations-btn-danger"
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            setError(null);
+            try {
+              await onDelete(annotation.id);
+            } catch {
+              setError("Не удалось удалить");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          Удалить
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -11,6 +11,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ProfileModule } from './profile/profile.module';
 import { ProjectsModule } from './projects/projects.module';
 import { RehearsalsModule } from './rehearsals/rehearsals.module';
+import { ActorNotesModule } from './actor-notes/actor-notes.module';
 import { DirectorSessionsModule } from './director-sessions/director-sessions.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
@@ -25,6 +26,7 @@ import { UsersModule } from './users/users.module';
     SyncModule,
     ProfileModule,
     RehearsalsModule,
+    ActorNotesModule,
     DirectorSessionsModule,
     NotificationsModule,
     FilesModule,

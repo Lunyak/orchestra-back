@@ -35,3 +35,5 @@ back/prisma/generated/
 /BOT_MIGRATION_SUMMARY.md
 /DEPLOYMENT.md
 /CHANGELOG-ROLE-FIX.md
+
+/.env
