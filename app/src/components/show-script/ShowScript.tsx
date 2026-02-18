@@ -1444,9 +1444,6 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                               {newAnnotation ? (
                                 <div className="actor-annotations-card">
                                   <div className="actor-annotations-card-head">
-                                    <div className="actor-annotations-card-title">
-                                      Новая пометка
-                                    </div>
                                     <button
                                       type="button"
                                       className="actor-annotations-x"
@@ -1797,7 +1794,6 @@ function ActorAnnotationDetails({
   return (
     <div className="actor-annotations-card">
       <div className="actor-annotations-card-head">
-        <div className="actor-annotations-card-title">Пометка</div>
         <button type="button" className="actor-annotations-x" onClick={onClose}>
           ×
         </button>
@@ -1811,7 +1807,7 @@ function ActorAnnotationDetails({
         className="actor-annotations-input"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={3}
+        rows={2}
       />
       {error ? <div className="actor-annotations-error">{error}</div> : null}
       <div className="actor-annotations-actions">
@@ -1832,7 +1828,7 @@ function ActorAnnotationDetails({
             }
           }}
         >
-          {saving ? "Сохраняю…" : "Сохранить"}
+          {saving ? "💾 cохраняю…" : "💾 cохранить"}
         </button>
         <button
           type="button"
@@ -1850,7 +1846,7 @@ function ActorAnnotationDetails({
             }
           }}
         >
-          Удалить
+          🗑 Удалить
         </button>
       </div>
     </div>

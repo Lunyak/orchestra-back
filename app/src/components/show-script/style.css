@@ -412,19 +412,20 @@
 .actor-annotations-popover {
   position: fixed;
   z-index: 1000;
-  width: min(420px, calc(100vw - 24px));
+  width: min(320px, calc(100vw - 24px));
   max-height: min(70vh, 520px);
   overflow: auto;
   filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.35));
 }
 
 .actor-annotations-card {
-  border: 1px solid #1f2937;
+
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  padding: 10px;
+  background: rgb(220, 199, 8);
+  padding: 0;
   display: grid;
-  gap: 8px;
+  gap: 2px;
+  position: relative;
 }
 
 .actor-annotations-card-head {
@@ -437,23 +438,29 @@
 .actor-annotations-card-title {
   font-size: 12px;
   font-weight: 700;
-  color: #f8fafc;
+
 }
 
 .actor-annotations-x {
   background: transparent;
-  border: 1px solid #334155;
-  color: #e2e8f0;
+  color: #6017ce;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
   cursor: pointer;
+  margin-left: auto;
+  border: none;
+  position: absolute;
+  top: 0;
+  right: 0;
+  cursor: pointer;
+  z-index: 2;
 }
 
 .actor-annotations-quote {
   font-size: 11px;
-  color: #cbd5e1;
+  color: #6017ce;
   opacity: 0.9;
+  padding-left: 4px;
 }
 
 .actor-annotations-input {
@@ -462,8 +469,7 @@
   background: #0b1220;
   color: #e2e8f0;
   border: 1px solid #1f2937;
-  border-radius: 8px;
-  padding: 10px;
+  padding: 0 10px;
   line-height: 1.35;
 }
 
@@ -471,6 +477,17 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+
+  button {
+    border: none;
+    background: none;
+    padding: 4px;
+    font-size: 11px;
+    color: #0b1220;
+    cursor: pointer;
+
+
+  }
 }
 
 .actor-annotations-error {
@@ -491,7 +508,6 @@
   background: #0b1220;
   color: #e2e8f0;
   border: 1px solid #1f2937;
-  border-radius: 8px;
   padding: 12px;
 }
 
