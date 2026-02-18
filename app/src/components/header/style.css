@@ -20,8 +20,7 @@
   top: 0;
   left: 0;
   bottom: 0;
-  width: 12px;
-  background: linear-gradient(to right, rgba(44, 62, 80, 0.95) 0%, rgba(44, 62, 80, 0.4) 70%, transparent 100%);
+  width: 32px;
 }
 
 .header {
