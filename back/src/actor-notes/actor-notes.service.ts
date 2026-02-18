@@ -73,7 +73,7 @@ export class ActorNotesService {
     return this.prisma.scene.upsert({
       where: { id: sceneId },
       update: { name },
-      create: { id: sceneId, projectId, name, rawJson: null },
+      create: { id: sceneId, projectId, name },
       select: { id: true },
     });
   }
