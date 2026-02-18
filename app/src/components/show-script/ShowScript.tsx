@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from "react-dom";
 import ReactMarkdown from 'react-markdown';
-import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
 import { getDesktopApi } from "../../shared/platform/desktop-api";
+import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
 import { pruneSceneImages } from "../../shared/utils/markdownImages";
 import {
   createActorAnnotation,
@@ -43,6 +43,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   canSave = true,
 }) => {
   const markdownModeStorageKey = `showScript:markdownMode:${projectName}:${sceneName}`;
+  const annotationsModeStorageKey = `showScript:annotationsMode:${projectName}:${sceneName}`;
   const pageStorageKey = `showScript:currentPage:${projectName}:${sceneName}`;
   const [localPage, setLocalPage] = useState(() => {
     if (typeof window === "undefined") return 0;
@@ -94,7 +95,19 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const actorNoteLoadedKeyRef = useRef<string | null>(null);
   const actorNoteLoadedTextRef = useRef<string>('');
 
-  const [annotationsMode, setAnnotationsMode] = useState(true);
+  const readStoredAnnotationsMode = useCallback(() => {
+    if (typeof window === "undefined") return true;
+    const raw = localStorage.getItem(annotationsModeStorageKey);
+    if (raw == null) return true; // дефолт — включено
+    return raw === "true";
+  }, [annotationsModeStorageKey]);
+
+  const [annotationsMode, setAnnotationsMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const raw = localStorage.getItem(annotationsModeStorageKey);
+    if (raw == null) return true;
+    return raw === "true";
+  });
   const [annotations, setAnnotations] = useState<ActorAnnotation[]>([]);
   const [annotationsLoading, setAnnotationsLoading] = useState(false);
   const [annotationsError, setAnnotationsError] = useState<string | null>(null);
@@ -107,7 +120,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const newAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const annotationsRootRef = useRef<HTMLDivElement | null>(null);
-  const annotationsDidDefaultRef = useRef(false);
+  const prevIsEditingRef = useRef(isEditing);
 
   type AnchorRect = {
     top: number;
@@ -144,6 +157,12 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     if (typeof window === "undefined") return;
     localStorage.setItem(markdownModeStorageKey, markdownMode);
   }, [markdownMode, markdownModeStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (isEditing) return; // в edit режиме мы принудительно выключаем — но не сохраняем это
+    localStorage.setItem(annotationsModeStorageKey, String(annotationsMode));
+  }, [annotationsMode, annotationsModeStorageKey, isEditing]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -547,7 +566,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
           const project = await ensureProject(accessToken, projectName, `Проект ${projectName}`);
           projectId = project.id;
           if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
-        } catch (_) {}
+        } catch (_) { }
       }
       if (accessToken && projectId) {
         try {
@@ -719,7 +738,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     };
   }, [lightChannels]);
 
-  // Пометки недоступны в режиме редактирования (там textarea).
+  // Метки недоступны в режиме редактирования (там textarea).
   useEffect(() => {
     if (isEditing && annotationsMode) {
       setAnnotationsMode(false);
@@ -730,12 +749,13 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     }
   }, [annotationsMode, isEditing]);
 
-  // По умолчанию включаем режим пометок при открытии (один раз за запуск).
   useEffect(() => {
-    if (annotationsDidDefaultRef.current) return;
-    if (isEditing) return;
-    annotationsDidDefaultRef.current = true;
-    setAnnotationsMode(true);
+    const prev = prevIsEditingRef.current;
+    prevIsEditingRef.current = isEditing;
+    if (prev && !isEditing) {
+      // Восстанавливаем последнее сохранённое состояние после выхода из edit
+      setAnnotationsMode(readStoredAnnotationsMode());
+    }
   }, [isEditing]);
 
   const computePopoverPos = useCallback(
@@ -900,7 +920,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
       .catch(() => {
         if (cancelled) return;
         setAnnotations([]);
-        setAnnotationsError('Не удалось загрузить пометки');
+        setAnnotationsError('Не удалось загрузить метки');
       })
       .finally(() => {
         if (!cancelled) setAnnotationsLoading(false);
@@ -1213,6 +1233,46 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                   >
                     Текст
                   </button>
+                  {isEditing ? (< div className="actor-annotations-toolbar" style={{ marginTop: 8 }}>
+                    <button
+                      type="button"
+                      className="actor-annotations-btn"
+                      data-active="false"
+                      disabled
+                      title="Метки работают в режиме просмотра (выйдите из редактирования шага)"
+                    >
+                      Метки
+                    </button>
+                    <div className="actor-annotations-meta">
+                      Выйдите из редактирования, чтобы выделять текст и делать метки
+                    </div>
+                  </div>) : <div className="actor-annotations-toolbar">
+                    <button
+                      type="button"
+                      className="actor-annotations-btn"
+                      data-active={annotationsMode ? "true" : "false"}
+                      onClick={() => {
+                        const next = !annotationsMode;
+                        setAnnotationsMode(next);
+                        if (!next) {
+                          setNewAnnotation(null);
+                          setActiveAnnotationId(null);
+                          setAnnotationAnchor(null);
+                          setAnnotationPopoverPos(null);
+                        }
+                      }}
+                      title="Включить режим пометок: выдели текст и добавь заметку"
+                    >
+                      Метки
+                    </button>
+                    <div className="actor-annotations-meta">
+                      {annotationsLoading
+                        ? "загрузка…"
+                        : annotationsError
+                          ? annotationsError
+                          : `пометок: ${annotations.length}`}
+                    </div>
+                  </div>}
                 </div>
                 {isEditing ? (
                   <div className="form-group form-group-grow">
@@ -1233,339 +1293,300 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                       }
                       rows={12}
                     />
-                    <div className="actor-annotations-toolbar" style={{ marginTop: 8 }}>
-                      <button
-                        type="button"
-                        className="actor-annotations-btn"
-                        data-active="false"
-                        disabled
-                        title="Пометки работают в режиме просмотра (выйдите из редактирования шага)"
-                      >
-                        Пометки
-                      </button>
-                      <div className="actor-annotations-meta">
-                        Выйдите из редактирования, чтобы выделять текст и делать пометки
-                      </div>
-                    </div>
+
                   </div>
                 ) : (
                   <div className="form-group">
                     <div className="markdown-preview">
-                      <div className="actor-annotations-toolbar">
-                        <button
-                          type="button"
-                          className="actor-annotations-btn"
-                          data-active={annotationsMode ? "true" : "false"}
-                          onClick={() => {
-                            const next = !annotationsMode;
-                            setAnnotationsMode(next);
-                            if (!next) {
-                              setNewAnnotation(null);
-                              setActiveAnnotationId(null);
-                              setAnnotationAnchor(null);
-                              setAnnotationPopoverPos(null);
-                            }
-                          }}
-                          title="Включить режим пометок: выдели текст и добавь заметку"
-                        >
-                          Пометки
-                        </button>
-                        <div className="actor-annotations-meta">
-                          {annotationsLoading
-                            ? "загрузка…"
-                            : annotationsError
-                              ? annotationsError
-                              : `пометок: ${annotations.length}`}
-                        </div>
-                      </div>
+
 
                       <div
                         ref={annotationsRootRef}
                         onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
                       >
                         <ReactMarkdown
-                        urlTransform={urlTransform}
-                        rehypePlugins={
-                          annotationsMode
-                            ? [
+                          urlTransform={urlTransform}
+                          rehypePlugins={
+                            annotationsMode
+                              ? [
                                 rehypeScriptTokens,
                                 [
                                   rehypeActorAnnotations,
                                   { annotations, activeId: activeAnnotationId },
                                 ],
                               ]
-                            : []
-                        }
-                        components={{
-                          p: ({ children }: { children: React.ReactNode }) => (
-                            <p>{renderLightTokens(children)}</p>
-                          ),
-                          li: ({ children }: { children: React.ReactNode }) => (
-                            <li>{renderLightTokens(children)}</li>
-                          ),
-                          h1: ({ children }: { children: React.ReactNode }) => (
-                            <h1>{renderLightTokens(children)}</h1>
-                          ),
-                          h2: ({ children }: { children: React.ReactNode }) => (
-                            <h2>{renderLightTokens(children)}</h2>
-                          ),
-                          h3: ({ children }: { children: React.ReactNode }) => (
-                            <h3>{renderLightTokens(children)}</h3>
-                          ),
-                          h4: ({ children }: { children: React.ReactNode }) => (
-                            <h4>{renderLightTokens(children)}</h4>
-                          ),
-                          h5: ({ children }: { children: React.ReactNode }) => (
-                            <h5>{renderLightTokens(children)}</h5>
-                          ),
-                          h6: ({ children }: { children: React.ReactNode }) => (
-                            <h6>{renderLightTokens(children)}</h6>
-                          ),
-                          blockquote: ({
-                            children,
-                          }: {
-                            children: React.ReactNode;
-                          }) => <blockquote>{renderLightTokens(children)}</blockquote>,
-                          td: ({ children }: { children: React.ReactNode }) => (
-                            <td>{renderLightTokens(children)}</td>
-                          ),
-                          th: ({ children }: { children: React.ReactNode }) => (
-                            <th>{renderLightTokens(children)}</th>
-                          ),
-                          a: ({
-                            href,
-                            children,
-                            ...rest
-                          }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-                            const resolved = resolveTrackLink(href);
-                            if (resolved && onTrackLinkClick) {
+                              : []
+                          }
+                          components={{
+                            p: ({ children }: { children: React.ReactNode }) => (
+                              <p>{renderLightTokens(children)}</p>
+                            ),
+                            li: ({ children }: { children: React.ReactNode }) => (
+                              <li>{renderLightTokens(children)}</li>
+                            ),
+                            h1: ({ children }: { children: React.ReactNode }) => (
+                              <h1>{renderLightTokens(children)}</h1>
+                            ),
+                            h2: ({ children }: { children: React.ReactNode }) => (
+                              <h2>{renderLightTokens(children)}</h2>
+                            ),
+                            h3: ({ children }: { children: React.ReactNode }) => (
+                              <h3>{renderLightTokens(children)}</h3>
+                            ),
+                            h4: ({ children }: { children: React.ReactNode }) => (
+                              <h4>{renderLightTokens(children)}</h4>
+                            ),
+                            h5: ({ children }: { children: React.ReactNode }) => (
+                              <h5>{renderLightTokens(children)}</h5>
+                            ),
+                            h6: ({ children }: { children: React.ReactNode }) => (
+                              <h6>{renderLightTokens(children)}</h6>
+                            ),
+                            blockquote: ({
+                              children,
+                            }: {
+                              children: React.ReactNode;
+                            }) => <blockquote>{renderLightTokens(children)}</blockquote>,
+                            td: ({ children }: { children: React.ReactNode }) => (
+                              <td>{renderLightTokens(children)}</td>
+                            ),
+                            th: ({ children }: { children: React.ReactNode }) => (
+                              <th>{renderLightTokens(children)}</th>
+                            ),
+                            a: ({
+                              href,
+                              children,
+                              ...rest
+                            }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
+                              const resolved = resolveTrackLink(href);
+                              if (resolved && onTrackLinkClick) {
+                                return (
+                                  <button
+                                    type="button"
+                                    className="markdown-track-link"
+                                    onClick={async () => {
+                                      if (resolved.id != null) {
+                                        onTrackLinkClick(Number(resolved.id));
+                                        return;
+                                      }
+                                      if (!resolved.name) return;
+                                      const fromCache = playlistOptions.find(
+                                        (item) =>
+                                          String(item?.title ?? "").toLowerCase() ===
+                                          String(resolved.name ?? "").toLowerCase(),
+                                      );
+                                      if (fromCache?.id != null) {
+                                        onTrackLinkClick(Number(fromCache.id));
+                                      }
+                                    }}
+                                  >
+                                    {children}
+                                  </button>
+                                );
+                              }
+                              if (isAudioLink(href)) {
+                                return (
+                                  <a
+                                    href={href}
+                                    className="markdown-track-link markdown-audio-link"
+                                    {...rest}
+                                  >
+                                    {children}
+                                  </a>
+                                );
+                              }
                               return (
-                                <button
-                                  type="button"
-                                  className="markdown-track-link"
-                                  onClick={async () => {
-                                    if (resolved.id != null) {
-                                      onTrackLinkClick(Number(resolved.id));
-                                      return;
-                                    }
-                                    if (!resolved.name) return;
-                                    const fromCache = playlistOptions.find(
-                                      (item) =>
-                                        String(item?.title ?? "").toLowerCase() ===
-                                        String(resolved.name ?? "").toLowerCase(),
-                                    );
-                                    if (fromCache?.id != null) {
-                                      onTrackLinkClick(Number(fromCache.id));
-                                    }
-                                  }}
-                                >
-                                  {children}
-                                </button>
-                              );
-                            }
-                            if (isAudioLink(href)) {
-                              return (
-                                <a
-                                  href={href}
-                                  className="markdown-track-link markdown-audio-link"
-                                  {...rest}
-                                >
+                                <a href={href} {...rest}>
                                   {children}
                                 </a>
                               );
-                            }
-                            return (
-                              <a href={href} {...rest}>
-                                {children}
-                              </a>
-                            );
-                          },
-                          img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
-                            const { src, alt, ...rest } = props;
-                            return (
-                              <img
-                                src={resolveImageSrc(src)}
-                                alt={alt || ''}
-                                style={{
-                                  maxHeight: 800,
-                                  maxWidth: '100%',
-                                  height: 'auto',
-                                }}
-                                {...rest}
-                              />
-                            );
-                          },
-                          mark: ({ node, children, ...rest }: any) => {
-                            const id = (node as any)?.properties?.["data-anno-id"] as
-                              | string
-                              | undefined;
-                            return (
-                              <mark
-                                {...rest}
-                                onClick={(e) => {
-                                  if (!id) return;
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setAnnotationAnchor(
-                                    rectToAnchor(
-                                      (e.currentTarget as HTMLElement).getBoundingClientRect(),
-                                    ),
-                                  );
-                                  setActiveAnnotationId((prev) =>
-                                    prev === id ? null : id,
-                                  );
-                                  setNewAnnotation(null);
-                                }}
-                              >
-                                {children}
-                              </mark>
-                            );
-                          },
-                        }}
-                      >
-                        {activeMarkdown || '*Пусто*'}
-                      </ReactMarkdown>
+                            },
+                            img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
+                              const { src, alt, ...rest } = props;
+                              return (
+                                <img
+                                  src={resolveImageSrc(src)}
+                                  alt={alt || ''}
+                                  style={{
+                                    maxHeight: 800,
+                                    maxWidth: '100%',
+                                    height: 'auto',
+                                  }}
+                                  {...rest}
+                                />
+                              );
+                            },
+                            mark: ({ node, children, ...rest }: any) => {
+                              const id = (node as any)?.properties?.["data-anno-id"] as
+                                | string
+                                | undefined;
+                              return (
+                                <mark
+                                  {...rest}
+                                  onClick={(e) => {
+                                    if (!id) return;
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setAnnotationAnchor(
+                                      rectToAnchor(
+                                        (e.currentTarget as HTMLElement).getBoundingClientRect(),
+                                      ),
+                                    );
+                                    setActiveAnnotationId((prev) =>
+                                      prev === id ? null : id,
+                                    );
+                                    setNewAnnotation(null);
+                                  }}
+                                >
+                                  {children}
+                                </mark>
+                              );
+                            },
+                          }}
+                        >
+                          {activeMarkdown || '*Пусто*'}
+                        </ReactMarkdown>
                       </div>
 
                       {annotationsMode &&
-                      typeof document !== "undefined" &&
-                      annotationPopoverPos &&
-                      (newAnnotation || activeAnnotationId)
+                        typeof document !== "undefined" &&
+                        annotationPopoverPos &&
+                        (newAnnotation || activeAnnotationId)
                         ? createPortal(
-                            <div
-                              ref={annotationPopoverRef}
-                              className="actor-annotations-popover"
-                              style={{
-                                top: annotationPopoverPos.top,
-                                left: annotationPopoverPos.left,
-                              }}
-                              onMouseDown={(e) => e.stopPropagation()}
-                            >
-                              {newAnnotation ? (
-                                <div className="actor-annotations-card">
-                                  <div className="actor-annotations-card-head">
-                                    <button
-                                      type="button"
-                                      className="actor-annotations-x"
-                                      onClick={() => {
-                                        setNewAnnotation(null);
-                                        setAnnotationPopoverPos(null);
-                                      }}
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                  <div className="actor-annotations-quote">
-                                    “{newAnnotation.selectedText.slice(0, 240)}”
-                                  </div>
-                                  <textarea
-                                    className="actor-annotations-input"
-                                    ref={newAnnotationTextareaRef}
-                                    value={newAnnotation.noteText}
-                                    onChange={(e) =>
-                                      setNewAnnotation((p) =>
-                                        p ? { ...p, noteText: e.target.value } : p,
-                                      )
-                                    }
-                                    placeholder="Напиши заметку…"
-                                    rows={3}
-                                  />
-                                  <div className="actor-annotations-actions">
-                                    <button
-                                      type="button"
-                                      onClick={async () => {
-                                        const token =
-                                          typeof window !== "undefined"
-                                            ? localStorage.getItem("accessToken")
-                                            : null;
-                                        if (!token || !currentStep?.id) return;
-                                        const noteText = newAnnotation.noteText.trim();
-                                        if (!noteText) return;
-                                        try {
-                                          const { annotation } =
-                                            await createActorAnnotation(token, {
-                                              projectSlug: projectName,
-                                              sceneName,
-                                              stepId: currentStep.id,
-                                              field: activeField,
-                                              startOffset: newAnnotation.start,
-                                              endOffset: newAnnotation.end,
-                                              selectedText: newAnnotation.selectedText,
-                                              noteText,
-                                            });
-                                          setAnnotations((prev) =>
-                                            [...prev, annotation].sort(
-                                              (a, b) =>
-                                                a.startOffset - b.startOffset ||
-                                                a.endOffset - b.endOffset,
-                                            ),
-                                          );
-                                          setNewAnnotation(null);
-                                          setAnnotationPopoverPos(null);
-                                        } catch {
-                                          setAnnotationsError("Не удалось создать пометку");
-                                        }
-                                      }}
-                                    >
-                                      Сохранить пометку
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="actor-annotations-btn-secondary"
-                                      onClick={() => {
-                                        setNewAnnotation(null);
-                                        setAnnotationPopoverPos(null);
-                                      }}
-                                    >
-                                      Отмена
-                                    </button>
-                                  </div>
+                          <div
+                            ref={annotationPopoverRef}
+                            className="actor-annotations-popover"
+                            style={{
+                              top: annotationPopoverPos.top,
+                              left: annotationPopoverPos.left,
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            {newAnnotation ? (
+                              <div className="actor-annotations-card">
+                                <div className="actor-annotations-card-head">
+                                  <button
+                                    type="button"
+                                    className="actor-annotations-x"
+                                    onClick={() => {
+                                      setNewAnnotation(null);
+                                      setAnnotationPopoverPos(null);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
                                 </div>
-                              ) : null}
-
-                              {activeAnnotationId ? (
-                                <ActorAnnotationDetails
-                                  annotation={
-                                    annotations.find((a) => a.id === activeAnnotationId) ??
-                                    null
+                                <div className="actor-annotations-quote">
+                                  “{newAnnotation.selectedText.slice(0, 240)}”
+                                </div>
+                                <textarea
+                                  className="actor-annotations-input"
+                                  ref={newAnnotationTextareaRef}
+                                  value={newAnnotation.noteText}
+                                  onChange={(e) =>
+                                    setNewAnnotation((p) =>
+                                      p ? { ...p, noteText: e.target.value } : p,
+                                    )
                                   }
-                                  onClose={() => {
-                                    setActiveAnnotationId(null);
-                                    setAnnotationPopoverPos(null);
-                                  }}
-                                  onUpdate={async (id, noteText) => {
-                                    const token =
-                                      typeof window !== "undefined"
-                                        ? localStorage.getItem("accessToken")
-                                        : null;
-                                    if (!token) return;
-                                    const { annotation } = await updateActorAnnotation(
-                                      token,
-                                      id,
-                                      { noteText },
-                                    );
-                                    setAnnotations((prev) =>
-                                      prev.map((a) => (a.id === id ? annotation : a)),
-                                    );
-                                  }}
-                                  onDelete={async (id) => {
-                                    const token =
-                                      typeof window !== "undefined"
-                                        ? localStorage.getItem("accessToken")
-                                        : null;
-                                    if (!token) return;
-                                    await deleteActorAnnotation(token, id);
-                                    setAnnotations((prev) =>
-                                      prev.filter((a) => a.id !== id),
-                                    );
-                                    setActiveAnnotationId(null);
-                                    setAnnotationPopoverPos(null);
-                                  }}
+                                  placeholder="Напиши заметку…"
+                                  rows={3}
                                 />
-                              ) : null}
-                            </div>,
-                            document.body,
-                          )
+                                <div className="actor-annotations-actions">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      const token =
+                                        typeof window !== "undefined"
+                                          ? localStorage.getItem("accessToken")
+                                          : null;
+                                      if (!token || !currentStep?.id) return;
+                                      const noteText = newAnnotation.noteText.trim();
+                                      if (!noteText) return;
+                                      try {
+                                        const { annotation } =
+                                          await createActorAnnotation(token, {
+                                            projectSlug: projectName,
+                                            sceneName,
+                                            stepId: currentStep.id,
+                                            field: activeField,
+                                            startOffset: newAnnotation.start,
+                                            endOffset: newAnnotation.end,
+                                            selectedText: newAnnotation.selectedText,
+                                            noteText,
+                                          });
+                                        setAnnotations((prev) =>
+                                          [...prev, annotation].sort(
+                                            (a, b) =>
+                                              a.startOffset - b.startOffset ||
+                                              a.endOffset - b.endOffset,
+                                          ),
+                                        );
+                                        setNewAnnotation(null);
+                                        setAnnotationPopoverPos(null);
+                                      } catch {
+                                        setAnnotationsError("Не удалось создать пометку");
+                                      }
+                                    }}
+                                  >
+                                    Сохранить пометку
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="actor-annotations-btn-secondary"
+                                    onClick={() => {
+                                      setNewAnnotation(null);
+                                      setAnnotationPopoverPos(null);
+                                    }}
+                                  >
+                                    Отмена
+                                  </button>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {activeAnnotationId ? (
+                              <ActorAnnotationDetails
+                                annotation={
+                                  annotations.find((a) => a.id === activeAnnotationId) ??
+                                  null
+                                }
+                                onClose={() => {
+                                  setActiveAnnotationId(null);
+                                  setAnnotationPopoverPos(null);
+                                }}
+                                onUpdate={async (id, noteText) => {
+                                  const token =
+                                    typeof window !== "undefined"
+                                      ? localStorage.getItem("accessToken")
+                                      : null;
+                                  if (!token) return;
+                                  const { annotation } = await updateActorAnnotation(
+                                    token,
+                                    id,
+                                    { noteText },
+                                  );
+                                  setAnnotations((prev) =>
+                                    prev.map((a) => (a.id === id ? annotation : a)),
+                                  );
+                                }}
+                                onDelete={async (id) => {
+                                  const token =
+                                    typeof window !== "undefined"
+                                      ? localStorage.getItem("accessToken")
+                                      : null;
+                                  if (!token) return;
+                                  await deleteActorAnnotation(token, id);
+                                  setAnnotations((prev) =>
+                                    prev.filter((a) => a.id !== id),
+                                  );
+                                  setActiveAnnotationId(null);
+                                  setAnnotationPopoverPos(null);
+                                }}
+                              />
+                            ) : null}
+                          </div>,
+                          document.body,
+                        )
                         : null}
                     </div>
                   </div>
@@ -1657,7 +1678,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
 
@@ -1669,7 +1690,7 @@ type HastNode =
   | { type: "root"; children?: HastNode[] }
   | { type: "element"; tagName: string; properties?: any; children?: HastNode[] }
   | { type: "text"; value: string }
-  | { type: string; [k: string]: any };
+  | { type: string;[k: string]: any };
 
 function rehypeActorAnnotations(opts: {
   annotations: ActorAnnotation[];
