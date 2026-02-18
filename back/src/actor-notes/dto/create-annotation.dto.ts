@@ -6,6 +6,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateAnnotationDto {
   @IsString()
@@ -16,6 +17,7 @@ export class CreateAnnotationDto {
   @MaxLength(80)
   sceneName: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   stepId: number;
@@ -23,10 +25,12 @@ export class CreateAnnotationDto {
   @IsIn(['markdown', 'playMarkdown'])
   field: 'markdown' | 'playMarkdown';
 
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   startOffset: number;
 
+  @Type(() => Number)
   @IsInt()
   @Min(0)
   endOffset: number;

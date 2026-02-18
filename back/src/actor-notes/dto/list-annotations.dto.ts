@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsString, MaxLength, Min } from 'class-validator';
 
 export class ListAnnotationsDto {
@@ -9,6 +10,7 @@ export class ListAnnotationsDto {
   @MaxLength(80)
   sceneName: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   stepId: number;

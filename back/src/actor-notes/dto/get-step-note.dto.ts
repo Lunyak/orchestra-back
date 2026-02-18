@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import { IsInt, IsString, MaxLength, Min } from 'class-validator';
 
 export class GetStepNoteDto {
@@ -9,6 +10,7 @@ export class GetStepNoteDto {
   @MaxLength(80)
   sceneName: string;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   stepId: number;
