@@ -82,7 +82,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
   const playlistPlayRef = useRef<(trackId: number) => void>();
   const selectedStepIdRef = useRef<number | null>(null);
-  const restoredStepRef = useRef(false);
+  const restoredStepRef = useRef<string | null>(null);
   const lightPlotSaveTimerRef = useRef<number | null>(null);
   const hasLocalEditsRef = useRef(false);
 
@@ -141,7 +141,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
     setCurrentPage(0);
     selectedStepIdRef.current = null;
-    restoredStepRef.current = false;
+    restoredStepRef.current = null;
     setIsSceneReady(false);
 
     let cancelled = false;
@@ -165,7 +165,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         setStepsState(scene?.steps ?? []);
         setCurrentPage(0);
         selectedStepIdRef.current = null;
-        restoredStepRef.current = false;
+        restoredStepRef.current = null;
         setIsSceneReady(true);
       } catch (error) {
         if (!cancelled) {
@@ -433,17 +433,18 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
   }, [projectName, steps, currentPage]);
 
   useEffect(() => {
-    if (!restoredStepRef.current) {
-      restoredStepRef.current = true;
+    if (steps.length === 0) {
+      setCurrentPage(0);
+      return;
+    }
+    if (projectName && restoredStepRef.current !== projectName) {
       const storedIdRaw = localStorage.getItem(`selectedStepId:${projectName}`);
       const storedId = storedIdRaw ? Number(storedIdRaw) : null;
-      if (storedId != null && steps.length > 0) {
+      if (storedId != null) {
         const idx = steps.findIndex((s) => s.id === storedId);
         if (idx !== -1) setCurrentPage(idx);
       }
-    }
-    if (steps.length === 0) {
-      setCurrentPage(0);
+      restoredStepRef.current = projectName;
       return;
     }
     const selectedId = selectedStepIdRef.current;

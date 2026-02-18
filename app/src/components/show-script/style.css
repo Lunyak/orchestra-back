@@ -409,6 +409,15 @@
   gap: 10px;
 }
 
+.actor-annotations-popover {
+  position: fixed;
+  z-index: 1000;
+  width: min(420px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.35));
+}
+
 .actor-annotations-card {
   border: 1px solid #1f2937;
   border-radius: 10px;
