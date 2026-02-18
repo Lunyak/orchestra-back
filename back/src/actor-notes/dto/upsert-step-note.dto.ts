@@ -18,4 +18,3 @@ export class UpsertStepNoteDto {
   @MaxLength(20000)
   text?: string;
 }
-

@@ -7,4 +7,3 @@ import { ActorNotesService } from './actor-notes.service';
   controllers: [ActorNotesController],
 })
 export class ActorNotesModule {}
-

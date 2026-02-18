@@ -13,4 +13,3 @@ export class GetStepNoteDto {
   @Min(1)
   stepId: number;
 }
-

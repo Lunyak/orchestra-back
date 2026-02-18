@@ -16,4 +16,3 @@ export class ListAnnotationsDto {
   @IsIn(['markdown', 'playMarkdown'])
   field: 'markdown' | 'playMarkdown';
 }
-

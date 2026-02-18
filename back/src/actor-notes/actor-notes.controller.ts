@@ -98,4 +98,3 @@ export class ActorNotesController {
     return this.actorNotes.deleteAnnotation(req.user.userId, id);
   }
 }
-

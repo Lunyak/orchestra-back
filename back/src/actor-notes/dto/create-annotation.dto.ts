@@ -1,4 +1,11 @@
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateAnnotationDto {
   @IsString()
@@ -33,4 +40,3 @@ export class CreateAnnotationDto {
   @MaxLength(10000)
   noteText: string;
 }
-

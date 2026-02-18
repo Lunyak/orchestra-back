@@ -7,16 +7,30 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { ActorAnnotationField } from '@prisma/client';
 
+function safeToString(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (
+    typeof v === 'number' ||
+    typeof v === 'boolean' ||
+    typeof v === 'bigint'
+  ) {
+    return String(v);
+  }
+  if (v instanceof Date) return v.toISOString();
+  return '';
+}
+
 function normSlug(v: unknown): string {
-  return String(v ?? '').trim();
+  return safeToString(v).trim();
 }
 
 function normSceneName(v: unknown): string {
-  return String(v ?? '').trim();
+  return safeToString(v).trim();
 }
 
 function normText(v: unknown): string {
-  return String(v ?? '').replace(/\r\n/g, '\n').trim();
+  return safeToString(v).replace(/\r\n/g, '\n').trim();
 }
 
 @Injectable()
@@ -64,7 +78,12 @@ export class ActorNotesService {
     });
   }
 
-  async getStepNote(userId: string, projectSlug: string, sceneName: string, stepId: number) {
+  async getStepNote(
+    userId: string,
+    projectSlug: string,
+    sceneName: string,
+    stepId: number,
+  ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
     const scene = await this.ensureScene(projectId, sceneName);
@@ -133,7 +152,12 @@ export class ActorNotesService {
     return { note };
   }
 
-  async deleteStepNote(userId: string, projectSlug: string, sceneName: string, stepId: number) {
+  async deleteStepNote(
+    userId: string,
+    projectSlug: string,
+    sceneName: string,
+    stepId: number,
+  ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
     const scene = await this.ensureScene(projectId, sceneName);
@@ -210,17 +234,24 @@ export class ActorNotesService {
 
     const start = Math.trunc(Number(startOffset));
     const end = Math.trunc(Number(endOffset));
-    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < 0) {
+    if (
+      !Number.isFinite(start) ||
+      !Number.isFinite(end) ||
+      start < 0 ||
+      end < 0
+    ) {
       throw new BadRequestException('Invalid offsets');
     }
     if (end <= start) {
-      throw new BadRequestException('endOffset must be greater than startOffset');
+      throw new BadRequestException(
+        'endOffset must be greater than startOffset',
+      );
     }
 
     const note = normText(noteText);
     if (!note) throw new BadRequestException('noteText is required');
 
-    const sel = String(selectedText ?? '').trim();
+    const sel = safeToString(selectedText).trim();
 
     const created = await this.prisma.actorAnnotation.create({
       data: {
@@ -248,7 +279,11 @@ export class ActorNotesService {
     return { annotation: created };
   }
 
-  async updateAnnotation(userId: string, id: string, patch: { noteText?: unknown }) {
+  async updateAnnotation(
+    userId: string,
+    id: string,
+    patch: { noteText?: unknown },
+  ) {
     const note = patch?.noteText != null ? normText(patch.noteText) : null;
     if (note != null && !note) {
       throw new BadRequestException('noteText cannot be empty');
@@ -288,4 +323,3 @@ export class ActorNotesService {
     return { ok: true };
   }
 }
-

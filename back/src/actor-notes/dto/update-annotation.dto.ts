@@ -6,4 +6,3 @@ export class UpdateAnnotationDto {
   @MaxLength(10000)
   noteText?: string;
 }
-
