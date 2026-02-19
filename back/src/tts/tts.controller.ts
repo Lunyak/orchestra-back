@@ -1,4 +1,4 @@
-import { Controller, Get, Header, HttpException, HttpStatus, Query, Res } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { TtsService } from './tts.service';
 
@@ -12,7 +12,6 @@ export class TtsController {
   }
 
   @Get()
-  @Header('Cache-Control', 'public, max-age=31536000, immutable')
   async speak(
     @Query('text') text: string,
     @Query('voice') voice: string | undefined,
@@ -25,6 +24,8 @@ export class TtsController {
     try {
       const out = await this.tts.synth({ text: t, voice });
       res.setHeader('Content-Type', out.mime);
+      // Cache only successful audio responses. Don't mark as immutable (errors got cached by browsers).
+      res.setHeader('Cache-Control', 'public, max-age=604800');
       res.send(out.buf);
     } catch (e: any) {
       const msg = String(e?.message ?? e ?? 'TTS failed');

@@ -60,10 +60,10 @@ docker compose ps
 curl -s http://localhost:3000
 ```
 
-- **Web (фронт):** http://213.226.126.196 (порт 80) — SPA + проксирование API на бэкенд.
+- **Web (фронт, без HTTPS):** http://213.226.126.196:8080 — SPA + проксирование API на бэкенд.
 - **API (бэкенд):** http://213.226.126.196:3000 — напрямую, если нужен отдельный доступ.
 
-В браузере открывайте основной адрес (порт 80): запросы к API идут через тот же хост по пути `/api`.
+В браузере открывайте основной адрес: запросы к API идут через тот же хост по пути `/api`.
 
 ---
 
@@ -106,6 +106,46 @@ ssh root@213.226.126.196 "cd /opt/orchestra-back && git pull && docker compose u
 ---
 
 ## 5. (Опционально) Nginx и HTTPS
+
+Ниже два варианта. Рекомендуется **вариант A (Caddy в Docker)**, потому что он:
+
+- не требует ставить Nginx/Certbot на хост,
+- автоматически продлевает сертификаты,
+- “прячет” прямые порты `back:3000`, `web:80`, `admin:80` наружу.
+
+### 5A. HTTPS через Caddy (в Docker, рекомендовано)
+
+**Предпосылки:**
+
+- У вас есть домены и A-записи на VPS (например `orchestra.ваш-домен.ru` и `admin.orchestra.ваш-домен.ru` → `213.226.126.196`).
+- Открыты входящие порты **80** и **443** (firewall / security group).
+
+**Шаги:**
+
+1) На сервере в `/opt/orchestra-back` откройте `.env` и добавьте:
+
+```env
+WEB_DOMAIN=orchestra.ваш-домен.ru
+ADMIN_DOMAIN=admin.orchestra.ваш-домен.ru
+ACME_EMAIL=you@example.com
+```
+
+2) Поднимите приложение с HTTPS-оверлеем:
+
+```bash
+cd /opt/orchestra-back
+docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+```
+
+3) Проверка:
+
+- Web: `https://orchestra.ваш-домен.ru`
+- Admin: `https://admin.orchestra.ваш-домен.ru`
+- API ходит через тот же домен по пути `/api/*` (префикс `/api` “снимается” на HTTPS‑шлюзе).
+
+**Важно про порты:** в режиме HTTPS `docker-compose.https.yml` отключает публикацию портов `web/admin/back` наружу, чтобы не было конфликтов и лишнего доступа.
+
+### 5B. HTTPS через Nginx + certbot (на хосте)
 
 Если есть домен (например, `api.ваш-домен.ru`), можно поставить Nginx и выдать сертификат Let's Encrypt:
 

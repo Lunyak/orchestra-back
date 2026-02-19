@@ -874,6 +874,40 @@ export function VoiceDialogueTrainer({
   const nextPartnerText = current.nextPartner?.text ? stripParentheses(current.nextPartner.text) : "";
   const nextPartnerTextTts = ttsPartnerLine(nextPartnerText);
   const myTextNoRemarks = stripParentheses(current.textRaw);
+
+  const resetProgressAll = () => {
+    if (!storageKey) return;
+    const confirmed = window.confirm("Сбросить весь прогресс голосового тренажёра для этой роли?");
+    if (!confirmed) return;
+    stopListening();
+    cancelSpeech();
+    const next = new Set<string>();
+    setDoneIds(next);
+    persistDoneSet(storageKey, next);
+    setIndex(0);
+    setSentenceIndex(0);
+    setTranscript("");
+    setInterim("");
+    setResult(null);
+    setLastAccepted("");
+    setCurrentTarget("");
+  };
+
+  const resetProgressCurrent = () => {
+    if (!storageKey || !current) return;
+    const confirmed = window.confirm("Сбросить прогресс ТОЛЬКО для текущей реплики?");
+    if (!confirmed) return;
+    const next = new Set(doneIds);
+    next.delete(current.id);
+    setDoneIds(next);
+    persistDoneSet(storageKey, next);
+    setSentenceIndex(0);
+    setTranscript("");
+    setInterim("");
+    setResult(null);
+    setLastAccepted("");
+    setCurrentTarget("");
+  };
   const isLongMonologue = expectedTokens.length >= 40;
   const maxListenMs = isLongMonologue ? LONG_MONOLOGUE_MAX_LISTEN_MS : BASE_MAX_LISTEN_MS;
   const silenceStopMs = isLongMonologue ? SILENCE_STOP_MS_LONG : SILENCE_STOP_MS_BASE;
@@ -988,27 +1022,7 @@ export function VoiceDialogueTrainer({
             >
               Озвучить
             </button>
-            <button
-              type="button"
-              className="voice-btn"
-              disabled={!supported.tts}
-              onClick={() => requestSpeak("привет как дела")}
-              title="Проверить TTS через бэкенд"
-            >
-              Тест TTS
-            </button>
-            <button
-              type="button"
-              className="voice-btn"
-              disabled={!supported.tts}
-              onClick={() => {
-                resetTts();
-                requestSpeak("привет как дела");
-              }}
-              title="Сбросить очередь/залипание TTS и сразу протестировать"
-            >
-              Сброс TTS
-            </button>
+
             <label className="voice-select">
               <span className="voice-select-label">Голос</span>
               <select
@@ -1025,15 +1039,6 @@ export function VoiceDialogueTrainer({
                 ))}
               </select>
             </label>
-            <button
-              type="button"
-              className="voice-btn"
-              disabled={!supported.tts}
-              onClick={() => setVoiceName("auto")}
-              title="Сбросить выбор голоса (Авто)"
-            >
-              Сброс голоса
-            </button>
             <label className="voice-checkbox">
               <input
                 type="checkbox"
@@ -1053,6 +1058,16 @@ export function VoiceDialogueTrainer({
                 <option value="sentences">По предложениям</option>
               </select>
             </label>
+            {storageKey ? (
+              <>
+                <button type="button" className="voice-btn" onClick={resetProgressCurrent} title="Сбросить текущую реплику">
+                  Сбросить текущую
+                </button>
+                <button type="button" className="voice-btn" onClick={resetProgressAll} title="Сбросить весь прогресс">
+                  Сбросить прогресс
+                </button>
+              </>
+            ) : null}
             <div className="voice-hint">
               Запись держится до {Math.round(maxListenMs / 1000)}с и не обрывается на коротких паузах.
               {isLongMonologue ? " Длинный монолог: можно говорить кусочками." : ""}
@@ -1117,7 +1132,7 @@ export function VoiceDialogueTrainer({
               }}
               title="Нажми и держи — идёт запись. Отпусти — проверим."
             >
-              {listening ? "● Запись… (отпусти)" : "● Нажми и держи, чтобы говорить"}
+              {listening ? "Запись…" : "Нажми и держи"}
             </button>
             <button
               type="button"

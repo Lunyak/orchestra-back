@@ -95,7 +95,7 @@ services:
     container_name: orkestr-web
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       back:
         condition: service_healthy

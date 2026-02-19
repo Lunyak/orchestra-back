@@ -1,0 +1,26 @@
+services:
+  # TLS termination + reverse proxy (Let's Encrypt)
+  caddy:
+    image: caddy:2-alpine
+    container_name: orkestr-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Required for HTTPS (set in .env on the server)
+      ACME_EMAIL: ${ACME_EMAIL}
+      WEB_DOMAIN: ${WEB_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+      - admin
+      - back
+
+volumes:
+  caddy_data:
+  caddy_config:

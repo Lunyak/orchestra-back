@@ -171,7 +171,7 @@
 }
 
 .voice-ptt {
-  flex: 1 1 420px;
+  min-width: 125px;
   min-height: var(--height-button-lg);
   border-radius: var(--radius-xl);
   border-color: var(--color-danger-light);

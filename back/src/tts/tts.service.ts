@@ -6,7 +6,6 @@ import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import axios from 'axios';
-import googleTTS from 'google-tts-api';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +32,14 @@ function chunkTextForGoogleTts(text: string): string[] {
     i += 1500;
   }
   return parts;
+}
+
+let googleTtsApiPromise: Promise<any> | null = null;
+async function getGoogleTtsApi(): Promise<any> {
+  if (!googleTtsApiPromise) {
+    googleTtsApiPromise = import('google-tts-api').then((m: any) => m?.default ?? m);
+  }
+  return googleTtsApiPromise;
 }
 
 @Injectable()
@@ -70,6 +77,16 @@ export class TtsService {
     if (!text) return Buffer.from([]);
     if (text.length > 4000) throw new Error('Text too long for TTS (max 4000 chars).');
 
+    const google = await getGoogleTtsApi();
+    const getAllAudioUrls: any =
+      google?.getAllAudioUrls ??
+      google?.default?.getAllAudioUrls ??
+      google?.getAudioUrl ??
+      google?.default?.getAudioUrl;
+    if (typeof getAllAudioUrls !== 'function') {
+      throw new Error('google-tts-api export mismatch (getAllAudioUrls/getAudioUrl not found)');
+    }
+
     const key = crypto
       .createHash('sha1')
       .update(JSON.stringify({ p: 'google', t: text }))
@@ -87,12 +104,20 @@ export class TtsService {
     const chunks = chunkTextForGoogleTts(text);
     const buffers: Buffer[] = [];
     for (const c of chunks) {
-      const urls = googleTTS.getAllAudioUrls(c, {
+      const urls = getAllAudioUrls(c, {
         lang: 'ru',
         slow: false,
         host: 'https://translate.google.com',
       });
-      for (const u of urls) {
+
+      // getAllAudioUrls returns array, getAudioUrl returns string
+      const list: Array<{ url: string }> = Array.isArray(urls)
+        ? urls
+        : typeof urls === 'string'
+          ? [{ url: urls }]
+          : [];
+
+      for (const u of list) {
         const url = String((u as any)?.url ?? '');
         if (!url) continue;
         const resp = await axios.get<ArrayBuffer>(url, {
