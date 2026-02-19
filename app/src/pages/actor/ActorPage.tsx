@@ -10,6 +10,7 @@ import {
 } from "../../features/actor-trainers/model/rolePhrases";
 import { WordOrderTrainer } from "../../features/actor-trainers/ui/WordOrderTrainer";
 import { DialogueSceneTrainer } from "../../features/actor-trainers/ui/DialogueSceneTrainer";
+import { VoiceDialogueTrainer } from "../../features/actor-trainers/ui/VoiceDialogueTrainer";
 import { getMyProfile } from "../../sync/api";
 import "./style.css";
 
@@ -31,8 +32,41 @@ export function ActorPage() {
   const { steps, sceneData } = useScene();
   const navigate = useNavigate();
 
+  const [focusMode, setFocusMode] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("actorPage:focusMode") === "true";
+  });
+
+  const [settingsHidden, setSettingsHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const stored = localStorage.getItem("actorPage:settingsHidden");
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+    return false;
+  });
+
   const [myEmail, setMyEmail] = useState<string>("");
   const [profileLoading, setProfileLoading] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("actorPage:focusMode", String(focusMode));
+    if (focusMode) setSettingsHidden(true);
+  }, [focusMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("actorPage:settingsHidden", String(settingsHidden));
+  }, [settingsHidden]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (focusMode) document.body.dataset.actorFocus = "true";
+    else delete (document.body.dataset as any).actorFocus;
+    return () => {
+      delete (document.body.dataset as any).actorFocus;
+    };
+  }, [focusMode]);
 
   useEffect(() => {
     if (!accessToken) {
@@ -161,12 +195,23 @@ export function ActorPage() {
     ].join(":");
   }, [effectiveRole, myEmail, projectName]);
 
+  const voiceStorageKey = useMemo(() => {
+    if (!projectName || !myEmail || !effectiveRole) return "";
+    return [
+      "actorTrainer",
+      "voice",
+      projectName,
+      normalizeActorKey(myEmail),
+      normalizeRoleKeyForStorage(effectiveRole),
+    ].join(":");
+  }, [effectiveRole, myEmail, projectName]);
+
   useEffect(() => {
     // When switching role/project, default back to full scope
     setSelectedStepIds("all");
   }, [effectiveRole, projectName]);
 
-  const [trainerMode, setTrainerMode] = useState<"dialogue" | "cards">("dialogue");
+  const [trainerMode, setTrainerMode] = useState<"dialogue" | "cards" | "voice">("dialogue");
 
   const selectedStepIdsForTraining = useMemo(() => {
     if (normalizedSelectedStepIds === "all") {
@@ -175,6 +220,12 @@ export function ActorPage() {
     }
     return normalizedSelectedStepIds;
   }, [normalizedSelectedStepIds, phraseSteps]);
+
+  const scenesLabel = useMemo(() => {
+    if (!effectiveRole) return "—";
+    if (normalizedSelectedStepIds === "all") return `все (${phraseSteps.length})`;
+    return `${normalizedSelectedStepIds.length} / ${phraseSteps.length}`;
+  }, [effectiveRole, normalizedSelectedStepIds, phraseSteps.length]);
 
   return (
     <div className="app-layout actor-layout">
@@ -186,7 +237,34 @@ export function ActorPage() {
               Тренажёры для заучивания текста роли.
             </p>
 
-            <div className="actor-controls">
+            <div className="actor-topbar">
+              <div className="actor-topbar-actions">
+                <button
+                  type="button"
+                  className="actor-topbar-btn"
+                  data-active={focusMode ? "true" : "false"}
+                  onClick={() => setFocusMode((v) => !v)}
+                  title="Скрыть левое меню навигации и сосредоточиться на тренировке"
+                >
+                  {focusMode ? "Фокус: вкл" : "Фокус"}
+                </button>
+                <button
+                  type="button"
+                  className="actor-topbar-btn"
+                  data-active={settingsHidden ? "true" : "false"}
+                  onClick={() => setSettingsHidden((v) => !v)}
+                >
+                  {settingsHidden ? "Показать настройки" : "Скрыть настройки"}
+                </button>
+              </div>
+              <div className="actor-topbar-meta">
+                Проект: <b>{projectName || "—"}</b> · Роль: <b>{effectiveRole || "—"}</b> · Сцены:{" "}
+                <b>{scenesLabel}</b>
+              </div>
+            </div>
+
+            {!settingsHidden ? (
+              <div className="actor-controls">
               <label className="actor-field">
                 <div className="actor-label">Проект</div>
                 <select
@@ -342,6 +420,7 @@ export function ActorPage() {
                 </div>
               </label>
             </div>
+            ) : null}
 
             <div className="actor-section">
               <div className="actor-section-head">
@@ -370,6 +449,15 @@ export function ActorPage() {
                 >
                   Карточки (переставь слова)
                 </button>
+                <button
+                  type="button"
+                  className={`actor-mode-tab ${trainerMode === "voice" ? "active" : ""}`}
+                  onClick={() => setTrainerMode("voice")}
+                  role="tab"
+                  aria-selected={trainerMode === "voice"}
+                >
+                  Голос
+                </button>
               </div>
 
               {trainerMode === "dialogue" ? (
@@ -378,6 +466,13 @@ export function ActorPage() {
                   role={effectiveRole}
                   selectedStepIds={selectedStepIdsForTraining}
                   storageKey={dialogueStorageKey || undefined}
+                />
+              ) : trainerMode === "voice" ? (
+                <VoiceDialogueTrainer
+                  steps={steps}
+                  role={effectiveRole}
+                  selectedStepIds={selectedStepIdsForTraining}
+                  storageKey={voiceStorageKey || undefined}
                 />
               ) : (
                 <WordOrderTrainer phrases={filteredPhrases} storageKey={trainerStorageKey || undefined} />
