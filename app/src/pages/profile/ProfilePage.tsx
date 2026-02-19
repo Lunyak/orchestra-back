@@ -18,9 +18,29 @@ dayjs.extend(isoWeek);
 dayjs.locale("ru");
 
 type AvailabilityStatus = "present" | "absent";
+type AvailabilityTimeRange = { from: string; to: string };
 
 function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
+}
+
+function toMinutesHHMM(v: string): number | null {
+  const s = String(v ?? "").trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23) return null;
+  if (mm < 0 || mm > 59) return null;
+  return hh * 60 + mm;
+}
+
+function minutesToHHMM(min: number): string {
+  const m = Math.max(0, Math.min(24 * 60, Math.floor(min)));
+  const hh = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
 export function ProfilePage() {
@@ -63,6 +83,7 @@ export function ProfilePage() {
       telegramId: profile?.telegramId ?? "",
       avatarUrl: profile?.avatarUrl ?? "",
       availabilityCalendar: profile?.availabilityCalendar ?? {},
+      availabilityTimeRanges: profile?.availabilityTimeRanges ?? {},
     });
   }, [profile]);
 
@@ -78,6 +99,34 @@ export function ProfilePage() {
         }
       }
     }
+
+    const inputRanges = (form as any).availabilityTimeRanges as
+      | Record<string, AvailabilityTimeRange[]>
+      | undefined;
+    const cleanRanges: Record<string, AvailabilityTimeRange[]> = {};
+    if (inputRanges && typeof inputRanges === "object") {
+      for (const [date, list] of Object.entries(inputRanges)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+        if (!Array.isArray(list)) continue;
+        const ranges: Array<{ a: number; b: number }> = [];
+        for (const it of list.slice(0, 20)) {
+          const from = toMinutesHHMM(String((it as any)?.from ?? ""));
+          const to = toMinutesHHMM(String((it as any)?.to ?? ""));
+          if (from == null || to == null) continue;
+          if (from >= to) continue;
+          ranges.push({ a: from, b: to });
+        }
+        if (ranges.length === 0) continue;
+        ranges.sort((x, y) => x.a - y.a || x.b - y.b);
+        const merged: Array<{ a: number; b: number }> = [];
+        for (const r of ranges) {
+          const last = merged[merged.length - 1];
+          if (!last || r.a > last.b) merged.push({ ...r });
+          else last.b = Math.max(last.b, r.b);
+        }
+        cleanRanges[date] = merged.map((r) => ({ from: minutesToHHMM(r.a), to: minutesToHHMM(r.b) }));
+      }
+    }
     return {
       displayName: t(form.displayName),
       firstName: t(form.firstName),
@@ -86,6 +135,7 @@ export function ProfilePage() {
       telegramId: t(form.telegramId),
       avatarUrl: t(form.avatarUrl),
       availabilityCalendar: cleanCalendar,
+      availabilityTimeRanges: cleanRanges,
     } as Partial<MyProfile>;
   }, [form]);
 
@@ -106,6 +156,12 @@ export function ProfilePage() {
   const availabilityCalendar = useMemo(
     () => (form.availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>,
     [form.availabilityCalendar],
+  );
+
+  const availabilityTimeRanges = useMemo(
+    () =>
+      ((form as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>,
+    [form],
   );
 
   const rehearsalsByDate = useMemo(() => {
@@ -155,11 +211,36 @@ export function ProfilePage() {
       const currentCalendar = {
         ...((prev.availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>),
       };
+      const currentRanges = {
+        ...(((prev as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>),
+      };
       if (next) currentCalendar[date] = next;
       else delete currentCalendar[date];
-      return { ...prev, availabilityCalendar: currentCalendar };
+      // If user marks the day as "absent" or clears it — drop time windows to avoid confusion.
+      if (next !== "present") delete currentRanges[date];
+      return { ...(prev as any), availabilityCalendar: currentCalendar, availabilityTimeRanges: currentRanges };
     });
   };
+
+  const setTimeRangesForDate = (date: string, ranges: AvailabilityTimeRange[]) => {
+    setForm((prev) => {
+      const currentRanges = {
+        ...(((prev as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>),
+      };
+      if (ranges.length > 0) currentRanges[date] = ranges;
+      else delete currentRanges[date];
+
+      // If we have any time windows — day is implicitly "present" (unless explicitly absent by user later).
+      const currentCalendar = {
+        ...((prev.availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>),
+      };
+      currentCalendar[date] = "present";
+      return { ...(prev as any), availabilityTimeRanges: currentRanges, availabilityCalendar: currentCalendar };
+    });
+  };
+
+  const selectedDate = calendarState.selectedDate;
+  const selectedRanges = availabilityTimeRanges[selectedDate] ?? [];
 
   if (!accessToken) return <div>Нужно войти, чтобы редактировать профиль.</div>;
 
@@ -256,6 +337,76 @@ export function ProfilePage() {
             dotsByDate={dotsByDate}
           />
           {calendarError && <div className="settings-invite-error" style={{ marginTop: 8 }}>{calendarError}</div>}
+
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+              Свободное время на {selectedDate}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+              Если указать диапазоны — они будут учитываться при планировании слотов сессии.
+              Время локальное (как на твоём компьютере).
+            </div>
+            {selectedRanges.length === 0 ? (
+              <div style={{ fontSize: 12, opacity: 0.7 }}>Не задано (если день “свободен” — считается весь день).</div>
+            ) : (
+              <div style={{ display: "grid", gap: 6 }}>
+                {selectedRanges.map((r, idx) => (
+                  <div key={`${selectedDate}:${idx}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      className="settings-invite-input"
+                      type="time"
+                      value={r.from}
+                      onChange={(e) => {
+                        const next = selectedRanges.slice();
+                        next[idx] = { ...next[idx]!, from: e.target.value };
+                        setTimeRangesForDate(selectedDate, next);
+                      }}
+                      style={{ maxWidth: 140 }}
+                    />
+                    <div style={{ opacity: 0.7, fontSize: 12 }}>—</div>
+                    <input
+                      className="settings-invite-input"
+                      type="time"
+                      value={r.to}
+                      onChange={(e) => {
+                        const next = selectedRanges.slice();
+                        next[idx] = { ...next[idx]!, to: e.target.value };
+                        setTimeRangesForDate(selectedDate, next);
+                      }}
+                      style={{ maxWidth: 140 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = selectedRanges.slice();
+                        next.splice(idx, 1);
+                        setTimeRangesForDate(selectedDate, next);
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = [...selectedRanges, { from: "19:00", to: "21:00" }];
+                  setTimeRangesForDate(selectedDate, next);
+                }}
+              >
+                + Добавить диапазон
+              </button>
+              {selectedRanges.length > 0 ? (
+                <button type="button" onClick={() => setTimeRangesForDate(selectedDate, [])}>
+                  Очистить время
+                </button>
+              ) : null}
+            </div>
+          </div>
+
           <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
             Мои репетиции на {calendarState.selectedDate}:
           </div>

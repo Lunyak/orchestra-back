@@ -48,6 +48,10 @@ export class UpdateProfileDto {
   availabilityCalendar?: Record<string, unknown>;
 
   @IsOptional()
+  @IsObject()
+  availabilityTimeRanges?: Record<string, unknown>;
+
+  @IsOptional()
   @IsString()
   @MaxLength(20)
   sex?: string;

@@ -35,11 +35,9 @@
 }
 
 .script-sidebar-content {
-  height: 100vh;
-  height: 100dvh;
   height: var(--app-height, 100dvh);
-  width: 240px;
-  max-width: 10px;
+  width: 100%;
+  max-width: 300px;
   background: #1f2a37;
   padding: 12px;
   color: #fff;

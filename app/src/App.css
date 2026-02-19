@@ -12,6 +12,42 @@ body {
   padding: 0;
 }
 
+/* Единый "красивый" скроллбар (Chrome/Safari/Edge + Firefox) */
+:root {
+  --scrollbar-size: 10px;
+  --scrollbar-radius: 999px;
+  --scrollbar-thumb: rgba(148, 163, 184, 0.45);
+  --scrollbar-thumb-hover: rgba(203, 213, 225, 0.65);
+  --scrollbar-track: rgba(2, 6, 23, 0.2);
+}
+
+/* Firefox */
+:where(*) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+/* WebKit (Chrome/Safari/Edge) */
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: var(--scrollbar-radius);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
 /* Экран входа (стили скопированы с web) */
 .login-layout {
   min-height: 100vh;
@@ -419,6 +455,7 @@ body {
   .playlist-sidebar-wrapper.mobile,
   .steps-sidebar-wrapper.mobile {
     max-width: 200px;
+    width: 100%;
   }
 
   .mobile-bottom-btn {
@@ -483,7 +520,8 @@ body {
   text-align: left;
   display: flex;
   min-height: 0;
-  overflow: scroll;
+  overflow: auto;
+  scrollbar-gutter: stable;
   background: #0b1220;
   /* height: calc(100vh - 118px); */
 }

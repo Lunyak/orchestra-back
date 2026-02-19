@@ -267,6 +267,7 @@ export interface MyProfile {
   avatarUrl?: string | null;
   characters?: string[] | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
+  availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
 }
 
 export interface TeamProfile {
@@ -277,6 +278,7 @@ export interface TeamProfile {
   telegramId?: string | null;
   characters?: string[] | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
+  availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
 }
 
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {

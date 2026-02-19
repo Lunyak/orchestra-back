@@ -25,6 +25,8 @@ type ProjectDataCache = Record<
   { steps: ScriptStep[]; roleAssignments: Record<string, string[]> }
 >;
 
+type AvailabilityTimeRange = { from: string; to: string };
+
 function formatTimeFromOffset(offsetMin: number): string {
   const m = Math.max(0, Math.floor(offsetMin));
   const hh = String(Math.floor(m / 60)).padStart(2, "0");
@@ -90,6 +92,43 @@ function looksLikeEmail(v: string): boolean {
 
 function normalizeEmail(v: string): string {
   return String(v ?? "").trim().toLowerCase();
+}
+
+function getRangesForDateMinutes(
+  prof: TeamProfile | null | undefined,
+  dateKey: string | null,
+): Array<{ fromMin: number; toMin: number }> {
+  if (!prof || !dateKey) return [];
+  const raw = (prof as any)?.availabilityTimeRanges as
+    | Record<string, AvailabilityTimeRange[]>
+    | null
+    | undefined;
+  const list = raw?.[dateKey];
+  if (!Array.isArray(list) || list.length === 0) return [];
+  const out: Array<{ fromMin: number; toMin: number }> = [];
+  for (const it of list.slice(0, 20)) {
+    const fromMin = parseTimeHHMM(String((it as any)?.from ?? ""));
+    const toMin = parseTimeHHMM(String((it as any)?.to ?? ""));
+    if (fromMin == null || toMin == null) continue;
+    if (fromMin >= toMin) continue;
+    out.push({ fromMin, toMin });
+  }
+  out.sort((a, b) => a.fromMin - b.fromMin || a.toMin - b.toMin);
+  return out;
+}
+
+function isSlotInsideRanges(
+  slotStartMin: number,
+  slotEndMin: number,
+  ranges: Array<{ fromMin: number; toMin: number }>,
+): boolean {
+  if (ranges.length === 0) return false;
+  const a = Math.max(0, Math.floor(slotStartMin));
+  const b = Math.max(0, Math.floor(slotEndMin));
+  for (const r of ranges) {
+    if (a >= r.fromMin && b <= r.toMin) return true;
+  }
+  return false;
 }
 
 function normalizeRoleKey(v: string): string {
@@ -234,6 +273,17 @@ export function DirectorSessionsPage() {
     () => sessions.find((s) => s.id === activeSessionId) ?? null,
     [activeSessionId, sessions],
   );
+
+  // minimal UX: selected slot
+  const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!activeSession) {
+      setActiveSlotId(null);
+      return;
+    }
+    setActiveSlotId((prev) => prev ?? activeSession.slots?.[0]?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
 
   const sessionDateKey = useMemo(() => {
     if (!activeSession?.startsAt) return null;
@@ -502,25 +552,40 @@ export function DirectorSessionsPage() {
         const st = cal?.[sessionDateKey] === "present" ? "present" : cal?.[sessionDateKey] === "absent" ? "absent" : "unknown";
         const chars = parseCharacters((p as any)?.characters);
         const rolesNorm = chars.map(normalizeRoleKey).filter(Boolean);
+        const ranges = getRangesForDateMinutes(p, sessionDateKey);
         return {
           email,
           displayName: String((p as any)?.displayName ?? "").trim() || null,
           status: st as "present" | "absent" | "unknown",
           rolesNorm,
           rolesDisplay: chars,
+          ranges,
         };
       })
       .filter((x) => x.email);
   }, [sessionDateKey, teamProfiles]);
 
+  const activeSlotWindow = useMemo(() => {
+    if (!activeSession || !activeSlotId) return null;
+    const sl = (activeSession.slots ?? []).find((s) => s.id === activeSlotId) ?? null;
+    if (!sl) return null;
+    const base = getSessionStartLocalMinutes(activeSession.startsAt);
+    const startMin = base + Math.max(0, Math.floor(sl.offsetMin || 0));
+    const endMin = startMin + Math.max(1, Math.floor(sl.durationMin || 1));
+    return { startMin, endMin };
+  }, [activeSessionId, activeSession?.startsAt, activeSession?.slots, activeSlotId]);
+
   const freeRolesNormSet = useMemo(() => {
     const set = new Set<string>();
     for (const a of freeActorsForDate) {
       if (a.status !== "present") continue;
+      if (activeSlotWindow && a.ranges?.length) {
+        if (!isSlotInsideRanges(activeSlotWindow.startMin, activeSlotWindow.endMin, a.ranges)) continue;
+      }
       for (const r of a.rolesNorm) set.add(r);
     }
     return set;
-  }, [freeActorsForDate]);
+  }, [activeSlotWindow, freeActorsForDate]);
 
   const [onlySelectable, setOnlySelectable] = useState(false);
   const selectableSteps = useMemo(() => {
@@ -559,16 +624,6 @@ export function DirectorSessionsPage() {
     projectSlug: string;
     step: ScriptStep;
   } | null>(null);
-
-  // minimal UX: selected slot
-  const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
-  useEffect(() => {
-    if (!activeSession) {
-      setActiveSlotId(null);
-      return;
-    }
-    setActiveSlotId((prev) => prev ?? activeSession.slots?.[0]?.id ?? null);
-  }, [activeSessionId]);
 
   // Drag & drop ordering for slots (re-packs timeline sequentially)
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
@@ -695,6 +750,53 @@ export function DirectorSessionsPage() {
       cancelled = true;
     };
   }, [accessToken, actorEmails.join("|"), sessionDateKey]);
+
+  const slotAvailabilityById = useMemo(() => {
+    if (!activeSession || !sessionDateKey) return new Map<string, { free: string[]; busy: string[]; unknown: string[] }>();
+    const base = getSessionStartLocalMinutes(activeSession.startsAt);
+    const slotActorsById = new Map<string, string[]>();
+    for (const s of slotInsights) slotActorsById.set(s.slotId, s.actors ?? []);
+
+    const out = new Map<string, { free: string[]; busy: string[]; unknown: string[] }>();
+    for (const sl of activeSession.slots ?? []) {
+      const actors = slotActorsById.get(sl.id) ?? [];
+      if (actors.length === 0) continue;
+
+      const startMin = base + Math.max(0, Math.floor(sl.offsetMin || 0));
+      const endMin = startMin + Math.max(1, Math.floor(sl.durationMin || 1));
+
+      const free: string[] = [];
+      const busy: string[] = [];
+      const unknown: string[] = [];
+
+      for (const actorRaw of actors) {
+        const actor = normalizeEmail(actorRaw);
+        if (!actor) continue;
+        const prof = profilesByEmail.get(actor);
+        if (!prof) {
+          unknown.push(actorRaw);
+          continue;
+        }
+        const cal = (prof as any)?.availabilityCalendar as Record<string, string> | undefined;
+        const st = cal?.[sessionDateKey] === "present" ? "present" : cal?.[sessionDateKey] === "absent" ? "absent" : "unknown";
+        if (st === "absent") {
+          busy.push(actorRaw);
+          continue;
+        }
+        const ranges = getRangesForDateMinutes(prof, sessionDateKey);
+        if (ranges.length > 0) {
+          if (isSlotInsideRanges(startMin, endMin, ranges)) free.push(actorRaw);
+          else busy.push(actorRaw);
+          continue;
+        }
+        if (st === "present") free.push(actorRaw);
+        else unknown.push(actorRaw);
+      }
+
+      out.set(sl.id, { free, busy, unknown });
+    }
+    return out;
+  }, [activeSessionId, activeSession?.startsAt, activeSession?.slots, profilesByEmail, sessionDateKey, slotInsights]);
 
   // Drafts for slot editing (time/duration)
   const [slotDraft, setSlotDraft] = useState<Record<string, { time: string; duration: string }>>({});
@@ -963,6 +1065,19 @@ export function DirectorSessionsPage() {
                                     : "Материал не выбран")}
                               </div>
                               {(() => {
+                                const av = slotAvailabilityById.get(sl.id);
+                                if (!av) return null;
+                                const total = av.free.length + av.busy.length + av.unknown.length;
+                                if (total === 0) return null;
+                                return (
+                                  <div className="rehearsals-muted" style={{ marginTop: 4 }}>
+                                    по доступности: свободны <b>{av.free.length}</b> / {total}
+                                    {av.unknown.length ? <> · не отмечено: <b>{av.unknown.length}</b></> : null}
+                                    {av.busy.length ? <> · заняты: <b>{av.busy.length}</b></> : null}
+                                  </div>
+                                );
+                              })()}
+                              {(() => {
                                 const info = slotInsights.find((x) => x.slotId === sl.id);
                                 if (!info || !sl.ref) return null;
                                 if (info.ready) {
@@ -1182,6 +1297,11 @@ export function DirectorSessionsPage() {
                                       роли: {a.rolesDisplay.slice(0, 6).join(", ")}
                                       {a.rolesDisplay.length > 6 ? ` +${a.rolesDisplay.length - 6}` : ""}
                                     </div>
+                                  {a.ranges?.length ? (
+                                    <div className="rehearsals-muted">
+                                      окна: {a.ranges.map((r) => `${formatTimeHHMM(r.fromMin)}–${formatTimeHHMM(r.toMin)}`).join(", ")}
+                                    </div>
+                                  ) : null}
                                   </div>
                                   <div className="rehearsals-muted sessions-actor-status">
                                     по календарю: свободен

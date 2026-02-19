@@ -35,6 +35,9 @@ model UserProfile {
   telegramId       String?  @unique
   avatarUrl        String?
   availabilityCalendar Json?
+  /// Доступность по времени на конкретные даты:
+  /// { "YYYY-MM-DD": [ { from: "HH:mm", to: "HH:mm" }, ... ] }
+  availabilityTimeRanges Json?
   sex              String?
   /// Роль в театре (актер, режиссер, и т.д.)
   role             String?

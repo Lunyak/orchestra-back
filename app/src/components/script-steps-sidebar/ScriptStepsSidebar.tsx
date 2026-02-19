@@ -30,6 +30,28 @@ export const ScriptStepsSidebar = ({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  const handleDeleteClick =
+    (step: ScriptStep, index: number) => (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      // Power-user shortcut: Shift+Click deletes without confirm.
+      if (event.shiftKey) {
+        onDelete(step.id);
+        return;
+      }
+
+      const prefix = `Удалить шаг ${index + 1}${step.title ? `: "${step.title}"` : ""}?`;
+      const suffix =
+        steps.length <= 1
+          ? " После удаления будет создан новый пустой шаг."
+          : " Это действие нельзя отменить.";
+      const message = `${prefix}${suffix}`;
+
+      if (!window.confirm(message)) return;
+      onDelete(step.id);
+    };
+
   const handleDragStart =
     (index: number) => (event: React.DragEvent<HTMLDivElement>) => {
       setDragIndex(index);
@@ -97,7 +119,7 @@ export const ScriptStepsSidebar = ({
               </button>
               <button
                 className="step-mini-delete"
-                onClick={() => onDelete(step.id)}
+                onClick={handleDeleteClick(step, index)}
                 title="Удалить шаг"
               >
                 ×

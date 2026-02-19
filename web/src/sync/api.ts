@@ -269,6 +269,7 @@ export interface MyProfile {
   telegramId?: string | null;
   avatarUrl?: string | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
+  availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
 }
 
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {

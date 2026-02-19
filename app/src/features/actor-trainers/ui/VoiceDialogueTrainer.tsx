@@ -90,8 +90,45 @@ const STOP_WORDS = new Set<string>([
 
 function asHashNumber(n: number): string {
   if (!Number.isFinite(n)) return "";
-  const v = Math.max(0, Math.min(9999, Math.trunc(n)));
+  const v = Math.max(0, Math.min(999_999_999, Math.trunc(n)));
   return `#${v}`;
+}
+
+const RU_THOUSAND_WORDS = new Set<string>([
+  "тысяча",
+  "тысячи",
+  "тысяч",
+  "тысяче",
+  "тысячу",
+  "тысячей",
+  "тысячами",
+]);
+
+const RU_MILLION_WORDS = new Set<string>([
+  "миллион",
+  "миллиона",
+  "миллионов",
+  "миллионе",
+  "миллионом",
+  "миллионами",
+]);
+
+const RU_BILLION_WORDS = new Set<string>([
+  "миллиард",
+  "миллиарда",
+  "миллиардов",
+  "миллиарде",
+  "миллиардом",
+  "миллиардами",
+]);
+
+function ruScaleMultiplier(word: string): number | null {
+  const w = String(word ?? "").toLowerCase();
+  if (!w) return null;
+  if (RU_THOUSAND_WORDS.has(w)) return 1_000;
+  if (RU_MILLION_WORDS.has(w)) return 1_000_000;
+  if (RU_BILLION_WORDS.has(w)) return 1_000_000_000;
+  return null;
 }
 
 function ruNumberWordValue(word: string): number | null {
@@ -99,7 +136,7 @@ function ruNumberWordValue(word: string): number | null {
   if (!w) return null;
 
   // Digits (already normalized to only letters/numbers)
-  if (/^\d{1,4}$/.test(w)) return Number(w);
+  if (/^\d+$/.test(w)) return Number(w);
 
   // Units (some common case forms included)
   const units: Record<string, number> = {
@@ -183,38 +220,66 @@ function ruNumberWordValue(word: string): number | null {
   return null;
 }
 
+function consumeRuBaseNumber(tokens: string[], i: number): { value: number; nextIndex: number } | null {
+  const a = tokens[i];
+  if (!a) return null;
+
+  // Digits, including "grouped" forms split by punctuation: 9 000 000 -> 9000000
+  if (/^\d+$/.test(a)) {
+    if (/^\d{1,3}$/.test(a)) {
+      let s = a;
+      let j = i + 1;
+      while (j < tokens.length && /^\d{3}$/.test(tokens[j] ?? "")) {
+        s += tokens[j];
+        j += 1;
+      }
+      return { value: Number(s), nextIndex: j };
+    }
+    return { value: Number(a), nextIndex: i + 1 };
+  }
+
+  const va = ruNumberWordValue(a);
+  if (va == null) return null;
+
+  // tens + unit (e.g. "двадцать" "два")
+  if (va >= 20 && va % 10 === 0) {
+    const b = tokens[i + 1];
+    const vb = b ? ruNumberWordValue(b) : null;
+    if (vb != null && vb >= 1 && vb <= 9) return { value: va + vb, nextIndex: i + 2 };
+    return { value: va, nextIndex: i + 1 };
+  }
+
+  return { value: va, nextIndex: i + 1 };
+}
+
 function normalizeNumberSequences(tokens: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < tokens.length; i += 1) {
-    const a = tokens[i]!;
-    const va = ruNumberWordValue(a);
-
-    // digits
-    if (/^\d{1,4}$/.test(a)) {
-      out.push(asHashNumber(Number(a)));
+    const parsed = consumeRuBaseNumber(tokens, i);
+    if (!parsed) {
+      out.push(tokens[i]!);
       continue;
     }
 
-    // tens + unit (e.g. "двадцать" "два")
-    if (va != null && va >= 20 && va % 10 === 0) {
-      const b = tokens[i + 1];
-      const vb = b ? ruNumberWordValue(b) : null;
-      if (vb != null && vb >= 1 && vb <= 9) {
-        out.push(asHashNumber(va + vb));
-        i += 1;
-        continue;
+    let value = parsed.value;
+    let j = parsed.nextIndex;
+
+    // Scale words: "девять тысяч" -> 9000, "9 тысяч" -> 9000
+    const mult = ruScaleMultiplier(tokens[j] ?? "");
+    if (mult) {
+      value *= mult;
+      j += 1;
+
+      // Optional remainder: "9 тысяч 500" (rare in scripts, but helps STT output)
+      const rem = consumeRuBaseNumber(tokens, j);
+      if (rem && rem.value >= 0 && rem.value < mult) {
+        value += rem.value;
+        j = rem.nextIndex;
       }
-      out.push(asHashNumber(va));
-      continue;
     }
 
-    // teens / units / 100
-    if (va != null && (va < 20 || va === 100)) {
-      out.push(asHashNumber(va));
-      continue;
-    }
-
-    out.push(a);
+    out.push(asHashNumber(value));
+    i = j - 1;
   }
   return out;
 }
