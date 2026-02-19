@@ -135,6 +135,16 @@ class AttendanceService {
     );
   }
 
+  /**
+   * Топик для director-sessions. По умолчанию публикуем в основной чат,
+   * чтобы публикация была "видимой" без дополнительных настроек топиков.
+   *
+   * Если нужно публиковать в конкретный топик — задайте DIRECTOR_SESSIONS_THREAD_ID.
+   */
+  getEffectiveDirectorSessionsThreadId() {
+    return process.env.DIRECTOR_SESSIONS_THREAD_ID || null;
+  }
+
   isOwner(userId) {
     return this.ownerId && String(userId) === String(this.ownerId);
   }
@@ -1161,7 +1171,7 @@ class AttendanceService {
    */
   async publishDirectorSessionFromBackend(projectId, sessionId) {
     const groupChatId = this.getEffectiveGroupChatId();
-    const threadId = this.getEffectiveThreadId();
+    const threadId = this.getEffectiveDirectorSessionsThreadId();
 
     if (!groupChatId) {
       throw new Error("Group chat is not configured (GROUP_CHAT_ID / /setgroup)");

@@ -69,6 +69,8 @@ services:
       GROUP_CHAT_ID: ${GROUP_CHAT_ID}
       # message_thread_id (topics) — set explicitly if you want a specific topic
       GROUP_CHAT_ID_ATTENTION: ${GROUP_CHAT_ID_ATTENTION}
+      # Optional: message_thread_id for director sessions публикаций
+      DIRECTOR_SESSIONS_THREAD_ID: ${DIRECTOR_SESSIONS_THREAD_ID}
       ANNOUNCEMENTS_THREAD_ID: ${ANNOUNCEMENTS_THREAD_ID:-14434}
       SPREADSHEET_ID: ${SPREADSHEET_ID}
       SERVER_URL: back:3000
