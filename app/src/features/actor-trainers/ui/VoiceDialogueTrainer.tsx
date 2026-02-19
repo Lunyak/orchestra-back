@@ -498,7 +498,7 @@ export function VoiceDialogueTrainer({
 
     const voice = voiceName && voiceName !== "auto" ? voiceName : undefined;
     api
-      .get("/tts", { params: { text: txt, voice }, responseType: "blob" })
+      .get("/tts", { params: { text: txt, voice, v: 2 }, responseType: "blob" })
       .then((res) => {
         const blob = res.data as Blob;
         const url = URL.createObjectURL(blob);
