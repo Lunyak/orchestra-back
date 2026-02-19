@@ -360,6 +360,15 @@ export function VoiceDialogueTrainer({
     return out;
   }, [allLines, roleKey]);
 
+  const exerciseIndexByLineId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (let i = 0; i < exercises.length; i += 1) {
+      const ex = exercises[i]!;
+      m.set(ex.lineId, i);
+    }
+    return m;
+  }, [exercises]);
+
   const [doneIds, setDoneIds] = useState<Set<string>>(() => readDoneSet(storageKey));
   useEffect(() => {
     setDoneIds(readDoneSet(storageKey));
@@ -371,6 +380,16 @@ export function VoiceDialogueTrainer({
   }, [exercises.length]);
 
   const current = exercises[index] ?? null;
+  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = activeLineRef.current;
+    if (!el) return;
+    try {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+    } catch {
+      // ignore
+    }
+  }, [current?.lineId]);
 
   const doneCount = useMemo(() => {
     let c = 0;
@@ -498,13 +517,17 @@ export function VoiceDialogueTrainer({
 
     const voice = voiceName && voiceName !== "auto" ? voiceName : undefined;
     api
-      .get("/tts", { params: { text: txt, voice, v: 2 }, responseType: "blob" })
+      .post("/tts", { text: txt, voice }, { responseType: "blob" })
       .then((res) => {
         const blob = res.data as Blob;
         const url = URL.createObjectURL(blob);
         audioUrlRef.current = url;
         const a = new Audio(url);
         audioRef.current = a;
+
+        // Ensure mic doesn't keep "ducking" audio while playing.
+        stopListening();
+        pttActiveRef.current = false;
 
         a.onplay = () =>
           setTtsDiag((p) => ({
@@ -530,15 +553,18 @@ export function VoiceDialogueTrainer({
           stopTtsAudio();
           opts?.onError?.({ code: "audio-playback-failed", message: "" });
         };
-        a.play().catch(() => {
-          setTtsDiag((p) => ({
-            ...p,
-            lastEvent: "error",
-            lastError: "play-rejected",
-          }));
-          stopTtsAudio();
-          opts?.onError?.({ code: "play-rejected", message: "" });
-        });
+        // Small delay gives the OS time to release mic audio session.
+        window.setTimeout(() => {
+          a.play().catch(() => {
+            setTtsDiag((p) => ({
+              ...p,
+              lastEvent: "error",
+              lastError: "play-rejected",
+            }));
+            stopTtsAudio();
+            opts?.onError?.({ code: "play-rejected", message: "" });
+          });
+        }, 250);
       })
       .catch((e) => {
         setTtsDiag((p) => ({
@@ -632,10 +658,12 @@ export function VoiceDialogueTrainer({
       silenceTimerRef.current = null;
     }
     const r = recRef.current;
+    setListening(false);
     if (!r) return;
     try {
       r.stop();
     } catch {}
+    recRef.current = null;
   };
 
   const cancelSpeech = () => {
@@ -945,6 +973,7 @@ export function VoiceDialogueTrainer({
   const pttActiveRef = useRef(false);
   const pttStart = () => {
     if (!supported.stt) return;
+    if (ttsDiag.lastEvent === "request" || ttsDiag.lastEvent === "start") return;
     if (pttActiveRef.current) return;
     if (listening) return;
     pttActiveRef.current = true;
@@ -1006,12 +1035,7 @@ export function VoiceDialogueTrainer({
       ) : null}
 
       <div className="voice-card">
-        <div className="voice-context">
-          <div className="voice-label">Предыдущая реплика</div>
-          <div className="voice-line">
-            <div className="voice-role">{current.prev?.role ?? "—"}</div>
-            <div className="voice-text">{prevText || "—"}</div>
-          </div>
+        <div className="voice-toolbar">
           <div className="voice-actions">
             <button
               type="button"
@@ -1020,7 +1044,7 @@ export function VoiceDialogueTrainer({
               onClick={() => requestSpeak(prevTextTts || prevText)}
               title={!supported.tts ? "TTS недоступен" : "Озвучить предыдущую реплику"}
             >
-              Озвучить
+              Озвучить предыдущую
             </button>
 
             <label className="voice-select">
@@ -1068,130 +1092,187 @@ export function VoiceDialogueTrainer({
                 </button>
               </>
             ) : null}
-            <div className="voice-hint">
-              Запись держится до {Math.round(maxListenMs / 1000)}с и не обрывается на коротких паузах.
-              {isLongMonologue ? " Длинный монолог: можно говорить кусочками." : ""}
-            </div>
-            <div className="voice-hint" style={{ maxWidth: 520 }}>
-              TTS:{" "}
-              <b>{supported.tts ? "есть" : "нет"}</b>, voices: <b>{ttsDiag.voicesCount}</b>
-              {ttsDiag.lastRequestedAt ? (
-                <>
-                  {" "}
-                  · последнее: <b>{ttsDiag.lastEvent}</b>
-                  {ttsDiag.lastError ? <> · ошибка: {ttsDiag.lastError}</> : null}
-                </>
-              ) : null}
-            </div>
+          </div>
+          <div className="voice-hint">
+            Запись держится до {Math.round(maxListenMs / 1000)}с и не обрывается на коротких паузах.
+            {isLongMonologue ? " Длинный монолог: можно говорить кусочками." : ""}
+          </div>
+          <div className="voice-hint" style={{ maxWidth: 520 }}>
+            TTS:{" "}
+            <b>{supported.tts ? "есть" : "нет"}</b>, voices: <b>{ttsDiag.voicesCount}</b>
+            {ttsDiag.lastRequestedAt ? (
+              <>
+                {" "}
+                · последнее: <b>{ttsDiag.lastEvent}</b>
+                {ttsDiag.lastError ? <> · ошибка: {ttsDiag.lastError}</> : null}
+              </>
+            ) : null}
           </div>
         </div>
 
-        <div className="voice-task">
-          <div className="voice-label">Твоя реплика</div>
-          <div className="voice-task-row">
-            <div className="voice-role">{current.role}</div>
-            <div className="voice-task-meta">
-              Шаг: <b>{current.stepTitle}</b>
-            </div>
-          </div>
+        <div className="voice-script">
+          {(() => {
+            let lastStepId: number | null = null;
+            return allLines.map((line) => {
+              const stepHeader =
+                lastStepId !== line.stepId ? (
+                  <div key={`${line.stepId}:h`} className="voice-step">
+                    {line.stepTitle}
+                  </div>
+                ) : null;
+              lastStepId = line.stepId;
 
-          {sentenceTokens.length > 1 ? (
-            <div className="voice-progress">
-              Фраза: <b>{sentenceIndex + 1}</b> / {sentenceTokens.length}
-            </div>
-          ) : null}
-          {currentTarget ? (
-            <div className="voice-target">
-              Сейчас: “{String(currentTarget).slice(0, 160)}{String(currentTarget).length > 160 ? "…" : ""}”
-            </div>
-          ) : null}
-          {lastAccepted ? (
-            <div className="voice-muted">Засчитано: “{String(lastAccepted).slice(0, 120)}{String(lastAccepted).length > 120 ? "…" : ""}”</div>
-          ) : null}
+              if (line.kind === "stage") {
+                return (
+                  <React.Fragment key={line.id}>
+                    {stepHeader}
+                    <div className="voice-line voice-line--stage">
+                      <div className="voice-text">{line.text}</div>
+                    </div>
+                  </React.Fragment>
+                );
+              }
 
-          <div className="voice-actions">
-            <button
-              type="button"
-              className="voice-btn voice-ptt"
-              data-active={listening ? "true" : "false"}
-              disabled={!supported.stt}
-              onPointerDown={(e) => {
-                // prevent synthetic mouse events after touch
-                try { (e.currentTarget as any)?.setPointerCapture?.(e.pointerId); } catch {}
-                e.preventDefault();
-                pttStart();
-              }}
-              onPointerUp={(e) => {
-                e.preventDefault();
-                pttStop();
-              }}
-              onPointerCancel={() => pttStop()}
-              onPointerLeave={() => {
-                // if user drags finger/mouse away while holding
-                if (pttActiveRef.current) pttStop();
-              }}
-              title="Нажми и держи — идёт запись. Отпусти — проверим."
-            >
-              {listening ? "Запись…" : "Нажми и держи"}
-            </button>
-            <button
-              type="button"
-              className="voice-btn"
-              disabled={!supported.stt}
-              onClick={() => {
-                beginListeningSession({ resetTranscript: false });
-              }}
-              title="Продолжить запись без сброса"
-            >
-              Продолжить
-            </button>
-            <button
-              type="button"
-              className="voice-btn"
-              disabled={!supported.stt || !autoFlow}
-              onClick={runAuto}
-              title="Озвучить предыдущую и начать запись"
-            >
-              ▶ цикл
-            </button>
-            <button type="button" className="voice-btn" onClick={() => setShowText((v) => !v)}>
-              {showText ? "Скрыть текст" : "Показать текст"}
-            </button>
-            <div className="voice-spacer" />
-            <button type="button" className="voice-btn" disabled={index <= 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
-              ←
-            </button>
-            <button type="button" className="voice-btn" disabled={index >= exercises.length - 1} onClick={() => setIndex((i) => Math.min(exercises.length - 1, i + 1))}>
-              →
-            </button>
-          </div>
+              const lineRole = line.role ?? "—";
+              const isMine = normalizeRoleKey(lineRole) === roleKey;
+              const exIdx = exerciseIndexByLineId.get(line.id);
+              const ex = typeof exIdx === "number" ? exercises[exIdx] : null;
+              const isDone = ex ? doneIds.has(ex.id) : false;
+              const isActive = current?.lineId === line.id;
 
-          {showText ? (
-            <div className="voice-textbox">
-              <div className="voice-label">Текст (без ремарок)</div>
-              <div className="voice-text">{myTextNoRemarks || "—"}</div>
-            </div>
-          ) : null}
+              return (
+                <React.Fragment key={line.id}>
+                  {stepHeader}
+                  <div
+                    ref={
+                      isActive
+                        ? (el) => {
+                            activeLineRef.current = el;
+                          }
+                        : undefined
+                    }
+                    className={[
+                      "voice-line",
+                      isMine ? "voice-line--mine" : "voice-line--partner",
+                      isDone ? "voice-line--done" : "",
+                      isActive ? "voice-line--active" : "",
+                      isMine && ex ? "voice-line--clickable" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    onClick={() => {
+                      if (!isMine || !ex) return;
+                      setIndex(exIdx!);
+                    }}
+                    title={isMine && ex ? "Перейти к реплике" : undefined}
+                  >
+                    <div className="voice-role">{lineRole}</div>
+                    <div className="voice-text">{line.text}</div>
+                  </div>
 
-          <div className="voice-recognition">
-            <div className="voice-label">Распознано</div>
-            <div className="voice-transcript">
-              {transcript || interim ? (
-                <>
-                  <div>{transcript}</div>
-                  {interim ? <div className="voice-interim">{interim}</div> : null}
-                </>
-              ) : (
-                <div className="voice-muted">Пока пусто.</div>
-              )}
-            </div>
-            {result ? (
-              <div className={`voice-result ${result.ok ? "ok" : "bad"}`}>
-                {result.ok ? "Похоже, верно." : "Не совпадает достаточно."} Точность:{" "}
-                <b>{Math.round(result.ratio * 100)}%</b>
-              </div>
-            ) : null}
-          </div>
+                  {isActive ? (
+                    <div className="voice-panel">
+                      {sentenceTokens.length > 1 ? (
+                        <div className="voice-progress">
+                          Фраза: <b>{sentenceIndex + 1}</b> / {sentenceTokens.length}
+                        </div>
+                      ) : null}
+                      {currentTarget ? (
+                        <div className="voice-target">
+                          Сейчас: “{String(currentTarget).slice(0, 160)}{String(currentTarget).length > 160 ? "…" : ""}”
+                        </div>
+                      ) : null}
+                      {lastAccepted ? (
+                        <div className="voice-muted">Засчитано: “{String(lastAccepted).slice(0, 120)}{String(lastAccepted).length > 120 ? "…" : ""}”</div>
+                      ) : null}
+
+                      <div className="voice-actions">
+                        <button
+                          type="button"
+                          className="voice-btn voice-ptt"
+                          data-active={listening ? "true" : "false"}
+                          disabled={!supported.stt}
+                          onPointerDown={(e) => {
+                            try { (e.currentTarget as any)?.setPointerCapture?.(e.pointerId); } catch {}
+                            e.preventDefault();
+                            pttStart();
+                          }}
+                          onPointerUp={(e) => {
+                            e.preventDefault();
+                            pttStop();
+                          }}
+                          onPointerCancel={() => pttStop()}
+                          onPointerLeave={() => {
+                            if (pttActiveRef.current) pttStop();
+                          }}
+                          title="Нажми и держи — идёт запись. Отпусти — проверим."
+                        >
+                          {listening ? "Запись…" : "Нажми и держи"}
+                        </button>
+                        <button
+                          type="button"
+                          className="voice-btn"
+                          disabled={!supported.stt}
+                          onClick={() => {
+                            beginListeningSession({ resetTranscript: false });
+                          }}
+                          title="Продолжить запись без сброса"
+                        >
+                          Продолжить
+                        </button>
+                        <button
+                          type="button"
+                          className="voice-btn"
+                          disabled={!supported.stt || !autoFlow}
+                          onClick={runAuto}
+                          title="Озвучить предыдущую и начать запись"
+                        >
+                          ▶ цикл
+                        </button>
+                        <button type="button" className="voice-btn" onClick={() => setShowText((v) => !v)}>
+                          {showText ? "Скрыть текст" : "Показать текст"}
+                        </button>
+                        <div className="voice-spacer" />
+                        <button type="button" className="voice-btn" disabled={index <= 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
+                          ←
+                        </button>
+                        <button type="button" className="voice-btn" disabled={index >= exercises.length - 1} onClick={() => setIndex((i) => Math.min(exercises.length - 1, i + 1))}>
+                          →
+                        </button>
+                      </div>
+
+                      {showText ? (
+                        <div className="voice-textbox">
+                          <div className="voice-label">Текст (без ремарок)</div>
+                          <div className="voice-text">{myTextNoRemarks || "—"}</div>
+                        </div>
+                      ) : null}
+
+                      <div className="voice-recognition">
+                        <div className="voice-label">Распознано</div>
+                        <div className="voice-transcript">
+                          {transcript || interim ? (
+                            <>
+                              <div>{transcript}</div>
+                              {interim ? <div className="voice-interim">{interim}</div> : null}
+                            </>
+                          ) : (
+                            <div className="voice-muted">Пока пусто.</div>
+                          )}
+                        </div>
+                        {result ? (
+                          <div className={`voice-result ${result.ok ? "ok" : "bad"}`}>
+                            {result.ok ? "Похоже, верно." : "Не совпадает достаточно."} Точность:{" "}
+                            <b>{Math.round(result.ratio * 100)}%</b>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </React.Fragment>
+              );
+            });
+          })()}
         </div>
       </div>
     </div>

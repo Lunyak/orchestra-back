@@ -36,6 +36,24 @@
   gap: var(--spacing-6);
 }
 
+.voice-toolbar {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.voice-script {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.voice-step {
+  margin-top: var(--spacing-2);
+  padding-top: var(--spacing-3);
+  border-top: 1px dashed var(--color-border-subtle);
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-medium);
+}
+
 .voice-label {
   font-size: var(--font-size-base);
   opacity: var(--opacity-medium);
@@ -55,6 +73,42 @@
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-transparent-1);
+}
+
+.voice-line--stage {
+  grid-template-columns: 1fr;
+  font-style: italic;
+  opacity: var(--opacity-medium);
+}
+
+.voice-line--mine {
+  border-color: color-mix(in srgb, var(--color-blue-border) 35%, var(--color-border-subtle));
+}
+
+.voice-line--partner {
+  opacity: var(--opacity-visible);
+}
+
+.voice-line--done {
+  opacity: var(--opacity-muted);
+}
+
+.voice-line--active {
+  border-color: var(--color-blue-border);
+  background: color-mix(in srgb, var(--color-blue-highlight-bg) 35%, var(--color-bg-transparent-1));
+}
+
+.voice-line--clickable {
+  cursor: pointer;
+}
+
+.voice-panel {
+  border: 1px solid var(--color-border-visible);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-5);
+  background: var(--color-bg-transparent-1);
+  display: grid;
+  gap: var(--spacing-5);
 }
 
 .voice-role {

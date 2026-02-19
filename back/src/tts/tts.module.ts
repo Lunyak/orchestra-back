@@ -7,4 +7,3 @@ import { TtsService } from './tts.service';
   providers: [TtsService],
 })
 export class TtsModule {}
-

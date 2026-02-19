@@ -14,10 +14,19 @@ function isDarwin() {
 }
 
 function safeText(input: string) {
-  return String(input ?? '')
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const s = String(input ?? '');
+  let out = '';
+  for (let i = 0; i < s.length; i += 1) {
+    const ch = s[i];
+    const code = ch.charCodeAt(0);
+    // Replace control chars (except tab/newline/CR) with space
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+      out += ' ';
+    } else {
+      out += ch;
+    }
+  }
+  return out.replace(/\s+/g, ' ').trim();
 }
 
 function chunkTextForGoogleTts(text: string): string[] {
@@ -34,10 +43,33 @@ function chunkTextForGoogleTts(text: string): string[] {
   return parts;
 }
 
+async function mapLimit<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: Math.max(1, limit) }, async () => {
+    while (true) {
+      const idx = nextIndex;
+      nextIndex += 1;
+      if (idx >= items.length) return;
+      out[idx] = await fn(items[idx], idx);
+    }
+  });
+
+  await Promise.all(workers);
+  return out;
+}
+
 let googleTtsApiPromise: Promise<any> | null = null;
 async function getGoogleTtsApi(): Promise<any> {
   if (!googleTtsApiPromise) {
-    googleTtsApiPromise = import('google-tts-api').then((m: any) => m?.default ?? m);
+    googleTtsApiPromise = import('google-tts-api').then(
+      (m: any) => m?.default ?? m,
+    );
   }
   return googleTtsApiPromise;
 }
@@ -48,7 +80,9 @@ export class TtsService {
 
   async listMacVoices(): Promise<Array<{ name: string; locale?: string }>> {
     if (!isDarwin()) return [];
-    const { stdout } = await execFileAsync('say', ['-v', '?'], { timeout: 15_000 });
+    const { stdout } = await execFileAsync('say', ['-v', '?'], {
+      timeout: 15_000,
+    });
     const lines = String(stdout ?? '')
       .split('\n')
       .map((l) => l.trim())
@@ -75,7 +109,8 @@ export class TtsService {
   private async synthGoogleMp3(opts: { text: string }): Promise<Buffer> {
     const text = safeText(opts.text);
     if (!text) return Buffer.from([]);
-    if (text.length > 4000) throw new Error('Text too long for TTS (max 4000 chars).');
+    if (text.length > 4000)
+      throw new Error('Text too long for TTS (max 4000 chars).');
 
     const google = await getGoogleTtsApi();
     const getAllAudioUrls: any =
@@ -84,7 +119,9 @@ export class TtsService {
       google?.getAudioUrl ??
       google?.default?.getAudioUrl;
     if (typeof getAllAudioUrls !== 'function') {
-      throw new Error('google-tts-api export mismatch (getAllAudioUrls/getAudioUrl not found)');
+      throw new Error(
+        'google-tts-api export mismatch (getAllAudioUrls/getAudioUrl not found)',
+      );
     }
 
     const key = crypto
@@ -101,49 +138,73 @@ export class TtsService {
       // ignore
     }
 
+    const startedAt = Date.now();
+    const DEADLINE_MS = 45_000;
+
     const chunks = chunkTextForGoogleTts(text);
-    const buffers: Buffer[] = [];
+    const allUrls: string[] = [];
     for (const c of chunks) {
       const urls = getAllAudioUrls(c, {
         lang: 'ru',
         slow: false,
         host: 'https://translate.google.com',
       });
-
-      // getAllAudioUrls returns array, getAudioUrl returns string
       const list: Array<{ url: string }> = Array.isArray(urls)
         ? urls
         : typeof urls === 'string'
           ? [{ url: urls }]
           : [];
-
       for (const u of list) {
         const url = String((u as any)?.url ?? '');
-        if (!url) continue;
+        if (url) allUrls.push(url);
+      }
+    }
+    if (allUrls.length === 0)
+      throw new Error('google-tts-api returned no urls');
+    if (allUrls.length > 24)
+      throw new Error('TTS chunking produced too many segments');
+
+    const fetchOne = async (url: string) => {
+      const fetchAttempt = async () => {
+        if (Date.now() - startedAt > DEADLINE_MS)
+          throw new Error('TTS deadline exceeded');
         const resp = await axios.get<ArrayBuffer>(url, {
           responseType: 'arraybuffer',
-          timeout: 20_000,
+          timeout: 10_000,
           headers: {
-            // keep it browser-like
             'User-Agent': 'Mozilla/5.0',
           },
         });
-        buffers.push(Buffer.from(resp.data));
+        return Buffer.from(resp.data);
+      };
+      try {
+        return await fetchAttempt();
+      } catch {
+        // small retry for transient 5xx/timeouts
+        await new Promise((r) => setTimeout(r, 250));
+        return await fetchAttempt();
       }
-    }
+    };
 
+    const buffers = await mapLimit(allUrls, 3, async (u) => await fetchOne(u));
     const out = Buffer.concat(buffers);
     await fs.writeFile(outMp3, out);
     return out;
   }
 
-  private async synthMacM4a(opts: { text: string; voice?: string | null }): Promise<Buffer> {
+  private async synthMacM4a(opts: {
+    text: string;
+    voice?: string | null;
+  }): Promise<Buffer> {
     if (!isDarwin()) {
-      throw new Error('TTS is only implemented for macOS (say/afconvert) in this build.');
+      throw new Error(
+        'TTS is only implemented for macOS (say/afconvert) in this build.',
+      );
     }
     const text = safeText(opts.text);
     if (!text) return Buffer.from([]);
-    if (text.length > 2500) throw new Error('Text too long for TTS (max 2500 chars).');
+    if (text.length > 2500)
+      throw new Error('Text too long for TTS (max 2500 chars).');
 
     const voice = safeText(opts.voice ?? '');
     const key = crypto
@@ -165,7 +226,10 @@ export class TtsService {
     if (voice) args.unshift(voice, '-v');
     args.push(text);
 
-    await execFileAsync('say', args, { timeout: 60_000, maxBuffer: 10 * 1024 * 1024 });
+    await execFileAsync('say', args, {
+      timeout: 60_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
     await execFileAsync(
       'afconvert',
       ['-f', 'm4af', '-d', 'aac', tmpAiff, outM4a],
@@ -181,7 +245,10 @@ export class TtsService {
     return await fs.readFile(outM4a);
   }
 
-  async synth(opts: { text: string; voice?: string | null }): Promise<{ buf: Buffer; mime: string }> {
+  async synth(opts: {
+    text: string;
+    voice?: string | null;
+  }): Promise<{ buf: Buffer; mime: string }> {
     if (isDarwin()) {
       const buf = await this.synthMacM4a(opts);
       return { buf, mime: 'audio/mp4' };
@@ -190,4 +257,3 @@ export class TtsService {
     return { buf, mime: 'audio/mpeg' };
   }
 }
-

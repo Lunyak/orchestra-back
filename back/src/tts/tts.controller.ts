@@ -1,4 +1,13 @@
-import { Controller, Get, HttpException, HttpStatus, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { TtsService } from './tts.service';
 
@@ -32,5 +41,25 @@ export class TtsController {
       throw new HttpException(msg, HttpStatus.BAD_REQUEST);
     }
   }
-}
 
+  @Post()
+  async speakPost(
+    @Body() body: { text?: string; voice?: string },
+    @Res() res: Response,
+  ) {
+    const t = String(body?.text ?? '').trim();
+    const voice = body?.voice;
+    if (!t) {
+      throw new HttpException('Missing text', HttpStatus.BAD_REQUEST);
+    }
+    try {
+      const out = await this.tts.synth({ text: t, voice });
+      res.setHeader('Content-Type', out.mime);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(out.buf);
+    } catch (e: any) {
+      const msg = String(e?.message ?? e ?? 'TTS failed');
+      throw new HttpException(msg, HttpStatus.BAD_REQUEST);
+    }
+  }
+}
