@@ -80,6 +80,17 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    path: "/actor",
+    label: "Актёр",
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M20 21a8 8 0 0 0-16 0" />
+        <circle cx="12" cy="7" r="4" />
+        <path d="M9 13.5l-1 3 2.8-1.2L12 18l1.2-2.7L16 16.5l-1-3" />
+      </svg>
+    ),
+  },
+  {
     path: "/profile",
     label: "Профиль",
     icon: (

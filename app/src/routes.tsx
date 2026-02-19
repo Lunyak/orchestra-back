@@ -34,6 +34,12 @@ const SettingsPage = lazy(() =>
   }))
 );
 
+const ActorPage = lazy(() =>
+  import("./pages/actor/ActorPage").then((m) => ({
+    default: m.ActorPage,
+  }))
+);
+
 /**
  * Компонент с маршрутами приложения.
  * Используется внутри провайдеров (AuthProvider, ProjectProvider, etc.)
@@ -83,6 +89,7 @@ export function AppRoutes() {
           <Route path="/board" element={<SpectaclePage />} />
           <Route path="/rehearsals" element={<RehearsalsPage />} />
           <Route path="/sessions" element={<DirectorSessionsPage />} />
+          <Route path="/actor" element={<ActorPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>

@@ -1,0 +1,166 @@
+.actor-view {
+  max-width: 920px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
+}
+
+.actor-subtitle {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.8;
+  line-height: 1.35;
+}
+
+.actor-controls {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.actor-field {
+  display: grid;
+  gap: 6px;
+}
+
+.actor-label {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.actor-select {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 10px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+}
+
+.actor-static {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 10px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 13px;
+  opacity: 0.95;
+}
+
+.actor-hint {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.actor-step-picker {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  display: grid;
+  gap: 8px;
+}
+
+.actor-step-picker-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.actor-step-btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+}
+
+.actor-step-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actor-step-picker-meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.actor-step-picker-list {
+  max-height: 220px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  padding: 2px;
+}
+
+.actor-step-item {
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.actor-step-title {
+  font-size: 13px;
+}
+
+.actor-step-count {
+  font-size: 12px;
+  opacity: 0.75;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.actor-section {
+  display: grid;
+  gap: 10px;
+}
+
+.actor-section-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.actor-mode-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.actor-mode-tab {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.actor-mode-tab.active {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.actor-section-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.actor-section-meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+

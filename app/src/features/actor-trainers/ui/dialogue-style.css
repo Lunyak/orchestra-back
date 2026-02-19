@@ -1,0 +1,216 @@
+.dialogue-trainer {
+  display: grid;
+  gap: 10px;
+}
+
+.dialogue-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dialogue-toolbar-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dialogue-toolbar-meta {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 2px;
+}
+
+.dialogue-toolbar-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.dialogue-chip {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.dialogue-btn {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.dialogue-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dialogue-btn--primary {
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.dialogue-scroll {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 10px;
+  max-height: 70vh;
+  overflow: auto;
+  display: grid;
+  gap: 8px;
+}
+
+.dialogue-line-wrap {
+  display: grid;
+}
+
+.dialogue-empty {
+  font-size: 13px;
+  opacity: 0.75;
+  padding: 6px;
+}
+
+.dialogue-stage {
+  font-size: 12px;
+  opacity: 0.75;
+  font-style: italic;
+  padding: 4px 6px;
+}
+
+.dialogue-line {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dialogue-role {
+  font-size: 12px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dialogue-text {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.dialogue-line--mine {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.dialogue-line--active .dialogue-my-line {
+  outline: 2px solid rgba(56, 189, 248, 0.35);
+}
+
+.dialogue-my-line {
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(56, 189, 248, 0.06);
+  display: grid;
+  gap: 8px;
+}
+
+.dialogue-my-line[data-done="true"] {
+  border-color: rgba(126, 231, 135, 0.35);
+  background: rgba(126, 231, 135, 0.06);
+}
+
+.dialogue-my-line[data-mistake="true"] {
+  animation: dialogue-shake 0.18s linear;
+}
+
+@keyframes dialogue-shake {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+  100% { transform: translateX(0); }
+}
+
+.dialogue-my-line-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.dialogue-my-line-role {
+  font-size: 12px;
+  opacity: 0.85;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dialogue-my-line-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dialogue-answer {
+  min-height: 24px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.dialogue-muted {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.dialogue-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dialogue-token {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+  user-select: none;
+}
+
+.dialogue-token:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.dialogue-token--punct {
+  opacity: 0.9;
+  border-style: dashed;
+}
+
+.dialogue-mistake {
+  font-size: 12px;
+  color: #f87171;
+}
+

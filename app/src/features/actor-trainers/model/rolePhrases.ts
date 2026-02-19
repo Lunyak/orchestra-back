@@ -1,0 +1,204 @@
+import { markdownToPlainText } from "../../../shared/utils/textPreview";
+import type { ScriptStep } from "../../../shared/types/script";
+
+export type RolePhraseSource = {
+  stepId: number;
+  stepTitle: string;
+  role: string;
+  text: string;
+};
+
+function normalizeRole(v: string): string {
+  return String(v ?? "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeRoleKey(v: string): string {
+  return normalizeRole(v)
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isStageDirectionLine(line: string): boolean {
+  const s = String(line ?? "").trim();
+  if (!s) return true;
+  if (s.startsWith("(")) return true;
+  if (s.startsWith("==")) return true;
+  if (s.startsWith(">")) return true;
+  return false;
+}
+
+function cleanUtteranceText(raw: string): string {
+  let s = String(raw ?? "");
+  // remove light/script tokens like {{light:1}} or {{blackout}}
+  s = s.replace(/\{\{[^}]*\}\}/g, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  s = markdownToPlainText(s);
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function parseLineSpeaker(line: string): { role: string; rest: string } | null {
+  const src = String(line ?? "");
+  const trimmed = src.trim();
+  if (!trimmed) return null;
+
+  // [[ROLE]] text
+  const mBracket = trimmed.match(/^\s*\[\[\s*([^\]]+?)\s*\]\]\s*(.*)$/);
+  if (mBracket?.[1]) {
+    return { role: normalizeRole(mBracket[1]), rest: String(mBracket[2] ?? "") };
+  }
+
+  // ROLE: text  /  ROLE — text  / ROLE - text
+  const mPrefix = trimmed.match(
+    /^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.\-]{1,40})\s*[:—-]\s+(.+)$/
+  );
+  if (mPrefix?.[1]) {
+    return { role: normalizeRole(mPrefix[1]), rest: String(mPrefix[2] ?? "") };
+  }
+
+  return null;
+}
+
+export function extractRolesFromText(text?: string): string[] {
+  const s = String(text ?? "");
+  if (!s.trim()) return [];
+  const out: string[] = [];
+
+  // [[ROLE]]
+  const re = /\[\[([^\]]+)\]\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    const role = normalizeRole(m[1] ?? "");
+    if (role) out.push(role);
+  }
+
+  // ROLE: text patterns
+  s.split(/\r?\n/).forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) return;
+    if (isStageDirectionLine(line)) return;
+    const parsed = parseLineSpeaker(line);
+    if (parsed?.role) out.push(parsed.role);
+  });
+
+  return Array.from(new Set(out));
+}
+
+export function normalizeCastActors(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    const out = value.map((x) => String(x ?? "").trim()).filter(Boolean);
+    return out.filter((v, i) => out.indexOf(v) === i);
+  }
+  const s = String(value ?? "").trim();
+  return s ? [s] : [];
+}
+
+/**
+ * Объединяет "истину" по ролям из:
+ * - `sceneData.roleAssignments` (глобально)
+ * - `step.cast` (локально на шаг)
+ */
+export function buildRoleAssignmentsIndex(opts: {
+  steps: ScriptStep[];
+  roleAssignments?: Record<string, string[]>;
+}): Map<string, { role: string; actors: string[] }> {
+  const map = new Map<string, { role: string; actors: string[] }>();
+  const push = (roleRaw: string, actorsRaw: string[]) => {
+    const role = normalizeRole(roleRaw);
+    const key = normalizeRoleKey(role);
+    if (!key) return;
+    const actors = (actorsRaw ?? [])
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean);
+    if (actors.length === 0) return;
+    const prev = map.get(key);
+    const nextActors = Array.from(
+      new Set([...(prev?.actors ?? []), ...actors])
+    );
+    map.set(key, { role: prev?.role ?? role, actors: nextActors });
+  };
+
+  for (const [role, list] of Object.entries(opts.roleAssignments ?? {})) {
+    if (!role) continue;
+    push(role, Array.isArray(list) ? list : []);
+  }
+
+  for (const step of opts.steps ?? []) {
+    const cast = (step as any)?.cast;
+    if (!cast || typeof cast !== "object") continue;
+    for (const [role, v] of Object.entries(cast as Record<string, unknown>)) {
+      push(role, normalizeCastActors(v));
+    }
+  }
+
+  return map;
+}
+
+export function extractRolePhrasesFromSteps(opts: {
+  steps: ScriptStep[];
+  role: string;
+  preferField?: "playMarkdown" | "markdown";
+}): RolePhraseSource[] {
+  const desiredKey = normalizeRoleKey(opts.role);
+  if (!desiredKey) return [];
+
+  const out: RolePhraseSource[] = [];
+
+  for (const step of opts.steps ?? []) {
+    const rawText =
+      (opts.preferField === "markdown"
+        ? step.markdown ?? ""
+        : step.playMarkdown ?? step.markdown ?? "") ?? "";
+    const text = String(rawText ?? "");
+    if (!text.trim()) continue;
+
+    let currentRole: string | null = null;
+    for (const rawLine of text.replace(/\r\n/g, "\n").split("\n")) {
+      const parsed = parseLineSpeaker(rawLine);
+      const line = String(rawLine ?? "").trim();
+
+      if (parsed) {
+        currentRole = parsed.role;
+        const rest = cleanUtteranceText(parsed.rest);
+        if (!rest) continue;
+        if (normalizeRoleKey(currentRole) === desiredKey) {
+          out.push({
+            stepId: step.id,
+            stepTitle: step.title ?? `Шаг ${step.id}`,
+            role: currentRole,
+            text: rest,
+          });
+        }
+        continue;
+      }
+
+      if (!currentRole) continue;
+      if (isStageDirectionLine(line)) continue;
+      const cleaned = cleanUtteranceText(line);
+      if (!cleaned) continue;
+      if (normalizeRoleKey(currentRole) === desiredKey) {
+        out.push({
+          stepId: step.id,
+          stepTitle: step.title ?? `Шаг ${step.id}`,
+          role: currentRole,
+          text: cleaned,
+        });
+      }
+    }
+  }
+
+  // uniq preserve order (same phrases can repeat via continuation normalization)
+  const seen = new Set<string>();
+  const uniq: RolePhraseSource[] = [];
+  for (const p of out) {
+    const key = `${p.stepId}:${p.role}:${p.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    uniq.push(p);
+  }
+  return uniq;
+}
+
