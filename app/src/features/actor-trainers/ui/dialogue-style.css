@@ -1,78 +1,79 @@
 .dialogue-trainer {
   display: grid;
-  gap: 10px;
+  gap: var(--spacing-5);
 }
 
 .dialogue-toolbar {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-5);
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border-visible);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-5) var(--spacing-6);
+  background: var(--color-bg-transparent-1);
 }
 
 .dialogue-toolbar-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
 }
 
 .dialogue-toolbar-meta {
-  font-size: 12px;
-  opacity: 0.75;
-  margin-top: 2px;
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-medium);
+  margin-top: var(--spacing-1);
 }
 
 .dialogue-toolbar-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-4);
   flex-wrap: wrap;
   align-items: center;
 }
 
 .dialogue-chip {
   display: inline-flex;
-  gap: 8px;
+  gap: var(--spacing-4);
   align-items: center;
-  font-size: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.03);
+  font-size: var(--font-size-base);
+  border: 1px solid var(--color-border-visible);
+  border-radius: var(--radius-full);
+  padding: var(--spacing-3) var(--spacing-5);
+  background: var(--color-bg-transparent-1);
 }
 
 .dialogue-btn {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-3) var(--spacing-3);
+  background: var(--color-bg-transparent-2);
   color: inherit;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-md);
+  transition: var(--transition-colors);
 }
 
 .dialogue-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
 .dialogue-btn--primary {
-  border-color: rgba(56, 189, 248, 0.35);
-  background: rgba(56, 189, 248, 0.12);
+  border-color: var(--color-blue-border);
+  background: var(--color-blue-highlight-bg);
 }
 
 .dialogue-scroll {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  padding: 10px;
+  border: 1px solid var(--color-border-visible);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-transparent-1);
+  padding: var(--spacing-5);
   max-height: 70vh;
   overflow: auto;
   display: grid;
-  gap: 8px;
+  gap: var(--spacing-4);
 }
 
 .dialogue-line-wrap {
@@ -80,66 +81,69 @@
 }
 
 .dialogue-empty {
-  font-size: 13px;
-  opacity: 0.75;
-  padding: 6px;
+  font-size: var(--font-size-md);
+  opacity: var(--opacity-medium);
+  padding: var(--spacing-3);
 }
 
 .dialogue-stage {
-  font-size: 12px;
-  opacity: 0.75;
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-medium);
   font-style: italic;
-  padding: 4px 6px;
+  padding: var(--spacing-2) var(--spacing-3);
 }
 
 .dialogue-line {
   display: grid;
   grid-template-columns: 140px 1fr;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  gap: var(--spacing-5);
+  padding: var(--spacing-4) var(--spacing-5);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-transparent-1);
 }
 
 .dialogue-role {
-  font-size: 12px;
-  opacity: 0.8;
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-visible);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .dialogue-text {
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
 }
 
 .dialogue-line--mine {
+  display: block;
   padding: 0;
   border: 0;
   background: transparent;
 }
 
 .dialogue-line--active .dialogue-my-line {
-  outline: 2px solid rgba(56, 189, 248, 0.35);
+  outline: 2px solid var(--color-blue-border);
 }
 
 .dialogue-my-line {
-  border: 1px solid rgba(56, 189, 248, 0.22);
-  border-radius: 12px;
-  padding: 10px;
-  background: rgba(56, 189, 248, 0.06);
+  border: 1px solid var(--color-border-accent);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-5);
+  background: var(--color-blue-highlight-bg);
   display: grid;
-  gap: 8px;
+  gap: var(--spacing-4);
 }
 
 .dialogue-my-line[data-done="true"] {
-  border-color: rgba(126, 231, 135, 0.35);
-  background: rgba(126, 231, 135, 0.06);
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.06);
 }
 
 .dialogue-my-line[data-mistake="true"] {
   animation: dialogue-shake 0.18s linear;
+  border-color: var(--color-error-border);
+  background: var(--color-error-bg);
 }
 
 @keyframes dialogue-shake {
@@ -152,56 +156,57 @@
 
 .dialogue-my-line-head {
   display: flex;
-  gap: 10px;
+  gap: var(--spacing-5);
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
 }
 
 .dialogue-my-line-role {
-  font-size: 12px;
-  opacity: 0.85;
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-bright);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .dialogue-my-line-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--spacing-4);
   align-items: center;
   flex-wrap: wrap;
 }
 
 .dialogue-answer {
   min-height: 24px;
-  font-size: 13px;
-  line-height: 1.35;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
 }
 
 .dialogue-muted {
-  font-size: 12px;
-  opacity: 0.7;
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-muted);
 }
 
 .dialogue-pool {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--spacing-4);
 }
 
 .dialogue-token {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  padding: 6px 10px;
-  background: rgba(255, 255, 255, 0.04);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--spacing-3) var(--spacing-3);
+  background: var(--color-bg-transparent-2);
   color: inherit;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-md);
   user-select: none;
+  transition: var(--transition-colors);
 }
 
 .dialogue-token:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--color-bg-hover);
 }
 
 .dialogue-token--punct {
@@ -210,7 +215,50 @@
 }
 
 .dialogue-mistake {
-  font-size: 12px;
-  color: #f87171;
+  font-size: var(--font-size-base);
+  color: var(--color-danger-light);
+}
+
+@media (max-width: 720px) {
+  .dialogue-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-index-panel);
+    padding: var(--spacing-4) var(--spacing-5);
+    backdrop-filter: blur(10px);
+  }
+
+  .dialogue-toolbar-actions {
+    width: 100%;
+  }
+
+  .dialogue-scroll {
+    padding: var(--spacing-4);
+    max-height: calc(100dvh - 260px);
+  }
+
+  .dialogue-line {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-2);
+  }
+
+  .dialogue-role {
+    font-size: var(--font-size-sm);
+    opacity: var(--opacity-medium);
+  }
+
+  .dialogue-btn {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
+
+  .dialogue-pool {
+    gap: var(--spacing-3);
+  }
+
+  .dialogue-token {
+    padding: var(--spacing-4) var(--spacing-6);
+    min-height: var(--height-button-md);
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 

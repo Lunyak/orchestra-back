@@ -183,8 +183,7 @@ export function ActorPage() {
           <div className="actor-view">
             <h2>Актёр</h2>
             <p className="actor-subtitle">
-              Тренажёры для заучивания текста роли. Источник реплик: метки
-              <b> [[РОЛЬ]]</b> и строки вида <b>РОЛЬ: текст</b> в тексте шага.
+              Тренажёры для заучивания текста роли.
             </p>
 
             <div className="actor-controls">
@@ -360,7 +359,7 @@ export function ActorPage() {
                   role="tab"
                   aria-selected={trainerMode === "dialogue"}
                 >
-                  Диалог (как Puzzle English)
+                  Диалог
                 </button>
                 <button
                   type="button"

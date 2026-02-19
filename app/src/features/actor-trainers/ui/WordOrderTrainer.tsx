@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import type { RolePhraseSource } from "../model/rolePhrases";
-import { isSameTokenSequence, shuffle, tokenizeText, type WordToken } from "../model/wordTokens";
+import { isSameTokenSequence, shuffle, tokenizeWords, type WordToken } from "../model/wordTokens";
 import "./style.css";
 
 type Exercise = {
@@ -39,12 +39,10 @@ export function WordOrderTrainer({
   title?: string;
   storageKey?: string;
 }) {
-  const [includePunctuation, setIncludePunctuation] = useState(false);
-
   const exercises = useMemo(() => {
     const out: Exercise[] = [];
     for (const p of phrases ?? []) {
-      const tokens = tokenizeText(p.text, { includePunctuation });
+      const tokens = tokenizeWords(p.text);
       if (tokens.length < 2) continue;
       const seed = Number(String(p.stepId ?? 0)) + p.text.length * 17;
       out.push({
@@ -55,7 +53,7 @@ export function WordOrderTrainer({
       });
     }
     return out;
-  }, [phrases, includePunctuation]);
+  }, [phrases]);
 
   const [index, setIndex] = useState(0);
   const current = exercises[Math.max(0, Math.min(index, exercises.length - 1))] ?? null;
@@ -207,14 +205,6 @@ export function WordOrderTrainer({
           <span className="actor-trainer-chip">
             Прогресс: <b>{doneCount}</b> / {total} (осталось {leftCount})
           </span>
-          <label className="actor-trainer-chip" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={includePunctuation}
-              onChange={(e) => setIncludePunctuation(e.target.checked)}
-            />
-            пунктуация
-          </label>
         </div>
       </div>
 

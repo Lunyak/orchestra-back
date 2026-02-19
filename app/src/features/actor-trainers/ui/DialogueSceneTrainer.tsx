@@ -50,48 +50,131 @@ function findNextUndone(exercises: Exercise[], done: Set<string>, fromIndex: num
   return start;
 }
 
+const AUTO_WORDS = new Set<string>([
+  "и",
+  "а",
+  "но",
+  "или",
+  "да",
+  "в",
+  "во",
+  "на",
+  "по",
+  "под",
+  "над",
+  "за",
+  "от",
+  "до",
+  "из",
+  "у",
+  "к",
+  "ко",
+  "с",
+  "со",
+  "о",
+  "об",
+  "обо",
+  "для",
+  "при",
+  "без",
+  "не",
+  "ни",
+  "же",
+  "ли",
+  "бы",
+]);
+
+function isAutoToken(t: WordToken): boolean {
+  if (t.kind === "punct") return true;
+  if (t.kind === "word" && AUTO_WORDS.has(t.norm)) return true;
+  return false;
+}
+
 function RoleLinePuzzle({
   ex,
   done,
-  includePunctuation,
   onDone,
   onResetDone,
 }: {
   ex: Exercise;
   done: boolean;
-  includePunctuation: boolean;
   onDone: () => void;
   onResetDone: () => void;
 }) {
   const [pool, setPool] = useState<WordToken[]>(ex.shuffled);
   const [answer, setAnswer] = useState<WordToken[]>([]);
   const [mistake, setMistake] = useState(false);
+  const completedFiredRef = useRef(false);
+  const poolRef = useRef<WordToken[]>(pool);
+  const answerRef = useRef<WordToken[]>(answer);
+
+  const resetState = () => {
+    const target = ex.target ?? [];
+    const autoPrefix: WordToken[] = [];
+    let i = 0;
+    while (i < target.length && isAutoToken(target[i]!)) {
+      autoPrefix.push(target[i]!);
+      i += 1;
+    }
+    setAnswer(autoPrefix);
+    setPool((ex.shuffled ?? []).filter((t) => !isAutoToken(t)));
+    setMistake(false);
+    completedFiredRef.current = false;
+  };
 
   useEffect(() => {
-    setPool(ex.shuffled);
-    setAnswer([]);
-    setMistake(false);
-  }, [ex.id, includePunctuation]);
+    resetState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ex.id]);
+
+  useEffect(() => {
+    poolRef.current = pool;
+  }, [pool]);
+
+  useEffect(() => {
+    answerRef.current = answer;
+  }, [answer]);
 
   const expected = ex.target[answer.length] ?? null;
 
   const pick = (token: WordToken) => {
+    const poolNow = poolRef.current;
+    const answerNow = answerRef.current;
+    const expected = ex.target[answerNow.length] ?? null;
     if (!expected) return;
+    // Ошибка должна "висеть" до следующего клика — сбрасываем на новом клике.
+    setMistake(false);
     const ok = token.norm === expected.norm;
     if (!ok) {
       setMistake(true);
-      window.setTimeout(() => setMistake(false), 220);
       return;
     }
-    setPool((prev) => prev.filter((t) => t.id !== token.id));
-    setAnswer((prev) => [...prev, token]);
+
+    let nextPool = poolNow.filter((t) => t.id !== token.id);
+    const nextAnswer: WordToken[] = [...answerNow, token];
+
+    // Автоподстановка: после верного слова автоматически добавляем
+    // идущие подряд частицы/союзы/предлоги и (опционально) пунктуацию.
+    let idx = nextAnswer.length;
+    while (idx < ex.target.length) {
+      const want = ex.target[idx];
+      if (!want) break;
+      if (!isAutoToken(want)) break;
+      nextAnswer.push(want);
+      idx += 1;
+    }
+
+    setPool(nextPool);
+    setAnswer(nextAnswer);
   };
 
   useEffect(() => {
     if (answer.length !== ex.target.length) return;
     if (ex.target.length === 0) return;
-    // Completed
-    const t = window.setTimeout(() => onDone(), 250);
+    if (completedFiredRef.current) return;
+    completedFiredRef.current = true;
+    // Completed (once)
+    const t = window.setTimeout(() => onDone(), 150);
     return () => window.clearTimeout(t);
   }, [answer.length, ex.target.length, onDone]);
 
@@ -102,19 +185,17 @@ function RoleLinePuzzle({
         <div className="dialogue-my-line-actions">
           {done ? (
             <button type="button" className="dialogue-btn" onClick={onResetDone}>
-              отметить как “не пройдено”
+              “не пройдено”
             </button>
           ) : null}
           <button
             type="button"
             className="dialogue-btn"
             onClick={() => {
-              setPool(ex.shuffled);
-              setAnswer([]);
-              setMistake(false);
+              resetState();
             }}
           >
-            сбросить реплику
+            сбросить
           </button>
         </div>
       </div>
@@ -160,8 +241,6 @@ export function DialogueSceneTrainer({
   selectedStepIds: number[];
   storageKey?: string;
 }) {
-  const [includePunctuation, setIncludePunctuation] = useState(true);
-
   const allLines = useMemo(() => {
     const selected = steps.filter((s) => selectedStepIds.includes(s.id));
     return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
@@ -175,7 +254,7 @@ export function DialogueSceneTrainer({
       if (line.kind !== "utterance") continue;
       if (!line.role) continue;
       if (normalizeRoleKey(line.role) !== roleKey) continue;
-      const tokens = tokenizeText(line.text, { includePunctuation });
+      const tokens = tokenizeText(line.text, { includePunctuation: true });
       if (tokens.length < 1) continue;
       const seed = Number(String(line.stepId ?? 0)) + line.text.length * 17;
       out.push({
@@ -190,7 +269,7 @@ export function DialogueSceneTrainer({
       });
     }
     return out;
-  }, [allLines, includePunctuation, roleKey]);
+  }, [allLines, roleKey]);
 
   const [doneIds, setDoneIds] = useState<Set<string>>(() => readDoneSet(storageKey));
   useEffect(() => {
@@ -299,10 +378,8 @@ export function DialogueSceneTrainer({
         <RoleLinePuzzle
           ex={ex}
           done={done}
-          includePunctuation={includePunctuation}
           onDone={() => {
             markDone(ex.id);
-            goNextUndone();
           }}
           onResetDone={() => markUndone(ex.id)}
         />
@@ -322,14 +399,6 @@ export function DialogueSceneTrainer({
           </div>
         </div>
         <div className="dialogue-toolbar-actions">
-          <label className="dialogue-chip">
-            <input
-              type="checkbox"
-              checked={includePunctuation}
-              onChange={(e) => setIncludePunctuation(e.target.checked)}
-            />
-            пунктуация
-          </label>
           <button type="button" className="dialogue-btn" onClick={goPrevMyLine} disabled={activeExerciseIndex <= 0}>
             ← моя реплика
           </button>
