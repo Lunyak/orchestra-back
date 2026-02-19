@@ -39,8 +39,7 @@
   height: 100dvh;
   height: var(--app-height, 100dvh);
   width: 240px;
-  min-width: 200px;
-  max-width: 280px;
+  max-width: 10px;
   background: #1f2a37;
   padding: 12px;
   color: #fff;

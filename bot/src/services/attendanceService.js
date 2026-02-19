@@ -28,15 +28,30 @@ function expandUuid(compact) {
 const DS_STATUS_COMPACT = { present: "p", absent: "a", late: "l" };
 const DS_STATUS_EXPAND = { p: "present", a: "absent", l: "late" };
 
-function formatRuDateTime(iso) {
+const DEFAULT_TZ = process.env.BOT_TIMEZONE || "Europe/Moscow";
+
+function formatRuDateTime(iso, timeZone = DEFAULT_TZ) {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return String(iso || "");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const yyyy = d.getFullYear();
-    const hh = String(d.getHours()).padStart(2, "0");
-    const min = String(d.getMinutes()).padStart(2, "0");
+    // Do not depend on server/container timezone (often UTC).
+    // Always format explicitly in a target timezone (default: Europe/Moscow).
+    const parts = new Intl.DateTimeFormat("ru-RU", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+    const byType = (t) => parts.find((p) => p.type === t)?.value || "";
+    const dd = byType("day");
+    const mm = byType("month");
+    const yyyy = byType("year");
+    const hh = byType("hour");
+    const min = byType("minute");
+    if (!dd || !mm || !yyyy || !hh || !min) return String(iso || "");
     return `${dd}.${mm}.${yyyy} ${hh}:${min}`;
   } catch {
     return String(iso || "");

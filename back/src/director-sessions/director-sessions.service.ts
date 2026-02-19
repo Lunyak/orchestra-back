@@ -49,6 +49,8 @@ type RawStepLike = {
   playMarkdown?: string;
 };
 
+const DEFAULT_TZ = 'Europe/Moscow';
+
 function slugifyEmail(email: string): string {
   return String(email ?? '')
     .trim()
@@ -73,13 +75,40 @@ function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
 }
 
-function getDateKey(dateIso: string): string {
+function getDatePartsInTimeZone(
+  dateIso: string,
+  timeZone: string = DEFAULT_TZ,
+): { yyyy: string; mm: string; dd: string; hh: string; min: string } | null {
   const d = new Date(dateIso);
-  if (!Number.isFinite(d.getTime())) return '';
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  if (!Number.isFinite(d.getTime())) return null;
+  try {
+    const parts = new Intl.DateTimeFormat('ru-RU', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(d);
+    const byType = (t: Intl.DateTimeFormatPartTypes) =>
+      parts.find((p) => p.type === t)?.value ?? '';
+    const yyyy = byType('year');
+    const mm = byType('month');
+    const dd = byType('day');
+    const hh = byType('hour');
+    const min = byType('minute');
+    if (!yyyy || !mm || !dd || !hh || !min) return null;
+    return { yyyy, mm, dd, hh, min };
+  } catch {
+    return null;
+  }
+}
+
+function getDateKey(dateIso: string): string {
+  const p = getDatePartsInTimeZone(dateIso);
+  if (!p) return '';
+  return `${p.yyyy}-${p.mm}-${p.dd}`;
 }
 
 function normalizeRoleKey(v: string): string {
@@ -459,10 +488,11 @@ export class DirectorSessionsService {
     }
 
     // local time labels (HH:MM) based on session.startsAt + offsetMin
-    const base = new Date(session.startsAt);
-    const baseMin = Number.isFinite(base.getTime())
-      ? base.getHours() * 60 + base.getMinutes()
-      : 0;
+    const baseParts = getDatePartsInTimeZone(session.startsAt);
+    const baseMin =
+      baseParts && /^\d{2}$/.test(baseParts.hh) && /^\d{2}$/.test(baseParts.min)
+        ? Number(baseParts.hh) * 60 + Number(baseParts.min)
+        : 0;
     const toHHMM = (min: number) => {
       const m = ((Math.floor(min) % (24 * 60)) + 24 * 60) % (24 * 60);
       const hh = String(Math.floor(m / 60)).padStart(2, '0');

@@ -32,15 +32,20 @@ function formatTimeFromOffset(offsetMin: number): string {
   return `${hh}:${mm}`;
 }
 
-function packSlotsSequential(slots: DirectorSessionSlot[]): DirectorSessionSlot[] {
-  const sorted = [...(slots ?? [])].sort((a, b) => a.offsetMin - b.offsetMin);
+function packSlotsSequentialInOrder(slots: DirectorSessionSlot[]): DirectorSessionSlot[] {
+  const list = [...(slots ?? [])];
   let offset = 0;
-  return sorted.map((s) => {
+  return list.map((s) => {
     const dur = Math.max(1, Math.floor(Number(s.durationMin) || 1));
     const item = { ...s, offsetMin: offset, durationMin: dur };
     offset += dur;
     return item;
   });
+}
+
+function packSlotsSequentialByOffset(slots: DirectorSessionSlot[]): DirectorSessionSlot[] {
+  const sorted = [...(slots ?? [])].sort((a, b) => a.offsetMin - b.offsetMin);
+  return packSlotsSequentialInOrder(sorted);
 }
 
 function parseTimeHHMM(src: string): number | null {
@@ -354,7 +359,9 @@ export function DirectorSessionsPage() {
 
   const packTimeline = async () => {
     if (!activeSession) return;
-    await updateActiveSession({ slots: packSlotsSequential(activeSession.slots ?? []) });
+    await updateActiveSession({
+      slots: packSlotsSequentialByOffset(activeSession.slots ?? []),
+    });
   };
 
   const insertSlotAfter = async (afterSlotId: string) => {
@@ -575,7 +582,8 @@ export function DirectorSessionsPage() {
     const next = [...sorted];
     const [moved] = next.splice(fromIndex, 1);
     next.splice(toIndex, 0, moved);
-    await updateActiveSession({ slots: packSlotsSequential(next) });
+    // Важно: после d&d сохраняем порядок, а не пересортировываем по старым offsetMin.
+    await updateActiveSession({ slots: packSlotsSequentialInOrder(next) });
   };
 
   // Подгружаем данные проектов, которые уже используются в слотах (чтобы показывать названия/аналитику)
