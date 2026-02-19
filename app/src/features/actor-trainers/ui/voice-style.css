@@ -87,6 +87,15 @@
   opacity: var(--opacity-medium);
 }
 
+.voice-target {
+  font-size: var(--font-size-md);
+  opacity: var(--opacity-visible);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--spacing-3) var(--spacing-5);
+  background: var(--color-bg-transparent-1);
+}
+
 .voice-actions {
   display: flex;
   gap: var(--spacing-4);
@@ -159,6 +168,26 @@
 .voice-btn--primary {
   border-color: var(--color-blue-border);
   background: var(--color-blue-highlight-bg);
+}
+
+.voice-ptt {
+  flex: 1 1 420px;
+  min-height: var(--height-button-lg);
+  border-radius: var(--radius-xl);
+  border-color: var(--color-danger-light);
+  background: color-mix(in srgb, var(--color-danger-light) 22%, var(--color-bg-transparent-2));
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  transform: none;
+}
+
+.voice-ptt[data-active="true"] {
+  border-color: var(--color-danger-light);
+  background: color-mix(in srgb, var(--color-danger-light) 42%, var(--color-bg-transparent-2));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger-light) 20%, transparent);
 }
 
 .voice-textbox {

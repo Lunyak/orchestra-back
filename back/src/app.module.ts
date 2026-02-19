@@ -15,6 +15,7 @@ import { ActorNotesModule } from './actor-notes/actor-notes.module';
 import { DirectorSessionsModule } from './director-sessions/director-sessions.module';
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
+import { TtsModule } from './tts/tts.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { UsersModule } from './users/users.module';
     FilesModule,
     AdminModule,
     BotModule,
+    TtsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
