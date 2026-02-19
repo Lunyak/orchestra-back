@@ -8,8 +8,7 @@ export class TtsController {
 
   @Get('voices')
   async voices() {
-    // macOS only for now
-    return await this.tts.listMacVoices();
+    return await this.tts.listVoices();
   }
 
   @Get()
@@ -24,15 +23,11 @@ export class TtsController {
       throw new HttpException('Missing text', HttpStatus.BAD_REQUEST);
     }
     try {
-      const buf = await this.tts.synthMacM4a({ text: t, voice });
-      res.setHeader('Content-Type', 'audio/mp4');
-      res.send(buf);
+      const out = await this.tts.synth({ text: t, voice });
+      res.setHeader('Content-Type', out.mime);
+      res.send(out.buf);
     } catch (e: any) {
       const msg = String(e?.message ?? e ?? 'TTS failed');
-      // Not implemented / missing tools on non-mac platforms
-      if (msg.toLowerCase().includes('only implemented for macos')) {
-        throw new HttpException(msg, HttpStatus.NOT_IMPLEMENTED);
-      }
       throw new HttpException(msg, HttpStatus.BAD_REQUEST);
     }
   }

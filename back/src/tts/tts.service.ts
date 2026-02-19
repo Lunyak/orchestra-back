@@ -5,6 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import axios from 'axios';
+import googleTTS from 'google-tts-api';
 
 const execFileAsync = promisify(execFile);
 
@@ -17,6 +19,20 @@ function safeText(input: string) {
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function chunkTextForGoogleTts(text: string): string[] {
+  const t = safeText(text);
+  if (!t) return [];
+  // google-tts-api already chunks internally, but we keep a reasonable cap for safety.
+  if (t.length <= 1500) return [t];
+  const parts: string[] = [];
+  let i = 0;
+  while (i < t.length) {
+    parts.push(t.slice(i, i + 1500));
+    i += 1500;
+  }
+  return parts;
 }
 
 @Injectable()
@@ -44,7 +60,59 @@ export class TtsService {
     return out;
   }
 
-  async synthMacM4a(opts: { text: string; voice?: string | null }): Promise<Buffer> {
+  async listVoices(): Promise<Array<{ name: string; locale?: string }>> {
+    if (isDarwin()) return await this.listMacVoices();
+    return [{ name: 'google', locale: 'ru-RU' }];
+  }
+
+  private async synthGoogleMp3(opts: { text: string }): Promise<Buffer> {
+    const text = safeText(opts.text);
+    if (!text) return Buffer.from([]);
+    if (text.length > 4000) throw new Error('Text too long for TTS (max 4000 chars).');
+
+    const key = crypto
+      .createHash('sha1')
+      .update(JSON.stringify({ p: 'google', t: text }))
+      .digest('hex');
+
+    await fs.mkdir(this.cacheDir, { recursive: true });
+    const outMp3 = path.join(this.cacheDir, `${key}.mp3`);
+    try {
+      const stat = await fs.stat(outMp3);
+      if (stat.isFile() && stat.size > 0) return await fs.readFile(outMp3);
+    } catch {
+      // ignore
+    }
+
+    const chunks = chunkTextForGoogleTts(text);
+    const buffers: Buffer[] = [];
+    for (const c of chunks) {
+      const urls = googleTTS.getAllAudioUrls(c, {
+        lang: 'ru',
+        slow: false,
+        host: 'https://translate.google.com',
+      });
+      for (const u of urls) {
+        const url = String((u as any)?.url ?? '');
+        if (!url) continue;
+        const resp = await axios.get<ArrayBuffer>(url, {
+          responseType: 'arraybuffer',
+          timeout: 20_000,
+          headers: {
+            // keep it browser-like
+            'User-Agent': 'Mozilla/5.0',
+          },
+        });
+        buffers.push(Buffer.from(resp.data));
+      }
+    }
+
+    const out = Buffer.concat(buffers);
+    await fs.writeFile(outMp3, out);
+    return out;
+  }
+
+  private async synthMacM4a(opts: { text: string; voice?: string | null }): Promise<Buffer> {
     if (!isDarwin()) {
       throw new Error('TTS is only implemented for macOS (say/afconvert) in this build.');
     }
@@ -86,6 +154,15 @@ export class TtsService {
     }
 
     return await fs.readFile(outM4a);
+  }
+
+  async synth(opts: { text: string; voice?: string | null }): Promise<{ buf: Buffer; mime: string }> {
+    if (isDarwin()) {
+      const buf = await this.synthMacM4a(opts);
+      return { buf, mime: 'audio/mp4' };
+    }
+    const buf = await this.synthGoogleMp3({ text: opts.text });
+    return { buf, mime: 'audio/mpeg' };
   }
 }
 
