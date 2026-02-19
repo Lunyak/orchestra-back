@@ -157,16 +157,13 @@ export function DialogueSceneTrainer({
 }: {
   steps: ScriptStep[];
   role: string;
-  selectedStepIds: "all" | number[];
+  selectedStepIds: number[];
   storageKey?: string;
 }) {
   const [includePunctuation, setIncludePunctuation] = useState(true);
 
   const allLines = useMemo(() => {
-    const selected =
-      selectedStepIds === "all"
-        ? steps
-        : steps.filter((s) => selectedStepIds.includes(s.id));
+    const selected = steps.filter((s) => selectedStepIds.includes(s.id));
     return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
   }, [selectedStepIds, steps]);
 

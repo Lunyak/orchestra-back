@@ -98,17 +98,39 @@
 
 .actor-step-item {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  grid-template-columns: 18px 1fr auto auto;
   gap: 10px;
-  align-items: center;
+  align-items: start;
   padding: 6px 8px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.02);
 }
 
+.actor-step-main {
+  display: grid;
+  gap: 4px;
+}
+
 .actor-step-title {
   font-size: 13px;
+}
+
+.actor-step-id {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-left: 6px;
+}
+
+.actor-step-examples {
+  display: grid;
+  gap: 3px;
+}
+
+.actor-step-example {
+  font-size: 12px;
+  opacity: 0.7;
+  line-height: 1.3;
 }
 
 .actor-step-count {
@@ -118,6 +140,22 @@
   border-radius: 999px;
   padding: 2px 8px;
   background: rgba(255, 255, 255, 0.03);
+  align-self: start;
+}
+
+.actor-step-open {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  align-self: start;
+}
+
+.actor-step-open:hover {
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .actor-section {

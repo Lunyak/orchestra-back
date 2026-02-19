@@ -72,10 +72,12 @@ export function buildDialogueLines(opts: {
   const out: DialogueLine[] = [];
 
   for (const step of opts.steps ?? []) {
+    // Важно: диалоговый тренажёр строится только из "Текста" (playMarkdown),
+    // без fallback на "Схему" (markdown), если явно не выбрано иначе.
     const rawText =
       (opts.preferField === "markdown"
         ? step.markdown ?? ""
-        : step.playMarkdown ?? step.markdown ?? "") ?? "";
+        : step.playMarkdown ?? "") ?? "";
     const text = String(rawText ?? "");
     if (!text.trim()) continue;
 

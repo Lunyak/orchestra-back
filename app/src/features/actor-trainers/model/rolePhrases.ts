@@ -148,10 +148,12 @@ export function extractRolePhrasesFromSteps(opts: {
   const out: RolePhraseSource[] = [];
 
   for (const step of opts.steps ?? []) {
+    // Важно: для актёрского тренажёра берём ТОЛЬКО "Текст" (playMarkdown),
+    // без подмешивания "Схемы" (markdown), если явно не выбрано иначе.
     const rawText =
       (opts.preferField === "markdown"
         ? step.markdown ?? ""
-        : step.playMarkdown ?? step.markdown ?? "") ?? "";
+        : step.playMarkdown ?? "") ?? "";
     const text = String(rawText ?? "");
     if (!text.trim()) continue;
 

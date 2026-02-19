@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
+import { useNavigate } from "react-router-dom";
 import {
   buildRoleAssignmentsIndex,
   extractRolePhrasesFromSteps,
@@ -28,6 +29,7 @@ export function ActorPage() {
   const { accessToken } = useAuth();
   const { projects, projectName, onProjectChange } = useProject();
   const { steps, sceneData } = useScene();
+  const navigate = useNavigate();
 
   const [myEmail, setMyEmail] = useState<string>("");
   const [profileLoading, setProfileLoading] = useState(false);
@@ -105,6 +107,16 @@ export function ActorPage() {
     return Array.from(map.values()).sort((a, b) => a.stepId - b.stepId);
   }, [phrases]);
 
+  const phrasesByStep = useMemo(() => {
+    const map = new Map<number, RolePhraseSource[]>();
+    for (const p of phrases) {
+      const arr = map.get(p.stepId);
+      if (arr) arr.push(p);
+      else map.set(p.stepId, [p]);
+    }
+    return map;
+  }, [phrases]);
+
   const [selectedStepIds, setSelectedStepIds] = useState<number[] | "all">("all");
 
   // Keep selection valid when role/project changes
@@ -155,6 +167,14 @@ export function ActorPage() {
   }, [effectiveRole, projectName]);
 
   const [trainerMode, setTrainerMode] = useState<"dialogue" | "cards">("dialogue");
+
+  const selectedStepIdsForTraining = useMemo(() => {
+    if (normalizedSelectedStepIds === "all") {
+      // "Все" означает "все шаги, где есть реплики выбранной роли" (то, что показано в пикере)
+      return phraseSteps.map((s) => s.stepId);
+    }
+    return normalizedSelectedStepIds;
+  }, [normalizedSelectedStepIds, phraseSteps]);
 
   return (
     <div className="app-layout actor-layout">
@@ -256,8 +276,9 @@ export function ActorPage() {
                           normalizedSelectedStepIds === "all"
                             ? true
                             : normalizedSelectedStepIds.includes(s.stepId);
+                        const examples = (phrasesByStep.get(s.stepId) ?? []).slice(0, 2);
                         return (
-                          <label key={s.stepId} className="actor-step-item">
+                          <div key={s.stepId} className="actor-step-item">
                             <input
                               type="checkbox"
                               checked={checked}
@@ -277,10 +298,41 @@ export function ActorPage() {
                                   return Array.from(set.values()).sort((a, b) => a - b);
                                 });
                               }}
+                              aria-label={`Выбрать шаг ${s.stepTitle}`}
                             />
-                            <span className="actor-step-title">{s.stepTitle}</span>
-                            <span className="actor-step-count">{s.count}</span>
-                          </label>
+                            <div className="actor-step-main">
+                              <div className="actor-step-title">
+                                {s.stepTitle} <span className="actor-step-id">#{s.stepId}</span>
+                              </div>
+                              {examples.length > 0 ? (
+                                <div className="actor-step-examples">
+                                  {examples.map((ex, idx) => (
+                                    <div key={`${s.stepId}-ex-${idx}`} className="actor-step-example">
+                                      “{String(ex.text).slice(0, 90)}
+                                      {ex.text.length > 90 ? "…" : ""}”
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                            <span className="actor-step-count" title="Количество реплик вашей роли в этом шаге">
+                              {s.count}
+                            </span>
+                            <button
+                              type="button"
+                              className="actor-step-open"
+                              onClick={(ev) => {
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                if (!projectName) return;
+                                localStorage.setItem(`selectedStepId:${projectName}`, String(s.stepId));
+                                navigate("/");
+                              }}
+                              title="Открыть этот шаг в сценарии"
+                            >
+                              Открыть
+                            </button>
+                          </div>
                         );
                       })
                     )}
@@ -325,7 +377,7 @@ export function ActorPage() {
                 <DialogueSceneTrainer
                   steps={steps}
                   role={effectiveRole}
-                  selectedStepIds={normalizedSelectedStepIds === "all" ? "all" : normalizedSelectedStepIds}
+                  selectedStepIds={selectedStepIdsForTraining}
                   storageKey={dialogueStorageKey || undefined}
                 />
               ) : (
