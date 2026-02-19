@@ -401,7 +401,18 @@ export class DirectorSessionsService {
 
     const session = sessions[idx] as DirectorRehearsalSession;
     if (session.telegramMessageId) {
-      return { ok: true, published: session };
+      // Debug-friendly response: publish endpoint may be clicked multiple times.
+      // If Telegram IDs exist, we consider it already published and do not send again.
+      return {
+        ok: true,
+        alreadyPublished: true,
+        telegram: {
+          chatId: session.telegramChatId ?? null,
+          messageId: session.telegramMessageId ?? null,
+          threadId: session.telegramThreadId ?? null,
+        },
+        published: session,
+      };
     }
 
     const participants = await this.buildParticipantsForSession(
@@ -430,6 +441,12 @@ export class DirectorSessionsService {
     }
 
     try {
+      // eslint-disable-next-line no-console
+      console.log('[director-sessions] publish via bot', {
+        projectId: directorProject.id,
+        sessionId: sessId,
+        botUrl,
+      });
       await axios.post(
         `${botUrl.replace(/\/$/, '')}/internal/publish-director-session`,
         { projectId: directorProject.id, sessionId: sessId },

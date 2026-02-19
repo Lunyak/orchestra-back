@@ -125,11 +125,13 @@ class AttendanceService {
    * ID топика в группе (message_thread_id). В .env: GROUP_CHAT_ID_ATTENTION или ATTENDANCE_THREAD_ID (напр. 41051).
    */
   getEffectiveThreadId() {
+    // Важно: НЕ задаём дефолтный threadId. Иначе бот может "успешно" отправлять
+    // сообщения в неожиданный топик, и будет казаться, что публикации нет.
     return (
       settingsStorage.getAttendanceThreadId() ||
       process.env.GROUP_CHAT_ID_ATTENTION ||
       process.env.ATTENDANCE_THREAD_ID ||
-      "41051"
+      null
     );
   }
 
@@ -1174,6 +1176,18 @@ class AttendanceService {
     if (tid && !Number.isNaN(tid)) {
       opts.message_thread_id = tid;
     }
+
+    console.log(
+      "[director-session] publish",
+      "projectId=",
+      projectId,
+      "sessionId=",
+      sessionId,
+      "chatId=",
+      groupChatId,
+      "threadId=",
+      opts.message_thread_id ?? null,
+    );
 
     const sent = await this.bot.telegram.sendMessage(
       groupChatId,
