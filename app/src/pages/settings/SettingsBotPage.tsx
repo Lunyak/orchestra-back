@@ -14,6 +14,14 @@ import {
   upsertBotVariable,
 } from "../../sync/api";
 
+function looksLikeTelegramBotToken(token: string): boolean {
+  const t = String(token ?? "").trim();
+  // Telegram bot token format: "<digits>:<secret>", where secret is typically 35+ chars.
+  // We keep it permissive but require ":" and a reasonably long suffix.
+  const m = t.match(/^(\d{5,}):([A-Za-z0-9_-]{20,})$/);
+  return Boolean(m);
+}
+
 export function SettingsBotPage() {
   const navigate = useNavigate();
   const { accessToken } = useAuth();
@@ -141,6 +149,18 @@ export function SettingsBotPage() {
     if (!accessToken) return;
     const token = connectToken.trim();
     if (!token) return;
+    if (token === "BOT_TOKENS_KEY") {
+      setConnectError(
+        'В это поле нужно вставить токен Telegram-бота из BotFather (пример: "123456789:AA..."), а не имя переменной окружения.',
+      );
+      return;
+    }
+    if (!looksLikeTelegramBotToken(token)) {
+      setConnectError(
+        'Токен не похож на токен Telegram-бота. Он должен выглядеть как "123456789:AA..." (обязательно с двоеточием).',
+      );
+      return;
+    }
     setConnectLoading(true);
     setConnectError(null);
     try {
@@ -273,14 +293,15 @@ export function SettingsBotPage() {
                   type="password"
                   value={connectToken}
                   onChange={(e) => setConnectToken(e.target.value)}
-                  placeholder="Токен из BotFather"
+                  placeholder='Токен из BotFather (пример: 123456789:AA...)'
                 />
                 <button type="button" onClick={handleConnect} disabled={connectLoading || !connectToken.trim()}>
                   {connectLoading ? "Подключаем..." : "Подключить"}
                 </button>
               </div>
               <p className="settings-bot-hint">
-                Токен хранится на сервере в зашифрованном виде. В интерфейсе он не показывается.
+                Вставьте токен Telegram-бота из BotFather (формат: <code>числа:секрет</code>).
+                Токен хранится на сервере в зашифрованном виде и в интерфейсе не показывается.
               </p>
               {connectError && <div className="settings-bot-error">{connectError}</div>}
             </section>

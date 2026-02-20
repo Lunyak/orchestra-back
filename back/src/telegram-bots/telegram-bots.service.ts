@@ -68,6 +68,28 @@ function renderTemplate(text: string, vars: Record<string, string>): string {
   });
 }
 
+function dbHintFromError(e: any): string | null {
+  const code = String(e?.code ?? '');
+  const msg = String(e?.message ?? '');
+
+  // Postgres: undefined_table / undefined_column
+  if (code === '42P01' || /relation .*TelegramBotIntegration.* does not exist/i.test(msg)) {
+    return 'DB is missing Telegram bot tables. Apply prisma migrations (20260220120000_telegram_bots*).';
+  }
+  if (code === '42703' || /column .* does not exist/i.test(msg)) {
+    return 'DB schema is outdated. Apply latest prisma migrations for Telegram bot fields.';
+  }
+  return null;
+}
+
+function configHintFromError(e: any): string | null {
+  const msg = String(e?.message ?? '');
+  if (/BOT_TOKENS_KEY/i.test(msg)) {
+    return 'Server is missing BOT_TOKENS_KEY (base64, 32 bytes) for token encryption.';
+  }
+  return null;
+}
+
 @Injectable()
 export class TelegramBotsService {
   constructor(
@@ -170,15 +192,29 @@ export class TelegramBotsService {
     const botTelegramUserId = String(me.id);
     const botUsername = me.username ? String(me.username) : null;
 
-    const existing = (await this.prisma.$queryRawUnsafe(
-      `SELECT "id","ownerUserId" FROM "TelegramBotIntegration"
-       WHERE "botTelegramUserId" = $1
-       LIMIT 1`,
-      botTelegramUserId,
-    )) as Array<{ id: string; ownerUserId: string }>;
+    let tokenEncrypted: string;
+    try {
+      tokenEncrypted = encryptString(token);
+    } catch (e: any) {
+      const hint = configHintFromError(e);
+      if (hint) throw new BadRequestException(hint);
+      throw e;
+    }
 
     const title = dto.title?.trim() || null;
-    const tokenEncrypted = encryptString(token);
+    let existing: Array<{ id: string; ownerUserId: string }>;
+    try {
+      existing = (await this.prisma.$queryRawUnsafe(
+        `SELECT "id","ownerUserId" FROM "TelegramBotIntegration"
+         WHERE "botTelegramUserId" = $1
+         LIMIT 1`,
+        botTelegramUserId,
+      )) as Array<{ id: string; ownerUserId: string }>;
+    } catch (e: any) {
+      const hint = dbHintFromError(e);
+      if (hint) throw new BadRequestException(hint);
+      throw e;
+    }
 
     if (existing.length > 0) {
       const row = existing[0];
@@ -187,27 +223,40 @@ export class TelegramBotsService {
       }
 
       // Keep previous webhookSecret
-      const current = (await this.prisma.$queryRawUnsafe(
-        `SELECT "webhookSecret" FROM "TelegramBotIntegration" WHERE "id" = $1`,
-        row.id,
-      )) as Array<{ webhookSecret: string }>;
+      let current: Array<{ webhookSecret: string }>;
+      try {
+        current = (await this.prisma.$queryRawUnsafe(
+          `SELECT "webhookSecret" FROM "TelegramBotIntegration" WHERE "id" = $1`,
+          row.id,
+        )) as Array<{ webhookSecret: string }>;
+      } catch (e: any) {
+        const hint = dbHintFromError(e);
+        if (hint) throw new BadRequestException(hint);
+        throw e;
+      }
       const webhookSecret = current[0]?.webhookSecret;
       if (!webhookSecret) throw new Error('webhookSecret missing');
 
-      await this.prisma.$executeRawUnsafe(
-        `UPDATE "TelegramBotIntegration"
-         SET "tokenEncrypted" = $1,
-             "botUsername" = $2,
-             "title" = COALESCE($3, "title"),
-             "status" = 'connected',
-             "updatedAt" = CURRENT_TIMESTAMP
-         WHERE "id" = $4 AND "ownerUserId" = $5`,
-        tokenEncrypted,
-        botUsername,
-        title,
-        row.id,
-        userId,
-      );
+      try {
+        await this.prisma.$executeRawUnsafe(
+          `UPDATE "TelegramBotIntegration"
+           SET "tokenEncrypted" = $1,
+               "botUsername" = $2,
+               "title" = COALESCE($3, "title"),
+               "status" = 'connected',
+               "updatedAt" = CURRENT_TIMESTAMP
+           WHERE "id" = $4 AND "ownerUserId" = $5`,
+          tokenEncrypted,
+          botUsername,
+          title,
+          row.id,
+          userId,
+        );
+      } catch (e: any) {
+        const hint = dbHintFromError(e);
+        if (hint) throw new BadRequestException(hint);
+        throw e;
+      }
 
       await this.telegramSetWebhook({ token, botId: row.id, secret: webhookSecret });
       return { ok: true, id: row.id };
@@ -216,18 +265,24 @@ export class TelegramBotsService {
     const id = crypto.randomUUID();
     const webhookSecret = crypto.randomBytes(24).toString('base64url');
 
-    await this.prisma.$executeRawUnsafe(
-      `INSERT INTO "TelegramBotIntegration"
-       ("id","ownerUserId","tokenEncrypted","botUsername","botTelegramUserId","title","status","webhookSecret","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,'connected',$7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
-      id,
-      userId,
-      tokenEncrypted,
-      botUsername,
-      botTelegramUserId,
-      title,
-      webhookSecret,
-    );
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `INSERT INTO "TelegramBotIntegration"
+         ("id","ownerUserId","tokenEncrypted","botUsername","botTelegramUserId","title","status","webhookSecret","createdAt","updatedAt")
+         VALUES ($1,$2,$3,$4,$5,$6,'connected',$7,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`,
+        id,
+        userId,
+        tokenEncrypted,
+        botUsername,
+        botTelegramUserId,
+        title,
+        webhookSecret,
+      );
+    } catch (e: any) {
+      const hint = dbHintFromError(e);
+      if (hint) throw new BadRequestException(hint);
+      throw e;
+    }
 
     await this.telegramSetWebhook({ token, botId: id, secret: webhookSecret });
     return { ok: true, id };
@@ -390,7 +445,13 @@ export class TelegramBotsService {
     )) as Array<{ tokenEncrypted: string }>;
     const enc = rows[0]?.tokenEncrypted;
     if (!enc) throw new NotFoundException('Bot not found');
-    return decryptString(enc);
+    try {
+      return decryptString(enc);
+    } catch (e: any) {
+      const hint = configHintFromError(e);
+      if (hint) throw new BadRequestException(hint);
+      throw e;
+    }
   }
 
   private async getVariablesMap(botId: string): Promise<Record<string, string>> {
