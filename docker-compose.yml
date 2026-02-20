@@ -36,6 +36,7 @@ services:
       # Back -> Bot (internal publish)
       BOT_INTERNAL_URL: ${BOT_INTERNAL_URL:-http://bot:3001}
       BOT_INTERNAL_SECRET: ${BOT_INTERNAL_SECRET}
+      BOT_TOKENS_KEY: ${BOT_TOKENS_KEY}
       # S3/MinIO storage (variant A)
       # Backend и браузер ходят к MinIO по одному и тому же адресу,
       # чтобы пресайнд-URL работали без переподписывания.
