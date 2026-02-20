@@ -2,11 +2,18 @@ const axios = require("axios");
 const API_BASE_URL = require("../const/API_BASE_URL");
 
 const BOT_SECRET = process.env.BOT_SECRET;
+const BOT_INTEGRATION_ID =
+  process.env.TELEGRAM_BOT_INTEGRATION_ID || process.env.BOT_INTEGRATION_ID;
 
 function assertConfigured() {
   if (!BOT_SECRET) {
     throw new Error(
       "BOT_SECRET is not configured (required to call backend /bot/* endpoints)",
+    );
+  }
+  if (!BOT_INTEGRATION_ID) {
+    throw new Error(
+      "TELEGRAM_BOT_INTEGRATION_ID is not configured (required for multi-bot /bot/* endpoints)",
     );
   }
 }
@@ -17,9 +24,16 @@ function client() {
     baseURL: API_BASE_URL,
     headers: {
       "X-Bot-Secret": BOT_SECRET,
+      "X-Telegram-Bot-Integration-Id": BOT_INTEGRATION_ID,
     },
     timeout: 15_000,
   });
+}
+
+async function getIntegration() {
+  const c = client();
+  const { data } = await c.get("/bot/integration");
+  return data;
 }
 
 async function getRehearsal(rehearsalId) {
@@ -75,6 +89,7 @@ async function setDirectorSessionAttendance(projectId, sessionId, payload) {
 }
 
 module.exports = {
+  getIntegration,
   getRehearsal,
   markRehearsalPublished,
   setRehearsalAttendance,

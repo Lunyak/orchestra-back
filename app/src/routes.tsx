@@ -34,6 +34,12 @@ const SettingsPage = lazy(() =>
   }))
 );
 
+const SettingsBotPage = lazy(() =>
+  import("./pages/settings/SettingsBotPage").then((m) => ({
+    default: m.SettingsBotPage,
+  }))
+);
+
 const ActorPage = lazy(() =>
   import("./pages/actor/ActorPage").then((m) => ({
     default: m.ActorPage,
@@ -92,6 +98,7 @@ export function AppRoutes() {
           <Route path="/actor" element={<ActorPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/settings/bot" element={<SettingsBotPage />} />
         </Routes>
       </Suspense>
     </>

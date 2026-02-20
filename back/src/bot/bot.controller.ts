@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { BotGuard } from './bot.guard';
 import { BotProfilesUpsertDto } from './dto/bot-profiles.dto';
 import { RehearsalPlanRequestDto } from './dto/rehearsal-plan.dto';
@@ -24,6 +24,12 @@ export class BotController {
     return this.botService.upsertProfiles(body);
   }
 
+  /** Получить настройки/переменные для текущей bot integration (по заголовку X-Telegram-Bot-Integration-Id) */
+  @Get('integration')
+  getIntegration(@Req() req: any) {
+    return this.botService.getIntegration(req.botIntegrationId);
+  }
+
   @Post('profiles/resolve')
   resolveProfiles(@Body() body: { emails: string[] }) {
     return this.botService.resolveProfiles(body?.emails ?? []);
@@ -36,9 +42,12 @@ export class BotController {
 
   /** Создать репетицию из бота (истина в БД Orchestra) */
   @Post('rehearsals')
-  createRehearsal(@Body() body: CreateRehearsalDto) {
+  createRehearsal(@Req() req: any, @Body() body: CreateRehearsalDto) {
     // createdBy неизвестен, помечаем createdVia=bot
-    return this.rehearsals.create('bot', body, 'bot');
+    const via = req?.botIntegrationId
+      ? `telegram:${String(req.botIntegrationId)}`
+      : 'bot';
+    return this.rehearsals.create('bot', body, via);
   }
 
   /** Обновить состав (кто придёт/не придёт) */

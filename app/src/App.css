@@ -566,6 +566,125 @@ body {
   margin-top: 0;
 }
 
+.settings-bot-topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-bot-topbar h2 {
+  margin: 0;
+}
+
+.settings-bot-section {
+  margin: 1.25rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid #334155;
+}
+
+.settings-bot-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.settings-bot-row input,
+.settings-bot-row select {
+  padding: 8px 12px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #f1f5f9;
+  min-width: 220px;
+}
+
+.settings-bot-grid input,
+.settings-bot-grid textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #475569;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+.settings-bot-grid textarea {
+  resize: vertical;
+}
+
+.settings-bot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.settings-bot-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.settings-bot-checkbox {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.settings-bot-hint {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  margin: 6px 0 0;
+}
+
+.settings-bot-error {
+  margin-top: 8px;
+  color: #f87171;
+  font-size: 0.875rem;
+}
+
+.settings-bot-ok {
+  margin-top: 8px;
+  color: #34d399;
+  font-size: 0.875rem;
+}
+
+.settings-bot-vars {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-bot-var-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.settings-bot-var-key {
+  min-width: 140px;
+  color: #e2e8f0;
+}
+
+.settings-bot-var-value {
+  flex: 1;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-invite {
   margin: 1.5rem 0;
   padding: 1rem 0;

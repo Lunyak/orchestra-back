@@ -16,6 +16,7 @@ import { DirectorSessionsModule } from './director-sessions/director-sessions.mo
 import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 import { TtsModule } from './tts/tts.module';
+import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TtsModule } from './tts/tts.module';
     AdminModule,
     BotModule,
     TtsModule,
+    TelegramBotsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

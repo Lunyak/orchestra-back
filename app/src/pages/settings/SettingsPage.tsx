@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ProjectPanel } from "../../components/project-panel/ProjectPanel";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
@@ -6,6 +7,7 @@ import { useTeam } from "../../features/team";
 import { usePlatform } from "../../PlatformContext";
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const { accessToken, logout } = useAuth();
   const { onPushAllLocal } = usePlatform();
   const {
@@ -77,6 +79,17 @@ export function SettingsPage() {
                 onCreateProject={handleCreateProject}
                 onDeleteProject={handleDeleteProject}
               />
+            </section>
+
+            <section className="settings-project-section">
+              <h2>Бот</h2>
+              <p>
+                Подключите Telegram-бота (своим токеном) и управляйте переменными
+                для шаблонов сообщений.
+              </p>
+              <button type="button" onClick={() => navigate("/settings/bot")}>
+                Настройки бота
+              </button>
             </section>
             <h2>Настройки проекта</h2>
             <p>Текущий проект: {projectName || "—"}</p>

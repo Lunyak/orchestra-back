@@ -21,6 +21,7 @@ model User {
   projectMemberships ProjectMember[]
   actorNotes         ActorNote[]
   actorAnnotations   ActorAnnotation[]
+  telegramBots       TelegramBotIntegration[]
 }
 
 model UserProfile {
@@ -336,6 +337,68 @@ model BotSettings {
   projectSlug       String?  // Slug проекта по умолчанию для бота
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model TelegramBotIntegration {
+  id                    String   @id @default(cuid())
+  ownerUserId           String
+  owner                 User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  /// Шифрованный токен Telegram бота (никогда не отдаём на frontend).
+  tokenEncrypted        String
+
+  /// getMe.username
+  botUsername           String?
+  /// getMe.id
+  botTelegramUserId     String?
+
+  /// Telegram ID владельца (аналог OWNER_TELEGRAM_ID из env, но пер-бот)
+  ownerTelegramId       String?
+  /// Telegram ID администратора (аналог ADMIN_ID из env, но пер-бот)
+  adminTelegramId       String?
+
+  /// Произвольное имя для отображения в UI
+  title                 String?
+
+  /// connected | disabled | error
+  status                String   @default("connected")
+
+  /// Секрет для валидации webhook запросов (header X-Telegram-Bot-Api-Secret-Token)
+  webhookSecret         String
+
+  // Настройки публикации/проекта — пер-бот
+  groupChatId           String?
+  attendanceThreadId    String?
+  announcementsThreadId String?
+  defaultProjectSlug    String?
+
+  /// Квиз/игры (аналог QUIZ_GROUP_CHAT_ID / QUIZ_THREAD_ID из env, но пер-бот)
+  quizGroupChatId       String?
+  quizThreadId          String?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  variables             BotVariable[]
+
+  @@index([ownerUserId])
+  @@unique([botTelegramUserId])
+}
+
+model BotVariable {
+  id        String  @id @default(cuid())
+  botId     String
+  bot       TelegramBotIntegration @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  key       String
+  value     String
+  isSecret  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([botId, key])
+  @@index([botId])
 }
 
 model ActorNote {

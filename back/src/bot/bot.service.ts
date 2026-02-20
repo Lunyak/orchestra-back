@@ -80,6 +80,53 @@ type RawStepLike = {
 export class BotService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async getIntegration(botIntegrationId: string) {
+    const id = String(botIntegrationId ?? '').trim();
+    if (!id) {
+      throw new BadRequestException('botIntegrationId is required');
+    }
+
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT
+        "id",
+        "botUsername",
+        "botTelegramUserId",
+        "title",
+        "status",
+        "ownerTelegramId",
+        "adminTelegramId",
+        "groupChatId",
+        "attendanceThreadId",
+        "announcementsThreadId",
+        "defaultProjectSlug",
+        "quizGroupChatId",
+        "quizThreadId",
+        "createdAt",
+        "updatedAt"
+      FROM "TelegramBotIntegration"
+      WHERE "id" = $1
+      LIMIT 1`,
+      id,
+    )) as Array<Record<string, any>>;
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Bot integration not found');
+    }
+
+    const vars = (await this.prisma.$queryRawUnsafe(
+      `SELECT "key","value","isSecret","updatedAt"
+       FROM "BotVariable"
+       WHERE "botId" = $1
+       ORDER BY "key" ASC`,
+      id,
+    )) as Array<{ key: string; value: string; isSecret: boolean; updatedAt: Date }>;
+
+    return {
+      integration: rows[0],
+      variables: vars,
+    };
+  }
+
   async upsertProfiles(dto: BotProfilesUpsertDto) {
     const profiles = Array.isArray(dto.profiles) ? dto.profiles : [];
     if (profiles.length === 0) {
