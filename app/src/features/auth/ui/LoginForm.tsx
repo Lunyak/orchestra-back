@@ -2,7 +2,11 @@ import React, { useState } from "react";
 import { getApiBaseUrl } from "../../../sync/api";
 import { useAuth } from "../model/auth-context";
 
-export function LoginForm() {
+export function LoginForm({
+  onAfterLogin,
+}: {
+  onAfterLogin?: (token: string) => Promise<void>;
+}) {
   const { login: doLogin, signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,9 +21,9 @@ export function LoginForm() {
     setError(null);
     try {
       if (isRegisterMode) {
-        await signUp(email.trim(), password);
+        await signUp(email.trim(), password, onAfterLogin);
       } else {
-        await doLogin(email.trim(), password);
+        await doLogin(email.trim(), password, onAfterLogin);
       }
     } catch (err: any) {
       setError(err?.response?.data?.message ?? "Ошибка");

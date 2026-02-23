@@ -2,8 +2,8 @@
   width: 100%;
   min-width: 240px;
   max-width: 320px;
-  background: #1f2a37;
-  color: #fff;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -98,13 +98,13 @@
 }
 
 .playlist-play-btn {
-  background: #10b981;
-  color: #fff;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
   border: none;
   padding: 8px 12px;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   width: 100%;
 }
 
@@ -241,7 +241,7 @@
 .playlist-tracks {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 4px;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -251,10 +251,11 @@
   background: #2c3e50;
   color: #fff;
   border: none;
-  padding: 8px 10px;
+  padding: 4px 10px;
   border-radius: 6px;
   cursor: pointer;
   width: 100%;
+  font-size: 12px;
 }
 
 .playlist-track-row.active .playlist-track-btn {
@@ -280,7 +281,7 @@
 }
 
 .playlist-track-row.active {
-  background: #10b981;
+  background: var(--color-bg-tertiary);
 }
 
 .playlist-track-row.active .playlist-track-btn,

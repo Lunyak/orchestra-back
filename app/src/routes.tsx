@@ -29,7 +29,7 @@ const ProfilePage = lazy(() =>
 );
 
 const SettingsPage = lazy(() =>
-  import("./pages/settings/SettingsPage").then((m) => ({
+  import("./pages/settings/SettingsPage/SettingsPage").then((m) => ({
     default: m.SettingsPage,
   }))
 );
@@ -75,15 +75,15 @@ export function AppRoutes() {
         scriptState={
           shouldShowScriptState
             ? {
-                showRequisites,
-                onToggleRequisites: toggleRequisites,
-                showPlaylist: showPlaylistSidebar,
-                onTogglePlaylist: togglePlaylist,
-                showHeaderSounds,
-                onToggleHeaderSounds: toggleHeaderSounds,
-                isStepsCollapsed,
-                onToggleStepsCollapsed: toggleStepsCollapsed,
-              }
+              showRequisites,
+              onToggleRequisites: toggleRequisites,
+              showPlaylist: showPlaylistSidebar,
+              onTogglePlaylist: togglePlaylist,
+              showHeaderSounds,
+              onToggleHeaderSounds: toggleHeaderSounds,
+              isStepsCollapsed,
+              onToggleStepsCollapsed: toggleStepsCollapsed,
+            }
             : undefined
         }
       />

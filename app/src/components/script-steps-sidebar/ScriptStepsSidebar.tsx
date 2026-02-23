@@ -85,13 +85,7 @@ export const ScriptStepsSidebar = ({
     <aside className="script-sidebar">
       <div className="script-sidebar-content">
         <div className="script-sidebar-header">
-          <button
-            className="script-edit-toggle"
-            onClick={onToggleEditing}
-            title={isEditing ? 'Режим чтения' : 'Режим редактирования'}
-          >
-            {isEditing ? 'Чтение' : 'Редакт.'}
-          </button>
+         
           <div className="script-sidebar-title">Шаги</div>
           <button className="script-add-step" onClick={onAddStep}>
             +

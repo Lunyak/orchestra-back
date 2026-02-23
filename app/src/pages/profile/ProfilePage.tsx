@@ -8,11 +8,11 @@ import {
 } from "../../sync/api";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
-import "./style.css";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
 import "dayjs/locale/ru";
 import { CalendarSection, type CalendarSectionState } from "../../components/calendar/CalendarSection";
+import "./style.css";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");

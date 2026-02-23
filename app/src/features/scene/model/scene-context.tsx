@@ -1,59 +1,32 @@
-import React, {
-  createContext,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import { createId } from "../../../shared/utils/createId";
-import {
-  syncPull,
-  syncPush,
-  type SyncChange,
-} from "../../../sync/api";
+import { syncPull, syncPush, type SyncChange } from "../../../sync/api";
+import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
+import {
+  DEFAULT_THEATER_LAYOUT,
+  sceneActions,
+  type SceneData,
+} from "./scene-slice";
 
-const DEFAULT_THEATER_LAYOUT: TheaterLayout = {
-  hallWidth: 9,
-  hallDepth: 6,
-  wallHeight: 6,
-  audienceStartZ: 3,
-  seatRows: 4,
-  seatsPerRow: 7,
-  seatSpacing: 1.1,
-  rowSpacing: 0.8,
-  rowRise: 0.25,
-  aisleWidth: 1.2,
-  aisleCenterX: 0,
-  doorWidth: 1.2,
-  doorHeight: 2.2,
-  doorZ: -6,
-};
+type SetStateAction<T> = T | ((prev: T) => T);
 
-export interface SceneData {
-  name?: string;
-  steps?: ScriptStep[];
-  playlist?: any[];
-  sounds?: any[];
-  theaterLayout?: TheaterLayout;
-  /** Глобальное распределение: роль -> актёры (email/имя). Истина для назначений. */
-  roleAssignments?: Record<string, string[]>;
-}
+let playlistPlayHandler: ((trackId: number) => void) | undefined;
 
 export interface SceneContextValue {
   sceneData: SceneData | null;
-  setSceneData: React.Dispatch<React.SetStateAction<SceneData | null>>;
+  setSceneData: (next: SetStateAction<SceneData | null>) => void;
   setRoleAssignments: (next: Record<string, string[]>) => void;
   steps: ScriptStep[];
-  setSteps: React.Dispatch<React.SetStateAction<ScriptStep[]>>;
+  setSteps: (next: SetStateAction<ScriptStep[]>) => void;
   theaterLayout: TheaterLayout;
-  setTheaterLayout: React.Dispatch<React.SetStateAction<TheaterLayout>>;
+  setTheaterLayout: (next: SetStateAction<TheaterLayout>) => void;
   currentPage: number;
-  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  setCurrentPage: (next: SetStateAction<number>) => void;
   isSceneReady: boolean;
   addStep: (atPage?: number) => void;
   deleteStep: (id: number) => void;
@@ -65,30 +38,17 @@ export interface SceneContextValue {
   handleTrackLinkClick: (trackId: number) => void;
 }
 
-const SceneContext = createContext<SceneContextValue | null>(null);
-
-export function SceneProvider({ children }: { children: React.ReactNode }) {
+function useSceneOperations() {
+  const dispatch = useAppDispatch();
   const { accessToken, setAccessToken } = useAuth();
   const { projectName, ensureRemoteProject } = useProject();
 
-  const [sceneData, setSceneData] = useState<SceneData | null>(null);
-  const [steps, setStepsState] = useState<ScriptStep[]>([]);
-  const [theaterLayout, setTheaterLayoutState] = useState<TheaterLayout>(DEFAULT_THEATER_LAYOUT);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [isSceneReady, setIsSceneReady] = useState(false);
-  const [, setLastSyncAt] = useState<string | null>(() =>
-    localStorage.getItem("lastSyncAt")
+  const { sceneData, steps, theaterLayout, hasLocalEdits } = useAppSelector(
+    (s) => s.scene,
   );
-
-  const playlistPlayRef = useRef<(trackId: number) => void>();
-  const selectedStepIdRef = useRef<number | null>(null);
-  const restoredStepRef = useRef<string | null>(null);
-  const lightPlotSaveTimerRef = useRef<number | null>(null);
-  const hasLocalEditsRef = useRef(false);
 
   const syncFromServer = useCallback(
     async (token?: string | null, projectOverride?: string) => {
-      // Берём актуальный токен из localStorage (интерцептор обновляет его при refresh)
       const tokenToUse =
         token ??
         (typeof localStorage !== "undefined"
@@ -97,179 +57,65 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         accessToken;
       const effectiveProject = projectOverride ?? projectName;
       if (!tokenToUse || !effectiveProject) return;
+
       const projectId = await ensureRemoteProject(tokenToUse);
       if (!projectId) return;
+
       const perProjectKey = `lastSyncAt:${effectiveProject}`;
       const effectiveLastSyncAt =
         localStorage.getItem(perProjectKey) ??
         localStorage.getItem("lastSyncAt") ??
         null;
+
       try {
         const { now, projects, scenes } = await syncPull(
           tokenToUse,
           effectiveLastSyncAt,
-          effectiveProject
+          effectiveProject,
         );
         const project = projects.find((p: any) => p.slug === effectiveProject);
         if (!project) return;
         const scene = scenes.find((s: any) => s.projectId === project.id);
         if (!scene) return;
         const raw = (scene.rawJson as any) ?? {};
-        hasLocalEditsRef.current = false;
-        setSceneData(raw || null);
-        setTheaterLayoutState(raw.theaterLayout || DEFAULT_THEATER_LAYOUT);
-        setStepsState((prev) => (raw.steps?.length ? raw.steps : prev));
-        setLastSyncAt(now);
+        dispatch(
+          sceneActions.hydrateScene({
+            sceneData: raw || null,
+            theaterLayout: raw.theaterLayout || DEFAULT_THEATER_LAYOUT,
+            steps: raw.steps?.length ? raw.steps : steps,
+            isSceneReady: true,
+          }),
+        );
         localStorage.setItem("lastSyncAt", now);
         localStorage.setItem(perProjectKey, now);
       } catch (error: any) {
         if (error?.response?.status === 401) {
           setAccessToken(null);
-          localStorage.removeItem("accessToken");
           return;
         }
         console.error("[sync] pull failed:", error);
       }
     },
-    [accessToken, projectName, setAccessToken, ensureRemoteProject]
+    [
+      accessToken,
+      projectName,
+      ensureRemoteProject,
+      setAccessToken,
+      dispatch,
+      steps,
+    ],
   );
 
-  useEffect(() => {
-    if (!projectName) return;
-    setSceneData(null);
-    setStepsState([]);
-    setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
-    setCurrentPage(0);
-    selectedStepIdRef.current = null;
-    restoredStepRef.current = null;
-    setIsSceneReady(false);
-
-    let cancelled = false;
-    const loadScene = async () => {
-      const desktopApi = getDesktopApi();
-      if (!desktopApi) {
-        if (cancelled) return;
-        setSceneData(null);
-        setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
-        setStepsState([]);
-        setCurrentPage(0);
-        setIsSceneReady(true);
-        return;
-      }
-      try {
-        const scene = await desktopApi.readProjectScene(projectName, "script");
-        if (cancelled) return;
-        hasLocalEditsRef.current = false;
-        setSceneData(scene || null);
-        setTheaterLayoutState(scene?.theaterLayout ?? DEFAULT_THEATER_LAYOUT);
-        setStepsState(scene?.steps ?? []);
-        setCurrentPage(0);
-        selectedStepIdRef.current = null;
-        restoredStepRef.current = null;
-        setIsSceneReady(true);
-      } catch (error) {
-        if (!cancelled) {
-          setSceneData(null);
-          setTheaterLayoutState(DEFAULT_THEATER_LAYOUT);
-          setStepsState([]);
-          setCurrentPage(0);
-          setIsSceneReady(false);
-        }
-      }
-    };
-    void loadScene();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectName]);
-
-  // Один sync при появлении (токен, проект); при смене проекта — один sync для новой пары
-  const lastSyncedKeyRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!accessToken || !projectName) return;
-    const key = `${accessToken}:${projectName}`;
-    if (lastSyncedKeyRef.current === key) return;
-    lastSyncedKeyRef.current = key;
-    void syncFromServer(accessToken, projectName);
-  }, [accessToken, projectName, syncFromServer]);
-
-  const setSteps = useCallback((action: React.SetStateAction<ScriptStep[]>) => {
-    hasLocalEditsRef.current = true;
-    setStepsState(action);
-  }, []);
-  const setTheaterLayout = useCallback((action: React.SetStateAction<TheaterLayout>) => {
-    hasLocalEditsRef.current = true;
-    setTheaterLayoutState(action);
-  }, []);
-  const setRoleAssignments = useCallback((next: Record<string, string[]>) => {
-    hasLocalEditsRef.current = true;
-    setSceneData((prev) => ({ ...(prev ?? {}), roleAssignments: next }));
-  }, []);
-
-  const addStep = useCallback(() => {
-    hasLocalEditsRef.current = true;
-    setStepsState((prev) => {
-      const nextId = prev.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
-      const insertIndex = Math.min(currentPage + 1, prev.length);
-      const sourceStep = prev[currentPage];
-      const nextRequisites = sourceStep?.requisites
-        ? sourceStep.requisites.map((item) => ({ ...item, checked: false }))
-        : [];
-      const nextItem: ScriptStep = {
-        id: nextId,
-        title: `Шаг ${nextId}`,
-        markdown: "",
-        requisites: nextRequisites,
-      };
-      const next = [...prev];
-      next.splice(insertIndex, 0, nextItem);
-      setCurrentPage(insertIndex);
-      return next;
-    });
-  }, [currentPage]);
-
-  const deleteStep = useCallback((id: number) => {
-    hasLocalEditsRef.current = true;
-    setStepsState((prev) => {
-      const next = prev.filter((s) => s.id !== id);
-      if (next.length === 0) {
-        setCurrentPage(0);
-        return [{ id: 1, title: "Новый шаг", markdown: "" }];
-      }
-      setCurrentPage((p) => Math.min(p, next.length - 1));
-      return next;
-    });
-  }, []);
-
-  const reorderSteps = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
-    hasLocalEditsRef.current = true;
-    setStepsState((prev) => {
-      if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-    setCurrentPage((prev) => {
-      if (prev === fromIndex) return toIndex;
-      if (fromIndex < toIndex && prev > fromIndex && prev <= toIndex) return prev - 1;
-      if (fromIndex > toIndex && prev < fromIndex && prev >= toIndex) return prev + 1;
-      return prev;
-    });
-  }, []);
-
   const saveStepsForLightPlot = useCallback(async () => {
-    if (!projectName || !hasLocalEditsRef.current) return;
+    if (!projectName || !hasLocalEdits) return;
     const desktopApi = getDesktopApi();
     const token = accessToken ?? localStorage.getItem("accessToken");
+
     try {
-      // В Desktop режиме сохраняем локальный файл, в Web режиме локального файла нет —
-      // но пуш на сервер всё равно должен происходить.
-      const current =
-        desktopApi
-          ? await desktopApi.readProjectScene(projectName, "script")
-          : (sceneData ?? null);
+      const current = desktopApi
+        ? await desktopApi.readProjectScene(projectName, "script")
+        : (sceneData ?? null);
+
       const images = pruneSceneImages(
         (current as any)?.images as
           | Record<string, { remoteKey?: string; remoteUrl?: string }>
@@ -284,6 +130,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
           console.error("Failed to save scene:", result?.error);
         }
       }
+
       if (token) {
         const projectId =
           localStorage.getItem(`projectId:${projectName}`) ??
@@ -312,6 +159,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
               return sound;
             });
           }
+
           const changes: SyncChange[] = [
             {
               id: createId(),
@@ -328,8 +176,11 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
               createdAt: nowIso,
             },
           ];
+
           const existingSteps: ScriptStep[] =
-            (Array.isArray((current as any)?.steps) ? ((current as any).steps as ScriptStep[]) : []) ?? [];
+            (Array.isArray((current as any)?.steps)
+              ? ((current as any).steps as ScriptStep[])
+              : []) ?? [];
           const existingIds = new Set(existingSteps.map((s) => s.id));
           const newIds = new Set(steps.map((s) => s.id));
           steps.forEach((step, index) => {
@@ -364,18 +215,27 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
               });
             }
           });
+
           if (changes.length > 0) {
             await syncPush(token, changes);
-            hasLocalEditsRef.current = false;
+            dispatch(sceneActions.markSaved());
           }
         }
       }
     } catch (error) {
       console.error("Failed to save/push scene:", error);
     }
-  }, [accessToken, projectName, sceneData, steps, theaterLayout, ensureRemoteProject]);
+  }, [
+    projectName,
+    hasLocalEdits,
+    accessToken,
+    sceneData,
+    steps,
+    theaterLayout,
+    ensureRemoteProject,
+    dispatch,
+  ]);
 
-  /** Как в плейлисте: звуки уже с remoteKey/remoteUrl (загружаются при добавлении). Просто пушим сцену с диска. */
   const pushSceneAfterSoundsSave = useCallback(async () => {
     const desktopApi = getDesktopApi();
     if (!desktopApi) return;
@@ -384,6 +244,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     try {
       const scene = await desktopApi.readProjectScene(projectName, "script");
       if (!scene) return;
+
       const projectId =
         localStorage.getItem(`projectId:${projectName}`) ??
         (await ensureRemoteProject(token));
@@ -420,13 +281,86 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     }
   }, [accessToken, projectName, ensureRemoteProject]);
 
-  const registerPlaylistPlay = useCallback((handler: (trackId: number) => void) => {
-    playlistPlayRef.current = handler;
-  }, []);
+  return { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave };
+}
 
-  const handleTrackLinkClick = useCallback((trackId: number) => {
-    playlistPlayRef.current?.(trackId);
-  }, []);
+function useSceneProviderEffects() {
+  const dispatch = useAppDispatch();
+  const { accessToken } = useAuth();
+  const { projectName } = useProject();
+  const { syncFromServer, saveStepsForLightPlot } = useSceneOperations();
+
+  const { steps, currentPage, isSceneReady, theaterLayout, sceneData, hasLocalEdits } =
+    useAppSelector((s) => s.scene);
+
+  const selectedStepIdRef = useRef<number | null>(null);
+  const restoredProjectRef = useRef<string | null>(null);
+  const lightPlotSaveTimerRef = useRef<number | null>(null);
+  const lastSyncedKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!projectName) return;
+    dispatch(sceneActions.resetForProject());
+    selectedStepIdRef.current = null;
+    restoredProjectRef.current = null;
+
+    let cancelled = false;
+    const loadScene = async () => {
+      const desktopApi = getDesktopApi();
+      if (!desktopApi) {
+        if (cancelled) return;
+        dispatch(
+          sceneActions.hydrateScene({
+            sceneData: null,
+            theaterLayout: DEFAULT_THEATER_LAYOUT,
+            steps: [],
+            currentPage: 0,
+            isSceneReady: true,
+          }),
+        );
+        return;
+      }
+      try {
+        const scene = await desktopApi.readProjectScene(projectName, "script");
+        if (cancelled) return;
+        dispatch(
+          sceneActions.hydrateScene({
+            sceneData: scene || null,
+            theaterLayout: scene?.theaterLayout ?? DEFAULT_THEATER_LAYOUT,
+            steps: scene?.steps ?? [],
+            currentPage: 0,
+            isSceneReady: true,
+          }),
+        );
+        selectedStepIdRef.current = null;
+        restoredProjectRef.current = null;
+      } catch (error) {
+        if (!cancelled) {
+          dispatch(
+            sceneActions.hydrateScene({
+              sceneData: null,
+              theaterLayout: DEFAULT_THEATER_LAYOUT,
+              steps: [],
+              currentPage: 0,
+              isSceneReady: false,
+            }),
+          );
+        }
+      }
+    };
+    void loadScene();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectName, dispatch]);
+
+  useEffect(() => {
+    if (!accessToken || !projectName) return;
+    const key = `${accessToken}:${projectName}`;
+    if (lastSyncedKeyRef.current === key) return;
+    lastSyncedKeyRef.current = key;
+    void syncFromServer(accessToken, projectName);
+  }, [accessToken, projectName, syncFromServer]);
 
   useEffect(() => {
     selectedStepIdRef.current = steps[currentPage]?.id ?? null;
@@ -434,36 +368,50 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (steps.length === 0) {
-      setCurrentPage(0);
+      if (currentPage !== 0) dispatch(sceneActions.setCurrentPage(0));
       return;
     }
-    if (projectName && restoredStepRef.current !== projectName) {
+
+    if (projectName && restoredProjectRef.current !== projectName) {
       const storedIdRaw = localStorage.getItem(`selectedStepId:${projectName}`);
       const storedId = storedIdRaw ? Number(storedIdRaw) : null;
       if (storedId != null) {
         const idx = steps.findIndex((s) => s.id === storedId);
-        if (idx !== -1) setCurrentPage(idx);
+        if (idx !== -1 && idx !== currentPage) dispatch(sceneActions.setCurrentPage(idx));
       }
-      restoredStepRef.current = projectName;
+      restoredProjectRef.current = projectName;
       return;
     }
+
     const selectedId = selectedStepIdRef.current;
     if (selectedId != null) {
       const nextIndex = steps.findIndex((s) => s.id === selectedId);
-      if (nextIndex !== -1 && nextIndex !== currentPage) setCurrentPage(nextIndex);
+      if (nextIndex !== -1 && nextIndex !== currentPage) {
+        dispatch(sceneActions.setCurrentPage(nextIndex));
+        return;
+      }
     }
-    if (currentPage > steps.length - 1) setCurrentPage(steps.length - 1);
-  }, [projectName, steps, currentPage]);
+
+    if (currentPage > steps.length - 1) {
+      dispatch(sceneActions.setCurrentPage(steps.length - 1));
+    }
+  }, [projectName, steps, currentPage, dispatch]);
 
   useEffect(() => {
+    if (!projectName) return;
     const selectedId = steps[currentPage]?.id;
     if (selectedId != null) {
       localStorage.setItem(`selectedStepId:${projectName}`, String(selectedId));
     }
   }, [projectName, steps, currentPage]);
 
+  const roleAssignmentsKey = useMemo(
+    () => JSON.stringify((sceneData as any)?.roleAssignments ?? null),
+    [sceneData],
+  );
+
   useEffect(() => {
-    if (!isSceneReady || steps.length === 0 || !hasLocalEditsRef.current) return;
+    if (!isSceneReady || steps.length === 0 || !hasLocalEdits) return;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
     }
@@ -475,16 +423,77 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
         window.clearTimeout(lightPlotSaveTimerRef.current);
       }
     };
-  }, [
-    isSceneReady,
-    steps.length,
-    theaterLayout,
-    // важный триггер: изменение глобального распределения ролей тоже должно пушиться
-    JSON.stringify((sceneData as any)?.roleAssignments ?? null),
-    saveStepsForLightPlot,
-  ]);
+  }, [isSceneReady, steps.length, theaterLayout, roleAssignmentsKey, hasLocalEdits, saveStepsForLightPlot]);
+}
 
-  const value: SceneContextValue = {
+export function SceneProvider({ children }: { children: React.ReactNode }) {
+  useSceneProviderEffects();
+  return <>{children}</>;
+}
+
+export function useScene(): SceneContextValue {
+  const dispatch = useAppDispatch();
+  const { sceneData, steps, theaterLayout, currentPage, isSceneReady } = useAppSelector(
+    (s) => s.scene,
+  );
+  const { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave } =
+    useSceneOperations();
+
+  const setSceneData = useCallback(
+    (next: SetStateAction<SceneData | null>) => {
+      const resolved = typeof next === "function" ? (next as any)(sceneData) : next;
+      dispatch(sceneActions.setSceneData(resolved));
+    },
+    [dispatch, sceneData],
+  );
+
+  const setRoleAssignments = useCallback(
+    (next: Record<string, string[]>) => {
+      dispatch(sceneActions.setRoleAssignments(next));
+    },
+    [dispatch],
+  );
+
+  const setSteps = useCallback(
+    (next: SetStateAction<ScriptStep[]>) => {
+      const resolved = typeof next === "function" ? (next as any)(steps) : next;
+      dispatch(sceneActions.setSteps(resolved));
+    },
+    [dispatch, steps],
+  );
+
+  const setTheaterLayout = useCallback(
+    (next: SetStateAction<TheaterLayout>) => {
+      const resolved = typeof next === "function" ? (next as any)(theaterLayout) : next;
+      dispatch(sceneActions.setTheaterLayout(resolved));
+    },
+    [dispatch, theaterLayout],
+  );
+
+  const setCurrentPage = useCallback(
+    (next: SetStateAction<number>) => {
+      const resolved = typeof next === "function" ? (next as any)(currentPage) : next;
+      dispatch(sceneActions.setCurrentPage(resolved));
+    },
+    [dispatch, currentPage],
+  );
+
+  const addStep = useCallback(() => dispatch(sceneActions.addStep()), [dispatch]);
+  const deleteStep = useCallback((id: number) => dispatch(sceneActions.deleteStep(id)), [dispatch]);
+  const reorderSteps = useCallback(
+    (fromIndex: number, toIndex: number) => dispatch(sceneActions.reorderSteps({ fromIndex, toIndex })),
+    [dispatch],
+  );
+
+  const registerPlaylistPlay = useCallback((handler: (trackId: number) => void) => {
+    playlistPlayHandler = handler;
+  }, []);
+
+  const handleTrackLinkClick = useCallback((trackId: number) => {
+    playlistPlayHandler?.(trackId);
+  }, []);
+
+  return {
     sceneData,
     setSceneData,
     setRoleAssignments,
@@ -504,17 +513,8 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
     registerPlaylistPlay,
     handleTrackLinkClick,
   };
-
-  return (
-    <SceneContext.Provider value={value}>{children}</SceneContext.Provider>
-  );
-}
-
-export function useScene(): SceneContextValue {
-  const ctx = React.useContext(SceneContext);
-  if (!ctx) throw new Error("useScene must be used within SceneProvider");
-  return ctx;
 }
 
 export { DEFAULT_THEATER_LAYOUT };
+export type { SceneData };
 

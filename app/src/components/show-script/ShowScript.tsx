@@ -1,21 +1,29 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from "react-dom";
-import ReactMarkdown from 'react-markdown';
+import { useScriptUI } from '../../features/script-ui';
 import { getDesktopApi } from "../../shared/platform/desktop-api";
 import { ScriptRequisite, ScriptStep } from "../../shared/types/script";
 import { pruneSceneImages } from "../../shared/utils/markdownImages";
+import { ensureProject, type ActorAnnotationField } from "../../sync/api";
+import { insertAtSelection } from "./utils/insertAtCursor";
+import type { NewAnnotationDraft } from "./annotations/ActorAnnotationsPopover";
+import { ScriptStepHeader } from "./components/ScriptStepHeader";
+import { ScriptMarkdownToolbar } from "./components/ScriptMarkdownToolbar";
+import { RequisitesPanel } from "./components/RequisitesPanel";
+import { ScriptMarkdownPreview } from "./components/ScriptMarkdownPreview";
 import {
-  createActorAnnotation,
-  deleteActorAnnotation,
-  ensureProject,
-  getActorStepNote,
-  listActorAnnotations,
-  updateActorAnnotation,
-  upsertActorStepNote,
-  type ActorAnnotation,
-  type ActorAnnotationField,
-} from "../../sync/api";
+  createAnnotation,
+  deleteAnnotation,
+  initShowScriptUi,
+  loadSceneScriptMeta,
+  loadActorAnnotations,
+  selectAnnotations,
+  selectShowScriptUi,
+  showScriptActions,
+  updateAnnotation,
+} from "../../features/show-script/model/show-script-slice";
+import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import './style.css';
+
 
 interface ShowScriptProps {
   steps?: ScriptStep[];
@@ -42,8 +50,6 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   showRequisites: controlledShowRequisites,
   canSave = true,
 }) => {
-  const markdownModeStorageKey = `showScript:markdownMode:${projectName}:${sceneName}`;
-  const annotationsModeStorageKey = `showScript:annotationsMode:${projectName}:${sceneName}`;
   const pageStorageKey = `showScript:currentPage:${projectName}:${sceneName}`;
   const [localPage, setLocalPage] = useState(() => {
     if (typeof window === "undefined") return 0;
@@ -65,20 +71,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const markdownRef = useRef<HTMLTextAreaElement | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const hasMountedRef = useRef(false);
-  const [playlistOptions, setPlaylistOptions] = useState<
-    { id: number; title: string }[]
-  >([]);
-  const [selectedTrackId, setSelectedTrackId] = useState<number | null>(null);
-  const [lightChannels, setLightChannels] = useState<string[]>(
-    Array.from({ length: 9 }, () => '')
-  );
-  const [selectedLightSlot, setSelectedLightSlot] = useState(1);
   const [newRequisite, setNewRequisite] = useState('');
-  const [markdownMode, setMarkdownMode] = useState<'notes' | 'play'>(() => {
-    if (typeof window === "undefined") return "notes";
-    const stored = localStorage.getItem(markdownModeStorageKey);
-    return stored === "play" || stored === "notes" ? stored : "notes";
-  });
   const requisitesClipboardRef = useRef<ScriptRequisite[] | null>(null);
   const steps = initialSteps ?? localSteps;
   const setSteps = onStepsChange ?? setLocalSteps;
@@ -86,65 +79,21 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   const isEditing = controlledEditing ?? false;
   const showRequisites = controlledShowRequisites ?? false;
 
-  // Личные заметки актёра (тетрадь) к шагу
-  const [actorNoteText, setActorNoteText] = useState('');
-  const [actorNoteLoading, setActorNoteLoading] = useState(false);
-  const [actorNoteSaving, setActorNoteSaving] = useState(false);
-  const [actorNoteError, setActorNoteError] = useState<string | null>(null);
-  const actorNoteSaveTimerRef = useRef<number | null>(null);
-  const actorNoteLoadedKeyRef = useRef<string | null>(null);
-  const actorNoteLoadedTextRef = useRef<string>('');
+  const {
+    setIsEditing
+  } = useScriptUI();
 
-  const readStoredAnnotationsMode = useCallback(() => {
-    if (typeof window === "undefined") return true;
-    const raw = localStorage.getItem(annotationsModeStorageKey);
-    if (raw == null) return true; // дефолт — включено
-    return raw === "true";
-  }, [annotationsModeStorageKey]);
-
-  const [annotationsMode, setAnnotationsMode] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    const raw = localStorage.getItem(annotationsModeStorageKey);
-    if (raw == null) return true;
-    return raw === "true";
-  });
-  const [annotations, setAnnotations] = useState<ActorAnnotation[]>([]);
-  const [annotationsLoading, setAnnotationsLoading] = useState(false);
-  const [annotationsError, setAnnotationsError] = useState<string | null>(null);
-  const [newAnnotation, setNewAnnotation] = useState<{
-    start: number;
-    end: number;
-    selectedText: string;
-    noteText: string;
-  } | null>(null);
+  const dispatch = useAppDispatch();
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const ui = useAppSelector((s) => selectShowScriptUi(s, projectName, sceneName));
+  const markdownMode = ui.markdownMode;
+  const annotationsMode = ui.annotationsMode;
+  const playlistOptions = ui.playlistOptions;
+  const selectedTrackId = ui.selectedTrackId;
+  const lightChannels = ui.lightChannels;
+  const selectedLightSlot = ui.selectedLightSlot;
+  const [newAnnotation, setNewAnnotation] = useState<NewAnnotationDraft | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-  const newAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const annotationsRootRef = useRef<HTMLDivElement | null>(null);
-  const prevIsEditingRef = useRef(isEditing);
-
-  type AnchorRect = {
-    top: number;
-    left: number;
-    right: number;
-    bottom: number;
-    width: number;
-    height: number;
-  };
-  const [annotationAnchor, setAnnotationAnchor] = useState<AnchorRect | null>(null);
-  const [annotationPopoverPos, setAnnotationPopoverPos] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  const annotationPopoverRef = useRef<HTMLDivElement | null>(null);
-
-  const rectToAnchor = (rect: DOMRect): AnchorRect => ({
-    top: rect.top,
-    left: rect.left,
-    right: rect.right,
-    bottom: rect.bottom,
-    width: rect.width,
-    height: rect.height,
-  });
 
   useEffect(() => {
     if (!onStepsChange && initialSteps && initialSteps.length > 0) {
@@ -154,15 +103,9 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   }, [initialSteps, onStepsChange]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(markdownModeStorageKey, markdownMode);
-  }, [markdownMode, markdownModeStorageKey]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (isEditing) return; // в edit режиме мы принудительно выключаем — но не сохраняем это
-    localStorage.setItem(annotationsModeStorageKey, String(annotationsMode));
-  }, [annotationsMode, annotationsModeStorageKey, isEditing]);
+    void dispatch(initShowScriptUi({ projectSlug: projectName, sceneName }));
+    void dispatch(loadSceneScriptMeta({ projectSlug: projectName, sceneName }));
+  }, [dispatch, projectName, sceneName]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -177,71 +120,6 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     }
     setLocalPage((prev) => Math.max(0, Math.min(prev, steps.length - 1)));
   }, [controlledPage, steps.length]);
-
-  useEffect(() => {
-    if (!isEditing) return;
-    let isCancelled = false;
-    const loadPlaylist = async () => {
-      const desktopApi = getDesktopApi();
-      if (!desktopApi) {
-        setPlaylistOptions([]);
-        return;
-      }
-      try {
-        const scene = await desktopApi.readProjectScene(projectName, sceneName);
-        if (isCancelled) return;
-        const nextOptions = (scene?.playlist || [])
-          .filter((item: { id?: number; title?: string }) => item?.id != null)
-          .map((item: { id: number; title?: string }) => ({
-            id: item.id,
-            title: item.title || `Трек ${item.id}`,
-          }));
-        setPlaylistOptions(nextOptions);
-        if (nextOptions.length > 0 && selectedTrackId == null) {
-          setSelectedTrackId(nextOptions[0].id);
-        }
-      } catch (err) {
-        if (!isCancelled) {
-          setPlaylistOptions([]);
-        }
-      }
-    };
-    void loadPlaylist();
-    return () => {
-      isCancelled = true;
-    };
-  }, [isEditing, projectName, sceneName, selectedTrackId]);
-
-  useEffect(() => {
-    let isCancelled = false;
-    const loadLightChannels = async () => {
-      const desktopApi = getDesktopApi();
-      if (!desktopApi) {
-        setLightChannels(Array.from({ length: 9 }, () => ''));
-        return;
-      }
-      try {
-        const scene = await desktopApi.readProjectScene(projectName, sceneName);
-        if (isCancelled) return;
-        const next =
-          Array.isArray(scene?.lightChannels) && scene.lightChannels.length > 0
-            ? scene.lightChannels.map((value: unknown) =>
-              typeof value === 'number' ? String(value) : String(value ?? '')
-            )
-            : [];
-        const normalized = Array.from({ length: 9 }, (_, index) => next[index] ?? '');
-        setLightChannels(normalized);
-      } catch (err) {
-        if (!isCancelled) {
-          setLightChannels(Array.from({ length: 9 }, () => ''));
-        }
-      }
-    };
-    void loadLightChannels();
-    return () => {
-      isCancelled = true;
-    };
-  }, [projectName, sceneName]);
 
   const saveScene = useCallback(async () => {
     const desktopApi = getDesktopApi();
@@ -284,252 +162,6 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
       }
     };
   }, [canSave, saveScene, steps.length]);
-
-  const resolveImageSrc = (src?: string) => {
-    if (!src) return src;
-
-    let path = src.trim().replace(/^\.?\//, '');
-
-    if (!path.startsWith('images/')) {
-      return src;
-    }
-
-    path = path.replace(/^images\//, '').replace(/^\/+/, '');
-
-    // Кодируем каждый сегмент пути отдельно (самый безопасный способ)
-    const pathSegments = path.split('/').map(segment =>
-      encodeURIComponent(segment)
-    );
-
-    const encodedPath = pathSegments.join('/');
-
-    const baseUrl = new URL(`project-images://${encodeURIComponent(projectName)}/`);
-    baseUrl.pathname = `/${encodedPath}`;
-
-    return baseUrl.toString();
-  };
-
-  const parseLightChannel = (rawValue: string) => {
-    const trimmed = rawValue.trim();
-    if (!trimmed) {
-      return { label: '', color: null as string | null };
-    }
-    const [labelPart, colorPart] = trimmed.split('|', 2);
-    return {
-      label: labelPart?.trim() ?? '',
-      color: colorPart?.trim() ?? null,
-    };
-  };
-
-  const resolveLightColor = (
-    label: string,
-    channelColor?: string | null,
-    override?: string
-  ): string | null => {
-    const raw = (override ?? channelColor ?? label).trim().toLowerCase();
-    if (!raw) return null;
-    if (raw.startsWith('#') || raw.startsWith('rgb') || raw.startsWith('hsl')) {
-      return raw;
-    }
-    const palette: Record<string, string> = {
-      blue: '#2563eb',
-      red: '#ef4444',
-      green: '#22c55e',
-      yellow: '#f59e0b',
-      white: '#f8fafc',
-      black: '#0f172a',
-      orange: '#f97316',
-      purple: '#a855f7',
-      pink: '#ec4899',
-      cyan: '#22d3ee',
-      magenta: '#d946ef',
-      'синий': '#2563eb',
-      'голубой': '#38bdf8',
-      'красный': '#ef4444',
-      'зеленый': '#22c55e',
-      'желтый': '#f59e0b',
-      'белый': '#f8fafc',
-      'черный': '#0f172a',
-      'оранжевый': '#f97316',
-      'фиолетовый': '#a855f7',
-      'розовый': '#ec4899',
-    };
-    return palette[raw] ?? null;
-  };
-
-  const getReadableTextColor = (color?: string | null): string | undefined => {
-    if (!color) return undefined;
-    const hex = color.startsWith('#') ? color.slice(1) : '';
-    if (hex.length !== 6) return undefined;
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return undefined;
-    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    return luminance > 0.6 ? '#0f172a' : '#f8fafc';
-  };
-
-  const renderLightChip = (
-    label: string,
-    color: string | null,
-    key: string
-  ) => {
-    const textColor = getReadableTextColor(color);
-    return (
-      <span
-        key={key}
-        className="markdown-light-chip"
-        style={{
-          backgroundColor: color || undefined,
-          color: textColor || undefined,
-          borderColor: color ? 'transparent' : undefined,
-        }}
-      >
-        {label}
-      </span>
-    );
-  };
-
-  const renderLightTokens = (
-    node: React.ReactNode,
-    keyPrefix = 'light'
-  ): React.ReactNode => {
-    if (typeof node === 'string') {
-      const pattern =
-        /(\{\{\s*(light|blackout)\s*(?::\s*(\d+))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
-      const result: React.ReactNode[] = [];
-      let lastIndex = 0;
-      let match: RegExpExecArray | null;
-      let counter = 0;
-      while ((match = pattern.exec(node)) !== null) {
-        const [raw, , rawType, rawIndex, rawColor, , rawLabel] = match;
-        const start = match.index;
-        if (start > lastIndex) {
-          result.push(node.slice(lastIndex, start));
-        }
-        if (rawLabel != null) {
-          const normalized = String(rawLabel).trim();
-          const text = normalized ? normalized.toUpperCase() : '…';
-          result.push(
-            <span
-              key={`${keyPrefix}-${counter}-lbl`}
-              className="markdown-speaker-label"
-              title={normalized}
-            >
-              {text}
-            </span>
-          );
-        } else if (rawType?.toLowerCase() === 'blackout') {
-          const label = 'Блекаут';
-          const color = resolveLightColor(label, '#000000', rawColor) ?? '#000000';
-          result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-b`));
-        } else {
-          const index = Number(rawIndex);
-          if (Number.isFinite(index) && index >= 1 && index <= 8) {
-            const channelValue = lightChannels[index - 1] ?? '';
-            const parsed = parseLightChannel(channelValue);
-            const label = parsed.label ? parsed.label : String(index);
-            const color = resolveLightColor(label, parsed.color, rawColor);
-            result.push(
-              renderLightChip(label, color, `${keyPrefix}-${counter}-${index}`)
-            );
-          } else {
-            result.push(raw);
-          }
-        }
-        counter += 1;
-        lastIndex = start + raw.length;
-      }
-      if (lastIndex < node.length) {
-        result.push(node.slice(lastIndex));
-      }
-      return result;
-    }
-    if (Array.isArray(node)) {
-      return node.flatMap((child, index) =>
-        renderLightTokens(child, `${keyPrefix}-${index}`)
-      );
-    }
-    if (React.isValidElement(node)) {
-      if (node.type === 'code' || node.type === 'pre') return node;
-      if (node.props?.children == null) return node;
-      return React.cloneElement(
-        node,
-        node.props,
-        renderLightTokens(node.props.children, `${keyPrefix}-child`)
-      );
-    }
-    return node;
-  };
-
-  const urlTransform = (url: string) => {
-    const trimmed = url.trim().toLowerCase();
-    if (trimmed.startsWith('javascript:')) {
-      return '';
-    }
-    return url;
-  };
-
-  const normalizeTrackName = (value: string) => {
-    const trimmed = value.trim();
-    if (
-      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-      (trimmed.startsWith("'") && trimmed.endsWith("'"))
-    ) {
-      return trimmed.slice(1, -1).trim();
-    }
-    return trimmed;
-  };
-
-  const resolveTrackLink = (href?: string) => {
-    if (!href) return null;
-    const trimmed = href.trim();
-    if (trimmed.startsWith("track:")) {
-      const payload = trimmed.replace(/^track:/i, "").trim();
-      const id = Number(payload);
-      if (Number.isFinite(id)) {
-        return { id };
-      }
-      return payload ? { name: normalizeTrackName(payload) } : null;
-    }
-    if (trimmed.startsWith("playlist:")) {
-      const payload = trimmed.replace(/^playlist:/i, "").trim();
-      const id = Number(payload);
-      if (Number.isFinite(id)) {
-        return { id };
-      }
-      return payload ? { name: normalizeTrackName(payload) } : null;
-    }
-    return null;
-  };
-
-  const isAudioLink = (href?: string) => {
-    if (!href) return false;
-    return /\.(mp3|wav|ogg|m4a|flac)$/i.test(href.trim());
-  };
-
-  const insertAtCursor = (text: string) => {
-    const step = steps[currentPage];
-    if (!step) return;
-    const textarea = markdownRef.current;
-    const field: keyof ScriptStep =
-      markdownMode === 'play' ? 'playMarkdown' : 'markdown';
-    const currentValue = (step[field] ?? '') as string;
-    if (!textarea) {
-      updateStep(step.id, field, `${currentValue}${text}`);
-      return;
-    }
-
-    const start = textarea.selectionStart ?? currentValue.length;
-    const end = textarea.selectionEnd ?? start;
-    const nextValue = currentValue.slice(0, start) + text + currentValue.slice(end);
-    updateStep(step.id, field, nextValue);
-    requestAnimationFrame(() => {
-      textarea.focus();
-      const pos = start + text.length;
-      textarea.setSelectionRange(pos, pos);
-    });
-  };
 
   const handlePasteImage = async (
     event: React.ClipboardEvent<HTMLTextAreaElement>,
@@ -590,7 +222,7 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
         }
       }
       const markdownSnippet = `\n\n![image](${markdownPath})\n\n`;
-      insertAtCursor(markdownSnippet);
+      insertIntoActiveMarkdown(markdownSnippet);
     } catch (err) {
       console.error("Failed to paste image:", err);
     }
@@ -606,11 +238,30 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     );
   };
 
-  const insertLightChannel = () => {
-    const slotNumber = Number(selectedLightSlot);
-    if (!Number.isFinite(slotNumber)) return;
-    const clamped = Math.max(1, Math.min(8, Math.trunc(slotNumber)));
-    insertAtCursor(`\n\nСВЕТ — канал {{light:${clamped}}}\n\n`);
+  const insertIntoActiveMarkdown = (text: string) => {
+    const step = steps[currentPage];
+    if (!step) return;
+
+    const textarea = markdownRef.current;
+    type MarkdownField = "markdown" | "playMarkdown";
+    const field: MarkdownField =
+      markdownMode === "play" ? "playMarkdown" : "markdown";
+    const currentValue = String(step[field] ?? "");
+
+    const { value: nextValue, cursor } = insertAtSelection({
+      value: currentValue,
+      insert: text,
+      selectionStart: textarea?.selectionStart,
+      selectionEnd: textarea?.selectionEnd,
+    });
+
+    updateStep(step.id, field, nextValue);
+
+    if (!textarea) return;
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    });
   };
 
 
@@ -623,411 +274,55 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     ? 'playMarkdown'
     : 'markdown') as ActorAnnotationField;
 
-  const rehypeScriptTokens = useCallback(() => {
-    const hastText = (value: string): HastNode =>
-      ({ type: "text", value } as HastNode);
-
-    const hastSpan = (
-      className: string[],
-      children: HastNode[],
-      properties?: Record<string, any>,
-    ): HastNode =>
-      ({
-        type: "element",
-        tagName: "span",
-        properties: { className, ...(properties ?? {}) },
-        children,
-      }) as HastNode;
-
-    const pattern =
-      /(\{\{\s*(light|blackout)\s*(?::\s*(\d+))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
-
-    const walk = (node: HastNode): HastNode => {
-      if (!node) return node;
-      if (node.type === "text") {
-        const value = String((node as any).value ?? "");
-        if (!value) return node;
-
-        const out: HastNode[] = [];
-        let lastIndex = 0;
-        let match: RegExpExecArray | null;
-        while ((match = pattern.exec(value)) !== null) {
-          const [raw, , rawType, rawIndex, rawColor, , rawLabel] = match;
-          const start = match.index;
-          if (start > lastIndex) out.push(hastText(value.slice(lastIndex, start)));
-
-          if (rawLabel != null) {
-            const normalized = String(rawLabel).trim();
-            const text = normalized ? normalized.toUpperCase() : "…";
-            out.push(
-              hastSpan(
-                ["markdown-speaker-label"],
-                [hastText(text)],
-                { title: normalized },
-              ),
-            );
-          } else if (rawType?.toLowerCase() === "blackout") {
-            const label = "Блекаут";
-            const color = resolveLightColor(label, "#000000", rawColor) ?? "#000000";
-            const textColor = getReadableTextColor(color);
-            out.push(
-              hastSpan(
-                ["markdown-light-chip"],
-                [hastText(label)],
-                {
-                  style: {
-                    backgroundColor: color || undefined,
-                    color: textColor || undefined,
-                    borderColor: color ? "transparent" : undefined,
-                  },
-                },
-              ),
-            );
-          } else {
-            const index = Number(rawIndex);
-            if (Number.isFinite(index) && index >= 1 && index <= 8) {
-              const channelValue = lightChannels[index - 1] ?? "";
-              const parsed = parseLightChannel(channelValue);
-              const label = parsed.label ? parsed.label : String(index);
-              const color = resolveLightColor(label, parsed.color, rawColor);
-              const textColor = getReadableTextColor(color);
-              out.push(
-                hastSpan(
-                  ["markdown-light-chip"],
-                  [hastText(label)],
-                  {
-                    style: {
-                      backgroundColor: color || undefined,
-                      color: textColor || undefined,
-                      borderColor: color ? "transparent" : undefined,
-                    },
-                  },
-                ),
-              );
-            } else {
-              out.push(hastText(raw));
-            }
-          }
-
-          lastIndex = start + raw.length;
-        }
-        if (lastIndex < value.length) out.push(hastText(value.slice(lastIndex)));
-        if (out.length === 0) return node;
-        if (out.length === 1) return out[0];
-        return ({ type: "element", tagName: "span", properties: {}, children: out } as HastNode);
-      }
-
-      if (node.type === "element") {
-        const tag = String((node as any).tagName ?? "");
-        if (tag === "code" || tag === "pre") return node;
-      }
-
-      const children = (node as any).children;
-      if (Array.isArray(children)) {
-        const nextChildren: HastNode[] = [];
-        for (const child of children) {
-          nextChildren.push(walk(child));
-        }
-        (node as any).children = nextChildren;
-      }
-      return node;
-    };
-
-    return (tree: HastNode) => {
-      walk(tree);
-    };
-  }, [lightChannels]);
+  const annotationsCacheKey =
+    currentStep?.id != null
+      ? `${projectName}:${sceneName}:${currentStep.id}:${activeField}`
+      : null;
+  const annotationsEntry = useAppSelector((s) =>
+    annotationsCacheKey ? selectAnnotations(s, annotationsCacheKey) : null,
+  );
+  const annotations = annotationsEntry?.items ?? [];
+  const annotationsLoading = annotationsEntry?.loading ?? false;
+  const annotationsError = annotationsEntry?.error ?? null;
 
   // Метки недоступны в режиме редактирования (там textarea).
   useEffect(() => {
     if (isEditing && annotationsMode) {
-      setAnnotationsMode(false);
+      dispatch(
+        showScriptActions.setAnnotationsMode({
+          projectSlug: projectName,
+          sceneName,
+          enabled: false,
+        }),
+      );
       setNewAnnotation(null);
       setActiveAnnotationId(null);
-      setAnnotationAnchor(null);
-      setAnnotationPopoverPos(null);
     }
-  }, [annotationsMode, isEditing]);
-
-  useEffect(() => {
-    const prev = prevIsEditingRef.current;
-    prevIsEditingRef.current = isEditing;
-    if (prev && !isEditing) {
-      // Восстанавливаем последнее сохранённое состояние после выхода из edit
-      setAnnotationsMode(readStoredAnnotationsMode());
-    }
-  }, [isEditing]);
-
-  const computePopoverPos = useCallback(
-    (anchor: AnchorRect, size?: { width: number; height: number }) => {
-      if (typeof window === "undefined") return { top: anchor.bottom, left: anchor.left };
-      const margin = 12;
-      const gap = 8;
-      const width = size?.width ?? 380;
-      const height = size?.height ?? 260;
-
-      const vw = window.innerWidth || 1024;
-      const vh = window.innerHeight || 768;
-
-      const left = clamp(anchor.left, margin, Math.max(margin, vw - width - margin));
-      const canPlaceBelow = anchor.bottom + gap + height <= vh - margin;
-      const canPlaceAbove = anchor.top - gap - height >= margin;
-      const top = canPlaceBelow
-        ? anchor.bottom + gap
-        : canPlaceAbove
-          ? anchor.top - gap - height
-          : clamp(anchor.bottom + gap, margin, Math.max(margin, vh - height - margin));
-
-      return { top, left };
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!annotationsMode) {
-      setAnnotationPopoverPos(null);
-      return;
-    }
-    if (!annotationAnchor) {
-      setAnnotationPopoverPos(null);
-      return;
-    }
-    if (!newAnnotation && !activeAnnotationId) {
-      setAnnotationPopoverPos(null);
-      return;
-    }
-
-    const update = () => {
-      let anchor = annotationAnchor;
-      if (activeAnnotationId && annotationsRootRef.current) {
-        const el = annotationsRootRef.current.querySelector(
-          `[data-anno-id="${CSS.escape(activeAnnotationId)}"]`,
-        ) as HTMLElement | null;
-        if (el) {
-          anchor = rectToAnchor(el.getBoundingClientRect());
-        }
-      }
-      const el = annotationPopoverRef.current;
-      const size = el ? { width: el.offsetWidth, height: el.offsetHeight } : undefined;
-      setAnnotationPopoverPos(computePopoverPos(anchor, size));
-    };
-
-    update();
-    const raf = window.requestAnimationFrame(update);
-
-    const onScrollOrResize = () => update();
-    window.addEventListener("scroll", onScrollOrResize, true);
-    window.addEventListener("resize", onScrollOrResize);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScrollOrResize, true);
-      window.removeEventListener("resize", onScrollOrResize);
-    };
-  }, [
-    activeAnnotationId,
-    annotationAnchor,
-    annotationsMode,
-    computePopoverPos,
-    newAnnotation,
-  ]);
-
-  const actorNoteKey =
-    currentStep?.id != null ? `${projectName}:${sceneName}:${currentStep.id}` : null;
-
-  const rangeTextLength = (range: Range) => {
-    const fragment = range.cloneContents();
-    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
-    let len = 0;
-    while (walker.nextNode()) {
-      len += (walker.currentNode.nodeValue ?? "").length;
-    }
-    return len;
-  };
-
-  const computeRenderedOffset = (
-    root: HTMLElement,
-    range: Range,
-    atStart: boolean,
-  ) => {
-    const pointRange = document.createRange();
-    pointRange.selectNodeContents(root);
-    if (atStart) {
-      pointRange.setEnd(range.startContainer, range.startOffset);
-    } else {
-      pointRange.setEnd(range.endContainer, range.endOffset);
-    }
-    // Важно: Range.toString() нормализует пробелы и иногда даёт "сдвиг" оффсетов.
-    // Считаем длину по текстовым нодам, как делает rehype.
-    return rangeTextLength(pointRange);
-  };
-
-  const handleMarkdownMouseUp = () => {
-    if (!annotationsMode) return;
-    const root = annotationsRootRef.current;
-    if (!root) return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return;
-    if (!root.contains(range.commonAncestorContainer)) return;
-
-    const anchorRect = range.getBoundingClientRect();
-    const start = computeRenderedOffset(root, range, true);
-    const end = computeRenderedOffset(root, range, false);
-    const s = Math.min(start, end);
-    const e = Math.max(start, end);
-    const selectedText = String(sel.toString() ?? "").trim();
-    if (!selectedText) return;
-
-    setAnnotationAnchor(rectToAnchor(anchorRect));
-    setNewAnnotation({ start: s, end: e, selectedText, noteText: "" });
-    setActiveAnnotationId(null);
-    setTimeout(() => newAnnotationTextareaRef.current?.focus(), 0);
-  };
+  }, [annotationsMode, dispatch, isEditing, projectName, sceneName]);
 
   // Аннотации: загрузка для текущего шага + поля (markdown / playMarkdown)
   useEffect(() => {
-    if (!actorNoteKey || currentStep?.id == null) {
-      setAnnotations([]);
-      setAnnotationsError(null);
-      setAnnotationsLoading(false);
+    if (currentStep?.id == null) {
       setNewAnnotation(null);
       setActiveAnnotationId(null);
       return;
     }
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-      setAnnotations([]);
-      setAnnotationsError(null);
-      setAnnotationsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setAnnotationsLoading(true);
-    setAnnotationsError(null);
-    listActorAnnotations(token, {
-      projectSlug: projectName,
-      sceneName,
-      stepId: currentStep.id,
-      field: activeField,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        setAnnotations(res.annotations ?? []);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setAnnotations([]);
-        setAnnotationsError('Не удалось загрузить метки');
-      })
-      .finally(() => {
-        if (!cancelled) setAnnotationsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [actorNoteKey, activeField, currentStep?.id, projectName, sceneName]);
-
-  // Загрузка заметки при смене шага
-  useEffect(() => {
-    if (!actorNoteKey || currentStep?.id == null) {
-      actorNoteLoadedKeyRef.current = null;
-      actorNoteLoadedTextRef.current = '';
-      setActorNoteText('');
-      setActorNoteError(null);
-      setActorNoteLoading(false);
-      return;
-    }
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-    if (!token) {
-      actorNoteLoadedKeyRef.current = actorNoteKey;
-      actorNoteLoadedTextRef.current = '';
-      setActorNoteText('');
-      setActorNoteError(null);
-      setActorNoteLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setActorNoteLoading(true);
-    setActorNoteError(null);
-    getActorStepNote(token, {
-      projectSlug: projectName,
-      sceneName,
-      stepId: currentStep.id,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        const next = String(res?.note?.text ?? '');
-        actorNoteLoadedKeyRef.current = actorNoteKey;
-        actorNoteLoadedTextRef.current = next;
-        setActorNoteText(next);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        actorNoteLoadedKeyRef.current = actorNoteKey;
-        actorNoteLoadedTextRef.current = '';
-        setActorNoteText('');
-        setActorNoteError('Не удалось загрузить заметку');
-      })
-      .finally(() => {
-        if (!cancelled) setActorNoteLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [actorNoteKey, currentStep?.id, projectName, sceneName]);
-
-  // Автосохранение заметки (debounce)
-  useEffect(() => {
-    if (!actorNoteKey || currentStep?.id == null) return;
-    if (actorNoteLoadedKeyRef.current !== actorNoteKey) return;
-    if (actorNoteLoading) return;
-
-    const currentLoaded = actorNoteLoadedTextRef.current ?? '';
-    if (actorNoteText === currentLoaded) return;
-
-    if (actorNoteSaveTimerRef.current) {
-      window.clearTimeout(actorNoteSaveTimerRef.current);
-    }
-
-    actorNoteSaveTimerRef.current = window.setTimeout(() => {
-      const token =
-        typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
-      if (!token) return;
-      setActorNoteSaving(true);
-      setActorNoteError(null);
-      upsertActorStepNote(token, {
+    if (!accessToken) return;
+    const cacheKey = `${projectName}:${sceneName}:${currentStep.id}:${activeField}`;
+    void dispatch(
+      loadActorAnnotations({
+        cacheKey,
         projectSlug: projectName,
         sceneName,
         stepId: currentStep.id,
-        text: actorNoteText,
-      })
-        .then((res) => {
-          const saved = String(res?.note?.text ?? '');
-          actorNoteLoadedTextRef.current = saved;
-          setActorNoteText(saved);
-        })
-        .catch(() => {
-          setActorNoteError('Не удалось сохранить заметку');
-        })
-        .finally(() => setActorNoteSaving(false));
-    }, 600);
-
-    return () => {
-      if (actorNoteSaveTimerRef.current) {
-        window.clearTimeout(actorNoteSaveTimerRef.current);
-      }
-    };
+        field: activeField,
+      }),
+    );
   }, [
-    actorNoteKey,
-    actorNoteLoading,
-    actorNoteText,
+    accessToken,
+    activeField,
     currentStep?.id,
+    dispatch,
     projectName,
     sceneName,
   ]);
@@ -1085,195 +380,88 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
   return (
     <div className="show-script">
       <div className="script-content">
-        <div className="script-header">
-          <div className="script-actions">
-            {isEditing && (
-              <div className="script-track-insert">
-                <select
-                  className="script-track-select"
-                  value={selectedTrackId ?? undefined}
-                  onChange={(event) => setSelectedTrackId(Number(event.target.value))}
-                >
-                  {playlistOptions.length === 0 && (
-                    <option value="">Треки не найдены</option>
-                  )}
-                  {playlistOptions.map((track) => (
-                    <option key={track.id} value={track.id}>
-                      {track.title}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    const target = playlistOptions.find(
-                      (item) => item.id === selectedTrackId,
+        <ScriptStepHeader
+          isEditing={isEditing}
+          currentStep={currentStep}
+          updateStep={updateStep}
+          controls={
+            isEditing
+              ? {
+                  selectedTrackId,
+                  playlistOptions,
+                  lightChannels,
+                  selectedLightSlot,
+                  onSelectedTrackIdChange: (trackId) => {
+                    dispatch(
+                      showScriptActions.setSelectedTrackId({
+                        projectSlug: projectName,
+                        sceneName,
+                        trackId,
+                      }),
                     );
-                    if (!target) return;
-                    insertAtCursor(`\n\n[${target.title}](track:${target.id})\n\n`);
-                  }}
-                  disabled={playlistOptions.length === 0}
-                >
-                  Вставить трек
-                </button>
-              </div>
-            )}
-            {isEditing && (
-              <div className="script-light-panel">
-                <div className="script-light-grid">
-                  {lightChannels.map((value, index) => (
-                    <label key={`light-${index + 1}`} className="script-light-cell">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        className="script-light-input"
-                        value={value}
-                        onChange={(event) => {
-                          const next = [...lightChannels];
-                          next[index] = event.target.value;
-                          setLightChannels(next);
-                        }}
-                        placeholder={`${index + 1}`}
-                      />
-                    </label>
-                  ))}
-                </div>
-                <div className="script-light-insert">
-                  <select
-                    className="script-track-select"
-                    value={selectedLightSlot}
-                    onChange={(event) => setSelectedLightSlot(Number(event.target.value))}
-                  >
-                    {Array.from({ length: 8 }, (_, index) => (
-                      <option key={`slot-${index + 1}`} value={index + 1}>
-                        Шаблон {index + 1}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={insertLightChannel}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        insertLightChannel();
-                      }
-                    }}
-                  >
-                    Вставить свет
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+                  },
+                  onLightChannelsChange: (next) => {
+                    dispatch(
+                      showScriptActions.setLightChannels({
+                        projectSlug: projectName,
+                        sceneName,
+                        lightChannels: next,
+                      }),
+                    );
+                  },
+                  onSelectedLightSlotChange: (slot) => {
+                    dispatch(
+                      showScriptActions.setSelectedLightSlot({
+                        projectSlug: projectName,
+                        sceneName,
+                        slot,
+                      }),
+                    );
+                  },
+                  onInsertText: insertIntoActiveMarkdown,
+                }
+              : null
+          }
+        />
 
         {currentStep && (
           <div className="script-step-editor">
-            {isEditing ? (
-              <div className="form-group">
-                <label htmlFor={`title-${currentStep.id}`}></label>
-                <input
-                  id={`title-${currentStep.id}`}
-                  type="text"
-                  className="form-input"
-                  value={currentStep.title}
-                  onChange={(e) => updateStep(currentStep.id, 'title', e.target.value)}
-                  placeholder="Введите название шага"
-                />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 10, marginTop: 10 }}>
-                  <div />
-                  <label style={{ display: "grid", gap: 4 }}>
-                    <div style={{ fontSize: 12, opacity: 0.8 }}>Длительность (мин)</div>
-                    <input
-                      type="number"
-                      min={1}
-                      max={480}
-                      step={1}
-                      className="form-input"
-                      value={currentStep.durationMin ?? ""}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        if (!raw) {
-                          updateStep(currentStep.id, "durationMin", undefined);
-                          return;
-                        }
-                        const n = Number(raw);
-                        if (!Number.isFinite(n)) return;
-                        const clamped = Math.max(1, Math.min(480, Math.trunc(n)));
-                        updateStep(currentStep.id, "durationMin", clamped);
-                      }}
-                      placeholder="например 10"
-                    />
-                  </label>
-                </div>
-              </div>
-            ) : (
-              <div className="script-step-title">{currentStep.title}</div>
-            )}
 
             <div className="script-step-body">
               <div className="script-markdown-pane">
-                <div className="script-markdown-toggle">
-                  <button
-                    type="button"
-                    className="script-markdown-toggle-btn"
-                    data-active={markdownMode === 'notes'}
-                    onClick={() => setMarkdownMode('notes')}
-                  >
-                    Схема
-                  </button>
-                  <button
-                    type="button"
-                    className="script-markdown-toggle-btn"
-                    data-active={markdownMode === 'play'}
-                    onClick={() => setMarkdownMode('play')}
-                  >
-                    Текст
-                  </button>
-                  {isEditing ? (< div className="actor-annotations-toolbar" style={{ marginTop: 8 }}>
-                    <button
-                      type="button"
-                      className="actor-annotations-btn"
-                      data-active="false"
-                      disabled
-                      title="Метки работают в режиме просмотра (выйдите из редактирования шага)"
-                    >
-                      Метки
-                    </button>
-                    <div className="actor-annotations-meta">
-                      Выйдите из редактирования, чтобы выделять текст и делать метки
-                    </div>
-                  </div>) : <div className="actor-annotations-toolbar">
-                    <button
-                      type="button"
-                      className="actor-annotations-btn"
-                      data-active={annotationsMode ? "true" : "false"}
-                      onClick={() => {
-                        const next = !annotationsMode;
-                        setAnnotationsMode(next);
-                        if (!next) {
-                          setNewAnnotation(null);
-                          setActiveAnnotationId(null);
-                          setAnnotationAnchor(null);
-                          setAnnotationPopoverPos(null);
-                        }
-                      }}
-                      title="Включить режим пометок: выдели текст и добавь заметку"
-                    >
-                      Метки
-                    </button>
-                    <div className="actor-annotations-meta">
-                      {annotationsLoading
-                        ? "загрузка…"
-                        : annotationsError
-                          ? annotationsError
-                          : `пометок: ${annotations.length}`}
-                    </div>
-                  </div>}
-                </div>
+                <ScriptMarkdownToolbar
+                  isEditing={isEditing}
+                  onToggleEditing={() => setIsEditing((p: boolean) => !p)}
+                  markdownMode={markdownMode}
+                  onSetMarkdownMode={(mode) => {
+                    dispatch(
+                      showScriptActions.setMarkdownMode({
+                        projectSlug: projectName,
+                        sceneName,
+                        mode,
+                      }),
+                    );
+                  }}
+                  annotations={{
+                    mode: annotationsMode,
+                    onToggleMode: () => {
+                      dispatch(
+                        showScriptActions.setAnnotationsMode({
+                          projectSlug: projectName,
+                          sceneName,
+                          enabled: !annotationsMode,
+                        }),
+                      );
+                    },
+                    loading: annotationsLoading,
+                    error: annotationsError,
+                    count: annotations.length,
+                    onClearSelectionState: () => {
+                      setNewAnnotation(null);
+                      setActiveAnnotationId(null);
+                    },
+                  }}
+                />
                 {isEditing ? (
                   <div className="form-group form-group-grow">
                     <label htmlFor={`markdown-${currentStep.id}`}></label>
@@ -1297,382 +485,63 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
                   </div>
                 ) : (
                   <div className="form-group">
-                    <div className="markdown-preview">
-
-
-                      <div
-                        ref={annotationsRootRef}
-                        onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
-                      >
-                        <ReactMarkdown
-                          urlTransform={urlTransform}
-                          rehypePlugins={
-                            annotationsMode
-                              ? [
-                                rehypeScriptTokens,
-                                [
-                                  rehypeActorAnnotations,
-                                  { annotations, activeId: activeAnnotationId },
-                                ],
-                              ]
-                              : []
-                          }
-                          components={{
-                            p: ({ children }: { children: React.ReactNode }) => (
-                              <p>{renderLightTokens(children)}</p>
-                            ),
-                            li: ({ children }: { children: React.ReactNode }) => (
-                              <li>{renderLightTokens(children)}</li>
-                            ),
-                            h1: ({ children }: { children: React.ReactNode }) => (
-                              <h1>{renderLightTokens(children)}</h1>
-                            ),
-                            h2: ({ children }: { children: React.ReactNode }) => (
-                              <h2>{renderLightTokens(children)}</h2>
-                            ),
-                            h3: ({ children }: { children: React.ReactNode }) => (
-                              <h3>{renderLightTokens(children)}</h3>
-                            ),
-                            h4: ({ children }: { children: React.ReactNode }) => (
-                              <h4>{renderLightTokens(children)}</h4>
-                            ),
-                            h5: ({ children }: { children: React.ReactNode }) => (
-                              <h5>{renderLightTokens(children)}</h5>
-                            ),
-                            h6: ({ children }: { children: React.ReactNode }) => (
-                              <h6>{renderLightTokens(children)}</h6>
-                            ),
-                            blockquote: ({
-                              children,
-                            }: {
-                              children: React.ReactNode;
-                            }) => <blockquote>{renderLightTokens(children)}</blockquote>,
-                            td: ({ children }: { children: React.ReactNode }) => (
-                              <td>{renderLightTokens(children)}</td>
-                            ),
-                            th: ({ children }: { children: React.ReactNode }) => (
-                              <th>{renderLightTokens(children)}</th>
-                            ),
-                            a: ({
-                              href,
-                              children,
-                              ...rest
-                            }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => {
-                              const resolved = resolveTrackLink(href);
-                              if (resolved && onTrackLinkClick) {
-                                return (
-                                  <button
-                                    type="button"
-                                    className="markdown-track-link"
-                                    onClick={async () => {
-                                      if (resolved.id != null) {
-                                        onTrackLinkClick(Number(resolved.id));
-                                        return;
-                                      }
-                                      if (!resolved.name) return;
-                                      const fromCache = playlistOptions.find(
-                                        (item) =>
-                                          String(item?.title ?? "").toLowerCase() ===
-                                          String(resolved.name ?? "").toLowerCase(),
-                                      );
-                                      if (fromCache?.id != null) {
-                                        onTrackLinkClick(Number(fromCache.id));
-                                      }
-                                    }}
-                                  >
-                                    {children}
-                                  </button>
-                                );
-                              }
-                              if (isAudioLink(href)) {
-                                return (
-                                  <a
-                                    href={href}
-                                    className="markdown-track-link markdown-audio-link"
-                                    {...rest}
-                                  >
-                                    {children}
-                                  </a>
-                                );
-                              }
-                              return (
-                                <a href={href} {...rest}>
-                                  {children}
-                                </a>
-                              );
-                            },
-                            img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
-                              const { src, alt, ...rest } = props;
-                              return (
-                                <img
-                                  src={resolveImageSrc(src)}
-                                  alt={alt || ''}
-                                  style={{
-                                    maxHeight: 800,
-                                    maxWidth: '100%',
-                                    height: 'auto',
-                                  }}
-                                  {...rest}
-                                />
-                              );
-                            },
-                            mark: ({ node, children, ...rest }: any) => {
-                              const id = (node as any)?.properties?.["data-anno-id"] as
-                                | string
-                                | undefined;
-                              return (
-                                <mark
-                                  {...rest}
-                                  onClick={(e) => {
-                                    if (!id) return;
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setAnnotationAnchor(
-                                      rectToAnchor(
-                                        (e.currentTarget as HTMLElement).getBoundingClientRect(),
-                                      ),
-                                    );
-                                    setActiveAnnotationId((prev) =>
-                                      prev === id ? null : id,
-                                    );
-                                    setNewAnnotation(null);
-                                  }}
-                                >
-                                  {children}
-                                </mark>
-                              );
-                            },
-                          }}
-                        >
-                          {activeMarkdown || '*Пусто*'}
-                        </ReactMarkdown>
-                      </div>
-
-                      {annotationsMode &&
-                        typeof document !== "undefined" &&
-                        annotationPopoverPos &&
-                        (newAnnotation || activeAnnotationId)
-                        ? createPortal(
-                          <div
-                            ref={annotationPopoverRef}
-                            className="actor-annotations-popover"
-                            style={{
-                              top: annotationPopoverPos.top,
-                              left: annotationPopoverPos.left,
-                            }}
-                            onMouseDown={(e) => e.stopPropagation()}
-                          >
-                            {newAnnotation ? (
-                              <div className="actor-annotations-card">
-                                <div className="actor-annotations-card-head">
-                                  <button
-                                    type="button"
-                                    className="actor-annotations-x"
-                                    onClick={() => {
-                                      setNewAnnotation(null);
-                                      setAnnotationPopoverPos(null);
-                                    }}
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                                <div className="actor-annotations-quote">
-                                  “{newAnnotation.selectedText.slice(0, 240)}”
-                                </div>
-                                <textarea
-                                  className="actor-annotations-input"
-                                  ref={newAnnotationTextareaRef}
-                                  value={newAnnotation.noteText}
-                                  onChange={(e) =>
-                                    setNewAnnotation((p) =>
-                                      p ? { ...p, noteText: e.target.value } : p,
-                                    )
-                                  }
-                                  placeholder="Напиши заметку…"
-                                  rows={3}
-                                />
-                                <div className="actor-annotations-actions">
-                                  <button
-                                    type="button"
-                                    onClick={async () => {
-                                      const token =
-                                        typeof window !== "undefined"
-                                          ? localStorage.getItem("accessToken")
-                                          : null;
-                                      if (!token || !currentStep?.id) return;
-                                      const noteText = newAnnotation.noteText.trim();
-                                      if (!noteText) return;
-                                      try {
-                                        const { annotation } =
-                                          await createActorAnnotation(token, {
-                                            projectSlug: projectName,
-                                            sceneName,
-                                            stepId: currentStep.id,
-                                            field: activeField,
-                                            startOffset: newAnnotation.start,
-                                            endOffset: newAnnotation.end,
-                                            selectedText: newAnnotation.selectedText,
-                                            noteText,
-                                          });
-                                        setAnnotations((prev) =>
-                                          [...prev, annotation].sort(
-                                            (a, b) =>
-                                              a.startOffset - b.startOffset ||
-                                              a.endOffset - b.endOffset,
-                                          ),
-                                        );
-                                        setNewAnnotation(null);
-                                        setAnnotationPopoverPos(null);
-                                      } catch {
-                                        setAnnotationsError("Не удалось создать пометку");
-                                      }
-                                    }}
-                                  >
-                                    Сохранить пометку
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="actor-annotations-btn-secondary"
-                                    onClick={() => {
-                                      setNewAnnotation(null);
-                                      setAnnotationPopoverPos(null);
-                                    }}
-                                  >
-                                    Отмена
-                                  </button>
-                                </div>
-                              </div>
-                            ) : null}
-
-                            {activeAnnotationId ? (
-                              <ActorAnnotationDetails
-                                annotation={
-                                  annotations.find((a) => a.id === activeAnnotationId) ??
-                                  null
-                                }
-                                onClose={() => {
-                                  setActiveAnnotationId(null);
-                                  setAnnotationPopoverPos(null);
-                                }}
-                                onUpdate={async (id, noteText) => {
-                                  const token =
-                                    typeof window !== "undefined"
-                                      ? localStorage.getItem("accessToken")
-                                      : null;
-                                  if (!token) return;
-                                  const { annotation } = await updateActorAnnotation(
-                                    token,
-                                    id,
-                                    { noteText },
-                                  );
-                                  setAnnotations((prev) =>
-                                    prev.map((a) => (a.id === id ? annotation : a)),
-                                  );
-                                }}
-                                onDelete={async (id) => {
-                                  const token =
-                                    typeof window !== "undefined"
-                                      ? localStorage.getItem("accessToken")
-                                      : null;
-                                  if (!token) return;
-                                  await deleteActorAnnotation(token, id);
-                                  setAnnotations((prev) =>
-                                    prev.filter((a) => a.id !== id),
-                                  );
-                                  setActiveAnnotationId(null);
-                                  setAnnotationPopoverPos(null);
-                                }}
-                              />
-                            ) : null}
-                          </div>,
-                          document.body,
-                        )
-                        : null}
-                    </div>
+                    <ScriptMarkdownPreview
+                      markdown={activeMarkdown}
+                      projectName={projectName}
+                      playlistOptions={playlistOptions}
+                      lightChannels={lightChannels}
+                      onTrackLinkClick={onTrackLinkClick}
+                      annotationsMode={annotationsMode}
+                      annotations={annotations}
+                      newAnnotation={newAnnotation}
+                      setNewAnnotation={setNewAnnotation}
+                      activeAnnotationId={activeAnnotationId}
+                      setActiveAnnotationId={setActiveAnnotationId}
+                      onCreateAnnotation={async (draft) => {
+                        if (!currentStep?.id) return;
+                        if (!annotationsCacheKey) return;
+                        void dispatch(
+                          createAnnotation({
+                            cacheKey: annotationsCacheKey,
+                            projectSlug: projectName,
+                            sceneName,
+                            stepId: currentStep.id,
+                            field: activeField,
+                            startOffset: draft.start,
+                            endOffset: draft.end,
+                            selectedText: draft.selectedText,
+                            noteText: draft.noteText,
+                          }),
+                        );
+                      }}
+                      onUpdateAnnotation={async (id, noteText) => {
+                        if (!annotationsCacheKey) return;
+                        void dispatch(
+                          updateAnnotation({ cacheKey: annotationsCacheKey, id, noteText }),
+                        );
+                      }}
+                      onDeleteAnnotation={async (id) => {
+                        if (!annotationsCacheKey) return;
+                        void dispatch(deleteAnnotation({ cacheKey: annotationsCacheKey, id }));
+                      }}
+                    />
                   </div>
                 )}
               </div>
-              {showRequisites && (
-                <aside className="requisites-panel">
-                  <div className="requisites-header">
-                    <span>Реквизит</span>
-                    <div className="requisites-actions">
-                      <button
-                        type="button"
-                        className="requisites-action-btn"
-                        onClick={copyRequisites}
-                        disabled={currentRequisites.length === 0}
-                        title="Скопировать реквизит"
-                      >
-                        С
-                      </button>
-
-                      <button
-                        type="button"
-                        className="requisites-action-btn"
-                        onClick={pasteRequisites}
-                        disabled={!hasCopiedRequisites}
-                        title="Вставить реквизит"
-                      >
-                        P
-                      </button>
-                      <button
-                        type="button"
-                        className="requisites-action-btn"
-                        onClick={resetRequisites}
-                        disabled={currentRequisites.length === 0}
-                        title="Сбросить отметки на всех шагах"
-                      >
-                        D
-                      </button>
-                    </div>
-                  </div>
-                  {isEditing && (
-                    <div className="requisites-add">
-                      <input
-                        type="text"
-                        value={newRequisite}
-                        onChange={(event) => setNewRequisite(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            addRequisite();
-                          }
-                        }}
-                        placeholder="Добавить реквизит"
-                      />
-                      <button type="button" onClick={addRequisite}>
-                        +
-                      </button>
-                    </div>
-                  )}
-                  <div className="requisites-list">
-                    {currentRequisites.length === 0 ? (
-                      <div className="requisites-empty">Нет реквизита</div>
-                    ) : (
-                      currentRequisites.map((item) => (
-                        <label key={item.id} className="requisite-item">
-                          <input
-                            type="checkbox"
-                            checked={item.checked}
-                            onChange={() => toggleRequisite(item.id)}
-                          />
-                          <span>{item.label}</span>
-                          {isEditing && (
-                            <button
-                              type="button"
-                              className="requisite-remove"
-                              onClick={() => removeRequisite(item.id)}
-                            >
-                              ×
-                            </button>
-                          )}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </aside>
-              )}
+              <RequisitesPanel
+                show={showRequisites}
+                isEditing={isEditing}
+                requisites={currentRequisites}
+                hasCopiedRequisites={hasCopiedRequisites}
+                newRequisite={newRequisite}
+                setNewRequisite={setNewRequisite}
+                onCopy={copyRequisites}
+                onPaste={pasteRequisites}
+                onResetAll={resetRequisites}
+                onAdd={addRequisite}
+                onToggle={toggleRequisite}
+                onRemove={removeRequisite}
+              />
             </div>
 
           </div>
@@ -1681,195 +550,3 @@ export const ShowScript: React.FC<ShowScriptProps> = ({
     </div >
   );
 };
-
-function clamp(n: number, a: number, b: number): number {
-  return Math.max(a, Math.min(b, n));
-}
-
-type HastNode =
-  | { type: "root"; children?: HastNode[] }
-  | { type: "element"; tagName: string; properties?: any; children?: HastNode[] }
-  | { type: "text"; value: string }
-  | { type: string;[k: string]: any };
-
-function rehypeActorAnnotations(opts: {
-  annotations: ActorAnnotation[];
-  activeId: string | null;
-}) {
-  const input = (opts.annotations ?? [])
-    .slice()
-    .filter((a) => a && typeof a.id === "string")
-    .map((a) => ({
-      id: a.id,
-      start: Math.max(0, Math.trunc(Number(a.startOffset))),
-      end: Math.max(0, Math.trunc(Number(a.endOffset))),
-    }))
-    .filter((a) => Number.isFinite(a.start) && Number.isFinite(a.end) && a.end > a.start)
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-
-  return function transformer(tree: HastNode) {
-    let pos = 0;
-    let idx = 0;
-
-    const wrap = (id: string, text: string) =>
-      ({
-        type: "element",
-        tagName: "mark",
-        properties: {
-          className: ["actor-annotations-mark"],
-          "data-anno-id": id,
-          "data-active": opts.activeId === id ? "true" : "false",
-        },
-        children: [{ type: "text", value: text }],
-      }) as HastNode;
-
-    const walk = (node: HastNode): HastNode => {
-      if (!node) return node;
-      if (node.type === "text") {
-        const value = String((node as any).value ?? "");
-        const len = value.length;
-        if (len === 0) return node;
-
-        // fast-forward annotations that already ended
-        while (idx < input.length && input[idx].end <= pos) idx += 1;
-        if (idx >= input.length) {
-          pos += len;
-          return node;
-        }
-
-        const startPos = pos;
-        const endPos = pos + len;
-        if (input[idx].start >= endPos) {
-          pos += len;
-          return node;
-        }
-
-        const out: HastNode[] = [];
-        let localCursor = 0;
-        while (idx < input.length) {
-          const a = input[idx];
-          if (a.start >= endPos) break;
-          const s = Math.max(a.start, startPos) - startPos;
-          const e = Math.min(a.end, endPos) - startPos;
-          if (e <= localCursor) {
-            idx += 1;
-            continue;
-          }
-          if (s > localCursor) {
-            out.push({ type: "text", value: value.slice(localCursor, s) } as HastNode);
-          }
-          out.push(wrap(a.id, value.slice(s, e)));
-          localCursor = e;
-          if (a.end <= endPos) idx += 1;
-          // если аннотация заканчивается позже — это overlap, пока игнорируем продолжение
-        }
-        if (localCursor < len) {
-          out.push({ type: "text", value: value.slice(localCursor) } as HastNode);
-        }
-
-        pos += len;
-        if (out.length === 1) return out[0];
-        return { type: "element", tagName: "span", properties: {}, children: out } as HastNode;
-      }
-
-      const children = (node as any).children;
-      if (Array.isArray(children)) {
-        const nextChildren: HastNode[] = [];
-        for (const child of children) {
-          const next = walk(child);
-          // flatten span wrappers we introduced only if safe? keep as-is
-          nextChildren.push(next);
-        }
-        (node as any).children = nextChildren;
-      }
-      return node;
-    };
-
-    walk(tree);
-  };
-}
-
-function ActorAnnotationDetails({
-  annotation,
-  onClose,
-  onUpdate,
-  onDelete,
-}: {
-  annotation: ActorAnnotation | null;
-  onClose: () => void;
-  onUpdate: (id: string, noteText: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-}) {
-  const [text, setText] = useState(annotation?.noteText ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setText(annotation?.noteText ?? "");
-    setError(null);
-    setSaving(false);
-  }, [annotation?.id]);
-
-  if (!annotation) return null;
-
-  return (
-    <div className="actor-annotations-card">
-      <div className="actor-annotations-card-head">
-        <button type="button" className="actor-annotations-x" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      {annotation.selectedText ? (
-        <div className="actor-annotations-quote">
-          “{String(annotation.selectedText).slice(0, 240)}”
-        </div>
-      ) : null}
-      <textarea
-        className="actor-annotations-input"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={2}
-      />
-      {error ? <div className="actor-annotations-error">{error}</div> : null}
-      <div className="actor-annotations-actions">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={async () => {
-            const next = text.trim();
-            if (!next) return;
-            setSaving(true);
-            setError(null);
-            try {
-              await onUpdate(annotation.id, next);
-            } catch {
-              setError("Не удалось сохранить");
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          {saving ? "💾 cохраняю…" : "💾 cохранить"}
-        </button>
-        <button
-          type="button"
-          className="actor-annotations-btn-danger"
-          disabled={saving}
-          onClick={async () => {
-            setSaving(true);
-            setError(null);
-            try {
-              await onDelete(annotation.id);
-            } catch {
-              setError("Не удалось удалить");
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          🗑 Удалить
-        </button>
-      </div>
-    </div>
-  );
-}

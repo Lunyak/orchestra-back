@@ -2,9 +2,9 @@
   /* ===== ЦВЕТА ===== */
   
   /* Основные фоновые цвета */
-  --color-bg-primary: #0b1220;
-  --color-bg-secondary: #1f2a37;
-  --color-bg-tertiary: #2c3e50;
+  --color-bg-primary: #18181b;
+  --color-bg-secondary: #1D1D20;
+  --color-bg-tertiary: #FEF08A;
   --color-bg-dark: #020617;
   --color-bg-overlay: rgba(15, 23, 42, 0.85);
   --color-bg-modal: rgba(16, 16, 18, 0.96);
@@ -67,6 +67,7 @@
   
   /* Текстовые цвета */
   --color-text-primary: #e2e8f0;
+  --color-text-secondary: #0b1220;
   --color-text-bright: #f8fafc;
   --color-text-light: #cbd5f5;
   --color-text-medium: #d1d5db;
@@ -107,6 +108,11 @@
   --gradient-login-bg: radial-gradient(circle at top, #1d4ed8 0, #020617 45%, #020617 100%);
   --gradient-button-primary: linear-gradient(135deg, #2563eb, #22c55e);
   --gradient-header-trigger: linear-gradient(to right, rgba(44, 62, 80, 0.95) 0%, rgba(44, 62, 80, 0.4) 70%, transparent 100%);
+  
+  /* Кнопки*/
+  --color-button-primary: #2563eb;
+  --color-button-secondary: #22c55e;
+  --color-button-danger: #b91c1c;
   
   /* ===== РАЗМЕРЫ ===== */
   
@@ -245,7 +251,7 @@
 /* Light theme (опционально) */
 @media (prefers-color-scheme: light) {
   :root {
-    --color-text-primary: #213547;
-    --color-bg-primary: #ffffff;
+    /* --color-text-primary: #213547; */
+    /* --color-bg-primary: #ffffff; */
   }
 }

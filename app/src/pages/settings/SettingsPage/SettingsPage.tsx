@@ -1,10 +1,12 @@
+import { Button } from "@shared/core/button/Button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ProjectPanel } from "../../components/project-panel/ProjectPanel";
-import { useAuth } from "../../features/auth";
-import { useProject } from "../../features/project";
-import { useTeam } from "../../features/team";
-import { usePlatform } from "../../PlatformContext";
+import { ProjectPanel } from "../../../components/project-panel/ProjectPanel";
+import { useAuth } from "../../../features/auth";
+import { useProject } from "../../../features/project";
+import { useTeam } from "../../../features/team";
+import { usePlatform } from "../../../PlatformContext";
+import "./style.css";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -68,8 +70,29 @@ export function SettingsPage() {
       <div className="app-content">
         <main className="main-content settings-main">
           <div className="settings-view">
+            <div className="settings-view-header">
+              <h2>Настройки проекта</h2>
+              <Button type="button" className="danger" onClick={logout}>
+                Выйти из аккаунта
+              </Button>
+            </div>
+            <p>Текущий проект: {projectName || "—"}</p>
+            {onPushAllLocal && (
+              <section className="settings-sync">
+                <h3>Синхронизация локальных данных</h3>
+                <p className="settings-sync-hint">
+                  Вы можете выгрузить все локальные проекты и сцены с этого
+                  компьютера на сервер. Используйте это, если раньше работали
+                  только офлайн и хотите перенести данные в онлайн-версию. Если на
+                  сервере уже есть изменённые данные, они могут быть перезаписаны.
+                </p>
+                <button type="button" onClick={handlePushAllLocal}>
+                  Выгрузить все локальные данные на сервер
+                </button>
+              </section>
+            )}
             <section className="settings-project-section">
-              <h2>Проект</h2>
+              <h2>Сменить проект</h2>
               <ProjectPanel
                 projects={projects}
                 projectName={projectName}
@@ -87,26 +110,11 @@ export function SettingsPage() {
                 Подключите Telegram-бота (своим токеном) и управляйте переменными
                 для шаблонов сообщений.
               </p>
-              <button type="button" onClick={() => navigate("/settings/bot")}>
+              <Button type="button" className="pri" onClick={() => navigate("/settings/bot")}>
                 Настройки бота
-              </button>
+              </Button>
             </section>
-            <h2>Настройки проекта</h2>
-            <p>Текущий проект: {projectName || "—"}</p>
-            {onPushAllLocal && (
-              <section className="settings-sync">
-                <h3>Синхронизация локальных данных</h3>
-                <p className="settings-sync-hint">
-                  Вы можете выгрузить все локальные проекты и сцены с этого
-                  компьютера на сервер. Используйте это, если раньше работали
-                  только офлайн и хотите перенести данные в онлайн-версию. Если на
-                  сервере уже есть изменённые данные, они могут быть перезаписаны.
-                </p>
-                <button type="button" onClick={handlePushAllLocal}>
-                  Выгрузить все локальные данные на сервер
-                </button>
-              </section>
-            )}
+
             <section className="settings-invite">
               {isProjectOwner === false ? (
                 <p className="settings-invite-forbidden">
@@ -131,20 +139,19 @@ export function SettingsPage() {
                       placeholder="email@example.com"
                       className="settings-invite-input"
                     />
-                    <button
+                    <Button
                       type="button"
-                      onClick={invite}
+                      className="primary" onClick={invite}
                       disabled={!inviteEmail.trim()}
                     >
                       Пригласить
-                    </button>
+                    </Button>
                   </div>
                   {inviteError && (
                     <div className="settings-invite-error">{inviteError}</div>
                   )}
                   {projectMembers.length > 0 && (
                     <div className="settings-members">
-                      <h4>Участники</h4>
                       <ul className="settings-members-list">
                         {projectMembers.map((m) => (
                           <li key={m.id} className="settings-member-row">
@@ -185,9 +192,7 @@ export function SettingsPage() {
                 </>
               )}
             </section>
-            <button type="button" onClick={logout}>
-              Выйти из аккаунта
-            </button>
+
           </div>
         </main>
       </div>

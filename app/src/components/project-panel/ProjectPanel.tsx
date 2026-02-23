@@ -1,5 +1,6 @@
 import React from "react";
 import "./style.css";
+import { Button } from "@shared/core/button/Button";
 
 interface ProjectPanelProps {
   projects: string[];
@@ -22,7 +23,6 @@ export const ProjectPanel: React.FC<ProjectPanelProps> = ({
 }) => {
   return (
     <div className="project-panel">
-      <label htmlFor="project-select">Проект</label>
       <select
         id="project-select"
         value={projectName}
@@ -42,12 +42,12 @@ export const ProjectPanel: React.FC<ProjectPanelProps> = ({
         onChange={(event) => onNewProjectNameChange(event.target.value)}
         placeholder="Новый проект"
       />
-      <button type="button" onClick={onCreateProject}>
+      <Button type="button" className="primary" onClick={onCreateProject}>
         Создать
-      </button>
-      <button type="button" className="project-delete" onClick={onDeleteProject}>
+      </Button>
+      <Button type="button" className="danger" onClick={onDeleteProject}>
         Удалить
-      </button>
+      </Button>
     </div>
   );
 };

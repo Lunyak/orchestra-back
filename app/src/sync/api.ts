@@ -67,21 +67,24 @@ api.interceptors.request.use(
  * Вызывает logout при получении Unauthorized.
  */
 let globalLogoutHandler: (() => void) | null = null;
+let unauthorizedInterceptorId: number | null = null;
 
 export function setupApiInterceptors(logout: () => void) {
   globalLogoutHandler = logout;
 
-  // Интерцептор для обработки ответов
-  api.interceptors.response.use(
+  if (unauthorizedInterceptorId !== null) return;
+
+  // Интерцептор для обработки ответов (401 -> logout handler).
+  // Делаем setup идемпотентным, чтобы не накапливать интерцепторы при повторных монтированиях.
+  unauthorizedInterceptorId = api.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
-      // При 401 — токен невалидный или истёк
       if (error.response?.status === 401 && globalLogoutHandler) {
         console.warn("[api] Unauthorized (401) — logging out");
         globalLogoutHandler();
       }
       return Promise.reject(error);
-    }
+    },
   );
 }
 
