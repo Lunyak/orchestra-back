@@ -1,8 +1,13 @@
-import type { ActorAnnotation } from "../../../sync/api";
+import type { ActorAnnotation } from "../../../../sync/api";
 
 export type HastNode =
   | { type: "root"; children?: HastNode[] }
-  | { type: "element"; tagName: string; properties?: any; children?: HastNode[] }
+  | {
+      type: "element";
+      tagName: string;
+      properties?: any;
+      children?: HastNode[];
+    }
   | { type: "text"; value: string }
   | { type: string; [k: string]: any };
 
@@ -19,7 +24,8 @@ export function rehypeActorAnnotations(opts: {
       end: Math.max(0, Math.trunc(Number(a.endOffset))),
     }))
     .filter(
-      (a) => Number.isFinite(a.start) && Number.isFinite(a.end) && a.end > a.start,
+      (a) =>
+        Number.isFinite(a.start) && Number.isFinite(a.end) && a.end > a.start,
     )
     .sort((a, b) => a.start - b.start || a.end - b.end);
 
@@ -72,7 +78,10 @@ export function rehypeActorAnnotations(opts: {
             continue;
           }
           if (s > localCursor) {
-            out.push({ type: "text", value: value.slice(localCursor, s) } as HastNode);
+            out.push({
+              type: "text",
+              value: value.slice(localCursor, s),
+            } as HastNode);
           }
           out.push(wrap(a.id, value.slice(s, e)));
           localCursor = e;
@@ -80,7 +89,10 @@ export function rehypeActorAnnotations(opts: {
           // если аннотация заканчивается позже — overlap, пока игнорируем продолжение
         }
         if (localCursor < len) {
-          out.push({ type: "text", value: value.slice(localCursor) } as HastNode);
+          out.push({
+            type: "text",
+            value: value.slice(localCursor),
+          } as HastNode);
         }
 
         pos += len;
@@ -107,4 +119,3 @@ export function rehypeActorAnnotations(opts: {
     walk(tree);
   };
 }
-

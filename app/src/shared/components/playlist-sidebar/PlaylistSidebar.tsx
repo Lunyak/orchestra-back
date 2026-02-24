@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import playlistBg from "../../shared/assets/fon_playlist.png";
-import { getDesktopApi } from "../../shared/platform/desktop-api";
-import { createId } from "../../shared/utils/createId";
 import {
   type SyncChange,
   ensureProject,
   syncPush,
-} from "../../sync/api";
+} from "../../../sync/api";
+import { getDesktopApi } from "../../platform/desktop-api";
+import { createId } from "../../utils/createId";
 import "./style.css";
 
 export interface PlaylistTrack {
@@ -46,6 +45,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const [isCompact, setIsCompact] = useState(true);
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
   const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set());
+  const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
   const [activeAudioKey, setActiveAudioKey] = useState<"a" | "b">("a");
@@ -54,6 +54,18 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     b: null,
   });
   const playRequestId = useRef(0);
+  const messageTimerRef = useRef<number | null>(null);
+
+  const showMessage = (message: string) => {
+    setUiMessage(message);
+    if (messageTimerRef.current !== null) {
+      window.clearTimeout(messageTimerRef.current);
+    }
+    messageTimerRef.current = window.setTimeout(() => {
+      setUiMessage(null);
+      messageTimerRef.current = null;
+    }, 3500);
+  };
 
   useEffect(() => {
     setPlaylist(
@@ -64,6 +76,14 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       })),
     );
   }, [tracks]);
+
+  useEffect(() => {
+    return () => {
+      if (messageTimerRef.current !== null) {
+        window.clearTimeout(messageTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (currentTrack || playlist.length === 0) return;
@@ -494,12 +514,16 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
   const addTracks = async () => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
+    if (!desktopApi) {
+      showMessage("Добавление аудио доступно только в десктоп-версии приложения.");
+      return;
+    }
     try {
       const res = await desktopApi.pickProjectAudio(projectName);
       if (!res?.ok) {
         if (res?.canceled) return;
         console.error("Failed to pick audio:", res?.error);
+        showMessage("Не удалось открыть выбор файла. Проверьте консоль.");
         return;
       }
 
@@ -517,16 +541,21 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       await updatePlaylist(nextTracks);
     } catch (err) {
       console.error("Failed to add tracks:", err);
+      showMessage("Не удалось добавить аудио. Проверьте консоль.");
     }
   };
 
   const addTracksFromPaths = async (filePaths: string[]) => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
+    if (!desktopApi) {
+      showMessage("Добавление аудио доступно только в десктоп-версии приложения.");
+      return;
+    }
     try {
       const res = await desktopApi.addProjectAudio(projectName, filePaths);
       if (!res?.ok) {
         console.error("Failed to add audio:", res?.error);
+        showMessage("Не удалось добавить аудио. Проверьте консоль.");
         return;
       }
       const maxId = playlist.reduce((acc, t) => Math.max(acc, t.id), 0);
@@ -542,6 +571,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       await updatePlaylist([...playlist, ...uploadedNewTracks]);
     } catch (err) {
       console.error("Failed to add audio:", err);
+      showMessage("Не удалось добавить аудио. Проверьте консоль.");
     }
   };
 
@@ -582,14 +612,19 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
   const deleteTrack = async (track: PlaylistTrack) => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
+    if (!desktopApi) {
+      showMessage("Удаление аудио доступно только в десктоп-версии приложения.");
+      return;
+    }
     try {
       const res = await desktopApi.deleteProjectAudio(projectName, track.file);
       if (!res?.ok) {
         console.error("Failed to delete audio:", res?.error);
+        showMessage("Не удалось удалить аудио. Проверьте консоль.");
       }
     } catch (err) {
       console.error("Failed to delete audio:", err);
+      showMessage("Не удалось удалить аудио. Проверьте консоль.");
     }
 
     const nextTracks = playlist.filter((item) => item.id !== track.id);
@@ -635,6 +670,11 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     event.preventDefault();
     setIsDragOver(false);
 
+    if (!getDesktopApi()) {
+      showMessage("Drag-and-drop аудио доступен только в десктоп-версии приложения.");
+      return;
+    }
+
     const files = Array.from(event.dataTransfer.files || []);
     const filePaths = files
       .map((file) => (file as { path?: string }).path)
@@ -645,6 +685,11 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
     void addTracksFromPaths(filePaths);
   };
+
+  const desktopAvailable = Boolean(getDesktopApi());
+  const addButtonTitle = desktopAvailable
+    ? "Добавить аудио"
+    : "Добавление аудио доступно только в десктоп-версии приложения";
 
   return (
     <aside
@@ -659,7 +704,6 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         {currentTrack && (
           <div
             className={`playlist-current ${isPlaying ? "playing" : ""}`}
-            style={{ backgroundImage: `url(${playlistBg})` }}
           >
             <div className="playlist-current-title">{currentTrack.title}</div>
             <div className="playlist-eq" aria-hidden="true">
@@ -680,7 +724,14 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
             >
               {isPlaying ? "Пауза" : "Играть"}
             </button>
-            <button className="playlist-add-btn" onClick={addTracks}>
+            <button
+              type="button"
+              className="playlist-add-btn"
+              onClick={addTracks}
+              disabled={!desktopAvailable}
+              title={addButtonTitle}
+              aria-disabled={!desktopAvailable}
+            >
               +
             </button>
             <button
@@ -690,6 +741,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               {isCompact ? "↕" : "—"}
             </button>
           </div>
+          {uiMessage && <div className="playlist-empty">{uiMessage}</div>}
           <div className="playlist-progress">
             <input
               type="range"

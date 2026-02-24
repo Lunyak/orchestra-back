@@ -1,4 +1,10 @@
+import dayjs from "dayjs";
+import "dayjs/locale/ru";
+import isoWeek from "dayjs/plugin/isoWeek";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../../features/auth";
+import { useProject } from "../../features/project";
+import { CalendarSection, type CalendarSectionState } from "../../shared/components/calendar/CalendarSection";
 import {
   getMyProfile,
   listRehearsals,
@@ -6,12 +12,6 @@ import {
   type MyProfile,
   type Rehearsal,
 } from "../../sync/api";
-import { useAuth } from "../../features/auth";
-import { useProject } from "../../features/project";
-import dayjs from "dayjs";
-import isoWeek from "dayjs/plugin/isoWeek";
-import "dayjs/locale/ru";
-import { CalendarSection, type CalendarSectionState } from "../../components/calendar/CalendarSection";
 import "./style.css";
 
 dayjs.extend(isoWeek);
@@ -323,142 +323,142 @@ export function ProfilePage() {
                 />
               </label>
 
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Календарь занятости</div>
-          <p style={{ margin: "0 0 10px", opacity: 0.75, fontSize: 12 }}>
-            Клик по дню: свободен → занят → не отмечено. Репетиции показываются точками.
-          </p>
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Календарь занятости</div>
+                <p style={{ margin: "0 0 10px", opacity: 0.75, fontSize: 12 }}>
+                  Клик по дню: свободен → занят → не отмечено. Репетиции показываются точками.
+                </p>
 
-          <CalendarSection
-            storageMonthKey="profile-calendar-month"
-            onStateChange={setCalendarState}
-            onDayClick={(date) => toggleDayStatus(date)}
-            statusByDate={availabilityCalendar}
-            dotsByDate={dotsByDate}
-          />
-          {calendarError && <div className="settings-invite-error" style={{ marginTop: 8 }}>{calendarError}</div>}
+                <CalendarSection
+                  storageMonthKey="profile-calendar-month"
+                  onStateChange={setCalendarState}
+                  onDayClick={(date) => toggleDayStatus(date)}
+                  statusByDate={availabilityCalendar}
+                  dotsByDate={dotsByDate}
+                />
+                {calendarError && <div className="settings-invite-error" style={{ marginTop: 8 }}>{calendarError}</div>}
 
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
-              Свободное время на {selectedDate}
-            </div>
-            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
-              Если указать диапазоны — они будут учитываться при планировании слотов сессии.
-              Время локальное (как на твоём компьютере).
-            </div>
-            {selectedRanges.length === 0 ? (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Не задано (если день “свободен” — считается весь день).</div>
-            ) : (
-              <div style={{ display: "grid", gap: 6 }}>
-                {selectedRanges.map((r, idx) => (
-                  <div key={`${selectedDate}:${idx}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <input
-                      className="settings-invite-input"
-                      type="time"
-                      value={r.from}
-                      onChange={(e) => {
-                        const next = selectedRanges.slice();
-                        next[idx] = { ...next[idx]!, from: e.target.value };
-                        setTimeRangesForDate(selectedDate, next);
-                      }}
-                      style={{ maxWidth: 140 }}
-                    />
-                    <div style={{ opacity: 0.7, fontSize: 12 }}>—</div>
-                    <input
-                      className="settings-invite-input"
-                      type="time"
-                      value={r.to}
-                      onChange={(e) => {
-                        const next = selectedRanges.slice();
-                        next[idx] = { ...next[idx]!, to: e.target.value };
-                        setTimeRangesForDate(selectedDate, next);
-                      }}
-                      style={{ maxWidth: 140 }}
-                    />
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                    Свободное время на {selectedDate}
+                  </div>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+                    Если указать диапазоны — они будут учитываться при планировании слотов сессии.
+                    Время локальное (как на твоём компьютере).
+                  </div>
+                  {selectedRanges.length === 0 ? (
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>Не задано (если день “свободен” — считается весь день).</div>
+                  ) : (
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {selectedRanges.map((r, idx) => (
+                        <div key={`${selectedDate}:${idx}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <input
+                            className="settings-invite-input"
+                            type="time"
+                            value={r.from}
+                            onChange={(e) => {
+                              const next = selectedRanges.slice();
+                              next[idx] = { ...next[idx]!, from: e.target.value };
+                              setTimeRangesForDate(selectedDate, next);
+                            }}
+                            style={{ maxWidth: 140 }}
+                          />
+                          <div style={{ opacity: 0.7, fontSize: 12 }}>—</div>
+                          <input
+                            className="settings-invite-input"
+                            type="time"
+                            value={r.to}
+                            onChange={(e) => {
+                              const next = selectedRanges.slice();
+                              next[idx] = { ...next[idx]!, to: e.target.value };
+                              setTimeRangesForDate(selectedDate, next);
+                            }}
+                            style={{ maxWidth: 140 }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = selectedRanges.slice();
+                              next.splice(idx, 1);
+                              setTimeRangesForDate(selectedDate, next);
+                            }}
+                          >
+                            Удалить
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                     <button
                       type="button"
                       onClick={() => {
-                        const next = selectedRanges.slice();
-                        next.splice(idx, 1);
+                        const next = [...selectedRanges, { from: "19:00", to: "21:00" }];
                         setTimeRangesForDate(selectedDate, next);
                       }}
                     >
-                      Удалить
+                      + Добавить диапазон
                     </button>
+                    {selectedRanges.length > 0 ? (
+                      <button type="button" onClick={() => setTimeRangesForDate(selectedDate, [])}>
+                        Очистить время
+                      </button>
+                    ) : null}
                   </div>
-                ))}
+                </div>
+
+                <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+                  Мои репетиции на {calendarState.selectedDate}:
+                </div>
+                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+                  {selectedDayRehearsalsMy.length === 0 ? (
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>Нет репетиций в этот день.</div>
+                  ) : (
+                    selectedDayRehearsalsMy.map((r) => (
+                      <div
+                        key={r.id}
+                        style={{
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: 10,
+                          padding: "8px 10px",
+                          background: "rgba(255,255,255,0.04)",
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{r.title}</div>
+                        <div style={{ fontSize: 11, opacity: 0.75 }}>
+                          {new Date(r.startsAt).toLocaleString("ru-RU")}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div style={{ marginTop: 12, fontSize: 12, opacity: 0.8 }}>
+                  Мои репетиции в этом месяце:
+                </div>
+                <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
+                  {myMonthRehearsals.length === 0 ? (
+                    <div style={{ fontSize: 12, opacity: 0.7 }}>Пока нет репетиций в этом месяце.</div>
+                  ) : (
+                    myMonthRehearsals.slice(0, 40).map((r) => (
+                      <div
+                        key={r.id}
+                        style={{
+                          border: "1px solid rgba(255,255,255,0.12)",
+                          borderRadius: 10,
+                          padding: "8px 10px",
+                          background: "rgba(255,255,255,0.04)",
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: 700 }}>{r.title}</div>
+                        <div style={{ fontSize: 11, opacity: 0.75 }}>
+                          {new Date(r.startsAt).toLocaleString("ru-RU")}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            )}
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  const next = [...selectedRanges, { from: "19:00", to: "21:00" }];
-                  setTimeRangesForDate(selectedDate, next);
-                }}
-              >
-                + Добавить диапазон
-              </button>
-              {selectedRanges.length > 0 ? (
-                <button type="button" onClick={() => setTimeRangesForDate(selectedDate, [])}>
-                  Очистить время
-                </button>
-              ) : null}
-            </div>
-          </div>
-
-          <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-            Мои репетиции на {calendarState.selectedDate}:
-          </div>
-          <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-            {selectedDayRehearsalsMy.length === 0 ? (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Нет репетиций в этот день.</div>
-            ) : (
-              selectedDayRehearsalsMy.map((r) => (
-                <div
-                  key={r.id}
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 10,
-                    padding: "8px 10px",
-                    background: "rgba(255,255,255,0.04)",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{r.title}</div>
-                  <div style={{ fontSize: 11, opacity: 0.75 }}>
-                    {new Date(r.startsAt).toLocaleString("ru-RU")}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div style={{ marginTop: 12, fontSize: 12, opacity: 0.8 }}>
-            Мои репетиции в этом месяце:
-          </div>
-          <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-            {myMonthRehearsals.length === 0 ? (
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Пока нет репетиций в этом месяце.</div>
-            ) : (
-              myMonthRehearsals.slice(0, 40).map((r) => (
-                <div
-                  key={r.id}
-                  style={{
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    borderRadius: 10,
-                    padding: "8px 10px",
-                    background: "rgba(255,255,255,0.04)",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{r.title}</div>
-                  <div style={{ fontSize: 11, opacity: 0.75 }}>
-                    {new Date(r.startsAt).toLocaleString("ru-RU")}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
               {error && <div className="settings-invite-error">{error}</div>}
               {ok && <div style={{ color: "#7ee787", fontSize: 13 }}>{ok}</div>}

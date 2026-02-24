@@ -7,6 +7,7 @@ import { syncPull, syncPush, type SyncChange } from "../../../sync/api";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
+import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import {
   DEFAULT_THEATER_LAYOUT,
   sceneActions,
@@ -23,6 +24,8 @@ export interface SceneContextValue {
   setRoleAssignments: (next: Record<string, string[]>) => void;
   steps: ScriptStep[];
   setSteps: (next: SetStateAction<ScriptStep[]>) => void;
+  updateStep: (id: number, changes: Partial<ScriptStep>) => void;
+  resetAllRequisites: () => void;
   theaterLayout: TheaterLayout;
   setTheaterLayout: (next: SetStateAction<TheaterLayout>) => void;
   currentPage: number;
@@ -31,7 +34,7 @@ export interface SceneContextValue {
   addStep: (atPage?: number) => void;
   deleteStep: (id: number) => void;
   reorderSteps: (fromIndex: number, toIndex: number) => void;
-  saveStepsForLightPlot: () => Promise<void>;
+  saveStepsForLightPlot: (opts?: { force?: boolean }) => Promise<void>;
   pushSceneAfterSoundsSave: () => Promise<void>;
   syncFromServer: (token?: string | null, projectOverride?: string) => Promise<void>;
   registerPlaylistPlay: (handler: (trackId: number) => void) => void;
@@ -45,6 +48,9 @@ function useSceneOperations() {
 
   const { sceneData, steps, theaterLayout, hasLocalEdits } = useAppSelector(
     (s) => s.scene,
+  );
+  const showScriptUi = useAppSelector((s) =>
+    selectShowScriptMarkdownUi(s, projectName || "fools", "script"),
   );
 
   const syncFromServer = useCallback(
@@ -106,15 +112,17 @@ function useSceneOperations() {
     ],
   );
 
-  const saveStepsForLightPlot = useCallback(async () => {
-    if (!projectName || !hasLocalEdits) return;
+  const saveStepsForLightPlot = useCallback(async (opts?: { force?: boolean }) => {
+    if (!projectName) return;
+    const shouldSave = hasLocalEdits || Boolean(opts?.force);
+    if (!shouldSave) return;
     const desktopApi = getDesktopApi();
     const token = accessToken ?? localStorage.getItem("accessToken");
 
     try {
-      const current = desktopApi
-        ? await desktopApi.readProjectScene(projectName, "script")
-        : (sceneData ?? null);
+      const current =
+        sceneData ??
+        (desktopApi ? await desktopApi.readProjectScene(projectName, "script") : null);
 
       const images = pruneSceneImages(
         (current as any)?.images as
@@ -122,7 +130,13 @@ function useSceneOperations() {
           | undefined,
         steps,
       );
-      const payload: any = { ...(current ?? {}), steps, theaterLayout, images };
+      const payload: any = {
+        ...(current ?? {}),
+        steps,
+        theaterLayout,
+        images,
+        lightChannels: showScriptUi.lightChannels,
+      };
 
       if (desktopApi) {
         const result = await desktopApi.saveProjectScene(projectName, "script", payload);
@@ -234,6 +248,7 @@ function useSceneOperations() {
     theaterLayout,
     ensureRemoteProject,
     dispatch,
+    showScriptUi.lightChannels,
   ]);
 
   const pushSceneAfterSoundsSave = useCallback(async () => {
@@ -290,13 +305,18 @@ function useSceneProviderEffects() {
   const { projectName } = useProject();
   const { syncFromServer, saveStepsForLightPlot } = useSceneOperations();
 
-  const { steps, currentPage, isSceneReady, theaterLayout, sceneData, hasLocalEdits } =
+  const { steps, currentPage, isSceneReady, theaterLayout, sceneData, hasLocalEdits, stepsRevision } =
     useAppSelector((s) => s.scene);
+  const sceneDataRevision = useAppSelector((s) => s.scene.sceneDataRevision);
+  const showScriptUi = useAppSelector((s) =>
+    selectShowScriptMarkdownUi(s, projectName || "fools", "script"),
+  );
 
   const selectedStepIdRef = useRef<number | null>(null);
   const restoredProjectRef = useRef<string | null>(null);
   const lightPlotSaveTimerRef = useRef<number | null>(null);
   const lastSyncedKeyRef = useRef<string | null>(null);
+  const lastSavedLightChannelsKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!projectName) return;
@@ -410,20 +430,43 @@ function useSceneProviderEffects() {
     [sceneData],
   );
 
+  const lightChannelsKey = useMemo(
+    () => JSON.stringify(showScriptUi.lightChannels ?? null),
+    [showScriptUi.lightChannels],
+  );
+
   useEffect(() => {
-    if (!isSceneReady || steps.length === 0 || !hasLocalEdits) return;
+    if (!isSceneReady || steps.length === 0) return;
+    if (lastSavedLightChannelsKeyRef.current === null) {
+      lastSavedLightChannelsKeyRef.current = lightChannelsKey;
+    }
+    const metaChanged = lastSavedLightChannelsKeyRef.current !== lightChannelsKey;
+    const shouldSave = hasLocalEdits || metaChanged;
+    if (!shouldSave) return;
+    const shouldForceSaveMeta = metaChanged && !hasLocalEdits;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
     }
     lightPlotSaveTimerRef.current = window.setTimeout(() => {
-      void saveStepsForLightPlot();
+      void saveStepsForLightPlot({ force: shouldForceSaveMeta });
+      lastSavedLightChannelsKeyRef.current = lightChannelsKey;
     }, 600);
     return () => {
       if (lightPlotSaveTimerRef.current) {
         window.clearTimeout(lightPlotSaveTimerRef.current);
       }
     };
-  }, [isSceneReady, steps.length, theaterLayout, roleAssignmentsKey, hasLocalEdits, saveStepsForLightPlot]);
+  }, [
+    isSceneReady,
+    steps.length,
+    stepsRevision,
+    sceneDataRevision,
+    theaterLayout,
+    roleAssignmentsKey,
+    hasLocalEdits,
+    lightChannelsKey,
+    saveStepsForLightPlot,
+  ]);
 }
 
 export function SceneProvider({ children }: { children: React.ReactNode }) {
@@ -462,6 +505,17 @@ export function useScene(): SceneContextValue {
     [dispatch, steps],
   );
 
+  const updateStep = useCallback(
+    (id: number, changes: Partial<ScriptStep>) => {
+      dispatch(sceneActions.updateStep({ id, changes }));
+    },
+    [dispatch],
+  );
+
+  const resetAllRequisites = useCallback(() => {
+    dispatch(sceneActions.resetAllRequisites());
+  }, [dispatch]);
+
   const setTheaterLayout = useCallback(
     (next: SetStateAction<TheaterLayout>) => {
       const resolved = typeof next === "function" ? (next as any)(theaterLayout) : next;
@@ -499,6 +553,8 @@ export function useScene(): SceneContextValue {
     setRoleAssignments,
     steps,
     setSteps,
+    updateStep,
+    resetAllRequisites,
     theaterLayout,
     setTheaterLayout,
     currentPage,

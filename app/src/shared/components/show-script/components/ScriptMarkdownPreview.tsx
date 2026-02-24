@@ -1,25 +1,27 @@
 import React, { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
-import type { ActorAnnotation } from "../../../sync/api";
+import {
+  selectActiveStepMarkdownContext,
+  selectAnnotations,
+  selectShowScriptMarkdownUi,
+} from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
+import type { ActorAnnotation } from "../../../../sync/api";
+import { useAppSelector } from "../../../store/hooks";
 import {
   ActorAnnotationsPopover,
   type NewAnnotationDraft,
 } from "../annotations/ActorAnnotationsPopover";
 import { rehypeActorAnnotations } from "../annotations/rehypeActorAnnotations";
+import { useAnnotationsPopoverPosition } from "../hooks/useAnnotationsPopoverPosition";
 import {
   createRehypeScriptTokens,
   createRenderLightTokens,
 } from "../utils/lightTokens";
-import { useAnnotationsPopoverPosition } from "../hooks/useAnnotationsPopoverPosition";
 
 export function ScriptMarkdownPreview({
-  markdown,
   projectName,
-  playlistOptions,
-  lightChannels,
+  sceneName = "script",
   onTrackLinkClick,
-  annotationsMode,
-  annotations,
   onCreateAnnotation,
   onUpdateAnnotation,
   onDeleteAnnotation,
@@ -28,13 +30,9 @@ export function ScriptMarkdownPreview({
   activeAnnotationId,
   setActiveAnnotationId,
 }: {
-  markdown: string;
   projectName: string;
-  playlistOptions: { id: number; title: string }[];
-  lightChannels: string[];
+  sceneName?: string;
   onTrackLinkClick?: (trackId: number) => void;
-  annotationsMode: boolean;
-  annotations: ActorAnnotation[];
   onCreateAnnotation: (draft: NewAnnotationDraft) => Promise<void>;
   onUpdateAnnotation: (id: string, noteText: string) => Promise<void>;
   onDeleteAnnotation: (id: string) => Promise<void>;
@@ -43,6 +41,19 @@ export function ScriptMarkdownPreview({
   activeAnnotationId: string | null;
   setActiveAnnotationId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
+  const ui = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectName, sceneName));
+  const { activeMarkdown: markdown, currentStep, activeField } = useAppSelector((s) =>
+    selectActiveStepMarkdownContext(s, projectName, sceneName),
+  );
+  const annotations = useAppSelector((s) => {
+    if (currentStep?.id == null) return [] as ActorAnnotation[];
+    const cacheKey = `${projectName}:${sceneName}:${currentStep.id}:${activeField}`;
+    return selectAnnotations(s, cacheKey).items ?? [];
+  });
+  const annotationsMode = ui.annotationsMode;
+  const playlistOptions = ui.playlistOptions;
+  const lightChannels = ui.lightChannels;
+
   const { rootRef, popoverRef, position, setAnchorFromRect, requestClose } =
     useAnnotationsPopoverPosition({
       enabled: annotationsMode,
@@ -183,9 +194,9 @@ export function ScriptMarkdownPreview({
           rehypePlugins={
             annotationsMode
               ? [
-                  rehypeScriptTokens,
-                  [rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }],
-                ]
+                rehypeScriptTokens,
+                [rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }],
+              ]
               : []
           }
           components={{

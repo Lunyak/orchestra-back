@@ -1,7 +1,8 @@
-import type { ScriptStep } from "../../shared/types/script";
 import React, { useEffect, useMemo, useState } from "react";
+import { useScene } from "../../../features/scene";
+import type { ScriptStep } from "../../types/script";
+import { markdownToPlainText } from "../../utils/textPreview";
 import "./style.css";
-import { markdownToPlainText } from "../../shared/utils/textPreview";
 
 type KanbanStatus = NonNullable<ScriptStep["kanbanStatus"]>;
 
@@ -215,18 +216,11 @@ function applyMove(
 }
 
 export function KanbanBoardPage({
-  steps,
-  onStepsChange,
-  roleAssignments,
-  onRoleAssignmentsChange,
   members,
 }: {
-  steps: ScriptStep[];
-  onStepsChange: React.Dispatch<React.SetStateAction<ScriptStep[]>>;
-  roleAssignments?: Record<string, string[]>;
-  onRoleAssignmentsChange?: (next: Record<string, string[]>) => void;
   members?: MemberInfo[];
 }) {
+  const { sceneData, setRoleAssignments, steps, setSteps } = useScene();
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [openedStepId, setOpenedStepId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
@@ -253,8 +247,8 @@ export function KanbanBoardPage({
   const normalizedSteps = useMemo(() => normalizeMissingOrders(steps), [steps]);
 
   useEffect(() => {
-    if (normalizedSteps !== steps) onStepsChange(normalizedSteps);
-  }, [normalizedSteps, onStepsChange, steps]);
+    if (normalizedSteps !== steps) setSteps(normalizedSteps);
+  }, [normalizedSteps, setSteps, steps]);
 
   const allRoles = useMemo(() => {
     const roles = new Set<string>();
@@ -265,7 +259,7 @@ export function KanbanBoardPage({
     return Array.from(roles).sort((a, b) => a.localeCompare(b, "ru"));
   }, [normalizedSteps]);
 
-  const effectiveRoleAssignments = roleAssignments ?? {};
+  const effectiveRoleAssignments = (sceneData?.roleAssignments ?? {}) as Record<string, string[]>;
 
   const getRoleActors = (step: ScriptStep, role: string): string[] => {
     const fromStep = normalizeCastActors((step.cast as any)?.[role]);
@@ -278,10 +272,9 @@ export function KanbanBoardPage({
 
   const [roleAddDraftByRole, setRoleAddDraftByRole] = useState<Record<string, string>>({});
   const addActorToRoleDirect = (role: string, actor: string) => {
-    if (!onRoleAssignmentsChange) return;
     const prev = effectiveRoleAssignments[role] ?? [];
     const nextList = Array.from(new Set([...(prev ?? []), actor]));
-    onRoleAssignmentsChange({ ...effectiveRoleAssignments, [role]: nextList });
+    setRoleAssignments({ ...effectiveRoleAssignments, [role]: nextList });
   };
   const addActorToRole = (role: string) => {
     const draft = String(roleAddDraftByRole[role] ?? "").trim();
@@ -290,13 +283,12 @@ export function KanbanBoardPage({
     setRoleAddDraftByRole((p) => ({ ...p, [role]: "" }));
   };
   const removeActorFromRole = (role: string, actor: string) => {
-    if (!onRoleAssignmentsChange) return;
     const prev = effectiveRoleAssignments[role] ?? [];
     const nextList = (prev ?? []).filter((x) => x !== actor);
     const next = { ...effectiveRoleAssignments };
     if (nextList.length === 0) delete (next as any)[role];
     else (next as any)[role] = nextList;
-    onRoleAssignmentsChange(next);
+    setRoleAssignments(next);
   };
 
   // Пикер участников проекта для быстрого добавления в роль
@@ -414,7 +406,7 @@ export function KanbanBoardPage({
     ev.preventDefault();
     const id = Number(ev.dataTransfer.getData("text/plain"));
     if (!Number.isFinite(id)) return;
-    onStepsChange(applyMove(normalizedSteps, id, toStatus));
+    setSteps(applyMove(normalizedSteps, id, toStatus));
     setDraggedId(null);
   };
 
@@ -422,19 +414,19 @@ export function KanbanBoardPage({
     ev.preventDefault();
     const id = Number(ev.dataTransfer.getData("text/plain"));
     if (!Number.isFinite(id)) return;
-    onStepsChange(applyMove(normalizedSteps, id, toStatus, beforeId));
+    setSteps(applyMove(normalizedSteps, id, toStatus, beforeId));
     setDraggedId(null);
   };
 
   const setStepStatus = (id: number, st: KanbanStatus) => {
-    onStepsChange((prev) => prev.map((s) => (s.id === id ? { ...s, kanbanStatus: st } : s)));
+    setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, kanbanStatus: st } : s)));
   };
 
   // Редактирование назначений в сцене больше не используем:
   // истина — в global roleAssignments.
 
   const setStepDurationMin = (id: number, durationMin: number | undefined) => {
-    onStepsChange((prev) =>
+    setSteps((prev) =>
       prev.map((s) => (s.id === id ? { ...s, durationMin } : s))
     );
   };
@@ -448,7 +440,7 @@ export function KanbanBoardPage({
         </p>
       </div>
 
-      {onRoleAssignmentsChange && allRoles.length > 0 && (
+      {allRoles.length > 0 && (
         <details className="kanban-details" style={{ marginBottom: 12 }}>
           <summary>Распределение ролей (истина)</summary>
           <div className="kanban-muted" style={{ marginTop: 6 }}>

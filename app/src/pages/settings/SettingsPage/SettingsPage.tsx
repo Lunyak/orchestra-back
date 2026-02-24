@@ -1,11 +1,11 @@
 import { Button } from "@shared/core/button/Button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ProjectPanel } from "../../../components/project-panel/ProjectPanel";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { useTeam } from "../../../features/team";
 import { usePlatform } from "../../../PlatformContext";
+import { ProjectPanel } from "../../../shared/components/project-panel/ProjectPanel";
 import "./style.css";
 
 export function SettingsPage() {

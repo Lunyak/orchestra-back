@@ -1,5 +1,4 @@
-import React from "react";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptStep } from "../../../types/script";
 import ControlsScript from "../controls-script/ControlsScript";
 
 export function ScriptStepHeader({

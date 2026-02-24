@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScriptStep } from "../../shared/types/script";
+import { ScriptStep } from "../../types/script";
 import './style.css';
 
 export interface ScriptStepsSidebarProps {
@@ -85,7 +85,7 @@ export const ScriptStepsSidebar = ({
     <aside className="script-sidebar">
       <div className="script-sidebar-content">
         <div className="script-sidebar-header">
-         
+
           <div className="script-sidebar-title">Шаги</div>
           <button className="script-add-step" onClick={onAddStep}>
             +

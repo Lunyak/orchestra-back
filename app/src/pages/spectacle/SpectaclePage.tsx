@@ -1,34 +1,32 @@
-import type { ComponentType } from "react";
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { HeaderPlayer } from "../../components/header/HeaderPlayer";
-import { PlaylistSidebar } from "../../components/playlist-sidebar/PlaylistSidebar";
-import { ScriptStepsSidebar } from "../../components/script-steps-sidebar/ScriptStepsSidebar";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useScriptUI } from "../../features/script-ui";
 import { useTeam } from "../../features/team";
-import type { ScriptStep } from "../../shared/types/script";
+import { HeaderPlayer } from "../../shared/components/header/HeaderPlayer";
+import { PlaylistSidebar } from "../../shared/components/playlist-sidebar/PlaylistSidebar";
+import { ScriptStepsSidebar } from "../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
 import { getMyProfile, type MyProfile } from "../../sync/api";
 
 const LightPlotPage = React.lazy(() =>
-  import("../../components/light-plot/LightPlotPage").then((m) => ({
+  import("../../shared/components/light-plot/LightPlotPage").then((m) => ({
     default: m.LightPlotPage,
   }))
 );
 const ShowScript = React.lazy(() =>
-  import("../../components/show-script/ShowScript").then((m) => ({
+  import("../../shared/components/show-script/ShowScript").then((m) => ({
     default: m.ShowScript,
   }))
 );
 const TheaterScene = React.lazy(() =>
-  import("../../components/theater/TheaterScene").then((m) => ({
+  import("../../shared/components/theater/TheaterScene").then((m) => ({
     default: m.TheaterScene,
   }))
 );
 const KanbanBoardPage = React.lazy(() =>
-  import("../../components/kanban/KanbanBoardPage").then((m) => ({
+  import("../../shared/components/kanban/KanbanBoardPage").then((m) => ({
     default: m.KanbanBoardPage,
   }))
 );
@@ -40,11 +38,9 @@ export function SpectaclePage() {
   const { projectMembers, projectOwner } = useTeam();
   const {
     sceneData,
-    setRoleAssignments,
     steps,
     currentPage,
     setCurrentPage,
-    setSteps,
     theaterLayout,
     setTheaterLayout,
     isSceneReady,
@@ -52,7 +48,6 @@ export function SpectaclePage() {
     deleteStep,
     reorderSteps,
     registerPlaylistPlay,
-    handleTrackLinkClick,
     saveStepsForLightPlot,
     pushSceneAfterSoundsSave,
   } = useScene();
@@ -148,16 +143,10 @@ export function SpectaclePage() {
   const isTheaterView = activeView === "theater";
   const isBoardView = activeView === "board";
 
-  const LightPlotView = LightPlotPage as ComponentType<{
-    steps: ScriptStep[];
-    currentPage: number;
-    onStepsChange: React.Dispatch<React.SetStateAction<ScriptStep[]>>;
-  }>;
-
   const projectDisplay = projectName || "fools";
 
   const playlistNode = !isBoardView ? (
-    <div      className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}
+    <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}
     >
       {isMobile && (
         <button
@@ -215,142 +204,120 @@ export function SpectaclePage() {
 
   return (
     <div className="app-layout">
-        {isTheaterView ? (
-          <>
-            {showPlaylistSidebar && (
-              <div style={{ display: shouldSwapPanels ? "none" : "block" }}>
-                {playlistNode}
-              </div>
-            )}
-            {shouldSwapPanels ? theaterControlsNode : null}
-          </>
-        ) : (
-          playlistNode
-        )}
-        <div className="app-content">
-          {showHeaderSounds && !isBoardView && !isMobile && (
-            <div className="sounds-bar">
-              <HeaderPlayer
-                projectName={projectDisplay}
-                sceneName="script"
-                sounds={sceneData?.sounds || []}
-                onSoundsSaved={pushSceneAfterSoundsSave}
-              />
+      {isTheaterView ? (
+        <>
+          {showPlaylistSidebar && (
+            <div style={{ display: shouldSwapPanels ? "none" : "block" }}>
+              {playlistNode}
             </div>
           )}
-          <main
-            className={`main-content${activeView === "theater" ? " main-content-theater" : ""}`}
-          >
-            {activeView === "theater" && (
-              <Suspense
-                fallback={
-                  <div className="view-loader">Загрузка 3D театра…</div>
-                }
-              >
-                <TheaterScene
-                  projectName={projectDisplay}
-                  steps={steps}
-                  currentPage={currentPage}
-                  onStepsChange={setSteps}
-                  theaterLayout={theaterLayout}
-                  onTheaterLayoutChange={setTheaterLayout}
-                  isPanelsSwapped={shouldSwapPanels}
-                  onTogglePanels={togglePanels}
-                  controlsHost={shouldSwapPanels ? theaterControlsHost : null}
-                  controlsInPanel={shouldSwapPanels}
-                />
-              </Suspense>
-            )}
-            {activeView === "light-plot" && (
-              <Suspense
-                fallback={<div className="view-loader">Загрузка схемы…</div>}
-              >
-                <LightPlotView
-                  steps={steps}
-                  currentPage={currentPage}
-                  onStepsChange={setSteps}
-                />
-              </Suspense>
-            )}
-            {activeView === "script" && (
-              <Suspense
-                fallback={
-                  <div className="view-loader">Загрузка сценария…</div>
-                }
-              >
-                <ShowScript
-                  title={sceneData?.name}
-                  steps={steps}
-                  currentPage={currentPage}
-                  onStepsChange={setSteps}
-                  isEditing={isEditing}
-                  onTrackLinkClick={handleTrackLinkClick}
-                  showRequisites={showRequisites}
-                  projectName={projectDisplay}
-                  sceneName="script"
-                  canSave={isSceneReady}
-                />
-              </Suspense>
-            )}
-            {activeView === "board" && (
-              <Suspense fallback={<div className="view-loader">Загрузка доски…</div>}>
-                <KanbanBoardPage
-                  steps={steps}
-                  onStepsChange={setSteps}
-                  roleAssignments={sceneData?.roleAssignments}
-                  onRoleAssignmentsChange={setRoleAssignments}
-                  members={[
-                    ...(myProfile?.email
-                      ? [{ email: myProfile.email, displayName: myProfile.displayName ?? null }]
-                      : []),
-                    ...(projectOwner?.email
-                      ? [{ email: projectOwner.email, displayName: projectOwner.displayName ?? null }]
-                      : []),
-                    ...(projectMembers ?? []).map((m: any) => ({
-                      email: m.user?.email,
-                      displayName: m.user?.displayName ?? null,
-                    })),
-                  ].filter((x: any) => Boolean(x?.email))}
-                />
-              </Suspense>
-            )}
-          </main>
-        </div>
-        {stepsSidebarNode}
-        {isMobile && !isBoardView && (
-          <div className="mobile-bottom-buttons">
-            {shouldShowStepsSidebar && (
-              <button
-                className="mobile-bottom-btn"
-                onClick={() => {
-                  setIsStepsCollapsed(false);
-                  setIsMobileStepsOpen(true);
-                }}
-                aria-label="Открыть шаги"
-              >
-                Шаги
-              </button>
-            )}
-            {showPlaylistSidebar && (
-              <button
-                className="mobile-bottom-btn"
-                onClick={() => setIsMobilePlaylistOpen(true)}
-                aria-label="Открыть плейлист"
-              >
-                Плейлист
-              </button>
-            )}
+          {shouldSwapPanels ? theaterControlsNode : null}
+        </>
+      ) : (
+        playlistNode
+      )}
+      <div className="app-content">
+        {showHeaderSounds && !isBoardView && !isMobile && (
+          <div className="sounds-bar">
+            <HeaderPlayer
+              projectName={projectDisplay}
+              sceneName="script"
+              sounds={sceneData?.sounds || []}
+              onSoundsSaved={pushSceneAfterSoundsSave}
+            />
           </div>
         )}
-        {isMobile && (isMobilePlaylistOpen || isMobileStepsOpen) && (
-          <div
-            className="mobile-overlay"
-            onClick={() => {
-              setIsMobilePlaylistOpen(false);
-              setIsMobileStepsOpen(false);
-            }}
-          />
-        )}
+        <main
+          className={`main-content${activeView === "theater" ? " main-content-theater" : ""}`}
+        >
+          {activeView === "theater" && (
+            <Suspense
+              fallback={
+                <div className="view-loader">Загрузка 3D театра…</div>
+              }
+            >
+              <TheaterScene
+                projectName={projectDisplay}
+                theaterLayout={theaterLayout}
+                onTheaterLayoutChange={setTheaterLayout}
+                isPanelsSwapped={shouldSwapPanels}
+                onTogglePanels={togglePanels}
+                controlsHost={shouldSwapPanels ? theaterControlsHost : null}
+                controlsInPanel={shouldSwapPanels}
+              />
+            </Suspense>
+          )}
+          {activeView === "light-plot" && (
+            <Suspense
+              fallback={<div className="view-loader">Загрузка схемы…</div>}
+            >
+              <LightPlotPage />
+            </Suspense>
+          )}
+          {activeView === "script" && (
+            <Suspense
+              fallback={
+                <div className="view-loader">Загрузка сценария…</div>
+              }
+            >
+              <ShowScript />
+            </Suspense>
+          )}
+          {activeView === "board" && (
+            <Suspense fallback={<div className="view-loader">Загрузка доски…</div>}>
+              <KanbanBoardPage
+                members={[
+                  ...(myProfile?.email
+                    ? [{ email: myProfile.email, displayName: myProfile.displayName ?? null }]
+                    : []),
+                  ...(projectOwner?.email
+                    ? [{ email: projectOwner.email, displayName: projectOwner.displayName ?? null }]
+                    : []),
+                  ...(projectMembers ?? []).map((m: any) => ({
+                    email: m.user?.email,
+                    displayName: m.user?.displayName ?? null,
+                  })),
+                ].filter((x: any) => Boolean(x?.email))}
+              />
+            </Suspense>
+          )}
+        </main>
       </div>
+      {stepsSidebarNode}
+      {isMobile && !isBoardView && (
+        <div className="mobile-bottom-buttons">
+          {shouldShowStepsSidebar && (
+            <button
+              className="mobile-bottom-btn"
+              onClick={() => {
+                setIsStepsCollapsed(false);
+                setIsMobileStepsOpen(true);
+              }}
+              aria-label="Открыть шаги"
+            >
+              Шаги
+            </button>
+          )}
+          {showPlaylistSidebar && (
+            <button
+              className="mobile-bottom-btn"
+              onClick={() => setIsMobilePlaylistOpen(true)}
+              aria-label="Открыть плейлист"
+            >
+              Плейлист
+            </button>
+          )}
+        </div>
+      )}
+      {isMobile && (isMobilePlaylistOpen || isMobileStepsOpen) && (
+        <div
+          className="mobile-overlay"
+          onClick={() => {
+            setIsMobilePlaylistOpen(false);
+            setIsMobileStepsOpen(false);
+          }}
+        />
+      )}
+    </div>
   );
 }

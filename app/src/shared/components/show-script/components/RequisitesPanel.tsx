@@ -1,5 +1,5 @@
 import React from "react";
-import type { ScriptRequisite } from "../../../shared/types/script";
+import type { ScriptRequisite } from "../../../types/script";
 
 export function RequisitesPanel({
   show,

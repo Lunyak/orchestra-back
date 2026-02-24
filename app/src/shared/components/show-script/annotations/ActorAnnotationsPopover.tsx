@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { ActorAnnotation } from "../../../sync/api";
+import type { ActorAnnotation } from "../../../../sync/api";
 import { ActorAnnotationDetails } from "./ActorAnnotationDetails";
 
 export type NewAnnotationDraft = {

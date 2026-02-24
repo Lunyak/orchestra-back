@@ -1,18 +1,10 @@
-import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
-import { LightFixture, ScriptStep } from "../../shared/types/script";
+import { useCallback, useRef, useState } from "react";
+import { useScene } from "../../../features/scene";
+import { LightFixture, ScriptStep } from "../../types/script";
 import "./style.css";
 
-interface LightPlotPageProps {
-  steps?: ScriptStep[];
-  currentPage?: number;
-  onStepsChange?: Dispatch<SetStateAction<ScriptStep[]>>;
-}
-
-export const LightPlotPage = ({
-  steps = [],
-  currentPage = 0,
-  onStepsChange,
-}: LightPlotPageProps) => {
+export const LightPlotPage = () => {
+  const { steps, currentPage, updateStep } = useScene();
   const [newLightLabel, setNewLightLabel] = useState("");
   const [newLightChannel, setNewLightChannel] = useState("");
   const [newLightX, setNewLightX] = useState(1);
@@ -41,15 +33,11 @@ export const LightPlotPage = ({
 
   const updateCurrentStepPlot = useCallback(
     (nextPlot: LightFixture[]) => {
-      if (!currentStep || !onStepsChange) return;
+      if (!currentStep) return;
       const normalized = normalizeLightPlot(nextPlot);
-      onStepsChange(
-        steps.map((step, index) =>
-          index === currentPage ? { ...step, lightPlot: normalized } : step
-        )
-      );
+      updateStep(currentStep.id, { lightPlot: normalized } as Partial<ScriptStep>);
     },
-    [currentPage, currentStep, normalizeLightPlot, onStepsChange, steps]
+    [currentStep, normalizeLightPlot, updateStep]
   );
 
   const addLightFixture = () => {

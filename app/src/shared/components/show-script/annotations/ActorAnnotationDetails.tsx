@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import type { ActorAnnotation } from "../../../sync/api";
+import { useEffect, useState } from "react";
+import type { ActorAnnotation } from "../../../../sync/api";
 
 export function ActorAnnotationDetails({
   annotation,

@@ -2,10 +2,17 @@ import { combineSlices, configureStore, type ReducersMapObject } from "@reduxjs/
 import { sceneSlice } from "../../features/scene/model/scene-slice";
 import { authSlice } from "../../features/auth/model/auth-slice";
 import { showScriptSlice } from "../../features/show-script/model/show-script-slice";
+import { showScriptMarkdownSlice } from "../../features/show-script-markdown/model/show-script-markdown-slice";
 
 const legacyReducers: ReducersMapObject = {};
 
-export const rootReducer = combineSlices(legacyReducers, sceneSlice, authSlice, showScriptSlice);
+export const rootReducer = combineSlices(
+  legacyReducers,
+  sceneSlice,
+  authSlice,
+  showScriptSlice,
+  showScriptMarkdownSlice,
+);
 
 export const store = configureStore({
   reducer: rootReducer,

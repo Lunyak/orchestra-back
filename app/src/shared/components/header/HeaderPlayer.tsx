@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { getDesktopApi } from "../../shared/platform/desktop-api";
-import { ensureProject } from "../../sync/api";
+import { ensureProject } from "../../../sync/api";
+import { getDesktopApi } from "../../platform/desktop-api";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import {
+  pickSceneSoundsDesktop,
+  sceneActions,
+  uploadSceneSoundsWeb,
+} from "../../../features/scene/model/scene-slice";
 import "./style.css";
 
 export interface HeaderSound {
@@ -53,6 +59,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sounds = [],
   onSoundsSaved,
 }) => {
+  const dispatch = useAppDispatch();
+  const soundsUpload = useAppSelector((s) => s.scene.soundsUpload);
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
       id: sound.id,
@@ -72,8 +80,22 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     })),
   );
   const [showSettings, setShowSettings] = useState(false);
+  const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
   const fadeTimers = useRef<Record<number, number | null>>({});
+  const messageTimerRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const showMessage = (message: string) => {
+    setUiMessage(message);
+    if (messageTimerRef.current !== null) {
+      window.clearTimeout(messageTimerRef.current);
+    }
+    messageTimerRef.current = window.setTimeout(() => {
+      setUiMessage(null);
+      messageTimerRef.current = null;
+    }, 3500);
+  };
 
   useEffect(() => {
     setTracks(
@@ -95,6 +117,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       })),
     );
   }, [sounds]);
+
+  useEffect(() => {
+    if (soundsUpload.error) {
+      showMessage(soundsUpload.error);
+    }
+  }, [soundsUpload.error]);
+
+  useEffect(() => {
+    return () => {
+      if (messageTimerRef.current !== null) {
+        window.clearTimeout(messageTimerRef.current);
+      }
+    };
+  }, []);
 
   /** Как в плейлисте: загружаем файлы на сервер сразу и получаем remoteKey/remoteUrl. */
   const uploadSoundsToServer = async (
@@ -156,7 +192,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
 
   const saveSounds = async (nextTracks: LoadedTrack[]) => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
+    if (!desktopApi) {
+      showMessage("Сохранение звуков доступно только в десктоп-версии приложения.");
+      return;
+    }
     try {
       const current = await desktopApi.readProjectScene(projectName, sceneName);
       const payload = {
@@ -197,61 +236,36 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const addTracks = async () => {
-    const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
     try {
-      const res = await desktopApi.pickProjectSound(projectName);
-      if (!res?.ok) {
-        if (res?.canceled) return;
-        console.error("Failed to pick sound:", res?.error);
+      if (soundsUpload.uploading) return;
+      const desktopApi = getDesktopApi();
+      if (desktopApi) {
+        await dispatch(pickSceneSoundsDesktop({ projectSlug: projectName }));
         return;
       }
-
-      const maxId = tracks.reduce((acc, t) => Math.max(acc, t.id), 0);
-      const rawNewSounds = res.tracks.map(
-        (track: { title: string; file: string; filePath?: string }, index: number) => ({
-          id: maxId + index + 1,
-          title: track.title,
-          file: track.file,
-          filePath: track.filePath,
-        }),
-      );
-      const uploadedSounds = await uploadSoundsToServer(rawNewSounds);
-      const newTracks: LoadedTrack[] = uploadedSounds.map((s) => ({
-        id: s.id,
-        name: s.title,
-        url: s.remoteUrl ?? s.file,
-        file: s.file,
-        icon: undefined,
-        volume: s.volume ?? 0.8,
-        fadeMs: s.fadeMs ?? 500,
-        loop: s.loop ?? false,
-        isPlaying: false,
-        filePath: s.filePath,
-        remoteKey: s.remoteKey,
-        remoteUrl: s.remoteUrl,
-      }));
-      const nextTracks = [...tracks, ...newTracks];
-      setTracks(nextTracks);
-      await saveSounds(nextTracks);
+      fileInputRef.current?.click();
     } catch (err) {
       console.error("Failed to add sounds:", err);
+      showMessage("Не удалось добавить звуки. Проверьте консоль.");
     }
   };
 
   const removeTrack = async (track: LoadedTrack) => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
-    try {
-      const res = await desktopApi.deleteProjectSound(
-        projectName,
-        track.file ?? track.filePath ?? track.url,
-      );
-      if (!res?.ok) {
-        console.error("Failed to delete sound:", res?.error);
+    if (desktopApi) {
+      try {
+        const res = await desktopApi.deleteProjectSound(
+          projectName,
+          track.file ?? track.filePath ?? track.url,
+        );
+        if (!res?.ok) {
+          console.error("Failed to delete sound:", res?.error);
+          showMessage("Не удалось удалить файл звука. Проверьте консоль.");
+        }
+      } catch (err) {
+        console.error("Failed to delete sound:", err);
+        showMessage("Не удалось удалить файл звука. Проверьте консоль.");
       }
-    } catch (err) {
-      console.error("Failed to delete sound:", err);
     }
 
     const audio = audioRefs.current[track.id];
@@ -262,7 +276,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }
     const nextTracks = tracks.filter((item) => item.id !== track.id);
     setTracks(nextTracks);
-    await saveSounds(nextTracks);
+    dispatch(sceneActions.removeSound(track.id));
   };
 
   const clearFadeTimer = (trackId: number) => {
@@ -358,6 +372,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         item.id === track.id ? { ...item, volume: value } : item,
       ),
     );
+    dispatch(sceneActions.updateSound({ id: track.id, changes: { volume: value } }));
   };
 
   const handleFadeChange = (track: LoadedTrack, value: number) => {
@@ -366,6 +381,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         item.id === track.id ? { ...item, fadeMs: value } : item,
       ),
     );
+    dispatch(sceneActions.updateSound({ id: track.id, changes: { fadeMs: value } }));
   };
 
   const handleLoopChange = async (track: LoadedTrack, value: boolean) => {
@@ -373,11 +389,12 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     if (audio) {
       audio.loop = value;
     }
-    const nextTracks = tracks.map((item) =>
-      item.id === track.id ? { ...item, loop: value } : item,
+    setTracks((prev) =>
+      prev.map((item) =>
+        item.id === track.id ? { ...item, loop: value } : item,
+      ),
     );
-    setTracks(nextTracks);
-    await saveSounds(nextTracks);
+    dispatch(sceneActions.updateSound({ id: track.id, changes: { loop: value } }));
   };
 
   const resolveIconSrc = (file: string) => {
@@ -395,12 +412,16 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
 
   const addIcon = async (track: LoadedTrack) => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
+    if (!desktopApi) {
+      showMessage("Иконки для звуков доступны только в десктоп-версии приложения.");
+      return;
+    }
     try {
       const res = await desktopApi.pickProjectSoundIcon(projectName);
       if (!res?.ok) {
         if (res?.canceled) return;
         console.error("Failed to pick icon:", res?.error);
+        showMessage("Не удалось выбрать иконку. Проверьте консоль.");
         return;
       }
       const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
@@ -411,7 +432,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           const project = await ensureProject(accessToken, projectName, `Проект ${projectName}`);
           projectId = project.id;
           if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
-        } catch (_) {}
+        } catch (_) { }
       }
       let iconRemoteKey: string | undefined;
       let iconRemoteUrl: string | undefined;
@@ -438,14 +459,38 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           : item,
       );
       setTracks(nextTracks);
-      await saveSounds(nextTracks);
+      dispatch(
+        sceneActions.updateSound({
+          id: track.id,
+          changes: { icon: res.file, iconRemoteKey, iconRemoteUrl },
+        }),
+      );
     } catch (err) {
       console.error("Failed to add icon:", err);
+      showMessage("Не удалось добавить иконку. Проверьте консоль.");
     }
   };
 
+  const desktopAvailable = Boolean(getDesktopApi());
+  const loadTileTitle = desktopAvailable
+    ? "Добавить звуки"
+    : "Добавить звуки (веб)";
+
   return (
     <div className="header-player">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        multiple
+        style={{ display: "none" }}
+        onChange={(event) => {
+          const list = event.target.files ? Array.from(event.target.files) : [];
+          event.target.value = "";
+          if (list.length === 0) return;
+          void dispatch(uploadSceneSoundsWeb({ projectSlug: projectName, files: list }));
+        }}
+      />
       <button
         className="header-player-settings-toggle"
         onClick={() => setShowSettings((prev) => !prev)}
@@ -580,6 +625,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           onClick={addTracks}
           role="button"
           tabIndex={0}
+          title={loadTileTitle}
+          aria-disabled={soundsUpload.uploading}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.preventDefault();
@@ -587,13 +634,17 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
             }
           }}
         >
-          <div className="header-player-track-name">Добавить</div>
+          <div className="header-player-track-name">
+            {soundsUpload.uploading ? "Загрузка…" : "Добавить"}
+          </div>
           <div className="header-player-load-icon" aria-hidden="true">
             ↑
           </div>
         </div>
-        {tracks.length === 0 && (
-          <div className="header-player-empty">Треки не загружены</div>
+        {(uiMessage || tracks.length === 0) && (
+          <div className="header-player-empty">
+            {uiMessage ?? "Треки не загружены"}
+          </div>
         )}
       </div>
     </div>

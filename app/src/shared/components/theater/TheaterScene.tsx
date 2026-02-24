@@ -21,14 +21,15 @@ import {
 import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
+import { useScene } from "../../../features/scene";
+import { getDesktopApi } from "../../platform/desktop-api";
 import grassTexture from "../../shared/assets/grass.jpg";
-import { getDesktopApi } from "../../shared/platform/desktop-api";
 import {
   ScriptStep,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
-} from "../../shared/types/script";
+} from "../../types/script";
 import "./style.css";
 
 const TheaterChair = ({ position }: { position: [number, number, number] }) => (
@@ -922,9 +923,6 @@ const SpotlightItem = ({
 
 interface TheaterSceneProps {
   projectName?: string;
-  steps?: ScriptStep[];
-  currentPage?: number;
-  onStepsChange?: Dispatch<SetStateAction<ScriptStep[]>>;
   theaterLayout?: TheaterLayout;
   onTheaterLayoutChange?: Dispatch<SetStateAction<TheaterLayout>>;
   isPanelsSwapped?: boolean;
@@ -935,9 +933,6 @@ interface TheaterSceneProps {
 
 export const TheaterScene = ({
   projectName = "fools",
-  steps = [],
-  currentPage = 0,
-  onStepsChange,
   theaterLayout,
   onTheaterLayoutChange,
   isPanelsSwapped,
@@ -945,6 +940,7 @@ export const TheaterScene = ({
   controlsHost,
   controlsInPanel,
 }: TheaterSceneProps) => {
+  const { steps, currentPage, updateStep } = useScene();
   const DEFAULT_LAYOUT: TheaterLayout = {
     hallWidth: 9,
     hallDepth: 6,
@@ -1054,14 +1050,10 @@ export const TheaterScene = ({
 
   const updateCurrentStep = useCallback(
     (patch: Partial<ScriptStep>) => {
-      if (!currentStep || !onStepsChange) return;
-      onStepsChange((prev) =>
-        prev.map((step, index) =>
-          index === currentPage ? { ...step, ...patch } : step
-        )
-      );
+      if (!currentStep) return;
+      updateStep(currentStep.id, patch);
     },
-    [currentPage, currentStep, onStepsChange]
+    [currentStep, updateStep]
   );
 
   const updateSpotlights = useCallback(
