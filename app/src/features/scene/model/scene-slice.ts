@@ -144,6 +144,76 @@ export const uploadSceneSoundsWeb = createAsyncThunk<
   return { projectSlug, sounds: uploaded };
 });
 
+export const setSoundIcon = createAsyncThunk<
+  { projectSlug: string; soundId: number; changes: Partial<SceneSound> },
+  { projectSlug: string; soundId: number; file?: File }
+>("scene/setSoundIcon", async (args, api) => {
+  const projectSlug = args.projectSlug;
+  const desktopApi = getDesktopApi();
+  const token = getAccessToken(api.getState as () => RootState);
+
+  const cachedId =
+    typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectSlug}`) : null;
+
+  let projectId: string | null = cachedId;
+  if (token && !projectId) {
+    projectId = (await ensureProject(token, projectSlug, `Проект ${projectSlug}`)).id;
+    ensureProjectIdCached(projectSlug, projectId);
+  }
+
+  // Web path: we get File directly from <input type="file" />
+  if (args.file) {
+    if (!token || !projectId) throw new Error("Нет токена авторизации");
+    const { key, url } = await uploadProjectFile(token, {
+      projectId,
+      type: "image",
+      file: args.file,
+    });
+    return {
+      projectSlug,
+      soundId: args.soundId,
+      changes: { iconRemoteKey: key, iconRemoteUrl: url },
+    };
+  }
+
+  // Desktop path: pick local file via Electron
+  if (!desktopApi?.pickProjectSoundIcon) {
+    throw new Error("Недоступен выбор иконки");
+  }
+
+  const res = await desktopApi.pickProjectSoundIcon(projectSlug, projectId || undefined);
+  if (!res?.ok) {
+    // canceled is not an error: no state change
+    if (res?.canceled) {
+      return { projectSlug, soundId: args.soundId, changes: {} };
+    }
+    throw new Error(res?.error ?? "Не удалось выбрать иконку");
+  }
+
+  const changes: Partial<SceneSound> = { icon: res.file };
+
+  // Optional remote upload (only if logged in and desktop invoke exists)
+  if (token && projectId && typeof desktopApi.invoke === "function") {
+    try {
+      const up = (await desktopApi.invoke("upload-project-sound-icon", {
+        projectName: projectSlug,
+        file: res.filePath || res.file,
+        accessToken: token,
+        projectId,
+      })) as { ok?: boolean; key?: string; url?: string };
+
+      if (up?.ok && up.key && up.url) {
+        changes.iconRemoteKey = up.key;
+        changes.iconRemoteUrl = up.url;
+      }
+    } catch (err) {
+      console.error("[sounds] upload-project-sound-icon error:", err);
+    }
+  }
+
+  return { projectSlug, soundId: args.soundId, changes };
+});
+
 export const pickSceneSoundsDesktop = createAsyncThunk<
   { projectSlug: string; sounds: SceneSound[] },
   { projectSlug: string }
@@ -398,6 +468,20 @@ export const sceneSlice = createSlice({
     builder.addCase(pickSceneSoundsDesktop.pending, pending);
     builder.addCase(pickSceneSoundsDesktop.fulfilled, fulfilled);
     builder.addCase(pickSceneSoundsDesktop.rejected, rejected);
+
+    builder.addCase(setSoundIcon.fulfilled, (state, action) => {
+      const { soundId, changes } = action.payload;
+      if (!changes || Object.keys(changes).length === 0) return;
+      const listRaw = (state.sceneData as any)?.sounds;
+      const list = Array.isArray(listRaw) ? listRaw : [];
+      const idx = list.findIndex((s: any) => Number(s?.id) === soundId);
+      if (idx === -1) return;
+      const next = [...list];
+      next[idx] = { ...next[idx], ...changes };
+      state.sceneData = { ...(state.sceneData ?? {}), sounds: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
   },
 });
 

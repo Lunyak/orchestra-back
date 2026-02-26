@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   pickSceneSoundsDesktop,
   sceneActions,
+  setSoundIcon,
   uploadSceneSoundsWeb,
 } from "../../../features/scene/model/scene-slice";
 import "./style.css";
@@ -85,6 +86,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const fadeTimers = useRef<Record<number, number | null>>({});
   const messageTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const iconInputRef = useRef<HTMLInputElement | null>(null);
+  const iconTargetIdRef = useRef<number | null>(null);
 
   const getLocalProjectId = () => {
     const key = `projectId:${projectName}`;
@@ -427,68 +430,18 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const addIcon = async (track: LoadedTrack) => {
     const desktopApi = getDesktopApi();
     if (!desktopApi) {
-      showMessage("Иконки для звуков доступны только в десктоп-версии приложения.");
+      iconTargetIdRef.current = track.id;
+      iconInputRef.current?.click();
       return;
     }
+
     try {
-      const accessToken =
-        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-      const projectIdKey = `projectId:${projectName}`;
-      let projectId =
-        typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
-
-      if (accessToken && !projectId) {
-        try {
-          const project = await ensureProject(
-            accessToken,
-            projectName,
-            `Проект ${projectName}`,
-          );
-          projectId = project.id;
-          if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
-        } catch (_) { }
-      }
-
-      const res = await desktopApi.pickProjectSoundIcon(
-        projectName,
-        projectId || undefined,
-      );
-      if (!res?.ok) {
-        if (res?.canceled) return;
-        console.error("Failed to pick icon:", res?.error);
-        showMessage("Не удалось выбрать иконку. Проверьте консоль.");
-        return;
-      }
-      let iconRemoteKey: string | undefined;
-      let iconRemoteUrl: string | undefined;
-      const api = getDesktopApi();
-      if (api?.invoke && accessToken && projectId) {
-        try {
-          const up = (await api.invoke("upload-project-sound-icon", {
-            projectName,
-            file: res.filePath || res.file,
-            accessToken,
-            projectId,
-          })) as { ok?: boolean; key?: string; url?: string };
-          if (up?.ok && up?.key && up?.url) {
-            iconRemoteKey = up.key;
-            iconRemoteUrl = up.url;
-          }
-        } catch (err) {
-          console.error("[sounds] icon upload failed", err);
-        }
-      }
-      const nextTracks = tracks.map((item) =>
-        item.id === track.id
-          ? { ...item, icon: res.file, iconRemoteKey, iconRemoteUrl }
-          : item,
-      );
-      setTracks(nextTracks);
-      dispatch(
-        sceneActions.updateSound({
-          id: track.id,
-          changes: { icon: res.file, iconRemoteKey, iconRemoteUrl },
-        }),
+      const res = await dispatch(
+        setSoundIcon({ projectSlug: projectName, soundId: track.id }),
+      ).unwrap();
+      if (!res?.changes || Object.keys(res.changes).length === 0) return;
+      setTracks((prev) =>
+        prev.map((t) => (t.id === track.id ? { ...t, ...res.changes } : t)),
       );
     } catch (err) {
       console.error("Failed to add icon:", err);
@@ -514,6 +467,35 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           event.target.value = "";
           if (list.length === 0) return;
           void dispatch(uploadSceneSoundsWeb({ projectSlug: projectName, files: list }));
+        }}
+      />
+      <input
+        ref={iconInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(event) => {
+          const file = event.target.files?.[0] ?? null;
+          event.target.value = "";
+          const soundId = iconTargetIdRef.current;
+          iconTargetIdRef.current = null;
+          if (!file || soundId == null) return;
+
+          void (async () => {
+            try {
+              const res = await dispatch(
+                setSoundIcon({ projectSlug: projectName, soundId, file }),
+              ).unwrap();
+
+              if (!res?.changes || Object.keys(res.changes).length === 0) return;
+              setTracks((prev) =>
+                prev.map((t) => (t.id === soundId ? { ...t, ...res.changes } : t)),
+              );
+            } catch (err) {
+              console.error("[sounds] web icon upload failed", err);
+              showMessage("Не удалось загрузить иконку. Проверьте консоль.");
+            }
+          })();
         }}
       />
       <button
