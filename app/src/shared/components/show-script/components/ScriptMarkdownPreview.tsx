@@ -75,10 +75,19 @@ export function ScriptMarkdownPreview({
     const pathSegments = path.split("/").map((segment) => encodeURIComponent(segment));
     const encodedPath = pathSegments.join("/");
 
-    const baseUrl = new URL(
-      `project-images://${encodeURIComponent(projectName)}/`,
-    );
-    baseUrl.pathname = `/${encodedPath}`;
+    let projectId: string | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        projectId = window.localStorage.getItem(`projectId:${projectName}`);
+      } catch {
+        // ignore
+      }
+    }
+
+    const baseUrl = new URL(`project-images://${encodeURIComponent(projectName)}/`);
+    baseUrl.pathname = projectId
+      ? `/${encodeURIComponent(projectId)}/${encodedPath}`
+      : `/${encodedPath}`;
 
     return baseUrl.toString();
   };

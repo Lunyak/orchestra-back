@@ -15,20 +15,21 @@ interface API {
   ) => Promise<any>;
   saveProjectConfig: (projectName: string, config: any) => Promise<any>;
   readProjectScene: (projectName: string, sceneName: string) => Promise<any>;
-  pickProjectImage: (projectName: string) => Promise<any>;
+  pickProjectImage: (projectName: string, projectId?: string) => Promise<any>;
   addProjectImage: (
     projectName: string,
     data: ArrayBuffer | Uint8Array,
     mimeType?: string,
-    originalName?: string
+    originalName?: string,
+    projectId?: string
   ) => Promise<any>;
-  getProjectImagesBase: (projectName: string) => Promise<any>;
+  getProjectImagesBase: (projectName: string, projectId?: string) => Promise<any>;
   pickProjectAudio: (projectName: string) => Promise<any>;
   addProjectAudio: (projectName: string, filePaths: string[]) => Promise<any>;
   deleteProjectAudio: (projectName: string, file: string) => Promise<any>;
   pickProjectSound: (projectName: string) => Promise<any>;
   pickProjectModel: (projectName: string) => Promise<any>;
-  pickProjectSoundIcon: (projectName: string) => Promise<any>;
+  pickProjectSoundIcon: (projectName: string, projectId?: string) => Promise<any>;
   deleteProjectSound: (projectName: string, file: string) => Promise<any>;
   listProjects: () => Promise<string[]>;
   createProject: (

@@ -86,6 +86,16 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const messageTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const getLocalProjectId = () => {
+    const key = `projectId:${projectName}`;
+    if (typeof window === "undefined") return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  };
+
   const showMessage = (message: string) => {
     setUiMessage(message);
     if (messageTimerRef.current !== null) {
@@ -398,8 +408,12 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const resolveIconSrc = (file: string) => {
+    const projectId = getLocalProjectId();
     const url = new URL(`project-sound-icons://${encodeURIComponent(projectName)}/`);
-    url.pathname = `/${file}`;
+    const encodedFile = encodeURIComponent(file);
+    url.pathname = projectId
+      ? `/${encodeURIComponent(projectId)}/${encodedFile}`
+      : `/${encodedFile}`;
     return url.toString();
   };
 
@@ -417,22 +431,33 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       return;
     }
     try {
-      const res = await desktopApi.pickProjectSoundIcon(projectName);
+      const accessToken =
+        typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+      const projectIdKey = `projectId:${projectName}`;
+      let projectId =
+        typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
+
+      if (accessToken && !projectId) {
+        try {
+          const project = await ensureProject(
+            accessToken,
+            projectName,
+            `Проект ${projectName}`,
+          );
+          projectId = project.id;
+          if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
+        } catch (_) { }
+      }
+
+      const res = await desktopApi.pickProjectSoundIcon(
+        projectName,
+        projectId || undefined,
+      );
       if (!res?.ok) {
         if (res?.canceled) return;
         console.error("Failed to pick icon:", res?.error);
         showMessage("Не удалось выбрать иконку. Проверьте консоль.");
         return;
-      }
-      const accessToken = typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-      const projectIdKey = `projectId:${projectName}`;
-      let projectId = typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
-      if (accessToken && !projectId) {
-        try {
-          const project = await ensureProject(accessToken, projectName, `Проект ${projectName}`);
-          projectId = project.id;
-          if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
-        } catch (_) { }
       }
       let iconRemoteKey: string | undefined;
       let iconRemoteUrl: string | undefined;
@@ -441,7 +466,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         try {
           const up = (await api.invoke("upload-project-sound-icon", {
             projectName,
-            file: res.file,
+            file: res.filePath || res.file,
             accessToken,
             projectId,
           })) as { ok?: boolean; key?: string; url?: string };

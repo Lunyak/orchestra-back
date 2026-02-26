@@ -69,7 +69,26 @@ export async function pasteProjectImageFromClipboard(
 
   event.preventDefault();
 
+  const projectIdKey = `projectId:${options.projectSlug}`;
+  const accessToken = options.accessToken ?? readLocalStorage("accessToken");
+  let projectId = accessToken ? readLocalStorage(projectIdKey) : null;
+
+  if (accessToken && !projectId) {
+    try {
+      const project = await ensureProject(
+        accessToken,
+        options.projectSlug,
+        options.projectTitle ?? `Проект ${options.projectSlug}`,
+      );
+      projectId = project.id;
+      writeLocalStorage(projectIdKey, projectId);
+    } catch {
+      // ignore: local paste should still succeed
+    }
+  }
+
   let markdownPath: string;
+  let localFilePath: string | undefined;
   try {
     const buffer = await file.arrayBuffer();
     const res = await desktopApi.addProjectImage(
@@ -77,6 +96,7 @@ export async function pasteProjectImageFromClipboard(
       buffer,
       file.type,
       file.name,
+      projectId || undefined,
     );
 
     if (!res?.ok) {
@@ -85,42 +105,25 @@ export async function pasteProjectImageFromClipboard(
     }
 
     markdownPath = res.markdownPath as string;
+    localFilePath = typeof res.filePath === "string" ? (res.filePath as string) : undefined;
   } catch (err) {
     console.error("Failed to paste image:", err);
     return null;
   }
 
   const filename = deriveFilenameFromMarkdownPath(markdownPath);
-  const projectIdKey = `projectId:${options.projectSlug}`;
-  const accessToken = options.accessToken ?? readLocalStorage("accessToken");
 
   let remoteKey: string | undefined;
   let remoteUrl: string | undefined;
 
   if (accessToken) {
-    let projectId = readLocalStorage(projectIdKey);
-
-    if (!projectId) {
-      try {
-        const project = await ensureProject(
-          accessToken,
-          options.projectSlug,
-          options.projectTitle ?? `Проект ${options.projectSlug}`,
-        );
-        projectId = project.id;
-        writeLocalStorage(projectIdKey, projectId);
-      } catch {
-        // ignore: local paste still succeeded
-      }
-    }
-
     if (projectId) {
       try {
         const api = getDesktopApi();
         if (api?.invoke) {
           const up = (await api.invoke("upload-project-file", {
             projectName: options.projectSlug,
-            file: filename,
+            file: localFilePath || filename,
             accessToken,
             projectId,
             type: "image",
