@@ -1,4 +1,4 @@
-.PHONY: help dev prod stop deploy logs status clean
+.PHONY: help dev prod stop deploy logs status clean https-up https-down https-rebuild
 
 # Цвета для вывода
 GREEN  := \033[0;32m
@@ -49,6 +49,21 @@ rebuild: ## Пересобрать и перезапустить (production)
 	@echo "$(YELLOW)Пересборка контейнеров...$(NC)"
 	@docker compose up -d --build
 	@echo "$(GREEN)✅ Контейнеры пересобраны и запущены$(NC)"
+
+https-up: ## Запустить production с HTTPS (Caddy + Let's Encrypt)
+	@echo "$(YELLOW)Запуск production с HTTPS...$(NC)"
+	@docker compose -f docker-compose.yml -f docker-compose.https.yml up -d
+	@echo "$(GREEN)✅ HTTPS-окружение запущено$(NC)"
+
+https-rebuild: ## Пересобрать и запустить production с HTTPS
+	@echo "$(YELLOW)Пересборка HTTPS-окружения...$(NC)"
+	@docker compose -f docker-compose.yml -f docker-compose.https.yml up -d --build
+	@echo "$(GREEN)✅ HTTPS-окружение пересобрано и запущено$(NC)"
+
+https-down: ## Остановить production с HTTPS и убрать orphan-контейнеры
+	@echo "$(YELLOW)Остановка HTTPS-окружения...$(NC)"
+	@docker compose -f docker-compose.yml -f docker-compose.https.yml down --remove-orphans
+	@echo "$(GREEN)✅ HTTPS-окружение остановлено$(NC)"
 
 clean: ## Остановить и удалить все контейнеры и volumes (ОСТОРОЖНО!)
 	@echo "$(RED)⚠️  Это удалит ВСЕ данные, включая БД!$(NC)"

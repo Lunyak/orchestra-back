@@ -11,6 +11,13 @@
 		reverse_proxy back:3000
 	}
 
+	# HTTPS прокси к MinIO S3 API (нужно, чтобы браузер не блокировал аудио как Mixed Content).
+	# Если S3_PUBLIC_URL выставлен в https://<web-domain>/minio, то ссылки будут вида:
+	#   https://<web-domain>/minio/<bucket>/<key>
+	handle_path /minio/* {
+		reverse_proxy minio:9000
+	}
+
 	handle {
 		reverse_proxy web:80
 	}
@@ -22,6 +29,10 @@
 
 	handle_path /api/* {
 		reverse_proxy back:3000
+	}
+
+	handle_path /minio/* {
+		reverse_proxy minio:9000
 	}
 
 	handle {
