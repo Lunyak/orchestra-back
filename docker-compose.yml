@@ -67,10 +67,12 @@ services:
     container_name: orkestr-bot
     restart: unless-stopped
     environment:
-      BOT_TOKEN: ${BOT_TOKEN}
+      # Runner mode does not need a single BOT_TOKEN,
+      # but keep it for legacy single-bot mode.
+      BOT_TOKEN: ${BOT_TOKEN:-}
       # Which TelegramBotIntegration (from Orchestra UI) this bot represents.
       # Required for backend /bot/* endpoints (guarded by X-Telegram-Bot-Integration-Id).
-      TELEGRAM_BOT_INTEGRATION_ID: ${TELEGRAM_BOT_INTEGRATION_ID}
+      TELEGRAM_BOT_INTEGRATION_ID: ${TELEGRAM_BOT_INTEGRATION_ID:-}
       # Single internal secret for server-to-server
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       ADMIN_ID: ${OWNER_TELEGRAM_ID}

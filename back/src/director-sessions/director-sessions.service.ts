@@ -467,11 +467,36 @@ export class DirectorSessionsService {
         botUrl,
         botIntegrationId,
       });
-      await axios.post(
-        `${botUrl.replace(/\/$/, '')}/internal/publish-director-session`,
-        { projectId: directorProject.id, sessionId: sessId, botIntegrationId },
-        { headers: { 'X-Internal-Secret': secret } },
-      );
+      const url = `${botUrl.replace(/\/$/, '')}/internal/publish-director-session`;
+      const payload = {
+        projectId: directorProject.id,
+        sessionId: sessId,
+        botIntegrationId,
+      };
+      const headers = { 'X-Internal-Secret': secret };
+
+      // Docker DNS can occasionally return EAI_AGAIN (temporary failure).
+      // Retry a few times to avoid flaky publish.
+      const delaysMs = [200, 800, 2000];
+      let lastErr: any = null;
+      for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+        try {
+          await axios.post(url, payload, { headers });
+          lastErr = null;
+          break;
+        } catch (e: any) {
+          lastErr = e;
+          const msg = String(e?.message ?? '');
+          const code = String(e?.code ?? '');
+          const isDns =
+            code === 'EAI_AGAIN' ||
+            /EAI_AGAIN/i.test(msg) ||
+            code === 'ENOTFOUND';
+          if (!isDns || attempt >= delaysMs.length) break;
+          await new Promise((r) => setTimeout(r, delaysMs[attempt]));
+        }
+      }
+      if (lastErr) throw lastErr;
     } catch (e: any) {
       const status = e?.response?.status;
       const msg =
