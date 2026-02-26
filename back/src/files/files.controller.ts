@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -13,6 +14,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -38,7 +40,15 @@ export class FilesController {
 
   @Post('upload')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        // Защита от случайной загрузки огромных файлов в память
+        fileSize: 100 * 1024 * 1024, // 100MB
+      },
+    }),
+  )
   async upload(
     // Тип Multer в @types/express@5 отсутствует, поэтому используем any
     @UploadedFile() file: any,
@@ -46,13 +56,21 @@ export class FilesController {
     @Query() query: Partial<UploadFileDto>,
   ) {
     if (!file) {
-      throw new Error('Файл не передан');
+      throw new BadRequestException('Файл не передан');
     }
 
     const projectId = body?.projectId ?? query?.projectId;
     const type = body?.type ?? query?.type;
     if (!projectId || !type) {
-      throw new Error('projectId и type обязательны');
+      throw new BadRequestException('projectId и type обязательны');
+    }
+    if (typeof projectId !== 'string' || typeof type !== 'string') {
+      throw new BadRequestException('projectId и type должны быть строками');
+    }
+    if (!file?.buffer) {
+      throw new BadRequestException(
+        'Файл получен без buffer (ожидается multipart/form-data)',
+      );
     }
 
     const storage = this.useLocalStorage() ? this.localStorage : this.storage;
@@ -75,7 +93,7 @@ export class FilesController {
   @UseGuards(JwtAuthGuard)
   async getPlayUrl(@Query('key') key: string) {
     if (!key || typeof key !== 'string') {
-      throw new Error('Параметр key обязателен');
+      throw new BadRequestException('Параметр key обязателен');
     }
     if (this.useLocalStorage()) {
       const url = `${this.config.get('APP_PUBLIC_URL') ?? this.config.get('API_BASE_URL') ?? 'http://localhost:3000'}/files/play/${encodeURIComponent(key)}`;
