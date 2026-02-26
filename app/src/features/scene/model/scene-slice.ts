@@ -2,6 +2,7 @@ import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/tool
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import type { RootState } from "../../../shared/store/store";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
+import { createId } from "../../../shared/utils/createId";
 import { ensureProject, uploadProjectFile } from "../../../sync/api";
 
 export const DEFAULT_THEATER_LAYOUT: TheaterLayout = {
@@ -29,7 +30,34 @@ export interface SceneData {
   theaterLayout?: TheaterLayout;
   /** Глобальное распределение: роль -> актёры (email/имя). Истина для назначений. */
   roleAssignments?: Record<string, string[]>;
+  /** Записанные актёрские реплики (озвучка ролей), синхронизируются как часть сцены. */
+  voiceLines?: SceneVoiceLines;
 }
+
+export type SceneVoiceLineTake = {
+  id: string;
+  performerId: string;
+  performerLabel?: string | null;
+  createdAt: string;
+  mimeType?: string;
+  durationMs?: number | null;
+  remoteKey?: string;
+  remoteUrl?: string;
+};
+
+export type SceneVoiceLineEntry = {
+  lineId: string;
+  role: string;
+  roleKey: string;
+  takesByPerformer: Record<string, SceneVoiceLineTake[]>;
+  /** Выбранный "удачный дубль" для конкретного исполнителя */
+  preferredTakeIdByPerformer?: Record<string, string | undefined>;
+};
+
+export type SceneVoiceLines = {
+  version: 1;
+  byLineId: Record<string, SceneVoiceLineEntry | undefined>;
+};
 
 export interface SceneSound {
   id: number;
@@ -73,6 +101,7 @@ export interface SceneState {
   stepsRevision: number;
   sceneDataRevision: number;
   soundsUpload: { uploading: boolean; error: string | null };
+  voiceLinesUpload: { uploading: boolean; error: string | null };
 }
 
 const initialState: SceneState = {
@@ -85,6 +114,7 @@ const initialState: SceneState = {
   stepsRevision: 0,
   sceneDataRevision: 0,
   soundsUpload: { uploading: false, error: null },
+  voiceLinesUpload: { uploading: false, error: null },
 };
 
 function ensureNonEmptySteps(raw: ScriptStep[]): ScriptStep[] {
@@ -96,6 +126,84 @@ function nextSoundIds(sounds: any[] | undefined, count: number): number[] {
   const maxId = (sounds ?? []).reduce((acc: number, s: any) => Math.max(acc, Number(s?.id ?? 0)), 0);
   return Array.from({ length: count }, (_v, i) => maxId + i + 1);
 }
+
+function voiceExtFromMime(mime: string): string {
+  const t = String(mime ?? "").toLowerCase();
+  if (t.includes("webm")) return "webm";
+  if (t.includes("ogg")) return "ogg";
+  if (t.includes("wav")) return "wav";
+  if (t.includes("mpeg") || t.includes("mp3")) return "mp3";
+  if (t.includes("mp4")) return "m4a";
+  return "webm";
+}
+
+export const uploadVoiceLineTakeWeb = createAsyncThunk<
+  {
+    projectSlug: string;
+    lineId: string;
+    role: string;
+    roleKey: string;
+    performerId: string;
+    take: SceneVoiceLineTake;
+  },
+  {
+    projectSlug: string;
+    lineId: string;
+    role: string;
+    roleKey: string;
+    performerId: string;
+    performerLabel?: string | null;
+    blob: Blob;
+    durationMs?: number | null;
+  }
+>("scene/uploadVoiceLineTakeWeb", async (args, api) => {
+  const token = getAccessToken(api.getState as () => RootState);
+  if (!token) throw new Error("Нет токена авторизации");
+
+  const projectSlug = args.projectSlug;
+  const cachedId =
+    typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectSlug}`) : null;
+  const projectId =
+    cachedId ??
+    (await ensureProject(token, projectSlug, `Проект ${projectSlug}`)).id;
+  if (!cachedId) ensureProjectIdCached(projectSlug, projectId);
+
+  const mimeType = String(args.blob?.type ?? "audio/webm");
+  const ext = voiceExtFromMime(mimeType);
+  const safeRole = String(args.roleKey || "role").replace(/[^a-z0-9_-]+/gi, "_").slice(0, 50);
+  const safePerformer = String(args.performerId || "actor")
+    .replace(/[^a-z0-9@._-]+/gi, "_")
+    .slice(0, 60);
+  const safeLine = String(args.lineId || "line").replace(/[^a-z0-9:._-]+/gi, "_").slice(0, 80);
+  const fileName = `voice_${projectSlug}_${safeRole}_${safePerformer}_${safeLine}_${Date.now()}.${ext}`;
+  const file = new File([args.blob], fileName, { type: mimeType });
+
+  const { key, url } = await uploadProjectFile(token, {
+    projectId,
+    type: "sound",
+    file,
+  });
+
+  const take: SceneVoiceLineTake = {
+    id: createId(),
+    performerId: args.performerId,
+    performerLabel: args.performerLabel ?? null,
+    createdAt: new Date().toISOString(),
+    mimeType,
+    durationMs: args.durationMs ?? null,
+    remoteKey: key,
+    remoteUrl: url,
+  };
+
+  return {
+    projectSlug,
+    lineId: args.lineId,
+    role: args.role,
+    roleKey: args.roleKey,
+    performerId: args.performerId,
+    take,
+  };
+});
 
 export const uploadSceneSoundsWeb = createAsyncThunk<
   { projectSlug: string; sounds: SceneSound[] },
@@ -330,6 +438,33 @@ export const sceneSlice = createSlice({
       state.hasLocalEdits = true;
       state.sceneDataRevision += 1;
     },
+    setPreferredVoiceLineTake(
+      state,
+      action: PayloadAction<{ lineId: string; performerId: string; takeId: string }>,
+    ) {
+      const { lineId, performerId, takeId } = action.payload;
+      const prev = state.sceneData?.voiceLines;
+      if (!prev?.byLineId) return;
+      const entry = prev.byLineId[lineId];
+      if (!entry) return;
+      const nextPreferred = {
+        ...(entry.preferredTakeIdByPerformer ?? {}),
+        [performerId]: takeId,
+      };
+      const nextEntry: SceneVoiceLineEntry = { ...entry, preferredTakeIdByPerformer: nextPreferred };
+      state.sceneData = {
+        ...(state.sceneData ?? {}),
+        voiceLines: {
+          version: 1,
+          byLineId: {
+            ...prev.byLineId,
+            [lineId]: nextEntry,
+          },
+        },
+      };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
     setSteps(state, action: PayloadAction<ScriptStep[]>) {
       state.steps = ensureNonEmptySteps(action.payload);
       state.hasLocalEdits = true;
@@ -479,6 +614,57 @@ export const sceneSlice = createSlice({
       const next = [...list];
       next[idx] = { ...next[idx], ...changes };
       state.sceneData = { ...(state.sceneData ?? {}), sounds: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
+    builder.addCase(uploadVoiceLineTakeWeb.pending, (state) => {
+      state.voiceLinesUpload = { uploading: true, error: null };
+    });
+    builder.addCase(uploadVoiceLineTakeWeb.rejected, (state, action: any) => {
+      state.voiceLinesUpload = {
+        uploading: false,
+        error: String(action?.error?.message ?? "Не удалось загрузить дубль"),
+      };
+    });
+    builder.addCase(uploadVoiceLineTakeWeb.fulfilled, (state, action) => {
+      state.voiceLinesUpload = { uploading: false, error: null };
+      const { lineId, role, roleKey, performerId, take } = action.payload;
+
+      const prev = state.sceneData?.voiceLines;
+      const byLineId = prev?.byLineId ?? {};
+      const existing = byLineId[lineId];
+
+      const prevTakesByPerformer = existing?.takesByPerformer ?? {};
+      const nextList = [...(prevTakesByPerformer[performerId] ?? []), take];
+      const nextTakesByPerformer = {
+        ...prevTakesByPerformer,
+        [performerId]: nextList,
+      };
+
+      const nextPreferred = {
+        ...(existing?.preferredTakeIdByPerformer ?? {}),
+        [performerId]: take.id,
+      };
+
+      const nextEntry: SceneVoiceLineEntry = {
+        lineId,
+        role: existing?.role ?? role,
+        roleKey: existing?.roleKey ?? roleKey,
+        takesByPerformer: nextTakesByPerformer,
+        preferredTakeIdByPerformer: nextPreferred,
+      };
+
+      state.sceneData = {
+        ...(state.sceneData ?? {}),
+        voiceLines: {
+          version: 1,
+          byLineId: {
+            ...byLineId,
+            [lineId]: nextEntry,
+          },
+        },
+      };
       state.hasLocalEdits = true;
       state.sceneDataRevision += 1;
     });

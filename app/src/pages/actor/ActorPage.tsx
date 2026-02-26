@@ -473,6 +473,8 @@ export function ActorPage() {
                   role={effectiveRole}
                   selectedStepIds={selectedStepIdsForTraining}
                   storageKey={voiceStorageKey || undefined}
+                  performerId={myEmail}
+                  performerLabel={myEmail || undefined}
                 />
               ) : (
                 <WordOrderTrainer phrases={filteredPhrases} storageKey={trainerStorageKey || undefined} />

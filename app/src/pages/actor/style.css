@@ -64,7 +64,15 @@
 }
 
 body[data-actor-focus="true"] .header-zone--left {
-  display: none !important;
+  /* Keep navigation доступной в фокус-режиме:
+     оставляем только "триггер" (узкую зону), а панель всё равно открывается по hover. */
+  width: 12px !important;
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+
+body[data-actor-focus="true"] .header-zone--left:hover {
+  opacity: 1;
 }
 
 body[data-actor-focus="true"] .actor-view {

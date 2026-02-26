@@ -3,6 +3,14 @@ import type { ScriptStep } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
 import { tokenizeWords } from "../model/wordTokens";
 import { api } from "../../../sync/api";
+import { useProject } from "../../project";
+import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { selectVoiceTrainerUi, voiceTrainerUiActions } from "../model/voiceTrainerUiSlice";
+import {
+  uploadVoiceLineTakeWeb,
+  type SceneVoiceLineEntry,
+  type SceneVoiceLineTake,
+} from "../../scene/model/scene-slice";
 import "./voice-style.css";
 
 type VoiceExercise = {
@@ -13,8 +21,8 @@ type VoiceExercise = {
   role: string;
   textRaw: string;
   textForCheck: string;
-  prev?: { role?: string; text: string } | null;
-  nextPartner?: { role?: string; text: string } | null;
+  prev?: { lineId: string; role?: string; text: string } | null;
+  nextPartner?: { lineId: string; role?: string; text: string } | null;
 };
 
 function stripParentheses(text: string): string {
@@ -373,13 +381,27 @@ export function VoiceDialogueTrainer({
   role,
   selectedStepIds,
   storageKey,
+  performerId,
+  performerLabel,
 }: {
   steps: ScriptStep[];
   role: string;
   selectedStepIds: number[];
   storageKey?: string;
+  performerId: string;
+  performerLabel?: string;
 }) {
   const roleKey = normalizeRoleKey(role);
+  const { projectName } = useProject();
+  const dispatch = useAppDispatch();
+  const uiKey = storageKey || `voiceTrainer:${projectName || "project"}:${roleKey || "role"}`;
+  const ui = useAppSelector((s) => selectVoiceTrainerUi(s, uiKey));
+  const voiceLines = useAppSelector((s) => s.scene.sceneData?.voiceLines);
+  const voiceUpload = useAppSelector((s) => s.scene.voiceLinesUpload);
+
+  useEffect(() => {
+    dispatch(voiceTrainerUiActions.initVoiceTrainerUi({ uiKey }));
+  }, [dispatch, uiKey]);
   const allLines = useMemo(() => {
     const selected = steps.filter((s) => selectedStepIds.includes(s.id));
     return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
@@ -394,7 +416,7 @@ export function VoiceDialogueTrainer({
       const prev = (() => {
         for (let j = idx - 1; j >= 0; j -= 1) {
           const p = allLines[j];
-          if (p.kind === "utterance" && p.text) return { role: p.role, text: p.text };
+          if (p.kind === "utterance" && p.text) return { lineId: p.id, role: p.role, text: p.text };
         }
         return null;
       })();
@@ -404,7 +426,7 @@ export function VoiceDialogueTrainer({
           if (n.kind !== "utterance" || !n.text) continue;
           const nk = normalizeRoleKey(n.role ?? "");
           if (!nk || nk === roleKey) continue;
-          return { role: n.role, text: n.text };
+          return { lineId: n.id, role: n.role, text: n.text };
         }
         return null;
       })();
@@ -472,23 +494,11 @@ export function VoiceDialogueTrainer({
     setSupported({ tts: true, stt: Boolean(getSpeechRecognition()) });
   }, []);
 
-  const [autoFlow, setAutoFlow] = useState(true);
-
-  const [checkMode, setCheckMode] = useState<"full" | "sentences">(() => {
-    if (typeof window === "undefined") return "full";
-    const v = localStorage.getItem("voiceDialogue:checkMode");
-    return v === "sentences" ? "sentences" : "full";
-  });
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("voiceDialogue:checkMode", checkMode);
-  }, [checkMode]);
+  const autoFlow = ui.autoFlow;
+  const checkMode = ui.checkMode;
 
   const [voices, setVoices] = useState<BackendTtsVoice[]>([]);
-  const [voiceName, setVoiceName] = useState<string>(() => {
-    if (typeof window === "undefined") return "auto";
-    return localStorage.getItem("voiceDialogue:ttsVoiceName") ?? "auto";
-  });
+  const voiceName = ui.ttsVoiceName;
   const [ttsDiag, setTtsDiag] = useState<{
     lastRequestedAt: number | null;
     lastText: string;
@@ -502,11 +512,6 @@ export function VoiceDialogueTrainer({
     lastError: "",
     voicesCount: 0,
   }));
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("voiceDialogue:ttsVoiceName", voiceName);
-  }, [voiceName]);
 
   useEffect(() => {
     if (!supported.tts) return;
@@ -652,6 +657,73 @@ export function VoiceDialogueTrainer({
     }));
   };
 
+  const playUrl = (
+    url: string,
+    opts?: { onEnd?: () => void; onError?: (info?: SpeakErrorInfo) => void; label?: string },
+  ) => {
+    const u = String(url ?? "").trim();
+    stopListening();
+    stopTtsAudio();
+    setTtsDiag((p) => ({
+      ...p,
+      lastRequestedAt: Date.now(),
+      lastText: opts?.label ? String(opts.label) : u,
+      lastEvent: "request",
+      lastError: "",
+    }));
+    if (!u) {
+      opts?.onEnd?.();
+      return;
+    }
+    try {
+      audioUrlRef.current = u;
+      const a = new Audio(u);
+      audioRef.current = a;
+
+      // Ensure mic doesn't keep "ducking" audio while playing.
+      stopListening();
+      pttActiveRef.current = false;
+
+      a.onplay = () =>
+        setTtsDiag((p) => ({
+          ...p,
+          lastEvent: "start",
+          lastError: "",
+        }));
+      a.onended = () => {
+        setTtsDiag((p) => ({
+          ...p,
+          lastEvent: "end",
+          lastError: "",
+        }));
+        stopTtsAudio();
+        opts?.onEnd?.();
+      };
+      a.onerror = () => {
+        setTtsDiag((p) => ({
+          ...p,
+          lastEvent: "error",
+          lastError: "audio-playback-failed",
+        }));
+        stopTtsAudio();
+        opts?.onError?.({ code: "audio-playback-failed", message: "" });
+      };
+      window.setTimeout(() => {
+        a.play().catch(() => {
+          setTtsDiag((p) => ({
+            ...p,
+            lastEvent: "error",
+            lastError: "play-rejected",
+          }));
+          stopTtsAudio();
+          opts?.onError?.({ code: "play-rejected", message: "" });
+        });
+      }, 120);
+    } catch {
+      opts?.onError?.({ code: "audio-playback-failed", message: "" });
+    }
+  };
+
   const recRef = useRef<any | null>(null);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -710,6 +782,94 @@ export function VoiceDialogueTrainer({
     setCurrentTarget("");
   }, [current?.id]);
 
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recChunksRef = useRef<BlobPart[]>([]);
+  const recStartedAtRef = useRef<number>(0);
+  const [lastTake, setLastTake] = useState<null | { blob: Blob; url: string; durationMs: number }>(null);
+
+  useEffect(() => {
+    return () => {
+      if (lastTake?.url) {
+        try {
+          URL.revokeObjectURL(lastTake.url);
+        } catch {}
+      }
+      const r = mediaRecorderRef.current;
+      if (r && r.state !== "inactive") {
+        try {
+          r.stop();
+        } catch {}
+      }
+      mediaRecorderRef.current = null;
+      if (mediaStreamRef.current) {
+        try {
+          mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        } catch {}
+      }
+      mediaStreamRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startTakeRecording = async () => {
+    if (!ui.recordTakes) return;
+    if (typeof window === "undefined") return;
+    if (!navigator.mediaDevices?.getUserMedia) return;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") return;
+
+    setLastTake((prev) => {
+      if (prev?.url) {
+        try {
+          URL.revokeObjectURL(prev.url);
+        } catch {}
+      }
+      return null;
+    });
+
+    try {
+      const stream = mediaStreamRef.current ?? (await navigator.mediaDevices.getUserMedia({ audio: true }));
+      mediaStreamRef.current = stream;
+
+      const preferTypes = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/ogg",
+      ];
+      const mimeType =
+        preferTypes.find((t) => (window as any).MediaRecorder?.isTypeSupported?.(t)) || "";
+      const rec = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = rec;
+      recChunksRef.current = [];
+      recStartedAtRef.current = Date.now();
+      rec.ondataavailable = (ev) => {
+        if (ev?.data && ev.data.size > 0) recChunksRef.current.push(ev.data);
+      };
+      rec.onstop = () => {
+        const chunks = recChunksRef.current;
+        recChunksRef.current = [];
+        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
+        if (!blob || blob.size === 0) return;
+        const durationMs = Math.max(0, Date.now() - (recStartedAtRef.current || Date.now()));
+        const url = URL.createObjectURL(blob);
+        setLastTake({ blob, url, durationMs });
+      };
+      rec.start();
+    } catch {
+      // ignore
+    }
+  };
+
+  const stopTakeRecording = () => {
+    const rec = mediaRecorderRef.current;
+    if (!rec) return;
+    if (rec.state === "inactive") return;
+    try {
+      rec.stop();
+    } catch {}
+  };
+
   const stopListening = () => {
     listenSessionRef.current = listenSessionRef.current
       ? { ...listenSessionRef.current, requested: false }
@@ -724,6 +884,7 @@ export function VoiceDialogueTrainer({
     }
     const r = recRef.current;
     setListening(false);
+    stopTakeRecording();
     if (!r) return;
     try {
       r.stop();
@@ -967,6 +1128,127 @@ export function VoiceDialogueTrainer({
   const nextPartnerText = current.nextPartner?.text ? stripParentheses(current.nextPartner.text) : "";
   const nextPartnerTextTts = ttsPartnerLine(nextPartnerText);
   const myTextNoRemarks = stripParentheses(current.textRaw);
+  const prevLineId = current.prev?.lineId ?? "";
+  const prevRoleKey = normalizeRoleKey(current.prev?.role ?? "");
+
+  const prevEntry: SceneVoiceLineEntry | undefined =
+    prevLineId && voiceLines?.byLineId ? (voiceLines.byLineId[prevLineId] as any) : undefined;
+
+  const findPreferredTake = (
+    entry: SceneVoiceLineEntry | undefined,
+    perfId: string,
+  ): SceneVoiceLineTake | null => {
+    if (!entry) return null;
+    const list = entry.takesByPerformer?.[perfId] ?? [];
+    if (list.length === 0) return null;
+    const preferredId = entry.preferredTakeIdByPerformer?.[perfId];
+    if (preferredId) {
+      const found = list.find((t) => t.id === preferredId);
+      if (found) return found;
+    }
+    return list[list.length - 1] ?? null;
+  };
+
+  const availablePerformersForPrevRole = useMemo(() => {
+    const out: Array<{ id: string; label: string }> = [];
+    const seen = new Set<string>();
+    const byLine = voiceLines?.byLineId ?? {};
+    if (!prevRoleKey) return out;
+    for (const entry of Object.values(byLine)) {
+      if (!entry) continue;
+      if (String((entry as any).roleKey ?? "") !== prevRoleKey) continue;
+      const tmap = (entry as any).takesByPerformer ?? {};
+      for (const [pid, list] of Object.entries(tmap as Record<string, SceneVoiceLineTake[]>)) {
+        if (!pid || seen.has(pid)) continue;
+        if (!Array.isArray(list) || list.length === 0) continue;
+        const anyLabel = list.find((t) => t.performerLabel)?.performerLabel ?? null;
+        out.push({ id: pid, label: String(anyLabel ?? pid) });
+        seen.add(pid);
+      }
+    }
+    out.sort((a, b) => a.label.localeCompare(b.label, "ru"));
+    return out;
+  }, [prevRoleKey, voiceLines?.byLineId]);
+
+  const partnerSource = prevRoleKey ? ui.partnerVoiceByRoleKey?.[prevRoleKey] : undefined;
+
+  const speakPrev = (opts?: { onEnd?: () => void; onError?: () => void }) => {
+    const text = prevText;
+    if (!text) {
+      opts?.onEnd?.();
+      return;
+    }
+    const src = partnerSource ?? ({ kind: "auto" as const });
+
+    const pickAnyPreferredTake = (entry: SceneVoiceLineEntry | undefined): SceneVoiceLineTake | null => {
+      if (!entry) return null;
+      let best: SceneVoiceLineTake | null = null;
+      for (const [pid, list] of Object.entries(entry.takesByPerformer ?? {})) {
+        if (!pid || !Array.isArray(list) || list.length === 0) continue;
+        const t = findPreferredTake(entry, pid) ?? null;
+        if (!t) continue;
+        if (!best) {
+          best = t;
+          continue;
+        }
+        const a = Date.parse(String(best.createdAt ?? "")) || 0;
+        const b = Date.parse(String(t.createdAt ?? "")) || 0;
+        if (b >= a) best = t;
+      }
+      return best;
+    };
+
+    if (src.kind === "auto") {
+      const take = pickAnyPreferredTake(prevEntry);
+      const url = take?.remoteUrl;
+      if (url) {
+        playUrl(url, { onEnd: opts?.onEnd, onError: () => opts?.onError?.(), label: "voice-line:auto" });
+        return;
+      }
+      // fallthrough to TTS
+    }
+    if (src.kind === "performer" && prevLineId) {
+      const take = findPreferredTake(prevEntry, src.performerId);
+      const url = take?.remoteUrl;
+      if (url) {
+        playUrl(url, { onEnd: opts?.onEnd, onError: () => opts?.onError?.(), label: "voice-line" });
+        return;
+      }
+    }
+    if (supported.tts) {
+      requestSpeak(prevTextTts || text, { onEnd: opts?.onEnd, onError: () => opts?.onError?.() });
+      return;
+    }
+    opts?.onEnd?.();
+  };
+
+  const saveLastTakeAsPreferred = async () => {
+    if (!lastTake || !projectName) return;
+    const perf = String(performerId ?? "").trim();
+    if (!perf) return;
+    const rk = normalizeRoleKey(current.role);
+    if (!rk) return;
+    await dispatch(
+      uploadVoiceLineTakeWeb({
+        projectSlug: projectName,
+        lineId: current.lineId,
+        role: current.role,
+        roleKey: rk,
+        performerId: perf,
+        performerLabel: performerLabel || perf,
+        blob: lastTake.blob,
+        durationMs: lastTake.durationMs,
+      }) as any,
+    );
+    setLastTake((prev) => {
+      if (prev?.url) {
+        try {
+          URL.revokeObjectURL(prev.url);
+        } catch {}
+      }
+      return null;
+    });
+  };
 
   const resetProgressAll = () => {
     if (!storageKey) return;
@@ -1014,6 +1296,7 @@ export function VoiceDialogueTrainer({
 
   const beginListeningSession = (opts: { resetTranscript: boolean }) => {
     if (!supported.stt) return;
+    void startTakeRecording();
     const token = Date.now();
     listenSessionRef.current = {
       token,
@@ -1073,8 +1356,8 @@ export function VoiceDialogueTrainer({
       return;
     }
 
-    if (supported.tts && prevText) {
-      requestSpeak(prevTextTts || prevText, { onEnd: startRec, onError: () => startRec() });
+    if (prevText) {
+      speakPrev({ onEnd: startRec, onError: () => startRec() });
       return;
     }
     // no previous phrase — start listening immediately
@@ -1105,9 +1388,9 @@ export function VoiceDialogueTrainer({
             <button
               type="button"
               className="voice-btn"
-              disabled={!supported.tts || !prevText}
-              onClick={() => requestSpeak(prevTextTts || prevText)}
-              title={!supported.tts ? "TTS недоступен" : "Озвучить предыдущую реплику"}
+              disabled={!prevText}
+              onClick={() => speakPrev()}
+              title="Озвучить предыдущую реплику"
             >
               Озвучить предыдущую
             </button>
@@ -1117,7 +1400,14 @@ export function VoiceDialogueTrainer({
               <select
                 className="voice-select-input"
                 value={voiceName}
-                onChange={(e) => setVoiceName(e.target.value)}
+                onChange={(e) =>
+                  dispatch(
+                    voiceTrainerUiActions.setVoiceTtsVoiceName({
+                      uiKey,
+                      value: e.target.value,
+                    }),
+                  )
+                }
                 disabled={!supported.tts}
               >
                 <option value="auto">Авто (по умолчанию)</option>
@@ -1132,7 +1422,14 @@ export function VoiceDialogueTrainer({
               <input
                 type="checkbox"
                 checked={autoFlow}
-                onChange={(e) => setAutoFlow(e.target.checked)}
+                onChange={(e) =>
+                  dispatch(
+                    voiceTrainerUiActions.setVoiceAutoFlow({
+                      uiKey,
+                      value: e.target.checked,
+                    }),
+                  )
+                }
               />
               авто (переход)
             </label>
@@ -1141,12 +1438,93 @@ export function VoiceDialogueTrainer({
               <select
                 className="voice-select-input"
                 value={checkMode}
-                onChange={(e) => setCheckMode(e.target.value === "sentences" ? "sentences" : "full")}
+                onChange={(e) =>
+                  dispatch(
+                    voiceTrainerUiActions.setVoiceCheckMode({
+                      uiKey,
+                      value: e.target.value === "sentences" ? "sentences" : "full",
+                    }),
+                  )
+                }
               >
                 <option value="full">1 раз (целиком)</option>
                 <option value="sentences">По предложениям</option>
               </select>
             </label>
+            <label
+              className="voice-checkbox"
+              title="Параллельно распознаванию речи будет записываться аудио вашей реплики (для сохранения)"
+            >
+              <input
+                type="checkbox"
+                checked={ui.recordTakes}
+                onChange={(e) =>
+                  dispatch(
+                    voiceTrainerUiActions.setVoiceRecordTakes({
+                      uiKey,
+                      value: e.target.checked,
+                    }),
+                  )
+                }
+              />
+              сохранять дубль
+            </label>
+            {prevRoleKey ? (
+              <label className="voice-select" title="Если есть записи — можно выбрать живую озвучку партнёра по роли">
+                <span className="voice-select-label">Партнёр</span>
+                <select
+                  className="voice-select-input"
+                  value={
+                    partnerSource?.kind === "performer"
+                      ? `p:${partnerSource.performerId}`
+                      : partnerSource?.kind === "tts"
+                        ? "tts"
+                        : "auto"
+                  }
+                  onChange={(e) => {
+                    const v = String(e.target.value);
+                    if (v === "auto") {
+                      dispatch(
+                        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+                          uiKey,
+                          roleKey: prevRoleKey,
+                          source: { kind: "auto" },
+                        }),
+                      );
+                      return;
+                    }
+                    if (v === "tts") {
+                      dispatch(
+                        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+                          uiKey,
+                          roleKey: prevRoleKey,
+                          source: { kind: "tts" },
+                        }),
+                      );
+                      return;
+                    }
+                    if (v.startsWith("p:")) {
+                      const pid = v.slice(2);
+                      dispatch(
+                        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+                          uiKey,
+                          roleKey: prevRoleKey,
+                          source: { kind: "performer", performerId: pid },
+                        }),
+                      );
+                    }
+                  }}
+                >
+                  <option value="auto">Авто (если есть записи)</option>
+                  <option value="tts">Робот (TTS)</option>
+                  {availablePerformersForPrevRole.map((p) => (
+                    <option key={p.id} value={`p:${p.id}`}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             {storageKey ? (
               <>
                 <button type="button" className="voice-btn" onClick={resetProgressCurrent} title="Сбросить текущую реплику">
@@ -1297,6 +1675,27 @@ export function VoiceDialogueTrainer({
                         <button type="button" className="voice-btn" onClick={() => setShowText((v) => !v)}>
                           {showText ? "Скрыть текст" : "Показать текст"}
                         </button>
+                        {lastTake ? (
+                          <>
+                            <button
+                              type="button"
+                              className="voice-btn"
+                              onClick={() => playUrl(lastTake.url, { label: "last-take" })}
+                              title="Прослушать последнюю запись"
+                            >
+                              ▶ дубль
+                            </button>
+                            <button
+                              type="button"
+                              className="voice-btn"
+                              disabled={voiceUpload.uploading || !projectName || !performerId}
+                              onClick={() => void saveLastTakeAsPreferred()}
+                              title="Сохранить последнюю запись как удачный дубль"
+                            >
+                              {voiceUpload.uploading ? "Сохраняю…" : "Сохранить как удачный"}
+                            </button>
+                          </>
+                        ) : null}
                         <div className="voice-spacer" />
                         <button type="button" className="voice-btn" disabled={index <= 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
                           ←
@@ -1330,6 +1729,9 @@ export function VoiceDialogueTrainer({
                             {result.ok ? "Похоже, верно." : "Не совпадает достаточно."} Точность:{" "}
                             <b>{Math.round(result.ratio * 100)}%</b>
                           </div>
+                        ) : null}
+                        {voiceUpload.error ? (
+                          <div className="voice-result bad">{voiceUpload.error}</div>
                         ) : null}
                       </div>
                     </div>
