@@ -1,6 +1,8 @@
 import {
   DeleteObjectCommand,
+  CreateBucketCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -19,6 +21,7 @@ export class FileStorageService {
   private readonly bucket: string;
   /** Базовый URL для ссылок (тот, по которому к MinIO ходят из браузера). */
   private readonly publicBaseUrl: string;
+  private bucketEnsured = false;
 
   constructor(@Inject(ConfigService) private readonly config: ConfigService) {
     const endpoint =
@@ -76,6 +79,10 @@ export class FileStorageService {
   }): Promise<StoredFileInfo> {
     const key = this.buildKey(params);
 
+    // На проде bucket может отсутствовать (например, после чистого деплоя).
+    // Тогда /files/upload падал бы с 500. Автоматически создаём bucket и повторяем.
+    await this.ensureBucketExists();
+
     await this.s3.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -108,5 +115,22 @@ export class FileStorageService {
     const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]+/g, '_');
     const ts = Date.now();
     return `${params.projectId}/${params.type}/${ts}-${safeName}`;
+  }
+
+  private async ensureBucketExists(): Promise<void> {
+    if (this.bucketEnsured) return;
+    try {
+      await this.s3.send(new HeadBucketCommand({ Bucket: this.bucket }));
+      this.bucketEnsured = true;
+      return;
+    } catch {
+      // continue to create
+    }
+    try {
+      await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
+    } catch {
+      // ignore: bucket might have been created concurrently
+    }
+    this.bucketEnsured = true;
   }
 }

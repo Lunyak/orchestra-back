@@ -39,6 +39,9 @@ function readJson(req) {
 }
 
 function startHttpServer({ onPublishRehearsal, onPublishDirectorSession }) {
+  if (String(process.env.DISABLE_INTERNAL_HTTP || "").trim() === "1") {
+    return;
+  }
   http
     .createServer(async (req, res) => {
       try {
@@ -52,8 +55,7 @@ function startHttpServer({ onPublishRehearsal, onPublishDirectorSession }) {
         }
 
         if (url === "/internal/publish-rehearsal" && method === "POST") {
-          const secret =
-            process.env.INTERNAL_API_SECRET || process.env.BOT_INTERNAL_SECRET;
+          const secret = process.env.INTERNAL_API_SECRET;
           const got = req.headers["x-internal-secret"];
           if (!secret || String(got || "") !== String(secret)) {
             res.writeHead(401, { "Content-Type": "application/json" });
@@ -83,8 +85,7 @@ function startHttpServer({ onPublishRehearsal, onPublishDirectorSession }) {
         }
 
         if (url === "/internal/publish-director-session" && method === "POST") {
-          const secret =
-            process.env.INTERNAL_API_SECRET || process.env.BOT_INTERNAL_SECRET;
+          const secret = process.env.INTERNAL_API_SECRET;
           const got = req.headers["x-internal-secret"];
           if (!secret || String(got || "") !== String(secret)) {
             res.writeHead(401, { "Content-Type": "application/json" });
@@ -182,6 +183,42 @@ class BotManager {
     this._registerBotCommands();
     this._initServices();
     this._startBot();
+
+    // Runner child mode: accept publish commands via IPC.
+    if (String(process.env.RUNNER_CHILD || "").trim() === "1") {
+      process.on("message", async (msg) => {
+        const requestId = msg?.requestId;
+        if (!requestId) return;
+        try {
+          if (msg.type === "publishRehearsal") {
+            const rehearsalId = String(msg.rehearsalId || "").trim();
+            if (!rehearsalId) throw new Error("rehearsalId is required");
+            const sent = await this.attendance.publishRehearsalFromBackend(rehearsalId);
+            process.send?.({ requestId, ok: true, result: sent || null });
+            return;
+          }
+          if (msg.type === "publishDirectorSession") {
+            const projectId = String(msg.projectId || "").trim();
+            const sessionId = String(msg.sessionId || "").trim();
+            if (!projectId || !sessionId)
+              throw new Error("projectId and sessionId are required");
+            const sent = await this.attendance.publishDirectorSessionFromBackend(
+              projectId,
+              sessionId,
+            );
+            process.send?.({ requestId, ok: true, result: sent || null });
+            return;
+          }
+          process.send?.({ requestId, ok: false, error: "unknown_command" });
+        } catch (e) {
+          process.send?.({
+            requestId,
+            ok: false,
+            error: String(e?.message || e || "failed"),
+          });
+        }
+      });
+    }
   }
 
   _isOwner(ctx) {
@@ -435,8 +472,10 @@ class BotManager {
       });
 
     // Включаем graceful stop
-    process.once("SIGINT", () => this.bot.stop("SIGINT"));
-    process.once("SIGTERM", () => this.bot.stop("SIGTERM"));
+    if (String(process.env.RUNNER_CHILD || "").trim() !== "1") {
+      process.once("SIGINT", () => this.bot.stop("SIGINT"));
+      process.once("SIGTERM", () => this.bot.stop("SIGTERM"));
+    }
   }
 }
 

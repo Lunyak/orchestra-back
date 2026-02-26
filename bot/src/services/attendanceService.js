@@ -1099,8 +1099,17 @@ class AttendanceService {
    * Backend вызывает /internal/publish-rehearsal, а бот отправляет сообщение в группу и фиксирует published в БД.
    */
   async publishRehearsalFromBackend(rehearsalId) {
-    const groupChatId = this.getEffectiveGroupChatId();
-    const threadId = this.getEffectiveThreadId();
+    // Prefer integration settings from backend (persistent, per-bot),
+    // fallback to local settingsStorage/env for backwards compatibility.
+    const integration = await orchestraBotApi.getIntegration().catch(() => null);
+    const groupChatId = normalizeSupergroupId(
+      String(integration?.groupChatId || "").trim() || this.getEffectiveGroupChatId(),
+    );
+    const threadId =
+      (integration?.attendanceThreadId != null &&
+      String(integration.attendanceThreadId).trim() !== ""
+        ? String(integration.attendanceThreadId).trim()
+        : null) || this.getEffectiveThreadId();
 
     if (!groupChatId) {
       throw new Error("Group chat is not configured (GROUP_CHAT_ID / /setgroup)");
@@ -1170,8 +1179,17 @@ class AttendanceService {
    * и фиксирует published в rawJson через backend /bot/director-sessions/*.
    */
   async publishDirectorSessionFromBackend(projectId, sessionId) {
-    const groupChatId = this.getEffectiveGroupChatId();
-    const threadId = this.getEffectiveDirectorSessionsThreadId();
+    // Prefer integration settings from backend (persistent, per-bot),
+    // fallback to local settingsStorage/env for backwards compatibility.
+    const integration = await orchestraBotApi.getIntegration().catch(() => null);
+    const groupChatId = normalizeSupergroupId(
+      String(integration?.groupChatId || "").trim() || this.getEffectiveGroupChatId(),
+    );
+    const threadId =
+      (integration?.announcementsThreadId != null &&
+      String(integration.announcementsThreadId).trim() !== ""
+        ? String(integration.announcementsThreadId).trim()
+        : null) || this.getEffectiveDirectorSessionsThreadId();
 
     if (!groupChatId) {
       throw new Error("Group chat is not configured (GROUP_CHAT_ID / /setgroup)");

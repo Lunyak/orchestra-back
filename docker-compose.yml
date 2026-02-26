@@ -35,7 +35,7 @@ services:
       BOT_SECRET: ${BOT_SECRET}
       # Back -> Bot (internal publish)
       BOT_INTERNAL_URL: ${BOT_INTERNAL_URL:-http://bot:3001}
-      BOT_INTERNAL_SECRET: ${BOT_INTERNAL_SECRET}
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       BOT_TOKENS_KEY: ${BOT_TOKENS_KEY}
       # S3/MinIO storage (variant A)
       # Backend и браузер ходят к MinIO по одному и тому же адресу,
@@ -68,6 +68,11 @@ services:
     restart: unless-stopped
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
+      # Which TelegramBotIntegration (from Orchestra UI) this bot represents.
+      # Required for backend /bot/* endpoints (guarded by X-Telegram-Bot-Integration-Id).
+      TELEGRAM_BOT_INTEGRATION_ID: ${TELEGRAM_BOT_INTEGRATION_ID}
+      # Single internal secret for server-to-server
+      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       ADMIN_ID: ${OWNER_TELEGRAM_ID}
       OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID}
       GROUP_CHAT_ID: ${GROUP_CHAT_ID}
@@ -80,8 +85,6 @@ services:
       SERVER_URL: back:3000
       # Bot -> Backend auth (/bot/*)
       BOT_SECRET: ${BOT_SECRET}
-      # Back -> Bot auth for /internal/*
-      INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
       HEALTH_PORT: 3001
     depends_on:
       back:

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -30,6 +31,20 @@ export class ProjectsController {
   @Get(':slug')
   getProject(@Req() req: any, @Param('slug') slug: string) {
     return this.projectsService.getProjectBySlug(req.user.userId, slug);
+  }
+
+  @Get(':slug/telegram-bot')
+  getTelegramBotPreference(@Req() req: any, @Param('slug') slug: string) {
+    return this.projectsService.getTelegramBotPreference(req.user.userId, slug);
+  }
+
+  @Put(':slug/telegram-bot')
+  setTelegramBotPreference(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Body() body: { botIntegrationId: string | null },
+  ) {
+    return this.projectsService.setTelegramBotPreference(req.user.userId, slug, body);
   }
 
   @Post()

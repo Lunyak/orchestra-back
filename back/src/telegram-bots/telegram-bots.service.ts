@@ -97,6 +97,64 @@ export class TelegramBotsService {
     private readonly config: ConfigService,
   ) {}
 
+  async listConnectedIntegrationsForRunner() {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT
+        "id",
+        "tokenEncrypted",
+        "botUsername",
+        "botTelegramUserId",
+        "title",
+        "status",
+        "ownerTelegramId",
+        "adminTelegramId",
+        "groupChatId",
+        "attendanceThreadId",
+        "announcementsThreadId",
+        "defaultProjectSlug",
+        "quizGroupChatId",
+        "quizThreadId",
+        "createdAt",
+        "updatedAt"
+      FROM "TelegramBotIntegration"
+      WHERE "status" = 'connected'
+      ORDER BY "createdAt" DESC`,
+    )) as Array<TelegramBotRow & { tokenEncrypted: string }>;
+
+    const items = rows.map((b) => {
+      const enc = (b as any)?.tokenEncrypted;
+      if (!enc) throw new BadRequestException('tokenEncrypted missing in DB');
+      let token: string;
+      try {
+        token = decryptString(String(enc));
+      } catch (e: any) {
+        const hint = configHintFromError(e);
+        if (hint) throw new BadRequestException(hint);
+        throw e;
+      }
+      return {
+        id: b.id,
+        token,
+        title: b.title,
+        botUsername: b.botUsername,
+        botTelegramUserId: b.botTelegramUserId,
+        ownerTelegramId: b.ownerTelegramId,
+        adminTelegramId: b.adminTelegramId,
+        status: b.status,
+        groupChatId: b.groupChatId,
+        attendanceThreadId: b.attendanceThreadId,
+        announcementsThreadId: b.announcementsThreadId,
+        defaultProjectSlug: b.defaultProjectSlug,
+        quizGroupChatId: b.quizGroupChatId,
+        quizThreadId: b.quizThreadId,
+        createdAt: b.createdAt,
+        updatedAt: b.updatedAt,
+      };
+    });
+
+    return { items };
+  }
+
   private telegramApiBase(token: string): string {
     const t = String(token ?? '').trim();
     if (!t) throw new BadRequestException('token is required');
@@ -145,6 +203,22 @@ export class TelegramBotsService {
         e?.response?.data?.description ||
         e?.message ||
         'Telegram setWebhook failed';
+      throw new BadRequestException(msg);
+    }
+  }
+
+  private async telegramDeleteWebhook(token: string) {
+    try {
+      await axios.post(
+        `${this.telegramApiBase(token)}/deleteWebhook`,
+        { drop_pending_updates: true },
+        { timeout: 10_000 },
+      );
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.description ||
+        e?.message ||
+        'Telegram deleteWebhook failed';
       throw new BadRequestException(msg);
     }
   }
@@ -258,7 +332,8 @@ export class TelegramBotsService {
         throw e;
       }
 
-      await this.telegramSetWebhook({ token, botId: row.id, secret: webhookSecret });
+      // We use long polling in bot-runner, so ensure webhook is disabled.
+      await this.telegramDeleteWebhook(token);
       return { ok: true, id: row.id };
     }
 
@@ -284,7 +359,8 @@ export class TelegramBotsService {
       throw e;
     }
 
-    await this.telegramSetWebhook({ token, botId: id, secret: webhookSecret });
+    // We use long polling in bot-runner, so ensure webhook is disabled.
+    await this.telegramDeleteWebhook(token);
     return { ok: true, id };
   }
 

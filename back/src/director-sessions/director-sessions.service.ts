@@ -431,12 +431,31 @@ export class DirectorSessionsService {
 
     const botUrl =
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
-    const secret =
-      this.config.get<string>('BOT_INTERNAL_SECRET') ||
-      this.config.get<string>('INTERNAL_API_SECRET');
+    const secret = this.config.get<string>('INTERNAL_API_SECRET');
     if (!secret) {
       throw new BadRequestException(
-        'Bot internal secret is not configured (set BOT_INTERNAL_SECRET in back env)',
+        'INTERNAL_API_SECRET is not configured',
+      );
+    }
+
+    const pref = await this.prisma.projectTelegramBotPreference.findUnique({
+      where: { projectId_userId: { projectId: directorProject.id, userId } },
+      select: { botIntegrationId: true },
+    });
+    const botIntegrationId =
+      String(pref?.botIntegrationId ?? '').trim() ||
+      String(
+        (
+          await this.prisma.telegramBotIntegration.findFirst({
+            where: { ownerUserId: userId, status: 'connected' },
+            select: { id: true },
+            orderBy: { createdAt: 'desc' },
+          })
+        )?.id ?? '',
+      ).trim();
+    if (!botIntegrationId) {
+      throw new BadRequestException(
+        'No connected Telegram bot. Connect a bot and select it in Project settings.',
       );
     }
 
@@ -446,10 +465,11 @@ export class DirectorSessionsService {
         projectId: directorProject.id,
         sessionId: sessId,
         botUrl,
+        botIntegrationId,
       });
       await axios.post(
         `${botUrl.replace(/\/$/, '')}/internal/publish-director-session`,
-        { projectId: directorProject.id, sessionId: sessId },
+        { projectId: directorProject.id, sessionId: sessId, botIntegrationId },
         { headers: { 'X-Internal-Secret': secret } },
       );
     } catch (e: any) {

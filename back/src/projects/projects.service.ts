@@ -28,6 +28,94 @@ export interface InviteByEmailDto {
 export class ProjectsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async assertUserHasProjectAccess(userId: string, slug: string) {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        slug,
+        deletedAt: null,
+        OR: [
+          { ownerId: userId },
+          {
+            members: {
+              some: { userId },
+            },
+          },
+        ],
+      },
+      select: { id: true, slug: true, ownerId: true },
+    });
+    if (!project) throw new ForbiddenException('No access to project');
+    return project;
+  }
+
+  async getTelegramBotPreference(userId: string, slug: string) {
+    const project = await this.assertUserHasProjectAccess(userId, slug);
+
+    const pref = await this.prisma.projectTelegramBotPreference.findUnique({
+      where: { projectId_userId: { projectId: project.id, userId } },
+      select: { botIntegrationId: true },
+    });
+
+    const bots = await this.prisma.telegramBotIntegration.findMany({
+      where: { ownerUserId: userId },
+      select: {
+        id: true,
+        title: true,
+        botUsername: true,
+        botTelegramUserId: true,
+        status: true,
+        groupChatId: true,
+        attendanceThreadId: true,
+        announcementsThreadId: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return {
+      selectedBotIntegrationId: pref?.botIntegrationId ?? null,
+      items: bots,
+    };
+  }
+
+  async setTelegramBotPreference(
+    userId: string,
+    slug: string,
+    dto: { botIntegrationId: string | null },
+  ) {
+    const project = await this.assertUserHasProjectAccess(userId, slug);
+    const botIntegrationIdRaw =
+      dto?.botIntegrationId != null ? String(dto.botIntegrationId).trim() : '';
+
+    if (!botIntegrationIdRaw) {
+      await this.prisma.projectTelegramBotPreference.deleteMany({
+        where: { projectId: project.id, userId },
+      });
+      return { ok: true, selectedBotIntegrationId: null };
+    }
+
+    const bot = await this.prisma.telegramBotIntegration.findFirst({
+      where: { id: botIntegrationIdRaw, ownerUserId: userId },
+      select: { id: true, status: true },
+    });
+    if (!bot) throw new NotFoundException('Telegram bot integration not found');
+    if (String(bot.status) !== 'connected') {
+      throw new BadRequestException('Telegram bot is not connected');
+    }
+
+    await this.prisma.projectTelegramBotPreference.upsert({
+      where: { projectId_userId: { projectId: project.id, userId } },
+      update: { botIntegrationId: bot.id },
+      create: {
+        projectId: project.id,
+        userId,
+        botIntegrationId: bot.id,
+      },
+    });
+
+    return { ok: true, selectedBotIntegrationId: bot.id };
+  }
+
   getUserProjects(userId: string) {
     return this.prisma.project.findMany({
       where: {

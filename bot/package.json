@@ -4,8 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node runner.js",
+    "dev": "nodemon runner.js",
+    "start:single": "node bot.js",
+    "dev:single": "nodemon bot.js"
   },
   "keywords": [],
   "author": "",

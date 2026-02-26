@@ -22,6 +22,7 @@ model User {
   actorNotes         ActorNote[]
   actorAnnotations   ActorAnnotation[]
   telegramBots       TelegramBotIntegration[]
+  projectTelegramBotPreferences ProjectTelegramBotPreference[]
 }
 
 model UserProfile {
@@ -73,6 +74,7 @@ model Project {
 
   scenes      Scene[]
   members     ProjectMember[]
+  telegramBotPreferences ProjectTelegramBotPreference[]
   modelFiles  ProjectModelFile[]
   rehearsals  Rehearsal[]
   actorNotes       ActorNote[]
@@ -145,6 +147,26 @@ model ProjectMember {
   user      User     @relation(fields: [userId], references: [id])
 
   @@unique([projectId, userId])
+}
+
+/// Per-user per-project preference: which connected Telegram bot to use for publishing.
+model ProjectTelegramBotPreference {
+  id               String               @id @default(cuid())
+  projectId        String
+  userId           String
+  botIntegrationId String
+
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bot              TelegramBotIntegration @relation(fields: [botIntegrationId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([botIntegrationId])
 }
 
 model Scene {
@@ -380,6 +402,7 @@ model TelegramBotIntegration {
   updatedAt             DateTime @updatedAt
 
   variables             BotVariable[]
+  projectPreferences    ProjectTelegramBotPreference[]
 
   @@index([ownerUserId])
   @@unique([botTelegramUserId])
