@@ -400,20 +400,9 @@ export class DirectorSessionsService {
     if (idx === -1) throw new NotFoundException('Session not found');
 
     const session = sessions[idx] as DirectorRehearsalSession;
-    if (session.telegramMessageId) {
-      // Debug-friendly response: publish endpoint may be clicked multiple times.
-      // If Telegram IDs exist, we consider it already published and do not send again.
-      return {
-        ok: true,
-        alreadyPublished: true,
-        telegram: {
-          chatId: session.telegramChatId ?? null,
-          messageId: session.telegramMessageId ?? null,
-          threadId: session.telegramThreadId ?? null,
-        },
-        published: session,
-      };
-    }
+    // NOTE: even if Telegram IDs exist, the message might have been deleted in Telegram.
+    // We still call bot-service: it will try to edit existing message, and if it's gone
+    // it will send a new one and overwrite Telegram IDs via markTelegramPublished.
 
     const participants = await this.buildParticipantsForSession(
       userId,

@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { HashRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
 import App from "./AppShell.tsx";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import "./index.css";
@@ -11,9 +11,9 @@ installViewportHeightCssVars();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AppErrorBoundary>
-      <HashRouter>
+      <BrowserRouter>
         <App />
-      </HashRouter>
+      </BrowserRouter>
     </AppErrorBoundary>
   </React.StrictMode>,
 );

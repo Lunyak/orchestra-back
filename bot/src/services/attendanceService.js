@@ -1129,6 +1129,40 @@ class AttendanceService {
       opts.message_thread_id = tid;
     }
 
+    // If already published, try to update existing message.
+    const chatId = rehearsal?.telegramChatId != null ? String(rehearsal.telegramChatId).trim() : "";
+    const messageIdRaw =
+      rehearsal?.telegramMessageId != null ? String(rehearsal.telegramMessageId).trim() : "";
+    const messageId = messageIdRaw && /^\d+$/.test(messageIdRaw) ? parseInt(messageIdRaw, 10) : null;
+    if (chatId && messageId) {
+      try {
+        await this.bot.telegram.editMessageText(chatId, messageId, undefined, text, {
+          parse_mode: "HTML",
+          ...this._backendKeyboard(rehearsalId),
+        });
+        return { ok: true, updated: true };
+      } catch (e) {
+        const desc = e?.response?.description || "";
+        // If message was deleted or can't be edited, we'll send a new one below.
+        if (
+          e?.response?.error_code === 400 &&
+          /message to edit not found|message identifier is not specified|message can't be edited/i.test(
+            desc,
+          )
+        ) {
+          // continue to send new message
+        } else if (
+          e?.response?.error_code === 400 &&
+          /message is not modified/i.test(desc)
+        ) {
+          return { ok: true, updated: true };
+        } else {
+          console.error("publishRehearsalFromBackend edit failed:", e?.message || e);
+          // continue to send new message as fallback
+        }
+      }
+    }
+
     const sent = await this.bot.telegram.sendMessage(
       groupChatId,
       text,
@@ -1216,6 +1250,39 @@ class AttendanceService {
       "threadId=",
       opts.message_thread_id ?? null,
     );
+
+    // If already published, try to update existing message.
+    const chatId = session?.telegramChatId != null ? String(session.telegramChatId).trim() : "";
+    const messageIdRaw =
+      session?.telegramMessageId != null ? String(session.telegramMessageId).trim() : "";
+    const messageId = messageIdRaw && /^\d+$/.test(messageIdRaw) ? parseInt(messageIdRaw, 10) : null;
+    if (chatId && messageId) {
+      try {
+        await this.bot.telegram.editMessageText(chatId, messageId, undefined, text, {
+          parse_mode: "HTML",
+          ...this._directorKeyboard(projectId, sessionId),
+        });
+        return { ok: true, updated: true };
+      } catch (e) {
+        const desc = e?.response?.description || "";
+        if (
+          e?.response?.error_code === 400 &&
+          /message to edit not found|message identifier is not specified|message can't be edited/i.test(
+            desc,
+          )
+        ) {
+          // continue to send new message
+        } else if (
+          e?.response?.error_code === 400 &&
+          /message is not modified/i.test(desc)
+        ) {
+          return { ok: true, updated: true };
+        } else {
+          console.error("publishDirectorSessionFromBackend edit failed:", e?.message || e);
+          // continue to send new message as fallback
+        }
+      }
+    }
 
     const sent = await this.bot.telegram.sendMessage(
       groupChatId,

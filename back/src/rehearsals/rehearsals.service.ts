@@ -744,10 +744,9 @@ export class RehearsalsService {
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, true);
 
-    // Уже опубликовано — не дёргаем бота второй раз.
-    if (reh.telegramMessageId) {
-      return { ok: true, published: reh };
-    }
+    // NOTE: even if Telegram IDs exist, the message might have been deleted in Telegram.
+    // We still call bot-service: it will try to edit existing message, and if it's gone
+    // it will send a new one and overwrite Telegram IDs via markTelegramPublished.
 
     // Перед публикацией формируем "опрос" (participants) только из тех,
     // кто (1) нужен по выбранным сценам, и (2) в профиле отметил присутствие (availabilityCalendar: present) на дату репетиции.
