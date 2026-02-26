@@ -13,6 +13,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { IsIn, IsString } from 'class-validator';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { createReadStream } from 'node:fs';
@@ -22,7 +23,11 @@ import { FileStorageService } from './file-storage.service';
 import { LocalFileStorageService } from './local-file-storage.service';
 
 export class UploadFileDto {
+  @IsString()
   projectId: string;
+
+  @IsString()
+  @IsIn(['playlist', 'image', 'sound', 'model'])
   type: 'playlist' | 'image' | 'sound' | 'model';
 }
 
