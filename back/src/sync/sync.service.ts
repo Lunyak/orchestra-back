@@ -456,7 +456,9 @@ export class SyncService {
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
-          cast: st.cast ?? Prisma.DbNull,
+          cast: st.cast
+            ? (st.cast as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
           order: st.order,
           deletedAt: null,
         },
@@ -470,7 +472,9 @@ export class SyncService {
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
-          cast: st.cast ?? Prisma.DbNull,
+          cast: st.cast
+            ? (st.cast as unknown as Prisma.InputJsonValue)
+            : Prisma.DbNull,
           order: st.order,
         },
       }),
