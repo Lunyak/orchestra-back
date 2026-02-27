@@ -291,8 +291,8 @@ export class BotService {
             requiredRoles: [],
             missingRoles: [],
             ready: true,
-            kanbanStatus: step.kanbanStatus,
-            kanbanOrder: step.kanbanOrder,
+            kanbanStatus: step.kanbanStatus ?? undefined,
+            kanbanOrder: step.kanbanOrder ?? undefined,
           });
           continue;
         }
@@ -322,8 +322,8 @@ export class BotService {
           requiredRoles: requiredRoles.sort((a, b) => a.localeCompare(b, 'ru')),
           missingRoles,
           ready: missingRoles.length === 0,
-          kanbanStatus: step.kanbanStatus,
-          kanbanOrder: step.kanbanOrder,
+          kanbanStatus: step.kanbanStatus ?? undefined,
+          kanbanOrder: step.kanbanOrder ?? undefined,
         });
       }
     }

@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { FileStorageService } from '../files/file-storage.service';
 import { LocalFileStorageService } from '../files/local-file-storage.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -455,7 +456,7 @@ export class SyncService {
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
-          cast: st.cast,
+          cast: st.cast ?? Prisma.DbNull,
           order: st.order,
           deletedAt: null,
         },
@@ -469,7 +470,7 @@ export class SyncService {
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
-          cast: st.cast,
+          cast: st.cast ?? Prisma.DbNull,
           order: st.order,
         },
       }),
@@ -938,7 +939,7 @@ export class SyncService {
         cast:
           payload.cast && typeof payload.cast === 'object' && !Array.isArray(payload.cast)
             ? payload.cast
-            : null,
+            : Prisma.DbNull,
         order: payload.order,
       },
     });
@@ -974,7 +975,10 @@ export class SyncService {
               checked: this.normalizeBool(r?.checked, false),
             };
           })
-          .filter(Boolean);
+          .filter(
+            (x): x is { stepId: string; sourceId: number; label: string; checked: boolean } =>
+              x !== null,
+          );
         tx.push(this.prisma.stepRequisite.deleteMany({ where: { stepId } }));
         if (data.length) tx.push(this.prisma.stepRequisite.createMany({ data }));
       }
@@ -1000,7 +1004,18 @@ export class SyncService {
               length: this.normalizeInt(f?.length, 0),
             };
           })
-          .filter(Boolean);
+          .filter(
+            (x): x is {
+              stepId: string;
+              sourceId: number;
+              label: string;
+              channel: string | null;
+              x: number;
+              y: number;
+              angle: number;
+              length: number;
+            } => x !== null,
+          );
         tx.push(this.prisma.stepLightPlot.deleteMany({ where: { stepId } }));
         if (data.length) tx.push(this.prisma.stepLightPlot.createMany({ data }));
       }
@@ -1027,7 +1042,19 @@ export class SyncService {
               scale: this.normalizeVec3(m?.scale, [1, 1, 1]),
             };
           })
-          .filter(Boolean);
+          .filter(
+            (x): x is {
+              stepId: string;
+              sourceId: number;
+              name: string;
+              type: string;
+              builtin: string | null;
+              allowOutOfBounds: boolean;
+              position: [number, number, number];
+              rotation: [number, number, number];
+              scale: [number, number, number];
+            } => x !== null,
+          );
         tx.push(this.prisma.theaterModel.deleteMany({ where: { stepId } }));
         if (data.length) tx.push(this.prisma.theaterModel.createMany({ data }));
       }
@@ -1052,7 +1079,21 @@ export class SyncService {
               isRgb: this.normalizeBool(sp?.isRgb, false),
             };
           })
-          .filter(Boolean);
+          .filter(
+            (x): x is {
+              stepId: string;
+              sourceId: number;
+              label: string;
+              position: [number, number, number];
+              target: [number, number, number];
+              angleDeg: number;
+              intensity: number;
+              color: string;
+              enabled: boolean;
+              channel: number;
+              isRgb: boolean;
+            } => x !== null,
+          );
         tx.push(this.prisma.theaterSpotlight.deleteMany({ where: { stepId } }));
         if (data.length) tx.push(this.prisma.theaterSpotlight.createMany({ data }));
       }
