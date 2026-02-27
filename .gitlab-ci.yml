@@ -8,6 +8,11 @@ stages:
 
 variables:
   NODE_VERSION: "22"
+  DEP_PROXY: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}"
+  NODE_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/node:${NODE_VERSION}-alpine"
+  POSTGRES_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/postgres:16-alpine"
+  DOCKER_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:24"
+  DOCKER_DIND_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:24-dind"
 
 # Кэш node_modules
 default:
@@ -21,7 +26,7 @@ default:
 # Линт бэкенда
 lint:back:
   stage: lint
-  image: node:${NODE_VERSION}-alpine
+  image: ${NODE_IMAGE}
   script:
     - cd back
     - npm ci
@@ -32,9 +37,10 @@ lint:back:
 # Тесты бэкенда
 test:back:
   stage: test
-  image: node:${NODE_VERSION}-alpine
+  image: ${NODE_IMAGE}
   services:
-    - postgres:16-alpine
+    - name: ${POSTGRES_IMAGE}
+      alias: postgres
   variables:
     POSTGRES_DB: dophamin_orkestr
     POSTGRES_USER: orkestr
@@ -52,16 +58,16 @@ test:back:
 # Сборка Docker-образов (бэкенд)
 build:back:
   stage: build
-  image: docker:24
+  image: ${DOCKER_IMAGE}
   services:
-    - name: docker:24-dind
+    - name: ${DOCKER_DIND_IMAGE}
       command: ["--tls=false"]
   variables:
     DOCKER_HOST: tcp://docker:2375
     DOCKER_TLS_CERTDIR: ""
   script:
     - cd back
-    - docker build -t orkestr-back:$CI_COMMIT_SHORT_SHA -t orkestr-back:latest .
+    - docker build --build-arg NODE_IMAGE=${NODE_IMAGE} -t orkestr-back:$CI_COMMIT_SHORT_SHA -t orkestr-back:latest .
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 # Деплой на VPS: postgres + back + bot + dozzle
