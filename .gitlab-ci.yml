@@ -68,6 +68,15 @@ build:back:
     DOCKER_TLS_CERTDIR: ""
   script:
     - cd back
+    # Dependency Proxy requires auth for docker build pulls
+    - |
+      if [ -n "${CI_DEPENDENCY_PROXY_SERVER:-}" ] && [ -n "${CI_DEPENDENCY_PROXY_USER:-}" ] && [ -n "${CI_DEPENDENCY_PROXY_PASSWORD:-}" ]; then
+        echo "$CI_DEPENDENCY_PROXY_PASSWORD" | docker login -u "$CI_DEPENDENCY_PROXY_USER" --password-stdin "$CI_DEPENDENCY_PROXY_SERVER"
+      elif [ -n "${CI_REGISTRY:-}" ] && [ -n "${CI_REGISTRY_USER:-}" ] && [ -n "${CI_REGISTRY_PASSWORD:-}" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+      else
+        echo "WARN: no dependency proxy/registry credentials found; build may fail when pulling base images"
+      fi
     - docker build --build-arg NODE_IMAGE=${NODE_IMAGE} -t orkestr-back:$CI_COMMIT_SHORT_SHA -t orkestr-back:latest .
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
