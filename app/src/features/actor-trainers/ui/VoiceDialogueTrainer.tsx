@@ -883,6 +883,7 @@ export function VoiceDialogueTrainer({
   const [interim, setInterim] = useState("");
   const [result, setResult] = useState<null | { ratio: number; ok: boolean }>(null);
   const autoRunTokenRef = useRef(0);
+  const pttActiveRef = useRef(false);
   const listenSessionRef = useRef<{
     token: number;
     startedAt: number;
