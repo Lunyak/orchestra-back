@@ -2,6 +2,7 @@ import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import type { ScriptStep } from "../../../shared/types/script";
 
 export type RolePhraseSource = {
+  lineId: string;
   stepId: number;
   stepTitle: string;
   role: string;
@@ -37,6 +38,8 @@ function cleanUtteranceText(raw: string): string {
   s = s.replace(/\{\{[^}]*\}\}/g, " ");
   s = s.replace(/\s+/g, " ").trim();
   s = markdownToPlainText(s);
+  // Parentheses in this project are stage remarks the actor doesn't speak.
+  s = s.replace(/\([^)]*\)/g, " ");
   return s.replace(/\s+/g, " ").trim();
 }
 
@@ -158,7 +161,9 @@ export function extractRolePhrasesFromSteps(opts: {
     if (!text.trim()) continue;
 
     let currentRole: string | null = null;
-    for (const rawLine of text.replace(/\r\n/g, "\n").split("\n")) {
+    const lines = text.replace(/\r\n/g, "\n").split("\n");
+    for (let i = 0; i < lines.length; i += 1) {
+      const rawLine = lines[i] ?? "";
       const parsed = parseLineSpeaker(rawLine);
       const line = String(rawLine ?? "").trim();
 
@@ -168,6 +173,7 @@ export function extractRolePhrasesFromSteps(opts: {
         if (!rest) continue;
         if (normalizeRoleKey(currentRole) === desiredKey) {
           out.push({
+            lineId: `${step.id}:u:${i}`,
             stepId: step.id,
             stepTitle: step.title ?? `Шаг ${step.id}`,
             role: currentRole,
@@ -183,6 +189,7 @@ export function extractRolePhrasesFromSteps(opts: {
       if (!cleaned) continue;
       if (normalizeRoleKey(currentRole) === desiredKey) {
         out.push({
+          lineId: `${step.id}:u:${i}`,
           stepId: step.id,
           stepTitle: step.title ?? `Шаг ${step.id}`,
           role: currentRole,
@@ -192,11 +199,11 @@ export function extractRolePhrasesFromSteps(opts: {
     }
   }
 
-  // uniq preserve order (same phrases can repeat via continuation normalization)
+  // uniq preserve order
   const seen = new Set<string>();
   const uniq: RolePhraseSource[] = [];
   for (const p of out) {
-    const key = `${p.stepId}:${p.role}:${p.text}`;
+    const key = p.lineId;
     if (seen.has(key)) continue;
     seen.add(key);
     uniq.push(p);

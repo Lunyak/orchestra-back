@@ -4,6 +4,7 @@ import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import { createId } from "../../../shared/utils/createId";
 import { syncPull, syncPush, type SyncChange } from "../../../sync/api";
+import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
@@ -146,6 +147,17 @@ function useSceneOperations() {
       }
 
       if (token) {
+        // Desktop path: deltas are enqueued by saveProjectScene; push only outbox.
+        if (desktopApi) {
+          try {
+            await flushDesktopOutbox(token, projectName);
+            dispatch(sceneActions.markSaved());
+          } catch (err) {
+            console.error("[sync] desktop outbox flush failed:", err);
+          }
+          return;
+        }
+
         const projectId =
           localStorage.getItem(`projectId:${projectName}`) ??
           (await ensureRemoteProject(token));
@@ -257,42 +269,9 @@ function useSceneOperations() {
     const token = accessToken ?? localStorage.getItem("accessToken");
     if (!token || !projectName) return;
     try {
-      const scene = await desktopApi.readProjectScene(projectName, "script");
-      if (!scene) return;
-
-      const projectId =
-        localStorage.getItem(`projectId:${projectName}`) ??
-        (await ensureRemoteProject(token));
-      if (!projectId) return;
-
-      const sceneId = `${projectId}:script`;
-      const nowIso = new Date().toISOString();
-      const soundsForServer = Array.isArray(scene.sounds)
-        ? scene.sounds.map((s: any) => {
-            const { filePath: _fp, ...rest } = s;
-            return rest;
-          })
-        : scene.sounds;
-      const payloadForServer = { ...scene, sounds: soundsForServer };
-
-      await syncPush(token, [
-        {
-          id: createId(),
-          entityType: "Scene",
-          entityId: sceneId,
-          operation: "update",
-          payload: {
-            id: sceneId,
-            projectId,
-            name: (payloadForServer.name as string) || `Сцена ${projectName}`,
-            rawJson: payloadForServer,
-            updatedAt: nowIso,
-          },
-          createdAt: nowIso,
-        },
-      ]);
+      await flushDesktopOutbox(token, projectName);
     } catch (error) {
-      console.error("[sync] push scene after sounds save failed:", error);
+      console.error("[sync] desktop outbox flush after sounds save failed:", error);
     }
   }, [accessToken, projectName, ensureRemoteProject]);
 

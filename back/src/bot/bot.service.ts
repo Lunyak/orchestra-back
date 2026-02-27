@@ -227,12 +227,36 @@ export class BotService {
         name: true,
         scenes: {
           where: { deletedAt: null },
-          select: { id: true, name: true, rawJson: true, updatedAt: true },
+          select: { id: true, name: true, updatedAt: true },
         },
       },
     });
     if (!project) {
       throw new NotFoundException('Project not found');
+    }
+
+    const stepRows = await this.prisma.step.findMany({
+      where: {
+        sceneId: { in: project.scenes.map((s) => s.id) },
+        deletedAt: null,
+      },
+      select: {
+        sceneId: true,
+        sourceId: true,
+        title: true,
+        markdown: true,
+        playMarkdown: true,
+        kanbanStatus: true,
+        kanbanOrder: true,
+        order: true,
+      },
+      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+    });
+    const stepsBySceneId = new Map<string, typeof stepRows>();
+    for (const st of stepRows) {
+      const list = stepsBySceneId.get(st.sceneId) ?? [];
+      list.push(st);
+      stepsBySceneId.set(st.sceneId, list);
     }
 
     const items: Array<{
@@ -249,10 +273,7 @@ export class BotService {
     }> = [];
 
     for (const scene of project.scenes) {
-      const raw = scene.rawJson as any;
-      const steps = Array.isArray(raw?.steps)
-        ? (raw.steps as RawStepLike[])
-        : [];
+      const steps = stepsBySceneId.get(scene.id) ?? [];
       for (const step of steps) {
         const text = step.playMarkdown ?? step.markdown ?? '';
         const requiredRoles = extractRolesSmart(text);
@@ -263,10 +284,10 @@ export class BotService {
             projectSlug: project.slug,
             sceneId: scene.id,
             sceneName: scene.name,
-            stepId: typeof step.id === 'number' ? step.id : null,
+            stepId: typeof step.sourceId === 'number' ? step.sourceId : null,
             stepTitle:
               (step.title ?? '').trim() ||
-              `Step ${String(step.id ?? '')}`.trim(),
+              `Step ${String(step.sourceId ?? '')}`.trim(),
             requiredRoles: [],
             missingRoles: [],
             ready: true,
@@ -294,9 +315,10 @@ export class BotService {
           projectSlug: project.slug,
           sceneId: scene.id,
           sceneName: scene.name,
-          stepId: typeof step.id === 'number' ? step.id : null,
+          stepId: typeof step.sourceId === 'number' ? step.sourceId : null,
           stepTitle:
-            (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
+            (step.title ?? '').trim() ||
+            `Step ${String(step.sourceId ?? '')}`.trim(),
           requiredRoles: requiredRoles.sort((a, b) => a.localeCompare(b, 'ru')),
           missingRoles,
           ready: missingRoles.length === 0,

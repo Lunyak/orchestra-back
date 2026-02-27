@@ -17,6 +17,7 @@ import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 import { TtsModule } from './tts/tts.module';
 import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
+import { TroupeModule } from './troupe/troupe.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
     BotModule,
     TtsModule,
     TelegramBotsModule,
+    TroupeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

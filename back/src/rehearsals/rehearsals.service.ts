@@ -344,9 +344,30 @@ export class RehearsalsService {
 
     const scenes = await this.prisma.scene.findMany({
       where: { projectId: reh.projectId, deletedAt: null },
-      select: { id: true, name: true, rawJson: true },
+      select: { id: true, name: true },
       orderBy: { createdAt: 'asc' },
     });
+
+    const steps = await this.prisma.step.findMany({
+      where: {
+        sceneId: { in: scenes.map((s) => s.id) },
+        deletedAt: null,
+      },
+      select: { sceneId: true, sourceId: true, title: true, order: true },
+      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+    });
+    const stepsBySceneId = new Map<
+      string,
+      Array<{ id: number; title: string }>
+    >();
+    for (const st of steps) {
+      const list = stepsBySceneId.get(st.sceneId) ?? [];
+      list.push({
+        id: st.sourceId,
+        title: String(st.title ?? '').trim() || `Step ${st.sourceId}`,
+      });
+      stepsBySceneId.set(st.sceneId, list);
+    }
 
     const selectedSceneIds = parseStringArrayJson(
       (reh as any)?.selectedSceneIds,
@@ -358,27 +379,10 @@ export class RehearsalsService {
       selectedSceneIds,
       selectedSteps,
       scenes: scenes.map((s) => {
-        const rawJson = s.rawJson;
-        const raw =
-          rawJson && typeof rawJson === 'object' && !Array.isArray(rawJson)
-            ? (rawJson as Record<string, unknown>)
-            : {};
-        const stepsValue = raw['steps'];
-        const steps = Array.isArray(stepsValue)
-          ? (stepsValue as RawStepLike[])
-          : [];
         return {
           id: s.id,
           name: s.name,
-          steps: steps
-            .map((st) => ({
-              id: typeof st.id === 'number' ? st.id : null,
-              title:
-                String(st.title ?? '').trim() ||
-                (st.id != null ? `Step ${String(st.id)}` : 'Step'),
-            }))
-            .filter((x) => x.id != null)
-            .slice(0, 200),
+          steps: (stepsBySceneId.get(s.id) ?? []).slice(0, 200),
         };
       }),
     };
@@ -507,18 +511,42 @@ export class RehearsalsService {
         deletedAt: null,
         ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
       },
-      select: { id: true, name: true, rawJson: true },
+      select: { id: true, name: true },
     });
+
+    const stepRows = await this.prisma.step.findMany({
+      where: {
+        sceneId: { in: scenes.map((s) => s.id) },
+        deletedAt: null,
+      },
+      select: {
+        sceneId: true,
+        sourceId: true,
+        title: true,
+        markdown: true,
+        playMarkdown: true,
+        cast: true,
+        durationMin: true,
+        order: true,
+      },
+      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+    });
+    const stepsBySceneId = new Map<string, typeof stepRows>();
+    for (const st of stepRows) {
+      const list = stepsBySceneId.get(st.sceneId) ?? [];
+      list.push(st);
+      stepsBySceneId.set(st.sceneId, list);
+    }
 
     const castEmails = new Set<string>();
     for (const scene of scenes) {
-      const raw = scene.rawJson as any;
-      const steps = Array.isArray(raw?.steps)
-        ? (raw.steps as RawStepLike[])
-        : [];
+      const steps = stepsBySceneId.get(scene.id) ?? [];
       for (const step of steps) {
-        const cast = step.cast ?? {};
-        for (const rawAssigned of Object.values(cast)) {
+        const cast =
+          step.cast && typeof step.cast === 'object' && !Array.isArray(step.cast)
+            ? (step.cast as any)
+            : {};
+        for (const rawAssigned of Object.values(cast ?? {})) {
           for (const assigned of normalizeCastActors(rawAssigned)) {
             if (!looksLikeEmail(assigned)) continue;
             castEmails.add(normEmail(assigned));
@@ -575,20 +603,19 @@ export class RehearsalsService {
     }> = [];
 
     for (const scene of scenes) {
-      const raw = scene.rawJson as any;
-      const steps = Array.isArray(raw?.steps)
-        ? (raw.steps as RawStepLike[])
-        : [];
+      const steps = stepsBySceneId.get(scene.id) ?? [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.id === 'number' && !allowed.has(step.id))
+        if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
           continue;
-        if (allowed && typeof step.id !== 'number') continue;
+        if (allowed && typeof step.sourceId !== 'number') continue;
         const text = step.playMarkdown ?? step.markdown ?? '';
         const roles = extractRolesSmart(text);
-        const cast = step.cast ?? {};
-        const rawDuration =
-          typeof step.durationMin === 'number' ? step.durationMin : null;
+        const cast =
+          step.cast && typeof step.cast === 'object' && !Array.isArray(step.cast)
+            ? (step.cast as any)
+            : {};
+        const rawDuration = typeof step.durationMin === 'number' ? step.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
             ? Math.max(1, Math.min(480, Math.trunc(rawDuration)))
@@ -637,9 +664,10 @@ export class RehearsalsService {
         items.push({
           sceneId: scene.id,
           sceneName: scene.name,
-          stepId: typeof step.id === 'number' ? step.id : null,
+          stepId: typeof step.sourceId === 'number' ? step.sourceId : null,
           stepTitle:
-            (step.title ?? '').trim() || `Step ${String(step.id ?? '')}`.trim(),
+            (step.title ?? '').trim() ||
+            `Step ${String(step.sourceId ?? '')}`.trim(),
           requiredRoles: roles,
           missing,
           ready: missing.length === 0,
@@ -778,8 +806,23 @@ export class RehearsalsService {
         deletedAt: null,
         ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
       },
-      select: { id: true, name: true, rawJson: true },
+      select: { id: true, name: true },
     });
+
+    const stepRows2 = await this.prisma.step.findMany({
+      where: {
+        sceneId: { in: scenes.map((s) => s.id) },
+        deletedAt: null,
+      },
+      select: { sceneId: true, sourceId: true, cast: true, order: true },
+      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+    });
+    const stepsBySceneId2 = new Map<string, typeof stepRows2>();
+    for (const st of stepRows2) {
+      const list = stepsBySceneId2.get(st.sceneId) ?? [];
+      list.push(st);
+      stepsBySceneId2.set(st.sceneId, list);
+    }
     if (effectiveSceneIds.length && scenes.length === 0) {
       throw new BadRequestException('Выбранные сцены не найдены');
     }
@@ -796,17 +839,17 @@ export class RehearsalsService {
 
     const neededEmails = new Set<string>();
     for (const scene of scenes) {
-      const raw = (scene as any).rawJson;
-      const steps = Array.isArray(raw?.steps)
-        ? (raw.steps as RawStepLike[])
-        : [];
+      const steps = stepsBySceneId2.get(scene.id) ?? [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.id === 'number' && !allowed.has(step.id))
+        if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
           continue;
-        if (allowed && typeof step.id !== 'number') continue;
-        const cast = step.cast ?? {};
-        for (const rawAssigned of Object.values(cast)) {
+        if (allowed && typeof step.sourceId !== 'number') continue;
+        const cast =
+          step.cast && typeof step.cast === 'object' && !Array.isArray(step.cast)
+            ? (step.cast as any)
+            : {};
+        for (const rawAssigned of Object.values(cast ?? {})) {
           for (const assigned of normalizeCastActors(rawAssigned)) {
             if (!looksLikeEmail(assigned)) continue;
             neededEmails.add(normEmail(assigned));

@@ -46,7 +46,8 @@ export function WordOrderTrainer({
       if (tokens.length < 2) continue;
       const seed = Number(String(p.stepId ?? 0)) + p.text.length * 17;
       out.push({
-        id: `${p.stepId}:${p.role}:${p.text}`,
+        // Use stable line id so progress survives minor text edits.
+        id: p.lineId || `${p.stepId}:${p.role}:${p.text}`,
         phrase: p,
         target: tokens,
         shuffled: shuffle(tokens, seed),

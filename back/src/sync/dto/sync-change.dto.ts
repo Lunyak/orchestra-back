@@ -51,3 +51,11 @@ export class SyncPullDto {
   @IsString()
   projectSlug?: string;
 }
+
+export class SyncPullSceneDto {
+  @IsString()
+  projectSlug: string;
+
+  @IsString()
+  sceneName: string;
+}

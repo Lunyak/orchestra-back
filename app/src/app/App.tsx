@@ -13,6 +13,10 @@ export interface AppProps {
   onAfterLogin?: (token: string) => Promise<void>;
   /** Выгрузка всех локальных данных на сервер (только desktop). */
   onPushAllLocal?: () => Promise<void>;
+  /** Ручной resync проекта (только desktop). */
+  onResyncProject?: (
+    projectSlug: string,
+  ) => Promise<{ updatedScenes: number; totalScenes: number }>;
 }
 
 function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => Promise<void> }) {
@@ -34,10 +38,10 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
   );
 }
 
-export default function App({ onAfterLogin, onPushAllLocal }: AppProps) {
+export default function App({ onAfterLogin, onPushAllLocal, onResyncProject }: AppProps) {
   return (
     <StoreProvider>
-      <PlatformProvider value={{ onPushAllLocal }}>
+      <PlatformProvider value={{ onPushAllLocal, onResyncProject }}>
         <AuthenticatedApp onAfterLogin={onAfterLogin} />
       </PlatformProvider>
     </StoreProvider>

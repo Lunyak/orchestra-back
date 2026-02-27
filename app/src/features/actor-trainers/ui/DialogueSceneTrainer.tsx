@@ -258,7 +258,8 @@ export function DialogueSceneTrainer({
       if (tokens.length < 1) continue;
       const seed = Number(String(line.stepId ?? 0)) + line.text.length * 17;
       out.push({
-        id: `${line.stepId}:${line.role}:${line.text}`,
+        // Use stable line id so progress survives text edits/cleanup.
+        id: line.id,
         lineId: line.id,
         stepId: line.stepId,
         stepTitle: line.stepTitle,

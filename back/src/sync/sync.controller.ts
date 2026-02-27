@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { SyncPullDto, SyncPushDto } from './dto/sync-change.dto';
+import { SyncPullDto, SyncPullSceneDto, SyncPushDto } from './dto/sync-change.dto';
 import { SyncService } from './sync.service';
 
 @UseGuards(JwtAuthGuard)
@@ -31,6 +31,15 @@ export class SyncController {
       req.user.userId,
       body.lastSyncAt,
       body.projectSlug,
+    );
+  }
+
+  @Post('pull-scene')
+  pullScene(@Req() req: any, @Body() body: SyncPullSceneDto) {
+    return this.syncService.getSceneSnapshot(
+      req.user.userId,
+      body.projectSlug,
+      body.sceneName,
     );
   }
 

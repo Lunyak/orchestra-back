@@ -185,6 +185,19 @@ export async function syncPull(
   return data;
 }
 
+export async function syncPullScene(
+  accessToken: string,
+  projectSlug: string,
+  sceneName: string,
+): Promise<{ scene: { id: string; projectId: string; name: string; rawJson: any; updatedAt: string } }> {
+  const { data } = await api.post(
+    "/sync/pull-scene",
+    { projectSlug, sceneName },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
 export async function fetchProjects(
   accessToken: string,
 ): Promise<ProjectSummary[]> {
@@ -282,6 +295,51 @@ export interface TeamProfile {
   characters?: string[] | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
   availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
+}
+
+export interface TroupeSummary {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TroupeMemberItem {
+  id: string;
+  troupeId: string;
+  email: string;
+  createdAt: string;
+  profile: TeamProfile | null;
+}
+
+export async function getMyTroupe(
+  accessToken: string,
+): Promise<{ troupe: TroupeSummary; members: TroupeMemberItem[] }> {
+  const { data } = await api.get("/troupe", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function addTroupeMember(
+  accessToken: string,
+  email: string,
+): Promise<TroupeMemberItem> {
+  const { data } = await api.post(
+    "/troupe/members",
+    { email: email.trim() },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function removeTroupeMember(
+  accessToken: string,
+  memberId: string,
+): Promise<void> {
+  await api.delete(`/troupe/members/${encodeURIComponent(memberId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 }
 
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {

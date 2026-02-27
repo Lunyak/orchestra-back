@@ -265,7 +265,13 @@ function normalizeNumberSequences(tokens: string[]): string[] {
   for (let i = 0; i < tokens.length; i += 1) {
     const parsed = consumeRuBaseNumber(tokens, i);
     if (!parsed) {
-      out.push(tokens[i]!);
+      // Handle standalone scale words like "с тысячи" -> 1000
+      const mult = ruScaleMultiplier(tokens[i] ?? "");
+      if (mult) {
+        out.push(asHashNumber(mult));
+      } else {
+        out.push(tokens[i]!);
+      }
       continue;
     }
 
@@ -295,21 +301,142 @@ function normalizeNumberSequences(tokens: string[]): string[] {
 function tokensForScore(text: string): string[] {
   const base = tokenizeWords(normalizeForCheck(text)).map((t) => t.norm);
   const withNums = normalizeNumberSequences(base);
-  return withNums.filter((w) => w && !STOP_WORDS.has(w));
+  const filtered = withNums.filter((w) => w && !STOP_WORDS.has(w));
+  return filtered.map(normalizeTokenForScore).filter(Boolean);
+}
+
+function normalizeTokenForScore(token: string): string {
+  const t = String(token ?? "").trim().toLowerCase();
+  if (!t) return "";
+  if (t.startsWith("#")) return t; // normalized numbers
+
+  // Ruble forms & abbreviations: "рубля", "руб.", "руб" -> "руб"
+  if (/^руб(л(я|ей|ю|ем|лях|лям|ли)?)?$/u.test(t)) return "руб";
+
+  return softStemRu(t);
+}
+
+function softStemRu(word: string): string {
+  const w = String(word ?? "").toLowerCase();
+  if (!w) return "";
+  if (w.length <= 4) return w;
+
+  // Very lightweight stemming for matching STT case/ending variants.
+  const endings = [
+    "иями",
+    "ями",
+    "ами",
+    "ого",
+    "ему",
+    "ому",
+    "ыми",
+    "ими",
+    "иях",
+    "ях",
+    "ах",
+    "ам",
+    "ям",
+    "ом",
+    "ем",
+    "ой",
+    "ей",
+    "ую",
+    "юю",
+    "ая",
+    "яя",
+    "ое",
+    "ее",
+    "ый",
+    "ий",
+    "ые",
+    "ие",
+    "а",
+    "я",
+    "ы",
+    "и",
+    "у",
+    "ю",
+    "е",
+    "о",
+  ];
+
+  for (const end of endings) {
+    if (!w.endsWith(end)) continue;
+    const base = w.slice(0, Math.max(0, w.length - end.length));
+    if (base.length >= 3) return base;
+  }
+
+  return w;
+}
+
+function editDistanceLeq1(aRaw: string, bRaw: string): boolean {
+  const a = String(aRaw ?? "");
+  const b = String(bRaw ?? "");
+  if (a === b) return true;
+  const la = a.length;
+  const lb = b.length;
+  const diff = Math.abs(la - lb);
+  if (diff > 1) return false;
+
+  // Same length: allow 1 substitution
+  if (la === lb) {
+    let mism = 0;
+    for (let i = 0; i < la; i += 1) {
+      if (a[i] !== b[i]) mism += 1;
+      if (mism > 1) return false;
+    }
+    return mism === 1;
+  }
+
+  // Length differs by 1: allow 1 insertion/deletion
+  const s = la < lb ? a : b;
+  const t = la < lb ? b : a;
+  let i = 0;
+  let j = 0;
+  let skipped = 0;
+  while (i < s.length && j < t.length) {
+    if (s[i] === t[j]) {
+      i += 1;
+      j += 1;
+      continue;
+    }
+    skipped += 1;
+    if (skipped > 1) return false;
+    j += 1;
+  }
+  return true;
 }
 
 function matchStats(expected: string[], spoken: string[]): { matched: number; ratio: number } {
   if (expected.length === 0) return { matched: 0, ratio: 0 };
-  // Greedy in-order match (allows extra words in speech)
-  let i = 0;
-  for (let j = 0; j < spoken.length && i < expected.length; j += 1) {
-    if (spoken[j] === expected[i]) i += 1;
+  if (spoken.length === 0) return { matched: 0, ratio: 0 };
+
+  // LCS-based matching: tolerates missing/extra words.
+  // This avoids the "one missed word blocks the whole tail" problem of greedy matching.
+  const m = spoken.length;
+  const dp = new Array<number>(m + 1).fill(0);
+
+  for (let i = 1; i <= expected.length; i += 1) {
+    let prevDiag = 0;
+    const e = expected[i - 1]!;
+    for (let j = 1; j <= m; j += 1) {
+      const tmp = dp[j]!;
+      const s = spoken[j - 1]!;
+      if (s === e || editDistanceLeq1(s, e)) {
+        dp[j] = prevDiag + 1;
+      } else {
+        dp[j] = Math.max(dp[j]!, dp[j - 1]!);
+      }
+      prevDiag = tmp;
+    }
   }
-  return { matched: i, ratio: i / expected.length };
+
+  const matched = dp[m] ?? 0;
+  return { matched, ratio: matched / expected.length };
 }
 
 const PASS_RATIO = 0.85;
-const BASE_MAX_LISTEN_MS = 25_000;
+const BASE_MAX_LISTEN_MS = 45_000;
 const LONG_MONOLOGUE_MAX_LISTEN_MS = 70_000;
 const AUTO_RESTART_DELAY_MS = 250;
 const SILENCE_STOP_MS_BASE = 1200;
@@ -366,14 +493,18 @@ async function fetchBackendTtsVoices(): Promise<BackendTtsVoice[]> {
     .filter((v) => v.name);
 }
 
-function findNextUndoneIndex(exercises: VoiceExercise[], done: Set<string>, fromIndex: number): number {
-  if (exercises.length === 0) return 0;
+function findNextUndoneIndex(
+  exercises: VoiceExercise[],
+  done: Set<string>,
+  fromIndex: number,
+): number | null {
+  if (exercises.length === 0) return null;
   const start = Math.max(0, Math.min(fromIndex, exercises.length - 1));
   for (let offset = 1; offset <= exercises.length; offset += 1) {
     const idx = (start + offset) % exercises.length;
     if (!done.has(exercises[idx]!.id)) return idx;
   }
-  return start;
+  return null;
 }
 
 export function VoiceDialogueTrainer({
@@ -433,7 +564,8 @@ export function VoiceDialogueTrainer({
       const textForCheck = normalizeForCheck(line.text);
       if (!textForCheck) continue;
       out.push({
-        id: `${line.stepId}:${line.role}:${line.text}`,
+        // Use stable line id (stepId + line index) so progress survives text edits/cleanup.
+        id: line.id,
         lineId: line.id,
         stepId: line.stepId,
         stepTitle: line.stepTitle,
@@ -457,8 +589,23 @@ export function VoiceDialogueTrainer({
   }, [exercises]);
 
   const [doneIds, setDoneIds] = useState<Set<string>>(() => readDoneSet(storageKey));
+  const [allDoneDialog, setAllDoneDialog] = useState(false);
   useEffect(() => {
-    setDoneIds(readDoneSet(storageKey));
+    const restored = readDoneSet(storageKey);
+    setDoneIds(restored);
+    // After reload, jump to next unfinished line (if any),
+    // so user doesn't have to repeat already learned lines.
+    if (restored.size > 0 && exercises.length > 0) {
+      setIndex((i) => {
+        const next = findNextUndoneIndex(exercises, restored, i);
+        if (next == null) {
+          setAllDoneDialog(true);
+          return i;
+        }
+        return next;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   const [index, setIndex] = useState(0);
@@ -496,6 +643,12 @@ export function VoiceDialogueTrainer({
 
   const autoFlow = ui.autoFlow;
   const checkMode = ui.checkMode;
+  const showText = ui.showText;
+
+  const [revealedLineIds, setRevealedLineIds] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    setRevealedLineIds(new Set());
+  }, [uiKey]);
 
   const [voices, setVoices] = useState<BackendTtsVoice[]>([]);
   const voiceName = ui.ttsVoiceName;
@@ -729,7 +882,6 @@ export function VoiceDialogueTrainer({
   const [transcript, setTranscript] = useState("");
   const [interim, setInterim] = useState("");
   const [result, setResult] = useState<null | { ratio: number; ok: boolean }>(null);
-  const [showText, setShowText] = useState(false);
   const autoRunTokenRef = useRef(0);
   const listenSessionRef = useRef<{
     token: number;
@@ -750,7 +902,6 @@ export function VoiceDialogueTrainer({
     setTranscript("");
     setInterim("");
     setResult(null);
-    setShowText(false);
   }, [current?.id]);
 
   useEffect(() => {
@@ -904,6 +1055,11 @@ export function VoiceDialogueTrainer({
     silenceTimerRef.current = window.setTimeout(() => {
       const sess = listenSessionRef.current;
       if (!sess || sess.token !== token || !sess.requested) return;
+      // While Push-To-Talk is held, never auto-stop by silence.
+      if (pttActiveRef.current) {
+        scheduleSilenceStop(token, silenceMs);
+        return;
+      }
       const txt = spokenForEval();
       // If user hasn't said anything yet — keep waiting (do not stop).
       if (!txt) {
@@ -985,6 +1141,16 @@ export function VoiceDialogueTrainer({
         }, AUTO_RESTART_DELAY_MS);
         return;
       }
+      // While Push-To-Talk is held, keep restarting recognition
+      // and only evaluate on button release.
+      if (pttActiveRef.current) {
+        window.setTimeout(() => {
+          const s2 = listenSessionRef.current;
+          if (!s2?.requested) return;
+          startListening({ resetTranscript: false });
+        }, AUTO_RESTART_DELAY_MS);
+        return;
+      }
       // If we've been silent long enough, do not restart (prevents "noise loops").
       const silenceMs =
         sess.maxMs >= LONG_MONOLOGUE_MAX_LISTEN_MS ? SILENCE_STOP_MS_LONG : SILENCE_STOP_MS_BASE;
@@ -1039,6 +1205,10 @@ export function VoiceDialogueTrainer({
       const after = () => {
         if (!autoFlow) return;
         const nextIndex = findNextUndoneIndex(exercises, next, index);
+        if (nextIndex == null) {
+          setAllDoneDialog(true);
+          return;
+        }
         const nextEx = exercises[nextIndex];
         if (nextEx?.id) skipPrevTtsForExerciseIdRef.current = nextEx.id;
         setIndex(nextIndex);
@@ -1100,6 +1270,10 @@ export function VoiceDialogueTrainer({
     const after = () => {
       if (!autoFlow) return;
       const nextIndex = findNextUndoneIndex(exercises, next, index);
+      if (nextIndex == null) {
+        setAllDoneDialog(true);
+        return;
+      }
       const nextEx = exercises[nextIndex];
       if (nextEx?.id) skipPrevTtsForExerciseIdRef.current = nextEx.id;
       setIndex(nextIndex);
@@ -1298,17 +1472,18 @@ export function VoiceDialogueTrainer({
     if (!supported.stt) return;
     void startTakeRecording();
     const token = Date.now();
+    const maxMsEffective = pttActiveRef.current ? Math.max(maxListenMs, 120_000) : maxListenMs;
     listenSessionRef.current = {
       token,
       startedAt: Date.now(),
-      maxMs: maxListenMs,
+      maxMs: maxMsEffective,
       requested: true,
     };
     lastActivityAtRef.current = Date.now();
     // Allow some time to start speaking before we consider it "silence".
     scheduleSilenceStop(token, INITIAL_SILENCE_MS);
     if (stopTimerRef.current != null) window.clearTimeout(stopTimerRef.current);
-    stopTimerRef.current = window.setTimeout(() => stopListening(), maxListenMs + 250);
+    stopTimerRef.current = window.setTimeout(() => stopListening(), maxMsEffective + 250);
     startListening({ resetTranscript: opts.resetTranscript });
   };
 
@@ -1318,7 +1493,6 @@ export function VoiceDialogueTrainer({
     if (txt) window.setTimeout(() => evaluate(txt), delayMs);
   };
 
-  const pttActiveRef = useRef(false);
   const pttStart = () => {
     if (!supported.stt) return;
     if (ttsDiag.lastEvent === "request" || ttsDiag.lastEvent === "start") return;
@@ -1338,6 +1512,10 @@ export function VoiceDialogueTrainer({
   const runAuto = () => {
     if (!autoFlow) return;
     if (!supported.stt) return;
+    if (left === 0 && total > 0) {
+      setAllDoneDialog(true);
+      return;
+    }
     // stop any current recognition and speech
     stopListening();
     cancelSpeech();
@@ -1384,6 +1562,34 @@ export function VoiceDialogueTrainer({
 
       <div className="voice-card">
         <div className="voice-toolbar">
+          {allDoneDialog && total > 0 ? (
+            <div className="voice-finished">
+              <div className="voice-finished-title">Вы повторили весь текст.</div>
+              <div className="voice-actions">
+                <button
+                  type="button"
+                  className="voice-btn"
+                  onClick={() => {
+                    stopListening();
+                    cancelSpeech();
+                    setAllDoneDialog(false);
+                  }}
+                >
+                  Закончить
+                </button>
+                <button
+                  type="button"
+                  className="voice-btn voice-btn--primary"
+                  onClick={() => {
+                    resetProgressAll();
+                    setAllDoneDialog(false);
+                  }}
+                >
+                  Начать заново
+                </button>
+              </div>
+            </div>
+          ) : null}
           <div className="voice-actions">
             <button
               type="button"
@@ -1393,6 +1599,22 @@ export function VoiceDialogueTrainer({
               title="Озвучить предыдущую реплику"
             >
               Озвучить предыдущую
+            </button>
+
+            <button
+              type="button"
+              className={`voice-btn ${showText ? "voice-btn--primary" : ""}`}
+              onClick={() =>
+                dispatch(
+                  voiceTrainerUiActions.setVoiceShowText({
+                    uiKey,
+                    value: !showText,
+                  }),
+                )
+              }
+              title="Режим показа текста во всём тренажёре"
+            >
+              {showText ? "Текст: показан" : "Текст: скрыт"}
             </button>
 
             <label className="voice-select">
@@ -1610,7 +1832,11 @@ export function VoiceDialogueTrainer({
                     title={isMine && ex ? "Перейти к реплике" : undefined}
                   >
                     <div className="voice-role">{lineRole}</div>
-                    <div className="voice-text">{line.text}</div>
+                    <div className="voice-text">
+                      {isMine && !(showText || revealedLineIds.has(line.id))
+                        ? "— текст скрыт —"
+                        : line.text}
+                    </div>
                   </div>
 
                   {isActive ? (
@@ -1620,12 +1846,12 @@ export function VoiceDialogueTrainer({
                           Фраза: <b>{sentenceIndex + 1}</b> / {sentenceTokens.length}
                         </div>
                       ) : null}
-                      {currentTarget ? (
+                      {(showText || (current?.lineId && revealedLineIds.has(current.lineId))) && currentTarget ? (
                         <div className="voice-target">
                           Сейчас: “{String(currentTarget).slice(0, 160)}{String(currentTarget).length > 160 ? "…" : ""}”
                         </div>
                       ) : null}
-                      {lastAccepted ? (
+                      {(showText || (current?.lineId && revealedLineIds.has(current.lineId))) && lastAccepted ? (
                         <div className="voice-muted">Засчитано: “{String(lastAccepted).slice(0, 120)}{String(lastAccepted).length > 120 ? "…" : ""}”</div>
                       ) : null}
 
@@ -1634,7 +1860,7 @@ export function VoiceDialogueTrainer({
                           type="button"
                           className="voice-btn voice-ptt"
                           data-active={listening ? "true" : "false"}
-                          disabled={!supported.stt}
+                          disabled={!supported.stt || (left === 0 && total > 0)}
                           onPointerDown={(e) => {
                             try { (e.currentTarget as any)?.setPointerCapture?.(e.pointerId); } catch {}
                             e.preventDefault();
@@ -1645,9 +1871,6 @@ export function VoiceDialogueTrainer({
                             pttStop();
                           }}
                           onPointerCancel={() => pttStop()}
-                          onPointerLeave={() => {
-                            if (pttActiveRef.current) pttStop();
-                          }}
                           title="Нажми и держи — идёт запись. Отпусти — проверим."
                         >
                           {listening ? "Запись…" : "Нажми и держи"}
@@ -1655,7 +1878,7 @@ export function VoiceDialogueTrainer({
                         <button
                           type="button"
                           className="voice-btn"
-                          disabled={!supported.stt}
+                          disabled={!supported.stt || (left === 0 && total > 0)}
                           onClick={() => {
                             beginListeningSession({ resetTranscript: false });
                           }}
@@ -1666,15 +1889,31 @@ export function VoiceDialogueTrainer({
                         <button
                           type="button"
                           className="voice-btn"
-                          disabled={!supported.stt || !autoFlow}
+                          disabled={!supported.stt || !autoFlow || (left === 0 && total > 0)}
                           onClick={runAuto}
                           title="Озвучить предыдущую и начать запись"
                         >
                           ▶ цикл
                         </button>
-                        <button type="button" className="voice-btn" onClick={() => setShowText((v) => !v)}>
-                          {showText ? "Скрыть текст" : "Показать текст"}
-                        </button>
+                        {!showText ? (
+                          <button
+                            type="button"
+                            className="voice-btn"
+                            onClick={() => {
+                              if (!current?.lineId) return;
+                              setRevealedLineIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(current.lineId)) next.delete(current.lineId);
+                                else next.add(current.lineId);
+                                return next;
+                              });
+                            }}
+                          >
+                            {current?.lineId && revealedLineIds.has(current.lineId)
+                              ? "Скрыть эту реплику"
+                              : "Показать эту реплику"}
+                          </button>
+                        ) : null}
                         {lastTake ? (
                           <>
                             <button

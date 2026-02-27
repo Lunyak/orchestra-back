@@ -41,6 +41,9 @@ function cleanText(raw: string): string {
   s = s.replace(/\{\{[^}]*\}\}/g, " ");
   s = s.replace(/\s+/g, " ").trim();
   s = markdownToPlainText(s);
+  // Parentheses in this project are stage remarks the actor doesn't speak.
+  // Nested parentheses are rare; simple removal is sufficient.
+  s = s.replace(/\([^)]*\)/g, " ");
   return s.replace(/\s+/g, " ").trim();
 }
 

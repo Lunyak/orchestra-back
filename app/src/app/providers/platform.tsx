@@ -3,6 +3,10 @@ import React from "react";
 export interface PlatformContextValue {
   /** Выгрузка всех локальных данных на сервер (только desktop). */
   onPushAllLocal?: () => Promise<void>;
+  /** Ручная "подтяжка отличий" с сервера в локальные файлы (только desktop). */
+  onResyncProject?: (
+    projectSlug: string,
+  ) => Promise<{ updatedScenes: number; totalScenes: number }>;
 }
 
 const PlatformContext = React.createContext<PlatformContextValue>({});

@@ -23,6 +23,7 @@ model User {
   actorAnnotations   ActorAnnotation[]
   telegramBots       TelegramBotIntegration[]
   projectTelegramBotPreferences ProjectTelegramBotPreference[]
+  troupeOwned        Troupe?
 }
 
 model UserProfile {
@@ -197,6 +198,8 @@ model PlaylistItem {
   sourceId  Int
   title     String
   file      String
+  remoteUrl String?
+  remoteKey String?
   fadeMs    Int
   loop      Boolean
 
@@ -210,6 +213,10 @@ model Sound {
   title     String
   file      String
   icon      String?
+  remoteUrl String?
+  remoteKey String?
+  iconRemoteUrl String?
+  iconRemoteKey String?
   volume    Float
   fadeMs    Int
   loop      Boolean
@@ -224,6 +231,10 @@ model Step {
   title        String
   markdown     String?
   playMarkdown String?
+  durationMin  Int?
+  kanbanStatus String?
+  kanbanOrder  Int?
+  cast         Json?
   order        Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -469,4 +480,30 @@ model ActorAnnotation {
 
   @@index([userId, sceneId, stepSourceId, field])
   @@index([projectId])
+}
+
+model Troupe {
+  id          String   @id @default(cuid())
+  ownerUserId String   @unique
+  owner       User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  title       String   @default("Моя труппа")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     TroupeMember[]
+
+  @@index([ownerUserId])
+}
+
+model TroupeMember {
+  id        String   @id @default(cuid())
+  troupeId  String
+  troupe    Troupe   @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  /// Email участника труппы. Храним в lower-case.
+  email     String
+  createdAt DateTime @default(now())
+
+  @@unique([troupeId, email])
+  @@index([email])
+  @@index([troupeId])
 }

@@ -11,7 +11,7 @@ import "./style.css";
 export function SettingsPage() {
   const navigate = useNavigate();
   const { accessToken, logout } = useAuth();
-  const { onPushAllLocal } = usePlatform();
+  const { onPushAllLocal, onResyncProject } = usePlatform();
   const {
     projects,
     projectName,
@@ -65,6 +65,19 @@ export function SettingsPage() {
     });
   };
 
+  const handleResync = () => {
+    if (!onResyncProject) return;
+    if (!projectName) return;
+    const confirmed = window.confirm(
+      "Подтянуть отличающиеся данные проекта с сервера в локальные файлы?\n\n" +
+        "Перед подтяжкой приложение попробует отправить локальные несинхронизированные изменения (outbox), чтобы не потерять их."
+    );
+    if (!confirmed) return;
+    void onResyncProject(projectName).then((r) => {
+      alert(`Resync завершён: обновлено сцен ${r.updatedScenes}/${r.totalScenes}.`);
+    });
+  };
+
   return (
     <div className="app-layout">
       <div className="app-content">
@@ -77,7 +90,7 @@ export function SettingsPage() {
               </Button>
             </div>
             <p>Текущий проект: {projectName || "—"}</p>
-            {onPushAllLocal && (
+            {(onPushAllLocal || onResyncProject) && (
               <section className="settings-sync">
                 <h3>Синхронизация локальных данных</h3>
                 <p className="settings-sync-hint">
@@ -86,9 +99,16 @@ export function SettingsPage() {
                   только офлайн и хотите перенести данные в онлайн-версию. Если на
                   сервере уже есть изменённые данные, они могут быть перезаписаны.
                 </p>
-                <button type="button" onClick={handlePushAllLocal}>
-                  Выгрузить все локальные данные на сервер
-                </button>
+                {onPushAllLocal && (
+                  <button type="button" onClick={handlePushAllLocal}>
+                    Выгрузить все локальные данные на сервер
+                  </button>
+                )}
+                {onResyncProject && (
+                  <button type="button" onClick={handleResync}>
+                    Подтянуть отличия с сервера (resync)
+                  </button>
+                )}
               </section>
             )}
             <section className="settings-project-section">

@@ -263,10 +263,22 @@ export class DirectorSessionsService {
         where: { projectId, deletedAt: null },
         select: { id: true, rawJson: true },
       }));
-    const raw = (scene?.rawJson as any) ?? {};
-    const steps: RawStepLike[] = Array.isArray(raw?.steps) ? raw.steps : [];
-    const roleAssignments = raw?.roleAssignments ?? {};
+
+    const roleAssignments = (scene?.rawJson as any)?.roleAssignments ?? {};
     const raIndex = normalizeRoleAssignmentsIndex(roleAssignments);
+
+    const stepRows = await this.prisma.step.findMany({
+      where: { sceneId: scene?.id ?? sceneId, deletedAt: null },
+      select: { sourceId: true, title: true, markdown: true, playMarkdown: true, order: true },
+      orderBy: { order: 'asc' },
+    });
+    const steps: RawStepLike[] = stepRows.map((st) => ({
+      id: st.sourceId,
+      title: st.title,
+      markdown: st.markdown ?? undefined,
+      playMarkdown: st.playMarkdown ?? undefined,
+    }));
+
     return { steps, raIndex };
   }
 

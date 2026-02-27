@@ -1,11 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import {
-  type SyncChange,
-  ensureProject,
-  syncPush,
-} from "../../../sync/api";
+import { ensureProject } from "../../../sync/api";
+import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { getDesktopApi } from "../../platform/desktop-api";
-import { createId } from "../../utils/createId";
 import "./style.css";
 
 export interface PlaylistTrack {
@@ -398,30 +394,12 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         }
       }
 
-      const sceneId = `${projectId}:${sceneName}`;
-      const nowIso = new Date().toISOString();
-      const changes: SyncChange[] = [
-        {
-          id: createId(),
-          entityType: "Scene",
-          entityId: sceneId,
-          operation: "update",
-          payload: {
-            id: sceneId,
-            projectId,
-            name: payload?.name || `Сцена ${sceneName}`,
-            rawJson: payload,
-            updatedAt: nowIso,
-          },
-          createdAt: nowIso,
-        },
-      ];
-
       try {
-        await syncPush(token, changes);
-        console.log("[playlist] playlist sync push completed");
+        // Desktop: enqueue delta on saveProjectScene, then flush outbox (push only changed parts)
+        await flushDesktopOutbox(token, projectName);
+        console.log("[playlist] playlist outbox flush completed");
       } catch (err) {
-        console.error("[playlist] playlist sync push failed", err);
+        console.error("[playlist] playlist outbox flush failed", err);
       }
     } catch (err) {
       console.error("Failed to save playlist:", err);

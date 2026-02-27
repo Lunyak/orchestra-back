@@ -11,7 +11,13 @@ import {
 import { WordOrderTrainer } from "../../features/actor-trainers/ui/WordOrderTrainer";
 import { DialogueSceneTrainer } from "../../features/actor-trainers/ui/DialogueSceneTrainer";
 import { VoiceDialogueTrainer } from "../../features/actor-trainers/ui/VoiceDialogueTrainer";
-import { getMyProfile } from "../../sync/api";
+import { getMyProfile, getProjectMembers } from "../../sync/api";
+import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
+import {
+  actorTrainerUiActions,
+  selectActorTrainerMode,
+  type ActorTrainerMode,
+} from "../../features/actor-trainers/model/actorTrainerUiSlice";
 import "./style.css";
 
 function normalizeActorKey(v: string): string {
@@ -31,6 +37,7 @@ export function ActorPage() {
   const { projects, projectName, onProjectChange } = useProject();
   const { steps, sceneData } = useScene();
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
 
   const [focusMode, setFocusMode] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -100,21 +107,89 @@ export function ActorPage() {
     });
   }, [steps, sceneData?.roleAssignments]);
 
-  const rolesForActor = useMemo(() => {
-    const aKey = normalizeActorKey(myEmail);
-    if (!aKey) return [];
-    const roles: string[] = [];
-    for (const { role, actors } of roleIndex.values()) {
-      if (actors.some((x) => normalizeActorKey(x) === aKey)) roles.push(role);
+  const [canPickAnyRole, setCanPickAnyRole] = useState<boolean>(false);
+  useEffect(() => {
+    if (!accessToken || !projectName || !myEmail) {
+      setCanPickAnyRole(false);
+      return;
     }
-    return roles.sort((a, b) => a.localeCompare(b, "ru"));
-  }, [myEmail, roleIndex]);
+    let cancelled = false;
+    getProjectMembers(accessToken, projectName)
+      .then((res) => {
+        if (cancelled) return;
+        const me = normalizeActorKey(myEmail);
+        const ownerEmail = normalizeActorKey(res?.owner?.email ?? "");
+        const isOwner = Boolean(me && ownerEmail && ownerEmail === me);
+        const isEditor = Boolean(
+          me &&
+            (res?.members ?? []).some(
+              (m) =>
+                normalizeActorKey(m?.user?.email ?? "") === me &&
+                String(m?.role ?? "") === "editor",
+            ),
+        );
+        setCanPickAnyRole(isOwner || isEditor);
+      })
+      .catch(() => {
+        if (!cancelled) setCanPickAnyRole(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, myEmail, projectName]);
+
+  const rolesForActor = useMemo(() => {
+    const roles: string[] = [];
+    const aKey = normalizeActorKey(myEmail);
+    for (const { role, actors } of roleIndex.values()) {
+      if (canPickAnyRole) roles.push(role);
+      else if (aKey && actors.some((x) => normalizeActorKey(x) === aKey)) roles.push(role);
+    }
+    return Array.from(new Set(roles)).sort((a, b) => a.localeCompare(b, "ru"));
+  }, [canPickAnyRole, myEmail, roleIndex]);
 
   const [role, setRole] = useState<string>("");
+
+  const roleStorageKey = useMemo(() => {
+    const actorKey = normalizeActorKey(myEmail);
+    if (!projectName || !actorKey) return "";
+    return ["actorPage", "selectedRole", projectName, actorKey].join(":");
+  }, [myEmail, projectName]);
+
+  // Restore last selected role for this project/user (if still available)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!roleStorageKey) return;
+    if (rolesForActor.length === 0) return;
+    const stored = String(localStorage.getItem(roleStorageKey) ?? "").trim();
+    if (stored && rolesForActor.includes(stored) && role !== stored) {
+      setRole(stored);
+      return;
+    }
+    // If current role is invalid/empty, prefer first available role and persist it
+    if (!role || !rolesForActor.includes(role)) {
+      const first = rolesForActor[0] ?? "";
+      if (first) setRole(first);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roleStorageKey, rolesForActor]);
+
   const effectiveRole = useMemo(() => {
     if (role && rolesForActor.includes(role)) return role;
     return rolesForActor[0] || "";
   }, [role, rolesForActor]);
+
+  // Persist effective role selection
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!roleStorageKey) return;
+    if (!effectiveRole) return;
+    try {
+      localStorage.setItem(roleStorageKey, effectiveRole);
+    } catch {
+      // ignore
+    }
+  }, [effectiveRole, roleStorageKey]);
 
   useEffect(() => {
     if (role && !rolesForActor.includes(role)) {
@@ -211,7 +286,35 @@ export function ActorPage() {
     setSelectedStepIds("all");
   }, [effectiveRole, projectName]);
 
-  const [trainerMode, setTrainerMode] = useState<"dialogue" | "cards" | "voice">("dialogue");
+  const actorUiKey = useMemo(() => {
+    if (!projectName || !myEmail || !effectiveRole) return "";
+    return [
+      "actorTrainer",
+      "pageUi",
+      projectName,
+      normalizeActorKey(myEmail),
+      normalizeRoleKeyForStorage(effectiveRole),
+    ].join(":");
+  }, [effectiveRole, myEmail, projectName]);
+
+  useEffect(() => {
+    if (!actorUiKey) return;
+    dispatch(actorTrainerUiActions.initActorTrainerUi({ uiKey: actorUiKey }));
+  }, [dispatch, actorUiKey]);
+
+  const trainerModeFromStore = useAppSelector((s) =>
+    actorUiKey ? selectActorTrainerMode(s, actorUiKey) : ("dialogue" as ActorTrainerMode),
+  );
+  const [trainerModeFallback, setTrainerModeFallback] = useState<ActorTrainerMode>("dialogue");
+  const trainerMode: ActorTrainerMode = actorUiKey ? trainerModeFromStore : trainerModeFallback;
+
+  const setTrainerMode = (mode: ActorTrainerMode) => {
+    if (!actorUiKey) {
+      setTrainerModeFallback(mode);
+      return;
+    }
+    dispatch(actorTrainerUiActions.setTrainerMode({ uiKey: actorUiKey, value: mode }));
+  };
 
   const selectedStepIdsForTraining = useMemo(() => {
     if (normalizedSelectedStepIds === "all") {
@@ -287,7 +390,11 @@ export function ActorPage() {
                 <div className="actor-static">
                   {profileLoading ? "загрузка профиля…" : myEmail || "—"}
                 </div>
-                <div className="actor-hint">Роли показываются только для текущего пользователя.</div>
+                <div className="actor-hint">
+                  {canPickAnyRole
+                    ? "Вы можете выбирать любые роли (режиссёр/автор проекта)."
+                    : "Роли показываются только для текущего пользователя."}
+                </div>
               </label>
 
               <label className="actor-field">
@@ -447,7 +554,7 @@ export function ActorPage() {
                   role="tab"
                   aria-selected={trainerMode === "cards"}
                 >
-                  Карточки (переставь слова)
+                  Переставь слова (карточки)
                 </button>
                 <button
                   type="button"

@@ -13,6 +13,7 @@ export type VoiceTrainerUiState = {
   checkMode: VoiceTrainerCheckMode;
   ttsVoiceName: string;
   recordTakes: boolean;
+  showText: boolean;
   partnerVoiceByRoleKey: Record<string, PartnerVoiceSource | undefined>;
 };
 
@@ -60,6 +61,7 @@ function defaultUi(uiKey: string): VoiceTrainerUiState {
     checkMode: legacyCheckMode === "sentences" ? "sentences" : "full",
     ttsVoiceName: legacyVoiceName || "auto",
     recordTakes: true,
+    showText: false,
     partnerVoiceByRoleKey: {},
   };
 }
@@ -106,6 +108,7 @@ export const voiceTrainerUiSlice = createSlice({
             : base.ttsVoiceName,
         recordTakes:
           typeof parsedObj?.recordTakes === "boolean" ? parsedObj.recordTakes : base.recordTakes,
+        showText: typeof parsedObj?.showText === "boolean" ? parsedObj.showText : base.showText,
         partnerVoiceByRoleKey,
       };
       state.byKey[uiKey] = next;
@@ -157,6 +160,13 @@ export const voiceTrainerUiSlice = createSlice({
       const { uiKey, value } = action.payload;
       const entry = state.byKey[uiKey] ?? defaultUi(uiKey);
       const next = { ...entry, recordTakes: Boolean(value) };
+      state.byKey[uiKey] = next;
+      persist(next);
+    },
+    setVoiceShowText(state, action: PayloadAction<{ uiKey: string; value: boolean }>) {
+      const { uiKey, value } = action.payload;
+      const entry = state.byKey[uiKey] ?? defaultUi(uiKey);
+      const next = { ...entry, showText: Boolean(value) };
       state.byKey[uiKey] = next;
       persist(next);
     },
