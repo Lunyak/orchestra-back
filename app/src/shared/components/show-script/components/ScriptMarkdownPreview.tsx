@@ -18,6 +18,8 @@ import {
   createRenderLightTokens,
 } from "../utils/lightTokens";
 
+const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
+
 export function ScriptMarkdownPreview({
   projectName,
   sceneName = "script",
@@ -46,9 +48,9 @@ export function ScriptMarkdownPreview({
     selectActiveStepMarkdownContext(s, projectName, sceneName),
   );
   const annotations = useAppSelector((s) => {
-    if (currentStep?.id == null) return [] as ActorAnnotation[];
+    if (currentStep?.id == null) return EMPTY_ANNOTATIONS;
     const cacheKey = `${projectName}:${sceneName}:${currentStep.id}:${activeField}`;
-    return selectAnnotations(s, cacheKey).items ?? [];
+    return selectAnnotations(s, cacheKey).items;
   });
   const annotationsMode = ui.annotationsMode;
   const playlistOptions = ui.playlistOptions;

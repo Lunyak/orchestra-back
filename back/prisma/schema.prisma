@@ -23,6 +23,9 @@ model User {
   actorAnnotations   ActorAnnotation[]
   telegramBots       TelegramBotIntegration[]
   projectTelegramBotPreferences ProjectTelegramBotPreference[]
+  directorSessions   DirectorSession[]
+  roleNotes          ProjectRoleNote[]
+  troupeMemberships  TroupeMember[]
   troupeOwned        Troupe?
 }
 
@@ -80,6 +83,8 @@ model Project {
   rehearsals  Rehearsal[]
   actorNotes       ActorNote[]
   actorAnnotations ActorAnnotation[]
+  directorSessions DirectorSession[]
+  roles            ProjectRole[]
 
   @@index([ownerId])
 }
@@ -189,6 +194,89 @@ model Scene {
   theaterLayout  TheaterLayout?
   actorNotes     ActorNote[]
   actorAnnotations ActorAnnotation[]
+}
+
+model DirectorSession {
+  id        String   @id
+  projectId String
+  userId    String
+  title     String
+  startsAt  DateTime
+  payload   Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([userId])
+  @@index([projectId, startsAt])
+}
+
+model ProjectRole {
+  id          String   @id @default(cuid())
+  projectId   String
+  /// Нормализованный ключ роли (lowercase, без спецсимволов). Уникален в рамках проекта.
+  key         String
+  /// Отображаемое имя роли.
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  aliases     ProjectRoleAlias[]
+  assignments ProjectRoleAssignment[]
+  notes       ProjectRoleNote[]
+
+  @@unique([projectId, key])
+  @@index([projectId])
+}
+
+model ProjectRoleAlias {
+  id      String @id @default(cuid())
+  roleId  String
+  /// Нормализованный ключ алиаса
+  key     String
+  /// Оригинальная строка алиаса
+  title   String
+
+  role    ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, key])
+  @@index([key])
+}
+
+model ProjectRoleAssignment {
+  id        String   @id @default(cuid())
+  roleId    String
+  /// Email актёра (lower-case). Привязка к UserProfile по email.
+  email     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role      ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, email])
+  @@index([email])
+}
+
+model ProjectRoleNote {
+  id          String   @id @default(cuid())
+  roleId      String
+  /// Кто написал (userId если автор залогинен), иначе null.
+  authorUserId String?
+  authorEmail  String?
+  content      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  role        ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  authorUser  User?       @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([roleId])
+  @@index([authorUserId])
 }
 
 model PlaylistItem {
@@ -499,6 +587,8 @@ model TroupeMember {
   id        String   @id @default(cuid())
   troupeId  String
   troupe    Troupe   @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   /// Email участника труппы. Храним в lower-case.
   email     String
   createdAt DateTime @default(now())
@@ -506,4 +596,5 @@ model TroupeMember {
   @@unique([troupeId, email])
   @@index([email])
   @@index([troupeId])
+  @@index([userId])
 }

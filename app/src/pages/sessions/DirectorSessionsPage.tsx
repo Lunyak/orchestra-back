@@ -4,6 +4,7 @@ import { useProject } from "../../features/project";
 import {
   getProfilesBatch,
   getProjectMembers,
+  getProjectRoles,
   syncPull,
   type TeamProfile,
 } from "../../sync/api";
@@ -22,7 +23,7 @@ import "./style.css";
 
 type ProjectDataCache = Record<
   string,
-  { steps: ScriptStep[]; roleAssignments: Record<string, string[]> }
+  { steps: ScriptStep[]; roleEmailsByKey: Record<string, string[]> }
 >;
 
 type AvailabilityTimeRange = { from: string; to: string };
@@ -169,41 +170,6 @@ function parseCharacters(value: unknown): string[] {
   return [];
 }
 
-function normalizeSteps(raw: any): ScriptStep[] {
-  if (!raw || typeof raw !== "object") return [];
-  const steps = (raw as any).steps;
-  return Array.isArray(steps) ? (steps as ScriptStep[]) : [];
-}
-
-function normalizeRoleAssignments(raw: any): Record<string, string[]> {
-  const src = raw?.roleAssignments;
-  if (!src || typeof src !== "object" || Array.isArray(src)) return {};
-  const out: Record<string, string[]> = {};
-  for (const [role, list] of Object.entries(src as Record<string, unknown>)) {
-    if (!role) continue;
-    if (Array.isArray(list)) {
-      const actors = list
-        .map((x) => String(x ?? "").trim())
-        .filter(Boolean);
-      if (actors.length) out[role] = Array.from(new Set(actors));
-    }
-  }
-  return out;
-}
-
-function normalizeRoleAssignmentsIndex(
-  roleAssignments: Record<string, string[]>,
-): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const [role, actors] of Object.entries(roleAssignments ?? {})) {
-    const key = normalizeRoleKey(role);
-    if (!key) continue;
-    const list = (actors ?? []).map((x) => String(x ?? "").trim()).filter(Boolean);
-    if (list.length) map.set(key, Array.from(new Set(list)));
-  }
-  return map;
-}
-
 function extractRolesBrackets(text?: string): string[] {
   if (!text) return [];
   const out: string[] = [];
@@ -264,8 +230,6 @@ export function DirectorSessionsPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const [sceneId, setSceneId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -299,8 +263,6 @@ export function DirectorSessionsPage() {
     loadDirectorSessions(accessToken)
       .then((res) => {
         if (cancelled) return;
-        setProjectId(res.projectId);
-        setSceneId(res.sceneId);
         setSessions(res.sessions ?? []);
         setActiveSessionId((prev) => prev ?? res.sessions?.[0]?.id ?? null);
       })
@@ -316,10 +278,10 @@ export function DirectorSessionsPage() {
   }, [accessToken]);
 
   const persist = async (next: DirectorRehearsalSession[]) => {
-    if (!accessToken || !projectId || !sceneId) return;
+    if (!accessToken) return;
     setSessions(next);
     try {
-      await saveDirectorSessions(accessToken, { projectId, sceneId, sessions: next });
+      await saveDirectorSessions(accessToken, { sessions: next });
     } catch (e) {
       console.error("saveDirectorSessions failed:", e);
     }
@@ -453,17 +415,39 @@ export function DirectorSessionsPage() {
     if (!slug || dataCache[slug]) return;
     setStepsLoading(true);
     try {
-      const pull = await syncPull(accessToken, null, slug);
+      const pull = await syncPull(accessToken, null, slug, { steps: true });
+      const rolesRes = await getProjectRoles(accessToken, slug).catch(() => null);
+      const roleEmailsByKey: Record<string, string[]> = {};
+      (rolesRes?.roles ?? []).forEach((r: any) => {
+        const key = normalizeRoleKey(String(r?.key ?? r?.title ?? ""));
+        if (!key) return;
+        const emails = Array.isArray(r?.emails)
+          ? r.emails.map((e: any) => normalizeEmail(e)).filter(Boolean)
+          : [];
+        roleEmailsByKey[key] = Array.from(new Set(emails));
+      });
       // у вас обычно одна сцена на проект (script); берём первую по projectId
       const proj = (pull.projects ?? []).find((p: any) => p.slug === slug);
-      const scene = proj ? (pull.scenes ?? []).find((s: any) => s.projectId === proj.id) : null;
-      const raw = scene?.rawJson ?? {};
-      const steps = normalizeSteps(raw);
-      const roleAssignments = normalizeRoleAssignments(raw);
-      setDataCache((p) => ({ ...p, [slug]: { steps, roleAssignments } }));
+      const scene =
+        proj ? (pull.scenes ?? []).find((s: any) => String(s?.id ?? "") === `${proj.id}:script`) : null;
+      const sceneId = String(scene?.id ?? "");
+      const steps = (Array.isArray((pull as any)?.steps) ? (pull as any).steps : [])
+        .filter((st: any) => String(st?.sceneId ?? "") === sceneId)
+        .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
+        .map((st: any) => ({
+          id: Number(st?.sourceId ?? 0),
+          title: String(st?.title ?? ""),
+          markdown: String(st?.markdown ?? ""),
+          playMarkdown: st?.playMarkdown ?? undefined,
+          durationMin: st?.durationMin ?? undefined,
+          kanbanStatus: st?.kanbanStatus ?? undefined,
+          kanbanOrder: st?.kanbanOrder ?? undefined,
+        }))
+        .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+      setDataCache((p) => ({ ...p, [slug]: { steps, roleEmailsByKey } }));
     } catch (e) {
       console.error("loadProjectData failed:", slug, e);
-      setDataCache((p) => ({ ...p, [slug]: { steps: [], roleAssignments: {} } }));
+      setDataCache((p) => ({ ...p, [slug]: { steps: [], roleEmailsByKey: {} } }));
     } finally {
       setStepsLoading(false);
     }
@@ -685,15 +669,13 @@ export function DirectorSessionsPage() {
         const data = dataCache[ref.projectSlug];
         const step = data?.steps?.find((x) => x.id === ref.stepId) ?? null;
         const roles = extractRolesSmart(String(step?.playMarkdown ?? step?.markdown ?? ""));
-        const roleAssignments = data?.roleAssignments ?? {};
-        const raIndex = normalizeRoleAssignmentsIndex(roleAssignments);
         const missingRoles = roles.filter((r) => {
           const key = normalizeRoleKey(r);
-          return !key || !(raIndex.get(key)?.length);
+          return !key || !((data?.roleEmailsByKey ?? {})[key]?.length);
         });
         const actors = roles.flatMap((r) => {
           const key = normalizeRoleKey(r);
-          return key ? raIndex.get(key) ?? [] : [];
+          return key ? (data?.roleEmailsByKey ?? {})[key] ?? [] : [];
         });
         return {
           slotId: sl.id,
@@ -1128,8 +1110,10 @@ export function DirectorSessionsPage() {
                             const text = String(step?.playMarkdown ?? step?.markdown ?? "").trim();
                             const previewText = markdownToPlainText(text);
                             const roles = extractRolesSmart(text);
-                            const ra = data?.roleAssignments ?? {};
-                            const missing = roles.filter((r) => !(ra[r]?.length));
+                            const missing = roles.filter((r) => {
+                              const key = normalizeRoleKey(r);
+                              return !key || !((data?.roleEmailsByKey ?? {})[key]?.length);
+                            });
                             return (
                               <>
                                 <div className="rehearsals-muted sessions-preview-sub">

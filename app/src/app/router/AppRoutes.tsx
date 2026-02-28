@@ -34,6 +34,12 @@ const TroupePage = lazy(() =>
   }))
 );
 
+const RolesPage = lazy(() =>
+  import("../../pages/roles/RolesPage").then((m) => ({
+    default: m.RolesPage,
+  }))
+);
+
 const SettingsPage = lazy(() =>
   import("../../pages/settings/SettingsPage/SettingsPage").then((m) => ({
     default: m.SettingsPage,
@@ -104,6 +110,7 @@ export function AppRoutes() {
           <Route path="/actor" element={<ActorPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/troupe" element={<TroupePage />} />
+          <Route path="/roles" element={<RolesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/bot" element={<SettingsBotPage />} />
         </Routes>

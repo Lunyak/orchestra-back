@@ -18,6 +18,7 @@ import { UsersModule } from './users/users.module';
 import { TtsModule } from './tts/tts.module';
 import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
 import { TroupeModule } from './troupe/troupe.module';
+import { RolesModule } from './roles/roles.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { TroupeModule } from './troupe/troupe.module';
     TtsModule,
     TelegramBotsModule,
     TroupeModule,
+    RolesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -10,13 +10,28 @@ import {
 
 export type SyncOperation = 'create' | 'update' | 'delete';
 
-export type SyncEntityType = 'Project' | 'Scene' | 'Step';
+export type SyncEntityType =
+  | 'Project'
+  | 'Scene'
+  | 'Step'
+  | 'PlaylistItem'
+  | 'Sound'
+  | 'GlobalLightChannel'
+  | 'TheaterLayout';
 
 export class SyncChangeDto {
   @IsString()
   id: string;
 
-  @IsIn(['Project', 'Scene', 'Step'])
+  @IsIn([
+    'Project',
+    'Scene',
+    'Step',
+    'PlaylistItem',
+    'Sound',
+    'GlobalLightChannel',
+    'TheaterLayout',
+  ])
   entityType: SyncEntityType;
 
   @IsString()
@@ -50,6 +65,20 @@ export class SyncPullDto {
   @IsOptional()
   @IsString()
   projectSlug?: string;
+
+  /**
+   * Управляет тем, какие "тяжелые" или legacy данные включать в ответ.
+   * По умолчанию (если не передано) возвращаем только projects/scenes (без rawJson) и без тяжелых таблиц.
+   */
+  @IsOptional()
+  @IsObject()
+  include?: {
+    steps?: boolean;
+    playlist?: boolean;
+    sounds?: boolean;
+    lightChannels?: boolean;
+    theaterLayout?: boolean;
+  };
 }
 
 export class SyncPullSceneDto {
@@ -58,4 +87,14 @@ export class SyncPullSceneDto {
 
   @IsString()
   sceneName: string;
+
+  @IsOptional()
+  @IsObject()
+  include?: {
+    steps?: boolean;
+    playlist?: boolean;
+    sounds?: boolean;
+    lightChannels?: boolean;
+    theaterLayout?: boolean;
+  };
 }

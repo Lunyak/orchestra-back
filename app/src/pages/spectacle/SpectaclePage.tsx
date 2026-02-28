@@ -1,5 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
@@ -32,6 +32,7 @@ const KanbanBoardPage = React.lazy(() =>
 );
 
 export function SpectaclePage() {
+  const navigate = useNavigate();
   const location = useLocation();
   const { accessToken } = useAuth();
   const { projectName } = useProject();
@@ -54,6 +55,7 @@ export function SpectaclePage() {
   const {
     showRequisites,
     showPlaylistSidebar,
+    togglePlaylist,
     showHeaderSounds,
     isStepsCollapsed,
     setIsStepsCollapsed,
@@ -143,7 +145,29 @@ export function SpectaclePage() {
   const isTheaterView = activeView === "theater";
   const isBoardView = activeView === "board";
 
-  const projectDisplay = projectName || "fools";
+  if (!projectName) {
+    return (
+      <div className="app-layout">
+        <div className="app-content">
+          <main className="main-content">
+            <div className="empty-project">
+              <h2>Проект не выбран</h2>
+              <p>Выберите проект в «Настройки» → «Сменить проект».</p>
+              <button
+                type="button"
+                className="empty-project-btn"
+                onClick={() => navigate("/settings")}
+              >
+                Перейти в настройки
+              </button>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  const projectDisplay = projectName;
 
   const playlistNode = !isBoardView ? (
     <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}
@@ -159,7 +183,6 @@ export function SpectaclePage() {
       )}
       <PlaylistSidebar
         projectName={projectDisplay}
-        tracks={sceneData?.playlist || []}
         sceneName="script"
         onRegisterPlayHandler={registerPlaylistPlay}
       />
@@ -284,6 +307,30 @@ export function SpectaclePage() {
         </main>
       </div>
       {stepsSidebarNode}
+      {!isMobile && !isBoardView && (
+        <div className="desktop-panel-buttons" aria-label="Панели">
+          {shouldShowStepsSidebar && isStepsCollapsed && (
+            <button
+              type="button"
+              className="desktop-panel-btn"
+              onClick={() => setIsStepsCollapsed(false)}
+              aria-label="Показать шаги"
+            >
+              Шаги
+            </button>
+          )}
+          {!showPlaylistSidebar && (
+            <button
+              type="button"
+              className="desktop-panel-btn"
+              onClick={togglePlaylist}
+              aria-label="Показать плейлист"
+            >
+              Плейлист
+            </button>
+          )}
+        </div>
+      )}
       {isMobile && !isBoardView && (
         <div className="mobile-bottom-buttons">
           {shouldShowStepsSidebar && (

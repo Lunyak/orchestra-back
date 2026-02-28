@@ -31,6 +31,7 @@ export class SyncController {
       req.user.userId,
       body.lastSyncAt,
       body.projectSlug,
+      body.include,
     );
   }
 
@@ -40,6 +41,7 @@ export class SyncController {
       req.user.userId,
       body.projectSlug,
       body.sceneName,
+      body.include,
     );
   }
 

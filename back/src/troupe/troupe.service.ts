@@ -34,7 +34,7 @@ export class TroupeService {
     const members = await this.prisma.troupeMember.findMany({
       where: { troupeId: troupe.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, troupeId: true, email: true, createdAt: true },
+      select: { id: true, troupeId: true, userId: true, email: true, createdAt: true },
     });
 
     const emails = members.map((m) => m.email.trim().toLowerCase()).filter(Boolean);
@@ -75,9 +75,13 @@ export class TroupeService {
     const email = normalizeEmail(rawEmail);
 
     try {
+      const user = await this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      });
       const created = await this.prisma.troupeMember.create({
-        data: { troupeId: troupe.id, email },
-        select: { id: true, troupeId: true, email: true, createdAt: true },
+        data: { troupeId: troupe.id, email, userId: user?.id ?? null },
+        select: { id: true, troupeId: true, userId: true, email: true, createdAt: true },
       });
 
       const profile = await this.prisma.userProfile.findUnique({

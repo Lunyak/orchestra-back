@@ -8,7 +8,7 @@ type OutboxPayload =
       projectSlug: string;
       sceneName: string;
       sceneTitle?: string;
-      rawJsonDelta: any;
+      rawJsonDelta: any; // legacy name: contains scene-level deltas (no longer pushed as rawJson)
     }
   | {
       kind: "stepUpsert";
@@ -37,7 +37,10 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
   const projectId = project.id;
 
   const nowIso = new Date().toISOString();
-  const sceneDeltaBySceneId = new Map<string, { name: string; rawJson: any; outboxIds: string[] }>();
+  const sceneDeltaBySceneId = new Map<
+    string,
+    { name: string; delta: any; outboxIds: string[] }
+  >();
   const stepUpserts: Array<{
     outboxId: string;
     sceneId: string;
@@ -56,10 +59,10 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
       const sceneId = `${projectId}:${payload.sceneName}`;
       const existing = sceneDeltaBySceneId.get(sceneId) ?? {
         name: payload.sceneTitle || `Сцена ${payload.sceneName}`,
-        rawJson: {},
+        delta: {},
         outboxIds: [],
       };
-      mergeSceneDelta(existing.rawJson, payload.rawJsonDelta);
+      mergeSceneDelta(existing.delta, payload.rawJsonDelta);
       if (payload.sceneTitle) existing.name = payload.sceneTitle;
       existing.outboxIds.push(outboxId);
       sceneDeltaBySceneId.set(sceneId, existing);
@@ -95,11 +98,89 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
         id: sceneId,
         projectId,
         name: pack.name,
-        rawJson: pack.rawJson,
         updatedAt: nowIso,
       },
       createdAt: nowIso,
     });
+
+    // Normalize delta keys into dedicated sync entities (rawJson is not sent/stored anymore).
+    const d = pack.delta ?? {};
+    if (Array.isArray(d.playlist)) {
+      for (const it of d.playlist) {
+        const sourceId = typeof it?.id === "number" ? it.id : null;
+        if (sourceId == null) continue;
+        changes.push({
+          id: createId(),
+          entityType: "PlaylistItem",
+          entityId: `${sceneId}:playlist:${sourceId}`,
+          operation: "update",
+          payload: {
+            sceneId,
+            sourceId,
+            order: typeof it?.order === "number" ? it.order : 0,
+            title: String(it?.title ?? `Track ${sourceId}`),
+            file: String(it?.file ?? ""),
+            fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
+            loop: Boolean(it?.loop),
+            remoteUrl: it?.remoteUrl ?? null,
+            remoteKey: it?.remoteKey ?? null,
+          },
+          createdAt: nowIso,
+        });
+      }
+    }
+
+    if (Array.isArray(d.sounds)) {
+      for (const it of d.sounds) {
+        const sourceId = typeof it?.id === "number" ? it.id : null;
+        if (sourceId == null) continue;
+        changes.push({
+          id: createId(),
+          entityType: "Sound",
+          entityId: `${sceneId}:sound:${sourceId}`,
+          operation: "update",
+          payload: {
+            sceneId,
+            sourceId,
+            title: String(it?.title ?? `Sound ${sourceId}`),
+            file: String(it?.file ?? ""),
+            icon: it?.icon ?? null,
+            volume: typeof it?.volume === "number" ? it.volume : 1,
+            fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
+            loop: Boolean(it?.loop),
+            remoteUrl: it?.remoteUrl ?? null,
+            remoteKey: it?.remoteKey ?? null,
+            iconRemoteUrl: it?.iconRemoteUrl ?? null,
+            iconRemoteKey: it?.iconRemoteKey ?? null,
+          },
+          createdAt: nowIso,
+        });
+      }
+    }
+
+    if (Array.isArray(d.lightChannels)) {
+      d.lightChannels.slice(0, 32).forEach((raw: any, index: number) => {
+        changes.push({
+          id: createId(),
+          entityType: "GlobalLightChannel",
+          entityId: `${sceneId}:lightChannel:${index}`,
+          operation: "update",
+          payload: { sceneId, index, raw: String(raw ?? "") },
+          createdAt: nowIso,
+        });
+      });
+    }
+
+    if (d.theaterLayout && typeof d.theaterLayout === "object") {
+      changes.push({
+        id: createId(),
+        entityType: "TheaterLayout",
+        entityId: `${sceneId}:theaterLayout`,
+        operation: "update",
+        payload: { sceneId, ...(d.theaterLayout as any) },
+        createdAt: nowIso,
+      });
+    }
   }
 
   for (const del of stepDeletes) {

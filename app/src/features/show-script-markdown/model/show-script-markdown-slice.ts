@@ -1,4 +1,9 @@
-import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import {
+  createAsyncThunk,
+  createSelector,
+  createSlice,
+  type PayloadAction,
+} from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 import type { ScriptStep } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
@@ -68,6 +73,24 @@ function defaultSceneUi(): SceneUiState {
     lightChannels: Array.from({ length: 8 }, () => ""),
     selectedLightSlot: 1,
   };
+}
+
+const defaultUiBySceneKeyCache = new Map<SceneKey, SceneUiState>();
+function getDefaultUiForSceneKey(sceneKey: SceneKey): SceneUiState {
+  const existing = defaultUiBySceneKeyCache.get(sceneKey);
+  if (existing) return existing;
+  const created = defaultSceneUi();
+  defaultUiBySceneKeyCache.set(sceneKey, created);
+  return created;
+}
+
+const defaultAnnotationsByCacheKey = new Map<CacheKey, AnnotationsEntry>();
+function getDefaultAnnotationsForCacheKey(cacheKey: CacheKey): AnnotationsEntry {
+  const existing = defaultAnnotationsByCacheKey.get(cacheKey);
+  if (existing) return existing;
+  const created: AnnotationsEntry = { items: [], loading: false, error: null };
+  defaultAnnotationsByCacheKey.set(cacheKey, created);
+  return created;
 }
 
 function normalizeLightChannels(raw: unknown): string[] {
@@ -365,52 +388,52 @@ export const showScriptMarkdownSlice = createSlice({
 export const showScriptMarkdownReducer = showScriptMarkdownSlice.reducer;
 export const showScriptMarkdownActions = showScriptMarkdownSlice.actions;
 
-export function selectShowScriptMarkdownUi(
-  state: RootState,
-  projectSlug: string,
-  sceneName: string,
-): SceneUiState {
-  const sceneKey = getSceneKey(projectSlug, sceneName);
-  return state.showScriptMarkdown.uiBySceneKey[sceneKey] ?? defaultSceneUi();
-}
+export const selectShowScriptMarkdownUi = createSelector(
+  [
+    (state: RootState) => state.showScriptMarkdown.uiBySceneKey,
+    (_state: RootState, projectSlug: string, sceneName: string) =>
+      getSceneKey(projectSlug, sceneName),
+  ],
+  (uiBySceneKey, sceneKey): SceneUiState =>
+    uiBySceneKey[sceneKey] ?? getDefaultUiForSceneKey(sceneKey),
+);
 
-export function selectActiveStepMarkdownContext(
-  state: RootState,
-  projectSlug: string,
-  sceneName: string,
-): {
-  currentStep: ScriptStep | undefined;
-  activeMarkdownField: "markdown" | "playMarkdown";
-  activeMarkdown: string;
-  activeField: ActorAnnotationField;
-} {
-  const ui = selectShowScriptMarkdownUi(state, projectSlug, sceneName);
-  const currentStep = state.scene.steps[state.scene.currentPage];
-  const activeMarkdownField: "markdown" | "playMarkdown" =
-    ui.markdownMode === "play" ? "playMarkdown" : "markdown";
-  const activeMarkdown = String(currentStep?.[activeMarkdownField] ?? "");
-  const activeField = (activeMarkdownField === "playMarkdown"
-    ? "playMarkdown"
-    : "markdown") as ActorAnnotationField;
+export const selectActiveStepMarkdownContext = createSelector(
+  [
+    (state: RootState, projectSlug: string, sceneName: string) =>
+      selectShowScriptMarkdownUi(state, projectSlug, sceneName),
+    (state: RootState) => state.scene.steps,
+    (state: RootState) => state.scene.currentPage,
+  ],
+  (
+    ui,
+    steps,
+    currentPage,
+  ): {
+    currentStep: ScriptStep | undefined;
+    activeMarkdownField: "markdown" | "playMarkdown";
+    activeMarkdown: string;
+    activeField: ActorAnnotationField;
+  } => {
+    const currentStep = steps[currentPage];
+    const activeMarkdownField: "markdown" | "playMarkdown" =
+      ui.markdownMode === "play" ? "playMarkdown" : "markdown";
+    const activeMarkdown = String(currentStep?.[activeMarkdownField] ?? "");
+    const activeField = (activeMarkdownField === "playMarkdown"
+      ? "playMarkdown"
+      : "markdown") as ActorAnnotationField;
 
-  return {
-    currentStep,
-    activeMarkdownField,
-    activeMarkdown,
-    activeField,
-  };
-}
+    return { currentStep, activeMarkdownField, activeMarkdown, activeField };
+  },
+);
 
-export function selectAnnotations(
-  state: RootState,
-  cacheKey: CacheKey,
-): AnnotationsEntry {
-  return (
-    state.showScriptMarkdown.annotationsByKey[cacheKey] ?? {
-      items: [],
-      loading: false,
-      error: null,
-    }
-  );
-}
+export const selectAnnotations = createSelector(
+  [
+    (state: RootState, cacheKey: CacheKey) =>
+      state.showScriptMarkdown.annotationsByKey[cacheKey],
+    (_state: RootState, cacheKey: CacheKey) => cacheKey,
+  ],
+  (entry, cacheKey): AnnotationsEntry =>
+    entry ?? getDefaultAnnotationsForCacheKey(cacheKey),
+);
 

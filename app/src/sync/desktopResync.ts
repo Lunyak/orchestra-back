@@ -2,7 +2,8 @@ import { syncPull, syncPullScene } from "./api";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "./desktopOutbox";
 
-const HEAVY_KEYS = ["steps", "playlist", "sounds", "lightChannels", "theaterLayout"] as const;
+// rawJson больше не приходит с сервера; resync делаем только по шагам.
+const HEAVY_KEYS = ["steps"] as const;
 type HeavyKey = (typeof HEAVY_KEYS)[number];
 
 function stableStringify(value: any): string {
@@ -83,8 +84,70 @@ export async function resyncDesktopProject(
   try {
     for (const sceneName of sceneNamesToSync) {
       totalScenes += 1;
-      const { scene } = await syncPullScene(accessToken, projectSlug, sceneName);
-      const serverRaw = scene?.rawJson ?? {};
+      const { scene, steps } = await syncPullScene(accessToken, projectSlug, sceneName, {
+        steps: true,
+      });
+      const serverRaw = {
+        steps: Array.isArray(steps)
+          ? steps
+              .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
+              .map((st: any) => ({
+                id: Number(st?.sourceId ?? 0),
+                title: String(st?.title ?? ""),
+                markdown: String(st?.markdown ?? ""),
+                playMarkdown: st?.playMarkdown ?? undefined,
+                durationMin: st?.durationMin ?? undefined,
+                kanbanStatus: st?.kanbanStatus ?? undefined,
+                kanbanOrder: st?.kanbanOrder ?? undefined,
+                cast: st?.cast ?? undefined,
+                requisites: Array.isArray(st?.requisites)
+                  ? st.requisites.map((r: any) => ({
+                      id: Number(r?.sourceId ?? r?.id ?? 0),
+                      label: String(r?.label ?? ""),
+                      checked: Boolean(r?.checked),
+                    }))
+                  : [],
+                lightPlot: Array.isArray(st?.lightPlot)
+                  ? st.lightPlot.map((f: any) => ({
+                      id: Number(f?.sourceId ?? f?.id ?? 0),
+                      label: String(f?.label ?? ""),
+                      channel: String(f?.channel ?? ""),
+                      x: Number(f?.x ?? 0),
+                      y: Number(f?.y ?? 0),
+                      angle: f?.angle ?? undefined,
+                      length: f?.length ?? undefined,
+                    }))
+                  : [],
+                theaterModels: Array.isArray(st?.theaterModels)
+                  ? st.theaterModels.map((m: any) => ({
+                      id: Number(m?.sourceId ?? m?.id ?? 0),
+                      name: String(m?.name ?? ""),
+                      type: m?.type ?? undefined,
+                      builtin: m?.builtin ?? undefined,
+                      allowOutOfBounds: Boolean(m?.allowOutOfBounds),
+                      position: m?.position,
+                      rotation: m?.rotation,
+                      scale: m?.scale,
+                    }))
+                  : [],
+                theaterSpotlights: Array.isArray(st?.theaterSpotlights)
+                  ? st.theaterSpotlights.map((sp: any) => ({
+                      id: Number(sp?.sourceId ?? sp?.id ?? 0),
+                      label: String(sp?.label ?? ""),
+                      position: sp?.position,
+                      target: sp?.target,
+                      angleDeg: Number(sp?.angleDeg ?? 0),
+                      intensity: Number(sp?.intensity ?? 0),
+                      color: sp?.color ?? undefined,
+                      enabled: Boolean(sp?.enabled),
+                      channel: sp?.channel ?? undefined,
+                      isRgb: sp?.isRgb ?? undefined,
+                    }))
+                  : [],
+              }))
+              .filter((x: any) => Number.isFinite(x.id) && x.id > 0)
+          : [],
+      };
       const localRaw = (await api.readProjectScene(projectSlug, sceneName)) ?? {};
 
       // "Smart" merge:
@@ -100,23 +163,6 @@ export async function resyncDesktopProject(
       let changed = !deepEqualByStableStringify(metaLocal, metaServer);
 
       for (const key of HEAVY_KEYS) {
-        if (key === "sounds") {
-          const mergedSounds = mergeSoundsPreservingLocalFilePath(
-            (localRaw as any)?.sounds,
-            (serverRaw as any)?.sounds,
-          );
-          if (
-            !deepEqualByStableStringify(
-              (localRaw as any)?.sounds ?? null,
-              mergedSounds,
-            )
-          ) {
-            next.sounds = mergedSounds;
-            changed = true;
-          }
-          continue;
-        }
-
         const localV = (localRaw as any)?.[key];
         const serverV = (serverRaw as any)?.[key];
         if (!deepEqualByStableStringify(localV ?? null, serverV ?? null)) {
@@ -137,11 +183,9 @@ export async function resyncDesktopProject(
   } catch (err) {
     // Legacy fallback: if per-scene pull isn't available, do full project pull.
     console.warn("[resync] pull-scene failed, fallback to syncPull", err);
-    const pull = await syncPull(accessToken, null, projectSlug);
+    const pull = await syncPull(accessToken, null, projectSlug, { steps: true });
     const serverScenes = Array.isArray(pull?.scenes) ? pull.scenes : [];
-    const related = serverScenes.filter(
-      (s: any) => String(s?.projectId ?? "").trim() && s?.rawJson,
-    );
+    const related = serverScenes.filter((s: any) => String(s?.projectId ?? "").trim());
 
     totalScenes = related.length;
     for (const s of related) {
@@ -149,7 +193,20 @@ export async function resyncDesktopProject(
       const parts = sceneId.split(":");
       const sceneName = parts.length >= 2 ? parts.slice(1).join(":") : "";
       if (!sceneName) continue;
-      const serverRaw = s.rawJson ?? {};
+      const serverSteps = Array.isArray((pull as any)?.steps)
+        ? (pull as any).steps.filter((st: any) => String(st?.sceneId ?? "") === sceneId)
+        : [];
+      const serverRaw = {
+        steps: serverSteps
+          .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
+          .map((st: any) => ({
+            id: Number(st?.sourceId ?? 0),
+            title: String(st?.title ?? ""),
+            markdown: String(st?.markdown ?? ""),
+            playMarkdown: st?.playMarkdown ?? undefined,
+          }))
+          .filter((x: any) => Number.isFinite(x.id) && x.id > 0),
+      };
       const localRaw = (await api.readProjectScene(projectSlug, sceneName)) ?? {};
       const next: any = { ...(isPlainObject(localRaw) ? localRaw : {}) };
 
@@ -159,22 +216,6 @@ export async function resyncDesktopProject(
       let changed = !deepEqualByStableStringify(metaLocal, metaServer);
 
       for (const key of HEAVY_KEYS) {
-        if (key === "sounds") {
-          const mergedSounds = mergeSoundsPreservingLocalFilePath(
-            (localRaw as any)?.sounds,
-            (serverRaw as any)?.sounds,
-          );
-          if (
-            !deepEqualByStableStringify(
-              (localRaw as any)?.sounds ?? null,
-              mergedSounds,
-            )
-          ) {
-            next.sounds = mergedSounds;
-            changed = true;
-          }
-          continue;
-        }
         const localV = (localRaw as any)?.[key];
         const serverV = (serverRaw as any)?.[key];
         if (!deepEqualByStableStringify(localV ?? null, serverV ?? null)) {

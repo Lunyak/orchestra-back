@@ -538,6 +538,18 @@ export class SyncService {
         if (entityType === 'Step') {
           await this.applyStepChange(userId, operation, payload);
         }
+        if (entityType === 'PlaylistItem') {
+          await this.applyPlaylistItemChange(operation, payload);
+        }
+        if (entityType === 'Sound') {
+          await this.applySoundChange(operation, payload);
+        }
+        if (entityType === 'GlobalLightChannel') {
+          await this.applyGlobalLightChannelChange(operation, payload);
+        }
+        if (entityType === 'TheaterLayout') {
+          await this.applyTheaterLayoutChange(operation, payload);
+        }
       } catch (error) {
         // Временно логируем ошибки синка, чтобы понимать, почему данные не попадают в БД
 
@@ -733,45 +745,6 @@ export class SyncService {
       return;
     }
 
-    const projectId = payload?.projectId;
-    if (projectId && operation === 'update' && payload?.rawJson) {
-      const existing = await this.prisma.scene.findUnique({
-        where: { id: payload.id },
-        select: { rawJson: true },
-      });
-      const oldKeys = await this.collectFileKeysFromSceneDb(
-        payload.id,
-        projectId,
-        existing?.rawJson ?? null,
-      );
-      const newKeys = this.collectFileKeysFromScene(payload.rawJson, projectId);
-      const toDelete = [...oldKeys].filter((k) => !newKeys.has(k));
-
-      // Дополнительное логирование для отладки
-      if (toDelete.length > 0) {
-        console.log('[sync] detected unused files', {
-          sceneId: payload.id,
-          oldKeysCount: oldKeys.size,
-          newKeysCount: newKeys.size,
-          toDeleteCount: toDelete.length,
-          oldKeys: [...oldKeys],
-          newKeys: [...newKeys],
-          toDelete,
-        });
-      }
-
-      const storage = this.getFileStorage();
-      for (const key of toDelete) {
-        await storage.deleteObject(key);
-      }
-      if (toDelete.length > 0) {
-        console.log('[sync] deleted unused files from storage', {
-          count: toDelete.length,
-          keys: toDelete,
-        });
-      }
-    }
-
     console.log('[sync] applying Scene change', {
       operation,
       id: payload.id,
@@ -779,75 +752,19 @@ export class SyncService {
       name: payload.name,
     });
 
-    const rawJsonToStore = payload?.rawJson
-      ? this.pruneSceneRawJson(payload.rawJson)
-      : null;
-
     const result = await this.prisma.scene.upsert({
       where: { id: payload.id },
       update: {
         name: payload.name,
-        rawJson: rawJsonToStore,
+        rawJson: null,
       },
       create: {
         id: payload.id,
         name: payload.name,
-        rawJson: rawJsonToStore,
+        rawJson: null,
         projectId: payload.projectId,
       },
     });
-
-    // ВАЖНО: раньше playlist хранился только в rawJson и таблица PlaylistItem оставалась пустой.
-    // Теперь дополнительно нормализуем playlist в отдельную таблицу, чтобы его можно было читать через include.
-    if (payload?.rawJson) {
-      try {
-        await this.syncPlaylistFromRawJson(result.id, payload.rawJson);
-      } catch (err) {
-        console.error('[sync] failed to sync playlist items from rawJson', {
-          sceneId: result.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    if (payload?.rawJson) {
-      try {
-        await this.syncSoundsFromRawJson(result.id, payload.rawJson);
-      } catch (err) {
-        console.error('[sync] failed to sync sounds from rawJson', {
-          sceneId: result.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
-
-    // Следующий шаг нормализации: шаги + свет/3D театр (из rawJson).
-    if (payload?.rawJson) {
-      try {
-        await this.syncStepsFromRawJson(result.id, payload.rawJson);
-      } catch (err) {
-        console.error('[sync] failed to sync steps from rawJson', {
-          sceneId: result.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-      try {
-        await this.syncLightChannelsFromRawJson(result.id, payload.rawJson);
-      } catch (err) {
-        console.error('[sync] failed to sync lightChannels from rawJson', {
-          sceneId: result.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-      try {
-        await this.syncTheaterLayoutFromRawJson(result.id, payload.rawJson);
-      } catch (err) {
-        console.error('[sync] failed to sync theaterLayout from rawJson', {
-          sceneId: result.id,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
 
     console.log('[sync] Scene upsert result', {
       id: result.id,
@@ -857,6 +774,208 @@ export class SyncService {
     if (payload.projectId) {
       this.notifications.notifySceneUpdated(payload.projectId);
     }
+  }
+
+  private async applyPlaylistItemChange(operation: string, payload: any) {
+    const sceneId = String(payload?.sceneId ?? '').trim();
+    const sourceId = this.normalizeInt(payload?.sourceId, -1);
+    if (!sceneId || sourceId <= 0) return;
+
+    if (operation === 'delete') {
+      await this.prisma.playlistItem.deleteMany({
+        where: { sceneId, sourceId },
+      });
+      return;
+    }
+
+    const order = this.normalizeInt(payload?.order, 0);
+    const title = this.normalizeString(payload?.title, `Track ${sourceId}`);
+    const file = this.normalizeString(payload?.file, '');
+
+    const fadeMs = this.normalizeInt(payload?.fadeMs, 0);
+    const loop = this.normalizeBool(payload?.loop, false);
+    const remoteUrl =
+      typeof payload?.remoteUrl === 'string' && payload.remoteUrl.trim()
+        ? payload.remoteUrl.trim()
+        : null;
+    const remoteKey =
+      typeof payload?.remoteKey === 'string' && payload.remoteKey.trim()
+        ? payload.remoteKey.trim()
+        : null;
+
+    const existing = await this.prisma.playlistItem.findFirst({
+      where: { sceneId, sourceId },
+      select: { id: true },
+    });
+    if (existing?.id) {
+      await this.prisma.playlistItem.update({
+        where: { id: existing.id },
+        data: { order, title, file, fadeMs, loop, remoteUrl, remoteKey },
+      });
+      return;
+    }
+    await this.prisma.playlistItem.create({
+      data: { sceneId, sourceId, order, title, file, fadeMs, loop, remoteUrl, remoteKey },
+    });
+  }
+
+  private async applySoundChange(operation: string, payload: any) {
+    const sceneId = String(payload?.sceneId ?? '').trim();
+    const sourceId = this.normalizeInt(payload?.sourceId, -1);
+    if (!sceneId || sourceId <= 0) return;
+
+    if (operation === 'delete') {
+      await this.prisma.sound.deleteMany({
+        where: { sceneId, sourceId },
+      });
+      return;
+    }
+
+    const title = this.normalizeString(payload?.title, `Sound ${sourceId}`);
+    const file = this.normalizeString(payload?.file, '');
+    const icon =
+      typeof payload?.icon === 'string' && payload.icon.trim()
+        ? payload.icon.trim()
+        : null;
+    const volume =
+      payload?.volume != null && Number.isFinite(Number(payload.volume))
+        ? Number(payload.volume)
+        : 1;
+    const fadeMs = this.normalizeInt(payload?.fadeMs, 0);
+    const loop = this.normalizeBool(payload?.loop, false);
+    const remoteUrl =
+      typeof payload?.remoteUrl === 'string' && payload.remoteUrl.trim()
+        ? payload.remoteUrl.trim()
+        : null;
+    const remoteKey =
+      typeof payload?.remoteKey === 'string' && payload.remoteKey.trim()
+        ? payload.remoteKey.trim()
+        : null;
+    const iconRemoteUrl =
+      typeof payload?.iconRemoteUrl === 'string' && payload.iconRemoteUrl.trim()
+        ? payload.iconRemoteUrl.trim()
+        : null;
+    const iconRemoteKey =
+      typeof payload?.iconRemoteKey === 'string' && payload.iconRemoteKey.trim()
+        ? payload.iconRemoteKey.trim()
+        : null;
+
+    const existing = await this.prisma.sound.findFirst({
+      where: { sceneId, sourceId },
+      select: { id: true },
+    });
+    if (existing?.id) {
+      await this.prisma.sound.update({
+        where: { id: existing.id },
+        data: {
+          title,
+          file,
+          icon,
+          remoteUrl,
+          remoteKey,
+          iconRemoteUrl,
+          iconRemoteKey,
+          volume,
+          fadeMs,
+          loop,
+        },
+      });
+      return;
+    }
+    await this.prisma.sound.create({
+      data: {
+        sceneId,
+        sourceId,
+        title,
+        file,
+        icon,
+        remoteUrl,
+        remoteKey,
+        iconRemoteUrl,
+        iconRemoteKey,
+        volume,
+        fadeMs,
+        loop,
+      },
+    });
+  }
+
+  private async applyGlobalLightChannelChange(operation: string, payload: any) {
+    const sceneId = String(payload?.sceneId ?? '').trim();
+    const index = this.normalizeInt(payload?.index, -1);
+    if (!sceneId || index < 0) return;
+
+    if (operation === 'delete') {
+      await this.prisma.globalLightChannel.deleteMany({
+        where: { sceneId, index },
+      });
+      return;
+    }
+
+    const raw = this.normalizeString(payload?.raw, '');
+    const updated = await this.prisma.globalLightChannel.updateMany({
+      where: { sceneId, index },
+      data: { raw, index },
+    });
+    if (updated.count > 0) return;
+    await this.prisma.globalLightChannel.create({
+      data: { sceneId, index, raw },
+    });
+  }
+
+  private async applyTheaterLayoutChange(operation: string, payload: any) {
+    const sceneId = String(payload?.sceneId ?? '').trim();
+    if (!sceneId) return;
+    if (operation === 'delete') {
+      await this.prisma.theaterLayout.deleteMany({ where: { sceneId } });
+      return;
+    }
+    const num = (v: any, fallback: number) =>
+      v != null && Number.isFinite(Number(v)) ? Number(v) : fallback;
+    await this.prisma.theaterLayout.upsert({
+      where: { sceneId },
+      update: {
+        hallWidth: this.normalizeInt(payload?.hallWidth, 0),
+        hallDepth: this.normalizeInt(payload?.hallDepth, 0),
+        wallHeight: this.normalizeInt(payload?.wallHeight, 0),
+        stageWidth: this.normalizeInt(payload?.stageWidth, 0),
+        stageDepth: this.normalizeInt(payload?.stageDepth, 0),
+        stageHeight: this.normalizeInt(payload?.stageHeight, 0),
+        stageZ: this.normalizeInt(payload?.stageZ, 0),
+        audienceStartZ: this.normalizeInt(payload?.audienceStartZ, 0),
+        seatRows: this.normalizeInt(payload?.seatRows, 0),
+        seatsPerRow: this.normalizeInt(payload?.seatsPerRow, 0),
+        seatSpacing: num(payload?.seatSpacing, 0),
+        rowSpacing: num(payload?.rowSpacing, 0),
+        rowRise: num(payload?.rowRise, 0),
+        aisleWidth: num(payload?.aisleWidth, 0),
+        aisleCenterX: num(payload?.aisleCenterX, 0),
+        doorWidth: num(payload?.doorWidth, 0),
+        doorHeight: num(payload?.doorHeight, 0),
+        doorZ: num(payload?.doorZ, 0),
+      },
+      create: {
+        sceneId,
+        hallWidth: this.normalizeInt(payload?.hallWidth, 0),
+        hallDepth: this.normalizeInt(payload?.hallDepth, 0),
+        wallHeight: this.normalizeInt(payload?.wallHeight, 0),
+        stageWidth: this.normalizeInt(payload?.stageWidth, 0),
+        stageDepth: this.normalizeInt(payload?.stageDepth, 0),
+        stageHeight: this.normalizeInt(payload?.stageHeight, 0),
+        stageZ: this.normalizeInt(payload?.stageZ, 0),
+        audienceStartZ: this.normalizeInt(payload?.audienceStartZ, 0),
+        seatRows: this.normalizeInt(payload?.seatRows, 0),
+        seatsPerRow: this.normalizeInt(payload?.seatsPerRow, 0),
+        seatSpacing: num(payload?.seatSpacing, 0),
+        rowSpacing: num(payload?.rowSpacing, 0),
+        rowRise: num(payload?.rowRise, 0),
+        aisleWidth: num(payload?.aisleWidth, 0),
+        aisleCenterX: num(payload?.aisleCenterX, 0),
+        doorWidth: num(payload?.doorWidth, 0),
+        doorHeight: num(payload?.doorHeight, 0),
+        doorZ: num(payload?.doorZ, 0),
+      },
+    });
   }
 
   private async applyStepChange(
@@ -903,6 +1022,8 @@ export class SyncService {
         title: payload.title,
         markdown: payload.markdown ?? null,
         playMarkdown: payload.playMarkdown ?? null,
+        // Если шаг ранее "удалили" (soft delete), любая upsert/update должна возвращать его в активное состояние.
+        deletedAt: null,
         durationMin:
           payload.durationMin != null && Number.isFinite(Number(payload.durationMin))
             ? Math.trunc(Number(payload.durationMin))
@@ -928,6 +1049,7 @@ export class SyncService {
         title: payload.title,
         markdown: payload.markdown ?? null,
         playMarkdown: payload.playMarkdown ?? null,
+        deletedAt: null,
         durationMin:
           payload.durationMin != null && Number.isFinite(Number(payload.durationMin))
             ? Math.trunc(Number(payload.durationMin))
@@ -1138,7 +1260,14 @@ export class SyncService {
   ): Promise<string | null> {
     if (entityType === 'Project' && payload?.id) return payload.id;
     if (entityType === 'Scene' && payload?.projectId) return payload.projectId;
-    if (entityType === 'Step' && payload?.sceneId) {
+    if (
+      (entityType === 'Step' ||
+        entityType === 'PlaylistItem' ||
+        entityType === 'Sound' ||
+        entityType === 'GlobalLightChannel' ||
+        entityType === 'TheaterLayout') &&
+      payload?.sceneId
+    ) {
       const scene = await this.prisma.scene.findUnique({
         where: { id: payload.sceneId },
         select: { projectId: true },
@@ -1153,6 +1282,13 @@ export class SyncService {
     userId: string,
     _lastSyncAt: string | null,
     projectSlug?: string,
+    include?: {
+      steps?: boolean;
+      playlist?: boolean;
+      sounds?: boolean;
+      lightChannels?: boolean;
+      theaterLayout?: boolean;
+    },
   ) {
     const projectAccessWhere = {
       OR: [{ ownerId: userId }, { members: { some: { userId } } }],
@@ -1179,20 +1315,42 @@ export class SyncService {
 
     const sceneIds = scenes.map((s) => s.id);
 
-    // IMPORTANT:
-    // Scene.rawJson хранит только "лёгкие" поля (metadata).
-    // Полный "офлайн JSON" собираем обратно из нормализованных таблиц,
-    // чтобы desktop/web могли работать как раньше после syncPull.
+    const wantSteps = Boolean(include?.steps);
+    const wantPlaylist = Boolean(include?.playlist);
+    const wantSounds = Boolean(include?.sounds);
+    const wantLightChannels = Boolean(include?.lightChannels);
+    const wantTheaterLayout = Boolean(include?.theaterLayout);
 
-    const steps = await this.prisma.step.findMany({
-      where: { sceneId: { in: sceneIds }, deletedAt: null },
-      include: {
-        requisites: true,
-        lightPlot: true,
-        theaterModels: true,
-        theaterSpotlights: true,
-      },
-      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+    const stepsRaw = wantSteps
+      ? await this.prisma.step.findMany({
+          where: { sceneId: { in: sceneIds }, deletedAt: null },
+          include: {
+            requisites: true,
+            lightPlot: true,
+            theaterModels: true,
+            theaterSpotlights: true,
+          },
+          orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+        })
+      : [];
+
+    // Дедуп шагов по (sceneId, sourceId).
+    // Причина: ранее могли приехать Step с неконсистентным id (другая "префиксная" часть),
+    // что приводило к двум строкам с одинаковым sourceId в одной сцене.
+    const stepsByComposite = new Map<string, (typeof stepsRaw)[number]>();
+    for (const st of stepsRaw) {
+      const k = `${st.sceneId}:${st.sourceId}`;
+      const prev = stepsByComposite.get(k);
+      if (!prev) {
+        stepsByComposite.set(k, st);
+        continue;
+      }
+      // Берём "самый свежий" как источник истины
+      if (st.updatedAt > prev.updatedAt) stepsByComposite.set(k, st);
+    }
+    const steps = Array.from(stepsByComposite.values()).sort((a, b) => {
+      if (a.sceneId !== b.sceneId) return a.sceneId < b.sceneId ? -1 : 1;
+      return a.order - b.order;
     });
 
     const stepsBySceneId = new Map<string, typeof steps>();
@@ -1202,177 +1360,60 @@ export class SyncService {
       stepsBySceneId.set(st.sceneId, list);
     }
 
-    const playlistItems = await this.prisma.playlistItem.findMany({
-      where: { sceneId: { in: sceneIds } },
-      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
-    });
-    const playlistBySceneId = new Map<string, typeof playlistItems>();
-    for (const p of playlistItems) {
-      const list = playlistBySceneId.get(p.sceneId) ?? [];
-      list.push(p);
-      playlistBySceneId.set(p.sceneId, list);
-    }
+    const playlistItems = wantPlaylist
+      ? await this.prisma.playlistItem.findMany({
+          where: { sceneId: { in: sceneIds } },
+          orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+        })
+      : [];
 
-    const sounds = await this.prisma.sound.findMany({
-      where: { sceneId: { in: sceneIds } },
-      orderBy: [{ sceneId: 'asc' }, { sourceId: 'asc' }],
-    });
-    const soundsBySceneId = new Map<string, typeof sounds>();
-    for (const s of sounds) {
-      const list = soundsBySceneId.get(s.sceneId) ?? [];
-      list.push(s);
-      soundsBySceneId.set(s.sceneId, list);
-    }
+    const sounds = wantSounds
+      ? await this.prisma.sound.findMany({
+          where: { sceneId: { in: sceneIds } },
+          orderBy: [{ sceneId: 'asc' }, { sourceId: 'asc' }],
+        })
+      : [];
 
-    const lightChannels = await this.prisma.globalLightChannel.findMany({
-      where: { sceneId: { in: sceneIds } },
-      orderBy: [{ sceneId: 'asc' }, { index: 'asc' }],
-    });
-    const lightChannelsBySceneId = new Map<string, typeof lightChannels>();
-    for (const ch of lightChannels) {
-      const list = lightChannelsBySceneId.get(ch.sceneId) ?? [];
-      list.push(ch);
-      lightChannelsBySceneId.set(ch.sceneId, list);
-    }
+    const lightChannels = wantLightChannels
+      ? await this.prisma.globalLightChannel.findMany({
+          where: { sceneId: { in: sceneIds } },
+          orderBy: [{ sceneId: 'asc' }, { index: 'asc' }],
+        })
+      : [];
 
-    const layouts = await this.prisma.theaterLayout.findMany({
-      where: { sceneId: { in: sceneIds } },
-    });
-    const layoutBySceneId = new Map<string, (typeof layouts)[number]>();
-    for (const l of layouts) layoutBySceneId.set(l.sceneId, l);
-
-    const scenesWithRehydratedRawJson = scenes.map((scene) => {
-      const legacy =
-        scene.rawJson && typeof scene.rawJson === 'object' && !Array.isArray(scene.rawJson)
-          ? (scene.rawJson as any)
-          : {};
-
-      const stepRows = stepsBySceneId.get(scene.id) ?? [];
-      const rehydratedSteps = stepRows.map((st) => ({
-        id: st.sourceId,
-        title: st.title,
-        markdown: st.markdown ?? '',
-        playMarkdown: st.playMarkdown ?? undefined,
-        durationMin: st.durationMin ?? undefined,
-        kanbanStatus: st.kanbanStatus ?? undefined,
-        kanbanOrder: st.kanbanOrder ?? undefined,
-        cast: (st.cast as any) ?? undefined,
-        requisites: (st.requisites ?? []).map((r) => ({
-          id: r.sourceId,
-          label: r.label,
-          checked: r.checked,
-        })),
-        lightPlot: (st.lightPlot ?? []).map((f) => ({
-          id: f.sourceId,
-          label: f.label,
-          channel: f.channel ?? '',
-          x: f.x,
-          y: f.y,
-          angle: f.angle,
-          length: f.length,
-        })),
-        theaterModels: (st.theaterModels ?? []).map((m) => ({
-          id: m.sourceId,
-          name: m.name,
-          type: m.type,
-          builtin: m.builtin ?? undefined,
-          allowOutOfBounds: m.allowOutOfBounds,
-          position: m.position,
-          rotation: m.rotation,
-          scale: m.scale,
-        })),
-        theaterSpotlights: (st.theaterSpotlights ?? []).map((sp) => ({
-          id: sp.sourceId,
-          label: sp.label,
-          position: sp.position,
-          target: sp.target,
-          angleDeg: sp.angleDeg,
-          intensity: sp.intensity,
-          color: sp.color,
-          enabled: sp.enabled,
-          channel: sp.channel,
-          isRgb: sp.isRgb,
-        })),
-      }));
-
-      const pl = playlistBySceneId.get(scene.id) ?? [];
-      const rehydratedPlaylist = pl.map((p) => ({
-        id: p.sourceId,
-        title: p.title,
-        file: p.file,
-        fadeMs: p.fadeMs,
-        loop: p.loop,
-        remoteUrl: (p as any).remoteUrl ?? undefined,
-        remoteKey: (p as any).remoteKey ?? undefined,
-      }));
-
-      const snd = soundsBySceneId.get(scene.id) ?? [];
-      const rehydratedSounds = snd.map((s) => ({
-        id: s.sourceId,
-        title: s.title,
-        file: s.file,
-        icon: s.icon ?? undefined,
-        volume: s.volume,
-        fadeMs: s.fadeMs,
-        loop: s.loop,
-        remoteUrl: s.remoteUrl ?? undefined,
-        remoteKey: s.remoteKey ?? undefined,
-        iconRemoteUrl: s.iconRemoteUrl ?? undefined,
-        iconRemoteKey: s.iconRemoteKey ?? undefined,
-      }));
-
-      const ch = lightChannelsBySceneId.get(scene.id) ?? [];
-      const rehydratedLightChannels = ch.map((x) => x.raw);
-
-      const layout = layoutBySceneId.get(scene.id);
-      const rehydratedTheaterLayout = layout
-        ? {
-            hallWidth: layout.hallWidth,
-            hallDepth: layout.hallDepth,
-            wallHeight: layout.wallHeight,
-            stageWidth: layout.stageWidth,
-            stageDepth: layout.stageDepth,
-            stageHeight: layout.stageHeight,
-            stageZ: layout.stageZ,
-            audienceStartZ: layout.audienceStartZ,
-            seatRows: layout.seatRows,
-            seatsPerRow: layout.seatsPerRow,
-            seatSpacing: layout.seatSpacing,
-            rowSpacing: layout.rowSpacing,
-            aisleWidth: layout.aisleWidth,
-            aisleCenterX: layout.aisleCenterX,
-            doorWidth: layout.doorWidth,
-            doorHeight: layout.doorHeight,
-            doorZ: layout.doorZ,
-            rowRise: layout.rowRise,
-          }
-        : undefined;
-
-      return {
-        ...scene,
-        rawJson: {
-          ...legacy,
-          name: legacy?.name ?? scene.name,
-          steps: rehydratedSteps,
-          playlist: rehydratedPlaylist,
-          sounds: rehydratedSounds,
-          lightChannels: rehydratedLightChannels,
-          theaterLayout: rehydratedTheaterLayout,
-        },
-      };
-    });
+    const theaterLayouts = wantTheaterLayout
+      ? await this.prisma.theaterLayout.findMany({
+          where: { sceneId: { in: sceneIds } },
+        })
+      : [];
 
     const now = new Date().toISOString();
+    const scenesForClient = scenes.map(({ rawJson: _rawJson, ...rest }: any) => rest);
 
     return {
       now,
       projects,
-      scenes: scenesWithRehydratedRawJson,
-      steps,
+      scenes: scenesForClient,
+      ...(wantSteps ? { steps } : {}),
+      ...(wantPlaylist ? { playlistItems } : {}),
+      ...(wantSounds ? { sounds } : {}),
+      ...(wantLightChannels ? { lightChannels } : {}),
+      ...(wantTheaterLayout ? { theaterLayouts } : {}),
     };
   }
 
-  async getSceneSnapshot(userId: string, projectSlug: string, sceneName: string) {
+  async getSceneSnapshot(
+    userId: string,
+    projectSlug: string,
+    sceneName: string,
+    include?: {
+      steps?: boolean;
+      playlist?: boolean;
+      sounds?: boolean;
+      lightChannels?: boolean;
+      theaterLayout?: boolean;
+    },
+  ) {
     const slug = String(projectSlug ?? '').trim();
     const name = String(sceneName ?? '').trim();
     if (!slug) throw new NotFoundException('Project not found');
@@ -1394,145 +1435,67 @@ export class SyncService {
     });
     if (!scene) throw new NotFoundException('Scene not found');
 
-    const steps = await this.prisma.step.findMany({
-      where: { sceneId, deletedAt: null },
-      include: {
-        requisites: true,
-        lightPlot: true,
-        theaterModels: true,
-        theaterSpotlights: true,
-      },
-      orderBy: { order: 'asc' },
-    });
+    const wantSteps = Boolean(include?.steps);
+    const wantPlaylist = Boolean(include?.playlist);
+    const wantSounds = Boolean(include?.sounds);
+    const wantLightChannels = Boolean(include?.lightChannels);
+    const wantTheaterLayout = Boolean(include?.theaterLayout);
 
-    const playlist = await this.prisma.playlistItem.findMany({
-      where: { sceneId },
-      orderBy: { order: 'asc' },
-    });
+    const stepsRaw = wantSteps
+      ? await this.prisma.step.findMany({
+          where: { sceneId, deletedAt: null },
+          include: {
+            requisites: true,
+            lightPlot: true,
+            theaterModels: true,
+            theaterSpotlights: true,
+          },
+          orderBy: { order: 'asc' },
+        })
+      : [];
+    const stepsBySourceId = new Map<number, (typeof stepsRaw)[number]>();
+    for (const st of stepsRaw) {
+      const prev = stepsBySourceId.get(st.sourceId);
+      if (!prev || st.updatedAt > prev.updatedAt) stepsBySourceId.set(st.sourceId, st);
+    }
+    const steps = Array.from(stepsBySourceId.values()).sort((a, b) => a.order - b.order);
 
-    const sounds = await this.prisma.sound.findMany({
-      where: { sceneId },
-      orderBy: { sourceId: 'asc' },
-    });
-
-    const lightChannels = await this.prisma.globalLightChannel.findMany({
-      where: { sceneId },
-      orderBy: { index: 'asc' },
-    });
-
-    const layout = await this.prisma.theaterLayout.findUnique({
-      where: { sceneId },
-    });
-
-    const legacy =
-      scene.rawJson && typeof scene.rawJson === 'object' && !Array.isArray(scene.rawJson)
-        ? (scene.rawJson as any)
-        : {};
-
-    const rawJson = {
-      ...legacy,
-      name: legacy?.name ?? scene.name,
-      steps: steps.map((st) => ({
-        id: st.sourceId,
-        title: st.title,
-        markdown: st.markdown ?? '',
-        playMarkdown: st.playMarkdown ?? undefined,
-        durationMin: st.durationMin ?? undefined,
-        kanbanStatus: st.kanbanStatus ?? undefined,
-        kanbanOrder: st.kanbanOrder ?? undefined,
-        cast: (st.cast as any) ?? undefined,
-        requisites: (st.requisites ?? []).map((r) => ({
-          id: r.sourceId,
-          label: r.label,
-          checked: r.checked,
-        })),
-        lightPlot: (st.lightPlot ?? []).map((f) => ({
-          id: f.sourceId,
-          label: f.label,
-          channel: f.channel ?? '',
-          x: f.x,
-          y: f.y,
-          angle: f.angle,
-          length: f.length,
-        })),
-        theaterModels: (st.theaterModels ?? []).map((m) => ({
-          id: m.sourceId,
-          name: m.name,
-          type: m.type,
-          builtin: m.builtin ?? undefined,
-          allowOutOfBounds: m.allowOutOfBounds,
-          position: m.position,
-          rotation: m.rotation,
-          scale: m.scale,
-        })),
-        theaterSpotlights: (st.theaterSpotlights ?? []).map((sp) => ({
-          id: sp.sourceId,
-          label: sp.label,
-          position: sp.position,
-          target: sp.target,
-          angleDeg: sp.angleDeg,
-          intensity: sp.intensity,
-          color: sp.color,
-          enabled: sp.enabled,
-          channel: sp.channel,
-          isRgb: sp.isRgb,
-        })),
-      })),
-      playlist: playlist.map((p) => ({
-        id: p.sourceId,
-        title: p.title,
-        file: p.file,
-        fadeMs: p.fadeMs,
-        loop: p.loop,
-        remoteUrl: (p as any).remoteUrl ?? undefined,
-        remoteKey: (p as any).remoteKey ?? undefined,
-      })),
-      sounds: sounds.map((s) => ({
-        id: s.sourceId,
-        title: s.title,
-        file: s.file,
-        icon: s.icon ?? undefined,
-        volume: s.volume,
-        fadeMs: s.fadeMs,
-        loop: s.loop,
-        remoteUrl: s.remoteUrl ?? undefined,
-        remoteKey: s.remoteKey ?? undefined,
-        iconRemoteUrl: s.iconRemoteUrl ?? undefined,
-        iconRemoteKey: s.iconRemoteKey ?? undefined,
-      })),
-      lightChannels: lightChannels.map((x) => x.raw),
-      theaterLayout: layout
-        ? {
-            hallWidth: layout.hallWidth,
-            hallDepth: layout.hallDepth,
-            wallHeight: layout.wallHeight,
-            stageWidth: layout.stageWidth,
-            stageDepth: layout.stageDepth,
-            stageHeight: layout.stageHeight,
-            stageZ: layout.stageZ,
-            audienceStartZ: layout.audienceStartZ,
-            seatRows: layout.seatRows,
-            seatsPerRow: layout.seatsPerRow,
-            seatSpacing: layout.seatSpacing,
-            rowSpacing: layout.rowSpacing,
-            aisleWidth: layout.aisleWidth,
-            aisleCenterX: layout.aisleCenterX,
-            doorWidth: layout.doorWidth,
-            doorHeight: layout.doorHeight,
-            doorZ: layout.doorZ,
-            rowRise: layout.rowRise,
-          }
-        : undefined,
-    };
+    const playlistItems = wantPlaylist
+      ? await this.prisma.playlistItem.findMany({
+          where: { sceneId },
+          orderBy: { order: 'asc' },
+        })
+      : [];
+    const sounds = wantSounds
+      ? await this.prisma.sound.findMany({
+          where: { sceneId },
+          orderBy: { sourceId: 'asc' },
+        })
+      : [];
+    const lightChannels = wantLightChannels
+      ? await this.prisma.globalLightChannel.findMany({
+          where: { sceneId },
+          orderBy: { index: 'asc' },
+        })
+      : [];
+    const theaterLayout = wantTheaterLayout
+      ? await this.prisma.theaterLayout.findUnique({
+          where: { sceneId },
+        })
+      : null;
 
     return {
       scene: {
         id: scene.id,
         projectId: scene.projectId,
         name: scene.name,
-        rawJson,
         updatedAt: scene.updatedAt,
       },
+      ...(wantSteps ? { steps } : {}),
+      ...(wantPlaylist ? { playlistItems } : {}),
+      ...(wantSounds ? { sounds } : {}),
+      ...(wantLightChannels ? { lightChannels } : {}),
+      ...(wantTheaterLayout ? { theaterLayout } : {}),
     };
   }
 

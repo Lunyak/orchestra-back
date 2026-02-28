@@ -75,21 +75,127 @@ function useSceneOperations() {
         null;
 
       try {
-        const { now, projects, scenes } = await syncPull(
+        const {
+          now,
+          projects,
+          scenes,
+          steps: serverSteps,
+          playlistItems,
+          sounds,
+        } = await syncPull(
           tokenToUse,
           effectiveLastSyncAt,
           effectiveProject,
+          { steps: true, playlist: true, sounds: true },
         );
         const project = projects.find((p: any) => p.slug === effectiveProject);
         if (!project) return;
-        const scene = scenes.find((s: any) => s.projectId === project.id);
+        const expectedSceneId = `${project.id}:script`;
+        const scene =
+          scenes.find((s: any) => s.id === expectedSceneId) ??
+          scenes.find((s: any) => s.projectId === project.id && s.name === "script") ??
+          scenes.find((s: any) => s.projectId === project.id);
         if (!scene) return;
-        const raw = (scene.rawJson as any) ?? {};
+        const normalizedSteps = (Array.isArray(serverSteps) ? serverSteps : [])
+          .filter((st: any) => String(st?.sceneId ?? "") === String(scene.id))
+          .sort((a: any, b: any) => (Number(a?.order ?? 0) - Number(b?.order ?? 0)))
+          .map((st: any) => ({
+            id: Number(st?.sourceId ?? 0),
+            title: String(st?.title ?? ""),
+            markdown: String(st?.markdown ?? ""),
+            playMarkdown: st?.playMarkdown ?? undefined,
+            durationMin: st?.durationMin ?? undefined,
+            kanbanStatus: st?.kanbanStatus ?? undefined,
+            kanbanOrder: st?.kanbanOrder ?? undefined,
+            cast: (st?.cast as any) ?? undefined,
+            requisites: Array.isArray(st?.requisites)
+              ? st.requisites.map((r: any) => ({
+                  id: Number(r?.sourceId ?? r?.id ?? 0),
+                  label: String(r?.label ?? ""),
+                  checked: Boolean(r?.checked),
+                }))
+              : [],
+            lightPlot: Array.isArray(st?.lightPlot)
+              ? st.lightPlot.map((f: any) => ({
+                  id: Number(f?.sourceId ?? f?.id ?? 0),
+                  label: String(f?.label ?? ""),
+                  channel: String(f?.channel ?? ""),
+                  x: Number(f?.x ?? 0),
+                  y: Number(f?.y ?? 0),
+                  angle: f?.angle ?? undefined,
+                  length: f?.length ?? undefined,
+                }))
+              : [],
+            theaterModels: Array.isArray(st?.theaterModels)
+              ? st.theaterModels.map((m: any) => ({
+                  id: Number(m?.sourceId ?? m?.id ?? 0),
+                  name: String(m?.name ?? ""),
+                  type: m?.type ?? undefined,
+                  builtin: m?.builtin ?? undefined,
+                  allowOutOfBounds: Boolean(m?.allowOutOfBounds),
+                  position: m?.position,
+                  rotation: m?.rotation,
+                  scale: m?.scale,
+                }))
+              : [],
+            theaterSpotlights: Array.isArray(st?.theaterSpotlights)
+              ? st.theaterSpotlights.map((sp: any) => ({
+                  id: Number(sp?.sourceId ?? sp?.id ?? 0),
+                  label: String(sp?.label ?? ""),
+                  position: sp?.position,
+                  target: sp?.target,
+                  angleDeg: Number(sp?.angleDeg ?? 0),
+                  intensity: Number(sp?.intensity ?? 0),
+                  color: sp?.color ?? undefined,
+                  enabled: Boolean(sp?.enabled),
+                  channel: sp?.channel ?? undefined,
+                  isRgb: sp?.isRgb ?? undefined,
+                }))
+              : [],
+          }))
+          .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+
+        const normalizedPlaylist = (Array.isArray(playlistItems) ? playlistItems : [])
+          .filter((pi: any) => String(pi?.sceneId ?? "") === String(scene.id))
+          .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
+          .map((pi: any) => ({
+            id: Number(pi?.sourceId ?? 0),
+            title: String(pi?.title ?? ""),
+            file: String(pi?.file ?? ""),
+            fadeMs: typeof pi?.fadeMs === "number" ? pi.fadeMs : 500,
+            loop: Boolean(pi?.loop),
+            remoteKey: pi?.remoteKey ?? undefined,
+            remoteUrl: pi?.remoteUrl ?? undefined,
+          }))
+          .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+
+        const normalizedSounds = (Array.isArray(sounds) ? sounds : [])
+          .filter((sd: any) => String(sd?.sceneId ?? "") === String(scene.id))
+          .map((sd: any) => ({
+            id: Number(sd?.sourceId ?? 0),
+            title: String(sd?.title ?? ""),
+            file: String(sd?.file ?? ""),
+            icon: sd?.icon ?? undefined,
+            iconRemoteKey: sd?.iconRemoteKey ?? undefined,
+            iconRemoteUrl: sd?.iconRemoteUrl ?? undefined,
+            volume: typeof sd?.volume === "number" ? sd.volume : 0.8,
+            fadeMs: typeof sd?.fadeMs === "number" ? sd.fadeMs : 500,
+            loop: Boolean(sd?.loop),
+            remoteKey: sd?.remoteKey ?? undefined,
+            remoteUrl: sd?.remoteUrl ?? undefined,
+          }))
+          .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+
+        const minimalSceneData: any = {
+          name: scene.name,
+          playlist: normalizedPlaylist,
+          sounds: normalizedSounds,
+        };
         dispatch(
           sceneActions.hydrateScene({
-            sceneData: raw || null,
-            theaterLayout: raw.theaterLayout || DEFAULT_THEATER_LAYOUT,
-            steps: raw.steps?.length ? raw.steps : steps,
+            sceneData: minimalSceneData,
+            theaterLayout: DEFAULT_THEATER_LAYOUT,
+            steps: normalizedSteps.length ? normalizedSteps : steps,
             isSceneReady: true,
           }),
         );
@@ -166,21 +272,36 @@ function useSceneOperations() {
           const nowIso = new Date().toISOString();
           let payloadForServer: any = { ...payload };
 
+          // Web path: use server state as "prev" baseline for diffs (playlist/sounds).
+          // Also preserve remoteKey/remoteUrl for sounds if desktop stored only filePath.
           let serverSounds: any[] = [];
+          let serverPlaylistItems: any[] = [];
           try {
-            const pull = await syncPull(token, null, projectName);
-            const serverScene = pull.scenes?.find((sc: any) => sc.id === sceneId);
-            if (serverScene?.rawJson?.sounds) serverSounds = serverScene.rawJson.sounds;
+            const pull = await syncPull(token, null, projectName, { sounds: true, playlist: true });
+            serverSounds = Array.isArray((pull as any)?.sounds)
+              ? (pull as any).sounds.filter((ss: any) => String(ss?.sceneId ?? "") === sceneId)
+              : [];
+            serverPlaylistItems = Array.isArray((pull as any)?.playlistItems)
+              ? (pull as any).playlistItems.filter((pi: any) => String(pi?.sceneId ?? "") === sceneId)
+              : [];
           } catch (_) {}
 
-          if (payloadForServer.sounds?.length) {
+          if (Array.isArray(payloadForServer.sounds) && payloadForServer.sounds.length) {
+            const bySourceId = new Map<number, any>();
+            serverSounds.forEach((ss: any) => {
+              const sid = typeof ss?.sourceId === "number" ? ss.sourceId : null;
+              if (sid != null) bySourceId.set(sid, ss);
+            });
             payloadForServer.sounds = payloadForServer.sounds.map((s: any) => {
               const { filePath: _fp, ...rest } = s;
               const sound = { ...rest };
-              if ((!sound.remoteKey || !sound.remoteUrl) && serverSounds.length > 0) {
-                const server = serverSounds.find((ss: any) => ss.id === s.id);
-                if (server?.remoteKey) sound.remoteKey = server.remoteKey;
-                if (server?.remoteUrl) sound.remoteUrl = server.remoteUrl;
+              const sid = typeof sound?.id === "number" ? sound.id : null;
+              const server = sid != null ? bySourceId.get(sid) : null;
+              if (server) {
+                if (!sound.remoteKey && server.remoteKey) sound.remoteKey = server.remoteKey;
+                if (!sound.remoteUrl && server.remoteUrl) sound.remoteUrl = server.remoteUrl;
+                if (!sound.iconRemoteKey && server.iconRemoteKey) sound.iconRemoteKey = server.iconRemoteKey;
+                if (!sound.iconRemoteUrl && server.iconRemoteUrl) sound.iconRemoteUrl = server.iconRemoteUrl;
               }
               return sound;
             });
@@ -196,12 +317,143 @@ function useSceneOperations() {
                 id: sceneId,
                 projectId,
                 name: payloadForServer.name || `Сцена ${projectName}`,
-                rawJson: payloadForServer,
                 updatedAt: nowIso,
               },
               createdAt: nowIso,
             },
           ];
+
+          // Playlist (scene-level)
+          const nextPlaylist = Array.isArray(payloadForServer.playlist)
+            ? (payloadForServer.playlist as any[])
+            : [];
+          const prevPlaylistIds = new Set(
+            serverPlaylistItems
+              .map((x: any) => (typeof x?.sourceId === "number" ? x.sourceId : null))
+              .filter(Boolean),
+          );
+          const nextPlaylistIds = new Set(
+            nextPlaylist.map((x: any) => (typeof x?.id === "number" ? x.id : null)).filter(Boolean),
+          );
+          nextPlaylist.forEach((it: any, order: number) => {
+            const sourceId = typeof it?.id === "number" ? it.id : null;
+            if (sourceId == null) return;
+            changes.push({
+              id: createId(),
+              entityType: "PlaylistItem",
+              entityId: `${sceneId}:playlist:${sourceId}`,
+              operation: prevPlaylistIds.has(sourceId) ? "update" : "create",
+              payload: {
+                sceneId,
+                sourceId,
+                order: typeof it?.order === "number" ? it.order : order,
+                title: String(it?.title ?? `Track ${sourceId}`),
+                file: String(it?.file ?? ""),
+                remoteUrl: it?.remoteUrl ?? null,
+                remoteKey: it?.remoteKey ?? null,
+                fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
+                loop: Boolean(it?.loop),
+              },
+              createdAt: nowIso,
+            });
+          });
+          prevPlaylistIds.forEach((id) => {
+            if (!nextPlaylistIds.has(id)) {
+              changes.push({
+                id: createId(),
+                entityType: "PlaylistItem",
+                entityId: `${sceneId}:playlist:${id}`,
+                operation: "delete",
+                payload: { sceneId, sourceId: id, updatedAt: nowIso },
+                createdAt: nowIso,
+              });
+            }
+          });
+
+          // Sounds (scene-level)
+          const nextSounds = Array.isArray(payloadForServer.sounds)
+            ? (payloadForServer.sounds as any[])
+            : [];
+          const prevSoundIds = new Set(
+            serverSounds
+              .map((x: any) => (typeof x?.sourceId === "number" ? x.sourceId : null))
+              .filter(Boolean),
+          );
+          const nextSoundIds = new Set(
+            nextSounds.map((x: any) => (typeof x?.id === "number" ? x.id : null)).filter(Boolean),
+          );
+          nextSounds.forEach((it: any) => {
+            const sourceId = typeof it?.id === "number" ? it.id : null;
+            if (sourceId == null) return;
+            changes.push({
+              id: createId(),
+              entityType: "Sound",
+              entityId: `${sceneId}:sound:${sourceId}`,
+              operation: prevSoundIds.has(sourceId) ? "update" : "create",
+              payload: {
+                sceneId,
+                sourceId,
+                title: String(it?.title ?? `Sound ${sourceId}`),
+                file: String(it?.file ?? ""),
+                icon: it?.icon ?? null,
+                remoteUrl: it?.remoteUrl ?? null,
+                remoteKey: it?.remoteKey ?? null,
+                iconRemoteUrl: it?.iconRemoteUrl ?? null,
+                iconRemoteKey: it?.iconRemoteKey ?? null,
+                volume: typeof it?.volume === "number" ? it.volume : 1,
+                fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
+                loop: Boolean(it?.loop),
+              },
+              createdAt: nowIso,
+            });
+          });
+          prevSoundIds.forEach((id) => {
+            if (!nextSoundIds.has(id)) {
+              changes.push({
+                id: createId(),
+                entityType: "Sound",
+                entityId: `${sceneId}:sound:${id}`,
+                operation: "delete",
+                payload: { sceneId, sourceId: id, updatedAt: nowIso },
+                createdAt: nowIso,
+              });
+            }
+          });
+
+          // Global light channels (scene-level)
+          const prevLight = Array.isArray((current as any)?.lightChannels)
+            ? ((current as any).lightChannels as any[])
+            : [];
+          const nextLight = Array.isArray(payloadForServer.lightChannels)
+            ? (payloadForServer.lightChannels as any[])
+            : [];
+          for (let i = 0; i < Math.max(prevLight.length, nextLight.length, 8); i++) {
+            const a = String(prevLight[i] ?? "");
+            const b = String(nextLight[i] ?? "");
+            if (a === b) continue;
+            changes.push({
+              id: createId(),
+              entityType: "GlobalLightChannel",
+              entityId: `${sceneId}:lightChannel:${i}`,
+              operation: "update",
+              payload: { sceneId, index: i, raw: b, updatedAt: nowIso },
+              createdAt: nowIso,
+            });
+          }
+
+          // Theater layout (scene-level)
+          const prevLayout = (current as any)?.theaterLayout ?? null;
+          const nextLayout = (payloadForServer as any)?.theaterLayout ?? null;
+          if (nextLayout && JSON.stringify(prevLayout ?? null) !== JSON.stringify(nextLayout ?? null)) {
+            changes.push({
+              id: createId(),
+              entityType: "TheaterLayout",
+              entityId: `${sceneId}:theaterLayout`,
+              operation: prevLayout ? "update" : "create",
+              payload: { sceneId, ...(nextLayout as any), updatedAt: nowIso },
+              createdAt: nowIso,
+            });
+          }
 
           const existingSteps: ScriptStep[] =
             (Array.isArray((current as any)?.steps)

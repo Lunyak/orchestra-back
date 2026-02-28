@@ -6,7 +6,7 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Разрешаем более крупные тела запросов (для /sync/push с rawJson и шагами)
+  // Разрешаем более крупные тела запросов (например, /sync/push со списками шагов/сущностей)
   app.use(
     json({
       limit: '10mb',

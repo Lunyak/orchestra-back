@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
+import { RolesService } from '../roles/roles.service';
 
 type DirectorSlotRef = { projectSlug: string; stepId: number };
 type DirectorSessionSlot = {
@@ -186,6 +187,7 @@ export class DirectorSessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly roles: RolesService,
   ) {}
 
   private async getDirectorProjectForUser(userId: string) {
@@ -207,33 +209,133 @@ export class DirectorSessionsService {
     return project;
   }
 
-  private async loadSessionsSceneByProjectId(projectId: string) {
-    const sceneId = `${projectId}:sessions`;
-    const scene = await this.prisma.scene.findUnique({
-      where: { id: sceneId },
-      select: { id: true, name: true, rawJson: true, projectId: true },
+  private normalizeSessionInput(raw: any): DirectorRehearsalSession | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const id = String((raw as any).id ?? '').trim();
+    const title = String((raw as any).title ?? '').trim() || 'Сессия';
+    const startsAt = String((raw as any).startsAt ?? '').trim();
+    const d = new Date(startsAt);
+    if (!id || !Number.isFinite(d.getTime())) return null;
+    const slots = Array.isArray((raw as any).slots) ? ((raw as any).slots as any[]) : [];
+    const payload: DirectorRehearsalSession = {
+      id,
+      title,
+      startsAt,
+      slots: slots as any,
+      updatedAt: String((raw as any).updatedAt ?? '').trim() || new Date().toISOString(),
+      participants: Array.isArray((raw as any).participants) ? (raw as any).participants : undefined,
+      telegramChatId: (raw as any).telegramChatId ?? null,
+      telegramMessageId: (raw as any).telegramMessageId ?? null,
+      telegramThreadId: (raw as any).telegramThreadId ?? null,
+      publishedAt: (raw as any).publishedAt ?? null,
+    };
+    return payload;
+  }
+
+  private async getSessionRow(projectId: string, sessionId: string) {
+    return this.prisma.directorSession.findFirst({
+      where: { projectId, id: sessionId },
+      select: { id: true, userId: true, title: true, startsAt: true, payload: true },
     });
-    if (!scene) throw new NotFoundException('Sessions scene not found');
-    const raw = (scene.rawJson as any) ?? {};
-    const sessions = Array.isArray(raw.sessions) ? (raw.sessions as any[]) : [];
-    return { sceneId, scene, raw, sessions };
+  }
+
+  private async upsertSessionRow(
+    projectId: string,
+    userId: string,
+    session: DirectorRehearsalSession,
+  ) {
+    const startsAt = new Date(session.startsAt);
+    await this.prisma.directorSession.upsert({
+      where: { id: session.id },
+      update: {
+        projectId,
+        userId,
+        title: session.title,
+        startsAt,
+        payload: session as any,
+      },
+      create: {
+        id: session.id,
+        projectId,
+        userId,
+        title: session.title,
+        startsAt,
+        payload: session as any,
+      },
+    });
+  }
+
+  async list(userId: string) {
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const rows = await this.prisma.directorSession.findMany({
+      where: { projectId: directorProject.id, userId },
+      select: { id: true, payload: true },
+      orderBy: { startsAt: 'asc' },
+    });
+    return {
+      projectId: directorProject.id,
+      sessions: rows.map((r) => (r.payload as any) ?? { id: r.id }),
+    };
+  }
+
+  async replaceAll(userId: string, body: { sessions?: any[] }) {
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const sessionsIn = Array.isArray(body?.sessions) ? body.sessions : [];
+    const sessions = sessionsIn
+      .map((s) => this.normalizeSessionInput(s))
+      .filter(Boolean) as DirectorRehearsalSession[];
+
+    const ids = Array.from(new Set(sessions.map((s) => s.id))).filter(Boolean);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.directorSession.deleteMany({
+        where: {
+          projectId: directorProject.id,
+          userId,
+          ...(ids.length ? { id: { notIn: ids } } : {}),
+        },
+      });
+      for (const s of sessions) {
+        await tx.directorSession.upsert({
+          where: { id: s.id },
+          update: {
+            projectId: directorProject.id,
+            userId,
+            title: s.title,
+            startsAt: new Date(s.startsAt),
+            payload: s as any,
+          },
+          create: {
+            id: s.id,
+            projectId: directorProject.id,
+            userId,
+            title: s.title,
+            startsAt: new Date(s.startsAt),
+            payload: s as any,
+          },
+        });
+      }
+    });
+    return { ok: true };
+  }
+
+  private async loadSessionsSceneByProjectId(projectId: string) {
+    const sessions = await this.prisma.directorSession.findMany({
+      where: { projectId },
+      select: { id: true, payload: true },
+      orderBy: { startsAt: 'asc' },
+    });
+    return {
+      sessions: sessions.map((r) => (r.payload as any) ?? { id: r.id }),
+    };
   }
 
   private async saveSessionsScene(
     projectId: string,
     sessions: DirectorRehearsalSession[],
   ) {
-    const sceneId = `${projectId}:sessions`;
-    await this.prisma.scene.upsert({
-      where: { id: sceneId },
-      update: { name: 'sessions', rawJson: { sessions } as any },
-      create: {
-        id: sceneId,
-        name: 'sessions',
-        rawJson: { sessions } as any,
-        projectId,
-      },
-    });
+    // legacy no-op: sessions are stored in DirectorSession table now
+    void projectId;
+    void sessions;
   }
 
   private async assertUserHasProjectAccessBySlug(userId: string, slug: string) {
@@ -257,19 +359,22 @@ export class DirectorSessionsService {
     const scene =
       (await this.prisma.scene.findUnique({
         where: { id: sceneId },
-        select: { id: true, rawJson: true },
+        select: { id: true },
       })) ??
       (await this.prisma.scene.findFirst({
         where: { projectId, deletedAt: null },
-        select: { id: true, rawJson: true },
+        select: { id: true },
       }));
-
-    const roleAssignments = (scene?.rawJson as any)?.roleAssignments ?? {};
-    const raIndex = normalizeRoleAssignmentsIndex(roleAssignments);
 
     const stepRows = await this.prisma.step.findMany({
       where: { sceneId: scene?.id ?? sceneId, deletedAt: null },
-      select: { sourceId: true, title: true, markdown: true, playMarkdown: true, order: true },
+      select: {
+        sourceId: true,
+        title: true,
+        markdown: true,
+        playMarkdown: true,
+        order: true,
+      },
       orderBy: { order: 'asc' },
     });
     const steps: RawStepLike[] = stepRows.map((st) => ({
@@ -279,7 +384,7 @@ export class DirectorSessionsService {
       playMarkdown: st.playMarkdown ?? undefined,
     }));
 
-    return { steps, raIndex };
+    return { steps };
   }
 
   /** Сформировать участников (neededEmails -> present profiles) по слотам сессии */
@@ -302,30 +407,30 @@ export class DirectorSessionsService {
       );
     }
 
-    // gather needed emails from roleAssignments per project
+    // gather needed emails from RoleAssignments per project
     const neededEmails = new Set<string>();
     const allowedEmails = new Set<string>();
+
+    // allowed: only people from my troupe (primary list for scheduling)
+    const troupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+      select: { id: true },
+    });
+    if (troupe?.id) {
+      const troupeMembers = await this.prisma.troupeMember.findMany({
+        where: { troupeId: troupe.id },
+        select: { email: true },
+      });
+      troupeMembers
+        .map((m) => normEmail(m.email))
+        .filter(Boolean)
+        .forEach((e) => allowedEmails.add(e));
+    }
 
     for (const slug of slugs) {
       const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
 
-      // union project members/emails for later filtering
-      const p = await this.prisma.project.findUnique({
-        where: { id: project.id },
-        select: {
-          owner: { select: { email: true } },
-          members: { select: { user: { select: { email: true } } } },
-        },
-      });
-      const memberEmails = [
-        normEmail(p?.owner?.email ?? ''),
-        ...((p?.members ?? []).map((m: any) =>
-          normEmail(m?.user?.email),
-        ) as string[]),
-      ].filter(Boolean);
-      memberEmails.forEach((e) => allowedEmails.add(normEmail(e)));
-
-      const { steps, raIndex } = await this.loadProjectScriptData(project.id);
+      const { steps } = await this.loadProjectScriptData(project.id);
       const stepById = new Map<number, RawStepLike>();
       steps.forEach((st) => {
         if (typeof st?.id === 'number') stepById.set(st.id, st);
@@ -336,21 +441,20 @@ export class DirectorSessionsService {
         const step = stepById.get(ref.stepId);
         const text = String(step?.playMarkdown ?? step?.markdown ?? '');
         const roles = extractRolesSmart(text);
-        for (const role of roles) {
-          const key = normalizeRoleKey(role);
-          if (!key) continue;
-          const actors = raIndex.get(key) ?? [];
-          for (const a of actors) {
-            const v = String(a ?? '').trim();
-            if (!looksLikeEmail(v)) continue;
-            neededEmails.add(normEmail(v));
-          }
+        const roleKeys = roles.map((r) => normalizeRoleKey(r)).filter(Boolean);
+        const assignmentMap = await this.roles.resolveAssignmentsByRoleKeys(
+          project.id,
+          roleKeys,
+        );
+        for (const k of roleKeys) {
+          const emails = assignmentMap.get(k) ?? [];
+          for (const e of emails) neededEmails.add(normEmail(e));
         }
       }
     }
 
     const effectiveNeeded = Array.from(neededEmails).filter((e) =>
-      allowedEmails.has(normEmail(e)),
+      allowedEmails.size > 0 ? allowedEmails.has(normEmail(e)) : true,
     );
     if (effectiveNeeded.length === 0) {
       throw new BadRequestException(
@@ -405,13 +509,9 @@ export class DirectorSessionsService {
     if (!sessId) throw new BadRequestException('session id is required');
 
     const directorProject = await this.getDirectorProjectForUser(userId);
-    const { sessions } = await this.loadSessionsSceneByProjectId(
-      directorProject.id,
-    );
-    const idx = sessions.findIndex((s) => String(s?.id) === sessId);
-    if (idx === -1) throw new NotFoundException('Session not found');
-
-    const session = sessions[idx] as DirectorRehearsalSession;
+    const row = await this.getSessionRow(directorProject.id, sessId);
+    const session = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    if (!session) throw new NotFoundException('Session not found');
     // NOTE: even if Telegram IDs exist, the message might have been deleted in Telegram.
     // We still call bot-service: it will try to edit existing message, and if it's gone
     // it will send a new one and overwrite Telegram IDs via markTelegramPublished.
@@ -426,9 +526,7 @@ export class DirectorSessionsService {
       participants,
       updatedAt: nowIso,
     };
-    const nextSessions = [...sessions];
-    nextSessions[idx] = updated;
-    await this.saveSessionsScene(directorProject.id, nextSessions as any);
+    await this.upsertSessionRow(directorProject.id, userId, updated);
 
     const botUrl =
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
@@ -519,10 +617,8 @@ export class DirectorSessionsService {
     const sid = String(sessionId ?? '').trim();
     if (!pid || !sid)
       throw new BadRequestException('projectId and sessionId are required');
-    const { sessions } = await this.loadSessionsSceneByProjectId(pid);
-    const session = sessions.find((s) => String(s?.id) === sid) as
-      | DirectorRehearsalSession
-      | undefined;
+    const row = await this.getSessionRow(pid, sid);
+    const session = (row?.payload as any) as DirectorRehearsalSession | undefined;
     if (!session) throw new NotFoundException('Session not found');
 
     // resolve slot titles
@@ -601,13 +697,11 @@ export class DirectorSessionsService {
     const sid = String(sessionId ?? '').trim();
     if (!pid || !sid)
       throw new BadRequestException('projectId and sessionId are required');
-    const { sessions } = await this.loadSessionsSceneByProjectId(pid);
-    const idx = sessions.findIndex((s) => String(s?.id) === sid);
-    if (idx === -1) throw new NotFoundException('Session not found');
+    const row = await this.getSessionRow(pid, sid);
+    const cur = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    if (!cur || !row?.userId) throw new NotFoundException('Session not found');
     const now = new Date().toISOString();
-    const next = [...sessions];
-    const cur = next[idx] as DirectorRehearsalSession;
-    next[idx] = {
+    const updated: DirectorRehearsalSession = {
       ...cur,
       telegramChatId: String(dto.chatId ?? '').trim() || null,
       telegramMessageId: String(dto.messageId ?? '').trim() || null,
@@ -616,7 +710,7 @@ export class DirectorSessionsService {
       publishedAt: now,
       updatedAt: now,
     };
-    await this.saveSessionsScene(pid, next as any);
+    await this.upsertSessionRow(pid, row.userId, updated);
     return { ok: true };
   }
 
@@ -637,12 +731,11 @@ export class DirectorSessionsService {
     const telegramId = String(dto.telegramId ?? '').trim();
     if (!telegramId) throw new BadRequestException('telegramId is required');
 
-    const { sessions } = await this.loadSessionsSceneByProjectId(pid);
-    const idx = sessions.findIndex((s) => String(s?.id) === sid);
-    if (idx === -1) throw new NotFoundException('Session not found');
+    const row = await this.getSessionRow(pid, sid);
+    const cur = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    if (!cur || !row?.userId) throw new NotFoundException('Session not found');
 
     const nowIso = new Date().toISOString();
-    const cur = sessions[idx] as DirectorRehearsalSession;
     const participants = Array.isArray(cur.participants)
       ? cur.participants
       : [];
@@ -669,13 +762,12 @@ export class DirectorSessionsService {
             : null,
       respondedAt: nowIso,
     };
-    const nextSessions = [...sessions];
-    nextSessions[idx] = {
+    const updated: DirectorRehearsalSession = {
       ...cur,
       participants: nextParticipants,
       updatedAt: nowIso,
     };
-    await this.saveSessionsScene(pid, nextSessions as any);
+    await this.upsertSessionRow(pid, row.userId, updated);
     return { ok: true };
   }
 }

@@ -4,6 +4,8 @@ import type { RootState } from "../../../shared/store/store";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { createId } from "../../../shared/utils/createId";
 import { ensureProject, uploadProjectFile } from "../../../sync/api";
+import type { PlaylistTrack } from "../../../shared/types/playlist";
+import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 
 export const DEFAULT_THEATER_LAYOUT: TheaterLayout = {
   hallWidth: 9,
@@ -25,7 +27,7 @@ export const DEFAULT_THEATER_LAYOUT: TheaterLayout = {
 export interface SceneData {
   name?: string;
   steps?: ScriptStep[];
-  playlist?: any[];
+  playlist?: PlaylistTrack[];
   sounds?: any[];
   theaterLayout?: TheaterLayout;
   /** Глобальное распределение: роль -> актёры (email/имя). Истина для назначений. */
@@ -101,6 +103,7 @@ export interface SceneState {
   stepsRevision: number;
   sceneDataRevision: number;
   soundsUpload: { uploading: boolean; error: string | null };
+  playlistUpload: { uploading: boolean; error: string | null; uploadingIds: number[] };
   voiceLinesUpload: { uploading: boolean; error: string | null };
 }
 
@@ -114,6 +117,7 @@ const initialState: SceneState = {
   stepsRevision: 0,
   sceneDataRevision: 0,
   soundsUpload: { uploading: false, error: null },
+  playlistUpload: { uploading: false, error: null, uploadingIds: [] },
   voiceLinesUpload: { uploading: false, error: null },
 };
 
@@ -124,6 +128,12 @@ function ensureNonEmptySteps(raw: ScriptStep[]): ScriptStep[] {
 
 function nextSoundIds(sounds: any[] | undefined, count: number): number[] {
   const maxId = (sounds ?? []).reduce((acc: number, s: any) => Math.max(acc, Number(s?.id ?? 0)), 0);
+  return Array.from({ length: count }, (_v, i) => maxId + i + 1);
+}
+
+function nextPlaylistIds(playlist: PlaylistTrack[] | undefined, count: number): number[] {
+  const list = Array.isArray(playlist) ? playlist : [];
+  const maxId = list.reduce((acc, t) => Math.max(acc, Number(t?.id ?? 0)), 0);
   return Array.from({ length: count }, (_v, i) => maxId + i + 1);
 }
 
@@ -250,6 +260,53 @@ export const uploadSceneSoundsWeb = createAsyncThunk<
   }
 
   return { projectSlug, sounds: uploaded };
+});
+
+export const uploadScenePlaylistWeb = createAsyncThunk<
+  { projectSlug: string; playlist: PlaylistTrack[] },
+  { projectSlug: string; files: File[] }
+>("scene/uploadScenePlaylistWeb", async (args, api) => {
+  const token = getAccessToken(api.getState as () => RootState);
+  if (!token) {
+    throw new Error("Нет токена авторизации");
+  }
+  const files = (args.files ?? []).filter(Boolean);
+  if (files.length === 0) return { projectSlug: args.projectSlug, playlist: [] };
+
+  const projectSlug = args.projectSlug;
+  const cachedId =
+    typeof window !== "undefined"
+      ? localStorage.getItem(`projectId:${projectSlug}`)
+      : null;
+  const projectId =
+    cachedId ?? (await ensureProject(token, projectSlug, `Проект ${projectSlug}`)).id;
+  if (!cachedId) ensureProjectIdCached(projectSlug, projectId);
+
+  const state = api.getState() as RootState;
+  const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+  const ids = nextPlaylistIds(current, files.length);
+
+  const uploaded: PlaylistTrack[] = [];
+  for (let i = 0; i < files.length; i += 1) {
+    const file = files[i];
+    const { key, url } = await uploadProjectFile(token, {
+      projectId,
+      type: "playlist",
+      file,
+    });
+    const title = file.name.replace(/\.[^.]+$/, "");
+    uploaded.push({
+      id: ids[i],
+      title,
+      file: file.name,
+      fadeMs: 500,
+      loop: false,
+      remoteKey: key,
+      remoteUrl: url,
+    });
+  }
+
+  return { projectSlug, playlist: uploaded };
 });
 
 export const setSoundIcon = createAsyncThunk<
@@ -393,6 +450,233 @@ export const pickSceneSoundsDesktop = createAsyncThunk<
   }
 
   return { projectSlug: args.projectSlug, sounds: uploaded };
+});
+
+async function persistScenePlaylistToDesktop(
+  projectSlug: string,
+  sceneName: string,
+  playlist: PlaylistTrack[],
+  getState: () => RootState,
+) {
+  const desktopApi = getDesktopApi();
+  if (!desktopApi) {
+    throw new Error("Desktop API недоступен");
+  }
+
+  const current = await desktopApi.readProjectScene(projectSlug, sceneName);
+  const payload = { ...current, playlist };
+  const result = await desktopApi.saveProjectScene(projectSlug, sceneName, payload);
+  if (!result?.ok) {
+    throw new Error(result?.error ?? "Не удалось сохранить плейлист");
+  }
+
+  const token = getAccessToken(getState);
+  if (!token) return;
+
+  let projectId =
+    typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectSlug}`) : null;
+  if (!projectId) {
+    const proj = await ensureProject(token, projectSlug, `Проект ${projectSlug}`);
+    projectId = proj.id;
+    ensureProjectIdCached(projectSlug, projectId);
+  }
+
+  // Desktop: enqueue delta on saveProjectScene, then flush outbox
+  await flushDesktopOutbox(token, projectSlug);
+}
+
+export const pickScenePlaylistTracksDesktop = createAsyncThunk<
+  { projectSlug: string; sceneName: string; playlist: PlaylistTrack[] },
+  { projectSlug: string; sceneName: string }
+>("scene/pickScenePlaylistTracksDesktop", async (args, api) => {
+  const desktopApi = getDesktopApi();
+  if (!desktopApi) {
+    throw new Error("Desktop API недоступен");
+  }
+
+  const res = await desktopApi.pickProjectAudio(args.projectSlug);
+  if (!res?.ok) {
+    if (res?.canceled) {
+      const state = api.getState() as RootState;
+      const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+      return { projectSlug: args.projectSlug, sceneName: args.sceneName, playlist: current };
+    }
+    throw new Error(res?.error ?? "Не удалось выбрать аудио");
+  }
+
+  const tracks = Array.isArray(res.tracks) ? res.tracks : [];
+  if (tracks.length === 0) {
+    const state = api.getState() as RootState;
+    const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+    return { projectSlug: args.projectSlug, sceneName: args.sceneName, playlist: current };
+  }
+
+  const state = api.getState() as RootState;
+  const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+  const ids = nextPlaylistIds(current, tracks.length);
+
+  const base: PlaylistTrack[] = tracks.map(
+    (t: { title?: string; file?: string }, i: number) => ({
+      id: ids[i],
+      title: String(t.title ?? "").trim() || String(t.file ?? "Track"),
+      file: String(t.file ?? ""),
+      fadeMs: 500,
+      loop: false,
+    }),
+  );
+
+  // Optional remote upload (only if logged in and desktop invoke exists)
+  const token = getAccessToken(api.getState as () => RootState);
+  let projectId: string | null = null;
+  if (token) {
+    const cached =
+      typeof window !== "undefined"
+        ? localStorage.getItem(`projectId:${args.projectSlug}`)
+        : null;
+    if (cached) {
+      projectId = cached;
+    } else {
+      const proj = await ensureProject(token, args.projectSlug, `Проект ${args.projectSlug}`);
+      projectId = proj.id;
+      ensureProjectIdCached(args.projectSlug, projectId);
+    }
+  }
+
+  const uploaded: PlaylistTrack[] = [];
+  for (const t of base) {
+    if (token && projectId && typeof desktopApi.invoke === "function") {
+      try {
+        const up = (await desktopApi.invoke("upload-project-audio", {
+          projectName: args.projectSlug,
+          file: t.file,
+          accessToken: token,
+          projectId,
+        })) as { ok?: boolean; key?: string; url?: string; error?: string };
+        if (up?.ok && up.key && up.url) {
+          uploaded.push({ ...t, remoteKey: up.key, remoteUrl: up.url });
+        } else {
+          if (up?.error) console.error("[playlist] upload-project-audio failed:", up.error);
+          uploaded.push(t);
+        }
+      } catch (err) {
+        console.error("[playlist] upload-project-audio error:", err);
+        uploaded.push(t);
+      }
+    } else {
+      uploaded.push(t);
+    }
+  }
+
+  const next = [...current, ...uploaded];
+  await persistScenePlaylistToDesktop(args.projectSlug, args.sceneName, next, api.getState as () => RootState);
+  return { projectSlug: args.projectSlug, sceneName: args.sceneName, playlist: next };
+});
+
+export const addScenePlaylistTracksFromPathsDesktop = createAsyncThunk<
+  { projectSlug: string; sceneName: string; playlist: PlaylistTrack[] },
+  { projectSlug: string; sceneName: string; filePaths: string[] }
+>("scene/addScenePlaylistTracksFromPathsDesktop", async (args, api) => {
+  const desktopApi = getDesktopApi();
+  if (!desktopApi) throw new Error("Desktop API недоступен");
+
+  const res = await desktopApi.addProjectAudio(args.projectSlug, args.filePaths);
+  if (!res?.ok) {
+    throw new Error(res?.error ?? "Не удалось добавить аудио");
+  }
+  const tracks = Array.isArray(res.tracks) ? res.tracks : [];
+  if (tracks.length === 0) {
+    const state = api.getState() as RootState;
+    const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+    return { projectSlug: args.projectSlug, sceneName: args.sceneName, playlist: current };
+  }
+
+  const state = api.getState() as RootState;
+  const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+  const ids = nextPlaylistIds(current, tracks.length);
+
+  const base: PlaylistTrack[] = tracks.map(
+    (t: { title?: string; file?: string }, i: number) => ({
+      id: ids[i],
+      title: String(t.title ?? "").trim() || String(t.file ?? "Track"),
+      file: String(t.file ?? ""),
+      fadeMs: 500,
+      loop: false,
+    }),
+  );
+
+  const token = getAccessToken(api.getState as () => RootState);
+  let projectId: string | null = null;
+  if (token) {
+    const cached =
+      typeof window !== "undefined"
+        ? localStorage.getItem(`projectId:${args.projectSlug}`)
+        : null;
+    if (cached) {
+      projectId = cached;
+    } else {
+      const proj = await ensureProject(token, args.projectSlug, `Проект ${args.projectSlug}`);
+      projectId = proj.id;
+      ensureProjectIdCached(args.projectSlug, projectId);
+    }
+  }
+
+  const uploaded: PlaylistTrack[] = [];
+  for (const t of base) {
+    if (token && projectId && typeof desktopApi.invoke === "function") {
+      try {
+        const up = (await desktopApi.invoke("upload-project-audio", {
+          projectName: args.projectSlug,
+          file: t.file,
+          accessToken: token,
+          projectId,
+        })) as { ok?: boolean; key?: string; url?: string; error?: string };
+        if (up?.ok && up.key && up.url) uploaded.push({ ...t, remoteKey: up.key, remoteUrl: up.url });
+        else uploaded.push(t);
+      } catch (err) {
+        console.error("[playlist] upload-project-audio error:", err);
+        uploaded.push(t);
+      }
+    } else {
+      uploaded.push(t);
+    }
+  }
+
+  const next = [...current, ...uploaded];
+  await persistScenePlaylistToDesktop(args.projectSlug, args.sceneName, next, api.getState as () => RootState);
+  return { projectSlug: args.projectSlug, sceneName: args.sceneName, playlist: next };
+});
+
+export const persistScenePlaylistDesktop = createAsyncThunk<
+  { projectSlug: string; sceneName: string; playlist: PlaylistTrack[] },
+  { projectSlug: string; sceneName: string }
+>("scene/persistScenePlaylistDesktop", async (args, api) => {
+  const state = api.getState() as RootState;
+  const current = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+  await persistScenePlaylistToDesktop(args.projectSlug, args.sceneName, current, api.getState as () => RootState);
+  return { projectSlug: args.projectSlug, sceneName: args.sceneName, playlist: current };
+});
+
+export const deleteScenePlaylistTrackDesktop = createAsyncThunk<
+  { projectSlug: string; sceneName: string; removedId: number },
+  { projectSlug: string; sceneName: string; id: number; file: string }
+>("scene/deleteScenePlaylistTrackDesktop", async (args, api) => {
+  const desktopApi = getDesktopApi();
+  if (!desktopApi) throw new Error("Desktop API недоступен");
+
+  try {
+    const res = await desktopApi.deleteProjectAudio(args.projectSlug, args.file);
+    if (!res?.ok) {
+      console.error("[playlist] deleteProjectAudio failed:", res?.error);
+    }
+  } catch (err) {
+    console.error("[playlist] deleteProjectAudio error:", err);
+  }
+
+  const state = api.getState() as RootState;
+  const prev = (state.scene.sceneData?.playlist ?? []) as PlaylistTrack[];
+  const next = prev.filter((t) => Number(t.id) !== Number(args.id));
+  await persistScenePlaylistToDesktop(args.projectSlug, args.sceneName, next, api.getState as () => RootState);
+  return { projectSlug: args.projectSlug, sceneName: args.sceneName, removedId: args.id };
 });
 
 export const sceneSlice = createSlice({
@@ -573,6 +857,40 @@ export const sceneSlice = createSlice({
       state.hasLocalEdits = true;
       state.sceneDataRevision += 1;
     },
+    setPlaylist(state, action: PayloadAction<PlaylistTrack[]>) {
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: action.payload ?? [] };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    updatePlaylistTrack(
+      state,
+      action: PayloadAction<{ id: number; changes: Partial<PlaylistTrack> }>,
+    ) {
+      const list = Array.isArray(state.sceneData?.playlist) ? state.sceneData!.playlist! : [];
+      const idx = list.findIndex((t) => Number(t?.id) === Number(action.payload.id));
+      if (idx === -1) return;
+      const next = [...list];
+      next[idx] = { ...next[idx], ...action.payload.changes };
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    reorderPlaylist(
+      state,
+      action: PayloadAction<{ fromIndex: number; toIndex: number }>,
+    ) {
+      const list = Array.isArray(state.sceneData?.playlist) ? state.sceneData!.playlist! : [];
+      const { fromIndex, toIndex } = action.payload;
+      if (fromIndex === toIndex) return;
+      if (fromIndex < 0 || toIndex < 0) return;
+      if (fromIndex >= list.length || toIndex >= list.length) return;
+      const next = [...list];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
   },
   extraReducers: (builder) => {
     const pending = (state: SceneState) => {
@@ -604,6 +922,28 @@ export const sceneSlice = createSlice({
     builder.addCase(pickSceneSoundsDesktop.fulfilled, fulfilled);
     builder.addCase(pickSceneSoundsDesktop.rejected, rejected);
 
+    builder.addCase(uploadScenePlaylistWeb.pending, (state) => {
+      state.playlistUpload.uploading = true;
+      state.playlistUpload.error = null;
+      state.playlistUpload.uploadingIds = [];
+    });
+    builder.addCase(uploadScenePlaylistWeb.rejected, (state, action: any) => {
+      state.playlistUpload.uploading = false;
+      state.playlistUpload.error = String(action?.error?.message ?? "Не удалось загрузить треки");
+      state.playlistUpload.uploadingIds = [];
+    });
+    builder.addCase(uploadScenePlaylistWeb.fulfilled, (state, action) => {
+      state.playlistUpload.uploading = false;
+      state.playlistUpload.error = null;
+      state.playlistUpload.uploadingIds = [];
+      const next = action.payload?.playlist ?? [];
+      if (next.length === 0) return;
+      const prev = Array.isArray(state.sceneData?.playlist) ? state.sceneData!.playlist! : [];
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: [...prev, ...next] };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
     builder.addCase(setSoundIcon.fulfilled, (state, action) => {
       const { soundId, changes } = action.payload;
       if (!changes || Object.keys(changes).length === 0) return;
@@ -614,6 +954,66 @@ export const sceneSlice = createSlice({
       const next = [...list];
       next[idx] = { ...next[idx], ...changes };
       state.sceneData = { ...(state.sceneData ?? {}), sounds: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
+    builder.addCase(pickScenePlaylistTracksDesktop.pending, (state) => {
+      state.playlistUpload.uploading = true;
+      state.playlistUpload.error = null;
+      state.playlistUpload.uploadingIds = [];
+    });
+    builder.addCase(pickScenePlaylistTracksDesktop.rejected, (state, action: any) => {
+      state.playlistUpload.uploading = false;
+      state.playlistUpload.error = String(action?.error?.message ?? "Не удалось добавить треки");
+      state.playlistUpload.uploadingIds = [];
+    });
+    builder.addCase(pickScenePlaylistTracksDesktop.fulfilled, (state, action) => {
+      state.playlistUpload.uploading = false;
+      state.playlistUpload.error = null;
+      state.playlistUpload.uploadingIds = [];
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: action.payload.playlist ?? [] };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
+    builder.addCase(addScenePlaylistTracksFromPathsDesktop.pending, (state) => {
+      state.playlistUpload.uploading = true;
+      state.playlistUpload.error = null;
+      state.playlistUpload.uploadingIds = [];
+    });
+    builder.addCase(addScenePlaylistTracksFromPathsDesktop.rejected, (state, action: any) => {
+      state.playlistUpload.uploading = false;
+      state.playlistUpload.error = String(action?.error?.message ?? "Не удалось добавить треки");
+      state.playlistUpload.uploadingIds = [];
+    });
+    builder.addCase(addScenePlaylistTracksFromPathsDesktop.fulfilled, (state, action) => {
+      state.playlistUpload.uploading = false;
+      state.playlistUpload.error = null;
+      state.playlistUpload.uploadingIds = [];
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: action.payload.playlist ?? [] };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
+    builder.addCase(persistScenePlaylistDesktop.pending, (state) => {
+      // do not block UI, but expose error if needed
+      state.playlistUpload.error = null;
+    });
+    builder.addCase(persistScenePlaylistDesktop.rejected, (state, action: any) => {
+      state.playlistUpload.error = String(action?.error?.message ?? "Не удалось сохранить плейлист");
+    });
+
+    builder.addCase(deleteScenePlaylistTrackDesktop.pending, (state) => {
+      state.playlistUpload.error = null;
+    });
+    builder.addCase(deleteScenePlaylistTrackDesktop.rejected, (state, action: any) => {
+      state.playlistUpload.error = String(action?.error?.message ?? "Не удалось удалить трек");
+    });
+    builder.addCase(deleteScenePlaylistTrackDesktop.fulfilled, (state, action) => {
+      const list = Array.isArray(state.sceneData?.playlist) ? state.sceneData!.playlist! : [];
+      const next = list.filter((t) => Number(t.id) !== Number(action.payload.removedId));
+      state.sceneData = { ...(state.sceneData ?? {}), playlist: next };
       state.hasLocalEdits = true;
       state.sceneDataRevision += 1;
     });

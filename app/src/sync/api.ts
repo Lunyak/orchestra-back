@@ -7,7 +7,14 @@ import { refreshToken } from "./auth";
 
 export type SyncOperation = "create" | "update" | "delete";
 
-export type SyncEntityType = "Project" | "Scene" | "Step";
+export type SyncEntityType =
+  | "Project"
+  | "Scene"
+  | "Step"
+  | "PlaylistItem"
+  | "Sound"
+  | "GlobalLightChannel"
+  | "TheaterLayout";
 
 export interface SyncChange {
   id: string;
@@ -25,13 +32,24 @@ export interface SyncPushRequest {
 export interface SyncPullRequest {
   lastSyncAt: string | null;
   projectSlug?: string;
+  include?: {
+    steps?: boolean;
+    playlist?: boolean;
+    sounds?: boolean;
+    lightChannels?: boolean;
+    theaterLayout?: boolean;
+  };
 }
 
 export interface SyncPullResponse {
   now: string;
   projects: ProjectSummary[];
   scenes: any[];
-  steps: any[];
+  steps?: any[];
+  playlistItems?: any[];
+  sounds?: any[];
+  lightChannels?: any[];
+  theaterLayouts?: any[];
 }
 
 export interface ProjectSummary {
@@ -176,9 +194,11 @@ export async function syncPull(
   accessToken: string,
   lastSyncAt: string | null,
   projectSlug?: string,
+  include?: SyncPullRequest["include"],
 ): Promise<SyncPullResponse> {
   const body: SyncPullRequest = { lastSyncAt };
   if (projectSlug) body.projectSlug = projectSlug;
+  if (include) body.include = include;
   const { data } = await api.post<SyncPullResponse>("/sync/pull", body, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -189,10 +209,18 @@ export async function syncPullScene(
   accessToken: string,
   projectSlug: string,
   sceneName: string,
-): Promise<{ scene: { id: string; projectId: string; name: string; rawJson: any; updatedAt: string } }> {
+  include?: SyncPullRequest["include"],
+): Promise<{
+  scene: { id: string; projectId: string; name: string; updatedAt: string };
+  steps?: any[];
+  playlistItems?: any[];
+  sounds?: any[];
+  lightChannels?: any[];
+  theaterLayout?: any;
+}> {
   const { data } = await api.post(
     "/sync/pull-scene",
-    { projectSlug, sceneName },
+    { projectSlug, sceneName, include },
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data as any;
@@ -271,6 +299,104 @@ export async function getProjectMembers(
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
+}
+
+export type ProjectRoleInfo = {
+  id: string;
+  key: string;
+  title: string;
+  description?: string | null;
+  aliases: string[];
+  emails: string[];
+};
+
+export async function getProjectRoles(
+  accessToken: string,
+  projectSlug: string,
+): Promise<{ projectId: string; roles: ProjectRoleInfo[] }> {
+  const { data } = await api.get(
+    `/projects/${encodeURIComponent(projectSlug)}/roles`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function createProjectRole(
+  accessToken: string,
+  projectSlug: string,
+  body: { title: string; description?: string; aliases?: string[] },
+): Promise<{ ok: boolean; roleId: string }> {
+  const { data } = await api.post(
+    `/projects/${encodeURIComponent(projectSlug)}/roles`,
+    body,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function updateProjectRole(
+  accessToken: string,
+  projectSlug: string,
+  roleId: string,
+  body: { title: string; description?: string; aliases?: string[] },
+): Promise<{ ok: boolean; roleId: string }> {
+  const { data } = await api.put(
+    `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}`,
+    body,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function setProjectRoleAssignments(
+  accessToken: string,
+  projectSlug: string,
+  roleId: string,
+  emails: string[],
+): Promise<{ ok: boolean }> {
+  const { data } = await api.put(
+    `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(
+      roleId,
+    )}/assignments`,
+    { emails },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export type RoleNoteItem = {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  authorEmail: string | null;
+  authorUserId: string | null;
+};
+
+export async function getProjectRoleNotes(
+  accessToken: string,
+  projectSlug: string,
+  roleId: string,
+): Promise<{ role: { id: string; title: string; key: string }; notes: RoleNoteItem[] }> {
+  const { data } = await api.get(
+    `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}/notes`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function addProjectRoleNote(
+  accessToken: string,
+  projectSlug: string,
+  roleId: string,
+  content: string,
+): Promise<{ ok: boolean; noteId: string }> {
+  const { data } = await api.post(
+    `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}/notes`,
+    { content },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
 }
 
 export interface MyProfile {
@@ -518,6 +644,27 @@ export async function publishDirectorSession(
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
+}
+
+export async function getDirectorSessions(
+  accessToken: string,
+): Promise<{ projectId: string; sessions: any[] }> {
+  const { data } = await api.get("/director-sessions", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data as any;
+}
+
+export async function replaceDirectorSessions(
+  accessToken: string,
+  sessions: any[],
+): Promise<{ ok: boolean }> {
+  const { data } = await api.put(
+    "/director-sessions",
+    { sessions },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
 }
 
 export async function planRehearsal(

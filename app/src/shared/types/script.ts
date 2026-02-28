@@ -13,7 +13,7 @@ export interface ScriptStep {
   theaterActiveModelId?: number;
   /**
    * Канбан-статус готовности "сцены" (шаг сценария).
-   * Хранится в rawJson сцены и синкается как часть steps.
+   * Хранится в Step и синкается как часть шага.
    */
   kanbanStatus?: "raw" | "text-learned" | "almost-ready" | "ready";
   /** Порядок карточки в колонке канбана (не влияет на порядок шагов в сценарии). */

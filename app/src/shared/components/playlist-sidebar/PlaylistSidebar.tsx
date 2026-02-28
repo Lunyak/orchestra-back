@@ -1,36 +1,37 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ensureProject } from "../../../sync/api";
-import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { getDesktopApi } from "../../platform/desktop-api";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import type { PlaylistTrack } from "../../types/playlist";
+import {
+  addScenePlaylistTracksFromPathsDesktop,
+  deleteScenePlaylistTrackDesktop,
+  persistScenePlaylistDesktop,
+  pickScenePlaylistTracksDesktop,
+  sceneActions,
+  uploadScenePlaylistWeb,
+} from "../../../features/scene/model/scene-slice";
 import "./style.css";
-
-export interface PlaylistTrack {
-  id: number;
-  title: string;
-  file: string;
-  fadeMs?: number;
-  loop?: boolean;
-  /** URL на сервере (MinIO), если трек уже выгружен */
-  remoteUrl?: string;
-  /** Ключ в хранилище — для запроса свежей ссылки, когда remoteUrl истёк */
-  remoteKey?: string;
-}
 
 interface PlaylistSidebarProps {
   projectName: string;
-  tracks?: PlaylistTrack[];
   sceneName?: string;
   onRegisterPlayHandler?: (handler: (trackId: number) => void) => void;
 }
 
+const EMPTY_PLAYLIST: PlaylistTrack[] = [];
+
 export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   projectName,
-  tracks = [],
   sceneName = "script",
   onRegisterPlayHandler,
 }) => {
+  const dispatch = useAppDispatch();
+  const playlist = useAppSelector(
+    (s) => (s.scene.sceneData?.playlist as PlaylistTrack[] | undefined) ?? EMPTY_PLAYLIST,
+  );
+  const playlistUpload = useAppSelector((s) => s.scene.playlistUpload);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState<PlaylistTrack | null>(null);
-  const [playlist, setPlaylist] = useState<PlaylistTrack[]>(tracks);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -40,7 +41,6 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const [duration, setDuration] = useState(0);
   const [isCompact, setIsCompact] = useState(true);
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
-  const [uploadingIds, setUploadingIds] = useState<Set<number>>(new Set());
   const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
@@ -64,14 +64,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   };
 
   useEffect(() => {
-    setPlaylist(
-      tracks.map((track) => ({
-        ...track,
-        fadeMs: track.fadeMs ?? 500,
-        loop: track.loop ?? false,
-      })),
-    );
-  }, [tracks]);
+    if (playlistUpload.error) {
+      showMessage(playlistUpload.error);
+    }
+  }, [playlistUpload.error]);
 
   useEffect(() => {
     return () => {
@@ -347,176 +343,17 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
   };
 
-  const savePlaylist = async (nextTracks: PlaylistTrack[]) => {
-    const desktopApi = getDesktopApi();
-    if (!desktopApi) return;
-    try {
-      const current = await desktopApi.readProjectScene(projectName, sceneName);
-      const payload = { ...current, playlist: nextTracks };
-      const result = await desktopApi.saveProjectScene(
-        projectName,
-        sceneName,
-        payload,
-      );
-      if (!result?.ok) {
-        console.error("Failed to save playlist:", result?.error);
-        return;
-      }
-
-      // После успешного локального сохранения плейлиста пробуем синхронизировать сцену на сервер.
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("accessToken")
-          : null;
-      if (!token) return;
-
-      let projectId =
-        typeof window !== "undefined"
-          ? localStorage.getItem(`projectId:${projectName}`)
-          : null;
-      if (!projectId) {
-        try {
-          const project = await ensureProject(
-            token,
-            projectName,
-            `Проект ${projectName}`,
-          );
-          projectId = project.id;
-          if (typeof window !== "undefined") {
-            localStorage.setItem(`projectId:${projectName}`, projectId);
-          }
-        } catch (err) {
-          console.error(
-            "[playlist] Failed to ensure remote project for playlist sync",
-            err,
-          );
-          return;
-        }
-      }
-
-      try {
-        // Desktop: enqueue delta on saveProjectScene, then flush outbox (push only changed parts)
-        await flushDesktopOutbox(token, projectName);
-        console.log("[playlist] playlist outbox flush completed");
-      } catch (err) {
-        console.error("[playlist] playlist outbox flush failed", err);
-      }
-    } catch (err) {
-      console.error("Failed to save playlist:", err);
-    }
-  };
-
-  const updatePlaylist = async (nextTracks: PlaylistTrack[]) => {
-    setPlaylist(nextTracks);
-    await savePlaylist(nextTracks);
-  };
-
-  const uploadTracksToServer = async (
-    tracksToUpload: PlaylistTrack[],
-  ): Promise<PlaylistTrack[]> => {
-    const desktopApi = getDesktopApi();
-    if (!desktopApi) return tracksToUpload;
-    const accessToken =
-      typeof window !== "undefined"
-        ? localStorage.getItem("accessToken")
-        : null;
-    if (!accessToken) return tracksToUpload;
-
-    const projectIdKey = `projectId:${projectName}`;
-    let projectId =
-      typeof window !== "undefined"
-        ? localStorage.getItem(projectIdKey)
-        : null;
-    if (!projectId) {
-      try {
-        const project = await ensureProject(
-          accessToken,
-          projectName,
-          `Проект ${projectName}`,
-        );
-        projectId = project.id;
-        if (typeof window !== "undefined") {
-          localStorage.setItem(projectIdKey, projectId);
-        }
-      } catch (err) {
-        console.error(
-          "[playlist] Failed to ensure remote project for uploadTracksToServer",
-          err,
-        );
-        return tracksToUpload;
-      }
-    }
-
-    const result: PlaylistTrack[] = [];
-    const idsToUpload = tracksToUpload.map((t) => t.id);
-    setUploadingIds((prev) => {
-      const next = new Set(prev);
-      idsToUpload.forEach((id) => next.add(id));
-      return next;
-    });
-    try {
-      // Загружаем треки по одному, чтобы не завалить сервер
-      for (const track of tracksToUpload) {
-        try {
-          const res = (await desktopApi.invoke("upload-project-audio", {
-            projectName,
-            file: track.file,
-            accessToken,
-            projectId,
-          })) as { ok: boolean; key?: string; url?: string; error?: string };
-
-          if (res?.ok && res.url) {
-            result.push({
-              ...track,
-              remoteUrl: res.url,
-              remoteKey: res.key,
-            });
-          } else {
-            console.error("uploadProjectAudio failed", res?.error);
-            result.push(track);
-          }
-        } catch (err) {
-          console.error("uploadProjectAudio error", err);
-          result.push(track);
-        }
-      }
-    } finally {
-      setUploadingIds((prev) => {
-        const next = new Set(prev);
-        idsToUpload.forEach((id) => next.delete(id));
-        return next;
-      });
-    }
-    return result;
-  };
-
   const addTracks = async () => {
+    if (playlistUpload.uploading) return;
     const desktopApi = getDesktopApi();
-    if (!desktopApi) {
-      showMessage("Добавление аудио доступно только в десктоп-версии приложения.");
-      return;
-    }
     try {
-      const res = await desktopApi.pickProjectAudio(projectName);
-      if (!res?.ok) {
-        if (res?.canceled) return;
-        console.error("Failed to pick audio:", res?.error);
-        showMessage("Не удалось открыть выбор файла. Проверьте консоль.");
+      if (desktopApi) {
+        await dispatch(
+          pickScenePlaylistTracksDesktop({ projectSlug: projectName, sceneName }),
+        ).unwrap();
         return;
       }
-
-      const maxId = playlist.reduce((acc, t) => Math.max(acc, t.id), 0);
-      const rawNewTracks: PlaylistTrack[] = res.tracks.map(
-        (track: { title: string; file: string }, index: number) => ({
-          id: maxId + index + 1,
-          title: track.title,
-          file: track.file,
-          fadeMs: 500,
-        }),
-      );
-      const uploadedNewTracks = await uploadTracksToServer(rawNewTracks);
-      const nextTracks = [...playlist, ...uploadedNewTracks];
-      await updatePlaylist(nextTracks);
+      fileInputRef.current?.click();
     } catch (err) {
       console.error("Failed to add tracks:", err);
       showMessage("Не удалось добавить аудио. Проверьте консоль.");
@@ -524,29 +361,20 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   };
 
   const addTracksFromPaths = async (filePaths: string[]) => {
+    if (playlistUpload.uploading) return;
     const desktopApi = getDesktopApi();
     if (!desktopApi) {
-      showMessage("Добавление аудио доступно только в десктоп-версии приложения.");
+      showMessage("Drag-and-drop с путями файлов доступен только в десктоп-версии приложения.");
       return;
     }
     try {
-      const res = await desktopApi.addProjectAudio(projectName, filePaths);
-      if (!res?.ok) {
-        console.error("Failed to add audio:", res?.error);
-        showMessage("Не удалось добавить аудио. Проверьте консоль.");
-        return;
-      }
-      const maxId = playlist.reduce((acc, t) => Math.max(acc, t.id), 0);
-      const rawNewTracks: PlaylistTrack[] = res.tracks.map(
-        (track: { title: string; file: string }, index: number) => ({
-          id: maxId + index + 1,
-          title: track.title,
-          file: track.file,
-          fadeMs: 500,
+      await dispatch(
+        addScenePlaylistTracksFromPathsDesktop({
+          projectSlug: projectName,
+          sceneName,
+          filePaths,
         }),
-      );
-      const uploadedNewTracks = await uploadTracksToServer(rawNewTracks);
-      await updatePlaylist([...playlist, ...uploadedNewTracks]);
+      ).unwrap();
     } catch (err) {
       console.error("Failed to add audio:", err);
       showMessage("Не удалось добавить аудио. Проверьте консоль.");
@@ -566,47 +394,68 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const applyRename = async (track: PlaylistTrack) => {
     const nextTitle = editingTitle.trim();
     if (!nextTitle) return;
-    const nextTracks = playlist.map((item) =>
-      item.id === track.id ? { ...item, title: nextTitle } : item,
-    );
-    await updatePlaylist(nextTracks);
+    dispatch(sceneActions.updatePlaylistTrack({ id: track.id, changes: { title: nextTitle } }));
+    if (getDesktopApi()) {
+      try {
+        await dispatch(
+          persistScenePlaylistDesktop({ projectSlug: projectName, sceneName }),
+        ).unwrap();
+      } catch (err) {
+        console.error("Failed to save playlist:", err);
+        showMessage("Не удалось сохранить плейлист. Проверьте консоль.");
+      }
+    }
     setEditingId(null);
     setEditingTitle("");
   };
 
   const updateFade = async (track: PlaylistTrack, nextFade: number) => {
-    const nextTracks = playlist.map((item) =>
-      item.id === track.id ? { ...item, fadeMs: nextFade } : item,
-    );
-    await updatePlaylist(nextTracks);
+    dispatch(sceneActions.updatePlaylistTrack({ id: track.id, changes: { fadeMs: nextFade } }));
+    if (getDesktopApi()) {
+      try {
+        await dispatch(
+          persistScenePlaylistDesktop({ projectSlug: projectName, sceneName }),
+        ).unwrap();
+      } catch (err) {
+        console.error("Failed to save playlist:", err);
+        showMessage("Не удалось сохранить плейлист. Проверьте консоль.");
+      }
+    }
   };
 
   const updateLoop = async (track: PlaylistTrack, nextLoop: boolean) => {
-    const nextTracks = playlist.map((item) =>
-      item.id === track.id ? { ...item, loop: nextLoop } : item,
-    );
-    await updatePlaylist(nextTracks);
+    dispatch(sceneActions.updatePlaylistTrack({ id: track.id, changes: { loop: nextLoop } }));
+    if (getDesktopApi()) {
+      try {
+        await dispatch(
+          persistScenePlaylistDesktop({ projectSlug: projectName, sceneName }),
+        ).unwrap();
+      } catch (err) {
+        console.error("Failed to save playlist:", err);
+        showMessage("Не удалось сохранить плейлист. Проверьте консоль.");
+      }
+    }
   };
 
   const deleteTrack = async (track: PlaylistTrack) => {
     const desktopApi = getDesktopApi();
-    if (!desktopApi) {
-      showMessage("Удаление аудио доступно только в десктоп-версии приложения.");
-      return;
-    }
     try {
-      const res = await desktopApi.deleteProjectAudio(projectName, track.file);
-      if (!res?.ok) {
-        console.error("Failed to delete audio:", res?.error);
-        showMessage("Не удалось удалить аудио. Проверьте консоль.");
+      if (desktopApi) {
+        await dispatch(
+          deleteScenePlaylistTrackDesktop({
+            projectSlug: projectName,
+            sceneName,
+            id: track.id,
+            file: track.file,
+          }),
+        ).unwrap();
+      } else {
+        dispatch(sceneActions.setPlaylist(playlist.filter((t) => Number(t.id) !== Number(track.id))));
       }
     } catch (err) {
       console.error("Failed to delete audio:", err);
       showMessage("Не удалось удалить аудио. Проверьте консоль.");
     }
-
-    const nextTracks = playlist.filter((item) => item.id !== track.id);
-    await updatePlaylist(nextTracks);
     if (currentTrack?.id === track.id) {
       const audioA = audioRefA.current;
       const audioB = audioRefB.current;
@@ -629,10 +478,17 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     if (index === -1) return;
     const targetIndex = direction === "up" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= playlist.length) return;
-    const nextTracks = [...playlist];
-    const [moved] = nextTracks.splice(index, 1);
-    nextTracks.splice(targetIndex, 0, moved);
-    await updatePlaylist(nextTracks);
+    dispatch(sceneActions.reorderPlaylist({ fromIndex: index, toIndex: targetIndex }));
+    if (getDesktopApi()) {
+      try {
+        await dispatch(
+          persistScenePlaylistDesktop({ projectSlug: projectName, sceneName }),
+        ).unwrap();
+      } catch (err) {
+        console.error("Failed to save playlist:", err);
+        showMessage("Не удалось сохранить плейлист. Проверьте консоль.");
+      }
+    }
   };
 
   const handleDragOver = (event: React.DragEvent<HTMLElement>) => {
@@ -648,12 +504,19 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     event.preventDefault();
     setIsDragOver(false);
 
-    if (!getDesktopApi()) {
-      showMessage("Drag-and-drop аудио доступен только в десктоп-версии приложения.");
+    const files = Array.from(event.dataTransfer.files || []);
+    if (files.length === 0) return;
+
+    const desktopApi = getDesktopApi();
+    if (!desktopApi) {
+      void dispatch(uploadScenePlaylistWeb({ projectSlug: projectName, files }))
+        .unwrap()
+        .catch((err) => {
+          console.error("Failed to upload playlist tracks (web):", err);
+          showMessage("Не удалось загрузить аудио. Проверьте авторизацию/консоль.");
+        });
       return;
     }
-
-    const files = Array.from(event.dataTransfer.files || []);
     const filePaths = files
       .map((file) => (file as { path?: string }).path)
       .filter((path): path is string => Boolean(path));
@@ -667,7 +530,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const desktopAvailable = Boolean(getDesktopApi());
   const addButtonTitle = desktopAvailable
     ? "Добавить аудио"
-    : "Добавление аудио доступно только в десктоп-версии приложения";
+    : "Добавить аудио (веб)";
 
   return (
     <aside
@@ -676,6 +539,24 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        multiple
+        style={{ display: "none" }}
+        onChange={(event) => {
+          const list = event.target.files ? Array.from(event.target.files) : [];
+          event.target.value = "";
+          if (list.length === 0) return;
+          void dispatch(uploadScenePlaylistWeb({ projectSlug: projectName, files: list }))
+            .unwrap()
+            .catch((err) => {
+              console.error("Failed to upload playlist tracks (web):", err);
+              showMessage("Не удалось загрузить аудио. Проверьте авторизацию/консоль.");
+            });
+        }}
+      />
       <div className="playlist-player">
         <audio ref={audioRefA} />
         <audio ref={audioRefB} />
@@ -706,9 +587,9 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               type="button"
               className="playlist-add-btn"
               onClick={addTracks}
-              disabled={!desktopAvailable}
+              disabled={playlistUpload.uploading}
               title={addButtonTitle}
-              aria-disabled={!desktopAvailable}
+              aria-disabled={!desktopAvailable || playlistUpload.uploading}
             >
               +
             </button>
@@ -819,14 +700,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
                     className="playlist-track-btn"
                     onClick={() => playTrack(track)}
                     title={track.title}
-                    disabled={uploadingIds.has(track.id)}
                   >
                     <span className="playlist-track-title">
                       {track.title}
                     </span>
-                    {uploadingIds.has(track.id) && (
-                      <span className="playlist-track-loading-bar" />
-                    )}
                   </button>
                   {!isCompact && (
                     <div className="playlist-track-actions">

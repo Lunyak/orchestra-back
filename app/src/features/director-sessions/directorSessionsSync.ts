@@ -1,6 +1,5 @@
-import { ensureProject, syncPull, syncPush } from "../../sync/api";
+import { ensureProject, getDirectorSessions, replaceDirectorSessions } from "../../sync/api";
 import { getMyProfile, type MyProfile } from "../../sync/api";
-import { createId } from "../../shared/utils/createId";
 
 export type DirectorSlotRef = {
   projectSlug: string;
@@ -23,9 +22,6 @@ export type DirectorRehearsalSession = {
   updatedAt: string;
 };
 
-type SessionsSceneRawJson = {
-  sessions?: DirectorRehearsalSession[];
-};
 
 function slugifyEmail(email: string): string {
   return String(email ?? "")
@@ -69,42 +65,18 @@ export async function loadDirectorSessions(
 ): Promise<{
   projectSlug: string;
   projectId: string;
-  sceneId: string;
   sessions: DirectorRehearsalSession[];
 }> {
   const { projectSlug, projectId } = await ensureDirectorSessionsProject(accessToken);
-  const sceneId = `${projectId}:sessions`;
-  const pull = await syncPull(accessToken, null, projectSlug);
-  const scene = (pull.scenes ?? []).find((s: any) => String(s?.id) === sceneId);
-  const raw = (scene?.rawJson ?? {}) as SessionsSceneRawJson;
-  const sessions = Array.isArray(raw?.sessions) ? raw.sessions : [];
-  return { projectSlug, projectId, sceneId, sessions };
+  const data = await getDirectorSessions(accessToken).catch(() => null);
+  const sessions = Array.isArray(data?.sessions) ? (data?.sessions as any[]) : [];
+  return { projectSlug, projectId, sessions: sessions as any };
 }
 
 export async function saveDirectorSessions(
   accessToken: string,
-  payload: {
-    projectId: string;
-    sceneId: string;
-    sessions: DirectorRehearsalSession[];
-  },
+  payload: { sessions: DirectorRehearsalSession[] },
 ): Promise<void> {
-  const nowIso = new Date().toISOString();
-  await syncPush(accessToken, [
-    {
-      id: createId(),
-      entityType: "Scene",
-      entityId: payload.sceneId,
-      operation: "update",
-      payload: {
-        id: payload.sceneId,
-        projectId: payload.projectId,
-        name: "sessions",
-        rawJson: { sessions: payload.sessions },
-        updatedAt: nowIso,
-      },
-      createdAt: nowIso,
-    },
-  ]);
+  await replaceDirectorSessions(accessToken, payload.sessions ?? []);
 }
 

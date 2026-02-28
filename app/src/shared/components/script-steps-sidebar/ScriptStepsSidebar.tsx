@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import React, { useState } from "react";
 import { ScriptStep } from "../../types/script";
-import './style.css';
+import "./style.css";
 
 export interface ScriptStepsSidebarProps {
   steps: ScriptStep[];
@@ -94,9 +94,10 @@ export const ScriptStepsSidebar = ({
         <div className="steps-mini-list">
           {steps.map((step, index) => (
             <div
-              key={step.id}
-              className={`step-mini-item ${index === currentIndex ? 'active' : ''}${dragOverIndex === index ? ' drag-over' : ''
-                }${dragIndex === index ? ' dragging' : ''}`}
+              key={`${step.id}:${index}`}
+              className={`step-mini-item ${index === currentIndex ? "active" : ""}${
+                dragOverIndex === index ? " drag-over" : ""
+              }${dragIndex === index ? " dragging" : ""}`}
               draggable
               onDragStart={handleDragStart(index)}
               onDragOver={handleDragOver}
