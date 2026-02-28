@@ -427,7 +427,6 @@ export interface MyProfile {
   telegramUsername?: string | null;
   telegramId?: string | null;
   avatarUrl?: string | null;
-  characters?: string[] | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
   availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
 }
@@ -438,7 +437,7 @@ export interface TeamProfile {
   firstName?: string | null;
   lastName?: string | null;
   telegramId?: string | null;
-  characters?: string[] | null;
+  avatarUrl?: string | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
   availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
 }
@@ -512,6 +511,18 @@ export async function updateMyProfile(
   patch: Partial<MyProfile>,
 ): Promise<MyProfile> {
   const { data } = await api.patch<MyProfile>("/profile", patch, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function uploadMyAvatar(
+  accessToken: string,
+  file: File,
+): Promise<MyProfile> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const { data } = await api.post<MyProfile>("/profile/avatar", form, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return data;

@@ -5,6 +5,7 @@ import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useScriptUI } from "../../features/script-ui";
 import { useTeam } from "../../features/team";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { HeaderPlayer } from "../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
@@ -35,7 +36,7 @@ export function SpectaclePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { accessToken } = useAuth();
-  const { projectName } = useProject();
+  const { projectName, isProjectsLoaded } = useProject();
   const { projectMembers, projectOwner } = useTeam();
   const {
     sceneData,
@@ -64,6 +65,19 @@ export function SpectaclePage() {
     swapTheaterPanels: shouldSwapPanels,
     togglePanels,
   } = useScriptUI();
+
+  // Не показываем "пустую" страницу между lazy-загрузкой и подгрузкой проектов/сцены.
+  if (!isProjectsLoaded) {
+    return (
+      <PageLoader
+        variant="spectacle"
+        showLeftSidebar
+        showRightSidebar
+        showTopBar
+        label="Загрузка проектов…"
+      />
+    );
+  }
 
   // При выходе из режима редактирования — принудительно сохраняем/пушим последние правки.
   // Это закрывает кейс: пользователь сделал правку и сразу вышел из edit (таймер дебаунса мог не успеть отработать).
@@ -169,6 +183,18 @@ export function SpectaclePage() {
 
   const projectDisplay = projectName;
 
+  if (!isSceneReady) {
+    return (
+      <PageLoader
+        variant="spectacle"
+        showLeftSidebar={showPlaylistSidebar}
+        showRightSidebar={!isStepsCollapsed}
+        showTopBar={showHeaderSounds}
+        label="Загрузка сцены…"
+      />
+    );
+  }
+
   const playlistNode = !isBoardView ? (
     <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}
     >
@@ -256,7 +282,7 @@ export function SpectaclePage() {
           {activeView === "theater" && (
             <Suspense
               fallback={
-                <div className="view-loader">Загрузка 3D театра…</div>
+                <PageLoader variant="view" label="Загрузка 3D театра…" />
               }
             >
               <TheaterScene
@@ -272,7 +298,7 @@ export function SpectaclePage() {
           )}
           {activeView === "light-plot" && (
             <Suspense
-              fallback={<div className="view-loader">Загрузка схемы…</div>}
+              fallback={<PageLoader variant="view" label="Загрузка схемы…" />}
             >
               <LightPlotPage />
             </Suspense>
@@ -280,14 +306,14 @@ export function SpectaclePage() {
           {activeView === "script" && (
             <Suspense
               fallback={
-                <div className="view-loader">Загрузка сценария…</div>
+                <PageLoader variant="view" label="Загрузка сценария…" />
               }
             >
               <ShowScript />
             </Suspense>
           )}
           {activeView === "board" && (
-            <Suspense fallback={<div className="view-loader">Загрузка доски…</div>}>
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка доски…" />}>
               <KanbanBoardPage
                 members={[
                   ...(myProfile?.email

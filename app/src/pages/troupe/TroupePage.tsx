@@ -9,6 +9,7 @@ import {
   troupeRemoveMember,
 } from "../../features/troupe/model/troupe-slice";
 import { useProject } from "../../features/project";
+import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import "./style.css";
 
 dayjs.locale("ru");
@@ -27,6 +28,7 @@ function memberLabel(m: {
     displayName?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+    avatarUrl?: string | null;
   } | null;
 }): string {
   const p = m.profile;
@@ -207,7 +209,12 @@ export function TroupePage() {
                         <>
                           <div key={`${m.id}:label`} className="troupe-cell troupe-sticky troupe-actor-cell">
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                              <div style={{ minWidth: 0 }}>
+                              <div style={{ minWidth: 0, display: "flex", gap: 10, alignItems: "center" }}>
+                                <MiniAvatar
+                                  src={String(m.profile?.avatarUrl ?? "").trim() || null}
+                                  label={label || m.email}
+                                  size={22}
+                                />
                                 <div className="troupe-actor-name" title={label}>
                                   {label}
                                 </div>

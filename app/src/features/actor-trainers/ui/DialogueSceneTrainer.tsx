@@ -233,11 +233,13 @@ function RoleLinePuzzle({
 export function DialogueSceneTrainer({
   steps,
   role,
+  roleKeys,
   selectedStepIds,
   storageKey,
 }: {
   steps: ScriptStep[];
   role: string;
+  roleKeys?: string[];
   selectedStepIds: number[];
   storageKey?: string;
 }) {
@@ -246,14 +248,19 @@ export function DialogueSceneTrainer({
     return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
   }, [selectedStepIds, steps]);
 
-  const roleKey = normalizeRoleKey(role);
+  const desiredRoleKeySet = useMemo(() => {
+    const keys = (roleKeys && roleKeys.length ? roleKeys : [role])
+      .map((x) => normalizeRoleKey(String(x ?? "")))
+      .filter(Boolean);
+    return new Set(keys);
+  }, [role, roleKeys]);
 
   const exercises = useMemo(() => {
     const out: Exercise[] = [];
     for (const line of allLines) {
       if (line.kind !== "utterance") continue;
       if (!line.role) continue;
-      if (normalizeRoleKey(line.role) !== roleKey) continue;
+      if (!desiredRoleKeySet.has(normalizeRoleKey(line.role))) continue;
       const tokens = tokenizeText(line.text, { includePunctuation: true });
       if (tokens.length < 1) continue;
       const seed = Number(String(line.stepId ?? 0)) + line.text.length * 17;
@@ -270,7 +277,7 @@ export function DialogueSceneTrainer({
       });
     }
     return out;
-  }, [allLines, roleKey]);
+  }, [allLines, desiredRoleKeySet]);
 
   const [doneIds, setDoneIds] = useState<Set<string>>(() => readDoneSet(storageKey));
   useEffect(() => {
@@ -349,7 +356,7 @@ export function DialogueSceneTrainer({
     }
 
     const roleLabel = line.role ? String(line.role) : "—";
-    const isMine = line.role && normalizeRoleKey(line.role) === roleKey;
+    const isMine = line.role && desiredRoleKeySet.has(normalizeRoleKey(line.role));
     if (!isMine || !activeExercise) {
       return (
         <div className={`dialogue-line ${isMine ? "dialogue-line--mine" : ""}`}>

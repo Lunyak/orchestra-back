@@ -1,5 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createHash } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { FileStorageService } from '../files/file-storage.service';
+import { LocalFileStorageService } from '../files/local-file-storage.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
 function clean(v: unknown): string | null {
@@ -95,49 +99,62 @@ function sanitizeAvailabilityTimeRanges(
   return out;
 }
 
-function sanitizeCharacters(value: unknown): string[] | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return undefined;
-
-  // Если это уже массив
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => (typeof item === 'string' ? item.trim() : String(item)))
-      .filter((item) => item.length > 0);
-  }
-
-  // Если это строка, пытаемся распарсить как JSON
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed === '') return undefined;
-
-    // Если строка начинается с [, пытаемся распарсить как JSON
-    if (trimmed.startsWith('[')) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed
-            .map((item) =>
-              typeof item === 'string' ? item.trim() : String(item),
-            )
-            .filter((item) => item.length > 0);
-        }
-      } catch {
-        // Если не получилось распарсить, возвращаем как одноэлементный массив
-        return [trimmed];
-      }
-    }
-
-    // Иначе это одна строка
-    return [trimmed];
-  }
-
-  return undefined;
-}
-
 @Injectable()
 export class ProfileService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly storage: FileStorageService,
+    private readonly localStorage: LocalFileStorageService,
+  ) {}
+
+  private useLocalStorage(): boolean {
+    return this.config.get<string>('STORAGE_TYPE') === 'local';
+  }
+
+  private profileBucketId(email: string): string {
+    const norm = String(email ?? '').trim().toLowerCase();
+    const h = createHash('sha1').update(norm).digest('hex').slice(0, 16);
+    return `profile-${h}`;
+  }
+
+  async uploadAvatarByEmail(email: string, file: any) {
+    const norm = String(email ?? '').trim().toLowerCase();
+    if (!norm) throw new Error('email is required');
+    const mimetype = String(file?.mimetype ?? '');
+    if (!mimetype.startsWith('image/')) {
+      throw new Error('avatar must be an image');
+    }
+    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+    if (!allowed.has(mimetype)) {
+      throw new Error('unsupported image type');
+    }
+    if (!file?.buffer) throw new Error('file buffer missing');
+
+    const storage = this.useLocalStorage() ? this.localStorage : this.storage;
+    const ext =
+      mimetype === 'image/png'
+        ? '.png'
+        : mimetype === 'image/webp'
+          ? '.webp'
+          : mimetype === 'image/gif'
+            ? '.gif'
+            : '.jpg';
+
+    const result = await storage.uploadObject({
+      projectId: this.profileBucketId(norm),
+      type: 'image',
+      fileName: `avatar${ext}`,
+      buffer: file.buffer,
+      contentType: mimetype,
+    });
+
+    return await this.prisma.userProfile.upsert({
+      where: { email: norm },
+      update: { avatarUrl: result.url },
+      create: { email: norm, avatarUrl: result.url },
+    });
+  }
 
   async getManyByEmails(emails: string[]) {
     const normalized = Array.from(
@@ -162,7 +179,7 @@ export class ProfileService {
         firstName: true,
         lastName: true,
         telegramId: true,
-        characters: true,
+        avatarUrl: true,
         availabilityCalendar: true,
         availabilityTimeRanges: true,
       },
@@ -198,7 +215,6 @@ export class ProfileService {
         avatarUrl: clean(dto.avatarUrl),
         sex: clean(dto.sex),
         role: clean(dto.role),
-        characters: sanitizeCharacters(dto.characters),
         phone: clean(dto.phone),
         birthday: clean(dto.birthday),
         availabilityCalendar: sanitizeAvailabilityCalendar(
@@ -230,10 +246,6 @@ export class ProfileService {
         avatarUrl: cleanOptional(dto.avatarUrl),
         sex: cleanOptional(dto.sex),
         role: cleanOptional(dto.role),
-        characters:
-          dto.characters !== undefined
-            ? sanitizeCharacters(dto.characters)
-            : undefined,
         phone: cleanOptional(dto.phone),
         birthday: cleanOptional(dto.birthday),
         availabilityCalendar: sanitizeAvailabilityCalendar(
@@ -262,10 +274,6 @@ export class ProfileService {
         availabilityTimeRanges: sanitizeAvailabilityTimeRanges(dto.availabilityTimeRanges),
         sex: cleanOptional(dto.sex),
         role: cleanOptional(dto.role),
-        characters:
-          dto.characters !== undefined
-            ? sanitizeCharacters(dto.characters)
-            : undefined,
         phone: cleanOptional(dto.phone),
         birthday: cleanOptional(dto.birthday),
       },
@@ -283,7 +291,6 @@ export class ProfileService {
         availabilityTimeRanges: sanitizeAvailabilityTimeRanges(dto.availabilityTimeRanges),
         sex: clean(dto.sex),
         role: clean(dto.role),
-        characters: sanitizeCharacters(dto.characters),
         phone: clean(dto.phone),
         birthday: clean(dto.birthday),
       },

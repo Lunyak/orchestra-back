@@ -102,7 +102,6 @@ export function normalizeCastActors(value: unknown): string[] {
 /**
  * Объединяет "истину" по ролям из:
  * - `sceneData.roleAssignments` (глобально)
- * - `step.cast` (локально на шаг)
  */
 export function buildRoleAssignmentsIndex(opts: {
   steps: ScriptStep[];
@@ -129,24 +128,25 @@ export function buildRoleAssignmentsIndex(opts: {
     push(role, Array.isArray(list) ? list : []);
   }
 
-  for (const step of opts.steps ?? []) {
-    const cast = (step as any)?.cast;
-    if (!cast || typeof cast !== "object") continue;
-    for (const [role, v] of Object.entries(cast as Record<string, unknown>)) {
-      push(role, normalizeCastActors(v));
-    }
-  }
-
   return map;
 }
 
 export function extractRolePhrasesFromSteps(opts: {
   steps: ScriptStep[];
   role: string;
+  /** Дополнительные ключи роли (key/aliases), чтобы находить реплики при алиасах в тексте. */
+  roleKeys?: string[];
   preferField?: "playMarkdown" | "markdown";
 }): RolePhraseSource[] {
-  const desiredKey = normalizeRoleKey(opts.role);
-  if (!desiredKey) return [];
+  const desiredKeys = Array.from(
+    new Set(
+      (opts.roleKeys && opts.roleKeys.length ? opts.roleKeys : [opts.role])
+        .map((x) => normalizeRoleKey(String(x ?? "")))
+        .filter(Boolean),
+    ),
+  );
+  if (desiredKeys.length === 0) return [];
+  const desiredSet = new Set(desiredKeys);
 
   const out: RolePhraseSource[] = [];
 
@@ -171,7 +171,7 @@ export function extractRolePhrasesFromSteps(opts: {
         currentRole = parsed.role;
         const rest = cleanUtteranceText(parsed.rest);
         if (!rest) continue;
-        if (normalizeRoleKey(currentRole) === desiredKey) {
+        if (desiredSet.has(normalizeRoleKey(currentRole))) {
           out.push({
             lineId: `${step.id}:u:${i}`,
             stepId: step.id,
@@ -187,7 +187,7 @@ export function extractRolePhrasesFromSteps(opts: {
       if (isStageDirectionLine(line)) continue;
       const cleaned = cleanUtteranceText(line);
       if (!cleaned) continue;
-      if (normalizeRoleKey(currentRole) === desiredKey) {
+      if (desiredSet.has(normalizeRoleKey(currentRole))) {
         out.push({
           lineId: `${step.id}:u:${i}`,
           stepId: step.id,

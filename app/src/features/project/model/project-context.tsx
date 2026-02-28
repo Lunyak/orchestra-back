@@ -10,6 +10,10 @@ export interface ProjectContextValue {
   projectName: string;
   setProjectName: (name: string) => void;
   loadProjects: (prefer?: string) => Promise<void>;
+  /** true после первой попытки загрузки списка проектов (успех/ошибка). */
+  isProjectsLoaded: boolean;
+  /** true пока идёт загрузка списка проектов. */
+  projectsLoading: boolean;
   onProjectChange: (name: string) => void;
   createProject: (name: string) => Promise<void>;
   deleteProject: (name: string) => Promise<void>;
@@ -22,6 +26,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const { accessToken, logout } = useAuth();
   const [projects, setProjects] = useState<string[]>([]);
   const [projectName, setProjectName] = useState("");
+  const [isProjectsLoaded, setIsProjectsLoaded] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
 
   const getDesktopApi = useCallback(() => {
     const api = getPlatformDesktopApi();
@@ -43,6 +49,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const loadProjects = useCallback(async (prefer?: string) => {
+    setProjectsLoading(true);
     try {
       const desktopApi = getDesktopApi();
       const listRaw = desktopApi
@@ -72,6 +79,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       
       setProjects([]);
+    } finally {
+      setProjectsLoading(false);
+      setIsProjectsLoaded(true);
     }
   }, [accessToken, getDesktopApi, logout]);
 
@@ -193,6 +203,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     projectName,
     setProjectName,
     loadProjects,
+    isProjectsLoaded,
+    projectsLoading,
     onProjectChange,
     createProject,
     deleteProject,

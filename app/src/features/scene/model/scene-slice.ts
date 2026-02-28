@@ -734,6 +734,9 @@ export const sceneSlice = createSlice({
         state.serverShadowRevision += 1;
       }
     },
+    setSceneReady(state, action: PayloadAction<boolean>) {
+      state.isSceneReady = action.payload;
+    },
     setServerShadow(
       state,
       action: PayloadAction<{

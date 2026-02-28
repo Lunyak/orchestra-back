@@ -23,6 +23,32 @@ function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
 }
 
+function extractRolesFromText(text?: string | null): string[] {
+  const s = String(text ?? '');
+  if (!s.trim()) return [];
+  const out: string[] = [];
+  const re = /\[\[([^\]]+)\]\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s))) {
+    const role = String(m[1] ?? '').trim();
+    if (role) out.push(role);
+  }
+  const lines = s.split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    if (line.startsWith('==') || line.startsWith('(')) continue;
+    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.-]{1,40})\s*[:—-]\s+\S/);
+    if (m1?.[1]) {
+      out.push(m1[1].replace(/\s+/g, ' ').trim());
+      continue;
+    }
+    const m2 = line.match(/^([A-ZА-ЯЁ]{2,40})([.,!?:])\s+/);
+    if (m2?.[1]) out.push(m2[1].trim());
+  }
+  return Array.from(new Set(out.map((x) => String(x ?? '').trim()).filter(Boolean)));
+}
+
 @Injectable()
 export class RolesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -202,7 +228,7 @@ export class RolesService {
   }
 
   /**
-   * One-time seed: if project has no roles yet, create roles+assignments from Step.cast.
+   * One-time seed: if project has no roles yet, create roles from Step text.
    * Safe to call repeatedly.
    */
   async seedFromStepCastIfEmpty(projectId: string) {
@@ -210,49 +236,30 @@ export class RolesService {
     if (existingCount > 0) return { ok: true, seeded: false };
 
     const steps = await this.prisma.step.findMany({
-      where: { scene: { projectId }, deletedAt: null, cast: { not: Prisma.DbNull } },
-      select: { cast: true },
+      where: { scene: { projectId }, deletedAt: null },
+      select: { markdown: true, playMarkdown: true },
       take: 5000,
     });
 
-    const roleToEmails = new Map<string, Set<string>>();
+    const keyToTitle = new Map<string, string>();
     for (const st of steps) {
-      const cast = st.cast as any;
-      if (!cast || typeof cast !== 'object' || Array.isArray(cast)) continue;
-      for (const [roleTitleRaw, value] of Object.entries(cast)) {
+      const text = (st as any)?.playMarkdown ?? (st as any)?.markdown ?? '';
+      for (const roleTitleRaw of extractRolesFromText(text)) {
         const roleTitle = String(roleTitleRaw ?? '').trim();
         const key = normalizeRoleKey(roleTitle);
         if (!key) continue;
-        const list = Array.isArray(value)
-          ? value.map((x) => String(x ?? '').trim())
-          : typeof value === 'string'
-            ? [value.trim()]
-            : [];
-        const set = roleToEmails.get(key) ?? new Set<string>();
-        list
-          .map((x) => normalizeEmail(x))
-          .filter((x) => x && looksLikeEmail(x))
-          .forEach((e) => set.add(e));
-        roleToEmails.set(key, set);
+        if (!keyToTitle.has(key)) keyToTitle.set(key, roleTitle);
       }
     }
 
-    if (roleToEmails.size === 0) return { ok: true, seeded: false };
+    if (keyToTitle.size === 0) return { ok: true, seeded: false };
 
     await this.prisma.$transaction(async (tx) => {
-      for (const [key, emailsSet] of roleToEmails.entries()) {
-        const title = key; // better than nothing; UI can rename later
-        const role = await tx.projectRole.create({
+      for (const [key, titleRaw] of keyToTitle.entries()) {
+        const title = String(titleRaw ?? '').trim() || key;
+        await tx.projectRole.create({
           data: { projectId, key, title },
-          select: { id: true },
         });
-        const emails = Array.from(emailsSet).slice(0, 200);
-        if (emails.length) {
-          await tx.projectRoleAssignment.createMany({
-            data: emails.map((email) => ({ roleId: role.id, email })),
-            skipDuplicates: true,
-          });
-        }
       }
     });
     return { ok: true, seeded: true };
@@ -264,7 +271,7 @@ export class RolesService {
       .filter(Boolean);
     if (keys.length === 0) return new Map<string, string[]>();
 
-    // Seed if empty (so older projects with Step.cast keep working).
+    // Seed if empty (для проектов без заведённых ролей).
     await this.seedFromStepCastIfEmpty(projectId);
 
     const roles = await this.prisma.projectRole.findMany({

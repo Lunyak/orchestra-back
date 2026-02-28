@@ -1,11 +1,13 @@
 import { Button } from "@shared/core/button/Button";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { useTeam } from "../../../features/team";
 import { usePlatform } from "../../../PlatformContext";
 import { ProjectPanel } from "../../../shared/components/project-panel/ProjectPanel";
+import { getProfilesBatch, type TeamProfile } from "../../../sync/api";
+import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import "./style.css";
 
 export function SettingsPage() {
@@ -21,6 +23,7 @@ export function SettingsPage() {
   } = useProject();
   const {
     projectMembers,
+    projectOwner,
     isProjectOwner,
     inviteEmail,
     setInviteEmail,
@@ -32,6 +35,42 @@ export function SettingsPage() {
   } = useTeam();
 
   const [newProjectName, setNewProjectName] = useState("");
+
+  const [profileByEmail, setProfileByEmail] = useState<Map<string, TeamProfile>>(() => new Map());
+  const memberEmails = useMemo(() => {
+    const out: string[] = [];
+    if (projectOwner?.email) out.push(String(projectOwner.email).trim().toLowerCase());
+    for (const m of projectMembers ?? []) {
+      const em = String(m?.user?.email ?? "").trim().toLowerCase();
+      if (em) out.push(em);
+    }
+    return Array.from(new Set(out)).filter(Boolean);
+  }, [projectMembers, projectOwner?.email]);
+
+  useEffect(() => {
+    if (!accessToken || memberEmails.length === 0) {
+      setProfileByEmail(new Map());
+      return;
+    }
+    let cancelled = false;
+    getProfilesBatch(accessToken, memberEmails)
+      .then((list) => {
+        if (cancelled) return;
+        const map = new Map<string, TeamProfile>();
+        for (const p of list ?? []) {
+          const em = String(p?.email ?? "").trim().toLowerCase();
+          if (!em) continue;
+          map.set(em, p);
+        }
+        setProfileByEmail(map);
+      })
+      .catch(() => {
+        if (!cancelled) setProfileByEmail(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, memberEmails.join("|")]);
 
   const handleProjectChange = (name: string) => {
     onProjectChange(name);
@@ -176,9 +215,23 @@ export function SettingsPage() {
                         {projectMembers.map((m) => (
                           <li key={m.id} className="settings-member-row">
                             <span className="settings-member-email">
-                              {m.user.displayName
-                                ? `${m.user.displayName} (${m.user.email})`
-                                : m.user.email}
+                              {(() => {
+                                const email = String(m.user.email ?? "").trim().toLowerCase();
+                                const prof = email ? profileByEmail.get(email) : null;
+                                const label = m.user.displayName
+                                  ? `${m.user.displayName} (${m.user.email})`
+                                  : m.user.email;
+                                return (
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                    <MiniAvatar
+                                      src={String(prof?.avatarUrl ?? "").trim() || null}
+                                      label={label}
+                                      size={20}
+                                    />
+                                    <span>{label}</span>
+                                  </span>
+                                );
+                              })()}
                             </span>
                             <div className="settings-member-actions">
                               <label className="settings-member-role">

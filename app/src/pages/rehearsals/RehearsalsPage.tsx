@@ -11,6 +11,7 @@ import {
   createRehearsal,
   getMyProfile,
   getProfilesBatch,
+  getProjectRoles,
   getRehearsal,
   getRehearsalSteps,
   listRehearsals,
@@ -18,10 +19,12 @@ import {
   publishRehearsal,
   updateRehearsal,
   type MyProfile,
+  type ProjectRoleInfo,
   type Rehearsal,
   type RehearsalSelectedStep,
   type TeamProfile,
 } from "../../sync/api";
+import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import "./style.css";
 
 dayjs.extend(isoWeek);
@@ -93,57 +96,6 @@ function normalizeRoleName(v: string): string {
     .replace(/[()]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function isAllCapsRole(raw: string): boolean {
-  const s = String(raw ?? "").trim();
-  if (!s) return false;
-  // Есть буквы, и все буквы — в верхнем регистре (RU/EN)
-  const hasLetters = /[A-Za-zА-ЯЁ]/.test(s);
-  if (!hasLetters) return false;
-  return !/[a-zа-яё]/.test(s);
-}
-
-function titleCaseRole(raw: string): string {
-  const s = String(raw ?? "").trim().replace(/\s+/g, " ");
-  if (!s) return s;
-  return s
-    .split(" ")
-    .map((w) => {
-      const t = w.trim();
-      if (!t) return t;
-      const first = t.slice(0, 1).toUpperCase();
-      const rest = t.slice(1).toLowerCase();
-      return first + rest;
-    })
-    .join(" ");
-}
-
-function parseCharacters(value: unknown): string[] {
-  if (value == null) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((x) => String(x ?? "").trim())
-      .filter((x) => x.length > 0);
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    if (trimmed.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed
-            .map((x) => String(x ?? "").trim())
-            .filter((x) => x.length > 0);
-        }
-      } catch {
-        // fallthrough
-      }
-    }
-    return [trimmed];
-  }
-  return [];
 }
 
 export function RehearsalsPage() {
@@ -430,8 +382,8 @@ export function RehearsalsPage() {
       map.set(e, p);
     }
     const me = myProfile?.email ? normalizeEmail(myProfile.email) : "";
-    // Важно: batch может вернуть профиль без characters (если бэк не перезапущен / старая схема select).
-    // Поэтому всегда подмешиваем myProfile поверх, чтобы хотя бы для себя роли работали.
+    // Всегда подмешиваем myProfile поверх: это даёт актуальную доступность для себя,
+    // даже если батч профилей лагнул/не включил некоторые поля.
     if (me && myProfile) {
       const existing = map.get(me);
       map.set(me, {
@@ -440,10 +392,6 @@ export function RehearsalsPage() {
         firstName: existing?.firstName ?? myProfile.firstName ?? null,
         lastName: existing?.lastName ?? myProfile.lastName ?? null,
         telegramId: existing?.telegramId ?? myProfile.telegramId ?? null,
-        characters:
-          (existing as any)?.characters != null
-            ? (existing as any).characters
-            : (myProfile as any)?.characters ?? null,
         availabilityCalendar:
           existing?.availabilityCalendar ?? myProfile.availabilityCalendar ?? null,
       });
@@ -451,7 +399,64 @@ export function RehearsalsPage() {
     return map;
   }, [myProfile, teamProfiles]);
 
-  const freeRolesNormSetForSelectedDate = useMemo(() => {
+  const [projectRoles, setProjectRoles] = useState<ProjectRoleInfo[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!accessToken || !projectSlug) {
+      setProjectRoles([]);
+      setRolesLoading(false);
+      setRolesError(null);
+      return;
+    }
+    let cancelled = false;
+    setRolesLoading(true);
+    setRolesError(null);
+    getProjectRoles(accessToken, projectSlug)
+      .then((res) => {
+        if (cancelled) return;
+        setProjectRoles(res?.roles ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProjectRoles([]);
+        setRolesError("Не удалось загрузить роли проекта");
+      })
+      .finally(() => {
+        if (!cancelled) setRolesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, projectSlug]);
+
+  const roleByNorm = useMemo(() => {
+    const map = new Map<string, { title: string; emails: string[] }>();
+    for (const r of projectRoles ?? []) {
+      const key = normalizeRoleName((r as any)?.key ?? (r as any)?.title);
+      if (key) {
+        map.set(key, {
+          title: String((r as any)?.title ?? key).trim() || key,
+          emails: Array.isArray((r as any)?.emails) ? (r as any).emails : [],
+        });
+      }
+      const aliases = Array.isArray((r as any)?.aliases) ? (r as any).aliases : [];
+      for (const a of aliases) {
+        const ak = normalizeRoleName(a);
+        if (!ak) continue;
+        if (!map.has(ak)) {
+          map.set(ak, {
+            title: String((r as any)?.title ?? ak).trim() || ak,
+            emails: Array.isArray((r as any)?.emails) ? (r as any).emails : [],
+          });
+        }
+      }
+    }
+    return map;
+  }, [projectRoles]);
+
+  const availableEmailSetForSelectedDate = useMemo(() => {
     const dateKey = calendarState.selectedDate;
     const set = new Set<string>();
     for (const m of membersWithMe) {
@@ -459,12 +464,7 @@ export function RehearsalsPage() {
       if (!email) continue;
       const prof = teamProfileByEmail.get(email);
       const availability = (prof?.availabilityCalendar as any)?.[dateKey];
-      if (availability !== "present") continue;
-      const chars = parseCharacters((prof as any)?.characters);
-      for (const ch of chars) {
-        const norm = normalizeRoleName(String(ch ?? ""));
-        if (norm) set.add(norm);
-      }
+      if (availability === "present") set.add(email);
     }
     return set;
   }, [calendarState.selectedDate, membersWithMe, teamProfileByEmail]);
@@ -474,6 +474,7 @@ export function RehearsalsPage() {
     const out: Array<{
       email: string;
       displayName?: string | null;
+      avatarUrl?: string | null;
       roles: string[];
     }> = [];
 
@@ -483,20 +484,28 @@ export function RehearsalsPage() {
       const prof = teamProfileByEmail.get(email);
       const availability = (prof?.availabilityCalendar as any)?.[dateKey];
       if (availability !== "present") continue;
-      const chars = parseCharacters((prof as any)?.characters);
-      const roles = chars
-        .map((x) => String(x ?? "").trim())
-        .filter((x) => x.length > 0)
-        .map((x) => (isAllCapsRole(x) ? titleCaseRole(x) : x));
-      roles.sort((a, b) => a.localeCompare(b, "ru"));
-      out.push({ email: m.email, displayName: m.displayName ?? null, roles });
+
+      const roles = (projectRoles ?? [])
+        .filter((r) =>
+          (Array.isArray((r as any)?.emails) ? (r as any).emails : [])
+            .map(normalizeEmail)
+            .includes(email),
+        )
+        .map((r) => String((r as any)?.title ?? "").trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b, "ru"));
+
+      out.push({
+        email: m.email,
+        displayName: m.displayName ?? null,
+        avatarUrl: String((prof as any)?.avatarUrl ?? "").trim() || null,
+        roles,
+      });
     }
 
-    out.sort((a, b) =>
-      formatMemberLabel(a).localeCompare(formatMemberLabel(b), "ru"),
-    );
+    out.sort((a, b) => formatMemberLabel(a).localeCompare(formatMemberLabel(b), "ru"));
     return out;
-  }, [calendarState.selectedDate, membersWithMe, teamProfileByEmail]);
+  }, [calendarState.selectedDate, membersWithMe, projectRoles, teamProfileByEmail]);
 
   const [planCache, setPlanCache] = useState<Record<string, { notReady: number }>>({});
 
@@ -660,24 +669,31 @@ export function RehearsalsPage() {
       for (const st of sc.steps ?? []) {
         const key = `${sc.id}:${st.id}`;
         const full = scriptStepById.get(st.id);
-        const unknown = !full;
+        const unknown = !full || rolesLoading;
         const text = (full?.playMarkdown ?? full?.markdown ?? "") as string;
         const requiredRolesRaw = extractRolesSmart(text);
-        const requiredNorms: Array<{ norm: string; display: string }> = [];
+        const requiredNorms: Array<{ norm: string; display: string; emails: string[] }> = [];
         const seen = new Set<string>();
         for (const r of requiredRolesRaw) {
           const nr = normalizeRoleName(r);
           if (!nr || seen.has(nr)) continue;
           seen.add(nr);
-          const disp = isAllCapsRole(r) ? titleCaseRole(r) : String(r ?? "").trim();
-          requiredNorms.push({ norm: nr, display: disp });
+          const info = roleByNorm.get(nr) ?? null;
+          const disp = info?.title ? String(info.title).trim() : String(r ?? "").trim();
+          const emails = Array.isArray(info?.emails) ? info!.emails : [];
+          requiredNorms.push({ norm: nr, display: disp || nr, emails });
         }
 
         const assignedRoles: string[] = [];
         const missingRoles: string[] = [];
         if (!unknown) {
           for (const role of requiredNorms) {
-            if (freeRolesNormSetForSelectedDate.has(role.norm)) {
+            const hasActor =
+              (role.emails ?? [])
+                .map((e) => normalizeEmail(e))
+                .filter(Boolean)
+                .some((e) => availableEmailSetForSelectedDate.has(e));
+            if (hasActor) {
               assignedRoles.push(role.display);
             } else {
               missingRoles.push(role.display);
@@ -697,7 +713,7 @@ export function RehearsalsPage() {
     }
 
     return out;
-  }, [freeRolesNormSetForSelectedDate, scriptStepById, stepsOptions]);
+  }, [availableEmailSetForSelectedDate, roleByNorm, rolesLoading, scriptStepById, stepsOptions]);
 
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
 
@@ -712,6 +728,7 @@ export function RehearsalsPage() {
             </div>
 
             {error && <div className="rehearsals-error">{error}</div>}
+            {rolesError && <div className="rehearsals-error">{rolesError}</div>}
 
             <div className="rehearsals-layout">
               <div className="rehearsals-main">
@@ -792,7 +809,12 @@ export function RehearsalsPage() {
                           <tbody>
                             {freeActorsForSelectedDate.map((a) => (
                               <tr key={a.email}>
-                                <td>{formatMemberLabel(a)}</td>
+                                <td>
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                    <MiniAvatar src={String(a.avatarUrl ?? "").trim() || null} label={formatMemberLabel(a)} size={20} />
+                                    <span>{formatMemberLabel(a)}</span>
+                                  </span>
+                                </td>
                                 <td className="rehearsals-td-muted">
                                   {a.roles.length ? a.roles.join(", ") : "—"}
                                 </td>
@@ -1073,7 +1095,16 @@ export function RehearsalsPage() {
                                 : ("unknown" as const);
                           return (
                             <div key={m.email} className="rehearsals-person">
-                              <div className="rehearsals-person-label">{formatMemberLabel(m)}</div>
+                              <div className="rehearsals-person-label">
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                  <MiniAvatar
+                                    src={String((prof as any)?.avatarUrl ?? "").trim() || null}
+                                    label={formatMemberLabel(m)}
+                                    size={20}
+                                  />
+                                  <span>{formatMemberLabel(m)}</span>
+                                </span>
+                              </div>
                               <div className="rehearsals-muted" style={{ fontSize: 11 }}>
                                 по календарю:{" "}
                                 {availability === "present"

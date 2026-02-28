@@ -4,14 +4,14 @@ import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useNavigate } from "react-router-dom";
 import {
-  buildRoleAssignmentsIndex,
   extractRolePhrasesFromSteps,
   type RolePhraseSource,
 } from "../../features/actor-trainers/model/rolePhrases";
+import { buildDialogueLines, normalizeRoleKey } from "../../features/actor-trainers/model/dialogue";
 import { WordOrderTrainer } from "../../features/actor-trainers/ui/WordOrderTrainer";
 import { DialogueSceneTrainer } from "../../features/actor-trainers/ui/DialogueSceneTrainer";
 import { VoiceDialogueTrainer } from "../../features/actor-trainers/ui/VoiceDialogueTrainer";
-import { getMyProfile, getProjectMembers } from "../../sync/api";
+import { getMyProfile, getProjectMembers, getProjectRoles, type ProjectRoleInfo } from "../../sync/api";
 import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import {
   actorTrainerUiActions,
@@ -35,7 +35,7 @@ function normalizeRoleKeyForStorage(v: string): string {
 export function ActorPage() {
   const { accessToken } = useAuth();
   const { projects, projectName, onProjectChange } = useProject();
-  const { steps, sceneData } = useScene();
+  const { steps } = useScene();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
@@ -54,6 +54,10 @@ export function ActorPage() {
 
   const [myEmail, setMyEmail] = useState<string>("");
   const [profileLoading, setProfileLoading] = useState(false);
+
+  const [projectRoles, setProjectRoles] = useState<ProjectRoleInfo[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState<string>("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -100,13 +104,6 @@ export function ActorPage() {
     };
   }, [accessToken]);
 
-  const roleIndex = useMemo(() => {
-    return buildRoleAssignmentsIndex({
-      steps,
-      roleAssignments: (sceneData?.roleAssignments ?? {}) as Record<string, string[]>,
-    });
-  }, [steps, sceneData?.roleAssignments]);
-
   const [canPickAnyRole, setCanPickAnyRole] = useState<boolean>(false);
   useEffect(() => {
     if (!accessToken || !projectName || !myEmail) {
@@ -138,17 +135,70 @@ export function ActorPage() {
     };
   }, [accessToken, myEmail, projectName]);
 
-  const rolesForActor = useMemo(() => {
-    const roles: string[] = [];
-    const aKey = normalizeActorKey(myEmail);
-    for (const { role, actors } of roleIndex.values()) {
-      if (canPickAnyRole) roles.push(role);
-      else if (aKey && actors.some((x) => normalizeActorKey(x) === aKey)) roles.push(role);
+  useEffect(() => {
+    if (!accessToken || !projectName) {
+      setProjectRoles([]);
+      setRolesLoading(false);
+      setRolesError("");
+      return;
     }
-    return Array.from(new Set(roles)).sort((a, b) => a.localeCompare(b, "ru"));
-  }, [canPickAnyRole, myEmail, roleIndex]);
+    let cancelled = false;
+    setRolesLoading(true);
+    setRolesError("");
+    getProjectRoles(accessToken, projectName)
+      .then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res?.roles) ? res.roles : [];
+        list.sort((a, b) => String(a?.title ?? "").localeCompare(String(b?.title ?? ""), "ru"));
+        setProjectRoles(list);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setProjectRoles([]);
+        setRolesError(String(e?.message ?? "roles-load-failed"));
+      })
+      .finally(() => {
+        if (!cancelled) setRolesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, projectName]);
 
-  const [role, setRole] = useState<string>("");
+  const roleKeysMentionedInScript = useMemo(() => {
+    const set = new Set<string>();
+    const lines = buildDialogueLines({ steps, preferField: "playMarkdown" });
+    for (const l of lines) {
+      if (l.kind !== "utterance") continue;
+      if (!l.role) continue;
+      const k = normalizeRoleKey(l.role);
+      if (k) set.add(k);
+    }
+    return set;
+  }, [steps]);
+
+  const rolesForActor = useMemo(() => {
+    const me = normalizeActorKey(myEmail);
+    const list = Array.isArray(projectRoles) ? projectRoles : [];
+    if (canPickAnyRole) return list;
+
+    const assigned = list.filter((r) => (r?.emails ?? []).some((em) => normalizeActorKey(em) === me));
+    if (assigned.length > 0) return assigned;
+
+    // Fallback: allow training for roles that are present in script text (even if not assigned).
+    // This matches user expectation: "прикрепил роль к сцене" => роль в тексте.
+    const mentioned = list.filter((r) => {
+      const keys = [
+        normalizeRoleKey(r?.key ?? ""),
+        normalizeRoleKey(r?.title ?? ""),
+        ...((r?.aliases ?? []) as any[]).map((a) => normalizeRoleKey(String(a ?? ""))),
+      ].filter(Boolean);
+      return keys.some((k) => roleKeysMentionedInScript.has(k));
+    });
+    return mentioned;
+  }, [canPickAnyRole, myEmail, projectRoles, roleKeysMentionedInScript]);
+
+  const [roleId, setRoleId] = useState<string>("");
 
   const roleStorageKey = useMemo(() => {
     const actorKey = normalizeActorKey(myEmail);
@@ -162,49 +212,66 @@ export function ActorPage() {
     if (!roleStorageKey) return;
     if (rolesForActor.length === 0) return;
     const stored = String(localStorage.getItem(roleStorageKey) ?? "").trim();
-    if (stored && rolesForActor.includes(stored) && role !== stored) {
-      setRole(stored);
+    if (stored && rolesForActor.some((r) => String(r.id) === stored) && roleId !== stored) {
+      setRoleId(stored);
       return;
     }
-    // If current role is invalid/empty, prefer first available role and persist it
-    if (!role || !rolesForActor.includes(role)) {
-      const first = rolesForActor[0] ?? "";
-      if (first) setRole(first);
+    // If current role is invalid/empty, prefer first available role
+    if (!roleId || !rolesForActor.some((r) => String(r.id) === roleId)) {
+      const first = rolesForActor[0]?.id;
+      if (first != null) setRoleId(String(first));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleStorageKey, rolesForActor]);
 
-  const effectiveRole = useMemo(() => {
-    if (role && rolesForActor.includes(role)) return role;
-    return rolesForActor[0] || "";
-  }, [role, rolesForActor]);
+  const effectiveRoleInfo = useMemo(() => {
+    const wanted = roleId ? rolesForActor.find((r) => String(r.id) === String(roleId)) : null;
+    return wanted || rolesForActor[0] || null;
+  }, [roleId, rolesForActor]);
+  const effectiveRoleTitle = useMemo(
+    () => String(effectiveRoleInfo?.title ?? ""),
+    [effectiveRoleInfo?.title],
+  );
+  const effectiveRoleKeys = useMemo(() => {
+    if (!effectiveRoleInfo) return [];
+    const out: string[] = [];
+    // role.key is already normalized by backend, but we normalize anyway for safety.
+    if (effectiveRoleInfo.key) out.push(normalizeRoleKey(effectiveRoleInfo.key));
+    if (effectiveRoleInfo.title) out.push(normalizeRoleKey(effectiveRoleInfo.title));
+    for (const a of effectiveRoleInfo.aliases ?? []) {
+      if (!a) continue;
+      out.push(normalizeRoleKey(a));
+    }
+    return Array.from(new Set(out.filter(Boolean)));
+  }, [effectiveRoleInfo]);
 
   // Persist effective role selection
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!roleStorageKey) return;
-    if (!effectiveRole) return;
+    if (!effectiveRoleInfo?.id) return;
     try {
-      localStorage.setItem(roleStorageKey, effectiveRole);
+      localStorage.setItem(roleStorageKey, String(effectiveRoleInfo.id));
     } catch {
       // ignore
     }
-  }, [effectiveRole, roleStorageKey]);
+  }, [effectiveRoleInfo?.id, roleStorageKey]);
 
   useEffect(() => {
-    if (role && !rolesForActor.includes(role)) {
-      setRole("");
+    if (roleId && !rolesForActor.some((r) => String(r.id) === String(roleId))) {
+      setRoleId("");
     }
-  }, [role, rolesForActor]);
+  }, [roleId, rolesForActor]);
 
   const phrases: RolePhraseSource[] = useMemo(() => {
-    if (!effectiveRole) return [];
+    if (!effectiveRoleInfo) return [];
     return extractRolePhrasesFromSteps({
       steps,
-      role: effectiveRole,
+      role: effectiveRoleTitle || effectiveRoleInfo.key || "",
+      roleKeys: effectiveRoleKeys,
       preferField: "playMarkdown",
     });
-  }, [effectiveRole, steps]);
+  }, [effectiveRoleInfo, effectiveRoleKeys, effectiveRoleTitle, steps]);
 
   const phraseSteps = useMemo(() => {
     const map = new Map<number, { stepId: number; stepTitle: string; count: number }>();
@@ -249,53 +316,57 @@ export function ActorPage() {
   );
 
   const trainerStorageKey = useMemo(() => {
-    if (!projectName || !myEmail || !effectiveRole) return "";
+    const roleKey = effectiveRoleInfo?.key ? normalizeRoleKeyForStorage(effectiveRoleInfo.key) : "";
+    if (!projectName || !myEmail || !roleKey) return "";
     return [
       "actorTrainer",
       "wordOrder",
       projectName,
       normalizeActorKey(myEmail),
-      normalizeRoleKeyForStorage(effectiveRole),
+      roleKey,
     ].join(":");
-  }, [effectiveRole, myEmail, projectName]);
+  }, [effectiveRoleInfo?.key, myEmail, projectName]);
 
   const dialogueStorageKey = useMemo(() => {
-    if (!projectName || !myEmail || !effectiveRole) return "";
+    const roleKey = effectiveRoleInfo?.key ? normalizeRoleKeyForStorage(effectiveRoleInfo.key) : "";
+    if (!projectName || !myEmail || !roleKey) return "";
     return [
       "actorTrainer",
       "dialogue",
       projectName,
       normalizeActorKey(myEmail),
-      normalizeRoleKeyForStorage(effectiveRole),
+      roleKey,
     ].join(":");
-  }, [effectiveRole, myEmail, projectName]);
+  }, [effectiveRoleInfo?.key, myEmail, projectName]);
 
   const voiceStorageKey = useMemo(() => {
-    if (!projectName || !myEmail || !effectiveRole) return "";
+    const roleKey = effectiveRoleInfo?.key ? normalizeRoleKeyForStorage(effectiveRoleInfo.key) : "";
+    if (!projectName || !myEmail || !roleKey) return "";
     return [
       "actorTrainer",
       "voice",
       projectName,
       normalizeActorKey(myEmail),
-      normalizeRoleKeyForStorage(effectiveRole),
+      roleKey,
     ].join(":");
-  }, [effectiveRole, myEmail, projectName]);
+  }, [effectiveRoleInfo?.key, myEmail, projectName]);
 
   useEffect(() => {
     // When switching role/project, default back to full scope
     setSelectedStepIds("all");
-  }, [effectiveRole, projectName]);
+  }, [effectiveRoleInfo?.id, projectName]);
 
   const actorUiKey = useMemo(() => {
-    if (!projectName || !myEmail || !effectiveRole) return "";
+    const roleKey = effectiveRoleInfo?.key ? normalizeRoleKeyForStorage(effectiveRoleInfo.key) : "";
+    if (!projectName || !myEmail || !roleKey) return "";
     return [
       "actorTrainer",
       "pageUi",
       projectName,
       normalizeActorKey(myEmail),
-      normalizeRoleKeyForStorage(effectiveRole),
+      roleKey,
     ].join(":");
-  }, [effectiveRole, myEmail, projectName]);
+  }, [effectiveRoleInfo?.key, myEmail, projectName]);
 
   useEffect(() => {
     if (!actorUiKey) return;
@@ -325,10 +396,10 @@ export function ActorPage() {
   }, [normalizedSelectedStepIds, phraseSteps]);
 
   const scenesLabel = useMemo(() => {
-    if (!effectiveRole) return "—";
+    if (!effectiveRoleInfo) return "—";
     if (normalizedSelectedStepIds === "all") return `все (${phraseSteps.length})`;
     return `${normalizedSelectedStepIds.length} / ${phraseSteps.length}`;
-  }, [effectiveRole, normalizedSelectedStepIds, phraseSteps.length]);
+  }, [effectiveRoleInfo, normalizedSelectedStepIds, phraseSteps.length]);
 
   return (
     <div className="app-layout actor-layout">
@@ -361,7 +432,7 @@ export function ActorPage() {
                 </button>
               </div>
               <div className="actor-topbar-meta">
-                Проект: <b>{projectName || "—"}</b> · Роль: <b>{effectiveRole || "—"}</b> · Сцены:{" "}
+                Проект: <b>{projectName || "—"}</b> · Роль: <b>{effectiveRoleTitle || "—"}</b> · Сцены:{" "}
                 <b>{scenesLabel}</b>
               </div>
             </div>
@@ -401,24 +472,35 @@ export function ActorPage() {
                 <div className="actor-label">Роль</div>
                 <select
                   className="actor-select"
-                  value={effectiveRole}
-                  onChange={(e) => setRole(e.target.value)}
-                  disabled={!myEmail || rolesForActor.length === 0}
+                  value={effectiveRoleInfo?.id != null ? String(effectiveRoleInfo.id) : ""}
+                  onChange={(e) => setRoleId(e.target.value)}
+                  disabled={!myEmail || rolesLoading || rolesForActor.length === 0}
                 >
                   {rolesForActor.length === 0 ? (
                     <option value="">
-                      {myEmail ? "Нет ролей для вашего пользователя" : "Профиль не загружен"}
+                      {rolesLoading
+                        ? "Загрузка ролей…"
+                        : myEmail
+                          ? "Нет ролей для вашего пользователя"
+                          : "Профиль не загружен"}
                     </option>
                   ) : null}
                   {rolesForActor.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
+                    <option key={String(r.id)} value={String(r.id)}>
+                      {String(r.title ?? r.key ?? r.id)}
                     </option>
                   ))}
                 </select>
                 <div className="actor-hint">
-                  Реплики роли извлекаются по <b>[[{effectiveRole || "РОЛЬ"}]]</b> в тексте шага.
+                  Реплики ищутся по спикеру в тексте шага (<b>[[РОЛЬ]]</b> или <b>РОЛЬ: текст</b>) и
+                  сопоставляются по ключу роли и алиасам.
                 </div>
+                {!canPickAnyRole && myEmail && rolesForActor.length === 0 && !rolesLoading ? (
+                  <div className="actor-hint">
+                    Похоже, роли не назначены на ваш email. Назначьте себя на роль на странице <b>Роли</b>.
+                  </div>
+                ) : null}
+                {rolesError ? <div className="actor-hint">Ошибка загрузки ролей: {rolesError}</div> : null}
               </label>
 
               <label className="actor-field">
@@ -429,7 +511,7 @@ export function ActorPage() {
                       type="button"
                       className="actor-step-btn"
                       onClick={() => setSelectedStepIds("all")}
-                      disabled={!effectiveRole || phraseSteps.length === 0}
+                      disabled={!effectiveRoleInfo || phraseSteps.length === 0}
                     >
                       Все ({totalInAllSteps})
                     </button>
@@ -437,7 +519,7 @@ export function ActorPage() {
                       type="button"
                       className="actor-step-btn"
                       onClick={() => setSelectedStepIds([])}
-                      disabled={!effectiveRole || phraseSteps.length === 0}
+                      disabled={!effectiveRoleInfo || phraseSteps.length === 0}
                     >
                       Очистить
                     </button>
@@ -570,14 +652,16 @@ export function ActorPage() {
               {trainerMode === "dialogue" ? (
                 <DialogueSceneTrainer
                   steps={steps}
-                  role={effectiveRole}
+                  role={effectiveRoleTitle}
+                  roleKeys={effectiveRoleKeys}
                   selectedStepIds={selectedStepIdsForTraining}
                   storageKey={dialogueStorageKey || undefined}
                 />
               ) : trainerMode === "voice" ? (
                 <VoiceDialogueTrainer
                   steps={steps}
-                  role={effectiveRole}
+                  role={effectiveRoleTitle}
+                  roleKeys={effectiveRoleKeys}
                   selectedStepIds={selectedStepIdsForTraining}
                   storageKey={voiceStorageKey || undefined}
                   performerId={myEmail}

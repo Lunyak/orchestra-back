@@ -133,10 +133,16 @@ function useSceneOperations() {
           : null) ??
         accessToken;
       const effectiveProject = projectOverride ?? projectName;
-      if (!tokenToUse || !effectiveProject) return;
+      if (!tokenToUse || !effectiveProject) {
+        dispatch(sceneActions.setSceneReady(true));
+        return;
+      }
 
       const projectId = await ensureRemoteProject(tokenToUse);
-      if (!projectId) return;
+      if (!projectId) {
+        dispatch(sceneActions.setSceneReady(true));
+        return;
+      }
 
       const perProjectKey = `lastSyncAt:${effectiveProject}`;
       const effectiveLastSyncAt =
@@ -161,13 +167,19 @@ function useSceneOperations() {
           { steps: true, playlist: true, sounds: true, lightChannels: true, theaterLayout: true },
         );
         const project = projects.find((p: any) => p.slug === effectiveProject);
-        if (!project) return;
+        if (!project) {
+          dispatch(sceneActions.setSceneReady(true));
+          return;
+        }
         const expectedSceneId = `${project.id}:script`;
         const scene =
           scenes.find((s: any) => s.id === expectedSceneId) ??
           scenes.find((s: any) => s.projectId === project.id && s.name === "script") ??
           scenes.find((s: any) => s.projectId === project.id);
-        if (!scene) return;
+        if (!scene) {
+          dispatch(sceneActions.setSceneReady(true));
+          return;
+        }
         const normalizedSteps = (Array.isArray(serverSteps) ? serverSteps : [])
           .filter((st: any) => String(st?.sceneId ?? "") === String(scene.id))
           .sort((a: any, b: any) => (Number(a?.order ?? 0) - Number(b?.order ?? 0)))
@@ -179,7 +191,6 @@ function useSceneOperations() {
             durationMin: st?.durationMin ?? undefined,
             kanbanStatus: st?.kanbanStatus ?? undefined,
             kanbanOrder: st?.kanbanOrder ?? undefined,
-            cast: (st?.cast as any) ?? undefined,
             requisites: Array.isArray(st?.requisites)
               ? st.requisites.map((r: any) => ({
                   id: Number(r?.sourceId ?? r?.id ?? 0),
@@ -297,6 +308,7 @@ function useSceneOperations() {
           return;
         }
         console.error("[sync] pull failed:", error);
+        dispatch(sceneActions.setSceneReady(true));
       }
     },
     [
@@ -390,7 +402,6 @@ function useSceneOperations() {
                     durationMin: st?.durationMin ?? undefined,
                     kanbanStatus: st?.kanbanStatus ?? undefined,
                     kanbanOrder: st?.kanbanOrder ?? undefined,
-                    cast: (st?.cast as any) ?? undefined,
                     requisites: Array.isArray(st?.requisites)
                       ? st.requisites.map((r: any) => ({
                           id: Number(r?.sourceId ?? r?.id ?? 0),
@@ -710,7 +721,6 @@ function useSceneOperations() {
               durationMin: step.durationMin ?? null,
               kanbanStatus: step.kanbanStatus ?? null,
               kanbanOrder: step.kanbanOrder ?? null,
-              cast: (step as any)?.cast ?? null,
               requisites: step.requisites ?? [],
               lightPlot: step.lightPlot ?? [],
               theaterModels: (step as any)?.theaterModels ?? [],
@@ -741,7 +751,6 @@ function useSceneOperations() {
                 durationMin: (step as any)?.durationMin ?? null,
                 kanbanStatus: (step as any)?.kanbanStatus ?? null,
                 kanbanOrder: (step as any)?.kanbanOrder ?? null,
-                cast: (step as any)?.cast ?? null,
                 order: index,
                 requisites: Array.isArray((step as any)?.requisites) ? (step as any).requisites : [],
                 lightPlot: Array.isArray((step as any)?.lightPlot) ? (step as any).lightPlot : [],
@@ -868,7 +877,8 @@ function useSceneProviderEffects() {
             theaterLayout: DEFAULT_THEATER_LAYOUT,
             steps: [],
             currentPage: 0,
-            isSceneReady: true,
+            // Web: ждём initial sync (если есть токен), чтобы не мелькало пустое состояние/шаг-заглушка
+            isSceneReady: !accessToken,
           }),
         );
         return;
@@ -905,7 +915,7 @@ function useSceneProviderEffects() {
     return () => {
       cancelled = true;
     };
-  }, [projectName, dispatch]);
+  }, [projectName, dispatch, accessToken]);
 
   useEffect(() => {
     if (!accessToken || !projectName) return;

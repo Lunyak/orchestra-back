@@ -1,7 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../features/auth";
+import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
 import type { ScriptStep } from "../../types/script";
-import { markdownToPlainText } from "../../utils/textPreview";
+import {
+  getMyTroupe,
+  getProjectRoles,
+  type ProjectRoleInfo,
+  type TroupeMemberItem,
+} from "../../../sync/api";
 import "./style.css";
 
 type KanbanStatus = NonNullable<ScriptStep["kanbanStatus"]>;
@@ -78,53 +86,15 @@ function normalizeEmail(v: string): string {
   return String(v ?? "").trim().toLowerCase();
 }
 
-type CastValue = string | string[] | null | undefined;
-
-function normalizeCastActors(value: CastValue): string[] {
-  if (Array.isArray(value)) {
-    const out = value.map((x) => String(x ?? "").trim()).filter(Boolean);
-    // uniq preserve order
-    return out.filter((v, i) => out.indexOf(v) === i);
-  }
-  const s = String(value ?? "").trim();
-  return s ? [s] : [];
-}
-
-function formatCastActors(value: CastValue): string {
-  return normalizeCastActors(value).join(", ");
-}
-
-function parseActorList(input: string): string[] {
-  // allow: comma/semicolon/newline as separators
-  const parts = String(input ?? "")
-    .split(/[,\n;]+/g)
-    .map((x) => x.trim())
-    .filter(Boolean);
-  // uniq preserve order
-  return parts.filter((v, i) => parts.indexOf(v) === i);
-}
-
-function looksLikeEmail(v: string): boolean {
-  return /.+@.+\..+/.test(v);
-}
-
-function extractEmailFromText(raw: string): string | null {
-  const m = String(raw ?? "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-  return m?.[0] ? normalizeEmail(m[0]) : null;
-}
-
-function resolveActorEmail(value: string, members: MemberInfo[]): string | null {
-  const raw = String(value ?? "").trim();
-  if (!raw) return null;
-  const fromText = extractEmailFromText(raw);
-  if (fromText) return fromText;
-  if (looksLikeEmail(raw)) return normalizeEmail(raw);
-  const lower = raw.toLowerCase?.() ?? "";
-  const hits = members.filter(
-    (m) => (m.displayName ?? "").trim().toLowerCase() === lower,
-  );
-  if (hits.length === 1) return normalizeEmail(hits[0].email);
-  return null;
+function normalizeRoleKey(v: unknown): string {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[_\-.]+/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function formatMemberLabel(m: MemberInfo): string {
@@ -220,11 +190,14 @@ export function KanbanBoardPage({
 }: {
   members?: MemberInfo[];
 }) {
-  const { sceneData, setRoleAssignments, steps, setSteps } = useScene();
+  const navigate = useNavigate();
+  const { accessToken } = useAuth();
+  const { projectName } = useProject();
+  const { sceneData, steps, setSteps } = useScene();
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [openedStepId, setOpenedStepId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("");
+  const [roleFilter, setRoleFilter] = useState<string>(""); // normalized role key
   const [actorFilter, setActorFilter] = useState<string>("");
   const [onlyUnassigned, setOnlyUnassigned] = useState(false);
 
@@ -250,87 +223,189 @@ export function KanbanBoardPage({
     if (normalizedSteps !== steps) setSteps(normalizedSteps);
   }, [normalizedSteps, setSteps, steps]);
 
-  const allRoles = useMemo(() => {
-    const roles = new Set<string>();
-    for (const s of normalizedSteps) {
-      const text = s.playMarkdown ?? s.markdown;
-      extractRolesSmart(text).forEach((r) => roles.add(r));
-    }
-    return Array.from(roles).sort((a, b) => a.localeCompare(b, "ru"));
-  }, [normalizedSteps]);
+  const effectiveRoleAssignmentsFallback = (sceneData?.roleAssignments ?? {}) as Record<
+    string,
+    string[]
+  >;
 
-  const effectiveRoleAssignments = (sceneData?.roleAssignments ?? {}) as Record<string, string[]>;
+  const [projectRoles, setProjectRoles] = useState<ProjectRoleInfo[]>([]);
+  const [troupeMembers, setTroupeMembers] = useState<TroupeMemberItem[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+  const [rolesError, setRolesError] = useState<string | null>(null);
 
-  const getRoleActors = (step: ScriptStep, role: string): string[] => {
-    const fromStep = normalizeCastActors((step.cast as any)?.[role]);
-    if (fromStep.length) return fromStep;
-    const fromGlobal = effectiveRoleAssignments[role] ?? [];
-    return Array.isArray(fromGlobal)
-      ? fromGlobal.map((x) => String(x ?? "").trim()).filter(Boolean)
-      : [];
-  };
-
-  const [roleAddDraftByRole, setRoleAddDraftByRole] = useState<Record<string, string>>({});
-  const addActorToRoleDirect = (role: string, actor: string) => {
-    const prev = effectiveRoleAssignments[role] ?? [];
-    const nextList = Array.from(new Set([...(prev ?? []), actor]));
-    setRoleAssignments({ ...effectiveRoleAssignments, [role]: nextList });
-  };
-  const addActorToRole = (role: string) => {
-    const draft = String(roleAddDraftByRole[role] ?? "").trim();
-    if (!draft) return;
-    addActorToRoleDirect(role, draft);
-    setRoleAddDraftByRole((p) => ({ ...p, [role]: "" }));
-  };
-  const removeActorFromRole = (role: string, actor: string) => {
-    const prev = effectiveRoleAssignments[role] ?? [];
-    const nextList = (prev ?? []).filter((x) => x !== actor);
-    const next = { ...effectiveRoleAssignments };
-    if (nextList.length === 0) delete (next as any)[role];
-    else (next as any)[role] = nextList;
-    setRoleAssignments(next);
-  };
-
-  // Пикер участников проекта для быстрого добавления в роль
-  const [openRolePicker, setOpenRolePicker] = useState<string | null>(null);
-  const closePickerTimerRef = React.useRef<number | null>(null);
   useEffect(() => {
+    if (!accessToken || !projectName) {
+      setProjectRoles([]);
+      setTroupeMembers([]);
+      setRolesLoading(false);
+      setRolesError(null);
+      return;
+    }
+    let cancelled = false;
+    setRolesLoading(true);
+    setRolesError(null);
+    Promise.all([
+      getProjectRoles(accessToken, projectName),
+      getMyTroupe(accessToken).catch(() => null),
+    ])
+      .then(([rolesRes, troupeRes]) => {
+        if (cancelled) return;
+        setProjectRoles(rolesRes?.roles ?? []);
+        setTroupeMembers(((troupeRes as any)?.members ?? []) as TroupeMemberItem[]);
+      })
+      .catch((e: any) => {
+        if (cancelled) return;
+        setProjectRoles([]);
+        setTroupeMembers([]);
+        setRolesError(e?.message ? String(e.message) : "Не удалось загрузить роли/труппу");
+      })
+      .finally(() => {
+        if (!cancelled) setRolesLoading(false);
+      });
     return () => {
-      if (closePickerTimerRef.current != null) {
-        window.clearTimeout(closePickerTimerRef.current);
+      cancelled = true;
+    };
+  }, [accessToken, projectName]);
+
+  const troupeAsMembers = useMemo((): MemberInfo[] => {
+    const list = Array.isArray(troupeMembers) ? troupeMembers : [];
+    return list
+      .map((m) => {
+        const email = normalizeEmail(String((m as any)?.email ?? ""));
+        if (!email) return null;
+        const p = (m as any)?.profile ?? null;
+        const displayName =
+          String(p?.displayName ?? "").trim() ||
+          `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim() ||
+          null;
+        return { email, displayName };
+      })
+      .filter(Boolean) as MemberInfo[];
+  }, [troupeMembers]);
+
+  const allKnownMembers = useMemo(() => {
+    const map = new Map<string, MemberInfo>();
+    const add = (m: MemberInfo | null | undefined) => {
+      const email = m?.email ? normalizeEmail(m.email) : "";
+      if (!email) return;
+      if (!map.has(email)) map.set(email, { email, displayName: m?.displayName ?? null });
+      else {
+        const prev = map.get(email)!;
+        if (!prev.displayName && m?.displayName) map.set(email, { ...prev, displayName: m.displayName });
       }
     };
-  }, []);
+    (normalizedMembers ?? []).forEach(add);
+    (troupeAsMembers ?? []).forEach(add);
+    return Array.from(map.values()).sort((a, b) =>
+      formatMemberLabel(a).localeCompare(formatMemberLabel(b), "ru"),
+    );
+  }, [normalizedMembers, troupeAsMembers]);
 
-  const scheduleClosePicker = () => {
-    if (closePickerTimerRef.current != null) {
-      window.clearTimeout(closePickerTimerRef.current);
+  const roleInfoByKey = useMemo(() => {
+    const map = new Map<string, ProjectRoleInfo>();
+    for (const r of projectRoles ?? []) {
+      const key = normalizeRoleKey((r as any)?.key ?? (r as any)?.title);
+      if (key) map.set(key, r);
     }
-    closePickerTimerRef.current = window.setTimeout(() => {
-      setOpenRolePicker(null);
-      closePickerTimerRef.current = null;
-    }, 120);
+    return map;
+  }, [projectRoles]);
+
+  const roleInfoByAliasKey = useMemo(() => {
+    const map = new Map<string, ProjectRoleInfo>();
+    for (const r of projectRoles ?? []) {
+      const aliases = Array.isArray((r as any)?.aliases) ? (r as any).aliases : [];
+      for (const a of aliases) {
+        const k = normalizeRoleKey(a);
+        if (k && !map.has(k)) map.set(k, r);
+      }
+    }
+    return map;
+  }, [projectRoles]);
+
+  const resolveRoleInfo = (rawRole: string): ProjectRoleInfo | null => {
+    const k = normalizeRoleKey(rawRole);
+    if (!k) return null;
+    return roleInfoByKey.get(k) ?? roleInfoByAliasKey.get(k) ?? null;
   };
 
-  const allActors = useMemo(() => {
-    const actors = new Set<string>();
-    for (const s of normalizedSteps) {
-      const cast = s.cast ?? {};
-      Object.values(cast).forEach((v) => {
-        normalizeCastActors(v as any).forEach((val) => {
-          if (val) actors.add(val);
-        });
-      });
+  const getFallbackRoleActors = (roleRaw: string): string[] => {
+    const direct = effectiveRoleAssignmentsFallback[roleRaw] ?? [];
+    const cleaned = (Array.isArray(direct) ? direct : [])
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean);
+    if (cleaned.length) return cleaned;
+    const roleKey = normalizeRoleKey(roleRaw);
+    if (!roleKey) return [];
+    for (const [k, v] of Object.entries(effectiveRoleAssignmentsFallback ?? {})) {
+      if (normalizeRoleKey(k) === roleKey) {
+        return (Array.isArray(v) ? v : []).map((x) => String(x ?? "").trim()).filter(Boolean);
+      }
     }
-    // Добавляем актёров из глобального распределения
-    Object.values(effectiveRoleAssignments).forEach((list) => {
-      (list ?? []).forEach((x) => {
-        const v = String(x ?? "").trim();
-        if (v) actors.add(v);
-      });
-    });
-    return Array.from(actors).sort((a, b) => a.localeCompare(b, "ru"));
-  }, [normalizedSteps, effectiveRoleAssignments]);
+    return [];
+  };
+
+  const getRoleActors = (step: ScriptStep, roleRaw: string): string[] => {
+    const info = resolveRoleInfo(roleRaw);
+    const emails = Array.isArray((info as any)?.emails) ? (info as any).emails : [];
+    const cleaned = emails.map((x: any) => String(x ?? "").trim()).filter(Boolean);
+    if (cleaned.length) return cleaned;
+    return getFallbackRoleActors(roleRaw);
+  };
+
+  const displayRoleTitle = (roleRaw: string): string => {
+    const info = resolveRoleInfo(roleRaw);
+    const title = info?.title ? String(info.title).trim() : "";
+    return title || roleRaw;
+  };
+
+  const formatActorList = (actors: string[]) => {
+    const uniq = Array.from(new Set((actors ?? []).map((x) => String(x ?? "").trim()).filter(Boolean)));
+    if (uniq.length === 0) return "—";
+    return uniq
+      .map((raw) => {
+        const email = normalizeEmail(raw);
+        const hit = allKnownMembers.find((m) => normalizeEmail(m.email) === email) ?? null;
+        return hit ? formatMemberLabel(hit) : raw;
+      })
+      .join(", ");
+  };
+
+  const allRoleKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of normalizedSteps) {
+      const text = s.playMarkdown ?? s.markdown;
+      extractRolesSmart(text)
+        .map((r) => normalizeRoleKey(r))
+        .filter(Boolean)
+        .forEach((k) => set.add(k));
+    }
+    return Array.from(set);
+  }, [normalizedSteps]);
+
+  const roleFilterOptions = useMemo(() => {
+    return allRoleKeys
+      .map((k) => {
+        const info = roleInfoByKey.get(k) ?? roleInfoByAliasKey.get(k) ?? null;
+        const label = info?.title ? String(info.title).trim() : "";
+        return { key: k, label: label || k };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, "ru"));
+  }, [allRoleKeys, roleInfoByAliasKey, roleInfoByKey]);
+
+  const allActors = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of normalizedSteps) {
+      const text = s.playMarkdown ?? s.markdown;
+      const roles = extractRolesSmart(text);
+      for (const r of roles) {
+        getRoleActors(s, r).forEach((a) => {
+          const v = String(a ?? "").trim();
+          if (v) set.add(v);
+        });
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "ru"));
+  }, [normalizedSteps, projectRoles, troupeMembers, sceneData]);
 
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -339,7 +414,7 @@ export function KanbanBoardPage({
       if (!normalizedQuery) return true;
       const inTitle = (s.title ?? "").toLowerCase().includes(normalizedQuery);
       const inRoles = roles.some((r) =>
-        String(r ?? "").toLowerCase().includes(normalizedQuery),
+        String(displayRoleTitle(r) ?? "").toLowerCase().includes(normalizedQuery),
       );
       const inActors = roles.some((role) =>
         getRoleActors(s, role).some((a) =>
@@ -353,7 +428,10 @@ export function KanbanBoardPage({
       const text = s.playMarkdown ?? s.markdown;
       const roles = extractRolesSmart(text);
       if (!matchesQuery(s, roles)) return false;
-      if (roleFilter && !roles.includes(roleFilter)) return false;
+      if (roleFilter) {
+        const has = roles.some((r) => normalizeRoleKey(r) === roleFilter);
+        if (!has) return false;
+      }
       if (actorFilter) {
         const hasActor = roles.some((role) =>
           getRoleActors(s, role).some((a) => a === actorFilter),
@@ -367,7 +445,7 @@ export function KanbanBoardPage({
       }
       return true;
     });
-  }, [actorFilter, normalizedQuery, normalizedSteps, onlyUnassigned, roleFilter]);
+  }, [actorFilter, normalizedQuery, normalizedSteps, onlyUnassigned, roleFilter, projectRoles, troupeMembers, sceneData]);
 
   const columns = useMemo(() => {
     const byStatus = new Map<KanbanStatus, ScriptStep[]>();
@@ -422,9 +500,6 @@ export function KanbanBoardPage({
     setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, kanbanStatus: st } : s)));
   };
 
-  // Редактирование назначений в сцене больше не используем:
-  // истина — в global roleAssignments.
-
   const setStepDurationMin = (id: number, durationMin: number | undefined) => {
     setSteps((prev) =>
       prev.map((s) => (s.id === id ? { ...s, durationMin } : s))
@@ -436,137 +511,14 @@ export function KanbanBoardPage({
       <div className="kanban-header">
         <h2 className="kanban-title">Доска готовности</h2>
         <p className="kanban-subtitle">
-          Перетаскивайте “сцены” (шаги) между колонками. Клик по карточке — детали, роли и назначения.
+          Перетаскивайте “сцены” (шаги) между колонками. В карточке видно роли и кто играет. Клик — подробности.
         </p>
       </div>
 
-      {allRoles.length > 0 && (
-        <details className="kanban-details" style={{ marginBottom: 12 }}>
-          <summary>Распределение ролей (истина)</summary>
-          <div className="kanban-muted" style={{ marginTop: 6 }}>
-            Здесь назначается состав на роль один раз. В сценах назначения подтягиваются отсюда, если в самой сцене не задано.
-          </div>
-          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-            {allRoles.map((role) => {
-              const list = effectiveRoleAssignments[role] ?? [];
-              const draft = roleAddDraftByRole[role] ?? "";
-              const q = draft.trim().toLowerCase();
-              const pickerItems = normalizedMembers
-                .map((m) => ({
-                  key: m.email,
-                  value: m.email,
-                  label: formatMemberLabel(m),
-                  search: `${m.email} ${m.displayName ?? ""}`.toLowerCase(),
-                }))
-                .filter((x) => (q ? x.search.includes(q) : true))
-                .slice(0, 12);
-              return (
-                <div key={`ra-${role}`} style={{ padding: 10, border: "1px solid #e5e7eb", borderRadius: 10 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 6 }}>{role}</div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", position: "relative" }}>
-                    <input
-                      value={draft}
-                      onChange={(e) =>
-                        setRoleAddDraftByRole((p) => ({ ...p, [role]: e.target.value }))
-                      }
-                      onFocus={() => {
-                        if (closePickerTimerRef.current != null) {
-                          window.clearTimeout(closePickerTimerRef.current);
-                          closePickerTimerRef.current = null;
-                        }
-                        setOpenRolePicker(role);
-                      }}
-                      onBlur={() => scheduleClosePicker()}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          addActorToRole(role);
-                        }
-                      }}
-                      placeholder="добавить актёра (email/имя)"
-                      list={normalizedMembers.length ? "kanban-members" : undefined}
-                      style={{ minWidth: 260 }}
-                    />
-                    <button type="button" className="btn btn-secondary" onClick={() => addActorToRole(role)}>
-                      Добавить
-                    </button>
-
-                    {openRolePicker === role && pickerItems.length > 0 && (
-                      <div
-                        role="listbox"
-                        style={{
-                          position: "absolute",
-                          left: 0,
-                          top: "calc(100% + 6px)",
-                          zIndex: 20,
-                          minWidth: 420,
-                          maxWidth: 520,
-                          background: "white",
-                          border: "1px solid #e5e7eb",
-                          borderRadius: 10,
-                          boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
-                          padding: 6,
-                        }}
-                        onMouseDown={(e) => {
-                          // чтобы клик по элементам не закрывал поповер из-за blur
-                          e.preventDefault();
-                        }}
-                      >
-                        {pickerItems.map((it) => {
-                          const already = (list ?? []).includes(it.value);
-                          return (
-                            <button
-                              key={it.key}
-                              type="button"
-                              disabled={already}
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                if (already) return;
-                                addActorToRoleDirect(role, it.value);
-                              }}
-                              style={{
-                                width: "100%",
-                                textAlign: "left",
-                                padding: "8px 10px",
-                                borderRadius: 8,
-                                border: "none",
-                                background: already ? "#f3f4f6" : "transparent",
-                                cursor: already ? "not-allowed" : "pointer",
-                              }}
-                            >
-                              {it.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {list.length > 0 ? (
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-                      {list.map((a) => (
-                        <button
-                          key={`${role}:${a}`}
-                          type="button"
-                          className="kanban-chip"
-                          title="Удалить"
-                          onClick={() => removeActorFromRole(role, a)}
-                          style={{ cursor: "pointer" }}
-                        >
-                          {a} ×
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="kanban-muted" style={{ marginTop: 8 }}>
-                      Пока никто не назначен
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </details>
+      {rolesError && (
+        <div className="kanban-muted" style={{ marginBottom: 12 }}>
+          {rolesError}
+        </div>
       )}
 
       <div className="kanban-toolbar" aria-label="Фильтры доски">
@@ -583,9 +535,9 @@ export function KanbanBoardPage({
           <span className="kanban-tool-label">Роль</span>
           <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
             <option value="">Все</option>
-            {allRoles.map((r) => (
-              <option key={r} value={r}>
-                {r}
+            {roleFilterOptions.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
               </option>
             ))}
           </select>
@@ -597,7 +549,7 @@ export function KanbanBoardPage({
             <option value="">Все</option>
             {allActors.map((a) => (
               <option key={a} value={a}>
-                {a}
+                {formatActorList([a])}
               </option>
             ))}
           </select>
@@ -676,12 +628,22 @@ export function KanbanBoardPage({
                         <div className="kanban-card-roles" aria-label="Роли в сцене">
                           {roles.slice(0, 6).map((r) => (
                             <span key={r} className="kanban-chip">
-                              {r}
+                              {displayRoleTitle(r)}
                             </span>
                           ))}
                           {roles.length > 6 && (
                             <span className="kanban-chip more">+{roles.length - 6}</span>
                           )}
+                        </div>
+                      )}
+                      {roles.length > 0 && (
+                        <div className="kanban-muted" style={{ marginTop: 8, lineHeight: 1.35 }}>
+                          {roles.slice(0, 2).map((r) => (
+                            <div key={`cast-${s.id}-${r}`}>
+                              <b>{displayRoleTitle(r)}</b>: {formatActorList(getRoleActors(s, r))}
+                            </div>
+                          ))}
+                          {roles.length > 2 && <div>+ ещё {roles.length - 2} рол.</div>}
                         </div>
                       )}
                       <div className="kanban-card-footer">
@@ -765,6 +727,11 @@ export function KanbanBoardPage({
 
               <div className="kanban-section">
                 <div className="kanban-section-title">Роли и кто играет</div>
+                {rolesLoading && (
+                  <div className="kanban-muted" style={{ marginBottom: 8 }}>
+                    Загрузка ролей…
+                  </div>
+                )}
                 {openedRoles.length === 0 ? (
                   <div className="kanban-muted">
                     Роли не найдены. Вытаскиваем роли из <code>[[Роль]]</code> и пробуем распознать говорящего (например <code>ЛЕОН: ...</code>).
@@ -773,66 +740,41 @@ export function KanbanBoardPage({
                   <div className="kanban-roles-grid">
                     {openedRoles.map((role) => (
                       <label key={role} className="kanban-role-row">
-                        <span className="kanban-role-name">{role}</span>
+                        <span className="kanban-role-name">{displayRoleTitle(role)}</span>
                         <div className="kanban-role-input-wrap">
-                          <div className="kanban-muted" style={{ marginBottom: 6 }}>
-                            Назначения подтягиваются из блока «Распределение ролей (истина)».
-                          </div>
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                             {getRoleActors(openedStep, role).length > 0 ? (
                               getRoleActors(openedStep, role).map((a) => (
                                 <span key={`${role}:${a}`} className="kanban-chip">
-                                  {a}
+                                  {formatActorList([a])}
                                 </span>
                               ))
                             ) : (
                               <span className="kanban-muted">—</span>
                             )}
                           </div>
-                          {(() => {
-                            const list = getRoleActors(openedStep, role);
-                            if (list.length === 0) return null;
-                            const resolved = list
-                              .map((x) => ({ raw: x, email: resolveActorEmail(x, normalizedMembers) }))
-                              .filter((x) => Boolean(x.email)) as Array<{ raw: string; email: string }>;
-                            if (resolved.length === 0) {
-                              return (
-                                <div className="kanban-role-hint warn">
-                                  Не удалось сопоставить с участником проекта
-                                </div>
-                              );
-                            }
-                            const labels = resolved
-                              .map((x) => {
-                                const m = normalizedMembers.find((mm) => normalizeEmail(mm.email) === x.email);
-                                return m ? formatMemberLabel(m) : x.email;
-                              })
-                              .filter(Boolean);
-                            return <div className="kanban-role-hint">{labels.join(", ")}</div>;
-                          })()}
+                          {resolveRoleInfo(role) == null && (
+                            <div className="kanban-role-hint warn">
+                              Роль не заведена в проекте. Создай её в разделе «Роли», чтобы назначать актёров.
+                            </div>
+                          )}
                         </div>
                       </label>
                     ))}
                   </div>
                 )}
+                <div style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => navigate("/roles")}
+                    disabled={!accessToken || !projectName}
+                    title={!accessToken ? "Нужно войти" : !projectName ? "Нужен проект" : undefined}
+                  >
+                    Открыть «Роли»
+                  </button>
+                </div>
               </div>
-
-              {normalizedMembers.length > 0 && (
-                <datalist id="kanban-members">
-                  {normalizedMembers.map((m) => (
-                    <option key={m.email} value={m.email}>
-                      {formatMemberLabel(m)}
-                    </option>
-                  ))}
-                </datalist>
-              )}
-
-              <details className="kanban-details">
-                <summary>Текст сцены</summary>
-                <pre className="kanban-text">
-                  {markdownToPlainText(String(openedStep.playMarkdown ?? openedStep.markdown ?? ""))}
-                </pre>
-              </details>
             </div>
           </div>
         </div>

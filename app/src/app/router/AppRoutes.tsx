@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { useScriptUI } from "../../features/script-ui";
 import { Header } from "../../shared/components/header/Header";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 
 // Lazy imports страниц
 const SpectaclePage = lazy(() =>
@@ -81,6 +82,13 @@ export function AppRoutes() {
     location.pathname === "/theater" ||
     location.pathname === "/light-plot";
 
+  const isSpectacleLayoutRoute =
+    location.pathname === "/" ||
+    location.pathname === "/theater" ||
+    location.pathname === "/light-plot";
+
+  const isBoardRoute = location.pathname === "/board";
+
   return (
     <>
       <Header
@@ -99,7 +107,21 @@ export function AppRoutes() {
             : undefined
         }
       />
-      <Suspense fallback={<div>Loading...</div>}>
+      <Suspense
+        fallback={
+          isSpectacleLayoutRoute ? (
+            <PageLoader
+              variant="spectacle"
+              showLeftSidebar={showPlaylistSidebar}
+              showRightSidebar={!isStepsCollapsed}
+              showTopBar={showHeaderSounds}
+              label="Загрузка страницы…"
+            />
+          ) : (
+            <PageLoader variant="simple" label={isBoardRoute ? "Загрузка доски…" : "Загрузка страницы…"} />
+          )
+        }
+      >
         <Routes>
           <Route path="/" element={<SpectaclePage />} />
           <Route path="/theater" element={<SpectaclePage />} />

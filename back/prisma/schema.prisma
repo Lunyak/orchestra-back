@@ -47,8 +47,6 @@ model UserProfile {
   sex              String?
   /// Роль в театре (актер, режиссер, и т.д.)
   role             String?
-  /// Роли/персонажи которые играет актер (JSON массив)
-  characters       Json?
   phone            String?
   birthday         String?
   createdAt        DateTime @default(now())

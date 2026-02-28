@@ -79,10 +79,6 @@ export class SyncService {
           kanbanOrderRaw != null && Number.isFinite(kanbanOrderRaw)
             ? Math.trunc(kanbanOrderRaw)
             : null;
-        const cast =
-          st?.cast && typeof st.cast === 'object' && !Array.isArray(st.cast)
-            ? (st.cast as Record<string, unknown>)
-            : null;
         return {
           id,
           sceneId,
@@ -93,7 +89,6 @@ export class SyncService {
           durationMin,
           kanbanStatus,
           kanbanOrder,
-          cast,
           order: idx,
           requisites: Array.isArray(st?.requisites) ? (st.requisites as any[]) : [],
           lightPlot: Array.isArray(st?.lightPlot) ? (st.lightPlot as any[]) : [],
@@ -113,7 +108,6 @@ export class SyncService {
       durationMin: number | null;
       kanbanStatus: string | null;
       kanbanOrder: number | null;
-      cast: Record<string, unknown> | null;
       order: number;
       requisites: any[];
       lightPlot: any[];
@@ -251,9 +245,6 @@ export class SyncService {
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
-          cast: st.cast
-            ? (st.cast as unknown as Prisma.InputJsonValue)
-            : Prisma.DbNull,
           order: st.order,
           deletedAt: null,
         },
@@ -267,9 +258,6 @@ export class SyncService {
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
-          cast: st.cast
-            ? (st.cast as unknown as Prisma.InputJsonValue)
-            : Prisma.DbNull,
           order: st.order,
         },
       }),
@@ -744,10 +732,6 @@ export class SyncService {
           payload.kanbanOrder != null && Number.isFinite(Number(payload.kanbanOrder))
             ? Math.trunc(Number(payload.kanbanOrder))
             : undefined,
-        cast:
-          payload.cast && typeof payload.cast === 'object' && !Array.isArray(payload.cast)
-            ? payload.cast
-            : undefined,
         order: payload.order,
       },
       create: {
@@ -770,10 +754,6 @@ export class SyncService {
           payload.kanbanOrder != null && Number.isFinite(Number(payload.kanbanOrder))
             ? Math.trunc(Number(payload.kanbanOrder))
             : null,
-        cast:
-          payload.cast && typeof payload.cast === 'object' && !Array.isArray(payload.cast)
-            ? payload.cast
-            : Prisma.DbNull,
         order: payload.order,
       },
     });

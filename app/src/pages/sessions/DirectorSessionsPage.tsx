@@ -12,6 +12,7 @@ import { publishDirectorSession } from "../../sync/api";
 import type { ScriptStep } from "../../shared/types/script";
 import { markdownToPlainText } from "../../shared/utils/textPreview";
 import { createId } from "../../shared/utils/createId";
+import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import {
   loadDirectorSessions,
   saveDirectorSessions,
@@ -23,7 +24,11 @@ import "./style.css";
 
 type ProjectDataCache = Record<
   string,
-  { steps: ScriptStep[]; roleEmailsByKey: Record<string, string[]> }
+  {
+    steps: ScriptStep[];
+    roleEmailsByKey: Record<string, string[]>;
+    roleTitleByKey: Record<string, string>;
+  }
 >;
 
 type AvailabilityTimeRange = { from: string; to: string };
@@ -141,33 +146,6 @@ function normalizeRoleKey(v: string): string {
     .replace(/[()]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function parseCharacters(value: unknown): string[] {
-  if (value == null) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((x) => String(x ?? "").trim())
-      .filter((x) => x.length > 0);
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return [];
-    if (trimmed.startsWith("[")) {
-      try {
-        const parsed = JSON.parse(trimmed);
-        if (Array.isArray(parsed)) {
-          return parsed
-            .map((x) => String(x ?? "").trim())
-            .filter((x) => x.length > 0);
-        }
-      } catch {
-        // fallthrough
-      }
-    }
-    return [trimmed];
-  }
-  return [];
 }
 
 function extractRolesBrackets(text?: string): string[] {
@@ -418,6 +396,7 @@ export function DirectorSessionsPage() {
       const pull = await syncPull(accessToken, null, slug, { steps: true });
       const rolesRes = await getProjectRoles(accessToken, slug).catch(() => null);
       const roleEmailsByKey: Record<string, string[]> = {};
+      const roleTitleByKey: Record<string, string> = {};
       (rolesRes?.roles ?? []).forEach((r: any) => {
         const key = normalizeRoleKey(String(r?.key ?? r?.title ?? ""));
         if (!key) return;
@@ -425,6 +404,7 @@ export function DirectorSessionsPage() {
           ? r.emails.map((e: any) => normalizeEmail(e)).filter(Boolean)
           : [];
         roleEmailsByKey[key] = Array.from(new Set(emails));
+        roleTitleByKey[key] = String(r?.title ?? r?.key ?? key).trim() || key;
       });
       // у вас обычно одна сцена на проект (script); берём первую по projectId
       const proj = (pull.projects ?? []).find((p: any) => p.slug === slug);
@@ -444,10 +424,10 @@ export function DirectorSessionsPage() {
           kanbanOrder: st?.kanbanOrder ?? undefined,
         }))
         .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
-      setDataCache((p) => ({ ...p, [slug]: { steps, roleEmailsByKey } }));
+      setDataCache((p) => ({ ...p, [slug]: { steps, roleEmailsByKey, roleTitleByKey } }));
     } catch (e) {
       console.error("loadProjectData failed:", slug, e);
-      setDataCache((p) => ({ ...p, [slug]: { steps: [], roleEmailsByKey: {} } }));
+      setDataCache((p) => ({ ...p, [slug]: { steps: [], roleEmailsByKey: {}, roleTitleByKey: {} } }));
     } finally {
       setStepsLoading(false);
     }
@@ -477,7 +457,7 @@ export function DirectorSessionsPage() {
     });
   }, [projectFilter, query, dataCache]);
 
-  // ----- Free actors & selectable scenes (based on availability + characters) -----
+  // ----- Free actors & selectable scenes (based on availability + project role assignments) -----
   const [membersLoading, setMembersLoading] = useState(false);
   const [projectMemberEmails, setProjectMemberEmails] = useState<string[]>([]);
   useEffect(() => {
@@ -529,25 +509,39 @@ export function DirectorSessionsPage() {
 
   const freeActorsForDate = useMemo(() => {
     if (!sessionDateKey) return [];
+    const data = projectFilter ? dataCache[projectFilter] : null;
+    const roleEmailsByKey = data?.roleEmailsByKey ?? {};
+    const roleTitleByKey = data?.roleTitleByKey ?? {};
     return (teamProfiles ?? [])
       .map((p) => {
         const email = normalizeEmail(p.email);
         const cal = (p as any)?.availabilityCalendar as Record<string, string> | undefined;
         const st = cal?.[sessionDateKey] === "present" ? "present" : cal?.[sessionDateKey] === "absent" ? "absent" : "unknown";
-        const chars = parseCharacters((p as any)?.characters);
-        const rolesNorm = chars.map(normalizeRoleKey).filter(Boolean);
         const ranges = getRangesForDateMinutes(p, sessionDateKey);
+        const rolesNorm: string[] = [];
+        const rolesDisplay: string[] = [];
+        if (email) {
+          for (const [rk, emails] of Object.entries(roleEmailsByKey)) {
+            if (!rk) continue;
+            if (!Array.isArray(emails) || emails.length === 0) continue;
+            if (!emails.includes(email)) continue;
+            rolesNorm.push(rk);
+            rolesDisplay.push(roleTitleByKey[rk] ?? rk);
+          }
+        }
+        rolesDisplay.sort((a, b) => a.localeCompare(b, "ru"));
         return {
           email,
           displayName: String((p as any)?.displayName ?? "").trim() || null,
+          avatarUrl: String((p as any)?.avatarUrl ?? "").trim() || null,
           status: st as "present" | "absent" | "unknown",
           rolesNorm,
-          rolesDisplay: chars,
+          rolesDisplay,
           ranges,
         };
       })
       .filter((x) => x.email);
-  }, [sessionDateKey, teamProfiles]);
+  }, [dataCache, projectFilter, sessionDateKey, teamProfiles]);
 
   const activeSlotWindow = useMemo(() => {
     if (!activeSession || !activeSlotId) return null;
@@ -1275,7 +1269,10 @@ export function DirectorSessionsPage() {
                                 <div key={a.email} className="sessions-actor-row">
                                   <div>
                                     <div className="sessions-actor-name">
-                                      {a.displayName ? `${a.displayName} (${a.email})` : a.email}
+                                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                        <MiniAvatar src={String(a.avatarUrl ?? "").trim() || null} label={a.displayName ? `${a.displayName} (${a.email})` : a.email} size={20} />
+                                        <span>{a.displayName ? `${a.displayName} (${a.email})` : a.email}</span>
+                                      </span>
                                     </div>
                                     <div className="rehearsals-muted">
                                       роли: {a.rolesDisplay.slice(0, 6).join(", ")}

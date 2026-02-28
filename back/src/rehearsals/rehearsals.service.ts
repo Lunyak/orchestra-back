@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { RolesService } from '../roles/roles.service';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
 import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
@@ -21,6 +22,17 @@ function normEmail(v: string): string {
   return String(v ?? '')
     .trim()
     .toLowerCase();
+}
+
+function normalizeRoleKey(v: unknown): string {
+  return String(v ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[_\-.]+/g, ' ')
+    .replace(/[()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function parseIsoDate(v: string): Date {
@@ -55,7 +67,6 @@ type RawStepLike = {
   title?: string;
   markdown?: string;
   playMarkdown?: string;
-  cast?: Record<string, string | string[]>;
   durationMin?: number;
   kanbanStatus?: string;
   kanbanOrder?: number;
@@ -133,24 +144,6 @@ function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
 }
 
-function normalizeCastActors(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    const out = value.map((x) => String(x ?? '').trim()).filter(Boolean);
-    return Array.from(new Set(out));
-  }
-  if (value == null) return [];
-  if (typeof value === 'string') {
-    const s = value.trim();
-    return s ? [s] : [];
-  }
-  if (typeof value === 'number' || typeof value === 'boolean') {
-    const s = String(value).trim();
-    return s ? [s] : [];
-  }
-  // Avoid stringifying objects (would become "[object Object]")
-  return [];
-}
-
 type AvailabilityCalendar = Record<string, 'present' | 'absent'>;
 
 function getDateKey(date: Date): string {
@@ -207,6 +200,7 @@ export class RehearsalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly roles: RolesService,
   ) {}
 
   private async assertUserHasProjectAccess(
@@ -525,7 +519,6 @@ export class RehearsalsService {
         title: true,
         markdown: true,
         playMarkdown: true,
-        cast: true,
         durationMin: true,
         order: true,
       },
@@ -538,28 +531,73 @@ export class RehearsalsService {
       stepsBySceneId.set(st.sceneId, list);
     }
 
-    const castEmails = new Set<string>();
+    // 1) Собираем все роли, которые реально нужны в выбранных шагах.
+    const requiredRoleKeysSet = new Set<string>();
     for (const scene of scenes) {
       const steps = stepsBySceneId.get(scene.id) ?? [];
       for (const step of steps) {
-        const cast =
-          step.cast && typeof step.cast === 'object' && !Array.isArray(step.cast)
-            ? (step.cast as any)
-            : {};
-        for (const rawAssigned of Object.values(cast ?? {})) {
-          for (const assigned of normalizeCastActors(rawAssigned)) {
-            if (!looksLikeEmail(assigned)) continue;
-            castEmails.add(normEmail(assigned));
-          }
+        const allowed = allowedStepsBySceneId.get(scene.id);
+        if (
+          allowed &&
+          typeof step.sourceId === 'number' &&
+          !allowed.has(step.sourceId)
+        )
+          continue;
+        if (allowed && typeof step.sourceId !== 'number') continue;
+        const text = step.playMarkdown ?? step.markdown ?? '';
+        const roles = extractRolesSmart(text);
+        roles
+          .map((r) => normalizeRoleKey(r))
+          .filter(Boolean)
+          .forEach((k) => requiredRoleKeysSet.add(k));
+      }
+    }
+
+    const assignmentsByKey = await this.roles.resolveAssignmentsByRoleKeys(
+      reh.projectId,
+      Array.from(requiredRoleKeysSet),
+    );
+
+    const getAssignedEmailsForRole = (roleRaw: string): string[] => {
+      const roleKey = normalizeRoleKey(roleRaw);
+      if (!roleKey) return [];
+      const fromRoles = assignmentsByKey.get(roleKey) ?? [];
+      return uniq(
+        (fromRoles ?? [])
+          .map((x) => String(x ?? '').trim())
+          .filter((x) => x && looksLikeEmail(x))
+          .map((x) => normEmail(x)),
+      );
+    };
+
+    // 2) Собираем нужные email-ы для доступности.
+    const neededEmails = new Set<string>();
+    for (const scene of scenes) {
+      const steps = stepsBySceneId.get(scene.id) ?? [];
+      for (const step of steps) {
+        const allowed = allowedStepsBySceneId.get(scene.id);
+        if (
+          allowed &&
+          typeof step.sourceId === 'number' &&
+          !allowed.has(step.sourceId)
+        )
+          continue;
+        if (allowed && typeof step.sourceId !== 'number') continue;
+        const text = step.playMarkdown ?? step.markdown ?? '';
+        const roles = extractRolesSmart(text);
+        for (const role of roles) {
+          getAssignedEmailsForRole(role).forEach((e) =>
+            neededEmails.add(normEmail(e)),
+          );
         }
       }
     }
 
-    const castEmailList = Array.from(castEmails);
+    const neededEmailList = Array.from(neededEmails);
     const profiles =
-      castEmailList.length > 0
+      neededEmailList.length > 0
         ? await this.prisma.userProfile.findMany({
-            where: { email: { in: castEmailList } },
+            where: { email: { in: neededEmailList } },
             select: { email: true, availabilityCalendar: true },
           })
         : [];
@@ -575,7 +613,7 @@ export class RehearsalsService {
       string,
       'present' | 'absent' | 'unknown'
     >();
-    for (const email of castEmailList) {
+    for (const email of neededEmailList) {
       const calendar = availabilityByEmail.get(email);
       const st = calendar?.[rehearsalDateKey];
       availabilityStatusByEmail.set(
@@ -611,10 +649,6 @@ export class RehearsalsService {
         if (allowed && typeof step.sourceId !== 'number') continue;
         const text = step.playMarkdown ?? step.markdown ?? '';
         const roles = extractRolesSmart(text);
-        const cast =
-          step.cast && typeof step.cast === 'object' && !Array.isArray(step.cast)
-            ? (step.cast as any)
-            : {};
         const rawDuration = typeof step.durationMin === 'number' ? step.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
@@ -629,16 +663,12 @@ export class RehearsalsService {
           availableFromTime: string;
         }> = [];
         for (const role of roles) {
-          const assignedList = normalizeCastActors((cast as any)[role]);
+          const assignedList = getAssignedEmailsForRole(role);
           if (assignedList.length === 0) {
             missing.push(`${role}: не назначено`);
             continue;
           }
           for (const assigned of assignedList) {
-            if (!looksLikeEmail(assigned)) {
-              missing.push(`${role}: "${assigned}" (нужен email)`);
-              continue;
-            }
             const email = normEmail(assigned);
             const availability =
               availabilityStatusByEmail.get(email) ?? 'unknown';
@@ -746,7 +776,7 @@ export class RehearsalsService {
         startsAt: reh.startsAt,
         project: reh.project,
       },
-      availableEmails: castEmailList.filter(
+      availableEmails: neededEmailList.filter(
         (e) => (availabilityStatusByEmail.get(e) ?? 'unknown') === 'present',
       ),
       items,
@@ -814,7 +844,14 @@ export class RehearsalsService {
         sceneId: { in: scenes.map((s) => s.id) },
         deletedAt: null,
       },
-      select: { sceneId: true, sourceId: true, cast: true, order: true },
+      select: {
+        sceneId: true,
+        sourceId: true,
+        title: true,
+        markdown: true,
+        playMarkdown: true,
+        order: true,
+      },
       orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
     });
     const stepsBySceneId2 = new Map<string, typeof stepRows2>();
@@ -837,7 +874,8 @@ export class RehearsalsService {
       );
     }
 
-    const neededEmails = new Set<string>();
+    // Нужные участники для публикации берём из назначений ролей (Role assignments).
+    const requiredRoleKeysSet = new Set<string>();
     for (const scene of scenes) {
       const steps = stepsBySceneId2.get(scene.id) ?? [];
       for (const step of steps) {
@@ -845,38 +883,65 @@ export class RehearsalsService {
         if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
-        const cast =
-          step.cast && typeof step.cast === 'object' && !Array.isArray(step.cast)
-            ? (step.cast as any)
-            : {};
-        for (const rawAssigned of Object.values(cast ?? {})) {
-          for (const assigned of normalizeCastActors(rawAssigned)) {
-            if (!looksLikeEmail(assigned)) continue;
-            neededEmails.add(normEmail(assigned));
-          }
+        const text = step.playMarkdown ?? step.markdown ?? '';
+        const roles = extractRolesSmart(text);
+        roles
+          .map((r) => normalizeRoleKey(r))
+          .filter(Boolean)
+          .forEach((k) => requiredRoleKeysSet.add(k));
+      }
+    }
+
+    const assignmentsByKey = await this.roles.resolveAssignmentsByRoleKeys(
+      reh.projectId,
+      Array.from(requiredRoleKeysSet),
+    );
+
+    const getAssignedEmailsForRole = (roleRaw: string): string[] => {
+      const roleKey = normalizeRoleKey(roleRaw);
+      if (!roleKey) return [];
+      const fromRoles = assignmentsByKey.get(roleKey) ?? [];
+      return uniq(
+        (fromRoles ?? [])
+          .map((x) => String(x ?? '').trim())
+          .filter((x) => x && looksLikeEmail(x))
+          .map((x) => normEmail(x)),
+      );
+    };
+
+    const neededEmails = new Set<string>();
+    const missingRoles = new Set<string>();
+    for (const scene of scenes) {
+      const steps = stepsBySceneId2.get(scene.id) ?? [];
+      for (const step of steps) {
+        const allowed = allowedStepsBySceneId.get(scene.id);
+        if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
+          continue;
+        if (allowed && typeof step.sourceId !== 'number') continue;
+        const text = step.playMarkdown ?? step.markdown ?? '';
+        const roles = extractRolesSmart(text);
+        for (const role of roles) {
+          const emails = getAssignedEmailsForRole(role);
+          if (emails.length === 0) missingRoles.add(role);
+          emails.forEach((e) => neededEmails.add(normEmail(e)));
         }
       }
     }
 
-    const project = await this.prisma.project.findUnique({
-      where: { id: reh.projectId },
-      select: {
-        owner: { select: { email: true } },
-        members: { select: { user: { select: { email: true } } } },
-      },
-    });
-    const memberEmails = uniq([
-      normEmail(project?.owner?.email ?? ''),
-      ...((project?.members ?? [])
-        .map((m: any) => normEmail(m?.user?.email))
-        .filter(Boolean) as string[]),
-    ]).filter(Boolean);
+    if (missingRoles.size > 0) {
+      const list = Array.from(missingRoles).slice(0, 8).join(', ');
+      throw new BadRequestException(
+        `Нельзя опубликовать репетицию: не назначены роли (${list}${missingRoles.size > 8 ? '…' : ''}). Зайди в раздел «Роли» и назначь актёров.`,
+      );
+    }
+
+    const neededEmailList = Array.from(neededEmails);
     const profiles =
-      memberEmails.length > 0
+      neededEmailList.length > 0
         ? await this.prisma.userProfile.findMany({
             where: {
               email: {
-                in: memberEmails.filter((e) => neededEmails.has(normEmail(e))),
+                in: neededEmailList,
               },
             },
             select: {

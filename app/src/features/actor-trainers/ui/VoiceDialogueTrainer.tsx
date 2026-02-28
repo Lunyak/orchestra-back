@@ -510,6 +510,7 @@ function findNextUndoneIndex(
 export function VoiceDialogueTrainer({
   steps,
   role,
+  roleKeys,
   selectedStepIds,
   storageKey,
   performerId,
@@ -517,15 +518,26 @@ export function VoiceDialogueTrainer({
 }: {
   steps: ScriptStep[];
   role: string;
+  roleKeys?: string[];
   selectedStepIds: number[];
   storageKey?: string;
   performerId: string;
   performerLabel?: string;
 }) {
-  const roleKey = normalizeRoleKey(role);
+  const desiredRoleKeySet = useMemo(() => {
+    const keys = (roleKeys && roleKeys.length ? roleKeys : [role])
+      .map((x) => normalizeRoleKey(String(x ?? "")))
+      .filter(Boolean);
+    return new Set(keys);
+  }, [role, roleKeys]);
+  const primaryRoleKey = useMemo(() => {
+    // used for uiKey and caches; prefer first provided key, else normalize role label
+    const first = roleKeys && roleKeys.length ? normalizeRoleKey(String(roleKeys[0] ?? "")) : "";
+    return first || normalizeRoleKey(role);
+  }, [role, roleKeys]);
   const { projectName } = useProject();
   const dispatch = useAppDispatch();
-  const uiKey = storageKey || `voiceTrainer:${projectName || "project"}:${roleKey || "role"}`;
+  const uiKey = storageKey || `voiceTrainer:${projectName || "project"}:${primaryRoleKey || "role"}`;
   const ui = useAppSelector((s) => selectVoiceTrainerUi(s, uiKey));
   const voiceLines = useAppSelector((s) => s.scene.sceneData?.voiceLines);
   const voiceUpload = useAppSelector((s) => s.scene.voiceLinesUpload);
@@ -543,7 +555,7 @@ export function VoiceDialogueTrainer({
     for (let idx = 0; idx < allLines.length; idx += 1) {
       const line = allLines[idx] as DialogueLine;
       if (line.kind !== "utterance" || !line.role) continue;
-      if (normalizeRoleKey(line.role) !== roleKey) continue;
+      if (!desiredRoleKeySet.has(normalizeRoleKey(line.role))) continue;
       const prev = (() => {
         for (let j = idx - 1; j >= 0; j -= 1) {
           const p = allLines[j];
@@ -556,7 +568,7 @@ export function VoiceDialogueTrainer({
           const n = allLines[j];
           if (n.kind !== "utterance" || !n.text) continue;
           const nk = normalizeRoleKey(n.role ?? "");
-          if (!nk || nk === roleKey) continue;
+          if (!nk || desiredRoleKeySet.has(nk)) continue;
           return { lineId: n.id, role: n.role, text: n.text };
         }
         return null;
@@ -577,7 +589,7 @@ export function VoiceDialogueTrainer({
       });
     }
     return out;
-  }, [allLines, roleKey]);
+  }, [allLines, desiredRoleKeySet]);
 
   const exerciseIndexByLineId = useMemo(() => {
     const m = new Map<string, number>();
@@ -1800,7 +1812,7 @@ export function VoiceDialogueTrainer({
               }
 
               const lineRole = line.role ?? "—";
-              const isMine = normalizeRoleKey(lineRole) === roleKey;
+              const isMine = desiredRoleKeySet.has(normalizeRoleKey(lineRole));
               const exIdx = exerciseIndexByLineId.get(line.id);
               const ex = typeof exIdx === "number" ? exercises[exIdx] : null;
               const isDone = ex ? doneIds.has(ex.id) : false;

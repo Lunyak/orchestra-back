@@ -1,5 +1,6 @@
 import {
   Body,
+  BadRequestException,
   Controller,
   Get,
   Param,
@@ -7,8 +8,12 @@ import {
   Post,
   Req,
   UseGuards,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { ProfileService } from './profile.service';
 
@@ -37,6 +42,35 @@ export class ProfileController {
     @Body() body: UpdateProfileDto,
   ) {
     return this.profileService.updateByEmail(req.user.email, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 6 * 1024 * 1024, // 6MB
+      },
+    }),
+  )
+  async uploadMyAvatar(
+    @Req() req: { user: { email: string } },
+    @UploadedFile() file: any,
+  ) {
+    if (!file) throw new BadRequestException('Файл не передан');
+    try {
+      return await this.profileService.uploadAvatarByEmail(req.user.email, file);
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (msg.includes('unsupported')) {
+        throw new BadRequestException('Поддерживаются PNG/JPG/WebP/GIF');
+      }
+      if (msg.includes('image')) {
+        throw new BadRequestException('Аватар должен быть изображением');
+      }
+      throw new BadRequestException('Не удалось загрузить аватар');
+    }
   }
 
   // Публичные эндпоинты для бота (работают по telegramId)

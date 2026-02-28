@@ -99,7 +99,6 @@ export async function resyncDesktopProject(
                 durationMin: st?.durationMin ?? undefined,
                 kanbanStatus: st?.kanbanStatus ?? undefined,
                 kanbanOrder: st?.kanbanOrder ?? undefined,
-                cast: st?.cast ?? undefined,
                 requisites: Array.isArray(st?.requisites)
                   ? st.requisites.map((r: any) => ({
                       id: Number(r?.sourceId ?? r?.id ?? 0),

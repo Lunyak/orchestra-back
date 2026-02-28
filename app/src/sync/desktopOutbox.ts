@@ -217,7 +217,6 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
           typeof up.step?.kanbanStatus === "string" ? up.step.kanbanStatus : null,
         kanbanOrder:
           typeof up.step?.kanbanOrder === "number" ? up.step.kanbanOrder : null,
-        cast: up.step?.cast ?? null,
         order: up.order,
         requisites: Array.isArray(up.step?.requisites) ? up.step.requisites : [],
         lightPlot: Array.isArray(up.step?.lightPlot) ? up.step.lightPlot : [],

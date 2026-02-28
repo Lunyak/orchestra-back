@@ -1,13 +1,14 @@
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { CalendarSection, type CalendarSectionState } from "../../shared/components/calendar/CalendarSection";
 import {
   getMyProfile,
   listRehearsals,
+  uploadMyAvatar,
   updateMyProfile,
   type MyProfile,
   type Rehearsal,
@@ -49,8 +50,10 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [form, setForm] = useState<Partial<MyProfile>>({});
   const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const [calendarState, setCalendarState] = useState<CalendarSectionState>(() => {
     const now = new Date();
     const monthStartDate = dayjs(now).startOf("month").toDate();
@@ -322,6 +325,76 @@ export function ProfilePage() {
                   style={{ maxWidth: "unset" }}
                 />
               </label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  style={{ display: "none" }}
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (!f || !accessToken) return;
+                    setError(null);
+                    setOk(null);
+                    setAvatarUploading(true);
+                    try {
+                      const next = await uploadMyAvatar(accessToken, f);
+                      setProfile(next);
+                      setForm((p) => ({ ...p, avatarUrl: next.avatarUrl ?? "" }));
+                      setOk("Аватар загружен");
+                    } catch (err: any) {
+                      setError(err?.response?.data?.message ?? "Не удалось загрузить аватар");
+                    } finally {
+                      setAvatarUploading(false);
+                      try {
+                        if (avatarInputRef.current) avatarInputRef.current.value = "";
+                      } catch {}
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!accessToken || avatarUploading}
+                  onClick={() => avatarInputRef.current?.click()}
+                >
+                  {avatarUploading ? "Загрузка…" : "Загрузить аватар"}
+                </button>
+                {String(form.avatarUrl ?? "").trim() ? (
+                  <button
+                    type="button"
+                    disabled={avatarUploading}
+                    onClick={() => setForm((p) => ({ ...p, avatarUrl: "" }))}
+                    title="Удалить ссылку на аватар (файл в хранилище останется)"
+                  >
+                    Убрать аватар
+                  </button>
+                ) : null}
+              </div>
+              {String(form.avatarUrl ?? "").trim() ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                  <img
+                    src={String(form.avatarUrl ?? "").trim()}
+                    alt="avatar preview"
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 999,
+                      objectFit: "cover",
+                      border: "1px solid rgba(255,255,255,0.14)",
+                      background: "rgba(255,255,255,0.06)",
+                    }}
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      try {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      } catch {}
+                    }}
+                  />
+                  <div style={{ fontSize: 12, opacity: 0.75, lineHeight: "14px" }}>
+                    Мини‑аватар будет показываться рядом с вашим именем в списках (труппа, роли, сессии).
+                  </div>
+                </div>
+              ) : null}
 
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Календарь занятости</div>
