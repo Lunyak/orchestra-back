@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 function normalizeRoleKey(v: unknown): string {
@@ -209,7 +210,7 @@ export class RolesService {
     if (existingCount > 0) return { ok: true, seeded: false };
 
     const steps = await this.prisma.step.findMany({
-      where: { scene: { projectId }, deletedAt: null, cast: { not: null } },
+      where: { scene: { projectId }, deletedAt: null, cast: { not: Prisma.DbNull } },
       select: { cast: true },
       take: 5000,
     });

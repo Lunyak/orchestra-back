@@ -179,7 +179,6 @@ model Scene {
   id        String   @id @default(cuid())
   projectId String
   name      String
-  rawJson   Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?

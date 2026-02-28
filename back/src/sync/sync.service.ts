@@ -55,213 +55,8 @@ export class SyncService {
     return [x, y, z];
   }
 
-  private pruneSceneRawJson(rawJson: any): any | null {
-    if (!rawJson || typeof rawJson !== 'object' || Array.isArray(rawJson)) return null;
-    const next: any = { ...(rawJson as any) };
-
-    // Тяжёлые куски — уже нормализованы в таблицы.
-    delete next.steps;
-    delete next.lightChannels;
-    delete next.theaterLayout;
-    delete next.playlist;
-    delete next.sounds;
-
-    return next;
-  }
-
-  private async syncPlaylistFromRawJson(sceneId: string, rawJson: any) {
-    const playlistValue = rawJson?.playlist;
-    if (!Array.isArray(playlistValue)) return;
-
-    const items = playlistValue
-      .map((t: any, idx: number) => {
-        const sourceId = this.normalizeInt(t?.id, -1);
-        if (sourceId <= 0) return null;
-        const title = this.normalizeString(t?.title, `Track ${sourceId}`);
-        const file = this.normalizeString(t?.file, '');
-        if (!file) return null;
-        const fadeMs = this.normalizeInt(t?.fadeMs, 500);
-        const loop = this.normalizeBool(t?.loop, false);
-        const remoteUrl =
-          typeof t?.remoteUrl === 'string' && t.remoteUrl.trim()
-            ? t.remoteUrl.trim()
-            : null;
-        const remoteKey =
-          typeof t?.remoteKey === 'string' && t.remoteKey.trim()
-            ? t.remoteKey.trim()
-            : null;
-
-        return {
-          sceneId,
-          order: idx,
-          sourceId,
-          title,
-          file,
-          remoteUrl,
-          remoteKey,
-          fadeMs,
-          loop,
-        };
-      })
-      .filter(Boolean) as Array<{
-      sceneId: string;
-      order: number;
-      sourceId: number;
-      title: string;
-      file: string;
-      remoteUrl: string | null;
-      remoteKey: string | null;
-      fadeMs: number;
-      loop: boolean;
-    }>;
-
-    await this.prisma.$transaction([
-      this.prisma.playlistItem.deleteMany({ where: { sceneId } }),
-      ...(items.length
-        ? [
-            this.prisma.playlistItem.createMany({
-              data: items,
-            }),
-          ]
-        : []),
-    ]);
-  }
-
-  private async syncSoundsFromRawJson(sceneId: string, rawJson: any) {
-    const soundsValue = rawJson?.sounds;
-    if (!Array.isArray(soundsValue)) return;
-
-    const rows = (soundsValue as any[])
-      .map((s: any) => {
-        const sourceId = this.normalizeInt(s?.id, -1);
-        if (sourceId <= 0) return null;
-        const title = this.normalizeString(s?.title, `Sound ${sourceId}`);
-        const file = this.normalizeString(s?.file, '');
-        if (!file) return null;
-        const icon =
-          typeof s?.icon === 'string' && s.icon.trim() ? s.icon.trim() : null;
-        const volume = this.normalizeFloat(s?.volume, 0.8);
-        const fadeMs = this.normalizeInt(s?.fadeMs, 500);
-        const loop = this.normalizeBool(s?.loop, false);
-
-        const remoteUrl =
-          typeof s?.remoteUrl === 'string' && s.remoteUrl.trim()
-            ? s.remoteUrl.trim()
-            : null;
-        const remoteKey =
-          typeof s?.remoteKey === 'string' && s.remoteKey.trim()
-            ? s.remoteKey.trim()
-            : null;
-
-        const iconRemoteUrl =
-          typeof s?.iconRemoteUrl === 'string' && s.iconRemoteUrl.trim()
-            ? s.iconRemoteUrl.trim()
-            : null;
-        const iconRemoteKey =
-          typeof s?.iconRemoteKey === 'string' && s.iconRemoteKey.trim()
-            ? s.iconRemoteKey.trim()
-            : null;
-
-        return {
-          // делаем id стабильным, чтобы можно было безопасно перезаписывать запись
-          id: `${sceneId}:sound:${sourceId}`,
-          sceneId,
-          sourceId,
-          title,
-          file,
-          icon,
-          remoteUrl,
-          remoteKey,
-          iconRemoteUrl,
-          iconRemoteKey,
-          volume,
-          fadeMs,
-          loop,
-        };
-      })
-      .filter(Boolean) as Array<{
-      id: string;
-      sceneId: string;
-      sourceId: number;
-      title: string;
-      file: string;
-      icon: string | null;
-      remoteUrl: string | null;
-      remoteKey: string | null;
-      iconRemoteUrl: string | null;
-      iconRemoteKey: string | null;
-      volume: number;
-      fadeMs: number;
-      loop: boolean;
-    }>;
-
-    await this.prisma.$transaction([
-      this.prisma.sound.deleteMany({ where: { sceneId } }),
-      ...(rows.length ? [this.prisma.sound.createMany({ data: rows })] : []),
-    ]);
-  }
-
-  private async syncTheaterLayoutFromRawJson(sceneId: string, rawJson: any) {
-    const v = rawJson?.theaterLayout;
-    if (!v || typeof v !== 'object' || Array.isArray(v)) return;
-
-    // NOTE: в БД TheaterLayout содержит stage* поля, а на фронте тип TheaterLayout — без stage*.
-    // Поэтому stage* берём из rawJson, если они есть, иначе используем безопасные дефолты.
-    const data = {
-      sceneId,
-      hallWidth: this.normalizeInt((v as any).hallWidth, 9),
-      hallDepth: this.normalizeInt((v as any).hallDepth, 6),
-      wallHeight: this.normalizeInt((v as any).wallHeight, 6),
-      stageWidth: this.normalizeInt((v as any).stageWidth, 6),
-      stageDepth: this.normalizeInt((v as any).stageDepth, 4),
-      stageHeight: this.normalizeInt((v as any).stageHeight, 1),
-      stageZ: this.normalizeInt((v as any).stageZ, 0),
-      audienceStartZ: this.normalizeInt((v as any).audienceStartZ, 3),
-      seatRows: this.normalizeInt((v as any).seatRows, 4),
-      seatsPerRow: this.normalizeInt((v as any).seatsPerRow, 7),
-      seatSpacing: this.normalizeFloat((v as any).seatSpacing, 1.1),
-      rowSpacing: this.normalizeFloat((v as any).rowSpacing, 0.8),
-      aisleWidth: this.normalizeFloat((v as any).aisleWidth, 1.2),
-      aisleCenterX: this.normalizeFloat((v as any).aisleCenterX, 0),
-      doorWidth: this.normalizeFloat((v as any).doorWidth, 1.2),
-      doorHeight: this.normalizeFloat((v as any).doorHeight, 2.2),
-      doorZ: this.normalizeFloat((v as any).doorZ, -6),
-      rowRise: this.normalizeFloat((v as any).rowRise, 0.25),
-    };
-
-    await this.prisma.theaterLayout.upsert({
-      where: { sceneId },
-      update: data,
-      create: { ...data },
-    });
-  }
-
-  private async syncLightChannelsFromRawJson(sceneId: string, rawJson: any) {
-    const value = rawJson?.lightChannels;
-    if (!Array.isArray(value)) return;
-
-    const rows = value
-      .map((raw: any, index: number) => ({
-        sceneId,
-        index,
-        raw: this.normalizeString(raw, ''),
-      }))
-      .filter((x) => x.raw);
-
-    await this.prisma.$transaction([
-      this.prisma.globalLightChannel.deleteMany({ where: { sceneId } }),
-      ...(rows.length
-        ? [
-            this.prisma.globalLightChannel.createMany({
-              data: rows,
-            }),
-          ]
-        : []),
-    ]);
-  }
-
-  private async syncStepsFromRawJson(sceneId: string, rawJson: any) {
-    const stepsValue = rawJson?.steps;
+  private async syncStepsFromLegacySceneSnapshot(sceneId: string, legacySceneSnapshot: any) {
+    const stepsValue = legacySceneSnapshot?.steps;
     if (!Array.isArray(stepsValue)) return;
 
     const steps = stepsValue as any[];
@@ -445,7 +240,7 @@ export class SyncService {
       isRgb: boolean;
     }>;
 
-    // Upsert steps + overwrite nested свет/3D данные из rawJson (локально rawJson остаётся как источник истины на фронте).
+    // Upsert steps + overwrite nested свет/3D данные из legacy-снапшота сцены.
     const stepUpserts = parsed.map((st) =>
       this.prisma.step.upsert({
         where: { id: st.id },
@@ -644,91 +439,6 @@ export class SyncService {
     return null;
   }
 
-  /** Собрать все ключи файлов из rawJson сцены (sounds, playlist). */
-  private collectFileKeysFromScene(
-    rawJson: any,
-    projectId: string,
-  ): Set<string> {
-    const keys = new Set<string>();
-    if (!rawJson || typeof rawJson !== 'object') return keys;
-
-    const push = (v: string) => {
-      const key = this.fileValueToStorageKey(v, projectId);
-      if (key) keys.add(key);
-    };
-
-    const sounds = rawJson.sounds;
-    if (Array.isArray(sounds)) {
-      sounds.forEach((s: any) => {
-        if (s?.file) push(String(s.file));
-        if (s?.remoteKey) push(String(s.remoteKey));
-        if (s?.icon) push(String(s.icon));
-        if (s?.iconRemoteKey) push(String(s.iconRemoteKey));
-      });
-    }
-
-    const playlist = rawJson.playlist;
-    if (Array.isArray(playlist)) {
-      playlist.forEach((p: any) => {
-        if (p?.file) push(String(p.file));
-        if (p?.remoteKey) push(String(p.remoteKey));
-      });
-    }
-
-    const images = rawJson.images;
-    if (images && typeof images === 'object' && !Array.isArray(images)) {
-      Object.values(images).forEach((img: any) => {
-        if (img?.remoteKey) push(String(img.remoteKey));
-      });
-    }
-
-    return keys;
-  }
-
-  private async collectFileKeysFromSceneDb(
-    sceneId: string,
-    projectId: string,
-    existingRawJson: any,
-  ): Promise<Set<string>> {
-    const keys = new Set<string>();
-    const push = (v: string) => {
-      const key = this.fileValueToStorageKey(v, projectId);
-      if (key) keys.add(key);
-    };
-
-    const sounds = await this.prisma.sound.findMany({
-      where: { sceneId },
-      select: { remoteKey: true, iconRemoteKey: true, file: true, icon: true },
-    });
-    sounds.forEach((s) => {
-      if (s.remoteKey) push(String(s.remoteKey));
-      if (s.iconRemoteKey) push(String(s.iconRemoteKey));
-      // на всякий случай поддерживаем старые "file" значения, если они были ключами
-      if (s.file) push(String(s.file));
-      if (s.icon) push(String(s.icon));
-    });
-
-    const playlist = await this.prisma.playlistItem.findMany({
-      where: { sceneId },
-      select: { remoteKey: true, file: true },
-    });
-    playlist.forEach((p) => {
-      if (p.remoteKey) push(String(p.remoteKey));
-      if (p.file) push(String(p.file));
-    });
-
-    // images пока остаются в rawJson (но при prune остаются тоже),
-    // поэтому ключи берём из существующего rawJson.
-    const images = existingRawJson?.images;
-    if (images && typeof images === 'object' && !Array.isArray(images)) {
-      Object.values(images).forEach((img: any) => {
-        if (img?.remoteKey) push(String(img.remoteKey));
-      });
-    }
-
-    return keys;
-  }
-
   private async applySceneChange(
     userId: string,
     operation: string,
@@ -756,12 +466,10 @@ export class SyncService {
       where: { id: payload.id },
       update: {
         name: payload.name,
-        rawJson: null,
       },
       create: {
         id: payload.id,
         name: payload.name,
-        rawJson: null,
         projectId: payload.projectId,
       },
     });
@@ -1388,7 +1096,7 @@ export class SyncService {
       : [];
 
     const now = new Date().toISOString();
-    const scenesForClient = scenes.map(({ rawJson: _rawJson, ...rest }: any) => rest);
+    const scenesForClient = scenes;
 
     return {
       now,
