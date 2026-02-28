@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import {
   selectActiveStepMarkdownContext,
@@ -6,6 +6,7 @@ import {
   selectShowScriptMarkdownUi,
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 import type { ActorAnnotation } from "../../../../sync/api";
+import { getPlayUrl } from "../../../../sync/api";
 import { useAppSelector } from "../../../store/hooks";
 import {
   ActorAnnotationsPopover,
@@ -44,6 +45,7 @@ export function ScriptMarkdownPreview({
   setActiveAnnotationId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
   const ui = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectName, sceneName));
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
   const { activeMarkdown: markdown, currentStep, activeField } = useAppSelector((s) =>
     selectActiveStepMarkdownContext(s, projectName, sceneName),
   );
@@ -55,6 +57,8 @@ export function ScriptMarkdownPreview({
   const annotationsMode = ui.annotationsMode;
   const playlistOptions = ui.playlistOptions;
   const lightChannels = ui.lightChannels;
+
+  const imageUrlCacheRef = useRef(new Map<string, string>());
 
   const { rootRef, popoverRef, position, setAnchorFromRect, requestClose } =
     useAnnotationsPopoverPosition({
@@ -92,6 +96,64 @@ export function ScriptMarkdownPreview({
       : `/${encodedPath}`;
 
     return baseUrl.toString();
+  };
+
+  const resolveRemoteImageUrl = async (key: string): Promise<string | null> => {
+    const cached = imageUrlCacheRef.current.get(key);
+    if (cached) return cached;
+    const token =
+      accessToken ??
+      (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
+    if (!token) return null;
+    try {
+      const { url } = await getPlayUrl(token, key);
+      if (url) imageUrlCacheRef.current.set(key, url);
+      return url ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const MarkdownImage = (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
+    const { src, alt, ...rest } = props;
+    const raw = String(src ?? "").trim();
+    const [resolved, setResolved] = useState<string>(resolveImageSrc(raw) || raw);
+
+    useEffect(() => {
+      let cancelled = false;
+      const run = async () => {
+        const s = String(src ?? "").trim();
+        if (!s) return;
+        if (s.startsWith("orchestra-image:")) {
+          const encoded = s.replace(/^orchestra-image:/i, "").trim();
+          const key = decodeURIComponent(encoded);
+          const url = await resolveRemoteImageUrl(key);
+          if (!cancelled && url) setResolved(url);
+          return;
+        }
+        // local images/ path
+        const local = resolveImageSrc(s);
+        if (!cancelled) setResolved(local || s);
+      };
+      void run();
+      return () => {
+        cancelled = true;
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [src, accessToken]);
+
+    return (
+      <img
+        src={resolved}
+        alt={alt || ""}
+        style={{
+          maxHeight: 800,
+          maxWidth: "100%",
+          height: "auto",
+        }}
+        {...rest}
+      />
+    );
   };
 
   const urlTransform = (url: string) => {
@@ -292,21 +354,9 @@ export function ScriptMarkdownPreview({
                 </a>
               );
             },
-            img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
-              const { src, alt, ...rest } = props;
-              return (
-                <img
-                  src={resolveImageSrc(src)}
-                  alt={alt || ""}
-                  style={{
-                    maxHeight: 800,
-                    maxWidth: "100%",
-                    height: "auto",
-                  }}
-                  {...rest}
-                />
-              );
-            },
+            img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
+              <MarkdownImage {...props} />
+            ),
             mark: ({ node, children, ...rest }: any) => {
               const id = (node as any)?.properties?.["data-anno-id"] as
                 | string

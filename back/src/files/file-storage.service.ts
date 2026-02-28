@@ -3,6 +3,7 @@ import {
   CreateBucketCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -105,6 +106,33 @@ export class FileStorageService {
     } catch (err: any) {
       console.warn('[FileStorage] deleteObject failed:', key, err?.message);
     }
+  }
+
+  /** Список ключей по префиксу (постранично). */
+  async listKeys(prefix: string, limit: number = 1000): Promise<string[]> {
+    const out: string[] = [];
+    let token: string | undefined = undefined;
+    await this.ensureBucketExists();
+    for (let i = 0; i < 10000; i += 1) {
+      const res = await this.s3.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          MaxKeys: Math.max(1, Math.min(1000, Math.trunc(limit))),
+          ContinuationToken: token,
+        }),
+      );
+      const contents = res.Contents ?? [];
+      for (const it of contents) {
+        const key = it.Key;
+        if (key) out.push(key);
+      }
+      if (!res.IsTruncated) break;
+      token = res.NextContinuationToken;
+      if (!token) break;
+      if (out.length > 200000) break;
+    }
+    return out;
   }
 
   private buildKey(params: {

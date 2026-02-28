@@ -3,7 +3,7 @@ import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import { createId } from "../../../shared/utils/createId";
-import { syncPull, syncPush, type SyncChange } from "../../../sync/api";
+import { cleanupProjectImages, syncPull, syncPush, type SyncChange } from "../../../sync/api";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
@@ -18,6 +18,76 @@ import {
 type SetStateAction<T> = T | ((prev: T) => T);
 
 let playlistPlayHandler: ((trackId: number) => void) | undefined;
+
+function stableStringify(value: any): string {
+  if (value === null) return "null";
+  const t = typeof value;
+  if (t === "number" || t === "boolean") return JSON.stringify(value);
+  if (t === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((v) => stableStringify(v)).join(",")}]`;
+  if (t === "object") {
+    const keys = Object.keys(value).sort();
+    return `{${keys
+      .map((k) => `${JSON.stringify(k)}:${stableStringify((value as any)[k])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(String(value));
+}
+
+function normalizeLightChannelsFromServer(rows: any[]): string[] {
+  const out = Array.from({ length: 8 }, () => "");
+  (rows ?? []).forEach((r: any) => {
+    const idx = typeof r?.index === "number" ? r.index : Number(r?.index ?? -1);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= out.length) return;
+    out[idx] = String(r?.raw ?? "");
+  });
+  return out;
+}
+
+function normalizeTheaterLayoutFromServer(row: any): TheaterLayout | null {
+  if (!row || typeof row !== "object") return null;
+  const num = (v: any, fallback: number) =>
+    v != null && Number.isFinite(Number(v)) ? Number(v) : fallback;
+  const int = (v: any, fallback: number) =>
+    v != null && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : fallback;
+  // keep shape compatible with app/src/shared/types/script.ts
+  return {
+    hallWidth: int(row.hallWidth, DEFAULT_THEATER_LAYOUT.hallWidth),
+    hallDepth: int(row.hallDepth, DEFAULT_THEATER_LAYOUT.hallDepth),
+    wallHeight: int(row.wallHeight, DEFAULT_THEATER_LAYOUT.wallHeight),
+    audienceStartZ: int(row.audienceStartZ, DEFAULT_THEATER_LAYOUT.audienceStartZ),
+    seatRows: int(row.seatRows, DEFAULT_THEATER_LAYOUT.seatRows),
+    seatsPerRow: int(row.seatsPerRow, DEFAULT_THEATER_LAYOUT.seatsPerRow),
+    seatSpacing: num(row.seatSpacing, DEFAULT_THEATER_LAYOUT.seatSpacing),
+    rowSpacing: num(row.rowSpacing, DEFAULT_THEATER_LAYOUT.rowSpacing),
+    rowRise: num(row.rowRise, DEFAULT_THEATER_LAYOUT.rowRise),
+    aisleWidth: num(row.aisleWidth, DEFAULT_THEATER_LAYOUT.aisleWidth),
+    aisleCenterX: num(row.aisleCenterX, DEFAULT_THEATER_LAYOUT.aisleCenterX),
+    doorWidth: num(row.doorWidth, DEFAULT_THEATER_LAYOUT.doorWidth),
+    doorHeight: num(row.doorHeight, DEFAULT_THEATER_LAYOUT.doorHeight),
+    doorZ: num(row.doorZ, DEFAULT_THEATER_LAYOUT.doorZ),
+  };
+}
+
+function extractReferencedRemoteImageKeysFromSteps(steps: ScriptStep[]): Set<string> {
+  const out = new Set<string>();
+  const re = /\borchestra-image:([^\s)]+)/gi;
+  for (const step of steps ?? []) {
+    const text = `${step.markdown ?? ""}\n${step.playMarkdown ?? ""}`;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const raw = String(m[1] ?? "").trim();
+      if (!raw) continue;
+      try {
+        const key = decodeURIComponent(raw);
+        if (key) out.add(key);
+      } catch {
+        // ignore
+      }
+    }
+  }
+  return out;
+}
 
 export interface SceneContextValue {
   sceneData: SceneData | null;
@@ -47,7 +117,7 @@ function useSceneOperations() {
   const { accessToken, setAccessToken } = useAuth();
   const { projectName, ensureRemoteProject } = useProject();
 
-  const { sceneData, steps, theaterLayout, hasLocalEdits } = useAppSelector(
+  const { sceneData, steps, theaterLayout, hasLocalEdits, serverShadow } = useAppSelector(
     (s) => s.scene,
   );
   const showScriptUi = useAppSelector((s) =>
@@ -82,11 +152,13 @@ function useSceneOperations() {
           steps: serverSteps,
           playlistItems,
           sounds,
+          lightChannels,
+          theaterLayouts,
         } = await syncPull(
           tokenToUse,
           effectiveLastSyncAt,
           effectiveProject,
-          { steps: true, playlist: true, sounds: true },
+          { steps: true, playlist: true, sounds: true, lightChannels: true, theaterLayout: true },
         );
         const project = projects.find((p: any) => p.slug === effectiveProject);
         if (!project) return;
@@ -186,6 +258,18 @@ function useSceneOperations() {
           }))
           .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
 
+        const normalizedLightChannels = normalizeLightChannelsFromServer(
+          (Array.isArray(lightChannels) ? lightChannels : []).filter(
+            (ch: any) => String(ch?.sceneId ?? "") === String(scene.id),
+          ),
+        );
+        const layoutRow =
+          (Array.isArray(theaterLayouts) ? theaterLayouts : []).find(
+            (tl: any) => String(tl?.sceneId ?? "") === String(scene.id),
+          ) ?? null;
+        const normalizedLayout =
+          normalizeTheaterLayoutFromServer(layoutRow) ?? DEFAULT_THEATER_LAYOUT;
+
         const minimalSceneData: any = {
           name: scene.name,
           playlist: normalizedPlaylist,
@@ -194,9 +278,15 @@ function useSceneOperations() {
         dispatch(
           sceneActions.hydrateScene({
             sceneData: minimalSceneData,
-            theaterLayout: DEFAULT_THEATER_LAYOUT,
+            theaterLayout: normalizedLayout,
             steps: normalizedSteps.length ? normalizedSteps : steps,
             isSceneReady: true,
+            serverShadow: {
+              sceneData: minimalSceneData,
+              steps: normalizedSteps.length ? normalizedSteps : steps,
+              theaterLayout: normalizedLayout,
+              lightChannels: normalizedLightChannels,
+            },
           }),
         );
         localStorage.setItem("lastSyncAt", now);
@@ -271,25 +361,128 @@ function useSceneOperations() {
           const sceneId = `${projectId}:script`;
           const nowIso = new Date().toISOString();
           let payloadForServer: any = { ...payload };
+          const nextSceneName = payloadForServer.name || `Сцена ${projectName}`;
 
-          // Web path: use server state as "prev" baseline for diffs (playlist/sounds).
-          // Also preserve remoteKey/remoteUrl for sounds if desktop stored only filePath.
-          let serverSounds: any[] = [];
-          let serverPlaylistItems: any[] = [];
-          try {
-            const pull = await syncPull(token, null, projectName, { sounds: true, playlist: true });
-            serverSounds = Array.isArray((pull as any)?.sounds)
-              ? (pull as any).sounds.filter((ss: any) => String(ss?.sceneId ?? "") === sceneId)
-              : [];
-            serverPlaylistItems = Array.isArray((pull as any)?.playlistItems)
-              ? (pull as any).playlistItems.filter((pi: any) => String(pi?.sceneId ?? "") === sceneId)
-              : [];
-          } catch (_) {}
+          // Ensure serverShadow is initialized once (without overwriting local edits).
+          // This makes diffs precise without pull-on-every-push.
+          if (!serverShadow) {
+            try {
+              const pull = await syncPull(token, null, projectName, {
+                sounds: true,
+                playlist: true,
+                steps: true,
+                theaterLayout: true,
+                lightChannels: true,
+              });
+              const scenesArr = Array.isArray((pull as any)?.scenes) ? (pull as any).scenes : [];
+              const sceneRow = scenesArr.find((s: any) => String(s?.id ?? "") === sceneId) ?? null;
+              if (sceneRow) {
+                const serverStepsRaw = Array.isArray((pull as any)?.steps)
+                  ? (pull as any).steps.filter((st: any) => String(st?.sceneId ?? "") === sceneId)
+                  : [];
+                const prevSteps = [...serverStepsRaw]
+                  .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
+                  .map((st: any) => ({
+                    id: Number(st?.sourceId ?? 0),
+                    title: String(st?.title ?? ""),
+                    markdown: String(st?.markdown ?? ""),
+                    playMarkdown: st?.playMarkdown ?? undefined,
+                    durationMin: st?.durationMin ?? undefined,
+                    kanbanStatus: st?.kanbanStatus ?? undefined,
+                    kanbanOrder: st?.kanbanOrder ?? undefined,
+                    cast: (st?.cast as any) ?? undefined,
+                    requisites: Array.isArray(st?.requisites)
+                      ? st.requisites.map((r: any) => ({
+                          id: Number(r?.sourceId ?? r?.id ?? 0),
+                          label: String(r?.label ?? ""),
+                          checked: Boolean(r?.checked),
+                        }))
+                      : [],
+                    lightPlot: Array.isArray(st?.lightPlot)
+                      ? st.lightPlot.map((f: any) => ({
+                          id: Number(f?.sourceId ?? f?.id ?? 0),
+                          label: String(f?.label ?? ""),
+                          channel: String(f?.channel ?? ""),
+                          x: Number(f?.x ?? 0),
+                          y: Number(f?.y ?? 0),
+                          angle: f?.angle ?? undefined,
+                          length: f?.length ?? undefined,
+                        }))
+                      : [],
+                    theaterModels: Array.isArray(st?.theaterModels) ? st.theaterModels : [],
+                    theaterSpotlights: Array.isArray(st?.theaterSpotlights) ? st.theaterSpotlights : [],
+                  }))
+                  .filter((x: any) => Number.isFinite(x.id) && x.id > 0) as ScriptStep[];
+
+                const playlistItems = Array.isArray((pull as any)?.playlistItems)
+                  ? (pull as any).playlistItems.filter((pi: any) => String(pi?.sceneId ?? "") === sceneId)
+                  : [];
+                const sounds = Array.isArray((pull as any)?.sounds)
+                  ? (pull as any).sounds.filter((sd: any) => String(sd?.sceneId ?? "") === sceneId)
+                  : [];
+                const normalizedPlaylist = playlistItems
+                  .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
+                  .map((pi: any) => ({
+                    id: Number(pi?.sourceId ?? 0),
+                    title: String(pi?.title ?? ""),
+                    file: String(pi?.file ?? ""),
+                    fadeMs: typeof pi?.fadeMs === "number" ? pi.fadeMs : 500,
+                    loop: Boolean(pi?.loop),
+                    remoteKey: pi?.remoteKey ?? undefined,
+                    remoteUrl: pi?.remoteUrl ?? undefined,
+                  }))
+                  .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+                const normalizedSounds = sounds
+                  .map((sd: any) => ({
+                    id: Number(sd?.sourceId ?? 0),
+                    title: String(sd?.title ?? ""),
+                    file: String(sd?.file ?? ""),
+                    icon: sd?.icon ?? undefined,
+                    iconRemoteKey: sd?.iconRemoteKey ?? undefined,
+                    iconRemoteUrl: sd?.iconRemoteUrl ?? undefined,
+                    volume: typeof sd?.volume === "number" ? sd.volume : 0.8,
+                    fadeMs: typeof sd?.fadeMs === "number" ? sd.fadeMs : 500,
+                    loop: Boolean(sd?.loop),
+                    remoteKey: sd?.remoteKey ?? undefined,
+                    remoteUrl: sd?.remoteUrl ?? undefined,
+                  }))
+                  .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+
+                const serverLightChannels = Array.isArray((pull as any)?.lightChannels)
+                  ? (pull as any).lightChannels.filter((ch: any) => String(ch?.sceneId ?? "") === sceneId)
+                  : [];
+                const normalizedLight = normalizeLightChannelsFromServer(serverLightChannels);
+                const layoutRow =
+                  (Array.isArray((pull as any)?.theaterLayouts) ? (pull as any).theaterLayouts : []).find(
+                    (tl: any) => String(tl?.sceneId ?? "") === sceneId,
+                  ) ?? null;
+                const normalizedLayout =
+                  normalizeTheaterLayoutFromServer(layoutRow) ?? DEFAULT_THEATER_LAYOUT;
+
+                const shadowSceneData: any = {
+                  name: sceneRow?.name ?? "script",
+                  playlist: normalizedPlaylist,
+                  sounds: normalizedSounds,
+                };
+                dispatch(
+                  sceneActions.setServerShadow({
+                    sceneData: shadowSceneData,
+                    steps: prevSteps.length ? prevSteps : [],
+                    theaterLayout: normalizedLayout,
+                    lightChannels: normalizedLight,
+                  }),
+                );
+              }
+            } catch (_) {
+              // ignore (fallback: diff will consider everything changed)
+            }
+          }
 
           if (Array.isArray(payloadForServer.sounds) && payloadForServer.sounds.length) {
             const bySourceId = new Map<number, any>();
-            serverSounds.forEach((ss: any) => {
-              const sid = typeof ss?.sourceId === "number" ? ss.sourceId : null;
+            const shadowSounds = (serverShadow?.sceneData as any)?.sounds ?? [];
+            (Array.isArray(shadowSounds) ? shadowSounds : []).forEach((ss: any) => {
+              const sid = typeof ss?.id === "number" ? ss.id : null;
               if (sid != null) bySourceId.set(sid, ss);
             });
             payloadForServer.sounds = payloadForServer.sounds.map((s: any) => {
@@ -307,8 +500,12 @@ function useSceneOperations() {
             });
           }
 
-          const changes: SyncChange[] = [
-            {
+          const changes: SyncChange[] = [];
+
+          // Send Scene meta only when needed (name changed or scene not yet shadowed).
+          const prevSceneName = (serverShadow?.sceneData as any)?.name ?? null;
+          if (!serverShadow || String(prevSceneName ?? "") !== String(nextSceneName ?? "")) {
+            changes.push({
               id: createId(),
               entityType: "Scene",
               entityId: sceneId,
@@ -316,48 +513,70 @@ function useSceneOperations() {
               payload: {
                 id: sceneId,
                 projectId,
-                name: payloadForServer.name || `Сцена ${projectName}`,
+                name: nextSceneName,
                 updatedAt: nowIso,
               },
               createdAt: nowIso,
-            },
-          ];
+            });
+          }
 
           // Playlist (scene-level)
           const nextPlaylist = Array.isArray(payloadForServer.playlist)
             ? (payloadForServer.playlist as any[])
             : [];
-          const prevPlaylistIds = new Set(
-            serverPlaylistItems
-              .map((x: any) => (typeof x?.sourceId === "number" ? x.sourceId : null))
-              .filter(Boolean),
-          );
+          const prevPlaylistById = new Map<number, any>();
+          const shadowPlaylist = ((serverShadow?.sceneData as any)?.playlist ?? []) as any[];
+          (Array.isArray(shadowPlaylist) ? shadowPlaylist : []).forEach((x: any, idx: number) => {
+            const id = typeof x?.id === "number" ? x.id : null;
+            if (id != null) prevPlaylistById.set(id, x);
+            if (x && typeof x === "object" && typeof (x as any).order !== "number") {
+              (x as any).order = idx;
+            }
+          });
           const nextPlaylistIds = new Set(
             nextPlaylist.map((x: any) => (typeof x?.id === "number" ? x.id : null)).filter(Boolean),
           );
           nextPlaylist.forEach((it: any, order: number) => {
             const sourceId = typeof it?.id === "number" ? it.id : null;
             if (sourceId == null) return;
+            const prev = prevPlaylistById.get(sourceId) ?? null;
+            const nextPayload = {
+              sceneId,
+              sourceId,
+              order: typeof it?.order === "number" ? it.order : order,
+              title: String(it?.title ?? `Track ${sourceId}`),
+              file: String(it?.file ?? ""),
+              remoteUrl: it?.remoteUrl ?? null,
+              remoteKey: it?.remoteKey ?? null,
+              fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
+              loop: Boolean(it?.loop),
+            };
+            const prevPayload = prev
+              ? {
+                  sceneId,
+                  sourceId,
+                  order: Number(prev?.order ?? 0),
+                  title: String(prev?.title ?? ""),
+                  file: String(prev?.file ?? ""),
+                  remoteUrl: prev?.remoteUrl ?? null,
+                  remoteKey: prev?.remoteKey ?? null,
+                  fadeMs: typeof prev?.fadeMs === "number" ? prev.fadeMs : 0,
+                  loop: Boolean(prev?.loop),
+                }
+              : null;
+            if (prevPayload && stableStringify(prevPayload) === stableStringify(nextPayload)) {
+              return;
+            }
             changes.push({
               id: createId(),
               entityType: "PlaylistItem",
               entityId: `${sceneId}:playlist:${sourceId}`,
-              operation: prevPlaylistIds.has(sourceId) ? "update" : "create",
-              payload: {
-                sceneId,
-                sourceId,
-                order: typeof it?.order === "number" ? it.order : order,
-                title: String(it?.title ?? `Track ${sourceId}`),
-                file: String(it?.file ?? ""),
-                remoteUrl: it?.remoteUrl ?? null,
-                remoteKey: it?.remoteKey ?? null,
-                fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
-                loop: Boolean(it?.loop),
-              },
+              operation: prev ? "update" : "create",
+              payload: nextPayload,
               createdAt: nowIso,
             });
           });
-          prevPlaylistIds.forEach((id) => {
+          Array.from(prevPlaylistById.keys()).forEach((id) => {
             if (!nextPlaylistIds.has(id)) {
               changes.push({
                 id: createId(),
@@ -374,40 +593,62 @@ function useSceneOperations() {
           const nextSounds = Array.isArray(payloadForServer.sounds)
             ? (payloadForServer.sounds as any[])
             : [];
-          const prevSoundIds = new Set(
-            serverSounds
-              .map((x: any) => (typeof x?.sourceId === "number" ? x.sourceId : null))
-              .filter(Boolean),
-          );
+          const prevSoundById = new Map<number, any>();
+          const shadowSounds2 = ((serverShadow?.sceneData as any)?.sounds ?? []) as any[];
+          (Array.isArray(shadowSounds2) ? shadowSounds2 : []).forEach((x: any) => {
+            const id = typeof x?.id === "number" ? x.id : null;
+            if (id != null) prevSoundById.set(id, x);
+          });
           const nextSoundIds = new Set(
             nextSounds.map((x: any) => (typeof x?.id === "number" ? x.id : null)).filter(Boolean),
           );
           nextSounds.forEach((it: any) => {
             const sourceId = typeof it?.id === "number" ? it.id : null;
             if (sourceId == null) return;
+            const prev = prevSoundById.get(sourceId) ?? null;
+            const nextPayload = {
+              sceneId,
+              sourceId,
+              title: String(it?.title ?? `Sound ${sourceId}`),
+              file: String(it?.file ?? ""),
+              icon: it?.icon ?? null,
+              remoteUrl: it?.remoteUrl ?? null,
+              remoteKey: it?.remoteKey ?? null,
+              iconRemoteUrl: it?.iconRemoteUrl ?? null,
+              iconRemoteKey: it?.iconRemoteKey ?? null,
+              volume: typeof it?.volume === "number" ? it.volume : 1,
+              fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
+              loop: Boolean(it?.loop),
+            };
+            const prevPayload = prev
+              ? {
+                  sceneId,
+                  sourceId,
+                  title: String(prev?.title ?? ""),
+                  file: String(prev?.file ?? ""),
+                  icon: prev?.icon ?? null,
+                  remoteUrl: prev?.remoteUrl ?? null,
+                  remoteKey: prev?.remoteKey ?? null,
+                  iconRemoteUrl: prev?.iconRemoteUrl ?? null,
+                  iconRemoteKey: prev?.iconRemoteKey ?? null,
+                  volume: typeof prev?.volume === "number" ? prev.volume : 1,
+                  fadeMs: typeof prev?.fadeMs === "number" ? prev.fadeMs : 0,
+                  loop: Boolean(prev?.loop),
+                }
+              : null;
+            if (prevPayload && stableStringify(prevPayload) === stableStringify(nextPayload)) {
+              return;
+            }
             changes.push({
               id: createId(),
               entityType: "Sound",
               entityId: `${sceneId}:sound:${sourceId}`,
-              operation: prevSoundIds.has(sourceId) ? "update" : "create",
-              payload: {
-                sceneId,
-                sourceId,
-                title: String(it?.title ?? `Sound ${sourceId}`),
-                file: String(it?.file ?? ""),
-                icon: it?.icon ?? null,
-                remoteUrl: it?.remoteUrl ?? null,
-                remoteKey: it?.remoteKey ?? null,
-                iconRemoteUrl: it?.iconRemoteUrl ?? null,
-                iconRemoteKey: it?.iconRemoteKey ?? null,
-                volume: typeof it?.volume === "number" ? it.volume : 1,
-                fadeMs: typeof it?.fadeMs === "number" ? it.fadeMs : 0,
-                loop: Boolean(it?.loop),
-              },
+              operation: prev ? "update" : "create",
+              payload: nextPayload,
               createdAt: nowIso,
             });
           });
-          prevSoundIds.forEach((id) => {
+          Array.from(prevSoundById.keys()).forEach((id) => {
             if (!nextSoundIds.has(id)) {
               changes.push({
                 id: createId(),
@@ -421,12 +662,12 @@ function useSceneOperations() {
           });
 
           // Global light channels (scene-level)
-          const prevLight = Array.isArray((current as any)?.lightChannels)
-            ? ((current as any).lightChannels as any[])
-            : [];
+          const prevLight = Array.isArray(serverShadow?.lightChannels)
+            ? serverShadow!.lightChannels
+            : Array.from({ length: 8 }, () => "");
           const nextLight = Array.isArray(payloadForServer.lightChannels)
-            ? (payloadForServer.lightChannels as any[])
-            : [];
+            ? (payloadForServer.lightChannels as any[]).map((x: any) => String(x ?? ""))
+            : Array.from({ length: 8 }, () => "");
           for (let i = 0; i < Math.max(prevLight.length, nextLight.length, 8); i++) {
             const a = String(prevLight[i] ?? "");
             const b = String(nextLight[i] ?? "");
@@ -442,9 +683,9 @@ function useSceneOperations() {
           }
 
           // Theater layout (scene-level)
-          const prevLayout = (current as any)?.theaterLayout ?? null;
+          const prevLayout = serverShadow?.theaterLayout ?? null;
           const nextLayout = (payloadForServer as any)?.theaterLayout ?? null;
-          if (nextLayout && JSON.stringify(prevLayout ?? null) !== JSON.stringify(nextLayout ?? null)) {
+          if (nextLayout && stableStringify(prevLayout ?? null) !== stableStringify(nextLayout ?? null)) {
             changes.push({
               id: createId(),
               entityType: "TheaterLayout",
@@ -455,19 +696,41 @@ function useSceneOperations() {
             });
           }
 
-          const existingSteps: ScriptStep[] =
-            (Array.isArray((current as any)?.steps)
-              ? ((current as any).steps as ScriptStep[])
-              : []) ?? [];
-          const existingIds = new Set(existingSteps.map((s) => s.id));
+          const prevSteps = Array.isArray(serverShadow?.steps) ? serverShadow!.steps : [];
+
+          const prevById = new Map<number, { step: ScriptStep; order: number }>();
+          prevSteps.forEach((s, idx) => prevById.set(s.id, { step: s, order: idx }));
+
           const newIds = new Set(steps.map((s) => s.id));
+          const stepFingerprint = (step: ScriptStep, order: number) =>
+            stableStringify({
+              title: step.title,
+              markdown: step.markdown ?? "",
+              playMarkdown: step.playMarkdown ?? null,
+              durationMin: step.durationMin ?? null,
+              kanbanStatus: step.kanbanStatus ?? null,
+              kanbanOrder: step.kanbanOrder ?? null,
+              cast: (step as any)?.cast ?? null,
+              requisites: step.requisites ?? [],
+              lightPlot: step.lightPlot ?? [],
+              theaterModels: (step as any)?.theaterModels ?? [],
+              theaterSpotlights: (step as any)?.theaterSpotlights ?? [],
+              order,
+            });
+
           steps.forEach((step, index) => {
             const stepKey = `${sceneId}:${step.id}`;
+            const prev = prevById.get(step.id) ?? null;
+            if (prev) {
+              const a = stepFingerprint(prev.step, prev.order);
+              const b = stepFingerprint(step, index);
+              if (a === b) return;
+            }
             changes.push({
               id: createId(),
               entityType: "Step",
               entityId: stepKey,
-              operation: existingIds.has(step.id) ? "update" : "create",
+              operation: prev ? "update" : "create",
               payload: {
                 id: stepKey,
                 sceneId,
@@ -475,13 +738,23 @@ function useSceneOperations() {
                 title: step.title,
                 markdown: step.markdown ?? "",
                 playMarkdown: step.playMarkdown ?? null,
+                durationMin: (step as any)?.durationMin ?? null,
+                kanbanStatus: (step as any)?.kanbanStatus ?? null,
+                kanbanOrder: (step as any)?.kanbanOrder ?? null,
+                cast: (step as any)?.cast ?? null,
                 order: index,
+                requisites: Array.isArray((step as any)?.requisites) ? (step as any).requisites : [],
+                lightPlot: Array.isArray((step as any)?.lightPlot) ? (step as any).lightPlot : [],
+                theaterModels: Array.isArray((step as any)?.theaterModels) ? (step as any).theaterModels : [],
+                theaterSpotlights: Array.isArray((step as any)?.theaterSpotlights)
+                  ? (step as any).theaterSpotlights
+                  : [],
                 updatedAt: nowIso,
               },
               createdAt: nowIso,
             });
           });
-          existingIds.forEach((id) => {
+          Array.from(prevById.keys()).forEach((id) => {
             if (!newIds.has(id)) {
               changes.push({
                 id: createId(),
@@ -496,6 +769,34 @@ function useSceneOperations() {
 
           if (changes.length > 0) {
             await syncPush(token, changes);
+            // If some orchestra-image keys were removed locally, trigger GC on server.
+            try {
+              const prevKeys = serverShadow ? extractReferencedRemoteImageKeysFromSteps(serverShadow.steps) : new Set<string>();
+              const nextKeys = extractReferencedRemoteImageKeysFromSteps(steps);
+              let removed = 0;
+              prevKeys.forEach((k) => {
+                if (!nextKeys.has(k)) removed += 1;
+              });
+              if (removed > 0) {
+                void cleanupProjectImages(token, projectName).catch(() => null);
+              }
+            } catch (_) {}
+            // after successful push: accept local state as new serverShadow baseline
+            dispatch(
+              sceneActions.setServerShadow({
+                sceneData: {
+                  ...(serverShadow?.sceneData ?? {}),
+                  name: nextSceneName,
+                  playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
+                  sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],
+                },
+                steps: steps,
+                theaterLayout: theaterLayout,
+                lightChannels: Array.isArray(showScriptUi.lightChannels)
+                  ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
+                  : Array.from({ length: 8 }, () => ""),
+              }),
+            );
             dispatch(sceneActions.markSaved());
           }
         }
@@ -513,6 +814,7 @@ function useSceneOperations() {
     ensureRemoteProject,
     dispatch,
     showScriptUi.lightChannels,
+    serverShadow,
   ]);
 
   const pushSceneAfterSoundsSave = useCallback(async () => {

@@ -6,7 +6,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { FileStorageService } from '../files/file-storage.service';
+import { LocalFileStorageService } from '../files/local-file-storage.service';
 
 export interface CreateProjectDto {
   slug: string;
@@ -26,7 +29,12 @@ export interface InviteByEmailDto {
 
 @Injectable()
 export class ProjectsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+    private readonly storage: FileStorageService,
+    private readonly localStorage: LocalFileStorageService,
+  ) {}
 
   private async assertUserHasProjectAccess(userId: string, slug: string) {
     const project = await this.prisma.project.findFirst({
@@ -46,6 +54,75 @@ export class ProjectsService {
     });
     if (!project) throw new ForbiddenException('No access to project');
     return project;
+  }
+
+  private useLocalStorage(): boolean {
+    return this.config.get<string>('STORAGE_TYPE') === 'local';
+  }
+
+  private extractReferencedImageKeysFromMarkdown(text: string): string[] {
+    const out: string[] = [];
+    const re = /\borchestra-image:([^\s)]+)/gi;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const raw = String(m[1] ?? '').trim();
+      if (!raw) continue;
+      try {
+        const key = decodeURIComponent(raw);
+        if (key) out.push(key);
+      } catch {
+        // ignore bad encoding
+      }
+    }
+    return out;
+  }
+
+  async cleanupProjectImages(userId: string, slug: string) {
+    const project = await this.assertUserHasProjectAccess(userId, slug);
+    const projectId = project.id;
+
+    // Find all referenced orchestra-image keys inside steps markdown/playMarkdown.
+    const rows = await this.prisma.step.findMany({
+      where: { scene: { projectId }, deletedAt: null },
+      select: { markdown: true, playMarkdown: true },
+      take: 20000,
+    });
+    const referenced = new Set<string>();
+    for (const r of rows) {
+      const text = `${r.markdown ?? ''}\n${r.playMarkdown ?? ''}`;
+      this.extractReferencedImageKeysFromMarkdown(text).forEach((k) =>
+        referenced.add(k),
+      );
+    }
+
+    const prefix = `${projectId}/image/`;
+
+    // List stored image keys and delete those that are not referenced.
+    if (this.useLocalStorage()) {
+      // Local storage GC not implemented (dev). In prod we use MinIO.
+      return {
+        ok: true,
+        projectId,
+        storage: 'local',
+        referencedCount: referenced.size,
+        deletedCount: 0,
+        skipped: true,
+      };
+    }
+
+    const existingKeys = await this.storage.listKeys(prefix, 1000);
+    const toDelete = existingKeys.filter((k) => k.startsWith(prefix) && !referenced.has(k));
+    for (const key of toDelete.slice(0, 5000)) {
+      await this.storage.deleteObject(key);
+    }
+    return {
+      ok: true,
+      projectId,
+      storage: 's3',
+      referencedCount: referenced.size,
+      existingCount: existingKeys.length,
+      deletedCount: Math.min(toDelete.length, 5000),
+    };
   }
 
   async getTelegramBotPreference(userId: string, slug: string) {

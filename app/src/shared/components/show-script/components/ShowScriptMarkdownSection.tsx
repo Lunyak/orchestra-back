@@ -17,6 +17,7 @@ import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptStep } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
 import { insertAtSelection } from "../utils/insertAtCursor";
+import { ensureProject, uploadProjectFile } from "../../../../sync/api";
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
 import { ScriptMarkdownToolbar } from "./ScriptMarkdownToolbar";
 import { ScriptStepHeader } from "./ScriptStepHeader";
@@ -140,6 +141,41 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
     });
   };
 
+  const handleInsertImage = async () => {
+    if (!currentStep) return;
+    const token =
+      accessToken ??
+      (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
+    if (!token) return;
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = false;
+    input.onchange = async () => {
+      const file = input.files?.[0] ?? null;
+      if (!file) return;
+      try {
+        const project = await ensureProject(
+          token,
+          projectSlug,
+          `Проект ${projectSlug}`,
+        );
+        const { key } = await uploadProjectFile(token, {
+          projectId: project.id,
+          type: "image",
+          file,
+        });
+        const alt = file.name.replace(/\.[^.]+$/, "") || "image";
+        const snippet = `\n\n![${alt}](orchestra-image:${encodeURIComponent(key)})\n\n`;
+        insertIntoActiveMarkdown(snippet);
+      } catch (e) {
+        console.error("insert image failed:", e);
+      }
+    };
+    input.click();
+  };
+
   const handlePasteImage = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const pasted = await pasteProjectImageMarkdownSnippetFromClipboard(event, {
       projectSlug,
@@ -212,6 +248,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
             setActiveAnnotationId(null);
           },
         }}
+        onInsertImage={handleInsertImage}
       />
 
       {isEditing ? (

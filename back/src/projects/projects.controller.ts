@@ -89,4 +89,10 @@ export class ProjectsController {
   ) {
     return this.projectsService.removeMember(req.user.userId, slug, memberId);
   }
+
+  /** Очистка неиспользуемых картинок проекта (MinIO): удаляет объекты projectId/image/*, которых нет в markdown шагов. */
+  @Post(':slug/images/cleanup')
+  cleanupImages(@Req() req: any, @Param('slug') slug: string) {
+    return this.projectsService.cleanupProjectImages(req.user.userId, slug);
+  }
 }

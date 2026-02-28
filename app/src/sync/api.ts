@@ -399,6 +399,26 @@ export async function addProjectRoleNote(
   return data as any;
 }
 
+export async function cleanupProjectImages(
+  accessToken: string,
+  projectSlug: string,
+): Promise<{
+  ok: boolean;
+  projectId: string;
+  storage: "s3" | "local";
+  referencedCount: number;
+  existingCount?: number;
+  deletedCount: number;
+  skipped?: boolean;
+}> {
+  const { data } = await api.post(
+    `/projects/${encodeURIComponent(projectSlug)}/images/cleanup`,
+    null,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
 export interface MyProfile {
   email: string;
   displayName?: string | null;

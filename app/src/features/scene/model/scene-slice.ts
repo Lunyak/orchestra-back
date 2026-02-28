@@ -97,11 +97,19 @@ export interface SceneState {
   sceneData: SceneData | null;
   steps: ScriptStep[];
   theaterLayout: TheaterLayout;
+  /** Последний принятый снимок с сервера (для точного diff local vs server). */
+  serverShadow: {
+    sceneData: SceneData | null;
+    steps: ScriptStep[];
+    theaterLayout: TheaterLayout;
+    lightChannels: string[];
+  } | null;
   currentPage: number;
   isSceneReady: boolean;
   hasLocalEdits: boolean;
   stepsRevision: number;
   sceneDataRevision: number;
+  serverShadowRevision: number;
   soundsUpload: { uploading: boolean; error: string | null };
   playlistUpload: { uploading: boolean; error: string | null; uploadingIds: number[] };
   voiceLinesUpload: { uploading: boolean; error: string | null };
@@ -111,11 +119,13 @@ const initialState: SceneState = {
   sceneData: null,
   steps: [],
   theaterLayout: DEFAULT_THEATER_LAYOUT,
+  serverShadow: null,
   currentPage: 0,
   isSceneReady: false,
   hasLocalEdits: false,
   stepsRevision: 0,
   sceneDataRevision: 0,
+  serverShadowRevision: 0,
   soundsUpload: { uploading: false, error: null },
   playlistUpload: { uploading: false, error: null, uploadingIds: [] },
   voiceLinesUpload: { uploading: false, error: null },
@@ -687,11 +697,13 @@ export const sceneSlice = createSlice({
       state.sceneData = null;
       state.steps = [];
       state.theaterLayout = DEFAULT_THEATER_LAYOUT;
+      state.serverShadow = null;
       state.currentPage = 0;
       state.isSceneReady = false;
       state.hasLocalEdits = false;
       state.stepsRevision += 1;
       state.sceneDataRevision += 1;
+      state.serverShadowRevision += 1;
     },
     hydrateScene(
       state,
@@ -701,6 +713,12 @@ export const sceneSlice = createSlice({
         theaterLayout: TheaterLayout;
         currentPage?: number;
         isSceneReady: boolean;
+        serverShadow?: {
+          sceneData: SceneData | null;
+          steps: ScriptStep[];
+          theaterLayout: TheaterLayout;
+          lightChannels: string[];
+        } | null;
       }>,
     ) {
       state.sceneData = action.payload.sceneData;
@@ -711,6 +729,22 @@ export const sceneSlice = createSlice({
       state.hasLocalEdits = false;
       state.stepsRevision += 1;
       state.sceneDataRevision += 1;
+      if (Object.prototype.hasOwnProperty.call(action.payload, "serverShadow")) {
+        state.serverShadow = action.payload.serverShadow ?? null;
+        state.serverShadowRevision += 1;
+      }
+    },
+    setServerShadow(
+      state,
+      action: PayloadAction<{
+        sceneData: SceneData | null;
+        steps: ScriptStep[];
+        theaterLayout: TheaterLayout;
+        lightChannels: string[];
+      } | null>,
+    ) {
+      state.serverShadow = action.payload;
+      state.serverShadowRevision += 1;
     },
     setSceneData(state, action: PayloadAction<SceneData | null>) {
       state.sceneData = action.payload;

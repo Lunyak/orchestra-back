@@ -6,6 +6,7 @@ export function ScriptMarkdownToolbar({
   markdownMode,
   onSetMarkdownMode,
   annotations,
+  onInsertImage,
 }: {
   isEditing: boolean;
   onToggleEditing: () => void;
@@ -19,6 +20,7 @@ export function ScriptMarkdownToolbar({
     count: number;
     onClearSelectionState: () => void;
   };
+  onInsertImage?: () => void;
 }) {
   return (
     <div className="script-markdown-toggle">
@@ -45,6 +47,18 @@ export function ScriptMarkdownToolbar({
       >
         Текст
       </button>
+
+      {isEditing && onInsertImage ? (
+        <button
+          type="button"
+          className="script-markdown-toggle-btn"
+          data-active="false"
+          onClick={onInsertImage}
+          title="Загрузить картинку и вставить в markdown"
+        >
+          Картинка
+        </button>
+      ) : null}
 
       {isEditing ? (
         <div className="actor-annotations-toolbar">
