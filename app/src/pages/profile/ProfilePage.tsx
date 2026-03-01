@@ -6,6 +6,7 @@ import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { CalendarSection, type CalendarSectionState } from "../../shared/components/calendar/CalendarSection";
 import {
+  deleteMyProfile,
   getMyProfile,
   listRehearsals,
   uploadMyAvatar,
@@ -50,6 +51,7 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [form, setForm] = useState<Partial<MyProfile>>({});
   const [saving, setSaving] = useState(false);
+  const [deletingProfile, setDeletingProfile] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
@@ -557,6 +559,52 @@ export function ProfilePage() {
                   disabled={saving}
                 >
                   {saving ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+
+              <div className="profile-legal-links">
+                Документы:{" "}
+                <a href="/terms" target="_blank" rel="noreferrer">
+                  Пользовательское соглашение
+                </a>{" "}
+                ·{" "}
+                <a href="/privacy" target="_blank" rel="noreferrer">
+                  Политика обработки персональных данных
+                </a>
+              </div>
+
+              <div className="profile-danger-zone">
+                <div className="profile-danger-title">Опасная зона</div>
+                <div className="profile-danger-text">
+                  Удаление профиля очистит данные профиля (имя, ник, телефон, аватар, календарь доступности). Аккаунт
+                  останется, и вы сможете заполнить профиль заново.
+                </div>
+                <button
+                  type="button"
+                  className="profile-danger-btn"
+                  disabled={!accessToken || deletingProfile}
+                  onClick={async () => {
+                    if (!accessToken) return;
+                    const okConfirm = window.confirm(
+                      "Удалить данные профиля? Это очистит ник/имя/телефон/аватар/календарь. Аккаунт останется.",
+                    );
+                    if (!okConfirm) return;
+                    setDeletingProfile(true);
+                    setError(null);
+                    setOk(null);
+                    try {
+                      await deleteMyProfile(accessToken);
+                      const fresh = await getMyProfile(accessToken);
+                      setProfile(fresh);
+                      setOk("Данные профиля удалены");
+                    } catch (err: any) {
+                      setError(err?.response?.data?.message ?? "Не удалось удалить профиль");
+                    } finally {
+                      setDeletingProfile(false);
+                    }
+                  }}
+                >
+                  {deletingProfile ? "Удаление…" : "Удалить данные профиля"}
                 </button>
               </div>
             </div>

@@ -59,6 +59,18 @@ const ActorPage = lazy(() =>
   }))
 );
 
+const PrivacyPage = lazy(() =>
+  import("../../pages/legal/PrivacyPage").then((m) => ({
+    default: m.PrivacyPage,
+  }))
+);
+
+const TermsPage = lazy(() =>
+  import("../../pages/legal/TermsPage").then((m) => ({
+    default: m.TermsPage,
+  }))
+);
+
 /**
  * Компонент с маршрутами приложения.
  * Используется внутри провайдеров (AuthProvider, ProjectProvider, etc.)
@@ -135,6 +147,8 @@ export function AppRoutes() {
           <Route path="/roles" element={<RolesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/bot" element={<SettingsBotPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
         </Routes>
       </Suspense>
     </>

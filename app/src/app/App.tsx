@@ -4,9 +4,12 @@ import { ProjectProvider } from "../features/project";
 import { SceneProvider } from "../features/scene";
 import { ScriptUIProvider } from "../features/script-ui";
 import { LoginPage } from "../pages/login/LoginPage";
+import { PrivacyPage } from "../pages/legal/PrivacyPage";
+import { TermsPage } from "../pages/legal/TermsPage";
 import { AppRoutes } from "./router/AppRoutes";
 import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
+import { Route, Routes } from "react-router-dom";
 
 export interface AppProps {
   /** После логина/регистрации (только desktop — выгрузка локальных данных). */
@@ -24,7 +27,13 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
   const { accessToken } = useAuth();
 
   if (!accessToken) {
-    return <LoginPage onAfterLogin={onAfterLogin} />;
+    return (
+      <Routes>
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="*" element={<LoginPage onAfterLogin={onAfterLogin} />} />
+      </Routes>
+    );
   }
 
   return (

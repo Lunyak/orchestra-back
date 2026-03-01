@@ -32,6 +32,47 @@
   flex-wrap: wrap;
 }
 
+.profile-legal-links {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 16px;
+}
+
+.profile-legal-links a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.profile-danger-zone {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 94, 94, 0.28);
+  background: rgba(255, 94, 94, 0.06);
+  display: grid;
+  gap: 8px;
+}
+
+.profile-danger-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  opacity: 0.95;
+}
+
+.profile-danger-text {
+  font-size: 12px;
+  opacity: 0.85;
+  line-height: 16px;
+}
+
+.profile-danger-btn {
+  border: 1px solid rgba(255, 94, 94, 0.4);
+  background: rgba(255, 94, 94, 0.12);
+  color: var(--color-text-lighter);
+}
+
 @media (max-width: 979px) {
   /* На профиле нет mobile-bottom-buttons, поэтому нижний отступ не нужен. */
   .profile-layout .app-content {

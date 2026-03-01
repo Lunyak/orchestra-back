@@ -296,4 +296,13 @@ export class ProfileService {
       },
     });
   }
+
+  async deleteByEmail(email: string): Promise<{ ok: true; deleted: number }> {
+    const normalized = String(email ?? "").trim().toLowerCase();
+    if (!normalized) return { ok: true, deleted: 0 };
+    const res = await this.prisma.userProfile.deleteMany({
+      where: { email: normalized },
+    });
+    return { ok: true, deleted: res.count };
+  }
 }

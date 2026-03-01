@@ -210,6 +210,7 @@ export function DirectorSessionsPage() {
 
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) ?? null,
@@ -263,6 +264,46 @@ export function DirectorSessionsPage() {
     } catch (e) {
       console.error("saveDirectorSessions failed:", e);
     }
+  };
+
+  const moveSessionBefore = async (dragId: string, beforeId: string) => {
+    if (dragId === beforeId) return;
+    const fromIndex = (sessions ?? []).findIndex((s) => s.id === dragId);
+    const toIndex = (sessions ?? []).findIndex((s) => s.id === beforeId);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const next = [...sessions];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    await persist(next);
+  };
+
+  const moveSessionDelta = async (id: string, delta: -1 | 1) => {
+    const idx = (sessions ?? []).findIndex((s) => s.id === id);
+    if (idx === -1) return;
+    const nextIndex = idx + delta;
+    if (nextIndex < 0 || nextIndex >= (sessions ?? []).length) return;
+    const next = [...sessions];
+    const tmp = next[idx];
+    next[idx] = next[nextIndex];
+    next[nextIndex] = tmp;
+    await persist(next);
+  };
+
+  const deleteSession = async (sessionId: string) => {
+    const s = (sessions ?? []).find((x) => x.id === sessionId) ?? null;
+    const ok =
+      typeof window !== "undefined"
+        ? window.confirm(`Удалить сессию “${s?.title ?? "Без названия"}”?`)
+        : true;
+    if (!ok) return;
+    const idx = (sessions ?? []).findIndex((x) => x.id === sessionId);
+    const next = (sessions ?? []).filter((x) => x.id !== sessionId);
+    const nextActive =
+      activeSessionId === sessionId
+        ? next[Math.min(idx, Math.max(0, next.length - 1))]?.id ?? next[0]?.id ?? null
+        : activeSessionId;
+    setActiveSessionId(nextActive);
+    await persist(next);
   };
 
   const publishActiveSession = async () => {
@@ -378,7 +419,18 @@ export function DirectorSessionsPage() {
   };
 
   // ---- Material picker (from "kanban" data via syncPull) ----
-  const [projectFilter, setProjectFilter] = useState<string>("");
+  const projectFilterStorageKey = "directorSessions:materialsProject";
+  const [projectFilter, setProjectFilter] = useState<string>(() => {
+    try {
+      return (
+        (typeof window !== "undefined" ? localStorage.getItem(projectFilterStorageKey) : null) ||
+        (typeof window !== "undefined" ? localStorage.getItem("selectedProject") : null) ||
+        ""
+      );
+    } catch (_) {
+      return "";
+    }
+  });
   const [query, setQuery] = useState("");
   const [dataCache, setDataCache] = useState<ProjectDataCache>({});
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -434,9 +486,19 @@ export function DirectorSessionsPage() {
   };
 
   useEffect(() => {
-    const first = projectFilter || visibleProjects[0] || "";
-    if (first && !projectFilter) setProjectFilter(first);
+    const first =
+      (projectFilter && visibleProjects.includes(projectFilter) ? projectFilter : "") ||
+      visibleProjects[0] ||
+      "";
+    if (first && first !== projectFilter) setProjectFilter(first);
   }, [projectFilter, visibleProjects]);
+
+  useEffect(() => {
+    if (!projectFilter) return;
+    try {
+      localStorage.setItem(projectFilterStorageKey, projectFilter);
+    } catch (_) {}
+  }, [projectFilter]);
 
   useEffect(() => {
     if (!projectFilter) return;
@@ -827,33 +889,86 @@ export function DirectorSessionsPage() {
         <main className="main-content">
           <div className="rehearsals-page sessions-page">
             <div className="rehearsals-head">
-              <h2 className="rehearsals-title">Сессии</h2>
-              <div className="rehearsals-meta">Сборные репетиции (режиссёр)</div>
+              <div className="rehearsals-meta">Сборные репетиции</div>
             </div>
 
             <div className="sessions-layout">
               <aside className="sessions-side">
                 <div className="rehearsals-card">
                   <div className="rehearsals-card-title">Сборные сессии</div>
-                  <div className="rehearsals-card-sub">Хранятся на сервере через sync.</div>
+
                   <div className="sessions-actions">
                     <button type="button" onClick={createSession}>
                       + Новая сессия
                     </button>
                   </div>
                   <div className="sessions-list">
-                    {(sessions ?? []).map((s) => (
-                      <button
+                    {(sessions ?? []).map((s, index) => (
+                      <div
                         key={s.id}
-                        type="button"
-                        onClick={() => setActiveSessionId(s.id)}
-                        className={`rehearsals-item ${s.id === activeSessionId ? "active" : ""}`}
+                        className={`sessions-sessionRow ${s.id === activeSessionId ? "active" : ""}`}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const dragId = e.dataTransfer.getData("text/plain") || draggedSessionId;
+                          if (!dragId) return;
+                          void moveSessionBefore(dragId, s.id);
+                        }}
                       >
-                        <div className="rehearsals-item-title">{s.title}</div>
-                        <div className="rehearsals-item-meta">
-                          {new Date(s.startsAt).toLocaleString()} · слотов: {s.slots?.length ?? 0}
+                        <button
+                          type="button"
+                          onClick={() => setActiveSessionId(s.id)}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("text/plain", s.id);
+                            e.dataTransfer.effectAllowed = "move";
+                            setDraggedSessionId(s.id);
+                          }}
+                          onDragEnd={() => setDraggedSessionId(null)}
+                          className={`sessions-sessionSelect rehearsals-item ${s.id === activeSessionId ? "active" : ""} ${draggedSessionId === s.id ? "dragging" : ""}`}
+                          title="Перетащи для изменения порядка"
+                        >
+                          <div className="rehearsals-item-title">{s.title}</div>
+                          <div className="rehearsals-item-meta">
+                            {new Date(s.startsAt).toLocaleString()} · слотов: {s.slots?.length ?? 0}
+                          </div>
+                        </button>
+
+                        <div className="sessions-sessionActions" aria-label="Действия сессии">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void moveSessionDelta(s.id, -1);
+                            }}
+                            disabled={index === 0}
+                            title="Вверх"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void moveSessionDelta(s.id, 1);
+                            }}
+                            disabled={index === (sessions?.length ?? 0) - 1}
+                            title="Вниз"
+                          >
+                            ↓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void deleteSession(s.id);
+                            }}
+                            title="Удалить"
+                          >
+                            ×
+                          </button>
                         </div>
-                      </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1258,7 +1373,7 @@ export function DirectorSessionsPage() {
 
                       <div className="rehearsals-section">
                         <div className="rehearsals-section-title">
-                          Свободные актёры на {sessionDateKey ?? "—"} (проект: {projectFilter || "—"})
+                          Свободные на {sessionDateKey ?? "—"}
                         </div>
                         {sessionDateKey ? (
                           <div className="sessions-actors">
@@ -1274,10 +1389,7 @@ export function DirectorSessionsPage() {
                                         <span>{a.displayName ? `${a.displayName} (${a.email})` : a.email}</span>
                                       </span>
                                     </div>
-                                    <div className="rehearsals-muted">
-                                      роли: {a.rolesDisplay.slice(0, 6).join(", ")}
-                                      {a.rolesDisplay.length > 6 ? ` +${a.rolesDisplay.length - 6}` : ""}
-                                    </div>
+                            
                                   {a.ranges?.length ? (
                                     <div className="rehearsals-muted">
                                       окна: {a.ranges.map((r) => `${formatTimeHHMM(r.fromMin)}–${formatTimeHHMM(r.toMin)}`).join(", ")}
@@ -1285,7 +1397,7 @@ export function DirectorSessionsPage() {
                                   ) : null}
                                   </div>
                                   <div className="rehearsals-muted sessions-actor-status">
-                                    по календарю: свободен
+                                    ✅
                                   </div>
                                 </div>
                               ))}

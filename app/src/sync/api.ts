@@ -494,6 +494,13 @@ export async function getMyProfile(accessToken: string): Promise<MyProfile> {
   return data;
 }
 
+export async function deleteMyProfile(accessToken: string): Promise<{ ok: boolean; deleted?: number }> {
+  const { data } = await api.delete<{ ok: boolean; deleted?: number }>("/profile", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function getProfilesBatch(
   accessToken: string,
   emails: string[],

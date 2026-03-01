@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -42,6 +43,12 @@ export class ProfileController {
     @Body() body: UpdateProfileDto,
   ) {
     return this.profileService.updateByEmail(req.user.email, body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete()
+  deleteMyProfile(@Req() req: { user: { email: string } }) {
+    return this.profileService.deleteByEmail(req.user.email);
   }
 
   @UseGuards(JwtAuthGuard)
