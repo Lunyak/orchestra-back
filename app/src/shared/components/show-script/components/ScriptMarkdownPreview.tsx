@@ -137,7 +137,9 @@ export function ScriptMarkdownPreview({
   const MarkdownImage = (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
     const { src, alt, ...rest } = props;
     const raw = String(src ?? "").trim();
-    const [resolved, setResolved] = useState<string>(resolveImageSrc(raw) || raw);
+    const initial =
+      raw.startsWith("orchestra-image:") ? "" : (resolveImageSrc(raw) || raw);
+    const [resolved, setResolved] = useState<string>(initial);
 
     useEffect(() => {
       let cancelled = false;

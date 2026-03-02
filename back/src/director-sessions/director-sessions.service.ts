@@ -270,7 +270,7 @@ export class DirectorSessionsService {
     const rows = await this.prisma.directorSession.findMany({
       where: { projectId: directorProject.id, userId },
       select: { id: true, payload: true },
-      orderBy: { startsAt: 'asc' },
+      orderBy: [{ order: 'asc' }, { startsAt: 'asc' }],
     });
     return {
       projectId: directorProject.id,
@@ -294,12 +294,14 @@ export class DirectorSessionsService {
           ...(ids.length ? { id: { notIn: ids } } : {}),
         },
       });
-      for (const s of sessions) {
+      for (let i = 0; i < sessions.length; i += 1) {
+        const s = sessions[i];
         await tx.directorSession.upsert({
           where: { id: s.id },
           update: {
             projectId: directorProject.id,
             userId,
+            order: i,
             title: s.title,
             startsAt: new Date(s.startsAt),
             payload: s as any,
@@ -308,6 +310,7 @@ export class DirectorSessionsService {
             id: s.id,
             projectId: directorProject.id,
             userId,
+            order: i,
             title: s.title,
             startsAt: new Date(s.startsAt),
             payload: s as any,
@@ -322,7 +325,7 @@ export class DirectorSessionsService {
     const sessions = await this.prisma.directorSession.findMany({
       where: { projectId },
       select: { id: true, payload: true },
-      orderBy: { startsAt: 'asc' },
+      orderBy: [{ order: 'asc' }, { startsAt: 'asc' }],
     });
     return {
       sessions: sessions.map((r) => (r.payload as any) ?? { id: r.id }),

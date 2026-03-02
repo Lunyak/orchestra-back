@@ -6,6 +6,53 @@
   width: 100%;
 }
 
+.realtime-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.6);
+  color: #e2e8f0;
+  margin-bottom: 12px;
+}
+
+.realtime-banner__text {
+  font-size: 12px;
+  line-height: 1.35;
+  opacity: 0.95;
+}
+
+.realtime-banner__actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.realtime-banner__btn {
+  background: #2563eb;
+  color: #fff;
+  border: 1px solid #2563eb;
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.realtime-banner__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.realtime-banner__btn--secondary {
+  background: transparent;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+
 .script-header {
   display: flex;
   align-items: center;

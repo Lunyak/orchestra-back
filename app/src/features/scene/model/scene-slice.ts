@@ -128,6 +128,9 @@ export interface SceneState {
   currentPage: number;
   isSceneReady: boolean;
   hasLocalEdits: boolean;
+  /** There are remote updates, but we delayed pull because of local edits. */
+  realtimePullDeferred: boolean;
+  realtimePullDeferredAt: string | null;
   stepsRevision: number;
   sceneDataRevision: number;
   serverShadowRevision: number;
@@ -144,6 +147,8 @@ const initialState: SceneState = {
   currentPage: 0,
   isSceneReady: false,
   hasLocalEdits: false,
+  realtimePullDeferred: false,
+  realtimePullDeferredAt: null,
   stepsRevision: 0,
   sceneDataRevision: 0,
   serverShadowRevision: 0,
@@ -882,6 +887,14 @@ export const sceneSlice = createSlice({
     },
     markSaved(state) {
       state.hasLocalEdits = false;
+    },
+    setRealtimePullDeferred(state, action: PayloadAction<{ deferred: boolean; at?: string | null }>) {
+      state.realtimePullDeferred = Boolean(action.payload?.deferred);
+      state.realtimePullDeferredAt = action.payload?.at ?? (state.realtimePullDeferred ? new Date().toISOString() : null);
+    },
+    clearRealtimePullDeferred(state) {
+      state.realtimePullDeferred = false;
+      state.realtimePullDeferredAt = null;
     },
     addSounds(state, action: PayloadAction<SceneSound[]>) {
       const next = action.payload ?? [];

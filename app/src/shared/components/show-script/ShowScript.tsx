@@ -20,6 +20,10 @@ export const ShowScript: React.FC = () => {
     updateStep: updateSceneStep,
     resetAllRequisites,
     handleTrackLinkClick,
+    hasLocalEdits,
+    realtimePullDeferred,
+    clearRealtimePullDeferred,
+    syncFromServer,
   } = useScene();
 
   const [newRequisite, setNewRequisite] = useState('');
@@ -87,6 +91,30 @@ export const ShowScript: React.FC = () => {
   return (
     <div className="show-script">
       <div className="script-content">
+        {realtimePullDeferred ? (
+          <div className="realtime-banner" role="status" aria-live="polite">
+            <div className="realtime-banner__text">
+              Есть обновления из другого окна.
+              {hasLocalEdits
+                ? " Авто‑обновление отложено, пока есть локальные правки."
+                : " Можно подтянуть сейчас."}
+            </div>
+            <div className="realtime-banner__actions">
+              <button
+                className="realtime-banner__btn"
+                onClick={() => syncFromServer(null, projectSlug)}
+                disabled={hasLocalEdits}
+                title={hasLocalEdits ? "Сначала дождитесь сохранения локальных правок" : "Подтянуть обновления"}
+              >
+                Подтянуть
+              </button>
+              <button className="realtime-banner__btn realtime-banner__btn--secondary" onClick={clearRealtimePullDeferred}>
+                Скрыть
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         <ShowScriptMarkdownSection
           projectSlug={projectSlug}
           sceneName={sceneName}

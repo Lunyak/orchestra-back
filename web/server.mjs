@@ -5,6 +5,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -57,11 +58,47 @@ async function proxy(req, res, pathname) {
   res.end(Buffer.from(await backend.arrayBuffer()));
 }
 
+function proxyUpgrade(req, socket, head) {
+  try {
+    const backend = new URL(BACK_URL);
+    const port = Number(backend.port || (backend.protocol === 'https:' ? 443 : 80));
+    const host = backend.hostname;
+
+    const backendSocket = net.connect(port, host, () => {
+      const headers = { ...req.headers, host: backend.host };
+      const headerLines = Object.entries(headers)
+        .map(([k, v]) => {
+          if (Array.isArray(v)) return v.map((vv) => `${k}: ${vv}`).join('\r\n');
+          return `${k}: ${v}`;
+        })
+        .join('\r\n');
+
+      backendSocket.write(`${req.method} ${req.url} HTTP/1.1\r\n${headerLines}\r\n\r\n`);
+      if (head?.length) backendSocket.write(head);
+      socket.pipe(backendSocket);
+      backendSocket.pipe(socket);
+    });
+
+    backendSocket.on('error', () => {
+      try {
+        socket.end();
+      } catch {}
+    });
+  } catch {
+    try {
+      socket.end();
+    } catch {}
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = req.url?.split('?')[0] || '/';
   if (url.startsWith('/api/')) {
     const pathname = url.replace(/^\/api/, '') || '/';
     return proxy(req, res, pathname);
+  }
+  if (url.startsWith('/socket.io/')) {
+    return proxy(req, res, url);
   }
   let filePath = path.join(ROOT, url === '/' ? 'index.html' : url);
   if (!filePath.startsWith(ROOT)) {
@@ -90,6 +127,17 @@ const server = http.createServer(async (req, res) => {
       send(res, 404, 'Not Found', 'text/plain');
     }
   }
+});
+
+server.on('upgrade', (req, socket, head) => {
+  const url = req.url?.split('?')[0] || '/';
+  if (url.startsWith('/socket.io/')) {
+    proxyUpgrade(req, socket, head);
+    return;
+  }
+  try {
+    socket.destroy();
+  } catch {}
 });
 
 server.listen(PORT, '0.0.0.0', () => {

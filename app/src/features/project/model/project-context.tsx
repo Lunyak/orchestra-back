@@ -28,6 +28,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projectName, setProjectName] = useState("");
   const [isProjectsLoaded, setIsProjectsLoaded] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(false);
+  const ensureRemoteInFlightRef = React.useRef<Record<string, Promise<string | null> | undefined>>({});
 
   const getDesktopApi = useCallback(() => {
     const api = getPlatformDesktopApi();
@@ -92,14 +93,24 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       const key = `projectId:${projectName}`;
       const existing = localStorage.getItem(key);
       if (existing) return existing;
+      const inFlightKey = `${tokenToUse}:${projectName}`;
+      const inFlight = ensureRemoteInFlightRef.current[inFlightKey];
+      if (inFlight) return await inFlight;
       try {
-        const project = await ensureProject(
-          tokenToUse,
-          projectName,
-          `Проект ${projectName}`
-        );
-        localStorage.setItem(key, project.id);
-        return project.id;
+        const p = ensureProject(tokenToUse, projectName, `Проект ${projectName}`)
+          .then((project) => {
+            localStorage.setItem(key, project.id);
+            return project.id;
+          })
+          .catch((error) => {
+            console.error("[sync] ensureProject failed:", error);
+            return null;
+          })
+          .finally(() => {
+            delete ensureRemoteInFlightRef.current[inFlightKey];
+          });
+        ensureRemoteInFlightRef.current[inFlightKey] = p;
+        return await p;
       } catch (error) {
         console.error("[sync] ensureProject failed:", error);
         return null;

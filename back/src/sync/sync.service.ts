@@ -55,6 +55,14 @@ export class SyncService {
     return [x, y, z];
   }
 
+  private projectIdFromCompoundId(value: string | null | undefined): string | null {
+    const id = typeof value === 'string' ? value.trim() : '';
+    if (!id) return null;
+    const idx = id.indexOf(':');
+    if (idx <= 0) return null;
+    return id.slice(0, idx);
+  }
+
   private async syncStepsFromLegacySceneSnapshot(sceneId: string, legacySceneSnapshot: any) {
     const stepsValue = legacySceneSnapshot?.steps;
     if (!Array.isArray(stepsValue)) return;
@@ -481,11 +489,13 @@ export class SyncService {
     const sceneId = String(payload?.sceneId ?? '').trim();
     const sourceId = this.normalizeInt(payload?.sourceId, -1);
     if (!sceneId || sourceId <= 0) return;
+    const projectId = this.projectIdFromCompoundId(sceneId);
 
     if (operation === 'delete') {
       await this.prisma.playlistItem.deleteMany({
         where: { sceneId, sourceId },
       });
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
 
@@ -513,22 +523,26 @@ export class SyncService {
         where: { id: existing.id },
         data: { order, title, file, fadeMs, loop, remoteUrl, remoteKey },
       });
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
     await this.prisma.playlistItem.create({
       data: { sceneId, sourceId, order, title, file, fadeMs, loop, remoteUrl, remoteKey },
     });
+    if (projectId) this.notifications.notifySceneUpdated(projectId);
   }
 
   private async applySoundChange(operation: string, payload: any) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     const sourceId = this.normalizeInt(payload?.sourceId, -1);
     if (!sceneId || sourceId <= 0) return;
+    const projectId = this.projectIdFromCompoundId(sceneId);
 
     if (operation === 'delete') {
       await this.prisma.sound.deleteMany({
         where: { sceneId, sourceId },
       });
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
 
@@ -581,6 +595,7 @@ export class SyncService {
           loop,
         },
       });
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
     await this.prisma.sound.create({
@@ -599,17 +614,20 @@ export class SyncService {
         loop,
       },
     });
+    if (projectId) this.notifications.notifySceneUpdated(projectId);
   }
 
   private async applyGlobalLightChannelChange(operation: string, payload: any) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     const index = this.normalizeInt(payload?.index, -1);
     if (!sceneId || index < 0) return;
+    const projectId = this.projectIdFromCompoundId(sceneId);
 
     if (operation === 'delete') {
       await this.prisma.globalLightChannel.deleteMany({
         where: { sceneId, index },
       });
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
 
@@ -622,13 +640,16 @@ export class SyncService {
     await this.prisma.globalLightChannel.create({
       data: { sceneId, index, raw },
     });
+    if (projectId) this.notifications.notifySceneUpdated(projectId);
   }
 
   private async applyTheaterLayoutChange(operation: string, payload: any) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     if (!sceneId) return;
+    const projectId = this.projectIdFromCompoundId(sceneId);
     if (operation === 'delete') {
       await this.prisma.theaterLayout.deleteMany({ where: { sceneId } });
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
     const num = (v: any, fallback: number) =>
@@ -677,6 +698,7 @@ export class SyncService {
         doorZ: num(payload?.doorZ, 0),
       },
     });
+    if (projectId) this.notifications.notifySceneUpdated(projectId);
   }
 
   private async applyStepChange(
@@ -694,6 +716,8 @@ export class SyncService {
         },
         data: { deletedAt: new Date(payload.updatedAt) },
       });
+      const projectId = this.projectIdFromCompoundId(payload?.id);
+      if (projectId) this.notifications.notifySceneUpdated(projectId);
       return;
     }
 
@@ -769,6 +793,9 @@ export class SyncService {
       id: result.id,
       title: result.title,
     });
+
+    const projectId = this.projectIdFromCompoundId(payload?.sceneId);
+    if (projectId) this.notifications.notifySceneUpdated(projectId);
 
     // Optional: normalize nested step data if provided in payload (requisites/light/theater).
     try {

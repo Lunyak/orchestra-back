@@ -2,6 +2,13 @@ import { ensureProject, syncPush, type SyncChange } from "./api";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { createId } from "../shared/utils/createId";
 
+export type FlushDesktopOutboxResult = {
+  hadOutbox: boolean;
+  outboxItems: number;
+  pushedChanges: number;
+  ackedOutboxItems: number;
+};
+
 type OutboxPayload =
   | {
       kind: "sceneDelta";
@@ -26,12 +33,19 @@ function mergeSceneDelta(target: any, delta: any) {
   }
 }
 
-export async function flushDesktopOutbox(accessToken: string, projectSlug: string) {
+export async function flushDesktopOutbox(
+  accessToken: string,
+  projectSlug: string,
+): Promise<FlushDesktopOutboxResult> {
   const api = getDesktopApi();
-  if (!api?.outboxList || !api?.outboxAck) return;
+  if (!api?.outboxList || !api?.outboxAck) {
+    return { hadOutbox: false, outboxItems: 0, pushedChanges: 0, ackedOutboxItems: 0 };
+  }
 
   const res = await api.outboxList(projectSlug, 400);
-  if (!res?.ok || !Array.isArray(res.items) || res.items.length === 0) return;
+  if (!res?.ok || !Array.isArray(res.items) || res.items.length === 0) {
+    return { hadOutbox: false, outboxItems: 0, pushedChanges: 0, ackedOutboxItems: 0 };
+  }
 
   // Avoid calling /projects on every keystroke autosave.
   // We can derive scene IDs using cached projectId (it is stable per slug).
@@ -247,7 +261,14 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
     });
   }
 
-  if (changes.length === 0) return;
+  if (changes.length === 0) {
+    return {
+      hadOutbox: true,
+      outboxItems: res.items.length,
+      pushedChanges: 0,
+      ackedOutboxItems: 0,
+    };
+  }
 
   await syncPush(accessToken, changes);
 
@@ -260,5 +281,12 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
     ]),
   );
   await api.outboxAck(ackIds);
+
+  return {
+    hadOutbox: true,
+    outboxItems: res.items.length,
+    pushedChanges: changes.length,
+    ackedOutboxItems: ackIds.length,
+  };
 }
 

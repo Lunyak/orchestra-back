@@ -5,6 +5,7 @@ import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import { createId } from "../../../shared/utils/createId";
 import { cleanupProjectImages, syncPull, syncPush, type SyncChange } from "../../../sync/api";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
+import { disconnectRealtimeSocket, getRealtimeSocket } from "../../../realtime/socket";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
@@ -134,6 +135,10 @@ export interface SceneContextValue {
   currentPage: number;
   setCurrentPage: (next: SetStateAction<number>) => void;
   isSceneReady: boolean;
+  hasLocalEdits: boolean;
+  realtimePullDeferred: boolean;
+  realtimePullDeferredAt: string | null;
+  clearRealtimePullDeferred: () => void;
   addStep: (atPage?: number) => void;
   deleteStep: (id: number) => void;
   reorderSteps: (fromIndex: number, toIndex: number) => void;
@@ -170,7 +175,11 @@ function useSceneOperations() {
         return;
       }
 
-      const projectId = await ensureRemoteProject(tokenToUse);
+      const cachedProjectId =
+        typeof window !== "undefined"
+          ? localStorage.getItem(`projectId:${effectiveProject}`)
+          : null;
+      const projectId = cachedProjectId ?? (await ensureRemoteProject(tokenToUse));
       if (!projectId) {
         dispatch(sceneActions.setSceneReady(true));
         return;
@@ -337,6 +346,7 @@ function useSceneOperations() {
             },
           }),
         );
+        dispatch(sceneActions.clearRealtimePullDeferred());
         localStorage.setItem("lastSyncAt", now);
         localStorage.setItem(perProjectKey, now);
       } catch (error: any) {
@@ -388,6 +398,7 @@ function useSceneOperations() {
         const result = await desktopApi.saveProjectScene(projectName, "script", payload);
         if (!result?.ok) {
           console.error("Failed to save scene:", result?.error);
+          return;
         }
       }
 
@@ -395,8 +406,162 @@ function useSceneOperations() {
         // Desktop path: deltas are enqueued by saveProjectScene; push only outbox.
         if (desktopApi) {
           try {
-            await flushDesktopOutbox(token, projectName);
-            dispatch(sceneActions.markSaved());
+            const before = await desktopApi.outboxList?.(projectName, 50);
+            const outboxBeforeLen =
+              before?.ok && Array.isArray(before.items) ? before.items.length : null;
+
+            const flush = await flushDesktopOutbox(token, projectName);
+
+            const after = await desktopApi.outboxList?.(projectName, 1);
+            const outboxAfterLen =
+              after?.ok && Array.isArray(after.items) ? after.items.length : null;
+
+            const pushSucceeded =
+              flush.pushedChanges > 0 || (outboxBeforeLen != null && outboxBeforeLen > 0 && outboxAfterLen === 0);
+
+            // If outbox was empty right after saveProjectScene -> enqueue likely failed.
+            // Fallback: push current steps snapshot directly (with deletes based on serverShadow).
+            if (!pushSucceeded && outboxBeforeLen === 0) {
+              const projectId =
+                localStorage.getItem(`projectId:${projectName}`) ??
+                (await ensureRemoteProject(token));
+              if (projectId) {
+                const sceneId = `${projectId}:script`;
+                const nowIso = new Date().toISOString();
+                const nextSceneName =
+                  typeof payload?.name === "string" && payload.name.trim()
+                    ? payload.name.trim()
+                    : (sceneData as any)?.name ?? `Сцена ${projectName}`;
+
+                const changes: SyncChange[] = [];
+                changes.push({
+                  id: createId(),
+                  entityType: "Scene",
+                  entityId: sceneId,
+                  operation: "update",
+                  payload: { id: sceneId, projectId, name: nextSceneName, updatedAt: nowIso },
+                  createdAt: nowIso,
+                });
+
+                // Deletes are only safe if we have a known server baseline.
+                const prevSteps = Array.isArray(serverShadow?.steps) ? serverShadow!.steps : null;
+                if (prevSteps) {
+                  const prevIds = new Set(prevSteps.map((s) => Number((s as any)?.id)));
+                  const nextIds = new Set(steps.map((s) => Number((s as any)?.id)));
+                  prevIds.forEach((id) => {
+                    if (!Number.isFinite(id) || id <= 0) return;
+                    if (!nextIds.has(id)) {
+                      changes.push({
+                        id: createId(),
+                        entityType: "Step",
+                        entityId: `${sceneId}:${id}`,
+                        operation: "delete",
+                        payload: { id: `${sceneId}:${id}`, updatedAt: nowIso },
+                        createdAt: nowIso,
+                      });
+                    }
+                  });
+                }
+
+                steps.forEach((step, index) => {
+                  const stepId = Number((step as any)?.id);
+                  if (!Number.isFinite(stepId) || stepId <= 0) return;
+                  const stepKey = `${sceneId}:${stepId}`;
+                  changes.push({
+                    id: createId(),
+                    entityType: "Step",
+                    entityId: stepKey,
+                    operation: "update",
+                    payload: {
+                      id: stepKey,
+                      sceneId,
+                      sourceId: stepId,
+                      title: String((step as any)?.title ?? "").trim() || `Step ${stepId}`,
+                      markdown: typeof (step as any)?.markdown === "string" ? (step as any).markdown : "",
+                      playMarkdown:
+                        typeof (step as any)?.playMarkdown === "string"
+                          ? (step as any).playMarkdown
+                          : null,
+                      explicationMarkdown:
+                        typeof (step as any)?.explicationMarkdown === "string"
+                          ? (step as any).explicationMarkdown
+                          : null,
+                      durationMin:
+                        typeof (step as any)?.durationMin === "number"
+                          ? (step as any).durationMin
+                          : null,
+                      kanbanStatus:
+                        typeof (step as any)?.kanbanStatus === "string"
+                          ? (step as any).kanbanStatus
+                          : null,
+                      kanbanOrder:
+                        typeof (step as any)?.kanbanOrder === "number"
+                          ? (step as any).kanbanOrder
+                          : null,
+                      order: index,
+                      requisites: Array.isArray((step as any)?.requisites) ? (step as any).requisites : [],
+                      lightPlot: Array.isArray((step as any)?.lightPlot) ? (step as any).lightPlot : [],
+                      theaterModels: Array.isArray((step as any)?.theaterModels)
+                        ? (step as any).theaterModels
+                        : [],
+                      theaterSpotlights: Array.isArray((step as any)?.theaterSpotlights)
+                        ? (step as any).theaterSpotlights
+                        : [],
+                      updatedAt: nowIso,
+                    },
+                    createdAt: nowIso,
+                  });
+                });
+
+                if (changes.length > 1) {
+                  console.warn("[sync] desktop outbox empty/stuck; fallback pushing steps snapshot", {
+                    outboxBeforeLen,
+                    changesCount: changes.length,
+                  });
+                  await syncPush(token, changes);
+                  dispatch(
+                    sceneActions.setServerShadow({
+                      sceneData: {
+                        ...(serverShadow?.sceneData ?? {}),
+                        name: nextSceneName,
+                        playlist: Array.isArray((payload as any)?.playlist)
+                          ? (payload as any).playlist
+                          : [],
+                        sounds: Array.isArray((payload as any)?.sounds) ? (payload as any).sounds : [],
+                      } as any,
+                      steps,
+                      theaterLayout,
+                      lightChannels: Array.isArray(showScriptUi.lightChannels)
+                        ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
+                        : Array.from({ length: 8 }, () => ""),
+                    }),
+                  );
+                  dispatch(sceneActions.markSaved());
+                  return;
+                }
+              }
+            }
+            if (pushSucceeded) {
+              // Accept local state as the new baseline.
+              dispatch(
+                sceneActions.setServerShadow({
+                  sceneData: (sceneData ?? null) as any,
+                  steps,
+                  theaterLayout,
+                  lightChannels: Array.isArray(showScriptUi.lightChannels)
+                    ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
+                    : Array.from({ length: 8 }, () => ""),
+                }),
+              );
+              dispatch(sceneActions.markSaved());
+              return;
+            }
+
+            console.error("[sync] desktop outbox flush: no push happened", {
+              outboxBeforeLen,
+              outboxAfterLen,
+              flush,
+            });
           } catch (err) {
             console.error("[sync] desktop outbox flush failed:", err);
           }
@@ -573,14 +738,14 @@ function useSceneOperations() {
           const nextPlaylist = Array.isArray(payloadForServer.playlist)
             ? (payloadForServer.playlist as any[])
             : [];
-          const prevPlaylistById = new Map<number, any>();
+          const prevPlaylistById = new Map<number, { item: any; order: number }>();
           const shadowPlaylist = ((serverShadow?.sceneData as any)?.playlist ?? []) as any[];
           (Array.isArray(shadowPlaylist) ? shadowPlaylist : []).forEach((x: any, idx: number) => {
             const id = typeof x?.id === "number" ? x.id : null;
-            if (id != null) prevPlaylistById.set(id, x);
-            if (x && typeof x === "object" && typeof (x as any).order !== "number") {
-              (x as any).order = idx;
-            }
+            if (id == null) return;
+            // Redux state can be frozen (dev). Never mutate `x` in-place.
+            const order = typeof x?.order === "number" ? x.order : idx;
+            prevPlaylistById.set(id, { item: x, order });
           });
           const nextPlaylistIds = new Set(
             nextPlaylist.map((x: any) => (typeof x?.id === "number" ? x.id : null)).filter(Boolean),
@@ -588,7 +753,8 @@ function useSceneOperations() {
           nextPlaylist.forEach((it: any, order: number) => {
             const sourceId = typeof it?.id === "number" ? it.id : null;
             if (sourceId == null) return;
-            const prev = prevPlaylistById.get(sourceId) ?? null;
+            const prevEntry = prevPlaylistById.get(sourceId) ?? null;
+            const prev = prevEntry?.item ?? null;
             const nextPayload = {
               sceneId,
               sourceId,
@@ -604,7 +770,7 @@ function useSceneOperations() {
               ? {
                   sceneId,
                   sourceId,
-                  order: Number(prev?.order ?? 0),
+                  order: typeof prevEntry?.order === "number" ? prevEntry.order : Number(prev?.order ?? 0),
                   title: String(prev?.title ?? ""),
                   file: String(prev?.file ?? ""),
                   remoteUrl: prev?.remoteUrl ?? null,
@@ -884,7 +1050,7 @@ function useSceneOperations() {
 function useSceneProviderEffects() {
   const dispatch = useAppDispatch();
   const { accessToken } = useAuth();
-  const { projectName } = useProject();
+  const { projectName, ensureRemoteProject } = useProject();
   const { syncFromServer, saveStepsForLightPlot } = useSceneOperations();
 
   const { steps, currentPage, isSceneReady, theaterLayout, sceneData, hasLocalEdits, stepsRevision } =
@@ -899,6 +1065,10 @@ function useSceneProviderEffects() {
   const lightPlotSaveTimerRef = useRef<number | null>(null);
   const lastSyncedKeyRef = useRef<string | null>(null);
   const lastSavedLightChannelsKeyRef = useRef<string | null>(null);
+  const joinedProjectIdRef = useRef<string | null>(null);
+  const realtimePullTimerRef = useRef<number | null>(null);
+  const realtimeSceneUpdatedHandlerRef = useRef<(() => void) | null>(null);
+  const realtimeConnectHandlerRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!projectName) return;
@@ -975,6 +1145,73 @@ function useSceneProviderEffects() {
     lastSyncedKeyRef.current = key;
     void syncFromServer(accessToken, projectName);
   }, [accessToken, projectName, syncFromServer]);
+
+  // Realtime: join socket.io room per project and pull on updates.
+  useEffect(() => {
+    const token =
+      accessToken ?? (typeof window !== "undefined" ? localStorage.getItem("accessToken") : null);
+
+    if (!token || !projectName) {
+      joinedProjectIdRef.current = null;
+      if (realtimePullTimerRef.current) {
+        window.clearTimeout(realtimePullTimerRef.current);
+        realtimePullTimerRef.current = null;
+      }
+      disconnectRealtimeSocket();
+      return;
+    }
+
+    let cancelled = false;
+
+    const setup = async () => {
+      const cachedProjectId =
+        typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectName}`) : null;
+      const projectId = cachedProjectId ?? (await ensureRemoteProject(token));
+      if (cancelled || !projectId) return;
+
+      const socket = getRealtimeSocket(token);
+      if (!socket) return;
+
+      const prev = joinedProjectIdRef.current;
+      if (prev && prev !== projectId) {
+        socket.emit("leave-project", { projectId: prev });
+      }
+      if (prev !== projectId) joinedProjectIdRef.current = projectId;
+
+      socket.connect();
+
+      const onConnect = () => {
+        socket.emit("join-project", { projectId });
+      };
+      const prevConnectHandler = realtimeConnectHandlerRef.current;
+      if (prevConnectHandler) socket.off("connect", prevConnectHandler);
+      socket.on("connect", onConnect);
+      realtimeConnectHandlerRef.current = onConnect;
+
+      const onSceneUpdated = () => {
+        // Pull can overwrite current draft; don't auto-pull while local edits exist.
+        if (hasLocalEdits) {
+          dispatch(sceneActions.setRealtimePullDeferred({ deferred: true, at: new Date().toISOString() }));
+          return;
+        }
+        if (realtimePullTimerRef.current) window.clearTimeout(realtimePullTimerRef.current);
+        realtimePullTimerRef.current = window.setTimeout(() => {
+          void syncFromServer(token, projectName);
+        }, 300);
+      };
+
+      const prevHandler = realtimeSceneUpdatedHandlerRef.current;
+      if (prevHandler) socket.off("scene-updated", prevHandler);
+      socket.on("scene-updated", onSceneUpdated);
+      realtimeSceneUpdatedHandlerRef.current = onSceneUpdated;
+    };
+
+    void setup();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, projectName, ensureRemoteProject, syncFromServer, hasLocalEdits]);
 
   useEffect(() => {
     selectedStepIdRef.current = steps[currentPage]?.id ?? null;
@@ -1070,7 +1307,7 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
 export function useScene(): SceneContextValue {
   const dispatch = useAppDispatch();
-  const { sceneData, steps, theaterLayout, currentPage, isSceneReady } = useAppSelector(
+  const { sceneData, steps, theaterLayout, currentPage, isSceneReady, hasLocalEdits, realtimePullDeferred, realtimePullDeferredAt } = useAppSelector(
     (s) => s.scene,
   );
   const { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave } =
@@ -1141,6 +1378,10 @@ export function useScene(): SceneContextValue {
     playlistPlayHandler?.(trackId);
   }, []);
 
+  const clearRealtimePullDeferred = useCallback(() => {
+    dispatch(sceneActions.clearRealtimePullDeferred());
+  }, [dispatch]);
+
   return {
     sceneData,
     setSceneData,
@@ -1154,6 +1395,10 @@ export function useScene(): SceneContextValue {
     currentPage,
     setCurrentPage,
     isSceneReady,
+    hasLocalEdits,
+    realtimePullDeferred,
+    realtimePullDeferredAt,
+    clearRealtimePullDeferred,
     addStep,
     deleteStep,
     reorderSteps,

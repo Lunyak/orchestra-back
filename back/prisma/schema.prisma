@@ -197,6 +197,8 @@ model DirectorSession {
   id        String   @id
   projectId String
   userId    String
+  /// Порядок в списке (кастомный порядок пользователя, не зависит от startsAt)
+  order     Int      @default(0)
   title     String
   startsAt  DateTime
   payload   Json
