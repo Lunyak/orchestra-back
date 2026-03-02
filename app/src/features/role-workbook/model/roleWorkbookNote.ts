@@ -81,7 +81,7 @@ export function decodeRoleWorkbookNoteContent(content: string): RoleWorkbookData
   // Backward-compat: `references` was string[] links before.
   const legacyRefsRaw = Array.isArray(parsed.references) ? parsed.references : [];
   const referenceLinksLegacy = legacyRefsRaw
-    .map((x) => String(x ?? "").trim())
+    .map((x: unknown) => String(x ?? "").trim())
     .filter(Boolean)
     .slice(0, 80);
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { useNavigate } from "react-router-dom";
 import {
   selectActiveStepMarkdownContext,
   selectAnnotations,
@@ -7,7 +8,7 @@ import {
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 import type { ActorAnnotation } from "../../../../sync/api";
 import { getPlayUrl } from "../../../../sync/api";
-import { useAppSelector } from "../../../store/hooks";
+import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   ActorAnnotationsPopover,
   type NewAnnotationDraft,
@@ -18,8 +19,18 @@ import {
   createRehypeScriptTokens,
   createRenderLightTokens,
 } from "../utils/lightTokens";
+import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
+import type { SceneRolesDataV1 } from "../../../../features/scene";
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
+
+function normalizeRoleToken(v: string) {
+  return String(v ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/\s+/g, " ");
+}
 
 export function ScriptMarkdownPreview({
   projectName,
@@ -44,8 +55,12 @@ export function ScriptMarkdownPreview({
   activeAnnotationId: string | null;
   setActiveAnnotationId: React.Dispatch<React.SetStateAction<string | null>>;
 }) {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const ui = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectName, sceneName));
   const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const roles = useAppSelector(selectProjectRoles);
+  const sceneData = useAppSelector((s) => (s as any).scene?.sceneData ?? null) as any;
   const { activeMarkdown: markdown, currentStep, activeField } = useAppSelector((s) =>
     selectActiveStepMarkdownContext(s, projectName, sceneName),
   );
@@ -57,6 +72,11 @@ export function ScriptMarkdownPreview({
   const annotationsMode = ui.annotationsMode;
   const playlistOptions = ui.playlistOptions;
   const lightChannels = ui.lightChannels;
+
+  useEffect(() => {
+    if (!accessToken || !projectName) return;
+    void dispatch(fetchProjectRolesThunk({ accessToken, projectName }));
+  }, [accessToken, projectName, dispatch]);
 
   const imageUrlCacheRef = useRef(new Map<string, string>());
 
@@ -259,9 +279,58 @@ export function ScriptMarkdownPreview({
     setActiveAnnotationId(null);
   };
 
+  const resolveRoleIdFromToken = (token: string): string | null => {
+    const t = normalizeRoleToken(token);
+    if (!t) return null;
+    const exactTitle = roles.find((r) => normalizeRoleToken(String((r as any)?.title ?? "")) === t) ?? null;
+    if (exactTitle) return String((exactTitle as any).id);
+    const exactKey = roles.find((r) => normalizeRoleToken(String((r as any)?.key ?? "")) === t) ?? null;
+    if (exactKey) return String((exactKey as any).id);
+    const byAlias =
+      roles.find((r) =>
+        (Array.isArray((r as any)?.aliases) ? (r as any).aliases : []).some(
+          (a: any) => normalizeRoleToken(String(a ?? "")) === t,
+        ),
+      ) ?? null;
+    if (byAlias) return String((byAlias as any).id);
+    return null;
+  };
+
+  const isRoleAttachedToCurrentStep = (roleId: string): boolean => {
+    if (!currentStep?.id) return false;
+    const sr = (sceneData as any)?.sceneRoles as SceneRolesDataV1 | undefined;
+    if (!sr || (sr as any).v !== 1) return false;
+    const stepMap = (sr as any).byStepId?.[String(currentStep.id)];
+    if (!stepMap || typeof stepMap !== "object") return false;
+    return Boolean(stepMap[String(roleId)]);
+  };
+
+  const handleSpeakerLabelClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed && String(sel.toString() ?? "").trim()) {
+      return; // allow text selection without navigation
+    }
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const el = target.closest?.(".markdown-speaker-label") as HTMLElement | null;
+    if (!el) return;
+    const token = String(el.getAttribute("title") ?? "").trim();
+    if (!token) return;
+    const roleId = resolveRoleIdFromToken(token);
+    if (!roleId) return;
+    if (!isRoleAttachedToCurrentStep(roleId)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/role-workbook/${encodeURIComponent(roleId)}`);
+  };
+
   return (
     <div className="markdown-preview">
-      <div ref={rootRef} onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}>
+      <div
+        ref={rootRef}
+        onClick={handleSpeakerLabelClick}
+        onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
+      >
         <ReactMarkdown
           urlTransform={urlTransform}
           rehypePlugins={

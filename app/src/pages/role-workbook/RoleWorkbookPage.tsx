@@ -13,7 +13,7 @@ import {
   saveDirectorRefsThunk,
   cleanupProjectImagesThunk,
 } from "../../features/role-workbook/model/roleWorkbookSlice";
-import { actorLabel } from "../../features/role-workbook/model/roleWorkbookNote";
+import { actorLabel, pickLatestWorkbookSnapshotForActor } from "../../features/role-workbook/model/roleWorkbookNote";
 import { extractRolePhrasesFromSteps } from "../../features/actor-trainers/model/rolePhrases";
 import { getPlayUrl, uploadProjectFile } from "../../sync/api";
 import "./style.css";
@@ -79,10 +79,24 @@ export function RoleWorkbookPage() {
     return (s.allowedActorEmails ?? []).slice().sort((a, b) => String(a).localeCompare(String(b), "ru"));
   }, [s.allowedActorEmails]);
 
+  const snapshotsByActorEmail = useMemo(() => {
+    // For director: show what each assigned actor saved.
+    const out = new Map<string, string | null>();
+    if (!s.isProjectOwner) return out;
+    const notes = Array.isArray(s.notes) ? s.notes : [];
+    for (const em of assigned) {
+      const snap = pickLatestWorkbookSnapshotForActor(notes as any, em);
+      const updated = snap?.note?.updatedAt ? String(snap.note.updatedAt) : null;
+      out.set(em, updated || null);
+    }
+    return out;
+  }, [assigned, s.isProjectOwner, s.notes]);
+
   const selectedActor = normalizeEmail(s.selectedActorEmail);
   const myEmail = normalizeEmail(s.myEmail);
   const canEdit = Boolean(myEmail && selectedActor && myEmail === selectedActor);
   const canEditDirectorRefs = Boolean(s.isProjectOwner);
+  const canViewActorWorkbook = Boolean((s as any).canViewActorWorkbook);
 
   const setSelectedActor = useCallback(
     (email: string) => dispatch(roleWorkbookActions.setSelectedActorEmail({ value: email })),
@@ -137,6 +151,30 @@ export function RoleWorkbookPage() {
         };
       });
   }, [roleStepIdSet, sceneArcs, steps]);
+
+  const sceneArcTextByStepId = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const a of sceneArcs ?? []) {
+      const id =
+        typeof (a as any)?.stepId === "number"
+          ? (a as any).stepId
+          : Number((a as any)?.stepId ?? NaN);
+      if (!Number.isFinite(id)) continue;
+      map.set(Number(id), String((a as any)?.text ?? ""));
+    }
+    return map;
+  }, [sceneArcs]);
+
+  const sceneArcsForView = useMemo(() => {
+    // Even in read-only mode, show the auto-generated scene list.
+    return (desiredSceneArcs ?? []).map((a) => ({
+      ...a,
+      text:
+        a.stepId != null && sceneArcTextByStepId.has(Number(a.stepId))
+          ? String(sceneArcTextByStepId.get(Number(a.stepId)) ?? "")
+          : String((a as any)?.text ?? ""),
+    }));
+  }, [desiredSceneArcs, sceneArcTextByStepId]);
 
   const desiredSceneArcsSignature = useMemo(() => {
     return (desiredSceneArcs ?? [])
@@ -446,39 +484,91 @@ export function RoleWorkbookPage() {
                 <div className="rolewb-card-title">Просмотр</div>
                 <div className="rolewb-row">
                   <div className="rolewb-hint">
-                    Страница роли у каждого актёра своя. Просмотр доступен только тем, кто в одной труппе и назначен на эту роль.
+                    Режиссёрская часть видна всем участникам проекта. Актёрские тетрадки видны только назначенным актёрам и режиссёру.
                   </div>
                 </div>
-                <div className="rolewb-row" style={{ marginTop: 4 }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>Актёр:</div>
-                  <select
-                    className="settings-invite-input"
-                    value={selectedActor || ""}
-                    onChange={(e) => setSelectedActor(e.target.value)}
-                    style={{ maxWidth: 520 }}
-                  >
-                    {assigned.length === 0 ? <option value="">Нет доступа / нет назначений в труппе</option> : null}
-                    {assigned.map((em) => (
-                      <option key={em} value={em}>
-                        {actorLabel(s.profilesByEmail?.[em] ?? null, em)}
-                      </option>
-                    ))}
-                  </select>
-                  {myEmail && assigned.includes(myEmail) ? (
-                    <Button className="secondary" type="button" onClick={() => setSelectedActor(myEmail)}>
-                      Моя
-                    </Button>
-                  ) : null}
-                </div>
+                {canViewActorWorkbook ? (
+                  <div className="rolewb-row" style={{ marginTop: 4 }}>
+                    <div style={{ fontSize: 12, opacity: 0.75 }}>Актёр:</div>
+                    <select
+                      className="settings-invite-input"
+                      value={selectedActor || ""}
+                      onChange={(e) => setSelectedActor(e.target.value)}
+                      style={{ maxWidth: 520 }}
+                      disabled={!s.isProjectOwner}
+                      title={!s.isProjectOwner ? "Можно просматривать только свою тетрадку" : "Режиссёр может выбрать актёра"}
+                    >
+                      {assigned.length === 0 ? <option value="">Нет назначений</option> : null}
+                      {assigned.map((em) => (
+                        <option key={em} value={em}>
+                          {actorLabel(s.profilesByEmail?.[em] ?? null, em)}
+                        </option>
+                      ))}
+                    </select>
+                    {myEmail && assigned.includes(myEmail) ? (
+                      <Button className="secondary" type="button" onClick={() => setSelectedActor(myEmail)}>
+                        Моя
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="rolewb-row" style={{ marginTop: 4 }}>
+                    <div className="rolewb-hint">
+                      Актёрская тетрадка недоступна: вы не назначены на эту роль.
+                    </div>
+                  </div>
+                )}
+
+                {canViewActorWorkbook && s.isProjectOwner && assigned.length > 0 ? (
+                  <div style={{ marginTop: 8, display: "grid", gap: 6 }}>
+                    <div className="rolewb-hint" style={{ marginTop: 0 }}>
+                      Быстрый просмотр тетрадок актёров (последнее сохранение):
+                    </div>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {assigned.map((em) => {
+                        const updatedAtIso = snapshotsByActorEmail.get(em) ?? null;
+                        const isActive = normalizeEmail(em) === selectedActor;
+                        return (
+                          <div
+                            key={`actor-snap-${em}`}
+                            className="rolewb-row"
+                            style={{ justifyContent: "space-between", gap: 10, alignItems: "center" }}
+                          >
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, opacity: isActive ? 1 : 0.9 }}>
+                                {actorLabel(s.profilesByEmail?.[em] ?? null, em)}
+                                {isActive ? <span style={{ opacity: 0.75 }}> · открыто</span> : null}
+                              </div>
+                              <div style={{ fontSize: 11, opacity: 0.75 }}>
+                                {updatedAtIso
+                                  ? `Сохранено: ${new Date(updatedAtIso).toLocaleString("ru-RU")}`
+                                  : "Нет сохранений"}
+                              </div>
+                            </div>
+                            <Button
+                              className="secondary"
+                              type="button"
+                              onClick={() => setSelectedActor(em)}
+                              disabled={isActive}
+                              title="Открыть тетрадку этого актёра"
+                            >
+                              Открыть
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
                   <div className="rolewb-hint">
-                    {s.snapshot?.note?.updatedAt ? (
+                    {canViewActorWorkbook && s.snapshot?.note?.updatedAt ? (
                       <>
                         Последняя версия: <b>{new Date(s.snapshot.note.updatedAt).toLocaleString("ru-RU")}</b>
                       </>
                     ) : (
-                      <>Пока нет сохранённой версии для выбранного актёра.</>
+                      canViewActorWorkbook ? <>Пока нет сохранённой версии для выбранного актёра.</> : <>Актёрская тетрадка скрыта.</>
                     )}
                   </div>
                   <div className="rolewb-row">
@@ -486,7 +576,7 @@ export function RoleWorkbookPage() {
                       className="secondary"
                       type="button"
                       onClick={() => dispatch(roleWorkbookActions.resetDraftFromSnapshot())}
-                      disabled={s.loading || s.saving}
+                      disabled={s.loading || s.saving || !canViewActorWorkbook}
                       title="Сбросить черновик к последней сохранённой версии"
                     >
                       Сбросить
@@ -494,7 +584,7 @@ export function RoleWorkbookPage() {
                     <Button
                       className="primary"
                       type="button"
-                      disabled={!canEdit || s.saving}
+                      disabled={!canEdit || s.saving || !canViewActorWorkbook}
                       onClick={async () => {
                         if (!accessToken || !projectSlug || !effectiveRoleId) return;
                         await dispatch(saveRoleWorkbookThunk({ accessToken, projectSlug, roleId: effectiveRoleId }));
@@ -726,156 +816,159 @@ export function RoleWorkbookPage() {
                 {urlTick ? null : null}
               </div>
 
-              <div className="rolewb-card">
-                <div className="rolewb-card-title">Биография</div>
-                <textarea
-                  className="settings-invite-input"
-                  rows={6}
-                  value={String(draft?.biography ?? "")}
-                  onChange={(e) =>
-                    dispatch(roleWorkbookActions.setDraftField({ key: "biography", value: e.target.value }))
-                  }
-                  disabled={!canEdit}
-                  style={{ maxWidth: "unset", width: "100%" }}
-                  placeholder="Прошлое персонажа, травмы, привычки, что сформировало характер…"
-                />
-              </div>
-
-              <div className="rolewb-card">
-                <div className="rolewb-card-title">Сквозное действие (супер‑цель)</div>
-                <textarea
-                  className="settings-invite-input"
-                  rows={3}
-                  value={String(draft?.superObjective ?? "")}
-                  onChange={(e) =>
-                    dispatch(roleWorkbookActions.setDraftField({ key: "superObjective", value: e.target.value }))
-                  }
-                  disabled={!canEdit}
-                  style={{ maxWidth: "unset", width: "100%" }}
-                  placeholder="Чего персонаж хочет больше всего на протяжении всей истории?"
-                />
-                <div className="rolewb-hint">
-                  Подход “как у киноактёров”: формулируй цель через действие (добиться/удержать/сломать/защитить), а не через чувство.
-                </div>
-              </div>
-
-              <div className="rolewb-card">
-                <div className="rolewb-card-title">Внешность и пластика</div>
-                <textarea
-                  className="settings-invite-input"
-                  rows={4}
-                  value={String(draft?.appearance ?? "")}
-                  onChange={(e) =>
-                    dispatch(roleWorkbookActions.setDraftField({ key: "appearance", value: e.target.value }))
-                  }
-                  disabled={!canEdit}
-                  style={{ maxWidth: "unset", width: "100%" }}
-                  placeholder="Осанка, жесты, походка, темп/ритм, голос, что заметно при первом взгляде…"
-                />
-              </div>
-
-              <div className="rolewb-card">
-                <div className="rolewb-card-title">Референсы</div>
-                <div className="rolewb-hint">
-                  Картинки для роли (наблюдения, фактуры, костюм/пластика, настроение). Добавление: Ctrl+V или перетащи файлы.
-                </div>
-                <div
-                  className="rolewb-dropzone"
-                  tabIndex={0}
-                  onPaste={onActorRefsPaste}
-                  onDragOver={(e) => {
-                    if (!canEdit) return;
-                    e.preventDefault();
-                  }}
-                  onDrop={(e) => {
-                    if (!canEdit) return;
-                    e.preventDefault();
-                    void uploadActorImages(e.dataTransfer?.files ?? null);
-                  }}
-                  onClick={(e) => {
-                    try {
-                      (e.currentTarget as HTMLDivElement).focus();
-                    } catch {}
-                  }}
-                  style={{ marginTop: 6 }}
-                  title="Кликни сюда и нажми Ctrl+V, либо перетащи файлы"
-                >
-                  {actorUploading
-                    ? "Загрузка…"
-                    : canEdit
-                      ? "Кликни сюда и вставь картинку (Ctrl+V) или перетащи файлы сюда."
-                      : "Только просмотр (выбран другой актёр)."}
-                </div>
-
-                {actorImages.length === 0 ? (
-                  <div className="rolewb-hint">Пока нет картинок.</div>
-                ) : (
-                  <div className="rolewb-gallery" style={{ marginTop: 8 }}>
-                    {actorImages.map((img, idx) => {
-                      const url = urlCacheRef.current.get(img.key) || "";
-                      return (
-                        <div key={img.key} className="rolewb-img-tile">
-                          {url ? (
-                            <img
-                              className="rolewb-img"
-                              src={url}
-                              alt={img.caption || "reference"}
-                              onClick={() => setActorLightboxIdx(idx)}
-                              onError={() => {
-                                urlCacheRef.current.delete(img.key);
-                                void ensureImageUrl(img.key);
-                              }}
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                height: 140,
-                                display: "grid",
-                                placeItems: "center",
-                                fontSize: 12,
-                                opacity: 0.7,
-                              }}
-                              onClick={() => {
-                                void ensureImageUrl(img.key);
-                                setActorLightboxIdx(idx);
-                              }}
-                            >
-                              загрузка…
-                            </div>
-                          )}
-                          <div className="rolewb-img-cap">
-                            <input
-                              className="settings-invite-input"
-                              value={String(img.caption ?? "")}
-                              onChange={(e) =>
-                                dispatch(
-                                  roleWorkbookActions.setActorRefCaption({
-                                    key: img.key,
-                                    caption: e.target.value,
-                                  }),
-                                )
-                              }
-                              placeholder="подпись (опционально)…"
-                              disabled={!canEdit}
-                              style={{ maxWidth: "unset" }}
-                            />
-                            <Button
-                              className="danger"
-                              type="button"
-                              onClick={() => {
-                                dispatch(roleWorkbookActions.removeActorRefImage({ key: img.key }));
-                                void dispatch(saveRoleWorkbookThunk({ accessToken, projectSlug, roleId: effectiveRoleId }));
-                              }}
-                              disabled={!canEdit}
-                            >
-                              Удалить
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
+              {canViewActorWorkbook ? (
+                <>
+                  <div className="rolewb-card">
+                    <div className="rolewb-card-title">Биография</div>
+                    <textarea
+                      className="settings-invite-input"
+                      rows={6}
+                      value={String(draft?.biography ?? "")}
+                      onChange={(e) =>
+                        dispatch(roleWorkbookActions.setDraftField({ key: "biography", value: e.target.value }))
+                      }
+                      disabled={!canEdit}
+                      style={{ maxWidth: "unset", width: "100%" }}
+                      placeholder="Прошлое персонажа, травмы, привычки, что сформировало характер…"
+                    />
                   </div>
-                )}
+
+                  <div className="rolewb-card">
+                    <div className="rolewb-card-title">Сквозное действие (супер‑цель)</div>
+                    <textarea
+                      className="settings-invite-input"
+                      rows={3}
+                      value={String(draft?.superObjective ?? "")}
+                      onChange={(e) =>
+                        dispatch(roleWorkbookActions.setDraftField({ key: "superObjective", value: e.target.value }))
+                      }
+                      disabled={!canEdit}
+                      style={{ maxWidth: "unset", width: "100%" }}
+                      placeholder="Чего персонаж хочет больше всего на протяжении всей истории?"
+                    />
+                    <div className="rolewb-hint">
+                      Подход “как у киноактёров”: формулируй цель через действие (добиться/удержать/сломать/защитить), а не через чувство.
+                    </div>
+                  </div>
+
+                  <div className="rolewb-card">
+                    <div className="rolewb-card-title">Внешность и пластика</div>
+                    <textarea
+                      className="settings-invite-input"
+                      rows={4}
+                      value={String(draft?.appearance ?? "")}
+                      onChange={(e) =>
+                        dispatch(roleWorkbookActions.setDraftField({ key: "appearance", value: e.target.value }))
+                      }
+                      disabled={!canEdit}
+                      style={{ maxWidth: "unset", width: "100%" }}
+                      placeholder="Осанка, жесты, походка, темп/ритм, голос, что заметно при первом взгляде…"
+                    />
+                  </div>
+
+                  <div className="rolewb-card">
+                    <div className="rolewb-card-title">Референсы</div>
+                    <div className="rolewb-hint">
+                      Картинки для роли (наблюдения, фактуры, костюм/пластика, настроение). Добавление: Ctrl+V или перетащи файлы.
+                    </div>
+                    <div
+                      className="rolewb-dropzone"
+                      tabIndex={0}
+                      onPaste={onActorRefsPaste}
+                      onDragOver={(e) => {
+                        if (!canEdit) return;
+                        e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        if (!canEdit) return;
+                        e.preventDefault();
+                        void uploadActorImages(e.dataTransfer?.files ?? null);
+                      }}
+                      onClick={(e) => {
+                        try {
+                          (e.currentTarget as HTMLDivElement).focus();
+                        } catch {}
+                      }}
+                      style={{ marginTop: 6 }}
+                      title="Кликни сюда и нажми Ctrl+V, либо перетащи файлы"
+                    >
+                      {actorUploading
+                        ? "Загрузка…"
+                        : canEdit
+                          ? "Кликни сюда и вставь картинку (Ctrl+V) или перетащи файлы сюда."
+                          : "Только просмотр (выбран другой актёр)."}
+                    </div>
+
+                    {actorImages.length === 0 ? (
+                      <div className="rolewb-hint">Пока нет картинок.</div>
+                    ) : (
+                      <div className="rolewb-gallery" style={{ marginTop: 8 }}>
+                        {actorImages.map((img, idx) => {
+                          const url = urlCacheRef.current.get(img.key) || "";
+                          return (
+                            <div key={img.key} className="rolewb-img-tile">
+                              {url ? (
+                                <img
+                                  className="rolewb-img"
+                                  src={url}
+                                  alt={img.caption || "reference"}
+                                  onClick={() => setActorLightboxIdx(idx)}
+                                  onError={() => {
+                                    urlCacheRef.current.delete(img.key);
+                                    void ensureImageUrl(img.key);
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    height: 140,
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontSize: 12,
+                                    opacity: 0.7,
+                                  }}
+                                  onClick={() => {
+                                    void ensureImageUrl(img.key);
+                                    setActorLightboxIdx(idx);
+                                  }}
+                                >
+                                  загрузка…
+                                </div>
+                              )}
+                              <div className="rolewb-img-cap">
+                                <input
+                                  className="settings-invite-input"
+                                  value={String(img.caption ?? "")}
+                                  onChange={(e) =>
+                                    dispatch(
+                                      roleWorkbookActions.setActorRefCaption({
+                                        key: img.key,
+                                        caption: e.target.value,
+                                      }),
+                                    )
+                                  }
+                                  placeholder="подпись (опционально)…"
+                                  disabled={!canEdit}
+                                  style={{ maxWidth: "unset" }}
+                                />
+                                <Button
+                                  className="danger"
+                                  type="button"
+                                  onClick={() => {
+                                    dispatch(roleWorkbookActions.removeActorRefImage({ key: img.key }));
+                                    void dispatch(saveRoleWorkbookThunk({ accessToken, projectSlug, roleId: effectiveRoleId }));
+                                  }}
+                                  disabled={!canEdit}
+                                >
+                                  Удалить
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                 {actorLightboxIdx != null && actorImages[actorLightboxIdx] ? (
                   <div
@@ -931,83 +1024,88 @@ export function RoleWorkbookPage() {
                     </div>
                   </div>
                 ) : null}
-              </div>
 
-              <div className="rolewb-card">
-                <div className="rolewb-card-title">Арка по сценам (что меняется)</div>
-                <div className="rolewb-hint">
-                  Для каждой сцены фиксируй: “что я хочу”, “что делаю”, “что получаю”, “в чём сдвиг”.
-                </div>
-                <div className="rolewb-hint" style={{ marginTop: 6 }}>
-                  Список сцен формируется автоматически из сценария: берём только те шаги, где роль{" "}
-                  <b>{s.roleInfo?.title ?? s.roleInfo?.key ?? effectiveRoleId}</b> встречается в “Тексте” (формат{" "}
-                  <code>РОЛЬ: ...</code> или <code>[[РОЛЬ]] ...</code>). Найдено сцен:{" "}
-                  <b>{Array.isArray(desiredSceneArcs) ? desiredSceneArcs.length : 0}</b>
-                </div>
-                <div style={{ display: "grid", gap: 8 }}>
-                  {sceneArcs.length === 0 ? (
+
+
+                  <div className="rolewb-card">
+                    <div className="rolewb-card-title">Арка по сценам (что меняется)</div>
                     <div className="rolewb-hint">
-                      Пока нет сцен с этой ролью в тексте сценария.
+                      Для каждой сцены фиксируй: “что я хочу”, “что делаю”, “что получаю”, “в чём сдвиг”.
                     </div>
-                  ) : null}
-                  {sceneArcs.map((a, idx) => (
-                    <div
-                      key={`arc-${idx}`}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.10)",
-                        borderRadius: 10,
-                        padding: 10,
-                        background: "rgba(255,255,255,0.03)",
-                        display: "grid",
-                        gap: 8,
-                      }}
-                    >
-                      <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
-                        <div style={{ fontSize: 12, opacity: 0.8 }}>
-                          {a.stepTitle ? (
-                            <>
-                              <b>{a.stepTitle}</b> {a.stepId ? <span style={{ opacity: 0.75 }}>· #{a.stepId}</span> : null}
-                            </>
-                          ) : (
-                            <b>Сцена #{idx + 1}</b>
-                          )}
+                    <div className="rolewb-hint" style={{ marginTop: 6 }}>
+                      Список сцен формируется автоматически из сценария: берём только те шаги, где роль{" "}
+                      <b>{s.roleInfo?.title ?? s.roleInfo?.key ?? effectiveRoleId}</b> встречается в “Тексте” (формат{" "}
+                      <code>РОЛЬ: ...</code> или <code>[[РОЛЬ]] ...</code>). Найдено сцен:{" "}
+                      <b>{Array.isArray(desiredSceneArcs) ? desiredSceneArcs.length : 0}</b>
+                    </div>
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {sceneArcsForView.length === 0 ? (
+                        <div className="rolewb-hint">
+                          Пока нет сцен с этой ролью в тексте сценария.
                         </div>
-                      </div>
-                      <textarea
-                        className="settings-invite-input"
-                        rows={3}
-                        value={String(a.text ?? "")}
-                        disabled={!canEdit}
-                        onChange={(e) => {
-                          const next = sceneArcs.slice();
-                          next[idx] = { ...(next[idx] as any), text: e.target.value };
-                          dispatch(roleWorkbookActions.setDraftSceneArcs({ value: next as any }));
-                        }}
-                        style={{ maxWidth: "unset", width: "100%" }}
-                        placeholder="Что происходит с персонажем в этой сцене? В чём поворот?"
-                      />
+                      ) : null}
+                      {sceneArcsForView.map((a, idx) => (
+                        <div
+                          key={`arc-${idx}`}
+                          style={{
+                            border: "1px solid rgba(255,255,255,0.10)",
+                            borderRadius: 10,
+                            padding: 10,
+                            background: "rgba(255,255,255,0.03)",
+                            display: "grid",
+                            gap: 8,
+                          }}
+                        >
+                          <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
+                            <div style={{ fontSize: 12, opacity: 0.8 }}>
+                              {a.stepTitle ? (
+                                <>
+                                  <b>{a.stepTitle}</b>{" "}
+                                  {a.stepId ? <span style={{ opacity: 0.75 }}>· #{a.stepId}</span> : null}
+                                </>
+                              ) : (
+                                <b>Сцена #{idx + 1}</b>
+                              )}
+                            </div>
+                          </div>
+                          <textarea
+                            className="settings-invite-input"
+                            rows={3}
+                            value={String(a.text ?? "")}
+                            disabled={!canEdit}
+                            onChange={(e) => {
+                              if (!canEdit) return;
+                              const next = sceneArcsForView.slice();
+                              next[idx] = { ...(next[idx] as any), text: e.target.value };
+                              dispatch(roleWorkbookActions.setDraftSceneArcs({ value: next as any }));
+                            }}
+                            style={{ maxWidth: "unset", width: "100%" }}
+                            placeholder="Что происходит с персонажем в этой сцене? В чём поворот?"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
-              <div className="rolewb-card">
-                <div className="rolewb-card-title">Как готовиться (киношный подход)</div>
-                <div className="rolewb-hint">
-                  Идеи: дневник персонажа, “физические привычки”, референсы, наблюдения, “что я скрываю”, “что я защищаю”, голос/темп, отношения.
-                </div>
-                <textarea
-                  className="settings-invite-input"
-                  rows={5}
-                  value={String(draft?.preparation ?? "")}
-                  onChange={(e) =>
-                    dispatch(roleWorkbookActions.setDraftField({ key: "preparation", value: e.target.value }))
-                  }
-                  disabled={!canEdit}
-                  style={{ maxWidth: "unset", width: "100%" }}
-                  placeholder="План подготовки: что изучить, что попробовать, какие задания себе дать…"
-                />
-              </div>
+                  <div className="rolewb-card">
+                    <div className="rolewb-card-title">Как готовиться (киношный подход)</div>
+                    <div className="rolewb-hint">
+                      Идеи: дневник персонажа, “физические привычки”, референсы, наблюдения, “что я скрываю”, “что я защищаю”, голос/темп, отношения.
+                    </div>
+                    <textarea
+                      className="settings-invite-input"
+                      rows={5}
+                      value={String(draft?.preparation ?? "")}
+                      onChange={(e) =>
+                        dispatch(roleWorkbookActions.setDraftField({ key: "preparation", value: e.target.value }))
+                      }
+                      disabled={!canEdit}
+                      style={{ maxWidth: "unset", width: "100%" }}
+                      placeholder="План подготовки: что изучить, что попробовать, какие задания себе дать…"
+                    />
+                  </div>
+                </>
+              ) : null}
             </div>
           </div>
         </main>

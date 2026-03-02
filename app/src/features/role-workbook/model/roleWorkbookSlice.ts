@@ -40,6 +40,8 @@ export type RoleWorkbookState = {
   isProjectOwner: boolean;
   projectOwnerEmail: string | null;
   projectOwnerLoaded: boolean;
+  /** Доступ к актёрским тетрадкам: назначенный актёр или режиссёр (владелец проекта). */
+  canViewActorWorkbook: boolean;
 
   myEmail: string;
   assignedEmails: string[];
@@ -102,6 +104,7 @@ const initialState: RoleWorkbookState = {
   isProjectOwner: false,
   projectOwnerEmail: null,
   projectOwnerLoaded: false,
+  canViewActorWorkbook: false,
   myEmail: "",
   assignedEmails: [],
   troupeEmails: [],
@@ -149,6 +152,7 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
     isProjectOwner: boolean;
     projectOwnerEmail: string | null;
     projectOwnerLoaded: boolean;
+    canViewActorWorkbook: boolean;
     notes: RoleNoteItem[];
     myEmail: string;
     assignedEmails: string[];
@@ -209,13 +213,9 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
       .filter(Boolean);
     const troupeEmails = Array.from(new Set([...(troupeEmailsBase ?? []), ...(myEmail ? [myEmail] : [])]));
 
-    const troupeSet = new Set(troupeEmails);
-    const allowedActorEmails = assignedEmails.filter((e) => troupeSet.has(e));
-
-    // Access: only troupe+assigned
-    if (!myEmail || !allowedActorEmails.includes(myEmail)) {
-      return rejectWithValue("Нет доступа: страница роли доступна только актёрам из труппы, назначенным на эту роль");
-    }
+    // Important: assignments define who owns the role notebook.
+    // Do not filter by "my troupe" here: directors and cross-troupe collaborators must still see assignments.
+    const allowedActorEmails = Array.from(new Set(assignedEmails));
 
     const projectOwnerEmail =
       ownerLoadedFromState && ownerEmailFromState
@@ -224,24 +224,34 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
     const projectOwnerLoaded = ownerLoadedFromState || membersRes != null;
     const isProjectOwner = Boolean(myEmail && projectOwnerEmail && myEmail === projectOwnerEmail);
 
+    const isAssignedActor = Boolean(myEmail && allowedActorEmails.includes(myEmail));
+    const canViewActorWorkbook = Boolean(isAssignedActor || isProjectOwner);
+
     const storedSelected =
       typeof window !== "undefined" ? String(localStorage.getItem(storageKey(projectSlug, roleId)) ?? "") : "";
     const storedSelectedNorm = normalizeEmail(storedSelected);
-    const selectedActorEmail =
-      storedSelectedNorm && allowedActorEmails.includes(storedSelectedNorm)
-        ? storedSelectedNorm
-        : myEmail && allowedActorEmails.includes(myEmail)
-          ? myEmail
-          : allowedActorEmails[0] ?? "";
+    const selectedActorEmail = (() => {
+      // Actor: only self
+      if (isAssignedActor) return myEmail;
+      // Director: can inspect any assigned actor
+      if (isProjectOwner) {
+        if (storedSelectedNorm && allowedActorEmails.includes(storedSelectedNorm)) return storedSelectedNorm;
+        return allowedActorEmails[0] ?? "";
+      }
+      // Viewer (no actor access): keep something stable for header, but actor workbook will be hidden.
+      return allowedActorEmails[0] ?? "";
+    })();
 
     const profiles = allowedActorEmails.length
       ? await getProfilesBatch(accessToken, allowedActorEmails).catch(() => [])
       : [];
-    const snapshot = selectedActorEmail
+    const snapshot = canViewActorWorkbook && selectedActorEmail
       ? pickLatestWorkbookSnapshotForActor(notesRes?.notes ?? [], selectedActorEmail)
       : null;
 
-    const draft = snapshot?.data ? snapshot.data : defaultDraft(selectedActorEmail || myEmail || "");
+    const draft = snapshot?.data
+      ? snapshot.data
+      : defaultDraft(canViewActorWorkbook ? (selectedActorEmail || myEmail || "") : "");
 
     const directorRefsSnapshot = pickLatestDirectorRefsSnapshotForRole(notesRes?.notes ?? [], roleId);
     const directorRefsDraft = directorRefsSnapshot?.data
@@ -254,6 +264,7 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
       isProjectOwner,
       projectOwnerEmail: projectOwnerEmail || null,
       projectOwnerLoaded,
+      canViewActorWorkbook,
       notes: notesRes?.notes ?? [],
       myEmail,
       assignedEmails,
@@ -345,7 +356,7 @@ export const saveDirectorRefsThunk = createAsyncThunk<
     if (!myEmail || !ownerEmail || myEmail !== ownerEmail) {
       return rejectWithValue("Только режиссёр (владелец проекта) может сохранять референсы");
     }
-    const draft = s.directorRefsDraft;
+    const draft = s?.directorRefsDraft;
     const clean: RoleDirectorRefsDataV1 = {
       v: 1,
       savedAtIso: new Date().toISOString(),
@@ -555,6 +566,7 @@ export const roleWorkbookSlice = createSlice({
       state.isProjectOwner = action.payload.isProjectOwner;
       state.projectOwnerEmail = action.payload.projectOwnerEmail;
       state.projectOwnerLoaded = action.payload.projectOwnerLoaded;
+      state.canViewActorWorkbook = Boolean(action.payload.canViewActorWorkbook);
       state.notes = action.payload.notes;
       state.myEmail = action.payload.myEmail;
       state.assignedEmails = action.payload.assignedEmails;

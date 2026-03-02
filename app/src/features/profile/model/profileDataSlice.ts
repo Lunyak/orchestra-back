@@ -1,4 +1,4 @@
-import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSelector, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 import {
   deleteMyProfile,
@@ -353,23 +353,35 @@ export const profileDataSlice = createSlice({
 export const profileDataActions = profileDataSlice.actions;
 export const profileDataReducer = profileDataSlice.reducer;
 
-export function selectMyProfile(state: RootState): MyProfile | null {
-  return (state as any).profileData?.profile ?? null;
+function selectProfileDataState(state: RootState): ProfileDataState | undefined {
+  return (state as any).profileData as ProfileDataState | undefined;
 }
 
-export function selectProfileForm(state: RootState): Partial<MyProfile> {
-  return (state as any).profileData?.form ?? {};
-}
+const EMPTY_PROFILE_FORM: Partial<MyProfile> = {};
 
-export function selectProfileDataFlags(state: RootState) {
-  const s = (state as any).profileData as ProfileDataState | undefined;
-  return {
+export const selectMyProfile = createSelector([selectProfileDataState], (s): MyProfile | null => s?.profile ?? null);
+
+export const selectProfileForm = createSelector(
+  [selectProfileDataState],
+  (s): Partial<MyProfile> => s?.form ?? EMPTY_PROFILE_FORM,
+);
+
+export const selectProfileDataFlags = createSelector(
+  [selectProfileDataState],
+  (s): {
+    loadingProfile: boolean;
+    saving: boolean;
+    avatarUploading: boolean;
+    deletingProfile: boolean;
+    error: string | null;
+    ok: string | null;
+  } => ({
     loadingProfile: Boolean(s?.loadingProfile),
     saving: Boolean(s?.saving),
     avatarUploading: Boolean(s?.avatarUploading),
     deletingProfile: Boolean(s?.deletingProfile),
     error: s?.error ?? null,
     ok: s?.ok ?? null,
-  };
-}
+  }),
+);
 

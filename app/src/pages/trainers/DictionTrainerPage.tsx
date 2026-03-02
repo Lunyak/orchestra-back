@@ -23,6 +23,11 @@ export function DictionTrainerPage() {
   const ui = useAppSelector(selectDictionTrainerUi);
   const exercises = useMemo(() => selectDictionExercises(), []);
 
+  const [running, setRunning] = useState(false);
+  const startedAtRef = useRef<number>(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [note, setNote] = useState("");
+
   const exercisesFiltered = useMemo(() => {
     if (ui.selectedLevel === "all") return exercises;
     return exercises.filter((e) => e.level === ui.selectedLevel);
@@ -63,11 +68,6 @@ export function DictionTrainerPage() {
     const id = ui.selectedExerciseId;
     return exercises.find((e) => e.id === id) ?? exercisesFiltered[0] ?? exercises[0] ?? null;
   }, [exercises, exercisesFiltered, ui.selectedExerciseId]);
-
-  const [running, setRunning] = useState(false);
-  const startedAtRef = useRef<number>(0);
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const [note, setNote] = useState("");
 
   useEffect(() => {
     dispatch(dictionTrainerUiActions.initDictionTrainerUi());

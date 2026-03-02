@@ -775,6 +775,12 @@
   letter-spacing: 0.6px;
   vertical-align: baseline;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.markdown-speaker-label:hover {
+  border-color: rgba(96, 165, 250, 0.75);
+  color: #e0f2fe;
 }
 
 .script-title-insert {
