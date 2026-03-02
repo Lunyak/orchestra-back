@@ -33,8 +33,17 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
   const res = await api.outboxList(projectSlug, 400);
   if (!res?.ok || !Array.isArray(res.items) || res.items.length === 0) return;
 
-  const project = await ensureProject(accessToken, projectSlug, `Проект ${projectSlug}`);
-  const projectId = project.id;
+  // Avoid calling /projects on every keystroke autosave.
+  // We can derive scene IDs using cached projectId (it is stable per slug).
+  let projectId: string | null =
+    typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectSlug}`) : null;
+  if (!projectId) {
+    const project = await ensureProject(accessToken, projectSlug, `Проект ${projectSlug}`);
+    projectId = project.id;
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`projectId:${projectSlug}`, projectId);
+    }
+  }
 
   const nowIso = new Date().toISOString();
   const sceneDeltaBySceneId = new Map<
@@ -184,19 +193,23 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
   }
 
   for (const del of stepDeletes) {
+    const stepIdNum = Number(del.stepId);
+    if (!Number.isFinite(stepIdNum)) continue;
+    const stepId = Math.trunc(stepIdNum);
     changes.push({
       id: createId(),
       entityType: "Step",
-      entityId: `${del.sceneId}:${del.stepId}`,
+      entityId: `${del.sceneId}:${stepId}`,
       operation: "delete",
-      payload: { id: `${del.sceneId}:${del.stepId}`, updatedAt: nowIso },
+      payload: { id: `${del.sceneId}:${stepId}`, updatedAt: nowIso },
       createdAt: nowIso,
     });
   }
 
   for (const up of stepUpserts) {
-    const stepId = typeof up.step?.id === "number" ? up.step.id : null;
-    if (stepId == null) continue;
+    const stepIdNum = Number((up.step as { id?: unknown } | null | undefined)?.id);
+    if (!Number.isFinite(stepIdNum)) continue;
+    const stepId = Math.trunc(stepIdNum);
     const stepKey = `${up.sceneId}:${stepId}`;
     changes.push({
       id: createId(),
