@@ -471,6 +471,7 @@ export function DirectorSessionsPage() {
           title: String(st?.title ?? ""),
           markdown: String(st?.markdown ?? ""),
           playMarkdown: st?.playMarkdown ?? undefined,
+          explicationMarkdown: st?.explicationMarkdown ?? undefined,
           durationMin: st?.durationMin ?? undefined,
           kanbanStatus: st?.kanbanStatus ?? undefined,
           kanbanOrder: st?.kanbanOrder ?? undefined,

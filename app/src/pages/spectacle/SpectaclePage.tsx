@@ -66,19 +66,6 @@ export function SpectaclePage() {
     togglePanels,
   } = useScriptUI();
 
-  // Не показываем "пустую" страницу между lazy-загрузкой и подгрузкой проектов/сцены.
-  if (!isProjectsLoaded) {
-    return (
-      <PageLoader
-        variant="spectacle"
-        showLeftSidebar
-        showRightSidebar
-        showTopBar
-        label="Загрузка проектов…"
-      />
-    );
-  }
-
   // При выходе из режима редактирования — принудительно сохраняем/пушим последние правки.
   // Это закрывает кейс: пользователь сделал правку и сразу вышел из edit (таймер дебаунса мог не успеть отработать).
   const prevIsEditingRef = useRef(isEditing);
@@ -158,6 +145,20 @@ export function SpectaclePage() {
     activeView === "theater";
   const isTheaterView = activeView === "theater";
   const isBoardView = activeView === "board";
+
+  // Не показываем "пустую" страницу между lazy-загрузкой и подгрузкой проектов/сцены.
+  // Важно: хуки должны вызываться в одинаковом порядке на каждом рендере.
+  if (!isProjectsLoaded) {
+    return (
+      <PageLoader
+        variant="spectacle"
+        showLeftSidebar
+        showRightSidebar
+        showTopBar
+        label="Загрузка проектов…"
+      />
+    );
+  }
 
   if (!projectName) {
     return (

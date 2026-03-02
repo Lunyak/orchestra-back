@@ -26,20 +26,20 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
-  {
-    path: "/light-plot",
-    label: "Схема проекторов",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="3" width="7" height="7" />
-        <rect x="14" y="3" width="7" height="7" />
-        <rect x="14" y="14" width="7" height="7" />
-        <rect x="3" y="14" width="7" height="7" />
-        <line x1="6.5" y1="6.5" x2="17.5" y2="17.5" />
-        <line x1="17.5" y1="6.5" x2="6.5" y2="17.5" />
-      </svg>
-    ),
-  },
+  // {
+  //   path: "/light-plot",
+  //   label: "Схема проекторов",
+  //   icon: (
+  //     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  //       <rect x="3" y="3" width="7" height="7" />
+  //       <rect x="14" y="3" width="7" height="7" />
+  //       <rect x="14" y="14" width="7" height="7" />
+  //       <rect x="3" y="14" width="7" height="7" />
+  //       <line x1="6.5" y1="6.5" x2="17.5" y2="17.5" />
+  //       <line x1="17.5" y1="6.5" x2="6.5" y2="17.5" />
+  //     </svg>
+  //   ),
+  // },
   {
     path: "/board",
     label: "Доска",
@@ -51,24 +51,24 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
-  {
-    path: "/rehearsals",
-    label: "Репетиции",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="4" width="18" height="18" rx="2" />
-        <line x1="16" y1="2" x2="16" y2="6" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="3" y1="10" x2="21" y2="10" />
-        <path d="M8 14h.01" />
-        <path d="M12 14h.01" />
-        <path d="M16 14h.01" />
-        <path d="M8 18h.01" />
-        <path d="M12 18h.01" />
-        <path d="M16 18h.01" />
-      </svg>
-    ),
-  },
+  // {
+  //   path: "/rehearsals",
+  //   label: "Репетиции",
+  //   icon: (
+  //     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  //       <rect x="3" y="4" width="18" height="18" rx="2" />
+  //       <line x1="16" y1="2" x2="16" y2="6" />
+  //       <line x1="8" y1="2" x2="8" y2="6" />
+  //       <line x1="3" y1="10" x2="21" y2="10" />
+  //       <path d="M8 14h.01" />
+  //       <path d="M12 14h.01" />
+  //       <path d="M16 14h.01" />
+  //       <path d="M8 18h.01" />
+  //       <path d="M12 18h.01" />
+  //       <path d="M16 18h.01" />
+  //     </svg>
+  //   ),
+  // },
   {
     path: "/sessions",
     label: "Сессии",
@@ -79,17 +79,17 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
-  {
-    path: "/actor",
-    label: "Актёр",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M20 21a8 8 0 0 0-16 0" />
-        <circle cx="12" cy="7" r="4" />
-        <path d="M9 13.5l-1 3 2.8-1.2L12 18l1.2-2.7L16 16.5l-1-3" />
-      </svg>
-    ),
-  },
+  // {
+  //   path: "/actor",
+  //   label: "Актёр",
+  //   icon: (
+  //     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+  //       <path d="M20 21a8 8 0 0 0-16 0" />
+  //       <circle cx="12" cy="7" r="4" />
+  //       <path d="M9 13.5l-1 3 2.8-1.2L12 18l1.2-2.7L16 16.5l-1-3" />
+  //     </svg>
+  //   ),
+  // },
   {
     path: "/troupe",
     label: "Труппа",

@@ -1,0 +1,344 @@
+.rolewb-view {
+  color: var(--color-text-lighter);
+  padding: 20px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 980px;
+  box-sizing: border-box;
+  /* Diary vibe: warm paper + subtle noise + vignette */
+  background:
+    radial-gradient(1200px 600px at 30% 0%, rgba(255, 243, 217, 0.08), transparent 60%),
+    radial-gradient(900px 520px at 80% 20%, rgba(255, 255, 255, 0.04), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rolewb-subtitle {
+  opacity: 0.8;
+  font-size: 13px;
+  margin-top: 6px;
+  line-height: 16px;
+}
+
+.rolewb-dateline {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
+  font-style: italic;
+}
+
+.rolewb-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.rolewb-card {
+  /* Paper sheet */
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 16px;
+  padding: 14px 14px 14px 16px;
+  background:
+    /* ruled lines */
+    repeating-linear-gradient(
+      to bottom,
+      rgba(41, 133, 255, 0.00) 0px,
+      rgba(41, 133, 255, 0.00) 22px,
+      rgba(41, 133, 255, 0.06) 23px
+    ),
+    /* paper */
+    linear-gradient(180deg, rgba(255, 248, 235, 0.10), rgba(255, 248, 235, 0.06));
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 8px;
+  position: relative;
+}
+
+.rolewb-card::before {
+  /* left margin line */
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 16px;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(255, 92, 92, 0.16);
+  pointer-events: none;
+}
+
+.rolewb-card::after {
+  /* "tape" */
+  content: "";
+  position: absolute;
+  top: -10px;
+  right: 18px;
+  width: 140px;
+  height: 34px;
+  transform: rotate(2.2deg);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.rolewb-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rolewb-card-title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.95;
+}
+
+.rolewb-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rolewb-dropzone {
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  opacity: 0.85;
+  outline: none;
+}
+
+.rolewb-dropzone:focus {
+  border-color: rgba(126, 231, 135, 0.55);
+  box-shadow: 0 0 0 3px rgba(126, 231, 135, 0.14);
+}
+
+.rolewb-hint {
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 16px;
+}
+
+.rolewb-view h2 {
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
+  letter-spacing: 0.01em;
+}
+
+.rolewb-casehead {
+  margin-top: 12px;
+  border-radius: 16px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 235, 0.10), rgba(255, 248, 235, 0.06));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rolewb-casehead-kicker {
+  font-size: 11px;
+  opacity: 0.8;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.rolewb-casehead-title {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.rolewb-casehead-meta {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.rolewb-stamp {
+  border: 3px solid rgba(255, 68, 68, 0.55);
+  color: rgba(255, 92, 92, 0.90);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: rotate(-7deg);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.24);
+  background: rgba(255, 68, 68, 0.06);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+/* Notebook-like inputs inside role workbook only */
+.rolewb-view .settings-invite-input {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  color: var(--color-text-lighter);
+}
+
+.rolewb-view textarea.settings-invite-input {
+  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
+  line-height: 20px;
+}
+
+.rolewb-view .settings-invite-input:focus {
+  outline: none;
+  border-color: rgba(126, 231, 135, 0.40);
+  box-shadow: 0 0 0 3px rgba(126, 231, 135, 0.12);
+}
+
+.rolewb-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rolewb-img-tile {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.18);
+}
+
+.rolewb-img {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  display: block;
+  cursor: pointer;
+}
+
+.rolewb-view.mode-compact {
+  padding: 14px;
+}
+
+.rolewb-view.mode-compact .rolewb-grid {
+  gap: 10px;
+}
+
+.rolewb-view.mode-compact .rolewb-card {
+  padding: 12px 12px 12px 14px;
+}
+
+.rolewb-view.mode-compact .rolewb-card::after {
+  opacity: 0.55;
+  width: 120px;
+}
+
+/* Dossier mode: manila folder + typewriter vibe */
+.rolewb-view.mode-dossier {
+  color: rgba(15, 15, 15, 0.95);
+  background:
+    radial-gradient(1200px 700px at 40% 10%, rgba(255, 235, 190, 0.86), rgba(255, 235, 190, 0.62)),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.00) 0px,
+      rgba(0, 0, 0, 0.00) 18px,
+      rgba(0, 0, 0, 0.06) 19px
+    );
+  border: 1px solid rgba(0, 0, 0, 0.20);
+}
+
+.rolewb-view.mode-dossier h2 {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rolewb-view.mode-dossier .rolewb-subtitle,
+.rolewb-view.mode-dossier .rolewb-hint,
+.rolewb-view.mode-dossier .rolewb-dateline {
+  color: rgba(15, 15, 15, 0.80);
+  opacity: 1;
+}
+
+.rolewb-view.mode-dossier .rolewb-card {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 240, 0.92), rgba(255, 249, 232, 0.86));
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.18);
+}
+
+.rolewb-view.mode-dossier .rolewb-card::before {
+  background: rgba(255, 68, 68, 0.18);
+}
+
+.rolewb-view.mode-dossier .rolewb-card::after {
+  opacity: 0.35;
+}
+
+.rolewb-view.mode-dossier .settings-invite-input {
+  color: rgba(12, 12, 12, 0.92);
+  background: rgba(255, 255, 255, 0.70);
+  border: 1px solid rgba(0, 0, 0, 0.14);
+}
+
+.rolewb-view.mode-dossier textarea.settings-invite-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.rolewb-view.mode-dossier .rolewb-dropzone {
+  border-color: rgba(0, 0, 0, 0.22);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.rolewb-img-cap {
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+}
+
+.rolewb-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+}
+
+.rolewb-lightbox-inner {
+  width: min(1100px, 96vw);
+  height: min(820px, 92vh);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 10px;
+}
+
+.rolewb-lightbox-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+}
+
+@media (max-width: 720px) {
+  .rolewb-view {
+    padding: 12px;
+  }
+
+  .rolewb-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+

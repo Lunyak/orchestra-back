@@ -81,7 +81,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
       setNewAnnotation(null);
       setActiveAnnotationId(null);
     }
-  }, [annotationsMode, dispatch, isEditing, projectSlug, sceneName]);
+  }, [annotationsMode, dispatch, isEditing, markdownMode, projectSlug, sceneName]);
 
   const annotationsCacheKey =
     currentStep?.id != null
@@ -249,6 +249,15 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
           },
         }}
         onInsertImage={handleInsertImage}
+        onInsertKadr={() => {
+          if (!currentStep) return;
+          const exp = String(activeMarkdown ?? "");
+          const count = (exp.match(/^###\s*Картина\b/gim) ?? []).length;
+          const nextN = count + 1;
+          insertIntoActiveMarkdown(
+            `\n\n### Картина ${nextN}\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`,
+          );
+        }}
       />
 
       {isEditing ? (
@@ -259,13 +268,13 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
             className="form-textarea"
             ref={markdownRef}
             value={activeMarkdown}
-            onChange={(e) =>
-              updateStepField(currentStep.id, activeMarkdownField, e.target.value)
-            }
+            onChange={(e) => updateStepField(currentStep.id, activeMarkdownField, e.target.value)}
             onPaste={handlePasteImage}
             placeholder={
               markdownMode === "play"
                 ? "Текст пьесы для этого шага"
+                : markdownMode === "explication"
+                  ? "Режиссёрская экспликация для этого шага"
                 : "Текст, изображения и ссылки на музыку"
             }
             rows={12}

@@ -13,6 +13,8 @@ import {
   DEFAULT_THEATER_LAYOUT,
   sceneActions,
   type SceneData,
+  type SceneRoleLinkV1,
+  type SceneRolesDataV1,
 } from "./scene-slice";
 
 type SetStateAction<T> = T | ((prev: T) => T);
@@ -32,6 +34,36 @@ function stableStringify(value: any): string {
       .join(",")}}`;
   }
   return JSON.stringify(String(value));
+}
+
+function loadSceneRolesFromStorage(projectSlug: string): SceneRolesDataV1 | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(`sceneRoles:${projectSlug}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    if ((parsed as any).v !== 1) return null;
+    const byStepId = (parsed as any).byStepId;
+    if (!byStepId || typeof byStepId !== "object") return null;
+    return parsed as SceneRolesDataV1;
+  } catch {
+    return null;
+  }
+}
+
+function saveSceneRolesToStorage(projectSlug: string, sceneData: SceneData | null) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = (sceneData as any)?.sceneRoles;
+    // Important: do not wipe previously cached roles on initial null sceneData.
+    if (!raw) return;
+    if (typeof raw !== "object") return;
+    if ((raw as any).v !== 1) return;
+    localStorage.setItem(`sceneRoles:${projectSlug}`, JSON.stringify(raw));
+  } catch {
+    // ignore
+  }
 }
 
 function normalizeLightChannelsFromServer(rows: any[]): string[] {
@@ -188,6 +220,7 @@ function useSceneOperations() {
             title: String(st?.title ?? ""),
             markdown: String(st?.markdown ?? ""),
             playMarkdown: st?.playMarkdown ?? undefined,
+            explicationMarkdown: st?.explicationMarkdown ?? undefined,
             durationMin: st?.durationMin ?? undefined,
             kanbanStatus: st?.kanbanStatus ?? undefined,
             kanbanOrder: st?.kanbanOrder ?? undefined,
@@ -286,6 +319,10 @@ function useSceneOperations() {
           playlist: normalizedPlaylist,
           sounds: normalizedSounds,
         };
+        const localRoles = loadSceneRolesFromStorage(effectiveProject);
+        if (localRoles) {
+          minimalSceneData.sceneRoles = localRoles;
+        }
         dispatch(
           sceneActions.hydrateScene({
             sceneData: minimalSceneData,
@@ -399,6 +436,7 @@ function useSceneOperations() {
                     title: String(st?.title ?? ""),
                     markdown: String(st?.markdown ?? ""),
                     playMarkdown: st?.playMarkdown ?? undefined,
+                    explicationMarkdown: st?.explicationMarkdown ?? undefined,
                     durationMin: st?.durationMin ?? undefined,
                     kanbanStatus: st?.kanbanStatus ?? undefined,
                     kanbanOrder: st?.kanbanOrder ?? undefined,
@@ -718,6 +756,7 @@ function useSceneOperations() {
               title: step.title,
               markdown: step.markdown ?? "",
               playMarkdown: step.playMarkdown ?? null,
+              explicationMarkdown: (step as any)?.explicationMarkdown ?? null,
               durationMin: step.durationMin ?? null,
               kanbanStatus: step.kanbanStatus ?? null,
               kanbanOrder: step.kanbanOrder ?? null,
@@ -748,6 +787,7 @@ function useSceneOperations() {
                 title: step.title,
                 markdown: step.markdown ?? "",
                 playMarkdown: step.playMarkdown ?? null,
+                explicationMarkdown: (step as any)?.explicationMarkdown ?? null,
                 durationMin: (step as any)?.durationMin ?? null,
                 kanbanStatus: (step as any)?.kanbanStatus ?? null,
                 kanbanOrder: (step as any)?.kanbanOrder ?? null,
@@ -886,11 +926,16 @@ function useSceneProviderEffects() {
       try {
         const scene = await desktopApi.readProjectScene(projectName, "script");
         if (cancelled) return;
+        const localRoles = loadSceneRolesFromStorage(projectName);
+        const mergedScene =
+          scene && typeof scene === "object"
+            ? { ...(scene as any), sceneRoles: (scene as any)?.sceneRoles ?? localRoles ?? undefined }
+            : scene;
         dispatch(
           sceneActions.hydrateScene({
-            sceneData: scene || null,
-            theaterLayout: scene?.theaterLayout ?? DEFAULT_THEATER_LAYOUT,
-            steps: scene?.steps ?? [],
+            sceneData: mergedScene || null,
+            theaterLayout: (mergedScene as any)?.theaterLayout ?? DEFAULT_THEATER_LAYOUT,
+            steps: (mergedScene as any)?.steps ?? [],
             currentPage: 0,
             isSceneReady: true,
           }),
@@ -916,6 +961,12 @@ function useSceneProviderEffects() {
       cancelled = true;
     };
   }, [projectName, dispatch, accessToken]);
+
+  // Persist per-step role links locally as well (helps web-only mode too).
+  useEffect(() => {
+    if (!projectName) return;
+    saveSceneRolesToStorage(projectName, sceneData);
+  }, [projectName, sceneData, sceneDataRevision]);
 
   useEffect(() => {
     if (!accessToken || !projectName) return;
@@ -1115,5 +1166,5 @@ export function useScene(): SceneContextValue {
 }
 
 export { DEFAULT_THEATER_LAYOUT };
-export type { SceneData };
+export type { SceneData, SceneRoleLinkV1, SceneRolesDataV1 };
 

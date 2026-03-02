@@ -22,8 +22,8 @@ export class CreateAnnotationDto {
   @Min(1)
   stepId: number;
 
-  @IsIn(['markdown', 'playMarkdown'])
-  field: 'markdown' | 'playMarkdown';
+  @IsIn(['markdown', 'playMarkdown', 'explicationMarkdown'])
+  field: 'markdown' | 'playMarkdown' | 'explicationMarkdown';
 
   @Type(() => Number)
   @IsInt()

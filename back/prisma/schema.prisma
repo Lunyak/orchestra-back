@@ -316,6 +316,7 @@ model Step {
   title        String
   markdown     String?
   playMarkdown String?
+  explicationMarkdown String?
   durationMin  Int?
   kanbanStatus String?
   kanbanOrder  Int?
@@ -543,6 +544,7 @@ model ActorNote {
 enum ActorAnnotationField {
   markdown
   playMarkdown
+  explicationMarkdown
 }
 
 model ActorAnnotation {

@@ -1,0 +1,69 @@
+.trainers-view {
+  color: var(--color-text-lighter);
+  padding: 20px;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 920px;
+  box-sizing: border-box;
+}
+
+.trainers-subtitle {
+  opacity: 0.8;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.trainer-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.trainer-card-title {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trainer-card-text {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 6px;
+  line-height: 16px;
+}
+
+.trainer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.trainer-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-lighter);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.trainer-pill[data-active="true"] {
+  border-color: rgba(126, 231, 135, 0.42);
+  background: rgba(126, 231, 135, 0.12);
+}
+
+.trainer-select {
+  max-width: 420px;
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .trainers-view {
+    padding: 12px;
+  }
+}
+

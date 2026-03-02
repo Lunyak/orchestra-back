@@ -6,6 +6,13 @@ import { showScriptMarkdownSlice } from "../../features/show-script-markdown/mod
 import { voiceTrainerUiSlice } from "../../features/actor-trainers/model/voiceTrainerUiSlice";
 import { actorTrainerUiSlice } from "../../features/actor-trainers/model/actorTrainerUiSlice";
 import { troupeSlice } from "../../features/troupe/model/troupe-slice";
+import { profileUiSlice } from "../../features/profile/model/profileUiSlice";
+import { profileDataSlice } from "../../features/profile/model/profileDataSlice";
+import { profileAvailabilitySlice } from "../../features/profile/model/profileAvailabilitySlice";
+import { profileRolesSlice } from "../../features/profile/model/profileRolesSlice";
+import { dictionTrainerUiSlice } from "../../features/trainers/model/dictionTrainerUiSlice";
+import { speechTrainerUiSlice } from "../../features/trainers/model/speechTrainerUiSlice";
+import { roleWorkbookSlice } from "../../features/role-workbook/model/roleWorkbookSlice";
 
 const legacyReducers: ReducersMapObject = {};
 
@@ -18,6 +25,13 @@ export const rootReducer = combineSlices(
   voiceTrainerUiSlice,
   actorTrainerUiSlice,
   troupeSlice,
+  profileUiSlice,
+  profileDataSlice,
+  profileAvailabilitySlice,
+  profileRolesSlice,
+  dictionTrainerUiSlice,
+  speechTrainerUiSlice,
+  roleWorkbookSlice,
 );
 
 export const store = configureStore({

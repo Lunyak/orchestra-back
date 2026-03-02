@@ -7,11 +7,12 @@ export function ScriptMarkdownToolbar({
   onSetMarkdownMode,
   annotations,
   onInsertImage,
+  onInsertKadr,
 }: {
   isEditing: boolean;
   onToggleEditing: () => void;
-  markdownMode: "notes" | "play";
-  onSetMarkdownMode: (mode: "notes" | "play") => void;
+  markdownMode: "notes" | "play" | "explication";
+  onSetMarkdownMode: (mode: "notes" | "play" | "explication") => void;
   annotations: {
     mode: boolean;
     onToggleMode: () => void;
@@ -21,6 +22,7 @@ export function ScriptMarkdownToolbar({
     onClearSelectionState: () => void;
   };
   onInsertImage?: () => void;
+  onInsertKadr?: () => void;
 }) {
   return (
     <div className="script-markdown-toggle">
@@ -47,6 +49,14 @@ export function ScriptMarkdownToolbar({
       >
         Текст
       </button>
+      <button
+        type="button"
+        className="script-markdown-toggle-btn"
+        data-active={markdownMode === "explication"}
+        onClick={() => onSetMarkdownMode("explication")}
+      >
+        Экспликация
+      </button>
 
       {isEditing && onInsertImage ? (
         <button
@@ -57,6 +67,18 @@ export function ScriptMarkdownToolbar({
           title="Загрузить картинку и вставить в markdown"
         >
           Картинка
+        </button>
+      ) : null}
+
+      {isEditing && markdownMode === "explication" && onInsertKadr ? (
+        <button
+          type="button"
+          className="script-markdown-toggle-btn"
+          data-active="false"
+          onClick={onInsertKadr}
+          title="Вставить заготовку для картины/мизансцены"
+        >
+          Картина
         </button>
       ) : null}
 

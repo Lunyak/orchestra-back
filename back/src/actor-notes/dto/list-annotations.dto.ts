@@ -15,6 +15,6 @@ export class ListAnnotationsDto {
   @Min(1)
   stepId: number;
 
-  @IsIn(['markdown', 'playMarkdown'])
-  field: 'markdown' | 'playMarkdown';
+  @IsIn(['markdown', 'playMarkdown', 'explicationMarkdown'])
+  field: 'markdown' | 'playMarkdown' | 'explicationMarkdown';
 }

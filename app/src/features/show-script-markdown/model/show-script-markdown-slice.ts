@@ -32,7 +32,7 @@ type AnnotationsEntry = {
   error: string | null;
 };
 
-export type ShowScriptMarkdownMode = "notes" | "play";
+export type ShowScriptMarkdownMode = "notes" | "play" | "explication";
 
 type SceneUiState = {
   markdownMode: ShowScriptMarkdownMode;
@@ -122,7 +122,7 @@ export const initShowScriptMarkdownUi = createAsyncThunk<
   const storedMarkdown = localStorage.getItem(keys.markdownModeStorageKey);
   const storedAnnotations = localStorage.getItem(keys.annotationsModeStorageKey);
   const ui: Partial<SceneUiState> = {};
-  if (storedMarkdown === "notes" || storedMarkdown === "play") {
+  if (storedMarkdown === "notes" || storedMarkdown === "play" || storedMarkdown === "explication") {
     ui.markdownMode = storedMarkdown;
   }
   if (storedAnnotations != null) {
@@ -238,7 +238,11 @@ export const showScriptMarkdownSlice = createSlice({
   reducers: {
     setMarkdownMode(
       state,
-      action: PayloadAction<{ projectSlug: string; sceneName: string; mode: ShowScriptMarkdownMode }>,
+      action: PayloadAction<{
+        projectSlug: string;
+        sceneName: string;
+        mode: ShowScriptMarkdownMode;
+      }>,
     ) {
       const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
       const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
@@ -411,17 +415,21 @@ export const selectActiveStepMarkdownContext = createSelector(
     currentPage,
   ): {
     currentStep: ScriptStep | undefined;
-    activeMarkdownField: "markdown" | "playMarkdown";
+    activeMarkdownField: "markdown" | "playMarkdown" | "explicationMarkdown";
     activeMarkdown: string;
     activeField: ActorAnnotationField;
   } => {
     const currentStep = steps[currentPage];
-    const activeMarkdownField: "markdown" | "playMarkdown" =
-      ui.markdownMode === "play" ? "playMarkdown" : "markdown";
+    const activeMarkdownField: "markdown" | "playMarkdown" | "explicationMarkdown" =
+      ui.markdownMode === "play"
+        ? "playMarkdown"
+        : ui.markdownMode === "explication"
+          ? "explicationMarkdown"
+          : "markdown";
+
     const activeMarkdown = String(currentStep?.[activeMarkdownField] ?? "");
-    const activeField = (activeMarkdownField === "playMarkdown"
-      ? "playMarkdown"
-      : "markdown") as ActorAnnotationField;
+
+    const activeField = activeMarkdownField as ActorAnnotationField;
 
     return { currentStep, activeMarkdownField, activeMarkdown, activeField };
   },

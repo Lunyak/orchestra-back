@@ -59,6 +59,30 @@ const ActorPage = lazy(() =>
   }))
 );
 
+const TrainersPage = lazy(() =>
+  import("../../pages/trainers/TrainersPage").then((m) => ({
+    default: m.TrainersPage,
+  }))
+);
+
+const SpeechTrainerPage = lazy(() =>
+  import("../../pages/trainers/SpeechTrainerPage").then((m) => ({
+    default: m.SpeechTrainerPage,
+  }))
+);
+
+const DictionTrainerPage = lazy(() =>
+  import("../../pages/trainers/DictionTrainerPage").then((m) => ({
+    default: m.DictionTrainerPage,
+  }))
+);
+
+const RoleWorkbookPage = lazy(() =>
+  import("../../pages/role-workbook/RoleWorkbookPage").then((m) => ({
+    default: m.RoleWorkbookPage,
+  }))
+);
+
 const PrivacyPage = lazy(() =>
   import("../../pages/legal/PrivacyPage").then((m) => ({
     default: m.PrivacyPage,
@@ -142,6 +166,10 @@ export function AppRoutes() {
           <Route path="/rehearsals" element={<RehearsalsPage />} />
           <Route path="/sessions" element={<DirectorSessionsPage />} />
           <Route path="/actor" element={<ActorPage />} />
+          <Route path="/trainers" element={<TrainersPage />} />
+          <Route path="/trainers/speech" element={<SpeechTrainerPage />} />
+          <Route path="/trainers/diction" element={<DictionTrainerPage />} />
+          <Route path="/role-workbook/:roleId" element={<RoleWorkbookPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/troupe" element={<TroupePage />} />
           <Route path="/roles" element={<RolesPage />} />

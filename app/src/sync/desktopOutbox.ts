@@ -211,6 +211,10 @@ export async function flushDesktopOutbox(accessToken: string, projectSlug: strin
         markdown: typeof up.step?.markdown === "string" ? up.step.markdown : "",
         playMarkdown:
           typeof up.step?.playMarkdown === "string" ? up.step.playMarkdown : null,
+        explicationMarkdown:
+          typeof up.step?.explicationMarkdown === "string"
+            ? up.step.explicationMarkdown
+            : null,
         durationMin:
           typeof up.step?.durationMin === "number" ? up.step.durationMin : null,
         kanbanStatus:

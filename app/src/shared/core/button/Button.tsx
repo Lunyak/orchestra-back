@@ -8,11 +8,12 @@ interface ButtonProps {
     className?: string;
     disabled?: boolean;
     onKeyDown?: (event: React.KeyboardEvent<HTMLButtonElement>) => void;
+    title?: string;
 }
 
-export const Button: React.FC<ButtonProps> = ({ children, onClick, type, className, disabled, onKeyDown }) => {
+export const Button: React.FC<ButtonProps> = ({ children, onClick, type, className, disabled, onKeyDown, title }) => {
     return (
-        <button className={`button ${className}`} onClick={onClick} type={type} disabled={disabled} onKeyDown={onKeyDown}>
+        <button className={`button ${className}`} onClick={onClick} type={type} disabled={disabled} onKeyDown={onKeyDown} title={title}>
             {children}
         </button>
     );

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
+import { useSearchParams } from "react-router-dom";
 import {
   addProjectRoleNote,
   createProjectRole,
@@ -39,6 +40,7 @@ function memberLabel(m: {
 export function RolesPage() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,6 +132,15 @@ export function RolesPage() {
     void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, projectName]);
+
+  // Allow deep-linking to a role: /roles?roleId=...
+  useEffect(() => {
+    const q = String(searchParams.get("roleId") ?? "").trim();
+    if (!q) return;
+    if (activeRoleId === q) return;
+    setActiveRoleId(q);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   useEffect(() => {
     if (!accessToken || !projectName || !activeRoleId) return;

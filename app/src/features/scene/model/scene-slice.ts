@@ -32,9 +32,30 @@ export interface SceneData {
   theaterLayout?: TheaterLayout;
   /** Глобальное распределение: роль -> актёры (email/имя). Истина для назначений. */
   roleAssignments?: Record<string, string[]>;
+  /**
+   * Роли, привязанные к конкретным шагам сценария (сцена = шаг).
+   * Хранится внутри sceneData, чтобы сохраняться в локальный project scene JSON.
+   */
+  sceneRoles?: SceneRolesDataV1;
   /** Записанные актёрские реплики (озвучка ролей), синхронизируются как часть сцены. */
   voiceLines?: SceneVoiceLines;
 }
+
+export type SceneRoleLinkV1 = {
+  roleId: string;
+  roleKey?: string;
+  roleTitle?: string;
+  /** Заметка по роли именно в этой сцене/шаге. */
+  note?: string;
+  createdAtIso?: string;
+  updatedAtIso?: string;
+};
+
+export type SceneRolesDataV1 = {
+  v: 1;
+  /** stepId -> roleId -> link */
+  byStepId: Record<string, Record<string, SceneRoleLinkV1 | undefined> | undefined>;
+};
 
 export type SceneVoiceLineTake = {
   id: string;

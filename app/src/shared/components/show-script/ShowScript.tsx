@@ -5,6 +5,7 @@ import { useScriptUI } from '../../../features/script-ui';
 import { ScriptRequisite, ScriptStep } from "../../types/script";
 import { RequisitesPanel } from "./components/RequisitesPanel";
 import { ShowScriptMarkdownSection } from "./components/ShowScriptMarkdownSection";
+import { StepRolesPanel } from "./components/StepRolesPanel";
 import './style.css';
 
 
@@ -95,7 +96,10 @@ export const ShowScript: React.FC = () => {
             currentStep ? (
               <div className="script-step-editor">
                 <div className="script-step-body">
-                  {markdownPane}
+                  <div className="script-step-main">
+                    {markdownPane}
+                    {isEditing ? <StepRolesPanel step={currentStep} /> : null}
+                  </div>
                   <RequisitesPanel
                     show={showRequisites}
                     isEditing={isEditing}

@@ -86,6 +86,8 @@ export class SyncService {
           title: this.normalizeString(st?.title, `Step ${sourceId}`),
           markdown: typeof st?.markdown === 'string' ? st.markdown : null,
           playMarkdown: typeof st?.playMarkdown === 'string' ? st.playMarkdown : null,
+          explicationMarkdown:
+            typeof st?.explicationMarkdown === 'string' ? st.explicationMarkdown : null,
           durationMin,
           kanbanStatus,
           kanbanOrder,
@@ -105,6 +107,7 @@ export class SyncService {
       title: string;
       markdown: string | null;
       playMarkdown: string | null;
+      explicationMarkdown: string | null;
       durationMin: number | null;
       kanbanStatus: string | null;
       kanbanOrder: number | null;
@@ -242,6 +245,7 @@ export class SyncService {
           title: st.title,
           markdown: st.markdown,
           playMarkdown: st.playMarkdown,
+          explicationMarkdown: st.explicationMarkdown,
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
@@ -255,6 +259,7 @@ export class SyncService {
           title: st.title,
           markdown: st.markdown,
           playMarkdown: st.playMarkdown,
+          explicationMarkdown: st.explicationMarkdown,
           durationMin: st.durationMin,
           kanbanStatus: st.kanbanStatus,
           kanbanOrder: st.kanbanOrder,
@@ -718,6 +723,7 @@ export class SyncService {
         title: payload.title,
         markdown: payload.markdown ?? null,
         playMarkdown: payload.playMarkdown ?? null,
+        explicationMarkdown: payload.explicationMarkdown ?? null,
         // Если шаг ранее "удалили" (soft delete), любая upsert/update должна возвращать его в активное состояние.
         deletedAt: null,
         durationMin:
@@ -741,6 +747,7 @@ export class SyncService {
         title: payload.title,
         markdown: payload.markdown ?? null,
         playMarkdown: payload.playMarkdown ?? null,
+        explicationMarkdown: payload.explicationMarkdown ?? null,
         deletedAt: null,
         durationMin:
           payload.durationMin != null && Number.isFinite(Number(payload.durationMin))

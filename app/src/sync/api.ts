@@ -808,7 +808,7 @@ export interface ActorStepNote {
   updatedAt: string;
 }
 
-export type ActorAnnotationField = "markdown" | "playMarkdown";
+export type ActorAnnotationField = "markdown" | "playMarkdown" | "explicationMarkdown";
 
 export interface ActorAnnotation {
   id: string;

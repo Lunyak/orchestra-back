@@ -133,12 +133,201 @@
   position: relative;
 }
 
+.script-step-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .script-markdown-pane {
   flex: 1;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.step-roles-panel {
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 10px;
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step-roles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.step-roles-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.step-roles-count {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #94a3b8;
+}
+
+.step-roles-autopick-btn {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.step-roles-autopick-btn:hover:not(:disabled) {
+  border-color: #60a5fa;
+  color: #fff;
+}
+
+.step-roles-autopick-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.step-roles-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.3;
+}
+
+.step-roles-add {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.step-roles-search,
+.step-roles-select {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  outline: none;
+}
+
+.step-roles-add-btn {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.step-roles-add-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.step-roles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.step-roles-empty {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.step-role-item {
+  border: 1px solid #1f2937;
+  background: rgba(17, 24, 39, 0.6);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.step-role-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.step-role-title-link {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f8fafc;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step-role-title-link:hover {
+  text-decoration: underline;
+  color: #93c5fd;
+}
+
+.step-role-remove {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.step-role-note {
+  width: 100%;
+  background: #0b1220;
+  color: #e2e8f0;
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12px;
+  outline: none;
+  resize: vertical;
+}
+
+.step-role-note-readonly {
+  font-size: 12px;
+  color: #cbd5e1;
+  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid rgba(31, 41, 55, 0.8);
+  border-radius: 8px;
+  padding: 8px;
+  white-space: pre-wrap;
 }
 
 .script-markdown-toggle {
