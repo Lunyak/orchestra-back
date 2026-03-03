@@ -1,7 +1,7 @@
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Button } from "@shared/core/button/Button";
 import { CalendarSection } from "../../../shared/components/calendar/CalendarSection";
 import { useAuth } from "../../../features/auth";
@@ -10,7 +10,9 @@ import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
   fetchMyProfileThunk,
   profileDataActions,
+  saveMyProfileThunk,
   selectMyProfile,
+  selectProfileDataFlags,
   selectProfileForm,
 } from "../../../features/profile/model/profileDataSlice";
 import {
@@ -38,10 +40,14 @@ export function ProfileAvailabilityTab() {
   const dispatch = useAppDispatch();
   const profile = useAppSelector(selectMyProfile);
   const form = useAppSelector(selectProfileForm);
+  const profileFlags = useAppSelector(selectProfileDataFlags);
 
   const calendarState = useAppSelector(selectProfileCalendarState);
   const rehearsals = useAppSelector(selectAvailabilityRehearsalsForActiveRange);
   const flags = useAppSelector(selectAvailabilityFlags);
+
+  const autoSaveBaselineRef = useRef<string | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -75,6 +81,54 @@ export function ProfileAvailabilityTab() {
     () => (((form as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>),
     [form],
   );
+
+  const availabilitySignature = useMemo(() => {
+    // Only the fields used by rehearsal planning / troupe availability.
+    return JSON.stringify({
+      availabilityCalendar,
+      availabilityTimeRanges,
+    });
+  }, [availabilityCalendar, availabilityTimeRanges]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      autoSaveBaselineRef.current = null;
+      if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+      return;
+    }
+
+    // Wait for the initial profile load to set the baseline.
+    if (!profile?.email) return;
+
+    if (autoSaveBaselineRef.current == null) {
+      autoSaveBaselineRef.current = availabilitySignature;
+      return;
+    }
+
+    if (availabilitySignature === autoSaveBaselineRef.current) return;
+
+    if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(async () => {
+      if (!accessToken) return;
+      if (profileFlags.saving) return;
+      if (autoSaveBaselineRef.current == null) return;
+      if (availabilitySignature === autoSaveBaselineRef.current) return;
+
+      const res = await dispatch(saveMyProfileThunk({ accessToken }));
+      if (saveMyProfileThunk.fulfilled.match(res)) {
+        autoSaveBaselineRef.current = JSON.stringify({
+          availabilityCalendar: (res.payload as any)?.availabilityCalendar ?? {},
+          availabilityTimeRanges: (res.payload as any)?.availabilityTimeRanges ?? {},
+        });
+      }
+    }, 800);
+
+    return () => {
+      if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    };
+  }, [accessToken, availabilitySignature, dispatch, profile?.email, profileFlags.saving]);
 
   const rehearsalsByDate = useMemo(() => {
     const grouped = new Map<string, Rehearsal[]>();
@@ -136,7 +190,18 @@ export function ProfileAvailabilityTab() {
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Календарь занятости</div>
+      <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Календарь занятости</div>
+        {profileFlags.saving ? (
+          <div style={{ fontSize: 12, opacity: 0.75 }}>Автосохранение…</div>
+        ) : profileFlags.error ? (
+          <div className="settings-invite-error" style={{ margin: 0 }}>
+            {profileFlags.error}
+          </div>
+        ) : profileFlags.ok ? (
+          <div style={{ color: "#7ee787", fontSize: 12 }}>{profileFlags.ok}</div>
+        ) : null}
+      </div>
       <p style={{ margin: "0 0 10px", opacity: 0.75, fontSize: 12 }}>
         Клик по дню: свободен → занят → не отмечено. Репетиции показываются точками.
       </p>

@@ -22,7 +22,11 @@ export class DirectorSessionsController {
 
   /** Публикация сборной сессии в Telegram (через bot-сервис) */
   @Post(':id/publish')
-  publish(@Req() req: any, @Param('id') id: string) {
-    return this.sessions.publish(req.user.userId, id);
+  publish(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { comment?: string } | undefined,
+  ) {
+    return this.sessions.publish(req.user.userId, id, body);
   }
 }

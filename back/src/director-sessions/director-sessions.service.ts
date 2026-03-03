@@ -35,6 +35,7 @@ type DirectorRehearsalSession = {
   title: string;
   startsAt: string; // ISO
   slots: DirectorSessionSlot[];
+  comment?: string | null;
   updatedAt?: string;
   participants?: DirectorSessionParticipant[];
   telegramChatId?: string | null;
@@ -252,11 +253,17 @@ export class DirectorSessionsService {
     const d = new Date(startsAt);
     if (!id || !Number.isFinite(d.getTime())) return null;
     const slots = Array.isArray((raw as any).slots) ? ((raw as any).slots as any[]) : [];
+    const commentRaw = (raw as any).comment;
+    const comment =
+      commentRaw == null
+        ? null
+        : String(commentRaw).trim().slice(0, 4000) || null;
     const payload: DirectorRehearsalSession = {
       id,
       title,
       startsAt,
       slots: slots as any,
+      comment,
       updatedAt: String((raw as any).updatedAt ?? '').trim() || new Date().toISOString(),
       participants: Array.isArray((raw as any).participants) ? (raw as any).participants : undefined,
       telegramChatId: (raw as any).telegramChatId ?? null,
@@ -546,7 +553,7 @@ export class DirectorSessionsService {
     return present;
   }
 
-  async publish(userId: string, sessionId: string) {
+  async publish(userId: string, sessionId: string, body?: { comment?: string }) {
     const sessId = String(sessionId ?? '').trim();
     if (!sessId) throw new BadRequestException('session id is required');
 
@@ -558,6 +565,13 @@ export class DirectorSessionsService {
     // We still call bot-service: it will try to edit existing message, and if it's gone
     // it will send a new one and overwrite Telegram IDs via markTelegramPublished.
 
+    const nextComment =
+      body && Object.prototype.hasOwnProperty.call(body, 'comment')
+        ? String((body as any)?.comment ?? '')
+            .trim()
+            .slice(0, 4000) || null
+        : session.comment ?? null;
+
     const participants = await this.buildParticipantsForSession(
       userId,
       session,
@@ -565,6 +579,7 @@ export class DirectorSessionsService {
     const nowIso = new Date().toISOString();
     const updated: DirectorRehearsalSession = {
       ...session,
+      comment: nextComment,
       participants,
       updatedAt: nowIso,
     };

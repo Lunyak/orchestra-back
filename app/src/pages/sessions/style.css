@@ -349,6 +349,160 @@
   margin-bottom: 6px;
 }
 
+/* ---- Mini troupe schedule (scoped to sessions page) ---- */
+
+.sessions-page .troupe-legend {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.sessions-page .troupe-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sessions-page .troupe-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sessions-page .troupe-dot.free {
+  background: rgba(46, 160, 67, 0.85);
+}
+
+.sessions-page .troupe-dot.partial {
+  background: rgba(88, 166, 255, 0.85);
+}
+
+.sessions-page .troupe-dot.busy {
+  background: rgba(248, 81, 73, 0.85);
+}
+
+.sessions-page .troupe-dot.unknown {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sessions-page .troupe-schedule {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.12);
+  /* примерно 8 актёров + шапка; остальное скролл */
+  max-height: 360px;
+}
+
+.sessions-page .troupe-grid {
+  display: grid;
+}
+
+.sessions-page .troupe-cell {
+  box-sizing: border-box;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 6px;
+  min-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sessions-page .troupe-header-cell {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.sessions-page .troupe-header-cell.focus {
+  background: rgba(37, 99, 235, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.45);
+}
+
+.sessions-page .troupe-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  justify-content: flex-start;
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(6px);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.sessions-page .troupe-actor-cell {
+  min-height: 22px;
+  user-select: none;
+}
+
+.sessions-page .troupe-actor-name {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.sessions-page .troupe-actor-email {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.sessions-page .troupe-day-cell {
+  padding: 0;
+}
+
+.sessions-page .troupe-day-cell.focus {
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.38);
+}
+
+.sessions-page .troupe-day-cell.free {
+  background: rgba(46, 160, 67, 0.22);
+}
+
+.sessions-page .troupe-day-cell.partial {
+  background: rgba(88, 166, 255, 0.22);
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(88, 166, 255, 0.35) 0px,
+    rgba(88, 166, 255, 0.35) 6px,
+    rgba(88, 166, 255, 0.12) 6px,
+    rgba(88, 166, 255, 0.12) 12px
+  );
+}
+
+.sessions-page .troupe-day-cell.busy {
+  background: rgba(248, 81, 73, 0.22);
+}
+
+.sessions-page .troupe-day-cell.unknown {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.sessions-page .troupe-empty {
+  justify-content: flex-start;
+  opacity: 0.75;
+}
+
 @media (max-width: 1100px) {
   .sessions-layout {
     grid-template-columns: 1fr;

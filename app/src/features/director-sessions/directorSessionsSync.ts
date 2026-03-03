@@ -18,6 +18,7 @@ export type DirectorRehearsalSession = {
   id: string;
   title: string;
   startsAt: string; // ISO
+  comment?: string | null;
   slots: DirectorSessionSlot[];
   updatedAt: string;
 };

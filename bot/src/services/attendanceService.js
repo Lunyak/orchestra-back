@@ -1303,11 +1303,19 @@ class AttendanceService {
   _buildDirectorSessionText(session) {
     const title = escapeHtml(session?.title || "Сессия");
     const startsAt = session?.startsAt ? formatRuDateTime(session.startsAt) : "";
+    const commentRaw = String(session?.comment || "").trim();
+    const comment =
+      commentRaw.length > 0
+        ? commentRaw.length > 1200
+          ? `${commentRaw.slice(0, 1200)}…`
+          : commentRaw
+        : "";
+    const commentBlock = comment ? `\n\nКомментарий\n${escapeHtml(comment)}` : "";
     const schedule = this._formatDirectorSchedule(session);
     const selected = this._formatDirectorSelectedMaterials(session);
     const invite = this._formatDirectorInviteList(session);
     const listText = this._formatBackendAttendanceList(session);
-    return `<b>${title}</b>\n${escapeHtml(startsAt)}\n\nПлан репетиции\n${schedule}\n\nВыбрано на сегодня\n${selected}\n\nКого зовём\n${invite}\n\nПодтверждение присутствия\n\n${listText}`;
+    return `<b>${title}</b>\n${escapeHtml(startsAt)}${commentBlock}\n\nПлан репетиции\n${schedule}\n\nВыбрано на сегодня\n${selected}\n\nКого зовём\n${invite}\n\nПодтверждение присутствия\n\n${listText}`;
   }
 
   _directorKeyboard(projectId, sessionId) {

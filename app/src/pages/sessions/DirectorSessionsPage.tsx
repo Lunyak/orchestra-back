@@ -33,6 +33,21 @@ type ProjectDataCache = Record<
 
 type AvailabilityTimeRange = { from: string; to: string };
 
+function isReadyStep(step: ScriptStep): boolean {
+  const st = String((step as any)?.kanbanStatus ?? "")
+    .trim()
+    .toLowerCase();
+  return st === "ready" || st === "готова";
+}
+
+function safeDateFromDateKey(dateKey: string): Date | null {
+  const s = String(dateKey ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  // Use noon to avoid timezone edge cases around midnight.
+  const d = new Date(`${s}T12:00:00`);
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+
 function formatTimeFromOffset(offsetMin: number): string {
   const m = Math.max(0, Math.floor(offsetMin));
   const hh = String(Math.floor(m / 60)).padStart(2, "0");
@@ -311,7 +326,9 @@ export function DirectorSessionsPage() {
     setPublishing(true);
     setPublishError(null);
     try {
-      await publishDirectorSession(accessToken, activeSession.id);
+      await publishDirectorSession(accessToken, activeSession.id, {
+        comment: activeSession.comment ?? "",
+      });
     } catch (e: any) {
       setPublishError(
         e?.response?.data?.message ||
@@ -509,9 +526,10 @@ export function DirectorSessionsPage() {
 
   const filteredSteps = useMemo(() => {
     const src = projectFilter ? (dataCache[projectFilter]?.steps ?? []) : [];
+    const base = src.filter((s) => !isReadyStep(s));
     const q = query.trim().toLowerCase();
-    if (!q) return src;
-    return src.filter((s) => {
+    if (!q) return base;
+    return base.filter((s) => {
       const inTitle = String(s.title ?? "").toLowerCase().includes(q);
       const inText = markdownToPlainText(String(s.playMarkdown ?? s.markdown ?? ""))
         .toLowerCase()
@@ -606,6 +624,62 @@ export function DirectorSessionsPage() {
       .filter((x) => x.email);
   }, [dataCache, projectFilter, sessionDateKey, teamProfiles]);
 
+  const troupeScheduleMonth = useMemo(() => {
+    if (sessionDateKey) return safeDateFromDateKey(sessionDateKey) ?? new Date();
+    return new Date();
+  }, [sessionDateKey]);
+
+  const troupeScheduleMonthKey = useMemo(() => {
+    const y = troupeScheduleMonth.getFullYear();
+    const m = String(troupeScheduleMonth.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}`;
+  }, [troupeScheduleMonth]);
+
+  const troupeScheduleDays = useMemo(() => {
+    const y = troupeScheduleMonth.getFullYear();
+    const m = troupeScheduleMonth.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const out: Date[] = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      out.push(new Date(y, m, day, 12, 0, 0));
+    }
+    return out;
+  }, [troupeScheduleMonth]);
+
+  const troupeScheduleGridTemplateColumns = useMemo(() => {
+    return `240px repeat(${troupeScheduleDays.length}, 28px)`;
+  }, [troupeScheduleDays.length]);
+
+  const troupeScheduleActors = useMemo(() => {
+    const list = (teamProfiles ?? [])
+      .map((p) => {
+        const email = normalizeEmail(p.email);
+        if (!email) return null;
+        return {
+          email,
+          displayName: String((p as any)?.displayName ?? "").trim() || null,
+          avatarUrl: String((p as any)?.avatarUrl ?? "").trim() || null,
+          availabilityCalendar: ((p as any)?.availabilityCalendar ?? null) as
+            | Record<string, "present" | "absent">
+            | null,
+          availabilityTimeRanges: ((p as any)?.availabilityTimeRanges ?? null) as
+            | Record<string, AvailabilityTimeRange[]>
+            | null,
+        };
+      })
+      .filter(Boolean) as Array<{
+      email: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+      availabilityCalendar: Record<string, "present" | "absent"> | null;
+      availabilityTimeRanges: Record<string, AvailabilityTimeRange[]> | null;
+    }>;
+    list.sort((a, b) =>
+      String(a.displayName ?? a.email).localeCompare(String(b.displayName ?? b.email), "ru"),
+    );
+    return list;
+  }, [teamProfiles]);
+
   const activeSlotWindow = useMemo(() => {
     if (!activeSession || !activeSlotId) return null;
     const sl = (activeSession.slots ?? []).find((s) => s.id === activeSlotId) ?? null;
@@ -630,7 +704,9 @@ export function DirectorSessionsPage() {
 
   const [onlySelectable, setOnlySelectable] = useState(false);
   const selectableSteps = useMemo(() => {
-    const steps = projectFilter ? (dataCache[projectFilter]?.steps ?? []) : [];
+    const steps = (projectFilter ? (dataCache[projectFilter]?.steps ?? []) : []).filter(
+      (s) => !isReadyStep(s),
+    );
     const out: Array<{ step: ScriptStep; ok: boolean; missing: string[]; roles: string[] }> = [];
     for (const s of steps) {
       const text = String(s.playMarkdown ?? s.markdown ?? "");
@@ -987,6 +1063,18 @@ export function DirectorSessionsPage() {
                         <input
                           value={activeSession.title}
                           onChange={(e) => void updateActiveSession({ title: e.target.value })}
+                        />
+                      </label>
+                      <label className="sessions-field">
+                        <span className="rehearsals-muted">
+                          Комментарий к сессии (будет прикреплён к сообщению бота)
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={String(activeSession.comment ?? "")}
+                          onChange={(e) => void updateActiveSession({ comment: e.target.value })}
+                          placeholder="Например: сбор к 19:50, разогрев 10 минут, начинаем ровно в 20:00."
+                          style={{ resize: "vertical" }}
                         />
                       </label>
                       <div className="sessions-row">
@@ -1374,110 +1462,147 @@ export function DirectorSessionsPage() {
 
                       <div className="rehearsals-section">
                         <div className="rehearsals-section-title">
-                          Свободные на {sessionDateKey ?? "—"}
+                          График актёров на {sessionDateKey ?? "—"}
                         </div>
-                        {sessionDateKey ? (
-                          <div className="sessions-actors">
-                            {freeActorsForDate
-                              .filter((a) => a.status === "present")
-                              .slice(0, 80)
-                              .map((a) => (
-                                <div key={a.email} className="sessions-actor-row">
-                                  <div>
-                                    <div className="sessions-actor-name">
-                                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                                        <MiniAvatar src={String(a.avatarUrl ?? "").trim() || null} label={a.displayName ? `${a.displayName} (${a.email})` : a.email} size={20} />
-                                        <span>{a.displayName ? `${a.displayName} (${a.email})` : a.email}</span>
-                                      </span>
-                                    </div>
-                            
-                                  {a.ranges?.length ? (
-                                    <div className="rehearsals-muted">
-                                      окна: {a.ranges.map((r) => `${formatTimeHHMM(r.fromMin)}–${formatTimeHHMM(r.toMin)}`).join(", ")}
-                                    </div>
-                                  ) : null}
-                                  </div>
-                                  <div className="rehearsals-muted sessions-actor-status">
-                                    ✅
-                                  </div>
-                                </div>
-                              ))}
-                            {freeActorsForDate.filter((a) => a.status === "present").length === 0 && (
-                              <div className="rehearsals-muted">
-                                Никто не отметил присутствие на эту дату в профиле.
-                              </div>
-                            )}
-                          </div>
-                        ) : (
+                        {!sessionDateKey ? (
                           <div className="rehearsals-muted">Сначала выбери дату сессии.</div>
-                        )}
-                      </div>
-
-                      <div className="rehearsals-section">
-                        <div className="rehearsals-section-title">
-                          Актёры на сессию (по распределению ролей)
-                        </div>
-                        {actorsSummary.length === 0 ? (
-                          <div className="rehearsals-muted">
-                            Пока нет назначений (нужно заполнить распределение ролей в спектаклях).
-                          </div>
                         ) : (
-                          <div className="sessions-actors">
-                            {actorsSummary.slice(0, 60).map((a) => {
-                              const email = looksLikeEmail(a.actor) ? normalizeEmail(a.actor) : null;
-                              const prof = email ? profilesByEmail.get(email) : null;
-                              const cal = (prof as any)?.availabilityCalendar as
-                                | Record<string, string>
-                                | undefined;
-                              const st =
-                                sessionDateKey && cal
-                                  ? cal[sessionDateKey] === "present"
-                                    ? "свободен"
-                                    : cal[sessionDateKey] === "absent"
-                                      ? "занят"
-                                      : "не отмечено"
-                                  : "—";
-                              return (
-                                <div key={a.actor} className="sessions-actor-row">
-                                  <div>
-                                    <div className="sessions-actor-name">{a.actor}</div>
-                                    <div className="rehearsals-muted">слотов: {a.slots}</div>
-                                  </div>
-                                  <div className="rehearsals-muted sessions-actor-status">
-                                    по календарю: {st}
-                                  </div>
+                          <>
+                            <div className="rehearsals-muted" style={{ marginTop: 6 }}>
+                              Месяц: <b>{troupeScheduleMonthKey}</b> · выбранный день подсвечен
+                            </div>
+                            <div className="troupe-legend" style={{ marginTop: 8 }}>
+                              <span className="troupe-legend-item">
+                                <span className="troupe-dot free" /> свободен
+                              </span>
+                              <span className="troupe-legend-item">
+                                <span className="troupe-dot partial" /> свободен (время)
+                              </span>
+                              <span className="troupe-legend-item">
+                                <span className="troupe-dot busy" /> занят
+                              </span>
+                              <span className="troupe-legend-item">
+                                <span className="troupe-dot unknown" /> не отмечено
+                              </span>
+                            </div>
+
+                            <div
+                              className="troupe-schedule"
+                              role="region"
+                              aria-label="График занятости актёров"
+                            >
+                              <div
+                                className="troupe-grid"
+                                style={{
+                                  gridTemplateColumns: troupeScheduleGridTemplateColumns,
+                                  minWidth: 240 + troupeScheduleDays.length * 28,
+                                }}
+                              >
+                                <div className="troupe-cell troupe-sticky troupe-header-cell">
+                                  Актёр
                                 </div>
-                              );
-                            })}
-                          </div>
+                                {troupeScheduleDays.map((d) => {
+                                  const dayKey = toDateKey(d);
+                                  const isFocus = dayKey === sessionDateKey;
+                                  const n = d.toLocaleDateString("ru-RU", { day: "numeric" });
+                                  const wd = d.toLocaleDateString("ru-RU", { weekday: "short" });
+                                  return (
+                                    <div
+                                      key={dayKey}
+                                      className={`troupe-cell troupe-header-cell ${isFocus ? "focus" : ""}`}
+                                      title={dayKey}
+                                    >
+                                      <div style={{ fontSize: 12, fontWeight: 700, lineHeight: "14px" }}>
+                                        {n}
+                                      </div>
+                                      <div style={{ fontSize: 10, opacity: 0.7, lineHeight: "12px" }}>
+                                        {wd}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {troupeScheduleActors.length === 0 ? (
+                                  <div
+                                    className="troupe-cell troupe-empty"
+                                    style={{ gridColumn: `1 / span ${troupeScheduleDays.length + 1}` }}
+                                  >
+                                    Нет данных по участникам проекта (или нет профилей).
+                                  </div>
+                                ) : (
+                                  troupeScheduleActors.slice(0, 200).map((a) => {
+                                    const label = a.displayName ? `${a.displayName} (${a.email})` : a.email;
+                                    return (
+                                      <React.Fragment key={a.email}>
+                                        <div className="troupe-cell troupe-sticky troupe-actor-cell" title={label}>
+                                          <div style={{ minWidth: 0, display: "flex", gap: 10, alignItems: "center" }}>
+                                            <MiniAvatar
+                                              src={String(a.avatarUrl ?? "").trim() || null}
+                                              label={label}
+                                              size={22}
+                                            />
+                                            <div style={{ display: "flex", flexDirection: "column", gap: 2, justifyContent: "center", minWidth: 0 }}>
+                                              <div className="troupe-actor-name" title={label}>
+                                                {a.displayName ? a.displayName : a.email}
+                                              </div>
+                                              <div className="troupe-actor-email" title={a.email}>
+                                                {a.email}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        {troupeScheduleDays.map((d) => {
+                                          const dayKey = toDateKey(d);
+                                          const cal = a.availabilityCalendar ?? {};
+                                          const ranges = (a.availabilityTimeRanges ?? {})[dayKey] ?? [];
+                                          const st =
+                                            cal?.[dayKey] === "present"
+                                              ? "present"
+                                              : cal?.[dayKey] === "absent"
+                                                ? "absent"
+                                                : "unknown";
+                                          const cls =
+                                            st === "absent"
+                                              ? "busy"
+                                              : ranges.length > 0
+                                                ? "partial"
+                                                : st === "present"
+                                                  ? "free"
+                                                  : "unknown";
+                                          const tooltip =
+                                            st === "absent"
+                                              ? "Занят"
+                                              : ranges.length > 0
+                                                ? `Свободен: ${ranges.map((r) => `${r.from}–${r.to}`).join(", ")}`
+                                                : st === "present"
+                                                  ? "Свободен"
+                                                  : "Не отмечено";
+                                          const isFocus = dayKey === sessionDateKey;
+                                          return (
+                                            <div
+                                              key={`${a.email}:${dayKey}`}
+                                              className={`troupe-cell troupe-day-cell ${cls} ${isFocus ? "focus" : ""}`}
+                                              title={`${dayKey} • ${tooltip}`}
+                                            />
+                                          );
+                                        })}
+                                      </React.Fragment>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="rehearsals-muted" style={{ marginTop: 8 }}>
+                              Наведи на ячейку, чтобы увидеть детали (занят / свободен / интервалы).
+                            </div>
+                          </>
                         )}
                       </div>
 
-                      <div className="rehearsals-section">
-                        <div className="rehearsals-section-title">Что собирается</div>
-                        <div className="sessions-insights">
-                          {slotInsights.map((s) => (
-                            <div key={`ins-${s.slotId}`} className="sessions-insight">
-                              <div className="sessions-insight-title">
-                                {s.time} · {s.title}
-                              </div>
-                              {s.title === "Материал не выбран" ? (
-                                <div className="rehearsals-muted">Нужно выбрать материал</div>
-                              ) : s.ready ? (
-                                <div className="rehearsals-muted">Собирается</div>
-                              ) : (
-                                <div className="rehearsals-error">
-                                  Не собирается: нет назначений для{" "}
-                                  {s.missingRoles.slice(0, 6).join(", ")}
-                                  {s.missingRoles.length > 6
-                                    ? ` +${s.missingRoles.length - 6}`
-                                    : ""}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+     
+
+          
                     </div>
                   </div>
                 )}
