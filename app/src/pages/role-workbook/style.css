@@ -1,17 +1,13 @@
 .rolewb-view {
-  color: var(--color-text-lighter);
+  color: var(--color-text-primary);
   padding: 20px;
   margin: 0 auto;
   width: 100%;
   max-width: 980px;
   box-sizing: border-box;
   /* Diary vibe: warm paper + subtle noise + vignette */
-  background:
-    radial-gradient(1200px 600px at 30% 0%, rgba(255, 243, 217, 0.08), transparent 60%),
-    radial-gradient(900px 520px at 80% 20%, rgba(255, 255, 255, 0.04), transparent 55%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: var(--color-bg-primary);
+  font-family: var(--font-family-script-body);
 }
 
 .rolewb-subtitle {
@@ -25,7 +21,6 @@
   margin-top: 4px;
   font-size: 12px;
   opacity: 0.75;
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
   font-style: italic;
 }
 
@@ -56,37 +51,6 @@
   display: grid;
   gap: 8px;
   position: relative;
-}
-
-.rolewb-card::before {
-  /* left margin line */
-  content: "";
-  position: absolute;
-  top: 10px;
-  bottom: 10px;
-  left: 16px;
-  width: 2px;
-  border-radius: 2px;
-  background: rgba(255, 92, 92, 0.16);
-  pointer-events: none;
-}
-
-.rolewb-card::after {
-  /* "tape" */
-  content: "";
-  position: absolute;
-  top: -10px;
-  right: 18px;
-  width: 140px;
-  height: 34px;
-  transform: rotate(2.2deg);
-  border-radius: 8px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
-  opacity: 0.75;
-  pointer-events: none;
 }
 
 .rolewb-card > * {
@@ -131,7 +95,6 @@
 }
 
 .rolewb-view h2 {
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
   letter-spacing: 0.01em;
 }
 
@@ -160,14 +123,12 @@
   font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .rolewb-casehead-meta {
   font-size: 12px;
   opacity: 0.85;
   margin-top: 6px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .rolewb-stamp {
@@ -181,7 +142,6 @@
   transform: rotate(-7deg);
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.24);
   background: rgba(255, 68, 68, 0.06);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 /* Notebook-like inputs inside role workbook only */
@@ -191,17 +151,17 @@
   border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 12px;
   color: var(--color-text-lighter);
+  resize: none;
+  padding: 8px 0 0 8px;
+  box-sizing: border-box;
 }
 
 .rolewb-view textarea.settings-invite-input {
-  font-family: ui-serif, Georgia, "Times New Roman", Times, serif;
   line-height: 20px;
 }
 
 .rolewb-view .settings-invite-input:focus {
   outline: none;
-  border-color: rgba(126, 231, 135, 0.40);
-  box-shadow: 0 0 0 3px rgba(126, 231, 135, 0.12);
 }
 
 .rolewb-gallery {
@@ -258,7 +218,6 @@
 }
 
 .rolewb-view.mode-dossier h2 {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -292,7 +251,6 @@
 }
 
 .rolewb-view.mode-dossier textarea.settings-invite-input {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .rolewb-view.mode-dossier .rolewb-dropzone {

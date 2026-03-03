@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UpsertProjectRoleDto } from './dto/upsert-role.dto';
 import { SetRoleAssignmentsDto } from './dto/set-role-assignments.dto';
@@ -38,6 +38,11 @@ export class RolesController {
     @Body() body: SetRoleAssignmentsDto,
   ) {
     return this.roles.setRoleAssignments(req.user.userId, slug, roleId, body as any);
+  }
+
+  @Delete(':slug/roles/:roleId')
+  remove(@Req() req: any, @Param('slug') slug: string, @Param('roleId') roleId: string) {
+    return this.roles.deleteRole(req.user.userId, slug, roleId);
   }
 
   @Get(':slug/roles/:roleId/notes')

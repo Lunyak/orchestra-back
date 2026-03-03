@@ -7,6 +7,8 @@ export interface HeaderScriptStateProps {
   onTogglePlaylist: () => void;
   showHeaderSounds: boolean;
   onToggleHeaderSounds: () => void;
+  showRoles: boolean;
+  onToggleRoles: () => void;
   isStepsCollapsed: boolean;
   onToggleStepsCollapsed: () => void;
 }
@@ -43,6 +45,12 @@ const icons = {
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
     </svg>
   ),
+  roles: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  ),
 };
 
 export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
@@ -52,6 +60,8 @@ export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
   onTogglePlaylist,
   showHeaderSounds,
   onToggleHeaderSounds,
+  showRoles,
+  onToggleRoles,
   isStepsCollapsed,
   onToggleStepsCollapsed,
 }) => (
@@ -95,6 +105,16 @@ export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
       aria-pressed={showRequisites}
     >
       <span className="header-nav-icon">{icons.requisite}</span>
+    </button>
+    <button
+      type="button"
+      className={`header-nav-btn ${showRoles ? "active" : ""}`}
+      onClick={onToggleRoles}
+      title={showRoles ? "Скрыть роли" : "Показать роли"}
+      aria-label={showRoles ? "Скрыть роли" : "Показать роли"}
+      aria-pressed={showRoles}
+    >
+      <span className="header-nav-icon">{icons.roles}</span>
     </button>
   </nav>
 );

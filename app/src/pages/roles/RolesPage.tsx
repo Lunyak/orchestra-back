@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   addProjectRoleNote,
   createProjectRole,
+  deleteProjectRole,
   getMyTroupe,
   getProjectRoleNotes,
   getProjectRoles,
@@ -49,7 +50,6 @@ export function RolesPage() {
   const [troupeMembers, setTroupeMembers] = useState<Array<{ email: string; profile: any | null }>>([]);
 
   const [createTitle, setCreateTitle] = useState("");
-  const [createDescription, setCreateDescription] = useState("");
 
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null);
   const activeRole = useMemo(
@@ -168,14 +168,29 @@ export function RolesPage() {
     try {
       await createProjectRole(accessToken, projectName, {
         title,
-        description: createDescription.trim() || undefined,
         aliases: [],
       });
       setCreateTitle("");
-      setCreateDescription("");
       await loadAll();
     } catch (e) {
       console.error("createRole failed:", e);
+    }
+  };
+
+  const deleteRole = async () => {
+    if (!accessToken || !projectName || !activeRole) return;
+    const ok =
+      typeof window !== "undefined"
+        ? window.confirm(`Удалить роль “${activeRole.title}”?`)
+        : true;
+    if (!ok) return;
+    try {
+      await deleteProjectRole(accessToken, projectName, activeRole.id);
+      setActiveRoleId((prev) => (prev === activeRole.id ? null : prev));
+      await loadAll();
+    } catch (e) {
+      console.error("deleteRole failed:", e);
+      setError("Не удалось удалить роль");
     }
   };
 
@@ -219,156 +234,161 @@ export function RolesPage() {
   }, [roles]);
 
   return (
-    <div className="roles-page">
-      <div className="roles-header">
-        <div>
-          <div className="roles-title">Роли</div>
-          <div className="roles-subtitle">
-            Проект: <b>{projectName || "—"}</b>
-          </div>
-        </div>
-      </div>
-
-      {error && <div className="roles-error">{error}</div>}
-      {loading && <div className="roles-muted">Загрузка…</div>}
-
-      {!accessToken ? (
-        <div className="roles-error">Нужен логин (accessToken)</div>
-      ) : (
-        <div className="roles-grid">
-          <div className="roles-col">
-            <div className="roles-card">
-              <div className="roles-card-title">Создать роль</div>
-              <div className="roles-form">
-                <input
-                  value={createTitle}
-                  onChange={(e) => setCreateTitle(e.target.value)}
-                  placeholder="Название роли"
-                />
-                <textarea
-                  value={createDescription}
-                  onChange={(e) => setCreateDescription(e.target.value)}
-                  placeholder="Описание (опционально)"
-                  rows={3}
-                />
-                <button type="button" onClick={createRole}>
-                  Создать
-                </button>
-              </div>
-            </div>
-
-            <div className="roles-card">
-              <div className="roles-card-title">Список ролей</div>
-              <div className="roles-list">
-                {rolesSorted.map((r) => {
-                  const isActive = r.id === activeRoleId;
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      className={`roles-list-item ${isActive ? "active" : ""}`}
-                      onClick={() => setActiveRoleId(r.id)}
-                    >
-                      <div className="roles-list-title">{r.title}</div>
-                      <div className="roles-list-meta">
-                        назначено: {(r.emails ?? []).length}
-                      </div>
-                    </button>
-                  );
-                })}
-                {rolesSorted.length === 0 && (
-                  <div className="roles-muted">Ролей пока нет</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="roles-col">
-            {!activeRole ? (
-              <div className="roles-card">
-                <div className="roles-muted">Выберите роль слева</div>
-              </div>
-            ) : (
-              <>
-                <div className="roles-card">
-                  <div className="roles-card-title">{activeRole.title}</div>
-                  {activeRole.description && (
-                    <div className="roles-desc">{activeRole.description}</div>
-                  )}
-                  <div className="roles-section-title">Назначения (труппа)</div>
-                  <div className="roles-assignments">
-                    {troupeMembers.map((m) => {
-                      const email = m.email;
-                      const checked = (activeRole.emails ?? [])
-                        .map(normalizeEmail)
-                        .includes(normalizeEmail(email));
-                      const label = memberLabel({ email, profile: m.profile });
-                      return (
-                        <label key={email} className="roles-check">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleAssignment(activeRole.id, email)}
-                          />
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                            <MiniAvatar
-                              src={String(m.profile?.avatarUrl ?? "").trim() || null}
-                              label={label}
-                              size={20}
-                            />
-                            <span>{label}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                    {troupeMembers.length === 0 && (
-                      <div className="roles-muted">
-                        Труппа пустая — добавь людей в разделе “Труппа”
-                      </div>
-                    )}
-                  </div>
+    <div className="app-layout">
+      <div className="app-content">
+        <main className="main-content">
+          <div className="roles-page">
+            <div className="roles-header">
+              <div>
+                <div className="roles-title">Роли</div>
+                <div className="roles-subtitle">
+                  Проект: <b>{projectName || "—"}</b>
                 </div>
+              </div>
+            </div>
 
-                <div className="roles-card">
-                  <div className="roles-card-title">Страница роли (заметки)</div>
-                  <div className="roles-form">
-                    <textarea
-                      value={noteDraft}
-                      onChange={(e) => setNoteDraft(e.target.value)}
-                      placeholder="Написать заметку по роли…"
-                      rows={4}
-                    />
-                    <button type="button" onClick={addNote}>
-                      Добавить заметку
-                    </button>
+            {error && <div className="roles-error">{error}</div>}
+            {loading && <div className="roles-muted">Загрузка…</div>}
+
+            {!accessToken ? (
+              <div className="roles-error">Нужен логин (accessToken)</div>
+            ) : (
+              <div className="roles-grid">
+                <div className="roles-col">
+                  <div className="roles-card">
+                    <div className="roles-card-title">Создать роль</div>
+                    <div className="roles-form">
+                      <input
+                        value={createTitle}
+                        onChange={(e) => setCreateTitle(e.target.value)}
+                        placeholder="Название роли"
+                      />
+                      <button type="button" onClick={createRole}>
+                        Создать
+                      </button>
+                    </div>
                   </div>
 
-                  {notesLoading ? (
-                    <div className="roles-muted">Загрузка заметок…</div>
-                  ) : (
-                    <div className="roles-notes">
-                      {notes.map((n) => (
-                        <div key={n.id} className="roles-note">
-                          <div className="roles-note-meta">
-                            <span>{n.authorEmail || "—"}</span>
-                            <span>
-                              {new Date(n.updatedAt).toLocaleString("ru-RU")}
-                            </span>
-                          </div>
-                          <div className="roles-note-body">{n.content}</div>
-                        </div>
-                      ))}
-                      {notes.length === 0 && (
-                        <div className="roles-muted">Заметок пока нет</div>
+                  <div className="roles-card">
+                    <div className="roles-card-title">Список ролей</div>
+                    <div className="roles-list">
+                      {rolesSorted.map((r) => {
+                        const isActive = r.id === activeRoleId;
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            className={`roles-list-item ${isActive ? "active" : ""}`}
+                            onClick={() => setActiveRoleId(r.id)}
+                          >
+                            <div className="roles-list-title">{r.title}</div>
+                            <div className="roles-list-meta">
+                              назначено: {(r.emails ?? []).length}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {rolesSorted.length === 0 && (
+                        <div className="roles-muted">Ролей пока нет</div>
                       )}
                     </div>
+                  </div>
+                </div>
+
+                <div className="roles-col">
+                  {!activeRole ? (
+                    <div className="roles-card">
+                      <div className="roles-muted">Выберите роль слева</div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="roles-card">
+                        <div
+                          className="roles-card-title"
+                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+                        >
+                          <span>{activeRole.title}</span>
+                          <button type="button" onClick={deleteRole} title="Удалить роль">
+                            Удалить
+                          </button>
+                        </div>
+                        <div className="roles-section-title">Назначения (труппа)</div>
+                        <div className="roles-assignments">
+                          {troupeMembers.map((m) => {
+                            const email = m.email;
+                            const checked = (activeRole.emails ?? [])
+                              .map(normalizeEmail)
+                              .includes(normalizeEmail(email));
+                            const label = memberLabel({ email, profile: m.profile });
+                            return (
+                              <label key={email} className="roles-check">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleAssignment(activeRole.id, email)}
+                                />
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                  <MiniAvatar
+                                    src={String(m.profile?.avatarUrl ?? "").trim() || null}
+                                    label={label}
+                                    size={20}
+                                  />
+                                  <span>{label}</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                          {troupeMembers.length === 0 && (
+                            <div className="roles-muted">
+                              Труппа пустая — добавь людей в разделе “Труппа”
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="roles-card">
+                        <div className="roles-card-title">Страница роли (заметки)</div>
+                        <div className="roles-form">
+                          <textarea
+                            value={noteDraft}
+                            onChange={(e) => setNoteDraft(e.target.value)}
+                            placeholder="Написать заметку по роли…"
+                            rows={4}
+                          />
+                          <button type="button" onClick={addNote}>
+                            Добавить заметку
+                          </button>
+                        </div>
+
+                        {notesLoading ? (
+                          <div className="roles-muted">Загрузка заметок…</div>
+                        ) : (
+                          <div className="roles-notes">
+                            {notes.map((n) => (
+                              <div key={n.id} className="roles-note">
+                                <div className="roles-note-meta">
+                                  <span>{n.authorEmail || "—"}</span>
+                                  <span>
+                                    {new Date(n.updatedAt).toLocaleString("ru-RU")}
+                                  </span>
+                                </div>
+                                <div className="roles-note-body">{n.content}</div>
+                              </div>
+                            ))}
+                            {notes.length === 0 && (
+                              <div className="roles-muted">Заметок пока нет</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
-              </>
+              </div>
             )}
           </div>
-        </div>
-      )}
+        </main>
+      </div>
     </div>
   );
 }

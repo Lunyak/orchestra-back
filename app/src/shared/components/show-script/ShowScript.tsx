@@ -31,6 +31,7 @@ export const ShowScript: React.FC = () => {
 
   const {
     showRequisites,
+    showStepRoles,
     isEditing,
     setIsEditing,
   } = useScriptUI();
@@ -126,8 +127,8 @@ export const ShowScript: React.FC = () => {
                 <div className="script-step-body">
                   <div className="script-step-main">
                     {markdownPane}
-                    {isEditing ? <StepRolesPanel step={currentStep} /> : null}
                   </div>
+                  {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
                   <RequisitesPanel
                     show={showRequisites}
                     isEditing={isEditing}

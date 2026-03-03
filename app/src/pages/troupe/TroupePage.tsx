@@ -1,16 +1,18 @@
+import { Button } from "@shared/core/button/Button";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useEffect, useMemo, useState } from "react";
-import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { useProject } from "../../features/project";
 import {
   fetchMyTroupe,
   troupeAddMember,
   troupeInviteMemberToProject,
   troupeRemoveMember,
 } from "../../features/troupe/model/troupe-slice";
-import { useProject } from "../../features/project";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
+import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import "./style.css";
+import { div } from "three/tsl";
 
 dayjs.locale("ru");
 
@@ -41,7 +43,7 @@ function memberLabel(m: {
 
 export function TroupePage() {
   const dispatch = useAppDispatch();
-  const { projectName } = useProject();
+  const { projectName, projects } = useProject();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const troupe = useAppSelector((s) => s.troupe.troupe);
   const members = useAppSelector((s) => s.troupe.members);
@@ -54,6 +56,15 @@ export function TroupePage() {
   const inviteErrorByMemberId = useAppSelector((s) => s.troupe.inviteErrorByMemberId);
 
   const [email, setEmail] = useState("");
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const inviteProjectStorageKey = "troupe-invite-project";
+  const [inviteProjectSlug, setInviteProjectSlug] = useState<string>(() => {
+    try {
+      return (typeof window !== "undefined" ? localStorage.getItem(inviteProjectStorageKey) : null) || "";
+    } catch {
+      return "";
+    }
+  });
   const [currentMonth, setCurrentMonth] = useState<Date>(() => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("troupe-month") : null;
     if (saved) {
@@ -87,6 +98,37 @@ export function TroupePage() {
     // 240px for actor label + fixed day cell widths
     return `240px repeat(${days.length}, 28px)`;
   }, [days.length]);
+
+  const availableProjects = useMemo(() => (Array.isArray(projects) ? projects : []).filter(Boolean), [projects]);
+  useEffect(() => {
+    const preferred =
+      (inviteProjectSlug && availableProjects.includes(inviteProjectSlug) ? inviteProjectSlug : "") ||
+      (projectName && availableProjects.includes(projectName) ? projectName : "") ||
+      availableProjects[0] ||
+      "";
+    if (preferred !== inviteProjectSlug) setInviteProjectSlug(preferred);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectName, availableProjects.join("|")]);
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      if (!inviteProjectSlug) return;
+      localStorage.setItem(inviteProjectStorageKey, inviteProjectSlug);
+    } catch {
+      // ignore
+    }
+  }, [inviteProjectSlug]);
+
+  const selectedMember = useMemo(
+    () => (selectedMemberId ? members.find((m) => m.id === selectedMemberId) ?? null : null),
+    [members, selectedMemberId],
+  );
+
+  useEffect(() => {
+    if (!selectedMemberId) return;
+    if (!members.some((m) => m.id === selectedMemberId)) setSelectedMemberId(null);
+  }, [members, selectedMemberId]);
 
   if (!accessToken) return <div>Нужно войти, чтобы открыть страницу труппы.</div>;
 
@@ -183,6 +225,89 @@ export function TroupePage() {
                 </div>
               </div>
 
+              <div className="troupe-actions">
+                <div className="troupe-actions-left">
+                  <span className="troupe-actions-label">Выбран:</span>{" "}
+                  {selectedMember ? (
+                    <span className="troupe-actions-selected" title={selectedMember.email}>
+                      {memberLabel(selectedMember)}
+                    </span>
+                  ) : (
+                    <span className="troupe-actions-selected muted">—</span>
+                  )}
+                </div>
+                <div className="troupe-actions-right">
+                  <select
+                    className="troupe-project-select"
+                    value={inviteProjectSlug}
+                    onChange={(e) => setInviteProjectSlug(e.target.value)}
+                    disabled={availableProjects.length === 0}
+                    title={availableProjects.length === 0 ? "Нет доступных проектов" : "Выбрать проект"}
+                  >
+                    {availableProjects.length === 0 ? (
+                      <option value="">Нет проектов</option>
+                    ) : (
+                      availableProjects.map((p) => (
+                        <option key={p} value={p}>
+                          {p === projectName ? `${p} (активный)` : p}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  {inviteProjectSlug ? (
+                    <Button
+                      className="primary"
+                      type="button"
+
+                      disabled={!selectedMember || !!invitingIds[selectedMember.id]}
+                      onClick={() => {
+                        if (!selectedMember) return;
+                        dispatch(
+                          troupeInviteMemberToProject({
+                            memberId: selectedMember.id,
+                            email: selectedMember.email,
+                            projectSlug: inviteProjectSlug,
+                            role: "viewer",
+                          }),
+                        );
+                      }}
+                      title={
+                        selectedMember
+                          ? `Добавить в проект`
+                          : "Выбери участника"
+                      }
+                    >
+                      {selectedMember && invitingIds[selectedMember.id] ? "…" : `Добавить в проект`}
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    className="danger"
+                    disabled={!selectedMember || !!removingIds[selectedMember.id]}
+                    onClick={() => {
+                      if (!selectedMember) return;
+                      if (!confirm("Удалить участника из труппы?")) return;
+                      dispatch(troupeRemoveMember({ memberId: selectedMember.id }));
+                    }}
+                    title={selectedMember ? "Удалить из труппы" : "Сначала выбери участника в таблице"}
+                  >
+                    {selectedMember && removingIds[selectedMember.id] ? "…" : "Удалить из труппы"}
+                  </Button>
+                  <Button
+                    type="button"
+                    className="primary"
+                    disabled={!selectedMemberId}
+                    onClick={() => setSelectedMemberId(null)}
+                    title="Снять выделение"
+                  >
+                    Снять выделение
+                  </Button>
+                </div>
+              </div>
+              {selectedMember && inviteErrorByMemberId[selectedMember.id] ? (
+                <div className="troupe-error">{inviteErrorByMemberId[selectedMember.id]}</div>
+              ) : null}
+
               <div className="troupe-schedule" role="region" aria-label="График занятости труппы">
                 <div className="troupe-grid" style={{ gridTemplateColumns }}>
                   <div className="troupe-cell troupe-sticky troupe-header-cell">Актёр</div>
@@ -204,17 +329,31 @@ export function TroupePage() {
                   ) : (
                     members.map((m) => {
                       const label = memberLabel(m);
-                      const inviteError = inviteErrorByMemberId[m.id];
+                      const isSelected = m.id === selectedMemberId;
                       return (
-                        <>
-                          <div key={`${m.id}:label`} className="troupe-cell troupe-sticky troupe-actor-cell">
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-                              <div style={{ minWidth: 0, display: "flex", gap: 10, alignItems: "center" }}>
-                                <MiniAvatar
-                                  src={String(m.profile?.avatarUrl ?? "").trim() || null}
-                                  label={label || m.email}
-                                  size={22}
-                                />
+                        <Fragment key={m.id}>
+                          <div
+                            key={`${m.id}:label`}
+                            className={`troupe-cell troupe-sticky troupe-actor-cell ${isSelected ? "selected" : ""}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedMemberId((prev) => (prev === m.id ? null : m.id))}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedMemberId((prev) => (prev === m.id ? null : m.id));
+                              }
+                            }}
+                            title={isSelected ? "Снять выделение" : "Выбрать"}
+                          >
+                            <div style={{ minWidth: 0, display: "flex", gap: 10, alignItems: "center" }}>
+                              <MiniAvatar
+                                src={String(m.profile?.avatarUrl ?? "").trim() || null}
+                                label={label || m.email}
+                                size={22}
+                              />
+                              <div style={{ display: "flex", flexDirection: "column", gap: 2, justifyContent: "center", minWidth: 0 }}>
                                 <div className="troupe-actor-name" title={label}>
                                   {label}
                                 </div>
@@ -222,42 +361,7 @@ export function TroupePage() {
                                   {m.email}
                                 </div>
                               </div>
-                              <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
-                                {projectName ? (
-                                  <button
-                                    type="button"
-                                    className="troupe-mini-btn"
-                                    disabled={!!invitingIds[m.id]}
-                                    onClick={() =>
-                                      dispatch(
-                                        troupeInviteMemberToProject({
-                                          memberId: m.id,
-                                          email: m.email,
-                                          projectSlug: projectName,
-                                          role: "viewer",
-                                        }),
-                                      )
-                                    }
-                                    title={`Добавить в проект ${projectName}`}
-                                  >
-                                    {invitingIds[m.id] ? "…" : `+ в ${projectName}`}
-                                  </button>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  className="troupe-mini-btn danger"
-                                  disabled={!!removingIds[m.id]}
-                                  onClick={() => {
-                                    if (!confirm("Удалить участника из труппы?")) return;
-                                    dispatch(troupeRemoveMember({ memberId: m.id }));
-                                  }}
-                                  title="Удалить из труппы"
-                                >
-                                  {removingIds[m.id] ? "…" : "×"}
-                                </button>
-                              </div>
                             </div>
-                            {inviteError ? <div className="troupe-error" style={{ marginTop: 6 }}>{inviteError}</div> : null}
                           </div>
                           {days.map((d) => {
                             const day = isoDate(d);
@@ -286,12 +390,13 @@ export function TroupePage() {
                             return (
                               <div
                                 key={`${m.id}:${day}`}
-                                className={`troupe-cell troupe-day-cell ${cls}`}
+                                className={`troupe-cell troupe-day-cell ${cls} ${isSelected ? "selected" : ""}`}
+                                data-selected={isSelected ? "true" : "false"}
                                 title={`${day} • ${tooltip}`}
                               />
                             );
                           })}
-                        </>
+                        </Fragment>
                       );
                     })
                   )}
@@ -303,8 +408,8 @@ export function TroupePage() {
             </div>
           </div>
         </main>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
 

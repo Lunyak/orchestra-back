@@ -108,6 +108,8 @@ export function AppRoutes() {
     togglePlaylist,
     showHeaderSounds,
     toggleHeaderSounds,
+    showStepRoles,
+    toggleStepRoles,
     isStepsCollapsed,
     toggleStepsCollapsed,
   } = useScriptUI();
@@ -137,6 +139,8 @@ export function AppRoutes() {
               onTogglePlaylist: togglePlaylist,
               showHeaderSounds,
               onToggleHeaderSounds: toggleHeaderSounds,
+              showRoles: showStepRoles,
+              onToggleRoles: toggleStepRoles,
               isStepsCollapsed,
               onToggleStepsCollapsed: toggleStepsCollapsed,
             }

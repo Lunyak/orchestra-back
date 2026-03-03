@@ -328,9 +328,14 @@ function useSceneOperations() {
           playlist: normalizedPlaylist,
           sounds: normalizedSounds,
         };
-        const localRoles = loadSceneRolesFromStorage(effectiveProject);
-        if (localRoles) {
-          minimalSceneData.sceneRoles = localRoles;
+        const serverSceneRoles = (scene as any)?.sceneRoles ?? null;
+        const isSceneRolesV1 = (v: any) =>
+          v && typeof v === "object" && (v as any).v === 1 && (v as any).byStepId && typeof (v as any).byStepId === "object";
+        if (isSceneRolesV1(serverSceneRoles)) {
+          minimalSceneData.sceneRoles = serverSceneRoles;
+        } else {
+          const localRoles = loadSceneRolesFromStorage(effectiveProject);
+          if (localRoles) minimalSceneData.sceneRoles = localRoles;
         }
         dispatch(
           sceneActions.hydrateScene({
@@ -524,6 +529,10 @@ function useSceneOperations() {
                       sceneData: {
                         ...(serverShadow?.sceneData ?? {}),
                         name: nextSceneName,
+                        sceneRoles:
+                          (payload as any)?.sceneRoles ??
+                          (serverShadow?.sceneData as any)?.sceneRoles ??
+                          undefined,
                         playlist: Array.isArray((payload as any)?.playlist)
                           ? (payload as any).playlist
                           : [],
@@ -718,18 +727,27 @@ function useSceneOperations() {
 
           // Send Scene meta only when needed (name changed or scene not yet shadowed).
           const prevSceneName = (serverShadow?.sceneData as any)?.name ?? null;
-          if (!serverShadow || String(prevSceneName ?? "") !== String(nextSceneName ?? "")) {
+          const nameChanged = String(prevSceneName ?? "") !== String(nextSceneName ?? "");
+          const prevSceneRoles = (serverShadow?.sceneData as any)?.sceneRoles ?? null;
+          const nextSceneRoles = (payloadForServer as any)?.sceneRoles ?? null;
+          const sceneRolesChanged = stableStringify(prevSceneRoles) !== stableStringify(nextSceneRoles);
+
+          if (!serverShadow || nameChanged || sceneRolesChanged) {
+            const scenePayload: any = {
+              id: sceneId,
+              projectId,
+              name: nextSceneName,
+              updatedAt: nowIso,
+            };
+            if (!serverShadow || sceneRolesChanged) {
+              scenePayload.sceneRoles = nextSceneRoles;
+            }
             changes.push({
               id: createId(),
               entityType: "Scene",
               entityId: sceneId,
               operation: "update",
-              payload: {
-                id: sceneId,
-                projectId,
-                name: nextSceneName,
-                updatedAt: nowIso,
-              },
+              payload: scenePayload,
               createdAt: nowIso,
             });
           }
@@ -1002,6 +1020,10 @@ function useSceneOperations() {
                 sceneData: {
                   ...(serverShadow?.sceneData ?? {}),
                   name: nextSceneName,
+                  sceneRoles:
+                    (payloadForServer as any)?.sceneRoles ??
+                    (serverShadow?.sceneData as any)?.sceneRoles ??
+                    undefined,
                   playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
                   sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],
                 },
@@ -1062,6 +1084,8 @@ function useSceneProviderEffects() {
 
   const selectedStepIdRef = useRef<number | null>(null);
   const restoredProjectRef = useRef<string | null>(null);
+  const lastProjectForSceneRolesSaveRef = useRef<string | null>(null);
+  const lastProjectForSelectedStepSaveRef = useRef<string | null>(null);
   const lightPlotSaveTimerRef = useRef<number | null>(null);
   const lastSyncedKeyRef = useRef<string | null>(null);
   const lastSavedLightChannelsKeyRef = useRef<string | null>(null);
@@ -1135,6 +1159,12 @@ function useSceneProviderEffects() {
   // Persist per-step role links locally as well (helps web-only mode too).
   useEffect(() => {
     if (!projectName) return;
+    // On project switch, the render can still hold previous project's sceneData.
+    // Never write it into the new project's localStorage key.
+    if (lastProjectForSceneRolesSaveRef.current !== projectName) {
+      lastProjectForSceneRolesSaveRef.current = projectName;
+      return;
+    }
     saveSceneRolesToStorage(projectName, sceneData);
   }, [projectName, sceneData, sceneDataRevision]);
 
@@ -1250,6 +1280,12 @@ function useSceneProviderEffects() {
 
   useEffect(() => {
     if (!projectName) return;
+    // Same race as with sceneRoles: don't persist previous project's selection
+    // into the new project's localStorage key on project switch.
+    if (lastProjectForSelectedStepSaveRef.current !== projectName) {
+      lastProjectForSelectedStepSaveRef.current = projectName;
+      return;
+    }
     const selectedId = steps[currentPage]?.id;
     if (selectedId != null) {
       localStorage.setItem(`selectedStepId:${projectName}`, String(selectedId));

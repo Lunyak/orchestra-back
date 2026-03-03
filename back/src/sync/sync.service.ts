@@ -463,15 +463,20 @@ export class SyncService {
       name: payload.name,
     });
 
+    const hasSceneRoles = Object.prototype.hasOwnProperty.call(payload ?? {}, 'sceneRoles');
+    const nextSceneRoles = hasSceneRoles ? (payload?.sceneRoles ?? null) : undefined;
+
     const result = await this.prisma.scene.upsert({
       where: { id: payload.id },
       update: {
         name: payload.name,
+        ...(hasSceneRoles ? { sceneRoles: nextSceneRoles } : {}),
       },
       create: {
         id: payload.id,
         name: payload.name,
         projectId: payload.projectId,
+        sceneRoles: hasSceneRoles ? nextSceneRoles : null,
       },
     });
 

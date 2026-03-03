@@ -1,18 +1,22 @@
 .troupe-layout .main-content {
   padding: 16px;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-script-body);
+  background-color: var(--color-bg-primary);
 }
 
 .troupe-view {
   max-width: 1200px;
   margin: 0 auto;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
 .troupe-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -85,8 +89,8 @@
   box-sizing: border-box;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 6px;
-  min-height: 38px;
+  padding: 4px 6px;
+  min-height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -98,6 +102,11 @@
   z-index: 5;
   background: rgba(20, 20, 20, 0.95);
   backdrop-filter: blur(6px);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
 }
 
 .troupe-sticky {
@@ -111,14 +120,72 @@
 }
 
 .troupe-actor-cell {
-  padding: 10px;
-  min-height: 62px;
+  min-height: 22px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.troupe-actor-cell.selected {
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.55);
+}
+
+.troupe-day-cell.selected {
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.25);
+}
+
+.troupe-actions {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.troupe-actions-left {
+  font-size: 12px;
+  opacity: 0.9;
+  min-width: 0;
+}
+
+.troupe-actions-label {
+  opacity: 0.75;
+}
+
+.troupe-actions-selected {
+  font-weight: 700;
+}
+
+.troupe-actions-selected.muted {
+  opacity: 0.65;
+  font-weight: 600;
+}
+
+.troupe-actions-right {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.troupe-project-select {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  max-width: 220px;
+}
+
+.troupe-project-select:disabled {
+  opacity: 0.6;
 }
 
 .troupe-actor-name {
   font-size: 13px;
   font-weight: 700;
-  line-height: 16px;
+  line-height: 14px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -128,6 +195,7 @@
 .troupe-actor-email {
   font-size: 11px;
   opacity: 0.7;
+  line-height: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

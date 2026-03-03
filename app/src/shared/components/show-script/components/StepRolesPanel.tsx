@@ -53,6 +53,23 @@ export function StepRolesPanel({ step }: { step: ScriptStep }) {
   const { sceneData, setSceneData } = useScene();
 
   const stepId = step.id;
+  const collapseKey = `stepRolesPanel:collapsed:${projectName || "unknown"}`;
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return (typeof window !== "undefined" ? localStorage.getItem(collapseKey) : null) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      localStorage.setItem(collapseKey, collapsed ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [collapseKey, collapsed]);
 
   useEffect(() => {
     if (!accessToken || !projectName) return;
@@ -249,12 +266,21 @@ export function StepRolesPanel({ step }: { step: ScriptStep }) {
   if (!projectName) return null;
 
   return (
-    <aside className="step-roles-panel">
+    <aside className="step-roles-panel" data-collapsed={collapsed ? "true" : "false"}>
       <div className="step-roles-header">
         <div className="step-roles-header-left">
           <span>Роли в сцене</span>
           <span className="step-roles-count">{attachedList.length}</span>
         </div>
+        <button
+          type="button"
+          className="step-roles-toggle"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Развернуть панель ролей" : "Свернуть панель ролей"}
+          aria-label={collapsed ? "Развернуть панель ролей" : "Свернуть панель ролей"}
+        >
+          {collapsed ? "⟩" : "⟨"}
+        </button>
         {isEditing ? (
           <button
             type="button"

@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { scriptUiActions, selectScriptUi } from "./script-ui-slice";
 
 export interface ScriptUIContextValue {
   showRequisites: boolean;
@@ -10,6 +12,9 @@ export interface ScriptUIContextValue {
   showHeaderSounds: boolean;
   setShowHeaderSounds: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleHeaderSounds: () => void;
+  showStepRoles: boolean;
+  setShowStepRoles: (v: boolean | ((prev: boolean) => boolean)) => void;
+  toggleStepRoles: () => void;
   isStepsCollapsed: boolean;
   setIsStepsCollapsed: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleStepsCollapsed: () => void;
@@ -21,63 +26,13 @@ export interface ScriptUIContextValue {
   togglePanels: () => void;
 }
 
-const ScriptUIContext = createContext<ScriptUIContextValue | null>(null);
-
-function storedBool(key: string, defaultValue: boolean): boolean {
-  const stored = localStorage.getItem(key);
-  return stored !== null ? stored === "true" : defaultValue;
-}
-
 export function ScriptUIProvider({ children }: { children: React.ReactNode }) {
-  const [showRequisites, setShowRequisites] = useState(() =>
-    storedBool("showRequisites", true)
-  );
-  const [showPlaylistSidebar, setShowPlaylistSidebar] = useState(() =>
-    storedBool("showPlaylistSidebar", true)
-  );
-  const [showHeaderSounds, setShowHeaderSounds] = useState(() =>
-    storedBool("showHeaderSounds", true)
-  );
-  const [isStepsCollapsed, setIsStepsCollapsed] = useState(() =>
-    storedBool("isStepsCollapsed", false)
-  );
-  const [isEditing, setIsEditing] = useState(false);
-  const [swapTheaterPanels, setSwapTheaterPanels] = useState(true);
+  const dispatch = useAppDispatch();
 
+  // Load persisted UI flags once on mount.
   useEffect(() => {
-    localStorage.setItem("showRequisites", String(showRequisites));
-  }, [showRequisites]);
-  useEffect(() => {
-    localStorage.setItem("showPlaylistSidebar", String(showPlaylistSidebar));
-  }, [showPlaylistSidebar]);
-  useEffect(() => {
-    localStorage.setItem("showHeaderSounds", String(showHeaderSounds));
-  }, [showHeaderSounds]);
-  useEffect(() => {
-    localStorage.setItem("isStepsCollapsed", String(isStepsCollapsed));
-  }, [isStepsCollapsed]);
-
-  const toggleRequisites = useCallback(
-    () => setShowRequisites((p) => !p),
-    []
-  );
-  const togglePlaylist = useCallback(
-    () => setShowPlaylistSidebar((p) => !p),
-    []
-  );
-  const toggleHeaderSounds = useCallback(
-    () => setShowHeaderSounds((p) => !p),
-    []
-  );
-  const toggleStepsCollapsed = useCallback(
-    () => setIsStepsCollapsed((p) => !p),
-    []
-  );
-  const toggleEditing = useCallback(() => setIsEditing((p) => !p), []);
-  const togglePanels = useCallback(
-    () => setSwapTheaterPanels((p) => !p),
-    []
-  );
+    dispatch(scriptUiActions.initScriptUi());
+  }, [dispatch]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -88,41 +43,103 @@ export function ScriptUIProvider({ children }: { children: React.ReactNode }) {
         key === "r" && (e.metaKey || e.ctrlKey) && !e.shiftKey;
       if (!isToggleShortcut) return;
       e.preventDefault();
-      setIsEditing((prev) => !prev);
+      dispatch(scriptUiActions.toggleEditing());
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [dispatch]);
 
-  const value: ScriptUIContextValue = {
-    showRequisites,
-    setShowRequisites,
-    toggleRequisites,
-    showPlaylistSidebar,
-    setShowPlaylistSidebar,
-    togglePlaylist,
-    showHeaderSounds,
-    setShowHeaderSounds,
-    toggleHeaderSounds,
-    isStepsCollapsed,
-    setIsStepsCollapsed,
-    toggleStepsCollapsed,
-    isEditing,
-    setIsEditing,
-    toggleEditing,
-    swapTheaterPanels,
-    setSwapTheaterPanels,
-    togglePanels,
-  };
-
-  return (
-    <ScriptUIContext.Provider value={value}>{children}</ScriptUIContext.Provider>
-  );
+  return <>{children}</>;
 }
 
 export function useScriptUI(): ScriptUIContextValue {
-  const ctx = React.useContext(ScriptUIContext);
-  if (!ctx)
-    throw new Error("useScriptUI must be used within ScriptUIProvider");
-  return ctx;
+  const dispatch = useAppDispatch();
+  const ui = useAppSelector(selectScriptUi);
+
+  const setShowRequisites = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.showRequisites) : v;
+      dispatch(scriptUiActions.setShowRequisites({ value: Boolean(next) }));
+    },
+    [dispatch, ui.showRequisites],
+  );
+  const toggleRequisites = useCallback(() => dispatch(scriptUiActions.toggleRequisites()), [dispatch]);
+
+  const setShowPlaylistSidebar = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.showPlaylistSidebar) : v;
+      dispatch(scriptUiActions.setShowPlaylistSidebar({ value: Boolean(next) }));
+    },
+    [dispatch, ui.showPlaylistSidebar],
+  );
+  const togglePlaylist = useCallback(() => dispatch(scriptUiActions.togglePlaylist()), [dispatch]);
+
+  const setShowHeaderSounds = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.showHeaderSounds) : v;
+      dispatch(scriptUiActions.setShowHeaderSounds({ value: Boolean(next) }));
+    },
+    [dispatch, ui.showHeaderSounds],
+  );
+  const toggleHeaderSounds = useCallback(() => dispatch(scriptUiActions.toggleHeaderSounds()), [dispatch]);
+
+  const setShowStepRoles = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.showStepRoles) : v;
+      dispatch(scriptUiActions.setShowStepRoles({ value: Boolean(next) }));
+    },
+    [dispatch, ui.showStepRoles],
+  );
+  const toggleStepRoles = useCallback(() => dispatch(scriptUiActions.toggleStepRoles()), [dispatch]);
+
+  const setIsStepsCollapsed = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.isStepsCollapsed) : v;
+      dispatch(scriptUiActions.setIsStepsCollapsed({ value: Boolean(next) }));
+    },
+    [dispatch, ui.isStepsCollapsed],
+  );
+  const toggleStepsCollapsed = useCallback(() => dispatch(scriptUiActions.toggleStepsCollapsed()), [dispatch]);
+
+  const setIsEditing: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
+    (v) => {
+      const next = typeof v === "function" ? (v as any)(ui.isEditing) : v;
+      dispatch(scriptUiActions.setIsEditing({ value: Boolean(next) }));
+    },
+    [dispatch, ui.isEditing],
+  );
+  const toggleEditing = useCallback(() => dispatch(scriptUiActions.toggleEditing()), [dispatch]);
+
+  const setSwapTheaterPanels: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
+    (v) => {
+      const next = typeof v === "function" ? (v as any)(ui.swapTheaterPanels) : v;
+      dispatch(scriptUiActions.setSwapTheaterPanels({ value: Boolean(next) }));
+    },
+    [dispatch, ui.swapTheaterPanels],
+  );
+  const togglePanels = useCallback(() => dispatch(scriptUiActions.togglePanels()), [dispatch]);
+
+  return {
+    showRequisites: ui.showRequisites,
+    setShowRequisites,
+    toggleRequisites,
+    showPlaylistSidebar: ui.showPlaylistSidebar,
+    setShowPlaylistSidebar,
+    togglePlaylist,
+    showHeaderSounds: ui.showHeaderSounds,
+    setShowHeaderSounds,
+    toggleHeaderSounds,
+    showStepRoles: ui.showStepRoles,
+    setShowStepRoles,
+    toggleStepRoles,
+    isStepsCollapsed: ui.isStepsCollapsed,
+    setIsStepsCollapsed,
+    toggleStepsCollapsed,
+    isEditing: ui.isEditing,
+    setIsEditing,
+    toggleEditing,
+    swapTheaterPanels: ui.swapTheaterPanels,
+    setSwapTheaterPanels,
+    togglePanels,
+  };
 }

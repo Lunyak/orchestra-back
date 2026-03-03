@@ -50,6 +50,20 @@ type RawStepLike = {
   playMarkdown?: string;
 };
 
+type SceneRoleLinkV1 = {
+  roleId: string;
+  roleKey?: string;
+  roleTitle?: string;
+  note?: string;
+  createdAtIso?: string;
+  updatedAtIso?: string;
+};
+
+type SceneRolesDataV1 = {
+  v: 1;
+  byStepId: Record<string, Record<string, SceneRoleLinkV1 | undefined> | undefined>;
+};
+
 const DEFAULT_TZ = 'Europe/Moscow';
 
 function slugifyEmail(email: string): string {
@@ -180,6 +194,27 @@ function normalizeRoleAssignmentsIndex(
     if (actors.length) map.set(key, Array.from(new Set(actors)));
   }
   return map;
+}
+
+function extractRoleKeysFromSceneRoles(sceneRoles: any, stepId: number): string[] {
+  const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
+  if (!sr || typeof sr !== 'object' || (sr as any).v !== 1) return [];
+  const byStepId = (sr as any).byStepId;
+  if (!byStepId || typeof byStepId !== 'object') return [];
+  const stepMap = (byStepId as any)[String(stepId)];
+  if (!stepMap || typeof stepMap !== 'object') return [];
+  const out: string[] = [];
+  for (const it of Object.values(stepMap as Record<string, any>)) {
+    if (!it || typeof it !== 'object') continue;
+    const key =
+      typeof it.roleKey === 'string' && it.roleKey.trim()
+        ? normalizeRoleKey(it.roleKey)
+        : typeof it.roleTitle === 'string' && it.roleTitle.trim()
+          ? normalizeRoleKey(it.roleTitle)
+          : null;
+    if (key) out.push(key);
+  }
+  return Array.from(new Set(out)).filter(Boolean);
 }
 
 @Injectable()
@@ -362,11 +397,11 @@ export class DirectorSessionsService {
     const scene =
       (await this.prisma.scene.findUnique({
         where: { id: sceneId },
-        select: { id: true },
+        select: { id: true, sceneRoles: true },
       })) ??
       (await this.prisma.scene.findFirst({
         where: { projectId, deletedAt: null },
-        select: { id: true },
+        select: { id: true, sceneRoles: true },
       }));
 
     const stepRows = await this.prisma.step.findMany({
@@ -387,7 +422,7 @@ export class DirectorSessionsService {
       playMarkdown: st.playMarkdown ?? undefined,
     }));
 
-    return { steps };
+    return { steps, sceneRoles: (scene as any)?.sceneRoles ?? null };
   }
 
   /** Сформировать участников (neededEmails -> present profiles) по слотам сессии */
@@ -433,7 +468,7 @@ export class DirectorSessionsService {
     for (const slug of slugs) {
       const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
 
-      const { steps } = await this.loadProjectScriptData(project.id);
+      const { steps, sceneRoles } = await this.loadProjectScriptData(project.id);
       const stepById = new Map<number, RawStepLike>();
       steps.forEach((st) => {
         if (typeof st?.id === 'number') stepById.set(st.id, st);
@@ -442,9 +477,13 @@ export class DirectorSessionsService {
       const slotRefs = refs.filter((r) => r.projectSlug === slug);
       for (const ref of slotRefs) {
         const step = stepById.get(ref.stepId);
-        const text = String(step?.playMarkdown ?? step?.markdown ?? '');
-        const roles = extractRolesSmart(text);
-        const roleKeys = roles.map((r) => normalizeRoleKey(r)).filter(Boolean);
+        const attachedKeys = extractRoleKeysFromSceneRoles(sceneRoles, ref.stepId);
+        const roleKeys =
+          attachedKeys.length > 0
+            ? attachedKeys
+            : extractRolesSmart(String(step?.playMarkdown ?? step?.markdown ?? ''))
+                .map((r) => normalizeRoleKey(r))
+                .filter(Boolean);
         const assignmentMap = await this.roles.resolveAssignmentsByRoleKeys(
           project.id,
           roleKeys,

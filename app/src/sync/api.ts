@@ -348,6 +348,18 @@ export async function updateProjectRole(
   return data as any;
 }
 
+export async function deleteProjectRole(
+  accessToken: string,
+  projectSlug: string,
+  roleId: string,
+): Promise<{ ok: boolean; deleted?: number }> {
+  const { data } = await api.delete(
+    `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
 export async function setProjectRoleAssignments(
   accessToken: string,
   projectSlug: string,

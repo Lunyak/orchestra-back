@@ -161,6 +161,16 @@ export class RolesService {
     return { ok: true };
   }
 
+  async deleteRole(userId: string, projectSlug: string, roleId: string) {
+    const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const rid = String(roleId ?? '').trim();
+    if (!rid) throw new BadRequestException('roleId is required');
+    const res = await this.prisma.projectRole.deleteMany({
+      where: { id: rid, projectId: project.id },
+    });
+    return { ok: true, deleted: res.count };
+  }
+
   async listRoleNotes(userId: string, projectSlug: string, roleId: string) {
     const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
     const role = await this.prisma.projectRole.findFirst({

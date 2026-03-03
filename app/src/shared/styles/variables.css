@@ -2,8 +2,10 @@
   /* ===== ЦВЕТА ===== */
   
   /* Основные фоновые цвета */
-  --color-bg-primary: #18181b;
-  --color-bg-secondary: #1D1D20;
+  --color-bg-primary: #282828;
+
+  --color-bg-secondary: #1d2021;
+  /* --color-bg-secondary: #1D1D20; */
   --color-bg-tertiary: #FEF08A;
   --color-bg-dark: #020617;
   --color-bg-overlay: rgba(15, 23, 42, 0.85);
@@ -66,8 +68,10 @@
   --color-warning-text: rgba(255, 190, 120, 0.95);
   
   /* Текстовые цвета */
-  --color-text-primary: #e2e8f0;
+  --color-text-primary: #d6c7aa;
+  /* --color-text-primary: #e2e8f0; */
   --color-text-secondary: #0b1220;
+  --color-text-label: #a9b664;
   --color-text-bright: #f8fafc;
   --color-text-light: #cbd5f5;
   --color-text-medium: #d1d5db;

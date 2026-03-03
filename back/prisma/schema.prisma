@@ -177,6 +177,8 @@ model Scene {
   id        String   @id @default(cuid())
   projectId String
   name      String
+  /// Метаданные сцены (в т.ч. привязки ролей к шагам: sceneRoles v1)
+  sceneRoles Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?

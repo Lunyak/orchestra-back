@@ -13,6 +13,7 @@ import { profileRolesSlice } from "../../features/profile/model/profileRolesSlic
 import { dictionTrainerUiSlice } from "../../features/trainers/model/dictionTrainerUiSlice";
 import { speechTrainerUiSlice } from "../../features/trainers/model/speechTrainerUiSlice";
 import { roleWorkbookSlice } from "../../features/role-workbook/model/roleWorkbookSlice";
+import { scriptUiSlice } from "../../features/script-ui/model/script-ui-slice";
 
 const legacyReducers: ReducersMapObject = {};
 
@@ -22,6 +23,7 @@ export const rootReducer = combineSlices(
   authSlice,
   showScriptSlice,
   showScriptMarkdownSlice,
+  scriptUiSlice,
   voiceTrainerUiSlice,
   actorTrainerUiSlice,
   troupeSlice,

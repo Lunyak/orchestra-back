@@ -206,6 +206,21 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 0 0 auto;
+  width: 320px;
+  min-width: 240px;
+  max-width: min(420px, 45vw);
+  max-height: 100%;
+  overflow: hidden;
+  resize: horizontal;
+}
+
+.step-roles-panel[data-collapsed="true"] {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  resize: none;
+  padding: 8px;
 }
 
 .step-roles-header {
@@ -216,6 +231,22 @@
   font-size: 13px;
   font-weight: 600;
   color: #f8fafc;
+}
+
+.step-roles-toggle {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.step-roles-toggle:hover {
+  border-color: #60a5fa;
+  color: #fff;
 }
 
 .step-roles-header-left {
@@ -298,6 +329,34 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow: auto;
+  min-height: 0;
+}
+
+.step-roles-panel[data-collapsed="true"] .step-roles-header-left,
+.step-roles-panel[data-collapsed="true"] .step-roles-autopick-btn,
+.step-roles-panel[data-collapsed="true"] .step-roles-hint,
+.step-roles-panel[data-collapsed="true"] .step-roles-add,
+.step-roles-panel[data-collapsed="true"] .step-roles-list {
+  display: none;
+}
+
+@media (max-width: 980px) {
+  .script-step-body {
+    flex-direction: column;
+  }
+  .step-roles-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    resize: none;
+    overflow: hidden;
+  }
+  .step-roles-panel[data-collapsed="true"] {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .step-roles-empty {
@@ -530,7 +589,8 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  color: #e2e8f0;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-script-body);
 }
 
 .actor-note-panel {
@@ -813,10 +873,10 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 999px;
+  /* border-radius: 999px; */
   background: rgba(37, 99, 235, 0.16);
-  border: 1px solid rgba(96, 165, 250, 0.45);
-  color: #bfdbfe;
+  /* border: 1px solid rgba(96, 165, 250, 0.45); */
+  color: var(--color-text-label);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.6px;
@@ -826,7 +886,7 @@
 }
 
 .markdown-speaker-label:hover {
-  border-color: rgba(96, 165, 250, 0.75);
+  /* border-color: rgba(96, 165, 250, 0.75); */
   color: #e0f2fe;
 }
 

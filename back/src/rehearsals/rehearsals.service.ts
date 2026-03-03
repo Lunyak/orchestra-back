@@ -72,6 +72,20 @@ type RawStepLike = {
   kanbanOrder?: number;
 };
 
+type SceneRoleLinkV1 = {
+  roleId: string;
+  roleKey?: string;
+  roleTitle?: string;
+  note?: string;
+  createdAtIso?: string;
+  updatedAtIso?: string;
+};
+
+type SceneRolesDataV1 = {
+  v: 1;
+  byStepId: Record<string, Record<string, SceneRoleLinkV1 | undefined> | undefined>;
+};
+
 function uniq<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
@@ -138,6 +152,37 @@ function extractRolesSmart(text?: string): string[] {
     ...extractRolesByBrackets(text),
     ...extractSpeakerRolesFromLines(text),
   ]);
+}
+
+function extractRoleKeysFromSceneRoles(sceneRoles: any, stepId: number): string[] {
+  const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
+  if (!sr || typeof sr !== 'object' || (sr as any).v !== 1) return [];
+  const byStepId = (sr as any).byStepId;
+  if (!byStepId || typeof byStepId !== 'object') return [];
+  const stepMap = (byStepId as any)[String(stepId)];
+  if (!stepMap || typeof stepMap !== 'object') return [];
+  const out: string[] = [];
+  for (const it of Object.values(stepMap as Record<string, any>)) {
+    if (!it || typeof it !== 'object') continue;
+    const key =
+      typeof it.roleKey === 'string' && it.roleKey.trim()
+        ? normalizeRoleKey(it.roleKey)
+        : typeof it.roleTitle === 'string' && it.roleTitle.trim()
+          ? normalizeRoleKey(it.roleTitle)
+          : null;
+    if (key) out.push(key);
+  }
+  return uniq(out).filter(Boolean);
+}
+
+function getRoleTokensForStep(scene: { sceneRoles?: any } | null, step: { sourceId?: number; markdown?: string | null; playMarkdown?: string | null }): string[] {
+  const stepId = typeof step.sourceId === 'number' ? step.sourceId : null;
+  if (stepId != null) {
+    const attached = extractRoleKeysFromSceneRoles((scene as any)?.sceneRoles, stepId);
+    if (attached.length > 0) return attached;
+  }
+  const text = step.playMarkdown ?? step.markdown ?? '';
+  return extractRolesSmart(text);
 }
 
 function looksLikeEmail(v: string): boolean {
@@ -505,7 +550,7 @@ export class RehearsalsService {
         deletedAt: null,
         ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, sceneRoles: true },
     });
 
     const stepRows = await this.prisma.step.findMany({
@@ -544,12 +589,8 @@ export class RehearsalsService {
         )
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
-        const text = step.playMarkdown ?? step.markdown ?? '';
-        const roles = extractRolesSmart(text);
-        roles
-          .map((r) => normalizeRoleKey(r))
-          .filter(Boolean)
-          .forEach((k) => requiredRoleKeysSet.add(k));
+        const roles = getRoleTokensForStep(scene as any, step as any);
+        roles.map((r) => normalizeRoleKey(r)).filter(Boolean).forEach((k) => requiredRoleKeysSet.add(k));
       }
     }
 
@@ -583,8 +624,7 @@ export class RehearsalsService {
         )
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
-        const text = step.playMarkdown ?? step.markdown ?? '';
-        const roles = extractRolesSmart(text);
+        const roles = getRoleTokensForStep(scene as any, step as any);
         for (const role of roles) {
           getAssignedEmailsForRole(role).forEach((e) =>
             neededEmails.add(normEmail(e)),
@@ -647,8 +687,7 @@ export class RehearsalsService {
         if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
-        const text = step.playMarkdown ?? step.markdown ?? '';
-        const roles = extractRolesSmart(text);
+        const roles = getRoleTokensForStep(scene as any, step as any);
         const rawDuration = typeof step.durationMin === 'number' ? step.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
@@ -836,7 +875,7 @@ export class RehearsalsService {
         deletedAt: null,
         ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
       },
-      select: { id: true, name: true },
+      select: { id: true, name: true, sceneRoles: true },
     });
 
     const stepRows2 = await this.prisma.step.findMany({
@@ -883,12 +922,8 @@ export class RehearsalsService {
         if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
-        const text = step.playMarkdown ?? step.markdown ?? '';
-        const roles = extractRolesSmart(text);
-        roles
-          .map((r) => normalizeRoleKey(r))
-          .filter(Boolean)
-          .forEach((k) => requiredRoleKeysSet.add(k));
+        const roles = getRoleTokensForStep(scene as any, step as any);
+        roles.map((r) => normalizeRoleKey(r)).filter(Boolean).forEach((k) => requiredRoleKeysSet.add(k));
       }
     }
 
@@ -918,8 +953,7 @@ export class RehearsalsService {
         if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
-        const text = step.playMarkdown ?? step.markdown ?? '';
-        const roles = extractRolesSmart(text);
+        const roles = getRoleTokensForStep(scene as any, step as any);
         for (const role of roles) {
           const emails = getAssignedEmailsForRole(role);
           if (emails.length === 0) missingRoles.add(role);
