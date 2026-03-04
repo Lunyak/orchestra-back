@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { RolesService } from '../roles/roles.service';
+import { UpsertMyDirectorSessionCommentDto } from './dto/upsert-my-director-session-comment.dto';
 
 type DirectorSlotRef = { projectSlug: string; stepId: number };
 type DirectorSessionSlot = {
@@ -36,6 +37,7 @@ type DirectorRehearsalSession = {
   startsAt: string; // ISO
   slots: DirectorSessionSlot[];
   comment?: string | null;
+  plannedEmails?: string[];
   updatedAt?: string;
   participants?: DirectorSessionParticipant[];
   telegramChatId?: string | null;
@@ -62,7 +64,10 @@ type SceneRoleLinkV1 = {
 
 type SceneRolesDataV1 = {
   v: 1;
-  byStepId: Record<string, Record<string, SceneRoleLinkV1 | undefined> | undefined>;
+  byStepId: Record<
+    string,
+    Record<string, SceneRoleLinkV1 | undefined> | undefined
+  >;
 };
 
 const DEFAULT_TZ = 'Europe/Moscow';
@@ -89,6 +94,19 @@ function normEmail(v: string): string {
 
 function looksLikeEmail(v: string): boolean {
   return /.+@.+\..+/.test(v);
+}
+
+function normalizePlannedEmails(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: string[] = [];
+  for (const item of value.slice(0, 800)) {
+    const e = normEmail(String(item ?? ''));
+    if (!e) continue;
+    if (!looksLikeEmail(e)) continue;
+    out.push(e);
+  }
+  const uniq = Array.from(new Set(out)).slice(0, 500);
+  return uniq.length ? uniq : [];
 }
 
 function getDatePartsInTimeZone(
@@ -197,12 +215,15 @@ function normalizeRoleAssignmentsIndex(
   return map;
 }
 
-function extractRoleKeysFromSceneRoles(sceneRoles: any, stepId: number): string[] {
+function extractRoleKeysFromSceneRoles(
+  sceneRoles: any,
+  stepId: number,
+): string[] {
   const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
   if (!sr || typeof sr !== 'object' || (sr as any).v !== 1) return [];
   const byStepId = (sr as any).byStepId;
   if (!byStepId || typeof byStepId !== 'object') return [];
-  const stepMap = (byStepId as any)[String(stepId)];
+  const stepMap = byStepId[String(stepId)];
   if (!stepMap || typeof stepMap !== 'object') return [];
   const out: string[] = [];
   for (const it of Object.values(stepMap as Record<string, any>)) {
@@ -247,13 +268,13 @@ export class DirectorSessionsService {
 
   private normalizeSessionInput(raw: any): DirectorRehearsalSession | null {
     if (!raw || typeof raw !== 'object') return null;
-    const id = String((raw as any).id ?? '').trim();
-    const title = String((raw as any).title ?? '').trim() || 'Сессия';
-    const startsAt = String((raw as any).startsAt ?? '').trim();
+    const id = String(raw.id ?? '').trim();
+    const title = String(raw.title ?? '').trim() || 'Сессия';
+    const startsAt = String(raw.startsAt ?? '').trim();
     const d = new Date(startsAt);
     if (!id || !Number.isFinite(d.getTime())) return null;
-    const slots = Array.isArray((raw as any).slots) ? ((raw as any).slots as any[]) : [];
-    const commentRaw = (raw as any).comment;
+    const slots = Array.isArray(raw.slots) ? (raw.slots as any[]) : [];
+    const commentRaw = raw.comment;
     const comment =
       commentRaw == null
         ? null
@@ -264,12 +285,15 @@ export class DirectorSessionsService {
       startsAt,
       slots: slots as any,
       comment,
-      updatedAt: String((raw as any).updatedAt ?? '').trim() || new Date().toISOString(),
-      participants: Array.isArray((raw as any).participants) ? (raw as any).participants : undefined,
-      telegramChatId: (raw as any).telegramChatId ?? null,
-      telegramMessageId: (raw as any).telegramMessageId ?? null,
-      telegramThreadId: (raw as any).telegramThreadId ?? null,
-      publishedAt: (raw as any).publishedAt ?? null,
+      plannedEmails: normalizePlannedEmails(raw.plannedEmails),
+      updatedAt: String(raw.updatedAt ?? '').trim() || new Date().toISOString(),
+      participants: Array.isArray(raw.participants)
+        ? raw.participants
+        : undefined,
+      telegramChatId: raw.telegramChatId ?? null,
+      telegramMessageId: raw.telegramMessageId ?? null,
+      telegramThreadId: raw.telegramThreadId ?? null,
+      publishedAt: raw.publishedAt ?? null,
     };
     return payload;
   }
@@ -277,7 +301,13 @@ export class DirectorSessionsService {
   private async getSessionRow(projectId: string, sessionId: string) {
     return this.prisma.directorSession.findFirst({
       where: { projectId, id: sessionId },
-      select: { id: true, userId: true, title: true, startsAt: true, payload: true },
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        startsAt: true,
+        payload: true,
+      },
     });
   }
 
@@ -316,8 +346,72 @@ export class DirectorSessionsService {
     });
     return {
       projectId: directorProject.id,
-      sessions: rows.map((r) => (r.payload as any) ?? { id: r.id }),
+      sessions: rows.map((r) => r.payload ?? { id: r.id }),
     };
+  }
+
+  async get(userId: string, sessionId: string) {
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const sid = String(sessionId ?? '').trim();
+    if (!sid) throw new BadRequestException('session id is required');
+    const row = await this.prisma.directorSession.findFirst({
+      where: { projectId: directorProject.id, userId, id: sid },
+      select: { id: true, payload: true },
+    });
+    if (!row) throw new NotFoundException('Session not found');
+    return row.payload ?? { id: row.id };
+  }
+
+  async getMyComment(userId: string, sessionId: string) {
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const sid = String(sessionId ?? '').trim();
+    if (!sid) throw new BadRequestException('session id is required');
+    const exists = await this.prisma.directorSession.findFirst({
+      where: { projectId: directorProject.id, userId, id: sid },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException('Session not found');
+
+    const comment = await this.prisma.directorSessionComment.findUnique({
+      where: { sessionId_authorUserId: { sessionId: sid, authorUserId: userId } },
+      select: { id: true, content: true, createdAt: true, updatedAt: true },
+    });
+    return { comment: comment ?? null };
+  }
+
+  async upsertMyComment(
+    userId: string,
+    userEmail: string,
+    sessionId: string,
+    dto: UpsertMyDirectorSessionCommentDto,
+  ) {
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const sid = String(sessionId ?? '').trim();
+    if (!sid) throw new BadRequestException('session id is required');
+    const exists = await this.prisma.directorSession.findFirst({
+      where: { projectId: directorProject.id, userId, id: sid },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException('Session not found');
+
+    const email = String(userEmail ?? '').trim().toLowerCase();
+    if (!email) throw new BadRequestException('Invalid user email');
+
+    const content = String(dto?.content ?? '').trim();
+    if (!content) {
+      await this.prisma.directorSessionComment.deleteMany({
+        where: { sessionId: sid, authorUserId: userId },
+      });
+      return { comment: null };
+    }
+
+    const comment = await this.prisma.directorSessionComment.upsert({
+      where: { sessionId_authorUserId: { sessionId: sid, authorUserId: userId } },
+      update: { content, authorEmail: email },
+      create: { sessionId: sid, authorUserId: userId, authorEmail: email, content },
+      select: { id: true, content: true, createdAt: true, updatedAt: true },
+    });
+    return { comment };
   }
 
   async replaceAll(userId: string, body: { sessions?: any[] }) {
@@ -370,7 +464,7 @@ export class DirectorSessionsService {
       orderBy: [{ order: 'asc' }, { startsAt: 'asc' }],
     });
     return {
-      sessions: sessions.map((r) => (r.payload as any) ?? { id: r.id }),
+      sessions: sessions.map((r) => r.payload ?? { id: r.id }),
     };
   }
 
@@ -475,7 +569,9 @@ export class DirectorSessionsService {
     for (const slug of slugs) {
       const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
 
-      const { steps, sceneRoles } = await this.loadProjectScriptData(project.id);
+      const { steps, sceneRoles } = await this.loadProjectScriptData(
+        project.id,
+      );
       const stepById = new Map<number, RawStepLike>();
       steps.forEach((st) => {
         if (typeof st?.id === 'number') stepById.set(st.id, st);
@@ -484,11 +580,16 @@ export class DirectorSessionsService {
       const slotRefs = refs.filter((r) => r.projectSlug === slug);
       for (const ref of slotRefs) {
         const step = stepById.get(ref.stepId);
-        const attachedKeys = extractRoleKeysFromSceneRoles(sceneRoles, ref.stepId);
+        const attachedKeys = extractRoleKeysFromSceneRoles(
+          sceneRoles,
+          ref.stepId,
+        );
         const roleKeys =
           attachedKeys.length > 0
             ? attachedKeys
-            : extractRolesSmart(String(step?.playMarkdown ?? step?.markdown ?? ''))
+            : extractRolesSmart(
+                String(step?.playMarkdown ?? step?.markdown ?? ''),
+              )
                 .map((r) => normalizeRoleKey(r))
                 .filter(Boolean);
         const assignmentMap = await this.roles.resolveAssignmentsByRoleKeys(
@@ -553,13 +654,17 @@ export class DirectorSessionsService {
     return present;
   }
 
-  async publish(userId: string, sessionId: string, body?: { comment?: string }) {
+  async publish(
+    userId: string,
+    sessionId: string,
+    body?: { comment?: string },
+  ) {
     const sessId = String(sessionId ?? '').trim();
     if (!sessId) throw new BadRequestException('session id is required');
 
     const directorProject = await this.getDirectorProjectForUser(userId);
     const row = await this.getSessionRow(directorProject.id, sessId);
-    const session = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    const session = row?.payload as any as DirectorRehearsalSession | undefined;
     if (!session) throw new NotFoundException('Session not found');
     // NOTE: even if Telegram IDs exist, the message might have been deleted in Telegram.
     // We still call bot-service: it will try to edit existing message, and if it's gone
@@ -570,7 +675,7 @@ export class DirectorSessionsService {
         ? String((body as any)?.comment ?? '')
             .trim()
             .slice(0, 4000) || null
-        : session.comment ?? null;
+        : (session.comment ?? null);
 
     const participants = await this.buildParticipantsForSession(
       userId,
@@ -589,9 +694,7 @@ export class DirectorSessionsService {
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
     const secret = this.config.get<string>('INTERNAL_API_SECRET');
     if (!secret) {
-      throw new BadRequestException(
-        'INTERNAL_API_SECRET is not configured',
-      );
+      throw new BadRequestException('INTERNAL_API_SECRET is not configured');
     }
 
     const pref = await this.prisma.projectTelegramBotPreference.findUnique({
@@ -616,7 +719,6 @@ export class DirectorSessionsService {
     }
 
     try {
-      // eslint-disable-next-line no-console
       console.log('[director-sessions] publish via bot', {
         projectId: directorProject.id,
         sessionId: sessId,
@@ -675,7 +777,7 @@ export class DirectorSessionsService {
     if (!pid || !sid)
       throw new BadRequestException('projectId and sessionId are required');
     const row = await this.getSessionRow(pid, sid);
-    const session = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    const session = row?.payload as any as DirectorRehearsalSession | undefined;
     if (!session) throw new NotFoundException('Session not found');
 
     // resolve slot titles
@@ -755,7 +857,7 @@ export class DirectorSessionsService {
     if (!pid || !sid)
       throw new BadRequestException('projectId and sessionId are required');
     const row = await this.getSessionRow(pid, sid);
-    const cur = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    const cur = row?.payload as any as DirectorRehearsalSession | undefined;
     if (!cur || !row?.userId) throw new NotFoundException('Session not found');
     const now = new Date().toISOString();
     const updated: DirectorRehearsalSession = {
@@ -789,7 +891,7 @@ export class DirectorSessionsService {
     if (!telegramId) throw new BadRequestException('telegramId is required');
 
     const row = await this.getSessionRow(pid, sid);
-    const cur = (row?.payload as any) as DirectorRehearsalSession | undefined;
+    const cur = row?.payload as any as DirectorRehearsalSession | undefined;
     if (!cur || !row?.userId) throw new NotFoundException('Session not found');
 
     const nowIso = new Date().toISOString();

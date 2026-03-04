@@ -10,6 +10,7 @@ import { RolesService } from '../roles/roles.service';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
 import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
+import { UpsertMyRehearsalCommentDto } from './dto/upsert-my-rehearsal-comment.dto';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/ru';
@@ -83,7 +84,10 @@ type SceneRoleLinkV1 = {
 
 type SceneRolesDataV1 = {
   v: 1;
-  byStepId: Record<string, Record<string, SceneRoleLinkV1 | undefined> | undefined>;
+  byStepId: Record<
+    string,
+    Record<string, SceneRoleLinkV1 | undefined> | undefined
+  >;
 };
 
 function uniq<T>(arr: T[]): T[] {
@@ -154,12 +158,15 @@ function extractRolesSmart(text?: string): string[] {
   ]);
 }
 
-function extractRoleKeysFromSceneRoles(sceneRoles: any, stepId: number): string[] {
+function extractRoleKeysFromSceneRoles(
+  sceneRoles: any,
+  stepId: number,
+): string[] {
   const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
   if (!sr || typeof sr !== 'object' || (sr as any).v !== 1) return [];
   const byStepId = (sr as any).byStepId;
   if (!byStepId || typeof byStepId !== 'object') return [];
-  const stepMap = (byStepId as any)[String(stepId)];
+  const stepMap = byStepId[String(stepId)];
   if (!stepMap || typeof stepMap !== 'object') return [];
   const out: string[] = [];
   for (const it of Object.values(stepMap as Record<string, any>)) {
@@ -175,10 +182,20 @@ function extractRoleKeysFromSceneRoles(sceneRoles: any, stepId: number): string[
   return uniq(out).filter(Boolean);
 }
 
-function getRoleTokensForStep(scene: { sceneRoles?: any } | null, step: { sourceId?: number; markdown?: string | null; playMarkdown?: string | null }): string[] {
+function getRoleTokensForStep(
+  scene: { sceneRoles?: any } | null,
+  step: {
+    sourceId?: number;
+    markdown?: string | null;
+    playMarkdown?: string | null;
+  },
+): string[] {
   const stepId = typeof step.sourceId === 'number' ? step.sourceId : null;
   if (stepId != null) {
-    const attached = extractRoleKeysFromSceneRoles((scene as any)?.sceneRoles, stepId);
+    const attached = extractRoleKeysFromSceneRoles(
+      (scene as any)?.sceneRoles,
+      stepId,
+    );
     if (attached.length > 0) return attached;
   }
   const text = step.playMarkdown ?? step.markdown ?? '';
@@ -344,6 +361,55 @@ export class RehearsalsService {
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, false);
     return reh;
+  }
+
+  async getMyComment(userId: string, rehearsalId: string) {
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+      select: { id: true, projectId: true },
+    });
+    if (!reh) throw new NotFoundException('Rehearsal not found');
+    await this.assertUserHasProjectAccess(userId, reh.projectId, false);
+
+    const comment = await this.prisma.rehearsalComment.findUnique({
+      where: { rehearsalId_authorUserId: { rehearsalId, authorUserId: userId } },
+      select: { id: true, content: true, createdAt: true, updatedAt: true },
+    });
+    return { comment: comment ?? null };
+  }
+
+  async upsertMyComment(
+    userId: string,
+    userEmail: string,
+    rehearsalId: string,
+    dto: UpsertMyRehearsalCommentDto,
+  ) {
+    const reh = await this.prisma.rehearsal.findUnique({
+      where: { id: rehearsalId },
+      select: { id: true, projectId: true },
+    });
+    if (!reh) throw new NotFoundException('Rehearsal not found');
+    await this.assertUserHasProjectAccess(userId, reh.projectId, false);
+
+    const email = String(userEmail ?? '').trim().toLowerCase();
+    if (!email) throw new BadRequestException('Invalid user email');
+
+    const content = String(dto?.content ?? '').trim();
+    if (!content) {
+      await this.prisma.rehearsalComment.deleteMany({
+        where: { rehearsalId, authorUserId: userId },
+      });
+      return { comment: null };
+    }
+
+    const comment = await this.prisma.rehearsalComment.upsert({
+      where: { rehearsalId_authorUserId: { rehearsalId, authorUserId: userId } },
+      update: { content, authorEmail: email },
+      create: { rehearsalId, authorUserId: userId, authorEmail: email, content },
+      select: { id: true, content: true, createdAt: true, updatedAt: true },
+    });
+
+    return { comment };
   }
 
   async update(userId: string, id: string, dto: UpdateRehearsalDto) {
@@ -590,7 +656,10 @@ export class RehearsalsService {
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
         const roles = getRoleTokensForStep(scene as any, step as any);
-        roles.map((r) => normalizeRoleKey(r)).filter(Boolean).forEach((k) => requiredRoleKeysSet.add(k));
+        roles
+          .map((r) => normalizeRoleKey(r))
+          .filter(Boolean)
+          .forEach((k) => requiredRoleKeysSet.add(k));
       }
     }
 
@@ -684,11 +753,16 @@ export class RehearsalsService {
       const steps = stepsBySceneId.get(scene.id) ?? [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
+        if (
+          allowed &&
+          typeof step.sourceId === 'number' &&
+          !allowed.has(step.sourceId)
+        )
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
         const roles = getRoleTokensForStep(scene as any, step as any);
-        const rawDuration = typeof step.durationMin === 'number' ? step.durationMin : null;
+        const rawDuration =
+          typeof step.durationMin === 'number' ? step.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
             ? Math.max(1, Math.min(480, Math.trunc(rawDuration)))
@@ -919,11 +993,18 @@ export class RehearsalsService {
       const steps = stepsBySceneId2.get(scene.id) ?? [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
+        if (
+          allowed &&
+          typeof step.sourceId === 'number' &&
+          !allowed.has(step.sourceId)
+        )
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
         const roles = getRoleTokensForStep(scene as any, step as any);
-        roles.map((r) => normalizeRoleKey(r)).filter(Boolean).forEach((k) => requiredRoleKeysSet.add(k));
+        roles
+          .map((r) => normalizeRoleKey(r))
+          .filter(Boolean)
+          .forEach((k) => requiredRoleKeysSet.add(k));
       }
     }
 
@@ -950,7 +1031,11 @@ export class RehearsalsService {
       const steps = stepsBySceneId2.get(scene.id) ?? [];
       for (const step of steps) {
         const allowed = allowedStepsBySceneId.get(scene.id);
-        if (allowed && typeof step.sourceId === 'number' && !allowed.has(step.sourceId))
+        if (
+          allowed &&
+          typeof step.sourceId === 'number' &&
+          !allowed.has(step.sourceId)
+        )
           continue;
         if (allowed && typeof step.sourceId !== 'number') continue;
         const roles = getRoleTokensForStep(scene as any, step as any);
@@ -1036,9 +1121,7 @@ export class RehearsalsService {
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
     const secret = this.config.get<string>('INTERNAL_API_SECRET');
     if (!secret) {
-      throw new BadRequestException(
-        'INTERNAL_API_SECRET is not configured',
-      );
+      throw new BadRequestException('INTERNAL_API_SECRET is not configured');
     }
 
     const pref = await this.prisma.projectTelegramBotPreference.findUnique({

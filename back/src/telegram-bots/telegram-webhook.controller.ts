@@ -1,4 +1,11 @@
-import { Body, Controller, ForbiddenException, Headers, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Headers,
+  Param,
+  Post,
+} from '@nestjs/common';
 import { TelegramBotsService } from './telegram-bots.service';
 
 @Controller('telegram')
@@ -21,4 +28,3 @@ export class TelegramWebhookController {
     return { ok: true };
   }
 }
-

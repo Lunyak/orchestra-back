@@ -5,4 +5,3 @@ export class AddTroupeMemberDto {
   @MaxLength(120)
   email!: string;
 }
-

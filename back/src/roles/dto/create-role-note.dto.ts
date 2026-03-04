@@ -5,4 +5,3 @@ export class CreateRoleNoteDto {
   @MaxLength(20000)
   content!: string;
 }
-

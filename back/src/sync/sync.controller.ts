@@ -1,6 +1,10 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { SyncPullDto, SyncPullSceneDto, SyncPushDto } from './dto/sync-change.dto';
+import {
+  SyncPullDto,
+  SyncPullSceneDto,
+  SyncPushDto,
+} from './dto/sync-change.dto';
 import { SyncService } from './sync.service';
 
 @UseGuards(JwtAuthGuard)

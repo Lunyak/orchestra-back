@@ -67,7 +67,10 @@ export class ProfileController {
   ) {
     if (!file) throw new BadRequestException('Файл не передан');
     try {
-      return await this.profileService.uploadAvatarByEmail(req.user.email, file);
+      return await this.profileService.uploadAvatarByEmail(
+        req.user.email,
+        file,
+      );
     } catch (e: any) {
       const msg = String(e?.message ?? '');
       if (msg.includes('unsupported')) {

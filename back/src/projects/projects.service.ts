@@ -111,7 +111,9 @@ export class ProjectsService {
     }
 
     const existingKeys = await this.storage.listKeys(prefix, 1000);
-    const toDelete = existingKeys.filter((k) => k.startsWith(prefix) && !referenced.has(k));
+    const toDelete = existingKeys.filter(
+      (k) => k.startsWith(prefix) && !referenced.has(k),
+    );
     for (const key of toDelete.slice(0, 5000)) {
       await this.storage.deleteObject(key);
     }

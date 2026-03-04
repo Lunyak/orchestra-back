@@ -577,6 +577,13 @@ export interface Rehearsal {
   participants?: RehearsalParticipant[];
 }
 
+export interface RehearsalMyComment {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export async function updateRehearsal(
   accessToken: string,
   rehearsalId: string,
@@ -653,6 +660,30 @@ export async function getRehearsal(
   return data;
 }
 
+export async function getMyRehearsalComment(
+  accessToken: string,
+  rehearsalId: string,
+): Promise<{ comment: RehearsalMyComment | null }> {
+  const { data } = await api.get(
+    `/rehearsals/${encodeURIComponent(rehearsalId)}/my-comment`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function upsertMyRehearsalComment(
+  accessToken: string,
+  rehearsalId: string,
+  body: { content?: string },
+): Promise<{ comment: RehearsalMyComment | null }> {
+  const { data } = await api.put(
+    `/rehearsals/${encodeURIComponent(rehearsalId)}/my-comment`,
+    body ?? {},
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
 export async function setRehearsalParticipants(
   accessToken: string,
   rehearsalId: string,
@@ -697,12 +728,90 @@ export async function publishDirectorSession(
   return data;
 }
 
+export type DirectorSessionParticipantStatus = "unknown" | "present" | "absent" | "late";
+
+export type DirectorSessionSlotRef = { projectSlug: string; stepId: number };
+
+export type DirectorSessionSlot = {
+  id: string;
+  offsetMin: number;
+  durationMin: number;
+  ref?: DirectorSessionSlotRef;
+  notes?: string;
+};
+
+export type DirectorSessionParticipant = {
+  email: string;
+  status: DirectorSessionParticipantStatus;
+  telegramId?: string | null;
+  userName?: string | null;
+  lateTime?: string | null;
+  respondedAt?: string | null;
+};
+
+export type DirectorSession = {
+  id: string;
+  title: string;
+  startsAt: string;
+  slots: DirectorSessionSlot[];
+  comment?: string | null;
+  plannedEmails?: string[];
+  updatedAt?: string;
+  participants?: DirectorSessionParticipant[];
+  telegramChatId?: string | null;
+  telegramMessageId?: string | null;
+  telegramThreadId?: string | null;
+  publishedAt?: string | null;
+};
+
+export type DirectorSessionMyComment = {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export async function getDirectorSessions(
   accessToken: string,
 ): Promise<{ projectId: string; sessions: any[] }> {
   const { data } = await api.get("/director-sessions", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  return data as any;
+}
+
+export async function getDirectorSession(
+  accessToken: string,
+  sessionId: string,
+): Promise<DirectorSession> {
+  const { data } = await api.get(
+    `/director-sessions/${encodeURIComponent(sessionId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function getMyDirectorSessionComment(
+  accessToken: string,
+  sessionId: string,
+): Promise<{ comment: DirectorSessionMyComment | null }> {
+  const { data } = await api.get(
+    `/director-sessions/${encodeURIComponent(sessionId)}/my-comment`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function upsertMyDirectorSessionComment(
+  accessToken: string,
+  sessionId: string,
+  body: { content?: string },
+): Promise<{ comment: DirectorSessionMyComment | null }> {
+  const { data } = await api.put(
+    `/director-sessions/${encodeURIComponent(sessionId)}/my-comment`,
+    body ?? {},
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
   return data as any;
 }
 

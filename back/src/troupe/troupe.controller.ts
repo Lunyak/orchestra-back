@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AddTroupeMemberDto } from './dto/add-troupe-member.dto';
 import { TroupeService } from './troupe.service';
@@ -23,4 +32,3 @@ export class TroupeController {
     return this.troupeService.removeMember(req.user.userId, memberId);
   }
 }
-

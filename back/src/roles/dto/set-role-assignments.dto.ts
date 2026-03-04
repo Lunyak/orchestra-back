@@ -14,4 +14,3 @@ export class SetRoleAssignmentsDto {
   @IsArray()
   roleAssignments?: Array<{ roleTitle: string; emails: string[] }>;
 }
-

@@ -20,6 +20,7 @@ export type DirectorRehearsalSession = {
   startsAt: string; // ISO
   comment?: string | null;
   slots: DirectorSessionSlot[];
+  plannedEmails?: string[];
   updatedAt: string;
 };
 

@@ -73,7 +73,10 @@ function dbHintFromError(e: any): string | null {
   const msg = String(e?.message ?? '');
 
   // Postgres: undefined_table / undefined_column
-  if (code === '42P01' || /relation .*TelegramBotIntegration.* does not exist/i.test(msg)) {
+  if (
+    code === '42P01' ||
+    /relation .*TelegramBotIntegration.* does not exist/i.test(msg)
+  ) {
     return 'DB is missing Telegram bot tables. Apply prisma migrations (20260220120000_telegram_bots*).';
   }
   if (code === '42703' || /column .* does not exist/i.test(msg)) {
@@ -176,9 +179,7 @@ export class TelegramBotsService {
       return data.result;
     } catch (e: any) {
       const msg =
-        e?.response?.data?.description ||
-        e?.message ||
-        'Telegram getMe failed';
+        e?.response?.data?.description || e?.message || 'Telegram getMe failed';
       throw new BadRequestException(msg);
     }
   }
@@ -386,9 +387,12 @@ export class TelegramBotsService {
       patch.adminTelegramId = dto.adminTelegramId
         ? String(dto.adminTelegramId).trim()
         : null;
-    if (dto.status !== undefined) patch.status = String(dto.status ?? '').trim();
+    if (dto.status !== undefined)
+      patch.status = String(dto.status ?? '').trim();
     if (dto.groupChatId !== undefined)
-      patch.groupChatId = dto.groupChatId ? String(dto.groupChatId).trim() : null;
+      patch.groupChatId = dto.groupChatId
+        ? String(dto.groupChatId).trim()
+        : null;
     if (dto.attendanceThreadId !== undefined)
       patch.attendanceThreadId = dto.attendanceThreadId
         ? String(dto.attendanceThreadId).trim()
@@ -530,7 +534,9 @@ export class TelegramBotsService {
     }
   }
 
-  private async getVariablesMap(botId: string): Promise<Record<string, string>> {
+  private async getVariablesMap(
+    botId: string,
+  ): Promise<Record<string, string>> {
     const rows = (await this.prisma.$queryRawUnsafe(
       `SELECT "key","value" FROM "BotVariable" WHERE "botId" = $1`,
       botId,
@@ -540,7 +546,11 @@ export class TelegramBotsService {
     return out;
   }
 
-  async sendTestMessage(userId: string, botId: string, dto: TelegramBotTestMessageDto) {
+  async sendTestMessage(
+    userId: string,
+    botId: string,
+    dto: TelegramBotTestMessageDto,
+  ) {
     const token = await this.getDecryptedTokenOrThrow(userId, botId);
     const vars = await this.getVariablesMap(botId);
     const text = renderTemplate(dto.text, vars);
@@ -564,7 +574,10 @@ export class TelegramBotsService {
     }
   }
 
-  async validateWebhookSecret(botId: string, secret: string | null | undefined) {
+  async validateWebhookSecret(
+    botId: string,
+    secret: string | null | undefined,
+  ) {
     const rows = (await this.prisma.$queryRawUnsafe(
       `SELECT "webhookSecret" FROM "TelegramBotIntegration" WHERE "id" = $1 LIMIT 1`,
       botId,
@@ -574,4 +587,3 @@ export class TelegramBotsService {
     return String(secret ?? '') === String(expected);
   }
 }
-

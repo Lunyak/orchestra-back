@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useScriptUI } from "../../features/script-ui";
 import { Header } from "../../shared/components/header/Header";
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
@@ -11,15 +11,15 @@ const SpectaclePage = lazy(() =>
   }))
 );
 
-const RehearsalsPage = lazy(() =>
-  import("../../pages/rehearsals/RehearsalsPage").then((m) => ({
-    default: m.RehearsalsPage,
-  }))
-);
-
 const DirectorSessionsPage = lazy(() =>
   import("../../pages/sessions/DirectorSessionsPage").then((m) => ({
     default: m.DirectorSessionsPage,
+  }))
+);
+
+const DirectorSessionDetailsPage = lazy(() =>
+  import("../../pages/sessions/DirectorSessionDetailsPage").then((m) => ({
+    default: m.DirectorSessionDetailsPage,
   }))
 );
 
@@ -167,8 +167,10 @@ export function AppRoutes() {
           <Route path="/theater" element={<SpectaclePage />} />
           <Route path="/light-plot" element={<SpectaclePage />} />
           <Route path="/board" element={<SpectaclePage />} />
-          <Route path="/rehearsals" element={<RehearsalsPage />} />
+          <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />
+          <Route path="/rehearsals/:rehearsalId" element={<Navigate to="/sessions" replace />} />
           <Route path="/sessions" element={<DirectorSessionsPage />} />
+          <Route path="/sessions/:sessionId" element={<DirectorSessionDetailsPage />} />
           <Route path="/actor" element={<ActorPage />} />
           <Route path="/trainers" element={<TrainersPage />} />
           <Route path="/trainers/speech" element={<SpeechTrainerPage />} />

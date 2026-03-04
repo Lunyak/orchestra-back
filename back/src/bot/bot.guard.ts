@@ -33,7 +33,9 @@ export class BotGuard implements CanActivate {
 
     // For multi-bot: bot-service must explicitly specify which integration it acts as.
     const integrationId =
-      (request.headers['x-telegram-bot-integration-id'] as string | undefined) ||
+      (request.headers['x-telegram-bot-integration-id'] as
+        | string
+        | undefined) ||
       (request.headers['x-bot-integration-id'] as string | undefined);
     const botIntegrationId = String(integrationId ?? '').trim();
     if (!botIntegrationId) {

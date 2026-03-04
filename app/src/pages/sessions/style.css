@@ -28,6 +28,11 @@
   align-items: stretch;
 }
 
+.sessions-sessionRow.active .sessions-sessionSelect {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.14);
+}
+
 .sessions-sessionSelect {
   flex: 1;
   min-width: 0;
@@ -37,28 +42,6 @@
 .sessions-sessionSelect.dragging {
   opacity: 0.9;
   transform: scale(0.995);
-}
-
-.sessions-sessionActions {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.sessions-sessionActions button {
-  height: 34px;
-  width: 34px;
-  padding: 0;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
-  cursor: pointer;
-}
-
-.sessions-sessionActions button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .sessions-main {
@@ -108,6 +91,13 @@
   margin-top: 10px;
   display: grid;
   gap: 8px;
+  border-radius: 12px;
+}
+
+.sessions-slots.dropActive {
+  outline: 2px dashed rgba(96, 165, 250, 0.65);
+  outline-offset: 6px;
+  background: rgba(37, 99, 235, 0.10);
 }
 
 .sessions-slot {
@@ -481,13 +471,11 @@
 
 .sessions-page .troupe-day-cell.partial {
   background: rgba(88, 166, 255, 0.22);
-  background-image: repeating-linear-gradient(
-    135deg,
-    rgba(88, 166, 255, 0.35) 0px,
-    rgba(88, 166, 255, 0.35) 6px,
-    rgba(88, 166, 255, 0.12) 6px,
-    rgba(88, 166, 255, 0.12) 12px
-  );
+  background-image: repeating-linear-gradient(135deg,
+      rgba(88, 166, 255, 0.35) 0px,
+      rgba(88, 166, 255, 0.35) 6px,
+      rgba(88, 166, 255, 0.12) 6px,
+      rgba(88, 166, 255, 0.12) 12px);
 }
 
 .sessions-page .troupe-day-cell.busy {
@@ -517,3 +505,6 @@
   }
 }
 
+.comments-for-bot{
+  margin: 10px 0;
+}

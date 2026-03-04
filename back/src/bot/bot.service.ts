@@ -119,7 +119,12 @@ export class BotService {
        WHERE "botId" = $1
        ORDER BY "key" ASC`,
       id,
-    )) as Array<{ key: string; value: string; isSecret: boolean; updatedAt: Date }>;
+    )) as Array<{
+      key: string;
+      value: string;
+      isSecret: boolean;
+      updatedAt: Date;
+    }>;
 
     return {
       integration: rows[0],

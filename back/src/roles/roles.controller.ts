@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UpsertProjectRoleDto } from './dto/upsert-role.dto';
 import { SetRoleAssignmentsDto } from './dto/set-role-assignments.dto';
@@ -16,7 +26,11 @@ export class RolesController {
   }
 
   @Post(':slug/roles')
-  create(@Req() req: any, @Param('slug') slug: string, @Body() body: UpsertProjectRoleDto) {
+  create(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Body() body: UpsertProjectRoleDto,
+  ) {
     return this.roles.upsertRole(req.user.userId, slug, null, body as any);
   }
 
@@ -37,16 +51,29 @@ export class RolesController {
     @Param('roleId') roleId: string,
     @Body() body: SetRoleAssignmentsDto,
   ) {
-    return this.roles.setRoleAssignments(req.user.userId, slug, roleId, body as any);
+    return this.roles.setRoleAssignments(
+      req.user.userId,
+      slug,
+      roleId,
+      body as any,
+    );
   }
 
   @Delete(':slug/roles/:roleId')
-  remove(@Req() req: any, @Param('slug') slug: string, @Param('roleId') roleId: string) {
+  remove(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Param('roleId') roleId: string,
+  ) {
     return this.roles.deleteRole(req.user.userId, slug, roleId);
   }
 
   @Get(':slug/roles/:roleId/notes')
-  listNotes(@Req() req: any, @Param('slug') slug: string, @Param('roleId') roleId: string) {
+  listNotes(
+    @Req() req: any,
+    @Param('slug') slug: string,
+    @Param('roleId') roleId: string,
+  ) {
     return this.roles.listRoleNotes(req.user.userId, slug, roleId);
   }
 
@@ -60,4 +87,3 @@ export class RolesController {
     return this.roles.addRoleNote(req.user.userId, slug, roleId, body as any);
   }
 }
-

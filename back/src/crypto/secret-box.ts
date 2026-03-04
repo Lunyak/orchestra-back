@@ -45,4 +45,3 @@ export function decryptString(payload: string): string {
   const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   return plain.toString('utf8');
 }
-

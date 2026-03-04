@@ -16,4 +16,3 @@ export class TelegramBotsInternalController {
     return this.telegramBots.listConnectedIntegrationsForRunner();
   }
 }
-

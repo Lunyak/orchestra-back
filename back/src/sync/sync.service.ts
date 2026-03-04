@@ -47,7 +47,10 @@ export class SyncService {
     return t || fallback;
   }
 
-  private normalizeVec3(v: any, fallback: [number, number, number]): [number, number, number] {
+  private normalizeVec3(
+    v: any,
+    fallback: [number, number, number],
+  ): [number, number, number] {
     if (!Array.isArray(v) || v.length !== 3) return fallback;
     const x = this.normalizeFloat(v[0], fallback[0]);
     const y = this.normalizeFloat(v[1], fallback[1]);
@@ -55,7 +58,9 @@ export class SyncService {
     return [x, y, z];
   }
 
-  private projectIdFromCompoundId(value: string | null | undefined): string | null {
+  private projectIdFromCompoundId(
+    value: string | null | undefined,
+  ): string | null {
     const id = typeof value === 'string' ? value.trim() : '';
     if (!id) return null;
     const idx = id.indexOf(':');
@@ -63,17 +68,21 @@ export class SyncService {
     return id.slice(0, idx);
   }
 
-  private async syncStepsFromLegacySceneSnapshot(sceneId: string, legacySceneSnapshot: any) {
+  private async syncStepsFromLegacySceneSnapshot(
+    sceneId: string,
+    legacySceneSnapshot: any,
+  ) {
     const stepsValue = legacySceneSnapshot?.steps;
     if (!Array.isArray(stepsValue)) return;
 
-    const steps = stepsValue as any[];
+    const steps = stepsValue;
     const parsed = steps
       .map((st: any, idx: number) => {
         const sourceId = this.normalizeInt(st?.id, -1);
         if (sourceId <= 0) return null;
         const id = `${sceneId}:${sourceId}`;
-        const rawDuration = typeof st?.durationMin === 'number' ? st.durationMin : null;
+        const rawDuration =
+          typeof st?.durationMin === 'number' ? st.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
             ? Math.max(1, Math.min(480, Math.trunc(rawDuration)))
@@ -82,7 +91,8 @@ export class SyncService {
           typeof st?.kanbanStatus === 'string' && st.kanbanStatus.trim()
             ? st.kanbanStatus.trim()
             : null;
-        const kanbanOrderRaw = typeof st?.kanbanOrder === 'number' ? st.kanbanOrder : null;
+        const kanbanOrderRaw =
+          typeof st?.kanbanOrder === 'number' ? st.kanbanOrder : null;
         const kanbanOrder =
           kanbanOrderRaw != null && Number.isFinite(kanbanOrderRaw)
             ? Math.trunc(kanbanOrderRaw)
@@ -93,16 +103,25 @@ export class SyncService {
           sourceId,
           title: this.normalizeString(st?.title, `Step ${sourceId}`),
           markdown: typeof st?.markdown === 'string' ? st.markdown : null,
-          playMarkdown: typeof st?.playMarkdown === 'string' ? st.playMarkdown : null,
+          playMarkdown:
+            typeof st?.playMarkdown === 'string' ? st.playMarkdown : null,
           explicationMarkdown:
-            typeof st?.explicationMarkdown === 'string' ? st.explicationMarkdown : null,
+            typeof st?.explicationMarkdown === 'string'
+              ? st.explicationMarkdown
+              : null,
           durationMin,
           kanbanStatus,
           kanbanOrder,
           order: idx,
-          requisites: Array.isArray(st?.requisites) ? (st.requisites as any[]) : [],
-          lightPlot: Array.isArray(st?.lightPlot) ? (st.lightPlot as any[]) : [],
-          theaterModels: Array.isArray(st?.theaterModels) ? (st.theaterModels as any[]) : [],
+          requisites: Array.isArray(st?.requisites)
+            ? (st.requisites as any[])
+            : [],
+          lightPlot: Array.isArray(st?.lightPlot)
+            ? (st.lightPlot as any[])
+            : [],
+          theaterModels: Array.isArray(st?.theaterModels)
+            ? (st.theaterModels as any[])
+            : [],
           theaterSpotlights: Array.isArray(st?.theaterSpotlights)
             ? (st.theaterSpotlights as any[])
             : [],
@@ -145,7 +164,12 @@ export class SyncService {
           };
         })
         .filter(Boolean),
-    ) as Array<{ stepId: string; sourceId: number; label: string; checked: boolean }>;
+    ) as Array<{
+      stepId: string;
+      sourceId: number;
+      label: string;
+      checked: boolean;
+    }>;
 
     const lightPlotData = parsed.flatMap((st) =>
       (st.lightPlot ?? [])
@@ -159,7 +183,9 @@ export class SyncService {
             sourceId,
             label,
             channel:
-              typeof f?.channel === 'string' && f.channel.trim() ? f.channel.trim() : null,
+              typeof f?.channel === 'string' && f.channel.trim()
+                ? f.channel.trim()
+                : null,
             x: this.normalizeInt(f?.x, 0),
             y: this.normalizeInt(f?.y, 0),
             angle: this.normalizeInt(f?.angle, 0),
@@ -190,7 +216,10 @@ export class SyncService {
             sourceId,
             name,
             type,
-            builtin: typeof m?.builtin === 'string' && m.builtin.trim() ? m.builtin.trim() : null,
+            builtin:
+              typeof m?.builtin === 'string' && m.builtin.trim()
+                ? m.builtin.trim()
+                : null,
             allowOutOfBounds: this.normalizeBool(m?.allowOutOfBounds, false),
             position: this.normalizeVec3(m?.position, [0, 0, 0]),
             rotation: this.normalizeVec3(m?.rotation, [0, 0, 0]),
@@ -215,7 +244,10 @@ export class SyncService {
         .map((sp: any) => {
           const sourceId = this.normalizeInt(sp?.id, -1);
           if (sourceId <= 0) return null;
-          const label = this.normalizeString(sp?.label, `Spotlight ${sourceId}`);
+          const label = this.normalizeString(
+            sp?.label,
+            `Spotlight ${sourceId}`,
+          );
           return {
             stepId: st.id,
             sourceId,
@@ -278,10 +310,18 @@ export class SyncService {
 
     await this.prisma.$transaction([
       ...stepUpserts,
-      this.prisma.stepRequisite.deleteMany({ where: { stepId: { in: stepIds } } }),
-      this.prisma.stepLightPlot.deleteMany({ where: { stepId: { in: stepIds } } }),
-      this.prisma.theaterModel.deleteMany({ where: { stepId: { in: stepIds } } }),
-      this.prisma.theaterSpotlight.deleteMany({ where: { stepId: { in: stepIds } } }),
+      this.prisma.stepRequisite.deleteMany({
+        where: { stepId: { in: stepIds } },
+      }),
+      this.prisma.stepLightPlot.deleteMany({
+        where: { stepId: { in: stepIds } },
+      }),
+      this.prisma.theaterModel.deleteMany({
+        where: { stepId: { in: stepIds } },
+      }),
+      this.prisma.theaterSpotlight.deleteMany({
+        where: { stepId: { in: stepIds } },
+      }),
       ...(requisitesData.length
         ? [this.prisma.stepRequisite.createMany({ data: requisitesData })]
         : []),
@@ -292,7 +332,11 @@ export class SyncService {
         ? [this.prisma.theaterModel.createMany({ data: theaterModelsData })]
         : []),
       ...(theaterSpotlightsData.length
-        ? [this.prisma.theaterSpotlight.createMany({ data: theaterSpotlightsData })]
+        ? [
+            this.prisma.theaterSpotlight.createMany({
+              data: theaterSpotlightsData,
+            }),
+          ]
         : []),
     ]);
   }
@@ -463,8 +507,13 @@ export class SyncService {
       name: payload.name,
     });
 
-    const hasSceneRoles = Object.prototype.hasOwnProperty.call(payload ?? {}, 'sceneRoles');
-    const nextSceneRoles = hasSceneRoles ? (payload?.sceneRoles ?? null) : undefined;
+    const hasSceneRoles = Object.prototype.hasOwnProperty.call(
+      payload ?? {},
+      'sceneRoles',
+    );
+    const nextSceneRoles = hasSceneRoles
+      ? (payload?.sceneRoles ?? null)
+      : undefined;
 
     const result = await this.prisma.scene.upsert({
       where: { id: payload.id },
@@ -532,7 +581,17 @@ export class SyncService {
       return;
     }
     await this.prisma.playlistItem.create({
-      data: { sceneId, sourceId, order, title, file, fadeMs, loop, remoteUrl, remoteKey },
+      data: {
+        sceneId,
+        sourceId,
+        order,
+        title,
+        file,
+        fadeMs,
+        loop,
+        remoteUrl,
+        remoteKey,
+      },
     });
     if (projectId) this.notifications.notifySceneUpdated(projectId);
   }
@@ -756,15 +815,18 @@ export class SyncService {
         // Если шаг ранее "удалили" (soft delete), любая upsert/update должна возвращать его в активное состояние.
         deletedAt: null,
         durationMin:
-          payload.durationMin != null && Number.isFinite(Number(payload.durationMin))
+          payload.durationMin != null &&
+          Number.isFinite(Number(payload.durationMin))
             ? Math.trunc(Number(payload.durationMin))
             : undefined,
         kanbanStatus:
-          typeof payload.kanbanStatus === 'string' && payload.kanbanStatus.trim()
+          typeof payload.kanbanStatus === 'string' &&
+          payload.kanbanStatus.trim()
             ? payload.kanbanStatus.trim()
             : undefined,
         kanbanOrder:
-          payload.kanbanOrder != null && Number.isFinite(Number(payload.kanbanOrder))
+          payload.kanbanOrder != null &&
+          Number.isFinite(Number(payload.kanbanOrder))
             ? Math.trunc(Number(payload.kanbanOrder))
             : undefined,
         order: payload.order,
@@ -779,15 +841,18 @@ export class SyncService {
         explicationMarkdown: payload.explicationMarkdown ?? null,
         deletedAt: null,
         durationMin:
-          payload.durationMin != null && Number.isFinite(Number(payload.durationMin))
+          payload.durationMin != null &&
+          Number.isFinite(Number(payload.durationMin))
             ? Math.trunc(Number(payload.durationMin))
             : null,
         kanbanStatus:
-          typeof payload.kanbanStatus === 'string' && payload.kanbanStatus.trim()
+          typeof payload.kanbanStatus === 'string' &&
+          payload.kanbanStatus.trim()
             ? payload.kanbanStatus.trim()
             : null,
         kanbanOrder:
-          payload.kanbanOrder != null && Number.isFinite(Number(payload.kanbanOrder))
+          payload.kanbanOrder != null &&
+          Number.isFinite(Number(payload.kanbanOrder))
             ? Math.trunc(Number(payload.kanbanOrder))
             : null,
         order: payload.order,
@@ -829,11 +894,18 @@ export class SyncService {
             };
           })
           .filter(
-            (x): x is { stepId: string; sourceId: number; label: string; checked: boolean } =>
-              x !== null,
+            (
+              x,
+            ): x is {
+              stepId: string;
+              sourceId: number;
+              label: string;
+              checked: boolean;
+            } => x !== null,
           );
         tx.push(this.prisma.stepRequisite.deleteMany({ where: { stepId } }));
-        if (data.length) tx.push(this.prisma.stepRequisite.createMany({ data }));
+        if (data.length)
+          tx.push(this.prisma.stepRequisite.createMany({ data }));
       }
 
       if (Array.isArray(lightPlotValue)) {
@@ -858,7 +930,9 @@ export class SyncService {
             };
           })
           .filter(
-            (x): x is {
+            (
+              x,
+            ): x is {
               stepId: string;
               sourceId: number;
               label: string;
@@ -870,7 +944,8 @@ export class SyncService {
             } => x !== null,
           );
         tx.push(this.prisma.stepLightPlot.deleteMany({ where: { stepId } }));
-        if (data.length) tx.push(this.prisma.stepLightPlot.createMany({ data }));
+        if (data.length)
+          tx.push(this.prisma.stepLightPlot.createMany({ data }));
       }
 
       if (Array.isArray(theaterModelsValue)) {
@@ -896,7 +971,9 @@ export class SyncService {
             };
           })
           .filter(
-            (x): x is {
+            (
+              x,
+            ): x is {
               stepId: string;
               sourceId: number;
               name: string;
@@ -917,7 +994,10 @@ export class SyncService {
           .map((sp: any) => {
             const sourceId = this.normalizeInt(sp?.id, -1);
             if (sourceId <= 0) return null;
-            const label = this.normalizeString(sp?.label, `Spotlight ${sourceId}`);
+            const label = this.normalizeString(
+              sp?.label,
+              `Spotlight ${sourceId}`,
+            );
             return {
               stepId,
               sourceId,
@@ -933,7 +1013,9 @@ export class SyncService {
             };
           })
           .filter(
-            (x): x is {
+            (
+              x,
+            ): x is {
               stepId: string;
               sourceId: number;
               label: string;
@@ -948,7 +1030,8 @@ export class SyncService {
             } => x !== null,
           );
         tx.push(this.prisma.theaterSpotlight.deleteMany({ where: { stepId } }));
-        if (data.length) tx.push(this.prisma.theaterSpotlight.createMany({ data }));
+        if (data.length)
+          tx.push(this.prisma.theaterSpotlight.createMany({ data }));
       }
 
       if (tx.length) {
@@ -1183,9 +1266,12 @@ export class SyncService {
     const stepsBySourceId = new Map<number, (typeof stepsRaw)[number]>();
     for (const st of stepsRaw) {
       const prev = stepsBySourceId.get(st.sourceId);
-      if (!prev || st.updatedAt > prev.updatedAt) stepsBySourceId.set(st.sourceId, st);
+      if (!prev || st.updatedAt > prev.updatedAt)
+        stepsBySourceId.set(st.sourceId, st);
     }
-    const steps = Array.from(stepsBySourceId.values()).sort((a, b) => a.order - b.order);
+    const steps = Array.from(stepsBySourceId.values()).sort(
+      (a, b) => a.order - b.order,
+    );
 
     const playlistItems = wantPlaylist
       ? await this.prisma.playlistItem.findMany({

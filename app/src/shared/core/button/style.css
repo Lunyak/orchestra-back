@@ -10,6 +10,11 @@
     cursor: pointer;
 }
 
+.button.is-active {
+    outline: 2px solid rgba(120, 180, 255, 0.85);
+    outline-offset: 2px;
+}
+
 .button:hover {
     background: var(--color-button-primary-hover);
 }
@@ -35,6 +40,22 @@
     cursor: pointer;
 }
 
+.button.secondary:hover {
+    background: var(--color-button-secondary-hover, var(--color-button-secondary));
+}
+
+.button.secondary:active {
+    background: var(--color-button-secondary-active, var(--color-button-secondary));
+}
+
 .button.danger {
     background: var(--color-button-danger);
+}
+
+.button.danger:hover {
+    background: var(--color-button-danger-hover, var(--color-button-danger));
+}
+
+.button.danger:active {
+    background: var(--color-button-danger-active, var(--color-button-danger));
 }

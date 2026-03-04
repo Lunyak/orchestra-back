@@ -2,6 +2,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
@@ -103,6 +104,7 @@ export function RehearsalsPage() {
   const { projectName } = useProject();
   const { projectMembers, projectOwner } = useTeam();
   const { steps: scriptSteps } = useScene();
+  const location = useLocation();
 
   const projectSlug = projectName || "fools";
   const members = useMemo(
@@ -142,6 +144,18 @@ export function RehearsalsPage() {
     () => rehearsals.find((r) => r.id === activeRehearsalId) ?? rehearsals[0] ?? null,
     [activeRehearsalId, rehearsals],
   );
+
+  const deepLinkedRehearsalId = useMemo(() => {
+    const sp = new URLSearchParams(location.search);
+    const v = String(sp.get("rehearsalId") ?? "").trim();
+    return v || null;
+  }, [location.search]);
+
+  useEffect(() => {
+    if (!deepLinkedRehearsalId) return;
+    if (!(rehearsals ?? []).some((r) => r.id === deepLinkedRehearsalId)) return;
+    setActiveRehearsalId(deepLinkedRehearsalId);
+  }, [deepLinkedRehearsalId, rehearsals]);
 
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);

@@ -34,10 +34,18 @@ export class TroupeService {
     const members = await this.prisma.troupeMember.findMany({
       where: { troupeId: troupe.id },
       orderBy: { createdAt: 'desc' },
-      select: { id: true, troupeId: true, userId: true, email: true, createdAt: true },
+      select: {
+        id: true,
+        troupeId: true,
+        userId: true,
+        email: true,
+        createdAt: true,
+      },
     });
 
-    const emails = members.map((m) => m.email.trim().toLowerCase()).filter(Boolean);
+    const emails = members
+      .map((m) => m.email.trim().toLowerCase())
+      .filter(Boolean);
     const profiles = emails.length
       ? await this.prisma.userProfile.findMany({
           where: { email: { in: emails } },
@@ -81,7 +89,13 @@ export class TroupeService {
       });
       const created = await this.prisma.troupeMember.create({
         data: { troupeId: troupe.id, email, userId: user?.id ?? null },
-        select: { id: true, troupeId: true, userId: true, email: true, createdAt: true },
+        select: {
+          id: true,
+          troupeId: true,
+          userId: true,
+          email: true,
+          createdAt: true,
+        },
       });
 
       const profile = await this.prisma.userProfile.findUnique({
@@ -122,4 +136,3 @@ export class TroupeService {
     return { ok: true };
   }
 }
-

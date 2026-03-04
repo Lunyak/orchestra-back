@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import { listRehearsals, type Rehearsal } from "../../../sync/api";
+import { getDirectorSessions, type DirectorSession } from "../../../sync/api";
 import dayjs from "dayjs";
 
 export type CalendarSectionState = {
@@ -14,7 +14,7 @@ export type CalendarSectionState = {
 
 export type ProfileAvailabilityState = {
   calendarState: CalendarSectionState;
-  byRangeKey: Record<string, Rehearsal[] | undefined>;
+  byRangeKey: Record<string, DirectorSession[] | undefined>;
   loading: boolean;
   error: string | null;
   activeRangeKey: string;
@@ -34,8 +34,8 @@ function defaultCalendarState(): CalendarSectionState {
   };
 }
 
-function rangeKey(projectName: string, fromIso: string, toIso: string) {
-  return [String(projectName ?? ""), String(fromIso ?? ""), String(toIso ?? "")].join("|");
+function rangeKey(fromIso: string, toIso: string) {
+  return [String(fromIso ?? ""), String(toIso ?? "")].join("|");
 }
 
 const initialState: ProfileAvailabilityState = {
@@ -46,26 +46,37 @@ const initialState: ProfileAvailabilityState = {
   activeRangeKey: "",
 };
 
-export const loadRehearsalsForRangeThunk = createAsyncThunk<
-  { rangeKey: string; rehearsals: Rehearsal[] },
-  { accessToken: string; projectName: string; fromIso: string; toIso: string },
+export const loadSessionsForRangeThunk = createAsyncThunk<
+  { rangeKey: string; sessions: DirectorSession[] },
+  { accessToken: string; fromIso: string; toIso: string },
   { state: RootState; rejectValue: string }
 >(
-  "profileAvailability/loadRehearsalsForRange",
-  async ({ accessToken, projectName, fromIso, toIso }, { rejectWithValue }) => {
+  "profileAvailability/loadSessionsForRange",
+  async ({ accessToken, fromIso, toIso }, { rejectWithValue }) => {
     try {
-      const res = await listRehearsals(accessToken, projectName, fromIso, toIso);
-      return { rangeKey: rangeKey(projectName, fromIso, toIso), rehearsals: res.rehearsals ?? [] };
+      const res = await getDirectorSessions(accessToken);
+      const fromMs = new Date(fromIso).getTime();
+      const toMs = new Date(toIso).getTime();
+      const sessions = (res.sessions ?? [])
+        .filter(Boolean)
+        .filter((s: any) => {
+          const t = new Date(String(s?.startsAt ?? "")).getTime();
+          if (!Number.isFinite(t)) return false;
+          if (Number.isFinite(fromMs) && t < fromMs) return false;
+          if (Number.isFinite(toMs) && t > toMs) return false;
+          return true;
+        }) as DirectorSession[];
+      return { rangeKey: rangeKey(fromIso, toIso), sessions };
     } catch {
-      return rejectWithValue("Не удалось загрузить события репетиций");
+      return rejectWithValue("Не удалось загрузить события сессий");
     }
   },
   {
-    condition: ({ projectName, fromIso, toIso }, { getState }) => {
+    condition: ({ fromIso, toIso }, { getState }) => {
       const s = (getState() as any).profileAvailability as ProfileAvailabilityState | undefined;
       if (!s) return true;
       if (s.loading) return false;
-      const key = rangeKey(projectName, fromIso, toIso);
+      const key = rangeKey(fromIso, toIso);
       if (s.byRangeKey[key]) return false;
       return true;
     },
@@ -101,19 +112,19 @@ export const profileAvailabilitySlice = createSlice({
     },
   },
   extraReducers: (b) => {
-    b.addCase(loadRehearsalsForRangeThunk.pending, (state) => {
+    b.addCase(loadSessionsForRangeThunk.pending, (state) => {
       state.loading = true;
       state.error = null;
     });
-    b.addCase(loadRehearsalsForRangeThunk.fulfilled, (state, action) => {
+    b.addCase(loadSessionsForRangeThunk.fulfilled, (state, action) => {
       state.loading = false;
       state.error = null;
-      state.byRangeKey[action.payload.rangeKey] = action.payload.rehearsals;
+      state.byRangeKey[action.payload.rangeKey] = action.payload.sessions;
       state.activeRangeKey = action.payload.rangeKey;
     });
-    b.addCase(loadRehearsalsForRangeThunk.rejected, (state, action) => {
+    b.addCase(loadSessionsForRangeThunk.rejected, (state, action) => {
       state.loading = false;
-      state.error = action.payload ?? "Не удалось загрузить события репетиций";
+      state.error = action.payload ?? "Не удалось загрузить события сессий";
     });
   },
 });
@@ -125,7 +136,7 @@ export function selectProfileCalendarState(state: RootState): CalendarSectionSta
   return (state as any).profileAvailability?.calendarState ?? defaultCalendarState();
 }
 
-export function selectAvailabilityRehearsalsForActiveRange(state: RootState): Rehearsal[] {
+export function selectAvailabilitySessionsForActiveRange(state: RootState): DirectorSession[] {
   const s = (state as any).profileAvailability as ProfileAvailabilityState | undefined;
   if (!s) return [];
   const list = s.byRangeKey?.[s.activeRangeKey];

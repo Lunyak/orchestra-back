@@ -9,4 +9,3 @@ export class UpsertBotVariableDto {
   @IsBoolean()
   isSecret?: boolean;
 }
-

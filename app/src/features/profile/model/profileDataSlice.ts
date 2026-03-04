@@ -228,6 +228,31 @@ export const profileDataSlice = createSlice({
       (state.form as any).availabilityCalendar = nextCal;
       (state.form as any).availabilityTimeRanges = nextRanges;
     },
+    setAvailabilityDayStatus(
+      state,
+      action: PayloadAction<{ date: string; status: AvailabilityStatus | null }>,
+    ) {
+      const date = String(action.payload.date ?? "").trim();
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+      const status = action.payload.status;
+
+      const availabilityCalendar =
+        (((state.form as any).availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>) ?? {};
+      const availabilityTimeRanges =
+        (((state.form as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>) ?? {};
+
+      const nextCal = { ...availabilityCalendar };
+      const nextRanges = { ...availabilityTimeRanges };
+
+      if (status === "present" || status === "absent") nextCal[date] = status;
+      else delete nextCal[date];
+
+      // Ranges only make sense when day is explicitly "present"
+      if (status !== "present") delete nextRanges[date];
+
+      (state.form as any).availabilityCalendar = nextCal;
+      (state.form as any).availabilityTimeRanges = nextRanges;
+    },
     setTimeRangesForDate(
       state,
       action: PayloadAction<{ date: string; ranges: AvailabilityTimeRange[] }>,

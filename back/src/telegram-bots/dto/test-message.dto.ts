@@ -11,4 +11,3 @@ export class TelegramBotTestMessageDto {
   @MaxLength(4000)
   text!: string;
 }
-

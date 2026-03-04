@@ -8,11 +8,13 @@ import {
   Query,
   Req,
   UseGuards,
+  Put,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
 import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
+import { UpsertMyRehearsalCommentDto } from './dto/upsert-my-rehearsal-comment.dto';
 import { RehearsalsService } from './rehearsals.service';
 
 @UseGuards(JwtAuthGuard)
@@ -38,6 +40,25 @@ export class RehearsalsController {
   @Get(':id')
   get(@Req() req: any, @Param('id') id: string) {
     return this.rehearsals.get(req.user.userId, id);
+  }
+
+  @Get(':id/my-comment')
+  getMyComment(@Req() req: any, @Param('id') id: string) {
+    return this.rehearsals.getMyComment(req.user.userId, id);
+  }
+
+  @Put(':id/my-comment')
+  upsertMyComment(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: UpsertMyRehearsalCommentDto,
+  ) {
+    return this.rehearsals.upsertMyComment(
+      req.user.userId,
+      req.user.email,
+      id,
+      body,
+    );
   }
 
   @Get(':id/steps')

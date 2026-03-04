@@ -7,4 +7,3 @@ import { TroupeService } from './troupe.service';
   providers: [TroupeService],
 })
 export class TroupeModule {}
-

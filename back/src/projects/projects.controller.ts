@@ -44,7 +44,11 @@ export class ProjectsController {
     @Param('slug') slug: string,
     @Body() body: { botIntegrationId: string | null },
   ) {
-    return this.projectsService.setTelegramBotPreference(req.user.userId, slug, body);
+    return this.projectsService.setTelegramBotPreference(
+      req.user.userId,
+      slug,
+      body,
+    );
   }
 
   @Post()

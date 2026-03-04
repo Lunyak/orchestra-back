@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -46,7 +50,9 @@ function extractRolesFromText(text?: string | null): string[] {
     const m2 = line.match(/^([A-ZА-ЯЁ]{2,40})([.,!?:])\s+/);
     if (m2?.[1]) out.push(m2[1].trim());
   }
-  return Array.from(new Set(out.map((x) => String(x ?? '').trim()).filter(Boolean)));
+  return Array.from(
+    new Set(out.map((x) => String(x ?? '').trim()).filter(Boolean)),
+  );
 }
 
 @Injectable()
@@ -70,7 +76,10 @@ export class RolesService {
   }
 
   async listRoles(userId: string, projectSlug: string) {
-    const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const project = await this.assertUserHasProjectAccessBySlug(
+      userId,
+      projectSlug,
+    );
     const roles = await this.prisma.projectRole.findMany({
       where: { projectId: project.id },
       orderBy: { title: 'asc' },
@@ -98,13 +107,19 @@ export class RolesService {
     roleId: string | null,
     body: { title: string; description?: string; aliases?: string[] },
   ) {
-    const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const project = await this.assertUserHasProjectAccessBySlug(
+      userId,
+      projectSlug,
+    );
     const title = String(body?.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
     const key = normalizeRoleKey(title);
     if (!key) throw new BadRequestException('invalid title');
 
-    const description = body?.description != null ? String(body.description).trim() || null : null;
+    const description =
+      body?.description != null
+        ? String(body.description).trim() || null
+        : null;
     const aliases = Array.isArray(body?.aliases)
       ? body.aliases
           .map((x) => String(x ?? '').trim())
@@ -124,12 +139,17 @@ export class RolesService {
         });
 
     // replace aliases
-    await this.prisma.projectRoleAlias.deleteMany({ where: { roleId: role.id } });
+    await this.prisma.projectRoleAlias.deleteMany({
+      where: { roleId: role.id },
+    });
     const aliasRows = aliases
       .map((a) => ({ roleId: role.id, title: a, key: normalizeRoleKey(a) }))
       .filter((x) => x.key);
     if (aliasRows.length) {
-      await this.prisma.projectRoleAlias.createMany({ data: aliasRows, skipDuplicates: true });
+      await this.prisma.projectRoleAlias.createMany({
+        data: aliasRows,
+        skipDuplicates: true,
+      });
     }
 
     return { ok: true, roleId: role.id };
@@ -162,7 +182,10 @@ export class RolesService {
   }
 
   async deleteRole(userId: string, projectSlug: string, roleId: string) {
-    const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const project = await this.assertUserHasProjectAccessBySlug(
+      userId,
+      projectSlug,
+    );
     const rid = String(roleId ?? '').trim();
     if (!rid) throw new BadRequestException('roleId is required');
     const res = await this.prisma.projectRole.deleteMany({
@@ -172,7 +195,10 @@ export class RolesService {
   }
 
   async listRoleNotes(userId: string, projectSlug: string, roleId: string) {
-    const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const project = await this.assertUserHasProjectAccessBySlug(
+      userId,
+      projectSlug,
+    );
     const role = await this.prisma.projectRole.findFirst({
       where: { id: roleId, projectId: project.id },
       select: { id: true, title: true, key: true },
@@ -210,7 +236,10 @@ export class RolesService {
     roleId: string,
     body: { content: string },
   ) {
-    const project = await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const project = await this.assertUserHasProjectAccessBySlug(
+      userId,
+      projectSlug,
+    );
     const role = await this.prisma.projectRole.findFirst({
       where: { id: roleId, projectId: project.id },
       select: { id: true },
@@ -223,7 +252,9 @@ export class RolesService {
       where: { id: userId },
       select: { email: true },
     });
-    const authorEmail = author?.email ? String(author.email).trim().toLowerCase() : null;
+    const authorEmail = author?.email
+      ? String(author.email).trim().toLowerCase()
+      : null;
 
     const created = await this.prisma.projectRoleNote.create({
       data: {
@@ -242,7 +273,9 @@ export class RolesService {
    * Safe to call repeatedly.
    */
   async seedFromStepCastIfEmpty(projectId: string) {
-    const existingCount = await this.prisma.projectRole.count({ where: { projectId } });
+    const existingCount = await this.prisma.projectRole.count({
+      where: { projectId },
+    });
     if (existingCount > 0) return { ok: true, seeded: false };
 
     const steps = await this.prisma.step.findMany({
@@ -298,4 +331,3 @@ export class RolesService {
     return out;
   }
 }
-

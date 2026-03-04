@@ -11,4 +11,3 @@ export class ConnectTelegramBotDto {
   @MaxLength(80)
   title?: string;
 }
-

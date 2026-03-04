@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { BotGuard } from './bot.guard';
 import { BotProfilesUpsertDto } from './dto/bot-profiles.dto';
 import { RehearsalPlanRequestDto } from './dto/rehearsal-plan.dto';

@@ -33,6 +33,45 @@ type ProjectDataCache = Record<
 
 type AvailabilityTimeRange = { from: string; to: string };
 
+const DND_MIME_SLOT_ID = "application/x-orchestra-director-session-slot";
+const DND_MIME_STEP_REF = "application/x-orchestra-director-session-step-ref";
+
+type DragStepRefPayload = {
+  kind: "stepRef";
+  projectSlug: string;
+  stepId: number;
+  durationMin?: number;
+};
+
+function parseDragStepRef(dt: DataTransfer): DragStepRefPayload | null {
+  const raw = dt.getData(DND_MIME_STEP_REF);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as Partial<DragStepRefPayload> | null;
+    if (!v || v.kind !== "stepRef") return null;
+    const projectSlug = String(v.projectSlug ?? "").trim();
+    const stepId = Number(v.stepId);
+    const durationMin =
+      v.durationMin == null ? undefined : Math.max(1, Math.floor(Number(v.durationMin)));
+    if (!projectSlug) return null;
+    if (!Number.isFinite(stepId) || stepId <= 0) return null;
+    return { kind: "stepRef", projectSlug, stepId, durationMin };
+  } catch (_) {
+    return null;
+  }
+}
+
+function parseDragSlotId(dt: DataTransfer): string | null {
+  const id = String(dt.getData(DND_MIME_SLOT_ID) || dt.getData("text/plain") || "").trim();
+  return id || null;
+}
+
+function guessDurationMin(payload: DragStepRefPayload): number {
+  const d = Number(payload.durationMin);
+  if (Number.isFinite(d) && d > 0) return Math.max(1, Math.floor(d));
+  return 30;
+}
+
 function isReadyStep(step: ScriptStep): boolean {
   const st = String((step as any)?.kanbanStatus ?? "")
     .trim()
@@ -205,6 +244,44 @@ function extractRolesSmart(text?: string): string[] {
   );
 }
 
+function computePlannedEmailsForSession(
+  session: DirectorRehearsalSession,
+  dataCache: ProjectDataCache,
+): { emails: string[]; complete: boolean } {
+  const out = new Set<string>();
+  let complete = true;
+  const slots = session?.slots ?? [];
+  for (const sl of slots) {
+    const ref = (sl as any)?.ref as { projectSlug?: string; stepId?: number } | undefined;
+    const slug = String(ref?.projectSlug ?? "").trim();
+    const stepId = typeof ref?.stepId === "number" ? ref.stepId : null;
+    if (!slug || stepId == null) continue;
+    const data = dataCache[slug];
+    if (!data) {
+      complete = false;
+      continue;
+    }
+    const step = (data.steps ?? []).find((x) => x.id === stepId) ?? null;
+    const text = String((step as any)?.playMarkdown ?? (step as any)?.markdown ?? "");
+    const roles = extractRolesSmart(text);
+    for (const r of roles) {
+      const key = normalizeRoleKey(r);
+      if (!key) continue;
+      const emails = (data.roleEmailsByKey ?? {})[key] ?? [];
+      for (const e of emails) {
+        const norm = normalizeEmail(String(e ?? ""));
+        if (!norm) continue;
+        if (!looksLikeEmail(norm)) continue;
+        out.add(norm);
+        if (out.size >= 500) break;
+      }
+      if (out.size >= 500) break;
+    }
+    if (out.size >= 500) break;
+  }
+  return { emails: Array.from(out), complete };
+}
+
 function getLocalDateTimeParts(iso: string): { date: string; time: string } {
   const d = new Date(iso);
   if (!Number.isFinite(d.getTime())) return { date: "", time: "" };
@@ -226,6 +303,7 @@ export function DirectorSessionsPage() {
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
+  const [timelineDragOver, setTimelineDragOver] = useState(false);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) ?? null,
@@ -360,9 +438,14 @@ export function DirectorSessionsPage() {
   const updateActiveSession = async (patch: Partial<DirectorRehearsalSession>) => {
     if (!activeSession) return;
     const nowIso = new Date().toISOString();
-    const nextSessions = sessions.map((s) =>
-      s.id === activeSession.id ? { ...s, ...patch, updatedAt: nowIso } : s
-    );
+    const nextActive: DirectorRehearsalSession = { ...activeSession, ...patch, updatedAt: nowIso };
+    const computed = computePlannedEmailsForSession(nextActive, dataCache);
+    const nextWithPlanned: DirectorRehearsalSession =
+      computed.complete || computed.emails.length > 0
+        ? { ...nextActive, plannedEmails: computed.emails }
+        : nextActive;
+
+    const nextSessions = sessions.map((s) => (s.id === activeSession.id ? nextWithPlanned : s));
     await persist(nextSessions);
   };
 
@@ -647,7 +730,7 @@ export function DirectorSessionsPage() {
   }, [troupeScheduleMonth]);
 
   const troupeScheduleGridTemplateColumns = useMemo(() => {
-    return `240px repeat(${troupeScheduleDays.length}, 28px)`;
+    return `140px repeat(${troupeScheduleDays.length}, 28px)`;
   }, [troupeScheduleDays.length]);
 
   const troupeScheduleActors = useMemo(() => {
@@ -734,6 +817,51 @@ export function DirectorSessionsPage() {
       sl.id === slotId ? { ...sl, ref } : sl
     );
     await updateActiveSession({ slots: nextSlots });
+  };
+
+  const attachStepToSlotByDrop = async (slotId: string, payload: DragStepRefPayload) => {
+    if (!activeSession) return;
+    const slots = [...(activeSession.slots ?? [])];
+    const current = slots.find((s) => s.id === slotId) ?? null;
+    if (!current) return;
+    const nextDur = guessDurationMin(payload);
+    const prevDur = Math.max(1, Math.floor(Number(current.durationMin) || 1));
+    const delta = nextDur - prevDur;
+    await updateSlot(
+      slotId,
+      {
+        ref: { projectSlug: payload.projectSlug, stepId: payload.stepId },
+        durationMin: nextDur,
+      },
+      { shiftFollowing: autoShiftFollowing, deltaMin: delta },
+    );
+    setActiveSlotId(slotId);
+    setSlotDraft((p) => ({
+      ...p,
+      [slotId]: {
+        ...(p[slotId] ?? {
+          time: activeSession ? formatSlotTime(activeSession.startsAt, current.offsetMin) : "",
+          duration: "",
+        }),
+        duration: String(nextDur),
+      },
+    }));
+  };
+
+  const addSlotFromDroppedStep = async (payload: DragStepRefPayload) => {
+    if (!activeSession) return;
+    const sorted = [...(activeSession.slots ?? [])].sort((a, b) => a.offsetMin - b.offsetMin);
+    const last = sorted.slice(-1)[0] ?? null;
+    const offsetMin = last ? last.offsetMin + Math.max(1, Math.floor(Number(last.durationMin) || 1)) : 0;
+    const durationMin = guessDurationMin(payload);
+    const slot: DirectorSessionSlot = {
+      id: createId(),
+      offsetMin,
+      durationMin,
+      ref: { projectSlug: payload.projectSlug, stepId: payload.stepId },
+    };
+    await updateActiveSession({ slots: [...(activeSession.slots ?? []), slot] });
+    setActiveSlotId(slot.id);
   };
 
   // Materials popover (step preview + assign)
@@ -960,6 +1088,9 @@ export function DirectorSessionsPage() {
   if (loading) return <div className="rehearsals-muted">Загрузка сессий…</div>;
   if (error) return <div className="rehearsals-error">{error}</div>;
 
+  const sessionsCount = sessions?.length ?? 0;
+  const activeIndex = (sessions ?? []).findIndex((s) => s.id === activeSessionId);
+
   return (
     <div className="app-layout">
       <div className="app-content">
@@ -972,11 +1103,34 @@ export function DirectorSessionsPage() {
             <div className="sessions-layout">
               <aside className="sessions-side">
                 <div className="rehearsals-card">
-                  <div className="rehearsals-card-title">Сборные сессии</div>
 
                   <div className="sessions-actions">
                     <button type="button" onClick={createSession}>
-                      + Новая сессия
+                      + Репетиция
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => activeSessionId && void moveSessionDelta(activeSessionId, -1)}
+                      disabled={activeIndex <= 0}
+                      title="Переместить выбранную сессию вверх"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => activeSessionId && void moveSessionDelta(activeSessionId, 1)}
+                      disabled={activeIndex < 0 || activeIndex === sessionsCount - 1}
+                      title="Переместить выбранную сессию вниз"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => activeSessionId && void deleteSession(activeSessionId)}
+                      disabled={activeIndex < 0}
+                      title="Удалить выбранную сессию"
+                    >
+                      ×
                     </button>
                   </div>
                   <div className="sessions-list">
@@ -984,6 +1138,7 @@ export function DirectorSessionsPage() {
                       <div
                         key={s.id}
                         className={`sessions-sessionRow ${s.id === activeSessionId ? "active" : ""}`}
+                        onClick={() => setActiveSessionId(s.id)}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                           e.preventDefault();
@@ -994,7 +1149,6 @@ export function DirectorSessionsPage() {
                       >
                         <button
                           type="button"
-                          onClick={() => setActiveSessionId(s.id)}
                           draggable
                           onDragStart={(e) => {
                             e.dataTransfer.setData("text/plain", s.id);
@@ -1010,41 +1164,6 @@ export function DirectorSessionsPage() {
                             {new Date(s.startsAt).toLocaleString()} · слотов: {s.slots?.length ?? 0}
                           </div>
                         </button>
-
-                        <div className="sessions-sessionActions" aria-label="Действия сессии">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void moveSessionDelta(s.id, -1);
-                            }}
-                            disabled={index === 0}
-                            title="Вверх"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void moveSessionDelta(s.id, 1);
-                            }}
-                            disabled={index === (sessions?.length ?? 0) - 1}
-                            title="Вниз"
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void deleteSession(s.id);
-                            }}
-                            title="Удалить"
-                          >
-                            ×
-                          </button>
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -1057,16 +1176,16 @@ export function DirectorSessionsPage() {
                 ) : (
                   <div className="sessions-panels">
                     <div className="rehearsals-card">
-                      <div className="rehearsals-card-title">Таймлайн</div>
+
                       <label className="sessions-field">
-                        <span className="rehearsals-muted">Название</span>
+
                         <input
                           value={activeSession.title}
                           onChange={(e) => void updateActiveSession({ title: e.target.value })}
                         />
                       </label>
                       <label className="sessions-field">
-                        <span className="rehearsals-muted">
+                        <span className="rehearsals-muted comments-for-bot">
                           Комментарий к сессии (будет прикреплён к сообщению бота)
                         </span>
                         <textarea
@@ -1138,11 +1257,28 @@ export function DirectorSessionsPage() {
                         <div className="rehearsals-error">{publishError}</div>
                       )}
 
-                      <div className="rehearsals-muted sessions-help">
-                        Материал выбирается так: кликни слот → кликни шаг справа.
-                      </div>
 
-                      <div className="sessions-slots">
+                      <div
+                        className={`sessions-slots ${timelineDragOver ? "dropActive" : ""}`}
+                        onDragEnter={(e) => {
+                          // Only highlight for step payload, not slot reordering.
+                          if (parseDragStepRef(e.dataTransfer)) setTimelineDragOver(true);
+                        }}
+                        onDragLeave={() => setTimelineDragOver(false)}
+                        onDragOver={(e) => {
+                          if (!parseDragStepRef(e.dataTransfer)) return;
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = "copy";
+                        }}
+                        onDrop={(e) => {
+                          const payload = parseDragStepRef(e.dataTransfer);
+                          setTimelineDragOver(false);
+                          if (!payload) return;
+                          e.preventDefault();
+                          void addSlotFromDroppedStep(payload);
+                        }}
+                        title="Сюда можно перетащить сцену, чтобы создать новый слот"
+                      >
                         {[...(activeSession.slots ?? [])]
                           .sort((a, b) => a.offsetMin - b.offsetMin)
                           .map((sl) => (
@@ -1152,6 +1288,7 @@ export function DirectorSessionsPage() {
                               draggable
                               onDragStart={(e) => {
                                 e.dataTransfer.setData("text/plain", sl.id);
+                                e.dataTransfer.setData(DND_MIME_SLOT_ID, sl.id);
                                 e.dataTransfer.effectAllowed = "move";
                                 setDraggedSlotId(sl.id);
                               }}
@@ -1159,7 +1296,13 @@ export function DirectorSessionsPage() {
                               onDragOver={(e) => e.preventDefault()}
                               onDrop={(e) => {
                                 e.preventDefault();
-                                const dragId = e.dataTransfer.getData("text/plain") || draggedSlotId;
+                                const payload = parseDragStepRef(e.dataTransfer);
+                                if (payload) {
+                                  e.stopPropagation();
+                                  void attachStepToSlotByDrop(sl.id, payload);
+                                  return;
+                                }
+                                const dragId = parseDragSlotId(e.dataTransfer) || draggedSlotId;
                                 if (!dragId) return;
                                 void moveSlotBefore(dragId, sl.id);
                               }}
@@ -1383,11 +1526,25 @@ export function DirectorSessionsPage() {
                           <button
                             key={`${projectFilter}:${s.id}`}
                             type="button"
+                            draggable
+                            onDragStart={(e) => {
+                              const payload: DragStepRefPayload = {
+                                kind: "stepRef",
+                                projectSlug: projectFilter,
+                                stepId: s.id,
+                                durationMin:
+                                  s.durationMin == null
+                                    ? undefined
+                                    : Math.max(1, Math.floor(Number(s.durationMin) || 1)),
+                              };
+                              e.dataTransfer.setData(DND_MIME_STEP_REF, JSON.stringify(payload));
+                              e.dataTransfer.effectAllowed = "copy";
+                            }}
                             onClick={() => {
                               setMaterialPreview({ projectSlug: projectFilter, step: s });
                             }}
                             className="rehearsals-item"
-                            title="Открыть текст и выбрать"
+                            title="Открыть текст и выбрать (или перетащи в слот)"
                           >
                             <div className="rehearsals-item-title">
                               #{s.id} {s.title}
@@ -1593,9 +1750,6 @@ export function DirectorSessionsPage() {
                               </div>
                             </div>
 
-                            <div className="rehearsals-muted" style={{ marginTop: 8 }}>
-                              Наведи на ячейку, чтобы увидеть детали (занят / свободен / интервалы).
-                            </div>
                           </>
                         )}
                       </div>

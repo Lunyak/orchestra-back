@@ -83,4 +83,3 @@ export class TelegramBotsController {
     return this.telegramBots.sendTestMessage(req.user.userId, id, body);
   }
 }
-

@@ -25,8 +25,26 @@ model User {
   projectTelegramBotPreferences ProjectTelegramBotPreference[]
   directorSessions   DirectorSession[]
   roleNotes          ProjectRoleNote[]
+  rehearsalComments  RehearsalComment[]
+  directorSessionComments DirectorSessionComment[]
   troupeMemberships  TroupeMember[]
   troupeOwned        Troupe?
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  /// SHA-256(token) в base64url
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model UserProfile {
@@ -117,8 +135,27 @@ model Rehearsal {
 
   project       Project  @relation(fields: [projectId], references: [id])
   participants  RehearsalParticipant[]
+  comments      RehearsalComment[]
 
   @@index([projectId, startsAt])
+}
+
+model RehearsalComment {
+  id            String   @id @default(cuid())
+  rehearsalId   String
+  authorUserId  String
+  authorEmail   String
+  content       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  rehearsal     Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  authorUser    User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([rehearsalId, authorUserId])
+  @@index([rehearsalId])
+  @@index([authorUserId])
+  @@index([authorEmail])
 }
 
 model RehearsalParticipant {
@@ -209,10 +246,29 @@ model DirectorSession {
 
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments  DirectorSessionComment[]
 
   @@index([projectId])
   @@index([userId])
   @@index([projectId, startsAt])
+}
+
+model DirectorSessionComment {
+  id            String   @id @default(cuid())
+  sessionId     String
+  authorUserId  String
+  authorEmail   String
+  content       String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  session       DirectorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  authorUser    User            @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, authorUserId])
+  @@index([sessionId])
+  @@index([authorUserId])
+  @@index([authorEmail])
 }
 
 model ProjectRole {

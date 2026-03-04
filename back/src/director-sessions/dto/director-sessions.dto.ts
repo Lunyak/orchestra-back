@@ -9,4 +9,3 @@ export class UpsertDirectorSessionsDto {
   @IsString()
   clientUpdatedAt?: string;
 }
-

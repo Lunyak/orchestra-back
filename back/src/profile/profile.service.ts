@@ -72,8 +72,8 @@ function sanitizeAvailabilityTimeRanges(
     const ranges: Array<{ fromMin: number; toMin: number }> = [];
     for (const item of raw.slice(0, 20)) {
       if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-      const fromMin = toMinutesHHMM((item as any).from);
-      const toMin = toMinutesHHMM((item as any).to);
+      const fromMin = toMinutesHHMM(item.from);
+      const toMin = toMinutesHHMM(item.to);
       if (fromMin == null || toMin == null) continue;
       if (fromMin >= toMin) continue;
       // allow 00:00..24:00 upper bound by clamping
@@ -113,19 +113,28 @@ export class ProfileService {
   }
 
   private profileBucketId(email: string): string {
-    const norm = String(email ?? '').trim().toLowerCase();
+    const norm = String(email ?? '')
+      .trim()
+      .toLowerCase();
     const h = createHash('sha1').update(norm).digest('hex').slice(0, 16);
     return `profile-${h}`;
   }
 
   async uploadAvatarByEmail(email: string, file: any) {
-    const norm = String(email ?? '').trim().toLowerCase();
+    const norm = String(email ?? '')
+      .trim()
+      .toLowerCase();
     if (!norm) throw new Error('email is required');
     const mimetype = String(file?.mimetype ?? '');
     if (!mimetype.startsWith('image/')) {
       throw new Error('avatar must be an image');
     }
-    const allowed = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+    const allowed = new Set([
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'image/gif',
+    ]);
     if (!allowed.has(mimetype)) {
       throw new Error('unsupported image type');
     }
@@ -220,7 +229,9 @@ export class ProfileService {
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
-        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(dto.availabilityTimeRanges),
+        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(
+          dto.availabilityTimeRanges,
+        ),
       },
     });
   }
@@ -251,7 +262,9 @@ export class ProfileService {
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
-        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(dto.availabilityTimeRanges),
+        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(
+          dto.availabilityTimeRanges,
+        ),
       },
     });
   }
@@ -271,7 +284,9 @@ export class ProfileService {
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
-        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(dto.availabilityTimeRanges),
+        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(
+          dto.availabilityTimeRanges,
+        ),
         sex: cleanOptional(dto.sex),
         role: cleanOptional(dto.role),
         phone: cleanOptional(dto.phone),
@@ -288,7 +303,9 @@ export class ProfileService {
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
-        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(dto.availabilityTimeRanges),
+        availabilityTimeRanges: sanitizeAvailabilityTimeRanges(
+          dto.availabilityTimeRanges,
+        ),
         sex: clean(dto.sex),
         role: clean(dto.role),
         phone: clean(dto.phone),
@@ -298,7 +315,9 @@ export class ProfileService {
   }
 
   async deleteByEmail(email: string): Promise<{ ok: true; deleted: number }> {
-    const normalized = String(email ?? "").trim().toLowerCase();
+    const normalized = String(email ?? '')
+      .trim()
+      .toLowerCase();
     if (!normalized) return { ok: true, deleted: 0 };
     const res = await this.prisma.userProfile.deleteMany({
       where: { email: normalized },

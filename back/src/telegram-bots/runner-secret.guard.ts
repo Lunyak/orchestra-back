@@ -28,4 +28,3 @@ export class RunnerSecretGuard implements CanActivate {
     return true;
   }
 }
-

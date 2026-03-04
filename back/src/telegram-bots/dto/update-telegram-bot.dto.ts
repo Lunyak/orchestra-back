@@ -51,4 +51,3 @@ export class UpdateTelegramBotDto {
   @MaxLength(50)
   quizThreadId?: string | null;
 }
-
