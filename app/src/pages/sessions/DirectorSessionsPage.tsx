@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import {
@@ -294,6 +295,14 @@ function getLocalDateTimeParts(iso: string): { date: string; time: string } {
 export function DirectorSessionsPage() {
   const { accessToken } = useAuth();
   const { projects } = useProject();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const sessionIdFromUrl = useMemo(() => {
+    const sp = new URLSearchParams(location.search);
+    const v = String(sp.get("sessionId") ?? "").trim();
+    return v || null;
+  }, [location.search]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -336,7 +345,11 @@ export function DirectorSessionsPage() {
       .then((res) => {
         if (cancelled) return;
         setSessions(res.sessions ?? []);
-        setActiveSessionId((prev) => prev ?? res.sessions?.[0]?.id ?? null);
+        const ids = new Set((res.sessions ?? []).map((s: any) => String(s?.id ?? "")).filter(Boolean));
+        setActiveSessionId((prev) => {
+          if (sessionIdFromUrl && ids.has(sessionIdFromUrl)) return sessionIdFromUrl;
+          return prev ?? res.sessions?.[0]?.id ?? null;
+        });
       })
       .catch((e) => {
         if (!cancelled) setError(e?.message || "Не удалось загрузить сессии");
@@ -347,7 +360,17 @@ export function DirectorSessionsPage() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, sessionIdFromUrl]);
+
+  // Keep URL in sync for shareable link
+  useEffect(() => {
+    if (location.pathname !== "/sessions") return;
+    const current = sessionIdFromUrl;
+    const next = activeSessionId || null;
+    if (current === next) return;
+    const search = next ? `?sessionId=${encodeURIComponent(next)}` : "";
+    navigate({ pathname: "/sessions", search }, { replace: true });
+  }, [activeSessionId, location.pathname, navigate, sessionIdFromUrl]);
 
   const persist = async (next: DirectorRehearsalSession[]) => {
     if (!accessToken) return;
@@ -1147,6 +1170,7 @@ export function DirectorSessionsPage() {
                           void moveSessionBefore(dragId, s.id);
                         }}
                       >
+                        <div className="sessions-sessionRow-content">
                         <button
                           type="button"
                           draggable
@@ -1164,6 +1188,26 @@ export function DirectorSessionsPage() {
                             {new Date(s.startsAt).toLocaleString()} · слотов: {s.slots?.length ?? 0}
                           </div>
                         </button>
+                        <Link
+                          to={`/sessions/${encodeURIComponent(s.id)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          title="Открыть страницу сессии"
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 34,
+                            height: 34,
+                            borderRadius: 10,
+                            background: "rgba(255,255,255,0.04)",
+                            color: "inherit",
+                            textDecoration: "none",
+                            opacity: 0.9,
+                          }}
+                        >
+                          ↗
+                        </Link>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1176,6 +1220,15 @@ export function DirectorSessionsPage() {
                 ) : (
                   <div className="sessions-panels">
                     <div className="rehearsals-card">
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                        <div style={{ fontSize: 12, opacity: 0.8 }}>Открыть:</div>
+                        <Link
+                          to={`/sessions/${encodeURIComponent(activeSession.id)}`}
+                          style={{ fontSize: 12, textDecoration: "none", color: "inherit", opacity: 0.9 }}
+                        >
+                          /sessions/{activeSession.id}
+                        </Link>
+                      </div>
 
                       <label className="sessions-field">
 

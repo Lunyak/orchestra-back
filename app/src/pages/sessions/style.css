@@ -26,17 +26,30 @@
   display: flex;
   gap: 8px;
   align-items: stretch;
+  border: none;
 }
 
 .sessions-sessionRow.active .sessions-sessionSelect {
   border-color: rgba(255, 255, 255, 0.22);
   box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.14);
+  border: none;
+}
+
+.sessions-sessionRow-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; width: 100%;
+  gap: 10px;
 }
 
 .sessions-sessionSelect {
+  padding: 8px 10px !important;
+  height: auto !important;
   flex: 1;
   min-width: 0;
   text-align: left;
+  border: none !important;
+  box-sizing: border-box;
 }
 
 .sessions-sessionSelect.dragging {
