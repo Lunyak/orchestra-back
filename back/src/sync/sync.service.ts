@@ -341,10 +341,15 @@ export class SyncService {
     ]);
   }
 
-  async applyChanges(userId: string, changes: SyncChangeDto[]) {
+  async applyChanges(
+    userId: string,
+    changes: SyncChangeDto[],
+    sourceClientId?: string | null,
+  ) {
     console.log('[sync] applyChanges called', {
       userId,
       changesCount: changes.length,
+      sourceClientId: sourceClientId ?? null,
       changes: changes.map((c) => ({
         entityType: c.entityType,
         operation: c.operation,
@@ -373,22 +378,22 @@ export class SyncService {
           await this.applyProjectChange(userId, operation, payload);
         }
         if (entityType === 'Scene') {
-          await this.applySceneChange(userId, operation, payload);
+          await this.applySceneChange(userId, operation, payload, sourceClientId);
         }
         if (entityType === 'Step') {
-          await this.applyStepChange(userId, operation, payload);
+          await this.applyStepChange(userId, operation, payload, sourceClientId);
         }
         if (entityType === 'PlaylistItem') {
-          await this.applyPlaylistItemChange(operation, payload);
+          await this.applyPlaylistItemChange(operation, payload, sourceClientId);
         }
         if (entityType === 'Sound') {
-          await this.applySoundChange(operation, payload);
+          await this.applySoundChange(operation, payload, sourceClientId);
         }
         if (entityType === 'GlobalLightChannel') {
-          await this.applyGlobalLightChannelChange(operation, payload);
+          await this.applyGlobalLightChannelChange(operation, payload, sourceClientId);
         }
         if (entityType === 'TheaterLayout') {
-          await this.applyTheaterLayoutChange(operation, payload);
+          await this.applyTheaterLayoutChange(operation, payload, sourceClientId);
         }
       } catch (error) {
         // Временно логируем ошибки синка, чтобы понимать, почему данные не попадают в БД
@@ -488,6 +493,7 @@ export class SyncService {
     userId: string,
     operation: string,
     payload: any,
+    sourceClientId?: string | null,
   ) {
     if (operation === 'delete') {
       await this.prisma.scene.updateMany({
@@ -535,11 +541,15 @@ export class SyncService {
     });
 
     if (payload.projectId) {
-      this.notifications.notifySceneUpdated(payload.projectId);
+      this.notifications.notifySceneUpdated(payload.projectId, sourceClientId);
     }
   }
 
-  private async applyPlaylistItemChange(operation: string, payload: any) {
+  private async applyPlaylistItemChange(
+    operation: string,
+    payload: any,
+    sourceClientId?: string | null,
+  ) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     const sourceId = this.normalizeInt(payload?.sourceId, -1);
     if (!sceneId || sourceId <= 0) return;
@@ -549,7 +559,7 @@ export class SyncService {
       await this.prisma.playlistItem.deleteMany({
         where: { sceneId, sourceId },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -577,7 +587,7 @@ export class SyncService {
         where: { id: existing.id },
         data: { order, title, file, fadeMs, loop, remoteUrl, remoteKey },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
     await this.prisma.playlistItem.create({
@@ -593,10 +603,14 @@ export class SyncService {
         remoteKey,
       },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId);
+    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
 
-  private async applySoundChange(operation: string, payload: any) {
+  private async applySoundChange(
+    operation: string,
+    payload: any,
+    sourceClientId?: string | null,
+  ) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     const sourceId = this.normalizeInt(payload?.sourceId, -1);
     if (!sceneId || sourceId <= 0) return;
@@ -606,7 +620,7 @@ export class SyncService {
       await this.prisma.sound.deleteMany({
         where: { sceneId, sourceId },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -659,7 +673,7 @@ export class SyncService {
           loop,
         },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
     await this.prisma.sound.create({
@@ -678,10 +692,14 @@ export class SyncService {
         loop,
       },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId);
+    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
 
-  private async applyGlobalLightChannelChange(operation: string, payload: any) {
+  private async applyGlobalLightChannelChange(
+    operation: string,
+    payload: any,
+    sourceClientId?: string | null,
+  ) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     const index = this.normalizeInt(payload?.index, -1);
     if (!sceneId || index < 0) return;
@@ -691,7 +709,7 @@ export class SyncService {
       await this.prisma.globalLightChannel.deleteMany({
         where: { sceneId, index },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -704,16 +722,20 @@ export class SyncService {
     await this.prisma.globalLightChannel.create({
       data: { sceneId, index, raw },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId);
+    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
 
-  private async applyTheaterLayoutChange(operation: string, payload: any) {
+  private async applyTheaterLayoutChange(
+    operation: string,
+    payload: any,
+    sourceClientId?: string | null,
+  ) {
     const sceneId = String(payload?.sceneId ?? '').trim();
     if (!sceneId) return;
     const projectId = this.projectIdFromCompoundId(sceneId);
     if (operation === 'delete') {
       await this.prisma.theaterLayout.deleteMany({ where: { sceneId } });
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
     const num = (v: any, fallback: number) =>
@@ -762,13 +784,14 @@ export class SyncService {
         doorZ: num(payload?.doorZ, 0),
       },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId);
+    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
 
   private async applyStepChange(
     userId: string,
     operation: string,
     payload: any,
+    sourceClientId?: string | null,
   ) {
     if (operation === 'delete') {
       await this.prisma.step.updateMany({
@@ -781,7 +804,7 @@ export class SyncService {
         data: { deletedAt: new Date(payload.updatedAt) },
       });
       const projectId = this.projectIdFromCompoundId(payload?.id);
-      if (projectId) this.notifications.notifySceneUpdated(projectId);
+      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -865,7 +888,7 @@ export class SyncService {
     });
 
     const projectId = this.projectIdFromCompoundId(payload?.sceneId);
-    if (projectId) this.notifications.notifySceneUpdated(projectId);
+    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
 
     // Optional: normalize nested step data if provided in payload (requisites/light/theater).
     try {

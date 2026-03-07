@@ -22,7 +22,15 @@ async function bootstrap() {
   app.enableCors({
     origin: true, // временно разрешаем все источники (включая http://localhost:5173)
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // ВАЖНО: если указать allowedHeaders явно, нужно перечислить и кастомные заголовки.
+    // Иначе preflight (OPTIONS) для запросов с ними будет падать "CORS".
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'Origin',
+      'x-orchestra-client-id',
+    ],
   });
 
   app.useGlobalPipes(

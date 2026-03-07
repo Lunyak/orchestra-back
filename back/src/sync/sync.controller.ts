@@ -14,10 +14,19 @@ export class SyncController {
 
   @Post('push')
   push(@Req() req: any, @Body() body: SyncPushDto) {
+    const headerRaw = req?.headers?.['x-orchestra-client-id'];
+    const sourceClientId =
+      typeof headerRaw === 'string'
+        ? headerRaw
+        : Array.isArray(headerRaw)
+          ? String(headerRaw[0] ?? '').trim() || null
+          : null;
+
     console.log('[sync] POST /sync/push received', {
       userId: req.user?.userId,
       bodyKeys: Object.keys(body),
       changesCount: body.changes?.length ?? 0,
+      sourceClientId,
       changes:
         body.changes?.map((c) => ({
           entityType: c.entityType,
@@ -26,7 +35,11 @@ export class SyncController {
         })) ?? [],
       rawBody: JSON.stringify(body).substring(0, 500), // Первые 500 символов для отладки
     });
-    return this.syncService.applyChanges(req.user.userId, body.changes ?? []);
+    return this.syncService.applyChanges(
+      req.user.userId,
+      body.changes ?? [],
+      sourceClientId,
+    );
   }
 
   @Post('pull')

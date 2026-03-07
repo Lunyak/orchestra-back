@@ -51,9 +51,11 @@ export class NotificationsGateway {
     this.logger.debug(`client ${client.id} left ${room}`);
   }
 
-  notifySceneUpdated(projectId: string) {
+  notifySceneUpdated(projectId: string, sourceClientId?: string | null) {
     const room = this.getProjectRoom(projectId);
     this.logger.debug(`emit scene-updated to ${room}`);
-    this.server.to(room).emit('scene-updated', { projectId });
+    this.server
+      .to(room)
+      .emit('scene-updated', { projectId, sourceClientId: sourceClientId ?? null });
   }
 }

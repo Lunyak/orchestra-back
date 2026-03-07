@@ -4,13 +4,21 @@ FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
+ENV NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FETCH_RETRIES=5 \
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000 \
+    NPM_CONFIG_FETCH_TIMEOUT=300000
+
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db"
 RUN npx prisma generate
 RUN npm run build
+RUN npm prune --omit=dev
 
 # Run stage
 ARG NODE_IMAGE=node:22-alpine
@@ -18,12 +26,12 @@ FROM ${NODE_IMAGE}
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm install --omit=dev --legacy-peer-deps
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json* ./
+COPY --from=builder /app/node_modules ./node_modules
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 ENV NODE_ENV=production
