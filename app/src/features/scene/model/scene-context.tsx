@@ -6,6 +6,7 @@ import { createId } from "../../../shared/utils/createId";
 import { cleanupProjectImages, syncPull, syncPush, type SyncChange } from "../../../sync/api";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { disconnectRealtimeSocket, getRealtimeSocket } from "../../../realtime/socket";
+import { getClientInstanceId } from "../../../realtime/clientInstanceId";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
@@ -1075,8 +1076,16 @@ function useSceneProviderEffects() {
   const { projectName, ensureRemoteProject } = useProject();
   const { syncFromServer, saveStepsForLightPlot } = useSceneOperations();
 
-  const { steps, currentPage, isSceneReady, theaterLayout, sceneData, hasLocalEdits, stepsRevision } =
-    useAppSelector((s) => s.scene);
+  const {
+    steps,
+    currentPage,
+    isSceneReady,
+    theaterLayout,
+    sceneData,
+    hasLocalEdits,
+    stepsRevision,
+    serverShadow,
+  } = useAppSelector((s) => s.scene);
   const sceneDataRevision = useAppSelector((s) => s.scene.sceneDataRevision);
   const showScriptUi = useAppSelector((s) =>
     selectShowScriptMarkdownUi(s, projectName || "fools", "script"),
@@ -1091,7 +1100,9 @@ function useSceneProviderEffects() {
   const lastSavedLightChannelsKeyRef = useRef<string | null>(null);
   const joinedProjectIdRef = useRef<string | null>(null);
   const realtimePullTimerRef = useRef<number | null>(null);
-  const realtimeSceneUpdatedHandlerRef = useRef<(() => void) | null>(null);
+  const realtimeSceneUpdatedHandlerRef = useRef<
+    ((payload?: { projectId?: string; sourceClientId?: string | null }) => void) | null
+  >(null);
   const realtimeConnectHandlerRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -1218,7 +1229,9 @@ function useSceneProviderEffects() {
       socket.on("connect", onConnect);
       realtimeConnectHandlerRef.current = onConnect;
 
-      const onSceneUpdated = () => {
+      const myClientId = getClientInstanceId();
+      const onSceneUpdated = (payload?: { projectId?: string; sourceClientId?: string | null }) => {
+        if (payload?.sourceClientId && payload.sourceClientId === myClientId) return;
         // Pull can overwrite current draft; don't auto-pull while local edits exist.
         if (hasLocalEdits) {
           dispatch(sceneActions.setRealtimePullDeferred({ deferred: true, at: new Date().toISOString() }));
@@ -1308,9 +1321,30 @@ function useSceneProviderEffects() {
       lastSavedLightChannelsKeyRef.current = lightChannelsKey;
     }
     const metaChanged = lastSavedLightChannelsKeyRef.current !== lightChannelsKey;
-    const shouldSave = hasLocalEdits || metaChanged;
+    const lightDirtyVsServer = (() => {
+      // Prevent feedback-loop: remote pull updates serverShadow -> UI meta updates ->
+      // metaChanged becomes true, but this is NOT a local change and must not trigger push.
+      const serverLight = Array.isArray(serverShadow?.lightChannels)
+        ? serverShadow!.lightChannels
+        : null;
+      const localLight = Array.isArray(showScriptUi.lightChannels) ? showScriptUi.lightChannels : null;
+      if (serverLight) {
+        return stableStringify(serverLight) !== stableStringify(localLight);
+      }
+      // If we don't have server baseline yet, treat non-empty values as local edits.
+      return (localLight ?? []).some((x) => String(x ?? "").trim().length > 0);
+    })();
+
+    // If meta changed but matches the server baseline, accept it as new baseline
+    // without persisting/pushing it back.
+    if (metaChanged && !lightDirtyVsServer) {
+      lastSavedLightChannelsKeyRef.current = lightChannelsKey;
+      return;
+    }
+
+    const shouldSave = hasLocalEdits || (metaChanged && lightDirtyVsServer);
     if (!shouldSave) return;
-    const shouldForceSaveMeta = metaChanged && !hasLocalEdits;
+    const shouldForceSaveMeta = metaChanged && !hasLocalEdits && lightDirtyVsServer;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
     }
@@ -1333,6 +1367,8 @@ function useSceneProviderEffects() {
     hasLocalEdits,
     lightChannelsKey,
     saveStepsForLightPlot,
+    serverShadow,
+    showScriptUi.lightChannels,
   ]);
 }
 

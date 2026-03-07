@@ -199,7 +199,7 @@
 .rehearsals-item {
   text-align: left;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
   background: rgba(0, 0, 0, 0.18);
   color: inherit;
   padding: 10px;
@@ -244,13 +244,11 @@
 }
 
 .rehearsals-card button {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
+  border: none;
   color: inherit;
   cursor: pointer;
+  background: inherit;
+  padding: 0;
 }
 
 .rehearsals-card button:disabled {

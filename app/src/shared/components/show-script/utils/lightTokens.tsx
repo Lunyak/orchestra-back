@@ -66,6 +66,13 @@ export function getReadableTextColor(color?: string | null): string | undefined 
   return luminance > 0.6 ? "#0f172a" : "#f8fafc";
 }
 
+function isColorOverrideToken(raw?: string | null): boolean {
+  const v = String(raw ?? "").trim();
+  if (!v) return false;
+  // If it resolves to any known color, treat it as a color override.
+  return resolveLightColor("x", null, v) != null;
+}
+
 function renderLightChip(label: string, color: string | null, key: string) {
   const textColor = getReadableTextColor(color);
   return (
@@ -90,7 +97,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
   ): React.ReactNode {
     if (typeof node === "string") {
       const pattern =
-        /(\{\{\s*(light|blackout)\s*(?::\s*(\d+))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+        /(\{\{\s*(light|blackout|play)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
       const result: React.ReactNode[] = [];
       let lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -113,17 +120,38 @@ export function createRenderLightTokens(lightChannels: string[]) {
               {text}
             </span>,
           );
+        } else if (rawType?.toLowerCase() === "play") {
+          const payload = String(rawIndex ?? "").trim();
+          const labelText = String(rawColor ?? "").trim() || "Play";
+          const id = Number(payload);
+          result.push(
+            <span
+              key={`${keyPrefix}-${counter}-play`}
+              className="markdown-play-label"
+              role="button"
+              tabIndex={0}
+              title="Воспроизвести"
+              data-track-id={Number.isFinite(id) ? String(id) : undefined}
+              data-track-name={!Number.isFinite(id) ? payload : undefined}
+            >
+              {labelText}
+            </span>,
+          );
         } else if (rawType?.toLowerCase() === "blackout") {
           const label = "Блекаут";
           const color = resolveLightColor(label, "#000000", rawColor) ?? "#000000";
           result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-b`));
         } else {
-          const index = Number(rawIndex);
+          const index = Number(String(rawIndex ?? ""));
           if (Number.isFinite(index) && index >= 1 && index <= 8) {
             const channelValue = lightChannels[index - 1] ?? "";
             const parsed = parseLightChannel(channelValue);
-            const label = parsed.label ? parsed.label : String(index);
-            const color = resolveLightColor(label, parsed.color, rawColor);
+            const overrideRaw = String(rawColor ?? "").trim();
+            const labelOverride = overrideRaw && !isColorOverrideToken(overrideRaw) ? overrideRaw : "";
+            const colorOverride = overrideRaw && isColorOverrideToken(overrideRaw) ? overrideRaw : "";
+
+            const label = labelOverride || (parsed.label ? parsed.label : String(index));
+            const color = resolveLightColor(label, parsed.color, colorOverride || undefined);
             result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-${index}`));
           } else {
             result.push(raw);
@@ -170,7 +198,7 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
       }) as HastNode;
 
     const pattern =
-      /(\{\{\s*(light|blackout)\s*(?::\s*(\d+))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+      /(\{\{\s*(light|blackout|play)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
 
     const walk = (node: HastNode): HastNode => {
       if (!node) return node;
@@ -192,6 +220,19 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
             out.push(
               hastSpan(["markdown-speaker-label"], [hastText(text)], { title: normalized }),
             );
+          } else if (rawType?.toLowerCase() === "play") {
+            const payload = String(rawIndex ?? "").trim();
+            const labelText = String(rawColor ?? "").trim() || "Play";
+            const id = Number(payload);
+            out.push(
+              hastSpan(["markdown-play-label"], [hastText(labelText)], {
+                role: "button",
+                tabIndex: 0,
+                title: "Воспроизвести",
+                "data-track-id": Number.isFinite(id) ? String(id) : undefined,
+                "data-track-name": !Number.isFinite(id) ? payload : undefined,
+              }),
+            );
           } else if (rawType?.toLowerCase() === "blackout") {
             const label = "Блекаут";
             const color = resolveLightColor(label, "#000000", rawColor) ?? "#000000";
@@ -206,12 +247,16 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
               }),
             );
           } else {
-            const index = Number(rawIndex);
+            const index = Number(String(rawIndex ?? ""));
             if (Number.isFinite(index) && index >= 1 && index <= 8) {
               const channelValue = lightChannels[index - 1] ?? "";
               const parsed = parseLightChannel(channelValue);
-              const label = parsed.label ? parsed.label : String(index);
-              const color = resolveLightColor(label, parsed.color, rawColor);
+              const overrideRaw = String(rawColor ?? "").trim();
+              const labelOverride = overrideRaw && !isColorOverrideToken(overrideRaw) ? overrideRaw : "";
+              const colorOverride = overrideRaw && isColorOverrideToken(overrideRaw) ? overrideRaw : "";
+
+              const label = labelOverride || (parsed.label ? parsed.label : String(index));
+              const color = resolveLightColor(label, parsed.color, colorOverride || undefined);
               const textColor = getReadableTextColor(color);
               out.push(
                 hastSpan(["markdown-light-chip"], [hastText(label)], {

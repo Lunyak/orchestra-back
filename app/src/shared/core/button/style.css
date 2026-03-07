@@ -40,6 +40,16 @@
     cursor: pointer;
 }
 
+.button.ghost {
+    background: none;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    transition: var(--transition-normal);
+    border: none;
+    cursor: pointer;
+}
+
 .button.secondary:hover {
     background: var(--color-button-secondary-hover, var(--color-button-secondary));
 }

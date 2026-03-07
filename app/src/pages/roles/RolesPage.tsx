@@ -1,20 +1,21 @@
-import React, { useEffect, useMemo, useState } from "react";
+import { ListItem } from "@shared/components/list-item/ListItem";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
-import { useSearchParams } from "react-router-dom";
+import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import {
   addProjectRoleNote,
   createProjectRole,
   deleteProjectRole,
   getMyTroupe,
+  getProjectMembers,
   getProjectRoleNotes,
   getProjectRoles,
   setProjectRoleAssignments,
   type ProjectRoleInfo,
   type RoleNoteItem,
 } from "../../sync/api";
-import { getProjectMembers } from "../../sync/api";
-import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import "./style.css";
 
 function normalizeEmail(v: unknown): string {
@@ -275,17 +276,19 @@ export function RolesPage() {
                       {rolesSorted.map((r) => {
                         const isActive = r.id === activeRoleId;
                         return (
-                          <button
-                            key={r.id}
-                            type="button"
-                            className={`roles-list-item ${isActive ? "active" : ""}`}
-                            onClick={() => setActiveRoleId(r.id)}
-                          >
-                            <div className="roles-list-title">{r.title}</div>
-                            <div className="roles-list-meta">
-                              назначено: {(r.emails ?? []).length}
-                            </div>
-                          </button>
+                          <ListItem>
+                            <button
+                              key={r.id}
+                              type="button"
+                              className={`roles-list-item ${isActive ? "active" : ""}`}
+                              onClick={() => setActiveRoleId(r.id)}
+                            >
+                              <div className="roles-list-title">{r.title}</div>
+                              <div className="roles-list-meta">
+                                назначено: {(r.emails ?? []).length}
+                              </div>
+                            </button>
+                          </ListItem>
                         );
                       })}
                       {rolesSorted.length === 0 && (

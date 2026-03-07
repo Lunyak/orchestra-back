@@ -1,3 +1,5 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import cn from 'classnames';
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth";
@@ -5,7 +7,6 @@ import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useScriptUI } from "../../features/script-ui";
 import { useTeam } from "../../features/team";
-import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { HeaderPlayer } from "../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
@@ -278,7 +279,7 @@ export function SpectaclePage() {
           </div>
         )}
         <main
-          className={`main-content${activeView === "theater" ? " main-content-theater" : ""}`}
+          className={cn('main-content', activeView === "theater" ? " main-content-theater" : "", activeView === "script" ? "show-script" : "")}
         >
           {activeView === "theater" && (
             <Suspense

@@ -12,12 +12,12 @@ import {
   showScriptMarkdownActions,
   updateAnnotation,
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
+import { ensureProject, uploadProjectFile } from "../../../../sync/api";
 import { pasteProjectImageMarkdownSnippetFromClipboard } from "../../../project-assets/pasteProjectImageMarkdownSnippetFromClipboard";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptStep } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
 import { insertAtSelection } from "../utils/insertAtCursor";
-import { ensureProject, uploadProjectFile } from "../../../../sync/api";
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
 import { ScriptMarkdownToolbar } from "./ScriptMarkdownToolbar";
 import { ScriptStepHeader } from "./ScriptStepHeader";
@@ -34,12 +34,24 @@ interface IProps {
   renderBody?: (args: {
     markdownPane: React.ReactNode;
     currentStep: ScriptStep | undefined;
+    controls: null | {
+      selectedTrackId: number | null;
+      playlistOptions: { id: number; title: string }[];
+      onSelectedTrackIdChange: (trackId: number | null) => void;
+      lightChannels: string[];
+      onLightChannelsChange: (next: string[]) => void;
+      selectedLightSlot: number;
+      onSelectedLightSlotChange: (slot: number) => void;
+      onInsertText: (text: string) => void;
+    };
   }) => React.ReactNode;
 }
 
 export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepField, onTrackLinkClick, renderBody }: IProps) {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const sceneDataRevision = useAppSelector((s) => (s as any).scene?.sceneDataRevision ?? 0);
+  const serverShadowRevision = useAppSelector((s) => (s as any).scene?.serverShadowRevision ?? 0);
 
   const ui = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectSlug, sceneName));
   const markdownMode = ui.markdownMode;
@@ -66,7 +78,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
   useEffect(() => {
     void dispatch(initShowScriptMarkdownUi({ projectSlug, sceneName }));
     void dispatch(loadSceneScriptMarkdownMeta({ projectSlug, sceneName }));
-  }, [dispatch, projectSlug, sceneName]);
+  }, [dispatch, projectSlug, sceneName, sceneDataRevision, serverShadowRevision]);
 
   // Метки недоступны в режиме редактирования (там textarea).
   useEffect(() => {
@@ -262,6 +274,10 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
 
       {isEditing ? (
         <div className="form-group form-group-grow">
+          <ScriptStepHeader
+            currentStep={currentStep}
+            updateStep={updateStepField}
+          />
           <label htmlFor={`markdown-${currentStep.id}`}></label>
           <textarea
             id={`markdown-${currentStep.id}`}
@@ -275,7 +291,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
                 ? "Текст пьесы для этого шага"
                 : markdownMode === "explication"
                   ? "Режиссёрская экспликация для этого шага"
-                : "Текст, изображения и ссылки на музыку"
+                  : "Текст, изображения и ссылки на музыку"
             }
             rows={12}
           />
@@ -299,52 +315,47 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
     </div>
   ) : null;
 
+  const controls =
+    isEditing
+      ? {
+        selectedTrackId,
+        playlistOptions,
+        lightChannels,
+        selectedLightSlot,
+        onSelectedTrackIdChange: (trackId: number | null) => {
+          dispatch(
+            showScriptMarkdownActions.setSelectedTrackId({
+              projectSlug,
+              sceneName,
+              trackId,
+            }),
+          );
+        },
+        onLightChannelsChange: (next: string[]) => {
+          dispatch(
+            showScriptMarkdownActions.setLightChannels({
+              projectSlug,
+              sceneName,
+              lightChannels: next,
+            }),
+          );
+        },
+        onSelectedLightSlotChange: (slot: number) => {
+          dispatch(
+            showScriptMarkdownActions.setSelectedLightSlot({
+              projectSlug,
+              sceneName,
+              slot,
+            }),
+          );
+        },
+        onInsertText: insertIntoActiveMarkdown,
+      }
+      : null;
+
   return (
     <>
-      <ScriptStepHeader
-        isEditing={isEditing}
-        currentStep={currentStep}
-        updateStep={updateStepField}
-        controls={
-          isEditing
-            ? {
-              selectedTrackId,
-              playlistOptions,
-              lightChannels,
-              selectedLightSlot,
-              onSelectedTrackIdChange: (trackId) => {
-                dispatch(
-                  showScriptMarkdownActions.setSelectedTrackId({
-                    projectSlug,
-                    sceneName,
-                    trackId,
-                  }),
-                );
-              },
-              onLightChannelsChange: (next) => {
-                dispatch(
-                  showScriptMarkdownActions.setLightChannels({
-                    projectSlug,
-                    sceneName,
-                    lightChannels: next,
-                  }),
-                );
-              },
-              onSelectedLightSlotChange: (slot) => {
-                dispatch(
-                  showScriptMarkdownActions.setSelectedLightSlot({
-                    projectSlug,
-                    sceneName,
-                    slot,
-                  }),
-                );
-              },
-              onInsertText: insertIntoActiveMarkdown,
-            }
-            : null
-        }
-      />
-      {renderBody ? renderBody({ markdownPane, currentStep }) : markdownPane}
+      {renderBody ? renderBody({ markdownPane, currentStep, controls }) : markdownPane}
     </>
   );
 }

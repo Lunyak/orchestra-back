@@ -120,7 +120,7 @@
 .steps-mini-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   overflow-y: auto;
   flex: 1;
   padding-right: 4px;
@@ -155,18 +155,14 @@
 .step-mini-btn {
   flex: 1;
   text-align: left;
-  background: #2c3e50;
-  color: #fff;
+  background: inherit;
+  color: inherit;
   border: none;
-  padding: 6px 32px 6px 8px;
-  border-radius: 6px;
+  padding: 0;
   cursor: pointer;
-  font-size: 12px;
+  font-size: inherit;
 }
 
-.step-mini-btn:hover {
-  background: #3a4b61;
-}
 
 .step-mini-delete {
   position: absolute;

@@ -4,10 +4,10 @@
   max-width: 320px;
   background: var(--color-bg-secondary);
   color: var(--color-text-primary);
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   height: 100vh;
   height: 100dvh;
   height: var(--app-height, 100dvh);
@@ -248,16 +248,14 @@
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
-  padding-right: 4px;
 }
 
 .playlist-track-btn {
   text-align: left;
-  background: #2c3e50;
+  background: #333b52;
   color: #fff;
   border: none;
   padding: 4px 10px;
-  border-radius: 6px;
   cursor: pointer;
   width: 100%;
   font-size: 12px;
@@ -274,19 +272,6 @@
 .playlist-empty {
   color: #9ca3af;
   font-size: 13px;
-}
-
-.playlist-track-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  background: #243041;
-  border-radius: 8px;
-  padding: 8px;
-}
-
-.playlist-track-row.active {
-  background: var(--color-bg-tertiary);
 }
 
 .playlist-track-row.active .playlist-track-btn,

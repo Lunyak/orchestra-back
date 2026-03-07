@@ -9,6 +9,8 @@ export interface HeaderScriptStateProps {
   onToggleHeaderSounds: () => void;
   showRoles: boolean;
   onToggleRoles: () => void;
+  showScriptEditorTools: boolean;
+  onToggleScriptEditorTools: () => void;
   isStepsCollapsed: boolean;
   onToggleStepsCollapsed: () => void;
 }
@@ -51,6 +53,11 @@ const icons = {
       <circle cx="12" cy="7" r="4" />
     </svg>
   ),
+  tools: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.2 2.2-2.8-2.8 2-2.4z" />
+    </svg>
+  ),
 };
 
 export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
@@ -62,6 +69,8 @@ export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
   onToggleHeaderSounds,
   showRoles,
   onToggleRoles,
+  showScriptEditorTools,
+  onToggleScriptEditorTools,
   isStepsCollapsed,
   onToggleStepsCollapsed,
 }) => (
@@ -105,6 +114,16 @@ export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
       aria-pressed={showRequisites}
     >
       <span className="header-nav-icon">{icons.requisite}</span>
+    </button>
+    <button
+      type="button"
+      className={`header-nav-btn ${showScriptEditorTools ? "active" : ""}`}
+      onClick={onToggleScriptEditorTools}
+      title={showScriptEditorTools ? "Скрыть инструменты" : "Показать инструменты"}
+      aria-label={showScriptEditorTools ? "Скрыть инструменты" : "Показать инструменты"}
+      aria-pressed={showScriptEditorTools}
+    >
+      <span className="header-nav-icon">{icons.tools}</span>
     </button>
     <button
       type="button"

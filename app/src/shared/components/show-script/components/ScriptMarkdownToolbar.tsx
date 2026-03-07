@@ -1,4 +1,4 @@
-import React from "react";
+import { Button } from "@shared/core/button/Button";
 
 export function ScriptMarkdownToolbar({
   isEditing,
@@ -24,105 +24,71 @@ export function ScriptMarkdownToolbar({
   onInsertImage?: () => void;
   onInsertKadr?: () => void;
 }) {
+  const annotationsMode = annotations.mode;
+
   return (
-    <div className="script-markdown-toggle">
-      <button
-        className="script-edit-toggle"
-        onClick={onToggleEditing}
-        title={isEditing ? "Режим чтения" : "Режим редактирования"}
-      >
-        {isEditing ? "Чтение" : "Редакт."}
-      </button>
-      <button
-        type="button"
-        className="script-markdown-toggle-btn"
-        data-active={markdownMode === "notes"}
-        onClick={() => onSetMarkdownMode("notes")}
-      >
-        Схема
-      </button>
-      <button
-        type="button"
-        className="script-markdown-toggle-btn"
-        data-active={markdownMode === "play"}
-        onClick={() => onSetMarkdownMode("play")}
-      >
-        Текст
-      </button>
-      <button
-        type="button"
-        className="script-markdown-toggle-btn"
-        data-active={markdownMode === "explication"}
-        onClick={() => onSetMarkdownMode("explication")}
-      >
-        Экспликация
-      </button>
+    <div className="script-markdown-toolbar">
 
-      {isEditing && onInsertImage ? (
+      <div className="script-markdown-tabs" role="tablist" aria-label="Режим шага">
         <button
           type="button"
-          className="script-markdown-toggle-btn"
-          data-active="false"
-          onClick={onInsertImage}
-          title="Загрузить картинку и вставить в markdown"
+          role="tab"
+          aria-selected={markdownMode === "notes"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "notes"}
+          onClick={() => onSetMarkdownMode("notes")}
         >
-          Картинка
+          Схема
         </button>
-      ) : null}
-
-      {isEditing && markdownMode === "explication" && onInsertKadr ? (
         <button
           type="button"
-          className="script-markdown-toggle-btn"
-          data-active="false"
-          onClick={onInsertKadr}
-          title="Вставить заготовку для картины/мизансцены"
+          role="tab"
+          aria-selected={markdownMode === "play"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "play"}
+          onClick={() => onSetMarkdownMode("play")}
         >
-          Картина
+          Текст
         </button>
-      ) : null}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={markdownMode === "explication"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "explication"}
+          onClick={() => onSetMarkdownMode("explication")}
+        >
+          Экспликация
+        </button>
 
-      {isEditing ? (
-        <div className="actor-annotations-toolbar">
-          <button
-            type="button"
-            className="actor-annotations-btn"
-            data-active="false"
-            disabled
-            title="Метки работают в режиме просмотра (выйдите из редактирования шага)"
+        <div className="show-script__control-wrap">
+          <Button
+            variant="ghost"
+            className="show-script__rail-btn"
+            onClick={onToggleEditing}
+            title={isEditing ? "Перейти в режим чтения" : "Перейти в режим редактирования"}
           >
-            Метки
-          </button>
-          <div className="actor-annotations-meta">
-            Выйдите из редактирования, чтобы выделять текст и делать метки
-          </div>
-        </div>
-      ) : (
-        <div className="actor-annotations-toolbar">
-          <button
-            type="button"
-            className="actor-annotations-btn"
-            data-active={annotations.mode ? "true" : "false"}
-            onClick={() => {
-              annotations.onToggleMode();
-              if (annotations.mode) {
-                annotations.onClearSelectionState();
-              }
-            }}
-            title="Включить режим пометок: выдели текст и добавь заметку"
+            {isEditing ? "📖" : "✏️"}
+          </Button>
+          <Button
+            variant="ghost"
+            className="show-script__rail-btn"
+            disabled={isEditing}
+            onClick={annotations.onToggleMode}
+            title={
+              isEditing
+                ? "Метки работают в режиме чтения"
+                : annotationsMode
+                  ? "Выключить метки"
+                  : "Включить метки"
+            }
           >
-            Метки
-          </button>
-          <div className="actor-annotations-meta">
-            {annotations.loading
-              ? "загрузка…"
-              : annotations.error
-                ? annotations.error
-                : `пометок: ${annotations.count}`}
-          </div>
+            🏷️
+          </Button>
         </div>
-      )}
+      </div>
     </div>
+
   );
 }
 

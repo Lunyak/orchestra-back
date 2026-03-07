@@ -15,6 +15,9 @@ export interface ScriptUIContextValue {
   showStepRoles: boolean;
   setShowStepRoles: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleStepRoles: () => void;
+  showScriptEditorTools: boolean;
+  setShowScriptEditorTools: (v: boolean | ((prev: boolean) => boolean)) => void;
+  toggleScriptEditorTools: () => void;
   isStepsCollapsed: boolean;
   setIsStepsCollapsed: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleStepsCollapsed: () => void;
@@ -92,6 +95,18 @@ export function useScriptUI(): ScriptUIContextValue {
   );
   const toggleStepRoles = useCallback(() => dispatch(scriptUiActions.toggleStepRoles()), [dispatch]);
 
+  const setShowScriptEditorTools = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.showScriptEditorTools) : v;
+      dispatch(scriptUiActions.setShowScriptEditorTools({ value: Boolean(next) }));
+    },
+    [dispatch, ui.showScriptEditorTools],
+  );
+  const toggleScriptEditorTools = useCallback(
+    () => dispatch(scriptUiActions.toggleScriptEditorTools()),
+    [dispatch],
+  );
+
   const setIsStepsCollapsed = useCallback(
     (v: boolean | ((prev: boolean) => boolean)) => {
       const next = typeof v === "function" ? (v as any)(ui.isStepsCollapsed) : v;
@@ -132,6 +147,9 @@ export function useScriptUI(): ScriptUIContextValue {
     showStepRoles: ui.showStepRoles,
     setShowStepRoles,
     toggleStepRoles,
+    showScriptEditorTools: ui.showScriptEditorTools,
+    setShowScriptEditorTools,
+    toggleScriptEditorTools,
     isStepsCollapsed: ui.isStepsCollapsed,
     setIsStepsCollapsed,
     toggleStepsCollapsed,

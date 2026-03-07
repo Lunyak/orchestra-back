@@ -7,6 +7,8 @@ interface ScriptSidebarOptionsProps {
   onTogglePlaylist: () => void;
   showHeaderSounds: boolean;
   onToggleHeaderSounds: () => void;
+  showScriptEditorTools: boolean;
+  onToggleScriptEditorTools: () => void;
   isCollapsed: boolean;
   onToggleCollapsed: () => void;
 }
@@ -18,6 +20,8 @@ export const ScriptSidebarOptions: React.FC<ScriptSidebarOptionsProps> = ({
   onTogglePlaylist,
   showHeaderSounds,
   onToggleHeaderSounds,
+  showScriptEditorTools,
+  onToggleScriptEditorTools,
   isCollapsed,
   onToggleCollapsed,
 }) => {
@@ -52,6 +56,16 @@ export const ScriptSidebarOptions: React.FC<ScriptSidebarOptionsProps> = ({
         data-open={showRequisites ? 'true' : 'false'}
       >
         Реквизит
+      </button>
+      <button
+        type="button"
+        className="script-requisites-toggle"
+        onClick={onToggleScriptEditorTools}
+        aria-pressed={showScriptEditorTools}
+        title={showScriptEditorTools ? 'Скрыть инструменты' : 'Показать инструменты'}
+        data-open={showScriptEditorTools ? 'true' : 'false'}
+      >
+        Инструменты
       </button>
       <button
         type="button"

@@ -1,0 +1,25 @@
+.list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 8px;
+
+    text-align: left;
+    background: #333b52;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    font-size: 12px;
+    color: var(--color-text-white);
+    box-sizing: border-box;
+}
+
+.list-item.active {
+    background: var(--color-bg-tertiary);
+    color: var(--color-text-dark);
+}
+
+.list-item:hover {
+    background: #3a4b61;
+}

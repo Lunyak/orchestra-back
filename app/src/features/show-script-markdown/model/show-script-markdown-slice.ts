@@ -138,22 +138,49 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
     lightChannels: string[];
   },
   { projectSlug: string; sceneName: string }
->("showScriptMarkdown/loadSceneMeta", async (args) => {
+>("showScriptMarkdown/loadSceneMeta", async (args, thunkApi) => {
   const api = getDesktopApi();
   const sceneKey = getSceneKey(args.projectSlug, args.sceneName);
-  if (!api) {
+  const getFromStore = () => {
+    const state = thunkApi.getState() as RootState;
+    const sceneData = (state as any)?.scene?.sceneData ?? null;
+    const serverShadow = (state as any)?.scene?.serverShadow ?? null;
+    const playlistRaw =
+      sceneData && String(sceneData?.name ?? "") === String(args.sceneName ?? "")
+        ? (sceneData as any)?.playlist
+        : (sceneData as any)?.playlist;
+    const lightRaw = Array.isArray(serverShadow?.lightChannels)
+      ? serverShadow.lightChannels
+      : (sceneData as any)?.lightChannels;
     return {
-      sceneKey,
-      playlistOptions: [],
-      lightChannels: Array.from({ length: 8 }, () => ""),
+      playlistOptions: normalizePlaylistOptions(playlistRaw),
+      lightChannels: normalizeLightChannels(lightRaw),
     };
-  }
-  const scene = await api.readProjectScene(args.projectSlug, args.sceneName);
-  return {
-    sceneKey,
-    playlistOptions: normalizePlaylistOptions((scene as any)?.playlist),
-    lightChannels: normalizeLightChannels((scene as any)?.lightChannels),
   };
+
+  if (api) {
+    try {
+      const scene = await api.readProjectScene(args.projectSlug, args.sceneName);
+      const fromFile = {
+        playlistOptions: normalizePlaylistOptions((scene as any)?.playlist),
+        lightChannels: normalizeLightChannels((scene as any)?.lightChannels),
+      };
+      const fileHasLight = fromFile.lightChannels.some((x) => String(x ?? "").trim().length > 0);
+      if (fromFile.playlistOptions.length > 0 || fileHasLight) {
+        return { sceneKey, ...fromFile };
+      }
+      // If file is empty (common during sync/first run), prefer store snapshot.
+      const fromStore = getFromStore();
+      if (fromStore.playlistOptions.length > 0 || fromStore.lightChannels.some((x) => String(x ?? "").trim().length > 0)) {
+        return { sceneKey, ...fromStore };
+      }
+      return { sceneKey, ...fromFile };
+    } catch {
+      // Fall through to store-based meta.
+    }
+  }
+
+  return { sceneKey, ...getFromStore() };
 });
 
 export const loadActorAnnotations = createAsyncThunk<

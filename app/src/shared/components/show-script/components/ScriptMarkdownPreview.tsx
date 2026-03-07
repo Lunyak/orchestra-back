@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
+import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
+import type { SceneRolesDataV1 } from "../../../../features/scene";
 import {
   selectActiveStepMarkdownContext,
   selectAnnotations,
@@ -19,10 +21,142 @@ import {
   createRehypeScriptTokens,
   createRenderLightTokens,
 } from "../utils/lightTokens";
-import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
-import type { SceneRolesDataV1 } from "../../../../features/scene";
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
+
+const LINE_LABEL_CLASSNAMES = new Set([
+  "markdown-speaker-label", // roles: [[ЕЛЕНА]]
+  "markdown-light-chip", // lights: {{light:1}}
+  "markdown-play-label", // music: {{play:123}}
+]);
+
+type LineLabelKind = "role" | "light" | "play";
+
+function markdownHasRoleLightOrPlayLineLabels(markdown: string): boolean {
+  const raw = String(markdown ?? "");
+  if (!raw.trim()) return false;
+  // Avoid false-positives from examples in code fences.
+  const withoutCodeFences = raw.replace(/```[\s\S]*?```/g, "");
+
+  // We treat "line labels" as tokens that are typically placed at the beginning of a paragraph.
+  // - roles: [[ЕЛЕНА]]
+  // - lights: {{light:1}} / {{blackout}}
+  // - play: {{play:123}}
+  const re =
+    /(^|\n)\s*(\[\[\s*[^\]]+?\s*]]|\{\{\s*(?:light|blackout|play)\b[^}]*}})/i;
+  return re.test(withoutCodeFences);
+}
+
+function isIgnorableLeadingNode(node: React.ReactNode): boolean {
+  if (node == null || typeof node === "boolean") return true;
+  if (typeof node === "string") {
+    // Treat NBSP / ZWSP as whitespace too
+    return /^[\s\u00A0\u200B\u200C\u200D\uFEFF]*$/.test(node);
+  }
+  if (React.isValidElement(node)) {
+    return node.type === "br";
+  }
+  return false;
+}
+
+function isLineLabelElement(node: unknown): node is React.ReactElement {
+  if (!React.isValidElement(node)) return false;
+  const className = (node.props as any)?.className;
+  if (typeof className === "string") {
+    for (const part of className.split(/\s+/)) {
+      if (LINE_LABEL_CLASSNAMES.has(part)) return true;
+    }
+    return false;
+  }
+  if (Array.isArray(className)) return className.some((c) => LINE_LABEL_CLASSNAMES.has(String(c)));
+  return false;
+}
+
+function getLineLabelKind(el: React.ReactElement): LineLabelKind | null {
+  const className = (el.props as any)?.className;
+  const parts =
+    typeof className === "string"
+      ? className.split(/\s+/)
+      : Array.isArray(className)
+        ? className.map((c) => String(c))
+        : [];
+  if (parts.includes("markdown-speaker-label")) return "role";
+  if (parts.includes("markdown-light-chip")) return "light";
+  if (parts.includes("markdown-play-label")) return "play";
+  return null;
+}
+
+type TrackLinkPayload = { id: number } | { name: string };
+
+function getLeadingTrackPayload(children: React.ReactNode): TrackLinkPayload | null {
+  const flat = flattenInertSpans(React.Children.toArray(children));
+  let i = 0;
+  while (i < flat.length) {
+    const n = flat[i];
+    if (isIgnorableLeadingNode(n)) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  const candidate = flat[i];
+  if (!React.isValidElement(candidate)) return null;
+  const className = (candidate.props as any)?.className;
+  const classStr = Array.isArray(className) ? className.join(" ") : String(className ?? "");
+  if (!/\bmarkdown-track-link\b/.test(classStr)) return null;
+  const rawId = (candidate.props as any)?.["data-track-id"];
+  const rawName = (candidate.props as any)?.["data-track-name"];
+  const id = Number(rawId);
+  if (Number.isFinite(id) && id > 0) return { id };
+  const name = String(rawName ?? "").trim();
+  if (name) return { name };
+  return null;
+}
+
+function flattenInertSpans(nodes: React.ReactNode[]): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  for (const n of nodes) {
+    if (
+      React.isValidElement(n) &&
+      (n.type === "span" || n.type === React.Fragment) &&
+      n.props &&
+      (n.props as any).className == null &&
+      (n.props as any).style == null &&
+      (n.props as any).title == null &&
+      (n.props as any).id == null
+    ) {
+      out.push(...flattenInertSpans(React.Children.toArray((n.props as any).children)));
+      continue;
+    }
+    out.push(n);
+  }
+  return out;
+}
+
+function splitLeadingLineLabel(
+  children: React.ReactNode,
+): {
+  label: React.ReactElement | null;
+  rest: React.ReactNode[];
+  kind: LineLabelKind | null;
+} {
+  const flat = flattenInertSpans(React.Children.toArray(children));
+  let i = 0;
+  while (i < flat.length) {
+    const n = flat[i];
+    if (isIgnorableLeadingNode(n)) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  const candidate = flat[i];
+  if (!isLineLabelElement(candidate)) {
+    return { label: null, rest: flat, kind: null };
+  }
+  const rest = flat.slice(i + 1);
+  return { label: candidate, rest, kind: getLineLabelKind(candidate) };
+}
 
 function normalizeRoleToken(v: string) {
   return String(v ?? "")
@@ -233,6 +367,28 @@ export function ScriptMarkdownPreview({
     [lightChannels],
   );
 
+  const hasRoleOrLightLabels = useMemo(
+    () => markdownHasRoleLightOrPlayLineLabels(markdown || ""),
+    [markdown],
+  );
+
+  const playFromPayload = (payload: TrackLinkPayload) => {
+    if (!onTrackLinkClick) return;
+    if ("id" in payload) {
+      onTrackLinkClick(Number(payload.id));
+      return;
+    }
+    const name = String(payload.name ?? "").trim();
+    if (!name) return;
+    const fromCache = playlistOptions.find(
+      (item) =>
+        String(item?.title ?? "").toLowerCase() === name.toLowerCase(),
+    );
+    if (fromCache?.id != null) {
+      onTrackLinkClick(Number(fromCache.id));
+    }
+  };
+
   const rangeTextLength = (range: Range) => {
     const fragment = range.cloneContents();
     const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
@@ -314,6 +470,27 @@ export function ScriptMarkdownPreview({
     }
     const target = e.target as HTMLElement | null;
     if (!target) return;
+
+    const playEl = target.closest?.(".markdown-play-label") as HTMLElement | null;
+    if (playEl && onTrackLinkClick) {
+      const rawId = playEl.getAttribute("data-track-id");
+      const rawName = playEl.getAttribute("data-track-name");
+      const id = Number(rawId);
+      if (Number.isFinite(id) && id > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        playFromPayload({ id });
+        return;
+      }
+      const name = String(rawName ?? "").trim();
+      if (name) {
+        e.preventDefault();
+        e.stopPropagation();
+        playFromPayload({ name });
+        return;
+      }
+    }
+
     const el = target.closest?.(".markdown-speaker-label") as HTMLElement | null;
     if (!el) return;
     const token = String(el.getAttribute("title") ?? "").trim();
@@ -327,12 +504,19 @@ export function ScriptMarkdownPreview({
   };
 
   return (
-    <div className="markdown-preview">
+    <div
+      className={
+        hasRoleOrLightLabels
+          ? "markdown-preview markdown-preview--has-line-labels"
+          : "markdown-preview"
+      }
+    >
       <div
         ref={rootRef}
         onClick={handleSpeakerLabelClick}
         onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
       >
+        <div className="script-step-title">{currentStep?.title}</div>
         <ReactMarkdown
           urlTransform={urlTransform}
           rehypePlugins={
@@ -344,9 +528,55 @@ export function ScriptMarkdownPreview({
               : []
           }
           components={{
-            p: ({ children }: { children: React.ReactNode }) => (
-              <p>{renderLightTokens(children)}</p>
-            ),
+            p: ({ children }: { children: React.ReactNode }) => {
+              const rendered = renderLightTokens(children);
+              const { label, rest, kind } = splitLeadingLineLabel(rendered);
+              const leadingTrack = onTrackLinkClick ? getLeadingTrackPayload(rendered) : null;
+              if (!label) {
+                if (leadingTrack) {
+                  const alignClass = hasRoleOrLightLabels
+                    ? "markdown-dialog-line--track-align"
+                    : "markdown-dialog-line--track-compact";
+                  return (
+                    <p className={`markdown-dialog-line markdown-dialog-line--label-track ${alignClass}`}>
+                      <span className="markdown-dialog-label" aria-hidden="true">
+                        <button
+                          type="button"
+                          className="markdown-track-play"
+                          title="Воспроизвести"
+                          onClick={() => playFromPayload(leadingTrack)}
+                        >
+                          ▶
+                        </button>
+                      </span>
+                      <span className="markdown-dialog-text">{rendered}</span>
+                    </p>
+                  );
+                }
+
+                if (!hasRoleOrLightLabels) {
+                  return <p>{rendered}</p>;
+                }
+                return (
+                  <p className="markdown-dialog-line markdown-dialog-line--no-label">
+                    <span className="markdown-dialog-label" aria-hidden="true" />
+                    <span className="markdown-dialog-text">{rendered}</span>
+                  </p>
+                );
+              }
+              const kindClass =
+                kind === "light"
+                  ? "markdown-dialog-line--label-light"
+                  : kind === "play"
+                    ? "markdown-dialog-line--label-play"
+                  : "markdown-dialog-line--label-role";
+              return (
+                <p className={`markdown-dialog-line ${kindClass}`}>
+                  <span className="markdown-dialog-label">{label}</span>
+                  <span className="markdown-dialog-text">{rest}</span>
+                </p>
+              );
+            },
             li: ({ children }: { children: React.ReactNode }) => (
               <li>{renderLightTokens(children)}</li>
             ),
@@ -388,19 +618,15 @@ export function ScriptMarkdownPreview({
                   <button
                     type="button"
                     className="markdown-track-link"
+                    data-track-id={"id" in resolved ? String(resolved.id) : undefined}
+                    data-track-name={"name" in resolved ? String(resolved.name) : undefined}
                     onClick={async () => {
-                      if (resolved.id != null) {
+                      if ("id" in resolved) {
                         onTrackLinkClick(Number(resolved.id));
                         return;
                       }
-                      if (!resolved.name) return;
-                      const fromCache = playlistOptions.find(
-                        (item) =>
-                          String(item?.title ?? "").toLowerCase() ===
-                          String(resolved.name ?? "").toLowerCase(),
-                      );
-                      if (fromCache?.id != null) {
-                        onTrackLinkClick(Number(fromCache.id));
+                      if ("name" in resolved) {
+                        playFromPayload({ name: String(resolved.name) });
                       }
                     }}
                   >

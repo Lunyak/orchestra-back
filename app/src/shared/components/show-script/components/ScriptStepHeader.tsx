@@ -1,47 +1,24 @@
+import { useScriptUI } from "../../../../features/script-ui";
 import type { ScriptStep } from "../../../types/script";
-import ControlsScript from "../controls-script/ControlsScript";
 
 export function ScriptStepHeader({
-  isEditing,
   currentStep,
   updateStep,
-  controls,
 }: {
-  isEditing: boolean;
   currentStep: ScriptStep | undefined;
   updateStep: <K extends keyof ScriptStep>(
     id: number,
     field: K,
     value: ScriptStep[K],
   ) => void;
-  controls: null | {
-    selectedTrackId: number | null;
-    playlistOptions: { id: number; title: string }[];
-    onSelectedTrackIdChange: (trackId: number | null) => void;
-    lightChannels: string[];
-    onLightChannelsChange: (next: string[]) => void;
-    selectedLightSlot: number;
-    onSelectedLightSlotChange: (slot: number) => void;
-    onInsertText: (text: string) => void;
-  };
+
 }) {
+  const {
+    isEditing,
+  } = useScriptUI();
+
   return (
     <div className="script-header">
-      <div className="script-actions">
-        {isEditing && controls ? (
-          <ControlsScript
-            selectedTrackId={controls.selectedTrackId}
-            playlistOptions={controls.playlistOptions}
-            onSelectedTrackIdChange={controls.onSelectedTrackIdChange}
-            lightChannels={controls.lightChannels}
-            selectedLightSlot={controls.selectedLightSlot}
-            onLightChannelsChange={controls.onLightChannelsChange}
-            onSelectedLightSlotChange={controls.onSelectedLightSlotChange}
-            onInsertText={controls.onInsertText}
-          />
-        ) : null}
-      </div>
-
       {isEditing && currentStep ? (
         <div className="form-group">
           <div className="script-title-insert">
@@ -82,7 +59,7 @@ export function ScriptStepHeader({
           </div>
         </div>
       ) : (
-        <div className="script-step-title">{currentStep?.title}</div>
+       null
       )}
     </div>
   );

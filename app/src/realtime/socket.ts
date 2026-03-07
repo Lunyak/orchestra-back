@@ -2,7 +2,7 @@ import { io, type Socket } from "socket.io-client";
 import { getApiBaseUrl } from "../sync/api";
 
 type ServerToClientEvents = {
-  "scene-updated": (payload: { projectId?: string }) => void;
+  "scene-updated": (payload: { projectId?: string; sourceClientId?: string | null }) => void;
 };
 
 type ClientToServerEvents = {

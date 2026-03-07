@@ -110,6 +110,8 @@ export function AppRoutes() {
     toggleHeaderSounds,
     showStepRoles,
     toggleStepRoles,
+    showScriptEditorTools,
+    toggleScriptEditorTools,
     isStepsCollapsed,
     toggleStepsCollapsed,
   } = useScriptUI();
@@ -141,6 +143,8 @@ export function AppRoutes() {
               onToggleHeaderSounds: toggleHeaderSounds,
               showRoles: showStepRoles,
               onToggleRoles: toggleStepRoles,
+              showScriptEditorTools,
+              onToggleScriptEditorTools: toggleScriptEditorTools,
               isStepsCollapsed,
               onToggleStepsCollapsed: toggleStepsCollapsed,
             }

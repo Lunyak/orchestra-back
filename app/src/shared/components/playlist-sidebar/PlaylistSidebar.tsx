@@ -1,7 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { getDesktopApi } from "../../platform/desktop-api";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
-import type { PlaylistTrack } from "../../types/playlist";
 import {
   addScenePlaylistTracksFromPathsDesktop,
   deleteScenePlaylistTrackDesktop,
@@ -10,6 +7,10 @@ import {
   sceneActions,
   uploadScenePlaylistWeb,
 } from "../../../features/scene/model/scene-slice";
+import { getDesktopApi } from "../../platform/desktop-api";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import type { PlaylistTrack } from "../../types/playlist";
+import { ListItem } from "../list-item/ListItem";
 import "./style.css";
 
 interface PlaylistSidebarProps {
@@ -642,7 +643,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           <div className="playlist-empty">Треки не добавлены</div>
         ) : (
           playlist.map((track) => (
-            <div
+            <ListItem
               key={track.id}
               className={`playlist-track-row ${isCompact ? "compact" : ""} ${currentTrack?.id === track.id ? "active" : ""
                 }`}
@@ -762,7 +763,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
                   )}
                 </>
               )}
-            </div>
+            </ListItem>
           ))
         )}
       </div>

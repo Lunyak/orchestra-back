@@ -1,27 +1,28 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth";
-import { useProject } from "../../features/project";
-import {
-  getProfilesBatch,
-  getProjectMembers,
-  getProjectRoles,
-  syncPull,
-  type TeamProfile,
-} from "../../sync/api";
-import { publishDirectorSession } from "../../sync/api";
-import type { ScriptStep } from "../../shared/types/script";
-import { markdownToPlainText } from "../../shared/utils/textPreview";
-import { createId } from "../../shared/utils/createId";
-import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import {
   loadDirectorSessions,
   saveDirectorSessions,
   type DirectorRehearsalSession,
   type DirectorSessionSlot,
 } from "../../features/director-sessions/directorSessionsSync";
+import { useProject } from "../../features/project";
+import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
+import type { ScriptStep } from "../../shared/types/script";
+import { createId } from "../../shared/utils/createId";
+import { markdownToPlainText } from "../../shared/utils/textPreview";
+import {
+  getProfilesBatch,
+  getProjectMembers,
+  getProjectRoles,
+  publishDirectorSession,
+  syncPull,
+  type TeamProfile,
+} from "../../sync/api";
 import "../rehearsals/style.css";
 import "./style.css";
+import { ListItem } from "@shared/components/list-item/ListItem";
 
 type ProjectDataCache = Record<
   string,
@@ -433,8 +434,8 @@ export function DirectorSessionsPage() {
     } catch (e: any) {
       setPublishError(
         e?.response?.data?.message ||
-          e?.message ||
-          "Не удалось опубликовать сессию",
+        e?.message ||
+        "Не удалось опубликовать сессию",
       );
     } finally {
       setPublishing(false);
@@ -621,7 +622,7 @@ export function DirectorSessionsPage() {
     if (!projectFilter) return;
     try {
       localStorage.setItem(projectFilterStorageKey, projectFilter);
-    } catch (_) {}
+    } catch (_) { }
   }, [projectFilter]);
 
   useEffect(() => {
@@ -774,12 +775,12 @@ export function DirectorSessionsPage() {
         };
       })
       .filter(Boolean) as Array<{
-      email: string;
-      displayName: string | null;
-      avatarUrl: string | null;
-      availabilityCalendar: Record<string, "present" | "absent"> | null;
-      availabilityTimeRanges: Record<string, AvailabilityTimeRange[]> | null;
-    }>;
+        email: string;
+        displayName: string | null;
+        avatarUrl: string | null;
+        availabilityCalendar: Record<string, "present" | "absent"> | null;
+        availabilityTimeRanges: Record<string, AvailabilityTimeRange[]> | null;
+      }>;
     list.sort((a, b) =>
       String(a.displayName ?? a.email).localeCompare(String(b.displayName ?? b.email), "ru"),
     );
@@ -1171,42 +1172,42 @@ export function DirectorSessionsPage() {
                         }}
                       >
                         <div className="sessions-sessionRow-content">
-                        <button
-                          type="button"
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData("text/plain", s.id);
-                            e.dataTransfer.effectAllowed = "move";
-                            setDraggedSessionId(s.id);
-                          }}
-                          onDragEnd={() => setDraggedSessionId(null)}
-                          className={`sessions-sessionSelect rehearsals-item ${s.id === activeSessionId ? "active" : ""} ${draggedSessionId === s.id ? "dragging" : ""}`}
-                          title="Перетащи для изменения порядка"
-                        >
-                          <div className="rehearsals-item-title">{s.title}</div>
-                          <div className="rehearsals-item-meta">
-                            {new Date(s.startsAt).toLocaleString()} · слотов: {s.slots?.length ?? 0}
-                          </div>
-                        </button>
-                        <Link
-                          to={`/sessions/${encodeURIComponent(s.id)}`}
-                          onClick={(e) => e.stopPropagation()}
-                          title="Открыть страницу сессии"
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            width: 34,
-                            height: 34,
-                            borderRadius: 10,
-                            background: "rgba(255,255,255,0.04)",
-                            color: "inherit",
-                            textDecoration: "none",
-                            opacity: 0.9,
-                          }}
-                        >
-                          ↗
-                        </Link>
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", s.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              setDraggedSessionId(s.id);
+                            }}
+                            onDragEnd={() => setDraggedSessionId(null)}
+                            className={`sessions-sessionSelect rehearsals-item ${s.id === activeSessionId ? "active" : ""} ${draggedSessionId === s.id ? "dragging" : ""}`}
+                            title="Перетащи для изменения порядка"
+                          >
+                            <div className="rehearsals-item-title">{s.title}</div>
+                            <div className="rehearsals-item-meta">
+                              {new Date(s.startsAt).toLocaleString()} · слотов: {s.slots?.length ?? 0}
+                            </div>
+                          </button>
+                          <Link
+                            to={`/sessions/${encodeURIComponent(s.id)}`}
+                            onClick={(e) => e.stopPropagation()}
+                            title="Открыть страницу сессии"
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 34,
+                              height: 34,
+                              borderRadius: 10,
+                              background: "rgba(255,255,255,0.04)",
+                              color: "inherit",
+                              textDecoration: "none",
+                              opacity: 0.9,
+                            }}
+                          >
+                            ↗
+                          </Link>
                         </div>
                       </div>
                     ))}
@@ -1576,33 +1577,35 @@ export function DirectorSessionsPage() {
 
                       <div className="sessions-material-list">
                         {filteredStepsForList.slice(0, 200).map((s) => (
-                          <button
-                            key={`${projectFilter}:${s.id}`}
-                            type="button"
-                            draggable
-                            onDragStart={(e) => {
-                              const payload: DragStepRefPayload = {
-                                kind: "stepRef",
-                                projectSlug: projectFilter,
-                                stepId: s.id,
-                                durationMin:
-                                  s.durationMin == null
-                                    ? undefined
-                                    : Math.max(1, Math.floor(Number(s.durationMin) || 1)),
-                              };
-                              e.dataTransfer.setData(DND_MIME_STEP_REF, JSON.stringify(payload));
-                              e.dataTransfer.effectAllowed = "copy";
-                            }}
-                            onClick={() => {
-                              setMaterialPreview({ projectSlug: projectFilter, step: s });
-                            }}
-                            className="rehearsals-item"
-                            title="Открыть текст и выбрать (или перетащи в слот)"
-                          >
-                            <div className="rehearsals-item-title">
-                              #{s.id} {s.title}
-                            </div>
-                          </button>
+                          <ListItem>
+                            <button
+                              key={`${projectFilter}:${s.id}`}
+                              type="button"
+                              draggable
+                              onDragStart={(e) => {
+                                const payload: DragStepRefPayload = {
+                                  kind: "stepRef",
+                                  projectSlug: projectFilter,
+                                  stepId: s.id,
+                                  durationMin:
+                                    s.durationMin == null
+                                      ? undefined
+                                      : Math.max(1, Math.floor(Number(s.durationMin) || 1)),
+                                };
+                                e.dataTransfer.setData(DND_MIME_STEP_REF, JSON.stringify(payload));
+                                e.dataTransfer.effectAllowed = "copy";
+                              }}
+                              onClick={() => {
+                                setMaterialPreview({ projectSlug: projectFilter, step: s });
+                              }}
+                              className="rehearsals-item"
+                              title="Открыть текст и выбрать (или перетащи в слот)"
+                            >
+                              <div className="rehearsals-item-title">
+                                #{s.id} {s.title}
+                              </div>
+                            </button>
+                          </ListItem>
                         ))}
                         {filteredStepsForList.length === 0 && (
                           <div className="rehearsals-muted">Ничего не найдено.</div>
@@ -1661,8 +1664,8 @@ export function DirectorSessionsPage() {
                               {markdownToPlainText(
                                 String(
                                   materialPreview.step.playMarkdown ??
-                                    materialPreview.step.markdown ??
-                                    "",
+                                  materialPreview.step.markdown ??
+                                  "",
                                 ),
                               )}
                             </pre>
@@ -1807,9 +1810,9 @@ export function DirectorSessionsPage() {
                         )}
                       </div>
 
-     
 
-          
+
+
                     </div>
                   </div>
                 )}

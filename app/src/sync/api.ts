@@ -4,6 +4,7 @@ import axios, {
   type AxiosResponse,
 } from "axios";
 import { refreshToken } from "./auth";
+import { getClientInstanceId } from "../realtime/clientInstanceId";
 
 export type SyncOperation = "create" | "update" | "delete";
 
@@ -186,7 +187,10 @@ export function getApiBaseUrl(): string {
 export async function syncPush(accessToken: string, changes: SyncChange[]) {
   if (!changes.length) return;
   await api.post<unknown>("/sync/push", { changes } as SyncPushRequest, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-orchestra-client-id": getClientInstanceId(),
+    },
   });
 }
 

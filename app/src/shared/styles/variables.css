@@ -1,24 +1,26 @@
 :root {
   /* ===== ЦВЕТА ===== */
-  
+
   /* Основные фоновые цвета */
   --color-bg-primary: #282828;
 
   --color-bg-secondary: #1d2021;
   /* --color-bg-secondary: #1D1D20; */
   --color-bg-tertiary: #FEF08A;
+  --color-bg-quaternary: #333b52;
+
   --color-bg-dark: #020617;
   --color-bg-overlay: rgba(15, 23, 42, 0.85);
   --color-bg-modal: rgba(16, 16, 18, 0.96);
   --color-bg-login: rgba(15, 23, 42, 0.96);
-  
+
   /* Темные оттенки для элементов */
   --color-surface-1: #0f172a;
   --color-surface-2: #1f2937;
   --color-surface-3: #111827;
   --color-surface-4: #1e293b;
   --color-surface-5: #243041;
-  
+
   /* Границы */
   --color-border-default: #1f2937;
   --color-border-light: #374151;
@@ -29,7 +31,7 @@
   --color-border-visible: rgba(255, 255, 255, 0.12);
   --color-border-strong: rgba(255, 255, 255, 0.14);
   --color-border-accent: rgba(148, 163, 184, 0.15);
-  
+
   /* Синие цвета (primary) */
   --color-primary: #2563eb;
   --color-primary-dark: #1d4ed8;
@@ -43,13 +45,13 @@
   --color-blue-border: rgba(96, 165, 250, 0.45);
   --color-blue-highlight: rgba(120, 180, 255, 0.45);
   --color-blue-highlight-bg: rgba(120, 180, 255, 0.10);
-  
+
   /* Зеленые цвета (success) */
   --color-success: #10b981;
   --color-success-dark: #059669;
   --color-success-accent: #22c55e;
   --color-success-border: #16a34a;
-  
+
   /* Красные цвета (danger/error) */
   --color-danger: #b91c1c;
   --color-danger-hover: #dc2626;
@@ -62,11 +64,11 @@
   --color-problem-border: rgba(255, 90, 90, 0.35);
   --color-problem-border-strong: rgba(255, 90, 90, 0.55);
   --color-problem-shadow: rgba(255, 90, 90, 0.22);
-  
+
   /* Желтые цвета (warning/accent) */
   --color-warning: #fbbf24;
   --color-warning-text: rgba(255, 190, 120, 0.95);
-  
+
   /* Текстовые цвета */
   --color-text-primary: #d6c7aa;
   /* --color-text-primary: #e2e8f0; */
@@ -85,7 +87,7 @@
   --color-text-blue: #bfdbfe;
   --color-text-dark: #213547;
   --color-text-placeholder: #6b7280;
-  
+
   /* Прозрачные фоны */
   --color-bg-transparent-1: rgba(255, 255, 255, 0.03);
   --color-bg-transparent-2: rgba(255, 255, 255, 0.04);
@@ -96,7 +98,7 @@
   --color-bg-hover: rgba(255, 255, 255, 0.1);
   --color-bg-active: rgba(255, 255, 255, 0.2);
   --color-bg-dim: rgba(15, 23, 42, 0.9);
-  
+
   /* Тени */
   --color-shadow-default: rgba(0, 0, 0, 0.15);
   --color-shadow-medium: rgba(0, 0, 0, 0.4);
@@ -107,19 +109,19 @@
   --color-shadow-glow-success: rgba(34, 197, 94, 0.35);
   --color-shadow-glow-success-strong: rgba(34, 197, 94, 0.5);
   --color-shadow-glow-warning: rgba(251, 191, 36, 0.5);
-  
+
   /* Градиенты */
   --gradient-login-bg: radial-gradient(circle at top, #1d4ed8 0, #020617 45%, #020617 100%);
   --gradient-button-primary: linear-gradient(135deg, #2563eb, #22c55e);
   --gradient-header-trigger: linear-gradient(to right, rgba(44, 62, 80, 0.95) 0%, rgba(44, 62, 80, 0.4) 70%, transparent 100%);
-  
+
   /* Кнопки*/
   --color-button-primary: #2563eb;
   --color-button-secondary: #22c55e;
   --color-button-danger: #b91c1c;
-  
+
   /* ===== РАЗМЕРЫ ===== */
-  
+
   /* Border radius */
   --radius-xs: 4px;
   --radius-sm: 6px;
@@ -129,7 +131,7 @@
   --radius-2xl: 14px;
   --radius-3xl: 18px;
   --radius-full: 999px;
-  
+
   /* Spacing (отступы и паддинги) */
   --spacing-1: 2px;
   --spacing-2: 4px;
@@ -144,7 +146,7 @@
   --spacing-12: 24px;
   --spacing-14: 28px;
   --spacing-16: 32px;
-  
+
   /* Размеры шрифтов */
   --font-size-xs: 10px;
   --font-size-sm: 11px;
@@ -156,13 +158,13 @@
   --font-size-3xl: 20px;
   --font-size-4xl: 22px;
   --font-size-5xl: 24px;
-  
+
   /* Line height */
   --line-height-tight: 1.1;
   --line-height-snug: 1.25;
   --line-height-normal: 1.4;
   --line-height-relaxed: 1.5;
-  
+
   /* Font weights */
   --font-weight-normal: 400;
   --font-weight-medium: 500;
@@ -170,7 +172,7 @@
   --font-weight-bold: 700;
   --font-weight-extrabold: 800;
   --font-weight-black: 900;
-  
+
   /* Ширины компонентов */
   --width-icon: 24px;
   --width-icon-sm: 18px;
@@ -190,7 +192,7 @@
   --width-panel: 320px;
   --width-card: 380px;
   --width-form: 420px;
-  
+
   /* Высоты компонентов */
   --height-icon: 24px;
   --height-icon-sm: 18px;
@@ -201,7 +203,7 @@
   --height-player: 70px;
   --height-track: 80px;
   --height-header-panel: 20px;
-  
+
   /* Размеры для сеток */
   --grid-col-min: 240px;
   --grid-col-max: 1fr;
@@ -209,7 +211,7 @@
   --grid-gap-md: 10px;
   --grid-gap-lg: 12px;
   --grid-gap-xl: 14px;
-  
+
   /* Z-index слои */
   --z-index-base: 1;
   --z-index-panel: 2;
@@ -218,7 +220,7 @@
   --z-index-overlay: 10;
   --z-index-modal: 50;
   --z-index-header: 1000;
-  
+
   /* Transitions */
   --transition-fast: 0.08s ease;
   --transition-normal: 0.12s ease;
@@ -229,7 +231,7 @@
   --transition-border: border-color 0.12s ease;
   --transition-all-smooth: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
   --transition-opacity: opacity 0.15s ease, transform 0.15s ease;
-  
+
   /* Opacity */
   --opacity-disabled: 0.5;
   --opacity-muted: 0.6;
@@ -239,7 +241,7 @@
   --opacity-bright: 0.85;
   --opacity-high: 0.9;
   --opacity-higher: 0.95;
-  
+
   /* Box shadows */
   --shadow-sm: 0 2px 4px var(--color-shadow-light);
   --shadow-md: 2px 0 8px var(--color-shadow-default);
@@ -268,7 +270,12 @@
   --script-font-size-heading: clamp(24px, 1.25rem + 1.2vw, 32px);
   /* 11–13pt ≈ 14.7–17.3px */
   --script-font-size-label: clamp(14.7px, 0.9rem + 0.25vw, 17.3px);
+
+  /* ===== ПЛЕЙЛИСТ ===== */
+  --color-bg-playlist: var(--color-bg-quaternary);
+  --color-bg-steps: var(--color-bg-quaternary);
 }
+
 
 /* Light theme (опционально) */
 @media (prefers-color-scheme: light) {

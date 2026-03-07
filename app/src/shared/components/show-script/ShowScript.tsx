@@ -2,10 +2,14 @@ import React, { useRef, useState } from 'react';
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
 import { useScriptUI } from '../../../features/script-ui';
+import { selectShowScriptMarkdownUi, showScriptMarkdownActions } from '../../../features/show-script-markdown/model/show-script-markdown-slice';
+import { Button } from '../../core/button/Button';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { ScriptRequisite, ScriptStep } from "../../types/script";
 import { RequisitesPanel } from "./components/RequisitesPanel";
 import { ShowScriptMarkdownSection } from "./components/ShowScriptMarkdownSection";
 import { StepRolesPanel } from "./components/StepRolesPanel";
+import ControlsScript from "./controls-script/ControlsScript";
 import './style.css';
 
 
@@ -13,6 +17,7 @@ export const ShowScript: React.FC = () => {
   const { projectName } = useProject();
   const projectSlug = projectName || "fools";
   const sceneName = "script";
+  const dispatch = useAppDispatch();
 
   const {
     steps,
@@ -32,12 +37,15 @@ export const ShowScript: React.FC = () => {
   const {
     showRequisites,
     showStepRoles,
+    showScriptEditorTools,
     isEditing,
     setIsEditing,
   } = useScriptUI();
 
   const currentStep = steps[currentPage];
   const currentRequisites = currentStep?.requisites ?? [];
+  const markdownUi = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectSlug, sceneName));
+  const annotationsMode = markdownUi.annotationsMode;
 
   const updateStepField = <K extends keyof ScriptStep>(
     id: number,
@@ -121,14 +129,30 @@ export const ShowScript: React.FC = () => {
           sceneName={sceneName}
           updateStepField={updateStepField}
           onTrackLinkClick={handleTrackLinkClick}
-          renderBody={({ markdownPane }) =>
+          renderBody={({ markdownPane, controls }) =>
             currentStep ? (
               <div className="script-step-editor">
                 <div className="script-step-body">
                   <div className="script-step-main">
                     {markdownPane}
                   </div>
-                  {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
+                  {(showStepRoles || (showScriptEditorTools && isEditing && controls)) ? (
+                    <div className="script-step-asides">
+                      {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
+                      {showScriptEditorTools && isEditing && controls ? (
+                        <ControlsScript
+                          selectedTrackId={controls.selectedTrackId}
+                          playlistOptions={controls.playlistOptions}
+                          onSelectedTrackIdChange={controls.onSelectedTrackIdChange}
+                          lightChannels={controls.lightChannels}
+                          onLightChannelsChange={controls.onLightChannelsChange}
+                          selectedLightSlot={controls.selectedLightSlot}
+                          onSelectedLightSlotChange={controls.onSelectedLightSlotChange}
+                          onInsertText={controls.onInsertText}
+                        />
+                      ) : null}
+                    </div>
+                  ) : null}
                   <RequisitesPanel
                     show={showRequisites}
                     isEditing={isEditing}

@@ -40,7 +40,7 @@
 
 .roles-grid {
   display: grid;
-  grid-template-columns: 1fr 1.6fr;
+  grid-template-columns: 350px 1.6fr;
   gap: 14px;
   margin-top: 12px;
 }
@@ -95,22 +95,17 @@
 .roles-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .roles-list-item {
-  text-align: left;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.16);
-  border-radius: 12px;
-  padding: 10px 10px;
-  cursor: pointer;
+  border: none;
+  background: inherit;
+  padding: 0;
   color: inherit;
-}
-
-.roles-list-item.active {
-  border-color: rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.08);
+  cursor: inherit;
+  text-align-last: left;
+  width: 100%;
 }
 
 .roles-list-title {

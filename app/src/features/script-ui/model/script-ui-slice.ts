@@ -8,6 +8,8 @@ export type ScriptUiState = {
   isStepsCollapsed: boolean;
   /** Панель "Роли в сцене" (StepRolesPanel) */
   showStepRoles: boolean;
+  /** Панель инструментов редактора сценария (музыка/свет) */
+  showScriptEditorTools: boolean;
 
   /** Режим редактирования (не persist'им) */
   isEditing: boolean;
@@ -33,6 +35,7 @@ function persistBooleans(state: ScriptUiState) {
     localStorage.setItem("showHeaderSounds", String(state.showHeaderSounds));
     localStorage.setItem("isStepsCollapsed", String(state.isStepsCollapsed));
     localStorage.setItem("showStepRoles", String(state.showStepRoles));
+    localStorage.setItem("showScriptEditorTools", String(state.showScriptEditorTools));
   } catch {
     // ignore
   }
@@ -45,6 +48,7 @@ function defaultState(): ScriptUiState {
     showHeaderSounds: true,
     isStepsCollapsed: false,
     showStepRoles: true,
+    showScriptEditorTools: false,
     isEditing: false,
     swapTheaterPanels: true,
   };
@@ -59,6 +63,7 @@ function initialStateFromStorage(): ScriptUiState {
     showHeaderSounds: storedBool("showHeaderSounds", base.showHeaderSounds),
     isStepsCollapsed: storedBool("isStepsCollapsed", base.isStepsCollapsed),
     showStepRoles: storedBool("showStepRoles", base.showStepRoles),
+    showScriptEditorTools: storedBool("showScriptEditorTools", base.showScriptEditorTools),
   };
 }
 
@@ -73,6 +78,7 @@ export const scriptUiSlice = createSlice({
       state.showHeaderSounds = storedBool("showHeaderSounds", base.showHeaderSounds);
       state.isStepsCollapsed = storedBool("isStepsCollapsed", base.isStepsCollapsed);
       state.showStepRoles = storedBool("showStepRoles", base.showStepRoles);
+      state.showScriptEditorTools = storedBool("showScriptEditorTools", base.showScriptEditorTools);
       // Non-persisted fields should be reset on init (matches previous behavior)
       state.isEditing = false;
       state.swapTheaterPanels = true;
@@ -121,6 +127,15 @@ export const scriptUiSlice = createSlice({
     },
     toggleStepRoles(state) {
       state.showStepRoles = !state.showStepRoles;
+      persistBooleans(state);
+    },
+
+    setShowScriptEditorTools(state, action: PayloadAction<{ value: boolean }>) {
+      state.showScriptEditorTools = Boolean(action.payload.value);
+      persistBooleans(state);
+    },
+    toggleScriptEditorTools(state) {
+      state.showScriptEditorTools = !state.showScriptEditorTools;
       persistBooleans(state);
     },
 
