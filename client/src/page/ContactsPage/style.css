@@ -1,0 +1,69 @@
+.contacts-page {
+  min-height: 100vh;
+  position: relative;
+  background: var(--color-bg);
+}
+
+.contacts-page__background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.contacts-page__back {
+  position: absolute;
+  left: clamp(20px, 4vw, 40px);
+  top: 24px;
+  z-index: 100;
+  font-family: "Russo One", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  transition: color var(--transition);
+}
+
+.contacts-page__back:hover {
+  color: var(--color-accent-hover);
+}
+
+.contacts-page__content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  max-width: 480px;
+  padding: 32px;
+  background: rgba(22, 18, 24, 0.85);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.contacts-page__title {
+  font-family: "Russo One", sans-serif;
+  font-size: 28px;
+  letter-spacing: 0.02em;
+  margin: 0 0 24px;
+  color: var(--color-text);
+}
+
+.contacts-page__line {
+  font-family: Georgia, serif;
+  font-size: 20px;
+  line-height: 1.6;
+  margin: 0 0 12px;
+  color: var(--color-text);
+}
+
+.contacts-page__label {
+  color: var(--color-text-muted);
+  margin-right: 4px;
+}
+
+.contacts-page__content a {
+  color: var(--color-accent);
+}
+
+.contacts-page__content a:hover {
+  color: var(--color-accent-hover);
+}

@@ -114,10 +114,13 @@ export function DirectorSessionDetailsPage() {
   return (
     <div style={{ padding: "12px 12px 40px" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Link to="/sessions" style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}>
-          ← Все сессии
+        <Link
+          to={`/sessions/${encodeURIComponent(id)}`}
+          style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}
+        >
+          ← К сессии
         </Link>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Сессия</div>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>Явка</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>{headerTimeLabel}</div>
       </div>
 

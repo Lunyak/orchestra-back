@@ -9,15 +9,16 @@ services:
       - "443:443"
     environment:
       # Required for HTTPS (set in .env on the server)
-      ACME_EMAIL: ${ACME_EMAIL}
-      WEB_DOMAIN: ${WEB_DOMAIN}
-      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:-admin.localhost}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - web
+      - site
       - admin
       - back
 

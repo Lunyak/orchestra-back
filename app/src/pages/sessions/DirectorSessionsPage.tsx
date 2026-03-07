@@ -1223,12 +1223,21 @@ export function DirectorSessionsPage() {
                     <div className="rehearsals-card">
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
                         <div style={{ fontSize: 12, opacity: 0.8 }}>Открыть:</div>
-                        <Link
-                          to={`/sessions/${encodeURIComponent(activeSession.id)}`}
-                          style={{ fontSize: 12, textDecoration: "none", color: "inherit", opacity: 0.9 }}
-                        >
-                          /sessions/{activeSession.id}
-                        </Link>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                          <Link
+                            to={`/sessions/${encodeURIComponent(activeSession.id)}`}
+                            style={{ fontSize: 12, textDecoration: "none", color: "inherit", opacity: 0.9 }}
+                          >
+                            /sessions/{activeSession.id}
+                          </Link>
+                          <Link
+                            to={`/sessions/${encodeURIComponent(activeSession.id)}/attendance`}
+                            style={{ fontSize: 12, textDecoration: "none", color: "inherit", opacity: 0.8 }}
+                            title="Явка и мой комментарий (для публикации)"
+                          >
+                            явка ↗
+                          </Link>
+                        </div>
                       </div>
 
                       <label className="sessions-field">

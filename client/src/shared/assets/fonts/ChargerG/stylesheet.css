@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'mr_ChargerG';
+    src: url('mr_ChargerG.woff2') format('woff2'),
+        url('mr_ChargerG.woff') format('woff');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+

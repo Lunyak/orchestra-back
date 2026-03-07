@@ -1,0 +1,50 @@
+* {
+  box-sizing: border-box;
+}
+
+.App {
+  min-height: 100vh;
+  position: relative;
+}
+
+.text {
+  font-family: "HouseBroken";
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+@font-face {
+  font-family: "ChargerG";
+  src: url("./shared/assets/fonts/ChargerG.woff2") format("woff2"),
+    url("./shared/assets/fonts/ChargerG.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'HouseBroken';
+  src: url('./shared/assets/fonts/HouseBrokenRoughG.woff2') format('woff2'),
+    url('./shared/assets/fonts/HouseBrokenRoughG.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'InsurgentPro';
+  src: url('./shared/assets/fonts/InsurgentPro.woff2') format('woff2'),
+    url('./shared/assets/fonts/InsurgentPro.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}

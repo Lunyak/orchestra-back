@@ -1,0 +1,30 @@
+.dopamine-molecule {
+  display: block;
+  color: var(--color-text-muted, #9a8f7f);
+}
+
+.dopamine-molecule__structure {
+  opacity: 0.85;
+}
+
+.dopamine-molecule__atom {
+  fill: currentColor;
+  opacity: 0.9;
+}
+
+/* Пульсирующий заряд: короткий «тире» бежит по пути (pathLength=520) */
+.dopamine-molecule__pulse {
+  stroke: var(--color-accent, #b8354a);
+  stroke-dasharray: 28 492;
+  animation: dopamine-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes dopamine-pulse {
+  0% {
+    stroke-dashoffset: 0;
+  }
+
+  100% {
+    stroke-dashoffset: -520;
+  }
+}

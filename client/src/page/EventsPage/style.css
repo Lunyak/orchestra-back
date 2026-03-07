@@ -1,0 +1,371 @@
+.events-page {
+  min-height: 100vh;
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+
+.events-page__background {
+  position: absolute;
+  top: 0;
+}
+
+.events-page__content {
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+}
+
+.events-list {
+  max-width: 980px;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 40px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.card {
+  padding: 20px;
+  position: relative;
+  height: 600px;
+  width: calc((100% / 2) - 20px);
+  max-width: 440px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+
+
+  transition: all 200ms ease-in-out;
+
+  border-radius: 20px;
+  /* overflow: hidden; */
+  box-sizing: border-box;
+  z-index: 0;
+
+  cursor: pointer;
+
+  color: white;
+}
+
+.card h1 {
+  font-family: "Russo One", sans-serif;
+  font-size: clamp(18px, 2.2vw, 24px);
+  font-weight: 400;
+  line-height: 1.25;
+  margin: 0;
+  padding: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text);
+  transition: transform var(--transition);
+}
+
+h2 {
+  margin: 0;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(180deg, transparent 40%, rgba(13, 10, 12, 0.92) 100%);
+  border-radius: var(--radius-lg);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.image-wrapper {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 5px;
+  cursor: pointer;
+
+  transition: all 200ms ease-in-out;
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: all 200ms ease-in-out;
+}
+
+.book-design-image {
+  object-position: center;
+}
+
+.card-header {
+  height: 40px;
+  margin-bottom: auto;
+  display: flex;
+}
+
+.card-soon {
+  z-index: 2;
+  color: var(--color-text);
+  padding: 0 10px;
+  background: var(--color-accent);
+  font-family: "Russo One", sans-serif;
+  font-size: 14px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius);
+}
+
+.card-name {
+  z-index: 2;
+  margin-bottom: 20px;
+  position: relative;
+  text-align: left;
+}
+
+.card-name::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: var(--color-accent);
+  left: 0;
+  bottom: -16px;
+  opacity: 0.7;
+  border-radius: 1px;
+  z-index: 1;
+}
+
+.card-date {
+  z-index: 2;
+  margin-bottom: 10px;
+}
+
+.card-type {
+  z-index: 2;
+  text-transform: lowercase;
+  font-size: 14px;
+}
+
+.card-anonse {
+  z-index: 2;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.card-date__date {
+  font-weight: 700;
+}
+
+.know-more {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  transition: all 200ms ease-in-out;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.wrapper:hover img {
+  transform: scale(2);
+  /*object-position: bottom;*/
+}
+
+.wrapper:hover h1 {
+  bottom: 300px;
+  transform: scale(.4);
+}
+
+.wrapper:hover .image-wrapper {
+  width: 800px;
+}
+
+.card-old {
+  color: white;
+  position: absolute;
+  right: 10px;
+  z-index: 2;
+}
+
+.shadow {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  opacity: 0.8;
+}
+
+
+.know-more button {
+  align-items: center;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  flex-shrink: 0;
+  height: 44px;
+  justify-content: center;
+  transition: background var(--transition), transform var(--transition);
+  width: 44px;
+}
+
+.know-more button:hover {
+  background: var(--color-accent-hover);
+  transform: scale(1.05);
+}
+
+.know-more svg {
+  fill: var(--color-text);
+  stroke: var(--color-text);
+}
+
+.card:hover {
+  transform: scale(1.05);
+}
+
+.card:nth-child(1) {
+  img {
+    object-position: 0px 0px;
+    object-fit: cover;
+  }
+}
+
+.card:nth-child(2) {
+  img {
+    object-position: 0px 0px;
+    object-fit: cover;
+  }
+}
+
+.card:nth-child(3) {
+  img {
+    object-position: 0px 0px;
+  }
+}
+
+.arrow-back {
+  position: absolute;
+  left: clamp(20px, 4vw, 40px);
+  top: 24px;
+  z-index: 100;
+  font-family: "Russo One", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
+  transition: color var(--transition);
+}
+
+.arrow-back:hover {
+  color: var(--color-accent-hover);
+}
+
+@media (max-width: 1440px) {
+  .events-page__content {
+    top: 20px;
+    left: 0;
+    transform: translate(0, 0);
+  }
+}
+
+@media (max-width: 980px) {
+  .events-page__content {
+    top: 20px;
+    left: 0;
+    transform: translate(0, 0);
+  }
+
+  .events-list {
+    padding-top: 80px;
+    max-width: 780px;
+  }
+
+  .card {
+    height: 500px;
+  }
+}
+
+@media (max-width: 780px) {
+  .events-list {
+    padding-top: 80px;
+    max-width: 580px;
+    gap: 20px;
+  }
+
+  .card {
+    height: 380px;
+  }
+
+  .card::before {
+    width: calc(100% + 10px);
+    height: calc(100% + 10px);
+  }
+}
+
+@media (max-width: 580px) {
+  .events-list {
+    padding-top: 80px;
+    max-width: 480px;
+    gap: 20px;
+  }
+
+  .card {
+    height: 320px;
+  }
+
+  .card-name {
+    h1 {
+      font-size: 14px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .events-list {
+    padding-top: 80px;
+    max-width: 460px;
+    gap: 10px;
+  }
+
+  .card {
+    height: 500px;
+    width: calc(100% - 20px);
+    padding: 10px;
+  }
+
+  .card-name {
+    h1 {
+      font-size: 14px;
+    }
+  }
+
+  .arrow-back {
+    left: -20px;
+  }
+}

@@ -1,10 +1,5 @@
-{
-	# Email for Let's Encrypt (ACME). Put it into .env as ACME_EMAIL=you@example.com
-	email {$ACME_EMAIL}
-}
-
 # Main web app (SPA). API is available under /api/* and is forwarded to the backend without /api prefix.
-{$WEB_DOMAIN} {
+{$WEB_DOMAIN:localhost} {
 	encode gzip zstd
 
 	handle_path /api/* {
@@ -23,13 +18,22 @@
 		reverse_proxy minio:9000
 	}
 
-	handle {
+	# Orchestra app is hosted under /orkestr (safe ASCII path).
+	handle /orkestr {
+		redir /orkestr/ 308
+	}
+	handle_path /orkestr/* {
 		reverse_proxy web:80
+	}
+
+	handle {
+		# Main marketing site from ./client
+		reverse_proxy site:80
 	}
 }
 
 # Admin panel (separate UI). Same /api/* forwarding.
-{$ADMIN_DOMAIN} {
+{$ADMIN_DOMAIN:admin.localhost} {
 	encode gzip zstd
 
 	handle_path /api/* {

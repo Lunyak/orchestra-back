@@ -1,0 +1,91 @@
+.home-page {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+.home-page .smoke {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.home-page__container {
+  z-index: 1;
+  width: 100%;
+  max-width: 2100px;
+  margin: 0 auto;
+  height: 100%;
+}
+
+/* Молекула дофамина с пульсирующим зарядом */
+.home-page__molecule {
+  position: absolute;
+
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text);
+  opacity: 0.95;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@media (max-width: 768px) {
+  .home-page__molecule {
+    right: 24px;
+    width: 100px !important;
+    height: auto !important;
+  }
+}
+
+.home-page nav {
+  position: absolute;
+  left: clamp(24px, 6vw, 80px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 320px;
+  font-family: "Russo One", sans-serif;
+  font-size: clamp(28px, 4vw, 56px);
+  letter-spacing: 0.02em;
+  z-index: 2;
+}
+
+.home-page nav a {
+  color: var(--color-text);
+  opacity: 0.95;
+  transition: opacity var(--transition), color var(--transition);
+}
+
+.home-page nav a:hover {
+  color: var(--color-accent);
+  opacity: 1;
+}
+
+.home-page nav a::after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 2px;
+  background: var(--color-accent);
+  transition: width var(--transition);
+}
+
+.home-page nav a:hover::after {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .home-page nav {
+    top: 24px;
+    left: 24px;
+    transform: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 20px;
+  }
+
+}

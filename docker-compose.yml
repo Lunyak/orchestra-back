@@ -104,6 +104,7 @@ services:
       dockerfile: web/Dockerfile
       args:
         VITE_API_BASE_URL: /api
+        VITE_BASE_PATH: /orkestr/
     container_name: orkestr-web
     restart: unless-stopped
     ports:
@@ -111,6 +112,15 @@ services:
     depends_on:
       back:
         condition: service_healthy
+
+  site:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: orkestr-site
+    restart: unless-stopped
+    ports:
+      - "8082:80"
 
   admin:
     build:

@@ -73,8 +73,18 @@ export const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("accessToken");
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (!token) return config;
+
+    const headersAny = config.headers as any;
+    const existingAuth =
+      typeof headersAny?.get === "function"
+        ? headersAny.get("Authorization") ?? headersAny.get("authorization")
+        : headersAny?.Authorization ?? headersAny?.authorization;
+
+    // Don't override Authorization explicitly set by the caller.
+    if (!existingAuth) {
+      config.headers = config.headers ?? {};
+      (config.headers as any).Authorization = `Bearer ${token}`;
     }
     return config;
   },

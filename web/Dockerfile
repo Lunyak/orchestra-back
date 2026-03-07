@@ -7,6 +7,10 @@ WORKDIR /workspace
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Base path where this SPA is hosted (e.g. /orkestr/)
+ARG VITE_BASE_PATH=/
+ENV VITE_BASE_PATH=$VITE_BASE_PATH
+
 # Сначала зависимости web и app
 COPY web/package.json web/package-lock.json ./web/
 COPY app/package.json app/package-lock.json ./app/

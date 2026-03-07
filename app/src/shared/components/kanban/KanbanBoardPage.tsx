@@ -16,8 +16,8 @@ type KanbanStatus = NonNullable<ScriptStep["kanbanStatus"]>;
 
 const STATUSES: Array<{ id: KanbanStatus; label: string; hint: string }> = [
   { id: "raw", label: "Сырая", hint: "черновик / в работе" },
-  { id: "text-learned", label: "Выучен текст", hint: "текст готов, остальное — в процессе" },
-  { id: "almost-ready", label: "Почти готова", hint: "осталось немного" },
+  { id: "text-learned", label: "Нужно взять", hint: "нужно взять, остальное — в процессе" },
+  { id: "almost-ready", label: "Репетируем", hint: "репетируем" },
   { id: "ready", label: "Готова", hint: "можно играть" },
 ];
 
@@ -561,7 +561,7 @@ export function KanbanBoardPage({
             checked={onlyUnassigned}
             onChange={(e) => setOnlyUnassigned(e.target.checked)}
           />
-          <span>Только без назначений</span>
+          <span>без назначений</span>
         </label>
 
         <button

@@ -1,0 +1,9 @@
+@font-face {
+    font-family: 'InsurgentPro';
+    src: url('InsurgentPro.woff2') format('woff2'),
+        url('InsurgentPro.woff') format('woff');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+

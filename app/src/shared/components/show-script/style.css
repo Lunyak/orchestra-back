@@ -327,6 +327,9 @@
   flex: 0 0 auto;
   min-height: 0;
   max-height: 100%;
+  position: absolute;
+  bottom: 0;
+  right: 0;
 }
 
 .script-step-main {

@@ -10,11 +10,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const rawBase = String(env.VITE_API_BASE_URL || "http://localhost:3000");
+  const basePath = String(env.VITE_BASE_PATH || "/");
   const target =
     rawBase.startsWith("http://") || rawBase.startsWith("https://")
       ? rawBase
       : "http://localhost:3000";
   return {
+    base: basePath,
     resolve: {
       alias: {
         "@shared": path.resolve(__dirname, "../app/src/shared"),

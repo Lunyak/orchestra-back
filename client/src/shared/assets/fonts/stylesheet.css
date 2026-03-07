@@ -1,0 +1,18 @@
+@font-face {
+    font-family: 'mr_ChargerG';
+    src: url('mr_ChargerG.woff2') format('woff2'),
+        url('mr_ChargerG.woff') format('woff');
+    font-weight: bold;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'mr_HouseBrokenRoughG';
+    src: url('mr_HouseBrokenRoughG.woff2') format('woff2'),
+        url('mr_HouseBrokenRoughG.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+

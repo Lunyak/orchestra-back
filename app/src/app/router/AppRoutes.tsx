@@ -23,6 +23,18 @@ const DirectorSessionDetailsPage = lazy(() =>
   }))
 );
 
+const DirectorSessionPage = lazy(() =>
+  import("../../pages/sessions/DirectorSessionPage").then((m) => ({
+    default: m.DirectorSessionPage,
+  }))
+);
+
+const DirectorSessionSlotPage = lazy(() =>
+  import("../../pages/sessions/DirectorSessionSlotPage").then((m) => ({
+    default: m.DirectorSessionSlotPage,
+  }))
+);
+
 const ProfilePage = lazy(() =>
   import("../../pages/profile/ProfilePage").then((m) => ({
     default: m.ProfilePage,
@@ -210,7 +222,9 @@ export function AppRoutes() {
           <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />
           <Route path="/rehearsals/:rehearsalId" element={<Navigate to="/sessions" replace />} />
           <Route path="/sessions" element={<DirectorSessionsPage />} />
-          <Route path="/sessions/:sessionId" element={<DirectorSessionDetailsPage />} />
+          <Route path="/sessions/:sessionId" element={<DirectorSessionPage />} />
+          <Route path="/sessions/:sessionId/slots/:slotId" element={<DirectorSessionSlotPage />} />
+          <Route path="/sessions/:sessionId/attendance" element={<DirectorSessionDetailsPage />} />
           <Route path="/actor" element={<ActorPage />} />
           <Route path="/trainers" element={<TrainersPage />} />
           <Route path="/trainers/speech" element={<SpeechTrainerPage />} />
