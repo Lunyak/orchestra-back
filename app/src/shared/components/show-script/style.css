@@ -91,6 +91,7 @@
 }
 
 .script-header {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -809,6 +810,7 @@
 }
 
 .form-group {
+  width: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1071,7 +1073,6 @@
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-primary);
-  padding: 12px;
   outline: none;
 }
 
@@ -1130,7 +1131,7 @@
   /* border-radius: 999px; */
   background: rgba(37, 99, 235, 0.16);
   /* border: 1px solid rgba(96, 165, 250, 0.45); */
-  color: var(--color-text-label);
+  /* color: var(--color-text-label); */
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.6px;
@@ -1232,28 +1233,26 @@
 }
 
 .script-title-insert {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  label {
+    width: 100%;
+  }
 
   input {
-    text-align: center;
+    text-align: left;
     background: none;
     color: var(--color-text-primary);
     border: none;
     outline: none;
-    width: fit-content;
+    width: 100%;
     font-weight: 700;
     font-size: 20px;
   }
 }
 
-.script-duration-label {}
-
 .script-duration-insert {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
 
   label {
     display: flex;

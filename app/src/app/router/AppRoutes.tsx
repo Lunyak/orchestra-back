@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useScriptUI } from "../../features/script-ui";
 import { Header } from "../../shared/components/header/Header";
@@ -114,7 +114,21 @@ export function AppRoutes() {
     toggleScriptEditorTools,
     isStepsCollapsed,
     toggleStepsCollapsed,
+    mobilePlaylistOpen,
+    setMobilePlaylistOpen,
+    toggleMobilePlaylist,
+    mobileStepsOpen,
+    setMobileStepsOpen,
+    toggleMobileSteps,
   } = useScriptUI();
+
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(typeof window !== "undefined" ? window.innerWidth < 980 : false);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // Определяем, нужно ли показывать scriptState controls в Header
   const shouldShowScriptState =
@@ -129,6 +143,28 @@ export function AppRoutes() {
 
   const isBoardRoute = location.pathname === "/board";
 
+  const headerShowPlaylist = isMobile ? mobilePlaylistOpen : showPlaylistSidebar;
+  const headerIsStepsCollapsed = isMobile ? !mobileStepsOpen : isStepsCollapsed;
+
+  const handleTogglePlaylist = () => {
+    if (!isMobile) {
+      togglePlaylist();
+      return;
+    }
+    // На мобилке открываем плейлист как оверлей, не трогая desktop-персист.
+    setMobileStepsOpen(false);
+    toggleMobilePlaylist();
+  };
+
+  const handleToggleSteps = () => {
+    if (!isMobile) {
+      toggleStepsCollapsed();
+      return;
+    }
+    setMobilePlaylistOpen(false);
+    toggleMobileSteps();
+  };
+
   return (
     <>
       <Header
@@ -137,16 +173,16 @@ export function AppRoutes() {
             ? {
               showRequisites,
               onToggleRequisites: toggleRequisites,
-              showPlaylist: showPlaylistSidebar,
-              onTogglePlaylist: togglePlaylist,
+              showPlaylist: headerShowPlaylist,
+              onTogglePlaylist: handleTogglePlaylist,
               showHeaderSounds,
               onToggleHeaderSounds: toggleHeaderSounds,
               showRoles: showStepRoles,
               onToggleRoles: toggleStepRoles,
               showScriptEditorTools,
               onToggleScriptEditorTools: toggleScriptEditorTools,
-              isStepsCollapsed,
-              onToggleStepsCollapsed: toggleStepsCollapsed,
+              isStepsCollapsed: headerIsStepsCollapsed,
+              onToggleStepsCollapsed: handleToggleSteps,
             }
             : undefined
         }
@@ -156,8 +192,8 @@ export function AppRoutes() {
           isSpectacleLayoutRoute ? (
             <PageLoader
               variant="spectacle"
-              showLeftSidebar={showPlaylistSidebar}
-              showRightSidebar={!isStepsCollapsed}
+              showLeftSidebar={isMobile ? mobilePlaylistOpen : showPlaylistSidebar}
+              showRightSidebar={isMobile ? mobileStepsOpen : !isStepsCollapsed}
               showTopBar={showHeaderSounds}
               label="Загрузка страницы…"
             />

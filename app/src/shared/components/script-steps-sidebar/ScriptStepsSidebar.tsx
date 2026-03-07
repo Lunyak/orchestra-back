@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { ScriptStep } from "../../types/script";
-import "./style.css";
 import { ListItem } from "../list-item/ListItem";
+import "./style.css";
 
 export interface ScriptStepsSidebarProps {
   steps: ScriptStep[];
@@ -85,13 +85,6 @@ export const ScriptStepsSidebar = ({
   return (
     <aside className="script-sidebar">
       <div className="script-sidebar-content">
-        <div className="script-sidebar-header">
-
-          <div className="script-sidebar-title">Шаги</div>
-          <button className="script-add-step" onClick={onAddStep}>
-            +
-          </button>
-        </div>
         <div className="steps-mini-list">
           {steps.map((step, index) => (
             <ListItem
@@ -121,6 +114,9 @@ export const ScriptStepsSidebar = ({
               </button>
             </ListItem>
           ))}
+          <button className="script-add-step" onClick={onAddStep}>
+            +
+          </button>
         </div>
         <div className="script-navigation">
           <button
@@ -128,7 +124,7 @@ export const ScriptStepsSidebar = ({
             onClick={onPrev}
             disabled={currentIndex === 0}
           >
-            ← Предыдущий
+            ←
           </button>
           <span className="page-indicator">
             Шаг {currentIndex + 1} из {steps.length}
@@ -138,7 +134,7 @@ export const ScriptStepsSidebar = ({
             onClick={onNext}
             disabled={currentIndex === steps.length - 1}
           >
-            Следующий →
+            →
           </button>
         </div>
       </div>

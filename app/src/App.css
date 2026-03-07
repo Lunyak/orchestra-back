@@ -208,8 +208,9 @@ body {
 
 .app-layout {
   display: flex;
+  overflow: hidden;
   min-height: 100vh;
-  min-height: 100dvh;
+  /* min-height: 100dvh; */
   min-height: var(--app-height, 100dvh);
 }
 
@@ -347,20 +348,7 @@ body {
   }
 }
 
-.mobile-bottom-buttons {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 8px;
-  padding: 12px;
-  background: rgba(15, 23, 42, 0.95);
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
-  z-index: 100;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
-}
+
 
 .mobile-bottom-btn {
   flex: 1;
@@ -374,19 +362,6 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: transform 0.1s ease, box-shadow 0.2s ease;
-}
-
-/* На экранах меньше 640px кнопки в колонку и на всю ширину */
-@media (max-width: 639px) {
-  .mobile-bottom-buttons {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .mobile-bottom-btn {
-    width: 100%;
-    flex: none;
-  }
 }
 
 .mobile-bottom-btn:active {
@@ -477,6 +452,10 @@ body {
   transform: scale(0.98);
 }
 
+.main-content {
+  min-height: 100vh;
+}
+
 /* Медиа-запросы для мобильных и планшетов */
 @media (max-width: 979px) {
   .app-layout {
@@ -493,7 +472,7 @@ body {
   }
 
   .app-content {
-    padding-bottom: 60px;
+    /* padding-bottom: 60px; */
   }
 
   .login-form {
@@ -511,11 +490,6 @@ body {
   .steps-sidebar-wrapper.mobile {
     max-width: 250px;
     width: 90vw;
-  }
-
-  .mobile-bottom-buttons {
-    padding: 10px;
-    gap: 6px;
   }
 
   .mobile-bottom-btn {

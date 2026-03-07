@@ -21,6 +21,13 @@ export interface ScriptUIContextValue {
   isStepsCollapsed: boolean;
   setIsStepsCollapsed: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleStepsCollapsed: () => void;
+  mobilePlaylistOpen: boolean;
+  setMobilePlaylistOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  toggleMobilePlaylist: () => void;
+  mobileStepsOpen: boolean;
+  setMobileStepsOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  toggleMobileSteps: () => void;
+  closeMobilePanels: () => void;
   isEditing: boolean;
   setIsEditing: React.Dispatch<React.SetStateAction<boolean>>;
   toggleEditing: () => void;
@@ -116,6 +123,31 @@ export function useScriptUI(): ScriptUIContextValue {
   );
   const toggleStepsCollapsed = useCallback(() => dispatch(scriptUiActions.toggleStepsCollapsed()), [dispatch]);
 
+  const setMobilePlaylistOpen = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.mobilePlaylistOpen) : v;
+      dispatch(scriptUiActions.setMobilePlaylistOpen({ value: Boolean(next) }));
+    },
+    [dispatch, ui.mobilePlaylistOpen],
+  );
+  const toggleMobilePlaylist = useCallback(
+    () => dispatch(scriptUiActions.toggleMobilePlaylist()),
+    [dispatch],
+  );
+
+  const setMobileStepsOpen = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next = typeof v === "function" ? (v as any)(ui.mobileStepsOpen) : v;
+      dispatch(scriptUiActions.setMobileStepsOpen({ value: Boolean(next) }));
+    },
+    [dispatch, ui.mobileStepsOpen],
+  );
+  const toggleMobileSteps = useCallback(
+    () => dispatch(scriptUiActions.toggleMobileSteps()),
+    [dispatch],
+  );
+  const closeMobilePanels = useCallback(() => dispatch(scriptUiActions.closeMobilePanels()), [dispatch]);
+
   const setIsEditing: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
     (v) => {
       const next = typeof v === "function" ? (v as any)(ui.isEditing) : v;
@@ -153,6 +185,13 @@ export function useScriptUI(): ScriptUIContextValue {
     isStepsCollapsed: ui.isStepsCollapsed,
     setIsStepsCollapsed,
     toggleStepsCollapsed,
+    mobilePlaylistOpen: ui.mobilePlaylistOpen,
+    setMobilePlaylistOpen,
+    toggleMobilePlaylist,
+    mobileStepsOpen: ui.mobileStepsOpen,
+    setMobileStepsOpen,
+    toggleMobileSteps,
+    closeMobilePanels,
     isEditing: ui.isEditing,
     setIsEditing,
     toggleEditing,

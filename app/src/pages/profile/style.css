@@ -101,7 +101,6 @@
 }
 
 @media (max-width: 979px) {
-  /* На профиле нет mobile-bottom-buttons, поэтому нижний отступ не нужен. */
   .profile-layout .app-content {
     padding-bottom: 0;
   }

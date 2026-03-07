@@ -11,6 +11,14 @@ export type ScriptUiState = {
   /** Панель инструментов редактора сценария (музыка/свет) */
   showScriptEditorTools: boolean;
 
+  /**
+   * Мобильные оверлеи панелей (НЕ persist'им).
+   * Нужны, чтобы на мобилке "контрольные кнопки" открывали панели,
+   * не ломая сохранённые desktop-настройки.
+   */
+  mobilePlaylistOpen: boolean;
+  mobileStepsOpen: boolean;
+
   /** Режим редактирования (не persist'им) */
   isEditing: boolean;
   /** Перестановка панелей в театре (не persist'им, как и раньше) */
@@ -49,6 +57,8 @@ function defaultState(): ScriptUiState {
     isStepsCollapsed: false,
     showStepRoles: true,
     showScriptEditorTools: false,
+    mobilePlaylistOpen: false,
+    mobileStepsOpen: false,
     isEditing: false,
     swapTheaterPanels: true,
   };
@@ -80,6 +90,8 @@ export const scriptUiSlice = createSlice({
       state.showStepRoles = storedBool("showStepRoles", base.showStepRoles);
       state.showScriptEditorTools = storedBool("showScriptEditorTools", base.showScriptEditorTools);
       // Non-persisted fields should be reset on init (matches previous behavior)
+      state.mobilePlaylistOpen = false;
+      state.mobileStepsOpen = false;
       state.isEditing = false;
       state.swapTheaterPanels = true;
       persistBooleans(state);
@@ -137,6 +149,25 @@ export const scriptUiSlice = createSlice({
     toggleScriptEditorTools(state) {
       state.showScriptEditorTools = !state.showScriptEditorTools;
       persistBooleans(state);
+    },
+
+    setMobilePlaylistOpen(state, action: PayloadAction<{ value: boolean }>) {
+      state.mobilePlaylistOpen = Boolean(action.payload.value);
+    },
+    toggleMobilePlaylist(state) {
+      state.mobilePlaylistOpen = !state.mobilePlaylistOpen;
+    },
+
+    setMobileStepsOpen(state, action: PayloadAction<{ value: boolean }>) {
+      state.mobileStepsOpen = Boolean(action.payload.value);
+    },
+    toggleMobileSteps(state) {
+      state.mobileStepsOpen = !state.mobileStepsOpen;
+    },
+
+    closeMobilePanels(state) {
+      state.mobilePlaylistOpen = false;
+      state.mobileStepsOpen = false;
     },
 
     setIsEditing(state, action: PayloadAction<{ value: boolean }>) {

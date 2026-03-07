@@ -61,6 +61,11 @@ export function SpectaclePage() {
     showHeaderSounds,
     isStepsCollapsed,
     setIsStepsCollapsed,
+    mobilePlaylistOpen,
+    setMobilePlaylistOpen,
+    mobileStepsOpen,
+    setMobileStepsOpen,
+    closeMobilePanels,
     isEditing,
     setIsEditing,
     swapTheaterPanels: shouldSwapPanels,
@@ -97,8 +102,6 @@ export function SpectaclePage() {
     };
   }, [accessToken]);
 
-  const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
-  const [isMobileStepsOpen, setIsMobileStepsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -111,7 +114,7 @@ export function SpectaclePage() {
   }, []);
 
   useEffect(() => {
-    if (isMobile && (isMobilePlaylistOpen || isMobileStepsOpen)) {
+    if (isMobile && (mobilePlaylistOpen || mobileStepsOpen)) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -119,7 +122,7 @@ export function SpectaclePage() {
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isMobile, isMobilePlaylistOpen, isMobileStepsOpen]);
+  }, [isMobile, mobilePlaylistOpen, mobileStepsOpen]);
 
   const [theaterControlsHost, setTheaterControlsHost] =
     useState<HTMLDivElement | null>(null);
@@ -189,8 +192,8 @@ export function SpectaclePage() {
     return (
       <PageLoader
         variant="spectacle"
-        showLeftSidebar={showPlaylistSidebar}
-        showRightSidebar={!isStepsCollapsed}
+        showLeftSidebar={isMobile ? mobilePlaylistOpen : showPlaylistSidebar}
+        showRightSidebar={isMobile ? mobileStepsOpen : !isStepsCollapsed}
         showTopBar={showHeaderSounds}
         label="Загрузка сцены…"
       />
@@ -198,12 +201,12 @@ export function SpectaclePage() {
   }
 
   const playlistNode = !isBoardView ? (
-    <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !isMobilePlaylistOpen) ? "hidden" : ""}`}
+    <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !mobilePlaylistOpen) ? "hidden" : ""}`}
     >
       {isMobile && (
         <button
           className="mobile-panel-close"
-          onClick={() => setIsMobilePlaylistOpen(false)}
+          onClick={() => setMobilePlaylistOpen(false)}
           aria-label="Закрыть плейлист"
         >
           ×
@@ -223,14 +226,14 @@ export function SpectaclePage() {
 
   const stepsSidebarNode =
     ((!isMobile && shouldShowStepsSidebar && !isStepsCollapsed) ||
-      (isMobile && isMobileStepsOpen && shouldShowStepsSidebar && !isStepsCollapsed)) ? (
+      (isMobile && mobileStepsOpen && shouldShowStepsSidebar && !isStepsCollapsed)) ? (
       <div
-        className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${isMobileStepsOpen ? "open" : ""}`}
+        className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobileStepsOpen ? "open" : ""}`}
       >
         {isMobile && (
           <button
             className="mobile-panel-close"
-            onClick={() => setIsMobileStepsOpen(false)}
+            onClick={() => setMobileStepsOpen(false)}
             aria-label="Закрыть шаги"
           >
             ×
@@ -257,7 +260,7 @@ export function SpectaclePage() {
     <div className="app-layout">
       {isTheaterView ? (
         <>
-          {showPlaylistSidebar && (
+          {(isMobile ? mobilePlaylistOpen : showPlaylistSidebar) && (
             <div style={{ display: shouldSwapPanels ? "none" : "block" }}>
               {playlistNode}
             </div>
@@ -359,37 +362,12 @@ export function SpectaclePage() {
           )}
         </div>
       )}
-      {isMobile && !isBoardView && (
-        <div className="mobile-bottom-buttons">
-          {shouldShowStepsSidebar && (
-            <button
-              className="mobile-bottom-btn"
-              onClick={() => {
-                setIsStepsCollapsed(false);
-                setIsMobileStepsOpen(true);
-              }}
-              aria-label="Открыть шаги"
-            >
-              Шаги
-            </button>
-          )}
-          {showPlaylistSidebar && (
-            <button
-              className="mobile-bottom-btn"
-              onClick={() => setIsMobilePlaylistOpen(true)}
-              aria-label="Открыть плейлист"
-            >
-              Плейлист
-            </button>
-          )}
-        </div>
-      )}
-      {isMobile && (isMobilePlaylistOpen || isMobileStepsOpen) && (
+
+      {isMobile && (mobilePlaylistOpen || mobileStepsOpen) && (
         <div
           className="mobile-overlay"
           onClick={() => {
-            setIsMobilePlaylistOpen(false);
-            setIsMobileStepsOpen(false);
+            closeMobilePanels();
           }}
         />
       )}

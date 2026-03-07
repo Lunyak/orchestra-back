@@ -27,11 +27,6 @@
   gap: 6px;
 }
 
-.script-sidebar-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-
 .script-sidebar-content {
   height: var(--app-height, 100dvh);
   width: 100%;
@@ -100,12 +95,11 @@
 }
 
 .script-add-step {
-  margin-left: auto;
   width: 22px;
   height: 22px;
   border-radius: 6px;
   border: none;
-  background: #2563eb;
+  background: inherit;
   color: #fff;
   cursor: pointer;
   font-size: 14px;
@@ -124,6 +118,7 @@
   overflow-y: auto;
   flex: 1;
   padding-right: 4px;
+  align-items: center;
 }
 
 .step-mini-item {
@@ -195,7 +190,9 @@
 
 .script-navigation {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  /* flex-direction: column; */
   gap: 6px;
 }
 

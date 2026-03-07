@@ -53,6 +53,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const playRequestId = useRef(0);
   const messageTimerRef = useRef<number | null>(null);
 
+  const progressPercent =
+    duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
+  const volumePercent = Math.min(100, Math.max(0, volume * 100));
+
   const showMessage = (message: string) => {
     setUiMessage(message);
     if (messageTimerRef.current !== null) {
@@ -585,16 +589,6 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               {isPlaying ? "Пауза" : "Играть"}
             </button>
             <button
-              type="button"
-              className="playlist-add-btn"
-              onClick={addTracks}
-              disabled={playlistUpload.uploading}
-              title={addButtonTitle}
-              aria-disabled={!desktopAvailable || playlistUpload.uploading}
-            >
-              +
-            </button>
-            <button
               className="playlist-toggle-btn"
               onClick={() => setIsCompact((prev) => !prev)}
             >
@@ -609,6 +603,11 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               max={duration || 0}
               step={0.01}
               value={Math.min(progress, duration || 0)}
+              style={
+                {
+                  ["--range-fill" as unknown as string]: `${progressPercent}%`,
+                } as React.CSSProperties
+              }
               onChange={handleSeek}
               disabled={!currentTrack || duration <= 0}
             />
@@ -624,17 +623,24 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               max={1}
               step={0.01}
               value={volume}
+              style={
+                {
+                  ["--range-fill" as unknown as string]: `${volumePercent}%`,
+                } as React.CSSProperties
+              }
               onChange={handleVolumeChange}
             />
           </div>
-          <label className="playlist-crossfade">
-            <input
-              type="checkbox"
-              checked={crossfadeEnabled}
-              onChange={(event) => setCrossfadeEnabled(event.target.checked)}
-            />
-            Кроссфейд
-          </label>
+          {editingId !== null && (
+            <label className="playlist-crossfade">
+              <input
+                type="checkbox"
+                checked={crossfadeEnabled}
+                onChange={(event) => setCrossfadeEnabled(event.target.checked)}
+              />
+              Кроссфейд
+            </label>
+          )}
         </div>
 
       </div>
@@ -766,6 +772,16 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
             </ListItem>
           ))
         )}
+        <button
+          type="button"
+          className="playlist-add-btn"
+          onClick={addTracks}
+          disabled={playlistUpload.uploading}
+          title={addButtonTitle}
+          aria-disabled={!desktopAvailable || playlistUpload.uploading}
+        >
+          +
+        </button>
       </div>
     </aside>
   );

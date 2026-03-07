@@ -43,16 +43,6 @@ export function ScriptMarkdownToolbar({
         <button
           type="button"
           role="tab"
-          aria-selected={markdownMode === "play"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "play"}
-          onClick={() => onSetMarkdownMode("play")}
-        >
-          Текст
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={markdownMode === "explication"}
           className="script-markdown-tab"
           data-active={markdownMode === "explication"}
@@ -60,7 +50,16 @@ export function ScriptMarkdownToolbar({
         >
           Экспликация
         </button>
-
+        <button
+          type="button"
+          role="tab"
+          aria-selected={markdownMode === "play"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "play"}
+          onClick={() => onSetMarkdownMode("play")}
+        >
+          Текст
+        </button>
         <div className="show-script__control-wrap">
           <Button
             variant="ghost"

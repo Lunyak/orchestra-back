@@ -843,7 +843,8 @@ export const sceneSlice = createSlice({
     addStep(state) {
       state.hasLocalEdits = true;
       const nextId = state.steps.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
-      const insertIndex = Math.min(state.currentPage + 1, state.steps.length);
+      // Добавляем новый шаг всегда в конец списка (а не после текущего).
+      const insertIndex = state.steps.length;
       const sourceStep = state.steps[state.currentPage];
       const nextRequisites = sourceStep?.requisites
         ? sourceStep.requisites.map((item) => ({ ...item, checked: false }))

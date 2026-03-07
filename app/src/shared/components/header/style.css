@@ -2,6 +2,7 @@
 .header-zone {
   position: fixed;
   z-index: 1000;
+  max-height: 100vh;
 }
 
 .header-zone--left {
