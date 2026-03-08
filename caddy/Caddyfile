@@ -19,9 +19,7 @@
 	}
 
 	# Orchestra app is hosted under /orkestr (safe ASCII path).
-	handle /orkestr {
-		redir /orkestr/ 308
-	}
+	redir /orkestr /orkestr/ 308
 	handle_path /orkestr/* {
 		reverse_proxy web:80
 	}
