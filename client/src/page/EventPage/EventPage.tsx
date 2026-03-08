@@ -6,7 +6,6 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Controller, Navigation } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
-import SmokeText from "../../shared/component/SmokeText/SmokeText";
 import { ROUTES } from "../../shared/model/routes";
 import "./style.css";
 
@@ -108,7 +107,6 @@ const EventPage: FC = () => {
   return (
     <div>
       <div className="event-page__background">
-        <SmokeText text="" color={curentEvent.colorBackground} />
       </div>
 
       <Link onClick={goBack} to={ROUTES.EVENTS} className="back-arrow">

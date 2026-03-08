@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import SmokeText from "../../shared/component/SmokeText/SmokeText";
 import { ROUTES } from "../../shared/model/routes";
 import "./style.css";
 
@@ -7,7 +6,6 @@ const ContactsPage = () => {
   return (
     <div className="contacts-page">
       <div className="contacts-page__background">
-        <SmokeText text="" color={0x2d1b2e} />
       </div>
 
       <Link to={ROUTES.HOME} className="contacts-page__back">

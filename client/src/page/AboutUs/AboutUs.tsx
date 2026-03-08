@@ -1,6 +1,5 @@
 import { FC } from "react";
 import { Link } from "react-router-dom";
-import SmokeText from "../../shared/component/SmokeText/SmokeText";
 import { ROUTES } from "../../shared/model/routes";
 import "./style.css";
 
@@ -82,7 +81,6 @@ const items = [
 const AboutUs: FC = () => {
   return (
     <div className="aboutus-page">
-      <SmokeText text="" color={0x2d1b2e} />
       <Link to={ROUTES.HOME} className="back-arrow">
         Назад
       </Link>
