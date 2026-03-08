@@ -7,7 +7,7 @@ const items = [
   {
     id: '1',
     soon: false,
-    name: "",
+    name: "Железнова",
     subtitle: "",
     old: "",
     anonse: "",
@@ -18,13 +18,13 @@ const items = [
   {
     id: '2',
     soon: false,
-    name: "",
+    name: "Заклятие",
     subtitle: "",
     old: "",
     type: "",
     anonse: '"',
     date: "",
-    img: "afisha-2.jpg",
+    img: "afisha.jpg",
   },
   {
     id: '3',
@@ -53,17 +53,20 @@ const items = [
 const EventsPage: FC = () => {
   return (
     <div className="events-page">
-      <div className="events-page__background">
-      </div>
       <div className="events-page__content">
-        <Link to={ROUTES.HOME} className="arrow-back">
+        <Link to={ROUTES.HOME} className="events-page__back">
           Назад
         </Link>
 
-        <div className="events-list">
-          {items.map((data) => {
-            return <Card data={data} />;
-          })}
+        <header className="events-page__header">
+          <h1 className="events-page__title">Спектакли</h1>
+          <p className="events-page__subtitle">Афиша и даты</p>
+        </header>
+
+        <div className="events-cards" role="list" aria-label="Афиша спектаклей">
+          {items.map((data) => (
+            <Card key={data.id} data={data} />
+          ))}
         </div>
       </div>
     </div>
@@ -91,43 +94,61 @@ interface ICard {
 const Card: FC<ICardProps> = ({ data }) => {
   const { name, img, old, type, anonse, date, soon, id } = data;
 
-  return (
-    <Link to={id} className="card">
-      {soon && <div className="shadow"></div>}
-      <div className="image-wrapper">
-        <img src={img} alt="paint" />
-      </div>
-      <div className="card-header">
-        {soon && <div className="card-soon">скоро</div>}
-        <div className="card-old">{old}</div>
-      </div>
+  const title = name?.trim() || "Спектакль";
+  const description =
+    (anonse?.trim() || type?.trim() || "Узнать больше") +
+    (date?.trim() ? ` · ${date.trim()}` : "");
 
-      <div className="card-date">
-        <span className="card-date__date">{date}</span>
-      </div>
+  const ariaLabelBase = `${title}${old?.trim() ? `, ${old.trim()}` : ""}`;
 
-      <div className="card-name">
-        <h1>{name}</h1>
-      </div>
+  if (soon) {
+    return (
+      <div className="events-card" role="listitem">
+        <div
+          className="events-card__link events-card__link--disabled"
+          role="link"
+          aria-disabled="true"
+          aria-label={`${ariaLabelBase}, скоро`}
+        >
+          <img
+            className="events-card__img"
+            src={img}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+          />
 
-      <hr />
+          <div className="events-card__badge">скоро</div>
+          {old?.trim() && <div className="events-card__age">{old.trim()}</div>}
 
-      <div className="card-anonse">
-        <h2>{anonse}</h2>
-      </div>
-
-      <div className="card-type">
-        <h2>{type}</h2>
-      </div>
-      {!soon && (
-        <div className="know-more">
-          <button className="">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M12.3323 1H1.31467V1.6672H11.8697L1 12.5283L1.47225 13L12.3323 2.14859V12.6761H13V1.6672V1H12.3323Z"></path>
-            </svg>
-          </button>
+          <div className="events-card__title">{title}</div>
+          <p className="events-card__desc">{description}</p>
         </div>
-      )}
-    </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="events-card" role="listitem">
+      <Link
+        to={id}
+        className="events-card__link"
+        aria-label={ariaLabelBase}
+      >
+        <img
+          className="events-card__img"
+          src={img}
+          alt={title}
+          loading="lazy"
+          decoding="async"
+        />
+
+        {soon && <div className="events-card__badge">скоро</div>}
+        {old?.trim() && <div className="events-card__age">{old.trim()}</div>}
+
+        <div className="events-card__title">{title}</div>
+        <p className="events-card__desc">{description}</p>
+      </Link>
+    </div>
   );
 };

@@ -8,87 +8,93 @@ const items = [
     id: 1,
     name: "Анастасия Рябых",
     social: "",
-    img: "./actors/nastya.jpg",
+    img: "/actors/nastya.JPG",
   },
   {
     id: 2,
     name: "Виктория Юркова",
     social: "",
-    img: "./actors/vica-2.jpg",
+    img: "/actors/vica-2.JPG",
   },
   {
     id: 3,
-    name: "Дмитрий Рыбочкин",
+    name: "Алексей Филатов",
     social: "",
-    img: "./actors/dima-2.jpg",
+    img: "/actors/lesha.JPG",
   },
   {
     id: 4,
-    name: "Сандра Олейник",
+    name: " Антон Васильев",
     social: "",
-    img: "./actors/sandra-2.jpg",
+    img: "/actors/anton.JPG",
   },
   {
     id: 5,
     name: "Ксения",
     social: "",
-    img: "./actors/ksysha-2.jpg",
+    img: "/actors/ksysha-2.JPG",
   },
   {
     id: 6,
-    name: "Александр Марченко",
+    name: "Григорий Найдёнов",
     social: "",
-    img: "./actors/sasha.jpg",
+    img: "/actors/grisha.jpg",
   },
   {
     id: 7,
     name: "Алена Паршина",
     social: "",
-    img: "./actors/alena.jpg",
+    img: "/actors/alena.JPG",
   },
   {
     id: 8,
     name: "Еатерина Слыххановская",
     social: "",
-    img: "./actors/katya.jpg",
+    img: "/actors/katya.JPG",
   },
   {
     id: 9,
-    name: "Лилия Маркова",
+    name: "Полина Смолкина",
     social: "",
-    img: "./actors/lilya.jpg",
+    img: "/actors/polina.JPG",
   },
   {
     id: 10,
     name: "Вероника Атушева",
     social: "",
-    img: "./actors/nika.jpg",
+    img: "/actors/nika.JPG",
   },
   {
     id: 11,
     name: "Сергей Луняка",
     social: "",
-    img: "./actors/ya-2.jpg",
+    img: "/actors/ya.JPG",
   },
   {
     id: 12,
-    name: "Константин Горелкин не пришел на фотосессию",
+    name: "Лера Буракова",
     social: "",
-    img: "./actors/kostya.png",
+    img: "./actors/lera.JPG",
   },
 ];
 
 const AboutUs: FC = () => {
   return (
     <div className="aboutus-page">
-      <Link to={ROUTES.HOME} className="back-arrow">
-        Назад
-      </Link>
       <div className="aboutus-page__content">
-        <div className="aboutus-list">
-          {items.map((data) => {
-            return <Card data={data} />;
-          })}
+        <Link to={ROUTES.HOME} className="events-page__back">
+          Назад
+        </Link>
+
+        <header className="aboutus-page__header">
+          <h1 className="aboutus-page__title">Команда</h1>
+          <p className="aboutus-page__subtitle">Актёры и команда</p>
+        </header>
+
+        <div className="aboutus-grid" role="list" aria-label="Команда">
+          {items.map((data) => (
+            <Card key={data.id} data={data} />
+          ))}
         </div>
       </div>
     </div>
@@ -111,12 +117,9 @@ const Card: FC<ICardProps> = ({ data }) => {
   const { name, img } = data;
 
   return (
-    <div className="aboutus-card">
-      <div className="card-shadow"></div>
-      <div className="image-wrapper">
-        <img src={img} alt="paint" />
-      </div>
-      <div className="card-name">{name}</div>
+    <div className="aboutus-card" role="listitem">
+      <img className="aboutus-card__img" src={img} alt={name} loading="lazy" decoding="async" />
+      <div className="aboutus-card__name">{name}</div>
     </div>
   );
 };

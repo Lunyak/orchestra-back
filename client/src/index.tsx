@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
+import { HelmetProvider } from "react-helmet-async";
 import App from './App';
 import './index.css';
 import { router } from './app/router';
@@ -11,9 +12,11 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <React.StrictMode>
-    <RouterProvider router={router}>
-      <App />
-    </RouterProvider>
+    <HelmetProvider>
+      <RouterProvider router={router}>
+        <App />
+      </RouterProvider>
+    </HelmetProvider>
   </React.StrictMode>
 );
 

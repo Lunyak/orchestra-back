@@ -1,6 +1,7 @@
 /* eslint-disable no-useless-escape */
-import { FC, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { CSSProperties, FC, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
@@ -13,7 +14,7 @@ const EVENTS = [
   {
     id: "1",
     soon: false,
-    name: "",
+    name: "Железнова",
     subtitle: "",
     old: "",
     anonse:
@@ -42,7 +43,7 @@ const EVENTS = [
   {
     id: "2",
     soon: false,
-    name: "",
+    name: "Заклятие",
     subtitle: "",
     old: "",
     type: "",
@@ -92,11 +93,6 @@ const EVENTS = [
 
 const EventPage: FC = () => {
   const { eventId } = useParams();
-  const navigate = useNavigate();
-
-  const goBack = () => {
-    navigate(-1);
-  };
 
   const curentEvent = EVENTS.find((E) => E.id === eventId);
 
@@ -104,30 +100,98 @@ const EventPage: FC = () => {
     return <div>Событие не найдено</div>;
   }
 
-  return (
-    <div>
-      <div className="event-page__background">
-      </div>
+  const title = curentEvent.name?.trim() || "Спектакль";
+  const subtitle = curentEvent.subtitle?.trim();
 
-      <Link onClick={goBack} to={ROUTES.EVENTS} className="back-arrow">
-        Назад
-      </Link>
+  const eventAccent =
+    typeof curentEvent.colorBackground === "number"
+      ? `#${curentEvent.colorBackground.toString(16).padStart(6, "0")}`
+      : undefined;
+
+  const style = eventAccent
+    ? ({
+        ["--event-accent" as any]: eventAccent,
+      } satisfies CSSProperties)
+    : undefined;
+
+  const eventsPath = ROUTES.EVENTS.startsWith("/") ? ROUTES.EVENTS : `/${ROUTES.EVENTS}`;
+
+  const normalizePublicPath = (p: string) => {
+    if (!p) return p;
+    if (p.startsWith("http://") || p.startsWith("https://")) return p;
+    return p.startsWith("/") ? p : `/${p}`;
+  };
+
+  const ogImageCandidate = curentEvent.img?.trim()
+    ? normalizePublicPath(curentEvent.img.trim())
+    : curentEvent.photos?.[0]
+      ? normalizePublicPath(curentEvent.photos[0])
+      : "";
+
+  const origin =
+    typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
+  const canonicalUrl =
+    origin && eventId ? `${origin}${eventsPath}/${encodeURIComponent(eventId)}` : "";
+  const ogImageUrl = origin && ogImageCandidate ? `${origin}${ogImageCandidate}` : "";
+
+  const descriptionText =
+    (curentEvent.anonse || "").replace(/\s+/g, " ").trim() ||
+    "Спектакль театра Дофамин. Афиша, фото и описание.";
+  const metaDescription =
+    descriptionText.length > 170 ? `${descriptionText.slice(0, 167).trim()}…` : descriptionText;
+
+  return (
+    <div className="event-page" style={style}>
+      <Helmet>
+        <title>{`${title} — Дофамин`}</title>
+        <meta name="description" content={metaDescription} />
+
+        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Дофамин" />
+        <meta property="og:title" content={`${title} — Дофамин`} />
+        <meta property="og:description" content={metaDescription} />
+        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
+        {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
+
+        <meta name="twitter:card" content={ogImageUrl ? "summary_large_image" : "summary"} />
+        <meta name="twitter:title" content={`${title} — Дофамин`} />
+        <meta name="twitter:description" content={metaDescription} />
+        {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
+      </Helmet>
 
       <div className="event-page__content">
-        <div className="event-page__header"></div>
+        <Link to={eventsPath} className="events-page__back">
+          Назад
+        </Link>
+
+        <header className="event-page__header">
+          <h1 className="event-page__title">{title}</h1>
+          {subtitle && <p className="event-page__subtitle">{subtitle}</p>}
+
+          <div className="event-page__meta" aria-label="Характеристики спектакля">
+            {curentEvent.soon && <span className="event-page__chip">скоро</span>}
+            {curentEvent.old?.trim() && (
+              <span className="event-page__chip">{curentEvent.old.trim()}</span>
+            )}
+            {curentEvent.type?.trim() && (
+              <span className="event-page__chip">{curentEvent.type.trim()}</span>
+            )}
+            {curentEvent.date?.trim() && (
+              <span className="event-page__chip">{curentEvent.date.trim()}</span>
+            )}
+          </div>
+        </header>
 
         <div className="event-page__main">
-          {/* Основной слайдер вместо одного img */}
-          <div className="event-page__image">
-            <PhotoCarousel images={curentEvent.photos} />
-          </div>
+          <section className="event-page__gallery" aria-label="Фотографии спектакля">
+            <PhotoCarousel images={curentEvent.photos} title={title} />
+          </section>
 
-          <div className="event-page__description">{curentEvent.anonse}</div>
-        </div>
-
-        {/* Можно оставить миниатюры в футере */}
-        <div className="event-page__footer">
-          {/* Миниатюры можно либо сюда, либо внутри PhotoCarousel */}
+          <section className="event-page__text" aria-label="Описание спектакля">
+            <div className="event-page__description">{curentEvent.anonse}</div>
+          </section>
         </div>
       </div>
     </div>
@@ -138,15 +202,16 @@ export const Component = EventPage;
 
 interface PhotoCarouselProps {
   images: string[];
+  title: string;
 }
 
-function PhotoCarousel({ images }: PhotoCarouselProps) {
+function PhotoCarousel({ images, title }: PhotoCarouselProps) {
   const [mainSwiper, setMainSwiper] = useState<SwiperClass | null>(null);
   const [thumbSwiper, setThumbSwiper] = useState<SwiperClass | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
   return (
-    <div>
+    <div className="event-carousel">
       {/* Основной слайдер */}
       <Swiper
         modules={[Controller]}
@@ -158,20 +223,11 @@ function PhotoCarousel({ images }: PhotoCarouselProps) {
         onSlideChange={(swiper: SwiperClass) =>
           setActiveIndex(swiper.realIndex)
         }
-        style={{ width: "100%", height: "700px", maxWidth: "600px" }}
+        className="event-carousel__main"
       >
         {images.map((src, index) => (
           <SwiperSlide key={index}>
-            <img
-              src={src}
-              alt={`Фото ${index + 1}`}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                borderRadius: "10px",
-              }}
-            />
+            <img src={src} alt={`${title} — фото ${index + 1}`} className="event-carousel__img" />
           </SwiperSlide>
         ))}
       </Swiper>
@@ -186,24 +242,18 @@ function PhotoCarousel({ images }: PhotoCarouselProps) {
         navigation
         // loop={true}
         slideToClickedSlide={true} // клики по миниатюрам меняют большой слайд
-        style={{ width: "100%", height: "100px", marginTop: "10px" }}
+        className="event-carousel__thumbs"
       >
         {images.map((src, index) => (
-          <SwiperSlide key={index} style={{ cursor: "pointer" }}>
+          <SwiperSlide key={index} className="event-carousel__thumbSlide">
             <img
               src={src}
-              alt={`Миниатюра ${index + 1}`}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                borderRadius: "5px",
-                border:
-                  index === activeIndex
-                    ? "2px solid #fff"
-                    : "2px solid transparent",
-                boxSizing: "border-box",
-              }}
+              alt={`${title} — миниатюра ${index + 1}`}
+              className={
+                index === activeIndex
+                  ? "event-carousel__thumbImg event-carousel__thumbImg--active"
+                  : "event-carousel__thumbImg"
+              }
             />
           </SwiperSlide>
         ))}

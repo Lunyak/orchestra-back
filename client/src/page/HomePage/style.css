@@ -234,14 +234,14 @@
   --f: url(#electricSwirl);
   --electric-border-color: #dd8448;
   --electric-light-color: oklch(from var(--electric-border-color) l c h);
-  --gradient-color: oklch(from var(--electric-border-color) 0.3 calc(c / 2) h / 0.4);
+  --gradient-color: oklch(from var(--electric-border-color) 0.3 c h / 0.4);
 }
 
 .home-page .card-container[data-variant="hue"] {
   --f: url(#electricHue);
   --electric-border-color: DodgerBlue;
   --electric-light-color: oklch(from var(--electric-border-color) l c h);
-  --gradient-color: oklch(from var(--electric-border-color) 0.3 calc(c / 2) h / 0.4);
+  --gradient-color: oklch(from var(--electric-border-color) 0.3 c h / 0.4);
 }
 
 .home-page .inner-container {
