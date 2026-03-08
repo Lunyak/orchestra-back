@@ -263,13 +263,21 @@
   }
 }
 
-@media (max-width: 520px) and (hover: none) {
+/* Touch devices: disable hover/active expansion to avoid "sticky hover" + double tap */
+@media (hover: none), (pointer: coarse) {
+  .events-card:hover,
   .events-card:active {
-    flex: 2;
+    flex: 1 1 0;
   }
 
+  .events-card:hover .events-card__img,
   .events-card:active .events-card__img {
-    transform: scale(1.08);
+    transform: none;
+  }
+
+  .events-card:hover .events-card__title,
+  .events-card:active .events-card__title {
+    transform: translate(-50%, -50%);
   }
 }
 

@@ -231,10 +231,6 @@
   .event-page__main {
     grid-template-columns: 1fr;
   }
-
-  .event-page__content {
-    padding-top: 60px;
-  }
 }
 
 @media (max-width: 520px) {
