@@ -42,7 +42,9 @@ function serveFile(res, filePath) {
 }
 
 async function proxy(req, res, pathname) {
-  const url = new URL(pathname + (req.url.slice(req.url.indexOf('?')) || ''), BACK_URL);
+  const queryIndex = req.url.indexOf('?');
+  const query = queryIndex >= 0 ? req.url.slice(queryIndex) : '';
+  const url = new URL(pathname + query, BACK_URL);
   const headers = { ...req.headers, host: new URL(BACK_URL).host };
   const opt = { method: req.method, headers };
   if (req.method !== 'GET' && req.method !== 'HEAD') {
