@@ -10,12 +10,13 @@ import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
 import { CastList } from "../../shared/component/CastList/CastList";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
 import { ROUTES } from "../../shared/model/routes";
-import { getShowKeyByName, SHOW_CAST } from "../../shared/model/showCast";
+import type { SiteEvent } from "../../shared/model/siteContent";
+import { fetchSiteEvents } from "../../shared/model/siteContent";
 import { isAbsoluteUrl, siteAsset } from "../../shared/model/siteAssets";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
-const EVENTS = [
+const FALLBACK_EVENTS: SiteEvent[] = [
   {
     id: "1",
     soon: false,
@@ -44,6 +45,7 @@ const EVENTS = [
       "/photos/vassa/13.jpg",
       "/photos/vassa/14.jpg",
     ],
+    cast: [],
   },
   {
     id: "2",
@@ -67,6 +69,18 @@ const EVENTS = [
       "/photos/fools/7.jpg",
       "/photos/fools/8.jpg",
     ],
+    cast: [
+      { role: "Леон", actor: "Григорий Найденов" },
+      { role: "Софья", actor: "Полина Смолкина" },
+      { role: "Доктор Зубрицкий", actor: "Сергей Луняка" },
+      { role: "Госпожа Зубрицкая", actor: "Анастасия Рябых" },
+      { role: "Граф", actor: "Анатон Васильев" },
+      { role: "Слович", actor: "Валерий Рутковский" },
+      { role: "Янка", actor: "Екатерина Слыхановская" },
+      { role: "Почтальон Мышкин", actor: "Алексей Филатов" },
+      { role: "Снецкий", actor: "Вероника Атушева" },
+      { role: "Барашек", actor: "Лера Буракова" },
+    ],
   },
   {
     id: "3",
@@ -80,6 +94,7 @@ const EVENTS = [
     img: "https://i.pinimg.com/736x/6c/de/d0/6cded009506170d47a5865ae6854bcf4.jpg",
     colorBackground: 0x6b0f1a,
     photos: ["/images/show1.jpg", "/images/show2.jpg", "/images/show3.jpg"],
+    cast: [],
   },
   {
     id: "4",
@@ -93,13 +108,31 @@ const EVENTS = [
     img: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1583&q=80",
     colorBackground: 0x6b0f1a,
     photos: ["/images/show1.jpg", "/images/show2.jpg", "/images/show3.jpg"],
+    cast: [],
   },
 ];
 
 const EventPage: FC = () => {
   const { eventId } = useParams();
 
-  const curentEvent = EVENTS.find((E) => E.id === eventId);
+  const [events, setEvents] = useState<SiteEvent[]>(FALLBACK_EVENTS);
+
+  useEffect(() => {
+    let alive = true;
+    fetchSiteEvents()
+      .then((remote) => {
+        if (!alive) return;
+        if (remote && remote.length) setEvents(remote);
+      })
+      .catch(() => {
+        // ignore: fallback is already shown
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const curentEvent = events.find((E) => E.id === eventId);
 
   if (!curentEvent) {
     return <div>Событие не найдено</div>;
@@ -111,8 +144,7 @@ const EventPage: FC = () => {
   const isZaklyatie =
     (curentEvent.name || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
 
-  const showKey = getShowKeyByName(curentEvent.name);
-  const cast = showKey ? SHOW_CAST[showKey] : null;
+  const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
 
   const ticketsCloudEventId = process.env.REACT_APP_TC_ZAKLYATIE_EVENT_ID;
   const ticketsCloudToken = process.env.REACT_APP_TC_ZAKLYATIE_TOKEN;

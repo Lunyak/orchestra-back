@@ -339,6 +339,122 @@ function SiteMediaPage() {
   );
 }
 
+type SiteCastItem = { role: string; actor: string };
+type SiteEvent = {
+  id: string;
+  soon: boolean;
+  name: string;
+  subtitle?: string;
+  old?: string;
+  anonse?: string;
+  date?: string;
+  img: string;
+  type?: string;
+  colorBackground?: number;
+  photos?: string[];
+  cast?: SiteCastItem[];
+};
+
+type SiteEventsContent = {
+  version?: number;
+  updatedAt?: string;
+  events: SiteEvent[];
+};
+
+function SiteContentPage() {
+  const [raw, setRaw] = useState<string>("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState<string>("");
+
+  const url = "/minio/orchestra-media/site/content/events.json";
+
+  const load = async () => {
+    setError("");
+    setOk("");
+    setLoading(true);
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Не удалось загрузить: ${res.status}`);
+      const text = await res.text();
+      setRaw(text);
+      setOk("Загружено");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const publish = async () => {
+    setError("");
+    setOk("");
+    setLoading(true);
+    try {
+      const parsed = JSON.parse(raw) as SiteEventsContent;
+      if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as any).events)) {
+        throw new Error("JSON должен быть формата { events: [...] }");
+      }
+      parsed.updatedAt = new Date().toISOString();
+      parsed.version = (parsed.version ?? 0) + 1;
+      const normalized = JSON.stringify(parsed, null, 2);
+      setRaw(normalized);
+
+      const file = new File([normalized], "events.json", { type: "application/json" });
+      const out = await uploadSiteMedia({
+        file,
+        path: "content/events.json",
+        prefix: "site",
+      });
+      setOk(`Опубликовано: ${out.url}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка публикации");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="admin-page">
+      <h1>Контент сайта</h1>
+      <p>
+        Редактируй спектакли, фото и cast (для <code>event-page__cast</code>) в JSON и публикуй в{" "}
+        <code>site/content/events.json</code>.
+      </p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button type="button" onClick={load} disabled={loading}>
+          {loading ? "…" : "Загрузить текущий JSON"}
+        </button>
+        <button type="button" onClick={publish} disabled={loading || !raw.trim()}>
+          {loading ? "…" : "Опубликовать"}
+        </button>
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          Открыть файл
+        </a>
+      </div>
+
+      {error && <div style={{ marginTop: 12, color: "#b00020" }}>Ошибка: {error}</div>}
+      {ok && <div style={{ marginTop: 12, color: "#0a7a2f" }}>{ok}</div>}
+
+      <div style={{ marginTop: 12 }}>
+        <textarea
+          value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+          placeholder={`{\n  "events": [\n    {\n      "id": "2",\n      "name": "Заклятие",\n      "soon": false,\n      "img": "afisha.jpg",\n      "photos": ["/photos/fools/0.jpg"],\n      "cast": [{ "role": "Леон", "actor": "..." }]\n    }\n  ]\n}\n`}
+          spellCheck={false}
+          style={{
+            width: "100%",
+            minHeight: 520,
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+            fontSize: 13,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function Layout({
   children,
   onLogout,
@@ -362,6 +478,7 @@ function Layout({
         </NavLink>
         <NavLink to="/projects">Проекты</NavLink>
         <NavLink to="/site-media">Медиа сайта</NavLink>
+        <NavLink to="/site-content">Контент сайта</NavLink>
         <NavLink to="/services">Сервисы</NavLink>
         <button type="button" className="logout" onClick={logout}>
           Выйти
@@ -429,6 +546,18 @@ export default function App() {
           loggedIn ? (
             <Layout onLogout={() => setLoggedIn(false)}>
               <SiteMediaPage />
+            </Layout>
+          ) : (
+            <LoginPage onLogin={() => setLoggedIn(true)} />
+          )
+        }
+      />
+      <Route
+        path="/site-content"
+        element={
+          loggedIn ? (
+            <Layout onLogout={() => setLoggedIn(false)}>
+              <SiteContentPage />
             </Layout>
           ) : (
             <LoginPage onLogin={() => setLoggedIn(true)} />

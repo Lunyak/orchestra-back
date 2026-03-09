@@ -1,12 +1,14 @@
-import { FC } from "react";
+import { FC, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
+import type { SiteEvent } from "../../shared/model/siteContent";
+import { fetchSiteEvents } from "../../shared/model/siteContent";
 import { siteAsset } from "../../shared/model/siteAssets";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
-const items = [
+const FALLBACK_ITEMS: SiteEvent[] = [
   {
     id: '1',
     soon: false,
@@ -54,6 +56,23 @@ const items = [
 ];
 
 const EventsPage: FC = () => {
+  const [items, setItems] = useState<SiteEvent[]>(FALLBACK_ITEMS);
+
+  useEffect(() => {
+    let alive = true;
+    fetchSiteEvents()
+      .then((remote) => {
+        if (!alive) return;
+        if (remote && remote.length) setItems(remote);
+      })
+      .catch(() => {
+        // ignore
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div className="events-page">
       <div className="events-page__content">
@@ -84,17 +103,17 @@ interface ICardProps {
   data: ICard;
 }
 
-interface ICard {
+type ICard = {
   name: string;
   img: string;
-  subtitle: string;
-  old: string;
-  type: string;
-  anonse: string;
-  date: string;
+  subtitle?: string;
+  old?: string;
+  type?: string;
+  anonse?: string;
+  date?: string;
   soon: boolean;
   id: string;
-}
+};
 
 const Card: FC<ICardProps> = ({ data }) => {
   const { name, img, old, type, anonse, date, soon, id } = data;
