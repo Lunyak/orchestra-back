@@ -10,18 +10,18 @@ import "./style.css";
 
 const FALLBACK_ITEMS: SiteEvent[] = [
   {
-    id: '1',
+    slug: "железнова",
     soon: false,
     name: "Железнова",
     subtitle: "",
     old: "",
     anonse: "",
     date: "",
-    img: "vassa-afisha.jpg",
+    cardImage: "vassa-afisha.jpg",
     type: "",
   },
   {
-    id: '2',
+    slug: "заклятие",
     soon: false,
     name: "Заклятие",
     subtitle: "",
@@ -29,10 +29,10 @@ const FALLBACK_ITEMS: SiteEvent[] = [
     type: "",
     anonse: '"',
     date: "",
-    img: "afisha.jpg",
+    cardImage: "afisha.jpg",
   },
   {
-    id: '3',
+    slug: "зойкина-квартирка",
     soon: true,
     name: "Зойкина квартирка",
     subtitle: "Узнать больше",
@@ -40,10 +40,10 @@ const FALLBACK_ITEMS: SiteEvent[] = [
     type: "трагикомедия",
     anonse: "",
     date: "февраль",
-    img: "https://i.pinimg.com/736x/6c/de/d0/6cded009506170d47a5865ae6854bcf4.jpg",
+    cardImage: "https://i.pinimg.com/736x/6c/de/d0/6cded009506170d47a5865ae6854bcf4.jpg",
   },
   {
-    id: '4',
+    slug: "чехов-дуэль",
     soon: true,
     name: "Чехов Дуэль",
     subtitle: "Узнать больше",
@@ -51,7 +51,7 @@ const FALLBACK_ITEMS: SiteEvent[] = [
     type: "трагикомедия",
     anonse: "",
     date: "март",
-    img: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1583&q=80",
+    cardImage: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1583&q=80",
   },
 ];
 
@@ -89,7 +89,7 @@ const EventsPage: FC = () => {
 
         <div className="events-cards" role="list" aria-label="Афиша спектаклей">
           {items.map((data) => (
-            <Card key={data.id} data={data} />
+            <Card key={data.slug} data={data} />
           ))}
         </div>
       </div>
@@ -105,18 +105,18 @@ interface ICardProps {
 
 type ICard = {
   name: string;
-  img: string;
+  cardImage: string;
   subtitle?: string;
   old?: string;
   type?: string;
   anonse?: string;
   date?: string;
   soon: boolean;
-  id: string;
+  slug: string;
 };
 
 const Card: FC<ICardProps> = ({ data }) => {
-  const { name, img, old, type, anonse, date, soon, id } = data;
+  const { name, cardImage, old, type, anonse, date, soon, slug } = data;
 
   const title = name?.trim() || "Спектакль";
   const description =
@@ -137,7 +137,7 @@ const Card: FC<ICardProps> = ({ data }) => {
           <ImageWithPreloader
             className="events-card__imgWrap"
             imgClassName="events-card__img"
-            src={siteAsset(img)}
+            src={siteAsset(cardImage)}
             alt={title}
             loading="lazy"
             decoding="async"
@@ -157,14 +157,14 @@ const Card: FC<ICardProps> = ({ data }) => {
   return (
     <div className="events-card" role="listitem">
       <Link
-        to={id}
+        to={encodeURIComponent(slug)}
         className="events-card__link"
         aria-label={ariaLabelBase}
       >
         <ImageWithPreloader
           className="events-card__imgWrap"
           imgClassName="events-card__img"
-          src={siteAsset(img)}
+          src={siteAsset(cardImage)}
           alt={title}
           loading="lazy"
           decoding="async"

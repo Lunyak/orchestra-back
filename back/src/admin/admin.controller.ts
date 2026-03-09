@@ -2,6 +2,11 @@ import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
 
+type UpdatePlanBody = {
+  maxProjects?: number | null;
+  maxCollaboratorsPerProject?: number | null;
+};
+
 @UseGuards(AdminGuard)
 @Controller('admin')
 export class AdminController {
@@ -20,6 +25,11 @@ export class AdminController {
   @Get('plans')
   getPlans() {
     return this.admin.getPlans();
+  }
+
+  @Patch('plans/:id')
+  updatePlan(@Param('id') planId: string, @Body() body: UpdatePlanBody) {
+    return this.admin.updatePlan(planId, body);
   }
 
   @Patch('users/:id/subscription')

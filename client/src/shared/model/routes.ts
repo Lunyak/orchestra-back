@@ -4,14 +4,14 @@ export const ROUTES = {
   HOME: "/",
   CAST: "cast",
   EVENTS: "events",
-  EVENT: "events/:eventId",
+  EVENT: "events/:eventSlug",
   CONTACTS: "/contacts",
   ABOUTUS: "/aboutus",
 } as const;
 
 export type PathParan = {
   [ROUTES.EVENT]: {
-    eventId: string;
+    eventSlug: string;
   };
 };
 

@@ -6,14 +6,18 @@ export type SiteCastItem = {
 };
 
 export type SiteEvent = {
-  id: string;
+  /** Human-readable identifier used in URLs: /events/:slug */
+  slug: string;
   soon: boolean;
   name: string;
   subtitle?: string;
   old?: string;
   anonse?: string;
   date?: string;
-  img: string;
+  /** Card/preview image for Events page */
+  cardImage: string;
+  /** Optional background image for Event page */
+  eventPageBg?: string;
   type?: string;
   colorBackground?: number;
   photos?: string[];
@@ -27,7 +31,7 @@ type SiteEventsContent = {
 };
 
 const EVENTS_URL = siteAsset("/content/events.json");
-const CACHE_KEY = "site:events-json:v1";
+const CACHE_KEY = "site:events-json:v2";
 
 function safeJsonParse<T>(raw: string): T | null {
   try {
@@ -39,6 +43,64 @@ function safeJsonParse<T>(raw: string): T | null {
 
 function isValidContent(x: any): x is SiteEventsContent {
   return x && typeof x === "object" && Array.isArray(x.events);
+}
+
+function normalizeEvent(raw: any): SiteEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+
+  const slugRaw = typeof raw.slug === "string" ? raw.slug : typeof raw.id === "string" ? raw.id : "";
+  const slug = slugRaw.trim();
+  const name = typeof raw.name === "string" ? raw.name : "";
+  const cardImageRaw =
+    typeof raw.cardImage === "string"
+      ? raw.cardImage
+      : typeof raw.img === "string"
+        ? raw.img
+        : "";
+  const cardImage = cardImageRaw.trim();
+
+  if (!slug || !name.trim() || !cardImage) return null;
+
+  const soon = Boolean(raw.soon);
+  const subtitle = typeof raw.subtitle === "string" ? raw.subtitle : undefined;
+  const old = typeof raw.old === "string" ? raw.old : undefined;
+  const anonse = typeof raw.anonse === "string" ? raw.anonse : undefined;
+  const date = typeof raw.date === "string" ? raw.date : undefined;
+  const type = typeof raw.type === "string" ? raw.type : undefined;
+  const colorBackground =
+    typeof raw.colorBackground === "number" ? raw.colorBackground : undefined;
+  const photos = Array.isArray(raw.photos) ? raw.photos.filter((x: any) => typeof x === "string") : undefined;
+  const cast = Array.isArray(raw.cast)
+    ? raw.cast
+        .map((x: any) =>
+          x && typeof x === "object" && typeof x.role === "string" && typeof x.actor === "string"
+            ? { role: x.role, actor: x.actor }
+            : null
+        )
+        .filter(Boolean)
+    : undefined;
+  const eventPageBg =
+    typeof raw.eventPageBg === "string"
+      ? raw.eventPageBg
+      : typeof raw.bgImage === "string"
+        ? raw.bgImage
+        : undefined;
+
+  return {
+    slug,
+    soon,
+    name: name.trim(),
+    subtitle,
+    old,
+    anonse,
+    date,
+    cardImage,
+    type,
+    colorBackground,
+    photos,
+    cast,
+    eventPageBg,
+  };
 }
 
 export async function fetchSiteEvents(opts?: {
@@ -67,8 +129,14 @@ export async function fetchSiteEvents(opts?: {
     const text = await res.text();
     const parsed = safeJsonParse<SiteEventsContent>(text);
     if (!parsed || !isValidContent(parsed)) return null;
-    if (cache) sessionStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
-    return parsed.events;
+    const normalized = (parsed.events ?? []).map(normalizeEvent).filter(Boolean) as SiteEvent[];
+    const cachedValue: SiteEventsContent = {
+      version: parsed.version,
+      updatedAt: parsed.updatedAt,
+      events: normalized,
+    };
+    if (cache) sessionStorage.setItem(CACHE_KEY, JSON.stringify(cachedValue));
+    return normalized;
   } catch {
     return null;
   } finally {

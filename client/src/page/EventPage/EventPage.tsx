@@ -18,7 +18,7 @@ import "./style.css";
 
 const FALLBACK_EVENTS: SiteEvent[] = [
   {
-    id: "1",
+    slug: "железнова",
     soon: false,
     name: "Железнова",
     subtitle: "",
@@ -26,7 +26,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     anonse:
       'Это не просто история о прошлом. Это размышление о времени, идеологии и вечных вопросах: что важнее — семья, долг или личные убеждения? Наш спектакль поставлен по второй редакции пьесы — последней работе Горького. Это рассказ о схватке между старым и новым, где каждая сторона по-своему права и по-своему несчастна. Железнова — сильная, но одинокая женщина. Она продолжает жить "как положено", сохраняя семейное дело и защищая его от любых угроз. Её жизнь — как пароход: идёт вперёд, не жалея себя и других. Её философия проста: "Дети — руки мои, внуки — пальцы мои". Она верит, что её долг — сохранить груз прошлого, чтобы передать его в будущее. Но её дети — это уже другое время, другие идеи. Между ними разворачивается схватка за смысл жизни, за право на своё будущее. Символом этого будущего становится маленький Коля, сын Рахиль и внук Вассы. За него борются идеалы двух эпох.',
     date: "",
-    img: "vassa-afisha.jpg",
+    cardImage: "vassa-afisha.jpg",
     type: "",
     colorBackground: 0x6b0f1a,
     photos: [
@@ -45,10 +45,11 @@ const FALLBACK_EVENTS: SiteEvent[] = [
       "/photos/vassa/13.jpg",
       "/photos/vassa/14.jpg",
     ],
+    eventPageBg: "/photos/vassa/0.jpg",
     cast: [],
   },
   {
-    id: "2",
+    slug: "заклятие",
     soon: false,
     name: "Заклятие",
     subtitle: "",
@@ -57,7 +58,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     anonse:
       'Комедия в двух действиях по пьесе Нила Саймона \"Дураки\" Леон Степанович, молодой учитель, приезжает в глухую деревню в надежде раскрыть весь свой потенциал. Он действует по приглашению местного доктора Зубрицкого, который мечтает, чтобы его дочь получила образование. На первый взгляд — совершенно обычная история. Но всё меняется с первых минут. Леон замечает странности в поведении местных жителей: другие учителя почему-то не задерживаются дольше суток, а в самой деревне витает что-то... неладное. Доктор Зубрицкий раскрывает тайну: вот уже 200 лет все жители деревни рождаются и умирают дураками — из-за страшного и древнего заклятия. Если Леон не уедет в течение 24 часов, то и сам навсегда потеряет разум.Он собирается уехать, но... влюбляется в дочь доктора. Теперь перед ним стоит выбор: либо он научит деревню хоть чему-то, либо навсегда останется одним из них. А времени — всё меньше.',
     date: "",
-    img: "afisha-2.jpg",
+    cardImage: "afisha-2.jpg",
     colorBackground: 0x01172f,
     photos: [
       "/photos/fools/0.jpg",
@@ -69,6 +70,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
       "/photos/fools/7.jpg",
       "/photos/fools/8.jpg",
     ],
+    eventPageBg: "/photos/fools/0.jpg",
     cast: [
       { role: "Леон", actor: "Григорий Найденов" },
       { role: "Софья", actor: "Полина Смолкина" },
@@ -83,7 +85,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     ],
   },
   {
-    id: "3",
+    slug: "зойкина-квартирка",
     soon: true,
     name: "Зойкина квартирка",
     subtitle: "Узнать больше",
@@ -91,13 +93,13 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     type: "трагикомедия",
     anonse: "",
     date: "февраль",
-    img: "https://i.pinimg.com/736x/6c/de/d0/6cded009506170d47a5865ae6854bcf4.jpg",
+    cardImage: "https://i.pinimg.com/736x/6c/de/d0/6cded009506170d47a5865ae6854bcf4.jpg",
     colorBackground: 0x6b0f1a,
     photos: ["/images/show1.jpg", "/images/show2.jpg", "/images/show3.jpg"],
     cast: [],
   },
   {
-    id: "4",
+    slug: "чехов-дуэль",
     soon: true,
     name: "Чехов Дуэль",
     subtitle: "Узнать больше",
@@ -105,7 +107,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     type: "трагикомедия",
     anonse: "",
     date: "март",
-    img: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1583&q=80",
+    cardImage: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1583&q=80",
     colorBackground: 0x6b0f1a,
     photos: ["/images/show1.jpg", "/images/show2.jpg", "/images/show3.jpg"],
     cast: [],
@@ -113,7 +115,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
 ];
 
 const EventPage: FC = () => {
-  const { eventId } = useParams();
+  const { eventSlug } = useParams();
 
   const [events, setEvents] = useState<SiteEvent[]>(FALLBACK_EVENTS);
 
@@ -132,7 +134,7 @@ const EventPage: FC = () => {
     };
   }, []);
 
-  const curentEvent = events.find((E) => E.id === eventId);
+  const curentEvent = events.find((E) => E.slug === eventSlug);
 
   if (!curentEvent) {
     return <div>Событие не найдено</div>;
@@ -142,7 +144,7 @@ const EventPage: FC = () => {
   const subtitle = curentEvent.subtitle?.trim();
 
   const isZaklyatie =
-    (curentEvent.name || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
+    (curentEvent.slug || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
 
   const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
 
@@ -164,10 +166,16 @@ const EventPage: FC = () => {
       : null),
   } as CSSProperties;
 
+  const bgUrl = curentEvent.eventPageBg ? siteAsset(curentEvent.eventPageBg) : "";
+  const styleWithBg = {
+    ...style,
+    ...(bgUrl ? ({ ["--event-bg-url" as any]: `url("${bgUrl}")` } satisfies CSSProperties) : null),
+  } as CSSProperties;
+
   const eventsPath = ROUTES.EVENTS.startsWith("/") ? ROUTES.EVENTS : `/${ROUTES.EVENTS}`;
 
-  const ogImageCandidate = curentEvent.img?.trim()
-    ? curentEvent.img.trim()
+  const ogImageCandidate = curentEvent.cardImage?.trim()
+    ? curentEvent.cardImage.trim()
     : curentEvent.photos?.[0]
       ? curentEvent.photos[0]
       : "";
@@ -175,7 +183,7 @@ const EventPage: FC = () => {
   const origin =
     typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
   const canonicalUrl =
-    origin && eventId ? `${origin}${eventsPath}/${encodeURIComponent(eventId)}` : "";
+    origin && eventSlug ? `${origin}${eventsPath}/${encodeURIComponent(eventSlug)}` : "";
   const ogImageResolved = ogImageCandidate ? siteAsset(ogImageCandidate) : "";
   const ogImageUrl =
     ogImageResolved && isAbsoluteUrl(ogImageResolved)
@@ -193,7 +201,7 @@ const EventPage: FC = () => {
   return (
     <div
       className={isZaklyatie ? "event-page event-page--zaklyatie" : "event-page"}
-      style={style}
+      style={styleWithBg}
     >
       <Helmet>
         <title>{`${title} — Дофамин`}</title>

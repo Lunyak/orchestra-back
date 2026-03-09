@@ -38,6 +38,17 @@ export class UsersService implements OnModuleInit {
         features: { collaboration: true, advancedLight: true },
       },
     });
+    await this.prisma.subscriptionPlan.upsert({
+      where: { name: 'premium' },
+      // null = unlimited (UI already shows ∞ for null)
+      update: { maxProjects: null, maxCollaboratorsPerProject: null },
+      create: {
+        name: 'premium',
+        maxProjects: null,
+        maxCollaboratorsPerProject: null,
+        features: { collaboration: true, advancedLight: true, premium: true },
+      },
+    });
   }
 
   async findByEmail(email: string) {

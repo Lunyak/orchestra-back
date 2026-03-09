@@ -2,6 +2,7 @@ import { FC, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Marquee } from "../../shared/component/Marquee/Marquee";
 import { ROUTES } from "../../shared/model/routes";
+import { fetchSiteMarquee } from "../../shared/model/siteMarquee";
 import { GlitchHero } from "./GlitchHero";
 import "./style.css";
 
@@ -12,6 +13,14 @@ type FilterTarget =
 const HomePage: FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [effectsEnabled, setEffectsEnabled] = useState(false);
+  const [marqueeItems, setMarqueeItems] = useState<string[]>([
+    "Театр «Дофамин»",
+    "Спектакли и даты",
+    "Заклятие — билеты онлайн уже в продаже",
+    "Приобрести можно на сайте https://ticketcloud.ru",
+    "Иили на странице спектакля",
+  ]);
+  const [marqueeDuration, setMarqueeDuration] = useState<number>(22);
 
   const handleFirstInteraction = useCallback(() => {
     if (audioRef.current) {
@@ -43,6 +52,22 @@ const HomePage: FC = () => {
     reduceMotion.addEventListener("change", update);
     return () => {
       reduceMotion.removeEventListener("change", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetchSiteMarquee()
+      .then((remote) => {
+        if (!alive) return;
+        if (remote?.items?.length) setMarqueeItems(remote.items);
+        if (typeof remote?.duration === "number" && Number.isFinite(remote.duration) && remote.duration > 3) {
+          setMarqueeDuration(remote.duration);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
     };
   }, []);
 
@@ -344,14 +369,8 @@ const HomePage: FC = () => {
         <Marquee
           className="home-page__marquee"
           label="Новости и объявления"
-          items={[
-            "Театр «Дофамин»",
-            "Спектакли и даты",
-            "Заклятие — билеты онлайн уже в продаже",
-            "Приобрести можно на сайте https://ticketcloud.ru",
-            "Иили на странице спектакля",
-
-          ]}
+          items={marqueeItems}
+          duration={marqueeDuration}
         />
 
         <div className="home-nav__contacts">

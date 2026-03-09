@@ -79,51 +79,38 @@
 
 /* === Expandable cards (CodePen-inspired, scoped to EventsPage) === */
 .events-cards {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   width: 100%;
-  height: 420px;
-  overflow: hidden;
+  height: auto;
+  overflow: visible;
   box-shadow:
     0 26px 70px rgba(0, 0, 0, 0.45),
     0 0 0 1px rgba(255, 255, 255, 0.08);
-  white-space: nowrap;
   background: rgba(255, 255, 255, 0.03);
   z-index: 10;
-  gap: 10px;
+  gap: 14px;
+  padding: 12px;
 }
 
 @media (max-width: 980px) {
   .events-cards {
-    height: auto;
-    flex-wrap: wrap;
-    overflow: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 .events-card {
   cursor: pointer;
-  flex: 1 1 0;
-  min-width: calc(100% / 4 - 10px);
-  height: calc(100% - 10px);
   position: relative;
   overflow: hidden;
-  transition: flex 0.55s ease;
-  will-change: flex;
+  border-radius: 12px;
+  aspect-ratio: 4 / 5;
 }
 
 @media (max-width: 980px) {
   .events-card {
-    flex: 1 1 0;
-    min-width: calc(100% / 2 - 10px);
-    height: auto;
-    /* overflow: auto; */
-    height: 506px;
+    aspect-ratio: 16 / 10;
   }
-}
-
-.events-card:hover {
-  flex: 1.01;
 }
 
 .events-card__link {
@@ -298,14 +285,12 @@
   }
 
   .events-cards {
-    flex-direction: column;
-    height: auto;
+    grid-template-columns: 1fr;
+    padding: 10px;
   }
 
   .events-card {
-    flex: none;
-    width: 100%;
-    height: 260px;
+    aspect-ratio: 16 / 9;
   }
 
   .events-card::after {
@@ -323,11 +308,6 @@
 
 /* Small screens: disable hover/active expansion (independent of device mode) */
 @media (max-width: 520px) {
-  .events-card:hover,
-  .events-card:active {
-    flex: 1 1 0;
-  }
-
   .events-card:hover .events-card__img,
   .events-card:active .events-card__img {
     transform: none;

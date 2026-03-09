@@ -44,8 +44,9 @@ export function ImageWithPreloader({
         <Preloader className="img-with-preloader__spinner" label="Загрузка изображения…" />
       )}
       <img
-        {...imgProps}
         className={imgCn}
+        {...imgProps}
+        alt={imgProps.alt ?? ""}
         onLoad={(e) => {
           setState("loaded");
           onLoad?.(e);

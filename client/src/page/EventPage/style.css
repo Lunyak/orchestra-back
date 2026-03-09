@@ -1,5 +1,6 @@
 .event-page {
   --event-accent: var(--color-accent);
+  --event-bg-url: none;
   min-height: 100vh;
   position: relative;
   display: flex;
@@ -9,7 +10,11 @@
     radial-gradient(900px 520px at 20% 10%, color-mix(in oklab, var(--event-accent) 28%, transparent), transparent 60%),
     radial-gradient(820px 520px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
     radial-gradient(1000px 700px at 50% 95%, rgba(0, 0, 0, 0.55), transparent 65%),
+    var(--event-bg-url),
     var(--color-bg);
+  background-size: auto, auto, auto, cover, auto;
+  background-position: center, center, center, center, center;
+  background-repeat: no-repeat;
   overflow: hidden;
 }
 

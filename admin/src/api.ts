@@ -50,6 +50,19 @@ export async function getPlans(): Promise<PlanRow[]> {
   return res.json();
 }
 
+export async function updatePlan(
+  planId: string,
+  patch: { maxProjects?: number | null; maxCollaboratorsPerProject?: number | null }
+): Promise<PlanRow> {
+  const res = await fetch(`${base()}/admin/plans/${planId}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function setUserSubscription(
   userId: string,
   subscriptionId: string | null
