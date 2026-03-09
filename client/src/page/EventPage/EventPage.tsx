@@ -11,6 +11,7 @@ import { CastList } from "../../shared/component/CastList/CastList";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
 import { ROUTES } from "../../shared/model/routes";
 import { getShowKeyByName, SHOW_CAST } from "../../shared/model/showCast";
+import { isAbsoluteUrl, siteAsset } from "../../shared/model/siteAssets";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
@@ -133,23 +134,23 @@ const EventPage: FC = () => {
 
   const eventsPath = ROUTES.EVENTS.startsWith("/") ? ROUTES.EVENTS : `/${ROUTES.EVENTS}`;
 
-  const normalizePublicPath = (p: string) => {
-    if (!p) return p;
-    if (p.startsWith("http://") || p.startsWith("https://")) return p;
-    return p.startsWith("/") ? p : `/${p}`;
-  };
-
   const ogImageCandidate = curentEvent.img?.trim()
-    ? normalizePublicPath(curentEvent.img.trim())
+    ? curentEvent.img.trim()
     : curentEvent.photos?.[0]
-      ? normalizePublicPath(curentEvent.photos[0])
+      ? curentEvent.photos[0]
       : "";
 
   const origin =
     typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
   const canonicalUrl =
     origin && eventId ? `${origin}${eventsPath}/${encodeURIComponent(eventId)}` : "";
-  const ogImageUrl = origin && ogImageCandidate ? `${origin}${ogImageCandidate}` : "";
+  const ogImageResolved = ogImageCandidate ? siteAsset(ogImageCandidate) : "";
+  const ogImageUrl =
+    ogImageResolved && isAbsoluteUrl(ogImageResolved)
+      ? ogImageResolved
+      : origin && ogImageResolved
+        ? `${origin}${ogImageResolved}`
+        : "";
 
   const descriptionText =
     (curentEvent.anonse || "").replace(/\s+/g, " ").trim() ||
@@ -181,7 +182,11 @@ const EventPage: FC = () => {
         {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
       </Helmet>
 
-      {isZaklyatie && <ZaklyatieAtmosphere fallbackSrc={curentEvent.photos?.[0]} />}
+      {isZaklyatie && (
+        <ZaklyatieAtmosphere
+          fallbackSrc={curentEvent.photos?.[0] ? siteAsset(curentEvent.photos[0]) : undefined}
+        />
+      )}
 
       <div className="event-page__content">
         <Link to={eventsPath} className="events-page__back">
@@ -215,7 +220,7 @@ const EventPage: FC = () => {
 
         <div className="event-page__main">
           <section className="event-page__gallery" aria-label="Фотографии спектакля">
-            <PhotoCarousel images={curentEvent.photos} title={title} />
+            <PhotoCarousel images={(curentEvent.photos ?? []).map(siteAsset)} title={title} />
           </section>
 
 

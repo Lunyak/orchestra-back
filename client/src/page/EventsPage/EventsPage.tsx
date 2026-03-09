@@ -2,6 +2,7 @@ import { FC } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
+import { siteAsset } from "../../shared/model/siteAssets";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
@@ -117,7 +118,7 @@ const Card: FC<ICardProps> = ({ data }) => {
           <ImageWithPreloader
             className="events-card__imgWrap"
             imgClassName="events-card__img"
-            src={img}
+            src={siteAsset(img)}
             alt={title}
             loading="lazy"
             decoding="async"
@@ -144,7 +145,7 @@ const Card: FC<ICardProps> = ({ data }) => {
         <ImageWithPreloader
           className="events-card__imgWrap"
           imgClassName="events-card__img"
-          src={img}
+          src={siteAsset(img)}
           alt={title}
           loading="lazy"
           decoding="async"

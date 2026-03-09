@@ -2,6 +2,7 @@ import { FC, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
 import Preloader from "../../shared/component/Preloader/Preloader";
+import { siteAsset } from "../../shared/model/siteAssets";
 import "./style.css";
 
 const items = [
@@ -127,7 +128,7 @@ const Card: FC<ICardProps> = ({ data }) => {
       )}
       <img
         className={isLoaded ? "aboutus-card__img" : "aboutus-card__img aboutus-card__img--loading"}
-        src={img}
+        src={siteAsset(img)}
         alt={name}
         loading="lazy"
         decoding="async"
