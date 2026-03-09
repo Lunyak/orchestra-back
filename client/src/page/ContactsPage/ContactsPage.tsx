@@ -3,6 +3,9 @@ import { ROUTES } from "../../shared/model/routes";
 import "./style.css";
 
 const ContactsPage = () => {
+  const vkGroupUrl = "https://vk.com/dofaminspb";
+  const vkHowToFindVideoUrl = "https://vk.com/video-81928625_456239136";
+
   return (
     <div className="contacts-page">
       <div className="contacts-page__background">
@@ -26,9 +29,28 @@ const ContactsPage = () => {
         </p>
         <p className="contacts-page__line">
           <span className="contacts-page__label">ВКонтакте:</span>{" "}
-          <a href="https://vk.com/dofaminspb" target="_blank" rel="noopener noreferrer">
+          <a href={vkGroupUrl} target="_blank" rel="noopener noreferrer">
             vk.com/dofaminspb
           </a>
+        </p>
+
+        <hr className="contacts-page__divider" />
+
+        <h2 className="contacts-page__subtitle">Как нас найти</h2>
+        <p className="contacts-page__hint">
+          Актуальный адрес и схема прохода — в нашей группе ВК:{" "}
+          <a href={vkGroupUrl} target="_blank" rel="noopener noreferrer">
+            vk.com/dofaminspb
+          </a>
+          .
+        </p>
+
+        <p className="contacts-page__hint">
+          Видео «как добраться / как пройти»:{" "}
+          <a href={vkHowToFindVideoUrl} target="_blank" rel="noopener noreferrer">
+            открыть
+          </a>
+          .
         </p>
       </div>
     </div>

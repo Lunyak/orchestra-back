@@ -5,6 +5,11 @@ export type SiteCastItem = {
   actor: string;
 };
 
+export type SiteReview = {
+  text: string;
+  author?: string;
+};
+
 export type SiteEvent = {
   /** Human-readable identifier used in URLs: /события/:slug */
   slug: string;
@@ -25,6 +30,8 @@ export type SiteEvent = {
   /** TicketCloud продажи билетов (опционально) */
   ticketsCloudEventId?: string;
   ticketsCloudToken?: string;
+  /** Отзывы (опционально) */
+  reviews?: SiteReview[];
 };
 
 type SiteEventsContent = {
@@ -94,6 +101,25 @@ function normalizeEvent(raw: any): SiteEvent | null {
   const ticketsCloudToken =
     typeof raw.ticketsCloudToken === "string" ? raw.ticketsCloudToken.trim() : undefined;
 
+  const reviewsRaw = Array.isArray(raw.reviews) ? raw.reviews : null;
+  const reviews = reviewsRaw
+    ? (reviewsRaw
+        .map((x: any) => {
+          if (typeof x === "string") {
+            const text = x.trim();
+            return text ? ({ text } satisfies SiteReview) : null;
+          }
+          if (x && typeof x === "object") {
+            const text = typeof x.text === "string" ? x.text.trim() : "";
+            if (!text) return null;
+            const author = typeof x.author === "string" ? x.author.trim() : "";
+            return (author ? { text, author } : { text }) satisfies SiteReview;
+          }
+          return null;
+        })
+        .filter(Boolean) as SiteReview[])
+    : undefined;
+
   return {
     slug,
     soon,
@@ -110,6 +136,7 @@ function normalizeEvent(raw: any): SiteEvent | null {
     eventPageBg,
     ...(ticketsCloudEventId ? { ticketsCloudEventId } : null),
     ...(ticketsCloudToken ? { ticketsCloudToken } : null),
+    ...(reviews && reviews.length ? { reviews } : null),
   };
 }
 

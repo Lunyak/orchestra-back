@@ -32,7 +32,9 @@
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 10;
-  max-width: 480px;
+  width: min(92vw, 820px);
+  max-height: calc(100vh - 120px);
+  overflow: auto;
   padding: 32px;
   background: rgba(22, 18, 24, 0.85);
   border-radius: var(--radius-lg);
@@ -66,4 +68,26 @@
 
 .contacts-page__content a:hover {
   color: var(--color-accent-hover);
+}
+
+.contacts-page__divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin: 18px 0;
+}
+
+.contacts-page__subtitle {
+  font-family: "Russo One", sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  margin: 0 0 10px;
+  color: var(--color-text);
+}
+
+.contacts-page__hint {
+  font-family: Georgia, serif;
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 0 0 10px;
+  color: var(--color-text);
 }

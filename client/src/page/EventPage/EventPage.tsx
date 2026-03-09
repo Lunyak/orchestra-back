@@ -5,7 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-import { Controller, Navigation } from "swiper/modules";
+import { Controller, Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
 import { CastList } from "../../shared/component/CastList/CastList";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
@@ -147,10 +147,15 @@ const EventPage: FC = () => {
     (curentEvent.slug || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
 
   const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
+  const reviews = Array.isArray(curentEvent.reviews) ? curentEvent.reviews : [];
+  const reviewImages = Array.isArray((curentEvent as any).reviewImages)
+    ? ((curentEvent as any).reviewImages as any[]).filter((x) => typeof x === "string")
+    : [];
 
   const ticketsCloudEventId = curentEvent.ticketsCloudEventId?.trim() || "";
   const ticketsCloudToken = curentEvent.ticketsCloudToken?.trim() || "";
   const hasTicketsCloud = Boolean(ticketsCloudEventId || ticketsCloudToken);
+  const howToFindVideoUrl = "https://vk.com/video-81928625_456239136";
 
   const eventAccent =
     typeof curentEvent.colorBackground === "number"
@@ -223,10 +228,12 @@ const EventPage: FC = () => {
         {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
       </Helmet>
 
-      {isZaklyatie && (
+      {isZaklyatie ? (
         <ZaklyatieAtmosphere
           fallbackSrc={curentEvent.photos?.[0] ? siteAsset(curentEvent.photos[0]) : undefined}
         />
+      ) : (
+        <div className="event-page__glass" aria-hidden="true" />
       )}
 
       <div className="event-page__content">
@@ -286,12 +293,32 @@ const EventPage: FC = () => {
                 )}
               </section>
             )}
+
+            <div className="event-page__howtofind" aria-label="Как нас найти">
+              <a href={howToFindVideoUrl} target="_blank" rel="noopener noreferrer">
+                Как нас найти — видео
+              </a>
+            </div>
           </section>
 
           {cast && cast.length > 0 && (
             <section className="event-page__cast" aria-label="Состав">
               <h2 className="event-page__sectionTitle">Состав</h2>
               <CastList items={cast} />
+            </section>
+          )}
+
+          {reviews.length > 0 && (
+            <section className="event-page__reviews" aria-label="Отзывы">
+              <h2 className="event-page__sectionTitle">Отзывы</h2>
+              <ReviewsSlider reviews={reviews} />
+            </section>
+          )}
+
+          {reviewImages.length > 0 && (
+            <section className="event-page__reviews" aria-label="Отзывы (фото)">
+              <h2 className="event-page__sectionTitle">Отзывы (фото)</h2>
+              <ReviewImagesSlider images={reviewImages.map((p) => siteAsset(p))} />
             </section>
           )}
 
@@ -307,6 +334,70 @@ export const Component = EventPage;
 interface PhotoCarouselProps {
   images: string[];
   title: string;
+}
+
+type Review = { text: string; author?: string };
+
+function ReviewsSlider({ reviews }: { reviews: Review[] }) {
+  return (
+    <div className="reviews-slider">
+      <Swiper
+        modules={[Navigation, Pagination]}
+        navigation
+        pagination={{ clickable: true }}
+        slidesPerView={1}
+        spaceBetween={12}
+        autoHeight
+        className="reviews-slider__swiper"
+      >
+        {reviews.map((r, idx) => {
+          const author = (r.author ?? "").trim();
+          const text = String(r.text ?? "").trim();
+          if (!text) return null;
+          return (
+            <SwiperSlide key={`${idx}-${author || "review"}`} className="reviews-slider__slide">
+              <figure className="reviews-slider__card">
+                <blockquote className="reviews-slider__text">“{text}”</blockquote>
+                {author && <figcaption className="reviews-slider__author">— {author}</figcaption>}
+              </figure>
+            </SwiperSlide>
+          );
+        })}
+      </Swiper>
+    </div>
+  );
+}
+
+function ReviewImagesSlider({ images }: { images: string[] }) {
+  return (
+    <div className="reviews-slider">
+      <Swiper
+        modules={[Navigation, Pagination]}
+        navigation
+        pagination={{ clickable: true }}
+        slidesPerView={1}
+        spaceBetween={12}
+        autoHeight
+        className="reviews-slider__swiper"
+      >
+        {images.map((src, idx) => (
+          <SwiperSlide key={`${idx}-${src}`} className="reviews-slider__slide">
+            <div className="reviews-slider__imgCard">
+              <ImageWithPreloader
+                className="reviews-slider__imgWrap"
+                imgClassName="reviews-slider__img"
+                src={src}
+                alt={`Отзыв — фото ${idx + 1}`}
+                loading="lazy"
+                decoding="async"
+                spinnerSize={54}
+              />
+            </div>
+          </SwiperSlide>
+        ))}
+      </Swiper>
+    </div>
+  );
 }
 
 function PhotoCarousel({ images, title }: PhotoCarouselProps) {

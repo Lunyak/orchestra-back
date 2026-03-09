@@ -1,6 +1,8 @@
 .event-page {
   --event-accent: var(--color-accent);
   --event-bg-url: none;
+  --event-glass-blur: 16px;
+  --event-glass-sat: 155%;
   min-height: 100vh;
   position: relative;
   display: flex;
@@ -16,6 +18,26 @@
   background-position: center, center, center, center, center;
   background-repeat: no-repeat;
   overflow: hidden;
+}
+
+/* Frosted glass overlay for EventPage (all events except Zaklyatie) */
+.event-page__glass {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 20% 12%, rgba(255, 255, 255, 0.06), transparent 62%),
+    radial-gradient(900px 640px at 70% 10%, rgba(120, 170, 255, 0.06), transparent 60%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.64));
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .event-page__glass {
+    backdrop-filter: blur(var(--event-glass-blur)) saturate(var(--event-glass-sat));
+    -webkit-backdrop-filter: blur(var(--event-glass-blur)) saturate(var(--event-glass-sat));
+  }
 }
 
 /* =========================================================
@@ -350,6 +372,120 @@
   border: 1px dashed rgba(255, 255, 255, 0.18);
   border-radius: 12px;
   padding: 12px 14px;
+}
+
+.event-page__howtofind {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.event-page__howtofind a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(22, 18, 24, 0.55);
+  color: rgba(245, 240, 232, 0.92);
+  font-family: "Russo One", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: border-color var(--transition), transform var(--transition), filter var(--transition);
+}
+
+.event-page__howtofind a:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--event-accent) 55%, rgba(255, 255, 255, 0.12));
+  filter: saturate(1.08);
+}
+
+.event-page__reviews {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: rgba(22, 18, 24, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.event-page__reviews::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.16;
+  background:
+    radial-gradient(700px 260px at 20% 15%, color-mix(in oklab, var(--event-accent) 24%, transparent), transparent 60%),
+    radial-gradient(600px 240px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%);
+  mix-blend-mode: screen;
+}
+
+.event-page__reviews > * {
+  position: relative;
+  z-index: 1;
+}
+
+.reviews-slider {
+  --swiper-theme-color: rgba(255, 255, 255, 0.78);
+  --swiper-navigation-color: rgba(255, 255, 255, 0.78);
+  --swiper-navigation-size: 14px;
+}
+
+.reviews-slider__card {
+  margin: 0;
+  padding: 16px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(18, 14, 20, 0.55);
+}
+
+.reviews-slider__text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.reviews-slider__author {
+  margin-top: 10px;
+  font-family: "Russo One", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.reviews-slider__imgCard {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(18, 14, 20, 0.55);
+  overflow: hidden;
+}
+
+.reviews-slider__imgWrap {
+  width: 100%;
+}
+
+.reviews-slider__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.reviews-slider__swiper .swiper-pagination-bullet {
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.reviews-slider__swiper .swiper-pagination-bullet-active {
+  background: rgba(255, 255, 255, 0.82);
 }
 
 /* === Carousel === */

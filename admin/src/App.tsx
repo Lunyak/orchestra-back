@@ -465,6 +465,7 @@ function SiteMediaPage() {
 }
 
 type SiteCastItem = { role: string; actor: string };
+type SiteReview = { text: string; author?: string };
 type SiteEvent = {
   slug: string;
   soon: boolean;
@@ -481,6 +482,8 @@ type SiteEvent = {
   cast?: SiteCastItem[];
   ticketsCloudEventId?: string;
   ticketsCloudToken?: string;
+  reviews?: SiteReview[];
+  reviewImages?: string[];
 };
 
 type SiteEventsContent = {
@@ -648,6 +651,7 @@ function SiteEventsCrudPage() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [photosFiles, setPhotosFiles] = useState<File[]>([]);
+  const [reviewImagesFiles, setReviewImagesFiles] = useState<File[]>([]);
 
   const load = async () => {
     setError("");
@@ -750,6 +754,23 @@ function SiteEventsCrudPage() {
     updateSelected({ photos: nextPhotos });
   };
 
+  const uploadAndAppendReviewImages = async (files: File[]) => {
+    if (!selected) throw new Error("Не выбран спектакль");
+    const slugSeg = normalizePathSegment(selected.slug);
+    const ts = Date.now();
+    const next = [...(selected.reviewImages ?? [])];
+    for (let i = 0; i < files.length; i += 1) {
+      const f = files[i];
+      const ext = extFromName(f.name);
+      const baseName = normalizePathSegment(f.name.replace(/\.[^.]+$/, ""));
+      const path = `reviews/${slugSeg}/${ts}-${i + 1}-${baseName}.${ext}`;
+      const out = await uploadSiteMedia({ file: f, path, prefix: "site" });
+      next.push(`/${path}`);
+      setOk(`Загружено: ${out.url}`);
+    }
+    updateSelected({ reviewImages: next });
+  };
+
   const createNew = () => {
     const baseSlug = "новый-спектакль";
     const existing = new Set((content.events ?? []).map((e) => e.slug));
@@ -774,6 +795,8 @@ function SiteEventsCrudPage() {
       colorBackground: 0x6b0f1a,
       ticketsCloudEventId: "",
       ticketsCloudToken: "",
+      reviews: [],
+      reviewImages: [],
     };
     setContent((prev) => ({ ...prev, events: [ev, ...(prev.events ?? [])] }));
     setSelectedSlug(slug);
@@ -846,6 +869,10 @@ function SiteEventsCrudPage() {
     .map((c: SiteCastItem) => `${c.role} — ${c.actor}`)
     .join("\n");
   const photosText = (selected?.photos ?? []).join("\n");
+  const reviewsText = (selected?.reviews ?? [])
+    .map((r: SiteReview) => (r.author?.trim() ? `${r.author.trim()} — ${r.text}` : r.text))
+    .join("\n");
+  const reviewImagesText = (selected?.reviewImages ?? []).join("\n");
 
   return (
     <div className="admin-page">
@@ -1101,6 +1128,50 @@ function SiteEventsCrudPage() {
                 />
               </label>
 
+              <div style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить фото-отзывы (добавятся в reviewImages)</span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => setReviewImagesFiles(Array.from(e.target.files ?? []))}
+                  />
+                  <button
+                    type="button"
+                    className="small"
+                    disabled={loading || reviewImagesFiles.length === 0}
+                    onClick={async () => {
+                      if (reviewImagesFiles.length === 0) return;
+                      setLoading(true);
+                      setError("");
+                      setOk("");
+                      try {
+                        await uploadAndAppendReviewImages(reviewImagesFiles);
+                        setReviewImagesFiles([]);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    Загрузить отзывы
+                  </button>
+                </div>
+              </div>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Отзывы-картинки (reviewImages, по одному пути на строку)</span>
+                <textarea
+                  value={reviewImagesText}
+                  onChange={(e) =>
+                    updateSelected({ reviewImages: e.target.value.split("\n").map((s) => s.trim()).filter(Boolean) })
+                  }
+                  spellCheck={false}
+                />
+              </label>
+
               <label style={{ display: "grid", gap: 6 }}>
                 <span>Cast (по строке: Роль — Актёр)</span>
                 <textarea
@@ -1118,6 +1189,31 @@ function SiteEventsCrudPage() {
                       })
                       .filter(Boolean) as SiteCastItem[];
                     updateSelected({ cast });
+                  }}
+                  spellCheck={false}
+                />
+              </label>
+
+              <label style={{ display: "grid", gap: 6 }}>
+                <span>Отзывы (по строке: Автор — Текст, либо просто Текст)</span>
+                <textarea
+                  value={reviewsText}
+                  onChange={(e) => {
+                    const lines = e.target.value.split("\n").map((s) => s.trim()).filter(Boolean);
+                    const reviews = lines
+                      .map((line) => {
+                        const parts = line.split("—");
+                        if (parts.length < 2) {
+                          const text = line.trim();
+                          return text ? ({ text } as SiteReview) : null;
+                        }
+                        const author = parts[0].trim();
+                        const text = parts.slice(1).join("—").trim();
+                        if (!text) return null;
+                        return author ? ({ author, text } as SiteReview) : ({ text } as SiteReview);
+                      })
+                      .filter(Boolean) as SiteReview[];
+                    updateSelected({ reviews });
                   }}
                   spellCheck={false}
                 />
