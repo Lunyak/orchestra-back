@@ -116,11 +116,12 @@ type ICard = {
 };
 
 const Card: FC<ICardProps> = ({ data }) => {
-  const { name, cardImage, old, type, anonse, date, soon, slug } = data;
+  const { name, cardImage, old, type, date, soon, slug } = data;
 
   const title = name?.trim() || "Спектакль";
+  // Do NOT show long "anonse" on the card; keep it for the Event page only.
   const description =
-    (anonse?.trim() || type?.trim() || "Узнать больше") +
+    (type?.trim() || "Узнать больше") +
     (date?.trim() ? ` · ${date.trim()}` : "");
 
   const ariaLabelBase = `${title}${old?.trim() ? `, ${old.trim()}` : ""}`;

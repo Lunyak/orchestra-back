@@ -479,6 +479,8 @@ type SiteEvent = {
   colorBackground?: number;
   photos?: string[];
   cast?: SiteCastItem[];
+  ticketsCloudEventId?: string;
+  ticketsCloudToken?: string;
 };
 
 type SiteEventsContent = {
@@ -502,6 +504,13 @@ function SiteContentPage() {
     setLoading(true);
     try {
       const res = await fetch(url, { cache: "no-store" });
+      if (res.status === 404) {
+        // First deploy: the file might not exist in MinIO yet.
+        setRaw('{\n  "events": []\n}\n');
+        setLoadedMeta(null);
+        setOk("Файл не найден (ещё не опубликован). Отредактируй и нажми «Опубликовать» — файл будет создан.");
+        return;
+      }
       if (!res.ok) throw new Error(`Не удалось загрузить: ${res.status}`);
       const text = await res.text();
       setRaw(text);
@@ -646,6 +655,13 @@ function SiteEventsCrudPage() {
     setLoading(true);
     try {
       const res = await fetch(url, { cache: "no-store" });
+      if (res.status === 404) {
+        setContent({ events: [] });
+        setLoadedMeta(null);
+        setSelectedSlug(null);
+        setOk("events.json не найден (ещё не опубликован). Нажми «Создать спектакль», затем «Опубликовать» — файл появится.");
+        return;
+      }
       if (!res.ok) throw new Error(`Не удалось загрузить: ${res.status}`);
       const text = await res.text();
       const parsed = JSON.parse(text) as SiteEventsContent;
@@ -756,6 +772,8 @@ function SiteEventsCrudPage() {
       photos: [],
       cast: [],
       colorBackground: 0x6b0f1a,
+      ticketsCloudEventId: "",
+      ticketsCloudToken: "",
     };
     setContent((prev) => ({ ...prev, events: [ev, ...(prev.events ?? [])] }));
     setSelectedSlug(slug);
@@ -892,7 +910,7 @@ function SiteEventsCrudPage() {
             <div style={{ display: "grid", gap: 10 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <label style={{ display: "grid", gap: 6 }}>
-                  <span>Slug (URL: /events/&lt;slug&gt;)</span>
+                  <span>Slug (URL: /события/&lt;slug&gt;)</span>
                   <input
                     value={selected.slug}
                     onChange={(e) => {
@@ -930,6 +948,27 @@ function SiteEventsCrudPage() {
                 <label style={{ display: "grid", gap: 6 }}>
                   <span>Возраст</span>
                   <input value={selected.old ?? ""} onChange={(e) => updateSelected({ old: e.target.value })} />
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span>TicketCloud eventId</span>
+                  <input
+                    value={selected.ticketsCloudEventId ?? ""}
+                    onChange={(e) => updateSelected({ ticketsCloudEventId: e.target.value })}
+                    placeholder="например 123456"
+                    spellCheck={false}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span>TicketCloud token</span>
+                  <input
+                    value={selected.ticketsCloudToken ?? ""}
+                    onChange={(e) => updateSelected({ ticketsCloudToken: e.target.value })}
+                    placeholder="например abcd1234..."
+                    spellCheck={false}
+                  />
                 </label>
               </div>
 
@@ -1106,6 +1145,13 @@ function SiteMarqueePage() {
     setLoading(true);
     try {
       const res = await fetch(url, { cache: "no-store" });
+      if (res.status === 404) {
+        setItemsText("");
+        setDuration("22");
+        setLoadedMeta(null);
+        setOk("Файл marquee.json не найден (ещё не опубликован). Заполни и нажми «Опубликовать» — файл будет создан.");
+        return;
+      }
       if (!res.ok) throw new Error(`Не удалось загрузить: ${res.status}`);
       const text = await res.text();
       const parsed = JSON.parse(text) as { items?: any; duration?: any; version?: any; updatedAt?: any };

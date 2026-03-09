@@ -148,8 +148,9 @@ const EventPage: FC = () => {
 
   const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
 
-  const ticketsCloudEventId = process.env.REACT_APP_TC_ZAKLYATIE_EVENT_ID;
-  const ticketsCloudToken = process.env.REACT_APP_TC_ZAKLYATIE_TOKEN;
+  const ticketsCloudEventId = curentEvent.ticketsCloudEventId?.trim() || "";
+  const ticketsCloudToken = curentEvent.ticketsCloudToken?.trim() || "";
+  const hasTicketsCloud = Boolean(ticketsCloudEventId || ticketsCloudToken);
 
   const eventAccent =
     typeof curentEvent.colorBackground === "number"
@@ -267,7 +268,7 @@ const EventPage: FC = () => {
 
           <section className="event-page__text" aria-label="Описание спектакля">
             <div className="event-page__description">{curentEvent.anonse}</div>
-            {isZaklyatie && (
+            {hasTicketsCloud && (
               <section className="event-page__tickets" aria-label="Билеты">
                 {ticketsCloudEventId && ticketsCloudToken ? (
                   <button
@@ -280,7 +281,7 @@ const EventPage: FC = () => {
                   </button>
                 ) : (
                   <div className="event-page__ticketsHint">
-                    Добавь `REACT_APP_TC_ZAKLYATIE_EVENT_ID` и `REACT_APP_TC_ZAKLYATIE_TOKEN` в `.env`.
+                    Добавь `ticketsCloudEventId` и `ticketsCloudToken` для этого события в `site/content/events.json` через админку.
                   </div>
                 )}
               </section>

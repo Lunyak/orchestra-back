@@ -6,7 +6,7 @@ export type SiteCastItem = {
 };
 
 export type SiteEvent = {
-  /** Human-readable identifier used in URLs: /events/:slug */
+  /** Human-readable identifier used in URLs: /события/:slug */
   slug: string;
   soon: boolean;
   name: string;
@@ -22,6 +22,9 @@ export type SiteEvent = {
   colorBackground?: number;
   photos?: string[];
   cast?: SiteCastItem[];
+  /** TicketCloud продажи билетов (опционально) */
+  ticketsCloudEventId?: string;
+  ticketsCloudToken?: string;
 };
 
 type SiteEventsContent = {
@@ -86,6 +89,11 @@ function normalizeEvent(raw: any): SiteEvent | null {
         ? raw.bgImage
         : undefined;
 
+  const ticketsCloudEventId =
+    typeof raw.ticketsCloudEventId === "string" ? raw.ticketsCloudEventId.trim() : undefined;
+  const ticketsCloudToken =
+    typeof raw.ticketsCloudToken === "string" ? raw.ticketsCloudToken.trim() : undefined;
+
   return {
     slug,
     soon,
@@ -100,6 +108,8 @@ function normalizeEvent(raw: any): SiteEvent | null {
     photos,
     cast,
     eventPageBg,
+    ...(ticketsCloudEventId ? { ticketsCloudEventId } : null),
+    ...(ticketsCloudToken ? { ticketsCloudToken } : null),
   };
 }
 
@@ -110,13 +120,13 @@ export async function fetchSiteEvents(opts?: {
   const timeoutMs = Math.max(1000, Math.min(20000, Math.trunc(opts?.timeoutMs ?? 5000)));
   const cache = opts?.cache !== false;
 
-  if (cache) {
+  const cachedEvents = (() => {
+    if (!cache) return null;
     const cached = sessionStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const parsed = safeJsonParse<SiteEventsContent>(cached);
-      if (parsed && isValidContent(parsed)) return parsed.events;
-    }
-  }
+    if (!cached) return null;
+    const parsed = safeJsonParse<SiteEventsContent>(cached);
+    return parsed && isValidContent(parsed) ? parsed.events : null;
+  })();
 
   const ac = new AbortController();
   const t = window.setTimeout(() => ac.abort(), timeoutMs);
@@ -125,10 +135,10 @@ export async function fetchSiteEvents(opts?: {
       cache: "no-store",
       signal: ac.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) return cachedEvents;
     const text = await res.text();
     const parsed = safeJsonParse<SiteEventsContent>(text);
-    if (!parsed || !isValidContent(parsed)) return null;
+    if (!parsed || !isValidContent(parsed)) return cachedEvents;
     const normalized = (parsed.events ?? []).map(normalizeEvent).filter(Boolean) as SiteEvent[];
     const cachedValue: SiteEventsContent = {
       version: parsed.version,
@@ -138,7 +148,7 @@ export async function fetchSiteEvents(opts?: {
     if (cache) sessionStorage.setItem(CACHE_KEY, JSON.stringify(cachedValue));
     return normalized;
   } catch {
-    return null;
+    return cachedEvents;
   } finally {
     window.clearTimeout(t);
   }
