@@ -38,11 +38,11 @@
   left: -20px;
   right: -20px;
   bottom: -20px;
-  background: radial-gradient(circle at 30% 50%,
+  /* background: radial-gradient(circle at 30% 50%,
       rgba(255, 255, 255, 0.2) 0%,
-      transparent 50%);
+      transparent 50%); */
   filter: blur(40px);
-  animation: home-glitch-glowPulse 3s infinite;
+  /* animation: home-glitch-glowPulse 3s infinite; */
   z-index: -1;
 }
 

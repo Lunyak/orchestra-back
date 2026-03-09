@@ -151,10 +151,10 @@
   display: inline-flex;
   align-items: center;
   padding: 7px 12px;
-  border-radius: 999px;
+  /* border-radius: 999px; */
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(245, 240, 232, 0.92);
+  /* border: 1px solid rgba(255, 255, 255, 0.12); */
+  /* color: rgba(245, 240, 232, 0.92); */
   font-family: "Russo One", sans-serif;
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -264,6 +264,50 @@
     radial-gradient(700px 260px at 20% 15%, color-mix(in oklab, var(--event-accent) 28%, transparent), transparent 60%),
     radial-gradient(600px 240px at 80% 30%, rgba(255, 255, 255, 0.08), transparent 60%);
   mix-blend-mode: screen;
+}
+
+.event-page__tickets {
+  display: flex;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.event-page__ticketsButton {
+  font-family: "Russo One", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  background:
+    radial-gradient(240px 120px at 30% 25%, color-mix(in oklab, var(--event-accent) 38%, transparent), transparent 70%),
+    rgba(18, 14, 20, 0.78);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform var(--transition), border-color var(--transition), filter var(--transition);
+}
+
+.event-page__ticketsButton:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--event-accent) 65%, rgba(255, 255, 255, 0.16));
+  filter: saturate(1.08);
+}
+
+.event-page__ticketsButton:active {
+  transform: translateY(0);
+}
+
+.event-page__ticketsHint {
+  max-width: 720px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(22, 18, 24, 0.6);
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
 }
 
 /* === Carousel === */

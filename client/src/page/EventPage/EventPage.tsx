@@ -1,7 +1,7 @@
 /* eslint-disable no-useless-escape */
 import { CSSProperties, FC, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { Link, useParams } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
@@ -107,6 +107,9 @@ const EventPage: FC = () => {
   const isZaklyatie =
     (curentEvent.name || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
 
+  const ticketsCloudEventId = process.env.REACT_APP_TC_ZAKLYATIE_EVENT_ID;
+  const ticketsCloudToken = process.env.REACT_APP_TC_ZAKLYATIE_TOKEN;
+
   const eventAccent =
     typeof curentEvent.colorBackground === "number"
       ? `#${curentEvent.colorBackground.toString(16).padStart(6, "0")}`
@@ -116,9 +119,9 @@ const EventPage: FC = () => {
     ...(eventAccent ? ({ ["--event-accent" as any]: eventAccent } satisfies CSSProperties) : null),
     ...(isZaklyatie
       ? ({
-          // Позже просто положи файл в public/bg/zaklyatie-village.jpg
-          ["--zaklyatie-bg-url" as any]: 'url("/bg/zaklyatie-village.jpg")',
-        } satisfies CSSProperties)
+        // Позже просто положи файл в public/bg/zaklyatie-village.jpg
+        ["--zaklyatie-bg-url" as any]: 'url("/bg/zaklyatie-village.jpg")',
+      } satisfies CSSProperties)
       : null),
   } as CSSProperties;
 
@@ -179,25 +182,27 @@ const EventPage: FC = () => {
           Назад
         </Link>
 
+        <div className="event-page__meta" aria-label="Характеристики спектакля">
+          {curentEvent.soon && <span className="event-page__chip">скоро</span>}
+          {curentEvent.old?.trim() && (
+            <span className="event-page__chip">{curentEvent.old.trim()}</span>
+          )}
+          {curentEvent.type?.trim() && (
+            <span className="event-page__chip">{curentEvent.type.trim()}</span>
+          )}
+          {curentEvent.date?.trim() && (
+            <span className="event-page__chip">{curentEvent.date.trim()}</span>
+          )}
+          {isZaklyatie && <RainAmbienceToggle />}
+        </div>
+
         <header className="event-page__header">
           <div className="event-page__hero">
             <GlitchHero as="h1" text={title} />
           </div>
           {subtitle && <p className="event-page__subtitle">{subtitle}</p>}
 
-          <div className="event-page__meta" aria-label="Характеристики спектакля">
-            {curentEvent.soon && <span className="event-page__chip">скоро</span>}
-            {curentEvent.old?.trim() && (
-              <span className="event-page__chip">{curentEvent.old.trim()}</span>
-            )}
-            {curentEvent.type?.trim() && (
-              <span className="event-page__chip">{curentEvent.type.trim()}</span>
-            )}
-            {curentEvent.date?.trim() && (
-              <span className="event-page__chip">{curentEvent.date.trim()}</span>
-            )}
-            {isZaklyatie && <RainAmbienceToggle />}
-          </div>
+
         </header>
 
         <div className="event-page__main">
@@ -208,6 +213,25 @@ const EventPage: FC = () => {
           <section className="event-page__text" aria-label="Описание спектакля">
             <div className="event-page__description">{curentEvent.anonse}</div>
           </section>
+
+          {isZaklyatie && (
+            <section className="event-page__tickets" aria-label="Билеты">
+              {ticketsCloudEventId && ticketsCloudToken ? (
+                <button
+                  type="button"
+                  className="event-page__ticketsButton"
+                  data-tc-event={ticketsCloudEventId}
+                  data-tc-token={ticketsCloudToken}
+                >
+                  Купить билет
+                </button>
+              ) : (
+                <div className="event-page__ticketsHint">
+                  Добавь `REACT_APP_TC_ZAKLYATIE_EVENT_ID` и `REACT_APP_TC_ZAKLYATIE_TOKEN` в `.env`.
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>
@@ -313,7 +337,8 @@ function ZaklyatieAtmosphere({ fallbackSrc }: ZaklyatieAtmosphereProps) {
   const rafRef = useRef<number | null>(null);
   const lastTRef = useRef<number>(0);
   const dropsRef = useRef<RainDrop[]>([]);
-  const [bgSrc, setBgSrc] = useState("https://i.pinimg.com/1200x/71/33/2e/71332e5fb4a472fa9dc27598f33855c5.jpg");
+  // const [bgSrc, setBgSrc] = useState("https://i.pinimg.com/1200x/71/33/2e/71332e5fb4a472fa9dc27598f33855c5.jpg");
+  const [bgSrc, setBgSrc] = useState("https://i.pinimg.com/1200x/f1/35/9b/f1359b0d0d57d5b89e1134113ebe8fd1.jpg");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -485,7 +510,7 @@ function RainAmbienceToggle() {
     const ctx = audioCtxRef.current;
     audioCtxRef.current = null;
     if (ctx && ctx.state !== "closed") {
-      ctx.close().catch(() => {});
+      ctx.close().catch(() => { });
     }
   };
 
@@ -556,7 +581,7 @@ function RainAmbienceToggle() {
         await start();
         // Некоторые браузеры создают контекст в suspended — попробуем возобновить.
         if (audioCtxRef.current?.state === "suspended") {
-          await audioCtxRef.current.resume().catch(() => {});
+          await audioCtxRef.current.resume().catch(() => { });
         }
         setIsOn(true);
       }}
