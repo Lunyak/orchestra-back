@@ -97,6 +97,29 @@ export class FileStorageService {
     return { bucket: this.bucket, key, url };
   }
 
+  /**
+   * Сохранить файл в S3/MinIO по фиксированному ключу (для стабильных URL).
+   * Важно: key должен быть безопасным (без ".." и без абсолютных путей).
+   */
+  async uploadObjectAtKey(params: {
+    key: string;
+    buffer: Buffer;
+    contentType?: string;
+  }): Promise<StoredFileInfo> {
+    const key = this.normalizeKey(params.key);
+    await this.ensureBucketExists();
+    await this.s3.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: params.buffer,
+        ContentType: params.contentType,
+      }),
+    );
+    const url = this.getPublicUrl(key);
+    return { bucket: this.bucket, key, url };
+  }
+
   /** Удалить объект из S3/MinIO (освобождение места при удалении из сцены). */
   async deleteObject(key: string): Promise<void> {
     try {
@@ -160,5 +183,17 @@ export class FileStorageService {
       // ignore: bucket might have been created concurrently
     }
     this.bucketEnsured = true;
+  }
+
+  private normalizeKey(raw: string): string {
+    const v = typeof raw === 'string' ? raw.trim() : '';
+    if (!v) {
+      throw new Error('Invalid key');
+    }
+    const normalized = v.replace(/^\/+/, '').replace(/\\/g, '/');
+    if (normalized.includes('..')) {
+      throw new Error('Invalid key');
+    }
+    return normalized;
   }
 }

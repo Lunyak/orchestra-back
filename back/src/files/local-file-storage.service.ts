@@ -42,6 +42,20 @@ export class LocalFileStorageService {
     return { bucket: 'local', key, url };
   }
 
+  /** Сохранить файл на диск по фиксированному ключу (для стабильных URL). */
+  async uploadObjectAtKey(params: {
+    key: string;
+    buffer: Buffer;
+    contentType?: string;
+  }): Promise<StoredFileInfo> {
+    const key = this.normalizeKey(params.key);
+    const fullPath = this.keyToPath(key);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, params.buffer);
+    const url = `${this.publicBaseUrl}/files/play/${encodeURIComponent(key)}`;
+    return { bucket: 'local', key, url };
+  }
+
   /** Путь к файлу по ключу (для раздачи). Защита от directory traversal. */
   pathForKey(key: string): string {
     const decoded = decodeURIComponent(key);
@@ -85,6 +99,16 @@ export class LocalFileStorageService {
 
   private keyToPath(key: string): string {
     return path.join(this.storagePath, key.replace(/\.\./g, ''));
+  }
+
+  private normalizeKey(raw: string): string {
+    const v = typeof raw === 'string' ? raw.trim() : '';
+    if (!v) throw new Error('Invalid key');
+    const normalized = v.replace(/^\/+/, '').replace(/\\/g, '/');
+    if (normalized.includes('..') || path.isAbsolute(normalized)) {
+      throw new Error('Invalid key');
+    }
+    return normalized;
   }
 
   private buildKey(params: {
