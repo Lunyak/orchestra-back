@@ -1,6 +1,7 @@
 import { FC } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
+import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
 const items = [
@@ -59,7 +60,9 @@ const EventsPage: FC = () => {
         </Link>
 
         <header className="events-page__header">
-          <h1 className="events-page__title">Спектакли</h1>
+          <div className="events-page__hero">
+            <GlitchHero as="h1" text="Спектакли" />
+          </div>
           <p className="events-page__subtitle">Афиша и даты</p>
         </header>
 
@@ -143,10 +146,8 @@ const Card: FC<ICardProps> = ({ data }) => {
           decoding="async"
         />
 
-        {soon && <div className="events-card__badge">скоро</div>}
         {old?.trim() && <div className="events-card__age">{old.trim()}</div>}
 
-        <div className="events-card__title">{title}</div>
         <p className="events-card__desc">{description}</p>
       </Link>
     </div>

@@ -1,5 +1,5 @@
 /* eslint-disable no-useless-escape */
-import { CSSProperties, FC, useState } from "react";
+import { CSSProperties, FC, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import "swiper/css";
@@ -8,6 +8,7 @@ import "swiper/css/pagination";
 import { Controller, Navigation } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
 import { ROUTES } from "../../shared/model/routes";
+import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
 const EVENTS = [
@@ -103,16 +104,23 @@ const EventPage: FC = () => {
   const title = curentEvent.name?.trim() || "Спектакль";
   const subtitle = curentEvent.subtitle?.trim();
 
+  const isZaklyatie =
+    (curentEvent.name || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
+
   const eventAccent =
     typeof curentEvent.colorBackground === "number"
       ? `#${curentEvent.colorBackground.toString(16).padStart(6, "0")}`
       : undefined;
 
-  const style = eventAccent
-    ? ({
-        ["--event-accent" as any]: eventAccent,
-      } satisfies CSSProperties)
-    : undefined;
+  const style = {
+    ...(eventAccent ? ({ ["--event-accent" as any]: eventAccent } satisfies CSSProperties) : null),
+    ...(isZaklyatie
+      ? ({
+          // Позже просто положи файл в public/bg/zaklyatie-village.jpg
+          ["--zaklyatie-bg-url" as any]: 'url("/bg/zaklyatie-village.jpg")',
+        } satisfies CSSProperties)
+      : null),
+  } as CSSProperties;
 
   const eventsPath = ROUTES.EVENTS.startsWith("/") ? ROUTES.EVENTS : `/${ROUTES.EVENTS}`;
 
@@ -141,7 +149,10 @@ const EventPage: FC = () => {
     descriptionText.length > 170 ? `${descriptionText.slice(0, 167).trim()}…` : descriptionText;
 
   return (
-    <div className="event-page" style={style}>
+    <div
+      className={isZaklyatie ? "event-page event-page--zaklyatie" : "event-page"}
+      style={style}
+    >
       <Helmet>
         <title>{`${title} — Дофамин`}</title>
         <meta name="description" content={metaDescription} />
@@ -161,13 +172,17 @@ const EventPage: FC = () => {
         {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
       </Helmet>
 
+      {isZaklyatie && <ZaklyatieAtmosphere fallbackSrc={curentEvent.photos?.[0]} />}
+
       <div className="event-page__content">
         <Link to={eventsPath} className="events-page__back">
           Назад
         </Link>
 
         <header className="event-page__header">
-          <h1 className="event-page__title">{title}</h1>
+          <div className="event-page__hero">
+            <GlitchHero as="h1" text={title} />
+          </div>
           {subtitle && <p className="event-page__subtitle">{subtitle}</p>}
 
           <div className="event-page__meta" aria-label="Характеристики спектакля">
@@ -181,6 +196,7 @@ const EventPage: FC = () => {
             {curentEvent.date?.trim() && (
               <span className="event-page__chip">{curentEvent.date.trim()}</span>
             )}
+            {isZaklyatie && <RainAmbienceToggle />}
           </div>
         </header>
 
@@ -227,7 +243,21 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
       >
         {images.map((src, index) => (
           <SwiperSlide key={index}>
-            <img src={src} alt={`${title} — фото ${index + 1}`} className="event-carousel__img" />
+            <div
+              className="event-carousel__frame"
+              style={
+                {
+                  ["--carousel-bg" as any]: `url("${src}")`,
+                } satisfies CSSProperties
+              }
+            >
+              <img
+                src={src}
+                alt={`${title} — фото ${index + 1}`}
+                className="event-carousel__img"
+                loading={index === 0 ? "eager" : "lazy"}
+              />
+            </div>
           </SwiperSlide>
         ))}
       </Swiper>
@@ -263,3 +293,275 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
 }
 
 export default PhotoCarousel;
+
+type ZaklyatieAtmosphereProps = {
+  fallbackSrc?: string;
+};
+
+type RainDrop = {
+  x: number;
+  y: number;
+  r: number;
+  vx: number;
+  vy: number;
+  trail: number;
+  wobble: number;
+};
+
+function ZaklyatieAtmosphere({ fallbackSrc }: ZaklyatieAtmosphereProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastTRef = useRef<number>(0);
+  const dropsRef = useRef<RainDrop[]>([]);
+  const [bgSrc, setBgSrc] = useState("https://i.pinimg.com/1200x/71/33/2e/71332e5fb4a472fa9dc27598f33855c5.jpg");
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+
+    const prefersReduced =
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const createDrop = (w: number, h: number): RainDrop => {
+      const r = 1.6 + Math.random() * 4.8;
+      return {
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r,
+        vx: (-0.2 + Math.random() * 0.4) * 30,
+        vy: (0.6 + Math.random() * 1.8) * (70 + r * 22),
+        trail: 18 + Math.random() * 70,
+        wobble: Math.random() * Math.PI * 2,
+      };
+    };
+
+    const setSize = () => {
+      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const w = Math.floor(window.innerWidth * dpr);
+      const h = Math.floor(window.innerHeight * dpr);
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.width = "100%";
+      canvas.style.height = "100%";
+
+      // Re-init drops for new size (keep density stable)
+      const area = (w * h) / (dpr * dpr);
+      const count = Math.max(70, Math.min(260, Math.floor(area / 9000)));
+      dropsRef.current = Array.from({ length: count }, () => createDrop(w, h));
+    };
+
+    const draw = (t: number) => {
+      const w = canvas.width;
+      const h = canvas.height;
+      const dt = Math.min(0.033, lastTRef.current ? (t - lastTRef.current) / 1000 : 0.016);
+      lastTRef.current = t;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "lighter";
+
+      const drops = dropsRef.current;
+      for (let i = 0; i < drops.length; i++) {
+        const d = drops[i];
+
+        // Motion: gravity + slight wobble (wind)
+        d.wobble += dt * (0.8 + d.r * 0.2);
+        const wind = Math.sin(d.wobble) * 10;
+        d.x += (d.vx + wind) * dt;
+        d.y += d.vy * dt;
+
+        // Wrap/reset
+        if (d.y - d.trail > h + 30) {
+          d.y = -20 - Math.random() * 120;
+          d.x = Math.random() * w;
+          d.r = 1.6 + Math.random() * 4.8;
+          d.vx = (-0.2 + Math.random() * 0.4) * 30;
+          d.vy = (0.6 + Math.random() * 1.8) * (70 + d.r * 22);
+          d.trail = 18 + Math.random() * 70;
+          d.wobble = Math.random() * Math.PI * 2;
+        }
+        if (d.x < -40) d.x = w + 40;
+        if (d.x > w + 40) d.x = -40;
+
+        // Trail
+        const trailLen = d.trail * (0.75 + d.r * 0.06);
+        const gx = ctx.createLinearGradient(d.x, d.y - trailLen, d.x, d.y);
+        gx.addColorStop(0, "rgba(255,255,255,0)");
+        gx.addColorStop(0.6, "rgba(255,255,255,0.08)");
+        gx.addColorStop(1, "rgba(255,255,255,0.18)");
+        ctx.strokeStyle = gx;
+        ctx.lineWidth = Math.max(0.8, d.r * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(d.x, d.y - trailLen);
+        ctx.lineTo(d.x, d.y + d.r * 1.5);
+        ctx.stroke();
+
+        // Drop head
+        const r = d.r * 2.1;
+        const rg = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, r);
+        rg.addColorStop(0, "rgba(255,255,255,0.36)");
+        rg.addColorStop(0.35, "rgba(255,255,255,0.16)");
+        rg.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y, r * 0.62, r, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      rafRef.current = window.requestAnimationFrame(draw);
+    };
+
+    setSize();
+    window.addEventListener("resize", setSize);
+
+    if (!prefersReduced) {
+      rafRef.current = window.requestAnimationFrame(draw);
+    } else {
+      // One static frame (reduced motion)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 80; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        const r = 2 + Math.random() * 5;
+        const rg = ctx.createRadialGradient(x, y, 0, x, y, r * 2);
+        rg.addColorStop(0, "rgba(255,255,255,0.22)");
+        rg.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.fillStyle = rg;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    return () => {
+      window.removeEventListener("resize", setSize);
+      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+  }, []);
+
+  return (
+    <div className="zaklyatie-atmosphere" aria-hidden="true">
+      <img
+        className="zaklyatie-atmosphere__bg"
+        src={bgSrc}
+        alt=""
+        onError={() => {
+          if (fallbackSrc && bgSrc !== fallbackSrc) setBgSrc(fallbackSrc);
+        }}
+      />
+      <canvas ref={canvasRef} className="zaklyatie-atmosphere__canvas" />
+      <div className="zaklyatie-atmosphere__glass" />
+    </div>
+  );
+}
+
+function RainAmbienceToggle() {
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const noiseSrcRef = useRef<AudioBufferSourceNode | null>(null);
+  const dropsTimerRef = useRef<number | null>(null);
+  const [isOn, setIsOn] = useState(false);
+
+  const stop = () => {
+    if (dropsTimerRef.current) {
+      window.clearInterval(dropsTimerRef.current);
+      dropsTimerRef.current = null;
+    }
+    try {
+      noiseSrcRef.current?.stop();
+    } catch {
+      // ignore
+    }
+    noiseSrcRef.current?.disconnect();
+    noiseSrcRef.current = null;
+
+    gainRef.current?.disconnect();
+    gainRef.current = null;
+
+    const ctx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    if (ctx && ctx.state !== "closed") {
+      ctx.close().catch(() => {});
+    }
+  };
+
+  const start = async () => {
+    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctx) return;
+
+    const ctx: AudioContext = new Ctx();
+    audioCtxRef.current = ctx;
+
+    const master = ctx.createGain();
+    master.gain.value = 0.12;
+    master.connect(ctx.destination);
+    gainRef.current = master;
+
+    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+    noise.loop = true;
+    noiseSrcRef.current = noise;
+
+    const low = ctx.createBiquadFilter();
+    low.type = "lowpass";
+    low.frequency.value = 900;
+    low.Q.value = 0.7;
+
+    const high = ctx.createBiquadFilter();
+    high.type = "highpass";
+    high.frequency.value = 140;
+    high.Q.value = 0.6;
+
+    noise.connect(high);
+    high.connect(low);
+    low.connect(master);
+    noise.start();
+
+    // "Капли" — редкие короткие всплески, чтобы звук не был плоским
+    dropsTimerRef.current = window.setInterval(() => {
+      if (!audioCtxRef.current || !gainRef.current) return;
+      const t = audioCtxRef.current.currentTime;
+      const g = gainRef.current.gain;
+      const spike = 0.03 + Math.random() * 0.045;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t);
+      g.linearRampToValueAtTime(0.12 + spike, t + 0.01);
+      g.linearRampToValueAtTime(0.12, t + 0.09 + Math.random() * 0.08);
+    }, 140);
+  };
+
+  useEffect(() => {
+    return () => stop();
+  }, []);
+
+  return (
+    <button
+      type="button"
+      className={isOn ? "event-page__chip zaklyatie-rain-toggle is-on" : "event-page__chip zaklyatie-rain-toggle"}
+      aria-pressed={isOn}
+      onClick={async () => {
+        if (isOn) {
+          stop();
+          setIsOn(false);
+          return;
+        }
+        await start();
+        // Некоторые браузеры создают контекст в suspended — попробуем возобновить.
+        if (audioCtxRef.current?.state === "suspended") {
+          await audioCtxRef.current.resume().catch(() => {});
+        }
+        setIsOn(true);
+      }}
+    >
+      Дождь: {isOn ? "вкл" : "выкл"}
+    </button>
+  );
+}

@@ -1,6 +1,7 @@
-import { FC } from "react";
+import { FC, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
+import Preloader from "../../shared/component/Preloader/Preloader";
 import "./style.css";
 
 const items = [
@@ -20,13 +21,13 @@ const items = [
     id: 3,
     name: "Алексей Филатов",
     social: "",
-    img: "/actors/lesha.JPG",
+    img: "/actors/lesha.jpg",
   },
   {
     id: 4,
     name: " Антон Васильев",
     social: "",
-    img: "/actors/anton.JPG",
+    img: "/actors/anton.jpg",
   },
   {
     id: 5,
@@ -56,7 +57,7 @@ const items = [
     id: 9,
     name: "Полина Смолкина",
     social: "",
-    img: "/actors/polina.JPG",
+    img: "/actors/polina.jpg",
   },
   {
     id: 10,
@@ -74,7 +75,7 @@ const items = [
     id: 12,
     name: "Лера Буракова",
     social: "",
-    img: "./actors/lera.JPG",
+    img: "/actors/lera.jpg",
   },
 ];
 
@@ -115,10 +116,24 @@ interface ICard {
 
 const Card: FC<ICardProps> = ({ data }) => {
   const { name, img } = data;
+  const [isLoaded, setIsLoaded] = useState(false);
 
   return (
     <div className="aboutus-card" role="listitem">
-      <img className="aboutus-card__img" src={img} alt={name} loading="lazy" decoding="async" />
+      {!isLoaded && (
+        <div className="aboutus-card__loader" aria-hidden="true">
+          <Preloader />
+        </div>
+      )}
+      <img
+        className={isLoaded ? "aboutus-card__img" : "aboutus-card__img aboutus-card__img--loading"}
+        src={img}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setIsLoaded(true)}
+      />
       <div className="aboutus-card__name">{name}</div>
     </div>
   );

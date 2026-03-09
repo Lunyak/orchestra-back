@@ -12,11 +12,23 @@
   overflow: hidden;
 }
 
+@media (max-width: 980px) {
+  .events-page {
+    padding: 28px 24px 22px;
+  }
+}
+
 .events-page__content {
   width: min(1170px, 92vw);
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+
+@media (max-width: 980px) {
+  .events-page__content {
+    gap: 0;
+  }
 }
 
 .events-page__back {
@@ -26,6 +38,7 @@
   letter-spacing: 0.04em;
   color: var(--color-accent);
   transition: color var(--transition), transform var(--transition);
+  z-index: 10;
 }
 
 .events-page__back:hover {
@@ -39,6 +52,12 @@
   align-items: flex-start;
   gap: 6px;
   margin-top: 2px;
+}
+
+.events-page__hero {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .events-page__title {
@@ -65,29 +84,50 @@
   width: 100%;
   height: 420px;
   overflow: hidden;
-  border-radius: 1rem;
   box-shadow:
     0 26px 70px rgba(0, 0, 0, 0.45),
     0 0 0 1px rgba(255, 255, 255, 0.08);
   white-space: nowrap;
   background: rgba(255, 255, 255, 0.03);
+  z-index: 10;
+  gap: 10px;
+}
+
+@media (max-width: 980px) {
+  .events-cards {
+    height: auto;
+    flex-wrap: wrap;
+    overflow: auto;
+  }
 }
 
 .events-card {
+  cursor: pointer;
   flex: 1 1 0;
-  min-width: 0;
-  height: 100%;
+  min-width: calc(100% / 4 - 10px);
+  height: calc(100% - 10px);
   position: relative;
   overflow: hidden;
   transition: flex 0.55s ease;
   will-change: flex;
 }
 
+@media (max-width: 980px) {
+  .events-card {
+    flex: 1 1 0;
+    min-width: calc(100% / 2 - 10px);
+    height: auto;
+    /* overflow: auto; */
+    height: 506px;
+  }
+}
+
 .events-card:hover {
-  flex: 3;
+  flex: 1.01;
 }
 
 .events-card__link {
+  cursor: pointer;
   display: block;
   width: 100%;
   height: 100%;
@@ -126,7 +166,7 @@
 }
 
 .events-card:hover .events-card__img {
-  transform: scale(1.18);
+  transform: scale(1.05);
   filter: grayscale(0%) contrast(1.05) brightness(1);
 }
 
@@ -263,8 +303,8 @@
   }
 }
 
-/* Touch devices: disable hover/active expansion to avoid "sticky hover" + double tap */
-@media (hover: none), (pointer: coarse) {
+/* Small screens: disable hover/active expansion (independent of device mode) */
+@media (max-width: 520px) {
   .events-card:hover,
   .events-card:active {
     flex: 1 1 0;

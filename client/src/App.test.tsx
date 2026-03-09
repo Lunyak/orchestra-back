@@ -1,9 +1,22 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import App from './App';
+import { render, screen } from "@testing-library/react";
 
-test('renders learn react link', () => {
+jest.mock(
+  "react-router-dom",
+  () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const React = require("react");
+
+    return {
+      Outlet: () => React.createElement("div", { "data-testid": "outlet" }),
+      useNavigation: () => ({ state: "idle" }),
+    };
+  },
+  { virtual: true }
+);
+
+import App from "./App";
+
+test("renders app outlet", () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+  expect(screen.getByTestId("outlet")).toBeInTheDocument();
 });

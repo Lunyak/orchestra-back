@@ -1,10 +1,16 @@
-import { FC, useCallback, useEffect, useRef } from "react";
+import { FC, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
+import { GlitchHero } from "./GlitchHero";
 import "./style.css";
+
+type FilterTarget =
+  | { variant: "swirl"; key: "events" | "team" }
+  | { variant: "hue"; key: "orkestr" };
 
 const HomePage: FC = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [effectsEnabled, setEffectsEnabled] = useState(false);
 
   const handleFirstInteraction = useCallback(() => {
     if (audioRef.current) {
@@ -23,262 +29,194 @@ const HomePage: FC = () => {
     };
   }, [handleFirstInteraction]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    const update = () => {
+      setEffectsEnabled(!reduceMotion.matches);
+    };
+
+    update();
+    reduceMotion.addEventListener("change", update);
+    return () => {
+      reduceMotion.removeEventListener("change", update);
+    };
+  }, []);
+
+  const startFilterAnimation = useCallback(
+    ({ variant, key }: FilterTarget) => {
+      if (!effectsEnabled) return;
+
+      const ids =
+        variant === "swirl"
+          ? [`hp-swirl-dx-${key}`, `hp-swirl-dy-${key}`]
+          : [`hp-hue-rotate-${key}`, `hp-hue-dx-${key}`];
+
+      for (const id of ids) {
+        const el = document.getElementById(id) as SVGAnimationElement | null;
+        el?.beginElement?.();
+      }
+    },
+    [effectsEnabled]
+  );
+
+  const stopFilterAnimation = useCallback(
+    ({ variant, key }: FilterTarget) => {
+      if (!effectsEnabled) return;
+
+      const ids =
+        variant === "swirl"
+          ? [`hp-swirl-dx-${key}`, `hp-swirl-dy-${key}`]
+          : [`hp-hue-rotate-${key}`, `hp-hue-dx-${key}`];
+
+      for (const id of ids) {
+        const el = document.getElementById(id) as SVGAnimationElement | null;
+        el?.endElement?.();
+      }
+    },
+    [effectsEnabled]
+  );
+
   return (
-    <div className="home-page">
-      <svg className="home-page__filters" aria-hidden>
-        <defs>
-          <filter id="threshold">
-            <feColorMatrix
-              in="SourceGraphic"
-              type="matrix"
-              values="
-                1 0 0 0 0
-                0 1 0 0 0
-                0 0 1 0 0
-                0 0 0 255 -140"
-            />
-          </filter>
-
-          <filter
-            id="electricSwirl"
-            colorInterpolationFilters="sRGB"
-            x="-20%"
-            y="-20%"
-            width="140%"
-            height="140%"
-          >
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.02"
-              numOctaves="10"
-              result="noise1a"
-              seed="1"
-            />
-            <feOffset in="noise1a" dx="0" dy="0" result="offsetNoise1">
-              <animate
-                attributeName="dy"
-                values="700; 0"
-                dur="6s"
-                repeatCount="indefinite"
-                calcMode="linear"
+    <div className="home-page" data-effects={effectsEnabled ? "on" : "off"}>
+      {effectsEnabled && (
+        <svg className="home-page__filters" aria-hidden>
+          <defs>
+            <filter id="threshold">
+              <feColorMatrix
+                in="SourceGraphic"
+                type="matrix"
+                values="
+                  1 0 0 0 0
+                  0 1 0 0 0
+                  0 0 1 0 0
+                  0 0 0 255 -140"
               />
-            </feOffset>
+            </filter>
 
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.02"
-              numOctaves="10"
-              result="noise2a"
-              seed="1"
-            />
-            <feOffset in="noise2a" dx="0" dy="0" result="offsetNoise2">
-              <animate
-                attributeName="dy"
-                values="0; -700"
-                dur="6s"
-                repeatCount="indefinite"
-                calcMode="linear"
+            <filter
+              id="electricSwirlEvents"
+              colorInterpolationFilters="sRGB"
+              x="-20%"
+              y="-20%"
+              width="140%"
+              height="140%"
+            >
+              <feTurbulence type="turbulence" baseFrequency="0.015" numOctaves="2" seed="2" result="noise" />
+              <feOffset in="noise" dx="0" dy="0" result="noiseOffset">
+                <animate
+                  id="hp-swirl-dy-events"
+                  attributeName="dy"
+                  values="0; 700"
+                  dur="6s"
+                  repeatCount="indefinite"
+                  begin="indefinite"
+                  calcMode="linear"
+                />
+                <animate
+                  id="hp-swirl-dx-events"
+                  attributeName="dx"
+                  values="0; -490"
+                  dur="6s"
+                  repeatCount="indefinite"
+                  begin="indefinite"
+                  calcMode="linear"
+                />
+              </feOffset>
+              <feDisplacementMap
+                in="SourceGraphic"
+                in2="noiseOffset"
+                scale="22"
+                xChannelSelector="R"
+                yChannelSelector="B"
               />
-            </feOffset>
+            </filter>
 
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.02"
-              numOctaves="10"
-              result="noise1b"
-              seed="2"
-            />
-            <feOffset in="noise1b" dx="0" dy="0" result="offsetNoise3">
-              <animate
-                attributeName="dx"
-                values="490; 0"
-                dur="6s"
-                repeatCount="indefinite"
-                calcMode="linear"
+            <filter
+              id="electricSwirlTeam"
+              colorInterpolationFilters="sRGB"
+              x="-20%"
+              y="-20%"
+              width="140%"
+              height="140%"
+            >
+              <feTurbulence type="turbulence" baseFrequency="0.015" numOctaves="2" seed="2" result="noise" />
+              <feOffset in="noise" dx="0" dy="0" result="noiseOffset">
+                <animate
+                  id="hp-swirl-dy-team"
+                  attributeName="dy"
+                  values="0; 700"
+                  dur="6s"
+                  repeatCount="indefinite"
+                  begin="indefinite"
+                  calcMode="linear"
+                />
+                <animate
+                  id="hp-swirl-dx-team"
+                  attributeName="dx"
+                  values="0; -490"
+                  dur="6s"
+                  repeatCount="indefinite"
+                  begin="indefinite"
+                  calcMode="linear"
+                />
+              </feOffset>
+              <feDisplacementMap
+                in="SourceGraphic"
+                in2="noiseOffset"
+                scale="22"
+                xChannelSelector="R"
+                yChannelSelector="B"
               />
-            </feOffset>
+            </filter>
 
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.02"
-              numOctaves="10"
-              result="noise2b"
-              seed="2"
-            />
-            <feOffset in="noise2b" dx="0" dy="0" result="offsetNoise4">
-              <animate
-                attributeName="dx"
-                values="0; -490"
-                dur="6s"
-                repeatCount="indefinite"
-                calcMode="linear"
+            <filter
+              id="electricHue"
+              colorInterpolationFilters="sRGB"
+              x="-20%"
+              y="-20%"
+              width="140%"
+              height="140%"
+            >
+              <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="2" seed="5" result="noise" />
+              <feOffset in="noise" dx="0" dy="0" result="noiseOffset">
+                <animate
+                  id="hp-hue-dx-orkestr"
+                  attributeName="dx"
+                  values="0; 240"
+                  dur="4s"
+                  repeatCount="indefinite"
+                  begin="indefinite"
+                  calcMode="linear"
+                />
+              </feOffset>
+              <feColorMatrix in="noiseOffset" type="hueRotate" values="140" result="hueNoise">
+                <animate
+                  id="hp-hue-rotate-orkestr"
+                  attributeName="values"
+                  values="140; 360; 140"
+                  dur="2.2s"
+                  repeatCount="indefinite"
+                  begin="indefinite"
+                  calcMode="paced"
+                />
+              </feColorMatrix>
+              <feDisplacementMap
+                in="SourceGraphic"
+                in2="hueNoise"
+                scale="22"
+                xChannelSelector="R"
+                yChannelSelector="B"
               />
-            </feOffset>
-
-            <feComposite in="offsetNoise1" in2="offsetNoise2" result="part1" />
-            <feComposite in="offsetNoise3" in2="offsetNoise4" result="part2" />
-            <feBlend in="part1" in2="part2" mode="color-dodge" result="combinedNoise" />
-
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="combinedNoise"
-              scale="30"
-              xChannelSelector="R"
-              yChannelSelector="B"
-            />
-          </filter>
-
-          <filter
-            id="electricSwirlInner"
-            colorInterpolationFilters="sRGB"
-            x="-20%"
-            y="-20%"
-            width="140%"
-            height="140%"
-          >
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.02"
-              numOctaves="8"
-              result="noise1a"
-              seed="1"
-            />
-            <feOffset in="noise1a" dx="0" dy="0" result="offsetNoise1">
-              <animate
-                attributeName="dy"
-                values="700; 0"
-                dur="6s"
-                repeatCount="indefinite"
-                calcMode="linear"
-              />
-            </feOffset>
-
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.02"
-              numOctaves="8"
-              result="noise2a"
-              seed="1"
-            />
-            <feOffset in="noise2a" dx="0" dy="0" result="offsetNoise2">
-              <animate
-                attributeName="dy"
-                values="0; -700"
-                dur="6s"
-                repeatCount="indefinite"
-                calcMode="linear"
-              />
-            </feOffset>
-
-            <feComposite in="offsetNoise1" in2="offsetNoise2" result="combinedNoise" />
-
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="combinedNoise"
-              scale="12"
-              xChannelSelector="R"
-              yChannelSelector="B"
-            />
-          </filter>
-
-          <filter
-            id="electricHue"
-            colorInterpolationFilters="sRGB"
-            x="-20%"
-            y="-20%"
-            width="140%"
-            height="140%"
-          >
-            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="7" result="t1" />
-            <feColorMatrix type="hueRotate" in="t1" result="pt1">
-              <animate
-                attributeName="values"
-                values="0;360;"
-                dur=".6s"
-                repeatCount="indefinite"
-                calcMode="paced"
-              />
-            </feColorMatrix>
-
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.03"
-              numOctaves="7"
-              seed="5"
-              result="t2"
-            />
-            <feColorMatrix type="hueRotate" in="t2" result="pt2">
-              <animate
-                attributeName="values"
-                values="0; 333; 199; 286; 64; 168; 256; 157; 360;"
-                dur="5s"
-                repeatCount="indefinite"
-                calcMode="paced"
-              />
-            </feColorMatrix>
-
-            <feBlend in="pt1" in2="pt2" mode="normal" result="combinedNoise" />
-
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="combinedNoise"
-              scale="30"
-              xChannelSelector="R"
-              yChannelSelector="B"
-            />
-          </filter>
-
-          <filter
-            id="electricHueInner"
-            colorInterpolationFilters="sRGB"
-            x="-20%"
-            y="-20%"
-            width="140%"
-            height="140%"
-          >
-            <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="6" result="t1" />
-            <feColorMatrix type="hueRotate" in="t1" result="pt1">
-              <animate
-                attributeName="values"
-                values="0;360;"
-                dur=".6s"
-                repeatCount="indefinite"
-                calcMode="paced"
-              />
-            </feColorMatrix>
-
-            <feTurbulence
-              type="turbulence"
-              baseFrequency="0.03"
-              numOctaves="6"
-              seed="5"
-              result="t2"
-            />
-            <feColorMatrix type="hueRotate" in="t2" result="pt2">
-              <animate
-                attributeName="values"
-                values="0; 333; 199; 286; 64; 168; 256; 157; 360;"
-                dur="5s"
-                repeatCount="indefinite"
-                calcMode="paced"
-              />
-            </feColorMatrix>
-
-            <feBlend in="pt1" in2="pt2" mode="normal" result="combinedNoise" />
-
-            <feDisplacementMap
-              in="SourceGraphic"
-              in2="combinedNoise"
-              scale="12"
-              xChannelSelector="R"
-              yChannelSelector="B"
-            />
-          </filter>
-        </defs>
-      </svg>
+            </filter>
+          </defs>
+        </svg>
+      )}
 
       <div className="home-page__container">
-        <div className="home-page__hero" aria-label="Дофамин. Театр. Спектакли.">
+        {/* <div className="home-page__hero" aria-label="Дофамин. Театр. Спектакли.">
           <div className="home-page__morph-container">
             <div className="word-rotator">
               <div className="word">Дофамин</div>
@@ -286,10 +224,21 @@ const HomePage: FC = () => {
               <div className="word">Оркестр</div>
             </div>
           </div>
-        </div>
+        </div> */}
+
+        <GlitchHero text="Дофамин" className="home-page__glitch-hero--home" />
 
         <nav className="home-nav" aria-label="Навигация">
-          <Link to={ROUTES.EVENTS} className="home-nav__card card-container" data-variant="swirl">
+          <Link
+            to={ROUTES.EVENTS}
+            className="home-nav__card card-container"
+            data-variant="swirl"
+            data-filter="events"
+            onMouseEnter={() => startFilterAnimation({ variant: "swirl", key: "events" })}
+            onMouseLeave={() => stopFilterAnimation({ variant: "swirl", key: "events" })}
+            onFocus={() => startFilterAnimation({ variant: "swirl", key: "events" })}
+            onBlur={() => stopFilterAnimation({ variant: "swirl", key: "events" })}
+          >
             <div className="inner-container" aria-hidden>
               <div className="border-outer">
                 <div className="main-card" />
@@ -322,6 +271,11 @@ const HomePage: FC = () => {
             rel="noopener noreferrer"
             className="home-nav__card card-container"
             data-variant="hue"
+            data-filter="orkestr"
+            onMouseEnter={() => startFilterAnimation({ variant: "hue", key: "orkestr" })}
+            onMouseLeave={() => stopFilterAnimation({ variant: "hue", key: "orkestr" })}
+            onFocus={() => startFilterAnimation({ variant: "hue", key: "orkestr" })}
+            onBlur={() => stopFilterAnimation({ variant: "hue", key: "orkestr" })}
           >
             <div className="inner-container" aria-hidden>
               <div className="border-outer">
@@ -349,7 +303,16 @@ const HomePage: FC = () => {
             </div>
           </a>
 
-          <Link to={ROUTES.ABOUTUS} className="home-nav__card card-container" data-variant="swirl">
+          <Link
+            to={ROUTES.ABOUTUS}
+            className="home-nav__card card-container"
+            data-variant="swirl"
+            data-filter="team"
+            onMouseEnter={() => startFilterAnimation({ variant: "swirl", key: "team" })}
+            onMouseLeave={() => stopFilterAnimation({ variant: "swirl", key: "team" })}
+            onFocus={() => startFilterAnimation({ variant: "swirl", key: "team" })}
+            onBlur={() => stopFilterAnimation({ variant: "swirl", key: "team" })}
+          >
             <div className="inner-container" aria-hidden>
               <div className="border-outer">
                 <div className="main-card" />

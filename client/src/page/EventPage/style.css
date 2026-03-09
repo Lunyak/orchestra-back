@@ -13,6 +13,74 @@
   overflow: hidden;
 }
 
+/* =========================================================
+   Zaklyatie — separate atmosphere styles (glass + village bg)
+   ========================================================= */
+.event-page--zaklyatie {
+  --zak-glass-blur: 18px;
+  --zak-glass-sat: 180%;
+  --zak-glass-bg: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.05) 55%,
+      rgba(255, 255, 255, 0.09) 100%
+    );
+  --zak-glass-border: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.32) 0%,
+      rgba(255, 255, 255, 0.06) 50%,
+      rgba(255, 255, 255, 0.14) 100%
+    );
+
+  background:
+    radial-gradient(980px 560px at 18% 8%, rgba(120, 170, 255, 0.10), transparent 60%),
+    radial-gradient(920px 600px at 86% 24%, rgba(255, 255, 255, 0.06), transparent 65%),
+    radial-gradient(1100px 760px at 50% 95%, rgba(0, 0, 0, 0.62), transparent 70%),
+    linear-gradient(180deg, rgba(8, 10, 14, 0.92), rgba(8, 10, 14, 0.88)),
+    var(--color-bg);
+}
+
+/* Background glass/rain overlay for the whole page (not UI cards) */
+.zaklyatie-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.zaklyatie-atmosphere__bg {
+  position: absolute;
+  inset: -30px;
+  width: calc(100% + 60px);
+  height: calc(100% + 60px);
+  object-fit: cover;
+  transform: scale(1.06);
+  filter: blur(8px) saturate(1.12) contrast(1.02) brightness(0.75);
+  opacity: 0.9;
+}
+
+.zaklyatie-atmosphere__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
+  mix-blend-mode: screen;
+}
+
+.zaklyatie-atmosphere__glass {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(900px 520px at 20% 12%, rgba(255, 255, 255, 0.06), transparent 62%),
+    radial-gradient(900px 640px at 70% 10%, rgba(120, 170, 255, 0.06), transparent 60%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.70));
+  backdrop-filter: blur(var(--zak-glass-blur)) saturate(var(--zak-glass-sat));
+  -webkit-backdrop-filter: blur(var(--zak-glass-blur)) saturate(var(--zak-glass-sat));
+}
+
 .event-page__content {
   width: min(1170px, 92vw);
   margin: 0 auto;
@@ -21,7 +89,6 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 18px;
 }
 
 /* Back link shared with /events (duplicated here so it works on direct visit) */
@@ -32,6 +99,7 @@
   letter-spacing: 0.04em;
   color: var(--color-accent);
   transition: color var(--transition), transform var(--transition);
+  z-index: 10;
 }
 
 .events-page__back:hover {
@@ -43,6 +111,12 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.event-page__hero {
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
 
 .event-page__title {
@@ -67,6 +141,10 @@
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 2px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  z-index: 100;
 }
 
 .event-page__chip {
@@ -84,11 +162,26 @@
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
 }
 
+.zaklyatie-rain-toggle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.zaklyatie-rain-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.zaklyatie-rain-toggle.is-on {
+  color: rgba(210, 235, 255, 0.96);
+}
+
 .event-page__main {
   display: grid;
   grid-template-columns: minmax(0, 600px) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  position: relative;
+  z-index: 10;
 }
 
 .event-page__gallery {
@@ -184,15 +277,49 @@
   height: clamp(360px, 60vh, 680px);
 }
 
+.event-carousel__main .swiper-slide {
+  height: 100%;
+}
+
+.event-carousel__frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.event-carousel__frame::before {
+  content: "";
+  position: absolute;
+  inset: -24px;
+  background-image: var(--carousel-bg);
+  background-size: cover;
+  background-position: center;
+  filter: blur(20px) saturate(1.1);
+  transform: scale(1.08);
+  opacity: 0.55;
+}
+
+.event-carousel__frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(650px 420px at 50% 30%, rgba(255, 255, 255, 0.09), transparent 65%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.5));
+  opacity: 0.95;
+}
+
 .event-carousel__img {
+  position: relative;
+  z-index: 1;
   width: 100%;
   height: 100%;
   display: block;
   object-fit: contain;
-  border-radius: 12px;
-  background:
-    radial-gradient(600px 420px at 50% 25%, rgba(255, 255, 255, 0.07), transparent 65%),
-    rgba(0, 0, 0, 0.25);
+  background: transparent;
 }
 
 .event-carousel__thumbs {
