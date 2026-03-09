@@ -153,13 +153,13 @@
   padding: 7px 12px;
   /* border-radius: 999px; */
   background: rgba(255, 255, 255, 0.06);
-  /* border: 1px solid rgba(255, 255, 255, 0.12); */
-  /* color: rgba(245, 240, 232, 0.92); */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(245, 240, 232, 0.92);
   font-family: "Russo One", sans-serif;
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+  /* box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28); */
 }
 
 .zaklyatie-rain-toggle {
@@ -168,11 +168,11 @@
 }
 
 .zaklyatie-rain-toggle:hover {
-  transform: translateY(-1px);
+  /* transform: translateY(-1px); */
 }
 
 .zaklyatie-rain-toggle.is-on {
-  color: rgba(210, 235, 255, 0.96);
+  /* color: rgba(210, 235, 255, 0.96); */
 }
 
 .event-page__main {
@@ -266,6 +266,43 @@
   mix-blend-mode: screen;
 }
 
+.event-page__sectionTitle {
+  margin: 0 0 12px;
+  font-family: "Russo One", sans-serif;
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.event-page__cast {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: rgba(22, 18, 24, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow);
+  position: relative;
+  overflow: hidden;
+}
+
+.event-page__cast::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0.16;
+  background:
+    radial-gradient(700px 260px at 20% 15%, color-mix(in oklab, var(--event-accent) 24%, transparent), transparent 60%),
+    radial-gradient(600px 240px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%);
+  mix-blend-mode: screen;
+}
+
+.event-page__cast > * {
+  position: relative;
+  z-index: 1;
+}
+
 .event-page__tickets {
   display: flex;
   justify-content: center;
@@ -318,7 +355,11 @@
 
 .event-carousel__main {
   width: 100%;
-  height: clamp(360px, 60vh, 680px);
+  height: clamp(360px, 60vh, 640px);
+  /* Swiper defaults are blue; override locally */
+  --swiper-theme-color: rgba(255, 255, 255, 0.78);
+  --swiper-navigation-color: rgba(255, 255, 255, 0.78);
+  --swiper-navigation-size: 16px;
 }
 
 .event-carousel__main .swiper-slide {
@@ -356,6 +397,77 @@
   opacity: 0.95;
 }
 
+/* Swiper navigation: make arrows subtle and consistent with page style */
+.event-carousel__main .swiper-button-prev,
+.event-carousel__main .swiper-button-next {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: rgba(18, 14, 20, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  transition: transform var(--transition), opacity var(--transition), border-color var(--transition), background var(--transition);
+  opacity: 0.65;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.event-carousel__main .swiper-button-prev:hover,
+.event-carousel__main .swiper-button-next:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--event-accent) 55%, rgba(255, 255, 255, 0.12));
+  background: rgba(18, 14, 20, 0.6);
+}
+
+.event-carousel__main .swiper-button-prev:active,
+.event-carousel__main .swiper-button-next:active {
+  transform: translateY(0);
+}
+
+.event-carousel__main .swiper-button-prev::after,
+.event-carousel__main .swiper-button-next::after {
+  font-size: var(--swiper-navigation-size);
+  font-weight: 900;
+  text-shadow: 0 0 18px color-mix(in oklab, var(--event-accent) 50%, transparent);
+}
+
+.event-carousel__main .swiper-button-disabled {
+  opacity: 0.28;
+}
+
+.event-carousel__main .swiper-button-prev {
+  left: 10px;
+}
+
+.event-carousel__main .swiper-button-next {
+  right: 10px;
+}
+
+.event-carousel__imgWrap .img-with-preloader__spinner {
+  z-index: 2;
+}
+
+.event-carousel__imgWrap .img-with-preloader__spinner .loader {
+  --preloader-glow: color-mix(in oklab, var(--event-accent) 55%, #7aa8ff);
+}
+
+.event-carousel__thumbWrap {
+  width: 100%;
+  height: 100%;
+}
+
+.event-carousel__thumbWrap .img-with-preloader__spinner {
+  z-index: 2;
+}
+
+.event-carousel__thumbWrap .img-with-preloader__spinner .loader {
+  --preloader-glow: color-mix(in oklab, var(--event-accent) 55%, #7aa8ff);
+}
+
 .event-carousel__img {
   position: relative;
   z-index: 1;
@@ -370,6 +482,39 @@
   width: 100%;
   height: 104px;
   margin-top: 12px;
+  /* Thumbs swiper also has navigation enabled */
+  --swiper-theme-color: rgba(255, 255, 255, 0.68);
+  --swiper-navigation-color: rgba(255, 255, 255, 0.68);
+  --swiper-navigation-size: 14px;
+}
+
+.event-carousel__thumbs .swiper-button-prev,
+.event-carousel__thumbs .swiper-button-next {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(18, 14, 20, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(10px) saturate(150%);
+  opacity: 0.45;
+  transition: opacity var(--transition), border-color var(--transition), background var(--transition);
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.event-carousel__thumbs .swiper-button-prev:hover,
+.event-carousel__thumbs .swiper-button-next:hover {
+  opacity: 0.85;
+  border-color: color-mix(in oklab, var(--event-accent) 45%, rgba(255, 255, 255, 0.10));
+  background: rgba(18, 14, 20, 0.55);
+}
+
+.event-carousel__thumbs .swiper-button-prev::after,
+.event-carousel__thumbs .swiper-button-next::after {
+  font-size: var(--swiper-navigation-size);
+  font-weight: 900;
+  text-shadow: 0 0 14px color-mix(in oklab, var(--event-accent) 45%, transparent);
 }
 
 .event-carousel__thumbSlide {
@@ -413,8 +558,44 @@
     padding: 10px;
   }
 
+  .event-carousel__main {
+    height: clamp(260px, 46vh, 440px);
+  }
+
+  .event-carousel__main .swiper-button-prev,
+  .event-carousel__main .swiper-button-next {
+    width: 34px;
+    height: 34px;
+    opacity: 0.55;
+  }
+
+  .event-carousel__main .swiper-button-prev {
+    left: 6px;
+  }
+
+  .event-carousel__main .swiper-button-next {
+    right: 6px;
+  }
+
+  .event-carousel__main .swiper-button-prev::after,
+  .event-carousel__main .swiper-button-next::after {
+    font-size: 14px;
+  }
+
   .event-carousel__thumbs {
     height: 92px;
+  }
+
+  /* On mobile thumbs navigation is visually noisy; swipe is enough */
+  .event-carousel__thumbs .swiper-button-prev,
+  .event-carousel__thumbs .swiper-button-next {
+    width: 26px;
+    height: 26px;
+    opacity: 0.28;
+  }
+
+  .event-page__cast {
+    padding: 14px;
   }
 }
 

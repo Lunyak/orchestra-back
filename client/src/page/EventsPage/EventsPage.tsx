@@ -1,6 +1,7 @@
 import { FC } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
+import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
@@ -113,12 +114,14 @@ const Card: FC<ICardProps> = ({ data }) => {
           aria-disabled="true"
           aria-label={`${ariaLabelBase}, скоро`}
         >
-          <img
-            className="events-card__img"
+          <ImageWithPreloader
+            className="events-card__imgWrap"
+            imgClassName="events-card__img"
             src={img}
             alt={title}
             loading="lazy"
             decoding="async"
+            spinnerSize={56}
           />
 
           <div className="events-card__badge">скоро</div>
@@ -138,12 +141,14 @@ const Card: FC<ICardProps> = ({ data }) => {
         className="events-card__link"
         aria-label={ariaLabelBase}
       >
-        <img
-          className="events-card__img"
+        <ImageWithPreloader
+          className="events-card__imgWrap"
+          imgClassName="events-card__img"
           src={img}
           alt={title}
           loading="lazy"
           decoding="async"
+          spinnerSize={56}
         />
 
         {old?.trim() && <div className="events-card__age">{old.trim()}</div>}

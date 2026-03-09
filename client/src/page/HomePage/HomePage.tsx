@@ -1,5 +1,6 @@
 import { FC, useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { Marquee } from "../../shared/component/Marquee/Marquee";
 import { ROUTES } from "../../shared/model/routes";
 import { GlitchHero } from "./GlitchHero";
 import "./style.css";
@@ -339,6 +340,19 @@ const HomePage: FC = () => {
             </div>
           </Link>
         </nav>
+
+        <Marquee
+          className="home-page__marquee"
+          label="Новости и объявления"
+          items={[
+            "Театр «Дофамин»",
+            "Спектакли и даты",
+            "Заклятие — билеты онлайн уже в продаже",
+            "Приобрести можно на сайте https://ticketcloud.ru",
+            "Иили на странице спектакля",
+
+          ]}
+        />
 
         <div className="home-nav__contacts">
           <Link to={ROUTES.CONTACTS} className="home-nav__contacts-link">

@@ -1,0 +1,41 @@
+.cast-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.cast-list__row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(160px, 1.2fr);
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cast-list__role {
+  margin: 0;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.cast-list__actor {
+  margin: 0;
+  text-align: right;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+@media (max-width: 520px) {
+  .cast-list__row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .cast-list__actor {
+    text-align: left;
+  }
+}
+

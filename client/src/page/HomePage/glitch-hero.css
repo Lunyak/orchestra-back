@@ -114,13 +114,13 @@
 
 @media (max-width: 768px) {
   .home-glitch__text {
-    font-size: clamp(32px, 7cqw, 190px);
+    font-size: clamp(32px, 12cqw, 190px);
   }
 }
 
 @media (max-width: 568px) {
   .home-glitch__text {
-    font-size: clamp(32px, 10cqw, 190px);
+    font-size: clamp(32px, 14cqw, 190px);
   }
 }
 
@@ -208,14 +208,14 @@
     animation: none !important;
   }
 
-  /* Make the effect visible even when animations are off */
+  /* Make the effect visible even when animations are off
   .home-glitch__text {
     text-shadow:
       2px 2px 4px rgb(0 0 0 / 0.3),
       0 0 20px rgb(233 69 96 / 0.5),
       2px 0 0 rgb(233 69 96 / 0.85),
       -2px 0 0 rgb(78 158 255 / 0.85);
-  }
+  } */
 
   .home-glitch__text::before {
     clip-path: inset(0 0 55% 0);

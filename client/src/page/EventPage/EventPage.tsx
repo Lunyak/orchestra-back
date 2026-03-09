@@ -7,7 +7,10 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Controller, Navigation } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
+import { CastList } from "../../shared/component/CastList/CastList";
+import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
 import { ROUTES } from "../../shared/model/routes";
+import { getShowKeyByName, SHOW_CAST } from "../../shared/model/showCast";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
@@ -107,6 +110,9 @@ const EventPage: FC = () => {
   const isZaklyatie =
     (curentEvent.name || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
 
+  const showKey = getShowKeyByName(curentEvent.name);
+  const cast = showKey ? SHOW_CAST[showKey] : null;
+
   const ticketsCloudEventId = process.env.REACT_APP_TC_ZAKLYATIE_EVENT_ID;
   const ticketsCloudToken = process.env.REACT_APP_TC_ZAKLYATIE_TOKEN;
 
@@ -205,33 +211,45 @@ const EventPage: FC = () => {
 
         </header>
 
+
+
         <div className="event-page__main">
           <section className="event-page__gallery" aria-label="Фотографии спектакля">
             <PhotoCarousel images={curentEvent.photos} title={title} />
           </section>
 
+
+
           <section className="event-page__text" aria-label="Описание спектакля">
             <div className="event-page__description">{curentEvent.anonse}</div>
+            {isZaklyatie && (
+              <section className="event-page__tickets" aria-label="Билеты">
+                {ticketsCloudEventId && ticketsCloudToken ? (
+                  <button
+                    type="button"
+                    className="event-page__ticketsButton"
+                    data-tc-event={ticketsCloudEventId}
+                    data-tc-token={ticketsCloudToken}
+                  >
+                    Купить билет
+                  </button>
+                ) : (
+                  <div className="event-page__ticketsHint">
+                    Добавь `REACT_APP_TC_ZAKLYATIE_EVENT_ID` и `REACT_APP_TC_ZAKLYATIE_TOKEN` в `.env`.
+                  </div>
+                )}
+              </section>
+            )}
           </section>
 
-          {isZaklyatie && (
-            <section className="event-page__tickets" aria-label="Билеты">
-              {ticketsCloudEventId && ticketsCloudToken ? (
-                <button
-                  type="button"
-                  className="event-page__ticketsButton"
-                  data-tc-event={ticketsCloudEventId}
-                  data-tc-token={ticketsCloudToken}
-                >
-                  Купить билет
-                </button>
-              ) : (
-                <div className="event-page__ticketsHint">
-                  Добавь `REACT_APP_TC_ZAKLYATIE_EVENT_ID` и `REACT_APP_TC_ZAKLYATIE_TOKEN` в `.env`.
-                </div>
-              )}
+          {cast && cast.length > 0 && (
+            <section className="event-page__cast" aria-label="Состав">
+              <h2 className="event-page__sectionTitle">Состав</h2>
+              <CastList items={cast} />
             </section>
           )}
+
+
         </div>
       </div>
     </div>
@@ -275,11 +293,14 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
                 } satisfies CSSProperties
               }
             >
-              <img
+              <ImageWithPreloader
+                className="event-carousel__imgWrap"
+                imgClassName="event-carousel__img"
                 src={src}
                 alt={`${title} — фото ${index + 1}`}
-                className="event-carousel__img"
                 loading={index === 0 ? "eager" : "lazy"}
+                decoding="async"
+                spinnerSize={64}
               />
             </div>
           </SwiperSlide>
@@ -300,14 +321,18 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
       >
         {images.map((src, index) => (
           <SwiperSlide key={index} className="event-carousel__thumbSlide">
-            <img
-              src={src}
-              alt={`${title} — миниатюра ${index + 1}`}
-              className={
+            <ImageWithPreloader
+              className="event-carousel__thumbWrap"
+              imgClassName={
                 index === activeIndex
                   ? "event-carousel__thumbImg event-carousel__thumbImg--active"
                   : "event-carousel__thumbImg"
               }
+              src={src}
+              alt={`${title} — миниатюра ${index + 1}`}
+              loading="lazy"
+              decoding="async"
+              spinnerSize={34}
             />
           </SwiperSlide>
         ))}
@@ -488,14 +513,28 @@ function RainAmbienceToggle() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const noiseSrcRef = useRef<AudioBufferSourceNode | null>(null);
-  const dropsTimerRef = useRef<number | null>(null);
+  const mediaElRef = useRef<HTMLAudioElement | null>(null);
+  const mediaSrcRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [isOn, setIsOn] = useState(false);
 
+  // Use absolute URL or a public/ URL (e.g. "/audio/zaklyatie-rain.mp3")
+  const rainUrl = "https://fyildiz1974.github.io/web/files/rain.mp3";
+
   const stop = () => {
-    if (dropsTimerRef.current) {
-      window.clearInterval(dropsTimerRef.current);
-      dropsTimerRef.current = null;
+    try {
+      mediaElRef.current?.pause();
+      if (mediaElRef.current) mediaElRef.current.currentTime = 0;
+    } catch {
+      // ignore
     }
+    mediaSrcRef.current?.disconnect();
+    mediaSrcRef.current = null;
+    if (mediaElRef.current) {
+      // release network resources
+      mediaElRef.current.src = "";
+    }
+    mediaElRef.current = null;
+
     try {
       noiseSrcRef.current?.stop();
     } catch {
@@ -522,45 +561,42 @@ function RainAmbienceToggle() {
     audioCtxRef.current = ctx;
 
     const master = ctx.createGain();
-    master.gain.value = 0.12;
+    master.gain.value = 0.18;
     master.connect(ctx.destination);
     gainRef.current = master;
 
-    const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-    const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    try {
+      const res = await fetch(rainUrl, { cache: "force-cache" });
+      const arrayBuffer = await res.arrayBuffer();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    noise.loop = true;
-    noiseSrcRef.current = noise;
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuffer;
+      src.loop = true;
+      noiseSrcRef.current = src;
 
-    const low = ctx.createBiquadFilter();
-    low.type = "lowpass";
-    low.frequency.value = 900;
-    low.Q.value = 0.7;
+      src.connect(master);
+      src.start();
+    } catch {
+      // Fallback for external URLs that block fetch/decode by CORS:
+      // play via <audio> and route into WebAudio for volume control.
+      try {
+        const el = new Audio();
+        el.crossOrigin = "anonymous";
+        el.src = rainUrl;
+        el.loop = true;
+        el.preload = "auto";
 
-    const high = ctx.createBiquadFilter();
-    high.type = "highpass";
-    high.frequency.value = 140;
-    high.Q.value = 0.6;
+        const node = ctx.createMediaElementSource(el);
+        node.connect(master);
+        mediaElRef.current = el;
+        mediaSrcRef.current = node;
 
-    noise.connect(high);
-    high.connect(low);
-    low.connect(master);
-    noise.start();
-
-    // "Капли" — редкие короткие всплески, чтобы звук не был плоским
-    dropsTimerRef.current = window.setInterval(() => {
-      if (!audioCtxRef.current || !gainRef.current) return;
-      const t = audioCtxRef.current.currentTime;
-      const g = gainRef.current.gain;
-      const spike = 0.03 + Math.random() * 0.045;
-      g.cancelScheduledValues(t);
-      g.setValueAtTime(g.value, t);
-      g.linearRampToValueAtTime(0.12 + spike, t + 0.01);
-      g.linearRampToValueAtTime(0.12, t + 0.09 + Math.random() * 0.08);
-    }, 140);
+        await el.play();
+      } catch {
+        stop();
+      }
+    }
   };
 
   useEffect(() => {
