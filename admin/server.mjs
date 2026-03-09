@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, 'dist');
 const BACK_URL = process.env.BACK_URL || 'http://back:3000';
+const MINIO_URL = process.env.MINIO_URL || 'http://minio:9000';
 const PORT = Number(process.env.PORT) || 80;
 
 const MIME = {
@@ -57,11 +58,32 @@ async function proxy(req, res, pathname) {
   res.end(Buffer.from(await backend.arrayBuffer()));
 }
 
+async function proxyMinio(req, res, pathname) {
+  const queryIndex = req.url.indexOf('?');
+  const query = queryIndex >= 0 ? req.url.slice(queryIndex) : '';
+  const url = new URL(pathname + query, MINIO_URL);
+  const headers = { ...req.headers, host: new URL(MINIO_URL).host };
+  const opt = { method: req.method, headers };
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    opt.body = Buffer.concat(chunks);
+  }
+  const upstream = await fetch(url.toString(), opt);
+  res.writeHead(upstream.status, Object.fromEntries(upstream.headers.entries()));
+  res.end(Buffer.from(await upstream.arrayBuffer()));
+}
+
 const server = http.createServer(async (req, res) => {
   const url = req.url?.split('?')[0] || '/';
   if (url.startsWith('/api/')) {
     const pathname = url.replace(/^\/api/, '') || '/';
     return proxy(req, res, pathname);
+  }
+  if (url.startsWith('/minio/')) {
+    // /minio/<bucket>/<key> -> MINIO_URL/<bucket>/<key>
+    const pathname = url.replace(/^\/minio/, '') || '/';
+    return proxyMinio(req, res, pathname);
   }
   let filePath = path.join(ROOT, url === '/' ? 'index.html' : url);
   if (!filePath.startsWith(ROOT)) {

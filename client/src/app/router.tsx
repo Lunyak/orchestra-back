@@ -13,11 +13,23 @@ export const router = createBrowserRouter([
         lazy: () => import("../page/EventsPage/EventsPage"),
       },
       {
+        path: ROUTES.LEGACY_EVENTS,
+        lazy: () => import("../page/EventsPage/EventsPage"),
+      },
+      {
         path: ROUTES.EVENT,
         lazy: () => import("../page/EventPage/EventPage"),
       },
       {
+        path: ROUTES.LEGACY_EVENT,
+        lazy: () => import("../page/EventPage/EventPage"),
+      },
+      {
         path: ROUTES.ABOUTUS,
+        lazy: () => import("../page/AboutUs/AboutUs"),
+      },
+      {
+        path: ROUTES.LEGACY_ABOUTUS,
         lazy: () => import("../page/AboutUs/AboutUs"),
       },
       {
@@ -26,6 +38,10 @@ export const router = createBrowserRouter([
       },
       {
         path: ROUTES.CONTACTS,
+        lazy: () => import("../page/ContactsPage/ContactsPage"),
+      },
+      {
+        path: ROUTES.LEGACY_CONTACTS,
         lazy: () => import("../page/ContactsPage/ContactsPage"),
       },
     ],

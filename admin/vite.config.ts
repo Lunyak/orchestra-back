@@ -20,6 +20,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
+      // Same behavior as Caddy: /minio/<bucket>/<key> -> http://localhost:9000/<bucket>/<key>
+      "/minio": {
+        target: "http://localhost:9000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio/, ""),
+      },
     },
   },
 });

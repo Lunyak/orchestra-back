@@ -3,10 +3,17 @@ import "react-router-dom";
 export const ROUTES = {
   HOME: "/",
   CAST: "cast",
-  EVENTS: "events",
-  EVENT: "events/:eventSlug",
-  CONTACTS: "/contacts",
-  ABOUTUS: "/aboutus",
+  // Canonical (Russian) URLs
+  EVENTS: "события",
+  EVENT: "события/:eventSlug",
+  ABOUTUS: "/команда",
+  CONTACTS: "/контакты",
+
+  // Legacy (English) URLs — keep working for old bookmarks/links
+  LEGACY_EVENTS: "events",
+  LEGACY_EVENT: "events/:eventSlug",
+  LEGACY_ABOUTUS: "/aboutus",
+  LEGACY_CONTACTS: "/contacts",
 } as const;
 
 export type PathParan = {
