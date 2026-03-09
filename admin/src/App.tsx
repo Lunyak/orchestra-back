@@ -10,6 +10,7 @@ import {
   isAdminLoggedIn,
   setProjectDeleted,
   setUserSubscription,
+  uploadSiteMedia,
   type PlanRow,
   type ProjectRow,
   type UserRow
@@ -231,6 +232,113 @@ function ProjectsPage() {
   );
 }
 
+function SiteMediaPage() {
+  const [pathValue, setPathValue] = useState("photos/vassa/0.jpg");
+  const [prefixValue, setPrefixValue] = useState("site");
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<{ key: string; url: string } | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setResult(null);
+    if (!file) {
+      setError("Выбери файл");
+      return;
+    }
+    const p = pathValue.trim();
+    if (!p) {
+      setError("Укажи path (например photos/vassa/0.jpg)");
+      return;
+    }
+    setLoading(true);
+    try {
+      const out = await uploadSiteMedia({
+        file,
+        path: p,
+        prefix: prefixValue.trim() || "site",
+      });
+      setResult(out);
+    } catch (e2) {
+      setError(e2 instanceof Error ? e2.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const referencePath = (() => {
+    const p = pathValue.trim().replace(/^\/+/, "");
+    return p ? `/${p}` : "";
+  })();
+
+  return (
+    <div className="admin-page">
+      <h1>Медиа сайта</h1>
+      <p>
+        Загружай картинки в MinIO/S3 и используй на сайте как путь из public, например{" "}
+        <code>{referencePath || "/photos/vassa/0.jpg"}</code>.
+      </p>
+
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 12, maxWidth: 720 }}>
+        <label style={{ display: "grid", gap: 6 }}>
+          <span>Path (относительно site/)</span>
+          <input
+            value={pathValue}
+            onChange={(e) => setPathValue(e.target.value)}
+            placeholder="photos/vassa/0.jpg"
+            spellCheck={false}
+          />
+          <small>Будет сохранено как: <code>{`site/${pathValue.trim().replace(/^\/+/, "")}`}</code></small>
+        </label>
+
+        <label style={{ display: "grid", gap: 6 }}>
+          <span>Prefix (опционально)</span>
+          <input
+            value={prefixValue}
+            onChange={(e) => setPrefixValue(e.target.value)}
+            placeholder="site"
+            spellCheck={false}
+          />
+        </label>
+
+        <label style={{ display: "grid", gap: 6 }}>
+          <span>Файл</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+
+        <button type="submit" disabled={loading}>
+          {loading ? "Загрузка…" : "Загрузить"}
+        </button>
+      </form>
+
+      {error && <div style={{ marginTop: 12, color: "#b00020" }}>Ошибка: {error}</div>}
+
+      {result && (
+        <div style={{ marginTop: 16, display: "grid", gap: 8 }}>
+          <div>
+            key: <code>{result.key}</code>
+          </div>
+          <div>
+            url:{" "}
+            <a href={result.url} target="_blank" rel="noopener noreferrer">
+              {result.url}
+            </a>
+          </div>
+          <div>
+            На сайте используй: <code>{referencePath}</code>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Layout({
   children,
   onLogout,
@@ -253,6 +361,7 @@ function Layout({
           Пользователи
         </NavLink>
         <NavLink to="/projects">Проекты</NavLink>
+        <NavLink to="/site-media">Медиа сайта</NavLink>
         <NavLink to="/services">Сервисы</NavLink>
         <button type="button" className="logout" onClick={logout}>
           Выйти
@@ -308,6 +417,18 @@ export default function App() {
           loggedIn ? (
             <Layout onLogout={() => setLoggedIn(false)}>
               <ServicesPage />
+            </Layout>
+          ) : (
+            <LoginPage onLogin={() => setLoggedIn(true)} />
+          )
+        }
+      />
+      <Route
+        path="/site-media"
+        element={
+          loggedIn ? (
+            <Layout onLogout={() => setLoggedIn(false)}>
+              <SiteMediaPage />
             </Layout>
           ) : (
             <LoginPage onLogin={() => setLoggedIn(true)} />

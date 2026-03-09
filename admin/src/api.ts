@@ -76,6 +76,30 @@ export async function setProjectDeleted(
   return res.json();
 }
 
+export async function uploadSiteMedia(params: {
+  file: File;
+  path: string;
+  prefix?: string;
+}): Promise<{ key: string; url: string }> {
+  const token = sessionStorage.getItem("adminToken");
+  if (!token) throw new Error("Нет adminToken (выйди/войти заново)");
+
+  const q = new URLSearchParams();
+  q.set("path", params.path);
+  if (params.prefix?.trim()) q.set("prefix", params.prefix.trim());
+
+  const fd = new FormData();
+  fd.append("file", params.file);
+
+  const res = await fetch(`${base()}/admin/files/upload?${q.toString()}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export interface PlanRow {
   id: string;
   name: string;

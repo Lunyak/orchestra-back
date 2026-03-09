@@ -25,7 +25,9 @@ function normalizePublicPath(value: string): string {
  * avoid extra deployment variables. When we finish migration and want flexibility,
  * we can switch it back to env.
  */
-const SITE_ASSETS_BASE_URL = 'http://213.226.126.196:9000/orchestra-media/site';
+// Use same-origin proxy to avoid Mixed Content when site is served over HTTPS.
+// Caddy proxies /minio/* -> minio:9000.
+const SITE_ASSETS_BASE_URL = '/minio/orchestra-media/site';
 
 /**
  * Convert a site media reference into a URL.
