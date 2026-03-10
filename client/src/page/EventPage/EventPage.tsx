@@ -148,14 +148,22 @@ const EventPage: FC = () => {
 
   const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
   const reviews = Array.isArray(curentEvent.reviews) ? curentEvent.reviews : [];
-  const reviewImages = Array.isArray((curentEvent as any).reviewImages)
-    ? ((curentEvent as any).reviewImages as any[]).filter((x) => typeof x === "string")
-    : [];
+  const reviewImages = Array.isArray(curentEvent.reviewImages) ? curentEvent.reviewImages : [];
 
   const ticketsCloudEventId = curentEvent.ticketsCloudEventId?.trim() || "";
   const ticketsCloudToken = curentEvent.ticketsCloudToken?.trim() || "";
   const hasTicketsCloud = Boolean(ticketsCloudEventId || ticketsCloudToken);
   const howToFindVideoUrl = "https://vk.com/video-81928625_456239136";
+
+  const rainAudioUrlRaw = curentEvent.rainAudioUrl?.trim() || "";
+  const rainButtonLabel = curentEvent.rainButtonLabel?.trim() || "Дождь";
+  const showRainToggle = Boolean(rainAudioUrlRaw);
+  const rainAudioUrl =
+    rainAudioUrlRaw && (isAbsoluteUrl(rainAudioUrlRaw) || rainAudioUrlRaw.startsWith("/minio/"))
+      ? rainAudioUrlRaw
+      : rainAudioUrlRaw
+        ? siteAsset(rainAudioUrlRaw)
+        : "";
 
   const eventAccent =
     typeof curentEvent.colorBackground === "number"
@@ -252,7 +260,7 @@ const EventPage: FC = () => {
           {curentEvent.date?.trim() && (
             <span className="event-page__chip">{curentEvent.date.trim()}</span>
           )}
-          {isZaklyatie && <RainAmbienceToggle />}
+          {showRainToggle && <RainAmbienceToggle url={rainAudioUrl} label={rainButtonLabel} />}
         </div>
 
         <header className="event-page__header">
@@ -646,16 +654,17 @@ function ZaklyatieAtmosphere({ fallbackSrc }: ZaklyatieAtmosphereProps) {
   );
 }
 
-function RainAmbienceToggle() {
+function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
   const noiseSrcRef = useRef<AudioBufferSourceNode | null>(null);
   const mediaElRef = useRef<HTMLAudioElement | null>(null);
   const mediaSrcRef = useRef<MediaElementAudioSourceNode | null>(null);
   const [isOn, setIsOn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const startingRef = useRef(false);
 
-  // Use absolute URL or a public/ URL (e.g. "/audio/zaklyatie-rain.mp3")
-  const rainUrl = "https://fyildiz1974.github.io/web/files/rain.mp3";
+  const rainUrl = url;
 
   const stop = () => {
     try {
@@ -693,6 +702,9 @@ function RainAmbienceToggle() {
   const start = async () => {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
     if (!Ctx) return;
+
+    // Ensure we never overlap multiple sources/contexts.
+    stop();
 
     const ctx: AudioContext = new Ctx();
     audioCtxRef.current = ctx;
@@ -745,21 +757,34 @@ function RainAmbienceToggle() {
       type="button"
       className={isOn ? "event-page__chip zaklyatie-rain-toggle is-on" : "event-page__chip zaklyatie-rain-toggle"}
       aria-pressed={isOn}
+      disabled={isLoading}
+      aria-busy={isLoading}
       onClick={async () => {
+        if (startingRef.current) return;
+        if (isLoading) return;
+
         if (isOn) {
           stop();
           setIsOn(false);
           return;
         }
-        await start();
-        // Некоторые браузеры создают контекст в suspended — попробуем возобновить.
-        if (audioCtxRef.current?.state === "suspended") {
-          await audioCtxRef.current.resume().catch(() => { });
+
+        startingRef.current = true;
+        setIsLoading(true);
+        try {
+          await start();
+          // Некоторые браузеры создают контекст в suspended — попробуем возобновить.
+          if (audioCtxRef.current?.state === "suspended") {
+            await audioCtxRef.current.resume().catch(() => { });
+          }
+          setIsOn(true);
+        } finally {
+          startingRef.current = false;
+          setIsLoading(false);
         }
-        setIsOn(true);
       }}
     >
-      Дождь: {isOn ? "вкл" : "выкл"}
+      {label}: {isLoading ? "…" : isOn ? "вкл" : "выкл"}
     </button>
   );
 }

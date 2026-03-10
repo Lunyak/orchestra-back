@@ -32,6 +32,11 @@ export type SiteEvent = {
   ticketsCloudToken?: string;
   /** Отзывы (опционально) */
   reviews?: SiteReview[];
+  /** Отзывы-картинки (опционально) */
+  reviewImages?: string[];
+  /** Амбиент (дождь): аудио и название кнопки (опционально) */
+  rainAudioUrl?: string;
+  rainButtonLabel?: string;
 };
 
 type SiteEventsContent = {
@@ -120,6 +125,18 @@ function normalizeEvent(raw: any): SiteEvent | null {
         .filter(Boolean) as SiteReview[])
     : undefined;
 
+  const reviewImages =
+    Array.isArray(raw.reviewImages)
+      ? (raw.reviewImages
+          .map((x: any) => (typeof x === "string" ? x.trim() : ""))
+          .filter(Boolean) as string[])
+      : undefined;
+
+  const rainAudioUrl =
+    typeof raw.rainAudioUrl === "string" ? raw.rainAudioUrl.trim() : undefined;
+  const rainButtonLabel =
+    typeof raw.rainButtonLabel === "string" ? raw.rainButtonLabel.trim() : undefined;
+
   return {
     slug,
     soon,
@@ -137,6 +154,9 @@ function normalizeEvent(raw: any): SiteEvent | null {
     ...(ticketsCloudEventId ? { ticketsCloudEventId } : null),
     ...(ticketsCloudToken ? { ticketsCloudToken } : null),
     ...(reviews && reviews.length ? { reviews } : null),
+    ...(reviewImages && reviewImages.length ? { reviewImages } : null),
+    ...(rainAudioUrl ? { rainAudioUrl } : null),
+    ...(rainButtonLabel ? { rainButtonLabel } : null),
   };
 }
 

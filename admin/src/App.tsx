@@ -484,6 +484,8 @@ type SiteEvent = {
   ticketsCloudToken?: string;
   reviews?: SiteReview[];
   reviewImages?: string[];
+  rainAudioUrl?: string;
+  rainButtonLabel?: string;
 };
 
 type SiteEventsContent = {
@@ -797,6 +799,8 @@ function SiteEventsCrudPage() {
       ticketsCloudToken: "",
       reviews: [],
       reviewImages: [],
+      rainAudioUrl: "",
+      rainButtonLabel: "",
     };
     setContent((prev) => ({ ...prev, events: [ev, ...(prev.events ?? [])] }));
     setSelectedSlug(slug);
@@ -994,6 +998,27 @@ function SiteEventsCrudPage() {
                     value={selected.ticketsCloudToken ?? ""}
                     onChange={(e) => updateSelected({ ticketsCloudToken: e.target.value })}
                     placeholder="например abcd1234..."
+                    spellCheck={false}
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span>Дождь: аудио (rainAudioUrl)</span>
+                  <input
+                    value={selected.rainAudioUrl ?? ""}
+                    onChange={(e) => updateSelected({ rainAudioUrl: e.target.value })}
+                    placeholder='например "/audio/rain.mp3" или "https://..."'
+                    spellCheck={false}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 6 }}>
+                  <span>Дождь: название кнопки (rainButtonLabel)</span>
+                  <input
+                    value={selected.rainButtonLabel ?? ""}
+                    onChange={(e) => updateSelected({ rainButtonLabel: e.target.value })}
+                    placeholder='например "Дождь"'
                     spellCheck={false}
                   />
                 </label>
