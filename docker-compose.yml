@@ -117,6 +117,8 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
+      args:
+        WEB_DOMAIN: ${WEB_DOMAIN:-}
     container_name: orkestr-site
     restart: unless-stopped
     ports:

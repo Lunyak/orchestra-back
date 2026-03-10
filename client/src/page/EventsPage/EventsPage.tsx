@@ -2,6 +2,7 @@ import { FC, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
+import { Seo } from "../../shared/component/Seo/Seo";
 import type { SiteEvent } from "../../shared/model/siteContent";
 import { fetchSiteEvents } from "../../shared/model/siteContent";
 import { siteAsset } from "../../shared/model/siteAssets";
@@ -76,6 +77,27 @@ const EventsPage: FC = () => {
   return (
     <div className="events-page">
       <div className="events-page__content">
+        <Seo
+          title="Спектакли и афиша — Дофамин"
+          description="Афиша театра «Дофамин»: спектакли, описание и ссылки на покупку билетов онлайн."
+          canonicalPath="/события"
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: "Афиша театра «Дофамин»",
+            itemListElement: items
+              .filter((e) => !e.soon)
+              .map((e, idx) => ({
+                "@type": "ListItem",
+                position: idx + 1,
+                name: e.name,
+                url:
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/события/${encodeURIComponent(e.slug)}`
+                    : undefined,
+              })),
+          }}
+        />
         <Link to={ROUTES.HOME} className="events-page__back">
           Назад
         </Link>

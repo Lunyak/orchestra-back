@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
+import { Seo } from "../../shared/component/Seo/Seo";
 import "./style.css";
 
 const ContactsPage = () => {
@@ -8,6 +9,11 @@ const ContactsPage = () => {
 
   return (
     <div className="contacts-page">
+      <Seo
+        title="Контакты — Театр «Дофамин»"
+        description="Контакты театра «Дофамин»: почта, Telegram, ВКонтакте и как нас найти."
+        canonicalPath="/контакты"
+      />
       <div className="contacts-page__background">
       </div>
 

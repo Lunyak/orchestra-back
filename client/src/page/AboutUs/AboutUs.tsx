@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
 import Preloader from "../../shared/component/Preloader/Preloader";
 import { siteAsset } from "../../shared/model/siteAssets";
+import { Seo } from "../../shared/component/Seo/Seo";
 import "./style.css";
 
 const items = [
@@ -84,6 +85,11 @@ const AboutUs: FC = () => {
   return (
     <div className="aboutus-page">
       <div className="aboutus-page__content">
+        <Seo
+          title="Команда — Театр «Дофамин»"
+          description="Актёры и команда театра «Дофамин»."
+          canonicalPath="/команда"
+        />
         <Link to={ROUTES.HOME} className="events-page__back">
           Назад
         </Link>

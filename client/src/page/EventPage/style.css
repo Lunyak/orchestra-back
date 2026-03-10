@@ -256,6 +256,7 @@
   line-height: 1.65;
   color: var(--color-text);
   text-align: left;
+  white-space: pre-line;
   background: rgba(22, 18, 24, 0.85);
   padding: 22px 22px;
   border-radius: var(--radius-lg);

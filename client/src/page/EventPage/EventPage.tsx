@@ -1,6 +1,5 @@
 /* eslint-disable no-useless-escape */
 import { CSSProperties, FC, useEffect, useRef, useState } from "react";
-import { Helmet } from "react-helmet-async";
 import { Link, useParams } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -9,6 +8,7 @@ import { Controller, Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
 import { CastList } from "../../shared/component/CastList/CastList";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
+import { Seo } from "../../shared/component/Seo/Seo";
 import { ROUTES } from "../../shared/model/routes";
 import type { SiteEvent } from "../../shared/model/siteContent";
 import { fetchSiteEvents } from "../../shared/model/siteContent";
@@ -212,29 +212,100 @@ const EventPage: FC = () => {
   const metaDescription =
     descriptionText.length > 170 ? `${descriptionText.slice(0, 167).trim()}…` : descriptionText;
 
+  const isoStartDate = (() => {
+    const raw = (curentEvent.date ?? "").trim();
+    if (!raw) return undefined;
+    // Accept ISO 8601 date/datetime if provided by remote content.
+    if (/^\d{4}-\d{2}-\d{2}([tT]\d{2}:\d{2}(:\d{2})?([+-]\d{2}:\d{2}|[zZ])?)?$/.test(raw)) {
+      return raw;
+    }
+    return undefined;
+  })();
+
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Дофамин",
+        item: origin ? `${origin}/` : undefined,
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Спектакли",
+        item: origin ? `${origin}${eventsPath}` : undefined,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: title,
+        item: canonicalUrl || undefined,
+      },
+    ],
+  };
+
+  const eventLd = {
+    "@context": "https://schema.org",
+    "@type": "TheaterEvent",
+    name: title,
+    description: descriptionText,
+    inLanguage: "ru-RU",
+    ...(canonicalUrl ? { url: canonicalUrl } : null),
+    ...(ogImageUrl ? { image: [ogImageUrl] } : null),
+    ...(isoStartDate ? { startDate: isoStartDate } : null),
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    eventStatus: "https://schema.org/EventScheduled",
+    location: {
+      "@type": "Place",
+      name: "Театр «Дофамин»",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Санкт-Петербург",
+        addressCountry: "RU",
+      },
+    },
+    organizer: {
+      "@type": "TheaterGroup",
+      name: "Театр «Дофамин»",
+      ...(origin ? { url: origin } : null),
+    },
+    ...(cast && cast.length
+      ? {
+        performer: cast
+          .map((x) => (x?.actor ? String(x.actor).trim() : ""))
+          .filter(Boolean)
+          .map((name) => ({ "@type": "Person", name })),
+      }
+      : null),
+    ...(hasTicketsCloud && canonicalUrl
+      ? {
+        offers: {
+          "@type": "Offer",
+          url: canonicalUrl,
+          availability: curentEvent.soon
+            ? "https://schema.org/PreOrder"
+            : "https://schema.org/InStock",
+          priceCurrency: "RUB",
+        },
+      }
+      : null),
+  };
+
   return (
     <div
       className={isZaklyatie ? "event-page event-page--zaklyatie" : "event-page"}
       style={styleWithBg}
     >
-      <Helmet>
-        <title>{`${title} — Дофамин`}</title>
-        <meta name="description" content={metaDescription} />
-
-        {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-
-        <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Дофамин" />
-        <meta property="og:title" content={`${title} — Дофамин`} />
-        <meta property="og:description" content={metaDescription} />
-        {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
-        {ogImageUrl && <meta property="og:image" content={ogImageUrl} />}
-
-        <meta name="twitter:card" content={ogImageUrl ? "summary_large_image" : "summary"} />
-        <meta name="twitter:title" content={`${title} — Дофамин`} />
-        <meta name="twitter:description" content={metaDescription} />
-        {ogImageUrl && <meta name="twitter:image" content={ogImageUrl} />}
-      </Helmet>
+      <Seo
+        title={`${title} — Дофамин`}
+        description={metaDescription}
+        canonicalPath={eventSlug ? `${eventsPath}/${encodeURIComponent(eventSlug)}` : undefined}
+        imageUrl={ogImageUrl}
+        jsonLd={[breadcrumbLd, eventLd]}
+      />
 
       {isZaklyatie ? (
         <ZaklyatieAtmosphere

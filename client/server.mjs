@@ -1,6 +1,7 @@
 /**
  * Minimal production server for CRA build (static + SPA fallback).
  */
+import { spawnSync } from "node:child_process";
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,6 +10,21 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "build");
 const PORT = Number(process.env.PORT) || 80;
+
+function runOnce(name) {
+  const scriptPath = path.join(__dirname, "scripts", name);
+  if (!fs.existsSync(scriptPath)) return;
+  spawnSync(process.execPath, [scriptPath], {
+    cwd: __dirname,
+    env: process.env,
+    stdio: "ignore",
+  });
+}
+
+// Generate SEO snapshots/sitemap at runtime too (so it can read fresh events from MinIO).
+// This is safe to run on each container start.
+runOnce("generate-seo-snapshots.mjs");
+runOnce("generate-sitemap.mjs");
 
 const MIME = {
   ".html": "text/html",
@@ -47,7 +63,16 @@ function serveFile(reqUrl, res, filePath) {
 }
 
 const server = http.createServer((req, res) => {
-  const urlPath = (req.url?.split("?")[0] || "/").trim() || "/";
+  const rawPath = (req.url?.split("?")[0] || "/").trim() || "/";
+  // Browsers send non-ASCII paths URL-encoded. Decode for filesystem lookup so
+  // routes like "/события/заклятие" map to actual UTF-8 folders.
+  const urlPath = (() => {
+    try {
+      return decodeURIComponent(rawPath);
+    } catch {
+      return rawPath;
+    }
+  })();
 
   let filePath = path.join(ROOT, urlPath === "/" ? "index.html" : urlPath);
   if (!filePath.startsWith(ROOT)) return send(res, 403, "Forbidden", "text/plain");
