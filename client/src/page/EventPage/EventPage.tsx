@@ -347,8 +347,17 @@ interface PhotoCarouselProps {
 type Review = { text: string; author?: string };
 
 function ReviewsSlider({ reviews }: { reviews: Review[] }) {
+  const normalized = reviews
+    .map((r) => ({ text: String(r.text ?? "").trim(), author: (r.author ?? "").trim() }))
+    .filter((r) => r.text.length > 0);
+  const [active, setActive] = useState(0);
+  const total = normalized.length;
+
   return (
     <div className="reviews-slider">
+      <div className="reviews-slider__counter" aria-label="Счётчик отзывов">
+        {total ? `${Math.min(active + 1, total)} / ${total}` : "—"}
+      </div>
       <Swiper
         modules={[Navigation, Pagination]}
         navigation
@@ -356,12 +365,12 @@ function ReviewsSlider({ reviews }: { reviews: Review[] }) {
         slidesPerView={1}
         spaceBetween={12}
         autoHeight
+        onSlideChange={(s) => setActive(s.realIndex ?? 0)}
         className="reviews-slider__swiper"
       >
-        {reviews.map((r, idx) => {
-          const author = (r.author ?? "").trim();
-          const text = String(r.text ?? "").trim();
-          if (!text) return null;
+        {normalized.map((r, idx) => {
+          const author = r.author;
+          const text = r.text;
           return (
             <SwiperSlide key={`${idx}-${author || "review"}`} className="reviews-slider__slide">
               <figure className="reviews-slider__card">
@@ -377,8 +386,15 @@ function ReviewsSlider({ reviews }: { reviews: Review[] }) {
 }
 
 function ReviewImagesSlider({ images }: { images: string[] }) {
+  const normalized = (images ?? []).map((s) => String(s ?? "").trim()).filter(Boolean);
+  const [active, setActive] = useState(0);
+  const total = normalized.length;
+
   return (
     <div className="reviews-slider">
+      <div className="reviews-slider__counter" aria-label="Счётчик фото-отзывов">
+        {total ? `${Math.min(active + 1, total)} / ${total}` : "—"}
+      </div>
       <Swiper
         modules={[Navigation, Pagination]}
         navigation
@@ -386,9 +402,10 @@ function ReviewImagesSlider({ images }: { images: string[] }) {
         slidesPerView={1}
         spaceBetween={12}
         autoHeight
+        onSlideChange={(s) => setActive(s.realIndex ?? 0)}
         className="reviews-slider__swiper"
       >
-        {images.map((src, idx) => (
+        {normalized.map((src, idx) => (
           <SwiperSlide key={`${idx}-${src}`} className="reviews-slider__slide">
             <div className="reviews-slider__imgCard">
               <ImageWithPreloader
@@ -665,6 +682,7 @@ function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
   const startingRef = useRef(false);
 
   const rainUrl = url;
+  const DEFAULT_VOLUME = 0.18;
 
   const stop = () => {
     try {
@@ -701,16 +719,33 @@ function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
 
   const start = async () => {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!Ctx) return;
 
     // Ensure we never overlap multiple sources/contexts.
     stop();
+
+    const origin =
+      typeof window !== "undefined" && window.location?.origin ? window.location.origin : "";
+    const isAbsolute = /^https?:\/\//i.test(rainUrl);
+    const isCrossOrigin = Boolean(origin && isAbsolute && !rainUrl.startsWith(origin));
+
+    // For cross-origin URLs prefer <audio> directly (WebAudio often fails due to CORS).
+    if (isCrossOrigin || !Ctx) {
+      const el = new Audio();
+      el.crossOrigin = "anonymous";
+      el.src = rainUrl;
+      el.loop = true;
+      el.preload = "auto";
+      el.volume = DEFAULT_VOLUME;
+      mediaElRef.current = el;
+      await el.play();
+      return;
+    }
 
     const ctx: AudioContext = new Ctx();
     audioCtxRef.current = ctx;
 
     const master = ctx.createGain();
-    master.gain.value = 0.18;
+    master.gain.value = DEFAULT_VOLUME;
     master.connect(ctx.destination);
     gainRef.current = master;
 
@@ -735,13 +770,22 @@ function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
         el.src = rainUrl;
         el.loop = true;
         el.preload = "auto";
+        el.volume = DEFAULT_VOLUME;
 
-        const node = ctx.createMediaElementSource(el);
-        node.connect(master);
-        mediaElRef.current = el;
-        mediaSrcRef.current = node;
-
-        await el.play();
+        try {
+          const node = ctx.createMediaElementSource(el);
+          node.connect(master);
+          mediaElRef.current = el;
+          mediaSrcRef.current = node;
+          await el.play();
+        } catch {
+          // Some hosts allow playback but disallow WebAudio connection (CORS taint).
+          // In that case just play the audio element directly.
+          stop();
+          mediaElRef.current = el;
+          mediaSrcRef.current = null;
+          await el.play();
+        }
       } catch {
         stop();
       }

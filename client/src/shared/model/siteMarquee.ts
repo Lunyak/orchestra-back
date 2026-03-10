@@ -7,6 +7,9 @@ export type SiteMarqueeContent = {
   items: string[];
   /** seconds */
   duration?: number;
+  /** Optional home page ambient audio toggle */
+  homeAudioUrl?: string;
+  homeAudioLabel?: string;
 };
 
 const URL = siteAsset("/content/marquee.json");
@@ -41,10 +44,29 @@ export async function fetchSiteMarquee(opts?: {
     const res = await fetch(URL, { cache: "no-store", signal: ac.signal });
     if (!res.ok) return cachedValue;
     const text = await res.text();
-    const parsed = safeJsonParse<SiteMarqueeContent>(text);
+    const parsed = safeJsonParse<any>(text);
     if (!parsed || !Array.isArray(parsed.items)) return cachedValue;
-    if (cache) sessionStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
-    return parsed;
+
+    const items = (parsed.items as any[])
+      .filter((x) => typeof x === "string")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const duration =
+      typeof parsed.duration === "number" && Number.isFinite(parsed.duration) ? parsed.duration : undefined;
+    const homeAudioUrl = typeof parsed.homeAudioUrl === "string" ? parsed.homeAudioUrl.trim() : "";
+    const homeAudioLabel = typeof parsed.homeAudioLabel === "string" ? parsed.homeAudioLabel.trim() : "";
+
+    const normalized: SiteMarqueeContent = {
+      version: typeof parsed.version === "number" ? parsed.version : undefined,
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : undefined,
+      items,
+      ...(typeof duration === "number" ? { duration } : null),
+      ...(homeAudioUrl ? { homeAudioUrl } : null),
+      ...(homeAudioLabel ? { homeAudioLabel } : null),
+    };
+
+    if (cache) sessionStorage.setItem(CACHE_KEY, JSON.stringify(normalized));
+    return normalized;
   } catch {
     return cachedValue;
   } finally {

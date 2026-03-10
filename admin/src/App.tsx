@@ -654,6 +654,7 @@ function SiteEventsCrudPage() {
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [photosFiles, setPhotosFiles] = useState<File[]>([]);
   const [reviewImagesFiles, setReviewImagesFiles] = useState<File[]>([]);
+  const [rainAudioFile, setRainAudioFile] = useState<File | null>(null);
 
   const load = async () => {
     setError("");
@@ -726,6 +727,14 @@ function SiteEventsCrudPage() {
     return "jpg";
   };
 
+  const audioExtFromName = (name: string): string => {
+    const m = String(name ?? "").toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+    const ext = m ? m[1] : "";
+    if (!ext) return "mp3";
+    if (["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm"].includes(ext)) return ext;
+    return "mp3";
+  };
+
   const uploadAndSetField = async (file: File, kind: "cover" | "bg") => {
     if (!selected) throw new Error("Не выбран спектакль");
     const slugSeg = normalizePathSegment(selected.slug);
@@ -736,6 +745,17 @@ function SiteEventsCrudPage() {
     const ref = `/${path}`;
     if (kind === "cover") updateSelected({ cardImage: ref });
     else updateSelected({ eventPageBg: ref });
+    setOk(`Загружено: ${out.url}`);
+  };
+
+  const uploadAndSetRainAudio = async (file: File) => {
+    if (!selected) throw new Error("Не выбран спектакль");
+    const slugSeg = normalizePathSegment(selected.slug);
+    const ext = audioExtFromName(file.name);
+    const path = `audio/${slugSeg}-rain.${ext}`;
+    const out = await uploadSiteMedia({ file, path, prefix: "site" });
+    const ref = `/${path}`;
+    updateSelected({ rainAudioUrl: ref });
     setOk(`Загружено: ${out.url}`);
   };
 
@@ -1024,6 +1044,40 @@ function SiteEventsCrudPage() {
                 </label>
               </div>
 
+              <div style={{ display: "grid", gap: 6 }}>
+                <span style={{ fontSize: 13, opacity: 0.9 }}>
+                  Загрузить аудио дождя в MinIO и вставить в rainAudioUrl
+                </span>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => setRainAudioFile(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    className="small"
+                    disabled={loading || !rainAudioFile}
+                    onClick={async () => {
+                      if (!rainAudioFile) return;
+                      setLoading(true);
+                      setError("");
+                      setOk("");
+                      try {
+                        await uploadAndSetRainAudio(rainAudioFile);
+                        setRainAudioFile(null);
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : "Ошибка загрузки");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                  >
+                    Загрузить аудио
+                  </button>
+                </div>
+              </div>
+
               <label style={{ display: "grid", gap: 6 }}>
                 <span>Лицевое изображение (cardImage)</span>
                 <input
@@ -1255,10 +1309,29 @@ function SiteMarqueePage() {
   const url = "/minio/orchestra-media/site/content/marquee.json";
   const [itemsText, setItemsText] = useState("");
   const [duration, setDuration] = useState<string>("22");
+  const [homeAudioUrl, setHomeAudioUrl] = useState<string>("");
+  const [homeAudioLabel, setHomeAudioLabel] = useState<string>("");
+  const [homeAudioFile, setHomeAudioFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [loadedMeta, setLoadedMeta] = useState<{ version: number | null; updatedAt: string | null } | null>(null);
+
+  const audioExtFromName = (name: string): string => {
+    const m = String(name ?? "").toLowerCase().match(/\.([a-z0-9]{1,8})$/);
+    const ext = m ? m[1] : "";
+    if (!ext) return "mp3";
+    if (["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm"].includes(ext)) return ext;
+    return "mp3";
+  };
+
+  const uploadHomeAudio = async (file: File) => {
+    const ext = audioExtFromName(file.name);
+    const path = `audio/home-ambient.${ext}`;
+    const out = await uploadSiteMedia({ file, path, prefix: "site" });
+    setHomeAudioUrl(`/${path}`);
+    setOk(`Загружено: ${out.url}`);
+  };
 
   const load = async () => {
     setError("");
@@ -1275,10 +1348,12 @@ function SiteMarqueePage() {
       }
       if (!res.ok) throw new Error(`Не удалось загрузить: ${res.status}`);
       const text = await res.text();
-      const parsed = JSON.parse(text) as { items?: any; duration?: any; version?: any; updatedAt?: any };
+      const parsed = JSON.parse(text) as { items?: any; duration?: any; version?: any; updatedAt?: any; homeAudioUrl?: any; homeAudioLabel?: any };
       const items = Array.isArray(parsed?.items) ? parsed.items.filter((x: any) => typeof x === "string") : [];
       setItemsText(items.join("\n"));
       setDuration(parsed?.duration != null ? String(parsed.duration) : "22");
+      setHomeAudioUrl(typeof parsed?.homeAudioUrl === "string" ? parsed.homeAudioUrl : "");
+      setHomeAudioLabel(typeof parsed?.homeAudioLabel === "string" ? parsed.homeAudioLabel : "");
       setLoadedMeta({
         version: typeof parsed?.version === "number" ? parsed.version : null,
         updatedAt: typeof parsed?.updatedAt === "string" ? parsed.updatedAt : null,
@@ -1335,6 +1410,8 @@ function SiteMarqueePage() {
         updatedAt: new Date().toISOString(),
         items,
         duration: durSafe,
+        ...(homeAudioUrl.trim() ? { homeAudioUrl: homeAudioUrl.trim() } : null),
+        ...(homeAudioLabel.trim() ? { homeAudioLabel: homeAudioLabel.trim() } : null),
       };
 
       const json = JSON.stringify(next, null, 2);
@@ -1376,6 +1453,55 @@ function SiteMarqueePage() {
         <span>Длительность (сек)</span>
         <input value={duration} onChange={(e) => setDuration(e.target.value)} inputMode="decimal" />
       </label>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+        <label style={{ display: "grid", gap: 6 }}>
+          <span>Главная: звук (homeAudioUrl)</span>
+          <input
+            value={homeAudioUrl}
+            onChange={(e) => setHomeAudioUrl(e.target.value)}
+            placeholder='например "/audio/home.mp3" или "https://..."'
+            spellCheck={false}
+          />
+        </label>
+        <label style={{ display: "grid", gap: 6 }}>
+          <span>Главная: название кнопки (homeAudioLabel)</span>
+          <input
+            value={homeAudioLabel}
+            onChange={(e) => setHomeAudioLabel(e.target.value)}
+            placeholder='например "Музыка"'
+            spellCheck={false}
+          />
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 13, opacity: 0.9 }}>Загрузить аудио для главной в MinIO и вставить в homeAudioUrl</span>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input type="file" accept="audio/*" onChange={(e) => setHomeAudioFile(e.target.files?.[0] ?? null)} />
+          <button
+            type="button"
+            className="small"
+            disabled={loading || !homeAudioFile}
+            onClick={async () => {
+              if (!homeAudioFile) return;
+              setLoading(true);
+              setError("");
+              setOk("");
+              try {
+                await uploadHomeAudio(homeAudioFile);
+                setHomeAudioFile(null);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Ошибка загрузки");
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Загрузить аудио
+          </button>
+        </div>
+      </div>
 
       <label style={{ display: "grid", gap: 6 }}>
         <span>Строки (каждая строка — отдельный элемент)</span>

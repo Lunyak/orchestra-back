@@ -435,6 +435,26 @@
   --swiper-theme-color: rgba(255, 255, 255, 0.78);
   --swiper-navigation-color: rgba(255, 255, 255, 0.78);
   --swiper-navigation-size: 14px;
+  position: relative;
+}
+
+.reviews-slider__counter {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 5;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 14, 20, 0.55);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: "Russo One", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
 }
 
 .reviews-slider__card {

@@ -11,7 +11,6 @@ type FilterTarget =
   | { variant: "hue"; key: "orkestr" };
 
 const HomePage: FC = () => {
-  const audioRef = useRef<HTMLAudioElement>(null);
   const [effectsEnabled, setEffectsEnabled] = useState(false);
   const [marqueeItems, setMarqueeItems] = useState<string[]>([
     "Театр «Дофамин»",
@@ -21,23 +20,8 @@ const HomePage: FC = () => {
     "Иили на странице спектакля",
   ]);
   const [marqueeDuration, setMarqueeDuration] = useState<number>(22);
-
-  const handleFirstInteraction = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current
-        .play()
-        .catch((e) => console.log("Audio play failed:", e));
-      document.removeEventListener("click", handleFirstInteraction);
-    }
-  }, []);
-
-  useEffect(() => {
-    document.addEventListener("click", handleFirstInteraction);
-    handleFirstInteraction();
-    return () => {
-      document.removeEventListener("click", handleFirstInteraction);
-    };
-  }, [handleFirstInteraction]);
+  const [homeAudioUrl, setHomeAudioUrl] = useState<string>("");
+  const [homeAudioLabel, setHomeAudioLabel] = useState<string>("Звук");
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -63,6 +47,10 @@ const HomePage: FC = () => {
         if (remote?.items?.length) setMarqueeItems(remote.items);
         if (typeof remote?.duration === "number" && Number.isFinite(remote.duration) && remote.duration > 3) {
           setMarqueeDuration(remote.duration);
+        }
+        if (typeof remote?.homeAudioUrl === "string") setHomeAudioUrl(remote.homeAudioUrl);
+        if (typeof remote?.homeAudioLabel === "string" && remote.homeAudioLabel.trim()) {
+          setHomeAudioLabel(remote.homeAudioLabel.trim());
         }
       })
       .catch(() => {});
@@ -242,6 +230,12 @@ const HomePage: FC = () => {
       )}
 
       <div className="home-page__container">
+        {homeAudioUrl.trim() && (
+          <div className="home-page__toggles">
+            <HomeAudioToggle url={homeAudioUrl.trim()} label={homeAudioLabel} />
+          </div>
+        )}
+
         {/* <div className="home-page__hero" aria-label="Дофамин. Театр. Спектакли.">
           <div className="home-page__morph-container">
             <div className="word-rotator">
@@ -384,3 +378,73 @@ const HomePage: FC = () => {
 };
 
 export const Component = HomePage;
+
+function HomeAudioToggle({ url, label }: { url: string; label: string }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const startingRef = useRef(false);
+  const [isOn, setIsOn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const stop = () => {
+    try {
+      audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.currentTime = 0;
+    } catch {
+      // ignore
+    }
+    if (audioRef.current) {
+      audioRef.current.src = "";
+    }
+    audioRef.current = null;
+  };
+
+  const start = async () => {
+    stop();
+    const el = new Audio();
+    el.crossOrigin = "anonymous";
+    el.src = url;
+    el.loop = true;
+    el.preload = "auto";
+    el.volume = 0.18;
+    audioRef.current = el;
+    await el.play();
+  };
+
+  useEffect(() => {
+    return () => stop();
+  }, []);
+
+  return (
+    <button
+      type="button"
+      className={isOn ? "home-audio-toggle is-on" : "home-audio-toggle"}
+      aria-pressed={isOn}
+      disabled={isLoading}
+      aria-busy={isLoading}
+      onClick={async () => {
+        if (startingRef.current || isLoading) return;
+
+        if (isOn) {
+          stop();
+          setIsOn(false);
+          return;
+        }
+
+        startingRef.current = true;
+        setIsLoading(true);
+        try {
+          await start();
+          setIsOn(true);
+        } catch {
+          stop();
+          setIsOn(false);
+        } finally {
+          startingRef.current = false;
+          setIsLoading(false);
+        }
+      }}
+    >
+      {label || "Звук"}: {isLoading ? "…" : isOn ? "вкл" : "выкл"}
+    </button>
+  );
+}
