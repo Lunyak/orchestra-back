@@ -330,6 +330,20 @@ const EventPage: FC = () => {
             </section>
           )}
 
+          {(reviews.length > 0 || reviewImages.length > 0) && (
+            <div className="event-page__reviewsHint" aria-label="Где оставить отзыв">
+              Вы можете оставить свой комментарий на наших ресурсах:{" "}
+              <a href="https://t.me/dofamintheatre" target="_blank" rel="noopener noreferrer">
+                @dofamintheatre
+              </a>{" "}
+              и{" "}
+              <a href="https://vk.com/dofaminspb" target="_blank" rel="noopener noreferrer">
+                vk.com/dofaminspb
+              </a>
+              .
+            </div>
+          )}
+
 
         </div>
       </div>
