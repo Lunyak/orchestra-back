@@ -365,7 +365,7 @@ function ReviewsSlider({ reviews }: { reviews: Review[] }) {
         slidesPerView={1}
         spaceBetween={12}
         autoHeight
-        onSlideChange={(s) => setActive(s.realIndex ?? 0)}
+        onSlideChange={(s: SwiperClass) => setActive(s.realIndex ?? 0)}
         className="reviews-slider__swiper"
       >
         {normalized.map((r, idx) => {
@@ -402,7 +402,7 @@ function ReviewImagesSlider({ images }: { images: string[] }) {
         slidesPerView={1}
         spaceBetween={12}
         autoHeight
-        onSlideChange={(s) => setActive(s.realIndex ?? 0)}
+        onSlideChange={(s: SwiperClass) => setActive(s.realIndex ?? 0)}
         className="reviews-slider__swiper"
       >
         {normalized.map((src, idx) => (
