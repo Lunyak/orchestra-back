@@ -1,5 +1,5 @@
 /* eslint-disable no-useless-escape */
-import { CSSProperties, FC, useEffect, useRef, useState } from "react";
+import { CSSProperties, FC, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -13,8 +13,12 @@ import { ROUTES } from "../../shared/model/routes";
 import type { SiteEvent } from "../../shared/model/siteContent";
 import { fetchSiteEvents } from "../../shared/model/siteContent";
 import { isAbsoluteUrl, siteAsset } from "../../shared/model/siteAssets";
+import { hitSiteEventView } from "../../shared/model/siteViews";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
+import Particles, { initParticlesEngine } from "@tsparticles/react";
+import type { ISourceOptions } from "@tsparticles/engine";
+import { loadFirePreset } from "@tsparticles/preset-fire";
 
 const FALLBACK_EVENTS: SiteEvent[] = [
   {
@@ -46,6 +50,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
       "/photos/vassa/14.jpg",
     ],
     eventPageBg: "/photos/vassa/0.jpg",
+    disableGlass: true,
     cast: [],
   },
   {
@@ -116,8 +121,28 @@ const FALLBACK_EVENTS: SiteEvent[] = [
 
 const EventPage: FC = () => {
   const { eventSlug } = useParams();
+  const [effectsEnabled, setEffectsEnabled] = useState(false);
+  const fireInitRef = useRef(false);
+  const [fireReady, setFireReady] = useState(false);
 
   const [events, setEvents] = useState<SiteEvent[]>(FALLBACK_EVENTS);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setEffectsEnabled(!reduceMotion.matches);
+    update();
+    reduceMotion.addEventListener("change", update);
+    return () => reduceMotion.removeEventListener("change", update);
+  }, []);
+
+  const normalizedSlug = (eventSlug ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.\s]+$/g, "");
+
+  const isZaklyatie = normalizedSlug === "заклятие";
+  const isZheleznova = normalizedSlug === "железнова";
 
   useEffect(() => {
     let alive = true;
@@ -134,6 +159,39 @@ const EventPage: FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const slug = (eventSlug ?? "").trim();
+    if (!slug) return;
+    const key = `site:event-viewed:${slug}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // ignore storage issues
+    }
+    void hitSiteEventView(slug);
+  }, [eventSlug]);
+
+  useEffect(() => {
+    if (!effectsEnabled) return;
+    if (!isZheleznova) return;
+    if (fireInitRef.current) return;
+    fireInitRef.current = true;
+    initParticlesEngine(async (engine) => {
+      await loadFirePreset(engine);
+    })
+      .then(() => setFireReady(true))
+      .catch(() => setFireReady(false));
+  }, [effectsEnabled, isZheleznova]);
+
+  const fireOptions: ISourceOptions = useMemo(() => {
+    return {
+      preset: "fire",
+      fullScreen: { enable: false },
+      background: { color: { value: "transparent" } },
+    };
+  }, []);
+
   const curentEvent = events.find((E) => E.slug === eventSlug);
 
   if (!curentEvent) {
@@ -142,9 +200,6 @@ const EventPage: FC = () => {
 
   const title = curentEvent.name?.trim() || "Спектакль";
   const subtitle = curentEvent.subtitle?.trim();
-
-  const isZaklyatie =
-    (curentEvent.slug || "").trim().toLowerCase().replace(/[.\s]+$/g, "") === "заклятие";
 
   const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
   const reviews = Array.isArray(curentEvent.reviews) ? curentEvent.reviews : [];
@@ -299,6 +354,11 @@ const EventPage: FC = () => {
       className={isZaklyatie ? "event-page event-page--zaklyatie" : "event-page"}
       style={styleWithBg}
     >
+      {effectsEnabled && isZheleznova && fireReady && (
+        <div className="event-page__particles event-page__particles--fire" aria-hidden>
+          <Particles id="eventFireParticles" options={fireOptions} />
+        </div>
+      )}
       <Seo
         title={`${title} — Дофамин`}
         description={metaDescription}
@@ -311,7 +371,7 @@ const EventPage: FC = () => {
         <ZaklyatieAtmosphere
           fallbackSrc={curentEvent.photos?.[0] ? siteAsset(curentEvent.photos[0]) : undefined}
         />
-      ) : (
+      ) : curentEvent.disableGlass ? null : (
         <div className="event-page__glass" aria-hidden="true" />
       )}
 

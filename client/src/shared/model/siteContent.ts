@@ -23,6 +23,8 @@ export type SiteEvent = {
   cardImage: string;
   /** Optional background image for Event page */
   eventPageBg?: string;
+  /** Disable frosted glass overlay on Event page */
+  disableGlass?: boolean;
   type?: string;
   colorBackground?: number;
   photos?: string[];
@@ -100,6 +102,7 @@ function normalizeEvent(raw: any): SiteEvent | null {
       : typeof raw.bgImage === "string"
         ? raw.bgImage
         : undefined;
+  const disableGlass = raw.disableGlass === true ? true : undefined;
 
   const ticketsCloudEventId =
     typeof raw.ticketsCloudEventId === "string" ? raw.ticketsCloudEventId.trim() : undefined;
@@ -146,6 +149,7 @@ function normalizeEvent(raw: any): SiteEvent | null {
     anonse,
     date,
     cardImage,
+    ...(disableGlass ? { disableGlass: true } : null),
     type,
     colorBackground,
     photos,

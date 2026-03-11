@@ -20,6 +20,20 @@
   overflow: hidden;
 }
 
+.event-page__particles {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.95;
+  mix-blend-mode: screen;
+}
+
+.event-page__particles > * {
+  width: 100%;
+  height: 100%;
+}
+
 /* Frosted glass overlay for EventPage (all events except Zaklyatie) */
 .event-page__glass {
   position: absolute;

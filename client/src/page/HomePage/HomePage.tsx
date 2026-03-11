@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useRef, useState } from "react";
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Marquee } from "../../shared/component/Marquee/Marquee";
 import { Seo } from "../../shared/component/Seo/Seo";
@@ -6,6 +6,9 @@ import { ROUTES } from "../../shared/model/routes";
 import { fetchSiteMarquee } from "../../shared/model/siteMarquee";
 import { GlitchHero } from "./GlitchHero";
 import "./style.css";
+import Particles, { initParticlesEngine } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
+import type { ISourceOptions } from "@tsparticles/engine";
 
 type FilterTarget =
   | { variant: "swirl"; key: "events" | "team" }
@@ -13,6 +16,8 @@ type FilterTarget =
 
 const HomePage: FC = () => {
   const [effectsEnabled, setEffectsEnabled] = useState(false);
+  const particlesInitRef = useRef(false);
+  const [particlesReady, setParticlesReady] = useState(false);
   const [marqueeItems, setMarqueeItems] = useState<string[]>([
     "Театр «Дофамин»",
     "Спектакли и даты",
@@ -37,6 +42,48 @@ const HomePage: FC = () => {
     reduceMotion.addEventListener("change", update);
     return () => {
       reduceMotion.removeEventListener("change", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!effectsEnabled) return;
+    if (particlesInitRef.current) return;
+    particlesInitRef.current = true;
+    initParticlesEngine(async (engine) => {
+      await loadSlim(engine);
+    })
+      .then(() => setParticlesReady(true))
+      .catch(() => setParticlesReady(false));
+  }, [effectsEnabled]);
+
+  const particlesOptions: ISourceOptions = useMemo(() => {
+    // Based on tsParticles "Basic" sample:
+    // https://particles.js.org/samples/#basic
+    return {
+      fpsLimit: 60,
+      detectRetina: true,
+      fullScreen: { enable: false },
+      background: { color: { value: "transparent" } },
+      particles: {
+        number: { value: 80, density: { enable: true, area: 800 } },
+        color: { value: "#ffffff" },
+        shape: { type: "circle" },
+        opacity: { value: 0.5 },
+        size: { value: { min: 1, max: 3 } },
+        links: { enable: true, distance: 150, color: "#ffffff", opacity: 0.4, width: 1 },
+        move: { enable: true, speed: 2, direction: "none", outModes: { default: "bounce" } },
+      },
+      interactivity: {
+        events: {
+          onHover: { enable: true, mode: "repulse" },
+          onClick: { enable: true, mode: "push" },
+          resize: { enable: true },
+        },
+        modes: {
+          repulse: { distance: 100, duration: 0.4 },
+          push: { quantity: 4 },
+        },
+      },
     };
   }, []);
 
@@ -96,6 +143,11 @@ const HomePage: FC = () => {
 
   return (
     <div className="home-page" data-effects={effectsEnabled ? "on" : "off"}>
+      {effectsEnabled && particlesReady && (
+        <div className="home-page__particles" aria-hidden>
+          <Particles id="homeParticles" options={particlesOptions} />
+        </div>
+      )}
       <Seo
         title="Дофамин — театр в Санкт-Петербурге"
         description="Театр «Дофамин» в Санкт-Петербурге: спектакли (комедия, драма, трагедия), афиша и билеты онлайн."

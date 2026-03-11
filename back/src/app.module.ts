@@ -19,6 +19,7 @@ import { TtsModule } from './tts/tts.module';
 import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
 import { TroupeModule } from './troupe/troupe.module';
 import { RolesModule } from './roles/roles.module';
+import { SiteAnalyticsModule } from './site-analytics/site-analytics.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { RolesModule } from './roles/roles.module';
     TelegramBotsModule,
     TroupeModule,
     RolesModule,
+    SiteAnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

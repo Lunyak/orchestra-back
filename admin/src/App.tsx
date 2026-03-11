@@ -4,6 +4,7 @@ import {
   adminLogin,
   adminLogout,
   getApiBaseUrl,
+  getSiteEventViews,
   getPlans,
   getProjects,
   getUsers,
@@ -14,6 +15,7 @@ import {
   uploadSiteMedia,
   type PlanRow,
   type ProjectRow,
+  type SiteEventViewRow,
   type UserRow
 } from "./api";
 
@@ -476,6 +478,7 @@ type SiteEvent = {
   date?: string;
   cardImage: string;
   eventPageBg?: string;
+  disableGlass?: boolean;
   type?: string;
   colorBackground?: number;
   photos?: string[];
@@ -812,6 +815,7 @@ function SiteEventsCrudPage() {
       date: "",
       cardImage: "afisha.jpg",
       eventPageBg: "",
+      disableGlass: false,
       photos: [],
       cast: [],
       colorBackground: 0x6b0f1a,
@@ -1001,6 +1005,15 @@ function SiteEventsCrudPage() {
                   <input value={selected.old ?? ""} onChange={(e) => updateSelected({ old: e.target.value })} />
                 </label>
               </div>
+
+              <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={!!selected.disableGlass}
+                  onChange={(e) => updateSelected({ disableGlass: e.target.checked })}
+                />
+                <span>Отключить матовое стекло на странице спектакля (disableGlass)</span>
+              </label>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                 <label style={{ display: "grid", gap: 6 }}>
@@ -1521,6 +1534,87 @@ function SiteMarqueePage() {
   );
 }
 
+function SiteViewsPage() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string>("");
+  const [rows, setRows] = useState<SiteEventViewRow[]>([]);
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    setOk("");
+    try {
+      const res = await getSiteEventViews();
+      setUpdatedAt(res.updatedAt ?? "");
+      setRows(Array.isArray(res.events) ? res.events : []);
+      setOk("Загружено");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка загрузки");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="admin-page">
+      <h1>Просмотры страниц спектаклей</h1>
+      <p>Счётчик увеличивается при открытии страницы <code>/события/:slug</code> на сайте.</p>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 10 }}>
+        <button type="button" onClick={load} disabled={loading}>
+          {loading ? "…" : "Обновить"}
+        </button>
+        {updatedAt && (
+          <div style={{ opacity: 0.85, fontSize: 13 }}>
+            updatedAt: {updatedAt}
+          </div>
+        )}
+      </div>
+
+      {error && <div style={{ marginBottom: 10, color: "#b00020" }}>Ошибка: {error}</div>}
+      {ok && <div style={{ marginBottom: 10, color: "#0a7a2f" }}>{ok}</div>}
+
+      <div style={{ overflowX: "auto" }}>
+        <table className="admin-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: "left" }}>slug</th>
+              <th style={{ textAlign: "right" }}>просмотры</th>
+              <th style={{ textAlign: "left" }}>последний просмотр</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length ? (
+              rows.map((r) => (
+                <tr key={r.slug}>
+                  <td><code>{r.slug}</code></td>
+                  <td style={{ textAlign: "right" }}>{r.total ?? 0}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    {r.lastHitAt ? new Date(r.lastHitAt).toLocaleString() : "—"}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={3} style={{ opacity: 0.8 }}>
+                  Пока нет данных (или никто ещё не открывал страницы).
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function Layout({
   children,
   onLogout,
@@ -1545,6 +1639,7 @@ function Layout({
         <NavLink to="/plans">Тарифы</NavLink>
         <NavLink to="/projects">Проекты</NavLink>
         <NavLink to="/site-events">Спектакли</NavLink>
+        <NavLink to="/site-views">Просмотры</NavLink>
         <NavLink to="/site-marquee">Бегущая строка</NavLink>
         <NavLink to="/site-media">Медиа сайта</NavLink>
         <NavLink to="/site-content">Контент сайта</NavLink>
@@ -1651,6 +1746,18 @@ export default function App() {
           loggedIn ? (
             <Layout onLogout={() => setLoggedIn(false)}>
               <SiteEventsCrudPage />
+            </Layout>
+          ) : (
+            <LoginPage onLogin={() => setLoggedIn(true)} />
+          )
+        }
+      />
+      <Route
+        path="/site-views"
+        element={
+          loggedIn ? (
+            <Layout onLogout={() => setLoggedIn(false)}>
+              <SiteViewsPage />
             </Layout>
           ) : (
             <LoginPage onLogin={() => setLoggedIn(true)} />

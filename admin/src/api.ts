@@ -113,6 +113,20 @@ export async function uploadSiteMedia(params: {
   return res.json();
 }
 
+export type SiteEventViewRow = { slug: string; total: number; lastHitAt: string };
+
+export async function getSiteEventViews(): Promise<{
+  version: 1;
+  updatedAt: string;
+  events: SiteEventViewRow[];
+}> {
+  const res = await fetch(`${base()}/admin/site/event-views`, {
+    headers: headers(),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export interface PlanRow {
   id: string;
   name: string;
