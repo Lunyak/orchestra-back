@@ -491,9 +491,11 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         setSoundIcon({ projectSlug: projectName, soundId: track.id }),
       ).unwrap();
       if (!res?.changes || Object.keys(res.changes).length === 0) return;
-      setTracks((prev) =>
-        prev.map((t) => (t.id === track.id ? { ...t, ...res.changes } : t)),
+      const nextTracks = tracks.map((t) =>
+        t.id === track.id ? { ...t, ...res.changes } : t,
       );
+      setTracks(nextTracks);
+      void saveSounds(nextTracks);
     } catch (err) {
       console.error("Failed to add icon:", err);
       showMessage("Не удалось добавить иконку. Проверьте консоль.");

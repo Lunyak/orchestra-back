@@ -81,21 +81,34 @@ export class ProjectsService {
     const project = await this.assertUserHasProjectAccess(userId, slug);
     const projectId = project.id;
 
-    // Find all referenced orchestra-image keys inside steps markdown/playMarkdown.
+    // Find all referenced orchestra-image keys inside steps markdown/playMarkdown/explicationMarkdown.
     const rows = await this.prisma.step.findMany({
       where: { scene: { projectId }, deletedAt: null },
-      select: { markdown: true, playMarkdown: true },
+      select: { markdown: true, playMarkdown: true, explicationMarkdown: true },
       take: 20000,
     });
     const referenced = new Set<string>();
     for (const r of rows) {
-      const text = `${r.markdown ?? ''}\n${r.playMarkdown ?? ''}`;
+      const text = `${r.markdown ?? ''}\n${r.playMarkdown ?? ''}\n${r.explicationMarkdown ?? ''}`;
       this.extractReferencedImageKeysFromMarkdown(text).forEach((k) =>
         referenced.add(k),
       );
     }
 
     const prefix = `${projectId}/image/`;
+
+    // Also keep images referenced from sounds icons (they are uploaded as type "image" too).
+    const soundRows = await this.prisma.sound.findMany({
+      where: { scene: { projectId } },
+      select: { iconRemoteKey: true },
+      take: 20000,
+    });
+    for (const s of soundRows) {
+      const key = typeof s.iconRemoteKey === 'string' ? s.iconRemoteKey.trim() : '';
+      if (!key) continue;
+      // only consider project-scoped images
+      if (key.startsWith(prefix)) referenced.add(key);
+    }
 
     // List stored image keys and delete those that are not referenced.
     if (this.useLocalStorage()) {
