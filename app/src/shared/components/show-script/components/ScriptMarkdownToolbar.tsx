@@ -8,6 +8,7 @@ export function ScriptMarkdownToolbar({
   annotations,
   onInsertImage,
   onInsertKadr,
+  editorToggles,
 }: {
   isEditing: boolean;
   onToggleEditing: () => void;
@@ -23,6 +24,12 @@ export function ScriptMarkdownToolbar({
   };
   onInsertImage?: () => void;
   onInsertKadr?: () => void;
+  editorToggles?: null | {
+    previewEnabled: boolean;
+    onTogglePreview: () => void;
+    tocEnabled?: boolean;
+    onToggleToc?: () => void;
+  };
 }) {
   const annotationsMode = annotations.mode;
 
@@ -73,6 +80,36 @@ export function ScriptMarkdownToolbar({
           >
             {isEditing ? "📖" : "✏️"}
           </Button>
+          {isEditing && editorToggles ? (
+            <>
+              <Button
+                variant="ghost"
+                className="show-script__rail-btn"
+                onClick={editorToggles.onTogglePreview}
+                title={editorToggles.previewEnabled ? "Скрыть предпросмотр" : "Показать предпросмотр"}
+                // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+                aria-pressed={editorToggles.previewEnabled}
+                // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+                data-active={editorToggles.previewEnabled ? "true" : "false"}
+              >
+                👁
+              </Button>
+              {typeof editorToggles.tocEnabled === "boolean" && editorToggles.onToggleToc ? (
+                <Button
+                  variant="ghost"
+                  className="show-script__rail-btn"
+                  onClick={editorToggles.onToggleToc}
+                  title={editorToggles.tocEnabled ? "Скрыть оглавление" : "Показать оглавление"}
+                  // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+                  aria-pressed={editorToggles.tocEnabled}
+                  // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+                  data-active={editorToggles.tocEnabled ? "true" : "false"}
+                >
+                  ≡
+                </Button>
+              ) : null}
+            </>
+          ) : null}
           <Button
             variant="ghost"
             className="show-script__rail-btn"

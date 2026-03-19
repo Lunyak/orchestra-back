@@ -1298,6 +1298,126 @@
   min-height: 0;
 }
 
+.script-markdown-edit-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.script-markdown-edit-grid[data-preview="off"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.script-markdown-edit-preview {
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.22);
+  overflow: hidden;
+  display: flex;
+}
+
+.script-markdown-edit-preview .markdown-preview {
+  padding: 10px;
+}
+
+.script-markdown-edit-preview .script-step-title {
+  display: none;
+}
+
+.script-markdown-editor-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+}
+
+.script-markdown-editor-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.script-markdown-toc {
+  width: 190px;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.18);
+  padding: 8px;
+}
+
+.script-markdown-toc__title {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(226, 232, 240, 0.85);
+  margin-bottom: 6px;
+}
+
+.script-markdown-toc__list {
+  display: grid;
+  gap: 4px;
+}
+
+.script-markdown-toc__item {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.92);
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-markdown-toc__item[data-level="2"] {
+  padding-left: 14px;
+}
+
+.script-markdown-toc__item[data-level="3"] {
+  padding-left: 20px;
+}
+
+.script-markdown-toc__item:hover {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.script-markdown-toc__item:focus-visible {
+  outline: 2px solid rgba(120, 180, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.script-markdown-toc__empty {
+  font-size: 11px;
+  color: rgba(148, 163, 184, 0.95);
+  padding: 6px 8px;
+}
+
+@media (max-width: 980px) {
+  .script-markdown-edit-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .script-markdown-edit-preview {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .script-markdown-toc {
+    display: none;
+  }
+}
+
 .form-textarea {
   flex: 1;
   min-height: 0;

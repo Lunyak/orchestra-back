@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useScriptUI } from "../../../../features/script-ui";
 import {
   createAnnotation,
@@ -74,6 +74,85 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
 
   const [newAnnotation, setNewAnnotation] = useState<NewAnnotationDraft | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+
+  const kadrLayoutEnabled = markdownMode === "notes" || markdownMode === "explication";
+
+  const previewStorageKey = `showScript:editorPreview:${projectSlug}:${sceneName}`;
+  const tocStorageKey = `showScript:editorToc:${projectSlug}:${sceneName}`;
+  const [previewEnabled, setPreviewEnabled] = useState<boolean>(() => {
+    try {
+      if (typeof window === "undefined") return true;
+      const v = localStorage.getItem(previewStorageKey);
+      return v == null ? true : v === "true";
+    } catch {
+      return true;
+    }
+  });
+  const [tocEnabled, setTocEnabled] = useState<boolean>(() => {
+    try {
+      if (typeof window === "undefined") return true;
+      const v = localStorage.getItem(tocStorageKey);
+      return v == null ? true : v === "true";
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") localStorage.setItem(previewStorageKey, String(previewEnabled));
+    } catch {
+      // ignore
+    }
+  }, [previewEnabled, previewStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") localStorage.setItem(tocStorageKey, String(tocEnabled));
+    } catch {
+      // ignore
+    }
+  }, [tocEnabled, tocStorageKey]);
+
+  const tocItems = useMemo(() => {
+    if (!kadrLayoutEnabled) return [];
+    const text = String(activeMarkdown ?? "");
+    const re = /^(#{1,3})\s+(.+)$/gm;
+    const items: Array<{ level: number; title: string; offset: number }> = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const level = m[1]?.length ?? 3;
+      const title = String(m[2] ?? "").trim() || "…";
+      const offset = Number(m.index) || 0;
+      items.push({ level, title, offset });
+      if (items.length > 2000) break;
+    }
+    return items;
+  }, [activeMarkdown, kadrLayoutEnabled]);
+
+  const jumpToOffset = (offset: number) => {
+    const textarea = markdownRef.current;
+    if (!textarea) return;
+    const max = textarea.value.length;
+    const pos = Math.max(0, Math.min(max, Math.trunc(offset)));
+    textarea.focus();
+    textarea.setSelectionRange(pos, pos);
+
+    // Best-effort scroll caret into view.
+    try {
+      const before = textarea.value.slice(0, pos);
+      const line = before.split("\n").length - 1;
+      const cs = window.getComputedStyle(textarea);
+      const lhRaw = cs.lineHeight;
+      const lh =
+        lhRaw && lhRaw !== "normal" ? Number.parseFloat(lhRaw) : Number.NaN;
+      const lineHeight = Number.isFinite(lh) ? lh : 20;
+      const target = Math.max(0, line * lineHeight - textarea.clientHeight * 0.25);
+      textarea.scrollTop = target;
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     void dispatch(initShowScriptMarkdownUi({ projectSlug, sceneName }));
@@ -280,31 +359,91 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
             `\n\n### Картина ${nextN}\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`,
           );
         }}
+        editorToggles={{
+          previewEnabled,
+          onTogglePreview: () => setPreviewEnabled((p) => !p),
+          tocEnabled: kadrLayoutEnabled ? tocEnabled : undefined,
+          onToggleToc: kadrLayoutEnabled ? () => setTocEnabled((p) => !p) : undefined,
+        }}
       />
 
       {isEditing ? (
-        <div className="form-group form-group-grow">
-          <ScriptStepHeader
-            currentStep={currentStep}
-            updateStep={updateStepField}
-          />
-          <label htmlFor={`markdown-${currentStep.id}`}></label>
-          <textarea
-            id={`markdown-${currentStep.id}`}
-            className="form-textarea"
-            ref={markdownRef}
-            value={activeMarkdown}
-            onChange={(e) => updateStepField(currentStep.id, activeMarkdownField, e.target.value)}
-            onPaste={handlePasteImage}
-            placeholder={
-              markdownMode === "play"
-                ? "Текст пьесы для этого шага"
-                : markdownMode === "explication"
-                  ? "Режиссёрская экспликация для этого шага"
-                  : "Текст, изображения и ссылки на музыку"
-            }
-            rows={12}
-          />
+        <div
+          className="script-markdown-edit-grid"
+          data-preview={previewEnabled ? "on" : "off"}
+        >
+          <div className="form-group form-group-grow">
+            <ScriptStepHeader
+              currentStep={currentStep}
+              updateStep={updateStepField}
+            />
+            <div className="script-markdown-editor-split">
+              {kadrLayoutEnabled && tocEnabled ? (
+                <div className="script-markdown-toc" aria-label="Картины">
+                  <div className="script-markdown-toc__title">Картины</div>
+                  {tocItems.length ? (
+                    <div className="script-markdown-toc__list">
+                      {tocItems.map((it, idx) => (
+                        <button
+                          key={`${it.offset}-${idx}`}
+                          type="button"
+                          className="script-markdown-toc__item"
+                          data-level={String(it.level)}
+                          title={it.title}
+                          onClick={() => jumpToOffset(it.offset)}
+                        >
+                          {it.title}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="script-markdown-toc__empty">
+                      Добавь заголовок `### ...`
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="script-markdown-editor-main">
+                <label htmlFor={`markdown-${currentStep.id}`}></label>
+                <textarea
+                  id={`markdown-${currentStep.id}`}
+                  className="form-textarea"
+                  ref={markdownRef}
+                  value={activeMarkdown}
+                  onChange={(e) =>
+                    updateStepField(currentStep.id, activeMarkdownField, e.target.value)
+                  }
+                  onPaste={handlePasteImage}
+                  placeholder={
+                    markdownMode === "play"
+                      ? "Текст пьесы для этого шага"
+                      : markdownMode === "explication"
+                        ? "Режиссёрская экспликация для этого шага"
+                        : "Текст, изображения и ссылки на музыку"
+                  }
+                  rows={12}
+                />
+              </div>
+            </div>
+          </div>
+
+          {previewEnabled ? (
+            <div className="script-markdown-edit-preview">
+              <ScriptMarkdownPreview
+                projectName={projectSlug}
+                sceneName={sceneName}
+                onTrackLinkClick={onTrackLinkClick}
+                newAnnotation={newAnnotation}
+                setNewAnnotation={setNewAnnotation}
+                activeAnnotationId={activeAnnotationId}
+                setActiveAnnotationId={setActiveAnnotationId}
+                onCreateAnnotation={handleCreateAnnotation}
+                onUpdateAnnotation={handleUpdateAnnotation}
+                onDeleteAnnotation={handleDeleteAnnotation}
+              />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="form-group">
