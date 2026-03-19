@@ -97,7 +97,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
   ): React.ReactNode {
     if (typeof node === "string") {
       const pattern =
-        /(\{\{\s*(light|blackout|play)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+        /(\{\{\s*(light|b|play)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
       const result: React.ReactNode[] = [];
       let lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -137,8 +137,8 @@ export function createRenderLightTokens(lightChannels: string[]) {
               {labelText}
             </span>,
           );
-        } else if (rawType?.toLowerCase() === "blackout") {
-          const label = "Блекаут";
+        } else if (rawType?.toLowerCase() === "b") {
+          const label = "ЗТМ";
           const color = resolveLightColor(label, "#000000", rawColor) ?? "#000000";
           result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-b`));
         } else {
