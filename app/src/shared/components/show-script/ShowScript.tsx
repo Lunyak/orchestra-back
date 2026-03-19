@@ -136,9 +136,25 @@ export const ShowScript: React.FC = () => {
                   <div className="script-step-main">
                     {markdownPane}
                   </div>
-                  {(showStepRoles || (showScriptEditorTools && isEditing && controls)) ? (
+                  {(showStepRoles || showRequisites || (showScriptEditorTools && isEditing && controls)) ? (
                     <div className="script-step-asides">
                       {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
+                      {showRequisites ? (
+                        <RequisitesPanel
+                          show={showRequisites}
+                          isEditing={isEditing}
+                          requisites={currentRequisites}
+                          hasCopiedRequisites={hasCopiedRequisites}
+                          newRequisite={newRequisite}
+                          setNewRequisite={setNewRequisite}
+                          onCopy={copyRequisites}
+                          onPaste={pasteRequisites}
+                          onResetAll={resetRequisites}
+                          onAdd={addRequisite}
+                          onToggle={toggleRequisite}
+                          onRemove={removeRequisite}
+                        />
+                      ) : null}
                       {showScriptEditorTools && isEditing && controls ? (
                         <ControlsScript
                           selectedTrackId={controls.selectedTrackId}
@@ -153,20 +169,6 @@ export const ShowScript: React.FC = () => {
                       ) : null}
                     </div>
                   ) : null}
-                  <RequisitesPanel
-                    show={showRequisites}
-                    isEditing={isEditing}
-                    requisites={currentRequisites}
-                    hasCopiedRequisites={hasCopiedRequisites}
-                    newRequisite={newRequisite}
-                    setNewRequisite={setNewRequisite}
-                    onCopy={copyRequisites}
-                    onPaste={pasteRequisites}
-                    onResetAll={resetRequisites}
-                    onAdd={addRequisite}
-                    onToggle={toggleRequisite}
-                    onRemove={removeRequisite}
-                  />
                 </div>
               </div>
             ) : null

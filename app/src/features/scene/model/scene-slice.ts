@@ -92,6 +92,8 @@ export interface SceneSound {
   volume?: number;
   fadeMs?: number;
   loop?: boolean;
+  /** If true, stopping the sound resets playback position to the start. */
+  restartOnStop?: boolean;
   remoteUrl?: string;
   remoteKey?: string;
   /** Полный путь к файлу на диске (только локально, для загрузки на сервер) */

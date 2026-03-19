@@ -233,6 +233,16 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
         onToggleEditing={() => setIsEditing((p: boolean) => !p)}
         markdownMode={markdownMode}
         onSetMarkdownMode={(mode) => {
+          try {
+            if (typeof window !== "undefined") {
+              localStorage.setItem(
+                `showScript:markdownMode:${projectSlug}:${sceneName}`,
+                mode,
+              );
+            }
+          } catch {
+            // ignore
+          }
           dispatch(
             showScriptMarkdownActions.setMarkdownMode({
               projectSlug,

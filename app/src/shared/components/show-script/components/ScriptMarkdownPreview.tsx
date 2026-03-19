@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
 import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
@@ -21,6 +21,7 @@ import {
   createRehypeScriptTokens,
   createRenderLightTokens,
 } from "../utils/lightTokens";
+import { rehypeKadrSections } from "../utils/rehypeKadrSections";
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
 
@@ -204,8 +205,20 @@ export function ScriptMarkdownPreview({
     return selectAnnotations(s, cacheKey).items;
   });
   const annotationsMode = ui.annotationsMode;
+  const markdownMode = ui.markdownMode;
   const playlistOptions = ui.playlistOptions;
   const lightChannels = ui.lightChannels;
+
+  const [lightbox, setLightbox] = useState<null | { src: string; alt: string }>(null);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [lightbox]);
 
   useEffect(() => {
     if (!accessToken || !projectName) return;
@@ -220,6 +233,9 @@ export function ScriptMarkdownPreview({
       activeAnnotationId,
       isOpen: Boolean(newAnnotation || activeAnnotationId),
     });
+
+  const [dialogLabelSlotPx, setDialogLabelSlotPx] = useState<number | null>(null);
+  const dialogLabelSlotPxRef = useRef<number | null>(null);
 
   const resolveImageSrc = (src?: string) => {
     if (!src) return src;
@@ -298,17 +314,33 @@ export function ScriptMarkdownPreview({
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [src, accessToken]);
 
-    return (
+    const canOpen = Boolean(resolved);
+    const altText = String(alt ?? "").trim();
+
+    const imgEl = (
       <img
         src={resolved}
-        alt={alt || ""}
-        style={{
-          maxHeight: 800,
-          maxWidth: "100%",
-          height: "auto",
-        }}
+        alt={altText}
         {...rest}
       />
+    );
+
+    if (!canOpen) return imgEl;
+
+    return (
+      <button
+        type="button"
+        className="markdown-image-btn"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setLightbox({ src: resolved, alt: altText });
+        }}
+        title="Открыть изображение"
+        aria-label="Открыть изображение"
+      >
+        {imgEl}
+      </button>
     );
   };
 
@@ -367,10 +399,66 @@ export function ScriptMarkdownPreview({
     [lightChannels],
   );
 
+  const kadrLayoutEnabled = markdownMode === "notes" || markdownMode === "explication";
+
+  const rehypePlugins = useMemo(() => {
+    const plugins: any[] = [];
+    if (annotationsMode) {
+      plugins.push(rehypeScriptTokens);
+      plugins.push([rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }]);
+    }
+    if (kadrLayoutEnabled) {
+      plugins.push([rehypeKadrSections, { enabled: true, headingMaxLevel: 3 }]);
+    }
+    return plugins;
+  }, [annotationsMode, rehypeScriptTokens, annotations, activeAnnotationId, kadrLayoutEnabled]);
+
   const hasRoleOrLightLabels = useMemo(
     () => markdownHasRoleLightOrPlayLineLabels(markdown || ""),
     [markdown],
   );
+
+  useLayoutEffect(() => {
+    if (!hasRoleOrLightLabels) {
+      dialogLabelSlotPxRef.current = null;
+      setDialogLabelSlotPx(null);
+      return;
+    }
+
+    const root = rootRef.current;
+    if (!root) return;
+
+    const MIN = 56;
+    const MAX = 220;
+
+    const compute = () => {
+      const labels = Array.from(
+        root.querySelectorAll<HTMLElement>(".markdown-dialog-label"),
+      );
+      let max = 0;
+      for (const label of labels) {
+        const child = label.firstElementChild as HTMLElement | null;
+        if (!child) continue;
+        const w = child.getBoundingClientRect().width;
+        if (Number.isFinite(w)) max = Math.max(max, Math.ceil(w));
+      }
+      const next = Math.max(MIN, Math.min(MAX, max || MIN));
+      const prev = dialogLabelSlotPxRef.current;
+      if (prev == null || Math.abs(prev - next) > 2) {
+        dialogLabelSlotPxRef.current = next;
+        setDialogLabelSlotPx(next);
+      }
+    };
+
+    // Measure after paint to avoid 0-width in some cases.
+    const raf = requestAnimationFrame(compute);
+    const ro = new ResizeObserver(() => compute());
+    ro.observe(root);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [hasRoleOrLightLabels, markdown]);
 
   const playFromPayload = (payload: TrackLinkPayload) => {
     if (!onTrackLinkClick) return;
@@ -505,10 +593,17 @@ export function ScriptMarkdownPreview({
 
   return (
     <div
-      className={
-        hasRoleOrLightLabels
-          ? "markdown-preview markdown-preview--has-line-labels"
-          : "markdown-preview"
+      className={[
+        "markdown-preview",
+        hasRoleOrLightLabels ? "markdown-preview--has-line-labels" : "",
+        kadrLayoutEnabled ? "markdown-preview--kadr" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={
+        dialogLabelSlotPx != null
+          ? ({ ["--dialog-label-slot-width" as any]: `${dialogLabelSlotPx}px` } as React.CSSProperties)
+          : undefined
       }
     >
       <div
@@ -519,14 +614,7 @@ export function ScriptMarkdownPreview({
         <div className="script-step-title">{currentStep?.title}</div>
         <ReactMarkdown
           urlTransform={urlTransform}
-          rehypePlugins={
-            annotationsMode
-              ? [
-                rehypeScriptTokens,
-                [rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }],
-              ]
-              : []
-          }
+          rehypePlugins={rehypePlugins}
           components={{
             p: ({ children }: { children: React.ReactNode }) => {
               const rendered = renderLightTokens(children);
@@ -676,11 +764,73 @@ export function ScriptMarkdownPreview({
                 </mark>
               );
             },
+            code: ({
+              className,
+              children,
+              node,
+              ...rest
+            }: {
+              className?: string;
+              children: React.ReactNode;
+            } & React.HTMLAttributes<HTMLElement>) => {
+              const classStr = String(className ?? "");
+              const isCodeBlock =
+                /\blanguage-/.test(classStr) ||
+                String(children ?? "").includes("\n");
+
+              if (!isCodeBlock) {
+                const text = String(children ?? "").replace(/\n/g, " ").trim();
+                return (
+                  <code
+                    className="markdown-inline-code-label"
+                    title={text || undefined}
+                    {...rest}
+                  >
+                    {text || children}
+                  </code>
+                );
+              }
+              return (
+                <code className={className} {...rest}>
+                  {children}
+                </code>
+              );
+            },
           }}
         >
           {markdown || "*Пусто*"}
         </ReactMarkdown>
       </div>
+
+      {lightbox && (
+        <div
+          className="markdown-lightbox"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Просмотр изображения"
+          onClick={() => setLightbox(null)}
+        >
+          <div
+            className="markdown-lightbox__content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="markdown-lightbox__close"
+              onClick={() => setLightbox(null)}
+              aria-label="Закрыть"
+              title="Закрыть"
+            >
+              ×
+            </button>
+            <img
+              className="markdown-lightbox__img"
+              src={lightbox.src}
+              alt={lightbox.alt || ""}
+            />
+          </div>
+        </div>
+      )}
 
       {annotationsMode ? (
         <ActorAnnotationsPopover

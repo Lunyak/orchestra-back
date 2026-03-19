@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useProject } from "../../../../features/project";
 import type { ScriptRequisite } from "../../../types/script";
 
 export function RequisitesPanel({
@@ -30,10 +31,41 @@ export function RequisitesPanel({
 }) {
   if (!show) return null;
 
+  const { projectName } = useProject();
+  const collapseKey = `requisitesPanel:collapsed:${projectName || "unknown"}`;
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    try {
+      return (typeof window !== "undefined" ? localStorage.getItem(collapseKey) : null) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      localStorage.setItem(collapseKey, collapsed ? "1" : "0");
+    } catch {
+      // ignore
+    }
+  }, [collapseKey, collapsed]);
+
   return (
-    <aside className="requisites-panel">
+    <aside className="requisites-panel" data-collapsed={collapsed ? "true" : "false"}>
       <div className="requisites-header">
-        <span>Реквизит</span>
+        <div className="requisites-header-left">
+          <span>Реквизит</span>
+          <span className="requisites-count">{requisites.length}</span>
+        </div>
+        <button
+          type="button"
+          className="requisites-toggle"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Развернуть панель реквизита" : "Свернуть панель реквизита"}
+          aria-label={collapsed ? "Развернуть панель реквизита" : "Свернуть панель реквизита"}
+        >
+          {collapsed ? "⟩" : "⟨"}
+        </button>
         <div className="requisites-actions">
           <button
             type="button"

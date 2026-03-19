@@ -66,6 +66,10 @@ export function ScriptMarkdownToolbar({
             className="show-script__rail-btn"
             onClick={onToggleEditing}
             title={isEditing ? "Перейти в режим чтения" : "Перейти в режим редактирования"}
+            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+            aria-pressed={isEditing}
+            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+            data-active={isEditing ? "true" : "false"}
           >
             {isEditing ? "📖" : "✏️"}
           </Button>
@@ -81,6 +85,10 @@ export function ScriptMarkdownToolbar({
                   ? "Выключить метки"
                   : "Включить метки"
             }
+            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+            aria-pressed={annotationsMode}
+            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
+            data-active={annotationsMode ? "true" : "false"}
           >
             🏷️
           </Button>

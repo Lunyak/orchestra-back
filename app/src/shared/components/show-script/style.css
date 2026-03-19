@@ -5,6 +5,7 @@
   height: 100%;
   width: 100%;
   position: relative;
+  box-sizing: border-box;
 }
 
 .show-script__controls-panel {
@@ -37,6 +38,20 @@
   padding: 0 14px;
   font-size: 12px;
   display: inline-block;
+}
+
+.show-script__rail-btn[data-active="true"] {
+  background: rgba(37, 99, 235, 0.18);
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  color: #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12);
+}
+
+.show-script__rail-btn:focus-visible {
+  outline: 2px solid rgba(120, 180, 255, 0.85);
+  outline-offset: 2px;
+  border-radius: 10px;
 }
 
 .script-step-title {
@@ -329,8 +344,10 @@
   min-height: 0;
   max-height: 100%;
   position: absolute;
-  bottom: 0;
+  bottom: 50%;
+  transform: translateY(50%);
   right: 0;
+  align-items: flex-end;
 }
 
 .script-step-main {
@@ -516,6 +533,20 @@
     min-width: 0;
     max-width: none;
   }
+
+  .requisites-panel {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    resize: none;
+    overflow: hidden;
+  }
+
+  .requisites-panel[data-collapsed="true"] {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .step-roles-empty {
@@ -694,11 +725,6 @@
 }
 
 .requisites-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 240px;
-  min-width: 200px;
   background: #0f172a;
   border: 1px solid #1f2937;
   border-radius: 8px;
@@ -707,8 +733,21 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: fit-content;
-  z-index: 10;
+  flex: 0 0 auto;
+  width: 320px;
+  min-width: 240px;
+  max-width: min(420px, 45vw);
+  max-height: 100%;
+  overflow: hidden;
+  resize: horizontal;
+}
+
+.requisites-panel[data-collapsed="true"] {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  resize: none;
+  padding: 8px;
 }
 
 .requisites-header {
@@ -719,16 +758,44 @@
   font-size: 13px;
   font-weight: 600;
   color: #f8fafc;
-  position: relative;
+}
+
+.requisites-toggle {
+  background: #1f2937;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 2px 6px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.requisites-toggle:hover {
+  border-color: #60a5fa;
+  color: #fff;
+}
+
+.requisites-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.requisites-count {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #374151;
+  background: #111827;
+  color: #94a3b8;
 }
 
 .requisites-actions {
   display: flex;
   gap: 6px;
-  flex-direction: column;
-  position: absolute;
-  right: 0;
-  top: 0;
+  flex-direction: row;
 }
 
 .requisites-action-btn {
@@ -784,6 +851,13 @@
   min-height: 0;
 }
 
+.requisites-panel[data-collapsed="true"] .requisites-header-left,
+.requisites-panel[data-collapsed="true"] .requisites-actions,
+.requisites-panel[data-collapsed="true"] .requisites-add,
+.requisites-panel[data-collapsed="true"] .requisites-list {
+  display: none;
+}
+
 .requisites-empty {
   color: #94a3b8;
   font-size: 12px;
@@ -827,10 +901,9 @@
   overflow: auto;
   color: var(--color-text-primary);
   font-family: var(--font-family-script-body);
-  --speaker-label-slot-width: clamp(88px, 10ch, 160px);
-  --light-label-slot-width: clamp(60px, 7ch, 120px);
-  --track-label-slot-width: clamp(70px, 9ch, 150px);
-  --play-label-slot-width: clamp(46px, 6ch, 78px);
+  /* Shared left "label slot" width for dialog lines.
+     Can be overridden dynamically from JS on the rendered markdown container. */
+  --dialog-label-slot-width: clamp(72px, 12ch, 220px);
 
   p {
     margin: 4px 0;
@@ -843,8 +916,164 @@
 }
 
 @supports (background-color: color-mix(in oklab, black 50%, white)) {
-  .markdown-preview p:nth-child(2n) {
+  .markdown-preview:not(.markdown-preview--kadr) p:nth-child(2n) {
     background-color: color-mix(in oklab, var(--color-bg-primary) 96%, black);
+  }
+}
+
+.markdown-kadr {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.markdown-kadr__left h1,
+.markdown-kadr__left h2,
+.markdown-kadr__left h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.2;
+  color: #f8fafc;
+}
+
+.markdown-kadr__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.markdown-kadr[data-has-image="false"] .markdown-kadr__grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.markdown-kadr__left {
+  min-width: 0;
+}
+
+.markdown-kadr__right {
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.markdown-kadr__right[data-empty="true"] {
+  display: none;
+}
+
+.markdown-kadr__right > * {
+  flex: 0 0 auto;
+}
+
+.markdown-kadr__right p {
+  margin: 0;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  max-height: 800px;
+}
+
+.markdown-kadr__right img {
+  width: auto;
+  height: 120px;
+  max-height: none;
+  display: block;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(2, 6, 23, 0.5);
+}
+
+.markdown-image-btn img {
+  display: block;
+}
+
+@media (max-width: 880px) {
+  .markdown-kadr__right img {
+    height: 100px;
+  }
+}
+
+.markdown-image-btn {
+  display: inline-block;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  border-radius: 10px;
+}
+
+.markdown-image-btn:focus-visible {
+  outline: 2px solid rgba(120, 180, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.markdown-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(2, 6, 23, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.markdown-lightbox__content {
+  position: relative;
+  width: min(1200px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.markdown-lightbox__close {
+  position: sticky;
+  top: 8px;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 6, 23, 0.55);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.markdown-lightbox__close:hover {
+  background: rgba(2, 6, 23, 0.75);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.markdown-lightbox__img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(2, 6, 23, 0.5);
+}
+
+@media (max-width: 880px) {
+  .markdown-kadr__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1112,6 +1341,24 @@
   content: "♪";
 }
 
+.markdown-inline-code-label {
+  display: inline;
+  padding: 0.12em 0.38em;
+  border-radius: 4px;
+  background: rgba(17, 24, 39, 0.72);
+  border: 1px solid rgba(51, 65, 85, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+  color: #e2e8f0;
+  font-size: 0.92em;
+  font-weight: 600;
+  line-height: 1.25;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  vertical-align: baseline;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .markdown-light-chip {
   display: flex;
   align-items: center;
@@ -1137,7 +1384,7 @@
   /* color: var(--color-text-label); */
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.25px;
   vertical-align: baseline;
   white-space: nowrap;
   cursor: pointer;
@@ -1173,37 +1420,34 @@
 }
 
 .markdown-dialog-line {
-  --line-label-slot-width: var(--speaker-label-slot-width);
+  --line-label-slot-width: var(--dialog-label-slot-width);
   display: flex;
   align-items: baseline;
   gap: 10px;
 }
 
-.markdown-dialog-line--label-light {
-  --line-label-slot-width: var(--light-label-slot-width);
-}
-
-.markdown-dialog-line--label-track {
-  --line-label-slot-width: var(--track-label-slot-width);
-}
-
-.markdown-dialog-line--label-play {
-  --line-label-slot-width: var(--play-label-slot-width);
-}
-
-.markdown-dialog-line--track-align {
-  --line-label-slot-width: var(--speaker-label-slot-width);
-}
-
-.markdown-dialog-line--track-compact {
-  --line-label-slot-width: 28px;
-}
+/* NOTE: slot width is unified via --dialog-label-slot-width */
 
 .markdown-dialog-label {
   flex: 0 0 var(--line-label-slot-width);
   min-width: var(--line-label-slot-width);
   display: flex;
   align-items: baseline;
+}
+
+/* Roles can be longer (e.g. "ВАССА ЖЕЛЕЗНОВА"): allow up to 2 lines in the fixed slot. */
+.markdown-dialog-line--label-role .markdown-dialog-label {
+  align-items: flex-start;
+}
+
+.markdown-dialog-line--label-role .markdown-speaker-label {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.05;
 }
 
 .markdown-track-play {

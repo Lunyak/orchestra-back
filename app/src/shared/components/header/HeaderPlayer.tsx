@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ensureProject } from "../../../sync/api";
-import { getDesktopApi } from "../../platform/desktop-api";
-import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   pickSceneSoundsDesktop,
   sceneActions,
   setSoundIcon,
   uploadSceneSoundsWeb,
 } from "../../../features/scene/model/scene-slice";
+import { ensureProject } from "../../../sync/api";
+import { getDesktopApi } from "../../platform/desktop-api";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import "./style.css";
 
 export interface HeaderSound {
@@ -21,6 +21,8 @@ export interface HeaderSound {
   volume?: number;
   fadeMs?: number;
   loop?: boolean;
+  /** If true, stopping the sound resets playback position to the start. */
+  restartOnStop?: boolean;
   remoteUrl?: string;
   remoteKey?: string;
   /** Полный путь к файлу на диске (только локально, для загрузки на сервер) */
@@ -40,6 +42,7 @@ interface LoadedTrack {
   volume: number;
   fadeMs: number;
   loop: boolean;
+  restartOnStop: boolean;
   isPlaying: boolean;
   filePath?: string;
   remoteKey?: string;
@@ -74,6 +77,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       volume: sound.volume ?? 0.8,
       fadeMs: sound.fadeMs ?? 500,
       loop: sound.loop ?? false,
+      restartOnStop: sound.restartOnStop ?? true,
       isPlaying: false,
       filePath: sound.filePath,
       remoteKey: sound.remoteKey,
@@ -111,24 +115,34 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   useEffect(() => {
-    setTracks(
-      sounds.map((sound) => ({
-        id: sound.id,
-        name: sound.title,
-        url: sound.remoteUrl ?? sound.file,
-        file: sound.file,
-        icon: sound.icon,
-        iconRemoteKey: sound.iconRemoteKey,
-        iconRemoteUrl: sound.iconRemoteUrl,
-        volume: sound.volume ?? 0.8,
-        fadeMs: sound.fadeMs ?? 500,
-        loop: sound.loop ?? false,
-        isPlaying: false,
-        filePath: sound.filePath,
-        remoteKey: sound.remoteKey,
-        remoteUrl: sound.remoteUrl,
-      })),
-    );
+    setTracks((prev) => {
+      const prevById = new Map(prev.map((t) => [t.id, t]));
+      return sounds.map((sound) => {
+        const existing = prevById.get(sound.id) ?? null;
+        const audio = audioRefs.current?.[sound.id] ?? null;
+        const isPlaying =
+          existing?.isPlaying ??
+          (audio ? !audio.paused : false);
+        return {
+          id: sound.id,
+          name: sound.title,
+          url: sound.remoteUrl ?? sound.file,
+          file: sound.file,
+          icon: sound.icon,
+          iconRemoteKey: sound.iconRemoteKey,
+          iconRemoteUrl: sound.iconRemoteUrl,
+          // Preserve previous values if backend payload doesn't include them yet.
+          volume: sound.volume ?? existing?.volume ?? 0.8,
+          fadeMs: sound.fadeMs ?? existing?.fadeMs ?? 500,
+          loop: sound.loop ?? existing?.loop ?? false,
+          restartOnStop: sound.restartOnStop ?? existing?.restartOnStop ?? true,
+          isPlaying: Boolean(isPlaying),
+          filePath: sound.filePath ?? existing?.filePath,
+          remoteKey: sound.remoteKey ?? existing?.remoteKey,
+          remoteUrl: sound.remoteUrl ?? existing?.remoteUrl,
+        };
+      });
+    });
   }, [sounds]);
 
   useEffect(() => {
@@ -151,7 +165,14 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   ): Promise<HeaderSound[]> => {
     const accessToken =
       typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
-    if (!accessToken) return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
+    if (!accessToken)
+      return soundsToUpload.map((s) => ({
+        ...s,
+        volume: 0.8,
+        fadeMs: 500,
+        loop: false,
+        restartOnStop: true,
+      }));
 
     const projectIdKey = `projectId:${projectName}`;
     let projectId = typeof window !== "undefined" ? localStorage.getItem(projectIdKey) : null;
@@ -162,7 +183,13 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         if (typeof window !== "undefined") localStorage.setItem(projectIdKey, projectId);
       } catch (err) {
         console.error("[sounds] ensureProject failed", err);
-        return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
+        return soundsToUpload.map((s) => ({
+          ...s,
+          volume: 0.8,
+          fadeMs: 500,
+          loop: false,
+          restartOnStop: true,
+        }));
       }
     }
 
@@ -170,7 +197,13 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     const api = getDesktopApi();
     if (!api?.invoke) {
       console.warn("[sounds] No desktop API — upload skipped, sounds will have no remoteKey/remoteUrl");
-      return soundsToUpload.map((s) => ({ ...s, volume: 0.8, fadeMs: 500, loop: false }));
+      return soundsToUpload.map((s) => ({
+        ...s,
+        volume: 0.8,
+        fadeMs: 500,
+        loop: false,
+        restartOnStop: true,
+      }));
     }
     for (const s of soundsToUpload) {
       try {
@@ -188,16 +221,17 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
             volume: 0.8,
             fadeMs: 500,
             loop: false,
+            restartOnStop: true,
             remoteKey: res.key,
             remoteUrl: res.url,
           });
         } else {
           console.error("[sounds] upload failed (no key/url)", res?.error ?? res);
-          result.push({ ...s, volume: 0.8, fadeMs: 500, loop: false });
+          result.push({ ...s, volume: 0.8, fadeMs: 500, loop: false, restartOnStop: true });
         }
       } catch (err) {
         console.error("[sounds] upload error", err);
-        result.push({ ...s, volume: 0.8, fadeMs: 500, loop: false });
+        result.push({ ...s, volume: 0.8, fadeMs: 500, loop: false, restartOnStop: true });
       }
     }
     return result;
@@ -226,6 +260,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
             volume: track.volume,
             fadeMs: track.fadeMs,
             loop: track.loop,
+            restartOnStop: track.restartOnStop,
             // Приоритет у новых значений (track), чтобы при повторном добавлении обновлялись ссылки
             remoteKey: track.remoteKey ?? orig?.remoteKey,
             remoteUrl: track.remoteUrl ?? orig?.remoteUrl,
@@ -366,6 +401,13 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       const from = audio.volume;
       runFade(track.id, from, 0, track.fadeMs, () => {
         audio.pause();
+        if (track.restartOnStop) {
+          try {
+            audio.currentTime = 0;
+          } catch {
+            // ignore (best-effort)
+          }
+        }
         setTracks((prev) =>
           prev.map((item) =>
             item.id === track.id ? { ...item, isPlaying: false } : item,
@@ -408,6 +450,15 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       ),
     );
     dispatch(sceneActions.updateSound({ id: track.id, changes: { loop: value } }));
+  };
+
+  const handleRestartOnStopChange = (track: LoadedTrack, value: boolean) => {
+    setTracks((prev) =>
+      prev.map((item) =>
+        item.id === track.id ? { ...item, restartOnStop: value } : item,
+      ),
+    );
+    dispatch(sceneActions.updateSound({ id: track.id, changes: { restartOnStop: value } }));
   };
 
   const resolveIconSrc = (file: string) => {
@@ -501,132 +552,160 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       <button
         className="header-player-settings-toggle"
         onClick={() => setShowSettings((prev) => !prev)}
+        type="button"
+        aria-pressed={showSettings}
+        aria-label={showSettings ? "Скрыть настройки звуков" : "Показать настройки звуков"}
+        title={showSettings ? "Скрыть настройки звуков" : "Настройки звуков"}
       >
-        {showSettings ? "Скрыть настройки" : "Настройки"}
+        <svg
+          className="header-player-settings-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            fill="currentColor"
+            d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.14 7.14 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.51.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+          />
+        </svg>
       </button>
 
       <div className="header-player-list">
-        {tracks.map((track) => (
-          <div
-            key={track.id}
-            className={`header-player-track-row ${track.isPlaying ? "playing" : ""
-              } ${showSettings ? "settings-open" : ""}`}
-            onClick={() => toggleTrack(track)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                toggleTrack(track);
-              }
-            }}
-          >
-            <audio
-              ref={(el) => {
-                audioRefs.current[track.id] = el;
-              }}
-              onEnded={() =>
-                setTracks((prev) =>
-                  prev.map((item) =>
-                    item.id === track.id ? { ...item, isPlaying: false } : item,
-                  ),
-                )
-              }
-            />
+        {tracks.map((track) => {
+          return (
             <div
-              className="header-player-mixer"
-              onClick={(event) => event.stopPropagation()}
+              key={track.id}
+              className={`header-player-track-row ${track.isPlaying ? "playing" : ""} ${showSettings ? "settings-open" : ""}`}
+              onClick={() => toggleTrack(track)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggleTrack(track);
+                }
+              } }
             >
+              <audio
+                ref={(el) => {
+                  audioRefs.current[track.id] = el;
+                } }
+                onEnded={() => setTracks((prev) => prev.map((item) => item.id === track.id ? { ...item, isPlaying: false } : item
+                )
+                )} />
               <div
-                className="header-player-knob"
-                style={{
-                  ["--sweep" as keyof React.CSSProperties]: `${Math.round(
-                    track.volume * 360,
-                  )}deg`,
-                  ["--angle" as keyof React.CSSProperties]: `${Math.round(
-                    track.volume * 360 - 90,
-                  )}deg`,
-                }}
+                className="header-player-hover-slider header-player-hover-slider--left"
+                onClick={(event) => event.stopPropagation()}
               >
-                <div className="header-player-knob-indicator" />
                 <input
-                  className="header-player-knob-input"
+                  className="header-player-slider header-player-volume"
                   type="range"
                   min={0}
                   max={1}
                   step={0.01}
                   value={track.volume}
-                  onChange={(event) =>
-                    handleVolumeChange(track, Number(event.target.value))
-                  }
-                />
+                  style={{
+                    ["--range-fill" as unknown as string]: `${Math.min(
+                      100,
+                      Math.max(0, Number(track.volume) * 100)
+                    )}%`,
+                  }}
+                  onChange={(event) => handleVolumeChange(track, Number(event.target.value))}
+                  aria-label="Track volume"
+                  title={`Громкость: ${Math.round(track.volume * 100)}%`} />
               </div>
-            </div>
-            {track.icon || track.iconRemoteUrl ? (
-              <img
-                className="header-player-track-icon"
-                src={getIconSrc(track)}
-                alt={track.name}
-                title={track.name}
-              />
-            ) : (
-              <div className="header-player-track-name" title={track.name}>
-                {track.name}
-              </div>
-            )}
-            <button
-              className="header-player-remove"
-              onClick={(event) => {
-                event.stopPropagation();
-                removeTrack(track);
-              }}
-            >
-              ×
-            </button>
-            {showSettings && (
+
               <div
-                className="header-player-settings"
+                className="header-player-hover-slider header-player-hover-slider--right"
                 onClick={(event) => event.stopPropagation()}
               >
-                <label className="header-player-setting">
-                  <span>Fade</span>
-                  <input
-                    className="header-player-slider header-player-fade"
-                    type="range"
-                    min={0}
-                    max={3000}
-                    step={100}
-                    value={track.fadeMs}
-                    onChange={(event) =>
-                      handleFadeChange(track, Number(event.target.value))
-                    }
-                    aria-label="Fade duration"
-                    title={`Плавность: ${track.fadeMs}мс`}
-                  />
-                </label>
-                <label className="header-player-loop">
-                  <input
-                    type="checkbox"
-                    checked={track.loop}
-                    onChange={(event) =>
-                      handleLoopChange(track, event.target.checked)
-                    }
-                  />
-                  Зациклить
-                </label>
-                <button
-                  className="header-player-icon-btn"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    addIcon(track);
+                <input
+                  className="header-player-slider header-player-fade"
+                  type="range"
+                  min={0}
+                  max={3000}
+                  step={100}
+                  value={track.fadeMs}
+                  style={{
+                    ["--range-fill" as unknown as string]: `${Math.min(
+                      100,
+                      Math.max(0, (Number(track.fadeMs) / 3000) * 100)
+                    )}%`,
                   }}
-                >
-                  Иконка
-                </button>
+                  onChange={(event) => handleFadeChange(track, Number(event.target.value))}
+                  aria-label="Fade duration"
+                  title={`Плавность: ${track.fadeMs}мс`} />
               </div>
-            )}
-          </div>
-        ))}
+              {track.icon || track.iconRemoteUrl ? (
+                <img
+                  className="header-player-track-icon"
+                  src={getIconSrc(track)}
+                  alt={track.name}
+                  title={track.name} />
+              ) : (
+                <div className="header-player-track-name" title={track.name}>
+                  {track.name}
+                </div>
+              )}
+              <button
+                className="header-player-remove"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeTrack(track);
+                } }
+              >
+                ×
+              </button>
+              {showSettings && (
+                <div
+                  className="header-player-settings"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <button
+                    className="header-player-mini-toggle"
+                    type="button"
+                    aria-pressed={track.restartOnStop}
+                    data-active={track.restartOnStop ? "true" : "false"}
+                    title="После стопа — с начала"
+                    aria-label="После стопа — с начала"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleRestartOnStopChange(track, !track.restartOnStop);
+                    } }
+                  >
+                    ↺
+                  </button>
+                  <button
+                    className="header-player-mini-toggle"
+                    type="button"
+                    aria-pressed={track.loop}
+                    data-active={track.loop ? "true" : "false"}
+                    title="Цикл"
+                    aria-label="Цикл"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleLoopChange(track, !track.loop);
+                    } }
+                  >
+                    ∞
+                  </button>
+                  <button
+                    className="header-player-icon-btn"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      addIcon(track);
+                    } }
+                    type="button"
+                    title="Иконка"
+                    aria-label="Иконка"
+                  >
+                    🏞️
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
         <div
           className="header-player-track-row header-player-load-tile"
           onClick={addTracks}
@@ -642,7 +721,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           }}
         >
           <div className="header-player-track-name">
-            {soundsUpload.uploading ? "Загрузка…" : "Добавить"}
+            {soundsUpload.uploading ? "Загрузка…" : "+"}
           </div>
           <div className="header-player-load-icon" aria-hidden="true">
             ↑

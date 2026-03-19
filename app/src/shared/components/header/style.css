@@ -87,15 +87,35 @@
 }
 
 .header-player-settings-toggle {
-  background: #0f172a;
-  border: 1px solid #1f2937;
-  color: #e2e8f0;
-  padding: 6px 10px;
-  border-radius: 6px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.65);
+  color: rgba(226, 232, 240, 0.92);
   cursor: pointer;
-  font-size: 12px;
-  width: 100%;
-  max-width: 98px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+.header-player-settings-toggle:hover {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: rgba(96, 165, 250, 0.55);
+  transform: translateY(-1px);
+}
+
+.header-player-settings-toggle[aria-pressed="true"] {
+  border-color: rgba(252, 188, 81, 0.7);
+  box-shadow: 0 0 0 3px rgba(252, 188, 81, 0.18);
+}
+
+.header-player-settings-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 .header-player-mixer {
@@ -170,10 +190,99 @@
   cursor: pointer;
 }
 
-.header-player-fade {
-  accent-color: #fbbf24;
-  width: 60px;
+.header-player-slider[type="range"] {
+  --range-fill: 0%;
+  --range-height: 10px;
+  --range-radius: 6px;
+  --range-track: rgba(0, 0, 0, 0.25);
+  --range-track-border: rgba(255, 255, 255, 0.08);
+  --range-thumb: rgba(255, 255, 255, 0.92);
+  --range-thumb-border: rgba(17, 24, 39, 0.9);
+  --range-fill-a: rgba(252, 188, 81, 1);
+  --range-fill-b: rgba(252, 163, 17, 0.95);
+
+  flex: 1;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.header-player-slider[type="range"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.header-player-slider[type="range"]:focus {
+  outline: none;
+}
+
+.header-player-slider[type="range"]::-webkit-slider-runnable-track {
+  height: var(--range-height);
+  border-radius: var(--range-radius);
+  border: 1px solid var(--range-track-border);
+  background-color: var(--range-track);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      var(--range-fill-b) 0 10px,
+      transparent 10px 20px
+    ),
+    linear-gradient(to right, var(--range-fill-a), var(--range-fill-a));
+  background-repeat: no-repeat, no-repeat;
+  background-size: var(--range-fill) 100%, var(--range-fill) 100%;
+  background-position: left center, left center;
+}
+
+.header-player-slider[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
   height: 14px;
+  margin-top: calc((var(--range-height) - 14px) / 2);
+  border-radius: 999px;
+  background: var(--range-thumb);
+  border: 2px solid var(--range-thumb-border);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.header-player-slider[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 3px rgba(252, 188, 81, 0.35),
+    0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.header-player-slider[type="range"]::-moz-range-track {
+  height: var(--range-height);
+  border-radius: var(--range-radius);
+  border: 1px solid var(--range-track-border);
+  background-color: var(--range-track);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.header-player-slider[type="range"]::-moz-range-progress {
+  height: var(--range-height);
+  border-radius: var(--range-radius);
+  background-color: var(--range-fill-a);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--range-fill-b) 0 10px,
+    transparent 10px 20px
+  );
+}
+
+.header-player-slider[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--range-thumb);
+  border: 2px solid var(--range-thumb-border);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
 }
 
 .header-player-list {
@@ -182,8 +291,8 @@
 }
 
 .header-player-track-row {
-  width: 80px;
-  height: 80px;
+  width: 60px;
+  height: 60px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -197,15 +306,85 @@
   justify-content: center;
 }
 
+.header-player-hover-slider {
+  position: absolute;
+  top: 50%;
+  width: 26px;
+  height: 92px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  transform: translateY(-50%) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 4;
+}
+
+.header-player-hover-slider--left {
+  left: -8px;
+}
+
+.header-player-hover-slider--right {
+  right: -8px;
+}
+
+.header-player-track-row:hover .header-player-hover-slider,
+.header-player-track-row:focus-within .header-player-hover-slider {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  pointer-events: auto;
+}
+
+/* In settings mode, do not show hover sliders */
+.header-player-track-row.settings-open .header-player-hover-slider {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-50%) scale(0.96) !important;
+}
+
+.header-player-hover-slider .header-player-slider[type="range"] {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 72px; /* becomes vertical height after rotate */
+  height: 26px;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  transform-origin: center;
+  touch-action: none;
+}
+
+/* Make hover sliders thinner/compact */
+.header-player-hover-slider .header-player-slider[type="range"] {
+  height: 20px;
+  --range-height: 8px;
+}
+
+.header-player-hover-slider .header-player-slider[type="range"]::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: calc((var(--range-height) - 12px) / 2);
+}
+
+.header-player-hover-slider .header-player-slider[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+}
+
 .header-player-settings {
   position: absolute;
-  inset: 6px;
-  background: rgba(15, 23, 42, 0.95);
-  border-radius: 6px;
-  padding: 6px;
+  left: 6px;
+  right: 6px;
+  bottom: 6px;
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 3px 4px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
   z-index: 3;
 }
 
@@ -231,8 +410,36 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
+  font-size: 8px;
   color: #cbd5f5;
+}
+
+.header-player-mini-toggle {
+  width: 22px;
+  height: 16px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.65);
+  color: rgba(226, 232, 240, 0.92);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+
+.header-player-mini-toggle:hover {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: rgba(96, 165, 250, 0.55);
+  transform: translateY(-1px);
+}
+
+.header-player-mini-toggle[data-active="true"] {
+  border-color: rgba(252, 188, 81, 0.7);
+  box-shadow: 0 0 0 3px rgba(252, 188, 81, 0.14);
 }
 
 .header-player-track-row.playing {
@@ -286,18 +493,25 @@
 
 .header-player-settings .header-player-icon-btn {
   position: static;
-  width: auto;
-  height: auto;
-  border-radius: 6px;
-  padding: 4px 6px;
-  font-size: 12px;
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  line-height: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.65);
   opacity: 1;
+  cursor: pointer;
+}
+
+.header-player-settings .header-player-icon-btn:hover {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: rgba(96, 165, 250, 0.55);
 }
 
 .header-player-load-tile {
   position: relative;
-  border: 1px dashed #334155;
-  background: #111827;
+  background: inherit;
   justify-content: center;
 }
 
@@ -331,8 +545,8 @@
 
 .header-player-remove {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: -6px;
+  right: -6px;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -343,7 +557,16 @@
   font-size: 14px;
   line-height: 18px;
   padding: 0;
-  opacity: 0.8;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.92);
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+.header-player-track-row.settings-open .header-player-remove {
+  opacity: 0.9;
+  pointer-events: auto;
+  transform: scale(1);
 }
 
 .header-player-remove:hover {
