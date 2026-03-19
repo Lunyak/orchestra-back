@@ -33,6 +33,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const playlistUpload = useAppSelector((s) => s.scene.playlistUpload);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState<PlaylistTrack | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -40,7 +41,6 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const [volume, setVolume] = useState(0.8);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isCompact, setIsCompact] = useState(true);
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
   const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefA = useRef<HTMLAudioElement>(null);
@@ -52,6 +52,24 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   });
   const playRequestId = useRef(0);
   const messageTimerRef = useRef<number | null>(null);
+
+  const [preloadRunning, setPreloadRunning] = useState(false);
+  const [preloadDone, setPreloadDone] = useState(0);
+  const [preloadStatusById, setPreloadStatusById] = useState<Record<number, "idle" | "loading" | "ready" | "error">>({});
+  const preloadRunIdRef = useRef(0);
+  const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [dragOverTrackId, setDragOverTrackId] = useState<number | null>(null);
+
+  const REORDER_MIME = "text/x-orchestra-playlist-reorder";
+
+  const tagPlayRequest = (audio: HTMLAudioElement, requestId: number, expectedSrc: string) => {
+    try {
+      audio.dataset.playRequestId = String(requestId);
+      audio.dataset.playExpectedSrc = expectedSrc;
+    } catch {
+      // ignore
+    }
+  };
 
   const progressPercent =
     duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
@@ -73,6 +91,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       showMessage(playlistUpload.error);
     }
   }, [playlistUpload.error]);
+
+  useEffect(() => {
+    if (!isEditMode) {
+      setEditingId(null);
+      setEditingTitle("");
+    }
+  }, [isEditMode]);
 
   useEffect(() => {
     return () => {
@@ -142,6 +167,14 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
   const resolveTrackSrc = useCallback(
     (file: string, remoteUrl?: string) => {
+      // Desktop should prefer local files to avoid network delays during show.
+      if (getDesktopApi()) {
+        const url = new URL(
+          `project-audio://${encodeURIComponent(projectName)}/`,
+        );
+        url.pathname = `/${file}`;
+        return url.toString();
+      }
       if (remoteUrl) return remoteUrl;
       const url = new URL(
         `project-audio://${encodeURIComponent(projectName)}/`,
@@ -159,6 +192,139 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       fadeTimers.current[key] = null;
     }
   }, []);
+
+  const preloadOne = useCallback(async (src: string, runId: number) => {
+    const audio = preloadAudioRef.current ?? new Audio();
+    preloadAudioRef.current = audio;
+    // Do not interfere with the main player.
+    audio.preload = "auto";
+    audio.muted = true;
+    audio.volume = 0;
+    if (audio.src !== src) {
+      audio.src = src;
+    }
+    // Start request.
+    audio.load();
+
+    // We only need "enough to start", not the full download.
+    const ready = await new Promise<"ready">((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error("preload timeout"));
+      }, 20000);
+
+      const onReady = () => {
+        cleanup();
+        resolve("ready");
+      };
+      const onErr = () => {
+        cleanup();
+        reject(new Error("preload error"));
+      };
+      const cleanup = () => {
+        window.clearTimeout(timeout);
+        audio.removeEventListener("canplay", onReady);
+        audio.removeEventListener("loadeddata", onReady);
+        audio.removeEventListener("loadedmetadata", onReady);
+        audio.removeEventListener("error", onErr);
+      };
+
+      audio.addEventListener("canplay", onReady);
+      audio.addEventListener("loadeddata", onReady);
+      audio.addEventListener("loadedmetadata", onReady);
+      audio.addEventListener("error", onErr);
+    });
+
+    if (runId !== preloadRunIdRef.current) {
+      // cancelled
+      throw new Error("cancelled");
+    }
+    return ready;
+  }, []);
+
+  const preparePlaylist = useCallback(async () => {
+    if (playlist.length === 0) return;
+    preloadRunIdRef.current += 1;
+    const runId = preloadRunIdRef.current;
+    setPreloadRunning(true);
+    setPreloadDone(0);
+    setPreloadStatusById(() => {
+      const next: Record<number, "idle" | "loading" | "ready" | "error"> = {};
+      playlist.forEach((t) => (next[t.id] = "idle"));
+      return next;
+    });
+
+    // Sequential warm-up: avoids saturating bandwidth and keeps UI responsive.
+    for (let i = 0; i < playlist.length; i += 1) {
+      const t = playlist[i];
+      if (runId !== preloadRunIdRef.current) break;
+      setPreloadStatusById((prev) => ({ ...prev, [t.id]: "loading" }));
+      const src = resolveTrackSrc(t.file, t.remoteUrl);
+      try {
+        await preloadOne(src, runId);
+        if (runId !== preloadRunIdRef.current) break;
+        setPreloadStatusById((prev) => ({ ...prev, [t.id]: "ready" }));
+      } catch (e) {
+        if (runId !== preloadRunIdRef.current) break;
+        setPreloadStatusById((prev) => ({ ...prev, [t.id]: "error" }));
+      }
+      setPreloadDone((d) => d + 1);
+      // Yield to keep the page interactive.
+      await new Promise((r) => window.setTimeout(r, 0));
+    }
+
+    if (runId === preloadRunIdRef.current) {
+      setPreloadRunning(false);
+    }
+  }, [playlist, preloadOne, resolveTrackSrc]);
+
+  const cancelPrepare = useCallback(() => {
+    preloadRunIdRef.current += 1;
+    setPreloadRunning(false);
+  }, []);
+
+  // Guard against race conditions: if an old pending play resolves late,
+  // immediately stop it so we never end up with two tracks playing.
+  useEffect(() => {
+    const audioA = audioRefA.current;
+    const audioB = audioRefB.current;
+    if (!audioA || !audioB) return;
+
+    const handlePlay = (audio: HTMLAudioElement, other: HTMLAudioElement, key: "a" | "b") => {
+      const reqRaw = audio.dataset.playRequestId ?? "";
+      const req = Number(reqRaw);
+      const current = playRequestId.current;
+      const expectedSrc = audio.dataset.playExpectedSrc ?? "";
+
+      // Only accept the latest request id AND the expected src.
+      // This prevents an old play() promise from affecting a newer src swap.
+      const isCurrent = Number.isFinite(req) && req === current && (!expectedSrc || audio.src === expectedSrc);
+      if (isCurrent) {
+        // Ensure only one audio plays when crossfade is disabled.
+        if (!crossfadeEnabled && !other.paused) {
+          other.pause();
+        }
+        return;
+      }
+
+      try {
+        audio.volume = 0;
+      } catch {
+        // ignore
+      }
+      audio.pause();
+      clearFadeTimer(key);
+    };
+
+    const onPlayA = () => handlePlay(audioA, audioB, "a");
+    const onPlayB = () => handlePlay(audioB, audioA, "b");
+    audioA.addEventListener("play", onPlayA);
+    audioB.addEventListener("play", onPlayB);
+    return () => {
+      audioA.removeEventListener("play", onPlayA);
+      audioB.removeEventListener("play", onPlayB);
+    };
+  }, [clearFadeTimer, crossfadeEnabled]);
 
   const runFade = useCallback((
     audio: HTMLAudioElement,
@@ -201,6 +367,22 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     const isSameTrack = currentTrack?.id === track.id;
     const isAudioPlaying = !activeAudio.paused;
 
+    // Cancel any pending play on the other element when crossfade is disabled.
+    // This closes the "two tracks playing" race when switching tracks quickly.
+    if (!crossfadeEnabled && !isSameTrack) {
+      clearFadeTimer("a");
+      clearFadeTimer("b");
+      try {
+        activeAudio.pause();
+        inactiveAudio.pause();
+        activeAudio.volume = 0;
+        inactiveAudio.volume = 0;
+      } catch {
+        // ignore
+      }
+      setIsPlaying(false);
+    }
+
     if (!isSameTrack) {
       setCurrentTrack(track);
     }
@@ -221,9 +403,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         activeAudio.src = src;
       }
       activeAudio.muted = false;
+      tagPlayRequest(activeAudio, requestId, activeAudio.src);
       try {
         await activeAudio.play();
-        if (requestId !== playRequestId.current) return;
+        if (requestId !== playRequestId.current) {
+          activeAudio.pause();
+          return;
+        }
         runFade(activeAudio, activeAudioKey, activeAudio.volume, volume, fadeMs);
         setIsPlaying(true);
       } catch (error) {
@@ -261,9 +447,14 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     inactiveAudio.currentTime = 0;
     inactiveAudio.loop = track.loop ?? false;
     inactiveAudio.volume = 0;
+    tagPlayRequest(inactiveAudio, requestId, inactiveAudio.src);
     try {
       await inactiveAudio.play();
-      if (requestId !== playRequestId.current) return;
+      if (requestId !== playRequestId.current) {
+        // Stale request: stop immediately to avoid overlapping playback.
+        inactiveAudio.pause();
+        return;
+      }
       setActiveAudioKey(inactiveKey);
       runFade(inactiveAudio, inactiveKey, 0, volume, fadeMs);
       setIsPlaying(true);
@@ -478,21 +669,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
   };
 
-  const moveTrack = async (trackId: number, direction: "up" | "down") => {
-    const index = playlist.findIndex((item) => item.id === trackId);
-    if (index === -1) return;
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= playlist.length) return;
-    dispatch(sceneActions.reorderPlaylist({ fromIndex: index, toIndex: targetIndex }));
-    if (getDesktopApi()) {
-      try {
-        await dispatch(
-          persistScenePlaylistDesktop({ projectSlug: projectName, sceneName }),
-        ).unwrap();
-      } catch (err) {
-        console.error("Failed to save playlist:", err);
-        showMessage("Не удалось сохранить плейлист. Проверьте консоль.");
-      }
+  const persistPlaylistIfDesktop = async () => {
+    if (!getDesktopApi()) return;
+    try {
+      await dispatch(persistScenePlaylistDesktop({ projectSlug: projectName, sceneName })).unwrap();
+    } catch (err) {
+      console.error("Failed to save playlist:", err);
+      showMessage("Не удалось сохранить плейлист. Проверьте консоль.");
     }
   };
 
@@ -579,7 +762,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
             </div>
           </div>
         )}
-        <div className={`playlist-controls ${isCompact ? "compact" : ""}`}>
+        <div className="playlist-controls compact">
           <div className="playlist-controls-row">
             <button
               className="playlist-play-btn"
@@ -589,12 +772,53 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               {isPlaying ? "Пауза" : "Играть"}
             </button>
             <button
+              type="button"
               className="playlist-toggle-btn"
-              onClick={() => setIsCompact((prev) => !prev)}
+              onClick={() => setIsEditMode((p) => !p)}
+              aria-pressed={isEditMode}
+              title={isEditMode ? "Закрыть настройки плейлиста" : "Настройки плейлиста"}
+              aria-label={isEditMode ? "Закрыть настройки плейлиста" : "Настройки плейлиста"}
             >
-              {isCompact ? "↕" : "—"}
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.7 1.7 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.7 1.7 0 0 0-1.82-.33 1.7 1.7 0 0 0-1 1.54V22a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.7 1.7 0 0 0-1-1.54 1.7 1.7 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.54-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.54V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.7 1.7 0 0 0 1 1.54 1.7 1.7 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.54 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.7 1.7 0 0 0-1.51 1z" />
+              </svg>
             </button>
           </div>
+          {isEditMode ? (
+            <div className="playlist-controls-row">
+              <button
+                type="button"
+                className="playlist-action-btn playlist-prepare-btn"
+                onClick={() => void preparePlaylist()}
+                disabled={preloadRunning || playlist.length === 0}
+                title="Фоновая подготовка треков (буферизация), чтобы в спектакле запускалось без ожидания"
+              >
+                {preloadRunning ? "Готовлю…" : "Подготовить"}
+                {playlist.length > 0 ? ` (${preloadDone}/${playlist.length})` : ""}
+              </button>
+              {preloadRunning ? (
+                <button
+                  type="button"
+                  className="playlist-action-btn danger playlist-prepare-stop-btn"
+                  onClick={cancelPrepare}
+                  title="Остановить подготовку"
+                >
+                  Стоп
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {uiMessage && <div className="playlist-empty">{uiMessage}</div>}
           <div className="playlist-progress">
             <input
@@ -631,14 +855,15 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               onChange={handleVolumeChange}
             />
           </div>
-          {editingId !== null && (
+          {isEditMode && (
             <label className="playlist-crossfade">
               <input
                 type="checkbox"
                 checked={crossfadeEnabled}
                 onChange={(event) => setCrossfadeEnabled(event.target.checked)}
               />
-              Кроссфейд
+              <span className="playlist-crossfade__switch" aria-hidden="true" />
+              <span className="playlist-crossfade__text">Кроссфейд</span>
             </label>
           )}
         </div>
@@ -648,127 +873,158 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         {playlist.length === 0 ? (
           <div className="playlist-empty">Треки не добавлены</div>
         ) : (
-          playlist.map((track) => (
+          playlist.map((track, index) => (
             <ListItem
               key={track.id}
-              className={`playlist-track-row ${isCompact ? "compact" : ""} ${currentTrack?.id === track.id ? "active" : ""
-                }`}
+              className={`playlist-track-row ${currentTrack?.id === track.id ? "active" : ""} ${isEditMode ? "edit-mode" : ""} ${dragOverTrackId === track.id ? "drag-over" : ""}`}
+              draggable={isEditMode}
+              onDragStart={(event) => {
+                if (!isEditMode) return;
+                if (!event.dataTransfer) return;
+                setDragOverTrackId(null);
+                try {
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData(REORDER_MIME, String(index));
+                } catch {
+                  // ignore
+                }
+              }}
+              onDragOver={(event) => {
+                if (!isEditMode) return;
+                const types = Array.from(event.dataTransfer?.types ?? []);
+                if (!types.includes(REORDER_MIME)) return;
+                event.preventDefault();
+                setDragOverTrackId(track.id);
+              }}
+              onDragLeave={() => {
+                setDragOverTrackId((prev) => (prev === track.id ? null : prev));
+              }}
+              onDrop={(event) => {
+                if (!isEditMode) return;
+                const types = Array.from(event.dataTransfer?.types ?? []);
+                if (!types.includes(REORDER_MIME)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const raw = event.dataTransfer.getData(REORDER_MIME);
+                const fromIndex = Number(raw);
+                const toIndex = index;
+                setDragOverTrackId(null);
+                if (!Number.isFinite(fromIndex) || fromIndex < 0) return;
+                if (fromIndex === toIndex) return;
+                if (toIndex < 0 || toIndex >= playlist.length) return;
+                dispatch(sceneActions.reorderPlaylist({ fromIndex, toIndex }));
+                void persistPlaylistIfDesktop();
+              }}
+              onDragEnd={() => setDragOverTrackId(null)}
             >
-              {editingId === track.id ? (
-                <>
-                  <input
-                    className="playlist-track-input"
-                    value={editingTitle}
-                    onChange={(event) => setEditingTitle(event.target.value)}
-                    placeholder="Название трека"
-                  />
-                  {!isCompact && (
-                    <div className="playlist-track-actions">
-                      <button
-                        className="playlist-action-btn"
-                        onClick={() => applyRename(track)}
-                      >
-                        Сохранить
-                      </button>
-                      <button className="playlist-action-btn" onClick={cancelRename}>
-                        Отмена
-                      </button>
-                    </div>
-                  )}
-                  {!isCompact && (
-                    <div className="playlist-track-fade">
-                      <span>Fade</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={3000}
-                        step={100}
-                        value={track.fadeMs ?? 500}
-                        onChange={(event) =>
-                          updateFade(track, Number(event.target.value))
+              <div className="playlist-track-row-top">
+                <button
+                  className="playlist-track-btn"
+                  onClick={() => playTrack(track)}
+                  title={track.title}
+                >
+                  {editingId === track.id ? (
+                    <input
+                      className="playlist-track-input"
+                      value={editingTitle}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(event) => setEditingTitle(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          applyRename(track);
                         }
-                      />
-                    </div>
-                  )}
-                  {!isCompact && (
-                    <label className="playlist-track-loop">
-                      <input
-                        type="checkbox"
-                        checked={track.loop ?? false}
-                        onChange={(event) => updateLoop(track, event.target.checked)}
-                      />
-                      Зациклить
-                    </label>
-                  )}
-                </>
-              ) : (
-                <>
-                  <button
-                    className="playlist-track-btn"
-                    onClick={() => playTrack(track)}
-                    title={track.title}
-                  >
-                    <span className="playlist-track-title">
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          cancelRename();
+                        }
+                      }}
+                      onBlur={() => applyRename(track)}
+                      placeholder="Название трека"
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className={`playlist-track-title ${isEditMode ? "editable" : ""}`}
+                      onClick={(e) => {
+                        if (!isEditMode) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        startRename(track);
+                      }}
+                      title={isEditMode ? "Переименовать" : track.title}
+                    >
                       {track.title}
                     </span>
+                  )}
+                  <span
+                    className="playlist-preload-dot"
+                    data-state={preloadStatusById[track.id] ?? "idle"}
+                    aria-hidden="true"
+                    title={
+                      (preloadStatusById[track.id] ?? "idle") === "ready"
+                        ? "Готов"
+                        : (preloadStatusById[track.id] ?? "idle") === "loading"
+                          ? "Грузится…"
+                          : (preloadStatusById[track.id] ?? "idle") === "error"
+                            ? "Ошибка загрузки"
+                            : "Не готов"
+                    }
+                  />
+                </button>
+              </div>
+
+              {isEditMode ? (
+                <div
+                  className="playlist-track-settings"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="playlist-track-icon-btn"
+                    data-active={track.loop ?? false}
+                    aria-pressed={track.loop ?? false}
+                    onClick={() => updateLoop(track, !(track.loop ?? false))}
+                    title={(track.loop ?? false) ? "Зацикливание включено" : "Зацикливание выключено"}
+                    aria-label="Зацикливание"
+                  >
+                    ∞
                   </button>
-                  {!isCompact && (
-                    <div className="playlist-track-actions">
-                      <button
-                        className="playlist-action-btn"
-                        onClick={() => moveTrack(track.id, "up")}
-                        disabled={playlist[0]?.id === track.id}
-                      >
-                        Вверх
-                      </button>
-                      <button
-                        className="playlist-action-btn"
-                        onClick={() => moveTrack(track.id, "down")}
-                        disabled={playlist[playlist.length - 1]?.id === track.id}
-                      >
-                        Вниз
-                      </button>
-                      <button
-                        className="playlist-action-btn"
-                        onClick={() => startRename(track)}
-                      >
-                        Переименовать
-                      </button>
-                      <button
-                        className="playlist-action-btn danger"
-                        onClick={() => deleteTrack(track)}
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  )}
-                  {!isCompact && (
-                    <div className="playlist-track-fade">
-                      <span>Fade</span>
-                      <input
-                        type="range"
-                        min={0}
-                        max={3000}
-                        step={100}
-                        value={track.fadeMs ?? 500}
-                        onChange={(event) =>
-                          updateFade(track, Number(event.target.value))
-                        }
-                      />
-                    </div>
-                  )}
-                  {!isCompact && (
-                    <label className="playlist-track-loop">
-                      <input
-                        type="checkbox"
-                        checked={track.loop ?? false}
-                        onChange={(event) => updateLoop(track, event.target.checked)}
-                      />
-                      Зациклить
-                    </label>
-                  )}
-                </>
-              )}
+
+                  <div className="playlist-track-fade">
+                    <span>Fade</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={3000}
+                      step={100}
+                      value={track.fadeMs ?? 500}
+                      style={
+                        {
+                          ["--range-fill" as unknown as string]: `${Math.min(
+                            100,
+                            Math.max(0, ((track.fadeMs ?? 500) / 3000) * 100),
+                          )}%`,
+                        } as React.CSSProperties
+                      }
+                      onChange={(event) => updateFade(track, Number(event.target.value))}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="playlist-track-remove"
+                    onClick={() => void deleteTrack(track)}
+                    title="Удалить трек"
+                    aria-label="Удалить трек"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null}
             </ListItem>
           ))
         )}
