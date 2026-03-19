@@ -100,6 +100,20 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [isEditMode]);
 
   useEffect(() => {
+    if (!isEditMode) {
+      setDragOverTrackId(null);
+      return;
+    }
+    const clear = () => setDragOverTrackId(null);
+    window.addEventListener("dragend", clear);
+    window.addEventListener("drop", clear);
+    return () => {
+      window.removeEventListener("dragend", clear);
+      window.removeEventListener("drop", clear);
+    };
+  }, [isEditMode]);
+
+  useEffect(() => {
     return () => {
       if (messageTimerRef.current !== null) {
         window.clearTimeout(messageTimerRef.current);
