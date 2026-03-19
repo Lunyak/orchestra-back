@@ -73,9 +73,7 @@ export function ScriptMarkdownToolbar({
             className="show-script__rail-btn"
             onClick={onToggleEditing}
             title={isEditing ? "Перейти в режим чтения" : "Перейти в режим редактирования"}
-            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
             aria-pressed={isEditing}
-            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
             data-active={isEditing ? "true" : "false"}
           >
             {isEditing ? "📖" : "✏️"}
@@ -87,9 +85,7 @@ export function ScriptMarkdownToolbar({
                 className="show-script__rail-btn"
                 onClick={editorToggles.onTogglePreview}
                 title={editorToggles.previewEnabled ? "Скрыть предпросмотр" : "Показать предпросмотр"}
-                // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
                 aria-pressed={editorToggles.previewEnabled}
-                // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
                 data-active={editorToggles.previewEnabled ? "true" : "false"}
               >
                 👁
@@ -100,9 +96,7 @@ export function ScriptMarkdownToolbar({
                   className="show-script__rail-btn"
                   onClick={editorToggles.onToggleToc}
                   title={editorToggles.tocEnabled ? "Скрыть оглавление" : "Показать оглавление"}
-                  // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
                   aria-pressed={editorToggles.tocEnabled}
-                  // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
                   data-active={editorToggles.tocEnabled ? "true" : "false"}
                 >
                   ≡
@@ -122,9 +116,7 @@ export function ScriptMarkdownToolbar({
                   ? "Выключить метки"
                   : "Включить метки"
             }
-            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
             aria-pressed={annotationsMode}
-            // @ts-expect-error: ButtonProps is minimal; pass-through attributes are ok for DOM button
             data-active={annotationsMode ? "true" : "false"}
           >
             🏷️

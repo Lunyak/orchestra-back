@@ -25,7 +25,7 @@ function isIgnorableWhitespaceText(node: HastNode): boolean {
 }
 
 function extractImgFromImgOnlyParagraph(node: HastNode): HastNode | null {
-  if (!node || node.type !== "element") return false;
+  if (!node || node.type !== "element") return null;
   const tag = String((node as any).tagName ?? "").toLowerCase();
   if (tag !== "p") return null;
   const children = Array.isArray((node as any).children) ? ((node as any).children as HastNode[]) : [];

@@ -802,6 +802,7 @@ export function ScriptMarkdownPreview({
             }: {
               className?: string;
               children: React.ReactNode;
+              node?: unknown;
             } & React.HTMLAttributes<HTMLElement>) => {
               const classStr = String(className ?? "");
               const isCodeBlock =
