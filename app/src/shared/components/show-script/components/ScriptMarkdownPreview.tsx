@@ -285,11 +285,12 @@ export function ScriptMarkdownPreview({
   };
 
   const MarkdownImage = (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
-    const { src, alt, ...rest } = props;
+    const { src, alt, onLoad, onError, ...rest } = props;
     const raw = String(src ?? "").trim();
     const initial =
       raw.startsWith("orchestra-image:") ? "" : (resolveImageSrc(raw) || raw);
     const [resolved, setResolved] = useState<string>(initial);
+    const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
 
     useEffect(() => {
       let cancelled = false;
@@ -314,18 +315,38 @@ export function ScriptMarkdownPreview({
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [src, accessToken]);
 
+    useEffect(() => {
+      setState("loading");
+    }, [resolved]);
+
     const canOpen = Boolean(resolved);
     const altText = String(alt ?? "").trim();
 
-    const imgEl = (
+    const imgEl = resolved ? (
       <img
         src={resolved}
         alt={altText}
         {...rest}
+        onLoad={(e) => {
+          setState("loaded");
+          onLoad?.(e);
+        }}
+        onError={(e) => {
+          setState("error");
+          onError?.(e);
+        }}
       />
-    );
+    ) : null;
 
-    if (!canOpen) return imgEl;
+    if (!canOpen) {
+      return (
+        <span className="markdown-img-with-preloader" data-state="loading">
+          <span className="markdown-preloader" aria-hidden="true">
+            <span className="markdown-loader" />
+          </span>
+        </span>
+      );
+    }
 
     return (
       <button
@@ -334,12 +355,21 @@ export function ScriptMarkdownPreview({
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (state !== "loaded") return;
           setLightbox({ src: resolved, alt: altText });
         }}
         title="Открыть изображение"
         aria-label="Открыть изображение"
+        aria-busy={state === "loading"}
       >
-        {imgEl}
+        <span className="markdown-img-with-preloader" data-state={state}>
+          {state === "loading" ? (
+            <span className="markdown-preloader" aria-hidden="true">
+              <span className="markdown-loader" />
+            </span>
+          ) : null}
+          {imgEl}
+        </span>
       </button>
     );
   };

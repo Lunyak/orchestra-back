@@ -630,6 +630,13 @@
   margin-bottom: 8px;
 }
 
+@media (max-width: 980px) {
+  /* Make room for the mobile burger button (fixed, top-left). */
+  .script-markdown-toolbar {
+    padding-left: 35px;
+  }
+}
+
 .script-markdown-toolbar__row {
   display: flex;
   align-items: center;
@@ -984,23 +991,34 @@
 }
 
 .markdown-kadr__right img {
-  width: auto;
-  height: 120px;
+  width: 100%;
+  height: 100%;
   max-height: none;
   display: block;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(2, 6, 23, 0.5);
+  object-fit: cover;
+}
+
+.markdown-kadr__right .markdown-img-with-preloader {
+  width: 100%;
+  height: 100%;
+}
+
+.markdown-kadr__right .markdown-preloader {
+  width: 100%;
+  height: 100%;
 }
 
 .markdown-image-btn img {
   display: block;
 }
 
-@media (max-width: 880px) {
-  .markdown-kadr__right img {
-    height: 100px;
-  }
+.markdown-kadr__right .markdown-image-btn {
+  width: 200px;
+  height: 120px;
+  flex: 0 0 auto;
 }
 
 .markdown-image-btn {
@@ -1010,6 +1028,89 @@
   background: transparent;
   cursor: zoom-in;
   border-radius: 10px;
+}
+
+.markdown-img-with-preloader {
+  --markdown-preloader-glow: #7aa8ff;
+  --markdown-preloader-size: 56px;
+
+  position: relative;
+  display: block;
+}
+
+.markdown-preloader {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 2;
+  pointer-events: none;
+  background: rgba(2, 6, 23, 0.18);
+  border-radius: 10px;
+}
+
+.markdown-loader {
+  position: relative;
+  width: var(--markdown-preloader-size);
+  height: var(--markdown-preloader-size);
+  animation:
+    markdown-preloader-rot 750ms ease-in-out infinite,
+    markdown-preloader-color 5000ms linear infinite;
+}
+
+.markdown-loader::before,
+.markdown-loader::after {
+  content: "";
+  position: absolute;
+  width: 25%;
+  height: 25%;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  background-color: #ffffff;
+  box-shadow:
+    0 0 40px var(--markdown-preloader-glow),
+    0 0 10px var(--markdown-preloader-glow);
+}
+
+.markdown-loader::after {
+  top: unset;
+  left: unset;
+  bottom: 0;
+  right: 0;
+}
+
+@keyframes markdown-preloader-rot {
+  0% {
+    rotate: 0deg;
+  }
+  100% {
+    rotate: 360deg;
+  }
+}
+
+@keyframes markdown-preloader-color {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-loader {
+    animation: none;
+  }
+}
+
+.markdown-img-with-preloader[data-state="loading"] img {
+  opacity: 0;
+}
+
+.markdown-img-with-preloader img {
+  opacity: 1;
+  transition: opacity 220ms ease;
 }
 
 .markdown-image-btn:focus-visible {
