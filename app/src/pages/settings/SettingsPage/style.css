@@ -3,3 +3,20 @@
     justify-content: space-between;
     align-items: center;
 }
+
+.settings-sync-live {
+    margin-top: 1rem;
+}
+
+.settings-sync-live-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin: 0.5rem 0;
+    line-height: 1.35;
+}
+
+.settings-sync-live-row input {
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+}

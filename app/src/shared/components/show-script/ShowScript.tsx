@@ -25,8 +25,10 @@ export const ShowScript: React.FC = () => {
     updateStep: updateSceneStep,
     resetAllRequisites,
     handleTrackLinkClick,
+    handleSoundLinkClick,
     hasLocalEdits,
     realtimePullDeferred,
+    realtimePullDeferredReason,
     clearRealtimePullDeferred,
     syncFromServer,
   } = useScene();
@@ -103,10 +105,13 @@ export const ShowScript: React.FC = () => {
         {realtimePullDeferred ? (
           <div className="realtime-banner" role="status" aria-live="polite">
             <div className="realtime-banner__text">
-              Есть обновления из другого окна.
-              {hasLocalEdits
-                ? " Авто‑обновление отложено, пока есть локальные правки."
-                : " Можно подтянуть сейчас."}
+              {hasLocalEdits || realtimePullDeferredReason === "local_edits"
+                ? "Есть обновления на сервере. Авто‑обновление отложено, пока есть локальные правки."
+                : realtimePullDeferredReason === "settings_pause"
+                  ? "Есть обновления на сервере. Авто‑подтягивание отключено в настройках (можно подтянуть вручную)."
+                  : realtimePullDeferredReason === "confirm_declined"
+                    ? "Есть обновления на сервере. Вы отказались от автоматического подтягивания."
+                    : "Есть обновления из другого окна. Можно подтянуть сейчас."}
             </div>
             <div className="realtime-banner__actions">
               <button
@@ -129,6 +134,7 @@ export const ShowScript: React.FC = () => {
           sceneName={sceneName}
           updateStepField={updateStepField}
           onTrackLinkClick={handleTrackLinkClick}
+          onSoundLinkClick={handleSoundLinkClick}
           renderBody={({ markdownPane, controls }) =>
             currentStep ? (
               <div className="script-step-editor">
@@ -159,6 +165,7 @@ export const ShowScript: React.FC = () => {
                         <ControlsScript
                           selectedTrackId={controls.selectedTrackId}
                           playlistOptions={controls.playlistOptions}
+                          soundsOptions={controls.soundsOptions}
                           onSelectedTrackIdChange={controls.onSelectedTrackIdChange}
                           lightChannels={controls.lightChannels}
                           onLightChannelsChange={controls.onLightChannelsChange}

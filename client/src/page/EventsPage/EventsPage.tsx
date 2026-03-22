@@ -2,62 +2,17 @@ import { FC, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "../../shared/model/routes";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
+import Preloader from "../../shared/component/Preloader/Preloader";
 import { Seo } from "../../shared/component/Seo/Seo";
 import type { SiteEvent } from "../../shared/model/siteContent";
-import { fetchSiteEvents } from "../../shared/model/siteContent";
+import { fetchSiteEvents, readSiteEventsCache } from "../../shared/model/siteContent";
 import { siteAsset } from "../../shared/model/siteAssets";
 import { GlitchHero } from "../HomePage/GlitchHero";
 import "./style.css";
 
-const FALLBACK_ITEMS: SiteEvent[] = [
-  {
-    slug: "железнова",
-    soon: false,
-    name: "Железнова",
-    subtitle: "",
-    old: "",
-    anonse: "",
-    date: "",
-    cardImage: "vassa-afisha.jpg",
-    type: "",
-  },
-  {
-    slug: "заклятие",
-    soon: false,
-    name: "Заклятие",
-    subtitle: "",
-    old: "",
-    type: "",
-    anonse: '"',
-    date: "",
-    cardImage: "afisha.jpg",
-  },
-  {
-    slug: "зойкина-квартирка",
-    soon: true,
-    name: "Зойкина квартирка",
-    subtitle: "Узнать больше",
-    old: "18+",
-    type: "трагикомедия",
-    anonse: "",
-    date: "февраль",
-    cardImage: "https://i.pinimg.com/736x/6c/de/d0/6cded009506170d47a5865ae6854bcf4.jpg",
-  },
-  {
-    slug: "чехов-дуэль",
-    soon: true,
-    name: "Чехов Дуэль",
-    subtitle: "Узнать больше",
-    old: "18+",
-    type: "трагикомедия",
-    anonse: "",
-    date: "март",
-    cardImage: "https://images.unsplash.com/photo-1579783902614-a3fb3927b6a5?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=1583&q=80",
-  },
-];
-
 const EventsPage: FC = () => {
-  const [items, setItems] = useState<SiteEvent[]>(FALLBACK_ITEMS);
+  const [items, setItems] = useState<SiteEvent[]>(() => readSiteEventsCache() ?? []);
+  const [eventsFetchSettled, setEventsFetchSettled] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -67,7 +22,10 @@ const EventsPage: FC = () => {
         if (remote && remote.length) setItems(remote);
       })
       .catch(() => {
-        // ignore
+        // fetchSiteEvents already falls back to session cache; ignore
+      })
+      .finally(() => {
+        if (alive) setEventsFetchSettled(true);
       });
     return () => {
       alive = false;
@@ -109,11 +67,21 @@ const EventsPage: FC = () => {
           <p className="events-page__subtitle">Афиша и даты</p>
         </header>
 
-        <div className="events-cards" role="list" aria-label="Афиша спектаклей">
-          {items.map((data) => (
-            <Card key={data.slug} data={data} />
-          ))}
-        </div>
+        {items.length === 0 && !eventsFetchSettled ? (
+          <div className="events-page__list-loading">
+            <Preloader label="Загрузка афиши…" />
+          </div>
+        ) : items.length === 0 ? (
+          <p className="events-page__list-empty" role="status">
+            Не удалось загрузить афишу. Проверьте соединение и обновите страницу.
+          </p>
+        ) : (
+          <div className="events-cards" role="list" aria-label="Афиша спектаклей">
+            {items.map((data) => (
+              <Card key={data.slug} data={data} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -143,7 +111,7 @@ const Card: FC<ICardProps> = ({ data }) => {
   const title = name?.trim() || "Спектакль";
   // Do NOT show long "anonse" on the card; keep it for the Event page only.
   const description =
-    (type?.trim() || "Узнать больше") +
+    (type?.trim() || "") +
     (date?.trim() ? ` · ${date.trim()}` : "");
 
   const ariaLabelBase = `${title}${old?.trim() ? `, ${old.trim()}` : ""}`;

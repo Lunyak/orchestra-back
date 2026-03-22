@@ -97,7 +97,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
   ): React.ReactNode {
     if (typeof node === "string") {
       const pattern =
-        /(\{\{\s*(light|b|play)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+        /(\{\{\s*(light|b|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
       const result: React.ReactNode[] = [];
       let lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -133,6 +133,23 @@ export function createRenderLightTokens(lightChannels: string[]) {
               title="Воспроизвести"
               data-track-id={Number.isFinite(id) ? String(id) : undefined}
               data-track-name={!Number.isFinite(id) ? payload : undefined}
+            >
+              {labelText}
+            </span>,
+          );
+        } else if (rawType?.toLowerCase() === "sound" || rawType?.toLowerCase() === "sfx") {
+          const payload = String(rawIndex ?? "").trim();
+          const labelText = String(rawColor ?? "").trim() || "SFX";
+          const id = Number(payload);
+          result.push(
+            <span
+              key={`${keyPrefix}-${counter}-sound`}
+              className="markdown-sound-label"
+              role="button"
+              tabIndex={0}
+              title="Звук: воспроизвести/остановить"
+              data-sound-id={Number.isFinite(id) ? String(id) : undefined}
+              data-sound-name={!Number.isFinite(id) ? payload : undefined}
             >
               {labelText}
             </span>,
@@ -198,7 +215,7 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
       }) as HastNode;
 
     const pattern =
-      /(\{\{\s*(light|blackout|play)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+      /(\{\{\s*(light|blackout|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
 
     const walk = (node: HastNode): HastNode => {
       if (!node) return node;
@@ -231,6 +248,19 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
                 title: "Воспроизвести",
                 "data-track-id": Number.isFinite(id) ? String(id) : undefined,
                 "data-track-name": !Number.isFinite(id) ? payload : undefined,
+              }),
+            );
+          } else if (rawType?.toLowerCase() === "sound" || rawType?.toLowerCase() === "sfx") {
+            const payload = String(rawIndex ?? "").trim();
+            const labelText = String(rawColor ?? "").trim() || "SFX";
+            const id = Number(payload);
+            out.push(
+              hastSpan(["markdown-sound-label"], [hastText(labelText)], {
+                role: "button",
+                tabIndex: 0,
+                title: "Звук: воспроизвести/остановить",
+                "data-sound-id": Number.isFinite(id) ? String(id) : undefined,
+                "data-sound-name": !Number.isFinite(id) ? payload : undefined,
               }),
             );
           } else if (rawType?.toLowerCase() === "blackout") {

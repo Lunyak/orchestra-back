@@ -51,6 +51,7 @@ export function SpectaclePage() {
     deleteStep,
     reorderSteps,
     registerPlaylistPlay,
+    registerSoundToggle,
     saveStepsForLightPlot,
     pushSceneAfterSoundsSave,
   } = useScene();
@@ -278,6 +279,7 @@ export function SpectaclePage() {
               sceneName="script"
               sounds={sceneData?.sounds || []}
               onSoundsSaved={pushSceneAfterSoundsSave}
+              onRegisterToggleHandler={registerSoundToggle}
             />
           </div>
         )}

@@ -38,6 +38,7 @@ type SceneUiState = {
   markdownMode: ShowScriptMarkdownMode;
   annotationsMode: boolean;
   playlistOptions: { id: number; title: string }[];
+  soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
   selectedTrackId: number | null;
   lightChannels: string[]; // length 8
   selectedLightSlot: number; // 1..8
@@ -69,6 +70,7 @@ function defaultSceneUi(): SceneUiState {
     markdownMode: "notes",
     annotationsMode: true,
     playlistOptions: [],
+    soundsOptions: [],
     selectedTrackId: null,
     lightChannels: Array.from({ length: 8 }, () => ""),
     selectedLightSlot: 1,
@@ -112,6 +114,21 @@ function normalizePlaylistOptions(raw: unknown): { id: number; title: string }[]
     .filter((x) => Number.isFinite(x.id));
 }
 
+function normalizeSoundsOptions(
+  raw: unknown,
+): { id: number; title: string; icon?: string; iconRemoteUrl?: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item: any) => item?.id != null)
+    .map((item: any) => ({
+      id: Number(item.id),
+      title: String(item.title ?? `Звук ${item.id}`),
+      icon: item?.icon != null ? String(item.icon) : undefined,
+      iconRemoteUrl: item?.iconRemoteUrl != null ? String(item.iconRemoteUrl) : undefined,
+    }))
+    .filter((x) => Number.isFinite(x.id));
+}
+
 export const initShowScriptMarkdownUi = createAsyncThunk<
   { sceneKey: SceneKey; ui: Partial<SceneUiState> },
   { projectSlug: string; sceneName: string }
@@ -135,6 +152,7 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
   {
     sceneKey: SceneKey;
     playlistOptions: { id: number; title: string }[];
+    soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
     lightChannels: string[];
   },
   { projectSlug: string; sceneName: string }
@@ -149,11 +167,16 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
       sceneData && String(sceneData?.name ?? "") === String(args.sceneName ?? "")
         ? (sceneData as any)?.playlist
         : (sceneData as any)?.playlist;
+    const soundsRaw =
+      sceneData && String(sceneData?.name ?? "") === String(args.sceneName ?? "")
+        ? (sceneData as any)?.sounds
+        : (sceneData as any)?.sounds;
     const lightRaw = Array.isArray(serverShadow?.lightChannels)
       ? serverShadow.lightChannels
       : (sceneData as any)?.lightChannels;
     return {
       playlistOptions: normalizePlaylistOptions(playlistRaw),
+      soundsOptions: normalizeSoundsOptions(soundsRaw),
       lightChannels: normalizeLightChannels(lightRaw),
     };
   };
@@ -163,15 +186,20 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
       const scene = await api.readProjectScene(args.projectSlug, args.sceneName);
       const fromFile = {
         playlistOptions: normalizePlaylistOptions((scene as any)?.playlist),
+        soundsOptions: normalizeSoundsOptions((scene as any)?.sounds),
         lightChannels: normalizeLightChannels((scene as any)?.lightChannels),
       };
       const fileHasLight = fromFile.lightChannels.some((x) => String(x ?? "").trim().length > 0);
-      if (fromFile.playlistOptions.length > 0 || fileHasLight) {
+      if (fromFile.playlistOptions.length > 0 || fromFile.soundsOptions.length > 0 || fileHasLight) {
         return { sceneKey, ...fromFile };
       }
       // If file is empty (common during sync/first run), prefer store snapshot.
       const fromStore = getFromStore();
-      if (fromStore.playlistOptions.length > 0 || fromStore.lightChannels.some((x) => String(x ?? "").trim().length > 0)) {
+      if (
+        fromStore.playlistOptions.length > 0 ||
+        fromStore.soundsOptions.length > 0 ||
+        fromStore.lightChannels.some((x) => String(x ?? "").trim().length > 0)
+      ) {
         return { sceneKey, ...fromStore };
       }
       return { sceneKey, ...fromFile };
@@ -326,6 +354,7 @@ export const showScriptMarkdownSlice = createSlice({
       const prev = state.uiBySceneKey[action.payload.sceneKey] ?? defaultSceneUi();
       const next = { ...prev };
       next.playlistOptions = action.payload.playlistOptions ?? [];
+      next.soundsOptions = action.payload.soundsOptions ?? [];
       next.lightChannels = normalizeLightChannels(action.payload.lightChannels);
       if (next.selectedTrackId == null && next.playlistOptions.length > 0) {
         next.selectedTrackId = next.playlistOptions[0].id;

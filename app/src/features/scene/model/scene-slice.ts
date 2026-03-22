@@ -133,6 +133,13 @@ export interface SceneState {
   /** There are remote updates, but we delayed pull because of local edits. */
   realtimePullDeferred: boolean;
   realtimePullDeferredAt: string | null;
+  /** Почему отложено авто‑подтягивание (для текста баннера). */
+  realtimePullDeferredReason:
+    | "local_edits"
+    | "settings_pause"
+    | "confirm_declined"
+    | "remote_pending"
+    | null;
   stepsRevision: number;
   sceneDataRevision: number;
   serverShadowRevision: number;
@@ -151,6 +158,7 @@ const initialState: SceneState = {
   hasLocalEdits: false,
   realtimePullDeferred: false,
   realtimePullDeferredAt: null,
+  realtimePullDeferredReason: null,
   stepsRevision: 0,
   sceneDataRevision: 0,
   serverShadowRevision: 0,
@@ -891,13 +899,29 @@ export const sceneSlice = createSlice({
     markSaved(state) {
       state.hasLocalEdits = false;
     },
-    setRealtimePullDeferred(state, action: PayloadAction<{ deferred: boolean; at?: string | null }>) {
-      state.realtimePullDeferred = Boolean(action.payload?.deferred);
-      state.realtimePullDeferredAt = action.payload?.at ?? (state.realtimePullDeferred ? new Date().toISOString() : null);
+    setRealtimePullDeferred(
+      state,
+      action: PayloadAction<{
+        deferred: boolean;
+        at?: string | null;
+        reason?: SceneState["realtimePullDeferredReason"];
+      }>,
+    ) {
+      const deferred = Boolean(action.payload?.deferred);
+      state.realtimePullDeferred = deferred;
+      state.realtimePullDeferredAt =
+        action.payload?.at ?? (deferred ? new Date().toISOString() : null);
+      if (!deferred) {
+        state.realtimePullDeferredReason = null;
+      } else {
+        state.realtimePullDeferredReason =
+          action.payload?.reason ?? "remote_pending";
+      }
     },
     clearRealtimePullDeferred(state) {
       state.realtimePullDeferred = false;
       state.realtimePullDeferredAt = null;
+      state.realtimePullDeferredReason = null;
     },
     addSounds(state, action: PayloadAction<SceneSound[]>) {
       const next = action.payload ?? [];

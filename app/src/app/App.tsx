@@ -6,6 +6,7 @@ import { ScriptUIProvider } from "../features/script-ui";
 import { LoginPage } from "../pages/login/LoginPage";
 import { PrivacyPage } from "../pages/legal/PrivacyPage";
 import { TermsPage } from "../pages/legal/TermsPage";
+import { SpectaclePageLockGuard } from "./SpectaclePageLockGuard";
 import { AppRoutes } from "./router/AppRoutes";
 import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
@@ -50,6 +51,7 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
 export default function App({ onAfterLogin, onPushAllLocal, onResyncProject }: AppProps) {
   return (
     <StoreProvider>
+      <SpectaclePageLockGuard />
       <PlatformProvider value={{ onPushAllLocal, onResyncProject }}>
         <AuthenticatedApp onAfterLogin={onAfterLogin} />
       </PlatformProvider>

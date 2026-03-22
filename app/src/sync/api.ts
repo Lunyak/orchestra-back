@@ -181,7 +181,13 @@ api.interceptors.response.use(
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("lastSyncAt");
       if (typeof window !== "undefined") {
-        window.location.reload();
+        // Полная перезагрузка ломает спектакль (плейлист, состояние плеера).
+        // Сбрасываем сессию через тот же путь, что и 401 — без reload.
+        if (globalLogoutHandler) {
+          globalLogoutHandler();
+        } else {
+          window.location.reload();
+        }
       }
       return Promise.reject(e);
     } finally {

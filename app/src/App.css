@@ -575,15 +575,13 @@ body {
 
 .main-content {
   flex: 1;
-  padding: 16px;
+  padding: 10px;
   text-align: left;
   display: flex;
   min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable;
-  /* background: #0b1220; */
   background: var(--color-bg-primary);
-  /* height: calc(100vh - 118px); */
 }
 
 .main-content-theater {

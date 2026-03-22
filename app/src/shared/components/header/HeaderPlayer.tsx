@@ -55,6 +55,8 @@ interface HeaderPlayerProps {
   sounds?: HeaderSound[];
   /** Вызывается после успешного сохранения звуков в файл (чтобы пушнуть сцену на сервер) */
   onSoundsSaved?: () => void;
+  /** Регистрирует внешний обработчик toggle звука по id (для кликов из show-script markdown). */
+  onRegisterToggleHandler?: (handler: (soundId: number) => void) => void;
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
@@ -62,6 +64,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sceneName,
   sounds = [],
   onSoundsSaved,
+  onRegisterToggleHandler,
 }) => {
   const dispatch = useAppDispatch();
   const soundsUpload = useAppSelector((s) => s.scene.soundsUpload);
@@ -92,6 +95,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const iconInputRef = useRef<HTMLInputElement | null>(null);
   const iconTargetIdRef = useRef<number | null>(null);
+  const tracksRef = useRef<LoadedTrack[]>(tracks);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingName, setEditingName] = useState<string>("");
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
+  useEffect(() => {
+    if (editingId == null) return;
+    // Focus after render.
+    requestAnimationFrame(() => renameInputRef.current?.focus());
+  }, [editingId]);
 
   const getLocalProjectId = () => {
     const key = `projectId:${projectName}`;
@@ -283,6 +300,40 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }
   };
 
+  const startRename = (track: LoadedTrack) => {
+    setEditingId(track.id);
+    setEditingName(track.name);
+  };
+
+  const cancelRename = () => {
+    setEditingId(null);
+    setEditingName("");
+  };
+
+  const applyRename = async (trackId: number) => {
+    const nextTitle = editingName.trim();
+    if (!nextTitle) {
+      cancelRename();
+      return;
+    }
+    const nextTracks = tracksRef.current.map((t) =>
+      t.id === trackId ? { ...t, name: nextTitle } : t,
+    );
+    setTracks(nextTracks);
+    dispatch(sceneActions.updateSound({ id: trackId, changes: { title: nextTitle } as any }));
+    setEditingId(null);
+    setEditingName("");
+
+    // Desktop: persist immediately (like icon changes).
+    if (getDesktopApi()) {
+      try {
+        await saveSounds(nextTracks);
+      } catch (err) {
+        console.error("Failed to save sounds after rename:", err);
+      }
+    }
+  };
+
   const addTracks = async () => {
     try {
       if (soundsUpload.uploading) return;
@@ -416,6 +467,17 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       });
     }
   };
+
+  useEffect(() => {
+    if (!onRegisterToggleHandler) return;
+    const handler = (soundId: number) => {
+      const id = Number(soundId);
+      if (!Number.isFinite(id)) return;
+      const target = tracksRef.current.find((t) => Number(t.id) === id) ?? null;
+      if (target) toggleTrack(target);
+    };
+    onRegisterToggleHandler(handler);
+  }, [onRegisterToggleHandler]);
 
   const handleVolumeChange = (track: LoadedTrack, value: number) => {
     const audio = audioRefs.current[track.id];
@@ -574,16 +636,21 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
 
       <div className="header-player-list">
         {tracks.map((track) => {
+          const isRenaming = editingId === track.id;
           return (
             <div
               key={track.id}
-              className={`header-player-track-row ${track.isPlaying ? "playing" : ""} ${showSettings ? "settings-open" : ""}`}
-              onClick={() => toggleTrack(track)}
+              className={`header-player-track-row ${track.isPlaying ? "playing" : ""} ${showSettings ? "settings-open" : ""} ${isRenaming ? "is-renaming" : ""}`}
+              onClick={() => {
+                if (isRenaming) return;
+                toggleTrack(track);
+              }}
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
+                  if (isRenaming) return;
                   toggleTrack(track);
                 }
               } }
@@ -638,12 +705,36 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                   aria-label="Fade duration"
                   title={`Плавность: ${track.fadeMs}мс`} />
               </div>
-              {track.icon || track.iconRemoteUrl ? (
+              {isRenaming ? (
+                <input
+                  ref={renameInputRef}
+                  className="header-player-rename-input"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void applyRename(track.id);
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  onBlur={() => void applyRename(track.id)}
+                  aria-label="Переименовать звук"
+                />
+              ) : track.icon || track.iconRemoteUrl ? (
                 <img
                   className="header-player-track-icon"
                   src={getIconSrc(track)}
                   alt={track.name}
-                  title={track.name} />
+                  title={track.name}
+                />
               ) : (
                 <div className="header-player-track-name" title={track.name}>
                   {track.name}
@@ -658,11 +749,23 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
               >
                 ×
               </button>
-              {showSettings && (
+              {showSettings && !isRenaming && (
                 <div
                   className="header-player-settings"
                   onClick={(event) => event.stopPropagation()}
                 >
+                  <button
+                    className="header-player-mini-toggle"
+                    type="button"
+                    title="Переименовать"
+                    aria-label="Переименовать"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      startRename(track);
+                    }}
+                  >
+                    ✎
+                  </button>
                   <button
                     className="header-player-mini-toggle"
                     type="button"

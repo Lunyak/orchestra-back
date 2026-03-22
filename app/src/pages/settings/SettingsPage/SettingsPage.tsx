@@ -8,6 +8,17 @@ import { usePlatform } from "../../../PlatformContext";
 import { ProjectPanel } from "../../../shared/components/project-panel/ProjectPanel";
 import { getProfilesBatch, type TeamProfile } from "../../../sync/api";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
+import { isOrchestraWebAppSubpath } from "../../../shared/settings/orchestraWebHost";
+import {
+  getSpectaclePageLockEnabled,
+  setSpectaclePageLockEnabled,
+} from "../../../shared/settings/spectaclePageLock";
+import {
+  getConfirmBeforeRemoteScenePull,
+  getPauseRemoteSceneUpdates,
+  setConfirmBeforeRemoteScenePull,
+  setPauseRemoteSceneUpdates,
+} from "../../../shared/settings/syncPreferences";
 import "./style.css";
 
 export function SettingsPage() {
@@ -35,6 +46,14 @@ export function SettingsPage() {
   } = useTeam();
 
   const [newProjectName, setNewProjectName] = useState("");
+  const [pauseRemoteSceneUpdates, setPauseRemoteSceneUpdatesState] = useState(() =>
+    getPauseRemoteSceneUpdates(),
+  );
+  const [confirmBeforeRemotePull, setConfirmBeforeRemotePullState] = useState(() =>
+    getConfirmBeforeRemoteScenePull(),
+  );
+  const [spectaclePageLock, setSpectaclePageLockUi] = useState(() => getSpectaclePageLockEnabled());
+  const showOrchestraWebPageLock = isOrchestraWebAppSubpath();
 
   const [profileByEmail, setProfileByEmail] = useState<Map<string, TeamProfile>>(() => new Map());
   const memberEmails = useMemo(() => {
@@ -129,6 +148,67 @@ export function SettingsPage() {
               </Button>
             </div>
             <p>Текущий проект: {projectName || "—"}</p>
+            <section className="settings-project-section settings-sync-live">
+              <h3>Синхронизация с сервером во время спектакля</h3>
+              <p className="settings-sync-hint">
+                По событию с сервера сцена подтягивается без перезагрузки страницы. Полная перезагрузка
+                вкладки при обычной работе чаще связана с истечением сессии или сбоем обновления токена.
+                Здесь можно ограничить автоматическое применение чужих правок.
+              </p>
+              <label className="settings-sync-live-row">
+                <input
+                  type="checkbox"
+                  checked={pauseRemoteSceneUpdates}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setPauseRemoteSceneUpdates(v);
+                    setPauseRemoteSceneUpdatesState(v);
+                  }}
+                />
+                <span>
+                  Не подтягивать обновления сцены автоматически (только по кнопке «Подтянуть» в интерфейсе)
+                </span>
+              </label>
+              <label className="settings-sync-live-row">
+                <input
+                  type="checkbox"
+                  checked={confirmBeforeRemotePull}
+                  onChange={(e) => {
+                    const v = e.target.checked;
+                    setConfirmBeforeRemoteScenePull(v);
+                    setConfirmBeforeRemotePullState(v);
+                  }}
+                  disabled={pauseRemoteSceneUpdates}
+                />
+                <span>
+                  Спрашивать подтверждение перед автоматическим подтягиванием обновлений с сервера
+                </span>
+              </label>
+            </section>
+            {showOrchestraWebPageLock ? (
+              <section className="settings-project-section settings-sync-live">
+                <h3>Страница на dopamin / orkestr</h3>
+                <p className="settings-sync-hint">
+                  Пока включено: нельзя уйти на другой маршрут приложения без подтверждения, браузер
+                  предупредит при перезагрузке или закрытии вкладки. Полностью запретить перезагрузку
+                  технически нельзя — только через системный диалог браузера.
+                </p>
+                <label className="settings-sync-live-row">
+                  <input
+                    type="checkbox"
+                    checked={spectaclePageLock}
+                    onChange={(e) => {
+                      const v = e.target.checked;
+                      setSpectaclePageLockEnabled(v);
+                      setSpectaclePageLockUi(v);
+                    }}
+                  />
+                  <span>
+                    Не покидать эту страницу (блок ухода по ссылкам и «Назад», предупреждение при F5)
+                  </span>
+                </label>
+              </section>
+            ) : null}
             {(onPushAllLocal || onResyncProject) && (
               <section className="settings-sync">
                 <h3>Синхронизация локальных данных</h3>

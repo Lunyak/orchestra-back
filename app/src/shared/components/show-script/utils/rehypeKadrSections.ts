@@ -24,17 +24,21 @@ function isIgnorableWhitespaceText(node: HastNode): boolean {
   return /^[\s\u00A0\u200B\u200C\u200D\uFEFF]*$/.test(String((node as any).value ?? ""));
 }
 
-function extractImgFromImgOnlyParagraph(node: HastNode): HastNode | null {
+/** Paragraph whose only meaningful children are <img> (one or more), e.g. after paste/merge. */
+function extractImgsFromImgOnlyParagraph(node: HastNode): HastNode[] | null {
   if (!node || node.type !== "element") return null;
   const tag = String((node as any).tagName ?? "").toLowerCase();
   if (tag !== "p") return null;
   const children = Array.isArray((node as any).children) ? ((node as any).children as HastNode[]) : [];
   const meaningful = children.filter((c) => !isIgnorableWhitespaceText(c));
-  if (meaningful.length !== 1) return null;
-  const only = meaningful[0];
-  if (!only || only.type !== "element") return null;
-  if (String((only as any).tagName ?? "").toLowerCase() !== "img") return null;
-  return only;
+  if (meaningful.length === 0) return null;
+  const imgs: HastNode[] = [];
+  for (const m of meaningful) {
+    if (!m || m.type !== "element") return null;
+    if (String((m as any).tagName ?? "").toLowerCase() !== "img") return null;
+    imgs.push(m);
+  }
+  return imgs;
 }
 
 function isBareImg(node: HastNode): boolean {
@@ -81,9 +85,9 @@ function moveImagesToRight(body: HastNode[]): { left: HastNode[]; right: HastNod
   const left: HastNode[] = [];
   const right: HastNode[] = [];
   for (const node of body) {
-    const extractedImg = extractImgFromImgOnlyParagraph(node);
-    if (extractedImg) {
-      right.push(extractedImg);
+    const fromP = extractImgsFromImgOnlyParagraph(node);
+    if (fromP) {
+      right.push(...fromP);
       continue;
     }
     if (isBareImg(node)) {

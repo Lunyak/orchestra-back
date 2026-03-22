@@ -7,6 +7,7 @@ import "./styles.css";
 interface IProps {
     selectedTrackId: number | null;
     playlistOptions: { id: number; title: string }[];
+    soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
     onSelectedTrackIdChange: (trackId: number | null) => void;
     lightChannels: string[];
     onLightChannelsChange: (next: string[]) => void;
@@ -18,6 +19,7 @@ interface IProps {
 const ControlsScript: FC<IProps> = ({
     selectedTrackId,
     playlistOptions,
+    soundsOptions,
     onSelectedTrackIdChange,
     lightChannels,
     onLightChannelsChange,
@@ -52,6 +54,17 @@ const ControlsScript: FC<IProps> = ({
             return false;
         }
     });
+
+    const [selectedSoundId, setSelectedSoundId] = useState<number | null>(() => {
+        const first = soundsOptions[0]?.id ?? null;
+        return typeof first === "number" ? first : null;
+    });
+
+    useEffect(() => {
+        if (selectedSoundId != null) return;
+        if (soundsOptions.length === 0) return;
+        setSelectedSoundId(soundsOptions[0].id);
+    }, [selectedSoundId, soundsOptions]);
 
     useEffect(() => {
         try {
@@ -140,6 +153,44 @@ const ControlsScript: FC<IProps> = ({
                                 disabled={playlistOptions.length === 0}
                             >
                                 Вставить трек
+                            </Button>
+                        </div>
+
+                        <div className="script-track-insert" style={{ marginTop: 8 }}>
+                            <select
+                                className="script-track-select"
+                                value={selectedSoundId ?? ""}
+                                onChange={(event) => {
+                                    const raw = String(event.target.value ?? "").trim();
+                                    if (!raw) {
+                                        setSelectedSoundId(null);
+                                        return;
+                                    }
+                                    const n = Number(raw);
+                                    setSelectedSoundId(Number.isFinite(n) ? n : null);
+                                }}
+                            >
+                                {soundsOptions.length === 0 && <option value="">Звуки не найдены</option>}
+                                {soundsOptions.map((sound) => (
+                                    <option key={sound.id} value={sound.id}>
+                                        {sound.title}
+                                    </option>
+                                ))}
+                            </select>
+                            <Button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    const target = soundsOptions.find((item) => item.id === selectedSoundId);
+                                    if (!target) return;
+                                    // Icon (if any) is rendered INSIDE the left label in preview.
+                                    // Don't insert the icon into the text part of markdown.
+                                    onInsertText(`\n\n{{sound:${target.id}|SFX}} [${target.title}](sound:${target.id})\n\n`);
+                                }}
+                                disabled={soundsOptions.length === 0}
+                                title="Вставит в markdown кнопку/ссылку на звук (можно с иконкой)"
+                            >
+                                Вставить звук
                             </Button>
                         </div>
                     </div>

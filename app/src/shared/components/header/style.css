@@ -104,8 +104,6 @@
   background-color: var(--color-bg-primary);
   padding-left: 16px;
   padding-right: 16px;
-  padding-bottom: 12px;
-  /* box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); */
 }
 
 .header-ping {
@@ -513,6 +511,29 @@
   height: 42px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+.header-player-rename-input {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 6px;
+  bottom: 6px;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(96, 165, 250, 0.55);
+  background: rgba(15, 23, 42, 0.92);
+  color: rgba(226, 232, 240, 0.98);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  z-index: 6;
+}
+
+.header-player-rename-input:focus {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
 }
 
 .header-player-icon-btn {

@@ -1,4 +1,13 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import { useNavigate } from "react-router-dom";
 import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
@@ -29,9 +38,10 @@ const LINE_LABEL_CLASSNAMES = new Set([
   "markdown-speaker-label", // roles: [[ЕЛЕНА]]
   "markdown-light-chip", // lights: {{light:1}}
   "markdown-play-label", // music: {{play:123}}
+  "markdown-sound-label", // sounds: {{sound:1}} / {{sfx:1}}
 ]);
 
-type LineLabelKind = "role" | "light" | "play";
+type LineLabelKind = "role" | "light" | "play" | "sound";
 
 function markdownHasRoleLightOrPlayLineLabels(markdown: string): boolean {
   const raw = String(markdown ?? "");
@@ -43,8 +53,9 @@ function markdownHasRoleLightOrPlayLineLabels(markdown: string): boolean {
   // - roles: [[ЕЛЕНА]]
   // - lights: {{light:1}} / {{blackout}}
   // - play: {{play:123}}
+  // - sound: {{sound:1}} / {{sfx:"applause"}}
   const re =
-    /(^|\n)\s*(\[\[\s*[^\]]+?\s*]]|\{\{\s*(?:light|blackout|play)\b[^}]*}})/i;
+    /(^|\n)\s*(\[\[\s*[^\]]+?\s*]]|\{\{\s*(?:light|blackout|play|sound|sfx)\b[^}]*}})/i;
   return re.test(withoutCodeFences);
 }
 
@@ -84,10 +95,182 @@ function getLineLabelKind(el: React.ReactElement): LineLabelKind | null {
   if (parts.includes("markdown-speaker-label")) return "role";
   if (parts.includes("markdown-light-chip")) return "light";
   if (parts.includes("markdown-play-label")) return "play";
+  if (parts.includes("markdown-sound-label")) return "sound";
   return null;
 }
 
 type TrackLinkPayload = { id: number } | { name: string };
+type SoundLinkPayload = { id: number } | { name: string };
+
+type MarkdownPreviewImageContextValue = {
+  accessToken: string | null;
+  playUrlCache: React.MutableRefObject<Map<string, string>>;
+  resolveImageSrc: (src?: string) => string | undefined;
+  resolveSoundIconFromPayload: (payload: SoundLinkPayload) => string | null;
+  setLightbox: React.Dispatch<React.SetStateAction<{ src: string; alt: string } | null>>;
+};
+
+const MarkdownPreviewImageContext = createContext<MarkdownPreviewImageContextValue | null>(null);
+
+/** Must stay a stable module-level component so React does not remount every image on parent re-render. */
+function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const ctx = useContext(MarkdownPreviewImageContext);
+  const { src, alt, onLoad, onError, ...rest } = props;
+  const accessToken = ctx?.accessToken ?? null;
+  const resolveToLocal = ctx?.resolveImageSrc;
+  const resolveSound = ctx?.resolveSoundIconFromPayload;
+  const playUrlCache = ctx?.playUrlCache;
+  const raw = String(src ?? "").trim();
+  const initial =
+    !ctx
+      ? raw
+      : raw.startsWith("orchestra-image:") || raw.startsWith("sound-icon:")
+        ? ""
+        : (ctx.resolveImageSrc(raw) || raw);
+  const [resolved, setResolved] = useState<string>(initial);
+  const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
+  const [playUrlRetry, setPlayUrlRetry] = useState(0);
+
+  useEffect(() => {
+    setPlayUrlRetry(0);
+  }, [src]);
+
+  useEffect(() => {
+    if (!ctx || !playUrlCache || !resolveToLocal || !resolveSound) return;
+    let cancelled = false;
+    const run = async () => {
+      const s = String(src ?? "").trim();
+      if (!s) return;
+      if (s.startsWith("sound-icon:")) {
+        const rawPayload = s.replace(/^sound-icon:/i, "").trim();
+        const n = Number(rawPayload);
+        const safeName = (() => {
+          try {
+            return decodeURIComponent(rawPayload);
+          } catch {
+            return rawPayload;
+          }
+        })();
+        const payload: SoundLinkPayload = Number.isFinite(n) ? { id: n } : { name: safeName };
+        const url = resolveSound(payload);
+        if (!cancelled && url) setResolved(url);
+        return;
+      }
+      if (s.startsWith("orchestra-image:")) {
+        const encoded = s.replace(/^orchestra-image:/i, "").trim();
+        let key: string;
+        try {
+          key = decodeURIComponent(encoded);
+        } catch {
+          key = encoded;
+        }
+        const cached = playUrlCache.current.get(key);
+        if (cached) {
+          if (!cancelled) setResolved(cached);
+          return;
+        }
+        const token =
+          accessToken ??
+          (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
+        if (!token) return;
+        try {
+          const { url } = await getPlayUrl(token, key);
+          if (url) playUrlCache.current.set(key, url);
+          if (!cancelled && url) setResolved(url);
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      const local = resolveToLocal(s);
+      if (!cancelled) setResolved(local || s);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx, src, accessToken, resolveToLocal, resolveSound, playUrlCache, playUrlRetry]);
+
+  useEffect(() => {
+    setState("loading");
+  }, [resolved]);
+
+  if (!ctx) {
+    return <img src={src} alt={alt} {...rest} />;
+  }
+
+  const canOpen = Boolean(resolved);
+  const altText = String(alt ?? "").trim();
+
+  const invalidatePlayUrlCacheAndRetry = () => {
+    if (!raw.startsWith("orchestra-image:")) return;
+    const encoded = raw.replace(/^orchestra-image:/i, "").trim();
+    let key: string;
+    try {
+      key = decodeURIComponent(encoded);
+    } catch {
+      key = encoded;
+    }
+    setPlayUrlRetry((prev) => {
+      if (prev >= 2) return prev;
+      ctx.playUrlCache.current.delete(key);
+      setResolved("");
+      return prev + 1;
+    });
+  };
+
+  const imgEl = resolved ? (
+    <img
+      src={resolved}
+      alt={altText}
+      {...rest}
+      onLoad={(e) => {
+        setState("loaded");
+        onLoad?.(e);
+      }}
+      onError={(e) => {
+        setState("error");
+        onError?.(e);
+        invalidatePlayUrlCacheAndRetry();
+      }}
+    />
+  ) : null;
+
+  if (!canOpen) {
+    return (
+      <span className="markdown-img-with-preloader" data-state="loading">
+        <span className="markdown-preloader" aria-hidden="true">
+          <span className="markdown-loader" />
+        </span>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="markdown-image-btn"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (state !== "loaded") return;
+        ctx.setLightbox({ src: resolved, alt: altText });
+      }}
+      title="Открыть изображение"
+      aria-label="Открыть изображение"
+      aria-busy={state === "loading"}
+    >
+      <span className="markdown-img-with-preloader" data-state={state}>
+        {state === "loading" ? (
+          <span className="markdown-preloader" aria-hidden="true">
+            <span className="markdown-loader" />
+          </span>
+        ) : null}
+        {imgEl}
+      </span>
+    </button>
+  );
+}
 
 function getLeadingTrackPayload(children: React.ReactNode): TrackLinkPayload | null {
   const flat = flattenInertSpans(React.Children.toArray(children));
@@ -107,6 +290,41 @@ function getLeadingTrackPayload(children: React.ReactNode): TrackLinkPayload | n
   if (!/\bmarkdown-track-link\b/.test(classStr)) return null;
   const rawId = (candidate.props as any)?.["data-track-id"];
   const rawName = (candidate.props as any)?.["data-track-name"];
+  const id = Number(rawId);
+  if (Number.isFinite(id) && id > 0) return { id };
+  const name = String(rawName ?? "").trim();
+  if (name) return { name };
+  return null;
+}
+
+function getSoundPayloadFromLabelEl(labelEl: React.ReactElement): SoundLinkPayload | null {
+  const rawId = (labelEl.props as any)?.["data-sound-id"];
+  const rawName = (labelEl.props as any)?.["data-sound-name"];
+  const id = Number(rawId);
+  if (Number.isFinite(id) && id > 0) return { id };
+  const name = String(rawName ?? "").trim();
+  if (name) return { name };
+  return null;
+}
+
+function getLeadingSoundPayload(children: React.ReactNode): SoundLinkPayload | null {
+  const flat = flattenInertSpans(React.Children.toArray(children));
+  let i = 0;
+  while (i < flat.length) {
+    const n = flat[i];
+    if (isIgnorableLeadingNode(n)) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  const candidate = flat[i];
+  if (!React.isValidElement(candidate)) return null;
+  const className = (candidate.props as any)?.className;
+  const classStr = Array.isArray(className) ? className.join(" ") : String(className ?? "");
+  if (!/\bmarkdown-sound-link\b/.test(classStr)) return null;
+  const rawId = (candidate.props as any)?.["data-sound-id"];
+  const rawName = (candidate.props as any)?.["data-sound-name"];
   const id = Number(rawId);
   if (Number.isFinite(id) && id > 0) return { id };
   const name = String(rawName ?? "").trim();
@@ -171,6 +389,7 @@ export function ScriptMarkdownPreview({
   projectName,
   sceneName = "script",
   onTrackLinkClick,
+  onSoundLinkClick,
   onCreateAnnotation,
   onUpdateAnnotation,
   onDeleteAnnotation,
@@ -182,6 +401,7 @@ export function ScriptMarkdownPreview({
   projectName: string;
   sceneName?: string;
   onTrackLinkClick?: (trackId: number) => void;
+  onSoundLinkClick?: (soundId: number) => void;
   onCreateAnnotation: (draft: NewAnnotationDraft) => Promise<void>;
   onUpdateAnnotation: (id: string, noteText: string) => Promise<void>;
   onDeleteAnnotation: (id: string) => Promise<void>;
@@ -207,6 +427,7 @@ export function ScriptMarkdownPreview({
   const annotationsMode = ui.annotationsMode;
   const markdownMode = ui.markdownMode;
   const playlistOptions = ui.playlistOptions;
+  const soundsOptions = ui.soundsOptions;
   const lightChannels = ui.lightChannels;
 
   const [lightbox, setLightbox] = useState<null | { src: string; alt: string }>(null);
@@ -237,20 +458,43 @@ export function ScriptMarkdownPreview({
   const [dialogLabelSlotPx, setDialogLabelSlotPx] = useState<number | null>(null);
   const dialogLabelSlotPxRef = useRef<number | null>(null);
 
-  const resolveImageSrc = (src?: string) => {
-    if (!src) return src;
+  const resolveImageSrc = useCallback(
+    (src?: string) => {
+      if (!src) return src;
 
-    let path = src.trim().replace(/^\.?\//, "");
+      let path = src.trim().replace(/^\.?\//, "");
 
-    if (!path.startsWith("images/")) {
-      return src;
-    }
+      if (!path.startsWith("images/")) {
+        return src;
+      }
 
-    path = path.replace(/^images\//, "").replace(/^\/+/, "");
+      path = path.replace(/^images\//, "").replace(/^\/+/, "");
 
-    const pathSegments = path.split("/").map((segment) => encodeURIComponent(segment));
-    const encodedPath = pathSegments.join("/");
+      const pathSegments = path.split("/").map((segment) => encodeURIComponent(segment));
+      const encodedPath = pathSegments.join("/");
 
+      let projectId: string | null = null;
+      if (typeof window !== "undefined") {
+        try {
+          projectId = window.localStorage.getItem(`projectId:${projectName}`);
+        } catch {
+          // ignore
+        }
+      }
+
+      const baseUrl = new URL(`project-images://${encodeURIComponent(projectName)}/`);
+      baseUrl.pathname = projectId
+        ? `/${encodeURIComponent(projectId)}/${encodedPath}`
+        : `/${encodedPath}`;
+
+      return baseUrl.toString();
+    },
+    [projectName],
+  );
+
+  const resolveSoundIconSrc = useCallback((iconFile: string) => {
+    const safe = String(iconFile ?? "").trim();
+    if (!safe) return "";
     let projectId: string | null = null;
     if (typeof window !== "undefined") {
       try {
@@ -259,120 +503,47 @@ export function ScriptMarkdownPreview({
         // ignore
       }
     }
+    const url = new URL(`project-sound-icons://${encodeURIComponent(projectName)}/`);
+    const encodedFile = encodeURIComponent(safe);
+    url.pathname = projectId
+      ? `/${encodeURIComponent(projectId)}/${encodedFile}`
+      : `/${encodedFile}`;
+    return url.toString();
+  }, [projectName]);
 
-    const baseUrl = new URL(`project-images://${encodeURIComponent(projectName)}/`);
-    baseUrl.pathname = projectId
-      ? `/${encodeURIComponent(projectId)}/${encodedPath}`
-      : `/${encodedPath}`;
-
-    return baseUrl.toString();
-  };
-
-  const resolveRemoteImageUrl = async (key: string): Promise<string | null> => {
-    const cached = imageUrlCacheRef.current.get(key);
-    if (cached) return cached;
-    const token =
-      accessToken ??
-      (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
-    if (!token) return null;
-    try {
-      const { url } = await getPlayUrl(token, key);
-      if (url) imageUrlCacheRef.current.set(key, url);
-      return url ?? null;
-    } catch {
+  const resolveSoundIconFromPayload = useCallback(
+    (payload: SoundLinkPayload): string | null => {
+      const byId =
+        "id" in payload
+          ? soundsOptions.find((s) => Number(s?.id) === Number(payload.id)) ?? null
+          : null;
+      const byName =
+        "name" in payload
+          ? soundsOptions.find(
+              (s) => String(s?.title ?? "").toLowerCase() === String(payload.name ?? "").toLowerCase(),
+            ) ?? null
+          : null;
+      const sound = byId ?? byName;
+      if (!sound) return null;
+      const remote = String(sound.iconRemoteUrl ?? "").trim();
+      if (remote && /^https?:\/\//i.test(remote)) return remote;
+      const icon = String(sound.icon ?? "").trim();
+      if (icon) return resolveSoundIconSrc(icon);
       return null;
-    }
-  };
+    },
+    [soundsOptions, resolveSoundIconSrc],
+  );
 
-  const MarkdownImage = (props: React.ImgHTMLAttributes<HTMLImageElement>) => {
-    const { src, alt, onLoad, onError, ...rest } = props;
-    const raw = String(src ?? "").trim();
-    const initial =
-      raw.startsWith("orchestra-image:") ? "" : (resolveImageSrc(raw) || raw);
-    const [resolved, setResolved] = useState<string>(initial);
-    const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
-
-    useEffect(() => {
-      let cancelled = false;
-      const run = async () => {
-        const s = String(src ?? "").trim();
-        if (!s) return;
-        if (s.startsWith("orchestra-image:")) {
-          const encoded = s.replace(/^orchestra-image:/i, "").trim();
-          const key = decodeURIComponent(encoded);
-          const url = await resolveRemoteImageUrl(key);
-          if (!cancelled && url) setResolved(url);
-          return;
-        }
-        // local images/ path
-        const local = resolveImageSrc(s);
-        if (!cancelled) setResolved(local || s);
-      };
-      void run();
-      return () => {
-        cancelled = true;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [src, accessToken]);
-
-    useEffect(() => {
-      setState("loading");
-    }, [resolved]);
-
-    const canOpen = Boolean(resolved);
-    const altText = String(alt ?? "").trim();
-
-    const imgEl = resolved ? (
-      <img
-        src={resolved}
-        alt={altText}
-        {...rest}
-        onLoad={(e) => {
-          setState("loaded");
-          onLoad?.(e);
-        }}
-        onError={(e) => {
-          setState("error");
-          onError?.(e);
-        }}
-      />
-    ) : null;
-
-    if (!canOpen) {
-      return (
-        <span className="markdown-img-with-preloader" data-state="loading">
-          <span className="markdown-preloader" aria-hidden="true">
-            <span className="markdown-loader" />
-          </span>
-        </span>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        className="markdown-image-btn"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (state !== "loaded") return;
-          setLightbox({ src: resolved, alt: altText });
-        }}
-        title="Открыть изображение"
-        aria-label="Открыть изображение"
-        aria-busy={state === "loading"}
-      >
-        <span className="markdown-img-with-preloader" data-state={state}>
-          {state === "loading" ? (
-            <span className="markdown-preloader" aria-hidden="true">
-              <span className="markdown-loader" />
-            </span>
-          ) : null}
-          {imgEl}
-        </span>
-      </button>
-    );
-  };
+  const markdownPreviewImageCtx = useMemo<MarkdownPreviewImageContextValue>(
+    () => ({
+      accessToken,
+      playUrlCache: imageUrlCacheRef,
+      resolveImageSrc,
+      resolveSoundIconFromPayload,
+      setLightbox,
+    }),
+    [accessToken, resolveImageSrc, resolveSoundIconFromPayload],
+  );
 
   const urlTransform = (url: string) => {
     const trimmed = url.trim().toLowerCase();
@@ -406,6 +577,20 @@ export function ScriptMarkdownPreview({
     }
     if (trimmed.startsWith("playlist:")) {
       const payload = trimmed.replace(/^playlist:/i, "").trim();
+      const id = Number(payload);
+      if (Number.isFinite(id)) {
+        return { id };
+      }
+      return payload ? { name: normalizeTrackName(payload) } : null;
+    }
+    return null;
+  };
+
+  const resolveSoundLink = (href?: string) => {
+    if (!href) return null;
+    const trimmed = href.trim();
+    if (trimmed.startsWith("sound:") || trimmed.startsWith("sfx:")) {
+      const payload = trimmed.replace(/^(sound|sfx):/i, "").trim();
       const id = Number(payload);
       if (Number.isFinite(id)) {
         return { id };
@@ -504,6 +689,22 @@ export function ScriptMarkdownPreview({
     );
     if (fromCache?.id != null) {
       onTrackLinkClick(Number(fromCache.id));
+    }
+  };
+
+  const toggleSoundFromPayload = (payload: SoundLinkPayload) => {
+    if (!onSoundLinkClick) return;
+    if ("id" in payload) {
+      onSoundLinkClick(Number(payload.id));
+      return;
+    }
+    const name = String(payload.name ?? "").trim();
+    if (!name) return;
+    const fromCache = soundsOptions.find(
+      (item) => String(item?.title ?? "").toLowerCase() === name.toLowerCase(),
+    );
+    if (fromCache?.id != null) {
+      onSoundLinkClick(Number(fromCache.id));
     }
   };
 
@@ -609,6 +810,26 @@ export function ScriptMarkdownPreview({
       }
     }
 
+    const soundEl = target.closest?.(".markdown-sound-label") as HTMLElement | null;
+    if (soundEl && onSoundLinkClick) {
+      const rawId = soundEl.getAttribute("data-sound-id");
+      const rawName = soundEl.getAttribute("data-sound-name");
+      const id = Number(rawId);
+      if (Number.isFinite(id) && id > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSoundFromPayload({ id });
+        return;
+      }
+      const name = String(rawName ?? "").trim();
+      if (name) {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleSoundFromPayload({ name });
+        return;
+      }
+    }
+
     const el = target.closest?.(".markdown-speaker-label") as HTMLElement | null;
     if (!el) return;
     const token = String(el.getAttribute("title") ?? "").trim();
@@ -642,6 +863,7 @@ export function ScriptMarkdownPreview({
         onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
       >
         <div className="script-step-title">{currentStep?.title}</div>
+        <MarkdownPreviewImageContext.Provider value={markdownPreviewImageCtx}>
         <ReactMarkdown
           urlTransform={urlTransform}
           rehypePlugins={rehypePlugins}
@@ -650,6 +872,7 @@ export function ScriptMarkdownPreview({
               const rendered = renderLightTokens(children);
               const { label, rest, kind } = splitLeadingLineLabel(rendered);
               const leadingTrack = onTrackLinkClick ? getLeadingTrackPayload(rendered) : null;
+              const leadingSound = onSoundLinkClick ? getLeadingSoundPayload(rendered) : null;
               if (!label) {
                 if (leadingTrack) {
                   const alignClass = hasRoleOrLightLabels
@@ -671,6 +894,26 @@ export function ScriptMarkdownPreview({
                     </p>
                   );
                 }
+                if (leadingSound) {
+                  const alignClass = hasRoleOrLightLabels
+                    ? "markdown-dialog-line--track-align"
+                    : "markdown-dialog-line--track-compact";
+                  return (
+                    <p className={`markdown-dialog-line markdown-dialog-line--label-sound ${alignClass}`}>
+                      <span className="markdown-dialog-label" aria-hidden="true">
+                        <button
+                          type="button"
+                          className="markdown-sound-play"
+                          title="Звук: воспроизвести/остановить"
+                          onClick={() => toggleSoundFromPayload(leadingSound)}
+                        >
+                          ▶
+                        </button>
+                      </span>
+                      <span className="markdown-dialog-text">{rendered}</span>
+                    </p>
+                  );
+                }
 
                 if (!hasRoleOrLightLabels) {
                   return <p>{rendered}</p>;
@@ -682,15 +925,56 @@ export function ScriptMarkdownPreview({
                   </p>
                 );
               }
+              let labelHasIcon = false;
+              const resolvedLabel =
+                kind === "sound"
+                  ? (() => {
+                      if (!onSoundLinkClick) return label;
+                      const payload = getSoundPayloadFromLabelEl(label);
+                      if (!payload) return label;
+                      const iconUrl = resolveSoundIconFromPayload(payload);
+                      if (!iconUrl) return label;
+                      labelHasIcon = true;
+                      return (
+                        <span
+                          className="markdown-sound-label markdown-sound-label--with-icon"
+                          role="button"
+                          tabIndex={0}
+                          title="Звук: воспроизвести/остановить"
+                          data-sound-id={"id" in payload ? String(payload.id) : undefined}
+                          data-sound-name={"name" in payload ? String(payload.name) : undefined}
+                          aria-label="Звук: воспроизвести/остановить"
+                        >
+                          <img
+                            className="markdown-sound-label__img"
+                            src={iconUrl}
+                            alt=""
+                            aria-hidden="true"
+                          />
+                          <span className="markdown-sound-label__fallback">SFX</span>
+                        </span>
+                      );
+                    })()
+                  : label;
               const kindClass =
                 kind === "light"
                   ? "markdown-dialog-line--label-light"
                   : kind === "play"
                     ? "markdown-dialog-line--label-play"
+                    : kind === "sound"
+                      ? "markdown-dialog-line--label-sound"
                   : "markdown-dialog-line--label-role";
               return (
-                <p className={`markdown-dialog-line ${kindClass}`}>
-                  <span className="markdown-dialog-label">{label}</span>
+                <p
+                  className={[
+                    "markdown-dialog-line",
+                    kindClass,
+                    labelHasIcon ? "markdown-dialog-line--label-has-icon" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <span className="markdown-dialog-label">{resolvedLabel}</span>
                   <span className="markdown-dialog-text">{rest}</span>
                 </p>
               );
@@ -752,6 +1036,28 @@ export function ScriptMarkdownPreview({
                   </button>
                 );
               }
+              const resolvedSound = resolveSoundLink(href);
+              if (resolvedSound && onSoundLinkClick) {
+                return (
+                  <button
+                    type="button"
+                    className="markdown-sound-link"
+                    data-sound-id={"id" in resolvedSound ? String(resolvedSound.id) : undefined}
+                    data-sound-name={"name" in resolvedSound ? String(resolvedSound.name) : undefined}
+                    onClick={async () => {
+                      if ("id" in resolvedSound) {
+                        onSoundLinkClick(Number(resolvedSound.id));
+                        return;
+                      }
+                      if ("name" in resolvedSound) {
+                        toggleSoundFromPayload({ name: String(resolvedSound.name) });
+                      }
+                    }}
+                  >
+                    {children}
+                  </button>
+                );
+              }
               if (isAudioLink(href)) {
                 return (
                   <a
@@ -769,9 +1075,7 @@ export function ScriptMarkdownPreview({
                 </a>
               );
             },
-            img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
-              <MarkdownImage {...props} />
-            ),
+            img: MarkdownPreviewImage,
             mark: ({ node, children, ...rest }: any) => {
               const id = (node as any)?.properties?.["data-anno-id"] as
                 | string
@@ -831,6 +1135,7 @@ export function ScriptMarkdownPreview({
         >
           {markdown || "*Пусто*"}
         </ReactMarkdown>
+        </MarkdownPreviewImageContext.Provider>
       </div>
 
       {lightbox && (

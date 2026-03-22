@@ -62,6 +62,21 @@ function isValidContent(x: any): x is SiteEventsContent {
   return x && typeof x === "object" && Array.isArray(x.events);
 }
 
+/** Same data as last successful `fetchSiteEvents` (sessionStorage). Safe for first paint — avoids stale hardcoded fallbacks. */
+export function readSiteEventsCache(): SiteEvent[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = sessionStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
+    const parsed = safeJsonParse<SiteEventsContent>(cached);
+    if (!parsed || !isValidContent(parsed)) return null;
+    const events = parsed.events ?? [];
+    return events.length ? (events as SiteEvent[]) : null;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeEvent(raw: any): SiteEvent | null {
   if (!raw || typeof raw !== "object") return null;
 

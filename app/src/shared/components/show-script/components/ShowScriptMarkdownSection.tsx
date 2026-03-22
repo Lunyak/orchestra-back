@@ -31,12 +31,14 @@ interface IProps {
     value: ScriptStep[K],
   ) => void;
   onTrackLinkClick: (trackId: number) => void;
+  onSoundLinkClick?: (soundId: number) => void;
   renderBody?: (args: {
     markdownPane: React.ReactNode;
     currentStep: ScriptStep | undefined;
     controls: null | {
       selectedTrackId: number | null;
       playlistOptions: { id: number; title: string }[];
+      soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
       onSelectedTrackIdChange: (trackId: number | null) => void;
       lightChannels: string[];
       onLightChannelsChange: (next: string[]) => void;
@@ -47,7 +49,14 @@ interface IProps {
   }) => React.ReactNode;
 }
 
-export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepField, onTrackLinkClick, renderBody }: IProps) {
+export function ShowScriptMarkdownSection({
+  projectSlug,
+  sceneName,
+  updateStepField,
+  onTrackLinkClick,
+  onSoundLinkClick,
+  renderBody,
+}: IProps) {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const sceneDataRevision = useAppSelector((s) => (s as any).scene?.sceneDataRevision ?? 0);
@@ -57,6 +66,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
   const markdownMode = ui.markdownMode;
   const annotationsMode = ui.annotationsMode;
   const playlistOptions = ui.playlistOptions;
+  const soundsOptions = ui.soundsOptions;
   const selectedTrackId = ui.selectedTrackId;
   const lightChannels = ui.lightChannels;
   const selectedLightSlot = ui.selectedLightSlot;
@@ -434,6 +444,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
                 projectName={projectSlug}
                 sceneName={sceneName}
                 onTrackLinkClick={onTrackLinkClick}
+                onSoundLinkClick={onSoundLinkClick}
                 newAnnotation={newAnnotation}
                 setNewAnnotation={setNewAnnotation}
                 activeAnnotationId={activeAnnotationId}
@@ -451,6 +462,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
             projectName={projectSlug}
             sceneName={sceneName}
             onTrackLinkClick={onTrackLinkClick}
+            onSoundLinkClick={onSoundLinkClick}
             newAnnotation={newAnnotation}
             setNewAnnotation={setNewAnnotation}
             activeAnnotationId={activeAnnotationId}
@@ -469,6 +481,7 @@ export function ShowScriptMarkdownSection({ projectSlug, sceneName, updateStepFi
       ? {
         selectedTrackId,
         playlistOptions,
+        soundsOptions,
         lightChannels,
         selectedLightSlot,
         onSelectedTrackIdChange: (trackId: number | null) => {

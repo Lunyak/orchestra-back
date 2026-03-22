@@ -1,4 +1,4 @@
-import { ImgHTMLAttributes, useMemo, useState } from "react";
+import { ImgHTMLAttributes, useEffect, useMemo, useState } from "react";
 import Preloader from "../Preloader/Preloader";
 import "./ImageWithPreloader.css";
 
@@ -22,9 +22,14 @@ export function ImageWithPreloader({
   spinnerSize = 56,
   onLoad,
   onError,
+  src,
   ...imgProps
 }: ImageWithPreloaderProps) {
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
+
+  useEffect(() => {
+    setState("loading");
+  }, [src]);
 
   const rootClassName = useMemo(() => {
     return ["img-with-preloader", className].filter(Boolean).join(" ");
@@ -46,6 +51,7 @@ export function ImageWithPreloader({
       <img
         className={imgCn}
         {...imgProps}
+        src={src}
         alt={imgProps.alt ?? ""}
         onLoad={(e) => {
           setState("loaded");

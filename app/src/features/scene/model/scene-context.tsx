@@ -7,6 +7,10 @@ import { cleanupProjectImages, syncPull, syncPush, type SyncChange } from "../..
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { disconnectRealtimeSocket, getRealtimeSocket } from "../../../realtime/socket";
 import { getClientInstanceId } from "../../../realtime/clientInstanceId";
+import {
+  getConfirmBeforeRemoteScenePull,
+  getPauseRemoteSceneUpdates,
+} from "../../../shared/settings/syncPreferences";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
@@ -22,6 +26,7 @@ import {
 type SetStateAction<T> = T | ((prev: T) => T);
 
 let playlistPlayHandler: ((trackId: number) => void) | undefined;
+let soundToggleHandler: ((soundId: number) => void) | undefined;
 
 function stableStringify(value: any): string {
   if (value === null) return "null";
@@ -139,6 +144,12 @@ export interface SceneContextValue {
   hasLocalEdits: boolean;
   realtimePullDeferred: boolean;
   realtimePullDeferredAt: string | null;
+  realtimePullDeferredReason:
+    | "local_edits"
+    | "settings_pause"
+    | "confirm_declined"
+    | "remote_pending"
+    | null;
   clearRealtimePullDeferred: () => void;
   addStep: (atPage?: number) => void;
   deleteStep: (id: number) => void;
@@ -148,6 +159,8 @@ export interface SceneContextValue {
   syncFromServer: (token?: string | null, projectOverride?: string) => Promise<void>;
   registerPlaylistPlay: (handler: (trackId: number) => void) => void;
   handleTrackLinkClick: (trackId: number) => void;
+  registerSoundToggle: (handler: (soundId: number) => void) => void;
+  handleSoundLinkClick: (soundId: number) => void;
 }
 
 function useSceneOperations() {
@@ -1234,11 +1247,42 @@ function useSceneProviderEffects() {
         if (payload?.sourceClientId && payload.sourceClientId === myClientId) return;
         // Pull can overwrite current draft; don't auto-pull while local edits exist.
         if (hasLocalEdits) {
-          dispatch(sceneActions.setRealtimePullDeferred({ deferred: true, at: new Date().toISOString() }));
+          dispatch(
+            sceneActions.setRealtimePullDeferred({
+              deferred: true,
+              at: new Date().toISOString(),
+              reason: "local_edits",
+            }),
+          );
+          return;
+        }
+        if (getPauseRemoteSceneUpdates()) {
+          dispatch(
+            sceneActions.setRealtimePullDeferred({
+              deferred: true,
+              at: new Date().toISOString(),
+              reason: "settings_pause",
+            }),
+          );
           return;
         }
         if (realtimePullTimerRef.current) window.clearTimeout(realtimePullTimerRef.current);
         realtimePullTimerRef.current = window.setTimeout(() => {
+          if (getConfirmBeforeRemoteScenePull()) {
+            const ok = window.confirm(
+              "На сервере обновили сцену. Подтянуть изменения сейчас? Отмена — оставить как есть, можно будет подтянуть вручную.",
+            );
+            if (!ok) {
+              dispatch(
+                sceneActions.setRealtimePullDeferred({
+                  deferred: true,
+                  at: new Date().toISOString(),
+                  reason: "confirm_declined",
+                }),
+              );
+              return;
+            }
+          }
           void syncFromServer(token, projectName);
         }, 300);
       };
@@ -1379,9 +1423,17 @@ export function SceneProvider({ children }: { children: React.ReactNode }) {
 
 export function useScene(): SceneContextValue {
   const dispatch = useAppDispatch();
-  const { sceneData, steps, theaterLayout, currentPage, isSceneReady, hasLocalEdits, realtimePullDeferred, realtimePullDeferredAt } = useAppSelector(
-    (s) => s.scene,
-  );
+  const {
+    sceneData,
+    steps,
+    theaterLayout,
+    currentPage,
+    isSceneReady,
+    hasLocalEdits,
+    realtimePullDeferred,
+    realtimePullDeferredAt,
+    realtimePullDeferredReason,
+  } = useAppSelector((s) => s.scene);
   const { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave } =
     useSceneOperations();
 
@@ -1450,6 +1502,14 @@ export function useScene(): SceneContextValue {
     playlistPlayHandler?.(trackId);
   }, []);
 
+  const registerSoundToggle = useCallback((handler: (soundId: number) => void) => {
+    soundToggleHandler = handler;
+  }, []);
+
+  const handleSoundLinkClick = useCallback((soundId: number) => {
+    soundToggleHandler?.(soundId);
+  }, []);
+
   const clearRealtimePullDeferred = useCallback(() => {
     dispatch(sceneActions.clearRealtimePullDeferred());
   }, [dispatch]);
@@ -1470,6 +1530,7 @@ export function useScene(): SceneContextValue {
     hasLocalEdits,
     realtimePullDeferred,
     realtimePullDeferredAt,
+    realtimePullDeferredReason,
     clearRealtimePullDeferred,
     addStep,
     deleteStep,
@@ -1479,6 +1540,8 @@ export function useScene(): SceneContextValue {
     syncFromServer,
     registerPlaylistPlay,
     handleTrackLinkClick,
+    registerSoundToggle,
+    handleSoundLinkClick,
   };
 }
 
