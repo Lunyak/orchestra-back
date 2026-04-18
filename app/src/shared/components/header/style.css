@@ -1,4 +1,4 @@
-/* Зона хедера: слева, выдвигается при наведении на левый край */
+/* Зона хедера: слева; панель открывается только по кнопке .header-sidebar-toggle */
 .header-zone {
   position: fixed;
   z-index: 1000;
@@ -9,28 +9,12 @@
   top: 0;
   left: 0;
   bottom: 0;
-  transition: width 0.2s ease;
+  width: 0;
+  pointer-events: none;
 }
 
-.header-trigger {
-  cursor: default;
-}
-
-.header-trigger--left {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 32px;
-  background: transparent;
-  border: none;
-  padding: 0;
-  z-index: 1;
-}
-
-.header-trigger--left:focus-visible {
-  outline: 2px solid rgba(120, 180, 255, 0.85);
-  outline-offset: 2px;
+.header-zone--left .header {
+  pointer-events: auto;
 }
 
 .header-touch-overlay {
@@ -38,35 +22,53 @@
   inset: 0;
   z-index: 0;
   background: transparent;
+  pointer-events: auto;
 }
 
-.header-mobile-toggle {
+/* Вертикально по центру левого края. В открытом виде — сразу справа от полосы навигации (не поверх иконок). */
+.header-sidebar-toggle {
+  --header-nav-strip-width: 56px;
   position: fixed;
-  top: 10px;
-  left: 10px;
+  left: 0;
+  top: 50%;
   z-index: 1100;
-  width: 42px;
-  height: 42px;
+  width: 22px;
+  height: 36px;
+  margin: 0;
   padding: 0;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(15, 23, 42, 0.72);
-  color: rgba(226, 232, 240, 0.92);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: rgba(15, 23, 42, 0.92);
+  color: rgba(226, 232, 240, 0.9);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.14);
   cursor: pointer;
+  transform: translateY(-50%);
+  transition: left 0.2s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
   -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
 }
 
-.header-mobile-toggle[aria-pressed="true"] {
-  border-color: rgba(96, 165, 250, 0.55);
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.16);
+.header-sidebar-toggle:hover {
+  background: rgba(30, 41, 59, 0.96);
+  border-color: rgba(96, 165, 250, 0.4);
 }
 
-.header-mobile-toggle:focus-visible {
+.header-sidebar-toggle--open {
+  left: var(--header-nav-strip-width);
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.16);
+}
+
+.header-sidebar-toggle:focus-visible {
   outline: 2px solid rgba(120, 180, 255, 0.85);
   outline-offset: 2px;
+}
+
+.header-sidebar-toggle[aria-expanded="true"] {
+  border-color: rgba(96, 165, 250, 0.5);
 }
 
 .header {
@@ -131,6 +133,7 @@
 }
 
 .header-player-settings-toggle {
+  flex-shrink: 0;
   width: 40px;
   height: 40px;
   padding: 0;
@@ -331,10 +334,19 @@
 
 .header-player-list {
   display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .header-player-track-row {
+  flex-shrink: 0;
   width: 60px;
   height: 60px;
   display: flex;
@@ -577,6 +589,7 @@
 }
 
 .header-player-load-tile {
+  flex-shrink: 0;
   position: relative;
   background: inherit;
   justify-content: center;
@@ -642,6 +655,9 @@
 }
 
 .header-player-empty {
+  flex-shrink: 0;
+  align-self: center;
+  white-space: nowrap;
   font-size: 12px;
   color: #94a3b8;
 }

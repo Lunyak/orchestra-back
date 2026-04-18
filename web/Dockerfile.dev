@@ -6,8 +6,8 @@ WORKDIR /workspace
 COPY web/package.json web/package-lock.json ./web/
 COPY app/package.json app/package-lock.json ./app/
 
-RUN cd web && npm ci
-RUN cd app && npm ci
+# Не вызываем npm ci здесь: при сборке часто падает по сети (ECONNRESET), а lock на старте
+# подтягивается с хоста через compose. Зависимости ставятся в CMD при запуске контейнера.
 
 COPY web/vite.config.ts web/tsconfig.json web/tsconfig.node.json web/index.html ./web/
 
@@ -15,4 +15,6 @@ WORKDIR /workspace/web
 
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# app: Vite резолвит импорты из ../app/src в ../app/node_modules (redux и т.д.).
+# web: зависимости Vite/React. package*.json монтируются из хоста в compose.
+CMD ["sh", "-c", "cd /workspace/app && npm install --no-audit --fund=false && cd /workspace/web && npm install --no-audit --fund=false && exec npm run dev -- --host 0.0.0.0"]

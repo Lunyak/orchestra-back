@@ -88,6 +88,69 @@ function markdownHasRoleLightOrPlayLineLabels(markdown: string): boolean {
   return re.test(withoutCodeFences);
 }
 
+const FENCE_RE = /```[\s\S]*?```/g;
+
+function isMarkdownListItemLine(line: string): boolean {
+  return /^\s{0,3}[-*+]\s+/.test(line);
+}
+
+/** Строка «сценического» блока: роль, свет/play/sfx, трек, orchestra-image. */
+function isScriptishBlockLine(line: string): boolean {
+  const t = line.replace(/^\s{0,3}>\s?/, "").replace(/^\s{0,3}[-*+]\s+/, "").trim();
+  if (!t) return false;
+  if (/^\[\[/.test(t)) return true;
+  if (/^\{\{\s*(?:light|blackout|b|play|sound|sfx)\b/i.test(t)) return true;
+  if (/^\[[^\]]*]\(\s*(?:track|playlist)\s*:/i.test(t)) return true;
+  if (/^!\[/.test(t)) return true;
+  return false;
+}
+
+function expandScriptLineParagraphBreaksInSegment(segment: string): string {
+  const lines = segment.split("\n");
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    out.push(line);
+    if (i + 1 >= lines.length) break;
+    const next = lines[i + 1]!;
+    if (
+      isScriptishBlockLine(line) &&
+      isScriptishBlockLine(next) &&
+      !isMarkdownListItemLine(line) &&
+      !isMarkdownListItemLine(next)
+    ) {
+      out.push("");
+    }
+  }
+  return out.join("\n");
+}
+
+/**
+ * Без пустой строки commonmark склеивает соседние «строки сценария» в один &lt;p&gt; — лейблы и отступы ломаются.
+ * Добавляем `\n\n` только между такими строками (вне ```…```). Не трогаем списки `- …`.
+ * Если уже есть сохранённые метки — не меняем строку (офсеты rehype совпадают с исходником).
+ */
+function expandScriptLineParagraphBreaks(
+  markdown: string,
+  annotationsMode: boolean,
+  annotationCount: number,
+): string {
+  if (annotationsMode && annotationCount > 0) return markdown;
+  const src = String(markdown ?? "");
+  if (!src) return src;
+  FENCE_RE.lastIndex = 0;
+  const parts: string[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = FENCE_RE.exec(src)) !== null) {
+    parts.push(expandScriptLineParagraphBreaksInSegment(src.slice(last, m.index)));
+    parts.push(m[0]);
+    last = m.index + m[0].length;
+  }
+  parts.push(expandScriptLineParagraphBreaksInSegment(src.slice(last)));
+  return parts.join("");
+}
+
 function isIgnorableLeadingNode(node: React.ReactNode): boolean {
   if (node == null || typeof node === "boolean") return true;
   if (typeof node === "string") {
@@ -131,13 +194,36 @@ function getLineLabelKind(el: React.ReactElement): LineLabelKind | null {
 type TrackLinkPayload = { id: number } | { name: string };
 type SoundLinkPayload = { id: number } | { name: string };
 
+type MarkdownLightboxSlide = { src: string; alt: string };
+
+type MarkdownLightboxState = {
+  slides: MarkdownLightboxSlide[];
+  index: number;
+};
+
 type MarkdownPreviewImageContextValue = {
   accessToken: string | null;
   playUrlCache: React.MutableRefObject<Map<string, string>>;
   resolveImageSrc: (src?: string) => string | undefined;
   resolveSoundIconFromPayload: (payload: SoundLinkPayload) => string | null;
-  setLightbox: React.Dispatch<React.SetStateAction<{ src: string; alt: string } | null>>;
+  openLightbox: (src: string, alt: string) => void;
 };
+
+/** Все открываемые по клику превью-картинки в порядке документа (только уже загруженные). */
+function collectLightboxSlidesFromPreviewRoot(root: HTMLElement | null): MarkdownLightboxSlide[] {
+  if (!root) return [];
+  const imgs = root.querySelectorAll(
+    'button.markdown-image-btn span.markdown-img-with-preloader[data-state="loaded"] img',
+  );
+  const out: MarkdownLightboxSlide[] = [];
+  imgs.forEach((node) => {
+    if (!(node instanceof HTMLImageElement)) return;
+    const src = String(node.currentSrc || node.getAttribute("src") || "").trim();
+    if (!src) return;
+    out.push({ src, alt: String(node.getAttribute("alt") ?? "").trim() });
+  });
+  return out;
+}
 
 const MarkdownPreviewImageContext = createContext<MarkdownPreviewImageContextValue | null>(null);
 
@@ -379,7 +465,7 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
         e.preventDefault();
         e.stopPropagation();
         if (state !== "loaded") return;
-        ctx.setLightbox({ src: resolved, alt: altText });
+        ctx.openLightbox(resolved, altText);
       }}
       title="Открыть изображение"
       aria-label="Открыть изображение"
@@ -510,6 +596,30 @@ function normalizeRoleToken(v: string) {
     .replace(/\s+/g, " ");
 }
 
+function isInteractiveMarkdownPreviewTarget(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el?.closest) return false;
+  if (el.closest("a[href], button, input, textarea, select, audio, video")) return true;
+  if (
+    el.closest(
+      [
+        ".markdown-image-btn",
+        ".markdown-track-play",
+        ".markdown-sound-play",
+        ".markdown-light-chip",
+        ".markdown-play-label",
+        ".markdown-sound-label",
+        ".markdown-speaker-label",
+        ".markdown-track-link",
+        ".markdown-sound-link",
+      ].join(", "),
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function ScriptMarkdownPreview({
   projectName,
   sceneName = "script",
@@ -522,6 +632,7 @@ export function ScriptMarkdownPreview({
   setNewAnnotation,
   activeAnnotationId,
   setActiveAnnotationId,
+  readModeActivateEdit,
 }: {
   projectName: string;
   sceneName?: string;
@@ -534,6 +645,8 @@ export function ScriptMarkdownPreview({
   setNewAnnotation: React.Dispatch<React.SetStateAction<NewAnnotationDraft | null>>;
   activeAnnotationId: string | null;
   setActiveAnnotationId: React.Dispatch<React.SetStateAction<string | null>>;
+  /** Режим чтения: клик по тексту (не по кнопкам/ссылкам) включает редактирование. */
+  readModeActivateEdit?: () => void;
 }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -550,6 +663,24 @@ export function ScriptMarkdownPreview({
     return selectAnnotations(s, cacheKey).items;
   });
   const annotationsMode = ui.annotationsMode;
+
+  const markdownForPreview = useMemo(
+    () =>
+      expandScriptLineParagraphBreaks(
+        String(markdown ?? ""),
+        annotationsMode,
+        annotations.length,
+      ),
+    [markdown, annotationsMode, annotations.length],
+  );
+
+  const onReadModePointerDown = (e: React.PointerEvent) => {
+    if (!readModeActivateEdit) return;
+    if (annotationsMode && e.detail < 2) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (isInteractiveMarkdownPreviewTarget(e.target)) return;
+    readModeActivateEdit();
+  };
   const markdownMode = ui.markdownMode;
   const playlistOptions = ui.playlistOptions;
   const soundsOptions = ui.soundsOptions;
@@ -557,12 +688,34 @@ export function ScriptMarkdownPreview({
   soundsOptionsRef.current = soundsOptions;
   const lightChannels = ui.lightChannels;
 
-  const [lightbox, setLightbox] = useState<null | { src: string; alt: string }>(null);
+  const [lightbox, setLightbox] = useState<MarkdownLightboxState | null>(null);
 
   useEffect(() => {
     if (!lightbox) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightbox(null);
+      if (e.key === "Escape") {
+        setLightbox(null);
+        return;
+      }
+      if (lightbox.slides.length <= 1) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setLightbox((prev) =>
+          !prev || prev.slides.length <= 1
+            ? prev
+            : { ...prev, index: (prev.index + 1) % prev.slides.length },
+        );
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setLightbox((prev) =>
+          !prev || prev.slides.length <= 1
+            ? prev
+            : {
+                ...prev,
+                index: (prev.index - 1 + prev.slides.length) % prev.slides.length,
+              },
+        );
+      }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -581,6 +734,16 @@ export function ScriptMarkdownPreview({
       activeAnnotationId,
       isOpen: Boolean(newAnnotation || activeAnnotationId),
     });
+
+  const openLightbox = useCallback((src: string, alt: string) => {
+    const slides = collectLightboxSlidesFromPreviewRoot(rootRef.current);
+    if (slides.length === 0) {
+      setLightbox({ slides: [{ src, alt }], index: 0 });
+      return;
+    }
+    const idx = slides.findIndex((s) => s.src === src);
+    setLightbox({ slides, index: idx >= 0 ? idx : 0 });
+  }, []);
 
   const [dialogLabelSlotPx, setDialogLabelSlotPx] = useState<number | null>(null);
   const dialogLabelSlotPxRef = useRef<number | null>(null);
@@ -669,9 +832,9 @@ export function ScriptMarkdownPreview({
       playUrlCache: imageUrlCacheRef,
       resolveImageSrc,
       resolveSoundIconFromPayload,
-      setLightbox,
+      openLightbox,
     }),
-    [accessToken, resolveImageSrc, resolveSoundIconFromPayload],
+    [accessToken, resolveImageSrc, resolveSoundIconFromPayload, openLightbox],
   );
 
   const urlTransform = (url: string) => {
@@ -743,7 +906,9 @@ export function ScriptMarkdownPreview({
     [lightChannels],
   );
 
-  const kadrLayoutEnabled = markdownMode === "notes" || markdownMode === "explication";
+  /** Блоки `.markdown-kadr` по заголовкам h1–h3 — и для текста пьесы (`play`), не только notes/explication. */
+  const kadrLayoutEnabled =
+    markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
 
   const rehypePlugins = useMemo(() => {
     const plugins: any[] = [];
@@ -794,7 +959,7 @@ export function ScriptMarkdownPreview({
       }
     };
 
-    // Measure after paint to avoid 0-width in some cases.
+    compute();
     const raf = requestAnimationFrame(compute);
     const ro = new ResizeObserver(() => compute());
     ro.observe(root);
@@ -802,7 +967,7 @@ export function ScriptMarkdownPreview({
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [hasRoleOrLightLabels, markdown]);
+  }, [hasRoleOrLightLabels, markdown, markdownForPreview, kadrLayoutEnabled]);
 
   const playFromPayload = (payload: TrackLinkPayload) => {
     if (!onTrackLinkClick) return;
@@ -977,6 +1142,7 @@ export function ScriptMarkdownPreview({
         "markdown-preview",
         hasRoleOrLightLabels ? "markdown-preview--has-line-labels" : "",
         kadrLayoutEnabled ? "markdown-preview--kadr" : "",
+        readModeActivateEdit ? "markdown-preview--read-activatable" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -989,6 +1155,7 @@ export function ScriptMarkdownPreview({
       <div
         ref={rootRef}
         onClick={handleSpeakerLabelClick}
+        onPointerDownCapture={readModeActivateEdit ? onReadModePointerDown : undefined}
         onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
       >
         <div className="script-step-title">{currentStep?.title}</div>
@@ -1262,7 +1429,7 @@ export function ScriptMarkdownPreview({
             },
           }}
         >
-          {markdown || "*Пусто*"}
+          {markdownForPreview || "*Пусто*"}
         </ReactMarkdown>
         </MarkdownPreviewImageContext.Provider>
       </div>
@@ -1289,10 +1456,51 @@ export function ScriptMarkdownPreview({
               ×
             </button>
             <img
+              key={lightbox.slides[lightbox.index]!.src}
               className="markdown-lightbox__img"
-              src={lightbox.src}
-              alt={lightbox.alt || ""}
+              src={lightbox.slides[lightbox.index]!.src}
+              alt={lightbox.slides[lightbox.index]!.alt || ""}
             />
+            {lightbox.slides.length > 1 ? (
+              <>
+                <button
+                  type="button"
+                  className="markdown-lightbox__nav markdown-lightbox__nav--prev"
+                  aria-label="Предыдущее изображение"
+                  title="Предыдущее (←)"
+                  onClick={() =>
+                    setLightbox((prev) =>
+                      !prev || prev.slides.length <= 1
+                        ? prev
+                        : {
+                            ...prev,
+                            index: (prev.index - 1 + prev.slides.length) % prev.slides.length,
+                          },
+                    )
+                  }
+                >
+                  ‹
+                </button>
+                <button
+                  type="button"
+                  className="markdown-lightbox__nav markdown-lightbox__nav--next"
+                  aria-label="Следующее изображение"
+                  title="Следующее (→)"
+                  onClick={() =>
+                    setLightbox((prev) =>
+                      !prev || prev.slides.length <= 1
+                        ? prev
+                        : { ...prev, index: (prev.index + 1) % prev.slides.length },
+                    )
+                  }
+                >
+                  ›
+                </button>
+                <div className="markdown-lightbox__counter" aria-live="polite">
+                  {lightbox.index + 1} / {lightbox.slides.length}
+                </div>
+              </>
+            ) : null}
           </div>
         </div>
       )}

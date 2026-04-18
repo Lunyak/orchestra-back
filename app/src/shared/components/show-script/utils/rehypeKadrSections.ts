@@ -24,13 +24,19 @@ function isIgnorableWhitespaceText(node: HastNode): boolean {
   return /^[\s\u00A0\u200B\u200C\u200D\uFEFF]*$/.test(String((node as any).value ?? ""));
 }
 
+function isIgnorableBetweenImgs(node: HastNode): boolean {
+  if (isIgnorableWhitespaceText(node)) return true;
+  if (!node || node.type !== "element") return false;
+  return String((node as any).tagName ?? "").toLowerCase() === "br";
+}
+
 /** Paragraph whose only meaningful children are <img> (one or more), e.g. after paste/merge. */
 function extractImgsFromImgOnlyParagraph(node: HastNode): HastNode[] | null {
   if (!node || node.type !== "element") return null;
   const tag = String((node as any).tagName ?? "").toLowerCase();
   if (tag !== "p") return null;
   const children = Array.isArray((node as any).children) ? ((node as any).children as HastNode[]) : [];
-  const meaningful = children.filter((c) => !isIgnorableWhitespaceText(c));
+  const meaningful = children.filter((c) => !isIgnorableBetweenImgs(c));
   if (meaningful.length === 0) return null;
   const imgs: HastNode[] = [];
   for (const m of meaningful) {

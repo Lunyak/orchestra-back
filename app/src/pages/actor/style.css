@@ -63,15 +63,13 @@
   opacity: var(--opacity-medium);
 }
 
-body[data-actor-focus="true"] .header-zone--left {
-  /* Keep navigation доступной в фокус-режиме:
-     оставляем только "триггер" (узкую зону), а панель всё равно открывается по hover. */
-  width: 12px !important;
+body[data-actor-focus="true"] .header-sidebar-toggle {
   opacity: 0.35;
   transition: opacity 0.2s ease;
 }
 
-body[data-actor-focus="true"] .header-zone--left:hover {
+body[data-actor-focus="true"] .header-sidebar-toggle:hover,
+body[data-actor-focus="true"] .header-sidebar-toggle:focus-visible {
   opacity: 1;
 }
 

@@ -19,6 +19,15 @@ export default defineConfig(({ mode }) => {
       : "http://localhost:3000");
   return {
     base: basePath,
+    optimizeDeps: {
+      include: [
+        "@codemirror/state",
+        "@codemirror/view",
+        "@codemirror/commands",
+        "@codemirror/language",
+        "@codemirror/lang-markdown",
+      ],
+    },
     resolve: {
       alias: {
         "@shared": path.resolve(__dirname, "../app/src/shared"),

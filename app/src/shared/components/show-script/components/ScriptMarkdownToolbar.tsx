@@ -25,10 +25,8 @@ export function ScriptMarkdownToolbar({
   onInsertImage?: () => void;
   onInsertKadr?: () => void;
   editorToggles?: null | {
-    previewEnabled: boolean;
-    onTogglePreview: () => void;
-    tocEnabled?: boolean;
-    onToggleToc?: () => void;
+    tocEnabled: boolean;
+    onToggleToc: () => void;
   };
 }) {
   const annotationsMode = annotations.mode;
@@ -79,30 +77,16 @@ export function ScriptMarkdownToolbar({
             {isEditing ? "📖" : "✏️"}
           </Button>
           {isEditing && editorToggles ? (
-            <>
-              <Button
-                variant="ghost"
-                className="show-script__rail-btn"
-                onClick={editorToggles.onTogglePreview}
-                title={editorToggles.previewEnabled ? "Скрыть предпросмотр" : "Показать предпросмотр"}
-                aria-pressed={editorToggles.previewEnabled}
-                data-active={editorToggles.previewEnabled ? "true" : "false"}
-              >
-                👁
-              </Button>
-              {typeof editorToggles.tocEnabled === "boolean" && editorToggles.onToggleToc ? (
-                <Button
-                  variant="ghost"
-                  className="show-script__rail-btn"
-                  onClick={editorToggles.onToggleToc}
-                  title={editorToggles.tocEnabled ? "Скрыть оглавление" : "Показать оглавление"}
-                  aria-pressed={editorToggles.tocEnabled}
-                  data-active={editorToggles.tocEnabled ? "true" : "false"}
-                >
-                  ≡
-                </Button>
-              ) : null}
-            </>
+            <Button
+              variant="ghost"
+              className="show-script__rail-btn"
+              onClick={editorToggles.onToggleToc}
+              title={editorToggles.tocEnabled ? "Скрыть оглавление" : "Показать оглавление"}
+              aria-pressed={editorToggles.tocEnabled}
+              data-active={editorToggles.tocEnabled ? "true" : "false"}
+            >
+              ≡
+            </Button>
           ) : null}
           <Button
             variant="ghost"

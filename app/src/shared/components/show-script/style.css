@@ -321,7 +321,7 @@
 }
 
 .script-content {
-  .markdown-kadr__left {
+  .markdown-kadr {
     h3 {
       color: #e78a4e;
     }
@@ -915,6 +915,10 @@
   gap: 6px;
 }
 
+.markdown-preview.markdown-preview--read-activatable {
+  cursor: text;
+}
+
 .markdown-preview {
   flex: 1;
   min-height: 0;
@@ -943,13 +947,17 @@
 
 .markdown-kadr {
   margin: 10px 0;
-  padding: 10px;
+  padding: 12px 14px 14px;
   background: var(--color-bg-secondary);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
-.markdown-kadr__left h1,
-.markdown-kadr__left h2,
-.markdown-kadr__left h3 {
+.markdown-kadr h1,
+.markdown-kadr h2,
+.markdown-kadr h3 {
   margin: 0 0 8px;
   font-size: 16px;
   line-height: 1.2;
@@ -957,16 +965,10 @@
 }
 
 .markdown-kadr__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 12px;
-  /* Same row height as the text column so the image strip can use vertical space
-     for extra rows (grid-auto-flow: column + repeat(auto-fill) on .markdown-kadr__right). */
   align-items: stretch;
-}
-
-.markdown-kadr[data-has-image="false"] .markdown-kadr__grid {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .markdown-kadr__left {
@@ -976,16 +978,15 @@
 .markdown-kadr__right {
   min-width: 0;
   min-height: 0;
-  /* Column-major grid: fill down while height allows, then next column to the right.
-     With one row track (short block) → one horizontal strip + overflow-x.
-     Taller block → more rows per column → less horizontal scroll. */
+  /* Как раньше: горизонтальная полоса превью со скроллом, но под текстом (не колонка справа). */
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 200px;
   grid-template-rows: repeat(auto-fill, 120px);
   align-content: start;
   justify-content: start;
-  gap: 10px;
+  /* row-gap заметнее при переносе / двух картинках подряд без пустой строки в md */
+  gap: 12px 14px;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -1148,23 +1149,25 @@
   position: relative;
   width: min(1200px, 96vw);
   max-height: 92vh;
-  overflow: auto;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  padding: 12px;
+  /* overflow: auto; */
+  background: inherit;
+  border: none;
+  border-radius: 0;
+  padding: 0;
 }
 
 .markdown-lightbox__close {
   position: sticky;
-  top: 8px;
-  margin-left: auto;
+  top: -22px;
+  right: -22px;
+  position: absolute;
+  /* margin-left: auto; */
   display: flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  /* border-radius: 10px; */
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(2, 6, 23, 0.55);
   color: #e2e8f0;
@@ -1178,33 +1181,73 @@
   border-color: rgba(96, 165, 250, 0.55);
 }
 
+.markdown-lightbox__nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 72px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.5);
+  color: rgba(248, 250, 252, 0.95);
+  font-size: 36px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.markdown-lightbox__nav--prev {
+  left: 10px;
+  border: none;
+}
+
+.markdown-lightbox__nav--next {
+  right: 10px;
+  border: none;
+}
+
+.markdown-lightbox__nav:hover {
+  background: rgba(2, 6, 23, 0.78);
+  border-color: rgba(96, 165, 250, 0.5);
+}
+
+.markdown-lightbox__nav:focus-visible {
+  outline: 2px solid rgba(120, 180, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.markdown-lightbox__counter {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.9);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
 .markdown-lightbox__img {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  /* border: 1px solid rgba(255, 255, 255, 0.08); */
   background: rgba(2, 6, 23, 0.5);
+  object-fit: contain;
 }
 
-@media (max-width: 880px) {
-  .markdown-kadr__grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* Stacked layout: no shared row height with the text column; keep a single scroll row. */
-  .markdown-kadr__right {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: flex-start;
-    gap: 10px;
-  }
-
-  .markdown-kadr__right > * {
-    flex: 0 0 auto;
-  }
-}
 
 .actor-note-panel {
   margin-top: 10px;
@@ -1427,35 +1470,6 @@
   min-height: 0;
 }
 
-.script-markdown-edit-grid {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px;
-}
-
-.script-markdown-edit-grid[data-preview="off"] {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.script-markdown-edit-preview {
-  min-height: 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  background: rgba(2, 6, 23, 0.22);
-  overflow: hidden;
-  display: flex;
-}
-
-.script-markdown-edit-preview .markdown-preview {
-  padding: 10px;
-}
-
-.script-markdown-edit-preview .script-step-title {
-  display: none;
-}
-
 .script-markdown-editor-split {
   flex: 1;
   min-height: 0;
@@ -1468,6 +1482,224 @@
   min-width: 0;
   min-height: 0;
   display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.script-markdown-editor-main .script-markdown-cm {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.script-markdown-cm .cm-editor {
+  border: 1px solid var(--color-border-primary);
+  border-radius: 6px;
+  outline: none;
+}
+
+/* CodeMirror: компактные чипы вместо сырого {{…}} / [[…]] / orchestra-image */
+.script-markdown-cm .markdown-light-chip {
+  user-select: none;
+  /* Глобальный .markdown-light-chip задаёт baseline — чип визуально ниже, клик/каретка «лезут» выше. */
+  vertical-align: middle;
+}
+
+.script-markdown-cm .cm-md-orchestra-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(240px, 100%);
+  vertical-align: middle;
+  line-height: 1.2;
+  /* box-sizing: border-box; */
+  font-family: var(--font-family-script-body);
+}
+
+.script-markdown-cm .cm-md-orchestra-image-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(260px, 100%);
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid rgba(100, 116, 139, 0.65);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-markdown-cm .cm-md-orchestra-image-preview {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: min(240px, 100%);
+  line-height: 0;
+}
+
+.script-markdown-cm .cm-md-orchestra-image-preview--with-raw {
+  max-width: min(320px, 100%);
+  line-height: normal;
+}
+
+.script-markdown-cm .cm-md-orchestra-image-preview__raw {
+  display: block;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid rgba(100, 116, 139, 0.4);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 10px;
+  line-height: 1.35;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 4.5em;
+  overflow: auto;
+}
+
+/* Слот 200×120 (или уже, если строка узкая): иначе % у img считаются от «рваной» высоты родителя — размеры пляшут. */
+.script-markdown-cm .cm-md-orchestra-image-preview__media {
+  display: block;
+  line-height: 0;
+  box-sizing: border-box;
+  width: min(200px, 100%);
+  aspect-ratio: 200 / 120;
+  max-height: 120px;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.script-markdown-cm .cm-md-orchestra-image-preview__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Только скрыть пустой <img> буфера; размеры — как в базовой теме CM (иначе posAtCoords видит «чужие» rects). */
+.script-markdown-cm .cm-widgetBuffer {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.script-markdown-cm .cm-md-orchestra-image-preview__ph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.92);
+  border: 1px solid rgba(100, 116, 139, 0.55);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.script-markdown-cm .cm-md-orchestra-image-preview__ph--err {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+}
+
+.script-markdown-cm .cm-md-orchestra-raw-chip {
+  display: inline-flex;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(127, 29, 29, 0.25);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/*
+ * Секция markdown в CM (BlockWrapper): только padding, без вертикального margin.
+ * Margin снаружи border-box не входит в measureVisibleLineHeights @codemirror/view —
+ * posAtCoords накапливает ошибку вниз по документу (клик «уезжает» вверх).
+ */
+.script-markdown-cm .cm-md-heading-section {
+  margin: 0;
+  padding: 22px 12px 20px;
+  background: var(--color-bg-secondary);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+.script-markdown-cm .cm-content > .cm-md-heading-section:first-child {
+  padding-top: 14px;
+}
+
+.script-markdown-cm .cm-md-heading-section + .cm-md-heading-section {
+  padding-top: 16px;
+}
+
+/* ATX-заголовок в CM: маркеры скрыты виджетом, тело — как в превью (.script-content h3) */
+.script-markdown-cm .cm-md-atx-heading-slot {
+  display: inline-block;
+  width: 0;
+  max-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+  line-height: 0;
+  vertical-align: baseline;
+  pointer-events: none;
+  user-select: none;
+}
+
+.script-markdown-cm .cm-md-heading-body {
+  font-family: var(--font-family-script-body);
+  font-weight: 700;
+}
+
+/* Как .markdown-kadr h1/h2 — белый; ### как h3 в сценарии — оранжевый */
+.script-markdown-cm .cm-md-heading-body--1 {
+  font-size: 1.32em;
+  color: #f8fafc;
+}
+
+.script-markdown-cm .cm-md-heading-body--2 {
+  font-size: 1.2em;
+  color: #f8fafc;
+}
+
+.script-markdown-cm .cm-md-heading-body--3 {
+  font-size: 16px;
+  color: #e78a4e;
+}
+
+.script-markdown-cm .cm-md-heading-body--4,
+.script-markdown-cm .cm-md-heading-body--5,
+.script-markdown-cm .cm-md-heading-body--6 {
+  font-size: 1em;
+  color: #fdba74;
+}
+
+.script-markdown-cm .cm-md-orchestra-track-link--static {
+  cursor: default;
+  opacity: 0.92;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .script-markdown-toc {
@@ -1530,16 +1762,6 @@
   font-size: 11px;
   color: rgba(148, 163, 184, 0.95);
   padding: 6px 8px;
-}
-
-@media (max-width: 980px) {
-  .script-markdown-edit-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .script-markdown-edit-preview {
-    display: none;
-  }
 }
 
 @media (max-width: 1180px) {
@@ -1634,7 +1856,7 @@
 }
 
 .markdown-light-chip {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 2px 8px;
@@ -1645,7 +1867,11 @@
   font-weight: 600;
   letter-spacing: 0.2px;
   vertical-align: baseline;
-  min-width: 30px;
+  min-width: 60px;
+  max-height: 23px;
+  height: 23px;
+  font-family: var(--font-family-script-body);
+  box-sizing: border-box;
 }
 
 .markdown-speaker-label {
@@ -1670,8 +1896,8 @@
 }
 
 .markdown-play-label {
-  padding: 2px 10px;
-
+  width: 60px;
+  padding: 2px 9px;
   background: #111827;
   color: #e0f2fe;
   font-size: 11px;
@@ -1680,12 +1906,13 @@
   cursor: pointer;
   user-select: none;
   text-transform: uppercase;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-
   text-align: center;
-
+  font-family: var(--font-family-script-body);
+  box-sizing: border-box;
+  height: 23px;
 }
 
 .markdown-sound-label {

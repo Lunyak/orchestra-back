@@ -33,13 +33,20 @@ services:
       - ./web/vite.config.ts:/workspace/web/vite.config.ts
       - ./web/tsconfig.json:/workspace/web/tsconfig.json
       - ./web/tsconfig.node.json:/workspace/web/tsconfig.node.json
+      - ./web/package.json:/workspace/web/package.json
+      - ./web/package-lock.json:/workspace/web/package-lock.json
+      - ./app/package.json:/workspace/app/package.json
+      - ./app/package-lock.json:/workspace/app/package-lock.json
       - ./app/src:/workspace/app/src
-      - /workspace/web/node_modules
-      - /workspace/app/node_modules
+      # Не монтируем тома на node_modules — иначе залипает старый кэш без новых пакетов.
     environment:
       # Браузер: тот же origin + /api. Прокси Vite (внутри контейнера): back:3000
       VITE_API_BASE_URL: /api
       DEV_PROXY_API: http://back:3000
+      # npm install при старте: чуть терпимее к обрывам сети до registry
+      NPM_CONFIG_FETCH_RETRIES: "5"
+      NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+      NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
     ports:
       - "5173:5173"
     depends_on:

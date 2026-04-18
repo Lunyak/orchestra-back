@@ -66,7 +66,7 @@ export function getReadableTextColor(color?: string | null): string | undefined 
   return luminance > 0.6 ? "#0f172a" : "#f8fafc";
 }
 
-function isColorOverrideToken(raw?: string | null): boolean {
+export function isColorOverrideToken(raw?: string | null): boolean {
   const v = String(raw ?? "").trim();
   if (!v) return false;
   // If it resolves to any known color, treat it as a color override.
