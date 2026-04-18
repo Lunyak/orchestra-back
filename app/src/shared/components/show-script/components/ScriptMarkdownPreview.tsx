@@ -19,6 +19,11 @@ import {
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 import type { ActorAnnotation } from "../../../../sync/api";
 import { getPlayUrl } from "../../../../sync/api";
+import { getDesktopApi } from "../../../platform/desktop-api";
+import {
+  httpUrlToImageFileName,
+  storageKeyToImageBasename,
+} from "../../../utils/markdownImages";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   ActorAnnotationsPopover,
@@ -33,6 +38,30 @@ import {
 import { rehypeKadrSections } from "../utils/rehypeKadrSections";
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
+
+function desktopOfflineImageFromCache(
+  rawHref: string,
+  resolveImageSrc: (src?: string) => string | undefined,
+): string | undefined {
+  if (!getDesktopApi()?.invoke) return undefined;
+  if (rawHref.startsWith("orchestra-image:")) {
+    const enc = rawHref.replace(/^orchestra-image:/i, "").trim();
+    let key: string;
+    try {
+      key = decodeURIComponent(enc);
+    } catch {
+      key = enc;
+    }
+    const bn = storageKeyToImageBasename(key);
+    if (!bn) return undefined;
+    return resolveImageSrc(`images/${bn}`);
+  }
+  if (/^https?:\/\//i.test(rawHref)) {
+    const bn = httpUrlToImageFileName(rawHref);
+    return resolveImageSrc(`images/${bn}`);
+  }
+  return undefined;
+}
 
 const LINE_LABEL_CLASSNAMES = new Set([
   "markdown-speaker-label", // roles: [[ЕЛЕНА]]
@@ -112,6 +141,12 @@ type MarkdownPreviewImageContextValue = {
 
 const MarkdownPreviewImageContext = createContext<MarkdownPreviewImageContextValue | null>(null);
 
+/** Параллельные MarkdownPreviewImage с одним storage key — один HTTP-запрос play-url. */
+const playUrlInflight = new Map<string, Promise<string | undefined>>();
+
+/** Presigned URL не запрашиваем, пока превью не близко к видимой области (как lazy-loading у нормальных CDN-клиентов). */
+const ORCH_IMAGE_IO_ROOT_MARGIN = "420px 0px 280px 0px";
+
 /** Must stay a stable module-level component so React does not remount every image on parent re-render. */
 function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   const ctx = useContext(MarkdownPreviewImageContext);
@@ -121,19 +156,54 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
   const resolveSound = ctx?.resolveSoundIconFromPayload;
   const playUrlCache = ctx?.playUrlCache;
   const raw = String(src ?? "").trim();
+  const isOrchestraImage = raw.startsWith("orchestra-image:");
   const initial =
     !ctx
       ? raw
-      : raw.startsWith("orchestra-image:") || raw.startsWith("sound-icon:")
+      : raw.startsWith("sound-icon:")
         ? ""
-        : (ctx.resolveImageSrc(raw) || raw);
+        : raw.startsWith("orchestra-image:")
+          ? desktopOfflineImageFromCache(raw, ctx.resolveImageSrc) ?? ""
+          : /^https?:\/\//i.test(raw)
+            ? raw
+            : (ctx.resolveImageSrc(raw) || raw);
   const [resolved, setResolved] = useState<string>(initial);
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
   const [playUrlRetry, setPlayUrlRetry] = useState(0);
+  const httpTriedLocalFallbackRef = useRef(false);
+  const orchSentinelRef = useRef<HTMLSpanElement | null>(null);
+  /** Для orchestra-image с сетевым play-url ждём intersection; кэш / desktop — без ожидания. */
+  const [orchInView, setOrchInView] = useState(() => !isOrchestraImage);
 
   useEffect(() => {
     setPlayUrlRetry(0);
+    httpTriedLocalFallbackRef.current = false;
   }, [src]);
+
+  useEffect(() => {
+    const s = String(src ?? "").trim();
+    setOrchInView(!s.startsWith("orchestra-image:"));
+  }, [src]);
+
+  useEffect(() => {
+    if (!isOrchestraImage || orchInView) return;
+    const el = orchSentinelRef.current;
+    if (!el) {
+      setOrchInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setOrchInView(true);
+          io.disconnect();
+        }
+      },
+      { root: null, rootMargin: ORCH_IMAGE_IO_ROOT_MARGIN, threshold: 0.01 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [src, isOrchestraImage, orchInView]);
 
   useEffect(() => {
     if (!ctx || !playUrlCache || !resolveToLocal || !resolveSound) return;
@@ -164,22 +234,48 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
         } catch {
           key = encoded;
         }
+        const tryLocalOrchestra = () => {
+          const localUrl = desktopOfflineImageFromCache(s, resolveToLocal);
+          if (localUrl) {
+            if (!cancelled) setResolved(localUrl);
+            return true;
+          }
+          return false;
+        };
         const cached = playUrlCache.current.get(key);
         if (cached) {
           if (!cancelled) setResolved(cached);
           return;
         }
+        if (!orchInView) return;
         const token =
           accessToken ??
           (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
-        if (!token) return;
+        if (!token) {
+          tryLocalOrchestra();
+          return;
+        }
         try {
-          const { url } = await getPlayUrl(token, key);
-          if (url) playUrlCache.current.set(key, url);
+          let pending = playUrlInflight.get(key);
+          if (!pending) {
+            pending = getPlayUrl(token, key).then(({ url }) => {
+              if (url) playUrlCache.current.set(key, url);
+              return url;
+            });
+            pending.finally(() => {
+              playUrlInflight.delete(key);
+            });
+            playUrlInflight.set(key, pending);
+          }
+          const url = await pending;
           if (!cancelled && url) setResolved(url);
         } catch {
-          /* ignore */
+          tryLocalOrchestra();
         }
+        return;
+      }
+      if (/^https?:\/\//i.test(s)) {
+        if (!cancelled) setResolved(s);
         return;
       }
       const local = resolveToLocal(s);
@@ -189,7 +285,16 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
     return () => {
       cancelled = true;
     };
-  }, [ctx, src, accessToken, resolveToLocal, resolveSound, playUrlCache, playUrlRetry]);
+  }, [
+    ctx,
+    src,
+    accessToken,
+    resolveToLocal,
+    resolveSound,
+    playUrlCache,
+    playUrlRetry,
+    orchInView,
+  ]);
 
   useEffect(() => {
     setState("loading");
@@ -221,14 +326,30 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
 
   const imgEl = resolved ? (
     <img
+      {...rest}
       src={resolved}
       alt={altText}
-      {...rest}
+      loading="lazy"
+      decoding="async"
       onLoad={(e) => {
         setState("loaded");
         onLoad?.(e);
       }}
       onError={(e) => {
+        if (
+          /^https?:\/\//i.test(raw) &&
+          !httpTriedLocalFallbackRef.current &&
+          getDesktopApi()?.invoke &&
+          ctx?.resolveImageSrc
+        ) {
+          const local = desktopOfflineImageFromCache(raw, ctx.resolveImageSrc);
+          if (local) {
+            httpTriedLocalFallbackRef.current = true;
+            setResolved(local);
+            setState("loading");
+            return;
+          }
+        }
         setState("error");
         onError?.(e);
         invalidatePlayUrlCacheAndRetry();
@@ -238,7 +359,11 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
 
   if (!canOpen) {
     return (
-      <span className="markdown-img-with-preloader" data-state="loading">
+      <span
+        ref={isOrchestraImage ? orchSentinelRef : undefined}
+        className="markdown-img-with-preloader"
+        data-state="loading"
+      >
         <span className="markdown-preloader" aria-hidden="true">
           <span className="markdown-loader" />
         </span>
@@ -428,6 +553,8 @@ export function ScriptMarkdownPreview({
   const markdownMode = ui.markdownMode;
   const playlistOptions = ui.playlistOptions;
   const soundsOptions = ui.soundsOptions;
+  const soundsOptionsRef = useRef(soundsOptions);
+  soundsOptionsRef.current = soundsOptions;
   const lightChannels = ui.lightChannels;
 
   const [lightbox, setLightbox] = useState<null | { src: string; alt: string }>(null);
@@ -511,15 +638,17 @@ export function ScriptMarkdownPreview({
     return url.toString();
   }, [projectName]);
 
+  // soundsOptions из Redux часто новый [] по ссылке → без ref контекст картинок меняется каждый рендер и play-url дергается снова.
   const resolveSoundIconFromPayload = useCallback(
     (payload: SoundLinkPayload): string | null => {
+      const opts = soundsOptionsRef.current;
       const byId =
         "id" in payload
-          ? soundsOptions.find((s) => Number(s?.id) === Number(payload.id)) ?? null
+          ? opts.find((s) => Number(s?.id) === Number(payload.id)) ?? null
           : null;
       const byName =
         "name" in payload
-          ? soundsOptions.find(
+          ? opts.find(
               (s) => String(s?.title ?? "").toLowerCase() === String(payload.name ?? "").toLowerCase(),
             ) ?? null
           : null;
@@ -531,7 +660,7 @@ export function ScriptMarkdownPreview({
       if (icon) return resolveSoundIconSrc(icon);
       return null;
     },
-    [soundsOptions, resolveSoundIconSrc],
+    [resolveSoundIconSrc],
   );
 
   const markdownPreviewImageCtx = useMemo<MarkdownPreviewImageContextValue>(

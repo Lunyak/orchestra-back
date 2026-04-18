@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Скрипт для запуска dev-окружения с hot-reload
+# Скрипт для запуска dev-окружения с hot-reload (Docker Desktop или OrbStack — команда та же: docker compose).
 
 set -e
 

@@ -5,6 +5,7 @@ import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import { createId } from "../../../shared/utils/createId";
 import { cleanupProjectImages, syncPull, syncPush, type SyncChange } from "../../../sync/api";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
+import { prefetchDesktopOfflineAfterSync } from "../../../sync/desktopPrefetchOffline";
 import { disconnectRealtimeSocket, getRealtimeSocket } from "../../../realtime/socket";
 import { getClientInstanceId } from "../../../realtime/clientInstanceId";
 import {
@@ -368,6 +369,35 @@ function useSceneOperations() {
         dispatch(sceneActions.clearRealtimePullDeferred());
         localStorage.setItem("lastSyncAt", now);
         localStorage.setItem(perProjectKey, now);
+
+        const desktopPrefetch = getDesktopApi();
+        if (desktopPrefetch?.invoke && typeof desktopPrefetch.invoke === "function") {
+          const pid =
+            typeof window !== "undefined"
+              ? localStorage.getItem(`projectId:${effectiveProject}`)
+              : null;
+          void prefetchDesktopOfflineAfterSync({
+            accessToken: tokenToUse,
+            projectSlug: effectiveProject,
+            projectId: pid,
+            minimalSceneData,
+            normalizedSteps: normalizedSteps.length ? normalizedSteps : steps,
+            normalizedLayout,
+            normalizedLightChannels,
+          }).then((result) => {
+            if (result.rehydratePayload) {
+              dispatch(sceneActions.hydrateScene(result.rehydratePayload as any));
+            }
+            if (result.errors.length) {
+              console.warn("[sync] desktop offline prefetch:", result.errors);
+            }
+            if (result.downloaded > 0) {
+              console.log(
+                `[sync] desktop offline: downloaded ${result.downloaded} file(s), skipped ${result.skipped}`,
+              );
+            }
+          });
+        }
       } catch (error: any) {
         if (error?.response?.status === 401) {
           setAccessToken(null);

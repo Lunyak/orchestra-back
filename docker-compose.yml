@@ -156,21 +156,25 @@ services:
     volumes:
       - minio_data:/data
 
+  # Одноразовый init: поднялся → mc (alias, бакет, public read) → завершился с кодом 0. Не держится в Up — это норма (restart: "no").
   # Авто-создание бакета после (re)deploy, чтобы /files/upload не падал с 500
+  # Без container_name: иначе после первого Exited нельзя снова `compose run` / пересоздать вручную (конфликт имён).
   minio-init:
     image: minio/mc:latest
-    container_name: orkestr-minio-init
     depends_on:
       - minio
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-orchestra}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-orchestra_secret}
       S3_BUCKET: ${S3_BUCKET:-orchestra-media}
-    entrypoint: ["/bin/sh", "-lc"]
-    command: >
-      mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" &&
-      (mc mb -p "local/$S3_BUCKET" || true) &&
-      (mc anonymous set download "local/$S3_BUCKET" || true)
+    # Один аргумент для sh -c: иначе compose режет multiline `command: >` на argv и теряет `&& ...`
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"
+        mc mb -p "local/$$S3_BUCKET" || true
+        mc anonymous set download "local/$$S3_BUCKET" || true
     restart: "no"
 
   dozzle:

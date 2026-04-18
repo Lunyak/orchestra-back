@@ -9,6 +9,17 @@
 > Если вы делали `docker compose down -v`, volume `minio_data` будет удалён и бакеты/файлы пропадут.
 > В `docker-compose.yml` есть сервис `minio-init`, который автоматически создаёт бакет `S3_BUCKET` и открывает его на чтение при старте.
 
+### Копирование объектов с production на локальный MinIO
+
+Дамп PostgreSQL **не содержит** файлы в S3. После `make restore-db` имеет смысл зеркалировать бакет:
+
+```bash
+docker compose up -d minio
+make pull-minio
+```
+
+Скрипт: `scripts/pull-minio-from-server.sh` (`mc mirror` с VPS на локальный MinIO). Нужен доступ к **порту 9000** на сервере; если он закрыт снаружи — SSH-туннель и `ORCHESTRA_MINIO_REMOTE=http://127.0.0.1:19000` описаны в шапке скрипта.
+
 ### 1. Установить mc и добавить хост
 
 ```bash

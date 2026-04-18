@@ -23,7 +23,7 @@ function getServerLockSnapshot(): boolean {
 /**
  * Режим «не уходить с /orkestr»: блок SPA-навигации (useBlocker) и предупреждение при
  * перезагрузке/закрытии вкладки (beforeunload). Полностью запретить reload скриптом нельзя —
- * браузер покажет свой диалог.
+ * браузер покажет свой диалог. Активен только под приложением оркестра (см. isOrchestraWebAppSubpath).
  */
 export function SpectaclePageLockGuard() {
   const lock = useSyncExternalStore(subscribeLock, getLockSnapshot, getServerLockSnapshot);

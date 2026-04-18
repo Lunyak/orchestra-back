@@ -1,16 +1,18 @@
+# Dev-сервер Vite. Контекст сборки — корень репозитория (общий пакет app, как в admin/Dockerfile).
 FROM node:22-alpine
 
-WORKDIR /app
+WORKDIR /workspace
 
-# Установка зависимостей
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY admin/package.json admin/package-lock.json ./admin/
+COPY app/package.json app/package-lock.json ./app/
 
-# Vite требует эти файлы для работы
-COPY vite.config.ts tsconfig.json tsconfig.node.json ./
+RUN cd admin && npm ci
+RUN cd app && npm ci
 
-# Expose Vite dev server port
+COPY admin/vite.config.ts admin/tsconfig.json admin/tsconfig.node.json admin/index.html ./admin/
+
+WORKDIR /workspace/admin
+
 EXPOSE 5173
 
-# Запуск Vite dev server с hot-reload
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

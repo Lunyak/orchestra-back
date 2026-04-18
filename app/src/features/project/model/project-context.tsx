@@ -61,15 +61,15 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       const list = listRaw.filter((slug) => !isDirectorSessionsSlug(slug));
       setProjects(list);
       const stored = localStorage.getItem("selectedProject") || "";
-      const initial =
-        prefer && list.includes(prefer)
-          ? prefer
-          : list.includes(stored)
-            ? stored
-            : list[0] || "";
-      if (initial) {
-        setProjectName(initial);
-      }
+      // Не затирать выбранный проект при каждом loadProjects (смена токена, повторный mount):
+      // иначе при несовпадении stored со списком на мгновение или при сортировке list[0] — «прыжок»
+      // на другой slug (часто первый по алфавиту).
+      setProjectName((prev) => {
+        if (prefer && list.includes(prefer)) return prefer;
+        if (prev && list.includes(prev)) return prev;
+        if (stored && list.includes(stored)) return stored;
+        return list[0] || "";
+      });
     } catch (error: any) {
       console.error("[projects] failed to load:", error);
       

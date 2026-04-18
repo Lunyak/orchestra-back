@@ -11,10 +11,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const rawBase = String(env.VITE_API_BASE_URL || "http://localhost:3000");
   const basePath = String(env.VITE_BASE_PATH || "/");
-  const target =
-    rawBase.startsWith("http://") || rawBase.startsWith("https://")
+  // DEV_PROXY_API — только для dev-сервера Vite в Docker (не VITE_*: не попадает в import.meta.env браузера)
+  const proxyTarget =
+    process.env.DEV_PROXY_API ||
+    (rawBase.startsWith("http://") || rawBase.startsWith("https://")
       ? rawBase
-      : "http://localhost:3000";
+      : "http://localhost:3000");
   return {
     base: basePath,
     resolve: {
@@ -38,13 +40,13 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // Keep API calls consistent with production (/api -> back:3000)
         "/api": {
-          target,
+          target: proxyTarget,
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/api/, ""),
         },
         // Realtime (socket.io)
         "/socket.io": {
-          target,
+          target: proxyTarget,
           ws: true,
           changeOrigin: true,
         },

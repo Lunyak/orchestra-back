@@ -1,9 +1,8 @@
-# Конфигурация для локальной разработки с hot-reload
-# Использование: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Локальная разработка с hot-reload (Docker / OrbStack: `docker compose` тот же CLI).
+# Использование: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+# Продакшен на VPS: только docker-compose.yml (и при необходимости docker-compose.https.yml).
 
 services:
-  # PostgreSQL наследуется из docker-compose.yml без изменений
-  
   back:
     build:
       context: ./back
@@ -15,46 +14,56 @@ services:
       - /app/node_modules
     environment:
       NODE_ENV: development
-      # Остальные переменные наследуются из docker-compose.yml
+      # Пресайнд URL для браузера на хосте; внутри сети compose — minio:9000
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: http://localhost:9000
     ports:
       - "3000:3000"
       - "9229:9229" # Debug port для Node.js
-    command: sh -c "npx prisma generate && npm run start:dev"
+    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:dev"
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: web/Dockerfile.dev
     volumes:
-      - ./web/src:/app/src
-      - ./web/public:/app/public
-      - ./web/index.html:/app/index.html
-      - ./web/vite.config.ts:/app/vite.config.ts
-      - ./web/tsconfig.json:/app/tsconfig.json
-      - /app/node_modules
+      - ./web/src:/workspace/web/src
+      - ./web/public:/workspace/web/public
+      - ./web/index.html:/workspace/web/index.html
+      - ./web/vite.config.ts:/workspace/web/vite.config.ts
+      - ./web/tsconfig.json:/workspace/web/tsconfig.json
+      - ./web/tsconfig.node.json:/workspace/web/tsconfig.node.json
+      - ./app/src:/workspace/app/src
+      - /workspace/web/node_modules
+      - /workspace/app/node_modules
     environment:
-      VITE_API_BASE_URL: http://localhost:3000
+      # Браузер: тот же origin + /api. Прокси Vite (внутри контейнера): back:3000
+      VITE_API_BASE_URL: /api
+      DEV_PROXY_API: http://back:3000
     ports:
-      - "5173:5173" # Vite dev server
+      - "5173:5173"
     depends_on:
       - back
 
   admin:
     build:
-      context: ./admin
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: admin/Dockerfile.dev
     volumes:
-      - ./admin/src:/app/src
-      - ./admin/public:/app/public
-      - ./admin/index.html:/app/index.html
-      - ./admin/vite.config.ts:/app/vite.config.ts
-      - ./admin/tsconfig.json:/app/tsconfig.json
-      - /app/node_modules
+      - ./admin/src:/workspace/admin/src
+      - ./admin/public:/workspace/admin/public
+      - ./admin/index.html:/workspace/admin/index.html
+      - ./admin/vite.config.ts:/workspace/admin/vite.config.ts
+      - ./admin/tsconfig.json:/workspace/admin/tsconfig.json
+      - ./admin/tsconfig.node.json:/workspace/admin/tsconfig.node.json
+      - ./app/src:/workspace/app/src
+      - /workspace/admin/node_modules
+      - /workspace/app/node_modules
     environment:
-      VITE_API_BASE_URL: http://localhost:3000
+      VITE_API_BASE_URL: /api
+      DEV_PROXY_API: http://back:3000
+      VITE_MINIO_PROXY_TARGET: http://minio:9000
     ports:
-      - "5174:5173" # Vite dev server (другой внешний порт)
+      - "5174:5173"
     depends_on:
       - back
-
-  # MinIO и Dozzle наследуются из docker-compose.yml без изменений

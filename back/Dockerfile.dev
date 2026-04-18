@@ -6,10 +6,14 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm install --legacy-peer-deps
 
-# Копируем prisma schema для генерации клиента
-COPY prisma ./prisma
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 
-# Генерируем Prisma Client
+# Prisma 7: URL в prisma.config.ts (как в Dockerfile)
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
+# prisma.config.ts вызывает env("DATABASE_URL"); на build connect не нужен — подставляем валидную заглушку
+ENV DATABASE_URL="postgresql://orkestr:orkestr_secret@127.0.0.1:5432/dophamin_orkestr"
 RUN npx prisma generate
 
 # Expose ports

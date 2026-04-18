@@ -82,6 +82,23 @@ backup-db: ## Создать бэкап базы данных
 	@docker compose cp postgres:/tmp/backup_*.dump ./backups/
 	@echo "$(GREEN)✅ Бэкап создан в ./backups/$(NC)"
 
+pull-db: ## Снять дамп БД с production (нужен ssh; ORCHESTRA_SSH, ORCHESTRA_REMOTE_DIR)
+	@chmod +x ./scripts/pull-db-from-server.sh 2>/dev/null || true
+	@./scripts/pull-db-from-server.sh
+
+pull-minio: ## Зеркало бакета MinIO с VPS в локальный (порт 9000; см. scripts/pull-minio-from-server.sh)
+	@chmod +x ./scripts/pull-minio-from-server.sh 2>/dev/null || true
+	@./scripts/pull-minio-from-server.sh
+
+restore-db: ## Восстановить дамп в локальный postgres: make restore-db DUMP=./backups/file.dump
+	@test -n "$(DUMP)" || (echo "$(RED)Укажите DUMP=путь/к/файлу.dump$(NC)"; exit 1)
+	@chmod +x ./scripts/restore-local-db.sh 2>/dev/null || true
+	@./scripts/restore-local-db.sh "$(DUMP)"
+
+minio-init: ## Одноразово: mc alias + бакет S3_BUCKET + public read (minio уже должен быть up)
+	@docker compose up -d minio
+	@docker compose run --rm minio-init
+
 shell-back: ## Открыть shell в контейнере бэкенда
 	@docker compose exec back sh
 
