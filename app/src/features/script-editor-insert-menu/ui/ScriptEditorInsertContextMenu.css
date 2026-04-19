@@ -1,0 +1,87 @@
+.script-editor-insert-menu {
+  position: fixed;
+  z-index: 12000;
+  left: 0;
+  top: 0;
+  min-width: 220px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(420px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 6px 0;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: var(--color-bg-primary, #0f172a);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+
+.script-editor-insert-menu__title {
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.script-editor-insert-menu__sep {
+  height: 1px;
+  margin: 6px 8px;
+  background: rgba(148, 163, 184, 0.22);
+}
+
+.script-editor-insert-menu__item {
+  display: flex;
+  width: calc(100% - 8px);
+  margin: 0 4px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-primary, #e2e8f0);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.script-editor-insert-menu__item:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.script-editor-insert-menu__item:disabled {
+  cursor: not-allowed;
+  color: rgba(148, 163, 184, 0.55);
+}
+
+.script-editor-insert-menu--sub {
+  z-index: 12020;
+  min-width: 200px;
+  max-width: min(360px, calc(100vw - 16px));
+}
+
+.script-editor-insert-menu__item--submenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.script-editor-insert-menu__item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.script-editor-insert-menu__chevron {
+  flex-shrink: 0;
+  opacity: 0.75;
+  font-size: 14px;
+}
+
+.script-editor-insert-menu__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 11990;
+  background: transparent;
+}

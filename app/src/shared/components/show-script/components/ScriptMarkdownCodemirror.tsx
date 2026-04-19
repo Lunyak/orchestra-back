@@ -16,6 +16,7 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
+import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
 import { markdownLiveConceal } from "./markdownLiveConceal";
 import {
   markdownHeadingSectionBlockWrappers,
@@ -126,6 +127,8 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
           drawSelection(),
           dropCursor(),
           highlightActiveLine(),
+          EditorView.lineWrapping,
+          markdownParagraphLineGaps,
           bracketMatching(),
           indentOnInput(),
           markdown(),
@@ -166,6 +169,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
                 caretColor: "var(--color-text-primary)",
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
+                overflowWrap: "break-word",
               },
               /* Сброс горизонтального padding строк из базовой темы CM (scoped class на корне редактора). */
               ".cm-line": {

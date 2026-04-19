@@ -40,6 +40,7 @@ type SceneUiState = {
   playlistOptions: { id: number; title: string }[];
   soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
   selectedTrackId: number | null;
+  selectedSoundId: number | null;
   lightChannels: string[]; // length 8
   selectedLightSlot: number; // 1..8
 };
@@ -72,6 +73,7 @@ function defaultSceneUi(): SceneUiState {
     playlistOptions: [],
     soundsOptions: [],
     selectedTrackId: null,
+    selectedSoundId: null,
     lightChannels: Array.from({ length: 8 }, () => ""),
     selectedLightSlot: 1,
   };
@@ -322,6 +324,15 @@ export const showScriptMarkdownSlice = createSlice({
       entry.selectedTrackId = action.payload.trackId;
       state.uiBySceneKey[sceneKey] = entry;
     },
+    setSelectedSoundId(
+      state,
+      action: PayloadAction<{ projectSlug: string; sceneName: string; soundId: number | null }>,
+    ) {
+      const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
+      const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
+      entry.selectedSoundId = action.payload.soundId;
+      state.uiBySceneKey[sceneKey] = entry;
+    },
     setLightChannels(
       state,
       action: PayloadAction<{ projectSlug: string; sceneName: string; lightChannels: string[] }>,
@@ -358,6 +369,15 @@ export const showScriptMarkdownSlice = createSlice({
       next.lightChannels = normalizeLightChannels(action.payload.lightChannels);
       if (next.selectedTrackId == null && next.playlistOptions.length > 0) {
         next.selectedTrackId = next.playlistOptions[0].id;
+      }
+      if (next.selectedSoundId == null && next.soundsOptions.length > 0) {
+        next.selectedSoundId = next.soundsOptions[0].id;
+      }
+      if (
+        next.selectedSoundId != null &&
+        !next.soundsOptions.some((s) => s.id === next.selectedSoundId)
+      ) {
+        next.selectedSoundId = next.soundsOptions[0]?.id ?? null;
       }
       state.uiBySceneKey[action.payload.sceneKey] = next;
     });

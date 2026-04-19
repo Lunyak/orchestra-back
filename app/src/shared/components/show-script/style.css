@@ -144,6 +144,7 @@
   border: 1px solid var(--color-border-default);
   border-radius: 12px;
   padding: 8px;
+  box-sizing: border-box;
 }
 
 .script-editor-tools__header {
@@ -179,6 +180,8 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .script-editor-tools__section {
@@ -220,8 +223,29 @@
 }
 
 .script-editor-tools[data-collapsed="true"] {
-  width: 44px;
-  padding: 6px;
+  width: fit-content;
+  max-width: fit-content;
+  padding: 4px;
+  gap: 0;
+  align-items: center;
+}
+
+.script-editor-tools[data-collapsed="true"] .script-editor-tools__header {
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.script-editor-tools[data-collapsed="true"] .script-editor-tools__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1;
 }
 
 .script-editor-tools[data-collapsed="true"] .script-editor-tools__title,
@@ -358,8 +382,73 @@
   position: absolute;
   bottom: 50%;
   transform: translateY(50%);
-  right: 0;
-  align-items: flex-end;
+  right: -12px;
+  align-items: stretch;
+  width: min(320px, 100%);
+  max-width: min(420px, 45vw);
+  box-sizing: border-box;
+}
+
+/* Роли, реквизит и свет на всю ширину панели «Инструменты» */
+.script-step-asides > .script-editor-tools {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+/* Иначе width: 100% и stretch у aside перекрывают компактный свёрнутый вид */
+.script-step-asides > .script-editor-tools[data-collapsed="true"] {
+  width: fit-content;
+  max-width: fit-content;
+  align-self: flex-end;
+}
+
+.script-editor-tools .step-roles-panel,
+.script-editor-tools .requisites-panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: none;
+  align-self: stretch;
+}
+
+.script-editor-tools .script-editor-tools__prepend {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.script-editor-tools .script-editor-tools__section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.script-editor-tools .script-editor-tools__section-body {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.script-editor-tools .script-light-panel {
+  width: 100%;
+  min-width: 0;
+}
+
+.script-editor-tools .script-light-grid {
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.script-editor-tools .script-light-cell {
+  max-width: none;
+  min-width: 0;
+}
+
+/* Поиск роли и выпадающий список — поровну */
+.script-editor-tools .step-roles-add {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
 .script-step-main {
@@ -380,6 +469,7 @@
 }
 
 .step-roles-panel {
+  box-sizing: border-box;
   background: #0f172a;
   border: 1px solid #1f2937;
   border-radius: 8px;
@@ -530,6 +620,17 @@
 
   .script-step-asides {
     width: 100%;
+  }
+
+  .script-step-asides > .script-editor-tools {
+    width: 100%;
+    max-width: none;
+  }
+
+  .script-step-asides > .script-editor-tools[data-collapsed="true"] {
+    width: fit-content;
+    max-width: fit-content;
+    align-self: flex-end;
   }
 
   .step-roles-panel {
@@ -745,6 +846,7 @@
 }
 
 .requisites-panel {
+  box-sizing: border-box;
   background: #0f172a;
   border: 1px solid #1f2937;
   border-radius: 8px;
@@ -919,6 +1021,42 @@
   cursor: text;
 }
 
+/* Вкладка «Текст» (play): ширина колонки лейбла по строке, без выравнивания по max всех реплик. */
+.markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-label {
+  flex: 0 0 auto;
+  min-width: auto;
+}
+
+/* «Текст»: [[РОЛЬ]] и реплика в одном потоке (как в редакторе), без flex-колонок. «Схема» / экспликация — без этого класса. */
+.markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role {
+  display: block;
+  gap: 0;
+}
+
+.markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-dialog-label {
+  display: inline-flex;
+  margin-right: 0.35em;
+  vertical-align: baseline;
+}
+
+.markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-dialog-text {
+  display: inline;
+  vertical-align: baseline;
+}
+
+.markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-speaker-label {
+  display: inline-flex;
+  white-space: nowrap;
+  overflow: visible;
+  max-height: none;
+  height: auto;
+  min-height: 18px;
+  line-height: inherit;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  -webkit-box-orient: unset;
+}
+
 .markdown-preview {
   flex: 1;
   min-height: 0;
@@ -930,8 +1068,14 @@
   --dialog-label-slot-width: clamp(72px, 12ch, 220px);
 
   p {
-    margin: 4px 0;
+    margin: 0;
     font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* Два абзаца по `\n\n` в md — два <p>; отступ заметнее, чем одиночный <br> внутри абзаца. */
+  p + p {
+    margin-top: 0.75em;
   }
 
   /* p:nth-child(2n) {
@@ -949,10 +1093,10 @@
   margin: 10px 0;
   padding: 12px 14px 14px;
   background: var(--color-bg-secondary);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  border-radius: 10px;
+  border: none;
   min-width: 0;
   box-sizing: border-box;
+  color: #ffffffce;
 }
 
 .markdown-kadr h1,
@@ -1498,6 +1642,52 @@
   outline: none;
 }
 
+/* Вертикальный ритм как у превью между абзацами (p + p) и между «сценическими» строками без \n\n в исходнике. */
+.script-markdown-cm .cm-content > .cm-line:first-child {
+  padding-top: 4px;
+}
+
+.script-markdown-cm .cm-line.cm-line-para-gap {
+  padding-top: 4px;
+}
+
+/*
+ * Вкладка «Текст» (play): фон и карточки как у превью (.markdown-preview + .markdown-kadr),
+ * без отдельной «плашки» редактора на --color-bg-primary.
+ */
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-editor {
+  background-color: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-scroller {
+  background-color: transparent !important;
+}
+
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-content {
+  color: var(--color-text-primary);
+}
+
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-activeLine {
+  background-color: transparent !important;
+}
+
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-md-heading-section {
+  margin: 10px 0;
+  padding: 12px 14px 14px;
+  border-radius: 0;
+}
+
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-content > .cm-md-heading-section:first-child {
+  padding-top: 12px;
+}
+
+.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-md-heading-section + .cm-md-heading-section {
+  padding-top: 14px;
+}
+
 /* CodeMirror: компактные чипы вместо сырого {{…}} / [[…]] / orchestra-image */
 .script-markdown-cm .markdown-light-chip {
   user-select: none;
@@ -1877,7 +2067,7 @@
 .markdown-speaker-label {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 0 8px;
   /* border-radius: 999px; */
   background: rgba(37, 99, 235, 0.16);
   /* border: 1px solid rgba(96, 165, 250, 0.45); */
@@ -1925,7 +2115,7 @@
   cursor: pointer;
   user-select: none;
   text-transform: uppercase;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   text-align: center;

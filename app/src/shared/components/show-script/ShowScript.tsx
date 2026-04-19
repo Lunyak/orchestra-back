@@ -144,36 +144,37 @@ export const ShowScript: React.FC = () => {
                   </div>
                   {(showStepRoles || showRequisites || (showScriptEditorTools && isEditing && controls)) ? (
                     <div className="script-step-asides">
-                      {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
-                      {showRequisites ? (
-                        <RequisitesPanel
-                          show={showRequisites}
-                          isEditing={isEditing}
-                          requisites={currentRequisites}
-                          hasCopiedRequisites={hasCopiedRequisites}
-                          newRequisite={newRequisite}
-                          setNewRequisite={setNewRequisite}
-                          onCopy={copyRequisites}
-                          onPaste={pasteRequisites}
-                          onResetAll={resetRequisites}
-                          onAdd={addRequisite}
-                          onToggle={toggleRequisite}
-                          onRemove={removeRequisite}
-                        />
-                      ) : null}
-                      {showScriptEditorTools && isEditing && controls ? (
-                        <ControlsScript
-                          selectedTrackId={controls.selectedTrackId}
-                          playlistOptions={controls.playlistOptions}
-                          soundsOptions={controls.soundsOptions}
-                          onSelectedTrackIdChange={controls.onSelectedTrackIdChange}
-                          lightChannels={controls.lightChannels}
-                          onLightChannelsChange={controls.onLightChannelsChange}
-                          selectedLightSlot={controls.selectedLightSlot}
-                          onSelectedLightSlotChange={controls.onSelectedLightSlotChange}
-                          onInsertText={controls.onInsertText}
-                        />
-                      ) : null}
+                      <ControlsScript
+                        light={
+                          showScriptEditorTools && isEditing && controls
+                            ? {
+                                lightChannels: controls.lightChannels,
+                                onLightChannelsChange: controls.onLightChannelsChange,
+                                selectedLightSlot: controls.selectedLightSlot,
+                                onSelectedLightSlotChange: controls.onSelectedLightSlotChange,
+                                onInsertText: controls.onInsertText,
+                              }
+                            : null
+                        }
+                      >
+                        {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
+                        {showRequisites ? (
+                          <RequisitesPanel
+                            show={showRequisites}
+                            isEditing={isEditing}
+                            requisites={currentRequisites}
+                            hasCopiedRequisites={hasCopiedRequisites}
+                            newRequisite={newRequisite}
+                            setNewRequisite={setNewRequisite}
+                            onCopy={copyRequisites}
+                            onPaste={pasteRequisites}
+                            onResetAll={resetRequisites}
+                            onAdd={addRequisite}
+                            onToggle={toggleRequisite}
+                            onRemove={removeRequisite}
+                          />
+                        ) : null}
+                      </ControlsScript>
                     </div>
                   ) : null}
                 </div>

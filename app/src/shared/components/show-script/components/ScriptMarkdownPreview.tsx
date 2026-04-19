@@ -9,6 +9,7 @@ import React, {
   useState,
 } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import { useNavigate } from "react-router-dom";
 import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
 import type { SceneRolesDataV1 } from "../../../../features/scene";
@@ -105,6 +106,24 @@ function isScriptishBlockLine(line: string): boolean {
   return false;
 }
 
+/** Между двумя соседними строками исходника нужна синтетическая пустая строка, иначе commonmark склеит их в один &lt;p&gt;. */
+function needsSyntheticParagraphBlankBetweenAdjacentLines(line: string, next: string): boolean {
+  const lineList = isMarkdownListItemLine(line);
+  const nextList = isMarkdownListItemLine(next);
+  const lineScr = isScriptishBlockLine(line) && !lineList;
+  const nextScr = isScriptishBlockLine(next) && !nextList;
+
+  if (lineScr && nextScr) return true;
+
+  /* Ремарка / абзац одной строкой, затем реплика с [[…]] — одного \n в md недостаточно для нового абзаца. */
+  if (line.trim() !== "" && !lineScr && !lineList && nextScr) return true;
+
+  /* Реплика / сценическая строка, затем проза (не сценическая): один \n иначе даёт <br>, а нужен новый абзац. */
+  if (lineScr && !lineList && !nextList && !nextScr && next.trim() !== "") return true;
+
+  return false;
+}
+
 function expandScriptLineParagraphBreaksInSegment(segment: string): string {
   const lines = segment.split("\n");
   const out: string[] = [];
@@ -113,12 +132,7 @@ function expandScriptLineParagraphBreaksInSegment(segment: string): string {
     out.push(line);
     if (i + 1 >= lines.length) break;
     const next = lines[i + 1]!;
-    if (
-      isScriptishBlockLine(line) &&
-      isScriptishBlockLine(next) &&
-      !isMarkdownListItemLine(line) &&
-      !isMarkdownListItemLine(next)
-    ) {
+    if (needsSyntheticParagraphBlankBetweenAdjacentLines(line, next)) {
       out.push("");
     }
   }
@@ -126,8 +140,10 @@ function expandScriptLineParagraphBreaksInSegment(segment: string): string {
 }
 
 /**
- * Без пустой строки commonmark склеивает соседние «строки сценария» в один &lt;p&gt; — лейблы и отступы ломаются.
- * Добавляем `\n\n` только между такими строками (вне ```…```). Не трогаем списки `- …`.
+ * Без пустой строки commonmark склеивает соседние строки в один &lt;p&gt; — лейблы и отступы ломаются.
+ * Добавляем `\n\n` между парными «сценическими» строками, между обычным текстом и следующей сценической
+ * (например ремарка и `[[РОЛЬ]]`), между сценической строкой и следующей не-сценической (реплика и ремарка),
+ * вне ```…```. Строки списков `- …` не трогаем.
  * Если уже есть сохранённые метки — не меняем строку (офсеты rehype совпадают с исходником).
  */
 function expandScriptLineParagraphBreaks(
@@ -148,6 +164,34 @@ function expandScriptLineParagraphBreaks(
     last = m.index + m[0].length;
   }
   parts.push(expandScriptLineParagraphBreaksInSegment(src.slice(last)));
+  return parts.join("");
+}
+
+/**
+ * CommonMark объединяет три и более подряд `\n` между блоками в один разрыв абзацев — лишний Enter
+ * в редакторе не даёт дополнительного вертикального воздуха в превью. Превращаем «лишние» переводы
+ * в отдельные абзацы с U+00A0 (как в типографике пустая строка с невидимым символом).
+ */
+function injectNbspParagraphsForTripleNewlinesInSegment(segment: string): string {
+  return segment.replace(/\n{3,}/g, (run) => {
+    const n = run.length;
+    return "\n\n" + Array.from({ length: n - 2 }, () => "\u00a0").join("\n\n") + "\n\n";
+  });
+}
+
+function injectNbspParagraphsForTripleNewlines(markdown: string): string {
+  const src = String(markdown ?? "");
+  if (!src) return src;
+  FENCE_RE.lastIndex = 0;
+  const parts: string[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = FENCE_RE.exec(src)) !== null) {
+    parts.push(injectNbspParagraphsForTripleNewlinesInSegment(src.slice(last, m.index)));
+    parts.push(m[0]);
+    last = m.index + m[0].length;
+  }
+  parts.push(injectNbspParagraphsForTripleNewlinesInSegment(src.slice(last)));
   return parts.join("");
 }
 
@@ -664,15 +708,15 @@ export function ScriptMarkdownPreview({
   });
   const annotationsMode = ui.annotationsMode;
 
-  const markdownForPreview = useMemo(
-    () =>
-      expandScriptLineParagraphBreaks(
-        String(markdown ?? ""),
-        annotationsMode,
-        annotations.length,
-      ),
-    [markdown, annotationsMode, annotations.length],
-  );
+  const markdownForPreview = useMemo(() => {
+    const expanded = expandScriptLineParagraphBreaks(
+      String(markdown ?? ""),
+      annotationsMode,
+      annotations.length,
+    );
+    if (annotationsMode && annotations.length > 0) return expanded;
+    return injectNbspParagraphsForTripleNewlines(expanded);
+  }, [markdown, annotationsMode, annotations.length]);
 
   const onReadModePointerDown = (e: React.PointerEvent) => {
     if (!readModeActivateEdit) return;
@@ -928,7 +972,8 @@ export function ScriptMarkdownPreview({
   );
 
   useLayoutEffect(() => {
-    if (!hasRoleOrLightLabels) {
+    /* Вкладка «Текст»: без общей колонки по max-width всех лейблов — как в редакторе. */
+    if (!hasRoleOrLightLabels || markdownMode === "play") {
       dialogLabelSlotPxRef.current = null;
       setDialogLabelSlotPx(null);
       return;
@@ -967,7 +1012,7 @@ export function ScriptMarkdownPreview({
       cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [hasRoleOrLightLabels, markdown, markdownForPreview, kadrLayoutEnabled]);
+  }, [hasRoleOrLightLabels, markdown, markdownForPreview, kadrLayoutEnabled, markdownMode]);
 
   const playFromPayload = (payload: TrackLinkPayload) => {
     if (!onTrackLinkClick) return;
@@ -1141,6 +1186,7 @@ export function ScriptMarkdownPreview({
       className={[
         "markdown-preview",
         hasRoleOrLightLabels ? "markdown-preview--has-line-labels" : "",
+        markdownMode === "play" ? "markdown-preview--play-inline-labels" : "",
         kadrLayoutEnabled ? "markdown-preview--kadr" : "",
         readModeActivateEdit ? "markdown-preview--read-activatable" : "",
       ]
@@ -1162,6 +1208,7 @@ export function ScriptMarkdownPreview({
         <MarkdownPreviewImageContext.Provider value={markdownPreviewImageCtx}>
         <ReactMarkdown
           urlTransform={urlTransform}
+          remarkPlugins={[remarkBreaks]}
           rehypePlugins={rehypePlugins}
           components={{
             p: ({ children }: { children: React.ReactNode }) => {

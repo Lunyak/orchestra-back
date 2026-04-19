@@ -1,4 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  buildScriptEditorInsertMenuRows,
+  defaultScriptEditorInsertDefinitions,
+  mergeInsertDefinitions,
+  ScriptEditorInsertContextMenu,
+  type ScriptEditorInsertItemDefinition,
+  type ScriptEditorInsertMenuPick,
+} from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
 import {
   createAnnotation,
@@ -29,6 +37,8 @@ import { ScriptStepHeader } from "./ScriptStepHeader";
 interface IProps {
   projectSlug: string;
   sceneName: string;
+  /** Доп. пункты контекстного меню вставки (режим редактирования). */
+  extraScriptEditorInsertItems?: ScriptEditorInsertItemDefinition[];
   updateStepField: <K extends keyof ScriptStep>(
     id: number,
     field: K,
@@ -40,10 +50,6 @@ interface IProps {
     markdownPane: React.ReactNode;
     currentStep: ScriptStep | undefined;
     controls: null | {
-      selectedTrackId: number | null;
-      playlistOptions: { id: number; title: string }[];
-      soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
-      onSelectedTrackIdChange: (trackId: number | null) => void;
       lightChannels: string[];
       onLightChannelsChange: (next: string[]) => void;
       selectedLightSlot: number;
@@ -56,6 +62,7 @@ interface IProps {
 export function ShowScriptMarkdownSection({
   projectSlug,
   sceneName,
+  extraScriptEditorInsertItems,
   updateStepField,
   onTrackLinkClick,
   onSoundLinkClick,
@@ -71,7 +78,6 @@ export function ShowScriptMarkdownSection({
   const annotationsMode = ui.annotationsMode;
   const playlistOptions = ui.playlistOptions;
   const soundsOptions = ui.soundsOptions;
-  const selectedTrackId = ui.selectedTrackId;
   const lightChannels = ui.lightChannels;
   const selectedLightSlot = ui.selectedLightSlot;
 
@@ -88,6 +94,7 @@ export function ShowScriptMarkdownSection({
 
   const [newAnnotation, setNewAnnotation] = useState<NewAnnotationDraft | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
+  const [insertMenu, setInsertMenu] = useState<{ x: number; y: number } | null>(null);
 
   /** Секции по `###` в превью (rehypeKadrSections) + TOC «Картины» — для пьесы тоже, иначе в режиме play блоки пропадают. */
   const kadrLayoutEnabled =
@@ -111,6 +118,14 @@ export function ShowScriptMarkdownSection({
       // ignore
     }
   }, [tocEnabled, tocStorageKey]);
+
+  const scriptEditorInsertDefinitions = useMemo(
+    () =>
+      extraScriptEditorInsertItems?.length
+        ? mergeInsertDefinitions(defaultScriptEditorInsertDefinitions, extraScriptEditorInsertItems)
+        : defaultScriptEditorInsertDefinitions,
+    [extraScriptEditorInsertItems],
+  );
 
   const tocItems = useMemo(() => {
     if (!kadrLayoutEnabled) return [];
@@ -248,6 +263,80 @@ export function ShowScriptMarkdownSection({
     input.click();
   };
 
+  const tokenForAssets =
+    accessToken ??
+    (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
+
+  const insertMenuRows = useMemo(() => {
+    if (!insertMenu) return [];
+    const ed = markdownRef.current;
+    const sel = ed?.getSelection();
+    const canCopySelection = Boolean(ed && sel && sel.from !== sel.to);
+    const canPasteFromClipboard =
+      typeof navigator !== "undefined" &&
+      Boolean(navigator.clipboard && typeof navigator.clipboard.readText === "function");
+    return buildScriptEditorInsertMenuRows(
+      {
+        playlistOptions,
+        soundsOptions,
+        activeMarkdown: String(activeMarkdown ?? ""),
+        canInsertImage: Boolean(tokenForAssets),
+        canCopySelection,
+        canPasteFromClipboard,
+      },
+      scriptEditorInsertDefinitions,
+    );
+  }, [
+    insertMenu,
+    scriptEditorInsertDefinitions,
+    playlistOptions,
+    soundsOptions,
+    activeMarkdown,
+    tokenForAssets,
+  ]);
+
+  const copyEditorSelection = async () => {
+    const ed = markdownRef.current;
+    if (!ed) return;
+    const doc = ed.getDoc();
+    const { from, to } = ed.getSelection();
+    if (from === to) return;
+    const sliceFrom = Math.min(from, to);
+    const sliceTo = Math.max(from, to);
+    const text = doc.slice(sliceFrom, sliceTo);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      console.error("copy failed:", e);
+    }
+  };
+
+  const pasteFromClipboard = async () => {
+    if (!markdownRef.current) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      insertIntoActiveMarkdown(text);
+    } catch (e) {
+      console.error("paste failed:", e);
+    }
+  };
+
+  const handleInsertMenuPick = (pick: ScriptEditorInsertMenuPick) => {
+    if (pick.kind === "snippet") {
+      insertIntoActiveMarkdown(pick.text);
+      return;
+    }
+    if (pick.kind === "copy-selection") {
+      void copyEditorSelection();
+      return;
+    }
+    if (pick.kind === "paste-clipboard") {
+      void pasteFromClipboard();
+      return;
+    }
+    void handleInsertImage();
+  };
+
   const handleClipboardImagePaste = async (event: ClipboardEvent) => {
     const pasted = await pasteProjectImageMarkdownSnippetFromClipboard(event, {
       projectSlug,
@@ -287,7 +376,7 @@ export function ShowScriptMarkdownSection({
   };
 
   const markdownPane = currentStep ? (
-    <div className="script-markdown-pane">
+    <div className="script-markdown-pane" data-markdown-mode={markdownMode}>
       <ScriptMarkdownToolbar
         isEditing={isEditing}
         onToggleEditing={() => setIsEditing((p: boolean) => !p)}
@@ -378,7 +467,13 @@ export function ShowScriptMarkdownSection({
               </div>
             ) : null}
 
-            <div className="script-markdown-editor-main">
+            <div
+              className="script-markdown-editor-main"
+              onContextMenu={(event) => {
+                event.preventDefault();
+                setInsertMenu({ x: event.clientX, y: event.clientY });
+              }}
+            >
               <label className="visually-hidden" htmlFor={`markdown-${currentStep.id}`}>
                 Текст шага
               </label>
@@ -386,6 +481,7 @@ export function ShowScriptMarkdownSection({
                 key={`md-${currentStep.id}-${String(activeMarkdownField)}`}
                 ref={markdownRef}
                 id={`markdown-${currentStep.id}`}
+                className={markdownMode === "play" ? "script-markdown-cm--play-as-preview" : undefined}
                 value={String(activeMarkdown ?? "")}
                 projectSlug={projectSlug}
                 accessToken={accessToken}
@@ -427,20 +523,8 @@ export function ShowScriptMarkdownSection({
   const controls =
     isEditing
       ? {
-        selectedTrackId,
-        playlistOptions,
-        soundsOptions,
         lightChannels,
         selectedLightSlot,
-        onSelectedTrackIdChange: (trackId: number | null) => {
-          dispatch(
-            showScriptMarkdownActions.setSelectedTrackId({
-              projectSlug,
-              sceneName,
-              trackId,
-            }),
-          );
-        },
         onLightChannelsChange: (next: string[]) => {
           dispatch(
             showScriptMarkdownActions.setLightChannels({
@@ -466,6 +550,14 @@ export function ShowScriptMarkdownSection({
   return (
     <>
       {renderBody ? renderBody({ markdownPane, currentStep, controls }) : markdownPane}
+      <ScriptEditorInsertContextMenu
+        open={insertMenu != null}
+        anchorX={insertMenu?.x ?? 0}
+        anchorY={insertMenu?.y ?? 0}
+        rows={insertMenuRows}
+        onClose={() => setInsertMenu(null)}
+        onPick={handleInsertMenuPick}
+      />
     </>
   );
 }
