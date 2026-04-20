@@ -4,6 +4,15 @@
   overflow: auto;
   margin: 0 auto;
   color: var(--color-text-lighter);
+  /* background: var(--color-bg-secondary); */
+  background: var(--color-bg-primary);
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.main-content-kanban {
+  background: var(--color-bg-secondary);
+  /* background: var(--color-bg-primary); */
 }
 
 .kanban-header {
@@ -14,6 +23,7 @@
   margin: 0;
   font-size: 22px;
   letter-spacing: 0.2px;
+  color: #e78a4e;
 }
 
 .kanban-subtitle {
@@ -29,9 +39,9 @@
   align-items: end;
   margin-bottom: 14px;
   padding: 10px 12px;
-  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(255, 255, 255, 0.03);
+  align-items: center;
 }
 
 .kanban-tool {
@@ -45,16 +55,17 @@
   opacity: 0.8;
 }
 
-.kanban-tool input,
+.kanban-tool input:not([type="checkbox"]),
 .kanban-tool select {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
+
   padding: 8px 10px;
   color: inherit;
   outline: none;
 }
 
+/* Ряд с чекбоксом: см. LabeledCheckbox + .labeled-checkbox в shared/core */
 .kanban-tool-check {
   min-width: unset;
   display: flex;
@@ -63,17 +74,9 @@
   padding: 0 4px 2px;
 }
 
-.kanban-tool-check input {
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border-radius: 4px;
-}
-
 .kanban-tool-reset {
   height: 38px;
   padding: 0 12px;
-  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: inherit;
@@ -90,7 +93,6 @@
 .kanban-col {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
   overflow: hidden;
   min-height: 180px;
 }
@@ -98,7 +100,8 @@
 .kanban-col-head {
   padding: 10px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.18);
+  /* background: задаётся из STATUSES.headerBg в KanbanBoardPage */
+  background: rgba(0, 0, 0, 0.22);
 }
 
 .kanban-col-title-row {
@@ -115,9 +118,7 @@
 
 .kanban-col-count {
   font-size: 12px;
-  opacity: 0.8;
   padding: 2px 8px;
-  border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
@@ -128,7 +129,7 @@
 }
 
 .kanban-col-body {
-  padding: 10px 10px 12px;
+  padding: 10px 4px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -137,11 +138,11 @@
 .kanban-card {
   cursor: grab;
   user-select: none;
-  background: rgba(0, 0, 0, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 12px;
+  background: var(--color-bg-secondary);
+  /* border: 1px solid rgba(255, 255, 255, 0.10); */
   padding: 10px 10px 8px;
   transition: transform 0.08s ease, border-color 0.12s ease;
+  color: #fff;
 }
 
 .kanban-card:hover {
@@ -157,6 +158,7 @@
   font-weight: 600;
   font-size: 13px;
   line-height: 1.25;
+  color: #e78a4e;
 }
 
 .kanban-card-roles {
@@ -169,9 +171,9 @@
 .kanban-chip {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   opacity: 0.9;
+  background-color: rgba(37, 99, 235, 0.16);
 }
 
 .kanban-chip.more {
@@ -209,65 +211,6 @@
 
 .kanban-card-action {
   opacity: 0.9;
-}
-
-.kanban-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  z-index: 50;
-}
-
-.kanban-modal {
-  width: min(920px, 96vw);
-  max-height: min(86vh, 900px);
-  overflow: auto;
-  background: rgba(16, 16, 18, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
-}
-
-.kanban-modal-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 14px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-}
-
-.kanban-modal-title {
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.kanban-modal-meta {
-  margin-top: 2px;
-  opacity: 0.75;
-  font-size: 12px;
-}
-
-.kanban-modal-close {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.kanban-modal-body {
-  padding: 12px 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
 }
 
 .kanban-field {
@@ -348,6 +291,10 @@
   border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 12px;
   padding: 10px;
+}
+
+.kanban-btn-reset {
+  margin-left: auto;
 }
 
 @media (max-width: 1100px) {

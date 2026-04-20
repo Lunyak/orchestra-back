@@ -70,7 +70,7 @@
   --color-warning-text: rgba(255, 190, 120, 0.95);
 
   /* Текстовые цвета */
-  --color-text-primary: #d6c7aa;
+  --color-text-primary: #fff;
   /* --color-text-primary: #e2e8f0; */
   --color-text-secondary: #0b1220;
   --color-text-label: #a9b664;
@@ -116,7 +116,7 @@
   --gradient-header-trigger: linear-gradient(to right, rgba(44, 62, 80, 0.95) 0%, rgba(44, 62, 80, 0.4) 70%, transparent 100%);
 
   /* Кнопки*/
-  --color-button-primary: #2563eb;
+  --color-button-primary: #e78a4e;
   --color-button-secondary: #22c55e;
   --color-button-danger: #b91c1c;
 

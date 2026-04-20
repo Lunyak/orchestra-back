@@ -98,7 +98,6 @@
   flex: 1;
   min-width: 0;
   height: 34px;
-  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background-image:
     radial-gradient(700px circle at 15% 30%, rgba(252, 188, 81, 0.14), transparent 40%),
@@ -657,7 +656,6 @@
   top: 7px;
   width: 16px;
   height: 16px;
-  border-radius: 999px;
   border: 1px solid rgba(239, 68, 68, 0.35);
   background: rgba(185, 28, 28, 0.85);
   color: #fff;

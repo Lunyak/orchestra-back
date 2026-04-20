@@ -33,6 +33,19 @@ const KanbanBoardPage = React.lazy(() =>
   }))
 );
 
+type SpectacleActiveView = "theater" | "light-plot" | "board" | "script";
+
+/** Доп. классы на `<main class="main-content">` по активному разделу (одна строка или массив). */
+const MAIN_CONTENT_VIEW_MODIFIERS: Record<
+  SpectacleActiveView,
+  string | readonly string[] | undefined
+> = {
+  theater: "main-content-theater",
+  "light-plot": undefined,
+  board: 'main-content-kanban',
+  script: "show-script",
+};
+
 export function SpectaclePage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -131,7 +144,7 @@ export function SpectaclePage() {
     setTheaterControlsHost(node);
   }, []);
 
-  const activeView =
+  const activeView: SpectacleActiveView =
     location.pathname === "/theater"
       ? "theater"
       : location.pathname === "/light-plot"
@@ -284,7 +297,7 @@ export function SpectaclePage() {
           </div>
         )}
         <main
-          className={cn('main-content', activeView === "theater" ? " main-content-theater" : "", activeView === "script" ? "show-script" : "")}
+          className={cn("main-content", MAIN_CONTENT_VIEW_MODIFIERS[activeView])}
         >
           {activeView === "theater" && (
             <Suspense

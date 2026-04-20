@@ -15,6 +15,7 @@ import {
 } from "@codemirror/view";
 import { getPlayUrl } from "../../../../sync/api";
 import {
+  formatSpeakerLabelDisplay,
   getReadableTextColor,
   isColorOverrideToken,
   parseLightChannel,
@@ -213,7 +214,7 @@ function resolveChip(
 
   if (m[5] != null && m[6] != null) {
     const normalized = String(m[6]).trim();
-    const text = normalized ? normalized.toUpperCase() : "…";
+    const text = formatSpeakerLabelDisplay(normalized);
     return {
       label: text,
       classNames: "markdown-speaker-label",

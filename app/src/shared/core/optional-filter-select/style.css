@@ -1,0 +1,14 @@
+.optional-filter-select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Пустое значение = «все»; визуально как плейсхолдер */
+.optional-filter-select[data-empty] {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+.optional-filter-select:not([data-empty]) {
+  font-style: normal;
+}

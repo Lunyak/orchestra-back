@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildScriptEditorInsertMenuRows,
   defaultScriptEditorInsertDefinitions,
@@ -26,11 +26,16 @@ import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptStep } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
 import { insertAtSelection } from "../utils/insertAtCursor";
-import {
-  ScriptMarkdownCodemirror,
-  type ScriptMarkdownEditorHandle,
-} from "./ScriptMarkdownCodemirror";
+import { ScriptMarkdownCodemirror, type ScriptMarkdownEditorHandle } from "./ScriptMarkdownCodemirror";
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
+
+const ScriptMarkdownCodemirrorLazy = lazy(() =>
+  import("./ScriptMarkdownCodemirror").then((m) => ({ default: m.ScriptMarkdownCodemirror })),
+);
+
+const ScriptMarkdownPreviewLazy = lazy(() =>
+  import("./ScriptMarkdownPreview").then((m) => ({ default: m.ScriptMarkdownPreview })),
+);
 import { ScriptMarkdownToolbar } from "./ScriptMarkdownToolbar";
 import { ScriptStepHeader } from "./ScriptStepHeader";
 
@@ -57,6 +62,11 @@ interface IProps {
       onInsertText: (text: string) => void;
     };
   }) => React.ReactNode;
+  /**
+   * Откладывает загрузку CodeMirror / превью (отдельные чанки) до первого показа;
+   * для канбан-модалки + граница Suspense по режиму (схема / экспликация / текст × чтение|редактирование).
+   */
+  lazyScriptBody?: boolean;
 }
 
 export function ShowScriptMarkdownSection({
@@ -67,6 +77,7 @@ export function ShowScriptMarkdownSection({
   onTrackLinkClick,
   onSoundLinkClick,
   renderBody,
+  lazyScriptBody = false,
 }: IProps) {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
@@ -477,44 +488,93 @@ export function ShowScriptMarkdownSection({
               <label className="visually-hidden" htmlFor={`markdown-${currentStep.id}`}>
                 Текст шага
               </label>
-              <ScriptMarkdownCodemirror
-                key={`md-${currentStep.id}-${String(activeMarkdownField)}`}
-                ref={markdownRef}
-                id={`markdown-${currentStep.id}`}
-                className={markdownMode === "play" ? "script-markdown-cm--play-as-preview" : undefined}
-                value={String(activeMarkdown ?? "")}
-                projectSlug={projectSlug}
-                accessToken={accessToken}
-                lightChannels={lightChannels}
-                onTrackLinkClick={onTrackLinkClick}
-                onChange={(next) => updateStepField(currentStep.id, activeMarkdownField, next)}
-                onClipboardImagePaste={handleClipboardImagePaste}
-                placeholder={
-                  markdownMode === "play"
-                    ? "Текст пьесы для этого шага"
-                    : markdownMode === "explication"
-                      ? "Режиссёрская экспликация для этого шага"
-                      : "Текст, изображения и ссылки на музыку"
-                }
-              />
+              {lazyScriptBody ? (
+                <Suspense
+                  key={`${markdownMode}-ed`}
+                  fallback={<div className="script-markdown-body-fallback">Загрузка редактора…</div>}
+                >
+                  <ScriptMarkdownCodemirrorLazy
+                    key={`md-${currentStep.id}-${String(activeMarkdownField)}`}
+                    ref={markdownRef}
+                    id={`markdown-${currentStep.id}`}
+                    className={markdownMode === "play" ? "script-markdown-cm--play-as-preview" : undefined}
+                    value={String(activeMarkdown ?? "")}
+                    projectSlug={projectSlug}
+                    accessToken={accessToken}
+                    lightChannels={lightChannels}
+                    onTrackLinkClick={onTrackLinkClick}
+                    onChange={(next) => updateStepField(currentStep.id, activeMarkdownField, next)}
+                    onClipboardImagePaste={handleClipboardImagePaste}
+                    placeholder={
+                      markdownMode === "play"
+                        ? "Текст пьесы для этого шага"
+                        : markdownMode === "explication"
+                          ? "Режиссёрская экспликация для этого шага"
+                          : "Текст, изображения и ссылки на музыку"
+                    }
+                  />
+                </Suspense>
+              ) : (
+                <ScriptMarkdownCodemirror
+                  key={`md-${currentStep.id}-${String(activeMarkdownField)}`}
+                  ref={markdownRef}
+                  id={`markdown-${currentStep.id}`}
+                  className={markdownMode === "play" ? "script-markdown-cm--play-as-preview" : undefined}
+                  value={String(activeMarkdown ?? "")}
+                  projectSlug={projectSlug}
+                  accessToken={accessToken}
+                  lightChannels={lightChannels}
+                  onTrackLinkClick={onTrackLinkClick}
+                  onChange={(next) => updateStepField(currentStep.id, activeMarkdownField, next)}
+                  onClipboardImagePaste={handleClipboardImagePaste}
+                  placeholder={
+                    markdownMode === "play"
+                      ? "Текст пьесы для этого шага"
+                      : markdownMode === "explication"
+                        ? "Режиссёрская экспликация для этого шага"
+                        : "Текст, изображения и ссылки на музыку"
+                  }
+                />
+              )}
             </div>
           </div>
         </div>
       ) : (
         <div className="form-group">
-          <ScriptMarkdownPreview
-            projectName={projectSlug}
-            sceneName={sceneName}
-            onTrackLinkClick={onTrackLinkClick}
-            onSoundLinkClick={onSoundLinkClick}
-            newAnnotation={newAnnotation}
-            setNewAnnotation={setNewAnnotation}
-            activeAnnotationId={activeAnnotationId}
-            setActiveAnnotationId={setActiveAnnotationId}
-            onCreateAnnotation={handleCreateAnnotation}
-            onUpdateAnnotation={handleUpdateAnnotation}
-            onDeleteAnnotation={handleDeleteAnnotation}
-          />
+          {lazyScriptBody ? (
+            <Suspense
+              key={`${markdownMode}-ro`}
+              fallback={<div className="script-markdown-body-fallback">Загрузка превью…</div>}
+            >
+              <ScriptMarkdownPreviewLazy
+                projectName={projectSlug}
+                sceneName={sceneName}
+                onTrackLinkClick={onTrackLinkClick}
+                onSoundLinkClick={onSoundLinkClick}
+                newAnnotation={newAnnotation}
+                setNewAnnotation={setNewAnnotation}
+                activeAnnotationId={activeAnnotationId}
+                setActiveAnnotationId={setActiveAnnotationId}
+                onCreateAnnotation={handleCreateAnnotation}
+                onUpdateAnnotation={handleUpdateAnnotation}
+                onDeleteAnnotation={handleDeleteAnnotation}
+              />
+            </Suspense>
+          ) : (
+            <ScriptMarkdownPreview
+              projectName={projectSlug}
+              sceneName={sceneName}
+              onTrackLinkClick={onTrackLinkClick}
+              onSoundLinkClick={onSoundLinkClick}
+              newAnnotation={newAnnotation}
+              setNewAnnotation={setNewAnnotation}
+              activeAnnotationId={activeAnnotationId}
+              setActiveAnnotationId={setActiveAnnotationId}
+              onCreateAnnotation={handleCreateAnnotation}
+              onUpdateAnnotation={handleUpdateAnnotation}
+              onDeleteAnnotation={handleDeleteAnnotation}
+            />
+          )}
         </div>
       )}
     </div>

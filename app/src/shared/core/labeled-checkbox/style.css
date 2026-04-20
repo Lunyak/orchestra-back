@@ -1,0 +1,42 @@
+/* `label.labeled-checkbox` — выше специфичности, чем у `.kanban-tool { display: grid }` */
+label.labeled-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+  color: rgba(248, 250, 252, 0.88);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+label.labeled-checkbox:has(.labeled-checkbox__input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Нативный чекбокс + accent как у заголовка канбана (#e78a4e) */
+.labeled-checkbox__input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin: 0;
+  border-radius: 4px;
+  accent-color: #e78a4e;
+  cursor: pointer;
+}
+
+.labeled-checkbox__input:focus-visible {
+  outline: 2px solid rgba(231, 138, 78, 0.65);
+  outline-offset: 2px;
+}
+
+.labeled-checkbox__input:disabled {
+  cursor: not-allowed;
+}
+
+.labeled-checkbox__text {
+  flex: 1;
+  min-width: 0;
+}

@@ -1,0 +1,107 @@
+@import "../../shared/styles/variables.css";
+
+.kanban-step-modal-panel {
+  max-width: min(960px, calc(100vw - 24px));
+  max-height: min(90vh, 920px);
+  /* Стабильная высота при переключении «Карточка» / «Сценарий». */
+  min-height: min(78vh, 720px);
+}
+
+.kanban-step-modal__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--color-border-medium);
+  flex-shrink: 0;
+}
+
+.kanban-step-modal__title {
+  font-weight: 700;
+  font-size: 16px;
+  color: #e78a4e;
+}
+
+.kanban-step-modal__meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.kanban-step-modal__close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-bg-transparent-2);
+  color: var(--color-text-primary);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.kanban-step-modal__close:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-bg-tertiary);
+}
+
+.kanban-step-modal__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--color-border-default);
+  flex-shrink: 0;
+  background: var(--color-bg-secondary);
+}
+
+.kanban-step-modal__tab {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  padding: 8px 14px;
+  border-radius: 10px 10px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.kanban-step-modal__tab:hover {
+  color: var(--color-text-primary);
+}
+
+.kanban-step-modal__tab[data-active="true"] {
+  color: var(--color-text-primary);
+  background: var(--color-bg-modal);
+  border: 1px solid var(--color-border-default);
+  border-bottom-color: transparent;
+}
+
+.kanban-step-modal__body {
+  padding: 12px 16px 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: clamp(360px, 52vh, 580px);
+}
+
+.kanban-step-modal__markdown-root {
+  flex: 1 1 auto;
+  min-height: clamp(320px, 48vh, 540px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.kanban-step-modal__lazy-fallback {
+  padding: 20px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.kanban-step-modal__roles-actions {
+  margin-top: 10px;
+}

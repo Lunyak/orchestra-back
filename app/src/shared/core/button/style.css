@@ -2,12 +2,14 @@
     background: var(--color-button-primary);
     color: var(--color-text-primary);
     padding: var(--spacing-3) var(--spacing-5);
-    border-radius: var(--radius-sm);
+    /* border-radius: var(--radius-sm); */
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
     transition: var(--transition-normal);
     border: none;
     cursor: pointer;
+    font-weight: 700;
+    text-transform: uppercase;
 }
 
 .button.is-active {

@@ -18,6 +18,13 @@ export function parseLightChannel(rawValue: string) {
   };
 }
 
+/** Текст `markdown-speaker-label`: первая буква заглавная, остальные строчные. */
+export function formatSpeakerLabelDisplay(raw: string): string {
+  const t = String(raw ?? "").trim();
+  if (!t) return "…";
+  return t.charAt(0).toLocaleUpperCase("ru-RU") + t.slice(1).toLocaleLowerCase("ru-RU");
+}
+
 export function resolveLightColor(
   label: string,
   channelColor?: string | null,
@@ -110,7 +117,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
         }
         if (rawLabel != null) {
           const normalized = String(rawLabel).trim();
-          const text = normalized ? normalized.toUpperCase() : "…";
+          const text = formatSpeakerLabelDisplay(normalized);
           result.push(
             <span
               key={`${keyPrefix}-${counter}-lbl`}
@@ -233,7 +240,7 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
 
           if (rawLabel != null) {
             const normalized = String(rawLabel).trim();
-            const text = normalized ? normalized.toUpperCase() : "…";
+            const text = formatSpeakerLabelDisplay(normalized);
             out.push(
               hastSpan(["markdown-speaker-label"], [hastText(text)], { title: normalized }),
             );

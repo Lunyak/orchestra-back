@@ -1,0 +1,36 @@
+@import "../../styles/variables.css";
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-index-modal, 50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 3vw, 24px);
+  background: var(--color-bg-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.modal-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: min(920px, calc(100vw - 24px));
+  max-height: min(86vh, 900px);
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-bg-modal);
+  /* border: 1px solid var(--color-border-strong); */
+  box-shadow: var(--shadow-modal, 0 20px 60px rgba(0, 0, 0, 0.55));
+  color: var(--color-text-primary, inherit);
+}
+
+.modal-panel:focus {
+  outline: none;
+}
+
+.modal-panel:focus-visible {
+  outline: 2px solid var(--color-bg-tertiary);
+  outline-offset: 2px;
+}

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../features/auth";
+import { KanbanStepDetailModal } from "../../../features/kanban-step-modal/KanbanStepDetailModal";
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
 import type { ScriptStep } from "../../types/script";
@@ -11,19 +12,10 @@ import {
   type TroupeMemberItem,
 } from "../../../sync/api";
 import "./style.css";
-
-type KanbanStatus = NonNullable<ScriptStep["kanbanStatus"]>;
-
-const STATUSES: Array<{ id: KanbanStatus; label: string; hint: string }> = [
-  { id: "raw", label: "Сырая", hint: "черновик / в работе" },
-  { id: "text-learned", label: "Нужно взять", hint: "нужно взять, остальное — в процессе" },
-  { id: "almost-ready", label: "Репетируем", hint: "репетируем" },
-  { id: "ready", label: "Готова", hint: "можно играть" },
-];
-
-function statusOf(step: ScriptStep): KanbanStatus {
-  return (step.kanbanStatus ?? "raw") as KanbanStatus;
-}
+import { Button } from "@shared/core/button/Button";
+import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
+import { OptionalFilterSelect } from "@shared/core/optional-filter-select/OptionalFilterSelect";
+import { STATUSES, statusOf, type KanbanStatus } from "./kanban-constants";
 
 function orderOf(step: ScriptStep, fallback: number): number {
   const v = step.kanbanOrder;
@@ -510,9 +502,6 @@ export function KanbanBoardPage({
     <div className="kanban-page">
       <div className="kanban-header">
         <h2 className="kanban-title">Доска готовности</h2>
-        <p className="kanban-subtitle">
-          Перетаскивайте “сцены” (шаги) между колонками. В карточке видно роли и кто играет. Клик — подробности.
-        </p>
       </div>
 
       {rolesError && (
@@ -523,7 +512,6 @@ export function KanbanBoardPage({
 
       <div className="kanban-toolbar" aria-label="Фильтры доски">
         <label className="kanban-tool">
-          <span className="kanban-tool-label">Поиск</span>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -532,41 +520,46 @@ export function KanbanBoardPage({
         </label>
 
         <label className="kanban-tool">
-          <span className="kanban-tool-label">Роль</span>
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-            <option value="">Все</option>
+          <OptionalFilterSelect
+            value={roleFilter}
+            onChange={setRoleFilter}
+            placeholder="Роли"
+            aria-label="Фильтр по роли"
+          >
             {roleFilterOptions.map((r) => (
               <option key={r.key} value={r.key}>
                 {r.label}
               </option>
             ))}
-          </select>
+          </OptionalFilterSelect>
         </label>
 
         <label className="kanban-tool">
-          <span className="kanban-tool-label">Исполнитель</span>
-          <select value={actorFilter} onChange={(e) => setActorFilter(e.target.value)}>
-            <option value="">Все</option>
+          <OptionalFilterSelect
+            value={actorFilter}
+            onChange={setActorFilter}
+            placeholder="Актеры"
+            aria-label="Фильтр по актеру"
+          >
             {allActors.map((a) => (
               <option key={a} value={a}>
                 {formatActorList([a])}
               </option>
             ))}
-          </select>
+          </OptionalFilterSelect>
         </label>
 
-        <label className="kanban-tool kanban-tool-check">
-          <input
-            type="checkbox"
-            checked={onlyUnassigned}
-            onChange={(e) => setOnlyUnassigned(e.target.checked)}
-          />
-          <span>без назначений</span>
-        </label>
+        <LabeledCheckbox
+          className="kanban-tool kanban-tool-check"
+          checked={onlyUnassigned}
+          onChange={setOnlyUnassigned}
+        >
+          без назначений
+        </LabeledCheckbox>
 
-        <button
+        <Button
           type="button"
-          className="kanban-tool-reset"
+          className="primary kanban-btn-reset"
           onClick={() => {
             setQuery("");
             setRoleFilter("");
@@ -575,7 +568,7 @@ export function KanbanBoardPage({
           }}
         >
           Сбросить
-        </button>
+        </Button>
       </div>
 
       <div className="kanban-board" role="region" aria-label="Доска готовности сцен">
@@ -589,7 +582,7 @@ export function KanbanBoardPage({
               onDrop={(e) => onDropToColumn(e, st.id)}
               aria-label={st.label}
             >
-              <div className="kanban-col-head">
+              <div className="kanban-col-head" style={{ backgroundColor: st.headerBg }}>
                 <div className="kanban-col-title-row">
                   <h3 className="kanban-col-title">{st.label}</h3>
                   <span className="kanban-col-count">{col.length}</span>
@@ -674,110 +667,21 @@ export function KanbanBoardPage({
       </div>
 
       {openedStep && (
-        <div className="kanban-modal-backdrop" role="presentation" onClick={() => setOpenedStepId(null)}>
-          <div
-            className="kanban-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Сцена: ${openedStep.title}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="kanban-modal-head">
-              <div>
-                <div className="kanban-modal-title">{openedStep.title}</div>
-                <div className="kanban-modal-meta">Шаг #{openedStep.id}</div>
-              </div>
-              <button type="button" className="kanban-modal-close" onClick={() => setOpenedStepId(null)} aria-label="Закрыть">
-                ×
-              </button>
-            </div>
-
-            <div className="kanban-modal-body">
-              <label className="kanban-field">
-                <span className="kanban-field-label">Статус готовности</span>
-                <select value={statusOf(openedStep)} onChange={(e) => setStepStatus(openedStep.id, e.target.value as KanbanStatus)}>
-                  {STATUSES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="kanban-field">
-                <span className="kanban-field-label">Длительность (мин)</span>
-                <input
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={openedStep.durationMin ?? ""}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === "") {
-                      setStepDurationMin(openedStep.id, undefined);
-                      return;
-                    }
-                    const num = Number(raw);
-                    if (!Number.isFinite(num) || num < 0) return;
-                    setStepDurationMin(openedStep.id, num);
-                  }}
-                  placeholder="не указано"
-                />
-              </label>
-
-              <div className="kanban-section">
-                <div className="kanban-section-title">Роли и кто играет</div>
-                {rolesLoading && (
-                  <div className="kanban-muted" style={{ marginBottom: 8 }}>
-                    Загрузка ролей…
-                  </div>
-                )}
-                {openedRoles.length === 0 ? (
-                  <div className="kanban-muted">
-                    Роли не найдены. Вытаскиваем роли из <code>[[Роль]]</code> и пробуем распознать говорящего (например <code>ЛЕОН: ...</code>).
-                  </div>
-                ) : (
-                  <div className="kanban-roles-grid">
-                    {openedRoles.map((role) => (
-                      <label key={role} className="kanban-role-row">
-                        <span className="kanban-role-name">{displayRoleTitle(role)}</span>
-                        <div className="kanban-role-input-wrap">
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {getRoleActors(openedStep, role).length > 0 ? (
-                              getRoleActors(openedStep, role).map((a) => (
-                                <span key={`${role}:${a}`} className="kanban-chip">
-                                  {formatActorList([a])}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="kanban-muted">—</span>
-                            )}
-                          </div>
-                          {resolveRoleInfo(role) == null && (
-                            <div className="kanban-role-hint warn">
-                              Роль не заведена в проекте. Создай её в разделе «Роли», чтобы назначать актёров.
-                            </div>
-                          )}
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                )}
-                <div style={{ marginTop: 10 }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => navigate("/roles")}
-                    disabled={!accessToken || !projectName}
-                    title={!accessToken ? "Нужно войти" : !projectName ? "Нужен проект" : undefined}
-                  >
-                    Открыть «Роли»
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <KanbanStepDetailModal
+          step={openedStep}
+          onClose={() => setOpenedStepId(null)}
+          setStepStatus={setStepStatus}
+          setStepDurationMin={setStepDurationMin}
+          rolesLoading={rolesLoading}
+          openedRoles={openedRoles}
+          getRoleActors={getRoleActors}
+          displayRoleTitle={displayRoleTitle}
+          resolveRoleInfo={resolveRoleInfo}
+          formatActorList={formatActorList}
+          navigate={navigate}
+          accessToken={accessToken}
+          projectName={projectName}
+        />
       )}
     </div>
   );
