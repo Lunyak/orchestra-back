@@ -7,10 +7,41 @@
 
 .troupe-view {
   max-width: 1200px;
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.troupe-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  opacity: 0.85;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.troupe-hint--after-form {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
+.troupe-invite-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  line-height: 1.25;
+}
+
+.troupe-invite-card__title-mobile {
+  display: none;
+}
+
+.troupe-legend-mobile {
+  display: none;
 }
 
 .troupe-header {
@@ -83,8 +114,13 @@
 }
 
 .troupe-grid {
+  --troupe-label-w: 240px;
+  --troupe-day-w: 28px;
+  --troupe-actor-text-max: 180px;
+  --troupe-actor-gap: 10px;
+
   display: grid;
-  min-width: 860px;
+  min-width: max-content;
 }
 
 .troupe-cell {
@@ -191,7 +227,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: var(--troupe-actor-text-max, 180px);
 }
 
 .troupe-actor-email {
@@ -201,7 +237,72 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: var(--troupe-actor-text-max, 180px);
+}
+
+.troupe-actor-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--troupe-actor-gap, 10px);
+}
+
+.troupe-scale-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.troupe-scale-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.troupe-month-nav {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.troupe-form-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.troupe-form-row__btn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.troupe-form-row__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.troupe-schedule-scroll-hint {
+  display: none;
+  margin: 0;
+}
+
+.troupe-calendar-hint {
+  font-size: 12px;
+  opacity: 0.75;
+  margin: 10px 0 0;
+}
+
+.troupe-calendar-hint--mobile {
+  display: none;
 }
 
 .troupe-day-cell {
@@ -252,5 +353,249 @@
 
 .troupe-mini-btn.danger {
   border-color: rgba(248, 81, 73, 0.35);
+}
+
+@media (max-width: 720px) {
+  .troupe-schedule-card {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .troupe-schedule-card .troupe-scale-head {
+    order: 10;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .troupe-layout .main-content {
+    padding: 12px;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+  }
+
+  .troupe-view {
+    gap: 12px;
+  }
+
+  .troupe-card {
+    padding: 10px;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .troupe-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 12px;
+    row-gap: 6px;
+    width: 100%;
+  }
+
+  .troupe-legend-desktop {
+    display: none;
+  }
+
+  .troupe-legend-mobile {
+    display: inline;
+  }
+
+  .troupe-view .troupe-form-row,
+  .troupe-view .troupe-actions-right {
+    min-width: 0;
+  }
+
+  .troupe-view .troupe-form-row .button,
+  .troupe-view .troupe-actions-right .button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-transform: none;
+    font-size: 13px;
+    line-height: 1.25;
+    padding: 10px 12px;
+    min-height: 44px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .troupe-view .troupe-form-row .button {
+    letter-spacing: 0.02em;
+  }
+
+  .troupe-grid {
+    --troupe-label-w: 148px;
+    --troupe-day-w: 21px;
+    --troupe-actor-text-max: 112px;
+    --troupe-actor-gap: 6px;
+  }
+
+  .troupe-actor-cell .mini-avatar {
+    width: 18px !important;
+    height: 18px !important;
+  }
+
+  .troupe-schedule {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .troupe-schedule-scroll-hint {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 11px;
+    line-height: 1.35;
+    opacity: 0.82;
+  }
+
+  .troupe-scale-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-scale-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-month-nav {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .troupe-month-nav button {
+    min-width: 44px;
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .troupe-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-actions-right {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-actions-right .troupe-project-select {
+    max-width: none;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .troupe-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-form-row .settings-invite-input {
+    max-width: none !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .troupe-invite-card {
+    padding: 8px 10px;
+  }
+
+  .troupe-invite-card__title {
+    margin-bottom: 6px;
+  }
+
+  .troupe-invite-card__title-desktop {
+    display: none;
+  }
+
+  .troupe-invite-card__title-mobile {
+    display: block;
+    font-size: 12px;
+  }
+
+  .troupe-form-row--invite-email {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .troupe-invite-card .troupe-form-row--invite-email .settings-invite-input {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 7px 10px;
+    font-size: 15px;
+    line-height: 1.25;
+    box-sizing: border-box;
+  }
+
+  .troupe-invite-card__submit {
+    flex: 0 0 auto;
+    width: auto !important;
+    max-width: none !important;
+    min-width: 88px;
+    min-height: 40px;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: none;
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+  }
+
+  .troupe-invite-card__hint {
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 1.35;
+    opacity: 0.78;
+  }
+
+  .troupe-grid > .troupe-header-cell:not(.troupe-sticky) {
+    padding: 2px 3px;
+  }
+
+  .troupe-grid > .troupe-header-cell:not(.troupe-sticky) > div:first-child {
+    font-size: 10px !important;
+    line-height: 12px !important;
+  }
+
+  .troupe-grid > .troupe-header-cell:not(.troupe-sticky) > div:last-child {
+    font-size: 9px !important;
+    line-height: 10px !important;
+  }
+
+  .troupe-actor-cell {
+    min-height: 36px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .troupe-day-cell {
+    min-height: 20px;
+  }
+
+  .troupe-calendar-hint--desktop {
+    display: none;
+  }
+
+  .troupe-calendar-hint--mobile {
+    display: block;
+  }
 }
 

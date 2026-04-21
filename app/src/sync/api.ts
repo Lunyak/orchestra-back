@@ -491,7 +491,7 @@ export interface TroupeMemberItem {
 
 export async function getMyTroupe(
   accessToken: string,
-): Promise<{ troupe: TroupeSummary; members: TroupeMemberItem[] }> {
+): Promise<{ troupe: TroupeSummary | null; members: TroupeMemberItem[] }> {
   const { data } = await api.get("/troupe", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -517,6 +517,73 @@ export async function removeTroupeMember(
   await api.delete(`/troupe/members/${encodeURIComponent(memberId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+}
+
+export async function patchMyTroupeTitle(
+  accessToken: string,
+  title: string,
+): Promise<TroupeSummary> {
+  const { data } = await api.patch<TroupeSummary>(
+    "/troupe",
+    { title: title.trim() },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export type ChatConversationKind = "TROUPE";
+
+export interface ChatConversationItem {
+  id: string;
+  kind: ChatConversationKind;
+  troupeId: string | null;
+  title: string;
+}
+
+export interface ChatMessageItem {
+  id: string;
+  conversationId: string;
+  authorUserId: string;
+  authorEmail: string;
+  body: string;
+  clientMessageId: string | null;
+  createdAt: string;
+}
+
+export async function fetchChatConversations(): Promise<ChatConversationItem[]> {
+  const { data } = await api.get<ChatConversationItem[]>("/chat/conversations");
+  return data ?? [];
+}
+
+export async function fetchChatMessages(
+  conversationId: string,
+  params?: { beforeMessageId?: string; limit?: number },
+): Promise<{ messages: ChatMessageItem[]; nextBeforeMessageId: string | null }> {
+  const { data } = await api.get<{
+    messages: ChatMessageItem[];
+    nextBeforeMessageId: string | null;
+  }>(`/chat/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    params: {
+      beforeMessageId: params?.beforeMessageId,
+      limit: params?.limit,
+    },
+  });
+  return {
+    messages: data?.messages ?? [],
+    nextBeforeMessageId: data?.nextBeforeMessageId ?? null,
+  };
+}
+
+export async function postChatMessage(
+  conversationId: string,
+  body: string,
+  clientMessageId?: string,
+): Promise<ChatMessageItem> {
+  const { data } = await api.post<ChatMessageItem>(
+    `/chat/conversations/${encodeURIComponent(conversationId)}/messages`,
+    { body, clientMessageId },
+  );
+  return data;
 }
 
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {

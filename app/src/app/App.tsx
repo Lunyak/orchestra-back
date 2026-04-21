@@ -11,6 +11,7 @@ import { AppRoutes } from "./router/AppRoutes";
 import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
 import { Route, Routes } from "react-router-dom";
+import { ChatDock } from "../features/chat";
 
 export interface AppProps {
   /** После логина/регистрации (только desktop — выгрузка локальных данных). */
@@ -41,7 +42,10 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
     <ProjectProvider>
       <SceneProvider>
         <ScriptUIProvider>
-          <AppRoutes />
+          <>
+            <AppRoutes />
+            <ChatDock />
+          </>
         </ScriptUIProvider>
       </SceneProvider>
     </ProjectProvider>

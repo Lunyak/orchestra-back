@@ -1,18 +1,18 @@
 import { Button } from "@shared/core/button/Button";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useProject } from "../../features/project";
 import {
   fetchMyTroupe,
   troupeAddMember,
   troupeInviteMemberToProject,
+  troupePatchTitle,
   troupeRemoveMember,
 } from "../../features/troupe/model/troupe-slice";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import "./style.css";
-import { div } from "three/tsl";
 
 dayjs.locale("ru");
 
@@ -41,6 +41,21 @@ function memberLabel(m: {
   return m.email;
 }
 
+const TROUPE_NARROW_MQ = "(max-width: 720px)";
+
+function useTroupeNarrowLayout(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window === "undefined") return () => {};
+      const mq = window.matchMedia(TROUPE_NARROW_MQ);
+      mq.addEventListener("change", onChange);
+      return () => mq.removeEventListener("change", onChange);
+    },
+    () => (typeof window !== "undefined" ? window.matchMedia(TROUPE_NARROW_MQ).matches : false),
+    () => false,
+  );
+}
+
 export function TroupePage() {
   const dispatch = useAppDispatch();
   const { projectName, projects } = useProject();
@@ -54,7 +69,10 @@ export function TroupePage() {
   const removingIds = useAppSelector((s) => s.troupe.removingIds);
   const invitingIds = useAppSelector((s) => s.troupe.invitingIds);
   const inviteErrorByMemberId = useAppSelector((s) => s.troupe.inviteErrorByMemberId);
+  const patchingTitle = useAppSelector((s) => s.troupe.patchingTitle);
+  const patchTitleError = useAppSelector((s) => s.troupe.patchTitleError);
 
+  const [titleDraft, setTitleDraft] = useState("");
   const [email, setEmail] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const inviteProjectStorageKey = "troupe-invite-project";
@@ -74,10 +92,16 @@ export function TroupePage() {
     return new Date();
   });
 
+  const narrowLayout = useTroupeNarrowLayout();
+
   useEffect(() => {
     if (!accessToken) return;
     dispatch(fetchMyTroupe());
   }, [accessToken, dispatch]);
+
+  useEffect(() => {
+    if (troupe?.title != null) setTitleDraft(troupe.title);
+  }, [troupe?.id, troupe?.title]);
 
   useEffect(() => {
     try {
@@ -94,10 +118,10 @@ export function TroupePage() {
     return Array.from({ length: n }, (_v, i) => start.add(i, "day").toDate());
   }, [currentMonth]);
 
-  const gridTemplateColumns = useMemo(() => {
-    // 240px for actor label + fixed day cell widths
-    return `240px repeat(${days.length}, 28px)`;
-  }, [days.length]);
+  const gridTemplateColumns = useMemo(
+    () => `var(--troupe-label-w, 240px) repeat(${days.length}, var(--troupe-day-w, 28px))`,
+    [days.length],
+  );
 
   const availableProjects = useMemo(() => (Array.isArray(projects) ? projects : []).filter(Boolean), [projects]);
   useEffect(() => {
@@ -144,17 +168,66 @@ export function TroupePage() {
             </div>
 
             <div className="troupe-card">
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Добавить в труппу по email</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Название труппы</div>
+              {!loading && !troupe ? (
+                <p className="troupe-hint">
+                  Своей труппы пока нет — запись и чат появятся после того, как вы добавите первого участника по
+                  email в блоке ниже. Чаты трупп, куда вас пригласили другие, доступны сразу.
+                </p>
+              ) : (
+                <p className="troupe-hint">
+                  Так же подписывается чат труппы в панели справа.
+                </p>
+              )}
+              <div className="troupe-form-row">
+                <input
+                  className="settings-invite-input"
+                  style={{ flex: "1 1 220px", minWidth: 180 }}
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  placeholder="Например, Студия «Гоголь-центр»"
+                  maxLength={120}
+                  disabled={loading || !troupe}
+                  aria-label="Название труппы"
+                />
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={
+                    patchingTitle ||
+                    !troupe ||
+                    !titleDraft.trim() ||
+                    titleDraft.trim() === (troupe?.title ?? "").trim()
+                  }
+                  onClick={() => void dispatch(troupePatchTitle({ title: titleDraft }))}
+                >
+                  {patchingTitle ? "Сохранение…" : "Сохранить"}
+                </Button>
+              </div>
+              {patchTitleError ? <div className="troupe-error">{patchTitleError}</div> : null}
+            </div>
+
+            <div className="troupe-card troupe-invite-card">
+              <div className="troupe-invite-card__title">
+                <span className="troupe-invite-card__title-desktop">Добавить в труппу по email</span>
+                <span className="troupe-invite-card__title-mobile">Пригласить по email</span>
+              </div>
+              <div className="troupe-form-row troupe-form-row--invite-email">
                 <input
                   className="settings-invite-input"
                   placeholder="actor@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   style={{ maxWidth: 360 }}
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                 />
                 <button
                   type="button"
+                  className="troupe-form-row__btn troupe-invite-card__submit"
                   disabled={adding || !email.trim()}
                   onClick={async () => {
                     const value = email.trim();
@@ -168,38 +241,42 @@ export function TroupePage() {
               </div>
               {addError ? <div className="troupe-error">{addError}</div> : null}
               {error ? <div className="troupe-error">{error}</div> : null}
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
+              <p className="troupe-hint troupe-hint--after-form troupe-invite-card__hint">
                 Занятость берётся из профиля актёра: календарь (свободен/занят) + при желании интервалы времени.
-              </div>
+              </p>
             </div>
 
-            <div className="troupe-card">
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div>
+            <div className="troupe-card troupe-schedule-card">
+              <div className="troupe-scale-head">
+                <div className="troupe-scale-head__titleblock">
                   <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Шкала занятости</div>
                   <div style={{ fontSize: 12, opacity: 0.75 }}>
                     Месяц: <b>{monthKey(currentMonth)}</b>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentMonth(dayjs(currentMonth).subtract(1, "month").toDate())}
-                  >
-                    ←
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCurrentMonth(dayjs(currentMonth).add(1, "month").toDate())}
-                  >
-                    →
-                  </button>
+                <div className="troupe-scale-toolbar">
+                  <div className="troupe-month-nav">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentMonth(dayjs(currentMonth).subtract(1, "month").toDate())}
+                    >
+                      ←
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentMonth(dayjs(currentMonth).add(1, "month").toDate())}
+                    >
+                      →
+                    </button>
+                  </div>
                   <div className="troupe-legend">
                     <span className="troupe-legend-item">
                       <span className="troupe-dot free" /> свободен
                     </span>
                     <span className="troupe-legend-item">
-                      <span className="troupe-dot partial" /> свободен (время)
+                      <span className="troupe-dot partial" />
+                      <span className="troupe-legend-desktop">свободен (время)</span>
+                      <span className="troupe-legend-mobile">по времени</span>
                     </span>
                     <span className="troupe-legend-item">
                       <span className="troupe-dot busy" /> занят
@@ -263,7 +340,11 @@ export function TroupePage() {
                           : "Выбери участника"
                       }
                     >
-                      {selectedMember && invitingIds[selectedMember.id] ? "…" : `Добавить в проект`}
+                      {selectedMember && invitingIds[selectedMember.id]
+                        ? "…"
+                        : narrowLayout
+                          ? "В проект"
+                          : "Добавить в проект"}
                     </Button>
                   ) : null}
                   <Button
@@ -277,7 +358,11 @@ export function TroupePage() {
                     }}
                     title={selectedMember ? "Удалить из труппы" : "Сначала выбери участника в таблице"}
                   >
-                    {selectedMember && removingIds[selectedMember.id] ? "…" : "Удалить из труппы"}
+                    {selectedMember && removingIds[selectedMember.id]
+                      ? "…"
+                      : narrowLayout
+                        ? "Удалить"
+                        : "Удалить из труппы"}
                   </Button>
                   <Button
                     type="button"
@@ -286,13 +371,17 @@ export function TroupePage() {
                     onClick={() => setSelectedMemberId(null)}
                     title="Снять выделение"
                   >
-                    Снять выделение
+                    {narrowLayout ? "Сбросить" : "Снять выделение"}
                   </Button>
                 </div>
               </div>
               {selectedMember && inviteErrorByMemberId[selectedMember.id] ? (
                 <div className="troupe-error">{inviteErrorByMemberId[selectedMember.id]}</div>
               ) : null}
+
+              <p className="troupe-schedule-scroll-hint">
+                Листайте таблицу вправо, чтобы увидеть все дни месяца.
+              </p>
 
               <div className="troupe-schedule" role="region" aria-label="График занятости труппы">
                 <div className="troupe-grid" style={{ gridTemplateColumns }}>
@@ -333,7 +422,7 @@ export function TroupePage() {
                             }}
                             title={isSelected ? "Снять выделение" : "Выбрать"}
                           >
-                            <div style={{ minWidth: 0, display: "flex", gap: 10, alignItems: "center" }}>
+                            <div className="troupe-actor-row">
                               <MiniAvatar
                                 src={String(m.profile?.avatarUrl ?? "").trim() || null}
                                 label={label || m.email}
@@ -388,14 +477,17 @@ export function TroupePage() {
                   )}
                 </div>
               </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
+              <p className="troupe-calendar-hint troupe-calendar-hint--desktop">
                 Подсказка: наведите на день, чтобы увидеть детали (занят / свободен / интервалы).
-              </div>
+              </p>
+              <p className="troupe-calendar-hint troupe-calendar-hint--mobile">
+                Подсказка: удерживайте палец на ячейке дня, чтобы увидеть подсказку с деталями.
+              </p>
             </div>
           </div>
         </main>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }
 
