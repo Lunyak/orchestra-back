@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -102,6 +103,52 @@ export class ChatService {
     });
   }
 
+  async listAccessibleConversationIds(
+    userId: string,
+    userEmail: string,
+  ): Promise<string[]> {
+    const troupeIds = await this.resolveAccessibleTroupeIds(userId, userEmail);
+    const ids: string[] = [];
+    for (const troupeId of troupeIds) {
+      const conv = await this.getOrCreateTroupeConversation(troupeId);
+      ids.push(conv.id);
+    }
+    return ids;
+  }
+
+  private async ensureReadBaseline(userId: string, conversationId: string) {
+    const existing = await this.prisma.chatConversationReadState.findUnique({
+      where: {
+        userId_conversationId: { userId, conversationId },
+      },
+    });
+    if (existing) return;
+
+    const latest = await this.prisma.chatMessage.findFirst({
+      where: { conversationId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      select: { createdAt: true },
+    });
+    const baseline = latest?.createdAt ?? new Date();
+    await this.prisma.chatConversationReadState.create({
+      data: { userId, conversationId, lastReadAt: baseline },
+    });
+  }
+
+  private async countUnread(userId: string, conversationId: string) {
+    const state = await this.prisma.chatConversationReadState.findUnique({
+      where: { userId_conversationId: { userId, conversationId } },
+    });
+    if (!state) return 0;
+    return this.prisma.chatMessage.count({
+      where: {
+        conversationId,
+        authorUserId: { not: userId },
+        createdAt: { gt: state.lastReadAt },
+      },
+    });
+  }
+
   async listConversations(userId: string, userEmail: string) {
     const troupeIds = await this.resolveAccessibleTroupeIds(userId, userEmail);
     if (!troupeIds.length) return [];
@@ -117,20 +164,66 @@ export class ChatService {
       kind: ChatConversationKind;
       troupeId: string | null;
       title: string;
+      unreadCount: number;
     }> = [];
 
     for (const troupeId of troupeIds) {
       const conv = await this.getOrCreateTroupeConversation(troupeId);
       const troupeTitle = titleById.get(troupeId) ?? 'Труппа';
+      await this.ensureReadBaseline(userId, conv.id);
+      const unreadCount = await this.countUnread(userId, conv.id);
       out.push({
         id: conv.id,
         kind: conv.kind,
         troupeId: conv.troupeId,
         title: troupeTitle,
+        unreadCount,
       });
     }
 
     return out;
+  }
+
+  async markConversationRead(
+    userId: string,
+    userEmail: string,
+    conversationId: string,
+    lastSeenMessageId?: string,
+  ) {
+    await this.assertConversationAccess(userId, userEmail, conversationId);
+
+    let readAt: Date;
+    if (lastSeenMessageId) {
+      const msg = await this.prisma.chatMessage.findFirst({
+        where: { id: lastSeenMessageId, conversationId },
+        select: { createdAt: true },
+      });
+      if (!msg) {
+        throw new BadRequestException('Сообщение не найдено в этом чате');
+      }
+      readAt = msg.createdAt;
+    } else {
+      const latest = await this.prisma.chatMessage.findFirst({
+        where: { conversationId },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: { createdAt: true },
+      });
+      readAt = latest?.createdAt ?? new Date();
+    }
+
+    const existing = await this.prisma.chatConversationReadState.findUnique({
+      where: { userId_conversationId: { userId, conversationId } },
+    });
+    const prevMs = existing?.lastReadAt?.getTime() ?? 0;
+    const next = new Date(Math.max(prevMs, readAt.getTime()));
+
+    await this.prisma.chatConversationReadState.upsert({
+      where: { userId_conversationId: { userId, conversationId } },
+      create: { userId, conversationId, lastReadAt: next },
+      update: { lastReadAt: next },
+    });
+
+    return { unreadCount: await this.countUnread(userId, conversationId) };
   }
 
   async assertConversationAccess(
@@ -154,7 +247,7 @@ export class ChatService {
     userId: string,
     userEmail: string,
     conversationId: string,
-    limit = 50,
+    limit = 20,
     beforeMessageId?: string,
   ) {
     await this.assertConversationAccess(userId, userEmail, conversationId);

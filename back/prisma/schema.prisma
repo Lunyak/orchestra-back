@@ -31,6 +31,7 @@ model User {
   troupeOwned        Troupe?
   passwordResetTokens PasswordResetToken[]
   chatMessages       ChatMessage[]
+  chatReadStates     ChatConversationReadState[]
 }
 
 model PasswordResetToken {
@@ -659,9 +660,25 @@ model ChatConversation {
 
   troupe   Troupe?       @relation(fields: [troupeId], references: [id], onDelete: Cascade)
   messages ChatMessage[]
+  readStates ChatConversationReadState[]
 
   @@unique([troupeId, kind])
   @@index([troupeId])
+}
+
+/// До какого момента пользователь «дочитал» чат (для непрочитанных).
+model ChatConversationReadState {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String
+  lastReadAt     DateTime
+
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation ChatConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+  @@index([userId])
+  @@index([conversationId])
 }
 
 model ChatMessage {

@@ -33,7 +33,7 @@ export class ChatGateway implements OnGatewayConnection {
     private readonly chatService: ChatService,
   ) {}
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     const raw =
       (client.handshake.auth as { token?: string } | undefined)?.token ??
       this.extractBearer(
@@ -59,6 +59,15 @@ export class ChatGateway implements OnGatewayConnection {
       );
       (client.data as SocketData).userId = payload.sub;
       (client.data as SocketData).userEmail = payload.email;
+
+      const ids = await this.chatService.listAccessibleConversationIds(
+        payload.sub,
+        payload.email,
+      );
+      for (const conversationId of ids) {
+        const room = this.chatService.roomForConversation(conversationId);
+        await client.join(room);
+      }
     } catch (e) {
       this.logger.warn(`chat jwt failed: ${String(e)}`);
       client.disconnect();
