@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { Button } from "@shared/core/button/Button";
 import { CalendarSection } from "../../../shared/components/calendar/CalendarSection";
 import { useAuth } from "../../../features/auth";
@@ -18,11 +17,13 @@ import {
 import {
   loadSessionsForRangeThunk,
   profileAvailabilityActions,
+  profileAvailabilityCacheKey,
   selectAvailabilityFlags,
   selectAvailabilitySessionsForActiveRange,
   selectProfileCalendarState,
 } from "../../../features/profile/model/profileAvailabilitySlice";
 import type { DirectorSession } from "../../../sync/api";
+import { DirectorSessionDetailModal } from "../../../features/director-session-detail/DirectorSessionDetailModal";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");
@@ -52,13 +53,20 @@ export function ProfileAvailabilityTab() {
   const autoSaveBaselineRef = useRef<string | null>(null);
   const autoSaveTimerRef = useRef<number | null>(null);
 
+  const selectedDate = calendarState.selectedDate;
+  const [dayPanelOpen, setDayPanelOpen] = useState(false);
+  const dayPanelRef = useRef<HTMLDivElement | null>(null);
+  const [sessionDetailModalId, setSessionDetailModalId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!accessToken) return;
     dispatch(fetchMyProfileThunk({ accessToken }));
   }, [accessToken, dispatch]);
 
+  /** Сессии: свои (режиссёр) + приглашения (GET /director-sessions/invitations) — после развёртывания дня или модалки. */
   useEffect(() => {
     if (!accessToken) return;
+    if (!dayPanelOpen && !sessionDetailModalId) return;
     dispatch(profileAvailabilityActions.clearAvailabilityError());
     dispatch(
       loadSessionsForRangeThunk({
@@ -69,10 +77,17 @@ export function ProfileAvailabilityTab() {
     );
     dispatch(
       profileAvailabilityActions.setActiveRangeKey({
-        value: [calendarState.fromIso, calendarState.toIso].join("|"),
+        value: profileAvailabilityCacheKey(calendarState.fromIso, calendarState.toIso),
       }),
     );
-  }, [accessToken, calendarState.fromIso, calendarState.toIso, dispatch]);
+  }, [
+    accessToken,
+    calendarState.fromIso,
+    calendarState.toIso,
+    dayPanelOpen,
+    sessionDetailModalId,
+    dispatch,
+  ]);
 
   const availabilityCalendar = useMemo(
     () => (((form as any).availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>),
@@ -85,7 +100,7 @@ export function ProfileAvailabilityTab() {
   );
 
   const availabilitySignature = useMemo(() => {
-    // Only the fields used by rehearsal planning / troupe availability.
+    // Only the fields used by session scheduling / troupe availability.
     return JSON.stringify({
       availabilityCalendar,
       availabilityTimeRanges,
@@ -144,38 +159,26 @@ export function ProfileAvailabilityTab() {
   }, [sessions]);
 
   const selectedDaySessionsAll = sessionsByDate.get(calendarState.selectedDate) ?? [];
-  const isMyPlannedSession = useCallback(
-    (s: DirectorSession) => {
-      const email = normalizeEmail(profile?.email);
-      if (!email) return false;
-      const planned = Array.isArray((s as any)?.plannedEmails) ? ((s as any).plannedEmails as any[]) : [];
-      if (planned.some((e) => normalizeEmail(e) === email)) return true;
-      return (s.participants ?? []).some((p) => normalizeEmail(p.email) === email);
-    },
-    [profile?.email],
-  );
-  const selectedDaySessionsMy = useMemo(() => {
-    return selectedDaySessionsAll.filter(isMyPlannedSession);
-  }, [isMyPlannedSession, selectedDaySessionsAll]);
-
-  const myMonthSessions = useMemo(() => {
+  /** Все сессии из GET /director-sessions — проект текущего пользователя (режиссёр); показываем в календаре целиком. */
+  const directorMonthSessions = useMemo(() => {
     return (sessions ?? [])
-      .filter(isMyPlannedSession)
       .slice()
       .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
-  }, [isMyPlannedSession, sessions]);
+  }, [sessions]);
 
   const dotsByDate = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const s of myMonthSessions) {
+    for (const s of directorMonthSessions) {
       const date = isoDate(new Date(s.startsAt));
       out[date] = (out[date] ?? 0) + 1;
     }
     return out;
-  }, [myMonthSessions]);
+  }, [directorMonthSessions]);
 
-  const selectedDate = calendarState.selectedDate;
-  const [dayPanelOpen, setDayPanelOpen] = useState(false);
+  useEffect(() => {
+    if (!dayPanelOpen) return;
+    dayPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedDate, dayPanelOpen]);
   const selectedStatus = (availabilityCalendar[selectedDate] ?? null) as AvailabilityStatus | null;
   const selectedRanges = availabilityTimeRanges[selectedDate] ?? [];
 
@@ -199,8 +202,8 @@ export function ProfileAvailabilityTab() {
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", marginBottom: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>Календарь занятости</div>
+      <div className="profile-availability-head">
+        <div className="profile-availability-title">Календарь занятости</div>
         {profileFlags.saving ? (
           <div style={{ fontSize: 12, opacity: 0.75 }}>Автосохранение…</div>
         ) : profileFlags.error ? (
@@ -211,7 +214,18 @@ export function ProfileAvailabilityTab() {
           <div style={{ color: "#7ee787", fontSize: 12 }}>{profileFlags.ok}</div>
         ) : null}
       </div>
-      <p style={{ margin: "0 0 10px", opacity: 0.75, fontSize: 12 }}>Клик по дню — редактировать статус и время.</p>
+
+      <div className="profile-availability-intro">
+        <strong>Как отметить занятость</strong>
+        <ol>
+          <li>Выберите день в сетке календаря ниже (активный день подсвечен).</li>
+          <li>В блоке «День» укажите статус: «Занят» — весь день недоступен, «Свободен» — доступны сессии.</li>
+          <li>
+            Чтобы ограничить <strong>часы</strong>, когда вы на сессии: статус «Свободен», затем кнопка «+ Добавить
+            диапазон» и поля времени «с — по». Если диапазонов нет, считается, что свободны весь день.
+          </li>
+        </ol>
+      </div>
 
       <CalendarSection
         storageMonthKey="profile-calendar-month"
@@ -229,36 +243,33 @@ export function ProfileAvailabilityTab() {
       ) : null}
 
       <div style={{ marginTop: 10 }}>
-        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>
-            Выбранная дата: <span style={{ fontWeight: 700 }}>{selectedDate}</span>
+        <div className="profile-availability-toolbar">
+          <div className="profile-availability-date-line">
+            Выбранный день в календаре: <b>{selectedDate}</b> ({dayjs(selectedDate).format("D MMMM YYYY")})
           </div>
-          <Button
-            className="secondary"
-            type="button"
-            onClick={() => setDayPanelOpen((v) => !v)}
-          >
-            {dayPanelOpen ? "Скрыть детали дня" : "Показать детали дня"}
+          <Button className="secondary" type="button" onClick={() => setDayPanelOpen((v) => !v)}>
+            {dayPanelOpen ? "Свернуть блок дня" : "Развернуть блок дня"}
           </Button>
         </div>
+        {!dayPanelOpen && !sessionDetailModalId ? (
+          <div className="profile-availability-hint" style={{ marginTop: 6 }}>
+            Список сессий не запрашивается, пока вы не развернёте блок дня, не выберете день в календаре или не
+            откроете карточку сессии. Сюда попадают ваши сессии как у режиссёра и{" "}
+            <strong>опубликованные</strong> сессии, куда вас вызвал другой пользователь (ваш email в плане вызова
+            или в списке участников). Это не значит, что вы режиссёр — просто вы приглашены в чужую карточку
+            сессии.
+          </div>
+        ) : null}
 
         {dayPanelOpen && (
-          <div
-            style={{
-              marginTop: 8,
-              borderRadius: 14,
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(255,255,255,0.04)",
-              padding: 12,
-            }}
-          >
-            <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 8 }}>
-              {dayjs(selectedDate).format("D MMMM YYYY")} · занятость
+          <div ref={dayPanelRef} className="profile-availability-panel">
+            <div className="profile-availability-panel-title">
+              {dayjs(selectedDate).format("D MMMM YYYY")} — занятость
             </div>
 
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Статус дня</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="profile-availability-section-label">Статус дня</div>
+              <div className="profile-availability-status-row">
                 <Button
                   className={selectedStatus == null ? "is-active" : "secondary"}
                   type="button"
@@ -285,21 +296,28 @@ export function ProfileAvailabilityTab() {
                   Занят
                 </Button>
               </div>
-              <div style={{ marginTop: 6, fontSize: 12, opacity: 0.7 }}>
-                Диапазоны времени учитываются при планировании слотов сессии. Время локальное.
+              <div className="profile-availability-hint">
+                Диапазоны времени учитываются при планировании слотов сессии. Время указано в вашем локальном часовом
+                поясе.
               </div>
             </div>
 
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Время, когда можешь быть на репетиции</div>
+            <div className="profile-availability-time-block">
+              <div className="profile-availability-section-label">Окна доступности для сессий</div>
               {selectedStatus !== "present" ? (
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Доступно только если день отмечен как «Свободен».</div>
+                <div className="profile-availability-hint">
+                  Поля времени появляются после выбора «Свободен»: так вы задаёте один или несколько интервалов
+                  доступности в этот день. Если весь день занят — выберите «Занят».
+                </div>
               ) : selectedRanges.length === 0 ? (
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Не задано (значит можно весь день).</div>
+                <div className="profile-availability-hint">
+                  Интервалы не заданы — вы считаетесь доступным весь этот день. Нажмите «+ Добавить диапазон», если
+                  свободны только часть дня.
+                </div>
               ) : (
-                <div style={{ display: "grid", gap: 6 }}>
+                <div className="profile-availability-time-ranges">
                   {selectedRanges.map((r, idx) => (
-                    <div key={`${selectedDate}:${idx}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div key={`${selectedDate}:${idx}`} className="profile-availability-time-row">
                       <input
                         className="settings-invite-input"
                         type="time"
@@ -311,7 +329,7 @@ export function ProfileAvailabilityTab() {
                         }}
                         style={{ maxWidth: 140 }}
                       />
-                      <div style={{ opacity: 0.7, fontSize: 12 }}>—</div>
+                      <div className="profile-availability-time-sep">—</div>
                       <input
                         className="settings-invite-input"
                         type="time"
@@ -340,7 +358,7 @@ export function ProfileAvailabilityTab() {
               )}
 
               {selectedStatus === "present" && (
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <div className="profile-availability-time-actions">
                   <Button
                     className="primary"
                     type="button"
@@ -364,27 +382,23 @@ export function ProfileAvailabilityTab() {
               )}
             </div>
 
-            <div style={{ marginTop: 14, fontSize: 12, opacity: 0.8 }}>Мои сессии на {selectedDate}:</div>
-            <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-              {selectedDaySessionsMy.length === 0 ? (
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Нет сессий в этот день.</div>
+            <div className="profile-availability-sessions-title">Режиссёрские сессии на {selectedDate}:</div>
+            <div className="profile-availability-sessions">
+              {selectedDaySessionsAll.length === 0 ? (
+                <div className="profile-availability-hint">Нет сессий в этот день.</div>
               ) : (
-                selectedDaySessionsMy.map((s) => (
-                  <Link
+                selectedDaySessionsAll.map((s) => (
+                  <button
                     key={s.id}
-                    to={`/sessions/${encodeURIComponent(s.id)}`}
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: 10,
-                      padding: "8px 10px",
-                      background: "rgba(0,0,0,0.10)",
-                      textDecoration: "none",
-                      color: "inherit",
-                    }}
+                    type="button"
+                    className="profile-availability-session-link"
+                    onClick={() => setSessionDetailModalId(s.id)}
                   >
-                    <div style={{ fontSize: 12, fontWeight: 700 }}>{s.title}</div>
-                    <div style={{ fontSize: 11, opacity: 0.75 }}>{new Date(s.startsAt).toLocaleString("ru-RU")}</div>
-                  </Link>
+                    <div className="profile-availability-session-title">{s.title}</div>
+                    <div className="profile-availability-session-meta">
+                      {new Date(s.startsAt).toLocaleString("ru-RU")}
+                    </div>
+                  </button>
                 ))
               )}
             </div>
@@ -392,32 +406,33 @@ export function ProfileAvailabilityTab() {
         )}
       </div>
 
-      <div style={{ marginTop: 12, fontSize: 12, opacity: 0.8 }}>Мои сессии в этом месяце:</div>
-      <div style={{ marginTop: 6, display: "grid", gap: 6 }}>
-        {myMonthSessions.length === 0 ? (
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Пока нет сессий в этом месяце.</div>
+      <div className="profile-availability-month-sessions">Режиссёрские сессии в этом месяце:</div>
+      <div className="profile-availability-sessions">
+        {directorMonthSessions.length === 0 ? (
+          <div className="profile-availability-hint">Пока нет сессий в этом месяце.</div>
         ) : (
-          myMonthSessions.slice(0, 40).map((s) => (
-            <Link
+          directorMonthSessions.slice(0, 40).map((s) => (
+            <button
               key={s.id}
-              to={`/sessions/${encodeURIComponent(s.id)}`}
-              style={{
-                border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: 10,
-                padding: "8px 10px",
-                background: "rgba(255,255,255,0.04)",
-                textDecoration: "none",
-                color: "inherit",
-              }}
+              type="button"
+              className="profile-availability-session-link profile-availability-session-link--muted"
+              onClick={() => setSessionDetailModalId(s.id)}
             >
-              <div style={{ fontSize: 12, fontWeight: 700 }}>{s.title}</div>
-              <div style={{ fontSize: 11, opacity: 0.75 }}>{new Date(s.startsAt).toLocaleString("ru-RU")}</div>
-            </Link>
+              <div className="profile-availability-session-title">{s.title}</div>
+              <div className="profile-availability-session-meta">{new Date(s.startsAt).toLocaleString("ru-RU")}</div>
+            </button>
           ))
         )}
       </div>
 
-      {flags.loading ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Загрузка репетиций…</div> : null}
+      {flags.loading ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Загрузка сессий…</div> : null}
+
+      <DirectorSessionDetailModal
+        isOpen={!!sessionDetailModalId}
+        sessionId={sessionDetailModalId}
+        accessToken={accessToken}
+        onClose={() => setSessionDetailModalId(null)}
+      />
     </div>
   );
 }

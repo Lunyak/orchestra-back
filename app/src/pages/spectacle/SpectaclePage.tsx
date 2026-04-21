@@ -1,7 +1,7 @@
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from 'classnames';
 import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
@@ -33,7 +33,7 @@ const KanbanBoardPage = React.lazy(() =>
   }))
 );
 
-type SpectacleActiveView = "theater" | "light-plot" | "board" | "script";
+type SpectacleActiveView = "theater" | "light-plot" | "board" | "script" | "sessions";
 
 /** Доп. классы на `<main class="main-content">` по активному разделу (одна строка или массив). */
 const MAIN_CONTENT_VIEW_MODIFIERS: Record<
@@ -42,8 +42,9 @@ const MAIN_CONTENT_VIEW_MODIFIERS: Record<
 > = {
   theater: "main-content-theater",
   "light-plot": undefined,
-  board: 'main-content-kanban',
+  board: "main-content-kanban",
   script: "show-script",
+  sessions: "main-content-sessions",
 };
 
 export function SpectaclePage() {
@@ -151,7 +152,9 @@ export function SpectaclePage() {
         ? "light-plot"
         : location.pathname === "/board"
           ? "board"
-          : "script";
+          : location.pathname === "/sessions" || location.pathname.startsWith("/sessions/")
+            ? "sessions"
+            : "script";
 
   React.useEffect(() => {
     localStorage.setItem("activeView", activeView);
@@ -162,7 +165,8 @@ export function SpectaclePage() {
     activeView === "light-plot" ||
     activeView === "theater";
   const isTheaterView = activeView === "theater";
-  const isBoardView = activeView === "board";
+  /** Доска и сессии: без плейлиста/звуковой полосы и кнопок боковых панелей в стиле спектакля. */
+  const compactMainChrome = activeView === "board" || activeView === "sessions";
 
   // Не показываем "пустую" страницу между lazy-загрузкой и подгрузкой проектов/сцены.
   // Важно: хуки должны вызываться в одинаковом порядке на каждом рендере.
@@ -214,7 +218,7 @@ export function SpectaclePage() {
     );
   }
 
-  const playlistNode = !isBoardView ? (
+  const playlistNode = !compactMainChrome ? (
     <div className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !mobilePlaylistOpen) ? "hidden" : ""}`}
     >
       {isMobile && (
@@ -285,7 +289,7 @@ export function SpectaclePage() {
         playlistNode
       )}
       <div className="app-content">
-        {showHeaderSounds && !isBoardView && !isMobile && (
+        {showHeaderSounds && !compactMainChrome && !isMobile && (
           <div className="sounds-bar">
             <HeaderPlayer
               projectName={projectDisplay}
@@ -350,10 +354,11 @@ export function SpectaclePage() {
               />
             </Suspense>
           )}
+          {activeView === "sessions" && <Outlet />}
         </main>
       </div>
       {stepsSidebarNode}
-      {!isMobile && !isBoardView && (
+      {!isMobile && !compactMainChrome && (
         <div className="desktop-panel-buttons" aria-label="Панели">
           {shouldShowStepsSidebar && isStepsCollapsed && (
             <button

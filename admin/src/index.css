@@ -29,7 +29,6 @@ body {
   margin: 100px auto;
   padding: 24px;
   background: #1e293b;
-  border-radius: 12px;
   border: 1px solid #334155;
 }
 
@@ -43,7 +42,6 @@ body {
   padding: 10px 12px;
   margin-bottom: 12px;
   border: 1px solid #475569;
-  border-radius: 8px;
   background: #0f172a;
   color: #e2e8f0;
   font-size: 14px;
@@ -53,7 +51,6 @@ body {
   width: 100%;
   padding: 10px;
   border: none;
-  border-radius: 8px;
   background: #2563eb;
   color: #fff;
   font-size: 14px;

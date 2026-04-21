@@ -1,5 +1,5 @@
 import { Button } from "@shared/core/button/Button";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../../../features/auth";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
@@ -20,11 +20,67 @@ export function ProfileDataTab() {
   const form = useAppSelector(selectProfileForm);
   const flags = useAppSelector(selectProfileDataFlags);
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const autoSaveBaselineRef = useRef<string | null>(null);
+  const autoSaveTimerRef = useRef<number | null>(null);
+
+  const mainFormSignature = useMemo(
+    () =>
+      JSON.stringify({
+        displayName: String((form as any).displayName ?? ""),
+        firstName: String((form as any).firstName ?? ""),
+        lastName: String((form as any).lastName ?? ""),
+        telegramUsername: String((form as any).telegramUsername ?? ""),
+        telegramId: String((form as any).telegramId ?? ""),
+        avatarUrl: String((form as any).avatarUrl ?? ""),
+      }),
+    [form],
+  );
 
   useEffect(() => {
     if (!accessToken) return;
     dispatch(fetchMyProfileThunk({ accessToken }));
   }, [accessToken, dispatch]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      autoSaveBaselineRef.current = null;
+      if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+      return;
+    }
+    if (!profile?.email) return;
+
+    if (autoSaveBaselineRef.current == null) {
+      autoSaveBaselineRef.current = mainFormSignature;
+      return;
+    }
+    if (mainFormSignature === autoSaveBaselineRef.current) return;
+
+    if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = window.setTimeout(async () => {
+      if (!accessToken) return;
+      if (flags.saving) return;
+      if (autoSaveBaselineRef.current == null) return;
+      if (mainFormSignature === autoSaveBaselineRef.current) return;
+
+      const res = await dispatch(saveMyProfileThunk({ accessToken }));
+      if (saveMyProfileThunk.fulfilled.match(res)) {
+        autoSaveBaselineRef.current = JSON.stringify({
+          displayName: String((res.payload as any)?.displayName ?? ""),
+          firstName: String((res.payload as any)?.firstName ?? ""),
+          lastName: String((res.payload as any)?.lastName ?? ""),
+          telegramUsername: String((res.payload as any)?.telegramUsername ?? ""),
+          telegramId: String((res.payload as any)?.telegramId ?? ""),
+          avatarUrl: String((res.payload as any)?.avatarUrl ?? ""),
+        });
+      }
+    }, 1000);
+
+    return () => {
+      if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    };
+  }, [accessToken, dispatch, flags.saving, mainFormSignature, profile?.email]);
 
   if (!accessToken) return <div>Нужно войти, чтобы редактировать профиль.</div>;
 
@@ -32,6 +88,10 @@ export function ProfileDataTab() {
     <div className="profile-form">
       <p className="profile-subtitle">
         Email: <b>{profile?.email ?? "—"}</b>
+      </p>
+      <p style={{ fontSize: 12, opacity: 0.72, marginTop: 4, marginBottom: 12 }}>
+        Имя, Telegram и ссылка на аватар сохраняются автоматически примерно через секунду после правки. При
+        ошибке сохранения сообщение появится ниже.
       </p>
 
       <label>
@@ -189,21 +249,6 @@ export function ProfileDataTab() {
 
       {flags.error ? <div className="settings-invite-error">{flags.error}</div> : null}
       {flags.ok ? <div style={{ color: "#7ee787", fontSize: 13 }}>{flags.ok}</div> : null}
-
-      <div className="profile-actions">
-        <Button
-          className="secondary"
-          type="button"
-          onClick={async () => {
-            if (!accessToken) return;
-            dispatch(profileDataActions.clearProfileMessages());
-            await dispatch(saveMyProfileThunk({ accessToken }));
-          }}
-          disabled={flags.saving}
-        >
-          {flags.saving ? "Сохранение..." : "Сохранить"}
-        </Button>
-      </div>
 
       <div className="profile-legal-links">
         Документы:{" "}

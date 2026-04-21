@@ -1,0 +1,37 @@
+.rehearsals-card {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-secondary);
+  padding: 12px;
+  max-width: 500px;
+  min-width: 0;
+}
+
+.rehearsals-card--fluid {
+  max-width: none;
+  width: 100%;
+}
+
+.rehearsals-card input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 8px 10px;
+  color: inherit;
+  outline: none;
+}
+
+.rehearsals-card button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rehearsals-card-title {
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.rehearsals-card-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.75;
+}

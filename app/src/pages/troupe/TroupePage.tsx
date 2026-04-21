@@ -139,21 +139,7 @@ export function TroupePage() {
           <div className="troupe-view">
             <div className="troupe-header">
               <div>
-                <h2 style={{ margin: 0 }}>Труппа</h2>
-                <div style={{ opacity: 0.75, fontSize: 12, marginTop: 4 }}>
-                  {troupe ? (
-                    <>
-                      {troupe.title} • {members.length} участн.
-                    </>
-                  ) : (
-                    "Загрузка…"
-                  )}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" onClick={() => dispatch(fetchMyTroupe())} disabled={loading}>
-                  {loading ? "Обновление…" : "Обновить"}
-                </button>
+                <h2 className="troupe-header__title">Труппа</h2>
               </div>
             </div>
 

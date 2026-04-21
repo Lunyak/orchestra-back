@@ -5,7 +5,7 @@ export interface ScriptStep {
   playMarkdown?: string;
   /** Режиссёрская экспликация для шага (markdown). */
   explicationMarkdown?: string;
-  /** Длительность шага в минутах (для планирования репетиции). */
+  /** Длительность шага в минутах (для планирования сессий / слотов). */
   durationMin?: number;
   requisites?: ScriptRequisite[];
   lightPlot?: LightFixture[];

@@ -1308,31 +1308,6 @@
   padding: 0;
 }
 
-.markdown-lightbox__close {
-  position: sticky;
-  top: -22px;
-  right: -22px;
-  position: absolute;
-  /* margin-left: auto; */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  /* border-radius: 10px; */
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(2, 6, 23, 0.55);
-  color: #e2e8f0;
-  cursor: pointer;
-  font-size: 22px;
-  line-height: 1;
-}
-
-.markdown-lightbox__close:hover {
-  background: rgba(2, 6, 23, 0.75);
-  border-color: rgba(96, 165, 250, 0.55);
-}
-
 .markdown-lightbox__nav {
   position: absolute;
   top: 50%;

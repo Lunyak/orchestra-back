@@ -43,7 +43,7 @@ export function OptionalFilterSelect({
   return (
     <select
       id={id}
-      className={cn("optional-filter-select", className)}
+      className={cn("optional-filter-select", "native-select", className)}
       aria-label={ariaLabel}
       disabled={disabled}
       value={value}

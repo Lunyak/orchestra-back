@@ -38,7 +38,7 @@ export function RehearsalDetailsPage() {
     getRehearsal(accessToken, id)
       .then((r) => setRehearsal(r))
       .catch((e: any) => {
-        const msg = e?.response?.data?.message ?? "Не удалось загрузить репетицию";
+        const msg = e?.response?.data?.message ?? "Не удалось загрузить сессию";
         setError(String(msg));
       })
       .finally(() => setLoading(false));
@@ -105,16 +105,16 @@ export function RehearsalDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [comment, accessToken, id]);
 
-  if (!accessToken) return <div>Нужно войти, чтобы открыть репетицию.</div>;
-  if (!id) return <div>Некорректный URL репетиции.</div>;
+  if (!accessToken) return <div>Нужно войти, чтобы открыть сессию.</div>;
+  if (!id) return <div>Некорректный URL.</div>;
 
   return (
     <div style={{ padding: "12px 12px 40px" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Link to="/rehearsals" style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}>
-          ← Все репетиции
+        <Link to="/sessions" style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}>
+          ← Все сессии
         </Link>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Репетиция</div>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>Сессия</div>
         <div style={{ fontSize: 12, opacity: 0.75 }}>{headerTimeLabel}</div>
       </div>
 
@@ -159,7 +159,7 @@ export function RehearsalDetailsPage() {
               background: "rgba(255,255,255,0.04)",
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Мой комментарий к репетиции</div>
+            <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Мой комментарий к сессии</div>
             <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
               {commentLoading ? <div style={{ fontSize: 12, opacity: 0.7 }}>Загрузка…</div> : null}
               {commentSaving ? <div style={{ fontSize: 12, opacity: 0.7 }}>Сохранение…</div> : null}

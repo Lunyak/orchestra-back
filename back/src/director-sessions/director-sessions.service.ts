@@ -28,6 +28,9 @@ type DirectorSessionParticipant = {
   status: DirectorSessionParticipantStatus;
   telegramId?: string | null;
   userName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatarUrl?: string | null;
   lateTime?: string | null;
   respondedAt?: string | null;
 };
@@ -350,16 +353,153 @@ export class DirectorSessionsService {
     };
   }
 
-  async get(userId: string, sessionId: string) {
-    const directorProject = await this.getDirectorProjectForUser(userId);
+  /**
+   * Сессии чужих режиссёров: email в plannedEmails или participants, только с publishedAt.
+   * Для календаря занятости приглашённого актёра.
+   */
+  async listPublishedInvitationsForEmail(
+    _userId: string,
+    userEmail: string | undefined,
+    fromIso?: string,
+    toIso?: string,
+  ) {
+    const email = normEmail(String(userEmail ?? ''));
+    if (!email) return { sessions: [] as DirectorRehearsalSession[] };
+
+    const fromRaw = String(fromIso ?? '').trim();
+    const toRaw = String(toIso ?? '').trim();
+    let from: Date;
+    let to: Date;
+    if (fromRaw && toRaw) {
+      from = new Date(fromRaw);
+      to = new Date(toRaw);
+      if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime())) {
+        throw new BadRequestException('fromIso or toIso is invalid');
+      }
+    } else {
+      const now = new Date();
+      from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+      to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 0, 23, 59, 59, 999));
+    }
+
+    /** Пока без JSON-индекса: узкий диапазон дат + лимит; фильтр по email в памяти. */
+    const rows = await this.prisma.directorSession.findMany({
+      where: { startsAt: { gte: from, lte: to } },
+      select: { id: true, payload: true },
+      orderBy: { startsAt: 'asc' },
+      take: 2500,
+    });
+
+    const sessions = rows
+      .map((r) => r.payload as any as DirectorRehearsalSession | undefined)
+      .filter((cur): cur is DirectorRehearsalSession => {
+        if (!cur || !String((cur as any).publishedAt ?? '').trim()) return false;
+        const planned = Array.isArray((cur as any).plannedEmails)
+          ? ((cur as any).plannedEmails as any[])
+          : [];
+        if (planned.some((x) => normEmail(String(x ?? '')) === email)) return true;
+        const parts = Array.isArray((cur as any).participants)
+          ? ((cur as any).participants as any[])
+          : [];
+        return parts.some((p) => normEmail(String(p?.email ?? '')) === email);
+      });
+
+    return { sessions };
+  }
+
+  /**
+   * Сессия: владелец (режиссёр) или приглашённый (email в participants / plannedEmails).
+   */
+  async get(
+    userId: string,
+    userEmail: string | undefined,
+    sessionId: string,
+  ): Promise<DirectorRehearsalSession> {
     const sid = String(sessionId ?? '').trim();
     if (!sid) throw new BadRequestException('session id is required');
-    const row = await this.prisma.directorSession.findFirst({
+
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const owned = await this.prisma.directorSession.findFirst({
       where: { projectId: directorProject.id, userId, id: sid },
-      select: { id: true, payload: true },
+      select: { payload: true },
+    });
+    if (owned) return (owned.payload ?? { id: sid }) as DirectorRehearsalSession;
+
+    const email = normEmail(String(userEmail ?? ''));
+    if (!email) throw new NotFoundException('Session not found');
+
+    const row = await this.prisma.directorSession.findFirst({
+      where: { id: sid },
+      select: { payload: true },
+    });
+    const cur = row?.payload as any as DirectorRehearsalSession | undefined;
+    if (!cur) throw new NotFoundException('Session not found');
+
+    const inParticipants = (cur.participants ?? []).some(
+      (p: any) => normEmail(String(p?.email ?? '')) === email,
+    );
+    const plannedRaw = Array.isArray(cur.plannedEmails) ? cur.plannedEmails : [];
+    const inPlanned = plannedRaw.some(
+      (e: any) => normEmail(String(e ?? '')) === email,
+    );
+    if (!inParticipants && !inPlanned) {
+      throw new ForbiddenException('Нет доступа к этой сессии');
+    }
+    if (!String((cur as any).publishedAt ?? '').trim()) {
+      throw new ForbiddenException('Сессия ещё не опубликована');
+    }
+    return cur;
+  }
+
+  /** Участник подтверждает явку (поле participants[].status = present). */
+  async confirmMyAttendance(
+    _userId: string,
+    userEmail: string | undefined,
+    sessionId: string,
+  ) {
+    const sid = String(sessionId ?? '').trim();
+    const email = normEmail(String(userEmail ?? ''));
+    if (!sid || !email) {
+      throw new BadRequestException('session id and email required');
+    }
+
+    const row = await this.prisma.directorSession.findFirst({
+      where: { id: sid },
+      select: { projectId: true, userId: true, payload: true },
     });
     if (!row) throw new NotFoundException('Session not found');
-    return row.payload ?? { id: row.id };
+
+    const cur = row.payload as any as DirectorRehearsalSession | undefined;
+    if (!cur) throw new NotFoundException('Session not found');
+    if (!String((cur as any).publishedAt ?? '').trim()) {
+      throw new ForbiddenException('Сессия ещё не опубликована');
+    }
+
+    const participants = Array.isArray(cur.participants)
+      ? [...cur.participants]
+      : [];
+    const pIdx = participants.findIndex(
+      (p: any) => normEmail(String(p?.email ?? '')) === email,
+    );
+    if (pIdx === -1) {
+      throw new ForbiddenException(
+        'Вы не в списке участников этой сессии (он формируется после публикации).',
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    participants[pIdx] = {
+      ...participants[pIdx],
+      status: 'present',
+      respondedAt: nowIso,
+    };
+    const updated: DirectorRehearsalSession = {
+      ...cur,
+      participants,
+      updatedAt: nowIso,
+    };
+    await this.upsertSessionRow(row.projectId, row.userId, updated);
+    return { ok: true, session: updated };
   }
 
   async getMyComment(userId: string, sessionId: string) {
@@ -431,7 +571,18 @@ export class DirectorSessionsService {
         },
       });
       for (let i = 0; i < sessions.length; i += 1) {
-        const s = sessions[i];
+        let s = sessions[i];
+        const existing = await tx.directorSession.findUnique({
+          where: { id: s.id },
+          select: { payload: true },
+        });
+        const prev = existing?.payload as any as DirectorRehearsalSession | undefined;
+        if (prev) {
+          const incomingPub = String((s as any).publishedAt ?? '').trim();
+          if (!incomingPub && String((prev as any).publishedAt ?? '').trim()) {
+            s = { ...s, publishedAt: (prev as any).publishedAt };
+          }
+        }
         await tx.directorSession.upsert({
           where: { id: s.id },
           update: {
@@ -524,6 +675,51 @@ export class DirectorSessionsService {
     }));
 
     return { steps, sceneRoles: (scene as any)?.sceneRoles ?? null };
+  }
+
+  /**
+   * Режиссёр, публикующий сессию, считается подтвердившим явку (не зависит от «Свободен» в профиле).
+   */
+  private async buildDirectorSelfParticipant(
+    userId: string,
+  ): Promise<DirectorSessionParticipant | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    const email = normEmail(String(user?.email ?? ''));
+    if (!email) return null;
+
+    const p =
+      (await this.prisma.userProfile.findUnique({
+        where: { email },
+        select: {
+          displayName: true,
+          firstName: true,
+          lastName: true,
+          avatarUrl: true,
+          telegramId: true,
+        },
+      })) ?? null;
+
+    const firstName = String(p?.firstName ?? '').trim() || null;
+    const lastName = String(p?.lastName ?? '').trim() || null;
+    const userName =
+      String(p?.displayName ?? '').trim() ||
+      [firstName, lastName].filter(Boolean).join(' ') ||
+      null;
+    const nowIso = new Date().toISOString();
+
+    return {
+      email,
+      status: 'present',
+      userName,
+      firstName,
+      lastName,
+      avatarUrl: String(p?.avatarUrl ?? '').trim() || null,
+      telegramId: p?.telegramId ? String(p.telegramId).trim() || null : null,
+      respondedAt: nowIso,
+    };
   }
 
   /** Сформировать участников (neededEmails -> present profiles) по слотам сессии */
@@ -620,6 +816,7 @@ export class DirectorSessionsService {
         displayName: true,
         firstName: true,
         lastName: true,
+        avatarUrl: true,
         telegramId: true,
       },
     });
@@ -630,10 +827,11 @@ export class DirectorSessionsService {
         const calendar = p.availabilityCalendar ?? {};
         const st = calendar?.[dateKey];
         if (st !== 'present') return null;
+        const firstName = String(p.firstName ?? '').trim() || null;
+        const lastName = String(p.lastName ?? '').trim() || null;
         const userName =
           String(p.displayName ?? '').trim() ||
-          [p.firstName, p.lastName]
-            .map((x) => String(x ?? '').trim())
+          [firstName, lastName]
             .filter(Boolean)
             .join(' ') ||
           null;
@@ -641,17 +839,36 @@ export class DirectorSessionsService {
           email,
           status: 'unknown' as const,
           userName,
+          firstName,
+          lastName,
+          avatarUrl: String(p.avatarUrl ?? '').trim() || null,
           telegramId: p.telegramId ? String(p.telegramId).trim() || null : null,
         };
       })
       .filter(Boolean) as DirectorSessionParticipant[];
 
-    if (present.length === 0) {
+    const directorSelf = await this.buildDirectorSelfParticipant(userId);
+    const mergedByEmail = new Map<string, DirectorSessionParticipant>();
+    for (const row of present) {
+      mergedByEmail.set(normEmail(row.email), row);
+    }
+    if (directorSelf) {
+      const prev = mergedByEmail.get(directorSelf.email);
+      mergedByEmail.set(directorSelf.email, {
+        ...(prev ?? { email: directorSelf.email }),
+        ...directorSelf,
+        status: 'present',
+        respondedAt: directorSelf.respondedAt,
+      });
+    }
+
+    const merged = Array.from(mergedByEmail.values());
+    if (merged.length === 0) {
       throw new BadRequestException(
         `Нельзя опубликовать сессию: среди нужных по слотам никто не отметил присутствие в профиле на ${dateKey}`,
       );
     }
-    return present;
+    return merged;
   }
 
   async publish(
@@ -686,16 +903,14 @@ export class DirectorSessionsService {
       ...session,
       comment: nextComment,
       participants,
+      publishedAt: nowIso,
       updatedAt: nowIso,
     };
     await this.upsertSessionRow(directorProject.id, userId, updated);
 
     const botUrl =
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
-    const secret = this.config.get<string>('INTERNAL_API_SECRET');
-    if (!secret) {
-      throw new BadRequestException('INTERNAL_API_SECRET is not configured');
-    }
+    const secret = String(this.config.get<string>('INTERNAL_API_SECRET') ?? '').trim();
 
     const pref = await this.prisma.projectTelegramBotPreference.findUnique({
       where: { projectId_userId: { projectId: directorProject.id, userId } },
@@ -712,62 +927,59 @@ export class DirectorSessionsService {
           })
         )?.id ?? '',
       ).trim();
-    if (!botIntegrationId) {
-      throw new BadRequestException(
-        'No connected Telegram bot. Connect a bot and select it in Project settings.',
-      );
-    }
 
-    try {
-      console.log('[director-sessions] publish via bot', {
-        projectId: directorProject.id,
-        sessionId: sessId,
-        botUrl,
-        botIntegrationId,
-      });
-      const url = `${botUrl.replace(/\/$/, '')}/internal/publish-director-session`;
-      const payload = {
-        projectId: directorProject.id,
-        sessionId: sessId,
-        botIntegrationId,
-      };
-      const headers = { 'X-Internal-Secret': secret };
+    let telegramSent = false;
+    if (secret && botIntegrationId) {
+      try {
+        console.log('[director-sessions] publish via bot', {
+          projectId: directorProject.id,
+          sessionId: sessId,
+          botUrl,
+          botIntegrationId,
+        });
+        const url = `${botUrl.replace(/\/$/, '')}/internal/publish-director-session`;
+        const payload = {
+          projectId: directorProject.id,
+          sessionId: sessId,
+          botIntegrationId,
+        };
+        const headers = { 'X-Internal-Secret': secret };
 
-      // Docker DNS can occasionally return EAI_AGAIN (temporary failure).
-      // Retry a few times to avoid flaky publish.
-      const delaysMs = [200, 800, 2000];
-      let lastErr: any = null;
-      for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
-        try {
-          await axios.post(url, payload, { headers });
-          lastErr = null;
-          break;
-        } catch (e: any) {
-          lastErr = e;
-          const msg = String(e?.message ?? '');
-          const code = String(e?.code ?? '');
-          const isDns =
-            code === 'EAI_AGAIN' ||
-            /EAI_AGAIN/i.test(msg) ||
-            code === 'ENOTFOUND';
-          if (!isDns || attempt >= delaysMs.length) break;
-          await new Promise((r) => setTimeout(r, delaysMs[attempt]));
+        const delaysMs = [200, 800, 2000];
+        let lastErr: any = null;
+        for (let attempt = 0; attempt <= delaysMs.length; attempt++) {
+          try {
+            await axios.post(url, payload, { headers });
+            lastErr = null;
+            telegramSent = true;
+            break;
+          } catch (e: any) {
+            lastErr = e;
+            const msg = String(e?.message ?? '');
+            const code = String(e?.code ?? '');
+            const isDns =
+              code === 'EAI_AGAIN' ||
+              /EAI_AGAIN/i.test(msg) ||
+              code === 'ENOTFOUND';
+            if (!isDns || attempt >= delaysMs.length) break;
+            await new Promise((r) => setTimeout(r, delaysMs[attempt]));
+          }
         }
+        if (lastErr) {
+          console.warn(
+            '[director-sessions] bot publish failed (сессия всё равно опубликована в приложении)',
+            lastErr,
+          );
+        }
+      } catch (e: any) {
+        console.warn(
+          '[director-sessions] bot publish error (сессия опубликована в приложении)',
+          e,
+        );
       }
-      if (lastErr) throw lastErr;
-    } catch (e: any) {
-      const status = e?.response?.status;
-      const msg =
-        e?.response?.data?.error ||
-        e?.response?.data?.message ||
-        e?.response?.data?.description ||
-        e?.message ||
-        'Unknown error';
-      throw new BadRequestException(
-        `Bot publish failed${status ? ` (HTTP ${status})` : ''}: ${String(msg)}`,
-      );
     }
-    return { ok: true };
+
+    return { ok: true, telegramSent, session: updated };
   }
 
   /** Для бота: получить сессию с участниками и резолвом слотов */

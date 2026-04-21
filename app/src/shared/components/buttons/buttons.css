@@ -1,0 +1,120 @@
+/* Shared compact icon actions: steps sidebar, playlist, sessions list */
+
+.icon-action-add {
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: inherit;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1d4ed8;
+}
+
+.icon-action-add:hover:not(:disabled) {
+  background: #1d4fd8b5;
+}
+
+.icon-action-add:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.icon-action-delete {
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+
+  /* position: absolute; */
+  /* right: 8px; */
+  /* top: 7px; */
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(185, 28, 28, 0.85);
+  font-size: 16px;
+}
+
+/* Playlist track row */
+.icon-action-delete--playlist {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(185, 28, 28, 0.85);
+  font-size: 16px;
+}
+
+.icon-action-delete--playlist:hover {
+  background: rgba(220, 38, 38, 0.95);
+}
+
+/* Script step row */
+.icon-action-delete--step {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #b91c1c;
+  font-size: 14px;
+  line-height: 22px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.icon-action-delete--step:hover {
+  background: #dc2626;
+}
+
+.icon-action-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(2, 6, 23, 0.55);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+}
+
+.icon-action-close:hover {
+  background: rgba(2, 6, 23, 0.75);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.icon-action-close--floating {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+}
+
+/* Markdown image lightbox (ScriptMarkdownPreview) */
+.icon-action-close--markdown-lightbox {
+  position: absolute;
+  top: -22px;
+  right: -22px;
+  z-index: 2;
+  width: 36px;
+  height: 36px;
+}

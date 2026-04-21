@@ -54,7 +54,6 @@
 .roles-card {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
-  border-radius: 14px;
   padding: 12px;
 }
 
@@ -74,15 +73,14 @@
   background: rgba(0, 0, 0, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: inherit;
-  border-radius: 10px;
-  padding: 10px 12px;
+  padding: 4px 12px;
   outline: none;
 }
 
 .roles-form button {
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
+  /* background: rgba(255, 255, 255, 0.12); */
+  /* border: 1px solid rgba(255, 255, 255, 0.18); */
+  /* border-radius: 10px; */
   padding: 10px 12px;
   cursor: pointer;
   color: inherit;

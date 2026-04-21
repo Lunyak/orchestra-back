@@ -1,0 +1,148 @@
+/**
+ * Нативные поля в палитре Orchestra (тёплый тёмный фон, акцент tertiary, лейбл-олива).
+ * Подключено из App.css — классы .native-select / .native-text-input.
+ *
+ * Про <option>: в Chrome/Edge/Firefox часть стилей применяется к списку; в Safari и
+ * многих нативных меню macOS/Windows выпадашка рисуется ОС — там вид почти системный.
+ * color-scheme: dark помогает тёмной теме там, где ОС это учитывает.
+ */
+
+.native-select,
+select.native-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: var(--field-control-min-height);
+  padding: var(--field-control-padding-y)
+    calc(var(--field-control-padding-x) + 22px)
+    var(--field-control-padding-y)
+    var(--field-control-padding-x);
+  border: 1px solid var(--field-control-border);
+  background-color: var(--field-control-bg-hover);
+  background-image: var(--field-control-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+  box-shadow: var(--field-control-inset);
+  color: var(--field-control-text);
+  color-scheme: dark;
+  font-family: var(--font-family-script-body);
+  font-size: var(--field-control-font-size);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+  cursor: pointer;
+  outline: none;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.native-select:hover,
+select.native-select:hover {
+  background-color: var(--field-control-bg-hover);
+  border-color: var(--field-control-border-hover);
+  background-image: var(--field-control-chevron);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px 14px;
+  box-shadow: var(--field-control-inset);
+}
+
+.native-select:focus-visible,
+select.native-select:focus-visible {
+  border-color: var(--field-control-border-focus);
+  box-shadow:
+    var(--field-control-inset),
+    0 0 0 2px var(--field-control-focus-ring);
+}
+
+.native-select:disabled,
+select.native-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- option / optgroup (ограниченная поддержка браузеров) --- */
+
+.native-select option,
+select.native-select option {
+  font-family: var(--font-family-script-body);
+  font-size: var(--field-control-font-size);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.45;
+  padding: 0.4em 0.55em;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-lighter);
+}
+
+.native-select option:checked,
+select.native-select option:checked {
+  background-color: var(--color-bg-quaternary);
+  color: var(--color-text-primary);
+}
+
+.native-select option:hover,
+select.native-select option:hover {
+  background-color: color-mix(in srgb, var(--color-bg-tertiary) 32%, var(--color-bg-primary));
+  color: var(--color-text-dark);
+}
+
+.native-select optgroup,
+select.native-select optgroup {
+  font-family: var(--font-family-script-label);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-style: normal;
+  color: var(--color-text-label);
+  background-color: var(--color-bg-secondary);
+}
+
+/* Текстовое поле в том же стиле */
+.native-text-input,
+input.native-text-input[type="text"],
+input.native-text-input[type="search"],
+input.native-text-input[type="email"],
+input.native-text-input[type="password"],
+input.native-text-input[type="number"],
+input.native-text-input[type="time"],
+input.native-text-input[type="date"] {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: var(--field-control-min-height);
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  border: 1px solid var(--field-control-border);
+  background: var(--field-control-bg-hover);
+  box-shadow: var(--field-control-inset);
+  color: var(--field-control-text);
+  font-family: var(--font-family-script-body);
+  font-size: var(--field-control-font-size);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+  outline: none;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.native-text-input:hover,
+input.native-text-input:hover {
+  background: var(--field-control-bg-hover);
+}
+
+.native-text-input:disabled,
+input.native-text-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.native-text-input::placeholder,
+input.native-text-input::placeholder {
+  color: var(--color-text-placeholder);
+  font-weight: var(--font-weight-normal);
+}

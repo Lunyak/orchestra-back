@@ -1,0 +1,140 @@
+/* Локальные дополнения; общий фон и типографика страницы — ../rehearsals/style.css */
+
+.director-session-page__subhead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.director-session-page__subhead a {
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+.director-session-page__subhead a:hover {
+  opacity: 1;
+}
+
+.director-session-page__subhead-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.director-session-page__body {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.director-session-page__card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.director-session-page__card-title {
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.director-session-page__invite {
+  margin-top: 0;
+}
+
+.director-session-page__invite-empty {
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.director-session-page__called-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.director-session-page__called-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.director-session-page__called-name {
+  min-width: 0;
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.director-session-page__slots {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.director-session-page__slot {
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.director-session-page__slot-main {
+  min-width: 0;
+}
+
+.director-session-page__slot-time {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.director-session-page__slot-ref {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.director-session-page__slot-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: inherit;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.director-session-page__slot-link:hover {
+  background: var(--color-bg-quaternary);
+}

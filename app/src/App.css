@@ -1,4 +1,5 @@
 @import './shared/styles/variables.css';
+@import './shared/core/native-fields/style.css';
 #root {
   max-width: 100%;
   margin: 0;
@@ -589,6 +590,10 @@ body {
   padding: 12px;
 }
 
+.main-content-sessions {
+  background: var(--color-bg-secondary);
+}
+
 .view-loader {
   color: #e2e8f0;
   font-size: 13px;
@@ -776,8 +781,7 @@ body {
   max-width: 240px;
   padding: 4px 12px;
   border: none;
-  border-radius: 6px;
-  background: #1e293b;
+  background: var(--color-bg-quaternary);
   color: #f1f5f9;
 }
 

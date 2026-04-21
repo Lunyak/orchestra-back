@@ -4,6 +4,7 @@ import isoWeek from "dayjs/plugin/isoWeek";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../features/auth";
+import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
 import { useTeam } from "../../features/team";
@@ -905,23 +906,21 @@ export function RehearsalsPage() {
 
               <aside className="rehearsals-side">
                 {!activeRehearsal ? (
-                  <div className="rehearsals-card">
+                  <RehearsalsCard>
                     <div className="rehearsals-muted">Выбери репетицию слева.</div>
-                  </div>
+                  </RehearsalsCard>
                 ) : (
-                  <div className="rehearsals-card">
-                    <div className="rehearsals-card-title">{activeRehearsal.title}</div>
-                    <div className="rehearsals-card-sub">
-                      {(() => {
-                        const start = dayjs(activeRehearsal.startsAt);
-                        const end =
-                          activeRehearsal.durationMin != null
-                            ? start.add(activeRehearsal.durationMin, "minute")
-                            : null;
-                        return `${start.format("DD.MM.YYYY HH:mm")}${end ? `–${end.format("HH:mm")}` : ""}`;
-                      })()}
-                    </div>
-
+                  <RehearsalsCard
+                    title={activeRehearsal.title}
+                    subtitle={(() => {
+                      const start = dayjs(activeRehearsal.startsAt);
+                      const end =
+                        activeRehearsal.durationMin != null
+                          ? start.add(activeRehearsal.durationMin, "minute")
+                          : null;
+                      return `${start.format("DD.MM.YYYY HH:mm")}${end ? `–${end.format("HH:mm")}` : ""}`;
+                    })()}
+                  >
                     <div className="rehearsals-section">
                       <div className="rehearsals-section-title">Параметры</div>
                       <div style={{ display: "grid", gap: 8 }}>
@@ -1157,7 +1156,7 @@ export function RehearsalsPage() {
                       <div className="rehearsals-section-title">Что не собирается</div>
                       <RehearsalPlanBlock accessToken={accessToken} rehearsalId={activeRehearsal.id} />
                     </div>
-                  </div>
+                  </RehearsalsCard>
                 )}
               </aside>
             </div>

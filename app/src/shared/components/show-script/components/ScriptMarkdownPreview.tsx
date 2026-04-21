@@ -25,6 +25,7 @@ import {
   httpUrlToImageFileName,
   storageKeyToImageBasename,
 } from "../../../utils/markdownImages";
+import { Buttons } from "../../buttons/Buttons";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   ActorAnnotationsPopover,
@@ -1493,15 +1494,12 @@ export function ScriptMarkdownPreview({
             className="markdown-lightbox__content"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              className="markdown-lightbox__close"
+            <Buttons.CloseButton
+              variant="markdownLightbox"
               onClick={() => setLightbox(null)}
               aria-label="Закрыть"
               title="Закрыть"
-            >
-              ×
-            </button>
+            />
             <img
               key={lightbox.slides[lightbox.index]!.src}
               className="markdown-lightbox__img"

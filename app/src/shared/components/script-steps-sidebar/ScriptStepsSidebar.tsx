@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ScriptStep } from "../../types/script";
+import { Buttons } from "../buttons/Buttons";
 import { ListItem } from "../list-item/ListItem";
 import "./style.css";
 
@@ -32,7 +33,8 @@ export const ScriptStepsSidebar = ({
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const handleDeleteClick =
-    (step: ScriptStep, index: number) => (event: React.MouseEvent<HTMLButtonElement>) => {
+    (step: ScriptStep, index: number) =>
+    (event: React.MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
       event.stopPropagation();
 
@@ -56,19 +58,19 @@ export const ScriptStepsSidebar = ({
   const handleDragStart =
     (index: number) => (event: React.DragEvent<HTMLDivElement>) => {
       setDragIndex(index);
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', String(index));
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(index));
     };
 
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+    event.dataTransfer.dropEffect = "move";
   };
 
   const handleDrop =
     (index: number) => (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
-      const raw = event.dataTransfer.getData('text/plain');
+      const raw = event.dataTransfer.getData("text/plain");
       const fromIndex = Number(raw);
       if (!Number.isFinite(fromIndex)) return;
       if (fromIndex === index) return;
@@ -86,37 +88,45 @@ export const ScriptStepsSidebar = ({
     <aside className="script-sidebar">
       <div className="script-sidebar-content">
         <div className="steps-mini-list">
-          {steps.map((step, index) => (
-            <ListItem
-              key={`${step.id}:${index}`}
-              className={`${index === currentIndex ? "active" : ""}${dragOverIndex === index ? " drag-over" : ""
+          {steps.map((step, index) => {
+            const isActive = index === currentIndex;
+            return (
+              <ListItem
+                key={`${step.id}:${index}`}
+                className={`${isActive ? "active" : ""}${
+                  dragOverIndex === index ? " drag-over" : ""
                 }${dragIndex === index ? " dragging" : ""}`}
-              draggable
-              onDragStart={handleDragStart(index)}
-              onDragOver={handleDragOver}
-              onDragEnter={() => setDragOverIndex(index)}
-              onDragLeave={() => setDragOverIndex(null)}
-              onDrop={handleDrop(index)}
-              onDragEnd={handleDragEnd}
-            >
-              <button
-                className="step-mini-btn"
-                onClick={() => onSelect(index)}
+                draggable
+                onDragStart={handleDragStart(index)}
+                onDragOver={handleDragOver}
+                onDragEnter={() => setDragOverIndex(index)}
+                onDragLeave={() => setDragOverIndex(null)}
+                onDrop={handleDrop(index)}
+                onDragEnd={handleDragEnd}
               >
-                {index + 1}. {step.title}
-              </button>
-              <button
-                className="step-mini-delete"
-                onClick={handleDeleteClick(step, index)}
-                title="Удалить шаг"
-              >
-                ×
-              </button>
-            </ListItem>
-          ))}
-          <button className="script-add-step" onClick={onAddStep}>
-            +
-          </button>
+                <button
+                  className="step-mini-btn"
+                  onClick={() => onSelect(index)}
+                >
+                  {index + 1}. {step.title}
+                </button>
+                {isActive && (
+                  <Buttons.DeleteButton
+                    className="step-mini-btn-delete"
+                    variant="step"
+                    onClick={handleDeleteClick(step, index)}
+                    title="Удалить шаг"
+                    aria-label="Удалить шаг"
+                  />
+                )}
+              </ListItem>
+            );
+          })}
+          <Buttons.AddButton
+            onClick={onAddStep}
+            title="Добавить шаг"
+            aria-label="Добавить шаг"
+          />
         </div>
         <div className="script-navigation">
           <button

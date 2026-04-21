@@ -1,0 +1,195 @@
+/* Компактный календарь-месяц: ровная сетка, без скругления у ячеек дней */
+
+.month-cal {
+  --month-cal-line: var(--color-border-visible, rgba(255, 255, 255, 0.12));
+  --month-cal-surface: rgba(255, 255, 255, 0.03);
+  --month-cal-surface-hover: rgba(255, 255, 255, 0.07);
+  --month-cal-present: rgba(96, 255, 140, 0.14);
+  --month-cal-absent: rgba(255, 120, 120, 0.14);
+  --month-cal-selected-ring: rgba(231, 138, 78, 0.85);
+  --month-cal-today-ring: rgba(231, 138, 78, 0.35);
+}
+
+.month-cal__heading {
+  margin-bottom: 10px;
+}
+
+.month-cal__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.month-cal__subtitle {
+  margin: 0;
+  opacity: 0.75;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.month-cal__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.month-cal__nav-btn {
+  padding: 7px 12px;
+  border-radius: 0;
+  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.14));
+  background: var(--month-cal-surface);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.month-cal__nav-btn:hover {
+  background: var(--month-cal-surface-hover);
+  border-color: var(--color-border-accent, rgba(148, 163, 184, 0.2));
+}
+
+.month-cal__month-label {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+
+.month-cal__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 1px;
+  background: var(--month-cal-line);
+  border: 1px solid var(--month-cal-line);
+}
+
+.month-cal__weekday {
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  padding: 6px 2px;
+  background: var(--color-bg-secondary, #1d2021);
+}
+
+.month-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--month-cal-line);
+  border: 1px solid var(--month-cal-line);
+  border-top: none;
+}
+
+.month-cal__cell {
+  border-radius: 0;
+  border: none;
+  margin: 0;
+  padding: 6px 4px 18px;
+  min-height: 48px;
+  background: var(--month-cal-surface);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+  transition: background 0.1s ease, box-shadow 0.1s ease;
+  font: inherit;
+}
+
+.month-cal__cell:hover {
+  background: var(--month-cal-surface-hover);
+}
+
+.month-cal__cell--other-month {
+  color: rgba(255, 255, 255, 0.32);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.month-cal__cell--other-month:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.month-cal__cell--other-month.month-cal__cell--present {
+  background: rgba(96, 255, 140, 0.08);
+}
+
+.month-cal__cell--other-month.month-cal__cell--present:hover {
+  background: rgba(96, 255, 140, 0.14);
+}
+
+.month-cal__cell--other-month.month-cal__cell--absent {
+  background: rgba(255, 120, 120, 0.09);
+}
+
+.month-cal__cell--other-month.month-cal__cell--absent:hover {
+  background: rgba(255, 120, 120, 0.16);
+}
+
+.month-cal__cell--present {
+  background: var(--month-cal-present);
+}
+
+.month-cal__cell--present:hover {
+  background: rgba(96, 255, 140, 0.2);
+}
+
+.month-cal__cell--absent {
+  background: var(--month-cal-absent);
+}
+
+.month-cal__cell--absent:hover {
+  background: rgba(255, 120, 120, 0.2);
+}
+
+.month-cal__cell--today:not(.month-cal__cell--selected) {
+  box-shadow: inset 0 0 0 1px var(--month-cal-today-ring);
+}
+
+.month-cal__cell--selected {
+  box-shadow: inset 0 0 0 2px var(--month-cal-selected-ring);
+  z-index: 1;
+}
+
+.month-cal__cell-num {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.month-cal__cell--today .month-cal__cell-num {
+  font-weight: 800;
+  color: var(--color-bg-tertiary, #e78a4e);
+}
+
+.month-cal__dots {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+  min-height: 6px;
+}
+
+.month-cal__dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(120, 180, 255, 0.85);
+}
+
+.month-cal__status-mark {
+  font-size: 9px;
+  opacity: 0.72;
+  position: absolute;
+  bottom: 3px;
+  line-height: 1;
+}

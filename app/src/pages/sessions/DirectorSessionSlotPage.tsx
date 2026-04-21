@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useAuth } from "../../features/auth";
+import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import { useProject } from "../../features/project";
 import {
   loadDirectorSessions,
@@ -539,7 +540,10 @@ export function DirectorSessionSlotPage() {
   return (
     <div style={{ padding: "12px 12px 40px", maxWidth: 1100, margin: "0 auto" }}>
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <Link to={`/sessions/${encodeURIComponent(sid)}`} style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}>
+        <Link
+          to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
+          style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}
+        >
           ← К сессии
         </Link>
         <div style={{ fontWeight: 800, fontSize: 16 }}>Слот</div>
@@ -556,16 +560,7 @@ export function DirectorSessionSlotPage() {
 
       {session && slot && !loading && !error && (
         <div style={{ marginTop: 12, display: "grid", gap: 12, gridTemplateColumns: "1fr 1.2fr", alignItems: "start" }}>
-          <div
-            style={{
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 12,
-              padding: 12,
-              background: "rgba(255,255,255,0.04)",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ fontWeight: 900, fontSize: 13 }}>Текущий выбор</div>
+          <RehearsalsCard fluid title="Текущий выбор">
             <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
               {slot.ref ? (
                 <>
@@ -642,7 +637,9 @@ export function DirectorSessionSlotPage() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate(`/sessions/${encodeURIComponent(sid)}`)}
+                onClick={() =>
+                  navigate(`/sessions?sessionId=${encodeURIComponent(sid)}`)
+                }
                 style={{
                   height: 34,
                   padding: "0 12px",
@@ -658,30 +655,14 @@ export function DirectorSessionSlotPage() {
                 Готово
               </button>
             </div>
-          </div>
+          </RehearsalsCard>
 
-          <div
-            style={{
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 12,
-              padding: 12,
-              background: "rgba(255,255,255,0.04)",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ fontWeight: 900, fontSize: 13 }}>Выбор сцены/шага</div>
+          <RehearsalsCard fluid title="Выбор сцены/шага">
             <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
               <select
+                className="native-select"
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                style={{
-                  background: "rgba(255, 255, 255, 0.06)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
-                  borderRadius: 10,
-                  padding: "8px 10px",
-                  color: "inherit",
-                  outline: "none",
-                }}
               >
                 {visibleProjects.map((p) => (
                   <option key={p} value={p}>
@@ -690,7 +671,7 @@ export function DirectorSessionSlotPage() {
                 ))}
               </select>
               <input
-                className="settings-invite-input"
+                className="native-text-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="поиск по названию/тексту"
@@ -802,7 +783,7 @@ export function DirectorSessionSlotPage() {
                 <div style={{ fontSize: 12, opacity: 0.75 }}>Нет шагов (или сцена не найдена).</div>
               )}
             </div>
-          </div>
+          </RehearsalsCard>
         </div>
       )}
     </div>

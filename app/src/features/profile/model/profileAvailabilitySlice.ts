@@ -1,6 +1,11 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import { getDirectorSessions, type DirectorSession } from "../../../sync/api";
+import { ensureDirectorSessionsProject } from "../../../features/director-sessions/directorSessionsSync";
+import {
+  getDirectorSessionInvitations,
+  getDirectorSessions,
+  type DirectorSession,
+} from "../../../sync/api";
 import dayjs from "dayjs";
 
 export type CalendarSectionState = {
@@ -34,8 +39,9 @@ function defaultCalendarState(): CalendarSectionState {
   };
 }
 
-function rangeKey(fromIso: string, toIso: string) {
-  return [String(fromIso ?? ""), String(toIso ?? "")].join("|");
+/** Ключ кэша сессий в занятости (суффикс при смене схемы — сброс старых данных без приглашений). */
+export function profileAvailabilityCacheKey(fromIso: string, toIso: string) {
+  return [String(fromIso ?? "").trim(), String(toIso ?? "").trim(), "v3inv"].join("|");
 }
 
 const initialState: ProfileAvailabilityState = {
@@ -54,10 +60,31 @@ export const loadSessionsForRangeThunk = createAsyncThunk<
   "profileAvailability/loadSessionsForRange",
   async ({ accessToken, fromIso, toIso }, { rejectWithValue }) => {
     try {
-      const res = await getDirectorSessions(accessToken);
+      await ensureDirectorSessionsProject(accessToken);
+      const ownRes = await getDirectorSessions(accessToken);
+      let invited: any[] = [];
+      try {
+        const invRes = await getDirectorSessionInvitations(accessToken, fromIso, toIso);
+        invited = invRes.sessions ?? [];
+      } catch (e) {
+        console.warn(
+          "[profileAvailability] director-sessions/invitations failed (свои сессии всё равно загружены):",
+          e,
+        );
+      }
+      const byId = new Map<string, DirectorSession>();
+      for (const s of ownRes.sessions ?? []) {
+        const id = String((s as any)?.id ?? "").trim();
+        if (id) byId.set(id, s as DirectorSession);
+      }
+      for (const s of invited) {
+        const id = String((s as any)?.id ?? "").trim();
+        if (id && !byId.has(id)) byId.set(id, s as DirectorSession);
+      }
+      const merged = Array.from(byId.values());
       const fromMs = new Date(fromIso).getTime();
       const toMs = new Date(toIso).getTime();
-      const sessions = (res.sessions ?? [])
+      const sessions = merged
         .filter(Boolean)
         .filter((s: any) => {
           const t = new Date(String(s?.startsAt ?? "")).getTime();
@@ -66,7 +93,7 @@ export const loadSessionsForRangeThunk = createAsyncThunk<
           if (Number.isFinite(toMs) && t > toMs) return false;
           return true;
         }) as DirectorSession[];
-      return { rangeKey: rangeKey(fromIso, toIso), sessions };
+      return { rangeKey: profileAvailabilityCacheKey(fromIso, toIso), sessions };
     } catch {
       return rejectWithValue("Не удалось загрузить события сессий");
     }
@@ -76,7 +103,7 @@ export const loadSessionsForRangeThunk = createAsyncThunk<
       const s = (getState() as any).profileAvailability as ProfileAvailabilityState | undefined;
       if (!s) return true;
       if (s.loading) return false;
-      const key = rangeKey(fromIso, toIso);
+      const key = profileAvailabilityCacheKey(fromIso, toIso);
       if (s.byRangeKey[key]) return false;
       return true;
     },

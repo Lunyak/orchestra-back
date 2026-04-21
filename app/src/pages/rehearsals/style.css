@@ -18,10 +18,9 @@
   letter-spacing: 0.2px;
 }
 
-.rehearsals-meta {  
-  margin-top: 6px;
+.rehearsals-meta {
   font-size: 24px;
-  opacity: 0.8;
+  color: var(--color-text-tertiary);
 }
 
 .rehearsals-muted {
@@ -30,7 +29,7 @@
 }
 
 .rehearsals-error {
-  color: rgba(255, 120, 120, 0.95);
+  color: var(--color-text-tertiary);
   margin: 10px 0;
 }
 
@@ -197,17 +196,14 @@
 }
 
 .rehearsals-item {
-  text-align: left;
-  border-radius: 12px;
   border: none;
-  background: rgba(0, 0, 0, 0.18);
   color: inherit;
-  padding: 10px;
   cursor: pointer;
+  background: inherit;
 }
 
 .rehearsals-item.active {
-  border-color: rgba(120, 180, 255, 0.45);
+  /* background-color: #333b52; */
 }
 
 .rehearsals-item.bad {
@@ -223,47 +219,6 @@
 .rehearsals-item-meta {
   margin-top: 4px;
   font-size: 11px;
-  opacity: 0.75;
-}
-
-.rehearsals-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 12px;
-  padding: 12px;
-  max-width: 500px;
-}
-
-.rehearsals-card input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
-  padding: 8px 10px;
-  color: inherit;
-  outline: none;
-}
-
-.rehearsals-card button {
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  background: inherit;
-  padding: 0;
-}
-
-.rehearsals-card button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.rehearsals-card-title {
-  font-weight: 900;
-  font-size: 14px;
-}
-
-.rehearsals-card-sub {
-  margin-top: 4px;
-  font-size: 12px;
   opacity: 0.75;
 }
 

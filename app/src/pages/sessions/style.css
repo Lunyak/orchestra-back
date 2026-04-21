@@ -1,4 +1,4 @@
-/* Sessions page builds on rehearsals styles */
+/* Sessions page: layout classes historically named rehearsals-* */
 
 .sessions-layout {
   display: grid;
@@ -15,11 +15,18 @@
 
 .sessions-list {
   margin-top: 10px;
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   max-height: calc(100vh - 260px);
   overflow: auto;
   padding-right: 4px;
+}
+
+.sessions-list > .icon-action-add {
+  align-self: center;
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 
 .sessions-sessionRow {
@@ -29,30 +36,30 @@
   border: none;
 }
 
-.sessions-sessionRow.active .sessions-sessionSelect {
-  border-color: rgba(255, 255, 255, 0.22);
+.sessions-sessionRow.active .list-item.active {
   box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.14);
-  border: none;
 }
 
-.sessions-sessionRow-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between; width: 100%;
-  gap: 10px;
+/* Список сессий и «Материалы»: одна обёртка ListItem + rehearsals-item внутри */
+.sessions-list .list-item.sessions-listItem-row,
+.sessions-material-list .list-item.sessions-listItem-row {
+  flex-direction: row;
+  align-items: stretch;
 }
 
-.sessions-sessionSelect {
-  padding: 8px 10px !important;
-  height: auto !important;
+.sessions-list .list-item.sessions-listItem-row .rehearsals-item,
+.sessions-material-list .list-item.sessions-listItem-row .rehearsals-item {
   flex: 1;
   min-width: 0;
   text-align: left;
-  border: none !important;
-  box-sizing: border-box;
 }
 
-.sessions-sessionSelect.dragging {
+.sessions-sessionRow .list-item.sessions-listItem-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.sessions-list .list-item.sessions-listItem-row.dragging {
   opacity: 0.9;
   transform: scale(0.995);
 }
@@ -63,7 +70,7 @@
 
 .sessions-panels {
   display: grid;
-  grid-template-columns: 1.05fr 1fr;
+  grid-template-columns: auto 1fr;
   gap: 12px;
   align-items: start;
 }
@@ -73,7 +80,11 @@
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
-  margin-top: 10px;
+}
+
+.sessions-actions__btn-delete {
+  width: 25px;
+  height: 25px;
 }
 
 .sessions-help {
@@ -85,12 +96,17 @@
   gap: 10px;
   align-items: end;
   flex-wrap: wrap;
+  margin-bottom: 10px;
 }
 
 .sessions-field {
   display: grid;
   gap: 6px;
   min-width: 180px;
+
+  input {
+    background-color: var(--field-control-bg-hover);
+  }
 }
 
 .sessions-check {
@@ -101,10 +117,14 @@
 }
 
 .sessions-slots {
-  margin-top: 10px;
+  margin: 10px 0;
   display: grid;
-  gap: 8px;
-  border-radius: 12px;
+  gap: 4px;
+  min-height: 56px;
+}
+
+.sessions-slot-title__btn-delete {
+  margin-left: auto;
 }
 
 .sessions-slots.dropActive {
@@ -113,16 +133,24 @@
   background: rgba(37, 99, 235, 0.10);
 }
 
-.sessions-slot {
+.sessions-slots .list-item.sessions-slot {
   cursor: grab;
+  padding: 10px 12px;
+  text-align: left;
+  box-sizing: border-box;
+  min-width: 0;
+
+  input {
+    background: var(--color-bg-tertiary);
+  }
 }
 
-.sessions-slot.dragging {
+.sessions-slots .list-item.sessions-slot.dragging {
   opacity: 0.9;
   transform: scale(0.995);
 }
 
-.sessions-slot:active {
+.sessions-slots .list-item.sessions-slot:active {
   cursor: grabbing;
 }
 
@@ -171,48 +199,18 @@
   margin-top: 8px;
 }
 
-.sessions-preview {
-  margin-top: 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(0, 0, 0, 0.18);
-  padding: 12px;
+
+.sessions-material-controls {
+  align-items: stretch;
 }
 
-.sessions-preview-title {
-  font-weight: 900;
-  font-size: 12px;
+.sessions-material-controls .native-select {
+  flex: 0 1 auto;
+  min-width: 160px;
+  width: auto;
 }
 
-.sessions-preview-sub {
-  margin-top: 6px;
-}
-
-.sessions-preview-bad {
-  margin-top: 8px;
-}
-
-.sessions-preview-text {
-  margin-top: 10px;
-  white-space: pre-wrap;
-  max-height: 200px;
-  overflow: auto;
-  padding-right: 4px;
-  font-size: 12px;
-  line-height: 1.35;
-  opacity: 0.95;
-}
-
-.sessions-material-controls select {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
-  padding: 8px 10px;
-  color: inherit;
-  outline: none;
-}
-
-.sessions-material-controls input {
+.sessions-material-controls .native-text-input {
   flex: 1;
   min-width: 200px;
 }
@@ -220,10 +218,19 @@
 .sessions-material-list {
   margin-top: 10px;
   display: grid;
-  gap: 8px;
-  max-height: 420px;
+  gap: 4px;
+  max-height: 220px;
   overflow: auto;
-  padding-right: 4px;
+}
+
+.sessions-slots-empty {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
 }
 
 .sessions-material-subtools {
@@ -232,13 +239,6 @@
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-}
-
-.sessions-preview-text {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.25);
-  padding: 10px;
 }
 
 .sessions-modal-backdrop {
@@ -396,10 +396,8 @@
 .sessions-page .troupe-schedule {
   margin-top: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
   overflow: auto;
   background: rgba(0, 0, 0, 0.12);
-  /* примерно 8 актёров + шапка; остальное скролл */
   max-height: 360px;
 }
 
@@ -442,7 +440,7 @@
   justify-content: flex-start;
   background: rgba(20, 20, 20, 0.95);
   backdrop-filter: blur(6px);
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+
 }
 
 .sessions-page .troupe-actor-cell {

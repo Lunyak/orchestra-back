@@ -1,110 +1,98 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useScriptUI } from "../../features/script-ui";
 import { Header } from "../../shared/components/header/Header";
-import { PageLoader } from "@shared/components/page-loader/PageLoader";
 
 // Lazy imports страниц
 const SpectaclePage = lazy(() =>
   import("../../pages/spectacle/SpectaclePage").then((m) => ({
     default: m.SpectaclePage,
-  }))
+  })),
 );
 
 const DirectorSessionsPage = lazy(() =>
   import("../../pages/sessions/DirectorSessionsPage").then((m) => ({
     default: m.DirectorSessionsPage,
-  }))
-);
-
-const DirectorSessionDetailsPage = lazy(() =>
-  import("../../pages/sessions/DirectorSessionDetailsPage").then((m) => ({
-    default: m.DirectorSessionDetailsPage,
-  }))
-);
-
-const DirectorSessionPage = lazy(() =>
-  import("../../pages/sessions/DirectorSessionPage").then((m) => ({
-    default: m.DirectorSessionPage,
-  }))
+  })),
 );
 
 const DirectorSessionSlotPage = lazy(() =>
   import("../../pages/sessions/DirectorSessionSlotPage").then((m) => ({
     default: m.DirectorSessionSlotPage,
-  }))
+  })),
 );
 
 const ProfilePage = lazy(() =>
   import("../../pages/profile/ProfilePage").then((m) => ({
     default: m.ProfilePage,
-  }))
+  })),
 );
 
 const TroupePage = lazy(() =>
   import("../../pages/troupe/TroupePage").then((m) => ({
     default: m.TroupePage,
-  }))
+  })),
 );
 
 const RolesPage = lazy(() =>
   import("../../pages/roles/RolesPage").then((m) => ({
     default: m.RolesPage,
-  }))
+  })),
 );
 
 const SettingsPage = lazy(() =>
   import("../../pages/settings/SettingsPage/SettingsPage").then((m) => ({
     default: m.SettingsPage,
-  }))
+  })),
 );
 
 const SettingsBotPage = lazy(() =>
   import("../../pages/settings/SettingsBotPage").then((m) => ({
     default: m.SettingsBotPage,
-  }))
+  })),
 );
 
 const ActorPage = lazy(() =>
   import("../../pages/actor/ActorPage").then((m) => ({
     default: m.ActorPage,
-  }))
+  })),
 );
 
 const TrainersPage = lazy(() =>
   import("../../pages/trainers/TrainersPage").then((m) => ({
     default: m.TrainersPage,
-  }))
+  })),
 );
 
 const SpeechTrainerPage = lazy(() =>
   import("../../pages/trainers/SpeechTrainerPage").then((m) => ({
     default: m.SpeechTrainerPage,
-  }))
+  })),
 );
 
 const DictionTrainerPage = lazy(() =>
   import("../../pages/trainers/DictionTrainerPage").then((m) => ({
     default: m.DictionTrainerPage,
-  }))
+  })),
 );
 
 const RoleWorkbookPage = lazy(() =>
   import("../../pages/role-workbook/RoleWorkbookPage").then((m) => ({
     default: m.RoleWorkbookPage,
-  }))
+  })),
 );
 
 const PrivacyPage = lazy(() =>
   import("../../pages/legal/PrivacyPage").then((m) => ({
     default: m.PrivacyPage,
-  }))
+  })),
 );
 
 const TermsPage = lazy(() =>
   import("../../pages/legal/TermsPage").then((m) => ({
     default: m.TermsPage,
-  }))
+  })),
 );
 
 /**
@@ -136,7 +124,10 @@ export function AppRoutes() {
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    const check = () => setIsMobile(typeof window !== "undefined" ? window.innerWidth < 980 : false);
+    const check = () =>
+      setIsMobile(
+        typeof window !== "undefined" ? window.innerWidth < 980 : false,
+      );
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
@@ -151,11 +142,15 @@ export function AppRoutes() {
   const isSpectacleLayoutRoute =
     location.pathname === "/" ||
     location.pathname === "/theater" ||
-    location.pathname === "/light-plot";
+    location.pathname === "/light-plot" ||
+    location.pathname === "/sessions" ||
+    location.pathname.startsWith("/sessions/");
 
   const isBoardRoute = location.pathname === "/board";
 
-  const headerShowPlaylist = isMobile ? mobilePlaylistOpen : showPlaylistSidebar;
+  const headerShowPlaylist = isMobile
+    ? mobilePlaylistOpen
+    : showPlaylistSidebar;
   const headerIsStepsCollapsed = isMobile ? !mobileStepsOpen : isStepsCollapsed;
 
   const handleTogglePlaylist = () => {
@@ -183,19 +178,19 @@ export function AppRoutes() {
         scriptState={
           shouldShowScriptState
             ? {
-              showRequisites,
-              onToggleRequisites: toggleRequisites,
-              showPlaylist: headerShowPlaylist,
-              onTogglePlaylist: handleTogglePlaylist,
-              showHeaderSounds,
-              onToggleHeaderSounds: toggleHeaderSounds,
-              showRoles: showStepRoles,
-              onToggleRoles: toggleStepRoles,
-              showScriptEditorTools,
-              onToggleScriptEditorTools: toggleScriptEditorTools,
-              isStepsCollapsed: headerIsStepsCollapsed,
-              onToggleStepsCollapsed: handleToggleSteps,
-            }
+                showRequisites,
+                onToggleRequisites: toggleRequisites,
+                showPlaylist: headerShowPlaylist,
+                onTogglePlaylist: handleTogglePlaylist,
+                showHeaderSounds,
+                onToggleHeaderSounds: toggleHeaderSounds,
+                showRoles: showStepRoles,
+                onToggleRoles: toggleStepRoles,
+                showScriptEditorTools,
+                onToggleScriptEditorTools: toggleScriptEditorTools,
+                isStepsCollapsed: headerIsStepsCollapsed,
+                onToggleStepsCollapsed: handleToggleSteps,
+              }
             : undefined
         }
       />
@@ -204,13 +199,18 @@ export function AppRoutes() {
           isSpectacleLayoutRoute ? (
             <PageLoader
               variant="spectacle"
-              showLeftSidebar={isMobile ? mobilePlaylistOpen : showPlaylistSidebar}
+              showLeftSidebar={
+                isMobile ? mobilePlaylistOpen : showPlaylistSidebar
+              }
               showRightSidebar={isMobile ? mobileStepsOpen : !isStepsCollapsed}
               showTopBar={showHeaderSounds}
               label="Загрузка страницы…"
             />
           ) : (
-            <PageLoader variant="simple" label={isBoardRoute ? "Загрузка доски…" : "Загрузка страницы…"} />
+            <PageLoader
+              variant="simple"
+              label={isBoardRoute ? "Загрузка доски…" : "Загрузка страницы…"}
+            />
           )
         }
       >
@@ -219,12 +219,21 @@ export function AppRoutes() {
           <Route path="/theater" element={<SpectaclePage />} />
           <Route path="/light-plot" element={<SpectaclePage />} />
           <Route path="/board" element={<SpectaclePage />} />
-          <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />
-          <Route path="/rehearsals/:rehearsalId" element={<Navigate to="/sessions" replace />} />
-          <Route path="/sessions" element={<DirectorSessionsPage />} />
-          <Route path="/sessions/:sessionId" element={<DirectorSessionPage />} />
-          <Route path="/sessions/:sessionId/slots/:slotId" element={<DirectorSessionSlotPage />} />
-          <Route path="/sessions/:sessionId/attendance" element={<DirectorSessionDetailsPage />} />
+          <Route
+            path="/rehearsals"
+            element={<Navigate to="/sessions" replace />}
+          />
+          <Route
+            path="/rehearsals/:rehearsalId"
+            element={<Navigate to="/sessions" replace />}
+          />
+          <Route path="/sessions" element={<SpectaclePage />}>
+            <Route index element={<DirectorSessionsPage />} />
+            <Route
+              path=":sessionId/slots/:slotId"
+              element={<DirectorSessionSlotPage />}
+            />
+          </Route>
           <Route path="/actor" element={<ActorPage />} />
           <Route path="/trainers" element={<TrainersPage />} />
           <Route path="/trainers/speech" element={<SpeechTrainerPage />} />
@@ -242,4 +251,3 @@ export function AppRoutes() {
     </>
   );
 }
-

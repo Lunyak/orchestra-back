@@ -32,6 +32,23 @@
   --color-border-strong: rgba(255, 255, 255, 0.14);
   --color-border-accent: rgba(148, 163, 184, 0.15);
 
+  /* Нативные поля (.native-select / .native-text-input) — тот же тон, что карточки и list-item */
+  --field-control-bg: rgba(29, 32, 33, 0.97);
+  --field-control-bg-hover: #333b52;
+  --field-control-border: rgba(255, 255, 255, 0.11);
+  --field-control-border-hover: rgba(231, 138, 78, 0.4);
+  --field-control-border-focus: rgba(231, 138, 78, 0.72);
+  --field-control-focus-ring: rgba(231, 138, 78, 0.28);
+  --field-control-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --field-control-radius: 10px;
+  --field-control-padding-y: 8px;
+  --field-control-padding-x: 12px;
+  --field-control-font-size: var(--font-size-md);
+  --field-control-min-height: 38px;
+  --field-control-text: var(--color-text-lighter);
+  /* стрелка в цвете подписей/лейблов как на остальных UI */
+  --field-control-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23a9b664' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
   /* Синие цвета (primary) */
   --color-primary: #2563eb;
   --color-primary-dark: #1d4ed8;
@@ -72,6 +89,7 @@
   /* Текстовые цвета */
   --color-text-primary: #fff;
   /* --color-text-primary: #e2e8f0; */
+  --color-text-tertiary: #e78a4e;
   --color-text-secondary: #0b1220;
   --color-text-label: #a9b664;
   --color-text-bright: #f8fafc;

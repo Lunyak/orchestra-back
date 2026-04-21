@@ -1,5 +1,11 @@
-import { ensureProject, getDirectorSessions, replaceDirectorSessions } from "../../sync/api";
-import { getMyProfile, type MyProfile } from "../../sync/api";
+import {
+  ensureProject,
+  getDirectorSessions,
+  getMyProfile,
+  replaceDirectorSessions,
+  type DirectorSessionParticipant,
+  type MyProfile,
+} from "../../sync/api";
 
 export type DirectorSlotRef = {
   projectSlug: string;
@@ -21,6 +27,10 @@ export type DirectorRehearsalSession = {
   comment?: string | null;
   slots: DirectorSessionSlot[];
   plannedEmails?: string[];
+  /** Заполняется при публикации сессии (акторы с «свободен» в календаре на дату). */
+  participants?: DirectorSessionParticipant[];
+  /** ISO: после нажатия «Опубликовать» в приложении; опционально дублируется в Telegram. */
+  publishedAt?: string | null;
   updatedAt: string;
 };
 

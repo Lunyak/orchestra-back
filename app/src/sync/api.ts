@@ -739,7 +739,7 @@ export async function publishDirectorSession(
   accessToken: string,
   sessionId: string,
   body?: { comment?: string | null },
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; telegramSent?: boolean; session?: DirectorSession }> {
   const { data } = await api.post(
     `/director-sessions/${encodeURIComponent(sessionId)}/publish`,
     body ?? null,
@@ -765,6 +765,9 @@ export type DirectorSessionParticipant = {
   status: DirectorSessionParticipantStatus;
   telegramId?: string | null;
   userName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatarUrl?: string | null;
   lateTime?: string | null;
   respondedAt?: string | null;
 };
@@ -800,12 +803,37 @@ export async function getDirectorSessions(
   return data as any;
 }
 
+/** Опубликованные сессии чужих режиссёров, где текущий пользователь в plannedEmails / participants. */
+export async function getDirectorSessionInvitations(
+  accessToken: string,
+  fromIso: string,
+  toIso: string,
+): Promise<{ sessions: any[] }> {
+  const { data } = await api.get("/director-sessions/invitations", {
+    params: { fromIso, toIso },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data as any;
+}
+
 export async function getDirectorSession(
   accessToken: string,
   sessionId: string,
 ): Promise<DirectorSession> {
   const { data } = await api.get(
     `/director-sessions/${encodeURIComponent(sessionId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
+export async function confirmMyDirectorSessionAttendance(
+  accessToken: string,
+  sessionId: string,
+): Promise<{ ok: boolean; session: DirectorSession }> {
+  const { data } = await api.post(
+    `/director-sessions/${encodeURIComponent(sessionId)}/confirm-attendance`,
+    {},
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data as any;

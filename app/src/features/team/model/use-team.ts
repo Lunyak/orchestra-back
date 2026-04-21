@@ -26,7 +26,8 @@ export function useTeam() {
     if (
       (location.pathname !== "/settings" &&
         location.pathname !== "/board" &&
-        location.pathname !== "/rehearsals") ||
+        location.pathname !== "/sessions" &&
+        !location.pathname.startsWith("/sessions/")) ||
       !accessToken ||
       !projectName
     )

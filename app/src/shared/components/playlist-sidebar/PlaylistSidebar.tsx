@@ -10,6 +10,7 @@ import {
 import { getDesktopApi } from "../../platform/desktop-api";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
+import { Buttons } from "../buttons/Buttons";
 import { ListItem } from "../list-item/ListItem";
 import "./style.css";
 
@@ -1028,30 +1029,24 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
                     />
                   </div>
 
-                  <button
-                    type="button"
-                    className="playlist-track-remove"
+                  <Buttons.DeleteButton
+                    variant="playlist"
                     onClick={() => void deleteTrack(track)}
                     title="Удалить трек"
                     aria-label="Удалить трек"
-                  >
-                    ×
-                  </button>
+                  />
                 </div>
               ) : null}
             </ListItem>
           ))
         )}
-        <button
-          type="button"
-          className="playlist-add-btn"
+        <Buttons.AddButton
           onClick={addTracks}
           disabled={playlistUpload.uploading}
           title={addButtonTitle}
           aria-disabled={!desktopAvailable || playlistUpload.uploading}
-        >
-          +
-        </button>
+          aria-label={addButtonTitle}
+        />
       </div>
     </aside>
   );

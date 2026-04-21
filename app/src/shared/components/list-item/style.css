@@ -13,13 +13,20 @@
     font-size: 12px;
     color: var(--color-text-white);
     box-sizing: border-box;
+    position: relative;
 }
 
 .list-item.active {
     background: var(--color-bg-tertiary);
-    color: var(--color-text-dark);
+    color: var(--color-text-secondary);
 }
 
 .list-item:hover {
     background: #3a4b61;
+}
+
+/* Не затирать оранжевый active серым hover — чуть темнее tertiary */
+.list-item.active:hover {
+    background: color-mix(in srgb, var(--color-bg-tertiary) 88%, black);
+    color: var(--color-text-dark);
 }

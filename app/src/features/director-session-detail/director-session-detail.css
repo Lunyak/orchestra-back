@@ -1,0 +1,257 @@
+/* Локальные стили; типографика блока — pages/rehearsals/style.css (подключает панель). */
+
+.director-session-detail-modal-panel {
+  position: relative;
+  max-width: min(520px, calc(100vw - 20px));
+  max-height: min(88vh, 820px);
+  display: flex;
+  flex-direction: column;
+}
+
+.director-session-detail-modal__close {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+
+  /* background: rgba(255, 255, 255, 0.06); */
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.director-session-detail-modal__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.director-session-detail-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.director-session-detail-root--modal .rehearsals-head {
+  margin-bottom: 8px;
+}
+
+.director-session-page__subhead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.director-session-page__subhead a {
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+.director-session-page__subhead a:hover {
+  opacity: 1;
+}
+
+.director-session-page__subhead-spacer {
+  flex: 1;
+  min-width: 8px;
+}
+
+.director-session-page__body {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.director-session-page__card {
+  /* border: 1px solid rgba(255, 255, 255, 0.12); */
+  padding: 12px;
+  /* background: rgba(255, 255, 255, 0.04); */
+}
+
+.director-session-page__card-title {
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.director-session-page__invite {
+  margin-top: 0;
+}
+
+.director-session-page__invite-empty {
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Скролл: max-height + overflow; thumb/track — глобально в App.css (:root, *::-webkit-scrollbar). */
+.director-session-page__called-scroll {
+  max-height: 300px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-top: 8px;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
+}
+
+.director-session-page__called-scroll .director-session-page__called-list {
+  margin-top: 0;
+}
+
+.director-session-page__called-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.director-session-page__attendance {
+  margin-top: 0;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.director-session-page__attendance-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.72;
+  margin: 0 0 2px;
+}
+
+.director-session-page__attendance:empty {
+  display: none;
+  margin-bottom: 0;
+}
+
+.director-session-page__attendance-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.78;
+}
+
+.director-session-page__called-item {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.director-session-page__called-item-main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.director-session-page__called-name {
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.director-session-page__called-status {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0.82;
+}
+
+.director-session-page__called-status--muted {
+  opacity: 0.65;
+}
+
+.director-session-page__called-status--ok {
+  color: #7ee787;
+  opacity: 0.95;
+}
+
+.director-session-page__called-status--warn {
+  color: #fbbf24;
+  opacity: 0.95;
+}
+
+.director-session-page__called-status--bad {
+  color: #f87171;
+  opacity: 0.95;
+}
+
+.director-session-page__slots {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.director-session-page__slot {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.director-session-page__slot-main {
+  min-width: 0;
+}
+
+.director-session-page__slot-time {
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.director-session-page__slot-ref {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.director-session-page__slot-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  height: 34px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid rgba(96, 165, 250, 0.3);
+  color: inherit;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.director-session-page__slot-link:hover {
+  background: var(--color-bg-quaternary);
+}

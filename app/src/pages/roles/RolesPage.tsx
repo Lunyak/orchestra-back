@@ -1,4 +1,5 @@
 import { ListItem } from "@shared/components/list-item/ListItem";
+import { Button } from "@shared/core/button/Button";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../features/auth";
@@ -19,7 +20,9 @@ import {
 import "./style.css";
 
 function normalizeEmail(v: unknown): string {
-  return String(v ?? "").trim().toLowerCase();
+  return String(v ?? "")
+    .trim()
+    .toLowerCase();
 }
 
 function memberLabel(m: {
@@ -34,7 +37,8 @@ function memberLabel(m: {
   const p = m.profile ?? null;
   const display = String(p?.displayName ?? "").trim();
   if (display) return `${display} (${m.email})`;
-  const full = `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim();
+  const full =
+    `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim();
   if (full) return `${full} (${m.email})`;
   return m.email;
 }
@@ -48,7 +52,9 @@ export function RolesPage() {
   const [error, setError] = useState<string | null>(null);
   const [roles, setRoles] = useState<ProjectRoleInfo[]>([]);
 
-  const [troupeMembers, setTroupeMembers] = useState<Array<{ email: string; profile: any | null }>>([]);
+  const [troupeMembers, setTroupeMembers] = useState<
+    Array<{ email: string; profile: any | null }>
+  >([]);
 
   const [createTitle, setCreateTitle] = useState("");
 
@@ -98,7 +104,9 @@ export function RolesPage() {
           if (!em) continue;
           out.push({
             email: em,
-            profile: m?.user?.displayName ? { displayName: m.user.displayName } : null,
+            profile: m?.user?.displayName
+              ? { displayName: m.user.displayName }
+              : null,
           });
         }
         return out;
@@ -114,7 +122,8 @@ export function RolesPage() {
           continue;
         }
         // Prefer profile data from troupe if available.
-        if (!prev.profile && m.profile) uniq.set(m.email, { ...prev, profile: m.profile });
+        if (!prev.profile && m.profile)
+          uniq.set(m.email, { ...prev, profile: m.profile });
       }
       const list = Array.from(uniq.values()).sort((a, b) =>
         memberLabel(a).localeCompare(memberLabel(b), "ru"),
@@ -199,7 +208,9 @@ export function RolesPage() {
     if (!accessToken || !projectName) return;
     const role = roles.find((r) => r.id === roleId);
     if (!role) return;
-    const cur = new Set((role.emails ?? []).map(normalizeEmail).filter(Boolean));
+    const cur = new Set(
+      (role.emails ?? []).map(normalizeEmail).filter(Boolean),
+    );
     const e = normalizeEmail(email);
     if (!e) return;
     if (cur.has(e)) cur.delete(e);
@@ -223,7 +234,11 @@ export function RolesPage() {
     try {
       await addProjectRoleNote(accessToken, projectName, activeRoleId, text);
       setNoteDraft("");
-      const res = await getProjectRoleNotes(accessToken, projectName, activeRoleId);
+      const res = await getProjectRoleNotes(
+        accessToken,
+        projectName,
+        activeRoleId,
+      );
       setNotes(res?.notes ?? []);
     } catch (e) {
       console.error("addNote failed:", e);
@@ -231,7 +246,9 @@ export function RolesPage() {
   };
 
   const rolesSorted = useMemo(() => {
-    return [...(roles ?? [])].sort((a, b) => a.title.localeCompare(b.title, "ru"));
+    return [...(roles ?? [])].sort((a, b) =>
+      a.title.localeCompare(b.title, "ru"),
+    );
   }, [roles]);
 
   return (
@@ -257,16 +274,19 @@ export function RolesPage() {
               <div className="roles-grid">
                 <div className="roles-col">
                   <div className="roles-card">
-                    <div className="roles-card-title">Создать роль</div>
                     <div className="roles-form">
                       <input
                         value={createTitle}
                         onChange={(e) => setCreateTitle(e.target.value)}
                         placeholder="Название роли"
                       />
-                      <button type="button" onClick={createRole}>
+                      <Button
+                        type="button"
+                        className="btn primary"
+                        onClick={createRole}
+                      >
                         Создать
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
@@ -308,31 +328,57 @@ export function RolesPage() {
                       <div className="roles-card">
                         <div
                           className="roles-card-title"
-                          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 12,
+                          }}
                         >
                           <span>{activeRole.title}</span>
-                          <button type="button" onClick={deleteRole} title="Удалить роль">
+                          <button
+                            type="button"
+                            onClick={deleteRole}
+                            title="Удалить роль"
+                          >
                             Удалить
                           </button>
                         </div>
-                        <div className="roles-section-title">Назначения (труппа)</div>
+                        <div className="roles-section-title">
+                          Назначения (труппа)
+                        </div>
                         <div className="roles-assignments">
                           {troupeMembers.map((m) => {
                             const email = m.email;
                             const checked = (activeRole.emails ?? [])
                               .map(normalizeEmail)
                               .includes(normalizeEmail(email));
-                            const label = memberLabel({ email, profile: m.profile });
+                            const label = memberLabel({
+                              email,
+                              profile: m.profile,
+                            });
                             return (
                               <label key={email} className="roles-check">
                                 <input
                                   type="checkbox"
                                   checked={checked}
-                                  onChange={() => toggleAssignment(activeRole.id, email)}
+                                  onChange={() =>
+                                    toggleAssignment(activeRole.id, email)
+                                  }
                                 />
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                  }}
+                                >
                                   <MiniAvatar
-                                    src={String(m.profile?.avatarUrl ?? "").trim() || null}
+                                    src={
+                                      String(
+                                        m.profile?.avatarUrl ?? "",
+                                      ).trim() || null
+                                    }
                                     label={label}
                                     size={20}
                                   />
@@ -348,42 +394,6 @@ export function RolesPage() {
                           )}
                         </div>
                       </div>
-
-                      <div className="roles-card">
-                        <div className="roles-card-title">Страница роли (заметки)</div>
-                        <div className="roles-form">
-                          <textarea
-                            value={noteDraft}
-                            onChange={(e) => setNoteDraft(e.target.value)}
-                            placeholder="Написать заметку по роли…"
-                            rows={4}
-                          />
-                          <button type="button" onClick={addNote}>
-                            Добавить заметку
-                          </button>
-                        </div>
-
-                        {notesLoading ? (
-                          <div className="roles-muted">Загрузка заметок…</div>
-                        ) : (
-                          <div className="roles-notes">
-                            {notes.map((n) => (
-                              <div key={n.id} className="roles-note">
-                                <div className="roles-note-meta">
-                                  <span>{n.authorEmail || "—"}</span>
-                                  <span>
-                                    {new Date(n.updatedAt).toLocaleString("ru-RU")}
-                                  </span>
-                                </div>
-                                <div className="roles-note-body">{n.content}</div>
-                              </div>
-                            ))}
-                            {notes.length === 0 && (
-                              <div className="roles-muted">Заметок пока нет</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
                     </>
                   )}
                 </div>
@@ -395,4 +405,3 @@ export function RolesPage() {
     </div>
   );
 }
-

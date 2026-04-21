@@ -37,29 +37,7 @@
   gap: 8px;
 }
 
-.playlist-add-btn {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  border: none;
-  background: inherit;
-  color: #fff;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 22px;
-  padding: 0;
-}
-
-.playlist-add-btn:hover {
-  background: #1d4ed8;
-}
-
-.playlist-add-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.playlist-tracks .playlist-add-btn {
+.playlist-tracks .icon-action-add {
   align-self: center;
   margin: 4px 0 2px;
   flex: 0 0 auto;
@@ -648,25 +626,4 @@
   border: 1px solid #374151;
   background: #1f2937;
   color: #fff;
-}
-
-.playlist-track-remove {
-  position: absolute;
-  right: 8px;
-  top: 7px;
-  width: 16px;
-  height: 16px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(185, 28, 28, 0.85);
-  color: #fff;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.playlist-track-remove:hover {
-  background: rgba(220, 38, 38, 0.95);
 }
