@@ -1,22 +1,37 @@
 import dayjs from "dayjs";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth";
+import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { disconnectChatSocket, getChatSocket } from "../../../realtime/chat-socket";
 import {
   fetchChatConversations,
   fetchChatMessages,
   getMyProfile,
+  getProfilesBatch,
+  markChatConversationRead,
   postChatMessage,
   type ChatConversationItem,
   type ChatMessageItem,
+  type TeamProfile,
 } from "../../../sync/api";
 import "./ChatDock.css";
+
+const CHAT_PAGE_SIZE = 20;
 
 function shortEmail(email: string) {
   const e = email.trim().toLowerCase();
   const at = e.indexOf("@");
   return at > 0 ? e.slice(0, at) : e;
+}
+
+function chatAuthorLabel(profile: TeamProfile | null | undefined, email: string): string {
+  const p = profile ?? null;
+  const display = String(p?.displayName ?? "").trim();
+  if (display) return display;
+  const full = `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim();
+  if (full) return full;
+  return shortEmail(email);
 }
 
 function conversationLabel(
@@ -42,13 +57,84 @@ export function ChatDock() {
   const [draft, setDraft] = useState("");
   const [myEmail, setMyEmail] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [unreadByConv, setUnreadByConv] = useState<Record<string, number>>({});
+  const [toggleAttention, setToggleAttention] = useState(false);
   const listEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement | null>(null);
+  const topSentinelRef = useRef<HTMLDivElement | null>(null);
+  const skipScrollToEndRef = useRef(false);
+  const scrollRestoreRef = useRef<{ fromTop: number; fromHeight: number } | null>(null);
+  const olderInFlightRef = useRef(false);
+  const authorProfilesRef = useRef<Record<string, TeamProfile | null>>({});
+  const [, authorProfilesTick] = useState(0);
+  const activeIdRef = useRef<string | null>(null);
+  const openRef = useRef(false);
+  const myEmailRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
+  openRef.current = open;
+  myEmailRef.current = myEmail;
 
   useEffect(() => {
     if (!accessToken) {
       disconnectChatSocket();
       setOpen(false);
+      setMyEmail(null);
+      setUnreadByConv({});
+      return;
     }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const profile = await getMyProfile(accessToken);
+        if (!cancelled) setMyEmail(profile.email.trim().toLowerCase());
+      } catch {
+        if (!cancelled) setMyEmail(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      disconnectChatSocket();
+      return;
+    }
+    const sock = getChatSocket(accessToken);
+    if (!sock) return;
+
+    (sock as any).auth = { token: accessToken };
+
+    const onMessage = (payload: ChatMessageItem) => {
+      const mine =
+        myEmailRef.current != null &&
+        payload.authorEmail.trim().toLowerCase() === myEmailRef.current;
+      const viewingThis =
+        openRef.current && activeIdRef.current === payload.conversationId;
+
+      if (!mine && !viewingThis) {
+        setUnreadByConv((prev) => ({
+          ...prev,
+          [payload.conversationId]: (prev[payload.conversationId] ?? 0) + 1,
+        }));
+        if (!openRef.current) setToggleAttention(true);
+      }
+
+      if (viewingThis) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === payload.id)) return prev;
+          return [...prev, payload];
+        });
+      }
+    };
+
+    sock.on("chat-message", onMessage);
+    if (!sock.connected) sock.connect();
+
+    return () => {
+      sock.off("chat-message", onMessage);
+    };
   }, [accessToken]);
 
   useEffect(() => {
@@ -79,13 +165,14 @@ export function ChatDock() {
     setLoadingList(true);
     (async () => {
       try {
-        const [convs, profile] = await Promise.all([
-          fetchChatConversations(),
-          getMyProfile(accessToken),
-        ]);
+        const convs = await fetchChatConversations();
         if (cancelled) return;
         setConversations(convs);
-        setMyEmail(profile.email.trim().toLowerCase());
+        const nextUnread: Record<string, number> = {};
+        for (const c of convs) {
+          nextUnread[c.id] = typeof c.unreadCount === "number" ? c.unreadCount : 0;
+        }
+        setUnreadByConv(nextUnread);
         if (!convs.length) {
           setActiveId(null);
         } else {
@@ -111,9 +198,10 @@ export function ChatDock() {
     let cancelled = false;
     setLoadingMsgs(true);
     setNextBefore(null);
+    setMessages([]);
     (async () => {
       try {
-        const res = await fetchChatMessages(activeId);
+        const res = await fetchChatMessages(activeId, { limit: CHAT_PAGE_SIZE });
         if (!cancelled) {
           setMessages(res.messages);
           setNextBefore(res.nextBeforeMessageId);
@@ -133,58 +221,123 @@ export function ChatDock() {
   }, [open, activeId]);
 
   useEffect(() => {
-    if (!open || !accessToken || !activeId) return undefined;
-    const sock = getChatSocket(accessToken);
-    if (!sock) return undefined;
-
-    (sock as any).auth = { token: accessToken };
-
-    const onMessage = (payload: ChatMessageItem) => {
-      if (payload.conversationId !== activeId) return;
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === payload.id)) return prev;
-        return [...prev, payload];
-      });
-    };
-
-    sock.on("chat-message", onMessage);
-
-    const join = () => {
-      sock.emit("join-conversation", { conversationId: activeId });
-    };
-
-    if (sock.connected) join();
-    else {
-      sock.connect();
-      sock.once("connect", join);
-    }
-
+    if (!open || !accessToken || !messages.length) return;
+    const need = [...new Set(messages.map((m) => m.authorEmail.trim().toLowerCase()))];
+    const missing = need.filter((e) => !(e in authorProfilesRef.current));
+    if (!missing.length) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await getProfilesBatch(accessToken, missing);
+        if (cancelled) return;
+        for (const e of missing) {
+          const p = rows.find((r) => r.email.trim().toLowerCase() === e);
+          authorProfilesRef.current[e] = p ?? null;
+        }
+        authorProfilesTick((n) => n + 1);
+      } catch {
+        for (const e of missing) {
+          authorProfilesRef.current[e] = null;
+        }
+        authorProfilesTick((n) => n + 1);
+      }
+    })();
     return () => {
-      sock.emit("leave-conversation", { conversationId: activeId });
-      sock.off("chat-message", onMessage);
-      sock.off("connect", join);
+      cancelled = true;
     };
-  }, [open, accessToken, activeId]);
+  }, [open, accessToken, messages]);
+
+  const lastVisibleMessageId = messages.length ? messages[messages.length - 1]!.id : null;
+
+  useEffect(() => {
+    if (!open || !activeId || !accessToken || loadingMsgs || !lastVisibleMessageId) return;
+    const t = window.setTimeout(() => {
+      void markChatConversationRead(activeId, lastVisibleMessageId).then((res) => {
+        setUnreadByConv((prev) => ({ ...prev, [activeId]: res.unreadCount }));
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [open, activeId, accessToken, loadingMsgs, lastVisibleMessageId]);
+
+  useEffect(() => {
+    if (open) setToggleAttention(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!toggleAttention) return;
+    const t = window.setTimeout(() => setToggleAttention(false), 2200);
+    return () => window.clearTimeout(t);
+  }, [toggleAttention]);
+
+  useLayoutEffect(() => {
+    const p = scrollRestoreRef.current;
+    if (!p) return;
+    scrollRestoreRef.current = null;
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    const delta = el.scrollHeight - p.fromHeight;
+    el.scrollTop = p.fromTop + delta;
+  }, [messages]);
 
   useEffect(() => {
     if (!open) return;
+    if (skipScrollToEndRef.current) {
+      skipScrollToEndRef.current = false;
+      return;
+    }
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [open, messages.length]);
 
+  const totalUnread = useMemo(
+    () => Object.values(unreadByConv).reduce((a, n) => a + (typeof n === "number" ? n : 0), 0),
+    [unreadByConv],
+  );
+
   const loadOlder = useCallback(async () => {
-    if (!activeId || !nextBefore || loadingOlder) return;
+    if (!activeId || !nextBefore || olderInFlightRef.current) return;
+    olderInFlightRef.current = true;
     setLoadingOlder(true);
     try {
       const res = await fetchChatMessages(activeId, {
         beforeMessageId: nextBefore,
-        limit: 50,
+        limit: CHAT_PAGE_SIZE,
       });
+      const root = messagesScrollRef.current;
+      if (root) {
+        scrollRestoreRef.current = {
+          fromTop: root.scrollTop,
+          fromHeight: root.scrollHeight,
+        };
+      }
+      skipScrollToEndRef.current = true;
       setMessages((prev) => [...res.messages, ...prev]);
       setNextBefore(res.nextBeforeMessageId);
+    } catch {
+      scrollRestoreRef.current = null;
+      skipScrollToEndRef.current = false;
     } finally {
+      olderInFlightRef.current = false;
       setLoadingOlder(false);
     }
-  }, [activeId, nextBefore, loadingOlder]);
+  }, [activeId, nextBefore]);
+
+  useEffect(() => {
+    if (!open || !activeId || !nextBefore || loadingMsgs) return;
+    const root = messagesScrollRef.current;
+    const sentinel = topSentinelRef.current;
+    if (!root || !sentinel) return;
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const hit = entries[0]?.isIntersecting;
+        if (!hit || olderInFlightRef.current) return;
+        void loadOlder();
+      },
+      { root, rootMargin: "120px 0px 0px 0px", threshold: 0 },
+    );
+    io.observe(sentinel);
+    return () => io.disconnect();
+  }, [open, activeId, nextBefore, loadingMsgs, loadOlder]);
 
   const send = useCallback(async () => {
     const text = draft.trim();
@@ -207,25 +360,46 @@ export function ChatDock() {
 
   const activeConv = conversations.find((c) => c.id === activeId);
   const activeTitle = activeConv ? conversationLabel(activeConv, myTroupe) : "Чат";
+  const toggleUnreadLabel =
+    totalUnread > 0 ? `${totalUnread > 99 ? "99+" : totalUnread} непрочитанных` : "";
 
   return (
     <>
       <button
         type="button"
-        className="chat-dock-toggle"
-        aria-label={open ? "Закрыть чат" : "Открыть чат"}
-        title="Чат"
+        className={[
+          "chat-dock-toggle",
+          totalUnread > 0 ? "chat-dock-toggle--has-unread" : "",
+          toggleAttention ? "chat-dock-toggle--attention" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        aria-label={
+          open
+            ? "Закрыть чат"
+            : toggleUnreadLabel
+              ? `Открыть чат, ${toggleUnreadLabel}`
+              : "Открыть чат"
+        }
+        title={toggleUnreadLabel ? `Чат — ${toggleUnreadLabel}` : "Чат"}
         onClick={() => setOpen((v) => !v)}
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path
-            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <span className="chat-dock-toggle-inner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {totalUnread > 0 ? (
+            <span className="chat-dock-toggle-badge" aria-hidden>
+              {totalUnread > 99 ? "99+" : totalUnread}
+            </span>
+          ) : null}
+        </span>
       </button>
 
       {open ? (
@@ -284,16 +458,29 @@ export function ChatDock() {
                   type="button"
                   role="tab"
                   aria-selected={c.id === activeId}
-                  className={`chat-dock-conv-btn ${c.id === activeId ? "chat-dock-conv-btn--active" : ""}`}
+                  className={[
+                    "chat-dock-conv-btn",
+                    c.id === activeId ? "chat-dock-conv-btn--active" : "",
+                    (unreadByConv[c.id] ?? 0) > 0 && c.id !== activeId
+                      ? "chat-dock-conv-btn--unread"
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   onClick={() => setActiveId(c.id)}
                 >
-                  {conversationLabel(c, myTroupe)}
+                  <span className="chat-dock-conv-btn-label">{conversationLabel(c, myTroupe)}</span>
+                  {(unreadByConv[c.id] ?? 0) > 0 && c.id !== activeId ? (
+                    <span className="chat-dock-conv-badge" aria-hidden>
+                      {(unreadByConv[c.id] ?? 0) > 99 ? "99+" : unreadByConv[c.id]}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
           ) : null}
 
-          <div className="chat-dock-messages">
+          <div className="chat-dock-messages" ref={messagesScrollRef}>
             {loadingList || loadingMsgs ? (
               <div className="chat-dock-muted">Загрузка…</div>
             ) : !conversations.length ? (
@@ -303,29 +490,44 @@ export function ChatDock() {
             ) : (
               <>
                 {nextBefore ? (
-                  <button
-                    type="button"
-                    className="chat-dock-load-more"
-                    disabled={loadingOlder}
-                    onClick={() => void loadOlder()}
-                  >
-                    {loadingOlder ? "…" : "Раньше"}
-                  </button>
+                  <div className="chat-dock-history-top" aria-busy={loadingOlder}>
+                    <div ref={topSentinelRef} className="chat-dock-history-sentinel" aria-hidden />
+                    {loadingOlder ? (
+                      <div className="chat-dock-history-loading">Загрузка истории…</div>
+                    ) : null}
+                  </div>
                 ) : null}
                 {messages.map((m) => {
                   const mine =
                     myEmail != null &&
                     m.authorEmail.trim().toLowerCase() === myEmail;
+                  const norm = m.authorEmail.trim().toLowerCase();
+                  const prof = authorProfilesRef.current[norm];
+                  const label = chatAuthorLabel(prof ?? undefined, m.authorEmail);
+                  const avatarSrc =
+                    prof && String(prof.avatarUrl ?? "").trim()
+                      ? String(prof.avatarUrl).trim()
+                      : null;
                   return (
                     <article
                       key={m.id}
                       className={`chat-dock-msg ${mine ? "chat-dock-msg--mine" : ""}`}
                     >
-                      <div className="chat-dock-msg-meta">
-                        <span>{shortEmail(m.authorEmail)}</span>
-                        <span>{dayjs(m.createdAt).format("DD.MM HH:mm")}</span>
+                      <div className="chat-dock-msg-row">
+                        <MiniAvatar
+                          src={avatarSrc}
+                          label={label}
+                          size={28}
+                          title={m.authorEmail}
+                        />
+                        <div className="chat-dock-msg-col">
+                          <div className="chat-dock-msg-meta">
+                            <span title={m.authorEmail}>{label}</span>
+                            <span>{dayjs(m.createdAt).format("DD.MM HH:mm")}</span>
+                          </div>
+                          <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                        </div>
                       </div>
-                      <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
                     </article>
                   );
                 })}

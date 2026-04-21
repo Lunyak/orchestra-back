@@ -16,15 +16,36 @@ label.labeled-checkbox:has(.labeled-checkbox__input:disabled) {
   opacity: 0.55;
 }
 
-/* Нативный чекбокс + accent как у заголовка канбана (#e78a4e) */
+/*
+ * Кастомная отрисовка: в неотмеченном состоянии нативный чекбокс часто остаётся светлым;
+ * рамка и фон в тон канбана (#e78a4e).
+ */
 .labeled-checkbox__input {
+  box-sizing: border-box;
   width: 18px;
   height: 18px;
   flex-shrink: 0;
   margin: 0;
   border-radius: 4px;
-  accent-color: #e78a4e;
   cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 2px solid rgba(231, 138, 78, 0.82);
+  background-color: rgba(8, 10, 14, 0.72);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 11px 11px;
+}
+
+.labeled-checkbox__input:hover:not(:disabled) {
+  border-color: rgba(243, 170, 112, 0.95);
+  background-color: rgba(12, 14, 18, 0.88);
+}
+
+.labeled-checkbox__input:checked {
+  border-color: #e78a4e;
+  background-color: #e78a4e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 6.2 5.1 8.8 9.5 3.4' stroke='%23f8fafc' stroke-width='1.85' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .labeled-checkbox__input:focus-visible {
@@ -34,6 +55,13 @@ label.labeled-checkbox:has(.labeled-checkbox__input:disabled) {
 
 .labeled-checkbox__input:disabled {
   cursor: not-allowed;
+  border-color: rgba(231, 138, 78, 0.35);
+  background-color: rgba(8, 10, 14, 0.4);
+}
+
+.labeled-checkbox__input:disabled:checked {
+  background-color: rgba(231, 138, 78, 0.45);
+  border-color: rgba(231, 138, 78, 0.4);
 }
 
 .labeled-checkbox__text {

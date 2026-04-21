@@ -11,6 +11,10 @@ services:
       - ./back/src:/app/src
       - ./back/prisma:/app/prisma
       - ./back/test:/app/test
+      # Синхронизация манифеста с хостом + npm install при старте — иначе анонимный том
+      # /app/node_modules залипает на старых пакетах после добавления зависимостей (без ручного docker volume rm).
+      - ./back/package.json:/app/package.json
+      - ./back/package-lock.json:/app/package-lock.json
       - /app/node_modules
     environment:
       NODE_ENV: development
@@ -20,7 +24,7 @@ services:
     ports:
       - "3000:3000"
       - "9229:9229" # Debug port для Node.js
-    command: sh -c "npx prisma generate && npx prisma migrate deploy && npm run start:dev"
+    command: sh -c "npm install --no-audit --fund=false && npx prisma generate && npx prisma migrate deploy && npm run start:dev"
 
   web:
     build:

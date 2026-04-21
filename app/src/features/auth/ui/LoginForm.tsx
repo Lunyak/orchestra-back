@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getApiBaseUrl } from "../../../sync/api";
-import { forgotPassword, resetPassword } from "../../../sync/auth";
+import { forgotPassword } from "../../../sync/auth";
 import { useAuth } from "../model/auth-context";
 
 export function LoginForm({
@@ -8,6 +9,7 @@ export function LoginForm({
 }: {
   onAfterLogin?: (token: string) => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const { login: doLogin, signUp } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -16,8 +18,6 @@ export function LoginForm({
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [acceptLegal, setAcceptLegal] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
-  const [resetToken, setResetToken] = useState("");
-  const [resetNewPassword, setResetNewPassword] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
 
   const apiBase = getApiBaseUrl();
@@ -27,27 +27,9 @@ export function LoginForm({
     e.preventDefault();
     setError(null);
     setMessage(null);
+    if (isResetMode) return;
     try {
       const emailNorm = email.trim().toLowerCase();
-      if (isResetMode) {
-        if (!resetToken.trim()) {
-          setError("Нужен код/токен для сброса");
-          return;
-        }
-        if (!resetNewPassword) {
-          setError("Нужен новый пароль");
-          return;
-        }
-        setResetLoading(true);
-        await resetPassword(resetToken.trim(), resetNewPassword);
-        setResetLoading(false);
-        setIsResetMode(false);
-        setResetToken("");
-        setResetNewPassword("");
-        setPassword("");
-        setMessage("Пароль обновлён. Теперь войдите с новым паролем.");
-        return;
-      }
       if (isRegisterMode) {
         if (!acceptLegal) {
           setError("Нужно принять соглашение и политику, чтобы создать аккаунт");
@@ -61,9 +43,14 @@ export function LoginForm({
       } else {
         await doLogin(emailNorm, password, onAfterLogin);
       }
-    } catch (err: any) {
-      setResetLoading(false);
-      setError(err?.response?.data?.message ?? "Ошибка");
+    } catch (err: unknown) {
+      const msg =
+        err &&
+        typeof err === "object" &&
+        "response" in err &&
+        (err as { response?: { data?: { message?: string } } }).response?.data
+          ?.message;
+      setError(typeof msg === "string" ? msg : "Ошибка");
     }
   };
 
@@ -91,6 +78,9 @@ export function LoginForm({
         </label>
         {isResetMode ? (
           <>
+            <p className="login-form-subtitle" style={{ marginTop: 8 }}>
+              Мы отправим письмо со ссылкой для смены пароля (если такой аккаунт есть).
+            </p>
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
               <button
                 type="button"
@@ -103,21 +93,29 @@ export function LoginForm({
                   setResetLoading(true);
                   try {
                     const res = await forgotPassword(emailNorm);
-                    // В проде токен не возвращаем (его надо доставлять пользователю по каналу связи).
-                    if (res?.token) setResetToken(res.token);
+                    if (res?.token) {
+                      navigate(
+                        `/reset-password?token=${encodeURIComponent(res.token)}`,
+                      );
+                      return;
+                    }
                     setMessage(
-                      res?.token
-                        ? "Код создан (dev): вставлен в поле ниже."
-                        : "Если такой email существует, мы подготовили сброс пароля.",
+                      "Если такой email зарегистрирован, на почту ушло письмо со ссылкой. Проверьте папку «Спам».",
                     );
-                  } catch (err: any) {
-                    setError(err?.response?.data?.message ?? "Ошибка");
+                  } catch (err: unknown) {
+                    const msg =
+                      err &&
+                      typeof err === "object" &&
+                      "response" in err &&
+                      (err as { response?: { data?: { message?: string } } })
+                        .response?.data?.message;
+                    setError(typeof msg === "string" ? msg : "Ошибка");
                   } finally {
                     setResetLoading(false);
                   }
                 }}
               >
-                {resetLoading ? "…" : "Получить код"}
+                {resetLoading ? "…" : "Отправить ссылку"}
               </button>
               <button
                 type="button"
@@ -125,33 +123,11 @@ export function LoginForm({
                   setIsResetMode(false);
                   setError(null);
                   setMessage(null);
-                  setResetToken("");
-                  setResetNewPassword("");
                 }}
               >
                 Назад к входу
               </button>
             </div>
-            <label>
-              Код / токен
-              <input
-                value={resetToken}
-                onChange={(e) => setResetToken(e.target.value)}
-                placeholder="вставь код из письма/сообщения"
-              />
-            </label>
-            <label>
-              Новый пароль
-              <input
-                type="password"
-                value={resetNewPassword}
-                onChange={(e) => setResetNewPassword(e.target.value)}
-                placeholder="минимум 6 символов"
-              />
-            </label>
-            <button type="submit" disabled={resetLoading}>
-              {resetLoading ? "…" : "Сменить пароль"}
-            </button>
           </>
         ) : (
           <>
@@ -206,8 +182,6 @@ export function LoginForm({
                   setError(null);
                   setMessage(null);
                   setIsResetMode(true);
-                  setResetToken("");
-                  setResetNewPassword("");
                 }}
               >
                 Забыли пароль?

@@ -538,6 +538,7 @@ export interface ChatConversationItem {
   kind: ChatConversationKind;
   troupeId: string | null;
   title: string;
+  unreadCount?: number;
 }
 
 export interface ChatMessageItem {
@@ -553,6 +554,17 @@ export interface ChatMessageItem {
 export async function fetchChatConversations(): Promise<ChatConversationItem[]> {
   const { data } = await api.get<ChatConversationItem[]>("/chat/conversations");
   return data ?? [];
+}
+
+export async function markChatConversationRead(
+  conversationId: string,
+  lastSeenMessageId?: string,
+): Promise<{ unreadCount: number }> {
+  const { data } = await api.patch<{ unreadCount: number }>(
+    `/chat/conversations/${encodeURIComponent(conversationId)}/read`,
+    lastSeenMessageId ? { lastSeenMessageId } : {},
+  );
+  return data ?? { unreadCount: 0 };
 }
 
 export async function fetchChatMessages(

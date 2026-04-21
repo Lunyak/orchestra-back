@@ -25,6 +25,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
+      WEB_DOMAIN: ${WEB_DOMAIN:-}
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-admin-secret}

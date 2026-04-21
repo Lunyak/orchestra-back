@@ -1,4 +1,5 @@
 import { Button } from "@shared/core/button/Button";
+import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../features/auth";
@@ -20,6 +21,7 @@ import {
   setPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
 import "./style.css";
+import { Buttons } from "@shared/components/buttons/Buttons";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -263,10 +265,6 @@ export function SettingsPage() {
               ) : (
                 <>
                   <h3>Пригласить в проект</h3>
-                  <p className="settings-invite-hint">
-                    Другие пользователи смогут подсоединиться к проекту после
-                    регистрации. Укажите email зарегистрированного пользователя.
-                  </p>
                   <div className="settings-invite-row">
                     <input
                       type="email"
@@ -314,28 +312,26 @@ export function SettingsPage() {
                               })()}
                             </span>
                             <div className="settings-member-actions">
-                              <label className="settings-member-role">
-                                <input
-                                  type="checkbox"
-                                  checked={m.role === "editor"}
-                                  onChange={(e) =>
-                                    updateMemberRole(
-                                      m.id,
-                                      e.target.checked ? "editor" : "viewer"
-                                    )
-                                  }
-                                />
+                              <LabeledCheckbox
+                                className="settings-member-role"
+                                checked={m.role === "editor"}
+                                onChange={(checked) =>
+                                  updateMemberRole(
+                                    m.id,
+                                    checked ? "editor" : "viewer"
+                                  )
+                                }
+                              >
                                 {m.role === "editor"
                                   ? "Редактирование"
                                   : "Только просмотр"}
-                              </label>
-                              <button
+                              </LabeledCheckbox>
+                              <Buttons.DeleteButton
                                 type="button"
                                 className="settings-member-remove"
                                 onClick={() => removeMember(m.id)}
                               >
-                                Удалить из проекта
-                              </button>
+                              </Buttons.DeleteButton>
                             </div>
                           </li>
                         ))}

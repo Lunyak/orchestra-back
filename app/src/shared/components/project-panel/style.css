@@ -11,8 +11,8 @@
   background: #1f2937;
   color: #e2e8f0;
   border: 1px solid #374151;
-  border-radius: 6px;
   padding: 4px 8px;
+  height: 29.5px;
   font-size: 12px;
 }
 
@@ -24,20 +24,15 @@
   background: #1f2937;
   color: #e2e8f0;
   border: 1px solid #374151;
-  border-radius: 6px;
-  padding: 4px 8px;
+  height: 25.5px;
   font-size: 12px;
   min-width: 160px;
 }
 
 .project-panel button {
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
+  width: fit-content;
+  padding: var(--spacing-3) var(--spacing-5);
+  height: 25.5px;
 }
 
 .project-panel button:hover {

@@ -618,9 +618,13 @@ body {
 }
 
 .settings-view {
+  height: fit-content;
   text-align: left;
   color: #e2e8f0;
   padding: 24px;
+
+  max-width: 1220px;
+  width: 100%;
 
   background-color: var(--color-bg-secondary);
 }
@@ -857,25 +861,13 @@ body {
   margin-left: auto;
 }
 
-.settings-member-role {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  cursor: pointer;
+/* см. LabeledCheckbox + .labeled-checkbox__input (канбан / роли) */
+.settings-member-role.labeled-checkbox {
   white-space: nowrap;
 }
 
-.settings-member-role input {
-  margin: 0;
-}
-
 .settings-member-remove {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8rem;
-  color: #f87171;
   background: transparent;
-  border: 1px solid rgba(248, 113, 113, 0.4);
-  border-radius: 4px;
   cursor: pointer;
 }
 

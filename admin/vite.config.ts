@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -5,14 +6,17 @@ import { defineConfig, loadEnv } from "vite";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function resolveApiProxyTarget(raw: string | undefined): string {
+  const explicit = String(process.env.DEV_PROXY_API ?? "").trim();
+  if (explicit) return explicit;
+  if (existsSync("/.dockerenv")) return "http://back:3000";
+  if (raw?.startsWith("http://") || raw?.startsWith("https://")) return String(raw);
+  return "http://localhost:3000";
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  const apiTarget =
-    process.env.DEV_PROXY_API ||
-    (env.VITE_API_BASE_URL?.startsWith("http://") ||
-    env.VITE_API_BASE_URL?.startsWith("https://")
-      ? env.VITE_API_BASE_URL
-      : "http://localhost:3000");
+  const apiTarget = resolveApiProxyTarget(env.VITE_API_BASE_URL);
   const minioTarget =
     env.VITE_MINIO_PROXY_TARGET?.startsWith("http://") ||
     env.VITE_MINIO_PROXY_TARGET?.startsWith("https://")

@@ -95,6 +95,12 @@ const TermsPage = lazy(() =>
   })),
 );
 
+const ResetPasswordPage = lazy(() =>
+  import("../../pages/login/ResetPasswordPage").then((m) => ({
+    default: m.ResetPasswordPage,
+  })),
+);
+
 /**
  * Компонент с маршрутами приложения.
  * Используется внутри провайдеров (AuthProvider, ProjectProvider, etc.)
@@ -215,6 +221,7 @@ export function AppRoutes() {
         }
       >
         <Routes>
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<SpectaclePage />} />
           <Route path="/theater" element={<SpectaclePage />} />
           <Route path="/light-plot" element={<SpectaclePage />} />

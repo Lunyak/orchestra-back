@@ -4,6 +4,7 @@ import { ProjectProvider } from "../features/project";
 import { SceneProvider } from "../features/scene";
 import { ScriptUIProvider } from "../features/script-ui";
 import { LoginPage } from "../pages/login/LoginPage";
+import { ResetPasswordPage } from "../pages/login/ResetPasswordPage";
 import { PrivacyPage } from "../pages/legal/PrivacyPage";
 import { TermsPage } from "../pages/legal/TermsPage";
 import { SpectaclePageLockGuard } from "./SpectaclePageLockGuard";
@@ -33,6 +34,7 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
       <Routes>
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<LoginPage onAfterLogin={onAfterLogin} />} />
       </Routes>
     );

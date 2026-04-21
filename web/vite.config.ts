@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -6,17 +7,25 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** Vite dev server (proxy) runs in Node; inside Docker it must reach API by compose service name, not LAN IP. */
+function resolveApiProxyTarget(rawBase: string): string {
+  const explicit = String(process.env.DEV_PROXY_API ?? "").trim();
+  if (explicit) return explicit;
+
+  const inDocker = existsSync("/.dockerenv");
+  if (inDocker) return "http://back:3000";
+
+  if (rawBase.startsWith("http://") || rawBase.startsWith("https://")) return rawBase;
+  return "http://localhost:3000";
+}
+
 // Чистая веб-конфигурация Vite без Electron
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const rawBase = String(env.VITE_API_BASE_URL || "http://localhost:3000");
   const basePath = String(env.VITE_BASE_PATH || "/");
-  // DEV_PROXY_API — только для dev-сервера Vite в Docker (не VITE_*: не попадает в import.meta.env браузера)
-  const proxyTarget =
-    process.env.DEV_PROXY_API ||
-    (rawBase.startsWith("http://") || rawBase.startsWith("https://")
-      ? rawBase
-      : "http://localhost:3000");
+  // DEV_PROXY_API — явный URL для прокси (compose: http://back:3000). Иначе в Docker — back:3000, на хосте — rawBase или localhost.
+  const proxyTarget = resolveApiProxyTarget(rawBase);
   return {
     base: basePath,
     optimizeDeps: {
