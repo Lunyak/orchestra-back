@@ -20,6 +20,7 @@ import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
 import { TroupeModule } from './troupe/troupe.module';
 import { RolesModule } from './roles/roles.module';
 import { SiteAnalyticsModule } from './site-analytics/site-analytics.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { SiteAnalyticsModule } from './site-analytics/site-analytics.module';
     TroupeModule,
     RolesModule,
     SiteAnalyticsModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

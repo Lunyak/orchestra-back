@@ -30,7 +30,13 @@ export class TroupeService {
   }
 
   async getMyTroupeWithMembers(userId: string) {
-    const troupe = await this.getOrCreateMyTroupe(userId);
+    const troupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+    });
+    if (!troupe) {
+      return { troupe: null, members: [] };
+    }
+
     const members = await this.prisma.troupeMember.findMany({
       where: { troupeId: troupe.id },
       orderBy: { createdAt: 'desc' },
@@ -124,8 +130,39 @@ export class TroupeService {
     }
   }
 
+  async updateMyTroupeTitle(userId: string, rawTitle: unknown) {
+    const title = String(rawTitle ?? '')
+      .trim()
+      .replace(/\s+/g, ' ');
+    if (!title) throw new BadRequestException('title is required');
+    if (title.length > 120) throw new BadRequestException('title is too long');
+
+    const troupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+    });
+    if (!troupe) {
+      throw new NotFoundException(
+        'Своей труппы ещё нет — добавьте первого участника по email',
+      );
+    }
+    const updated = await this.prisma.troupe.update({
+      where: { id: troupe.id },
+      data: { title },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    return updated;
+  }
+
   async removeMember(userId: string, memberId: string) {
-    const troupe = await this.getOrCreateMyTroupe(userId);
+    const troupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+    });
+    if (!troupe) throw new NotFoundException('Troupe not found');
     const id = String(memberId ?? '').trim();
     if (!id) throw new BadRequestException('memberId is required');
 

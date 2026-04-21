@@ -5,6 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.10.0"
+  },
   "scripts": {
     "build": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -19,7 +22,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migrate:fix-roles": "ts-node -r tsconfig-paths/register scripts/fix-role-characters.ts",
-    "migrate:site-media": "node migrate-site-media.cjs"
+    "migrate:site-media": "node migrate-site-media.cjs",
+    "migrate:baseline-applied": "bash scripts/baseline-migrations-applied.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.692.0",

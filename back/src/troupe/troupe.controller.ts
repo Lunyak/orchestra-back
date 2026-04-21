@@ -4,12 +4,14 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AddTroupeMemberDto } from './dto/add-troupe-member.dto';
+import { PatchTroupeDto } from './dto/patch-troupe.dto';
 import { TroupeService } from './troupe.service';
 
 @UseGuards(JwtAuthGuard)
@@ -20,6 +22,11 @@ export class TroupeController {
   @Get()
   getMyTroupe(@Req() req: any) {
     return this.troupeService.getMyTroupeWithMembers(req.user.userId);
+  }
+
+  @Patch()
+  patchMyTroupe(@Req() req: any, @Body() body: PatchTroupeDto) {
+    return this.troupeService.updateMyTroupeTitle(req.user.userId, body?.title);
   }
 
   @Post('members')

@@ -30,6 +30,7 @@ model User {
   troupeMemberships  TroupeMember[]
   troupeOwned        Troupe?
   passwordResetTokens PasswordResetToken[]
+  chatMessages       ChatMessage[]
 }
 
 model PasswordResetToken {
@@ -637,9 +638,46 @@ model Troupe {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  members     TroupeMember[]
+  members            TroupeMember[]
+  chatConversations  ChatConversation[]
 
   @@index([ownerUserId])
+}
+
+enum ChatConversationKind {
+  TROUPE
+}
+
+/// Комната чата: тип + привязка к сущности (сейчас только труппа).
+model ChatConversation {
+  id        String               @id @default(cuid())
+  kind      ChatConversationKind
+  troupeId  String?
+  title     String?
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  troupe   Troupe?       @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@unique([troupeId, kind])
+  @@index([troupeId])
+}
+
+model ChatMessage {
+  id              String   @id @default(cuid())
+  conversationId String
+  authorUserId    String
+  body            String
+  clientMessageId String?
+  createdAt       DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author       User             @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, clientMessageId])
+  @@index([conversationId, createdAt])
+  @@index([authorUserId])
 }
 
 model TroupeMember {
