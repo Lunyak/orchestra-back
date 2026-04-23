@@ -109,9 +109,11 @@ input.native-text-input[type="email"],
 input.native-text-input[type="password"],
 input.native-text-input[type="number"],
 input.native-text-input[type="time"],
-input.native-text-input[type="date"] {
+input.native-text-input[type="date"],
+textarea.native-text-input {
   width: 100%;
   max-width: 100%;
+  min-width: 0;
   box-sizing: border-box;
   min-height: var(--field-control-min-height);
   padding: var(--field-control-padding-y) var(--field-control-padding-x);
@@ -130,19 +132,41 @@ input.native-text-input[type="date"] {
     box-shadow 0.16s ease;
 }
 
+textarea.native-text-input {
+  min-height: 6.5rem;
+  max-height: min(40vh, 22rem);
+  resize: vertical;
+  line-height: 1.45;
+  vertical-align: top;
+  border-radius: var(--field-control-radius);
+}
+
 .native-text-input:hover,
-input.native-text-input:hover {
+input.native-text-input:hover,
+textarea.native-text-input:hover {
   background: var(--field-control-bg-hover);
+  border-color: var(--field-control-border-hover);
+}
+
+.native-text-input:focus-visible,
+input.native-text-input:focus-visible,
+textarea.native-text-input:focus-visible {
+  border-color: var(--field-control-border-focus);
+  box-shadow:
+    var(--field-control-inset),
+    0 0 0 2px var(--field-control-focus-ring);
 }
 
 .native-text-input:disabled,
-input.native-text-input:disabled {
+input.native-text-input:disabled,
+textarea.native-text-input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
 .native-text-input::placeholder,
-input.native-text-input::placeholder {
+input.native-text-input::placeholder,
+textarea.native-text-input::placeholder {
   color: var(--color-text-placeholder);
   font-weight: var(--font-weight-normal);
 }

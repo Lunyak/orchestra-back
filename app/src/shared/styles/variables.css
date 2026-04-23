@@ -10,7 +10,7 @@
   --color-bg-quaternary: #333b52;
 
   --color-bg-dark: #020617;
-  --color-bg-overlay: rgba(15, 23, 42, 0.85);
+  --color-bg-overlay: rgba(16, 16, 18, 0.96);
   --color-bg-modal: rgba(16, 16, 18, 0.96);
   --color-bg-login: rgba(15, 23, 42, 0.96);
 
@@ -30,7 +30,7 @@
   --color-border-medium: rgba(255, 255, 255, 0.10);
   --color-border-visible: rgba(255, 255, 255, 0.12);
   --color-border-strong: rgba(255, 255, 255, 0.14);
-  --color-border-accent: rgba(148, 163, 184, 0.15);
+  --color-border-accent: rgba(14, 15, 15, 0.15);
 
   /* Нативные поля (.native-select / .native-text-input) — тот же тон, что карточки и list-item */
   --field-control-bg: rgba(29, 32, 33, 0.97);
@@ -123,7 +123,7 @@
   --color-shadow-strong: rgba(0, 0, 0, 0.55);
   --color-shadow-dark: rgba(0, 0, 0, 0.6);
   --color-shadow-light: rgba(0, 0, 0, 0.1);
-  --color-shadow-overlay: rgba(15, 23, 42, 0.8);
+  --color-shadow-overlay: rgba(0, 0, 0, 0.8);
   --color-shadow-glow-success: rgba(34, 197, 94, 0.35);
   --color-shadow-glow-success-strong: rgba(34, 197, 94, 0.5);
   --color-shadow-glow-warning: rgba(251, 191, 36, 0.5);
@@ -139,6 +139,9 @@
   --color-button-danger: #b91c1c;
 
   /* ===== РАЗМЕРЫ ===== */
+
+  /* Контейнеры */
+  --width-content-page: 1440px;
 
   /* Border radius */
   --radius-xs: 4px;

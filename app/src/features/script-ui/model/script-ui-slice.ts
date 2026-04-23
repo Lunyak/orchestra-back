@@ -51,11 +51,11 @@ function persistBooleans(state: ScriptUiState) {
 
 function defaultState(): ScriptUiState {
   return {
-    showRequisites: true,
+    showRequisites: false,
     showPlaylistSidebar: true,
     showHeaderSounds: true,
     isStepsCollapsed: false,
-    showStepRoles: true,
+    showStepRoles: false,
     showScriptEditorTools: false,
     mobilePlaylistOpen: false,
     mobileStepsOpen: false,

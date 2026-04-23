@@ -21,8 +21,7 @@
   width: 100%;
   overflow: hidden;
   background: var(--color-bg-modal);
-  /* border: 1px solid var(--color-border-strong); */
-  box-shadow: var(--shadow-modal, 0 20px 60px rgba(0, 0, 0, 0.55));
+  box-shadow: var(--shadow-modal, 20px 20px 20px);
   color: var(--color-text-primary, inherit);
 }
 
@@ -31,6 +30,6 @@
 }
 
 .modal-panel:focus-visible {
-  outline: 2px solid var(--color-bg-tertiary);
+  /* outline: 2px solid var(--color-bg-tertiary); */
   outline-offset: 2px;
 }

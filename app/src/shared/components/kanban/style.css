@@ -5,7 +5,7 @@
   margin: 0 auto;
   color: var(--color-text-lighter);
   background: var(--color-bg-primary);
-  max-width: 1440px;
+  max-width: var(--width-content-page);
   margin: 0 auto;
 }
 

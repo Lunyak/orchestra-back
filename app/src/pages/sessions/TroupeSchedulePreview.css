@@ -1,0 +1,64 @@
+.troupe-schedule-preview {
+  margin-top: 12px;
+}
+
+.troupe-schedule-preview--session-window .troupe-header-day-num {
+  font-size: 11px;
+  line-height: 13px;
+}
+
+.troupe-schedule-preview--session-window .troupe-header-day-wd {
+  font-size: 9px;
+  line-height: 11px;
+}
+
+.troupe-schedule-preview--session-window .troupe-day-cell {
+  min-width: 0;
+  min-height: 18px;
+  padding: 0;
+}
+
+.troupe-schedule-preview--session-window .troupe-actor-name {
+  max-width: 168px;
+  font-size: 12px;
+  line-height: 13px;
+}
+
+.troupe-schedule-preview--session-window .troupe-actor-row {
+  gap: 8px;
+}
+
+.troupe-schedule-preview__muted {
+  margin-top: 6px;
+}
+
+.troupe-schedule-preview__loading {
+  margin-top: 8px;
+}
+
+.troupe-header-day-num {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+.troupe-header-day-wd {
+  font-size: 10px;
+  opacity: 0.7;
+  line-height: 12px;
+}
+
+.troupe-actor-row {
+  min-width: 0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.troupe-actor-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  justify-content: center;
+  min-width: 0;
+}

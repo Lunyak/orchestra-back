@@ -5,7 +5,7 @@
     padding: 4px 8px;
 
     text-align: left;
-    background: #333b52;
+    /* background: #333b52; */
     color: #fff;
     border: none;
     cursor: pointer;
@@ -17,8 +17,8 @@
 }
 
 .list-item.active {
-    background: var(--color-bg-tertiary);
-    color: var(--color-text-secondary);
+    /* background: var(--color-bg-tertiary); */
+    /* color: var(--color-text); */
 }
 
 .list-item:hover {

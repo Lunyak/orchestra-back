@@ -202,6 +202,11 @@
   opacity: 0.95;
 }
 
+.director-session-page__called-status--confirmed {
+  color: #e78a4e;
+  opacity: 0.98;
+}
+
 .director-session-page__slots {
   margin-top: 8px;
   display: grid;

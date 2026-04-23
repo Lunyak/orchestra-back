@@ -14,11 +14,17 @@ interface ListItemProps {
     onDrop?: (event: React.DragEvent<HTMLDivElement>) => void
     onDragEnd?: (event: React.DragEvent<HTMLDivElement>) => void
     onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
+    onDoubleClick?: (event: React.MouseEvent<HTMLDivElement>) => void
+    onPointerDown?: (event: React.PointerEvent<HTMLDivElement>) => void
+    onPointerMove?: (event: React.PointerEvent<HTMLDivElement>) => void
+    onPointerUp?: (event: React.PointerEvent<HTMLDivElement>) => void
+    onPointerLeave?: (event: React.PointerEvent<HTMLDivElement>) => void
+    onPointerCancel?: (event: React.PointerEvent<HTMLDivElement>) => void
 }
 
-export const ListItem = ({ children, className, title, draggable, onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd, onClick }: ListItemProps) => {
+export const ListItem = ({ children, className, title, draggable, onDragStart, onDragOver, onDragEnter, onDragLeave, onDrop, onDragEnd, onClick, onDoubleClick, onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onPointerCancel }: ListItemProps) => {
     return (
-        <div className={cn('list-item', className)} title={title} draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDrop={onDrop} onDragEnd={onDragEnd} onClick={onClick}>
+        <div className={cn('list-item', className)} title={title} draggable={draggable} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDrop={onDrop} onDragEnd={onDragEnd} onClick={onClick} onDoubleClick={onDoubleClick} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerLeave={onPointerLeave} onPointerCancel={onPointerCancel}>
             {children}
         </div>
     )

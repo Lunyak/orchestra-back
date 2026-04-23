@@ -1,3 +1,14 @@
+/** Vite-подобные флаги сборки (приложение собирается Vite из родительского пакета). */
+interface ImportMetaEnv {
+  readonly DEV: boolean;
+  readonly PROD: boolean;
+  readonly MODE: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 declare module "obj2gltf";
 declare module "fbx2gltf";
 

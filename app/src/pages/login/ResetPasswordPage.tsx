@@ -1,3 +1,4 @@
+import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getApiBaseUrl } from "../../sync/api";
@@ -48,7 +49,10 @@ export function ResetPasswordPage() {
 
   if (done) {
     return (
-      <div className="app-layout login-layout">
+      <div
+        className="app-layout login-layout"
+        style={loginLayoutBackgroundStyle}
+      >
         <div className="login-form">
           <h1>Пароль обновлён</h1>
           <p className="login-form-subtitle">
@@ -63,7 +67,10 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="app-layout login-layout">
+    <div
+      className="app-layout login-layout"
+      style={loginLayoutBackgroundStyle}
+    >
       <form className="login-form" onSubmit={handleSubmit}>
         <h1>Новый пароль</h1>
         <p className="login-form-subtitle">

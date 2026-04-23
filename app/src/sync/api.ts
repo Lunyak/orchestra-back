@@ -831,12 +831,19 @@ export type DirectorSessionParticipantStatus = "unknown" | "present" | "absent" 
 
 export type DirectorSessionSlotRef = { projectSlug: string; stepId: number };
 
+export type DirectorSlotRoleRehearsalPick = {
+  roleKey: string;
+  email: string;
+  checked: boolean;
+};
+
 export type DirectorSessionSlot = {
   id: string;
   offsetMin: number;
   durationMin: number;
   ref?: DirectorSessionSlotRef;
   notes?: string;
+  roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 
 export type DirectorSessionParticipant = {

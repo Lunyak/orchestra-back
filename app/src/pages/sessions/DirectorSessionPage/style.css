@@ -1,140 +1,123 @@
-/* Локальные дополнения; общий фон и типографика страницы — ../rehearsals/style.css */
+.session__step-item {
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  color: #fff;
+  border: none;
+  /* Стабильная высота строки списка: три текстовых зоны, даже если часть пустая */
+  grid-template-rows: auto auto minmax(calc(12px * 1.35), auto);
+  align-content: start;
+}
 
-.director-session-page__subhead {
+.session__step-item__title {
+  min-height: calc(12px * 1.25);
+  line-height: 1.25;
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 14px;
   align-items: center;
-  margin-top: 8px;
+  gap: 6px 8px;
 }
 
-.director-session-page__subhead a {
-  text-decoration: none;
-  color: inherit;
-  opacity: 0.85;
-  font-size: 12px;
-}
-
-.director-session-page__subhead a:hover {
-  opacity: 1;
-}
-
-.director-session-page__subhead-spacer {
-  flex: 1;
-  min-width: 8px;
-}
-
-.director-session-page__body {
-  margin-top: 12px;
-  display: grid;
-  gap: 10px;
-}
-
-.director-session-page__card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.director-session-page__card-title {
-  font-weight: 900;
-  font-size: 14px;
-}
-
-.director-session-page__invite {
-  margin-top: 0;
-}
-
-.director-session-page__invite-empty {
-  font-size: 12px;
-  line-height: 1.45;
-  margin: 0;
-}
-
-.director-session-page__called-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.director-session-page__called-item {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.1);
-  min-height: 38px;
-  box-sizing: border-box;
-}
-
-.director-session-page__called-name {
+.session__step-item__title-text {
   min-width: 0;
-  flex: 1;
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1 1 12rem;
 }
 
-.director-session-page__slots {
-  margin-top: 8px;
+.session__step-item__badge {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 6px;
+  line-height: 1.2;
+}
+
+.session__step-item__badge-detail {
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.92;
+}
+
+.session__step-item__badge--in-session {
+  background: rgba(251, 191, 36, 0.12);
+  color: rgba(253, 224, 71, 0.96);
+  border: 1px solid rgba(251, 191, 36, 0.38);
+}
+
+.session__step-item--booked:not(.session__step-item--selected) {
+  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.5);
+}
+
+.session__step-item__status {
+  min-height: calc(12px * 1.35);
+  line-height: 1.35;
+}
+
+.session__step-item__missing {
+  min-height: calc(12px * 1.35);
+  line-height: 1.35;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.session__step-item__missing--empty {
+  visibility: hidden;
+}
+
+.director-session-page__preview-pre {
+  min-height: 140px;
+  max-height: 160px;
+  white-space: pre-wrap;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  line-height: 1.35;
+  box-sizing: border-box;
+  margin: 0;
+}
+
+.session__step-item--selected {
+  background: var(--color-bg-tertiary);
+  color: #fff;
+}
+
+.session__step-item--ok {
+  background: rgba(46, 160, 67, 0.08);
+}
+
+.session__step-item--bad {
+  background: rgba(248, 81, 73, 0.06);
+}
+
+.director-session-page__preview {
+  background-color: var(--color-bg-primary);
+  overflow: hidden;
+}
+
+.session__steps-checkbox {
+  display: block;
+  margin-top: 10px;
+
+  span {
+    font-size: 12px;
+    color: #fff;
+  }
+}
+
+.session__steps-list {
+  margin-top: 10px;
   display: grid;
   gap: 8px;
-}
-
-.director-session-page__slot {
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.1);
-  padding: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
-
-.director-session-page__slot-main {
-  min-width: 0;
-}
-
-.director-session-page__slot-time {
-  font-weight: 900;
-  font-size: 13px;
-}
-
-.director-session-page__slot-ref {
-  font-size: 12px;
-  opacity: 0.75;
-  margin-top: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.director-session-page__slot-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--color-bg-tertiary);
-  border: 1px solid rgba(96, 165, 250, 0.3);
-  color: inherit;
-  text-decoration: none;
-  font-weight: 800;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.director-session-page__slot-link:hover {
-  background: var(--color-bg-quaternary);
+  max-height: 550px;
+  overflow: auto;
+  padding-right: 4px;
 }

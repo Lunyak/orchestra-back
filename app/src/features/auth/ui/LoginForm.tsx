@@ -1,3 +1,5 @@
+import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
+import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getApiBaseUrl } from "../../../sync/api";
@@ -21,7 +23,8 @@ export function LoginForm({
   const [resetLoading, setResetLoading] = useState(false);
 
   const apiBase = getApiBaseUrl();
-  const isLocal = apiBase.includes("localhost") || apiBase.includes("127.0.0.1");
+  const isLocal =
+    apiBase.includes("localhost") || apiBase.includes("127.0.0.1");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +35,9 @@ export function LoginForm({
       const emailNorm = email.trim().toLowerCase();
       if (isRegisterMode) {
         if (!acceptLegal) {
-          setError("Нужно принять соглашение и политику, чтобы создать аккаунт");
+          setError(
+            "Нужно принять соглашение и политику, чтобы создать аккаунт",
+          );
           return;
         }
         try {
@@ -55,21 +60,27 @@ export function LoginForm({
   };
 
   return (
-    <div className="app-layout login-layout">
+    <div
+      className="app-layout login-layout"
+      style={loginLayoutBackgroundStyle}
+    >
       <form className="login-form" onSubmit={handleSubmit}>
         <h1>
-          {isResetMode ? "Сброс пароля" : isRegisterMode ? "Регистрация" : "Вход"}
+          {isResetMode
+            ? "Сброс пароля"
+            : isRegisterMode
+              ? "Регистрация"
+              : "Вход"}
         </h1>
         <p className="login-form-subtitle">
-          Войди в аккаунт, чтобы работать с проектами и сценарием на этом устройстве.
+          Войди в аккаунт, чтобы работать с проектами и сценарием на этом
+          устройстве.
         </p>
-        <p className="login-api-hint" title={apiBase}>
-          {isLocal ? "Подключение: локальный сервер" : "Подключение: сервер"}
-          <span className="login-api-url"> {apiBase}</span>
-        </p>
-        <label>
+
+        <label className="login-form__label">
           Email
           <input
+            className="login-form__input "
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -79,9 +90,10 @@ export function LoginForm({
         {isResetMode ? (
           <>
             <p className="login-form-subtitle" style={{ marginTop: 8 }}>
-              Мы отправим письмо со ссылкой для смены пароля (если такой аккаунт есть).
+              Мы отправим письмо со ссылкой для смены пароля (если такой аккаунт
+              есть).
             </p>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+            <div>
               <button
                 type="button"
                 disabled={!email.trim() || resetLoading}
@@ -131,9 +143,10 @@ export function LoginForm({
           </>
         ) : (
           <>
-            <label>
+            <label className="login-form__label">
               Пароль
               <input
+                className="login-form__input "
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -141,14 +154,12 @@ export function LoginForm({
               />
             </label>
             {isRegisterMode ? (
-              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 4 }}>
-                <input
-                  type="checkbox"
-                  checked={acceptLegal}
-                  onChange={(e) => setAcceptLegal(e.target.checked)}
-                  style={{ marginTop: 3 }}
-                />
-                <span style={{ fontSize: 13, opacity: 0.9, lineHeight: "18px" }}>
+              <LabeledCheckbox
+                checked={acceptLegal}
+                onChange={setAcceptLegal}
+                className="login__assign-policy"
+              >
+                <span>
                   Я принимаю{" "}
                   <a href="/terms" target="_blank" rel="noreferrer">
                     Пользовательское соглашение
@@ -159,7 +170,7 @@ export function LoginForm({
                   </a>
                   .
                 </span>
-              </label>
+              </LabeledCheckbox>
             ) : null}
             <button type="submit" disabled={isRegisterMode && !acceptLegal}>
               {isRegisterMode ? "Создать аккаунт" : "Войти"}
@@ -173,7 +184,9 @@ export function LoginForm({
                 setIsRegisterMode((prev) => !prev);
               }}
             >
-              {isRegisterMode ? "У меня уже есть аккаунт" : "Создать новый аккаунт"}
+              {isRegisterMode
+                ? "У меня уже есть аккаунт"
+                : "Создать новый аккаунт"}
             </button>
             {!isRegisterMode ? (
               <button
@@ -191,9 +204,6 @@ export function LoginForm({
         )}
         {error && <div className="login-error">{error}</div>}
         {message && <div className="login-form-footer">{message}</div>}
-        <p className="login-form-footer">
-          Сервер API: <code>{apiBase}</code>
-        </p>
       </form>
     </div>
   );

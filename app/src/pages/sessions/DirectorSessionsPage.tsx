@@ -1,32 +1,40 @@
 import { Buttons } from "@shared/components/buttons/Buttons";
 import { ListItem } from "@shared/components/list-item/ListItem";
 import { Button } from "@shared/core/button/Button";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../features/auth";
-import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
+import "../../features/director-session-detail/director-session-detail.css";
 import {
   loadDirectorSessions,
   saveDirectorSessions,
   type DirectorRehearsalSession,
   type DirectorSessionSlot,
 } from "../../features/director-sessions/directorSessionsSync";
-import type { SceneRolesDataV1 } from "../../features/scene";
-import { DirectorSessionDetailModal } from "../../features/director-session-detail/DirectorSessionDetailModal";
 import { useProject } from "../../features/project";
+import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
+import type { SceneRolesDataV1 } from "../../features/scene";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import type { ScriptStep } from "../../shared/types/script";
 import { createId } from "../../shared/utils/createId";
-import { markdownToPlainText } from "../../shared/utils/textPreview";
 import {
   getProfilesBatch,
-  getProjectMembers,
   getProjectRoles,
   publishDirectorSession,
   syncPull,
   type TeamProfile,
 } from "../../sync/api";
 import "../rehearsals/style.css";
+import {
+  getEmailsPlannedForDirectorSlot,
+  getNormalizedRoleKeysForSlotStep,
+} from "./sessionSlotPlanned";
 import "./style.css";
 
 type ProjectDataCache = Record<
@@ -41,90 +49,15 @@ type ProjectDataCache = Record<
 
 type AvailabilityTimeRange = { from: string; to: string };
 
-const DND_MIME_SLOT_ID = "application/x-orchestra-director-session-slot";
-const DND_MIME_STEP_REF = "application/x-orchestra-director-session-step-ref";
+type SessionsSideCalledStatusTone =
+  | "muted"
+  | "ok"
+  | "warn"
+  | "bad"
+  | "confirmed";
 
-type DragStepRefPayload = {
-  kind: "stepRef";
-  projectSlug: string;
-  stepId: number;
-  durationMin?: number;
-};
-
-function parseDragStepRef(dt: DataTransfer): DragStepRefPayload | null {
-  const raw = dt.getData(DND_MIME_STEP_REF);
-  if (!raw) return null;
-  try {
-    const v = JSON.parse(raw) as Partial<DragStepRefPayload> | null;
-    if (!v || v.kind !== "stepRef") return null;
-    const projectSlug = String(v.projectSlug ?? "").trim();
-    const stepId = Number(v.stepId);
-    const durationMin =
-      v.durationMin == null
-        ? undefined
-        : Math.max(1, Math.floor(Number(v.durationMin)));
-    if (!projectSlug) return null;
-    if (!Number.isFinite(stepId) || stepId <= 0) return null;
-    return { kind: "stepRef", projectSlug, stepId, durationMin };
-  } catch (_) {
-    return null;
-  }
-}
-
-function parseDragSlotId(dt: DataTransfer): string | null {
-  const id = String(
-    dt.getData(DND_MIME_SLOT_ID) || dt.getData("text/plain") || "",
-  ).trim();
-  return id || null;
-}
-
-function guessDurationMin(payload: DragStepRefPayload): number {
-  const d = Number(payload.durationMin);
-  if (Number.isFinite(d) && d > 0) return Math.max(1, Math.floor(d));
-  return 30;
-}
-
-function isReadyStep(step: ScriptStep): boolean {
-  const st = String((step as any)?.kanbanStatus ?? "")
-    .trim()
-    .toLowerCase();
-  return st === "ready" || st === "готова";
-}
-
-function safeDateFromDateKey(dateKey: string): Date | null {
-  const s = String(dateKey ?? "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  // Use noon to avoid timezone edge cases around midnight.
-  const d = new Date(`${s}T12:00:00`);
-  return Number.isFinite(d.getTime()) ? d : null;
-}
-
-function formatTimeFromOffset(offsetMin: number): string {
-  const m = Math.max(0, Math.floor(offsetMin));
-  const hh = String(Math.floor(m / 60)).padStart(2, "0");
-  const mm = String(m % 60).padStart(2, "0");
-  return `${hh}:${mm}`;
-}
-
-function packSlotsSequentialInOrder(
-  slots: DirectorSessionSlot[],
-): DirectorSessionSlot[] {
-  const list = [...(slots ?? [])];
-  let offset = 0;
-  return list.map((s) => {
-    const dur = Math.max(1, Math.floor(Number(s.durationMin) || 1));
-    const item = { ...s, offsetMin: offset, durationMin: dur };
-    offset += dur;
-    return item;
-  });
-}
-
-function packSlotsSequentialByOffset(
-  slots: DirectorSessionSlot[],
-): DirectorSessionSlot[] {
-  const sorted = [...(slots ?? [])].sort((a, b) => a.offsetMin - b.offsetMin);
-  return packSlotsSequentialInOrder(sorted);
-}
+const SESSION_ROW_LONG_PRESS_MS = 520;
+const SESSION_ROW_LONG_PRESS_MOVE_PX = 12;
 
 function parseTimeHHMM(src: string): number | null {
   const s = String(src ?? "").trim();
@@ -223,7 +156,9 @@ function profileHasSpecifiedAvailabilityForDate(
   return getRangesForDateMinutes(prof, dateKey).length > 0;
 }
 
-function sessionStartsDateKey(session: DirectorRehearsalSession): string | null {
+function sessionStartsDateKey(
+  session: DirectorRehearsalSession,
+): string | null {
   const d = new Date(session.startsAt);
   return Number.isFinite(d.getTime()) ? toDateKey(d) : null;
 }
@@ -253,76 +188,6 @@ function normalizeRoleKey(v: string): string {
     .trim();
 }
 
-/** Совпадает с логикой back/src/director-sessions (роли из панели шага, не только markdown). */
-function extractRoleKeysFromSceneRoles(
-  sceneRoles: SceneRolesDataV1 | null | undefined,
-  stepId: number,
-): string[] {
-  const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
-  if (!sr || typeof sr !== "object" || (sr as any).v !== 1) return [];
-  const byStepId = (sr as any).byStepId;
-  if (!byStepId || typeof byStepId !== "object") return [];
-  const stepMap = byStepId[String(stepId)];
-  if (!stepMap || typeof stepMap !== "object") return [];
-  const out: string[] = [];
-  for (const it of Object.values(stepMap as Record<string, unknown>)) {
-    if (!it || typeof it !== "object") continue;
-    const o = it as Record<string, unknown>;
-    const key =
-      typeof o.roleKey === "string" && o.roleKey.trim()
-        ? normalizeRoleKey(o.roleKey)
-        : typeof o.roleTitle === "string" && o.roleTitle.trim()
-          ? normalizeRoleKey(o.roleTitle)
-          : null;
-    if (key) out.push(key);
-  }
-  return Array.from(new Set(out)).filter(Boolean);
-}
-
-function extractRolesBrackets(text?: string): string[] {
-  if (!text) return [];
-  const out: string[] = [];
-  const re = /\[\[([^\]]+)\]\]/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const role = (m[1] ?? "").trim();
-    if (role) out.push(role);
-  }
-  return Array.from(new Set(out));
-}
-
-function extractSpeakerRolesFromLines(text?: string): string[] {
-  if (!text) return [];
-  const out: string[] = [];
-  const lines = text.split(/\r?\n/);
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) continue;
-    if (line.startsWith("==") || line.startsWith("(")) continue;
-    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.\-]{1,40})\s*[:—-]\s+\S/);
-    if (m1?.[1]) {
-      const role = m1[1].replace(/\s+/g, " ").trim();
-      if (role.length >= 2 && role.length <= 40) out.push(role);
-      continue;
-    }
-    const m2 = line.match(/^([A-ZА-ЯЁ]{2,40})([.,!?:])\s+/);
-    if (m2?.[1]) out.push(m2[1].trim());
-  }
-  return Array.from(new Set(out));
-}
-
-function extractRolesSmart(text?: string): string[] {
-  const a = extractRolesBrackets(text);
-  const b = extractSpeakerRolesFromLines(text);
-  return Array.from(
-    new Set(
-      [...a, ...b]
-        .map((x) => String(x ?? "").trim())
-        .filter((x) => x.length > 0),
-    ),
-  );
-}
-
 function computePlannedEmailsForSession(
   session: DirectorRehearsalSession,
   dataCache: ProjectDataCache,
@@ -342,27 +207,14 @@ function computePlannedEmailsForSession(
       complete = false;
       continue;
     }
-    const step = (data.steps ?? []).find((x) => x.id === stepId) ?? null;
-    const text = String(
-      (step as any)?.playMarkdown ?? (step as any)?.markdown ?? "",
+    const slotEmails = getEmailsPlannedForDirectorSlot(
+      slug,
+      stepId,
+      data,
+      (sl as any)?.roleRehearsalPicks,
     );
-    const attachedKeys = extractRoleKeysFromSceneRoles(data.sceneRoles, stepId);
-    const roleKeys =
-      attachedKeys.length > 0
-        ? attachedKeys
-        : extractRolesSmart(text)
-            .map((r) => normalizeRoleKey(r))
-            .filter(Boolean);
-    for (const key of roleKeys) {
-      if (!key) continue;
-      const emails = (data.roleEmailsByKey ?? {})[key] ?? [];
-      for (const e of emails) {
-        const norm = normalizeEmail(String(e ?? ""));
-        if (!norm) continue;
-        if (!looksLikeEmail(norm)) continue;
-        out.add(norm);
-        if (out.size >= 500) break;
-      }
+    for (const norm of slotEmails) {
+      out.add(norm);
       if (out.size >= 500) break;
     }
     if (out.size >= 500) break;
@@ -384,12 +236,26 @@ export function DirectorSessionsPage() {
   const { projects } = useProject();
   const location = useLocation();
   const navigate = useNavigate();
+  const { sessionId: paramSessionId, slotId: paramSlotId } = useParams<{
+    sessionId?: string;
+    slotId?: string;
+  }>();
+
+  const sessionIdFromQuery = useMemo(() => {
+    const sp = new URLSearchParams(location.search);
+    return String(sp.get("sessionId") ?? "").trim() || null;
+  }, [location.search]);
 
   const sessionIdFromUrl = useMemo(() => {
-    const sp = new URLSearchParams(location.search);
-    const v = String(sp.get("sessionId") ?? "").trim();
-    return v || null;
-  }, [location.search]);
+    const fromPath = String(paramSessionId ?? "").trim();
+    if (fromPath) return fromPath;
+    return sessionIdFromQuery;
+  }, [paramSessionId, sessionIdFromQuery]);
+
+  const slotIdFromUrl = useMemo(
+    () => String(paramSlotId ?? "").trim() || null,
+    [paramSlotId],
+  );
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -404,7 +270,8 @@ export function DirectorSessionsPage() {
     for (const s of sessions ?? []) {
       const id = String(s?.id ?? "").trim();
       const p = String(s.publishedAt ?? "").trim();
-      if (id && p) publishedAtBySessionIdRef.current.set(id, String(s.publishedAt));
+      if (id && p)
+        publishedAtBySessionIdRef.current.set(id, String(s.publishedAt));
     }
   }, [sessions]);
 
@@ -423,8 +290,70 @@ export function DirectorSessionsPage() {
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [draggedSessionId, setDraggedSessionId] = useState<string | null>(null);
-  const [timelineDragOver, setTimelineDragOver] = useState(false);
-  const [detailModalSessionId, setDetailModalSessionId] = useState<string | null>(null);
+
+  const navigateToSessionPage = useCallback(
+    (sessionId: string) => {
+      setActiveSessionId(sessionId);
+      navigate(`/sessions/${encodeURIComponent(sessionId)}`);
+    },
+    [navigate],
+  );
+
+  const sessionRowLongPressRef = useRef<{
+    timer: ReturnType<typeof setTimeout> | null;
+    sessionId: string | null;
+    startX: number;
+    startY: number;
+  }>({ timer: null, sessionId: null, startX: 0, startY: 0 });
+  const suppressSessionRowClickUntilRef = useRef(0);
+
+  const cancelSessionRowLongPress = useCallback(() => {
+    const st = sessionRowLongPressRef.current;
+    if (st.timer) clearTimeout(st.timer);
+    st.timer = null;
+    st.sessionId = null;
+  }, []);
+
+  useEffect(
+    () => () => {
+      cancelSessionRowLongPress();
+    },
+    [cancelSessionRowLongPress],
+  );
+
+  const onSessionRowPointerDown = useCallback(
+    (e: React.PointerEvent, sessionId: string) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      cancelSessionRowLongPress();
+      const st = sessionRowLongPressRef.current;
+      st.sessionId = sessionId;
+      st.startX = e.clientX;
+      st.startY = e.clientY;
+      st.timer = setTimeout(() => {
+        st.timer = null;
+        st.sessionId = null;
+        suppressSessionRowClickUntilRef.current = Date.now() + 450;
+        navigateToSessionPage(sessionId);
+      }, SESSION_ROW_LONG_PRESS_MS);
+    },
+    [cancelSessionRowLongPress, navigateToSessionPage],
+  );
+
+  const onSessionRowPointerMove = useCallback(
+    (e: React.PointerEvent, sessionId: string) => {
+      const st = sessionRowLongPressRef.current;
+      if (!st.timer || st.sessionId !== sessionId) return;
+      const dx = e.clientX - st.startX;
+      const dy = e.clientY - st.startY;
+      if (
+        dx * dx + dy * dy >
+        SESSION_ROW_LONG_PRESS_MOVE_PX * SESSION_ROW_LONG_PRESS_MOVE_PX
+      ) {
+        cancelSessionRowLongPress();
+      }
+    },
+    [cancelSessionRowLongPress],
+  );
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) ?? null,
@@ -432,19 +361,29 @@ export function DirectorSessionsPage() {
   );
 
   const activeSessionPublished = Boolean(
-    String((activeSession as DirectorRehearsalSession | null)?.publishedAt ?? "").trim(),
+    String(
+      (activeSession as DirectorRehearsalSession | null)?.publishedAt ?? "",
+    ).trim(),
   );
 
-  // minimal UX: selected slot
+  // minimal UX: selected slot (для блока «кто вызван»)
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!activeSession) {
       setActiveSlotId(null);
       return;
     }
-    setActiveSlotId((prev) => prev ?? activeSession.slots?.[0]?.id ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSessionId]);
+    const slots = activeSession.slots ?? [];
+    if (slotIdFromUrl && slots.some((sl) => sl.id === slotIdFromUrl)) {
+      setActiveSlotId(slotIdFromUrl);
+      return;
+    }
+    setActiveSlotId((prev) => {
+      if (prev && slots.some((sl) => sl.id === prev)) return prev;
+      return slots[0]?.id ?? null;
+    });
+  }, [activeSessionId, activeSession, slotIdFromUrl]);
 
   const sessionDateKey = useMemo(() => {
     if (!activeSession?.startsAt) return null;
@@ -483,15 +422,75 @@ export function DirectorSessionsPage() {
     };
   }, [accessToken, sessionIdFromUrl]);
 
-  // Keep URL in sync for shareable link
+  // Диплинк /sessions/:id/slots/:slotId — та же страница списка сессий; индекс /sessions — ?sessionId=
   useEffect(() => {
+    if (!activeSessionId) return;
+
+    const deepMatch = /^\/sessions\/([^/]+)\/slots\/([^/]+)\/?$/.exec(
+      location.pathname,
+    );
+
+    if (deepMatch) {
+      const urlSid = deepMatch[1];
+      const urlSlot = deepMatch[2];
+
+      if (urlSid !== activeSessionId) {
+        const sess = sessions.find((s) => s.id === activeSessionId);
+        const first = sess?.slots?.[0]?.id ?? null;
+        if (first) {
+          navigate(
+            `/sessions/${encodeURIComponent(activeSessionId)}/slots/${encodeURIComponent(first)}`,
+            { replace: true },
+          );
+        } else {
+          navigate(
+            {
+              pathname: "/sessions",
+              search: `?sessionId=${encodeURIComponent(activeSessionId)}`,
+            },
+            { replace: true },
+          );
+        }
+        return;
+      }
+
+      const sess = sessions.find((s) => s.id === activeSessionId);
+      const slots = sess?.slots ?? [];
+      if (slots.length === 0) {
+        navigate(
+          {
+            pathname: "/sessions",
+            search: `?sessionId=${encodeURIComponent(activeSessionId)}`,
+          },
+          { replace: true },
+        );
+        return;
+      }
+      if (
+        activeSlotId &&
+        slots.some((sl) => sl.id === activeSlotId) &&
+        urlSlot !== activeSlotId
+      ) {
+        navigate(
+          `/sessions/${encodeURIComponent(activeSessionId)}/slots/${encodeURIComponent(activeSlotId)}`,
+          { replace: true },
+        );
+      }
+      return;
+    }
+
     if (location.pathname !== "/sessions") return;
-    const current = sessionIdFromUrl;
-    const next = activeSessionId || null;
-    if (current === next) return;
-    const search = next ? `?sessionId=${encodeURIComponent(next)}` : "";
+    if (sessionIdFromQuery === activeSessionId) return;
+    const search = `?sessionId=${encodeURIComponent(activeSessionId)}`;
     navigate({ pathname: "/sessions", search }, { replace: true });
-  }, [activeSessionId, location.pathname, navigate, sessionIdFromUrl]);
+  }, [
+    activeSessionId,
+    activeSlotId,
+    location.pathname,
+    navigate,
+    sessionIdFromQuery,
+    sessions,
+  ]);
 
   const persist = async (next: DirectorRehearsalSession[]) => {
     if (!accessToken) return;
@@ -555,10 +554,15 @@ export function DirectorSessionsPage() {
       const pub = await publishDirectorSession(accessToken, activeSession.id, {
         comment: activeSession.comment ?? "",
       });
-      if (pub?.session && String((pub.session as any)?.id ?? "") === activeSession.id) {
+      if (
+        pub?.session &&
+        String((pub.session as any)?.id ?? "") === activeSession.id
+      ) {
         setSessions((prev) =>
           prev.map((s) =>
-            s.id === activeSession.id ? ({ ...s, ...(pub.session as any) } as DirectorRehearsalSession) : s,
+            s.id === activeSession.id
+              ? ({ ...s, ...(pub.session as any) } as DirectorRehearsalSession)
+              : s,
           ),
         );
       }
@@ -632,90 +636,6 @@ export function DirectorSessionsPage() {
     await persist(nextSessions);
   };
 
-  const updateSlot = async (
-    slotId: string,
-    patch: Partial<DirectorSessionSlot>,
-    options?: { shiftFollowing?: boolean; deltaMin?: number },
-  ) => {
-    if (!activeSession) return;
-    const shiftFollowing = Boolean(options?.shiftFollowing);
-    const deltaMin = options?.deltaMin ?? 0;
-    const baseSlots = [...(activeSession.slots ?? [])];
-    const current = baseSlots.find((s) => s.id === slotId) ?? null;
-    if (!current) return;
-    const currentOffset = current.offsetMin;
-    const nextSlots = baseSlots.map((s) => {
-      if (s.id === slotId) return { ...s, ...patch };
-      if (shiftFollowing && deltaMin !== 0 && s.offsetMin > currentOffset) {
-        return {
-          ...s,
-          offsetMin: Math.max(0, Math.floor(s.offsetMin + deltaMin)),
-        };
-      }
-      return s;
-    });
-    await updateActiveSession({ slots: nextSlots });
-  };
-
-  const addSlot = async () => {
-    if (!activeSession) return;
-    const last = [...(activeSession.slots ?? [])]
-      .sort((a, b) => a.offsetMin - b.offsetMin)
-      .slice(-1)[0];
-    const nextOffset = last
-      ? last.offsetMin + Math.max(1, last.durationMin)
-      : 0;
-    const slot: DirectorSessionSlot = {
-      id: createId(),
-      offsetMin: nextOffset,
-      durationMin: 30,
-    };
-    await updateActiveSession({
-      slots: [...(activeSession.slots ?? []), slot],
-    });
-  };
-
-  const removeSlot = async (slotId: string) => {
-    if (!activeSession) return;
-    await updateActiveSession({
-      slots: (activeSession.slots ?? []).filter((x) => x.id !== slotId),
-    });
-  };
-
-  const packTimeline = async () => {
-    if (!activeSession) return;
-    await updateActiveSession({
-      slots: packSlotsSequentialByOffset(activeSession.slots ?? []),
-    });
-  };
-
-  const insertSlotAfter = async (afterSlotId: string) => {
-    if (!activeSession) return;
-    const slots = [...(activeSession.slots ?? [])];
-    const after = slots.find((s) => s.id === afterSlotId);
-    if (!after) return;
-    const insertOffset = Math.max(
-      0,
-      Math.floor(after.offsetMin + Math.max(1, after.durationMin || 1)),
-    );
-    const durationMin = 30;
-    const nextSlot: DirectorSessionSlot = {
-      id: createId(),
-      offsetMin: insertOffset,
-      durationMin,
-    };
-    const shifted = slots.map((s) => {
-      if (!autoShiftFollowing) return s;
-      // Сдвигаем то, что начинается не раньше вставки (чтобы не налезало)
-      if (s.offsetMin >= insertOffset)
-        return { ...s, offsetMin: s.offsetMin + durationMin };
-      return s;
-    });
-    const nextSlots = [...shifted, nextSlot];
-    await updateActiveSession({ slots: nextSlots });
-    setActiveSlotId(nextSlot.id);
-  };
-
   // ---- Material picker (from "kanban" data via syncPull) ----
   const projectFilterStorageKey = "directorSessions:materialsProject";
   const [projectFilter, setProjectFilter] = useState<string>(() => {
@@ -733,7 +653,6 @@ export function DirectorSessionsPage() {
       return "";
     }
   });
-  const [query, setQuery] = useState("");
   const [dataCache, setDataCache] = useState<ProjectDataCache>({});
   const [stepsLoading, setStepsLoading] = useState(false);
 
@@ -789,7 +708,8 @@ export function DirectorSessionsPage() {
           kanbanOrder: st?.kanbanOrder ?? undefined,
         }))
         .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
-      const sceneRoles = ((scene as any)?.sceneRoles ?? null) as SceneRolesDataV1 | null;
+      const sceneRoles = ((scene as any)?.sceneRoles ??
+        null) as SceneRolesDataV1 | null;
       setDataCache((p) => ({
         ...p,
         [slug]: { steps, roleEmailsByKey, roleTitleByKey, sceneRoles },
@@ -798,7 +718,12 @@ export function DirectorSessionsPage() {
       console.error("loadProjectData failed:", slug, e);
       setDataCache((p) => ({
         ...p,
-        [slug]: { steps: [], roleEmailsByKey: {}, roleTitleByKey: {}, sceneRoles: null },
+        [slug]: {
+          steps: [],
+          roleEmailsByKey: {},
+          roleTitleByKey: {},
+          sceneRoles: null,
+        },
       }));
     } finally {
       setStepsLoading(false);
@@ -806,7 +731,9 @@ export function DirectorSessionsPage() {
   };
 
   function plannedEmailsFingerprint(emails: string[] | undefined): string {
-    return [...(emails ?? []).map((e) => normalizeEmail(String(e))).filter(Boolean)]
+    return [
+      ...(emails ?? []).map((e) => normalizeEmail(String(e))).filter(Boolean),
+    ]
       .sort()
       .join("|");
   }
@@ -854,7 +781,10 @@ export function DirectorSessionsPage() {
       let profilesFetchOk = false;
       if (allEmails.size > 0) {
         try {
-          const profs = await getProfilesBatch(accessToken, Array.from(allEmails));
+          const profs = await getProfilesBatch(
+            accessToken,
+            Array.from(allEmails),
+          );
           if (cancelled) return;
           profilesFetchOk = true;
           profileByEmail = new Map();
@@ -877,7 +807,11 @@ export function DirectorSessionsPage() {
         const dk = dateKeyBySessionId.get(session.id) ?? null;
         const nextEmails =
           profilesFetchOk && dk
-            ? filterPlannedEmailsBySpecifiedAvailability(raw, dk, profileByEmail)
+            ? filterPlannedEmailsBySpecifiedAvailability(
+                raw,
+                dk,
+                profileByEmail,
+              )
             : raw;
         if (
           plannedEmailsFingerprint(session.plannedEmails) ===
@@ -921,337 +855,6 @@ export function DirectorSessionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectFilter]);
 
-  const filteredSteps = useMemo(() => {
-    const src = projectFilter ? (dataCache[projectFilter]?.steps ?? []) : [];
-    const base = src.filter((s) => !isReadyStep(s));
-    const q = query.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((s) => {
-      const inTitle = String(s.title ?? "")
-        .toLowerCase()
-        .includes(q);
-      const inText = markdownToPlainText(
-        String(s.playMarkdown ?? s.markdown ?? ""),
-      )
-        .toLowerCase()
-        .includes(q);
-      return inTitle || inText;
-    });
-  }, [projectFilter, query, dataCache]);
-
-  // ----- Free actors & selectable scenes (based on availability + project role assignments) -----
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [projectMemberEmails, setProjectMemberEmails] = useState<string[]>([]);
-  useEffect(() => {
-    if (!accessToken || !projectFilter) {
-      setProjectMemberEmails([]);
-      return;
-    }
-    let cancelled = false;
-    setMembersLoading(true);
-    getProjectMembers(accessToken, projectFilter)
-      .then((res) => {
-        if (cancelled) return;
-        const emails = [
-          res.owner?.email ? normalizeEmail(res.owner.email) : null,
-          ...(res.members ?? []).map((m) => normalizeEmail(m.user?.email)),
-        ].filter(Boolean) as string[];
-        setProjectMemberEmails(Array.from(new Set(emails)));
-      })
-      .catch(() => {
-        if (!cancelled) setProjectMemberEmails([]);
-      })
-      .finally(() => {
-        if (!cancelled) setMembersLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, projectFilter]);
-
-  const [teamProfiles, setTeamProfiles] = useState<TeamProfile[]>([]);
-  useEffect(() => {
-    if (!accessToken) return;
-    if (projectMemberEmails.length === 0) {
-      setTeamProfiles([]);
-      return;
-    }
-    let cancelled = false;
-    getProfilesBatch(accessToken, projectMemberEmails)
-      .then((list) => {
-        if (!cancelled) setTeamProfiles(list ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setTeamProfiles([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, projectMemberEmails.join("|")]);
-
-  const freeActorsForDate = useMemo(() => {
-    if (!sessionDateKey) return [];
-    const data = projectFilter ? dataCache[projectFilter] : null;
-    const roleEmailsByKey = data?.roleEmailsByKey ?? {};
-    const roleTitleByKey = data?.roleTitleByKey ?? {};
-    return (teamProfiles ?? [])
-      .map((p) => {
-        const email = normalizeEmail(p.email);
-        const cal = (p as any)?.availabilityCalendar as
-          | Record<string, string>
-          | undefined;
-        const st =
-          cal?.[sessionDateKey] === "present"
-            ? "present"
-            : cal?.[sessionDateKey] === "absent"
-              ? "absent"
-              : "unknown";
-        const ranges = getRangesForDateMinutes(p, sessionDateKey);
-        const rolesNorm: string[] = [];
-        const rolesDisplay: string[] = [];
-        if (email) {
-          for (const [rk, emails] of Object.entries(roleEmailsByKey)) {
-            if (!rk) continue;
-            if (!Array.isArray(emails) || emails.length === 0) continue;
-            if (!emails.includes(email)) continue;
-            rolesNorm.push(rk);
-            rolesDisplay.push(roleTitleByKey[rk] ?? rk);
-          }
-        }
-        rolesDisplay.sort((a, b) => a.localeCompare(b, "ru"));
-        return {
-          email,
-          displayName: String((p as any)?.displayName ?? "").trim() || null,
-          avatarUrl: String((p as any)?.avatarUrl ?? "").trim() || null,
-          status: st as "present" | "absent" | "unknown",
-          rolesNorm,
-          rolesDisplay,
-          ranges,
-        };
-      })
-      .filter((x) => x.email);
-  }, [dataCache, projectFilter, sessionDateKey, teamProfiles]);
-
-  const troupeScheduleMonth = useMemo(() => {
-    if (sessionDateKey)
-      return safeDateFromDateKey(sessionDateKey) ?? new Date();
-    return new Date();
-  }, [sessionDateKey]);
-
-  const troupeScheduleMonthKey = useMemo(() => {
-    const y = troupeScheduleMonth.getFullYear();
-    const m = String(troupeScheduleMonth.getMonth() + 1).padStart(2, "0");
-    return `${y}-${m}`;
-  }, [troupeScheduleMonth]);
-
-  const troupeScheduleDays = useMemo(() => {
-    const y = troupeScheduleMonth.getFullYear();
-    const m = troupeScheduleMonth.getMonth();
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
-    const out: Date[] = [];
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      out.push(new Date(y, m, day, 12, 0, 0));
-    }
-    return out;
-  }, [troupeScheduleMonth]);
-
-  const troupeScheduleGridTemplateColumns = useMemo(() => {
-    return `140px repeat(${troupeScheduleDays.length}, 28px)`;
-  }, [troupeScheduleDays.length]);
-
-  const troupeScheduleActors = useMemo(() => {
-    const list = (teamProfiles ?? [])
-      .map((p) => {
-        const email = normalizeEmail(p.email);
-        if (!email) return null;
-        return {
-          email,
-          displayName: String((p as any)?.displayName ?? "").trim() || null,
-          avatarUrl: String((p as any)?.avatarUrl ?? "").trim() || null,
-          availabilityCalendar: ((p as any)?.availabilityCalendar ??
-            null) as Record<string, "present" | "absent"> | null,
-          availabilityTimeRanges: ((p as any)?.availabilityTimeRanges ??
-            null) as Record<string, AvailabilityTimeRange[]> | null,
-        };
-      })
-      .filter(Boolean) as Array<{
-      email: string;
-      displayName: string | null;
-      avatarUrl: string | null;
-      availabilityCalendar: Record<string, "present" | "absent"> | null;
-      availabilityTimeRanges: Record<string, AvailabilityTimeRange[]> | null;
-    }>;
-    list.sort((a, b) =>
-      String(a.displayName ?? a.email).localeCompare(
-        String(b.displayName ?? b.email),
-        "ru",
-      ),
-    );
-    return list;
-  }, [teamProfiles]);
-
-  const activeSlotWindow = useMemo(() => {
-    if (!activeSession || !activeSlotId) return null;
-    const sl =
-      (activeSession.slots ?? []).find((s) => s.id === activeSlotId) ?? null;
-    if (!sl) return null;
-    const base = getSessionStartLocalMinutes(activeSession.startsAt);
-    const startMin = base + Math.max(0, Math.floor(sl.offsetMin || 0));
-    const endMin = startMin + Math.max(1, Math.floor(sl.durationMin || 1));
-    return { startMin, endMin };
-  }, [
-    activeSessionId,
-    activeSession?.startsAt,
-    activeSession?.slots,
-    activeSlotId,
-  ]);
-
-  const freeRolesNormSet = useMemo(() => {
-    const set = new Set<string>();
-    for (const a of freeActorsForDate) {
-      if (a.status !== "present") continue;
-      if (activeSlotWindow && a.ranges?.length) {
-        if (
-          !isSlotInsideRanges(
-            activeSlotWindow.startMin,
-            activeSlotWindow.endMin,
-            a.ranges,
-          )
-        )
-          continue;
-      }
-      for (const r of a.rolesNorm) set.add(r);
-    }
-    return set;
-  }, [activeSlotWindow, freeActorsForDate]);
-
-  const [onlySelectable, setOnlySelectable] = useState(false);
-  const selectableSteps = useMemo(() => {
-    const steps = (
-      projectFilter ? (dataCache[projectFilter]?.steps ?? []) : []
-    ).filter((s) => !isReadyStep(s));
-    const out: Array<{
-      step: ScriptStep;
-      ok: boolean;
-      missing: string[];
-      roles: string[];
-    }> = [];
-    for (const s of steps) {
-      const text = String(s.playMarkdown ?? s.markdown ?? "");
-      const roles = extractRolesSmart(text);
-      const missing: string[] = [];
-      for (const r of roles) {
-        const norm = normalizeRoleKey(r);
-        if (norm && !freeRolesNormSet.has(norm)) missing.push(r);
-      }
-      out.push({ step: s, ok: missing.length === 0, missing, roles });
-    }
-    return out;
-  }, [dataCache, freeRolesNormSet, projectFilter]);
-
-  const filteredStepsForList = useMemo(() => {
-    const base = filteredSteps;
-    if (!onlySelectable) return base;
-    const okIds = new Set(
-      selectableSteps.filter((x) => x.ok).map((x) => x.step.id),
-    );
-    return base.filter((s) => okIds.has(s.id));
-  }, [filteredSteps, onlySelectable, selectableSteps]);
-
-  const attachToSlot = async (
-    slotId: string,
-    ref: { projectSlug: string; stepId: number },
-  ) => {
-    if (!activeSession) return;
-    const nextSlots = (activeSession.slots ?? []).map((sl) =>
-      sl.id === slotId ? { ...sl, ref } : sl,
-    );
-    await updateActiveSession({ slots: nextSlots });
-  };
-
-  const attachStepToSlotByDrop = async (
-    slotId: string,
-    payload: DragStepRefPayload,
-  ) => {
-    if (!activeSession) return;
-    const slots = [...(activeSession.slots ?? [])];
-    const current = slots.find((s) => s.id === slotId) ?? null;
-    if (!current) return;
-    const nextDur = guessDurationMin(payload);
-    const prevDur = Math.max(1, Math.floor(Number(current.durationMin) || 1));
-    const delta = nextDur - prevDur;
-    await updateSlot(
-      slotId,
-      {
-        ref: { projectSlug: payload.projectSlug, stepId: payload.stepId },
-        durationMin: nextDur,
-      },
-      { shiftFollowing: autoShiftFollowing, deltaMin: delta },
-    );
-    setActiveSlotId(slotId);
-    setSlotDraft((p) => ({
-      ...p,
-      [slotId]: {
-        ...(p[slotId] ?? {
-          time: activeSession
-            ? formatSlotTime(activeSession.startsAt, current.offsetMin)
-            : "",
-          duration: "",
-        }),
-        duration: String(nextDur),
-      },
-    }));
-  };
-
-  const addSlotFromDroppedStep = async (payload: DragStepRefPayload) => {
-    if (!activeSession) return;
-    const sorted = [...(activeSession.slots ?? [])].sort(
-      (a, b) => a.offsetMin - b.offsetMin,
-    );
-    const last = sorted.slice(-1)[0] ?? null;
-    const offsetMin = last
-      ? last.offsetMin + Math.max(1, Math.floor(Number(last.durationMin) || 1))
-      : 0;
-    const durationMin = guessDurationMin(payload);
-    const slot: DirectorSessionSlot = {
-      id: createId(),
-      offsetMin,
-      durationMin,
-      ref: { projectSlug: payload.projectSlug, stepId: payload.stepId },
-    };
-    await updateActiveSession({
-      slots: [...(activeSession.slots ?? []), slot],
-    });
-    setActiveSlotId(slot.id);
-  };
-
-  // Materials popover (step preview + assign)
-  const [materialPreview, setMaterialPreview] = useState<{
-    projectSlug: string;
-    step: ScriptStep;
-  } | null>(null);
-
-  // Drag & drop ordering for slots (re-packs timeline sequentially)
-  const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
-  /** В dragover getData часто пустой — держим payload в состоянии, чтобы была зона дропа. */
-  const [materialDragPayload, setMaterialDragPayload] =
-    useState<DragStepRefPayload | null>(null);
-  const moveSlotBefore = async (dragId: string, beforeId: string) => {
-    if (!activeSession) return;
-    if (dragId === beforeId) return;
-    const sorted = [...(activeSession.slots ?? [])].sort(
-      (a, b) => a.offsetMin - b.offsetMin,
-    );
-    const fromIndex = sorted.findIndex((s) => s.id === dragId);
-    const toIndex = sorted.findIndex((s) => s.id === beforeId);
-    if (fromIndex === -1 || toIndex === -1) return;
-    const next = [...sorted];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
-    // Важно: после d&d сохраняем порядок, а не пересортировываем по старым offsetMin.
-    await updateActiveSession({ slots: packSlotsSequentialInOrder(next) });
-  };
-
   // Подгружаем данные проектов, которые уже используются в слотах (чтобы показывать названия/аналитику)
   useEffect(() => {
     if (!activeSession) return;
@@ -1275,7 +878,6 @@ export function DirectorSessionsPage() {
   }, [activeSession?.slots]);
 
   const activeSlot = activeSlotId ? (slotById.get(activeSlotId) ?? null) : null;
-  const [autoShiftFollowing, setAutoShiftFollowing] = useState(true);
 
   const slotInsights = useMemo(() => {
     if (!activeSession) return [];
@@ -1295,21 +897,24 @@ export function DirectorSessionsPage() {
         }
         const data = dataCache[ref.projectSlug];
         const step = data?.steps?.find((x) => x.id === ref.stepId) ?? null;
-        const attachedKeys = extractRoleKeysFromSceneRoles(data?.sceneRoles, ref.stepId);
-        const roleKeys =
-          attachedKeys.length > 0
-            ? attachedKeys
-            : extractRolesSmart(
-                String(step?.playMarkdown ?? step?.markdown ?? ""),
-              )
-                .map((r) => normalizeRoleKey(r))
-                .filter(Boolean);
+        const roleKeys = getNormalizedRoleKeysForSlotStep(
+          step ?? null,
+          data?.sceneRoles,
+          ref.stepId,
+        );
         const missingRoles = roleKeys
           .filter((key) => !key || !(data?.roleEmailsByKey ?? {})[key]?.length)
-          .map((key) => String(data?.roleTitleByKey?.[key ?? ""] ?? key ?? "").trim() || key);
-        const actors = roleKeys.flatMap((key) => {
-          return key ? ((data?.roleEmailsByKey ?? {})[key] ?? []) : [];
-        });
+          .map(
+            (key) =>
+              String(data?.roleTitleByKey?.[key ?? ""] ?? key ?? "").trim() ||
+              key,
+          );
+        const actors = getEmailsPlannedForDirectorSlot(
+          ref.projectSlug,
+          ref.stepId,
+          data,
+          sl.roleRehearsalPicks,
+        );
         return {
           slotId: sl.id,
           time: formatSlotTime(activeSession.startsAt, sl.offsetMin),
@@ -1338,14 +943,22 @@ export function DirectorSessionsPage() {
     );
   }, [slotInsights]);
 
-  const actorEmails = useMemo(
-    () =>
-      actorsSummary
-        .map((x) => x.actor)
-        .filter(looksLikeEmail)
-        .map(normalizeEmail),
-    [actorsSummary],
-  );
+  const actorEmails = useMemo(() => {
+    const set = new Set<string>();
+    for (const x of actorsSummary) {
+      const raw = String(x.actor ?? "").trim();
+      if (!looksLikeEmail(raw)) continue;
+      const n = normalizeEmail(raw);
+      if (n) set.add(n);
+    }
+    for (const p of activeSession?.plannedEmails ?? []) {
+      const raw = String(p ?? "").trim();
+      if (!looksLikeEmail(raw)) continue;
+      const n = normalizeEmail(raw);
+      if (n) set.add(n);
+    }
+    return Array.from(set);
+  }, [actorsSummary, activeSession?.plannedEmails, activeSession?.id]);
 
   const [profilesByEmail, setProfilesByEmail] = useState<
     Map<string, TeamProfile>
@@ -1445,52 +1058,167 @@ export function DirectorSessionsPage() {
     slotInsights,
   ]);
 
-  // Drafts for slot editing (time/duration)
-  const [slotDraft, setSlotDraft] = useState<
-    Record<string, { time: string; duration: string }>
-  >({});
-  useEffect(() => {
-    if (!activeSession) {
-      setSlotDraft({});
-      return;
-    }
-    setSlotDraft((prev) => {
-      const next = { ...prev };
-      for (const sl of activeSession.slots ?? []) {
-        if (!next[sl.id]) {
-          next[sl.id] = {
-            time: formatSlotTime(activeSession.startsAt, sl.offsetMin),
-            duration: String(sl.durationMin ?? 30),
-          };
+  const sessionsSideCalledRows = useMemo(() => {
+    if (!activeSession) return [];
+
+    const rowForEmail = (
+      raw: string,
+      opts: {
+        freeSet: Set<string> | null;
+        busySet: Set<string> | null;
+      },
+    ) => {
+      const emailNorm = normalizeEmail(String(raw ?? ""));
+      const prof = emailNorm ? profilesByEmail.get(emailNorm) : undefined;
+      const displayName = String((prof as any)?.displayName ?? "").trim();
+      const name = displayName || String(raw ?? "").trim() || emailNorm;
+      const avatarUrl = String((prof as any)?.avatarUrl ?? "").trim() || null;
+      let statusLabel = "";
+      let statusTone: SessionsSideCalledStatusTone = "muted";
+      const cal =
+        sessionDateKey && prof
+          ? (
+              (prof as any)?.availabilityCalendar as
+                | Record<string, string>
+                | undefined
+            )?.[sessionDateKey]
+          : undefined;
+
+      if (!sessionDateKey) {
+        statusLabel = "Сначала укажи дату сессии";
+        statusTone = "warn";
+      } else if (opts.busySet?.has(emailNorm)) {
+        statusLabel = "Занят на это время";
+        statusTone = "bad";
+      } else if (cal === "present") {
+        statusLabel = "Подтвердил явку";
+        statusTone = "confirmed";
+      } else if (opts.freeSet && opts.freeSet.has(emailNorm)) {
+        statusLabel = "Свободен";
+        statusTone = "ok";
+      } else if (!opts.freeSet) {
+        if (cal === "absent") {
+          statusLabel = "Занят (календарь)";
+          statusTone = "bad";
+        } else {
+          statusLabel = "Свободен";
+          statusTone = "ok";
+        }
+      } else {
+        statusLabel = "Занятость не отмечена";
+        statusTone = "warn";
+      }
+
+      return {
+        key: emailNorm || String(raw),
+        email: String(raw ?? "").trim(),
+        name,
+        avatarUrl,
+        avatarLabel: name,
+        statusLabel,
+        statusTone,
+      };
+    };
+
+    if (!activeSlotId) {
+      const emailSet = new Set<string>();
+      for (const p of activeSession.plannedEmails ?? []) {
+        const n = normalizeEmail(String(p ?? ""));
+        if (n) emailSet.add(n);
+      }
+      for (const s of slotInsights) {
+        for (const a of s.actors ?? []) {
+          const n = normalizeEmail(String(a ?? ""));
+          if (n) emailSet.add(n);
         }
       }
-      // cleanup removed slots
-      Object.keys(next).forEach((id) => {
-        if (!(activeSession.slots ?? []).some((s) => s.id === id))
-          delete next[id];
-      });
-      return next;
-    });
-  }, [activeSessionId, activeSession?.slots?.length, activeSession?.startsAt]);
+      const sorted = Array.from(emailSet).sort((a, b) =>
+        a.localeCompare(b, "ru"),
+      );
+      return sorted.map((emailNorm) =>
+        rowForEmail(emailNorm, { freeSet: null, busySet: null }),
+      );
+    }
 
-  const commitSlotDraft = async (slotId: string) => {
-    if (!activeSession) return;
-    const d = slotDraft[slotId];
-    const sl = (activeSession.slots ?? []).find((s) => s.id === slotId);
-    if (!d || !sl) return;
-    const base = getSessionStartLocalMinutes(activeSession.startsAt);
-    const abs = parseTimeHHMM(d.time);
-    const durNum = Math.max(1, Math.min(480, Math.floor(Number(d.duration))));
-    const nextOffset =
-      abs == null ? sl.offsetMin : Math.max(0, Math.floor(abs - base));
-    const prevDur = Math.max(1, Math.floor(sl.durationMin || 1));
-    const delta = durNum - prevDur;
-    await updateSlot(
-      slotId,
-      { offsetMin: nextOffset, durationMin: durNum },
-      { shiftFollowing: autoShiftFollowing, deltaMin: delta },
+    const insight = slotInsights.find((x) => x.slotId === activeSlotId);
+    if (!insight) return [];
+    const emails = insight.actors ?? [];
+    if (emails.length === 0) return [];
+    const avail = slotAvailabilityById.get(activeSlotId) ?? {
+      free: [] as string[],
+      busy: [] as string[],
+      unknown: [] as string[],
+    };
+    const freeSet = new Set(
+      avail.free.map((x) => normalizeEmail(String(x ?? ""))),
     );
-  };
+    const busySet = new Set(
+      avail.busy.map((x) => normalizeEmail(String(x ?? ""))),
+    );
+    return emails.map((raw) => rowForEmail(raw, { freeSet, busySet }));
+  }, [
+    activeSession,
+    activeSlotId,
+    slotInsights,
+    slotAvailabilityById,
+    profilesByEmail,
+    sessionDateKey,
+  ]);
+
+  const slotRowToneClassBySlotId = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!activeSession || !sessionDateKey) return out;
+
+    for (const insight of slotInsights) {
+      const actors = insight.actors ?? [];
+      const normActors = actors
+        .map((a) => normalizeEmail(String(a ?? "")))
+        .filter(Boolean);
+      if (normActors.length === 0) continue;
+
+      let allCalendarPresent = true;
+      for (const e of normActors) {
+        const p = profilesByEmail.get(e);
+        const cal = (p as any)?.availabilityCalendar as
+          | Record<string, string>
+          | undefined;
+        if (cal?.[sessionDateKey] !== "present") {
+          allCalendarPresent = false;
+          break;
+        }
+      }
+      if (allCalendarPresent) {
+        out.set(
+          insight.slotId,
+          "sessions-slots-readonly__row--tone-all-confirmed",
+        );
+        continue;
+      }
+
+      const avail = slotAvailabilityById.get(insight.slotId);
+      if (!avail) continue;
+      if (avail.busy.length > 0 || avail.unknown.length > 0) continue;
+      const freeSet = new Set(
+        avail.free.map((x) => normalizeEmail(String(x ?? ""))),
+      );
+      const allFree = normActors.every((e) => freeSet.has(e));
+      if (allFree) {
+        out.set(insight.slotId, "sessions-slots-readonly__row--tone-all-free");
+      }
+    }
+    return out;
+  }, [
+    activeSession?.id,
+    sessionDateKey,
+    slotInsights,
+    profilesByEmail,
+    slotAvailabilityById,
+  ]);
+
+  const activeSlotInsight = useMemo(
+    () => slotInsights.find((x) => x.slotId === activeSlotId) ?? null,
+    [slotInsights, activeSlotId],
+  );
 
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
   if (loading) return <div className="rehearsals-muted">Загрузка сессий…</div>;
@@ -1503,411 +1231,378 @@ export function DirectorSessionsPage() {
 
   return (
     <>
-    <div className="rehearsals-page sessions-page">
-      <div className="rehearsals-head">
-        <div className="rehearsals-meta">Сессии</div>
-      </div>
+      <div className="rehearsals-page sessions-page">
+        <div className="rehearsals-head">
+          <div className="rehearsals-meta">Сессии</div>
+        </div>
 
-      <div className="sessions-layout">
-        <aside className="sessions-side">
-          <RehearsalsCard>
-            <div className="sessions-actions">
-              <Button
-                type="button"
-                onClick={() =>
-                  activeSessionId && void moveSessionDelta(activeSessionId, -1)
-                }
-                disabled={activeIndex <= 0}
-                title="Переместить выбранную сессию вверх"
-              >
-                ↑
-              </Button>
-              <Button
-                type="button"
-                onClick={() =>
-                  activeSessionId && void moveSessionDelta(activeSessionId, 1)
-                }
-                disabled={activeIndex < 0 || activeIndex === sessionsCount - 1}
-                title="Переместить выбранную сессию вниз"
-              >
-                ↓
-              </Button>
-              <Buttons.DeleteButton
-                type="button"
-                className="sessions-actions__btn-delete"
-                onClick={() =>
-                  activeSessionId && void deleteSession(activeSessionId)
-                }
-                disabled={activeIndex < 0}
-                title="Удалить выбранную сессию"
-              />
-            </div>
-            <div className="sessions-list">
-              {(sessions ?? []).map((s, index) => (
-                <div
-                  key={s.id}
-                  className={`sessions-sessionRow ${s.id === activeSessionId ? "active" : ""}`}
-                  title="Двойной клик — карточка сессии"
-                  onClick={() => setActiveSessionId(s.id)}
-                  onDoubleClick={() => setDetailModalSessionId(s.id)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const dragId =
-                      e.dataTransfer.getData("text/plain") || draggedSessionId;
-                    if (!dragId) return;
-                    void moveSessionBefore(dragId, s.id);
-                  }}
+        <div className="sessions-layout">
+          <aside className="sessions-side">
+            <RehearsalsCard>
+              <div className="sessions-actions">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    activeSessionId &&
+                    void moveSessionDelta(activeSessionId, -1)
+                  }
+                  disabled={activeIndex <= 0}
+                  title="Переместить выбранную сессию вверх"
                 >
-                  <ListItem
-                    className={`sessions-listItem-row ${s.id === activeSessionId ? "active" : ""} ${draggedSessionId === s.id ? "dragging" : ""}`}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", s.id);
-                      e.dataTransfer.effectAllowed = "move";
-                      setDraggedSessionId(s.id);
+                  ↑
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    activeSessionId && void moveSessionDelta(activeSessionId, 1)
+                  }
+                  disabled={
+                    activeIndex < 0 || activeIndex === sessionsCount - 1
+                  }
+                  title="Переместить выбранную сессию вниз"
+                >
+                  ↓
+                </Button>
+                <Buttons.DeleteButton
+                  type="button"
+                  className="sessions-actions__btn-delete"
+                  onClick={() =>
+                    activeSessionId && void deleteSession(activeSessionId)
+                  }
+                  disabled={activeIndex < 0}
+                  title="Удалить выбранную сессию"
+                />
+              </div>
+              <div className="sessions-list">
+                {(sessions ?? []).map((s, index) => (
+                  <div
+                    key={s.id}
+                    className={`sessions-sessionRow ${s.id === activeSessionId ? "active" : ""}`}
+                    title="Выбор: клик · открыть сессию: двойной клик или долгое нажатие"
+                    onClick={() => {
+                      if (Date.now() < suppressSessionRowClickUntilRef.current)
+                        return;
+                      setActiveSessionId(s.id);
                     }}
-                    onDragEnd={() => setDraggedSessionId(null)}
+                    onDoubleClick={() => navigateToSessionPage(s.id)}
+                    onPointerDown={(e) => onSessionRowPointerDown(e, s.id)}
+                    onPointerMove={(e) => onSessionRowPointerMove(e, s.id)}
+                    onPointerUp={cancelSessionRowLongPress}
+                    onPointerCancel={cancelSessionRowLongPress}
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const dragId =
+                        e.dataTransfer.getData("text/plain") ||
+                        draggedSessionId;
+                      if (!dragId) return;
+                      void moveSessionBefore(dragId, s.id);
+                    }}
                   >
-                    <button
-                      type="button"
-                      className="rehearsals-item"
-                      title="Перетащи для изменения порядка"
+                    <ListItem
+                      className={`sessions-listItem-row ${s.id === activeSessionId ? "active" : ""} ${draggedSessionId === s.id ? "dragging" : ""}`}
                     >
-                      <div className="rehearsals-item-title">{s.title}</div>
-                    </button>
-                  </ListItem>
-                </div>
-              ))}
-              <Buttons.AddButton
-                type="button"
-                onClick={createSession}
-                title="Новая сессия"
-                aria-label="Добавить сессию"
-              />
-            </div>
-          </RehearsalsCard>
-        </aside>
-
-        <div className="sessions-main">
-          {!activeSession ? (
-            <div className="rehearsals-muted">Выбери или создай сессию.</div>
-          ) : (
-            <div className="sessions-panels">
-              <RehearsalsCard fluid>
-                <label className="sessions-field">
-                  <input
-                    value={activeSession.title}
-                    onChange={(e) =>
-                      void updateActiveSession({ title: e.target.value })
-                    }
-                  />
-                </label>
-
-                <div className="sessions-row">
-                  <label className="sessions-field">
-                    <span className="rehearsals-muted">Дата</span>
-                    <input
-                      type="date"
-                      value={getLocalDateTimeParts(activeSession.startsAt).date}
-                      onChange={(e) => {
-                        const { time } = getLocalDateTimeParts(
-                          activeSession.startsAt,
-                        );
-                        const next = `${e.target.value}T${time || "20:00"}:00`;
-                        const d = new Date(next);
-                        if (Number.isFinite(d.getTime()))
-                          void updateActiveSession({
-                            startsAt: d.toISOString(),
-                          });
-                      }}
-                    />
-                  </label>
-                  <label className="sessions-field">
-                    <span className="rehearsals-muted">Старт</span>
-                    <input
-                      type="time"
-                      value={getLocalDateTimeParts(activeSession.startsAt).time}
-                      onChange={(e) => {
-                        const { date } = getLocalDateTimeParts(
-                          activeSession.startsAt,
-                        );
-                        const next = `${date || toDateKey(new Date())}T${e.target.value}:00`;
-                        const d = new Date(next);
-                        if (Number.isFinite(d.getTime()))
-                          void updateActiveSession({
-                            startsAt: d.toISOString(),
-                          });
-                      }}
-                    />
-                  </label>
-                </div>
-
-                <div className="sessions-actions">
-                  <Buttons.AddButton type="button" onClick={addSlot}>
-                    +
-                  </Buttons.AddButton>
-                  <Button type="button" onClick={packTimeline}>
-                    Выстроить подряд
-                  </Button>
-
-                  <label className="sessions-check">
-                    <input
-                      type="checkbox"
-                      checked={autoShiftFollowing}
-                      onChange={(e) => setAutoShiftFollowing(e.target.checked)}
-                    />
-                    <span className="rehearsals-muted">
-                      сдвигать последующие при изменении длительности
-                    </span>
-                  </label>
-                </div>
-                {publishError && (
-                  <div className="rehearsals-error">{publishError}</div>
-                )}
-
-                <div
-                  className={`sessions-slots ${timelineDragOver ? "dropActive" : ""}`}
-                  onDragEnter={() => {
-                    if (materialDragPayload) setTimelineDragOver(true);
-                  }}
-                  onDragLeave={() => setTimelineDragOver(false)}
-                  onDragOver={(e) => {
-                    if (!materialDragPayload) return;
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "copy";
-                  }}
-                  onDrop={(e) => {
-                    const payload =
-                      parseDragStepRef(e.dataTransfer) ?? materialDragPayload;
-                    setTimelineDragOver(false);
-                    setMaterialDragPayload(null);
-                    if (!payload) return;
-                    e.preventDefault();
-                    void addSlotFromDroppedStep(payload);
-                  }}
-                  title="Сюда можно перетащить сцену, чтобы создать новый слот"
-                >
-                  {(!activeSession.slots ||
-                    activeSession.slots.length === 0) && (
-                    <div className="sessions-slots-empty rehearsals-muted">
-                      Слотов пока нет — перетащи шаг сюда или нажми «+», чтобы
-                      добавить слот.
-                    </div>
-                  )}
-                  {[...(activeSession.slots ?? [])]
-                    .sort((a, b) => a.offsetMin - b.offsetMin)
-                    .map((sl) => (
-                      <ListItem
-                        key={sl.id}
-                        className={`sessions-slot ${sl.id === activeSlotId ? "active" : ""} ${draggedSlotId === sl.id ? "dragging" : ""}`}
-                        title="Перетащи для изменения порядка"
+                      <span
+                        className="sessions-sessionRow__dragHandle"
                         draggable
-                        onClick={() => setActiveSlotId(sl.id)}
+                        title="Перетащи за ручку, чтобы изменить порядок"
+                        role="presentation"
+                        onPointerDown={(e) => e.stopPropagation()}
                         onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", sl.id);
-                          e.dataTransfer.setData(DND_MIME_SLOT_ID, sl.id);
+                          cancelSessionRowLongPress();
+                          e.dataTransfer.setData("text/plain", s.id);
                           e.dataTransfer.effectAllowed = "move";
-                          setDraggedSlotId(sl.id);
+                          setDraggedSessionId(s.id);
                         }}
-                        onDragEnd={() => setDraggedSlotId(null)}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          if (materialDragPayload)
-                            e.dataTransfer.dropEffect = "copy";
-                          else e.dataTransfer.dropEffect = "move";
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          const payload =
-                            parseDragStepRef(e.dataTransfer) ??
-                            materialDragPayload;
-                          if (payload) {
-                            e.stopPropagation();
-                            setMaterialDragPayload(null);
-                            void attachStepToSlotByDrop(sl.id, payload);
-                            return;
-                          }
-                          const dragId =
-                            parseDragSlotId(e.dataTransfer) || draggedSlotId;
-                          if (!dragId) return;
-                          void moveSlotBefore(dragId, sl.id);
-                        }}
+                        onDragEnd={() => setDraggedSessionId(null)}
                       >
-                        <div className="sessions-slot-head">
-                          <div className="sessions-slot-title">
+                        ⋮⋮
+                      </span>
+                      <button
+                        type="button"
+                        className="rehearsals-item"
+                        title="Выбор — клик · страница сессии — двойной клик или долгое нажатие"
+                      >
+                        <div className="rehearsals-item-title">{s.title}</div>
+                      </button>
+                    </ListItem>
+                  </div>
+                ))}
+                <Buttons.AddButton
+                  type="button"
+                  onClick={createSession}
+                  title="Новая сессия"
+                  aria-label="Добавить сессию"
+                />
+              </div>
+            </RehearsalsCard>
+          </aside>
+
+          <div className="sessions-main">
+            {!activeSession ? (
+              <div className="rehearsals-muted">Выбери или создай сессию.</div>
+            ) : (
+              <div className="sessions-panels">
+                <RehearsalsCard fluid>
+                  <label className="sessions-field">
+                    <input
+                      value={activeSession.title}
+                      onChange={(e) =>
+                        void updateActiveSession({ title: e.target.value })
+                      }
+                    />
+                  </label>
+
+                  <div className="sessions-row">
+                    <label className="sessions-field">
+                      <span className="rehearsals-muted">Дата</span>
+                      <input
+                        type="date"
+                        value={
+                          getLocalDateTimeParts(activeSession.startsAt).date
+                        }
+                        onChange={(e) => {
+                          const { time } = getLocalDateTimeParts(
+                            activeSession.startsAt,
+                          );
+                          const next = `${e.target.value}T${time || "20:00"}:00`;
+                          const d = new Date(next);
+                          if (Number.isFinite(d.getTime()))
+                            void updateActiveSession({
+                              startsAt: d.toISOString(),
+                            });
+                        }}
+                      />
+                    </label>
+                    <label className="sessions-field">
+                      <span className="rehearsals-muted">Старт</span>
+                      <input
+                        type="time"
+                        value={
+                          getLocalDateTimeParts(activeSession.startsAt).time
+                        }
+                        onChange={(e) => {
+                          const { date } = getLocalDateTimeParts(
+                            activeSession.startsAt,
+                          );
+                          const next = `${date || toDateKey(new Date())}T${e.target.value}:00`;
+                          const d = new Date(next);
+                          if (Number.isFinite(d.getTime()))
+                            void updateActiveSession({
+                              startsAt: d.toISOString(),
+                            });
+                        }}
+                      />
+                    </label>
+
+                    <Button
+                      className="sessions-field__plan"
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/sessions/${encodeURIComponent(activeSession.id)}`,
+                        )
+                      }
+                      title="Создавать, наполнять и менять порядок слотов — на странице сессии"
+                    >
+                      План и материалы
+                    </Button>
+                  </div>
+
+                  <div className="sessions-slots-readonly">
+                    <div className="sessions-slots-readonly__head">
+                      <span className="rehearsals-muted">Слоты (обзор)</span>
+                    </div>
+                    {(!activeSession.slots ||
+                      activeSession.slots.length === 0) && (
+                      <div className="sessions-slots-empty rehearsals-muted">
+                        Слотов пока нет — задай план на странице сессии (кнопка
+                        выше).
+                      </div>
+                    )}
+                    {[...(activeSession.slots ?? [])]
+                      .sort((a, b) => a.offsetMin - b.offsetMin)
+                      .map((sl) => (
+                        <button
+                          key={sl.id}
+                          type="button"
+                          className={`sessions-slots-readonly__row ${sl.id === activeSlotId ? "active" : ""} ${slotRowToneClassBySlotId.get(sl.id) ?? ""}`.trim()}
+                          onClick={() => setActiveSlotId(sl.id)}
+                        >
+                          <div className="sessions-slots-readonly__time">
                             {formatSlotTime(
                               activeSession.startsAt,
                               sl.offsetMin,
                             )}{" "}
                             · {sl.durationMin} мин
                           </div>
-
-                          <Buttons.DeleteButton
-                            type="button"
-                            className="sessions-slot-title__btn-delete"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void removeSlot(sl.id);
-                            }}
-                          />
-                        </div>
-
-                        {sl.id === activeSlotId && (
-                          <div className="sessions-slot-controls">
-                            <label className="sessions-field">
-                              <span className="rehearsals-muted">Время</span>
-                              <input
-                                type="time"
-                                value={
-                                  slotDraft[sl.id]?.time ??
-                                  formatSlotTime(
-                                    activeSession.startsAt,
-                                    sl.offsetMin,
-                                  )
-                                }
-                                onChange={(e) =>
-                                  setSlotDraft((p) => ({
-                                    ...p,
-                                    [sl.id]: {
-                                      ...(p[sl.id] ?? {
-                                        time: "",
-                                        duration: "",
-                                      }),
-                                      time: e.target.value,
-                                    },
-                                  }))
-                                }
-                                onBlur={() => void commitSlotDraft(sl.id)}
-                              />
-                            </label>
-                            <label className="sessions-field">
-                              <span className="rehearsals-muted">
-                                Длительность
-                              </span>
-                              <input
-                                type="number"
-                                min={1}
-                                max={480}
-                                value={
-                                  slotDraft[sl.id]?.duration ??
-                                  String(sl.durationMin ?? 30)
-                                }
-                                onChange={(e) =>
-                                  setSlotDraft((p) => ({
-                                    ...p,
-                                    [sl.id]: {
-                                      ...(p[sl.id] ?? {
-                                        time: "",
-                                        duration: "",
-                                      }),
-                                      duration: e.target.value,
-                                    },
-                                  }))
-                                }
-                                onBlur={() => void commitSlotDraft(sl.id)}
-                              />
-                            </label>
+                          <div className="sessions-slots-readonly__meta">
+                            {slotInsights.find((x) => x.slotId === sl.id)
+                              ?.title ??
+                              (sl.ref
+                                ? `${sl.ref.projectSlug} · шаг #${sl.ref.stepId}`
+                                : "Материал не выбран")}
                           </div>
-                        )}
-
-                        <div className="sessions-slot-meta">
-                          {slotInsights.find((x) => x.slotId === sl.id)
-                            ?.title ??
-                            (sl.ref
-                              ? `${sl.ref.projectSlug} · шаг #${sl.ref.stepId}`
-                              : "Материал не выбран")}
-                        </div>
-                        {(() => {
-                          const av = slotAvailabilityById.get(sl.id);
-                          if (!av) return null;
-                          const total =
-                            av.free.length + av.busy.length + av.unknown.length;
-                          if (total === 0) return null;
-                          return (
-                            <div
-                              className="rehearsals-muted"
-                              style={{ marginTop: 4 }}
-                            >
-                              по доступности: свободны <b>{av.free.length}</b> /{" "}
-                              {total}
-                              {av.unknown.length ? (
-                                <>
-                                  {" "}
-                                  · не отмечено: <b>{av.unknown.length}</b>
-                                </>
-                              ) : null}
-                              {av.busy.length ? (
-                                <>
-                                  {" "}
-                                  · заняты: <b>{av.busy.length}</b>
-                                </>
-                              ) : null}
-                            </div>
-                          );
-                        })()}
-                        {(() => {
-                          const info = slotInsights.find(
-                            (x) => x.slotId === sl.id,
-                          );
-                          if (!info || !sl.ref) return null;
-                          if (info.ready) {
+                          {(() => {
+                            const av = slotAvailabilityById.get(sl.id);
+                            if (!av) return null;
+                            const total =
+                              av.free.length +
+                              av.busy.length +
+                              av.unknown.length;
+                            if (total === 0) return null;
                             return (
-                              <div className="rehearsals-muted sessions-slot-ok">
-                                Собирается
+                              <div className="rehearsals-muted sessions-slots-readonly__avail">
+                                по доступности: свободны <b>{av.free.length}</b>{" "}
+                                / {total}
+                                {av.unknown.length ? (
+                                  <>
+                                    {" "}
+                                    · не отмечено: <b>{av.unknown.length}</b>
+                                  </>
+                                ) : null}
+                                {av.busy.length ? (
+                                  <>
+                                    {" "}
+                                    · заняты: <b>{av.busy.length}</b>
+                                  </>
+                                ) : null}
                               </div>
                             );
-                          }
-                          if (info.missingRoles.length) {
-                            return (
-                              <div className="rehearsals-error sessions-slot-bad">
-                                Не собирается: нет назначений для{" "}
-                                {info.missingRoles.slice(0, 4).join(", ")}
-                                {info.missingRoles.length > 4
-                                  ? ` +${info.missingRoles.length - 4}`
-                                  : ""}
-                              </div>
+                          })()}
+                          {(() => {
+                            const info = slotInsights.find(
+                              (x) => x.slotId === sl.id,
                             );
-                          }
-                          return null;
-                        })()}
-                      </ListItem>
-                    ))}
-                </div>
-                <Button
-                  type="button"
-                  onClick={() => void publishActiveSession()}
-                  disabled={publishing}
-                  title={
-                    activeSessionPublished
-                      ? "Пересобрать список участников по календарю, обновить комментарий; при подключённом боте — обновить или отправить сообщение в Telegram"
-                      : "Помечает сессию опубликованной; при подключённом боте — дублирует вызов в Telegram"
-                  }
-                >
-                  {publishing
-                    ? "Публикую…"
-                    : activeSessionPublished
-                      ? "Обновить публикацию"
-                      : "Опубликовать"}
-                </Button>
-
-                <label className="sessions-field">
-                  <span className="rehearsals-muted comments-for-bot">
-                    Комментарий к сессии
-                  </span>
-                  <textarea
-                    rows={3}
-                    value={String(activeSession.comment ?? "")}
-                    onChange={(e) =>
-                      void updateActiveSession({ comment: e.target.value })
+                            if (!info || !sl.ref) return null;
+                            if (info.ready) {
+                              return (
+                                <div className="rehearsals-muted sessions-slot-ok">
+                                  Собирается
+                                </div>
+                              );
+                            }
+                            if (info.missingRoles.length) {
+                              return (
+                                <div className="rehearsals-error sessions-slot-bad">
+                                  Не собирается: нет назначений для{" "}
+                                  {info.missingRoles.slice(0, 4).join(", ")}
+                                  {info.missingRoles.length > 4
+                                    ? ` +${info.missingRoles.length - 4}`
+                                    : ""}
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </button>
+                      ))}
+                  </div>
+                  {publishError && (
+                    <div className="rehearsals-error">{publishError}</div>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => void publishActiveSession()}
+                    disabled={publishing}
+                    title={
+                      activeSessionPublished
+                        ? "Пересобрать список участников по календарю, обновить комментарий; при подключённом боте — обновить или отправить сообщение в Telegram"
+                        : "Помечает сессию опубликованной; при подключённом боте — дублирует вызов в Telegram"
                     }
-                    placeholder="Например: сбор к 19:50, разогрев 10 минут, начинаем ровно в 20:00."
-                    style={{ resize: "vertical" }}
-                  />
-                </label>
-              </RehearsalsCard>
+                  >
+                    {publishing
+                      ? "Публикую…"
+                      : activeSessionPublished
+                        ? "Обновить публикацию"
+                        : "Опубликовать"}
+                  </Button>
 
-              <RehearsalsCard fluid title="Материалы">
+                  <label className="sessions-field">
+                    <span className="rehearsals-muted comments-for-bot">
+                      Комментарий к сессии
+                    </span>
+                    <textarea
+                      rows={3}
+                      value={String(activeSession.comment ?? "")}
+                      onChange={(e) =>
+                        void updateActiveSession({ comment: e.target.value })
+                      }
+                      placeholder="Например: сбор к 19:50, разогрев 10 минут, начинаем ровно в 20:00."
+                      style={{ resize: "vertical" }}
+                    />
+                  </label>
+                </RehearsalsCard>
+
+                {activeSession ? (
+                  <div
+                    className="sessions-side-called"
+                    style={{ marginTop: 12 }}
+                  >
+                    <div className="rehearsals-section-title">
+                      {activeSlotId ? "В выбранном слоте" : "Участники сессии"}
+                      {activeSlotInsight ? (
+                        <span
+                          className="rehearsals-muted"
+                          style={{ fontWeight: 600 }}
+                        >
+                          {" "}
+                          · {activeSlotInsight.time}
+                        </span>
+                      ) : null}
+                    </div>
+                    {sessionsSideCalledRows.length === 0 ? (
+                      <div
+                        className="rehearsals-muted"
+                        style={{ fontSize: 12 }}
+                      >
+                        {activeSlotId
+                          ? "Нет актёров по ролям (выбери материал в слоте или назначь роли в проекте)."
+                          : "Нет участников: опубликуй сессию или назначь материалы в слотах."}
+                      </div>
+                    ) : (
+                      <div className="director-session-page__called-scroll">
+                        <ul className="director-session-page__called-list">
+                          {sessionsSideCalledRows.map((row) => (
+                            <li
+                              key={row.key}
+                              className="director-session-page__called-item"
+                            >
+                              <MiniAvatar
+                                src={row.avatarUrl}
+                                label={row.avatarLabel}
+                                title={row.email}
+                                size={22}
+                              />
+                              <div className="director-session-page__called-item-main">
+                                <span
+                                  className="director-session-page__called-name"
+                                  title={row.email}
+                                >
+                                  {row.name}
+                                </span>
+                                {row.statusLabel ? (
+                                  <span
+                                    className={
+                                      row.statusTone === "confirmed"
+                                        ? "director-session-page__called-status director-session-page__called-status--confirmed"
+                                        : `director-session-page__called-status director-session-page__called-status--${row.statusTone}`
+                                    }
+                                  >
+                                    {row.statusLabel}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* <RehearsalsCard fluid title="Материалы">
                 <div className="sessions-row sessions-material-controls">
                   <select
                     className="native-select"
@@ -2262,18 +1957,12 @@ export function DirectorSessionsPage() {
                     </>
                   )}
                 </div>
-              </RehearsalsCard>
-            </div>
-          )}
+              </RehearsalsCard> */}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-    <DirectorSessionDetailModal
-      isOpen={!!detailModalSessionId}
-      sessionId={detailModalSessionId}
-      accessToken={accessToken}
-      onClose={() => setDetailModalSessionId(null)}
-    />
     </>
   );
 }

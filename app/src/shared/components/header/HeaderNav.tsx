@@ -1,10 +1,12 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { ENABLE_3D_THEATER } from "../../build-features";
 
-const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
+const navItems: { path: string; label: string; navClass: string; icon: React.ReactNode }[] = [
   {
     path: "/",
     label: "Сценарий",
+    navClass: "header-nav-btn--script",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -18,6 +20,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/theater",
     label: "3D театр",
+    navClass: "header-nav-btn--theater",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -43,6 +46,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/board",
     label: "Доска",
+    navClass: "header-nav-btn--board",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="4" width="6" height="16" rx="1" />
@@ -54,6 +58,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/sessions",
     label: "Сессии",
+    navClass: "header-nav-btn--sessions",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <circle cx="12" cy="12" r="10" />
@@ -75,6 +80,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/troupe",
     label: "Труппа",
+    navClass: "header-nav-btn--troupe",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -87,6 +93,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/roles",
     label: "Роли",
+    navClass: "header-nav-btn--roles",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -98,6 +105,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/profile",
     label: "Профиль",
+    navClass: "header-nav-btn--profile",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M20 21a8 8 0 0 0-16 0" />
@@ -108,6 +116,7 @@ const navItems: { path: string; label: string; icon: React.ReactNode }[] = [
   {
     path: "/settings",
     label: "Настройки",
+    navClass: "header-nav-btn--settings",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <circle cx="12" cy="12" r="3" />
@@ -124,13 +133,15 @@ export const HeaderNav: React.FC = () => {
 
   return (
     <nav className="header-nav" aria-label="Навигация">
-      {navItems.map(({ path, label, icon }) => {
+      {navItems
+        .filter((item) => ENABLE_3D_THEATER || item.path !== "/theater")
+        .map(({ path, label, navClass, icon }) => {
         const isActive = currentPath === path || (path !== "/" && currentPath.startsWith(path));
         return (
           <button
             key={path}
             type="button"
-            className={`header-nav-btn ${isActive ? "active" : ""}`}
+            className={`header-nav-btn ${navClass} ${isActive ? "active" : ""}`}
             onClick={() => navigate(path)}
             title={label}
             aria-label={label}

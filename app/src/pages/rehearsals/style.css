@@ -1,11 +1,13 @@
 .rehearsals-page {
   padding: 18px 18px 28px;
   height: 100%;
+  width: 100%;
   overflow: auto;
   margin: 0 auto;
   color: var(--color-text-lighter);
   background-color: var(--color-bg-primary);
   font-family: var(--font-family-script-body);
+  max-width: var(--width-content-page);
 }
 
 .rehearsals-head {

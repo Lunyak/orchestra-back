@@ -2,6 +2,7 @@ import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useScriptUI } from "../../features/script-ui";
+import { ENABLE_3D_THEATER } from "../../shared/build-features";
 import { Header } from "../../shared/components/header/Header";
 
 // Lazy imports страниц
@@ -17,10 +18,12 @@ const DirectorSessionsPage = lazy(() =>
   })),
 );
 
-const DirectorSessionSlotPage = lazy(() =>
-  import("../../pages/sessions/DirectorSessionSlotPage").then((m) => ({
-    default: m.DirectorSessionSlotPage,
-  })),
+const DirectorSessionPage = lazy(() =>
+  import("../../pages/sessions/DirectorSessionPage/DirectorSessionPage").then(
+    (m) => ({
+      default: m.DirectorSessionPage,
+    }),
+  ),
 );
 
 const ProfilePage = lazy(() =>
@@ -142,12 +145,12 @@ export function AppRoutes() {
   // Определяем, нужно ли показывать scriptState controls в Header
   const shouldShowScriptState =
     location.pathname === "/" ||
-    location.pathname === "/theater" ||
+    (ENABLE_3D_THEATER && location.pathname === "/theater") ||
     location.pathname === "/light-plot";
 
   const isSpectacleLayoutRoute =
     location.pathname === "/" ||
-    location.pathname === "/theater" ||
+    (ENABLE_3D_THEATER && location.pathname === "/theater") ||
     location.pathname === "/light-plot" ||
     location.pathname === "/sessions" ||
     location.pathname.startsWith("/sessions/");
@@ -223,7 +226,16 @@ export function AppRoutes() {
         <Routes>
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/" element={<SpectaclePage />} />
-          <Route path="/theater" element={<SpectaclePage />} />
+          <Route
+            path="/theater"
+            element={
+              ENABLE_3D_THEATER ? (
+                <SpectaclePage />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
           <Route path="/light-plot" element={<SpectaclePage />} />
           <Route path="/board" element={<SpectaclePage />} />
           <Route
@@ -238,8 +250,9 @@ export function AppRoutes() {
             <Route index element={<DirectorSessionsPage />} />
             <Route
               path=":sessionId/slots/:slotId"
-              element={<DirectorSessionSlotPage />}
+              element={<DirectorSessionPage />}
             />
+            <Route path=":sessionId" element={<DirectorSessionPage />} />
           </Route>
           <Route path="/actor" element={<ActorPage />} />
           <Route path="/trainers" element={<TrainersPage />} />

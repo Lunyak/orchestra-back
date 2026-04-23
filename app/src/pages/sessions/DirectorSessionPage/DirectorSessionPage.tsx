@@ -1,19 +1,23 @@
+import { Button } from "@shared/core/button/Button";
+import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
+import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
+import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../../features/auth";
+import { useAuth } from "../../../features/auth";
 import {
   loadDirectorSessions,
   saveDirectorSessions,
   type DirectorRehearsalSession,
   type DirectorSessionSlot,
-} from "../../features/director-sessions/directorSessionsSync";
-import { useProject } from "../../features/project";
-import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
-import type { SceneRolesDataV1 } from "../../features/scene";
-import type { ScriptStep } from "../../shared/types/script";
-import { markdownToPlainText } from "../../shared/utils/textPreview";
+} from "../../../features/director-sessions/directorSessionsSync";
+import type { SceneRolesDataV1 } from "../../../features/scene";
+import { useProject } from "../../../features/project";
+import { RehearsalsCard } from "../../../features/rehearsals-card/RehearsalsCard";
+import type { ScriptStep } from "../../../shared/types/script";
+import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import {
   getProfilesBatch,
   getProjectMembers,
@@ -21,15 +25,17 @@ import {
   syncPull,
   type SyncPullResponse,
   type TeamProfile,
-} from "../../sync/api";
-import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
-import { SlotRoleRehearsalPicker } from "./SlotRoleRehearsalPicker";
+} from "../../../sync/api";
+import { DirectorSessionSlotsPanel } from "../DirectorSessionSlotsPanel";
+import { SlotRoleRehearsalPicker } from "../SlotRoleRehearsalPicker";
 import {
   getAllAssigneeEmailsForDirectorSlotChart,
   getNormalizedRoleKeysForSlotStep,
   type DirectorSlotPlannedData,
-} from "./sessionSlotPlanned";
-import { TroupeSchedulePreview } from "./TroupeSchedulePreview";
+} from "../sessionSlotPlanned";
+import { TroupeSchedulePreview } from "../TroupeSchedulePreview";
+import "../style.css";
+import "./style.css";
 
 dayjs.locale("ru");
 
@@ -60,6 +66,10 @@ function formatTimeHHMM(totalMin: number): string {
 function formatSlotTime(startsAtIso: string, offsetMin: number): string {
   const base = getSessionStartLocalMinutes(startsAtIso);
   return formatTimeHHMM(base + Math.max(0, Math.floor(offsetMin)));
+}
+
+function directorSlotRefKey(projectSlug: string, stepId: number): string {
+  return `${String(projectSlug ?? "").trim()}:${Math.floor(Number(stepId) || 0)}`;
 }
 
 function toDateKey(d: Date): string {
@@ -224,14 +234,15 @@ function parseStepsFromPull(
   return { steps, sceneId, sceneRoles };
 }
 
-export function DirectorSessionSlotPage() {
+export function DirectorSessionPage() {
   const { accessToken } = useAuth();
   const { projects } = useProject();
   const navigate = useNavigate();
 
   const { sessionId, slotId } = useParams();
   const sid = String(sessionId ?? "").trim();
-  const slId = String(slotId ?? "").trim();
+  const slId =
+    slotId != null && String(slotId).trim() !== "" ? String(slotId).trim() : "";
 
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
   const [session, setSession] = useState<DirectorRehearsalSession | null>(null);
@@ -266,7 +277,7 @@ export function DirectorSessionSlotPage() {
   );
 
   const projectFilterStorageKey = useMemo(
-    () => `directorSessions:slot:${sid}:${slId}:project`,
+    () => `directorSessions:session:${sid}:${slId || "all"}:project`,
     [sid, slId],
   );
   const [projectFilter, setProjectFilter] = useState<string>(() => {
@@ -293,7 +304,7 @@ export function DirectorSessionSlotPage() {
   }, [slot?.ref?.projectSlug, projectFilter]);
 
   useEffect(() => {
-    if (!accessToken || !sid || !slId) return;
+    if (!accessToken || !sid) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -309,20 +320,27 @@ export function DirectorSessionSlotPage() {
           setError("Сессия не найдена");
           return;
         }
-        const sl = (s.slots ?? []).find((x) => x.id === slId) ?? null;
-        if (!sl) {
-          setSession(s);
+        setSession(s);
+        if (!slId) {
           setSlot(null);
-          setError("Слот не найден");
+          setError(null);
           return;
         }
-        setSession(s);
+        const sl = (s.slots ?? []).find((x) => x.id === slId) ?? null;
         setSlot(sl);
-        setError(null);
+        if (!sl) {
+          const n = (s.slots ?? []).length;
+          setError(
+            n === 0
+              ? "Слотов пока нет — добавь первый в блоке «Слоты» слева."
+              : null,
+          );
+        } else {
+          setError(null);
+        }
       })
       .catch((e: any) => {
-        if (cancelled) return;
-        setError(e?.message ?? "Не удалось загрузить слот");
+        if (!cancelled) setError(e?.message ?? "Не удалось загрузить сессию");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -365,6 +383,17 @@ export function DirectorSessionSlotPage() {
     if (!accessToken) return;
     setSessions(next);
     await saveDirectorSessions(accessToken, { sessions: next });
+    const s = next.find((x) => x.id === sid) ?? null;
+    setSession(s);
+    if (!s) {
+      setSlot(null);
+      return;
+    }
+    if (slId) {
+      setSlot((s.slots ?? []).find((x) => x.id === slId) ?? null);
+    } else {
+      setSlot(null);
+    }
   };
 
   const updateSlot = async (patch: Partial<DirectorSessionSlot>) => {
@@ -614,6 +643,23 @@ export function DirectorSessionSlotPage() {
     return selectableSteps.filter((x) => x.ok);
   }, [onlySelectable, selectableSteps]);
 
+  /** Шаги (project + stepId), которые уже привязаны к какому-либо слоту этой сессии */
+  const slotsByStepRefInSession = useMemo(() => {
+    const map = new Map<string, DirectorSessionSlot[]>();
+    if (!session?.slots?.length) return map;
+    for (const sl of session.slots) {
+      const r = sl.ref;
+      if (!r?.projectSlug) continue;
+      const stepId = Math.floor(Number(r.stepId) || 0);
+      if (!Number.isFinite(stepId) || stepId <= 0) continue;
+      const k = directorSlotRefKey(r.projectSlug, stepId);
+      const arr = map.get(k) ?? [];
+      arr.push(sl);
+      map.set(k, arr);
+    }
+    return map;
+  }, [session?.id, session?.slots]);
+
   const selectedStep = useMemo(() => {
     if (!slot?.ref) return null;
     const slug = slot.ref.projectSlug;
@@ -657,31 +703,33 @@ export function DirectorSessionSlotPage() {
   }, [slot?.ref, slotPlannedInput]);
 
   if (!accessToken)
-    return <div style={{ padding: 12 }}>Нужно войти, чтобы открыть слот.</div>;
-  if (!sid || !slId)
-    return <div style={{ padding: 12 }}>Некорректный URL слота.</div>;
+    return (
+      <div style={{ padding: 12 }}>
+        Нужно войти, чтобы открыть страницу сессии.
+      </div>
+    );
+  if (!sid) return <div style={{ padding: 12 }}>Некорректный адрес.</div>;
 
   return (
-    <div
-      style={{ padding: "12px 12px 40px", maxWidth: 1100, margin: "0 auto" }}
-    >
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
+    <div className="director-session-page">
+      <div className="director-session-page__head">
         <Link
           to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
-          style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}
+          className="director-session-page__back"
         >
-          ← К сессии
+          ← К списку сессий
         </Link>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Слот</div>
-        <div style={{ fontSize: 12, opacity: 0.75 }}>{headerTimeLabel}</div>
-        <div style={{ fontSize: 12, opacity: 0.75 }}>{slotTimeLabel}</div>
+        {session ? (
+          <>
+            <div className="director-session-page__title">{session.title}</div>
+            <div className="director-session-page__meta">{headerTimeLabel}</div>
+            {slot ? (
+              <div className="director-session-page__meta">{slotTimeLabel}</div>
+            ) : null}
+          </>
+        ) : (
+          <div className="director-session-page__title">Сессия</div>
+        )}
       </div>
 
       {loading ? (
@@ -693,340 +741,321 @@ export function DirectorSessionSlotPage() {
         </div>
       ) : null}
 
-      {session && slot && !loading && !error && (
-        <div
-          style={{
-            marginTop: 12,
-            display: "grid",
-            gap: 12,
-            gridTemplateColumns: "1fr 1.2fr",
-            alignItems: "start",
-          }}
-        >
-          <RehearsalsCard fluid title="Текущий выбор">
-            <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
-              {slot.ref ? (
-                <>
-                  <div>
-                    Проект: <b>{slot.ref.projectSlug}</b>
-                  </div>
-                  <div>
-                    Шаг: <b>#{slot.ref.stepId}</b>
-                  </div>
-                </>
-              ) : (
-                <div>Материал не выбран.</div>
-              )}
-            </div>
-
-            {selectedStep && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 900 }}>Превью</div>
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
-                  {selectedStep.title ? selectedStep.title : "—"}
-                </div>
-                <pre
-                  style={{
-                    marginTop: 8,
-                    whiteSpace: "pre-wrap",
-                    maxHeight: 260,
-                    overflow: "auto",
-                    padding: 10,
-                    borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,0.10)",
-                    background: "rgba(0,0,0,0.20)",
-                    fontSize: 12,
-                    lineHeight: 1.35,
-                  }}
-                >
-                  {(() => {
-                    const text = String(
-                      (selectedStep as any).playMarkdown ??
-                        (selectedStep as any).markdown ??
-                        "",
-                    );
-                    const plain = markdownToPlainText(text);
-                    return (
-                      plain.slice(0, 1600) +
-                      (plain.length > 1600 ? "\n\n… (обрезано)" : "")
-                    );
-                  })()}
-                </pre>
-                <TroupeSchedulePreview
-                  sessionDateKey={sessionDateKey}
-                  profiles={teamProfiles}
-                  membersLoading={membersLoading}
-                  participantEmailSet={slotChartEmailSet}
-                />
-                <SlotRoleRehearsalPicker
-                  roleKeys={slotRoleKeysForPicker}
-                  roleTitleByKey={roleTitleByKey}
-                  roleEmailsByKey={roleEmailsByKey}
-                  picks={slot.roleRehearsalPicks}
-                  profiles={teamProfiles}
-                  onPicksChange={(next) =>
-                    void updateSlot({ roleRehearsalPicks: next })
-                  }
-                />
-              </div>
-            )}
-
-            <FormTextarea
-              rootClassName="form-textarea--section"
-              label="Заметки к слоту"
-              value={String(slot.notes ?? "")}
-              onChange={(e) => void updateSlot({ notes: e.target.value })}
-              placeholder="Например: темп, ключевой акцент, кого проверить…"
-              rows={4}
-            />
-
-            <div
-              style={{
-                marginTop: 12,
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() =>
-                  void updateSlot({
-                    ref: undefined,
-                    roleRehearsalPicks: undefined,
-                  })
-                }
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "inherit",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 12,
-                }}
-              >
-                Снять материал
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(`/sessions?sessionId=${encodeURIComponent(sid)}`)
-                }
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  background: "rgba(255,255,255,0.05)",
-                  color: "inherit",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 12,
-                }}
-              >
-                Готово
-              </button>
-            </div>
-          </RehearsalsCard>
-
-          <RehearsalsCard fluid title="Выбор сцены/шага">
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
-              <select
-                className="native-select"
-                value={projectFilter}
-                onChange={(e) => setProjectFilter(e.target.value)}
-              >
-                {visibleProjects.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="native-text-input"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="поиск по названию/тексту"
-                style={{ flex: 1, minWidth: 240 }}
-              />
-            </div>
-
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <label
-                style={{
-                  display: "inline-flex",
-                  gap: 8,
-                  alignItems: "center",
-                  userSelect: "none",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={onlySelectable}
-                  onChange={(e) => setOnlySelectable(e.target.checked)}
-                />
-                <span style={{ fontSize: 12, opacity: 0.85 }}>
-                  по доступности актёров
-                </span>
-              </label>
-              {(membersLoading || rolesLoading) && (
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
-                  подгружаю роли/участников…
-                </span>
-              )}
-              {sessionDateKey && slotWindow ? (
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
-                  окно слота: <b>{sessionDateKey}</b> ·{" "}
-                  {formatTimeHHMM(slotWindow.startMin)}–
-                  {formatTimeHHMM(slotWindow.endMin)}
-                </span>
-              ) : (
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
-                  нет даты/времени для расчёта доступности
-                </span>
-              )}
-            </div>
-
-            {stepsLoading ? (
-              <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
-                Загружаю шаги…
-              </div>
-            ) : null}
-            {stepsError ? (
-              <div className="settings-invite-error" style={{ marginTop: 10 }}>
-                {stepsError}
-              </div>
-            ) : null}
-            {availabilityError ? (
-              <div className="settings-invite-error" style={{ marginTop: 10 }}>
-                {availabilityError}
-              </div>
-            ) : null}
-
-            <div
-              style={{
-                marginTop: 10,
-                display: "grid",
-                gap: 8,
-                maxHeight: 620,
-                overflow: "auto",
-                paddingRight: 4,
-              }}
-            >
-              {stepsForList.slice(0, 250).map((x) => {
-                const s = x.step;
-                const isSelected = Boolean(
-                  slot.ref &&
-                  slot.ref.projectSlug === projectFilter &&
-                  slot.ref.stepId === s.id,
-                );
-                const ok = x.ok;
-                return (
-                  <button
-                    key={`${projectFilter}:${s.id}`}
-                    type="button"
-                    onClick={() =>
-                      void updateSlot({
-                        ref: { projectSlug: projectFilter, stepId: s.id },
-                        durationMin:
-                          s.durationMin == null
-                            ? slot.durationMin
-                            : Math.max(
-                                1,
-                                Math.floor(Number(s.durationMin) || 1),
-                              ),
-                        roleRehearsalPicks: undefined,
-                      })
-                    }
-                    style={{
-                      textAlign: "left",
-                      borderRadius: 12,
-                      border: isSelected
-                        ? "1px solid rgba(96,165,250,0.55)"
-                        : ok
-                          ? "1px solid rgba(46,160,67,0.28)"
-                          : "1px solid rgba(248,81,73,0.22)",
-                      background: isSelected
-                        ? "rgba(96,165,250,0.10)"
-                        : ok
-                          ? "rgba(46,160,67,0.08)"
-                          : "rgba(248,81,73,0.06)",
-                      padding: "10px 10px",
-                      cursor: "pointer",
-                      color: "inherit",
-                      display: "grid",
-                      gap: 4,
-                    }}
-                    title="Назначить в этот слот"
+      {session && !loading && (
+        <div className="director-session-page__grid">
+          <DirectorSessionSlotsPanel
+            session={session}
+            sessions={sessions}
+            selectedSlotId={slId || null}
+            onSelectSlot={(id) =>
+              navigate(
+                `/sessions/${encodeURIComponent(sid)}/slots/${encodeURIComponent(id)}`,
+              )
+            }
+            onRequestCloseSlot={() =>
+              navigate(`/sessions/${encodeURIComponent(sid)}`)
+            }
+            onNoSlotsLeft={() =>
+              navigate(`/sessions/${encodeURIComponent(sid)}`, {
+                replace: true,
+              })
+            }
+            persistSessions={persistSessions}
+            slotSettings={
+              slot ? (
+                <div className="director-session-page__detail-grid">
+                  <RehearsalsCard
+                    fluid
+                    title=""
+                    className="director-session-page__preview"
                   >
-                    <div style={{ fontWeight: 900, fontSize: 12 }}>
-                      #{s.id} {s.title}
-                    </div>
-                    <div style={{ fontSize: 12, opacity: 0.72 }}>
-                      {isReadyStep(s) ? "Готова" : "В работе"}
-                      {s.durationMin != null
-                        ? ` · длит.: ${Math.max(1, Math.floor(Number(s.durationMin) || 1))} мин`
-                        : ""}
-                      {" · "}
-                      {ok ? (
-                        <span
-                          style={{
-                            color: "rgba(126, 231, 135, 0.95)",
-                            fontWeight: 800,
-                          }}
-                        >
-                          можно взять
-                        </span>
-                      ) : (
-                        <span
-                          style={{
-                            color: "rgba(248, 81, 73, 0.95)",
-                            fontWeight: 800,
-                          }}
-                        >
-                          не собирается
-                        </span>
-                      )}
-                    </div>
-                    {!ok && x.missing.length > 0 && (
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>
-                        не хватает: <b>{x.missing.slice(0, 6).join(", ")}</b>
-                        {x.missing.length > 6
-                          ? ` +${x.missing.length - 6}`
-                          : ""}
+                    {selectedStep && (
+                      <div className="session__step-item">
+                       
+                          <PreviewSlot selectedStep={selectedStep} />
+              
+                        <TroupeSchedulePreview
+                          sessionDateKey={sessionDateKey}
+                          profiles={teamProfiles}
+                          membersLoading={membersLoading}
+                          participantEmailSet={slotChartEmailSet}
+                        />
+                        <SlotRoleRehearsalPicker
+                          roleKeys={slotRoleKeysForPicker}
+                          roleTitleByKey={roleTitleByKey}
+                          roleEmailsByKey={roleEmailsByKey}
+                          picks={slot.roleRehearsalPicks}
+                          profiles={teamProfiles}
+                          onPicksChange={(next) =>
+                            void updateSlot({ roleRehearsalPicks: next })
+                          }
+                        />
                       </div>
                     )}
-                  </button>
-                );
-              })}
-              {stepsForList.length === 0 && !stepsLoading && (
-                <div style={{ fontSize: 12, opacity: 0.75 }}>
-                  Нет шагов (или сцена не найдена).
+
+                    <FormTextarea
+                      rootClassName="form-textarea--section"
+                      label="Заметки к слоту"
+                      value={String(slot.notes ?? "")}
+                      onChange={(e) =>
+                        void updateSlot({ notes: e.target.value })
+                      }
+                      placeholder="Например: темп, акценты, на что обратить внимание…"
+                      rows={4}
+                    />
+
+                    <div
+                      style={{
+                        marginTop: 12,
+                        display: "flex",
+                        gap: 10,
+                        flexWrap: "wrap",
+                      }}
+                    ></div>
+                  </RehearsalsCard>
+
+                  <RehearsalsCard fluid title="">
+                    <div style={{ marginTop: 10 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                        }}
+                      >
+                        <select
+                          className="native-select"
+                          value={projectFilter}
+                          onChange={(e) => setProjectFilter(e.target.value)}
+                        >
+                          {visibleProjects.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          className="native-text-input"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="поиск по названию/тексту"
+                          style={{ flex: 1, minWidth: 240 }}
+                        />
+                      </div>
+                    </div>
+                    <div className="session__steps-checkbox">
+                      <LabeledCheckbox
+                        checked={onlySelectable}
+                        onChange={(e) => setOnlySelectable(e)}
+                      >
+                        <span className="">по доступности актёров</span>
+                      </LabeledCheckbox>
+                    </div>
+
+                    {stepsLoading ? (
+                      <div className="session__steps-list">Загружаю шаги…</div>
+                    ) : null}
+                    {stepsError ? (
+                      <div
+                        className="settings-invite-error"
+                        style={{ marginTop: 10 }}
+                      >
+                        {stepsError}
+                      </div>
+                    ) : null}
+                    {availabilityError ? (
+                      <div
+                        className="settings-invite-error"
+                        style={{ marginTop: 10 }}
+                      >
+                        {availabilityError}
+                      </div>
+                    ) : null}
+
+                    <div className="session__steps-list">
+                      {stepsForList.slice(0, 250).map((stepData) => {
+                        const s = stepData.step;
+                        const isSelected = Boolean(
+                          slot.ref &&
+                          slot.ref.projectSlug === projectFilter &&
+                          slot.ref.stepId === s.id,
+                        );
+                        const ok = stepData.ok;
+                        const refKey = directorSlotRefKey(projectFilter, s.id);
+                        const slotsWithSameRef =
+                          slotsByStepRefInSession.get(refKey) ?? [];
+                        const otherSlotsWithRef = slotsWithSameRef.filter(
+                          (sl) => sl.id !== slot.id,
+                        );
+                        const bookedInOtherSlots = otherSlotsWithRef.length > 0;
+                        const otherSlotsTimesLabel =
+                          bookedInOtherSlots && session
+                            ? (() => {
+                                const sorted = [...otherSlotsWithRef].sort(
+                                  (a, b) => a.offsetMin - b.offsetMin,
+                                );
+                                if (sorted.length === 1) {
+                                  return formatSlotTime(
+                                    session.startsAt,
+                                    sorted[0].offsetMin,
+                                  );
+                                }
+                                if (sorted.length === 2) {
+                                  return `${formatSlotTime(session.startsAt, sorted[0].offsetMin)} · ${formatSlotTime(session.startsAt, sorted[1].offsetMin)}`;
+                                }
+                                return `${formatSlotTime(session.startsAt, sorted[0].offsetMin)} +${sorted.length - 1}`;
+                              })()
+                            : "";
+                        const assignTitle =
+                          bookedInOtherSlots && session
+                            ? `Назначить в этот слот. Уже в сессии: ${[
+                                ...otherSlotsWithRef,
+                              ]
+                                .sort((a, b) => a.offsetMin - b.offsetMin)
+                                .map((sl) =>
+                                  formatSlotTime(
+                                    session.startsAt,
+                                    sl.offsetMin,
+                                  ),
+                                )
+                                .join(", ")}`
+                            : "Назначить в этот слот";
+                        return (
+                          <button
+                            className={cn("session__step-item", {
+                              "session__step-item--selected": isSelected,
+                              "session__step-item--ok": !isSelected && ok,
+                              "session__step-item--bad": !isSelected && !ok,
+                              "session__step-item--booked":
+                                bookedInOtherSlots && !isSelected,
+                            })}
+                            key={`${projectFilter}:${s.id}`}
+                            type="button"
+                            onClick={() =>
+                              void updateSlot({
+                                ref: {
+                                  projectSlug: projectFilter,
+                                  stepId: s.id,
+                                },
+                                durationMin:
+                                  s.durationMin == null
+                                    ? slot.durationMin
+                                    : Math.max(
+                                        1,
+                                        Math.floor(Number(s.durationMin) || 1),
+                                      ),
+                                roleRehearsalPicks: undefined,
+                              })
+                            }
+                            title={assignTitle}
+                          >
+                            <div
+                              className="session__step-item__title"
+                              style={{ fontWeight: 900, fontSize: 12 }}
+                            >
+                              <span className="session__step-item__title-text">
+                                #{s.id} {s.title || "\u00a0"}
+                              </span>
+                              {bookedInOtherSlots ? (
+                                <span
+                                  className="session__step-item__badge session__step-item__badge--in-session"
+                                  aria-hidden
+                                >
+                                  в сессии
+                                  {otherSlotsTimesLabel ? (
+                                    <span className="session__step-item__badge-detail">
+                                      {" "}
+                                      · {otherSlotsTimesLabel}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div
+                              className="session__step-item__status"
+                              style={{ fontSize: 12, opacity: 0.72 }}
+                            >
+                              {isReadyStep(s) ? "Готова" : "В работе"}
+                              {s.durationMin != null
+                                ? ` · длит.: ${Math.max(1, Math.floor(Number(s.durationMin) || 1))} мин`
+                                : ""}
+                              {" · "}
+                              {ok ? (
+                                <span
+                                  style={{
+                                    color: "rgba(126, 231, 135, 0.95)",
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  можно взять
+                                </span>
+                              ) : (
+                                <span
+                                  style={{
+                                    color: "rgba(248, 81, 73, 0.95)",
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  не собирается
+                                </span>
+                              )}
+                            </div>
+                            <div
+                              className={cn(
+                                "session__step-item__missing",
+                                !(!ok && stepData.missing.length > 0) &&
+                                  "session__step-item__missing--empty",
+                              )}
+                            >
+                              {!ok && stepData.missing.length > 0 ? (
+                                <>
+                                  не хватает:{" "}
+                                  <b>
+                                    {stepData.missing.slice(0, 6).join(", ")}
+                                  </b>
+                                  {stepData.missing.length > 6
+                                    ? ` +${stepData.missing.length - 6}`
+                                    : ""}
+                                </>
+                              ) : (
+                                "\u00a0"
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {stepsForList.length === 0 && !stepsLoading && (
+                        <div style={{ fontSize: 12, opacity: 0.75 }}>
+                          Нет шагов (или сцена не найдена).
+                        </div>
+                      )}
+                    </div>
+                  </RehearsalsCard>
                 </div>
-              )}
-            </div>
-          </RehearsalsCard>
+              ) : undefined
+            }
+          />
         </div>
       )}
     </div>
   );
 }
+
+const PreviewSlot = ({ selectedStep }: { selectedStep: any }) => {
+  return (
+    <pre className="director-session-page__preview-pre">
+      {(() => {
+        const text = String(
+          (selectedStep as any).playMarkdown ??
+            (selectedStep as any).markdown ??
+            "",
+        );
+        const plain = markdownToPlainText(text);
+        return (
+          plain.slice(0, 1600) + (plain.length > 1600 ? "\n\n… (обрезано)" : "")
+        );
+      })()}
+    </pre>
+  );
+};

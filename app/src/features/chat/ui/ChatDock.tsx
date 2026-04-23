@@ -59,12 +59,13 @@ export function ChatDock() {
   const [expanded, setExpanded] = useState(false);
   const [unreadByConv, setUnreadByConv] = useState<Record<string, number>>({});
   const [toggleAttention, setToggleAttention] = useState(false);
-  const listEndRef = useRef<HTMLDivElement | null>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const messagesScrollRef = useRef<HTMLDivElement | null>(null);
   const topSentinelRef = useRef<HTMLDivElement | null>(null);
   const skipScrollToEndRef = useRef(false);
   const scrollRestoreRef = useRef<{ fromTop: number; fromHeight: number } | null>(null);
   const olderInFlightRef = useRef(false);
+  const wasLoadingMsgsRef = useRef(false);
   const authorProfilesRef = useRef<Record<string, TeamProfile | null>>({});
   const [, authorProfilesTick] = useState(0);
   const activeIdRef = useRef<string | null>(null);
@@ -269,24 +270,79 @@ export function ChatDock() {
     return () => window.clearTimeout(t);
   }, [toggleAttention]);
 
+  const updateJumpToBottomVisibility = useCallback(() => {
+    const el = messagesScrollRef.current;
+    if (!el || !open) return;
+    const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowJumpToBottom(gap > 100);
+  }, [open]);
+
   useLayoutEffect(() => {
-    const p = scrollRestoreRef.current;
-    if (!p) return;
-    scrollRestoreRef.current = null;
+    if (!open) return;
     const el = messagesScrollRef.current;
     if (!el) return;
-    const delta = el.scrollHeight - p.fromHeight;
-    el.scrollTop = p.fromTop + delta;
-  }, [messages]);
 
-  useEffect(() => {
-    if (!open) return;
-    if (skipScrollToEndRef.current) {
+    const p = scrollRestoreRef.current;
+    if (p) {
+      scrollRestoreRef.current = null;
+      const delta = el.scrollHeight - p.fromHeight;
+      el.scrollTop = p.fromTop + delta;
       skipScrollToEndRef.current = false;
+      wasLoadingMsgsRef.current = loadingMsgs;
+      setShowJumpToBottom(false);
       return;
     }
-    listEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [open, messages.length]);
+
+    if (skipScrollToEndRef.current) {
+      skipScrollToEndRef.current = false;
+      wasLoadingMsgsRef.current = loadingMsgs;
+      return;
+    }
+
+    if (messages.length === 0) {
+      if (loadingMsgs) wasLoadingMsgsRef.current = true;
+      setShowJumpToBottom(false);
+      return;
+    }
+
+    const finishedInitialLoad = wasLoadingMsgsRef.current && !loadingMsgs;
+    wasLoadingMsgsRef.current = loadingMsgs;
+
+    if (finishedInitialLoad) {
+      el.scrollTop = el.scrollHeight;
+      setShowJumpToBottom(false);
+      return;
+    }
+
+    if (!loadingMsgs) {
+      const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (gap < 96) {
+        el.scrollTop = el.scrollHeight;
+        setShowJumpToBottom(false);
+      }
+    }
+  }, [open, loadingMsgs, messages]);
+
+  useEffect(() => {
+    const el = messagesScrollRef.current;
+    if (!el || !open) return;
+    updateJumpToBottomVisibility();
+    el.addEventListener("scroll", updateJumpToBottomVisibility, { passive: true });
+    return () => el.removeEventListener("scroll", updateJumpToBottomVisibility);
+  }, [open, activeId, updateJumpToBottomVisibility]);
+
+  useEffect(() => {
+    if (!open || loadingMsgs) return;
+    const id = requestAnimationFrame(() => updateJumpToBottomVisibility());
+    return () => cancelAnimationFrame(id);
+  }, [open, loadingMsgs, messages.length, updateJumpToBottomVisibility]);
+
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+    setShowJumpToBottom(false);
+  }, []);
 
   const totalUnread = useMemo(
     () => Object.values(unreadByConv).reduce((a, n) => a + (typeof n === "number" ? n : 0), 0),
@@ -331,9 +387,14 @@ export function ChatDock() {
       (entries) => {
         const hit = entries[0]?.isIntersecting;
         if (!hit || olderInFlightRef.current) return;
+        const tall = root.scrollHeight > root.clientHeight + 12;
+        // Без реальной прокрутки scrollTop всегда 0 — IO по sentinel зациклит подгрузку.
+        if (!tall) return;
+        // У низа списка: не тянем историю, пока пользователь не прокрутил вверх.
+        if (root.scrollTop > 72) return;
         void loadOlder();
       },
-      { root, rootMargin: "120px 0px 0px 0px", threshold: 0 },
+      { root, rootMargin: "80px 0px 0px 0px", threshold: 0 },
     );
     io.observe(sentinel);
     return () => io.disconnect();
@@ -531,7 +592,18 @@ export function ChatDock() {
                     </article>
                   );
                 })}
-                <div ref={listEndRef} />
+                <div className="chat-dock-messages-end" aria-hidden />
+                {showJumpToBottom ? (
+                  <button
+                    type="button"
+                    className="chat-dock-scroll-down"
+                    aria-label="К последним сообщениям"
+                    title="К последним сообщениям"
+                    onClick={() => scrollMessagesToBottom("smooth")}
+                  >
+                    <span aria-hidden>↓</span>
+                  </button>
+                ) : null}
               </>
             )}
           </div>

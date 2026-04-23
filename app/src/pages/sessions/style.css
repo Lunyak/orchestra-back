@@ -23,7 +23,7 @@
   padding-right: 4px;
 }
 
-.sessions-list > .icon-action-add {
+.sessions-list>.icon-action-add {
   align-self: center;
   margin-top: 2px;
   flex-shrink: 0;
@@ -34,6 +34,30 @@
   gap: 8px;
   align-items: stretch;
   border: none;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+.sessions-sessionRow__dragHandle {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  margin: -4px 0 -4px -6px;
+  padding: 0 2px;
+  cursor: grab;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: -0.12em;
+  color: rgba(255, 255, 255, 0.38);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sessions-sessionRow__dragHandle:active {
+  cursor: grabbing;
 }
 
 .sessions-sessionRow.active .list-item.active {
@@ -66,11 +90,14 @@
 
 .sessions-main {
   min-width: 0;
+  display: flex;
+  gap: 10px;
 }
 
 .sessions-panels {
   display: grid;
-  grid-template-columns: auto 1fr;
+  width: 100%;
+  grid-template-columns: 2fr 1fr;
   gap: 12px;
   align-items: start;
 }
@@ -233,6 +260,334 @@
   pointer-events: none;
 }
 
+/* Страница одной сессии (план слотов + материал) */
+.director-session-page {
+  padding: 12px 12px 40px;
+  max-width: 1420px;
+  margin: 0 auto;
+}
+
+.director-session-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.director-session-page__back {
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.85;
+  font-size: 13px;
+}
+
+.director-session-page__title {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.director-session-page__meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.director-session-page__grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.director-session-page__detail-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 350px);
+  align-items: start;
+  /* max-height: 550px; */
+}
+
+.director-session-slots-panel__slot-settings {
+  min-width: 0;
+}
+
+
+@media (max-width: 1020px) {
+  .director-session-page__detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.session-slot {
+  padding: 0;
+  background: var(--color-bg-tertiary);
+}
+
+.director-session-slots-panel__tools {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+}
+
+.director-session-slots-panel__timeline {
+  margin-top: 10px;
+}
+
+.director-session-slots-panel__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+  padding: 10px;
+}
+
+.director-session-slots-panel__row.active {
+  box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.14);
+}
+
+.director-session-slots-panel__slot-main {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: inherit;
+}
+
+.director-session-slots-panel__controls {
+  /* margin-left: 30px; */
+}
+
+.director-session-slots-panel__drop-hint {
+  margin-left: 30px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.director-session-slot-modal-panel {
+  position: relative;
+  max-width: min(1100px, calc(100vw - 20px));
+  max-height: min(92vh, 960px);
+  display: flex;
+  flex-direction: column;
+}
+
+.director-session-slot-modal__close {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.director-session-slot-modal__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.director-session-slot-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.director-session-slot-modal__time-row {
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 6px 8px;
+  margin-bottom: 10px;
+}
+
+.director-session-slot-modal__time-sep {
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.3;
+  opacity: 0.55;
+  user-select: none;
+}
+
+.director-session-slot-modal__duration-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.director-session-slot-modal__duration-suffix {
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 1.3;
+  opacity: 0.72;
+  user-select: none;
+}
+
+.director-session-slot-modal__textlike {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.3;
+  padding: 2px 6px;
+  margin: 0;
+  border-radius: 4px;
+  min-width: 0;
+  cursor: text;
+}
+
+.director-session-slot-modal__textlike::selection {
+  background-color: transparent;
+  color: inherit;
+}
+
+.director-session-slot-modal__textlike::-moz-selection {
+  background-color: transparent;
+  color: inherit;
+}
+
+.director-session-slot-modal__textlike[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.director-session-slot-modal__textlike[type="time"]::-webkit-clear-button {
+  display: none;
+  -webkit-appearance: none;
+}
+
+.director-session-slot-modal__textlike:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.director-session-slot-modal__textlike:focus {
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.director-session-slot-modal__textlike:focus:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.director-session-slot-modal__textlike--duration {
+  max-width: 4.2em;
+  text-align: right;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.director-session-slot-modal__textlike--duration::-webkit-outer-spin-button,
+.director-session-slot-modal__textlike--duration::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Обзор слотов на странице списка сессий */
+.sessions-slots-readonly {
+  margin: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sessions-slots-readonly__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sessions-slots-readonly__row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.12);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.sessions-slots-readonly__row:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.sessions-slots-readonly__row.active {
+  box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.16);
+  color: #fff;
+}
+
+.sessions-slots-readonly__time {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.sessions-slots-readonly__meta {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.78;
+}
+
+.sessions-slots-readonly__avail {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+/* Слот: все нужные актёры свободны по времени / все подтвердили явку в календаре */
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free {
+  background: #7ee787;
+  border-color: rgba(15, 23, 42, 0.22);
+  color: #0f172a;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .rehearsals-muted,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .sessions-slots-readonly__meta {
+  color: #0f172a;
+  opacity: 0.88;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .sessions-slot-ok,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .sessions-slot-bad {
+  color: #0f172a;
+  opacity: 0.95;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed {
+  background: #e78a4e;
+  border-color: rgba(15, 23, 42, 0.2);
+  color: #fff;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .rehearsals-muted,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .sessions-slots-readonly__meta {
+  color: #fff;
+  opacity: 0.9;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .sessions-slot-ok,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .sessions-slot-bad {
+  color: #fff;
+  opacity: 0.95;
+}
+
 .sessions-material-subtools {
   margin-top: 8px;
   display: flex;
@@ -354,7 +709,8 @@
 
 /* ---- Mini troupe schedule (scoped to sessions page) ---- */
 
-.sessions-page .troupe-legend {
+.sessions-page .troupe-legend,
+.director-session-page .troupe-legend {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
@@ -363,13 +719,15 @@
   opacity: 0.9;
 }
 
-.sessions-page .troupe-legend-item {
+.sessions-page .troupe-legend-item,
+.director-session-page .troupe-legend-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.sessions-page .troupe-dot {
+.sessions-page .troupe-dot,
+.director-session-page .troupe-dot {
   width: 10px;
   height: 10px;
   border-radius: 3px;
@@ -377,23 +735,28 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.sessions-page .troupe-dot.free {
+.sessions-page .troupe-dot.free,
+.director-session-page .troupe-dot.free {
   background: rgba(46, 160, 67, 0.85);
 }
 
-.sessions-page .troupe-dot.partial {
+.sessions-page .troupe-dot.partial,
+.director-session-page .troupe-dot.partial {
   background: rgba(88, 166, 255, 0.85);
 }
 
-.sessions-page .troupe-dot.busy {
+.sessions-page .troupe-dot.busy,
+.director-session-page .troupe-dot.busy {
   background: rgba(248, 81, 73, 0.85);
 }
 
-.sessions-page .troupe-dot.unknown {
+.sessions-page .troupe-dot.unknown,
+.director-session-page .troupe-dot.unknown {
   background: rgba(255, 255, 255, 0.12);
 }
 
-.sessions-page .troupe-schedule {
+.sessions-page .troupe-schedule,
+.director-session-page .troupe-schedule {
   margin-top: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: auto;
@@ -401,11 +764,13 @@
   max-height: 360px;
 }
 
-.sessions-page .troupe-grid {
+.sessions-page .troupe-grid,
+.director-session-page .troupe-grid {
   display: grid;
 }
 
-.sessions-page .troupe-cell {
+.sessions-page .troupe-cell,
+.director-session-page .troupe-cell {
   box-sizing: border-box;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
@@ -416,7 +781,8 @@
   justify-content: center;
 }
 
-.sessions-page .troupe-header-cell {
+.sessions-page .troupe-header-cell,
+.director-session-page .troupe-header-cell {
   position: sticky;
   top: 0;
   z-index: 5;
@@ -428,12 +794,14 @@
   flex-direction: column;
 }
 
-.sessions-page .troupe-header-cell.focus {
+.sessions-page .troupe-header-cell.focus,
+.director-session-page .troupe-header-cell.focus {
   background: rgba(37, 99, 235, 0.18);
   box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.45);
 }
 
-.sessions-page .troupe-sticky {
+.sessions-page .troupe-sticky,
+.director-session-page .troupe-sticky {
   position: sticky;
   left: 0;
   z-index: 6;
@@ -443,12 +811,14 @@
 
 }
 
-.sessions-page .troupe-actor-cell {
+.sessions-page .troupe-actor-cell,
+.director-session-page .troupe-actor-cell {
   min-height: 22px;
   user-select: none;
 }
 
-.sessions-page .troupe-actor-name {
+.sessions-page .troupe-actor-name,
+.director-session-page .troupe-actor-name {
   font-size: 13px;
   font-weight: 700;
   line-height: 14px;
@@ -458,7 +828,8 @@
   max-width: 180px;
 }
 
-.sessions-page .troupe-actor-email {
+.sessions-page .troupe-actor-email,
+.director-session-page .troupe-actor-email {
   font-size: 11px;
   opacity: 0.7;
   line-height: 12px;
@@ -468,19 +839,23 @@
   max-width: 180px;
 }
 
-.sessions-page .troupe-day-cell {
+.sessions-page .troupe-day-cell,
+.director-session-page .troupe-day-cell {
   padding: 0;
 }
 
-.sessions-page .troupe-day-cell.focus {
+.sessions-page .troupe-day-cell.focus,
+.director-session-page .troupe-day-cell.focus {
   box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.38);
 }
 
-.sessions-page .troupe-day-cell.free {
+.sessions-page .troupe-day-cell.free,
+.director-session-page .troupe-day-cell.free {
   background: rgba(46, 160, 67, 0.22);
 }
 
-.sessions-page .troupe-day-cell.partial {
+.sessions-page .troupe-day-cell.partial,
+.director-session-page .troupe-day-cell.partial {
   background: rgba(88, 166, 255, 0.22);
   background-image: repeating-linear-gradient(135deg,
       rgba(88, 166, 255, 0.35) 0px,
@@ -489,15 +864,18 @@
       rgba(88, 166, 255, 0.12) 12px);
 }
 
-.sessions-page .troupe-day-cell.busy {
+.sessions-page .troupe-day-cell.busy,
+.director-session-page .troupe-day-cell.busy {
   background: rgba(248, 81, 73, 0.22);
 }
 
-.sessions-page .troupe-day-cell.unknown {
+.sessions-page .troupe-day-cell.unknown,
+.director-session-page .troupe-day-cell.unknown {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.sessions-page .troupe-empty {
+.sessions-page .troupe-empty,
+.director-session-page .troupe-empty {
   justify-content: flex-start;
   opacity: 0.75;
 }
@@ -516,6 +894,24 @@
   }
 }
 
-.comments-for-bot{
+.comments-for-bot {
   margin: 10px 0;
+}
+
+.sessions-field__plan {
+  height: 100%;
+  margin-left: auto;
+}
+
+.session__step-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.session__step-head-btn {
+  align-self: start;
+  width: 100%;
+  max-width: 140px;
 }

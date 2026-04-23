@@ -1,5 +1,6 @@
 @import './shared/styles/variables.css';
 @import './shared/core/native-fields/style.css';
+
 #root {
   max-width: 100%;
   margin: 0;
@@ -58,7 +59,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top, #1d4ed8 0, #020617 45%, #020617 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   padding: 16px;
   box-sizing: border-box;
 }
@@ -66,8 +69,8 @@ body {
 .login-form {
   width: 100%;
   max-width: 420px;
-  background: rgba(15, 23, 42, 0.96);
-  border-radius: 18px;
+  background: var(--color-bg-tertiary);
+  color: #fff;
   box-shadow:
     0 25px 50px rgba(15, 23, 42, 0.8),
     0 0 0 1px rgba(148, 163, 184, 0.15);
@@ -81,18 +84,15 @@ body {
   margin: 0 0 4px;
   font-size: 24px;
   font-weight: 600;
-  color: #e5e7eb;
 }
 
 .login-form-subtitle {
   margin: 0 0 20px;
   font-size: 13px;
-  color: #9ca3af;
 }
 
 .login-api-hint {
   font-size: 12px;
-  color: #64748b;
   margin: 0 0 12px;
 }
 
@@ -102,31 +102,28 @@ body {
 
 .login-env-hint {
   font-size: 11px;
-  color: #94a3b8;
   margin: 16px 0 0;
 }
 
 .login-env-hint code {
-  background: #1e293b;
+
   padding: 2px 6px;
   border-radius: 4px;
 }
 
-.login-form label {
+.login-form__label {
   display: block;
   margin-bottom: 14px;
   font-size: 13px;
-  color: #cbd5f5;
 }
 
-.login-form input {
+.login-form__input {
   width: 100%;
   margin-top: 4px;
   padding: 9px 11px;
-  border-radius: 10px;
-  border: 1px solid #1f2937;
-  background: #020617;
-  color: #e5e7eb;
+  border: none;
+
+  color: #020617;
   font-size: 13px;
   box-sizing: border-box;
   outline: none;
@@ -139,11 +136,10 @@ body {
 .login-form input:focus {
   border-color: #3b82f6;
   box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.6);
-  background: #020617;
 }
 
 .login-form input::placeholder {
-  color: #6b7280;
+  color: #000;
 }
 
 .login-error {
@@ -159,7 +155,6 @@ body {
 .login-form button {
   width: 100%;
   padding: 9px 12px;
-  border-radius: 999px;
   border: none;
   font-size: 13px;
   font-weight: 500;
@@ -173,19 +168,13 @@ body {
 }
 
 .login-form button[type="submit"] {
-  background: linear-gradient(135deg, #2563eb, #22c55e);
+  background: rgba(15, 23, 42, 0.9);
   color: #f9fafb;
-  box-shadow: 0 10px 25px rgba(34, 197, 94, 0.35);
-}
-
-.login-form button[type="submit"]:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 32px rgba(34, 197, 94, 0.5);
 }
 
 .login-form button[type="button"] {
   background: transparent;
-  color: #9ca3af;
+  color: #f9fafb;
   border: 1px dashed #4b5563;
 }
 
@@ -488,6 +477,7 @@ body {
 
 /* Мобильные устройства (до 480px) */
 @media (max-width: 480px) {
+
   .playlist-sidebar-wrapper.mobile,
   .steps-sidebar-wrapper.mobile {
     max-width: 250px;
@@ -512,6 +502,7 @@ body {
 
 /* Очень маленькие экраны (320px+) */
 @media (max-width: 320px) {
+
   .playlist-sidebar-wrapper.mobile,
   .steps-sidebar-wrapper.mobile {
     max-width: 200px;
@@ -600,277 +591,9 @@ body {
   padding: 12px;
 }
 
-/* Настройки */
-.settings-main .settings-view {
-  padding: 1rem 24px;
-  margin: 0 auto;
-}
-
-.settings-project-section {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #334155;
-}
-
-.settings-project-section h2 {
-  margin-top: 0;
-  margin-bottom: 0.75rem;
-}
-
-.settings-view {
-  height: fit-content;
-  text-align: left;
-  color: #e2e8f0;
-  padding: 24px;
-
-  max-width: 1220px;
-  width: 100%;
-
-  background-color: var(--color-bg-secondary);
-}
-
-.settings-view h2 {
-  margin-top: 0;
-}
-
-.settings-bot-topbar {
+.login__assign-policy {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-
-.settings-bot-topbar h2 {
-  margin: 0;
-}
-
-.settings-bot-section {
-  margin: 1.25rem 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid #334155;
-}
-
-.settings-bot-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.settings-bot-row input,
-.settings-bot-row select {
-  padding: 8px 12px;
-  border: 1px solid #475569;
-  border-radius: 6px;
-  background: #1e293b;
-  color: #f1f5f9;
-  min-width: 220px;
-}
-
-.settings-bot-grid input,
-.settings-bot-grid textarea {
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 6px;
-  background: #1e293b;
-  color: #f1f5f9;
-  outline: none;
-  max-width: 100px;
-}
-
-.settings-bot-grid textarea {
-  resize: vertical;
-}
-
-.settings-bot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin-top: 8px;
-
-  label {
-    max-width: 100px;
-  }
-}
-
-.settings-bot-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: #94a3b8;
-  font-size: 0.875rem;
-}
-
-.settings-bot-checkbox {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  color: #94a3b8;
-  font-size: 0.875rem;
-}
-
-.settings-bot-hint {
-  font-size: 0.875rem;
-  color: #94a3b8;
-  margin: 6px 0 0;
-}
-
-.settings-bot-error {
-  margin-top: 8px;
-  color: #f87171;
-  font-size: 0.875rem;
-}
-
-.settings-bot-ok {
-  margin-top: 8px;
-  color: #34d399;
-  font-size: 0.875rem;
-}
-
-.settings-bot-vars {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.settings-bot-var-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  padding: 8px 10px;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  background: #0f172a;
-}
-
-.settings-bot-var-key {
-  min-width: 140px;
-  color: #e2e8f0;
-}
-
-.settings-bot-var-value {
-  flex: 1;
-  color: #94a3b8;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-invite {
-  margin: 1.5rem 0;
-  padding: 1rem 0;
-}
-
-.settings-invite h3 {
-  margin-top: 0;
-  font-size: 1rem;
-}
-
-.settings-invite-hint {
-  font-size: 0.875rem;
-  color: #94a3b8;
-  margin: 0.5rem 0 1rem;
-}
-
-.settings-invite-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.settings-invite-input {
-  flex: 1;
-  max-width: 240px;
-  padding: 4px 12px;
-  border: none;
-  background: var(--color-bg-quaternary);
-  color: #f1f5f9;
-}
-
-.settings-invite-input::placeholder {
-  color: #64748b;
-}
-
-.settings-invite-error {
-  margin-top: 8px;
-  color: #f87171;
-  font-size: 0.875rem;
-}
-
-.settings-invite-forbidden {
-  color: #94a3b8;
-  font-size: 0.875rem;
-  margin: 0;
-}
-
-.settings-members {
-  margin-top: 20px;
-
-
-}
-
-.settings-members h4 {
-  font-size: 0.875rem;
-  margin: 0 0 0.5rem;
-}
-
-.settings-members ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.875rem;
-  color: #94a3b8;
-}
-
-.settings-members-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-
-  max-height: 400px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
-}
-
-.settings-member-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  padding: 4px 0;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-}
-
-.settings-member-row:last-child {
-  border-bottom: none;
-}
-
-.settings-member-email {
-  min-width: 10rem;
-  color: #e2e8f0;
-}
-
-.settings-member-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
-  margin-left: auto;
-}
-
-/* см. LabeledCheckbox + .labeled-checkbox__input (канбан / роли) */
-.settings-member-role.labeled-checkbox {
-  white-space: nowrap;
-}
-
-.settings-member-remove {
-  background: transparent;
-  cursor: pointer;
-}
-
-.settings-member-remove:hover {
-  background: rgba(248, 113, 113, 0.15);
+  gap: 10px;
+  alignItems: flex-start;
+  marginTop: 4;
 }

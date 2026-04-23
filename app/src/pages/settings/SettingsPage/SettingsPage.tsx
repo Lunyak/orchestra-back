@@ -1,3 +1,4 @@
+import { Buttons } from "@shared/components/buttons/Buttons";
 import { Button } from "@shared/core/button/Button";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { useEffect, useMemo, useState } from "react";
@@ -6,9 +7,8 @@ import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { useTeam } from "../../../features/team";
 import { usePlatform } from "../../../PlatformContext";
-import { ProjectPanel } from "../../../shared/components/project-panel/ProjectPanel";
-import { getProfilesBatch, type TeamProfile } from "../../../sync/api";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
+import { ProjectPanel } from "../../../shared/components/project-panel/ProjectPanel";
 import { isOrchestraWebAppSubpath } from "../../../shared/settings/orchestraWebHost";
 import {
   getSpectaclePageLockEnabled,
@@ -20,8 +20,8 @@ import {
   setConfirmBeforeRemoteScenePull,
   setPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
+import { getProfilesBatch, type TeamProfile } from "../../../sync/api";
 import "./style.css";
-import { Buttons } from "@shared/components/buttons/Buttons";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -48,21 +48,28 @@ export function SettingsPage() {
   } = useTeam();
 
   const [newProjectName, setNewProjectName] = useState("");
-  const [pauseRemoteSceneUpdates, setPauseRemoteSceneUpdatesState] = useState(() =>
-    getPauseRemoteSceneUpdates(),
+  const [pauseRemoteSceneUpdates, setPauseRemoteSceneUpdatesState] = useState(
+    () => getPauseRemoteSceneUpdates(),
   );
-  const [confirmBeforeRemotePull, setConfirmBeforeRemotePullState] = useState(() =>
-    getConfirmBeforeRemoteScenePull(),
+  const [confirmBeforeRemotePull, setConfirmBeforeRemotePullState] = useState(
+    () => getConfirmBeforeRemoteScenePull(),
   );
-  const [spectaclePageLock, setSpectaclePageLockUi] = useState(() => getSpectaclePageLockEnabled());
+  const [spectaclePageLock, setSpectaclePageLockUi] = useState(() =>
+    getSpectaclePageLockEnabled(),
+  );
   const showOrchestraWebPageLock = isOrchestraWebAppSubpath();
 
-  const [profileByEmail, setProfileByEmail] = useState<Map<string, TeamProfile>>(() => new Map());
+  const [profileByEmail, setProfileByEmail] = useState<
+    Map<string, TeamProfile>
+  >(() => new Map());
   const memberEmails = useMemo(() => {
     const out: string[] = [];
-    if (projectOwner?.email) out.push(String(projectOwner.email).trim().toLowerCase());
+    if (projectOwner?.email)
+      out.push(String(projectOwner.email).trim().toLowerCase());
     for (const m of projectMembers ?? []) {
-      const em = String(m?.user?.email ?? "").trim().toLowerCase();
+      const em = String(m?.user?.email ?? "")
+        .trim()
+        .toLowerCase();
       if (em) out.push(em);
     }
     return Array.from(new Set(out)).filter(Boolean);
@@ -79,7 +86,9 @@ export function SettingsPage() {
         if (cancelled) return;
         const map = new Map<string, TeamProfile>();
         for (const p of list ?? []) {
-          const em = String(p?.email ?? "").trim().toLowerCase();
+          const em = String(p?.email ?? "")
+            .trim()
+            .toLowerCase();
           if (!em) continue;
           map.set(em, p);
         }
@@ -107,7 +116,7 @@ export function SettingsPage() {
   const handleDeleteProject = async () => {
     if (!projectName) return;
     const confirmed = window.confirm(
-      `Удалить проект "${projectName}"? Это удалит все файлы проекта${accessToken ? " и на сервере" : ""}.`
+      `Удалить проект "${projectName}"? Это удалит все файлы проекта${accessToken ? " и на сервере" : ""}.`,
     );
     if (!confirmed) return;
     await deleteProject(projectName);
@@ -117,7 +126,7 @@ export function SettingsPage() {
     if (!onPushAllLocal) return;
     const confirmed = window.confirm(
       "Выгрузить все локальные проекты и сцены на сервер?\n\n" +
-      "Если на сервере уже есть изменённые данные, они могут быть перезаписаны."
+        "Если на сервере уже есть изменённые данные, они могут быть перезаписаны.",
     );
     if (!confirmed) return;
     void onPushAllLocal().then(() => {
@@ -130,11 +139,13 @@ export function SettingsPage() {
     if (!projectName) return;
     const confirmed = window.confirm(
       "Подтянуть отличающиеся данные проекта с сервера в локальные файлы?\n\n" +
-        "Перед подтяжкой приложение попробует отправить локальные несинхронизированные изменения (outbox), чтобы не потерять их."
+        "Перед подтяжкой приложение попробует отправить локальные несинхронизированные изменения (outbox), чтобы не потерять их.",
     );
     if (!confirmed) return;
     void onResyncProject(projectName).then((r) => {
-      alert(`Resync завершён: обновлено сцен ${r.updatedScenes}/${r.totalScenes}.`);
+      alert(
+        `Resync завершён: обновлено сцен ${r.updatedScenes}/${r.totalScenes}.`,
+      );
     });
   };
 
@@ -153,47 +164,48 @@ export function SettingsPage() {
             <section className="settings-project-section settings-sync-live">
               <h3>Синхронизация с сервером во время спектакля</h3>
               <p className="settings-sync-hint">
-                По событию с сервера сцена подтягивается без перезагрузки страницы. Полная перезагрузка
-                вкладки при обычной работе чаще связана с истечением сессии или сбоем обновления токена.
-                Здесь можно ограничить автоматическое применение чужих правок.
+                По событию с сервера сцена подтягивается без перезагрузки
+                страницы. Полная перезагрузка вкладки при обычной работе чаще
+                связана с истечением сессии или сбоем обновления токена. Здесь
+                можно ограничить автоматическое применение чужих правок.
               </p>
-              <label className="settings-sync-live-row">
-                <input
-                  type="checkbox"
-                  checked={pauseRemoteSceneUpdates}
-                  onChange={(e) => {
-                    const v = e.target.checked;
-                    setPauseRemoteSceneUpdates(v);
-                    setPauseRemoteSceneUpdatesState(v);
-                  }}
-                />
-                <span>
-                  Не подтягивать обновления сцены автоматически (только по кнопке «Подтянуть» в интерфейсе)
+              <LabeledCheckbox
+                className="settings-sync-live-row"
+                checked={pauseRemoteSceneUpdates}
+                onChange={(e) => {
+                  setPauseRemoteSceneUpdates(e);
+                  setPauseRemoteSceneUpdatesState(e);
+                }}
+              >
+                <span className="settings-sync-hint">
+                  Не подтягивать обновления сцены автоматически (только по
+                  кнопке «Подтянуть» в интерфейсе)
                 </span>
-              </label>
-              <label className="settings-sync-live-row">
-                <input
-                  type="checkbox"
-                  checked={confirmBeforeRemotePull}
-                  onChange={(e) => {
-                    const v = e.target.checked;
-                    setConfirmBeforeRemoteScenePull(v);
-                    setConfirmBeforeRemotePullState(v);
-                  }}
-                  disabled={pauseRemoteSceneUpdates}
-                />
-                <span>
-                  Спрашивать подтверждение перед автоматическим подтягиванием обновлений с сервера
+              </LabeledCheckbox>
+
+              <LabeledCheckbox
+                className="settings-sync-live-row"
+                checked={confirmBeforeRemotePull}
+                onChange={(e) => {
+                  setConfirmBeforeRemoteScenePull(e);
+                  setConfirmBeforeRemotePullState(e);
+                }}
+                disabled={pauseRemoteSceneUpdates}
+              >
+                <span className="settings-sync-hint">
+                  Спрашивать подтверждение перед автоматическим подтягиванием
+                  обновлений с сервера
                 </span>
-              </label>
+              </LabeledCheckbox>
             </section>
             {showOrchestraWebPageLock ? (
               <section className="settings-project-section settings-sync-live">
                 <h3>Страница на dopamin / orkestr</h3>
                 <p className="settings-sync-hint">
-                  Пока включено: нельзя уйти на другой маршрут приложения без подтверждения, браузер
-                  предупредит при перезагрузке или закрытии вкладки. Полностью запретить перезагрузку
-                  технически нельзя — только через системный диалог браузера.
+                  Пока включено: нельзя уйти на другой маршрут приложения без
+                  подтверждения, браузер предупредит при перезагрузке или
+                  закрытии вкладки. Полностью запретить перезагрузку технически
+                  нельзя — только через системный диалог браузера.
                 </p>
                 <label className="settings-sync-live-row">
                   <input
@@ -206,7 +218,8 @@ export function SettingsPage() {
                     }}
                   />
                   <span>
-                    Не покидать эту страницу (блок ухода по ссылкам и «Назад», предупреждение при F5)
+                    Не покидать эту страницу (блок ухода по ссылкам и «Назад»,
+                    предупреждение при F5)
                   </span>
                 </label>
               </section>
@@ -217,8 +230,9 @@ export function SettingsPage() {
                 <p className="settings-sync-hint">
                   Вы можете выгрузить все локальные проекты и сцены с этого
                   компьютера на сервер. Используйте это, если раньше работали
-                  только офлайн и хотите перенести данные в онлайн-версию. Если на
-                  сервере уже есть изменённые данные, они могут быть перезаписаны.
+                  только офлайн и хотите перенести данные в онлайн-версию. Если
+                  на сервере уже есть изменённые данные, они могут быть
+                  перезаписаны.
                 </p>
                 {onPushAllLocal && (
                   <button type="button" onClick={handlePushAllLocal}>
@@ -248,10 +262,14 @@ export function SettingsPage() {
             <section className="settings-project-section">
               <h2>Бот</h2>
               <p>
-                Подключите Telegram-бота (своим токеном) и управляйте переменными
-                для шаблонов сообщений.
+                Подключите Telegram-бота (своим токеном) и управляйте
+                переменными для шаблонов сообщений.
               </p>
-              <Button type="button" className="pri" onClick={() => navigate("/settings/bot")}>
+              <Button
+                type="button"
+                className="pri"
+                onClick={() => navigate("/settings/bot")}
+              >
                 Настройки бота
               </Button>
             </section>
@@ -264,7 +282,9 @@ export function SettingsPage() {
                 </p>
               ) : (
                 <>
-                  <h3>Пригласить в проект</h3>
+                  <h3 className="settings-privet-title">
+                    Права участников в проекте
+                  </h3>
                   <div className="settings-invite-row">
                     <input
                       type="email"
@@ -278,7 +298,8 @@ export function SettingsPage() {
                     />
                     <Button
                       type="button"
-                      className="primary" onClick={invite}
+                      className="primary"
+                      onClick={invite}
                       disabled={!inviteEmail.trim()}
                     >
                       Пригласить
@@ -294,15 +315,28 @@ export function SettingsPage() {
                           <li key={m.id} className="settings-member-row">
                             <span className="settings-member-email">
                               {(() => {
-                                const email = String(m.user.email ?? "").trim().toLowerCase();
-                                const prof = email ? profileByEmail.get(email) : null;
+                                const email = String(m.user.email ?? "")
+                                  .trim()
+                                  .toLowerCase();
+                                const prof = email
+                                  ? profileByEmail.get(email)
+                                  : null;
                                 const label = m.user.displayName
                                   ? `${m.user.displayName} (${m.user.email})`
                                   : m.user.email;
                                 return (
-                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                  <span
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                    }}
+                                  >
                                     <MiniAvatar
-                                      src={String(prof?.avatarUrl ?? "").trim() || null}
+                                      src={
+                                        String(prof?.avatarUrl ?? "").trim() ||
+                                        null
+                                      }
                                       label={label}
                                       size={20}
                                     />
@@ -318,7 +352,7 @@ export function SettingsPage() {
                                 onChange={(checked) =>
                                   updateMemberRole(
                                     m.id,
-                                    checked ? "editor" : "viewer"
+                                    checked ? "editor" : "viewer",
                                   )
                                 }
                               >
@@ -330,8 +364,7 @@ export function SettingsPage() {
                                 type="button"
                                 className="settings-member-remove"
                                 onClick={() => removeMember(m.id)}
-                              >
-                              </Buttons.DeleteButton>
+                              ></Buttons.DeleteButton>
                             </div>
                           </li>
                         ))}
@@ -341,7 +374,6 @@ export function SettingsPage() {
                 </>
               )}
             </section>
-
           </div>
         </main>
       </div>

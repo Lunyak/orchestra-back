@@ -10,6 +10,7 @@ import { useTeam } from "../../features/team";
 import { HeaderPlayer } from "../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
+import { ENABLE_3D_THEATER } from "../../shared/build-features";
 import { getMyProfile, type MyProfile } from "../../sync/api";
 
 const LightPlotPage = React.lazy(() =>
@@ -146,7 +147,7 @@ export function SpectaclePage() {
   }, []);
 
   const activeView: SpectacleActiveView =
-    location.pathname === "/theater"
+    ENABLE_3D_THEATER && location.pathname === "/theater"
       ? "theater"
       : location.pathname === "/light-plot"
         ? "light-plot"

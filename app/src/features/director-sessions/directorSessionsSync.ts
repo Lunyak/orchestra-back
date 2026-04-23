@@ -12,12 +12,20 @@ export type DirectorSlotRef = {
   stepId: number;
 };
 
+export type DirectorSlotRoleRehearsalPick = {
+  roleKey: string;
+  email: string;
+  checked: boolean;
+};
+
 export type DirectorSessionSlot = {
   id: string;
   offsetMin: number;
   durationMin: number;
   ref?: DirectorSlotRef;
   notes?: string;
+  /** Кто репетирует роли в слоте; в план вызова попадают только checked=true. */
+  roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 
 export type DirectorRehearsalSession = {

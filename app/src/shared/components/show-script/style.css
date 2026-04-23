@@ -1071,8 +1071,8 @@
   overflow: auto;
   color: var(--color-text-primary);
   font-family: var(--font-family-script-body);
-  /* Shared left "label slot" width for dialog lines.
-     Can be overridden dynamically from JS on the rendered markdown container. */
+  max-width: var(--width-content-page);
+  margin: 0 auto;
   --dialog-label-slot-width: clamp(72px, 12ch, 220px);
 
   p {
