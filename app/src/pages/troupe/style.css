@@ -169,7 +169,7 @@
 }
 
 .troupe-day-cell.selected {
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.25);
+  box-shadow: none;
 }
 
 .troupe-actions {
@@ -329,6 +329,43 @@
 
 .troupe-day-cell.unknown {
   background: rgba(255, 255, 255, 0.02);
+}
+
+.troupe-day-cell.free.selected {
+  background-color: rgba(46, 160, 67, 0.22);
+  background-image: linear-gradient(
+    rgba(231, 138, 78, 0.2),
+    rgba(231, 138, 78, 0.2)
+  );
+}
+
+.troupe-day-cell.partial.selected {
+  background-color: rgba(88, 166, 255, 0.22);
+  background-image:
+    linear-gradient(rgba(231, 138, 78, 0.2), rgba(231, 138, 78, 0.2)),
+    repeating-linear-gradient(
+      135deg,
+      rgba(88, 166, 255, 0.35) 0px,
+      rgba(88, 166, 255, 0.35) 6px,
+      rgba(88, 166, 255, 0.12) 6px,
+      rgba(88, 166, 255, 0.12) 12px
+    );
+}
+
+.troupe-day-cell.busy.selected {
+  background-color: rgba(248, 81, 73, 0.22);
+  background-image: linear-gradient(
+    rgba(231, 138, 78, 0.2),
+    rgba(231, 138, 78, 0.2)
+  );
+}
+
+.troupe-day-cell.unknown.selected {
+  background-color: rgba(255, 255, 255, 0.02);
+  background-image: linear-gradient(
+    rgba(231, 138, 78, 0.2),
+    rgba(231, 138, 78, 0.2)
+  );
 }
 
 .troupe-empty {

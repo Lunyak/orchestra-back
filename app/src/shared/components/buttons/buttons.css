@@ -13,7 +13,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: #1d4ed8;
+  /* background-color: #1d4ed8; */
 }
 
 .icon-action-add:hover:not(:disabled) {

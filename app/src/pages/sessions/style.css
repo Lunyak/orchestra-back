@@ -64,6 +64,17 @@
   box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.14);
 }
 
+.sessions-listItem-row {
+  border: none;
+  background: var(--color-bg-quaternary);
+  height: 40px;
+}
+
+.sessions-listItem-row.active {
+  border: none;
+  background: var(--color-bg-tertiary);
+}
+
 /* Список сессий и «Материалы»: одна обёртка ListItem + rehearsals-item внутри */
 .sessions-list .list-item.sessions-listItem-row,
 .sessions-material-list .list-item.sessions-listItem-row {
@@ -126,14 +137,11 @@
   margin-bottom: 10px;
 }
 
-.sessions-field {
-  display: grid;
-  gap: 6px;
+.sessions-row>.form-textarea.form-textarea--with-label {
+  width: auto;
   min-width: 180px;
-
-  input {
-    background-color: var(--field-control-bg-hover);
-  }
+  flex: 0 1 auto;
+  max-width: 100%;
 }
 
 .sessions-check {
@@ -218,6 +226,19 @@
   opacity: 0.75;
 }
 
+.sessions-slot-notes {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.68;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: normal;
+}
+
 .sessions-slot-ok {
   margin-top: 6px;
 }
@@ -265,6 +286,14 @@
   padding: 12px 12px 40px;
   max-width: 1420px;
   margin: 0 auto;
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+
+  background: var(--color-bg-primary);
 }
 
 .director-session-page__head {
@@ -272,6 +301,9 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
+
+  justify-content: space-between;
+  width: 100%;
 }
 
 .director-session-page__back {
@@ -279,16 +311,20 @@
   color: inherit;
   opacity: 0.85;
   font-size: 13px;
+  color: #fff;
 }
 
 .director-session-page__title {
   font-weight: 800;
   font-size: 16px;
+
+  color: #fff;
 }
 
 .director-session-page__meta {
   font-size: 12px;
   opacity: 0.75;
+  color: #fff;
 }
 
 .director-session-page__grid {
@@ -297,6 +333,11 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+  width: 100%;
+  max-width: 600px;
+  box-sizing: border-box;
+
+  background: var(--color-bg-secondary);
 }
 
 .director-session-page__detail-grid {
@@ -305,6 +346,13 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 350px);
   align-items: start;
   /* max-height: 550px; */
+}
+
+.director-session-slots-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .director-session-slots-panel__slot-settings {
@@ -323,16 +371,29 @@
   background: var(--color-bg-tertiary);
 }
 
+/* Страница одной сессии: слоты по графику полного состава ролей (интервалы / явка дня; без чекбоксов репетиции) */
+.session-slot.session-slot--rehearsal-ok {
+  box-shadow: inset 0 0 0 1px rgba(126, 231, 135, 0.65);
+  background: rgba(46, 160, 67, 0.28);
+}
+
+.session-slot.session-slot--rehearsal-bad {
+  box-shadow: inset 0 0 0 1px rgba(248, 81, 73, 0.45);
+  background: rgba(248, 81, 73, 0.1);
+}
+
 .director-session-slots-panel__tools {
   margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px 10px;
   align-items: center;
+  color: #fff;
 }
 
 .director-session-slots-panel__timeline {
   margin-top: 10px;
+  width: 100%;
 }
 
 .director-session-slots-panel__row {
@@ -341,6 +402,7 @@
   gap: 6px;
   padding: 4px 0;
   padding: 10px;
+  /* width: 100%; */
 }
 
 .director-session-slots-panel__row.active {
@@ -517,8 +579,8 @@
   width: 100%;
   text-align: left;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.12);
+  border: none;
+  background: var(--color-bg-quaternary);
   color: inherit;
   cursor: pointer;
   font: inherit;
@@ -526,13 +588,13 @@
 }
 
 .sessions-slots-readonly__row:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--color-bg-tertiary);
   color: #fff;
 }
 
 .sessions-slots-readonly__row.active {
-  box-shadow: 0 0 0 2px rgba(165, 220, 255, 0.16);
   color: #fff;
+  background: var(--color-bg-tertiary);
 }
 
 .sessions-slots-readonly__time {
@@ -546,12 +608,25 @@
   opacity: 0.78;
 }
 
+.sessions-slots-readonly__notes {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.78;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: normal;
+}
+
 .sessions-slots-readonly__avail {
   margin-top: 6px;
   font-size: 12px;
 }
 
-/* Слот: все нужные актёры свободны по времени / все подтвердили явку в календаре */
+/* Список сессий — обзор слотов: все вызванные по слоту подтвердили явку (календарь) */
 .sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free {
   background: #7ee787;
   border-color: rgba(15, 23, 42, 0.22);
@@ -559,7 +634,8 @@
 }
 
 .sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .rehearsals-muted,
-.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .sessions-slots-readonly__meta {
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .sessions-slots-readonly__meta,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free .sessions-slots-readonly__notes {
   color: #0f172a;
   opacity: 0.88;
 }
@@ -570,6 +646,26 @@
   opacity: 0.95;
 }
 
+/* Список сессий — обзор слотов: не все подтвердили явку на вызов */
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered {
+  background: #f85149;
+  border-color: rgba(15, 23, 42, 0.22);
+  color: #fff;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered .rehearsals-muted,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered .sessions-slots-readonly__meta,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered .sessions-slots-readonly__notes {
+  color: #fff;
+  opacity: 0.9;
+}
+
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered .sessions-slot-ok,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered .sessions-slot-bad {
+  color: #fff;
+  opacity: 0.95;
+}
+
 .sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed {
   background: #e78a4e;
   border-color: rgba(15, 23, 42, 0.2);
@@ -577,7 +673,8 @@
 }
 
 .sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .rehearsals-muted,
-.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .sessions-slots-readonly__meta {
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .sessions-slots-readonly__meta,
+.sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-confirmed .sessions-slots-readonly__notes {
   color: #fff;
   opacity: 0.9;
 }
@@ -796,8 +893,10 @@
 
 .sessions-page .troupe-header-cell.focus,
 .director-session-page .troupe-header-cell.focus {
-  background: rgba(37, 99, 235, 0.18);
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.45);
+  background-color: rgba(20, 20, 20, 0.95);
+  background-image: linear-gradient(rgba(231, 138, 78, 0.24),
+      rgba(231, 138, 78, 0.24));
+  box-shadow: none;
 }
 
 .sessions-page .troupe-sticky,
@@ -846,7 +945,7 @@
 
 .sessions-page .troupe-day-cell.focus,
 .director-session-page .troupe-day-cell.focus {
-  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.38);
+  box-shadow: none;
 }
 
 .sessions-page .troupe-day-cell.free,
@@ -874,6 +973,39 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+.sessions-page .troupe-day-cell.free.focus,
+.director-session-page .troupe-day-cell.free.focus {
+  background-color: rgba(46, 160, 67, 0.22);
+  background-image: linear-gradient(rgba(231, 138, 78, 0.26),
+      rgba(231, 138, 78, 0.26));
+}
+
+.sessions-page .troupe-day-cell.partial.focus,
+.director-session-page .troupe-day-cell.partial.focus {
+  background-color: rgba(88, 166, 255, 0.22);
+  background-image:
+    linear-gradient(rgba(231, 138, 78, 0.26), rgba(231, 138, 78, 0.26)),
+    repeating-linear-gradient(135deg,
+      rgba(88, 166, 255, 0.35) 0px,
+      rgba(88, 166, 255, 0.35) 6px,
+      rgba(88, 166, 255, 0.12) 6px,
+      rgba(88, 166, 255, 0.12) 12px);
+}
+
+.sessions-page .troupe-day-cell.busy.focus,
+.director-session-page .troupe-day-cell.busy.focus {
+  background-color: rgba(248, 81, 73, 0.22);
+  background-image: linear-gradient(rgba(231, 138, 78, 0.26),
+      rgba(231, 138, 78, 0.26));
+}
+
+.sessions-page .troupe-day-cell.unknown.focus,
+.director-session-page .troupe-day-cell.unknown.focus {
+  background-color: rgba(255, 255, 255, 0.02);
+  background-image: linear-gradient(rgba(231, 138, 78, 0.26),
+      rgba(231, 138, 78, 0.26));
+}
+
 .sessions-page .troupe-empty,
 .director-session-page .troupe-empty {
   justify-content: flex-start;
@@ -894,10 +1026,6 @@
   }
 }
 
-.comments-for-bot {
-  margin: 10px 0;
-}
-
 .sessions-field__plan {
   height: 100%;
   margin-left: auto;
@@ -914,4 +1042,12 @@
   align-self: start;
   width: 100%;
   max-width: 140px;
+}
+
+.sessions-slots__title {
+  margin-bottom: 10px;
+}
+
+.form-textarea--section {
+  margin-bottom: 10px;
 }

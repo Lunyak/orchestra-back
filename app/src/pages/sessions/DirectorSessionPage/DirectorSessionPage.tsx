@@ -1,4 +1,3 @@
-import { Button } from "@shared/core/button/Button";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import cn from "classnames";
@@ -13,9 +12,9 @@ import {
   type DirectorRehearsalSession,
   type DirectorSessionSlot,
 } from "../../../features/director-sessions/directorSessionsSync";
-import type { SceneRolesDataV1 } from "../../../features/scene";
 import { useProject } from "../../../features/project";
 import { RehearsalsCard } from "../../../features/rehearsals-card/RehearsalsCard";
+import type { SceneRolesDataV1 } from "../../../features/scene";
 import type { ScriptStep } from "../../../shared/types/script";
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import {
@@ -28,12 +27,13 @@ import {
 } from "../../../sync/api";
 import { DirectorSessionSlotsPanel } from "../DirectorSessionSlotsPanel";
 import { SlotRoleRehearsalPicker } from "../SlotRoleRehearsalPicker";
+import { TroupeSchedulePreview } from "../TroupeSchedulePreview";
 import {
   getAllAssigneeEmailsForDirectorSlotChart,
   getNormalizedRoleKeysForSlotStep,
+  getRolePlannedEmailsForDirectorSlot,
   type DirectorSlotPlannedData,
 } from "../sessionSlotPlanned";
-import { TroupeSchedulePreview } from "../TroupeSchedulePreview";
 import "../style.css";
 import "./style.css";
 
@@ -137,6 +137,34 @@ function isSlotInsideRanges(
   return false;
 }
 
+type SlotActorAvailability = "free" | "busy" | "unknown";
+
+/** Свободен на время слота по графику; «не отмечено» и без интервалов = не свободен. */
+function classifyActorSlotAvailability(
+  prof: TeamProfile | undefined,
+  dateKey: string,
+  startMin: number,
+  endMin: number,
+): SlotActorAvailability {
+  if (!prof) return "unknown";
+  const cal = (prof as any)?.availabilityCalendar as
+    | Record<string, string>
+    | undefined;
+  const st =
+    cal?.[dateKey] === "present"
+      ? "present"
+      : cal?.[dateKey] === "absent"
+        ? "absent"
+        : "unknown";
+  if (st === "absent") return "busy";
+  const ranges = getRangesForDateMinutes(prof, dateKey);
+  if (ranges.length > 0) {
+    return isSlotInsideRanges(startMin, endMin, ranges) ? "free" : "busy";
+  }
+  if (st === "present") return "free";
+  return "unknown";
+}
+
 function normalizeRoleKey(v: string): string {
   return String(v ?? "")
     .trim()
@@ -146,50 +174,6 @@ function normalizeRoleKey(v: string): string {
     .replace(/[()]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function extractRolesBrackets(text?: string): string[] {
-  if (!text) return [];
-  const out: string[] = [];
-  const re = /\[\[([^\]]+)\]\]/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const role = (m[1] ?? "").trim();
-    if (role) out.push(role);
-  }
-  return Array.from(new Set(out));
-}
-
-function extractSpeakerRolesFromLines(text?: string): string[] {
-  if (!text) return [];
-  const out: string[] = [];
-  const lines = text.split(/\r?\n/);
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) continue;
-    if (line.startsWith("==") || line.startsWith("(")) continue;
-    const m1 = line.match(/^([A-ZА-ЯЁ][A-ZА-ЯЁ0-9 _.\-]{1,40})\s*[:—-]\s+\S/);
-    if (m1?.[1]) {
-      const role = m1[1].replace(/\s+/g, " ").trim();
-      if (role.length >= 2 && role.length <= 40) out.push(role);
-      continue;
-    }
-    const m2 = line.match(/^([A-ZА-ЯЁ]{2,40})([.,!?:])\s+/);
-    if (m2?.[1]) out.push(m2[1].trim());
-  }
-  return Array.from(new Set(out));
-}
-
-function extractRolesSmart(text?: string): string[] {
-  const a = extractRolesBrackets(text);
-  const b = extractSpeakerRolesFromLines(text);
-  return Array.from(
-    new Set(
-      [...a, ...b]
-        .map((x) => String(x ?? "").trim())
-        .filter((x) => x.length > 0),
-    ),
-  );
 }
 
 function isReadyStep(step: ScriptStep): boolean {
@@ -214,7 +198,8 @@ function parseStepsFromPull(
       )
     : null;
   const sceneId = String(scene?.id ?? "") || null;
-  const sceneRoles = ((scene as any)?.sceneRoles ?? null) as SceneRolesDataV1 | null;
+  const sceneRoles = ((scene as any)?.sceneRoles ??
+    null) as SceneRolesDataV1 | null;
   const steps = (Array.isArray((pull as any)?.steps) ? (pull as any).steps : [])
     .filter((st: any) =>
       sceneId ? String(st?.sceneId ?? "") === sceneId : true,
@@ -267,6 +252,11 @@ export function DirectorSessionPage() {
   const [roleTitleByKey, setRoleTitleByKey] = useState<Record<string, string>>(
     {},
   );
+  /** Роли по slug проекта — для расчёта тонов всех слотов (разные проекты в одной сессии). */
+  const [roleEmailsByProjectSlug, setRoleEmailsByProjectSlug] = useState<
+    Record<string, Record<string, string[]>>
+  >({});
+  const [plannerProfiles, setPlannerProfiles] = useState<TeamProfile[]>([]);
 
   const visibleProjects = useMemo(
     () =>
@@ -438,6 +428,204 @@ export function DirectorSessionPage() {
     }
   };
 
+  const projectSlugsInSession = useMemo(() => {
+    const s = new Set<string>();
+    for (const sl of session?.slots ?? []) {
+      const u = String(sl.ref?.projectSlug ?? "").trim();
+      if (u) s.add(u);
+    }
+    return Array.from(s).sort();
+  }, [session?.id, session?.slots]);
+
+  const projectDataLoadedSig = useMemo(
+    () =>
+      projectSlugsInSession.filter((slug) => dataCache[slug] != null).join("|"),
+    [dataCache, projectSlugsInSession],
+  );
+
+  useEffect(() => {
+    if (!accessToken || projectSlugsInSession.length === 0) return;
+    for (const slug of projectSlugsInSession) {
+      if (dataCache[slug] != null) continue;
+      void loadProjectData(slug);
+    }
+  }, [accessToken, projectSlugsInSession.join("|"), projectDataLoadedSig]);
+
+  useEffect(() => {
+    if (!accessToken || projectSlugsInSession.length === 0) {
+      setRoleEmailsByProjectSlug({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const entries = await Promise.all(
+        projectSlugsInSession.map(async (slug) => {
+          try {
+            const rolesRes = await getProjectRoles(accessToken, slug);
+            const emailsByKey: Record<string, string[]> = {};
+            (rolesRes?.roles ?? []).forEach((r: any) => {
+              const key = normalizeRoleKey(String(r?.key ?? r?.title ?? ""));
+              if (!key) return;
+              const emails = Array.isArray(r?.emails)
+                ? r.emails.map((e: any) => normalizeEmail(e)).filter(Boolean)
+                : [];
+              emailsByKey[key] = Array.from(new Set(emails));
+            });
+            return [slug, emailsByKey] as const;
+          } catch {
+            return [slug, {}] as const;
+          }
+        }),
+      );
+      if (!cancelled)
+        setRoleEmailsByProjectSlug(Object.fromEntries(entries) as Record<
+          string,
+          Record<string, string[]>
+        >);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, projectSlugsInSession.join("|")]);
+
+  const slotPlannerEmails = useMemo(() => {
+    if (!session) return [];
+    const set = new Set<string>();
+    for (const sl of session.slots ?? []) {
+      const ref = sl.ref;
+      if (!ref?.projectSlug || ref.stepId == null) continue;
+      const slug = String(ref.projectSlug).trim();
+      const cached = dataCache[slug];
+      const rem = roleEmailsByProjectSlug[slug];
+      if (!cached?.steps?.length || !rem) continue;
+      const plannedData: DirectorSlotPlannedData = {
+        steps: cached.steps,
+        sceneRoles: cached.sceneRoles ?? null,
+        roleEmailsByKey: rem,
+      };
+      const byRole = getRolePlannedEmailsForDirectorSlot(
+        slug,
+        ref.stepId,
+        plannedData,
+        null,
+      );
+      for (const { emails } of byRole) {
+        for (const e of emails) {
+          const n = normalizeEmail(String(e ?? ""));
+          if (n && looksLikeEmail(n)) set.add(n);
+        }
+      }
+    }
+    return Array.from(set);
+  }, [session, session?.slots, dataCache, roleEmailsByProjectSlug]);
+
+  useEffect(() => {
+    if (!accessToken) {
+      setPlannerProfiles([]);
+      return;
+    }
+    if (slotPlannerEmails.length === 0) {
+      setPlannerProfiles([]);
+      return;
+    }
+    let cancelled = false;
+    getProfilesBatch(accessToken, slotPlannerEmails)
+      .then((list) => {
+        if (!cancelled) setPlannerProfiles(list ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setPlannerProfiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, slotPlannerEmails.join("|")]);
+
+  const profilesForSlotTones = useMemo(() => {
+    const m = new Map<string, TeamProfile>();
+    for (const p of teamProfiles ?? []) {
+      const e = normalizeEmail((p as any)?.email);
+      if (e) m.set(e, p);
+    }
+    for (const p of plannerProfiles ?? []) {
+      const e = normalizeEmail((p as any)?.email);
+      if (e) m.set(e, p);
+    }
+    return m;
+  }, [teamProfiles, plannerProfiles]);
+
+  /** Цвет слота по графику полного состава ролей (чекбоксы репетиции не учитываются). */
+  const slotRehearsalToneClassById = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!session || !sessionDateKey) return out;
+    const base = getSessionStartLocalMinutes(session.startsAt);
+
+    for (const sl of session.slots ?? []) {
+      const ref = sl.ref;
+      if (!ref?.projectSlug || ref.stepId == null) continue;
+      const slug = String(ref.projectSlug).trim();
+      const cached = dataCache[slug];
+      const rem = roleEmailsByProjectSlug[slug];
+      if (!cached?.steps?.length || !rem) continue;
+
+      const plannedData: DirectorSlotPlannedData = {
+        steps: cached.steps,
+        sceneRoles: cached.sceneRoles ?? null,
+        roleEmailsByKey: rem,
+      };
+
+      const byRole = getRolePlannedEmailsForDirectorSlot(
+        slug,
+        ref.stepId,
+        plannedData,
+        null,
+      );
+      if (byRole.length === 0) continue;
+
+      const startMin = base + Math.max(0, Math.floor(sl.offsetMin || 0));
+      const endMin = startMin + Math.max(1, Math.floor(sl.durationMin || 1));
+
+      let allRolesOk = true;
+      for (const { emails } of byRole) {
+        if (emails.length === 0) {
+          allRolesOk = false;
+          break;
+        }
+        const roleOk = emails.some((normEmail) => {
+          const prof = profilesForSlotTones.get(
+            normalizeEmail(String(normEmail ?? "")),
+          );
+          return (
+            classifyActorSlotAvailability(
+              prof,
+              sessionDateKey,
+              startMin,
+              endMin,
+            ) === "free"
+          );
+        });
+        if (!roleOk) {
+          allRolesOk = false;
+          break;
+        }
+      }
+
+      out.set(
+        sl.id,
+        allRolesOk ? "session-slot--rehearsal-ok" : "session-slot--rehearsal-bad",
+      );
+    }
+    return out;
+  }, [
+    session?.id,
+    session?.startsAt,
+    session?.slots,
+    sessionDateKey,
+    dataCache,
+    roleEmailsByProjectSlug,
+    profilesForSlotTones,
+  ]);
+
   useEffect(() => {
     if (!projectFilter) return;
     void loadProjectData(projectFilter);
@@ -556,37 +744,28 @@ export function DirectorSessionPage() {
 
   const freeRolesNormSet = useMemo(() => {
     const set = new Set<string>();
-    if (!sessionDateKey) return set;
-    if (!slotWindow) return set;
+    if (!sessionDateKey || !slotWindow) return set;
     const roleEmails = roleEmailsByKey ?? {};
-    for (const p of teamProfiles ?? []) {
-      const email = normalizeEmail((p as any)?.email);
-      if (!email) continue;
-      if (!looksLikeEmail(email)) continue;
-      const cal = (p as any)?.availabilityCalendar as
-        | Record<string, string>
-        | undefined;
-      const st =
-        cal?.[sessionDateKey] === "present"
-          ? "present"
-          : cal?.[sessionDateKey] === "absent"
-            ? "absent"
-            : "unknown";
-      if (st !== "present") continue;
-      const ranges = getRangesForDateMinutes(p, sessionDateKey);
-      if (ranges.length > 0) {
-        if (!isSlotInsideRanges(slotWindow.startMin, slotWindow.endMin, ranges))
-          continue;
-      }
-      for (const [rk, emails] of Object.entries(roleEmails)) {
-        if (!rk) continue;
-        if (!Array.isArray(emails) || emails.length === 0) continue;
-        if (!emails.includes(email)) continue;
-        set.add(rk);
-      }
+    const profMap = profilesForSlotTones;
+    for (const [rk, emails] of Object.entries(roleEmails)) {
+      if (!rk || !Array.isArray(emails) || emails.length === 0) continue;
+      const ok = emails.some((raw) => {
+        const email = normalizeEmail(String(raw ?? ""));
+        if (!email || !looksLikeEmail(email)) return false;
+        const p = profMap.get(email);
+        return (
+          classifyActorSlotAvailability(
+            p,
+            sessionDateKey,
+            slotWindow.startMin,
+            slotWindow.endMin,
+          ) === "free"
+        );
+      });
+      if (ok) set.add(rk);
     }
     return set;
-  }, [roleEmailsByKey, sessionDateKey, slotWindow, teamProfiles]);
+  }, [roleEmailsByKey, sessionDateKey, slotWindow, profilesForSlotTones]);
 
   const headerTimeLabel = useMemo(() => {
     if (!session?.startsAt) return "";
@@ -625,18 +804,28 @@ export function DirectorSessionPage() {
     }> = [];
     const list = steps;
     const freeSet = freeRolesNormSet;
+    const pack = projectFilter ? dataCache[projectFilter] : null;
+    const sceneRoles = pack?.sceneRoles ?? null;
+
     for (const s of list) {
-      const text = String((s as any).playMarkdown ?? (s as any).markdown ?? "");
-      const roles = extractRolesSmart(text);
+      const roleKeysNorm = getNormalizedRoleKeysForSlotStep(
+        s,
+        sceneRoles,
+        s.id,
+      );
+      const roles = roleKeysNorm.map(
+        (rk) => roleTitleByKey[rk] ?? rk,
+      );
       const missing: string[] = [];
-      for (const r of roles) {
-        const norm = normalizeRoleKey(r);
-        if (norm && !freeSet.has(norm)) missing.push(r);
+      for (const normKey of roleKeysNorm) {
+        if (normKey && !freeSet.has(normKey)) {
+          missing.push(roleTitleByKey[normKey] ?? normKey);
+        }
       }
       out.push({ step: s, ok: missing.length === 0, missing, roles });
     }
     return out;
-  }, [freeRolesNormSet, steps]);
+  }, [freeRolesNormSet, steps, dataCache, projectFilter, roleTitleByKey]);
 
   const stepsForList = useMemo(() => {
     if (!onlySelectable) return selectableSteps;
@@ -682,8 +871,7 @@ export function DirectorSessionPage() {
   const slotRoleKeysForPicker = useMemo(() => {
     if (!slot?.ref || !slotPlannedInput) return [];
     const stepId = slot.ref.stepId;
-    const step =
-      slotPlannedInput.steps.find((s) => s.id === stepId) ?? null;
+    const step = slotPlannedInput.steps.find((s) => s.id === stepId) ?? null;
     return getNormalizedRoleKeysForSlotStep(
       step,
       slotPlannedInput.sceneRoles,
@@ -719,17 +907,6 @@ export function DirectorSessionPage() {
         >
           ← К списку сессий
         </Link>
-        {session ? (
-          <>
-            <div className="director-session-page__title">{session.title}</div>
-            <div className="director-session-page__meta">{headerTimeLabel}</div>
-            {slot ? (
-              <div className="director-session-page__meta">{slotTimeLabel}</div>
-            ) : null}
-          </>
-        ) : (
-          <div className="director-session-page__title">Сессия</div>
-        )}
       </div>
 
       {loading ? (
@@ -741,11 +918,19 @@ export function DirectorSessionPage() {
         </div>
       ) : null}
 
+      {session ? (
+        <>
+          <div className="director-session-page__title">{session.title}</div>
+        </>
+      ) : (
+        <div className="director-session-page__title">Сессия</div>
+      )}
       {session && !loading && (
         <div className="director-session-page__grid">
           <DirectorSessionSlotsPanel
             session={session}
             sessions={sessions}
+            slotToneClassById={slotRehearsalToneClassById}
             selectedSlotId={slId || null}
             onSelectSlot={(id) =>
               navigate(
@@ -771,9 +956,8 @@ export function DirectorSessionPage() {
                   >
                     {selectedStep && (
                       <div className="session__step-item">
-                       
-                          <PreviewSlot selectedStep={selectedStep} />
-              
+                        <PreviewSlot selectedStep={selectedStep} />
+
                         <TroupeSchedulePreview
                           sessionDateKey={sessionDateKey}
                           profiles={teamProfiles}

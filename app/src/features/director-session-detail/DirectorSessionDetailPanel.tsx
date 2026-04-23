@@ -555,6 +555,14 @@ export function DirectorSessionDetailPanel({
                         >
                           {refLabel}
                         </div>
+                        {String(sl.notes ?? "").trim() ? (
+                          <div
+                            className="director-session-page__slot-notes"
+                            title={String(sl.notes).trim()}
+                          >
+                            {String(sl.notes).trim()}
+                          </div>
+                        ) : null}
                       </div>
                       <Link
                         className="director-session-page__slot-link"

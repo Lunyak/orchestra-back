@@ -108,6 +108,8 @@ export type DirectorSessionSlotsPanelProps = {
   /** Блок настроек слота (проект, шаг, превью, заметки) — в модалке по выбранному слоту */
   slotSettings?: React.ReactNode;
   onRequestCloseSlot: () => void;
+  /** Доп. класс на карточке слота (напр. доступность по ролям на странице одной сессии) */
+  slotToneClassById?: Map<string, string> | null;
 };
 
 export function DirectorSessionSlotsPanel({
@@ -119,6 +121,7 @@ export function DirectorSessionSlotsPanel({
   persistSessions,
   slotSettings,
   onRequestCloseSlot,
+  slotToneClassById,
 }: DirectorSessionSlotsPanelProps) {
   const [autoShiftFollowing, setAutoShiftFollowing] = useState(true);
   const [timelineDragOver, setTimelineDragOver] = useState(false);
@@ -327,17 +330,17 @@ export function DirectorSessionSlotsPanel({
   return (
     <RehearsalsCard fluid title="" className="director-session-slots-panel">
       <div className="director-session-slots-panel__tools">
-        <Button type="button" onClick={() => void packTimeline()}>
+        {/* <Button type="button" onClick={() => void packTimeline()}>
           Выстроить подряд
-        </Button>
-        <label className="sessions-check">
+        </Button> */}
+        {/* <label className="sessions-check">
           <input
             type="checkbox"
             checked={autoShiftFollowing}
             onChange={(e) => setAutoShiftFollowing(e.target.checked)}
           />
           <span className="rehearsals-muted">сдвигать последующие при смене длительности</span>
-        </label>
+        </label> */}
       </div>
 
       <div
@@ -402,6 +405,7 @@ export function DirectorSessionSlotsPanel({
                 "session-slot",
                 sl.id === selectedSlotId && "active",
                 draggedSlotId === sl.id && "dragging",
+                slotToneClassById?.get(sl.id),
               )}
             >
               <span
@@ -443,6 +447,14 @@ export function DirectorSessionSlotsPanel({
                     ? `${sl.ref.projectSlug} · шаг #${sl.ref.stepId}`
                     : "Материал не выбран"}
                 </div>
+                {String(sl.notes ?? "").trim() ? (
+                  <div
+                    className="sessions-slot-notes"
+                    title={String(sl.notes).trim()}
+                  >
+                    {String(sl.notes).trim()}
+                  </div>
+                ) : null}
               </Button>
             </ListItem>
           </div>

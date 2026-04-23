@@ -1,9 +1,12 @@
 import { Buttons } from "@shared/components/buttons/Buttons";
 import { ListItem } from "@shared/components/list-item/ListItem";
 import { Button } from "@shared/core/button/Button";
+import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
+import cn from "classnames";
 import React, {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -142,6 +145,33 @@ function isSlotInsideRanges(
   return false;
 }
 
+type SlotActorAvailability = "free" | "busy" | "unknown";
+
+function classifyActorSlotAvailability(
+  prof: TeamProfile | undefined,
+  sessionDateKey: string,
+  startMin: number,
+  endMin: number,
+): SlotActorAvailability {
+  if (!prof) return "unknown";
+  const cal = (prof as any)?.availabilityCalendar as
+    | Record<string, string>
+    | undefined;
+  const st =
+    cal?.[sessionDateKey] === "present"
+      ? "present"
+      : cal?.[sessionDateKey] === "absent"
+        ? "absent"
+        : "unknown";
+  if (st === "absent") return "busy";
+  const ranges = getRangesForDateMinutes(prof, sessionDateKey);
+  if (ranges.length > 0) {
+    return isSlotInsideRanges(startMin, endMin, ranges) ? "free" : "busy";
+  }
+  if (st === "present") return "free";
+  return "unknown";
+}
+
 /** Есть явная отметка на день или заданы интервалы — иначе в план вызова не попадаем. */
 function profileHasSpecifiedAvailabilityForDate(
   prof: TeamProfile | null | undefined,
@@ -232,6 +262,10 @@ function getLocalDateTimeParts(iso: string): { date: string; time: string } {
 }
 
 export function DirectorSessionsPage() {
+  const sessionFormFieldId = useId();
+  const sessionDateInputId = `${sessionFormFieldId}-date`;
+  const sessionTimeInputId = `${sessionFormFieldId}-time`;
+
   const { accessToken } = useAuth();
   const { projects } = useProject();
   const location = useLocation();
@@ -1019,30 +1053,14 @@ export function DirectorSessionsPage() {
         const actor = normalizeEmail(actorRaw);
         if (!actor) continue;
         const prof = profilesByEmail.get(actor);
-        if (!prof) {
-          unknown.push(actorRaw);
-          continue;
-        }
-        const cal = (prof as any)?.availabilityCalendar as
-          | Record<string, string>
-          | undefined;
-        const st =
-          cal?.[sessionDateKey] === "present"
-            ? "present"
-            : cal?.[sessionDateKey] === "absent"
-              ? "absent"
-              : "unknown";
-        if (st === "absent") {
-          busy.push(actorRaw);
-          continue;
-        }
-        const ranges = getRangesForDateMinutes(prof, sessionDateKey);
-        if (ranges.length > 0) {
-          if (isSlotInsideRanges(startMin, endMin, ranges)) free.push(actorRaw);
-          else busy.push(actorRaw);
-          continue;
-        }
-        if (st === "present") free.push(actorRaw);
+        const st = classifyActorSlotAvailability(
+          prof,
+          sessionDateKey,
+          startMin,
+          endMin,
+        );
+        if (st === "free") free.push(actorRaw);
+        else if (st === "busy") busy.push(actorRaw);
         else unknown.push(actorRaw);
       }
 
@@ -1165,6 +1183,7 @@ export function DirectorSessionsPage() {
     sessionDateKey,
   ]);
 
+  /** Список сессий: зелёный/красный по явке на вызов (календарь дня сессии = «приду»). */
   const slotRowToneClassBySlotId = useMemo(() => {
     const out = new Map<string, string>();
     if (!activeSession || !sessionDateKey) return out;
@@ -1176,35 +1195,24 @@ export function DirectorSessionsPage() {
         .filter(Boolean);
       if (normActors.length === 0) continue;
 
-      let allCalendarPresent = true;
+      let allConfirmedPresent = true;
       for (const e of normActors) {
         const p = profilesByEmail.get(e);
         const cal = (p as any)?.availabilityCalendar as
           | Record<string, string>
           | undefined;
         if (cal?.[sessionDateKey] !== "present") {
-          allCalendarPresent = false;
+          allConfirmedPresent = false;
           break;
         }
       }
-      if (allCalendarPresent) {
-        out.set(
-          insight.slotId,
-          "sessions-slots-readonly__row--tone-all-confirmed",
-        );
-        continue;
-      }
 
-      const avail = slotAvailabilityById.get(insight.slotId);
-      if (!avail) continue;
-      if (avail.busy.length > 0 || avail.unknown.length > 0) continue;
-      const freeSet = new Set(
-        avail.free.map((x) => normalizeEmail(String(x ?? ""))),
+      out.set(
+        insight.slotId,
+        allConfirmedPresent
+          ? "sessions-slots-readonly__row--tone-all-free"
+          : "sessions-slots-readonly__row--tone-roles-not-covered",
       );
-      const allFree = normActors.every((e) => freeSet.has(e));
-      if (allFree) {
-        out.set(insight.slotId, "sessions-slots-readonly__row--tone-all-free");
-      }
     }
     return out;
   }, [
@@ -1212,7 +1220,6 @@ export function DirectorSessionsPage() {
     sessionDateKey,
     slotInsights,
     profilesByEmail,
-    slotAvailabilityById,
   ]);
 
   const activeSlotInsight = useMemo(
@@ -1345,19 +1352,28 @@ export function DirectorSessionsPage() {
             ) : (
               <div className="sessions-panels">
                 <RehearsalsCard fluid>
-                  <label className="sessions-field">
+                  <div className="form-textarea sessions-slots__title">
                     <input
+                      className="native-text-input"
+                      type="text"
+                      aria-label="Название сессии"
                       value={activeSession.title}
                       onChange={(e) =>
                         void updateActiveSession({ title: e.target.value })
                       }
                     />
-                  </label>
+                  </div>
 
                   <div className="sessions-row">
-                    <label className="sessions-field">
-                      <span className="rehearsals-muted">Дата</span>
+                    <div
+                      className={cn(
+                        "form-textarea",
+                        "form-textarea--with-label",
+                      )}
+                    >
                       <input
+                        id={sessionDateInputId}
+                        className="native-text-input"
                         type="date"
                         value={
                           getLocalDateTimeParts(activeSession.startsAt).date
@@ -1374,10 +1390,16 @@ export function DirectorSessionsPage() {
                             });
                         }}
                       />
-                    </label>
-                    <label className="sessions-field">
-                      <span className="rehearsals-muted">Старт</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "form-textarea",
+                        "form-textarea--with-label",
+                      )}
+                    >
                       <input
+                        id={sessionTimeInputId}
+                        className="native-text-input"
                         type="time"
                         value={
                           getLocalDateTimeParts(activeSession.startsAt).time
@@ -1394,7 +1416,7 @@ export function DirectorSessionsPage() {
                             });
                         }}
                       />
-                    </label>
+                    </div>
 
                     <Button
                       className="sessions-field__plan"
@@ -1444,6 +1466,14 @@ export function DirectorSessionsPage() {
                                 ? `${sl.ref.projectSlug} · шаг #${sl.ref.stepId}`
                                 : "Материал не выбран")}
                           </div>
+                          {String(sl.notes ?? "").trim() ? (
+                            <div
+                              className="sessions-slots-readonly__notes"
+                              title={String(sl.notes).trim()}
+                            >
+                              {String(sl.notes).trim()}
+                            </div>
+                          ) : null}
                           {(() => {
                             const av = slotAvailabilityById.get(sl.id);
                             if (!av) return null;
@@ -1502,6 +1532,17 @@ export function DirectorSessionsPage() {
                   {publishError && (
                     <div className="rehearsals-error">{publishError}</div>
                   )}
+
+                  <FormTextarea
+                    rootClassName="form-textarea--section"
+                    rows={3}
+                    value={String(activeSession.comment ?? "")}
+                    onChange={(e) =>
+                      void updateActiveSession({ comment: e.target.value })
+                    }
+                    placeholder="Комментарий к сессии"
+                  />
+
                   <Button
                     type="button"
                     onClick={() => void publishActiveSession()}
@@ -1518,21 +1559,6 @@ export function DirectorSessionsPage() {
                         ? "Обновить публикацию"
                         : "Опубликовать"}
                   </Button>
-
-                  <label className="sessions-field">
-                    <span className="rehearsals-muted comments-for-bot">
-                      Комментарий к сессии
-                    </span>
-                    <textarea
-                      rows={3}
-                      value={String(activeSession.comment ?? "")}
-                      onChange={(e) =>
-                        void updateActiveSession({ comment: e.target.value })
-                      }
-                      placeholder="Например: сбор к 19:50, разогрев 10 минут, начинаем ровно в 20:00."
-                      style={{ resize: "vertical" }}
-                    />
-                  </label>
                 </RehearsalsCard>
 
                 {activeSession ? (

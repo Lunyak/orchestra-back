@@ -150,6 +150,55 @@ export function getAllAssigneeEmailsForDirectorSlotChart(
   return Array.from(out);
 }
 
+export type RolePlannedEmails = { roleKey: string; emails: string[] };
+
+/** План по ролям шага (для проверки «в каждой роли есть свободный актёр»). */
+export function getRolePlannedEmailsForDirectorSlot(
+  projectSlug: string,
+  stepId: number,
+  data: DirectorSlotPlannedData | null | undefined,
+  roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[] | null,
+): RolePlannedEmails[] {
+  const slug = String(projectSlug ?? "").trim();
+  if (!slug) return [];
+  if (!data) return [];
+  const step = (data.steps ?? []).find((x) => x.id === stepId) ?? null;
+  const roleKeys = getNormalizedRoleKeysForSlotStep(
+    step,
+    data.sceneRoles,
+    stepId,
+  );
+  const picks = roleRehearsalPicks ?? null;
+  const roleEmails = data.roleEmailsByKey ?? {};
+  const out: RolePlannedEmails[] = [];
+  for (const key of roleKeys) {
+    if (!key) continue;
+    const assignees = roleEmails[key] ?? [];
+    const rolePicks = (picks ?? []).filter(
+      (p) => normalizeRoleKey(p.roleKey) === key,
+    );
+    const emails: string[] = [];
+    if (rolePicks.length > 0) {
+      for (const p of rolePicks) {
+        if (!p.checked) continue;
+        const norm = normalizeEmail(String(p.email ?? ""));
+        if (!norm || !looksLikeEmail(norm)) continue;
+        emails.push(norm);
+        if (emails.length >= 200) break;
+      }
+    } else {
+      for (const e of assignees) {
+        const norm = normalizeEmail(String(e ?? ""));
+        if (!norm || !looksLikeEmail(norm)) continue;
+        emails.push(norm);
+        if (emails.length >= 200) break;
+      }
+    }
+    out.push({ roleKey: key, emails });
+  }
+  return out;
+}
+
 export function getEmailsPlannedForDirectorSlot(
   projectSlug: string,
   stepId: number,

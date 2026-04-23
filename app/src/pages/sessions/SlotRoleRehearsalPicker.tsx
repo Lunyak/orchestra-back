@@ -114,7 +114,6 @@ export function SlotRoleRehearsalPicker({
 
   return (
     <div className={cn("slot-role-rehearsal", className)}>
-      <div className="slot-role-rehearsal__title">Кто репетирует в слоте</div>
       {roleKeys.map((rk) => {
         const title =
           String(roleTitleByKey[rk] ?? rk).trim() || rk;

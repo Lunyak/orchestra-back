@@ -242,6 +242,19 @@
   white-space: nowrap;
 }
 
+.director-session-page__slot-notes {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.72;
+  margin-top: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  white-space: normal;
+}
+
 .director-session-page__slot-link {
   display: inline-flex;
   align-items: center;
