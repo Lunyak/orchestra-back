@@ -142,8 +142,6 @@
   align-items: stretch;
   background: var(--color-surface-3);
   border: 1px solid var(--color-border-default);
-  border-radius: 12px;
-  padding: 8px;
   box-sizing: border-box;
 }
 
@@ -164,7 +162,6 @@
   background: #1f2937;
   color: #e2e8f0;
   border: 1px solid #374151;
-  border-radius: 8px;
   padding: 2px 8px;
   cursor: pointer;
   font-size: 12px;
@@ -243,7 +240,6 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border-radius: 10px;
   font-size: 15px;
   line-height: 1;
 }
@@ -1023,6 +1019,10 @@
   gap: 6px;
 }
 
+.markdown-preview {
+  width: 100%;
+}
+
 .markdown-preview.markdown-preview--read-activatable {
   cursor: text;
 }
@@ -1105,6 +1105,7 @@
   min-width: 0;
   box-sizing: border-box;
   color: #ffffffce;
+  width: 100%;
 }
 
 .markdown-kadr h1,

@@ -87,9 +87,7 @@ export class AppErrorBoundary extends React.Component<
           style={{
             maxWidth: 640,
             width: "100%",
-            background: "#171a21",
-            border: "1px solid #2a303d",
-            borderRadius: 14,
+            background: "#e78a4e",
             padding: 20,
             boxSizing: "border-box",
           }}
@@ -104,7 +102,6 @@ export class AppErrorBoundary extends React.Component<
             style={{
               margin: "0 0 14px 0",
               padding: 12,
-              borderRadius: 10,
               overflowX: "auto",
               background: "#0f1115",
               border: "1px solid #2a303d",

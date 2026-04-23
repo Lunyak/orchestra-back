@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../features/auth";
 import { KanbanStepDetailModal } from "../../../features/kanban-step-modal/KanbanStepDetailModal";
+import type { KanbanStepRolesAdminMember } from "../../../features/kanban-step-modal/KanbanStepRolesAdminPanel";
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
 import type { ScriptStep } from "../../types/script";
 import {
   getMyTroupe,
+  getProjectMembers,
   getProjectRoles,
   type ProjectRoleInfo,
   type TroupeMemberItem,
@@ -182,7 +183,6 @@ export function KanbanBoardPage({
 }: {
   members?: MemberInfo[];
 }) {
-  const navigate = useNavigate();
   const { accessToken } = useAuth();
   const { projectName } = useProject();
   const { sceneData, steps, setSteps } = useScene();
@@ -222,6 +222,7 @@ export function KanbanBoardPage({
 
   const [projectRoles, setProjectRoles] = useState<ProjectRoleInfo[]>([]);
   const [troupeMembers, setTroupeMembers] = useState<TroupeMemberItem[]>([]);
+  const [roleAssignmentMembers, setRoleAssignmentMembers] = useState<KanbanStepRolesAdminMember[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [rolesError, setRolesError] = useState<string | null>(null);
 
@@ -229,6 +230,7 @@ export function KanbanBoardPage({
     if (!accessToken || !projectName) {
       setProjectRoles([]);
       setTroupeMembers([]);
+      setRoleAssignmentMembers([]);
       setRolesLoading(false);
       setRolesError(null);
       return;
@@ -239,16 +241,65 @@ export function KanbanBoardPage({
     Promise.all([
       getProjectRoles(accessToken, projectName),
       getMyTroupe(accessToken).catch(() => null),
+      getProjectMembers(accessToken, projectName).catch(() => null),
     ])
-      .then(([rolesRes, troupeRes]) => {
+      .then(([rolesRes, troupeRes, projectMembers]) => {
         if (cancelled) return;
         setProjectRoles(rolesRes?.roles ?? []);
         setTroupeMembers(((troupeRes as any)?.members ?? []) as TroupeMemberItem[]);
+
+        const membersFromTroupe = (((troupeRes as any)?.members ?? []) as any[])
+          .map((m) => ({
+            email: normalizeEmail(String((m as any)?.email ?? "")),
+            profile: (m as any)?.profile ?? null,
+          }))
+          .filter((m) => Boolean(m.email));
+
+        const membersFromProject = (() => {
+          const out: KanbanStepRolesAdminMember[] = [];
+          const ownerEmail = normalizeEmail(String(projectMembers?.owner?.email ?? ""));
+          if (ownerEmail) {
+            out.push({
+              email: ownerEmail,
+              profile: projectMembers?.owner?.displayName
+                ? { displayName: projectMembers.owner.displayName }
+                : null,
+            });
+          }
+          for (const m of projectMembers?.members ?? []) {
+            const em = normalizeEmail(String(m?.user?.email ?? ""));
+            if (!em) continue;
+            out.push({
+              email: em,
+              profile: m?.user?.displayName ? { displayName: m.user.displayName } : null,
+            });
+          }
+          return out;
+        })();
+
+        const uniq = new Map<string, KanbanStepRolesAdminMember>();
+        const merged = [...membersFromTroupe, ...membersFromProject];
+        for (const m of merged) {
+          if (!m.email) continue;
+          const prev = uniq.get(m.email);
+          if (!prev) {
+            uniq.set(m.email, m);
+            continue;
+          }
+          if (!prev.profile && m.profile) uniq.set(m.email, { ...prev, profile: m.profile });
+        }
+        const list = Array.from(uniq.values()).sort((a, b) => {
+          const la = `${String(a.profile?.displayName ?? "").trim() || a.email} (${a.email})`;
+          const lb = `${String(b.profile?.displayName ?? "").trim() || b.email} (${b.email})`;
+          return la.localeCompare(lb, "ru");
+        });
+        setRoleAssignmentMembers(list);
       })
       .catch((e: any) => {
         if (cancelled) return;
         setProjectRoles([]);
         setTroupeMembers([]);
+        setRoleAssignmentMembers([]);
         setRolesError(e?.message ? String(e.message) : "Не удалось загрузить роли/труппу");
       })
       .finally(() => {
@@ -677,10 +728,11 @@ export function KanbanBoardPage({
           getRoleActors={getRoleActors}
           displayRoleTitle={displayRoleTitle}
           resolveRoleInfo={resolveRoleInfo}
-          formatActorList={formatActorList}
-          navigate={navigate}
           accessToken={accessToken}
           projectName={projectName}
+          projectRoles={projectRoles}
+          roleAssignmentMembers={roleAssignmentMembers}
+          onProjectRolesUpdated={setProjectRoles}
         />
       )}
     </div>

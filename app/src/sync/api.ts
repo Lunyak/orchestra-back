@@ -925,6 +925,18 @@ export async function confirmMyDirectorSessionAttendance(
   return data as any;
 }
 
+export async function declineMyDirectorSessionAttendance(
+  accessToken: string,
+  sessionId: string,
+): Promise<{ ok: boolean; session: DirectorSession }> {
+  const { data } = await api.post(
+    `/director-sessions/${encodeURIComponent(sessionId)}/decline-attendance`,
+    {},
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
+
 export async function getMyDirectorSessionComment(
   accessToken: string,
   sessionId: string,

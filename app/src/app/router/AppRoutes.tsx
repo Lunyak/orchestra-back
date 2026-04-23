@@ -38,12 +38,6 @@ const TroupePage = lazy(() =>
   })),
 );
 
-const RolesPage = lazy(() =>
-  import("../../pages/roles/RolesPage").then((m) => ({
-    default: m.RolesPage,
-  })),
-);
-
 const SettingsPage = lazy(() =>
   import("../../pages/settings/SettingsPage/SettingsPage").then((m) => ({
     default: m.SettingsPage,
@@ -261,7 +255,7 @@ export function AppRoutes() {
           <Route path="/role-workbook/:roleId" element={<RoleWorkbookPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/troupe" element={<TroupePage />} />
-          <Route path="/roles" element={<RolesPage />} />
+          <Route path="/roles" element={<Navigate to="/board" replace />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/bot" element={<SettingsBotPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />

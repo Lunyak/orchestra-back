@@ -8,6 +8,7 @@ import {
 } from "../director-sessions/directorSessionsSync";
 import {
   confirmMyDirectorSessionAttendance,
+  declineMyDirectorSessionAttendance,
   getDirectorSession,
   getMyProfile,
   getProfilesBatch,
@@ -73,7 +74,10 @@ function normalizeEmail(v: string): string {
   return String(v ?? "").trim().toLowerCase();
 }
 
-type CallRowStatus = { statusLabel: string; statusTone: "muted" | "ok" | "warn" | "bad" };
+type CallRowStatus = {
+  statusLabel: string;
+  statusTone: "muted" | "ok" | "warn" | "bad" | "confirmed";
+};
 
 function callConfirmationLabel(
   participant: DirectorSessionParticipant | undefined,
@@ -91,7 +95,7 @@ function callConfirmationLabel(
   }
   const st = participant.status as DirectorSessionParticipantStatus;
   if (st === "present") {
-    return { statusLabel: "Вызов подтверждён", statusTone: "ok" };
+    return { statusLabel: "Вызов подтверждён", statusTone: "confirmed" };
   }
   if (st === "absent") {
     return { statusLabel: "Отметил «не приду»", statusTone: "bad" };
@@ -150,9 +154,9 @@ export function DirectorSessionDetailPanel({
   >({});
   const [resolvedProfiles, setResolvedProfiles] = useState<TeamProfile[]>([]);
   const [myEmail, setMyEmail] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
-  const [confirmErr, setConfirmErr] = useState<string | null>(null);
-  const [confirmOk, setConfirmOk] = useState<string | null>(null);
+  const [attendanceBusy, setAttendanceBusy] = useState(false);
+  const [attendanceErr, setAttendanceErr] = useState<string | null>(null);
+  const [attendanceOk, setAttendanceOk] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) {
@@ -182,8 +186,8 @@ export function DirectorSessionDetailPanel({
   }, [session?.slots]);
 
   useEffect(() => {
-    setConfirmErr(null);
-    setConfirmOk(null);
+    setAttendanceErr(null);
+    setAttendanceOk(null);
   }, [id]);
 
   useEffect(() => {
@@ -333,8 +337,7 @@ export function DirectorSessionDetailPanel({
         const p = participantByEmail[email];
         const disp = calledPersonDisplay(email, p, profileByEmail[email]);
         const rowStatus = callConfirmationLabel(p, published);
-        const respondedShort =
-          p?.status === "present" ? formatRespondedShort(p?.respondedAt) : null;
+        const respondedShort = formatRespondedShort(p?.respondedAt);
         return { key: email, ...disp, ...rowStatus, respondedShort };
       });
     }
@@ -347,8 +350,7 @@ export function DirectorSessionDetailPanel({
       const email = normalizeEmail(String(p.email));
       const disp = calledPersonDisplay(String(p.email), p, profileByEmail[email]);
       const rowStatus = callConfirmationLabel(p, published);
-      const respondedShort =
-        p.status === "present" ? formatRespondedShort(p.respondedAt) : null;
+      const respondedShort = formatRespondedShort(p.respondedAt);
       return { key: email || disp.name, ...disp, ...rowStatus, respondedShort };
     });
   }, [
@@ -387,21 +389,45 @@ export function DirectorSessionDetailPanel({
 
   const onConfirmAttendance = async () => {
     if (!accessToken || !id) return;
-    setConfirming(true);
-    setConfirmErr(null);
-    setConfirmOk(null);
+    setAttendanceBusy(true);
+    setAttendanceErr(null);
+    setAttendanceOk(null);
     try {
       const res = await confirmMyDirectorSessionAttendance(accessToken, id);
       if (res?.session) setSession(res.session as DirectorRehearsalSession);
-      setConfirmOk("Вызов подтверждён");
+      setAttendanceOk("Вызов подтверждён");
     } catch (e: any) {
       const msg =
         e?.response?.data?.message ??
         e?.message ??
         "Не удалось подтвердить вызов";
-      setConfirmErr(String(msg));
+      setAttendanceErr(String(msg));
     } finally {
-      setConfirming(false);
+      setAttendanceBusy(false);
+    }
+  };
+
+  const onDeclineAttendance = async () => {
+    if (!accessToken || !id) return;
+    const ok = window.confirm(
+      "Отметить «не приду»? Режиссёр увидит, что вы не сможете прийти на эту сессию.",
+    );
+    if (!ok) return;
+    setAttendanceBusy(true);
+    setAttendanceErr(null);
+    setAttendanceOk(null);
+    try {
+      const res = await declineMyDirectorSessionAttendance(accessToken, id);
+      if (res?.session) setSession(res.session as DirectorRehearsalSession);
+      setAttendanceOk("Ответ сохранён: не приду");
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ??
+        e?.message ??
+        "Не удалось сохранить ответ";
+      setAttendanceErr(String(msg));
+    } finally {
+      setAttendanceBusy(false);
     }
   };
 
@@ -443,34 +469,106 @@ export function DirectorSessionDetailPanel({
                   <>
                     <div className="director-session-page__attendance-title">Мой ответ на вызов</div>
                     {myParticipant ? (
-                      myParticipant.status === "present" ? (
+                      !sessionPublished ? (
                         <p className="director-session-page__attendance-note">
-                          Вы подтвердили вызов (в системе отмечено «приду»). Режиссёр видит это в списке ниже.
-                        </p>
-                      ) : !sessionPublished ? (
-                        <p className="director-session-page__attendance-note">
-                          Подтвердить вызов можно после публикации сессии режиссёром.
+                          Подтвердить или отклонить вызов можно после публикации сессии режиссёром.
                         </p>
                       ) : (
                         <>
-                          {confirmErr ? (
+                          {attendanceErr ? (
                             <div className="settings-invite-error" style={{ margin: 0 }}>
-                              {confirmErr}
+                              {attendanceErr}
                             </div>
                           ) : null}
-                          {confirmOk ? (
+                          {attendanceOk ? (
                             <p className="director-session-page__attendance-note" style={{ color: "#7ee787" }}>
-                              {confirmOk}
+                              {attendanceOk}
                             </p>
                           ) : null}
-                          <Button
-                            className="primary"
-                            type="button"
-                            disabled={confirming}
-                            onClick={() => void onConfirmAttendance()}
-                          >
-                            {confirming ? "Отправка…" : "Подтвердить вызов"}
-                          </Button>
+                          {myParticipant.status === "present" ? (
+                            <>
+                              <p className="director-session-page__attendance-note">
+                                Вы подтвердили вызов (в системе отмечено «приду»). Режиссёр видит это в списке ниже.
+                              </p>
+                              <div className="director-session-page__attendance-actions">
+                                <Button
+                                  variant="danger"
+                                  type="button"
+                                  disabled={attendanceBusy}
+                                  onClick={() => void onDeclineAttendance()}
+                                >
+                                  {attendanceBusy ? "Отправка…" : "Не смогу прийти"}
+                                </Button>
+                              </div>
+                            </>
+                          ) : myParticipant.status === "absent" ? (
+                            <>
+                              <p className="director-session-page__attendance-note">
+                                Вы отметили, что не придёте. Режиссёр видит это в списке ниже. Если планы
+                                изменились, можно снова подтвердить вызов.
+                              </p>
+                              <div className="director-session-page__attendance-actions">
+                                <Button
+                                  className="primary"
+                                  type="button"
+                                  disabled={attendanceBusy}
+                                  onClick={() => void onConfirmAttendance()}
+                                >
+                                  {attendanceBusy ? "Отправка…" : "Подтвердить вызов"}
+                                </Button>
+                              </div>
+                            </>
+                          ) : myParticipant.status === "late" ? (
+                            <>
+                              <p className="director-session-page__attendance-note">
+                                По вызову у вас отмечено опоздание. При необходимости обновите ответ: подтвердите
+                                приход или отметьте, что не придёте.
+                              </p>
+                              <div className="director-session-page__attendance-actions">
+                                <Button
+                                  className="primary"
+                                  type="button"
+                                  disabled={attendanceBusy}
+                                  onClick={() => void onConfirmAttendance()}
+                                >
+                                  {attendanceBusy ? "Отправка…" : "Подтвердить приход"}
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  type="button"
+                                  disabled={attendanceBusy}
+                                  onClick={() => void onDeclineAttendance()}
+                                >
+                                  Не смогу прийти
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="director-session-page__attendance-note">
+                                Подтвердите вызов или отметьте, что не сможете прийти — режиссёр увидит ответ в
+                                списке ниже.
+                              </p>
+                              <div className="director-session-page__attendance-actions">
+                                <Button
+                                  className="primary"
+                                  type="button"
+                                  disabled={attendanceBusy}
+                                  onClick={() => void onConfirmAttendance()}
+                                >
+                                  {attendanceBusy ? "Отправка…" : "Подтвердить вызов"}
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  type="button"
+                                  disabled={attendanceBusy}
+                                  onClick={() => void onDeclineAttendance()}
+                                >
+                                  Не смогу прийти
+                                </Button>
+                              </div>
+                            </>
+                          )}
                         </>
                       )
                     ) : inPlannedOnly ? (
@@ -496,7 +594,14 @@ export function DirectorSessionDetailPanel({
                 <div className="director-session-page__called-scroll">
                   <ul className="director-session-page__called-list">
                     {calledList.map((row) => (
-                      <li key={row.key} className="director-session-page__called-item">
+                      <li
+                        key={row.key}
+                        className={
+                          row.statusTone === "confirmed"
+                            ? "director-session-page__called-item director-session-page__called-item--confirmed"
+                            : "director-session-page__called-item"
+                        }
+                      >
                         <MiniAvatar
                           src={row.avatarUrl}
                           label={row.avatarLabel}

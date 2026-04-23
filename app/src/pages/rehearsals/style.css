@@ -8,6 +8,7 @@
   background-color: var(--color-bg-primary);
   font-family: var(--font-family-script-body);
   max-width: var(--width-content-page);
+  box-sizing: border-box;
 }
 
 .rehearsals-head {

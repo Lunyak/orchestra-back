@@ -229,7 +229,6 @@ export function ProfileDataTab() {
             style={{
               width: 44,
               height: 44,
-              borderRadius: 999,
               objectFit: "cover",
               border: "1px solid rgba(255,255,255,0.14)",
               background: "rgba(255,255,255,0.06)",

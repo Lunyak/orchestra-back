@@ -626,7 +626,7 @@
   font-size: 12px;
 }
 
-/* Список сессий — обзор слотов: все вызванные по слоту подтвердили явку (календарь) */
+/* Список сессий — обзор слотов: слот собирается + все вызванные на репетицию подтвердили явку (текущий пользователь — по JWT, если не «занят») */
 .sessions-slots-readonly__row.sessions-slots-readonly__row--tone-all-free {
   background: #7ee787;
   border-color: rgba(15, 23, 42, 0.22);
@@ -646,7 +646,7 @@
   opacity: 0.95;
 }
 
-/* Список сессий — обзор слотов: не все подтвердили явку на вызов */
+/* Список сессий — обзор слотов: не собирается / не все из полного состава подтвердили явку */
 .sessions-slots-readonly__row.sessions-slots-readonly__row--tone-roles-not-covered {
   background: #f85149;
   border-color: rgba(15, 23, 42, 0.22);
@@ -1026,11 +1026,6 @@
   }
 }
 
-.sessions-field__plan {
-  height: 100%;
-  margin-left: auto;
-}
-
 .session__step-head {
   display: flex;
   align-items: center;
@@ -1050,4 +1045,11 @@
 
 .form-textarea--section {
   margin-bottom: 10px;
+}
+
+.sessions-slots__container-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  align-items: flex-start;
 }

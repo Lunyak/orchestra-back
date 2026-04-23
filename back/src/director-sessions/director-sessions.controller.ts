@@ -76,6 +76,16 @@ export class DirectorSessionsController {
     );
   }
 
+  /** Участник отклоняет явку («не приду», participants[].status = absent). */
+  @Post(':id/decline-attendance')
+  declineMyAttendance(@Req() req: any, @Param('id') id: string) {
+    return this.sessions.declineMyAttendance(
+      req.user.userId,
+      req.user.email,
+      id,
+    );
+  }
+
   @Get(':id/my-comment')
   getMyComment(@Req() req: any, @Param('id') id: string) {
     return this.sessions.getMyComment(req.user.userId, id);

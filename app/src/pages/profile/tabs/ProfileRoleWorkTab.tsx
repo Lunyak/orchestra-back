@@ -51,13 +51,13 @@ export function ProfileRoleWorkTab() {
     <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
       <div style={{ fontSize: 13, fontWeight: 700 }}>Работа над ролью</div>
       <div style={{ fontSize: 12, opacity: 0.75 }}>
-        Здесь собраны роли, назначенные на ваш email. Для каждой роли можно перейти в “Роли” и работать с заметками и
-        назначениями.
+        Здесь собраны роли, назначенные на ваш email. Создание ролей и назначения актёров — в карточке сцены на доске
+        готовности.
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <Button className="secondary" type="button" onClick={() => navigate("/roles")}>
-          Открыть страницу “Роли”
+        <Button className="secondary" type="button" onClick={() => navigate("/board")}>
+          Открыть доску
         </Button>
       </div>
 
@@ -67,7 +67,7 @@ export function ProfileRoleWorkTab() {
       <div style={{ display: "grid", gap: 8, maxWidth: 720 }}>
         {myAssignedRoles.length === 0 && !flags.loading ? (
           <div style={{ fontSize: 12, opacity: 0.7 }}>
-            Роли не назначены на ваш email (или профиль ещё не загружен). Назначения делаются на странице “Роли”.
+            Роли не назначены на ваш email (или профиль ещё не загружен). Назначения делаются в карточке сцены на доске.
           </div>
         ) : null}
 
@@ -76,7 +76,6 @@ export function ProfileRoleWorkTab() {
             key={String(r.id)}
             style={{
               border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 12,
               padding: 10,
               display: "flex",
               alignItems: "center",

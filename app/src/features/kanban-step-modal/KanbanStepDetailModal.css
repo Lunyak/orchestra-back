@@ -102,6 +102,24 @@
   color: var(--color-text-muted);
 }
 
-.kanban-step-modal__roles-actions {
-  margin-top: 10px;
+.kanban-field__container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.kanban-chip.kanban-chip--person {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px 2px 4px;
+  max-width: 100%;
+}
+
+.kanban-chip__person-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

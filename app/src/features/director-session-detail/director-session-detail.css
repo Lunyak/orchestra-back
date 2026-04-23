@@ -146,6 +146,13 @@
   opacity: 0.78;
 }
 
+.director-session-page__attendance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .director-session-page__called-item {
   display: flex;
   flex-direction: row;
@@ -156,6 +163,11 @@
   background: rgba(0, 0, 0, 0.1);
   min-height: 38px;
   box-sizing: border-box;
+}
+
+.director-session-page__called-item.director-session-page__called-item--confirmed {
+  background: rgba(46, 160, 67, 0.2);
+  border-color: rgba(126, 231, 135, 0.45);
 }
 
 .director-session-page__called-item-main {
@@ -203,7 +215,7 @@
 }
 
 .director-session-page__called-status--confirmed {
-  color: #e78a4e;
+  color: #7ee787;
   opacity: 0.98;
 }
 

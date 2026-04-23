@@ -1,0 +1,166 @@
+.kanban-roles-admin {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.kanban-roles-admin__title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.kanban-roles-admin__missing {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.kanban-roles-admin__missing-label {
+  font-size: 12px;
+  opacity: 0.75;
+  width: 100%;
+}
+
+.kanban-roles-admin__chip {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.kanban-roles-admin__chip:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kanban-roles-admin__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.kanban-roles-admin__row input[type="text"] {
+  flex: 1 1 140px;
+  min-width: 120px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.25);
+  color: inherit;
+  font-size: 13px;
+}
+
+.kanban-roles-admin__list {
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.kanban-roles-admin__list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.kanban-roles-admin__list-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kanban-roles-admin__list-item_active {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kanban-roles-admin__list-title {
+  font-weight: 600;
+}
+
+.kanban-roles-admin__list-meta {
+  font-size: 11px;
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
+.kanban-roles-admin__assign-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.kanban-roles-admin__assign-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.kanban-roles-admin__danger {
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 120, 120, 0.35);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kanban-roles-admin__danger:hover {
+  background: rgba(255, 80, 80, 0.12);
+}
+
+.kanban-roles-admin__assignments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.kanban-roles-admin__check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.kanban-roles-admin__check input {
+  margin-top: 2px;
+}
+
+.kanban-roles-admin__check-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kanban-roles-admin__muted {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.kanban-roles-admin__muted_spacing {
+  margin-bottom: 8px;
+}
+
+.kanban-roles-admin__error {
+  font-size: 12px;
+  color: #ffb4b4;
+  margin-bottom: 8px;
+}

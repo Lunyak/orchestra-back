@@ -451,11 +451,13 @@ export class DirectorSessionsService {
     return cur;
   }
 
-  /** Участник подтверждает явку (поле participants[].status = present). */
-  async confirmMyAttendance(
-    _userId: string,
+  /**
+   * Участник отвечает на вызов: participants[].status = present | absent.
+   */
+  private async setMyAttendanceStatus(
     userEmail: string | undefined,
     sessionId: string,
+    status: 'present' | 'absent',
   ) {
     const sid = String(sessionId ?? '').trim();
     const email = normEmail(String(userEmail ?? ''));
@@ -490,7 +492,7 @@ export class DirectorSessionsService {
     const nowIso = new Date().toISOString();
     participants[pIdx] = {
       ...participants[pIdx],
-      status: 'present',
+      status,
       respondedAt: nowIso,
     };
     const updated: DirectorRehearsalSession = {
@@ -500,6 +502,24 @@ export class DirectorSessionsService {
     };
     await this.upsertSessionRow(row.projectId, row.userId, updated);
     return { ok: true, session: updated };
+  }
+
+  /** Участник подтверждает явку (participants[].status = present). */
+  async confirmMyAttendance(
+    _userId: string,
+    userEmail: string | undefined,
+    sessionId: string,
+  ) {
+    return this.setMyAttendanceStatus(userEmail, sessionId, 'present');
+  }
+
+  /** Участник отклоняет явку / отмечает «не приду» (participants[].status = absent). */
+  async declineMyAttendance(
+    _userId: string,
+    userEmail: string | undefined,
+    sessionId: string,
+  ) {
+    return this.setMyAttendanceStatus(userEmail, sessionId, 'absent');
   }
 
   async getMyComment(userId: string, sessionId: string) {

@@ -31,6 +31,7 @@ import {
   getProjectRoles,
   publishDirectorSession,
   syncPull,
+  type DirectorSessionParticipant,
   type TeamProfile,
 } from "../../sync/api";
 import "../rehearsals/style.css";
@@ -106,6 +107,62 @@ function normalizeEmail(v: string): string {
   return String(v ?? "")
     .trim()
     .toLowerCase();
+}
+
+/** Email из JWT accessToken (для учёта собственной явки режиссёра). */
+function parseEmailFromAccessToken(token: string | null): string | null {
+  if (!token) return null;
+  try {
+    const seg = token.split(".")[1];
+    if (!seg) return null;
+    let b64 = seg.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const json = JSON.parse(atob(b64)) as { email?: string; sub?: string };
+    const raw =
+      typeof json.email === "string" && json.email.trim()
+        ? json.email
+        : typeof json.sub === "string" && json.sub.includes("@")
+          ? json.sub
+          : "";
+    const n = normalizeEmail(raw);
+    return n && looksLikeEmail(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+function isDirectorSessionPublished(
+  session: DirectorRehearsalSession,
+): boolean {
+  return Boolean(String(session.publishedAt ?? "").trim());
+}
+
+function findDirectorSessionParticipant(
+  session: DirectorRehearsalSession,
+  emailNorm: string,
+): DirectorSessionParticipant | undefined {
+  const list = (session.participants ?? []) as DirectorSessionParticipant[];
+  return list.find((p) => normalizeEmail(String(p.email ?? "")) === emailNorm);
+}
+
+/**
+ * Явка на вызов (после «Опубликовать»): только status участника из participants.
+ * До публикации — зелёный слот по календарю: явная отметка дня/интервалов + «приду»; для себя (JWT) — как исключение для режиссёра.
+ */
+function actorCalendarPresentStrictForDraft(
+  emailNorm: string,
+  sessionDateKey: string,
+  profilesByEmail: Map<string, TeamProfile>,
+  selfEmailNorm: string | null,
+): boolean {
+  if (selfEmailNorm && emailNorm === selfEmailNorm) return true;
+  const p = profilesByEmail.get(emailNorm);
+  if (!p) return false;
+  if (!profileHasSpecifiedAvailabilityForDate(p, sessionDateKey)) return false;
+  const cal = (p as any)?.availabilityCalendar?.[sessionDateKey] as
+    | string
+    | undefined;
+  return cal === "present";
 }
 
 function getRangesForDateMinutes(
@@ -267,6 +324,10 @@ export function DirectorSessionsPage() {
   const sessionTimeInputId = `${sessionFormFieldId}-time`;
 
   const { accessToken } = useAuth();
+  const selfEmailNorm = useMemo(
+    () => parseEmailFromAccessToken(accessToken),
+    [accessToken],
+  );
   const { projects } = useProject();
   const location = useLocation();
   const navigate = useNavigate();
@@ -943,11 +1004,12 @@ export function DirectorSessionsPage() {
               String(data?.roleTitleByKey?.[key ?? ""] ?? key ?? "").trim() ||
               key,
           );
+        /** Кто вызван на репетицию в слоте: чекбоксы «кто репетирует», иначе весь состав ролей. */
         const actors = getEmailsPlannedForDirectorSlot(
           ref.projectSlug,
           ref.stepId,
           data,
-          sl.roleRehearsalPicks,
+          (sl as DirectorSessionSlot).roleRehearsalPicks,
         );
         return {
           slotId: sl.id,
@@ -962,6 +1024,28 @@ export function DirectorSessionsPage() {
         };
       });
   }, [activeSession, dataCache]);
+
+  /** Все email, отмеченные в слотах как участники репетиции (для панели без выбранного слота). */
+  const sessionPickedActorEmails = useMemo(() => {
+    if (!activeSession) return new Set<string>();
+    const set = new Set<string>();
+    for (const sl of activeSession.slots ?? []) {
+      const ref = sl.ref;
+      if (!ref?.projectSlug || ref.stepId == null) continue;
+      const data = dataCache[ref.projectSlug];
+      if (!data) continue;
+      for (const e of getEmailsPlannedForDirectorSlot(
+        ref.projectSlug,
+        ref.stepId,
+        data,
+        (sl as DirectorSessionSlot).roleRehearsalPicks,
+      )) {
+        const n = normalizeEmail(String(e ?? ""));
+        if (n) set.add(n);
+      }
+    }
+    return set;
+  }, [activeSession?.id, activeSession?.slots, dataCache]);
 
   const actorsSummary = useMemo(() => {
     const map = new Map<string, { actor: string; slots: number }>();
@@ -1102,13 +1186,35 @@ export function DirectorSessionsPage() {
             )?.[sessionDateKey]
           : undefined;
 
+      const published = isDirectorSessionPublished(activeSession);
+      const participants = activeSession.participants ?? [];
+      const hasCallTable = published && participants.length > 0;
+
       if (!sessionDateKey) {
         statusLabel = "Сначала укажи дату сессии";
         statusTone = "warn";
       } else if (opts.busySet?.has(emailNorm)) {
         statusLabel = "Занят на это время";
         statusTone = "bad";
-      } else if (cal === "present") {
+      } else if (hasCallTable) {
+        const part = findDirectorSessionParticipant(activeSession, emailNorm);
+        if (part?.status === "present") {
+          statusLabel = "Подтвердил явку";
+          statusTone = "confirmed";
+        } else if (part?.status === "absent") {
+          statusLabel = "Отметил «не приду»";
+          statusTone = "bad";
+        } else if (part?.status === "late") {
+          statusLabel = "Опоздает";
+          statusTone = "warn";
+        } else if (part) {
+          statusLabel = "Вызов не подтверждён";
+          statusTone = "warn";
+        } else {
+          statusLabel = "Вызов не подтверждён";
+          statusTone = "warn";
+        }
+      } else if (selfEmailNorm && emailNorm === selfEmailNorm) {
         statusLabel = "Подтвердил явку";
         statusTone = "confirmed";
       } else if (opts.freeSet && opts.freeSet.has(emailNorm)) {
@@ -1144,12 +1250,7 @@ export function DirectorSessionsPage() {
         const n = normalizeEmail(String(p ?? ""));
         if (n) emailSet.add(n);
       }
-      for (const s of slotInsights) {
-        for (const a of s.actors ?? []) {
-          const n = normalizeEmail(String(a ?? ""));
-          if (n) emailSet.add(n);
-        }
-      }
+      sessionPickedActorEmails.forEach((n) => emailSet.add(n));
       const sorted = Array.from(emailSet).sort((a, b) =>
         a.localeCompare(b, "ru"),
       );
@@ -1178,17 +1279,37 @@ export function DirectorSessionsPage() {
     activeSession,
     activeSlotId,
     slotInsights,
+    sessionPickedActorEmails,
     slotAvailabilityById,
     profilesByEmail,
     sessionDateKey,
+    selfEmailNorm,
   ]);
 
-  /** Список сессий: зелёный/красный по явке на вызов (календарь дня сессии = «приду»). */
+  /**
+   * Список сессий: зелёный слот — кастинг готов и у каждого вызванного «явка на вызов»:
+   * после публикации — participants.status === "present"; до публикации — явная отметка дня + «приду» (или JWT для себя).
+   */
   const slotRowToneClassBySlotId = useMemo(() => {
     const out = new Map<string, string>();
     if (!activeSession || !sessionDateKey) return out;
 
+    const published = isDirectorSessionPublished(activeSession);
+    const participants = activeSession.participants ?? [];
+    const hasCallTable = published && participants.length > 0;
+
     for (const insight of slotInsights) {
+      const sl = slotById.get(insight.slotId);
+      if (!sl?.ref) continue;
+
+      if (!insight.ready) {
+        out.set(
+          insight.slotId,
+          "sessions-slots-readonly__row--tone-roles-not-covered",
+        );
+        continue;
+      }
+
       const actors = insight.actors ?? [];
       const normActors = actors
         .map((a) => normalizeEmail(String(a ?? "")))
@@ -1197,11 +1318,20 @@ export function DirectorSessionsPage() {
 
       let allConfirmedPresent = true;
       for (const e of normActors) {
-        const p = profilesByEmail.get(e);
-        const cal = (p as any)?.availabilityCalendar as
-          | Record<string, string>
-          | undefined;
-        if (cal?.[sessionDateKey] !== "present") {
+        if (hasCallTable) {
+          const st = findDirectorSessionParticipant(activeSession, e)?.status;
+          if (st !== "present") {
+            allConfirmedPresent = false;
+            break;
+          }
+        } else if (
+          !actorCalendarPresentStrictForDraft(
+            e,
+            sessionDateKey,
+            profilesByEmail,
+            selfEmailNorm,
+          )
+        ) {
           allConfirmedPresent = false;
           break;
         }
@@ -1216,10 +1346,12 @@ export function DirectorSessionsPage() {
     }
     return out;
   }, [
-    activeSession?.id,
+    activeSession,
     sessionDateKey,
     slotInsights,
+    slotById,
     profilesByEmail,
+    selfEmailNorm,
   ]);
 
   const activeSlotInsight = useMemo(
@@ -1417,19 +1549,6 @@ export function DirectorSessionsPage() {
                         }}
                       />
                     </div>
-
-                    <Button
-                      className="sessions-field__plan"
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          `/sessions/${encodeURIComponent(activeSession.id)}`,
-                        )
-                      }
-                      title="Создавать, наполнять и менять порядок слотов — на странице сессии"
-                    >
-                      План и материалы
-                    </Button>
                   </div>
 
                   <div className="sessions-slots-readonly">
@@ -1543,22 +1662,37 @@ export function DirectorSessionsPage() {
                     placeholder="Комментарий к сессии"
                   />
 
-                  <Button
-                    type="button"
-                    onClick={() => void publishActiveSession()}
-                    disabled={publishing}
-                    title={
-                      activeSessionPublished
-                        ? "Пересобрать список участников по календарю, обновить комментарий; при подключённом боте — обновить или отправить сообщение в Telegram"
-                        : "Помечает сессию опубликованной; при подключённом боте — дублирует вызов в Telegram"
-                    }
-                  >
-                    {publishing
-                      ? "Публикую…"
-                      : activeSessionPublished
-                        ? "Обновить публикацию"
-                        : "Опубликовать"}
-                  </Button>
+                  <div className="sessions-slots__container-btns">
+                    <Button
+                      type="button"
+                      onClick={() => void publishActiveSession()}
+                      disabled={publishing}
+                      title={
+                        activeSessionPublished
+                          ? "Пересобрать список участников по календарю, обновить комментарий; при подключённом боте — обновить или отправить сообщение в Telegram"
+                          : "Помечает сессию опубликованной; при подключённом боте — дублирует вызов в Telegram"
+                      }
+                    >
+                      {publishing
+                        ? "Публикую…"
+                        : activeSessionPublished
+                          ? "Обновить публикацию"
+                          : "Опубликовать"}
+                    </Button>
+
+                    <Button
+                      className="sessions-field__plan"
+                      type="button"
+                      onClick={() =>
+                        navigate(
+                          `/sessions/${encodeURIComponent(activeSession.id)}`,
+                        )
+                      }
+                      title="Создавать, наполнять и менять порядок слотов — на странице сессии"
+                    >
+                      План и материалы
+                    </Button>
+                  </div>
                 </RehearsalsCard>
 
                 {activeSession ? (
@@ -1593,7 +1727,11 @@ export function DirectorSessionsPage() {
                           {sessionsSideCalledRows.map((row) => (
                             <li
                               key={row.key}
-                              className="director-session-page__called-item"
+                              className={cn(
+                                "director-session-page__called-item",
+                                row.statusTone === "confirmed" &&
+                                  "director-session-page__called-item--confirmed",
+                              )}
                             >
                               <MiniAvatar
                                 src={row.avatarUrl}

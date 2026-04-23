@@ -33,27 +33,6 @@ export function RoleWorkbookPage() {
 
   const effectiveRoleId = String(roleId ?? "").trim();
 
-  type ViewStyle = "diary" | "dossier" | "compact";
-  const viewStyleStorageKey = useMemo(() => `roleWorkbook:viewStyle`, []);
-  const [viewStyle, setViewStyle] = useState<ViewStyle>(() => {
-    if (typeof window === "undefined") return "diary";
-    try {
-      const raw = String(localStorage.getItem(viewStyleStorageKey) ?? "");
-      if (raw === "dossier") return "dossier";
-      if (raw === "compact") return "compact";
-      return "diary";
-    } catch {
-      return "diary";
-    }
-  });
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(viewStyleStorageKey, viewStyle);
-    } catch {}
-  }, [viewStyle, viewStyleStorageKey]);
-
   const entryDateLabel = useMemo(() => {
     const d = new Date();
     return d.toLocaleString("ru-RU", {
@@ -413,18 +392,12 @@ export function RoleWorkbookPage() {
     <div className="app-layout">
       <div className="app-content">
         <main className="main-content">
-          <div className={`rolewb-view mode-${viewStyle}`}>
+          <div className="rolewb-view mode-dossier">
             <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
               <div>
                 <h2 style={{ marginBottom: 0 }}>Страница роли</h2>
                 <div className="rolewb-dateline">
-                  {viewStyle === "dossier" ? (
-                    <>
-                      CASE FILE · #{caseIdShort} · {entryDateLabel}
-                    </>
-                  ) : (
-                    <>Запись: {entryDateLabel}</>
-                  )}
+                  CASE FILE · #{caseIdShort} · {entryDateLabel}
                 </div>
                 <div className="rolewb-subtitle">
                   Проект: <b>{projectSlug}</b> · Роль:{" "}
@@ -443,41 +416,26 @@ export function RoleWorkbookPage() {
                 </div>
               </div>
               <div className="rolewb-row">
-                <Button
-                  className="secondary"
-                  type="button"
-                  onClick={() =>
-                    setViewStyle((v) => (v === "dossier" ? "diary" : v === "diary" ? "compact" : "dossier"))
-                  }
-                  title="Переключить стиль страницы"
-                >
-                  {viewStyle === "dossier" ? "Вид: досье" : viewStyle === "compact" ? "Вид: компакт" : "Вид: дневник"}
-                </Button>
                 <Button className="secondary" type="button" onClick={() => navigate("/profile")}>
                   Профиль
-                </Button>
-                <Button className="secondary" type="button" onClick={() => navigate("/roles")}>
-                  Роли (админ)
                 </Button>
               </div>
             </div>
 
-            {viewStyle === "dossier" ? (
-              <div className="rolewb-casehead" aria-label="Обложка дела">
-                <div className="rolewb-casehead-left">
-                  <div className="rolewb-casehead-kicker">ORCHESTRA ARCHIVE</div>
-                  <div className="rolewb-casehead-title">DOSSIER</div>
-                  <div className="rolewb-casehead-meta">
-                    SUBJECT: <b>{s.roleInfo?.title ?? s.roleInfo?.key ?? effectiveRoleId}</b>
-                    {" · "}
-                    ACTOR: <b>{actorLabel(s.profilesByEmail?.[selectedActor] ?? null, selectedActor || "—")}</b>
-                  </div>
-                </div>
-                <div className="rolewb-stamp" aria-label="Штамп секретности">
-                  CONFIDENTIAL
+            <div className="rolewb-casehead" aria-label="Обложка дела">
+              <div className="rolewb-casehead-left">
+                <div className="rolewb-casehead-kicker">ORCHESTRA ARCHIVE</div>
+                <div className="rolewb-casehead-title">DOSSIER</div>
+                <div className="rolewb-casehead-meta">
+                  SUBJECT: <b>{s.roleInfo?.title ?? s.roleInfo?.key ?? effectiveRoleId}</b>
+                  {" · "}
+                  ACTOR: <b>{actorLabel(s.profilesByEmail?.[selectedActor] ?? null, selectedActor || "—")}</b>
                 </div>
               </div>
-            ) : null}
+              <div className="rolewb-stamp" aria-label="Штамп секретности">
+                CONFIDENTIAL
+              </div>
+            </div>
 
             <div className="rolewb-grid">
               <div className="rolewb-card">
@@ -1049,7 +1007,6 @@ export function RoleWorkbookPage() {
                           key={`arc-${idx}`}
                           style={{
                             border: "1px solid rgba(255,255,255,0.10)",
-                            borderRadius: 10,
                             padding: 10,
                             background: "rgba(255,255,255,0.03)",
                             display: "grid",

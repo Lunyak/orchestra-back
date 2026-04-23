@@ -36,6 +36,49 @@ const KanbanBoardPage = React.lazy(() =>
 
 type SpectacleActiveView = "theater" | "light-plot" | "board" | "script" | "sessions";
 
+type SpectacleProjectPickerProps = {
+  projects: string[];
+  projectName: string;
+  projectsLoading: boolean;
+  onProjectChange: (slug: string) => void;
+};
+
+function SpectacleProjectPicker({
+  projects,
+  projectName,
+  projectsLoading,
+  onProjectChange,
+}: SpectacleProjectPickerProps) {
+  const hasProjects = projects.length > 0;
+
+  return (
+    <div className="spectacle-project-bar">
+      <label className="spectacle-project-field">
+        <span className="spectacle-project-field-label">Проект</span>
+        <select
+          className="spectacle-project-select"
+          value={hasProjects ? projectName : ""}
+          onChange={(e) => onProjectChange(e.target.value)}
+          disabled={!hasProjects || projectsLoading}
+          aria-label="Текущий проект"
+        >
+          {!hasProjects ? <option value="">Проектов нет</option> : null}
+          {hasProjects && !projectName ? (
+            <option value="" disabled>
+              Выберите проект
+            </option>
+          ) : null}
+          {projects.map((slug) => (
+            <option key={slug} value={slug}>
+              {slug}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
 /** Доп. классы на `<main class="main-content">` по активному разделу (одна строка или массив). */
 const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   SpectacleActiveView,
@@ -52,7 +95,13 @@ export function SpectaclePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { accessToken } = useAuth();
-  const { projectName, isProjectsLoaded } = useProject();
+  const {
+    projectName,
+    isProjectsLoaded,
+    projects,
+    projectsLoading,
+    onProjectChange,
+  } = useProject();
   const { projectMembers, projectOwner } = useTeam();
   const {
     sceneData,
@@ -184,13 +233,26 @@ export function SpectaclePage() {
   }
 
   if (!projectName) {
+    const showPicker = projects.length > 0;
     return (
       <div className="app-layout">
         <div className="app-content">
+          {showPicker ? (
+            <SpectacleProjectPicker
+              projects={projects}
+              projectName={projectName}
+              projectsLoading={projectsLoading}
+              onProjectChange={onProjectChange}
+            />
+          ) : null}
           <main className="main-content">
             <div className="empty-project">
               <h2>Проект не выбран</h2>
-              <p>Выберите проект в «Настройки» → «Сменить проект».</p>
+              <p>
+                {showPicker
+                  ? "Выберите проект в списке выше или в настройках."
+                  : "Создайте проект в настройках или дождитесь загрузки списка."}
+              </p>
               <button
                 type="button"
                 className="empty-project-btn"
@@ -290,6 +352,12 @@ export function SpectaclePage() {
         playlistNode
       )}
       <div className="app-content">
+        <SpectacleProjectPicker
+          projects={projects}
+          projectName={projectName}
+          projectsLoading={projectsLoading}
+          onProjectChange={onProjectChange}
+        />
         {showHeaderSounds && !compactMainChrome && !isMobile && (
           <div className="sounds-bar">
             <HeaderPlayer

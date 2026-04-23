@@ -33,7 +33,6 @@
 .rolewb-card {
   /* Paper sheet */
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 16px;
   padding: 14px 14px 14px 16px;
   background:
     /* ruled lines */
@@ -75,7 +74,6 @@
 
 .rolewb-dropzone {
   border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
   padding: 12px;
   background: rgba(255, 255, 255, 0.04);
   font-size: 12px;
@@ -149,7 +147,6 @@
   background:
     linear-gradient(180deg, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0.04));
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 12px;
   color: var(--color-text-lighter);
   resize: none;
   padding: 8px 0 0 8px;
@@ -205,6 +202,7 @@
 
 /* Dossier mode: manila folder + typewriter vibe */
 .rolewb-view.mode-dossier {
+  height: fit-content;
   color: rgba(15, 15, 15, 0.95);
   background:
     radial-gradient(1200px 700px at 40% 10%, rgba(255, 235, 190, 0.86), rgba(255, 235, 190, 0.62)),

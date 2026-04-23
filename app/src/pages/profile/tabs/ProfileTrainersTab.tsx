@@ -12,7 +12,7 @@ export function ProfileTrainersTab() {
       </div>
 
       <div style={{ display: "grid", gap: 8 }}>
-        <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 10 }}>
+        <div style={{ border: "1px solid rgba(255,255,255,0.12)", padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 800 }}>Учить текст роли</div>
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
             Уже реализовано: тренажёр по репликам выбранной роли (диалог/карточки/голос).
@@ -24,7 +24,7 @@ export function ProfileTrainersTab() {
           </div>
         </div>
 
-        <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 10 }}>
+        <div style={{ border: "1px solid rgba(255,255,255,0.12)", padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 800 }}>Речь</div>
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
             Дыхание + чтение с темпом (метроном).
@@ -36,7 +36,7 @@ export function ProfileTrainersTab() {
           </div>
         </div>
 
-        <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 10 }}>
+        <div style={{ border: "1px solid rgba(255,255,255,0.12)", padding: 10 }}>
           <div style={{ fontSize: 12, fontWeight: 800 }}>Дикция</div>
           <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
             Скороговорки + история попыток.

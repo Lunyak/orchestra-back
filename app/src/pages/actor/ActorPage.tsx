@@ -497,7 +497,8 @@ export function ActorPage() {
                 </div>
                 {!canPickAnyRole && myEmail && rolesForActor.length === 0 && !rolesLoading ? (
                   <div className="actor-hint">
-                    Похоже, роли не назначены на ваш email. Назначьте себя на роль на странице <b>Роли</b>.
+                    Похоже, роли не назначены на ваш email. Назначьте себя на роль в карточке сцены на доске{" "}
+                    <b>готовности</b>.
                   </div>
                 ) : null}
                 {rolesError ? <div className="actor-hint">Ошибка загрузки ролей: {rolesError}</div> : null}
