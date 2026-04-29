@@ -28,13 +28,13 @@ import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import type { ScriptStep } from "../../shared/types/script";
 import { createId } from "../../shared/utils/createId";
 import {
-  getProfilesBatch,
-  getProjectRoles,
   publishDirectorSession,
-  syncPull,
+  remindDirectorSessionMissingAvailability,
   type DirectorSessionParticipant,
-  type TeamProfile,
-} from "../../sync/api";
+} from "../../sync/api/director-sessions";
+import { syncPull } from "../../sync/api/entity-sync";
+import { getProfilesBatch, type TeamProfile } from "../../sync/api/profile";
+import { getProjectRoles } from "../../sync/api/projects";
 import "../rehearsals/style.css";
 import {
   getEmailsPlannedForDirectorSlot,
@@ -357,6 +357,11 @@ export function DirectorSessionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [sendingAvailabilityReminders, setSendingAvailabilityReminders] =
+    useState(false);
+  const [availabilityReminderMessage, setAvailabilityReminderMessage] = useState<
+    string | null
+  >(null);
 
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
   /** Любой PUT без publishedAt в payload не должен «снимать» публикацию в UI; сервер уже мержит, клиент тоже. */
@@ -1308,6 +1313,28 @@ export function DirectorSessionsPage() {
     selfEmailNorm,
   ]);
 
+  const sessionMissingAvailabilityEmails = useMemo(() => {
+    if (!activeSession || !sessionDateKey) return [] as string[];
+    const source = new Set<string>();
+    for (const email of activeSession.plannedEmails ?? []) {
+      const normalized = normalizeEmail(String(email ?? ""));
+      if (normalized) source.add(normalized);
+    }
+    sessionPickedActorEmails.forEach((email) => source.add(email));
+    return Array.from(source).filter((email) => {
+      if (selfEmailNorm && email === selfEmailNorm) return false;
+      const profile = profilesByEmail.get(email);
+      return !profileHasSpecifiedAvailabilityForDate(profile, sessionDateKey);
+    });
+  }, [
+    activeSession,
+    activeSession?.plannedEmails,
+    sessionDateKey,
+    sessionPickedActorEmails,
+    profilesByEmail,
+    selfEmailNorm,
+  ]);
+
   /**
    * Список сессий: зелёный слот — кастинг готов и у каждого вызванного «явка на вызов»:
    * после публикации — participants.status === "present"; до публикации — явная отметка дня + «приду» (или JWT для себя).
@@ -1380,6 +1407,38 @@ export function DirectorSessionsPage() {
     () => slotInsights.find((x) => x.slotId === activeSlotId) ?? null,
     [slotInsights, activeSlotId],
   );
+
+  const sendAvailabilityReminders = async () => {
+    if (!accessToken || !activeSession) return;
+    setSendingAvailabilityReminders(true);
+    setAvailabilityReminderMessage(null);
+    setPublishError(null);
+    try {
+      const result = await remindDirectorSessionMissingAvailability(
+        accessToken,
+        activeSession.id,
+      );
+      const sent = Number(result?.sentCount ?? 0);
+      const total = Number(result?.totalWithoutAvailability ?? 0);
+      if (total === 0) {
+        setAvailabilityReminderMessage("У всех участников занятость уже отмечена.");
+      } else if (sent > 0) {
+        setAvailabilityReminderMessage(
+          `Отправлено напоминаний: ${sent} из ${total}.`,
+        );
+      } else {
+        setAvailabilityReminderMessage(
+          "Нет адресатов с Telegram ID: отправка не выполнена.",
+        );
+      }
+    } catch (e: any) {
+      setPublishError(
+        e?.response?.data?.message || e?.message || "Не удалось отправить напоминания",
+      );
+    } finally {
+      setSendingAvailabilityReminders(false);
+    }
+  };
 
   if (!accessToken) return <div className="rehearsals-muted">Нужно войти.</div>;
   if (loading) return <div className="rehearsals-muted">Загрузка сессий…</div>;
@@ -1673,6 +1732,9 @@ export function DirectorSessionsPage() {
                   {publishError && (
                     <div className="rehearsals-error">{publishError}</div>
                   )}
+                  {availabilityReminderMessage ? (
+                    <div className="rehearsals-muted">{availabilityReminderMessage}</div>
+                  ) : null}
 
                   <FormTextarea
                     rootClassName="form-textarea--section"
@@ -1699,6 +1761,19 @@ export function DirectorSessionsPage() {
                         : activeSessionPublished
                           ? "Обновить публикацию"
                           : "Опубликовать"}
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => void sendAvailabilityReminders()}
+                      disabled={
+                        sendingAvailabilityReminders ||
+                        sessionMissingAvailabilityEmails.length === 0
+                      }
+                      title="Отправить в Telegram напоминания актёрам без отметки занятости"
+                    >
+                      {sendingAvailabilityReminders
+                        ? "Отправляю…"
+                        : `Напомнить в Telegram (${sessionMissingAvailabilityEmails.length})`}
                     </Button>
 
                     <Button

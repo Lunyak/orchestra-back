@@ -2,7 +2,7 @@ import cn from "classnames";
 import { useMemo } from "react";
 import type { DirectorSlotRoleRehearsalPick } from "../../features/director-sessions/directorSessionsSync";
 import { LabeledCheckbox } from "../../shared/core/labeled-checkbox/LabeledCheckbox";
-import type { TeamProfile } from "../../sync/api";
+import type { TeamProfile } from "../../sync/api/profile";
 import "./SlotRoleRehearsalPicker.css";
 
 function normalizeEmail(v: string): string {

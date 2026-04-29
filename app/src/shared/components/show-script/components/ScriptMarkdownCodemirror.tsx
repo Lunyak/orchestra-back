@@ -29,7 +29,6 @@ export type ScriptMarkdownEditorHandle = {
   getDoc: () => string;
   getSelection: () => { from: number; to: number };
   setSelection: (anchor: number, head?: number) => void;
-  /** Replace full document and move caret (used for toolbar inserts). */
   applyDocument: (text: string, cursor: number) => void;
 };
 
@@ -48,6 +47,41 @@ type Props = {
   /** Клик по `[…](track:N)` / `[…](playlist:N)` в редакторе (числовой id). */
   onTrackLinkClick?: (trackId: number) => void;
 };
+
+/** Тема редактора: токены приложения, без gutter, active line без фона (чипы / inline-превью). */
+const scriptMarkdownCodemirrorTheme = EditorView.theme(
+  {
+    "&": {
+      height: "100%",
+      backgroundColor: "var(--color-bg-primary)",
+      color: "var(--color-text-primary)",
+    },
+    ".cm-scroller": {
+      fontFamily: "var(--font-family-script-body)",
+      fontSize: "14px",
+      lineHeight: "1.5",
+      minHeight: "280px",
+    },
+    ".cm-content": {
+      caretColor: "var(--color-text-primary)",
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+      overflowWrap: "break-word",
+    },
+    ".cm-line": {
+      padding: 0,
+    },
+    ".cm-cursor, .cm-dropCursor": {
+      borderLeftColor: "var(--color-text-primary)",
+    },
+    ".cm-activeLine": {
+      backgroundColor: "inherit",
+    },
+    ".cm-gutters": { display: "none" },
+    ".cm-placeholder": { color: "rgba(148,163,184,0.75)" },
+  },
+  { dark: true },
+);
 
 export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, Props>(
   function ScriptMarkdownCodemirror(
@@ -152,41 +186,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
               return true;
             },
           }),
-          EditorView.theme(
-            {
-              "&": {
-                height: "100%",
-                backgroundColor: "var(--color-bg-primary)",
-                color: "var(--color-text-primary)",
-              },
-              ".cm-scroller": {
-                fontFamily: "var(--font-family-script-body)",
-                fontSize: "14px",
-                lineHeight: "1.5",
-                minHeight: "280px",
-              },
-              ".cm-content": {
-                caretColor: "var(--color-text-primary)",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-              },
-              /* Сброс горизонтального padding строк из базовой темы CM (scoped class на корне редактора). */
-              ".cm-line": {
-                padding: 0,
-              },
-              ".cm-cursor, .cm-dropCursor": {
-                borderLeftColor: "var(--color-text-primary)",
-              },
-              /* Не менять font-size на всей строке: с чипами света / inline-превью ломается posAtCoords и выделение. */
-              ".cm-activeLine": {
-                backgroundColor: "inherit",
-              },
-              ".cm-gutters": { display: "none" },
-              ".cm-placeholder": { color: "rgba(148,163,184,0.75)" },
-            },
-            { dark: true },
-          ),
+          scriptMarkdownCodemirrorTheme,
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               onChangeRef.current(update.state.doc.toString());

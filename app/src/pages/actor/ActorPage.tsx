@@ -11,7 +11,12 @@ import { buildDialogueLines, normalizeRoleKey } from "../../features/actor-train
 import { WordOrderTrainer } from "../../features/actor-trainers/ui/WordOrderTrainer";
 import { DialogueSceneTrainer } from "../../features/actor-trainers/ui/DialogueSceneTrainer";
 import { VoiceDialogueTrainer } from "../../features/actor-trainers/ui/VoiceDialogueTrainer";
-import { getMyProfile, getProjectMembers, getProjectRoles, type ProjectRoleInfo } from "../../sync/api";
+import { getMyProfile } from "../../sync/api/profile";
+import {
+  getProjectMembers,
+  getProjectRoles,
+  type ProjectRoleInfo,
+} from "../../sync/api/projects";
 import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import {
   actorTrainerUiActions,

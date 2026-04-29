@@ -1,14 +1,14 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
+import { inviteToProject } from "../../../sync/api/projects";
 import {
   addTroupeMember,
   getMyTroupe,
-  inviteToProject,
   patchMyTroupeTitle,
   removeTroupeMember,
   type TroupeMemberItem,
   type TroupeSummary,
-} from "../../../sync/api";
+} from "../../../sync/api/troupe";
 
 function getAccessToken(getState: () => RootState): string | null {
   const fromState = getState().auth?.accessToken ?? null;

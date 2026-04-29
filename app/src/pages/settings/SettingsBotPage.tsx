@@ -12,7 +12,7 @@ import {
   sendTelegramBotTestMessage,
   updateTelegramBot,
   upsertBotVariable,
-} from "../../sync/api";
+} from "../../sync/api/telegram-bots";
 
 function looksLikeTelegramBotToken(token: string): boolean {
   const t = String(token ?? "").trim();

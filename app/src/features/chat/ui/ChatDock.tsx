@@ -7,14 +7,12 @@ import { disconnectChatSocket, getChatSocket } from "../../../realtime/chat-sock
 import {
   fetchChatConversations,
   fetchChatMessages,
-  getMyProfile,
-  getProfilesBatch,
   markChatConversationRead,
   postChatMessage,
   type ChatConversationItem,
   type ChatMessageItem,
-  type TeamProfile,
-} from "../../../sync/api";
+} from "../../../sync/api/chat";
+import { getMyProfile, getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
 import "./ChatDock.css";
 
 const CHAT_PAGE_SIZE = 20;

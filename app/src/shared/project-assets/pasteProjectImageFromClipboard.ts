@@ -1,5 +1,5 @@
 import { getDesktopApi } from "../platform/desktop-api";
-import { ensureProject } from "../../sync/api";
+import { ensureProject } from "../../sync/api/projects";
 
 type ClipboardLikeEvent = {
   clipboardData?: DataTransfer | null;

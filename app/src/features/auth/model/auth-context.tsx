@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { setupApiInterceptors } from "../../../sync/api";
+import { setupApiInterceptors } from "../../../sync/api/client";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
   authActions,

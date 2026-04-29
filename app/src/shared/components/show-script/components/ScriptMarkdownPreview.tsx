@@ -18,8 +18,8 @@ import {
   selectAnnotations,
   selectShowScriptMarkdownUi,
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
-import type { ActorAnnotation } from "../../../../sync/api";
-import { getPlayUrl } from "../../../../sync/api";
+import type { ActorAnnotation } from "../../../../sync/api/actor-notes";
+import { getPlayUrl } from "../../../../sync/api/files";
 import { getDesktopApi } from "../../../platform/desktop-api";
 import {
   httpUrlToImageFileName,

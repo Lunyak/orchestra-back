@@ -6,7 +6,7 @@ import {
   updateMyProfile,
   uploadMyAvatar,
   type MyProfile,
-} from "../../../sync/api";
+} from "../../../sync/api/profile";
 
 type AvailabilityStatus = "present" | "absent";
 type AvailabilityTimeRange = { from: string; to: string };

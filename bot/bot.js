@@ -38,7 +38,11 @@ function readJson(req) {
   });
 }
 
-function startHttpServer({ onPublishRehearsal, onPublishDirectorSession }) {
+function startHttpServer({
+  onPublishRehearsal,
+  onPublishDirectorSession,
+  onRemindDirectorSessionAvailability,
+}) {
   if (String(process.env.DISABLE_INTERNAL_HTTP || "").trim() === "1") {
     return;
   }
@@ -123,6 +127,59 @@ function startHttpServer({ onPublishRehearsal, onPublishDirectorSession }) {
           return;
         }
 
+        if (
+          url === "/internal/remind-director-session-availability" &&
+          method === "POST"
+        ) {
+          const secret = process.env.INTERNAL_API_SECRET;
+          const got = req.headers["x-internal-secret"];
+          if (!secret || String(got || "") !== String(secret)) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+            return;
+          }
+
+          const body = await readJson(req);
+          const projectId = String(body?.projectId || "").trim();
+          const sessionId = String(body?.sessionId || "").trim();
+          const recipients = Array.isArray(body?.recipients) ? body.recipients : [];
+          if (!projectId || !sessionId) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error: "projectId and sessionId are required",
+              }),
+            );
+            return;
+          }
+
+          try {
+            if (!onRemindDirectorSessionAvailability) {
+              throw new Error("director session reminders are not configured");
+            }
+            const result = await onRemindDirectorSessionAvailability(
+              projectId,
+              sessionId,
+              recipients,
+            );
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                ok: true,
+                sentCount: Number(result?.sentCount || 0),
+                failedCount: Number(result?.failedCount || 0),
+              }),
+            );
+          } catch (e) {
+            const msg = String(e?.message || e || "remind_failed");
+            console.error("remind-director-session-availability failed:", msg);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: msg }));
+          }
+          return;
+        }
+
         res.writeHead(404);
         res.end();
       } catch (e) {
@@ -175,6 +232,17 @@ class BotManager {
       onPublishDirectorSession: async (projectId, sessionId) => {
         await this.attendance.publishDirectorSessionFromBackend(projectId, sessionId);
       },
+      onRemindDirectorSessionAvailability: async (
+        projectId,
+        sessionId,
+        recipients,
+      ) => {
+        await this.attendance.remindDirectorSessionMissingAvailabilityFromBackend(
+          projectId,
+          sessionId,
+          recipients,
+        );
+      },
     });
     this._setupStartCommand();
     this._setupMenuHandler();
@@ -207,6 +275,21 @@ class BotManager {
               sessionId,
             );
             process.send?.({ requestId, ok: true, result: sent || null });
+            return;
+          }
+          if (msg.type === "remindDirectorSessionAvailability") {
+            const projectId = String(msg.projectId || "").trim();
+            const sessionId = String(msg.sessionId || "").trim();
+            const recipients = Array.isArray(msg.recipients) ? msg.recipients : [];
+            if (!projectId || !sessionId)
+              throw new Error("projectId and sessionId are required");
+            const out =
+              await this.attendance.remindDirectorSessionMissingAvailabilityFromBackend(
+                projectId,
+                sessionId,
+                recipients,
+              );
+            process.send?.({ requestId, ok: true, result: out || null });
             return;
           }
           process.send?.({ requestId, ok: false, error: "unknown_command" });

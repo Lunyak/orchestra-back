@@ -1,4 +1,8 @@
-import axios, { type AxiosError, type AxiosRequestConfig } from "axios";
+import axios, {
+  type AxiosError,
+  type AxiosRequestConfig,
+  isAxiosError,
+} from "axios";
 import { refreshToken } from "./auth";
 
 export type SyncOperation = "create" | "update" | "delete";
@@ -105,6 +109,34 @@ function notifyTokenRefreshed(token: string | null) {
   refreshQueue = [];
 }
 
+/**
+ * Сетевой сбой / таймаут / 5xx на /auth/refresh — сессию не рвём.
+ * 400/401/403 от сервера — refresh недействителен, чистим токены.
+ */
+function shouldInvalidateSessionOnRefreshError(error: unknown): boolean {
+  if (!isAxiosError(error)) {
+    return false;
+  }
+  if (
+    error.code === "ERR_NETWORK" ||
+    error.code === "ECONNABORTED" ||
+    error.code === "ERR_CANCELED"
+  ) {
+    return false;
+  }
+  if (!error.response) {
+    return false;
+  }
+  const status = error.response.status;
+  if (status >= 500 && status < 600) {
+    return false;
+  }
+  if (status === 408 || status === 429) {
+    return false;
+  }
+  return status === 400 || status === 401 || status === 403;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -156,8 +188,15 @@ api.interceptors.response.use(
       return api(originalConfig);
     } catch (e) {
       notifyTokenRefreshed(null);
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
+      if (shouldInvalidateSessionOnRefreshError(e)) {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+      } else if (typeof console !== "undefined" && console.warn) {
+        console.warn(
+          "[api] Refresh token request failed (session kept); will retry on next request",
+          e,
+        );
+      }
       return Promise.reject(e);
     } finally {
       isRefreshing = false;

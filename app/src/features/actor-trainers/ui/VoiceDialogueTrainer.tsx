@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ScriptStep } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
 import { tokenizeWords } from "../model/wordTokens";
-import { api } from "../../../sync/api";
+import { api } from "../../../sync/api/client";
 import { useProject } from "../../project";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { selectVoiceTrainerUi, voiceTrainerUiActions } from "../model/voiceTrainerUiSlice";

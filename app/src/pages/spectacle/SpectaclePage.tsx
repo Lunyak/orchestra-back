@@ -12,7 +12,7 @@ import { PlaylistSidebar } from "../../shared/components/playlist-sidebar/Playli
 import { ScriptStepsSidebar } from "../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
 import { CustomSelect } from "../../shared/core/custom-select/CustomSelect";
 import { ENABLE_3D_THEATER } from "../../shared/build-features";
-import { getMyProfile, type MyProfile } from "../../sync/api";
+import { getMyProfile, type MyProfile } from "../../sync/api/profile";
 
 const LightPlotPage = React.lazy(() =>
   import("../../shared/components/light-plot/LightPlotPage").then((m) => ({

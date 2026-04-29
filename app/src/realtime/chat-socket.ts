@@ -1,6 +1,6 @@
 import { io, type Socket } from "socket.io-client";
-import type { ChatMessageItem } from "../sync/api";
-import { getApiBaseUrl } from "../sync/api";
+import type { ChatMessageItem } from "../sync/api/chat";
+import { getApiBaseUrl } from "../sync/api/client";
 
 type ServerToClientEvents = {
   "chat-message": (payload: ChatMessageItem) => void;

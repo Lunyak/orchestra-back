@@ -6,7 +6,7 @@ import {
   removeProjectMember,
   updateProjectMemberRole,
   type ProjectMemberInfo,
-} from "../../../sync/api";
+} from "../../../sync/api/projects";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 

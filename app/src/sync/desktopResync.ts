@@ -1,4 +1,4 @@
-import { syncPull, syncPullScene } from "./api";
+import { syncPull, syncPullScene } from "./api/entity-sync";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "./desktopOutbox";
 

@@ -15,7 +15,7 @@ import {
 } from "../../features/role-workbook/model/roleWorkbookSlice";
 import { actorLabel, pickLatestWorkbookSnapshotForActor } from "../../features/role-workbook/model/roleWorkbookNote";
 import { extractRolePhrasesFromSteps } from "../../features/actor-trainers/model/rolePhrases";
-import { getPlayUrl, uploadProjectFile } from "../../sync/api";
+import { getPlayUrl, uploadProjectFile } from "../../sync/api/files";
 import "./style.css";
 
 function normalizeEmail(v: unknown): string {

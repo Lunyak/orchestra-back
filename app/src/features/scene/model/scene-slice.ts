@@ -3,7 +3,8 @@ import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import type { RootState } from "../../../shared/store/store";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { createId } from "../../../shared/utils/createId";
-import { ensureProject, uploadProjectFile } from "../../../sync/api";
+import { uploadProjectFile } from "../../../sync/api/files";
+import { ensureProject } from "../../../sync/api/projects";
 import type { PlaylistTrack } from "../../../shared/types/playlist";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 

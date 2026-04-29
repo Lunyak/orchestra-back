@@ -10,22 +10,23 @@ import { useScene } from "../../features/scene";
 import { useTeam } from "../../features/team";
 import { CalendarSection, type CalendarSectionState } from "../../shared/components/calendar/CalendarSection";
 import {
-  createRehearsal,
   getMyProfile,
   getProfilesBatch,
-  getProjectRoles,
+  type MyProfile,
+  type TeamProfile,
+} from "../../sync/api/profile";
+import { getProjectRoles, type ProjectRoleInfo } from "../../sync/api/projects";
+import {
+  createRehearsal,
   getRehearsal,
   getRehearsalSteps,
   listRehearsals,
   planRehearsal,
   publishRehearsal,
   updateRehearsal,
-  type MyProfile,
-  type ProjectRoleInfo,
   type Rehearsal,
   type RehearsalSelectedStep,
-  type TeamProfile,
-} from "../../sync/api";
+} from "../../sync/api/rehearsals";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import "./style.css";
 

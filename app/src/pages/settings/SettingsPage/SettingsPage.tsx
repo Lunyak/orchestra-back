@@ -19,7 +19,7 @@ import {
   setConfirmBeforeRemoteScenePull,
   setPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
-import { getProfilesBatch, type TeamProfile } from "../../../sync/api";
+import { getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
 import "./style.css";
 
 export function SettingsPage() {

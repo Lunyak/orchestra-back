@@ -1300,6 +1300,53 @@ class AttendanceService {
     return sent;
   }
 
+  async remindDirectorSessionMissingAvailabilityFromBackend(
+    projectId,
+    sessionId,
+    recipients,
+  ) {
+    const list = Array.isArray(recipients) ? recipients.slice(0, 500) : [];
+    if (list.length === 0) {
+      return { ok: true, sentCount: 0, failedCount: 0 };
+    }
+
+    const session = await orchestraBotApi
+      .getDirectorSession(projectId, sessionId)
+      .catch(() => null);
+    const sessionTitle = String(session?.title || "Сессия").trim() || "Сессия";
+    const startsAt = session?.startsAt ? formatRuDateTime(session.startsAt) : "";
+    const baseText = [
+      `Напоминание по сессии «${sessionTitle}».`,
+      startsAt ? `Дата: ${startsAt}.` : "",
+      "Пожалуйста, зайдите в профиль и отметьте занятость на этот день.",
+      "Команда: /profile",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    let sentCount = 0;
+    let failedCount = 0;
+    for (const item of list) {
+      const telegramId = String(item?.telegramId || "").trim();
+      if (!telegramId) {
+        failedCount += 1;
+        continue;
+      }
+      try {
+        await this.bot.telegram.sendMessage(telegramId, baseText);
+        sentCount += 1;
+      } catch (e) {
+        failedCount += 1;
+        console.error(
+          "remindDirectorSessionMissingAvailabilityFromBackend failed:",
+          telegramId,
+          e?.message || e,
+        );
+      }
+    }
+    return { ok: true, sentCount, failedCount };
+  }
+
   _buildDirectorSessionText(session) {
     const title = escapeHtml(session?.title || "Сессия");
     const startsAt = session?.startsAt ? formatRuDateTime(session.startsAt) : "";

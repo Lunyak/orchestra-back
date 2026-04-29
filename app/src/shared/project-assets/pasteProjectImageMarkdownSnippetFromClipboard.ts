@@ -3,7 +3,8 @@ import type {
   PasteProjectImageFromClipboardResult,
 } from "./pasteProjectImageFromClipboard";
 import { pasteProjectImageFromClipboard } from "./pasteProjectImageFromClipboard";
-import { ensureProject, uploadProjectFile } from "../../sync/api";
+import { uploadProjectFile } from "../../sync/api/files";
+import { ensureProject } from "../../sync/api/projects";
 
 export async function pasteProjectImageMarkdownSnippetFromClipboard(
   event: { clipboardData?: DataTransfer | null; preventDefault: () => void },

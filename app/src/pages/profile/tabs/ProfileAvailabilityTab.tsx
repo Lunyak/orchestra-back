@@ -23,7 +23,7 @@ import {
   selectAvailabilitySessionsForActiveRange,
   selectProfileCalendarState,
 } from "../../../features/profile/model/profileAvailabilitySlice";
-import type { DirectorSession } from "../../../sync/api";
+import type { DirectorSession } from "../../../sync/api/director-sessions";
 import { DirectorSessionDetailModal } from "../../../features/director-session-detail/DirectorSessionDetailModal";
 
 dayjs.extend(isoWeek);

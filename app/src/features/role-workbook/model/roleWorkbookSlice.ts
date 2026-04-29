@@ -1,18 +1,16 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
+import { getMyProfile, getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
 import {
   addProjectRoleNote,
   cleanupProjectImages,
-  getMyProfile,
-  getMyTroupe,
-  getProfilesBatch,
   getProjectMembers,
   getProjectRoleNotes,
   getProjectRoles,
   type ProjectRoleInfo,
   type RoleNoteItem,
-  type TeamProfile,
-} from "../../../sync/api";
+} from "../../../sync/api/projects";
+import { getMyTroupe } from "../../../sync/api/troupe";
 import {
   encodeDirectorRefsNoteContent,
   encodeRoleWorkbookNoteContent,

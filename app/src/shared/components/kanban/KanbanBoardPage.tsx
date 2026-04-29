@@ -5,13 +5,12 @@ import type { KanbanStepRolesAdminMember } from "../../../features/kanban-step-m
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
 import type { ScriptStep } from "../../types/script";
+import { getMyTroupe, type TroupeMemberItem } from "../../../sync/api/troupe";
 import {
-  getMyTroupe,
   getProjectMembers,
   getProjectRoles,
   type ProjectRoleInfo,
-  type TroupeMemberItem,
-} from "../../../sync/api";
+} from "../../../sync/api/projects";
 import "./style.css";
 import { Button } from "@shared/core/button/Button";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";

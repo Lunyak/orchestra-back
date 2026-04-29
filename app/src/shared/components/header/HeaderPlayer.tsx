@@ -5,7 +5,7 @@ import {
   setSoundIcon,
   uploadSceneSoundsWeb,
 } from "../../../features/scene/model/scene-slice";
-import { ensureProject } from "../../../sync/api";
+import { ensureProject } from "../../../sync/api/projects";
 import { getDesktopApi } from "../../platform/desktop-api";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import "./style.css";

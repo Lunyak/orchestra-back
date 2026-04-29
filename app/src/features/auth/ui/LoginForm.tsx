@@ -2,7 +2,7 @@ import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getApiBaseUrl } from "../../../sync/api";
+import { getApiBaseUrl } from "../../../sync/api/client";
 import { forgotPassword } from "../../../sync/auth";
 import { useAuth } from "../model/auth-context";
 

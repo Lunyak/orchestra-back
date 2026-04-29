@@ -1,5 +1,5 @@
 import { io, type Socket } from "socket.io-client";
-import { getApiBaseUrl } from "../sync/api";
+import { getApiBaseUrl } from "../sync/api/client";
 
 type ServerToClientEvents = {
   "scene-updated": (payload: { projectId?: string; sourceClientId?: string | null }) => void;

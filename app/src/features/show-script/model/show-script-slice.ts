@@ -3,7 +3,7 @@ import type { RootState } from "../../../shared/store/store";
 import {
   getActorStepNote,
   upsertActorStepNote,
-} from "../../../sync/api";
+} from "../../../sync/api/actor-notes";
 
 type CacheKey = string;
 

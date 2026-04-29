@@ -4,7 +4,12 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { Button } from "@shared/core/button/Button";
 import { useAuth } from "../../features/auth";
-import { getRehearsal, getMyRehearsalComment, upsertMyRehearsalComment, type Rehearsal } from "../../sync/api";
+import {
+  getRehearsal,
+  getMyRehearsalComment,
+  upsertMyRehearsalComment,
+  type Rehearsal,
+} from "../../sync/api/rehearsals";
 
 dayjs.locale("ru");
 

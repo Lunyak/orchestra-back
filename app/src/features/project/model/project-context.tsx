@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
-import { ensureProject, fetchProjects, syncPush } from "../../../sync/api";
+import { syncPush } from "../../../sync/api/entity-sync";
+import { ensureProject, fetchProjects } from "../../../sync/api/projects";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
 import { createId } from "../../../shared/utils/createId";
 import { useAuth } from "../../auth/model/auth-context";

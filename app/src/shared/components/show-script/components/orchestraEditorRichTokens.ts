@@ -13,7 +13,7 @@ import {
   WidgetType,
   type ViewUpdate,
 } from "@codemirror/view";
-import { getPlayUrl } from "../../../../sync/api";
+import { getPlayUrl } from "../../../../sync/api/files";
 import {
   formatSpeakerLabelDisplay,
   getReadableTextColor,

@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import { getProjectRoles, type ProjectRoleInfo } from "../../../sync/api";
+import { getProjectRoles, type ProjectRoleInfo } from "../../../sync/api/projects";
 
 export type ProfileRolesState = {
   roles: ProjectRoleInfo[];

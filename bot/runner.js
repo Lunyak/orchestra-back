@@ -142,7 +142,8 @@ class BotRunner {
 
           if (
             url !== "/internal/publish-rehearsal" &&
-            url !== "/internal/publish-director-session"
+            url !== "/internal/publish-director-session" &&
+            url !== "/internal/remind-director-session-availability"
           ) {
             res.writeHead(404);
             res.end();
@@ -199,6 +200,31 @@ class BotRunner {
               type: "publishDirectorSession",
               projectId,
               sessionId,
+            });
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true, result: out || null }));
+            return;
+          }
+
+          if (url === "/internal/remind-director-session-availability") {
+            const projectId = String(body?.projectId || "").trim();
+            const sessionId = String(body?.sessionId || "").trim();
+            const recipients = Array.isArray(body?.recipients) ? body.recipients : [];
+            if (!projectId || !sessionId) {
+              res.writeHead(400, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  ok: false,
+                  error: "projectId and sessionId are required",
+                }),
+              );
+              return;
+            }
+            const out = await this.callChild(integrationId, {
+              type: "remindDirectorSessionAvailability",
+              projectId,
+              sessionId,
+              recipients,
             });
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, result: out || null }));

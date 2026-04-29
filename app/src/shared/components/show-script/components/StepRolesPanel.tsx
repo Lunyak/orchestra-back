@@ -8,7 +8,7 @@ import {
   fetchProjectRolesThunk,
   selectProjectRoles,
 } from "../../../../features/profile/model/profileRolesSlice";
-import type { ProjectRoleInfo } from "../../../../sync/api";
+import type { ProjectRoleInfo } from "../../../../sync/api/projects";
 import type { SceneData, SceneRolesDataV1, SceneRoleLinkV1 } from "../../../../features/scene";
 import type { ScriptStep } from "../../../types/script";
 

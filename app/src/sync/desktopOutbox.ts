@@ -1,4 +1,6 @@
-import { ensureProject, syncPush, type SyncChange } from "./api";
+import { syncPush } from "./api/entity-sync";
+import type { SyncChange } from "./api/types/sync";
+import { ensureProject } from "./api/projects";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { createId } from "../shared/utils/createId";
 

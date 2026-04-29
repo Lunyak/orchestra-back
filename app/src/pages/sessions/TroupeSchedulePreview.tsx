@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { Fragment, useMemo } from "react";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
-import type { TeamProfile } from "../../sync/api";
+import type { TeamProfile } from "../../sync/api/profile";
 import "./TroupeSchedulePreview.css";
 
 dayjs.locale("ru");

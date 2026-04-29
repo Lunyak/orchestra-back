@@ -1,11 +1,10 @@
 import {
-  ensureProject,
   getDirectorSessions,
-  getMyProfile,
   replaceDirectorSessions,
   type DirectorSessionParticipant,
-  type MyProfile,
-} from "../../sync/api";
+} from "../../sync/api/director-sessions";
+import { ensureProject } from "../../sync/api/projects";
+import { getMyProfile, type MyProfile } from "../../sync/api/profile";
 
 export type DirectorSlotRef = {
   projectSlug: string;

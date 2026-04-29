@@ -12,7 +12,7 @@ import { InlineTextField } from "../../shared/core/inline-text-field/InlineTextF
 import { Modal } from "../../shared/core/modal/Modal";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import type { ScriptStep } from "../../shared/types/script";
-import type { ProjectRoleInfo } from "../../sync/api";
+import type { ProjectRoleInfo } from "../../sync/api/projects";
 import "./KanbanStepDetailModal.css";
 import {
   KanbanStepRolesAdminPanel,

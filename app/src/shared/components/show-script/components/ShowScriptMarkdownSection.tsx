@@ -20,7 +20,8 @@ import {
   showScriptMarkdownActions,
   updateAnnotation,
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
-import { ensureProject, uploadProjectFile } from "../../../../sync/api";
+import { ensureProject } from "../../../../sync/api/projects";
+import { uploadProjectFile } from "../../../../sync/api/files";
 import { pasteProjectImageMarkdownSnippetFromClipboard } from "../../../project-assets/pasteProjectImageMarkdownSnippetFromClipboard";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptStep } from "../../../types/script";

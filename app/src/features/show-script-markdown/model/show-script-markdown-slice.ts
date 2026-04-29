@@ -14,7 +14,7 @@ import {
   updateActorAnnotation,
   type ActorAnnotation,
   type ActorAnnotationField,
-} from "../../../sync/api";
+} from "../../../sync/api/actor-notes";
 
 type CacheKey = string;
 type SceneKey = string;

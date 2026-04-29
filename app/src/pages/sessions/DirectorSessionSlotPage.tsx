@@ -14,14 +14,10 @@ import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import type { SceneRolesDataV1 } from "../../features/scene";
 import type { ScriptStep } from "../../shared/types/script";
 import { markdownToPlainText } from "../../shared/utils/textPreview";
-import {
-  getProfilesBatch,
-  getProjectMembers,
-  getProjectRoles,
-  syncPull,
-  type SyncPullResponse,
-  type TeamProfile,
-} from "../../sync/api";
+import { syncPull } from "../../sync/api/entity-sync";
+import type { SyncPullResponse } from "../../sync/api/types/sync";
+import { getProfilesBatch, type TeamProfile } from "../../sync/api/profile";
+import { getProjectMembers, getProjectRoles } from "../../sync/api/projects";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import { SlotRoleRehearsalPicker } from "./SlotRoleRehearsalPicker";

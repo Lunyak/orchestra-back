@@ -7,7 +7,7 @@ import {
   pruneSceneImages,
   storageKeyToImageBasename,
 } from "../shared/utils/markdownImages";
-import { getPlayUrl } from "./api";
+import { getPlayUrl } from "./api/files";
 
 function isHttpUrl(u: string | undefined | null): boolean {
   return Boolean(u && /^https?:\/\//i.test(String(u).trim()));

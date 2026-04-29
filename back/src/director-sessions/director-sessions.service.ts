@@ -148,6 +148,36 @@ function getDateKey(dateIso: string): string {
   return `${p.yyyy}-${p.mm}-${p.dd}`;
 }
 
+function parseTimeHHMM(src: string): number | null {
+  const s = String(src ?? '').trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
+  return hh * 60 + mm;
+}
+
+function profileHasSpecifiedAvailabilityForDate(
+  profile: any,
+  dateKey: string,
+): boolean {
+  if (!profile || !dateKey) return false;
+  const day = profile?.availabilityCalendar?.[dateKey];
+  if (day === 'present' || day === 'absent') return true;
+  const ranges = profile?.availabilityTimeRanges?.[dateKey];
+  if (!Array.isArray(ranges) || ranges.length === 0) return false;
+  for (const item of ranges.slice(0, 20)) {
+    const fromMin = parseTimeHHMM(String(item?.from ?? ''));
+    const toMin = parseTimeHHMM(String(item?.to ?? ''));
+    if (fromMin == null || toMin == null) continue;
+    if (fromMin >= toMin) continue;
+    return true;
+  }
+  return false;
+}
+
 function normalizeRoleKey(v: string): string {
   return String(v ?? '')
     .trim()
@@ -747,89 +777,12 @@ export class DirectorSessionsService {
     userId: string,
     session: DirectorRehearsalSession,
   ): Promise<DirectorSessionParticipant[]> {
+    const needed = await this.collectNeededEmailsForSession(userId, session);
     const dateKey = getDateKey(session.startsAt);
     if (!dateKey) throw new BadRequestException('Invalid session startsAt');
 
-    const refs = (session.slots ?? [])
-      .map((s) => s.ref)
-      .filter(Boolean) as DirectorSlotRef[];
-    const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(
-      Boolean,
-    );
-    if (slugs.length === 0) {
-      throw new BadRequestException(
-        'Перед публикацией выберите материалы (слоты)',
-      );
-    }
-
-    // gather needed emails from RoleAssignments per project
-    const neededEmails = new Set<string>();
-    const allowedEmails = new Set<string>();
-
-    // allowed: only people from my troupe (primary list for scheduling)
-    const troupe = await this.prisma.troupe.findUnique({
-      where: { ownerUserId: userId },
-      select: { id: true },
-    });
-    if (troupe?.id) {
-      const troupeMembers = await this.prisma.troupeMember.findMany({
-        where: { troupeId: troupe.id },
-        select: { email: true },
-      });
-      troupeMembers
-        .map((m) => normEmail(m.email))
-        .filter(Boolean)
-        .forEach((e) => allowedEmails.add(e));
-    }
-
-    for (const slug of slugs) {
-      const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
-
-      const { steps, sceneRoles } = await this.loadProjectScriptData(
-        project.id,
-      );
-      const stepById = new Map<number, RawStepLike>();
-      steps.forEach((st) => {
-        if (typeof st?.id === 'number') stepById.set(st.id, st);
-      });
-
-      const slotRefs = refs.filter((r) => r.projectSlug === slug);
-      for (const ref of slotRefs) {
-        const step = stepById.get(ref.stepId);
-        const attachedKeys = extractRoleKeysFromSceneRoles(
-          sceneRoles,
-          ref.stepId,
-        );
-        const roleKeys =
-          attachedKeys.length > 0
-            ? attachedKeys
-            : extractRolesSmart(
-                String(step?.playMarkdown ?? step?.markdown ?? ''),
-              )
-                .map((r) => normalizeRoleKey(r))
-                .filter(Boolean);
-        const assignmentMap = await this.roles.resolveAssignmentsByRoleKeys(
-          project.id,
-          roleKeys,
-        );
-        for (const k of roleKeys) {
-          const emails = assignmentMap.get(k) ?? [];
-          for (const e of emails) neededEmails.add(normEmail(e));
-        }
-      }
-    }
-
-    const effectiveNeeded = Array.from(neededEmails).filter((e) =>
-      allowedEmails.size > 0 ? allowedEmails.has(normEmail(e)) : true,
-    );
-    if (effectiveNeeded.length === 0) {
-      throw new BadRequestException(
-        `Нельзя опубликовать сессию: не нашли emails актёров по roleAssignments (или нет доступа к ним)`,
-      );
-    }
-
     const profiles = await this.prisma.userProfile.findMany({
-      where: { email: { in: effectiveNeeded } },
+      where: { email: { in: needed } },
       select: {
         email: true,
         availabilityCalendar: true,
@@ -889,6 +842,194 @@ export class DirectorSessionsService {
       );
     }
     return merged;
+  }
+
+  private async collectNeededEmailsForSession(
+    userId: string,
+    session: DirectorRehearsalSession,
+  ): Promise<string[]> {
+    const refs = (session.slots ?? [])
+      .map((s) => s.ref)
+      .filter(Boolean) as DirectorSlotRef[];
+    const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(
+      Boolean,
+    );
+    if (slugs.length === 0) {
+      throw new BadRequestException(
+        'Перед публикацией выберите материалы (слоты)',
+      );
+    }
+
+    const neededEmails = new Set<string>();
+    const allowedEmails = new Set<string>();
+
+    const troupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+      select: { id: true },
+    });
+    if (troupe?.id) {
+      const troupeMembers = await this.prisma.troupeMember.findMany({
+        where: { troupeId: troupe.id },
+        select: { email: true },
+      });
+      troupeMembers
+        .map((m) => normEmail(m.email))
+        .filter(Boolean)
+        .forEach((e) => allowedEmails.add(e));
+    }
+
+    for (const slug of slugs) {
+      const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
+      const { steps, sceneRoles } = await this.loadProjectScriptData(project.id);
+      const stepById = new Map<number, RawStepLike>();
+      steps.forEach((st) => {
+        if (typeof st?.id === 'number') stepById.set(st.id, st);
+      });
+
+      const slotRefs = refs.filter((r) => r.projectSlug === slug);
+      for (const ref of slotRefs) {
+        const step = stepById.get(ref.stepId);
+        const attachedKeys = extractRoleKeysFromSceneRoles(
+          sceneRoles,
+          ref.stepId,
+        );
+        const roleKeys =
+          attachedKeys.length > 0
+            ? attachedKeys
+            : extractRolesSmart(
+                String(step?.playMarkdown ?? step?.markdown ?? ''),
+              )
+                .map((r) => normalizeRoleKey(r))
+                .filter(Boolean);
+        const assignmentMap = await this.roles.resolveAssignmentsByRoleKeys(
+          project.id,
+          roleKeys,
+        );
+        for (const key of roleKeys) {
+          const emails = assignmentMap.get(key) ?? [];
+          for (const email of emails) neededEmails.add(normEmail(email));
+        }
+      }
+    }
+
+    const filtered = Array.from(neededEmails).filter((email) =>
+      allowedEmails.size > 0 ? allowedEmails.has(normEmail(email)) : true,
+    );
+    if (filtered.length === 0) {
+      throw new BadRequestException(
+        `Нельзя опубликовать сессию: не нашли emails актёров по roleAssignments (или нет доступа к ним)`,
+      );
+    }
+    return filtered;
+  }
+
+  async remindMissingAvailability(userId: string, sessionId: string) {
+    const sid = String(sessionId ?? '').trim();
+    if (!sid) throw new BadRequestException('session id is required');
+    const directorProject = await this.getDirectorProjectForUser(userId);
+    const row = await this.getSessionRow(directorProject.id, sid);
+    const session = row?.payload as any as DirectorRehearsalSession | undefined;
+    if (!session) throw new NotFoundException('Session not found');
+
+    const dateKey = getDateKey(session.startsAt);
+    if (!dateKey) throw new BadRequestException('Invalid session startsAt');
+
+    const neededEmails = await this.collectNeededEmailsForSession(userId, session);
+    const profiles = await this.prisma.userProfile.findMany({
+      where: { email: { in: neededEmails } },
+      select: {
+        email: true,
+        telegramId: true,
+        displayName: true,
+        firstName: true,
+        lastName: true,
+        availabilityCalendar: true,
+        availabilityTimeRanges: true,
+      },
+    });
+    const profileByEmail = new Map<string, any>();
+    for (const profile of profiles) {
+      const email = normEmail(String(profile?.email ?? ''));
+      if (email) profileByEmail.set(email, profile);
+    }
+
+    const recipients: Array<{ telegramId: string; email: string; name?: string }> = [];
+    let totalWithoutAvailability = 0;
+    for (const email of neededEmails) {
+      const profile = profileByEmail.get(normEmail(email));
+      if (profileHasSpecifiedAvailabilityForDate(profile, dateKey)) continue;
+      totalWithoutAvailability += 1;
+      const telegramId = String(profile?.telegramId ?? '').trim();
+      if (!telegramId) continue;
+      const name =
+        String(profile?.displayName ?? '').trim() ||
+        [profile?.firstName, profile?.lastName]
+          .map((v) => String(v ?? '').trim())
+          .filter(Boolean)
+          .join(' ')
+          .trim() ||
+        undefined;
+      recipients.push({ telegramId, email, name });
+    }
+
+    if (recipients.length === 0) {
+      return {
+        ok: true,
+        sentCount: 0,
+        skippedCount: totalWithoutAvailability,
+        totalWithoutAvailability,
+      };
+    }
+
+    const botUrl =
+      this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
+    const secret = String(this.config.get<string>('INTERNAL_API_SECRET') ?? '').trim();
+    if (!secret) {
+      throw new BadRequestException('INTERNAL_API_SECRET is not configured');
+    }
+    const pref = await this.prisma.projectTelegramBotPreference.findUnique({
+      where: { projectId_userId: { projectId: directorProject.id, userId } },
+      select: { botIntegrationId: true },
+    });
+    const botIntegrationId =
+      String(pref?.botIntegrationId ?? '').trim() ||
+      String(
+        (
+          await this.prisma.telegramBotIntegration.findFirst({
+            where: { ownerUserId: userId, status: 'connected' },
+            select: { id: true },
+            orderBy: { createdAt: 'desc' },
+          })
+        )?.id ?? '',
+      ).trim();
+    if (!botIntegrationId) {
+      throw new BadRequestException('Не найден подключенный Telegram-бот');
+    }
+
+    const url = `${botUrl.replace(/\/$/, '')}/internal/remind-director-session-availability`;
+    const payload = {
+      projectId: directorProject.id,
+      sessionId: sid,
+      botIntegrationId,
+      recipients,
+    };
+    const headers = { 'X-Internal-Secret': secret };
+
+    let sentCount = 0;
+    try {
+      const res = await axios.post(url, payload, { headers });
+      sentCount = Number(res?.data?.sentCount ?? 0) || 0;
+    } catch (e) {
+      const msg = String((e as any)?.message ?? 'Failed to send reminders');
+      throw new BadRequestException(msg);
+    }
+
+    return {
+      ok: true,
+      sentCount,
+      skippedCount: Math.max(0, totalWithoutAvailability - sentCount),
+      totalWithoutAvailability,
+    };
   }
 
   async publish(

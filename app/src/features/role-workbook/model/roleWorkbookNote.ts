@@ -1,4 +1,5 @@
-import type { RoleNoteItem, TeamProfile } from "../../../sync/api";
+import type { TeamProfile } from "../../../sync/api/profile";
+import type { RoleNoteItem } from "../../../sync/api/projects";
 
 export const ROLE_WORKBOOK_MARKER = "[[ROLE_WORKBOOK_V1]]";
 export const ROLE_DIRECTOR_REFS_MARKER = "[[ROLE_DIRECTOR_REFS_V1]]";

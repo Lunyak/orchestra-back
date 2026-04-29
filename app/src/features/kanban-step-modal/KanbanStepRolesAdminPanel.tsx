@@ -10,7 +10,7 @@ import {
   getProjectRoles,
   setProjectRoleAssignments,
   type ProjectRoleInfo,
-} from "../../sync/api";
+} from "../../sync/api/projects";
 import "./KanbanStepRolesAdminPanel.css";
 
 export type KanbanStepRolesAdminMember = {

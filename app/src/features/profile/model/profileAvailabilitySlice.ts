@@ -5,7 +5,7 @@ import {
   getDirectorSessionInvitations,
   getDirectorSessions,
   type DirectorSession,
-} from "../../../sync/api";
+} from "../../../sync/api/director-sessions";
 import dayjs from "dayjs";
 
 export type CalendarSectionState = {

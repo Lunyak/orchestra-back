@@ -1,4 +1,4 @@
-import type { ActorAnnotation } from "../../../../sync/api";
+import type { ActorAnnotation } from "../../../../sync/api/actor-notes";
 
 export type HastNode =
   | { type: "root"; children?: HastNode[] }

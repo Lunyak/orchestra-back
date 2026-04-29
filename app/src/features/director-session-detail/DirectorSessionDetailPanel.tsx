@@ -10,14 +10,12 @@ import {
   confirmMyDirectorSessionAttendance,
   declineMyDirectorSessionAttendance,
   getDirectorSession,
-  getMyProfile,
-  getProfilesBatch,
-  syncPull,
   type DirectorSessionParticipant,
   type DirectorSessionParticipantStatus,
-  type SyncPullResponse,
-  type TeamProfile,
-} from "../../sync/api";
+} from "../../sync/api/director-sessions";
+import { syncPull } from "../../sync/api/entity-sync";
+import type { SyncPullResponse } from "../../sync/api/types/sync";
+import { getMyProfile, getProfilesBatch, type TeamProfile } from "../../sync/api/profile";
 import type { ScriptStep } from "../../shared/types/script";
 import { MiniAvatar } from "../../shared/core/mini-avatar/MiniAvatar";
 import { Button } from "@shared/core/button/Button";
