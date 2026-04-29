@@ -97,7 +97,7 @@ export function ScriptMarkdownToolbar({
               aria-pressed={editorToggles.tocEnabled}
               data-active={editorToggles.tocEnabled ? "true" : "false"}
             >
-              &#127183;
+              &#129526;
             </Button>
           ) : null}
           <Button

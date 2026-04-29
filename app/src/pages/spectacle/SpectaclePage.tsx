@@ -10,6 +10,7 @@ import { useTeam } from "../../features/team";
 import { HeaderPlayer } from "../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
+import { CustomSelect } from "../../shared/core/custom-select/CustomSelect";
 import { ENABLE_3D_THEATER } from "../../shared/build-features";
 import { getMyProfile, type MyProfile } from "../../sync/api";
 
@@ -50,30 +51,23 @@ function SpectacleProjectPicker({
   onProjectChange,
 }: SpectacleProjectPickerProps) {
   const hasProjects = projects.length > 0;
+  const projectSelectPlaceholder = "Выберите проект";
+  const projectSelectOptions = projects.map((slug) => ({ value: slug, label: slug }));
 
   return (
     <div className="spectacle-project-bar">
       <label className="spectacle-project-field">
         <span className="spectacle-project-field-label">Проект</span>
-        <select
-          className="spectacle-project-select"
+        <CustomSelect
           value={hasProjects ? projectName : ""}
-          onChange={(e) => onProjectChange(e.target.value)}
+          options={projectSelectOptions}
+          onChange={(nextValue) => onProjectChange(nextValue)}
+          placeholder={projectSelectPlaceholder}
+          noOptionsLabel="Проектов нет"
+          triggerClassName="spectacle-project-select"
           disabled={!hasProjects || projectsLoading}
           aria-label="Текущий проект"
-        >
-          {!hasProjects ? <option value="">Проектов нет</option> : null}
-          {hasProjects && !projectName ? (
-            <option value="" disabled>
-              Выберите проект
-            </option>
-          ) : null}
-          {projects.map((slug) => (
-            <option key={slug} value={slug}>
-              {slug}
-            </option>
-          ))}
-        </select>
+        />
       </label>
     </div>
   );

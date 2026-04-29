@@ -4,6 +4,10 @@ import {
   statusOf,
   type KanbanStatus,
 } from "../../shared/components/kanban/kanban-constants";
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from "../../shared/core/custom-select/CustomSelect";
 import { InlineTextField } from "../../shared/core/inline-text-field/InlineTextField";
 import { Modal } from "../../shared/core/modal/Modal";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
@@ -102,6 +106,10 @@ export function KanbanStepDetailModal({
   onProjectRolesUpdated,
 }: KanbanStepDetailModalProps) {
   const [tab, setTab] = useState<ModalTab>("info");
+  const statusSelectOptions: CustomSelectOption[] = STATUSES.map((statusItem) => ({
+    value: statusItem.id,
+    label: statusItem.label,
+  }));
 
   useEffect(() => {
     setTab("info");
@@ -166,19 +174,14 @@ export function KanbanStepDetailModal({
             <div className="kanban-field__container">
               <label className="kanban-field">
                 <span className="kanban-field-label">Статус готовности</span>
-                <select
-                  className="native-select"
+                <CustomSelect
                   value={statusOf(step)}
-                  onChange={(e) =>
-                    setStepStatus(step.id, e.target.value as KanbanStatus)
+                  options={statusSelectOptions}
+                  onChange={(nextValue) =>
+                    setStepStatus(step.id, nextValue as KanbanStatus)
                   }
-                >
-                  {STATUSES.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
+                  aria-label="Статус готовности"
+                />
               </label>
 
               <label className="kanban-field">

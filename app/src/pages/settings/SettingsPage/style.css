@@ -14,11 +14,13 @@
     align-items: flex-start;
     margin: 0.5rem 0;
     line-height: 1.35;
+    display: flex !important;
 }
 
 .settings-sync-live-row input {
     margin-top: 0.2rem;
     flex-shrink: 0;
+   
 }
 
 .settings-main .settings-view {
@@ -36,6 +38,25 @@
 .settings-project-section h2 {
     margin-top: 0;
     margin-bottom: 0.75rem;
+}
+
+.settings-project-create {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.settings-project-create input {
+    flex: 1;
+    max-width: 320px;
+    padding: 4px 12px;
+    border: none;
+    background: var(--color-bg-quaternary);
+    color: #f1f5f9;
+}
+
+.settings-project-create input::placeholder {
+    color: #64748b;
 }
 
 .settings-view {

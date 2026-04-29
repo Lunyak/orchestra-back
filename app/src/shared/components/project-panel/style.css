@@ -7,16 +7,21 @@
   font-size: 12px;
 }
 
-.project-panel select {
+.project-panel .custom-select {
+  min-width: 180px;
+}
+
+.project-panel .custom-select__trigger {
   background: #1f2937;
   color: #e2e8f0;
   border: 1px solid #374151;
   padding: 4px 8px;
   height: 29.5px;
+  min-height: 29.5px;
   font-size: 12px;
 }
 
-.project-panel select:disabled {
+.project-panel .custom-select.disabled .custom-select__trigger {
   opacity: 0.6;
 }
 

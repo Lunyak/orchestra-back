@@ -8,7 +8,6 @@ import { useProject } from "../../../features/project";
 import { useTeam } from "../../../features/team";
 import { usePlatform } from "../../../PlatformContext";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
-import { ProjectPanel } from "../../../shared/components/project-panel/ProjectPanel";
 import { isOrchestraWebAppSubpath } from "../../../shared/settings/orchestraWebHost";
 import {
   getSpectaclePageLockEnabled,
@@ -28,11 +27,8 @@ export function SettingsPage() {
   const { accessToken, logout } = useAuth();
   const { onPushAllLocal, onResyncProject } = usePlatform();
   const {
-    projects,
     projectName,
-    onProjectChange,
     createProject,
-    deleteProject,
   } = useProject();
   const {
     projectMembers,
@@ -102,24 +98,11 @@ export function SettingsPage() {
     };
   }, [accessToken, memberEmails.join("|")]);
 
-  const handleProjectChange = (name: string) => {
-    onProjectChange(name);
-  };
-
   const handleCreateProject = async () => {
     const value = newProjectName.trim();
     if (!value) return;
     await createProject(value);
     setNewProjectName("");
-  };
-
-  const handleDeleteProject = async () => {
-    if (!projectName) return;
-    const confirmed = window.confirm(
-      `Удалить проект "${projectName}"? Это удалит все файлы проекта${accessToken ? " и на сервере" : ""}.`,
-    );
-    if (!confirmed) return;
-    await deleteProject(projectName);
   };
 
   const handlePushAllLocal = () => {
@@ -247,16 +230,23 @@ export function SettingsPage() {
               </section>
             )}
             <section className="settings-project-section">
-              <h2>Сменить проект</h2>
-              <ProjectPanel
-                projects={projects}
-                projectName={projectName}
-                newProjectName={newProjectName}
-                onProjectChange={handleProjectChange}
-                onNewProjectNameChange={setNewProjectName}
-                onCreateProject={handleCreateProject}
-                onDeleteProject={handleDeleteProject}
-              />
+              <h2>Создание проекта</h2>
+              <div className="settings-project-create">
+                <input
+                  type="text"
+                  value={newProjectName}
+                  onChange={(event) => setNewProjectName(event.target.value)}
+                  placeholder="Новый проект"
+                />
+                <Button
+                  type="button"
+                  className="primary"
+                  onClick={handleCreateProject}
+                  disabled={!newProjectName.trim()}
+                >
+                  Создать
+                </Button>
+              </div>
             </section>
 
             <section className="settings-project-section">

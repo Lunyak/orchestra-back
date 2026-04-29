@@ -1,0 +1,111 @@
+.custom-select {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+}
+
+.custom-select__trigger {
+  width: 100%;
+  min-height: var(--field-control-min-height);
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  border: 1px solid var(--field-control-border);
+  background: var(--field-control-bg-hover);
+  box-shadow: var(--field-control-inset);
+  color: var(--field-control-text);
+  font-family: var(--font-family-script-body);
+  font-size: var(--field-control-font-size);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.custom-select__trigger:hover {
+  background: var(--field-control-bg-hover);
+  border-color: var(--color-active-ascent);
+}
+
+.custom-select__trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-active-ascent);
+  box-shadow:
+    var(--field-control-inset),
+    0 0 0 2px var(--field-control-focus-ring);
+}
+
+.custom-select.disabled .custom-select__trigger {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.custom-select__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.custom-select__chevron {
+  font-size: 12px;
+  opacity: 0.85;
+  transition: transform 0.16s ease;
+}
+
+.custom-select.open .custom-select__chevron {
+  transform: rotate(180deg);
+}
+
+.custom-select__dropdown {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--field-control-border-hover);
+  background: var(--color-bg-primary);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+}
+
+.custom-select__option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-text-lighter);
+  text-align: left;
+  padding: 8px 10px;
+  font-family: var(--font-family-script-body);
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.custom-select__option:hover {
+  background: var(--color-active-ascent);
+  color: var(--color-text-dark);
+}
+
+.custom-select__option:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--color-bg-tertiary) 36%, var(--color-bg-primary));
+}
+
+.custom-select__option--selected {
+  background: var(--color-bg-quaternary);
+  color: var(--color-text-primary);
+}
+
+.custom-select__option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

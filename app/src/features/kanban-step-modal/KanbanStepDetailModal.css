@@ -187,7 +187,7 @@
   -moz-appearance: textfield;
 }
 
-.kanban-step-modal__body .kanban-field select.native-select {
+.kanban-step-modal__body .kanban-field .custom-select {
   width: 100%;
   max-width: 100%;
 }

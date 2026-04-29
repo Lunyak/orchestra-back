@@ -1,6 +1,7 @@
 import React from "react";
 import "./style.css";
 import { Button } from "@shared/core/button/Button";
+import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import { Buttons } from "../buttons/Buttons";
 
 interface ProjectPanelProps {
@@ -22,21 +23,22 @@ export const ProjectPanel: React.FC<ProjectPanelProps> = ({
   onCreateProject,
   onDeleteProject,
 }) => {
+  const projectOptions = projects.map((project) => ({
+    value: project,
+    label: project,
+  }));
+
   return (
     <div className="project-panel">
-      <select
+      <CustomSelect
         id="project-select"
         value={projectName}
-        onChange={(event) => onProjectChange(event.target.value)}
+        options={projectOptions}
+        onChange={onProjectChange}
+        placeholder="Выберите проект"
+        noOptionsLabel="Проектов нет"
         disabled={projects.length === 0}
-      >
-        {projects.length === 0 && <option value="">Проектов нет</option>}
-        {projects.map((project) => (
-          <option key={project} value={project}>
-            {project}
-          </option>
-        ))}
-      </select>
+      />
       <input
         type="text"
         value={newProjectName}

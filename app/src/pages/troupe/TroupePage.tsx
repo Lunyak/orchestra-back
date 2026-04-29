@@ -1,4 +1,8 @@
 import { Button } from "@shared/core/button/Button";
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from "@shared/core/custom-select/CustomSelect";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import cn from "classnames";
@@ -8,7 +12,6 @@ import {
   Fragment,
   useEffect,
   useMemo,
-  useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
@@ -138,8 +141,6 @@ export function TroupePage() {
   const [currentMonth, setCurrentMonth] = useState<Date>(() =>
     readStoredTroupeMonth(),
   );
-  const [isProjectSelectOpen, setIsProjectSelectOpen] = useState(false);
-  const projectSelectRef = useRef<HTMLDivElement | null>(null);
 
   const narrowLayout = useTroupeNarrowLayout();
 
@@ -180,16 +181,15 @@ export function TroupePage() {
     () => (Array.isArray(projects) ? projects : []).filter(Boolean),
     [projects],
   );
-  const hasAvailableProjects = availableProjects.length > 0;
-  const selectedProjectLabel = useMemo(() => {
-    if (!inviteProjectSlug) return "";
-    return inviteProjectSlug === projectName
-      ? `${inviteProjectSlug} (активный)`
-      : inviteProjectSlug;
-  }, [inviteProjectSlug, projectName]);
-  const projectSelectButtonLabel = hasAvailableProjects
-    ? selectedProjectLabel || "Выбрать проект"
-    : "Нет проектов";
+  const projectSelectOptions = useMemo<CustomSelectOption[]>(() => {
+    return availableProjects.map((projectSlug) => ({
+      value: projectSlug,
+      label:
+        projectSlug === projectName
+          ? `${projectSlug} (активный)`
+          : projectSlug,
+    }));
+  }, [availableProjects, projectName]);
 
   useEffect(() => {
     const preferred =
@@ -214,33 +214,6 @@ export function TroupePage() {
       // ignore
     }
   }, [inviteProjectSlug]);
-  useEffect(() => {
-    if (hasAvailableProjects) return;
-    setIsProjectSelectOpen(false);
-  }, [hasAvailableProjects]);
-  useEffect(() => {
-    if (!isProjectSelectOpen) return;
-    const onPointerDown = (event: MouseEvent | TouchEvent) => {
-      const root = projectSelectRef.current;
-      const target = event.target;
-      if (!root || !(target instanceof Node)) return;
-      if (root.contains(target)) return;
-      setIsProjectSelectOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setIsProjectSelectOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("touchstart", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("touchstart", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [isProjectSelectOpen]);
-
   const selectedMember = useMemo(
     () =>
       selectedMemberId
@@ -379,78 +352,16 @@ export function TroupePage() {
                   )}
                 </div>
                 <div className="troupe-actions-right">
-                  <div
-                    className={cn("troupe-project-select", {
-                      open: isProjectSelectOpen,
-                      disabled: !hasAvailableProjects,
-                    })}
-                    ref={projectSelectRef}
-                  >
-                    <button
-                      type="button"
-                      className="troupe-project-select__trigger"
-                      onClick={() => {
-                        if (!hasAvailableProjects) return;
-                        setIsProjectSelectOpen((prev) => !prev);
-                      }}
-                      onKeyDown={(event) => {
-                        if (!hasAvailableProjects) return;
-                        if (event.key !== "ArrowDown" && event.key !== "Enter")
-                          return;
-                        event.preventDefault();
-                        setIsProjectSelectOpen(true);
-                      }}
-                      disabled={!hasAvailableProjects}
-                      title={
-                        hasAvailableProjects
-                          ? "Выбрать проект"
-                          : "Нет доступных проектов"
-                      }
-                      aria-haspopup="listbox"
-                      aria-expanded={isProjectSelectOpen}
-                      aria-controls="troupe-project-listbox"
-                    >
-                      <span className="troupe-project-select__label">
-                        {projectSelectButtonLabel}
-                      </span>
-                      <span className="troupe-project-select__chevron">▾</span>
-                    </button>
-                    {isProjectSelectOpen && hasAvailableProjects ? (
-                      <div
-                        className="troupe-project-select__dropdown"
-                        role="listbox"
-                        id="troupe-project-listbox"
-                        aria-label="Проекты"
-                      >
-                        {availableProjects.map((projectSlug) => {
-                          const optionLabel =
-                            projectSlug === projectName
-                              ? `${projectSlug} (активный)`
-                              : projectSlug;
-                          const isSelected = inviteProjectSlug === projectSlug;
-                          return (
-                            <button
-                              key={projectSlug}
-                              type="button"
-                              role="option"
-                              aria-selected={isSelected}
-                              className={cn(
-                                "troupe-project-select__option",
-                                isSelected &&
-                                  "troupe-project-select__option--selected",
-                              )}
-                              onClick={() => {
-                                setInviteProjectSlug(projectSlug);
-                                setIsProjectSelectOpen(false);
-                              }}
-                            >
-                              {optionLabel}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
+                  <CustomSelect
+                    id="troupe-project"
+                    className="troupe-project-select"
+                    value={inviteProjectSlug}
+                    options={projectSelectOptions}
+                    onChange={setInviteProjectSlug}
+                    placeholder="Выбрать проект"
+                    noOptionsLabel="Нет проектов"
+                    aria-label="Проекты"
+                  />
                   {inviteProjectSlug ? (
                     <Button
                       className="primary"
