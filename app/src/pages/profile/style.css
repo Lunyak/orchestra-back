@@ -213,6 +213,17 @@ button.profile-availability-session-link {
   margin-top: 12px;
 }
 
+.profile-form label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-availability-time-input {
+  max-width: 140px;
+  width: auto;
+}
+
 .profile-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

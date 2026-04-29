@@ -267,11 +267,13 @@
   align-items: center;
 }
 
-.troupe-form-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
+.troupe-title-field {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.troupe-invite-email-field {
+  max-width: 360px;
 }
 
 .troupe-form-row__btn {
@@ -533,7 +535,7 @@
     align-items: stretch;
   }
 
-  .troupe-form-row .settings-invite-input {
+  .troupe-form-row .inline-text-field {
     max-width: none !important;
     flex: 1 1 auto !important;
     min-width: 0 !important;
@@ -565,7 +567,7 @@
     gap: 6px;
   }
 
-  .troupe-invite-card .troupe-form-row--invite-email .settings-invite-input {
+  .troupe-invite-card .troupe-form-row--invite-email .inline-text-field {
     flex: 1 1 0 !important;
     min-width: 0 !important;
     width: auto !important;

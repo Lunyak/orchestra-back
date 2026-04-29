@@ -1,4 +1,6 @@
 import { Button } from "@shared/core/button/Button";
+import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
+import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -179,10 +181,9 @@ export function TroupePage() {
                   Так же подписывается чат труппы в панели справа.
                 </p>
               )}
-              <div className="troupe-form-row">
-                <input
-                  className="settings-invite-input"
-                  style={{ flex: "1 1 220px", minWidth: 180 }}
+              <FormInlineRow className="troupe-form-row">
+                <InlineTextField
+                  className="troupe-title-field"
                   value={titleDraft}
                   onChange={(e) => setTitleDraft(e.target.value)}
                   placeholder="Например, Студия «Гоголь-центр»"
@@ -203,7 +204,7 @@ export function TroupePage() {
                 >
                   {patchingTitle ? "Сохранение…" : "Сохранить"}
                 </Button>
-              </div>
+              </FormInlineRow>
               {patchTitleError ? <div className="troupe-error">{patchTitleError}</div> : null}
             </div>
 
@@ -212,13 +213,12 @@ export function TroupePage() {
                 <span className="troupe-invite-card__title-desktop">Добавить в труппу по email</span>
                 <span className="troupe-invite-card__title-mobile">Пригласить по email</span>
               </div>
-              <div className="troupe-form-row troupe-form-row--invite-email">
-                <input
-                  className="settings-invite-input"
+              <FormInlineRow className="troupe-form-row troupe-form-row--invite-email">
+                <InlineTextField
+                  className="troupe-invite-email-field"
                   placeholder="actor@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  style={{ maxWidth: 360 }}
                   inputMode="email"
                   autoComplete="email"
                   autoCapitalize="none"
@@ -238,7 +238,7 @@ export function TroupePage() {
                 >
                   {adding ? "Добавление…" : "Добавить"}
                 </button>
-              </div>
+              </FormInlineRow>
               {addError ? <div className="troupe-error">{addError}</div> : null}
               {error ? <div className="troupe-error">{error}</div> : null}
               <p className="troupe-hint troupe-hint--after-form troupe-invite-card__hint">

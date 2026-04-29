@@ -223,15 +223,6 @@
   opacity: 0.8;
 }
 
-.kanban-field select,
-.kanban-role-row input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  padding: 8px 10px;
-  color: inherit;
-  outline: none;
-}
-
 .kanban-section-title {
   font-weight: 700;
   font-size: 13px;

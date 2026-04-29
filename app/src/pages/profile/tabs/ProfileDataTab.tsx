@@ -1,4 +1,5 @@
 import { Button } from "@shared/core/button/Button";
+import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../../../features/auth";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
@@ -96,8 +97,7 @@ export function ProfileDataTab() {
 
       <label>
         <div style={{ fontSize: 12, opacity: 0.7 }}>Отображаемое имя</div>
-        <input
-          className="settings-invite-input"
+        <InlineTextField
           value={String((form as any).displayName ?? "")}
           onChange={(e) =>
             dispatch(
@@ -108,31 +108,26 @@ export function ProfileDataTab() {
             )
           }
           placeholder="например: Сергей"
-          style={{ maxWidth: "unset" }}
         />
       </label>
 
       <div className="profile-form-row">
         <label>
           <div style={{ fontSize: 12, opacity: 0.7 }}>Имя</div>
-          <input
-            className="settings-invite-input"
+          <InlineTextField
             value={String((form as any).firstName ?? "")}
             onChange={(e) =>
               dispatch(profileDataActions.setProfileFormField({ key: "firstName", value: e.target.value }))
             }
-            style={{ maxWidth: "unset" }}
           />
         </label>
         <label>
           <div style={{ fontSize: 12, opacity: 0.7 }}>Фамилия</div>
-          <input
-            className="settings-invite-input"
+          <InlineTextField
             value={String((form as any).lastName ?? "")}
             onChange={(e) =>
               dispatch(profileDataActions.setProfileFormField({ key: "lastName", value: e.target.value }))
             }
-            style={{ maxWidth: "unset" }}
           />
         </label>
       </div>
@@ -140,8 +135,7 @@ export function ProfileDataTab() {
       <div className="profile-form-row">
         <label>
           <div style={{ fontSize: 12, opacity: 0.7 }}>Telegram username</div>
-          <input
-            className="settings-invite-input"
+          <InlineTextField
             value={String((form as any).telegramUsername ?? "")}
             onChange={(e) =>
               dispatch(
@@ -152,33 +146,28 @@ export function ProfileDataTab() {
               )
             }
             placeholder="@username"
-            style={{ maxWidth: "unset" }}
           />
         </label>
         <label>
           <div style={{ fontSize: 12, opacity: 0.7 }}>Telegram id</div>
-          <input
-            className="settings-invite-input"
+          <InlineTextField
             value={String((form as any).telegramId ?? "")}
             onChange={(e) =>
               dispatch(profileDataActions.setProfileFormField({ key: "telegramId", value: e.target.value }))
             }
             placeholder="123456789"
-            style={{ maxWidth: "unset" }}
           />
         </label>
       </div>
 
       <label>
         <div style={{ fontSize: 12, opacity: 0.7 }}>Avatar URL</div>
-        <input
-          className="settings-invite-input"
+        <InlineTextField
           value={String((form as any).avatarUrl ?? "")}
           onChange={(e) =>
             dispatch(profileDataActions.setProfileFormField({ key: "avatarUrl", value: e.target.value }))
           }
           placeholder="https://..."
-          style={{ maxWidth: "unset" }}
         />
       </label>
 

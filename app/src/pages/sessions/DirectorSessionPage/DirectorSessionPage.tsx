@@ -1,9 +1,10 @@
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
+import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../../features/auth";
 import {
@@ -386,24 +387,52 @@ export function DirectorSessionPage() {
     }
   };
 
-  const updateSlot = async (patch: Partial<DirectorSessionSlot>) => {
-    if (!session || !slot) return;
-    const nextSessions = (sessions ?? []).map((s) => {
-      if (s.id !== session.id) return s;
-      return {
-        ...s,
-        slots: (s.slots ?? []).map((sl) =>
-          sl.id === slot.id ? { ...sl, ...patch } : sl,
-        ),
-        updatedAt: new Date().toISOString(),
-      };
-    });
-    await persistSessions(nextSessions);
-    const nextSession = nextSessions.find((x) => x.id === session.id) ?? null;
-    const nextSlot = nextSession?.slots?.find((x) => x.id === slot.id) ?? null;
-    setSession(nextSession);
-    setSlot(nextSlot);
-  };
+  const updateSlotById = useCallback(
+    async (targetSlotId: string, patch: Partial<DirectorSessionSlot>) => {
+      if (!session) return;
+      const nextSessions = (sessions ?? []).map((s) => {
+        if (s.id !== session.id) return s;
+        return {
+          ...s,
+          slots: (s.slots ?? []).map((sl) =>
+            sl.id === targetSlotId ? { ...sl, ...patch } : sl,
+          ),
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      await persistSessions(nextSessions);
+      const nextSession = nextSessions.find((x) => x.id === session.id) ?? null;
+      setSession(nextSession);
+      setSlot((prev) => {
+        if (!prev || prev.id !== targetSlotId) return prev;
+        return (
+          nextSession?.slots?.find((x) => x.id === targetSlotId) ?? null
+        );
+      });
+    },
+    [session, sessions, persistSessions],
+  );
+
+  const updateSlot = useCallback(
+    async (patch: Partial<DirectorSessionSlot>) => {
+      if (!slot) return;
+      await updateSlotById(slot.id, patch);
+    },
+    [slot, updateSlotById],
+  );
+
+  const persistSlotNotes = useCallback(
+    (targetSlotId: string, notes: string) => {
+      void updateSlotById(targetSlotId, { notes });
+    },
+    [updateSlotById],
+  );
+
+  const {
+    draft: slotNotesDraft,
+    onChange: onSlotNotesChange,
+    onBlur: onSlotNotesBlur,
+  } = useDebouncedSyncedText(slot?.id, slot?.notes, persistSlotNotes);
 
   const loadProjectData = async (slug: string) => {
     if (!accessToken) return;
@@ -980,10 +1009,9 @@ export function DirectorSessionPage() {
                     <FormTextarea
                       rootClassName="form-textarea--section"
                       label="Заметки к слоту"
-                      value={String(slot.notes ?? "")}
-                      onChange={(e) =>
-                        void updateSlot({ notes: e.target.value })
-                      }
+                      value={slotNotesDraft}
+                      onChange={(e) => onSlotNotesChange(e.target.value)}
+                      onBlur={onSlotNotesBlur}
                       placeholder="Например: темп, акценты, на что обратить внимание…"
                       rows={4}
                     />

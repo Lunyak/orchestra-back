@@ -3,6 +3,7 @@ import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@shared/core/button/Button";
+import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { CalendarSection } from "../../../shared/components/calendar/CalendarSection";
 import { useAuth } from "../../../features/auth";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
@@ -318,8 +319,8 @@ export function ProfileAvailabilityTab() {
                 <div className="profile-availability-time-ranges">
                   {selectedRanges.map((r, idx) => (
                     <div key={`${selectedDate}:${idx}`} className="profile-availability-time-row">
-                      <input
-                        className="settings-invite-input"
+                      <InlineTextField
+                        className="profile-availability-time-input"
                         type="time"
                         value={r.from}
                         onChange={(e) => {
@@ -327,11 +328,10 @@ export function ProfileAvailabilityTab() {
                           next[idx] = { ...next[idx]!, from: e.target.value };
                           dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }));
                         }}
-                        style={{ maxWidth: 140 }}
                       />
                       <div className="profile-availability-time-sep">—</div>
-                      <input
-                        className="settings-invite-input"
+                      <InlineTextField
+                        className="profile-availability-time-input"
                         type="time"
                         value={r.to}
                         onChange={(e) => {
@@ -339,7 +339,6 @@ export function ProfileAvailabilityTab() {
                           next[idx] = { ...next[idx]!, to: e.target.value };
                           dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }));
                         }}
-                        style={{ maxWidth: 140 }}
                       />
                       <Button
                         className="danger"

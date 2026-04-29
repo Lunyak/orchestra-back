@@ -44,14 +44,10 @@
   align-items: center;
 }
 
-.kanban-roles-admin__row input[type="text"] {
+.kanban-roles-admin__row .kanban-roles-admin__title-input {
   flex: 1 1 140px;
   min-width: 120px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.25);
-  color: inherit;
+  width: auto;
   font-size: 13px;
 }
 
@@ -131,15 +127,13 @@
   overflow: auto;
 }
 
-.kanban-roles-admin__check {
-  display: flex;
+.kanban-roles-admin__assignments .kanban-roles-admin__check.labeled-checkbox {
+  width: 100%;
   align-items: flex-start;
-  gap: 8px;
   font-size: 12px;
-  cursor: pointer;
 }
 
-.kanban-roles-admin__check input {
+.kanban-roles-admin__assignments .kanban-roles-admin__check .labeled-checkbox__input {
   margin-top: 2px;
 }
 

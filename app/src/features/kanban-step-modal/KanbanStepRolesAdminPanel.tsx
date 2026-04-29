@@ -1,6 +1,8 @@
 import cn from "classnames";
 import { useMemo, useState } from "react";
 import { Button } from "../../shared/core/button/Button";
+import { InlineTextField } from "../../shared/core/inline-text-field/InlineTextField";
+import { LabeledCheckbox } from "../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import {
   createProjectRole,
@@ -168,8 +170,8 @@ export function KanbanStepRolesAdminPanel({
       ) : null}
 
       <div className="kanban-roles-admin__row">
-        <input
-          type="text"
+        <InlineTextField
+          className="kanban-roles-admin__title-input"
           value={createTitle}
           onChange={(e) => setCreateTitle(e.target.value)}
           placeholder="Название новой роли"
@@ -223,13 +225,13 @@ export function KanbanStepRolesAdminPanel({
                 .includes(normalizeEmail(email));
               const label = memberLabel(m);
               return (
-                <label key={email} className="kanban-roles-admin__check">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={busy}
-                    onChange={() => toggleAssignment(activeRole.id, email)}
-                  />
+                <LabeledCheckbox
+                  key={email}
+                  className="kanban-roles-admin__check"
+                  checked={checked}
+                  disabled={busy}
+                  onChange={() => toggleAssignment(activeRole.id, email)}
+                >
                   <span className="kanban-roles-admin__check-label">
                     <MiniAvatar
                       src={String(m.profile?.avatarUrl ?? "").trim() || null}
@@ -238,7 +240,7 @@ export function KanbanStepRolesAdminPanel({
                     />
                     <span>{label}</span>
                   </span>
-                </label>
+                </LabeledCheckbox>
               );
             })}
             {members.length === 0 ? (

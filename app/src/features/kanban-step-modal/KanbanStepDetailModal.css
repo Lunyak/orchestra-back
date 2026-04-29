@@ -88,6 +88,145 @@
   min-height: clamp(360px, 52vh, 580px);
 }
 
+/* Как InlineTextField: карточка + вложенный редактор сценария */
+.kanban-step-modal__body
+  :is(
+    input:not(
+      [type="checkbox"],
+      [type="file"],
+      [type="hidden"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    )
+  ) {
+  box-sizing: border-box;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  padding: 2px 0;
+  min-width: 0;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+.kanban-step-modal__body
+  :is(
+    input:not(
+      [type="checkbox"],
+      [type="file"],
+      [type="hidden"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    )
+  )::placeholder {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.kanban-step-modal__body
+  :is(
+    input:not(
+      [type="checkbox"],
+      [type="file"],
+      [type="hidden"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    )
+  ):focus-visible {
+  box-shadow: 0 1px 0 0 var(--color-text-tertiary);
+}
+
+.kanban-step-modal__body
+  :is(
+    input:not(
+      [type="checkbox"],
+      [type="file"],
+      [type="hidden"],
+      [type="radio"],
+      [type="range"],
+      [type="color"],
+      [type="button"],
+      [type="submit"],
+      [type="reset"]
+    )
+  ):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kanban-step-modal__body input[type="number"]::-webkit-outer-spin-button,
+.kanban-step-modal__body input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.kanban-step-modal__body input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.kanban-step-modal__body .kanban-field select.native-select {
+  width: 100%;
+  max-width: 100%;
+}
+
+.kanban-step-modal__body textarea {
+  box-sizing: border-box;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  padding: 2px 0;
+  min-width: 0;
+  width: 100%;
+  outline: none;
+  resize: vertical;
+  min-height: 3.5rem;
+}
+
+.kanban-step-modal__body textarea::placeholder {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.kanban-step-modal__body textarea:focus-visible {
+  box-shadow: 0 1px 0 0 var(--color-text-tertiary);
+}
+
+.kanban-step-modal__body textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .kanban-step-modal__markdown-root {
   flex: 1 1 auto;
   min-height: clamp(320px, 48vh, 540px);

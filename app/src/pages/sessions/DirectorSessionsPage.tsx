@@ -2,6 +2,7 @@ import { Buttons } from "@shared/components/buttons/Buttons";
 import { ListItem } from "@shared/components/list-item/ListItem";
 import { Button } from "@shared/core/button/Button";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
+import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import cn from "classnames";
 import React, {
   useCallback,
@@ -641,39 +642,6 @@ export function DirectorSessionsPage() {
     await persist(next);
   };
 
-  const publishActiveSession = async () => {
-    if (!accessToken || !activeSession) return;
-    setPublishing(true);
-    setPublishError(null);
-    try {
-      const pub = await publishDirectorSession(accessToken, activeSession.id, {
-        comment: activeSession.comment ?? "",
-      });
-      if (
-        pub?.session &&
-        String((pub.session as any)?.id ?? "") === activeSession.id
-      ) {
-        setSessions((prev) =>
-          prev.map((s) =>
-            s.id === activeSession.id
-              ? ({ ...s, ...(pub.session as any) } as DirectorRehearsalSession)
-              : s,
-          ),
-        );
-      }
-      const res = await loadDirectorSessions(accessToken);
-      setSessions(res.sessions ?? []);
-    } catch (e: any) {
-      setPublishError(
-        e?.response?.data?.message ||
-          e?.message ||
-          "Не удалось опубликовать или обновить публикацию сессии",
-      );
-    } finally {
-      setPublishing(false);
-    }
-  };
-
   const createSession = async () => {
     const now = new Date();
     const nowIso = now.toISOString();
@@ -689,13 +657,15 @@ export function DirectorSessionsPage() {
     await persist(merged);
   };
 
-  const updateActiveSession = async (
+  const updateSessionById = async (
+    sessionId: string,
     patch: Partial<DirectorRehearsalSession>,
   ) => {
-    if (!activeSession) return;
+    const base = (sessions ?? []).find((x) => x.id === sessionId) ?? null;
+    if (!base) return;
     const nowIso = new Date().toISOString();
     const nextActive: DirectorRehearsalSession = {
-      ...activeSession,
+      ...base,
       ...patch,
       updatedAt: nowIso,
     };
@@ -726,9 +696,61 @@ export function DirectorSessionsPage() {
         : nextActive;
 
     const nextSessions = sessions.map((s) =>
-      s.id === activeSession.id ? nextWithPlanned : s,
+      s.id === sessionId ? nextWithPlanned : s,
     );
     await persist(nextSessions);
+  };
+
+  const updateActiveSession = async (
+    patch: Partial<DirectorRehearsalSession>,
+  ) => {
+    if (!activeSession) return;
+    await updateSessionById(activeSession.id, patch);
+  };
+
+  const {
+    draft: sessionCommentDraft,
+    onChange: onSessionCommentChange,
+    onBlur: onSessionCommentBlur,
+  } = useDebouncedSyncedText(
+    activeSession?.id,
+    activeSession?.comment,
+    (sessionId, comment) => {
+      void updateSessionById(sessionId, { comment });
+    },
+  );
+
+  const publishActiveSession = async () => {
+    if (!accessToken || !activeSession) return;
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const pub = await publishDirectorSession(accessToken, activeSession.id, {
+        comment: sessionCommentDraft ?? "",
+      });
+      if (
+        pub?.session &&
+        String((pub.session as any)?.id ?? "") === activeSession.id
+      ) {
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === activeSession.id
+              ? ({ ...s, ...(pub.session as any) } as DirectorRehearsalSession)
+              : s,
+          ),
+        );
+      }
+      const res = await loadDirectorSessions(accessToken);
+      setSessions(res.sessions ?? []);
+    } catch (e: any) {
+      setPublishError(
+        e?.response?.data?.message ||
+          e?.message ||
+          "Не удалось опубликовать или обновить публикацию сессии",
+      );
+    } finally {
+      setPublishing(false);
+    }
   };
 
   // ---- Material picker (from "kanban" data via syncPull) ----
@@ -1655,10 +1677,9 @@ export function DirectorSessionsPage() {
                   <FormTextarea
                     rootClassName="form-textarea--section"
                     rows={3}
-                    value={String(activeSession.comment ?? "")}
-                    onChange={(e) =>
-                      void updateActiveSession({ comment: e.target.value })
-                    }
+                    value={sessionCommentDraft}
+                    onChange={(e) => onSessionCommentChange(e.target.value)}
+                    onBlur={onSessionCommentBlur}
                     placeholder="Комментарий к сессии"
                   />
 

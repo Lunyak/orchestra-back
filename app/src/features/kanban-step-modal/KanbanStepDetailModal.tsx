@@ -4,6 +4,7 @@ import {
   statusOf,
   type KanbanStatus,
 } from "../../shared/components/kanban/kanban-constants";
+import { InlineTextField } from "../../shared/core/inline-text-field/InlineTextField";
 import { Modal } from "../../shared/core/modal/Modal";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import type { ScriptStep } from "../../shared/types/script";
@@ -166,6 +167,7 @@ export function KanbanStepDetailModal({
               <label className="kanban-field">
                 <span className="kanban-field-label">Статус готовности</span>
                 <select
+                  className="native-select"
                   value={statusOf(step)}
                   onChange={(e) =>
                     setStepStatus(step.id, e.target.value as KanbanStatus)
@@ -181,7 +183,7 @@ export function KanbanStepDetailModal({
 
               <label className="kanban-field">
                 <span className="kanban-field-label">Длительность (мин)</span>
-                <input
+                <InlineTextField
                   type="number"
                   min={0}
                   step={1}

@@ -1,0 +1,45 @@
+.inline-text-field {
+  box-sizing: border-box;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  padding: 2px 0;
+  min-width: 0;
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+
+.inline-text-field::placeholder {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.inline-text-field:focus-visible {
+  box-shadow: 0 1px 0 0 var(--color-text-tertiary);
+}
+
+.inline-text-field:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.inline-text-field[type="number"]::-webkit-outer-spin-button,
+.inline-text-field[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inline-text-field[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
