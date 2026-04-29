@@ -21,6 +21,8 @@ export type TroupeState = {
   troupe: TroupeSummary | null;
   members: TroupeMemberItem[];
   loading: boolean;
+  scheduleRefreshing: boolean;
+  scheduleMonthKey: string | null;
   error: string | null;
   adding: boolean;
   addError: string | null;
@@ -35,6 +37,8 @@ const initialState: TroupeState = {
   troupe: null,
   members: [],
   loading: false,
+  scheduleRefreshing: false,
+  scheduleMonthKey: null,
   error: null,
   adding: false,
   addError: null,
@@ -47,11 +51,12 @@ const initialState: TroupeState = {
 
 export const fetchMyTroupe = createAsyncThunk<
   { troupe: TroupeSummary | null; members: TroupeMemberItem[] },
-  void
->("troupe/fetchMyTroupe", async (_args, api) => {
+  { month?: string } | void
+>("troupe/fetchMyTroupe", async (arg, api) => {
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) throw new Error("Нет токена авторизации");
-  return await getMyTroupe(token);
+  const month = arg && typeof arg === "object" && arg.month ? arg.month : undefined;
+  return await getMyTroupe(token, month ? { month } : undefined);
 });
 
 export const troupeAddMember = createAsyncThunk<
@@ -61,7 +66,8 @@ export const troupeAddMember = createAsyncThunk<
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) throw new Error("Нет токена авторизации");
   await addTroupeMember(token, email);
-  return await getMyTroupe(token);
+  const month = (api.getState as () => RootState)().troupe.scheduleMonthKey;
+  return await getMyTroupe(token, month ? { month } : undefined);
 });
 
 export const troupeRemoveMember = createAsyncThunk<
@@ -71,7 +77,8 @@ export const troupeRemoveMember = createAsyncThunk<
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) throw new Error("Нет токена авторизации");
   await removeTroupeMember(token, memberId);
-  return await getMyTroupe(token);
+  const month = (api.getState as () => RootState)().troupe.scheduleMonthKey;
+  return await getMyTroupe(token, month ? { month } : undefined);
 });
 
 export const troupeInviteMemberToProject = createAsyncThunk<
@@ -116,18 +123,30 @@ export const troupeSlice = createSlice({
       state.patchTitleError = String(action.error?.message ?? "Не удалось сохранить название");
     });
 
-    builder.addCase(fetchMyTroupe.pending, (state) => {
-      state.loading = true;
+    builder.addCase(fetchMyTroupe.pending, (state, action) => {
+      const arg = action.meta.arg;
+      const month = arg && typeof arg === "object" && arg.month ? arg.month : undefined;
+      const partial = Boolean(month) && state.troupe != null;
+      if (partial) {
+        state.scheduleRefreshing = true;
+      } else {
+        state.loading = true;
+      }
       state.error = null;
     });
     builder.addCase(fetchMyTroupe.fulfilled, (state, action) => {
       state.loading = false;
+      state.scheduleRefreshing = false;
       state.error = null;
       state.troupe = action.payload.troupe;
       state.members = action.payload.members ?? [];
+      const arg = action.meta.arg;
+      const month = arg && typeof arg === "object" && arg.month ? arg.month : undefined;
+      if (month) state.scheduleMonthKey = month;
     });
     builder.addCase(fetchMyTroupe.rejected, (state, action) => {
       state.loading = false;
+      state.scheduleRefreshing = false;
       state.error = String(action.error?.message ?? "Не удалось загрузить труппу");
     });
 

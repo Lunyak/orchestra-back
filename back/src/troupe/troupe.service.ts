@@ -15,6 +15,35 @@ function normalizeEmail(v: unknown): string {
   return email;
 }
 
+function parseMonthFilter(v: unknown): { first: string; last: string } | null {
+  const s = String(v ?? '').trim();
+  const m = /^(\d{4})-(\d{2})$/.exec(s);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  if (mo < 1 || mo > 12 || !Number.isFinite(y)) return null;
+  const ym = `${m[1]}-${m[2]}`;
+  const first = `${ym}-01`;
+  const lastDay = new Date(y, mo, 0).getDate();
+  const last = `${ym}-${String(lastDay).padStart(2, '0')}`;
+  return { first, last };
+}
+
+function filterAvailabilityByMonth<T extends Record<string, unknown>>(
+  raw: unknown,
+  first: string,
+  last: string,
+): T {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return {} as T;
+  }
+  const out = {} as T;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (k >= first && k <= last) (out as Record<string, unknown>)[k] = v;
+  }
+  return out;
+}
+
 @Injectable()
 export class TroupeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -29,7 +58,7 @@ export class TroupeService {
     });
   }
 
-  async getMyTroupeWithMembers(userId: string) {
+  async getMyTroupeWithMembers(userId: string, month?: unknown) {
     const troupe = await this.prisma.troupe.findUnique({
       where: { ownerUserId: userId },
     });
@@ -69,6 +98,7 @@ export class TroupeService {
       : [];
 
     const profileByEmail = new Map(profiles.map((p) => [p.email, p]));
+    const monthRange = parseMonthFilter(month);
 
     return {
       troupe: {
@@ -77,10 +107,29 @@ export class TroupeService {
         createdAt: troupe.createdAt,
         updatedAt: troupe.updatedAt,
       },
-      members: members.map((m) => ({
-        ...m,
-        profile: profileByEmail.get(m.email.trim().toLowerCase()) ?? null,
-      })),
+      members: members.map((m) => {
+        const raw = profileByEmail.get(m.email.trim().toLowerCase()) ?? null;
+        const profile =
+          raw && monthRange
+            ? {
+                ...raw,
+                availabilityCalendar: filterAvailabilityByMonth(
+                  raw.availabilityCalendar,
+                  monthRange.first,
+                  monthRange.last,
+                ),
+                availabilityTimeRanges: filterAvailabilityByMonth(
+                  raw.availabilityTimeRanges,
+                  monthRange.first,
+                  monthRange.last,
+                ),
+              }
+            : raw;
+        return {
+          ...m,
+          profile,
+        };
+      }),
     };
   }
 

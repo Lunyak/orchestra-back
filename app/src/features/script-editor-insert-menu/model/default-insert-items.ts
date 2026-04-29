@@ -36,6 +36,17 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
     },
   },
   {
+    id: "selection-to-step",
+    label: "Выделение в новый шаг",
+    group: "Буфер",
+    resolve: (ctx): ScriptEditorInsertResolveResult => {
+      if (!ctx.canCopySelection) {
+        return { state: "disabled", reason: "Выдели текст в редакторе" };
+      }
+      return { state: "ok", pick: { kind: "create-step-from-selection" } };
+    },
+  },
+  {
     id: "track",
     label: "Трек",
     group: "Оркестр",

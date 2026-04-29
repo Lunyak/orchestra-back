@@ -31,8 +31,23 @@
 }
 
 .profile-tab-btn.active {
-  border-color: var(--color-bg-tertiary);
-  background:var(--color-bg-tertiary);
+  border-color: var(--color-active-ascent);
+  background: var(--color-active-ascent);
+  color: var(--color-bg-base);
+}
+
+.profile-tab-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.profile-tabs-disabled-note {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 12px;
+  opacity: 0.9;
 }
 
 .profile-tab-content {

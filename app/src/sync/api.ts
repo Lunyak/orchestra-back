@@ -491,9 +491,11 @@ export interface TroupeMemberItem {
 
 export async function getMyTroupe(
   accessToken: string,
+  opts?: { month?: string },
 ): Promise<{ troupe: TroupeSummary | null; members: TroupeMemberItem[] }> {
   const { data } = await api.get("/troupe", {
     headers: { Authorization: `Bearer ${accessToken}` },
+    params: opts?.month ? { month: opts.month } : undefined,
   });
   return data;
 }

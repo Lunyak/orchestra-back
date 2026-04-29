@@ -33,8 +33,11 @@ export function ScriptMarkdownToolbar({
 
   return (
     <div className="script-markdown-toolbar">
-
-      <div className="script-markdown-tabs" role="tablist" aria-label="Режим шага">
+      <div
+        className="script-markdown-tabs"
+        role="tablist"
+        aria-label="Режим шага"
+      >
         <button
           type="button"
           role="tab"
@@ -70,7 +73,11 @@ export function ScriptMarkdownToolbar({
             variant="ghost"
             className="show-script__rail-btn"
             onClick={onToggleEditing}
-            title={isEditing ? "Перейти в режим чтения" : "Перейти в режим редактирования"}
+            title={
+              isEditing
+                ? "Перейти в режим чтения"
+                : "Перейти в режим редактирования"
+            }
             aria-pressed={isEditing}
             data-active={isEditing ? "true" : "false"}
           >
@@ -80,12 +87,17 @@ export function ScriptMarkdownToolbar({
             <Button
               variant="ghost"
               className="show-script__rail-btn"
+              data-role="toc-toggle"
               onClick={editorToggles.onToggleToc}
-              title={editorToggles.tocEnabled ? "Скрыть оглавление" : "Показать оглавление"}
+              title={
+                editorToggles.tocEnabled
+                  ? "Скрыть оглавление"
+                  : "Показать оглавление"
+              }
               aria-pressed={editorToggles.tocEnabled}
               data-active={editorToggles.tocEnabled ? "true" : "false"}
             >
-              ≡
+              &#127183;
             </Button>
           ) : null}
           <Button
@@ -108,7 +120,5 @@ export function ScriptMarkdownToolbar({
         </div>
       </div>
     </div>
-
   );
 }
-

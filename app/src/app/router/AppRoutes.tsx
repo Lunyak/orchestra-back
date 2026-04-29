@@ -1,8 +1,13 @@
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import { UnderDevelopmentPage } from "@shared/components/under-development-page/UnderDevelopmentPage";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useScriptUI } from "../../features/script-ui";
-import { ENABLE_3D_THEATER } from "../../shared/build-features";
+import {
+  ENABLE_3D_THEATER,
+  ENABLE_ACTOR_PAGE,
+  ENABLE_ROLE_WORKBOOK_PAGE,
+} from "../../shared/build-features";
 import { Header } from "../../shared/components/header/Header";
 
 // Lazy imports страниц
@@ -248,11 +253,32 @@ export function AppRoutes() {
             />
             <Route path=":sessionId" element={<DirectorSessionPage />} />
           </Route>
-          <Route path="/actor" element={<ActorPage />} />
+          <Route
+            path="/actor"
+            element={
+              ENABLE_ACTOR_PAGE ? (
+                <ActorPage />
+              ) : (
+                <UnderDevelopmentPage title="Актёр" description="Раздел тренажёров роли скоро будет доступен." />
+              )
+            }
+          />
           <Route path="/trainers" element={<TrainersPage />} />
           <Route path="/trainers/speech" element={<SpeechTrainerPage />} />
           <Route path="/trainers/diction" element={<DictionTrainerPage />} />
-          <Route path="/role-workbook/:roleId" element={<RoleWorkbookPage />} />
+          <Route
+            path="/role-workbook/:roleId"
+            element={
+              ENABLE_ROLE_WORKBOOK_PAGE ? (
+                <RoleWorkbookPage />
+              ) : (
+                <UnderDevelopmentPage
+                  title="Работа над ролью"
+                  description="Страница тетрадки роли пока в разработке."
+                />
+              )
+            }
+          />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/troupe" element={<TroupePage />} />
           <Route path="/roles" element={<Navigate to="/board" replace />} />

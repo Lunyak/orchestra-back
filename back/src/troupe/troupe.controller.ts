@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -20,8 +21,8 @@ export class TroupeController {
   constructor(private readonly troupeService: TroupeService) {}
 
   @Get()
-  getMyTroupe(@Req() req: any) {
-    return this.troupeService.getMyTroupeWithMembers(req.user.userId);
+  getMyTroupe(@Req() req: any, @Query('month') month?: string) {
+    return this.troupeService.getMyTroupeWithMembers(req.user.userId, month);
   }
 
   @Patch()

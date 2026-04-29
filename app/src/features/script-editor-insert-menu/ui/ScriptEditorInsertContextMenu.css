@@ -8,7 +8,6 @@
   max-height: min(420px, calc(100vh - 16px));
   overflow: auto;
   padding: 6px 0;
-  border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.35);
   background: var(--color-bg-primary, #0f172a);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
@@ -34,7 +33,7 @@
   margin: 0 4px;
   padding: 8px 10px;
   border: none;
-  border-radius: 8px;
+
   background: transparent;
   color: var(--color-text-primary, #e2e8f0);
   font: inherit;
@@ -44,7 +43,7 @@
 }
 
 .script-editor-insert-menu__item:hover:not(:disabled) {
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--color-bg-tertiary)
 }
 
 .script-editor-insert-menu__item:disabled {

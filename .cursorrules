@@ -63,3 +63,22 @@ SHARED UTILITIES:
 - Do not refactor unrelated code
 - Keep responses under 150 lines unless explicitly required
 - Think step-by-step internally but output only the final answer
+
+Когда создаёшь новые UI-элементы (кнопки, карточки, инпуты, модальные окна, dropdowns, табы, меню и любые контейнеры):
+
+- **Никогда не добавляй border-radius по умолчанию**. Новые элементы должны создаваться с острыми углами (border-radius: 0 или вообще без этого свойства).
+- Закругления используй только тогда, когда это явно требуется по дизайну, и только через дизайн-токены, если они есть в проекте.
+
+Для всех **активных состояний** элементов (active, selected, current, aria-selected="true", data-state="active" и т.п.):
+
+- Обязательно используй цвет из переменной `--color-active-ascent`.
+- Никогда не хардкодь цвет `#e78a4e` напрямую.
+- Пример правильного использования:
+
+```css
+.active,
+[data-state="active"],
+[aria-selected="true"] {
+  color: var(--color-active-ascent);
+  /* или background-color, border-color — в зависимости от контекста */
+}

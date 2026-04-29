@@ -23,6 +23,7 @@ export const ShowScript: React.FC = () => {
     steps,
     currentPage,
     updateStep: updateSceneStep,
+    addStep,
     resetAllRequisites,
     handleTrackLinkClick,
     handleSoundLinkClick,
@@ -98,6 +99,14 @@ export const ShowScript: React.FC = () => {
   };
 
   const hasCopiedRequisites = requisitesClipboardRef.current != null;
+  const createStepFromSelection = (
+    selectedText: string,
+    targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
+  ) => {
+    const nextStepId = steps.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
+    addStep();
+    updateSceneStep(nextStepId, { [targetField]: selectedText });
+  };
 
   return (
     <div className="show-script">
@@ -135,6 +144,7 @@ export const ShowScript: React.FC = () => {
           updateStepField={updateStepField}
           onTrackLinkClick={handleTrackLinkClick}
           onSoundLinkClick={handleSoundLinkClick}
+          onCreateStepFromSelection={createStepFromSelection}
           renderBody={({ markdownPane, controls }) =>
             currentStep ? (
               <div className="script-step-editor">

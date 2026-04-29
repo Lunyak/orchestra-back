@@ -1,0 +1,16 @@
+.underdev-view {
+  max-width: 680px;
+  padding: 20px;
+  color: var(--color-text-lighter);
+}
+
+.underdev-text {
+  margin-top: 8px;
+  opacity: 0.85;
+}
+
+.underdev-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}

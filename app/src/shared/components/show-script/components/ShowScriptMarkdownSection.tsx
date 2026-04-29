@@ -51,6 +51,10 @@ interface IProps {
   ) => void;
   onTrackLinkClick: (trackId: number) => void;
   onSoundLinkClick?: (soundId: number) => void;
+  onCreateStepFromSelection?: (
+    selectedText: string,
+    targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
+  ) => void;
   renderBody?: (args: {
     markdownPane: React.ReactNode;
     currentStep: ScriptStep | undefined;
@@ -76,6 +80,7 @@ export function ShowScriptMarkdownSection({
   updateStepField,
   onTrackLinkClick,
   onSoundLinkClick,
+  onCreateStepFromSelection,
   renderBody,
   lazyScriptBody = false,
 }: IProps) {
@@ -343,6 +348,29 @@ export function ShowScriptMarkdownSection({
     }
     if (pick.kind === "paste-clipboard") {
       void pasteFromClipboard();
+      return;
+    }
+    if (pick.kind === "create-step-from-selection") {
+      const ed = markdownRef.current;
+      const selection = ed?.getSelection();
+      if (!selection) return;
+      const selectionFrom = Math.min(selection.from, selection.to);
+      const selectionTo = Math.max(selection.from, selection.to);
+      if (selectionFrom === selectionTo) return;
+      const selectedText = ed.getDoc().slice(selectionFrom, selectionTo);
+      if (!onCreateStepFromSelection) return;
+      onCreateStepFromSelection?.(
+        selectedText,
+        activeMarkdownField as "markdown" | "playMarkdown" | "explicationMarkdown",
+      );
+      const currentValue = ed.getDoc();
+      const { value: nextValue, cursor } = insertAtSelection({
+        value: currentValue,
+        insert: "",
+        selectionStart: selectionFrom,
+        selectionEnd: selectionTo,
+      });
+      ed.applyDocument(nextValue, cursor);
       return;
     }
     void handleInsertImage();

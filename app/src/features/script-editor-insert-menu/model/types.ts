@@ -15,7 +15,8 @@ export type ScriptEditorInsertMenuPick =
   | { kind: "snippet"; text: string }
   | { kind: "insert-image" }
   | { kind: "copy-selection" }
-  | { kind: "paste-clipboard" };
+  | { kind: "paste-clipboard" }
+  | { kind: "create-step-from-selection" };
 
 export type ScriptEditorInsertSubmenuChild = {
   id: string;
