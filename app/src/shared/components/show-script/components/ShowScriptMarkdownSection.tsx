@@ -352,7 +352,8 @@ export function ShowScriptMarkdownSection({
     }
     if (pick.kind === "create-step-from-selection") {
       const ed = markdownRef.current;
-      const selection = ed?.getSelection();
+      if (!ed) return;
+      const selection = ed.getSelection();
       if (!selection) return;
       const selectionFrom = Math.min(selection.from, selection.to);
       const selectionTo = Math.max(selection.from, selection.to);
