@@ -1,8 +1,4 @@
 import { Button } from "@shared/core/button/Button";
-import {
-  CustomSelect,
-  type CustomSelectOption,
-} from "@shared/core/custom-select/CustomSelect";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import cn from "classnames";
@@ -17,6 +13,7 @@ import {
   type CSSProperties,
 } from "react";
 import { useProject } from "../../features/project";
+import { useTeam } from "../../features/team";
 import {
   fetchMyTroupe,
   troupeAddMember,
@@ -105,7 +102,8 @@ function useTroupeNarrowLayout(): boolean {
 
 export function TroupePage() {
   const dispatch = useAppDispatch();
-  const { projectName, projects } = useProject();
+  const { projectName, isProjectsLoaded, projectsLoading } = useProject();
+  const { isProjectOwner } = useTeam();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const troupe = useAppSelector((s) => s.troupe.troupe);
   const members = useAppSelector((s) => s.troupe.members);
@@ -126,18 +124,6 @@ export function TroupePage() {
   const [email, setEmail] = useState("");
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
-  const inviteProjectStorageKey = "troupe-invite-project";
-  const [inviteProjectSlug, setInviteProjectSlug] = useState<string>(() => {
-    try {
-      return (
-        (typeof window !== "undefined"
-          ? localStorage.getItem(inviteProjectStorageKey)
-          : null) || ""
-      );
-    } catch {
-      return "";
-    }
-  });
   const [currentMonth, setCurrentMonth] = useState<Date>(() =>
     readStoredTroupeMonth(),
   );
@@ -146,8 +132,19 @@ export function TroupePage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    dispatch(fetchMyTroupe({ month: monthKey(currentMonth) }));
-  }, [accessToken, currentMonth, dispatch]);
+    if (!isProjectsLoaded || projectsLoading) return;
+    if (!projectName) return;
+    void dispatch(
+      fetchMyTroupe({ month: monthKey(currentMonth), project: projectName }),
+    );
+  }, [
+    accessToken,
+    currentMonth,
+    dispatch,
+    isProjectsLoaded,
+    projectName,
+    projectsLoading,
+  ]);
 
   useEffect(() => {
     if (troupe?.title != null) setTitleDraft(troupe.title);
@@ -177,43 +174,6 @@ export function TroupePage() {
     });
   }, [currentMonth, days]);
 
-  const availableProjects = useMemo(
-    () => (Array.isArray(projects) ? projects : []).filter(Boolean),
-    [projects],
-  );
-  const projectSelectOptions = useMemo<CustomSelectOption[]>(() => {
-    return availableProjects.map((projectSlug) => ({
-      value: projectSlug,
-      label:
-        projectSlug === projectName
-          ? `${projectSlug} (активный)`
-          : projectSlug,
-    }));
-  }, [availableProjects, projectName]);
-
-  useEffect(() => {
-    const preferred =
-      (inviteProjectSlug && availableProjects.includes(inviteProjectSlug)
-        ? inviteProjectSlug
-        : "") ||
-      (projectName && availableProjects.includes(projectName)
-        ? projectName
-        : "") ||
-      availableProjects[0] ||
-      "";
-    if (preferred !== inviteProjectSlug) setInviteProjectSlug(preferred);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectName, availableProjects.join("|")]);
-
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      if (!inviteProjectSlug) return;
-      localStorage.setItem(inviteProjectStorageKey, inviteProjectSlug);
-    } catch {
-      // ignore
-    }
-  }, [inviteProjectSlug]);
   const selectedMember = useMemo(
     () =>
       selectedMemberId
@@ -231,6 +191,8 @@ export function TroupePage() {
   if (!accessToken)
     return <div>Нужно войти, чтобы открыть страницу труппы.</div>;
 
+  const canManageProjectTroupe = isProjectOwner === true;
+
   return (
     <div className="app-layout troupe-layout">
       <div className="app-content">
@@ -242,44 +204,46 @@ export function TroupePage() {
               </div>
             </div>
 
-            <div className="troupe-card">
-              {!loading && !troupe ? (
-                <p className="troupe-hint">
-                  Своей труппы пока нет — запись и чат появятся после того, как
-                  вы добавите первого участника по email в блоке ниже. Чаты
-                  трупп, куда вас пригласили другие, доступны сразу.
-                </p>
-              ) : null}
-              <FormInlineRow className="troupe-form-row">
-                <InlineTextField
-                  className="troupe-title-field"
-                  value={titleDraft}
-                  onChange={(e) => setTitleDraft(e.target.value)}
-                  placeholder="Например, Студия «Гоголь-центр»"
-                  maxLength={120}
-                  disabled={loading || !troupe}
-                  aria-label="Название труппы"
-                />
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={
-                    patchingTitle ||
-                    !troupe ||
-                    !titleDraft.trim() ||
-                    titleDraft.trim() === (troupe?.title ?? "").trim()
-                  }
-                  onClick={() =>
-                    void dispatch(troupePatchTitle({ title: titleDraft }))
-                  }
-                >
-                  {patchingTitle ? "Сохранение…" : "Сохранить"}
-                </Button>
-              </FormInlineRow>
-              {patchTitleError ? (
-                <div className="troupe-error">{patchTitleError}</div>
-              ) : null}
-            </div>
+            {canManageProjectTroupe ? (
+              <div className="troupe-card">
+                {!loading && !troupe ? (
+                  <p className="troupe-hint">
+                    Своей труппы пока нет — запись и чат появятся после того, как
+                    вы добавите первого участника по email в блоке ниже. Чаты
+                    трупп, куда вас пригласили другие, доступны сразу.
+                  </p>
+                ) : null}
+                <FormInlineRow className="troupe-form-row">
+                  <InlineTextField
+                    className="troupe-title-field"
+                    value={titleDraft}
+                    onChange={(e) => setTitleDraft(e.target.value)}
+                    placeholder="Например, Студия «Гоголь-центр»"
+                    maxLength={120}
+                    disabled={loading || !troupe}
+                    aria-label="Название труппы"
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    disabled={
+                      patchingTitle ||
+                      !troupe ||
+                      !titleDraft.trim() ||
+                      titleDraft.trim() === (troupe?.title ?? "").trim()
+                    }
+                    onClick={() =>
+                      void dispatch(troupePatchTitle({ title: titleDraft }))
+                    }
+                  >
+                    {patchingTitle ? "Сохранение…" : "Сохранить"}
+                  </Button>
+                </FormInlineRow>
+                {patchTitleError ? (
+                  <div className="troupe-error">{patchTitleError}</div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="troupe-card troupe-schedule-card">
               <div className="troupe-scale-head">
@@ -289,6 +253,12 @@ export function TroupePage() {
                   </div>
                   <div className="troupe-scale-head__subtitle">
                     Месяц: <b>{monthKey(currentMonth)}</b>
+                    {projectName ? (
+                      <>
+                        {" "}
+                        · проект: <b>{projectName}</b>
+                      </>
+                    ) : null}
                   </div>
                 </div>
                 <div className="troupe-scale-toolbar">
@@ -352,72 +322,79 @@ export function TroupePage() {
                   )}
                 </div>
                 <div className="troupe-actions-right">
-                  <CustomSelect
-                    id="troupe-project"
-                    className="troupe-project-select"
-                    value={inviteProjectSlug}
-                    options={projectSelectOptions}
-                    onChange={setInviteProjectSlug}
-                    placeholder="Выбрать проект"
-                    noOptionsLabel="Нет проектов"
-                    aria-label="Проекты"
-                  />
-                  {inviteProjectSlug ? (
-                    <Button
-                      className="primary"
-                      type="button"
-                      disabled={
-                        !selectedMember || !!invitingIds[selectedMember.id]
-                      }
-                      onClick={() => {
-                        if (!selectedMember) return;
-                        dispatch(
-                          troupeInviteMemberToProject({
-                            memberId: selectedMember.id,
-                            email: selectedMember.email,
-                            projectSlug: inviteProjectSlug,
-                            role: "viewer",
-                          }),
-                        );
-                      }}
-                      title={
-                        selectedMember
-                          ? `Добавить в проект`
-                          : "Выбери участника"
-                      }
-                    >
-                      {selectedMember && invitingIds[selectedMember.id]
-                        ? "…"
-                        : narrowLayout
-                          ? "В проект"
-                          : "Добавить в проект"}
-                    </Button>
+                  {canManageProjectTroupe && projectName ? (
+                    <>
+                      <Button
+                        className="primary"
+                        type="button"
+                        disabled={
+                          !selectedMember || !!invitingIds[selectedMember.id]
+                        }
+                        onClick={async () => {
+                          if (!selectedMember || !projectName) return;
+                          const res = await dispatch(
+                            troupeInviteMemberToProject({
+                              memberId: selectedMember.id,
+                              email: selectedMember.email,
+                              projectSlug: projectName,
+                              role: "viewer",
+                            }),
+                          );
+                          if (
+                            troupeInviteMemberToProject.fulfilled.match(res) &&
+                            projectName
+                          ) {
+                            void dispatch(
+                              fetchMyTroupe({
+                                month: monthKey(currentMonth),
+                                project: projectName,
+                              }),
+                            );
+                          }
+                        }}
+                        title={
+                          selectedMember
+                            ? `Добавить в проект`
+                            : "Выбери участника"
+                        }
+                      >
+                        {selectedMember && invitingIds[selectedMember.id]
+                          ? "…"
+                          : narrowLayout
+                            ? "В проект"
+                            : "Добавить в проект"}
+                      </Button>
+                      <Button
+                        type="button"
+                        className="danger"
+                        disabled={
+                          !selectedMember?.troupeMemberId ||
+                          !!removingIds[String(selectedMember.troupeMemberId)]
+                        }
+                        onClick={() => {
+                          if (!selectedMember?.troupeMemberId) return;
+                          if (!confirm("Удалить участника из труппы?")) return;
+                          dispatch(
+                            troupeRemoveMember({
+                              memberId: selectedMember.troupeMemberId,
+                            }),
+                          );
+                        }}
+                        title={
+                          selectedMember?.troupeMemberId
+                            ? "Удалить из труппы"
+                            : "Только участники из вашей труппы, совпадающие с командой проекта"
+                        }
+                      >
+                        {selectedMember?.troupeMemberId &&
+                        removingIds[String(selectedMember.troupeMemberId)]
+                          ? "…"
+                          : narrowLayout
+                            ? "Удалить"
+                            : "Удалить из труппы"}
+                      </Button>
+                    </>
                   ) : null}
-                  <Button
-                    type="button"
-                    className="danger"
-                    disabled={
-                      !selectedMember || !!removingIds[selectedMember.id]
-                    }
-                    onClick={() => {
-                      if (!selectedMember) return;
-                      if (!confirm("Удалить участника из труппы?")) return;
-                      dispatch(
-                        troupeRemoveMember({ memberId: selectedMember.id }),
-                      );
-                    }}
-                    title={
-                      selectedMember
-                        ? "Удалить из труппы"
-                        : "Сначала выбери участника в таблице"
-                    }
-                  >
-                    {selectedMember && removingIds[selectedMember.id]
-                      ? "…"
-                      : narrowLayout
-                        ? "Удалить"
-                        : "Удалить из труппы"}
-                  </Button>
                   <Button
                     type="button"
                     className="primary"
@@ -448,7 +425,7 @@ export function TroupePage() {
                   scheduleRefreshing && "troupe-schedule--refreshing",
                 )}
                 role="region"
-                aria-label="График занятости труппы"
+                aria-label="График занятости команды проекта"
                 aria-busy={scheduleRefreshing}
               >
                 <div
@@ -503,7 +480,9 @@ export function TroupePage() {
 
                   {members.length === 0 ? (
                     <div className="troupe-cell troupe-empty">
-                      В труппе пока никого нет. Добавьте актёров по email.
+                      {projectName
+                        ? `В проекте «${projectName}» пока нет участников.`
+                        : "Нет активного проекта — выберите проект в шапке приложения."}
                     </div>
                   ) : (
                     members.map((m) => {
@@ -609,46 +588,49 @@ export function TroupePage() {
               </div>
             </div>
 
-            <div className="troupe-card troupe-invite-card">
-              <div className="troupe-invite-card__title">
-                <span className="troupe-invite-card__title-desktop">
-                  Добавить в труппу по email
-                </span>
-                <span className="troupe-invite-card__title-mobile">
-                  Пригласить по email
-                </span>
+            {error ? <div className="troupe-error">{error}</div> : null}
+
+            {canManageProjectTroupe ? (
+              <div className="troupe-card troupe-invite-card">
+                <div className="troupe-invite-card__title">
+                  <span className="troupe-invite-card__title-desktop">
+                    Добавить в труппу по email
+                  </span>
+                  <span className="troupe-invite-card__title-mobile">
+                    Пригласить по email
+                  </span>
+                </div>
+                <FormInlineRow className="troupe-form-row troupe-form-row--invite-email">
+                  <InlineTextField
+                    className="troupe-invite-email-field"
+                    placeholder="actor@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="troupe-form-row__btn troupe-invite-card__submit"
+                    disabled={adding || !email.trim() || !projectName}
+                    onClick={async () => {
+                      const value = email.trim();
+                      if (!value) return;
+                      const res = await dispatch(
+                        troupeAddMember({ email: value }),
+                      );
+                      if (troupeAddMember.fulfilled.match(res)) setEmail("");
+                    }}
+                  >
+                    {adding ? "Добавление…" : "Добавить"}
+                  </button>
+                </FormInlineRow>
+                {addError ? <div className="troupe-error">{addError}</div> : null}
               </div>
-              <FormInlineRow className="troupe-form-row troupe-form-row--invite-email">
-                <InlineTextField
-                  className="troupe-invite-email-field"
-                  placeholder="actor@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  className="troupe-form-row__btn troupe-invite-card__submit"
-                  disabled={adding || !email.trim()}
-                  onClick={async () => {
-                    const value = email.trim();
-                    if (!value) return;
-                    const res = await dispatch(
-                      troupeAddMember({ email: value }),
-                    );
-                    if (troupeAddMember.fulfilled.match(res)) setEmail("");
-                  }}
-                >
-                  {adding ? "Добавление…" : "Добавить"}
-                </button>
-              </FormInlineRow>
-              {addError ? <div className="troupe-error">{addError}</div> : null}
-              {error ? <div className="troupe-error">{error}</div> : null}
-            </div>
+            ) : null}
           </div>
         </main>
       </div>

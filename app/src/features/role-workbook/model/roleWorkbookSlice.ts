@@ -179,7 +179,9 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
     const rolesPromise = rolesFromState ? null : getProjectRoles(accessToken, projectSlug).catch(() => null);
 
     const troupeFromState = Array.isArray(state?.troupe?.members) ? state.troupe.members : null;
-    const troupePromise = troupeFromState ? null : getMyTroupe(accessToken).catch(() => null);
+    const troupePromise = troupeFromState
+      ? null
+      : getMyTroupe(accessToken, { project: projectSlug }).catch(() => null);
 
     const myProfilePromise = myEmailFromState ? null : getMyProfile(accessToken).catch(() => null);
 

@@ -251,20 +251,6 @@ function sessionStartsDateKey(
   return Number.isFinite(d.getTime()) ? toDateKey(d) : null;
 }
 
-function filterPlannedEmailsBySpecifiedAvailability(
-  emails: string[],
-  dateKey: string | null,
-  profileByEmail: Map<string, TeamProfile>,
-): string[] {
-  if (!dateKey || emails.length === 0) return emails;
-  return emails.filter((e) =>
-    profileHasSpecifiedAvailabilityForDate(
-      profileByEmail.get(normalizeEmail(e)),
-      dateKey,
-    ),
-  );
-}
-
 function normalizeRoleKey(v: string): string {
   return String(v ?? "")
     .trim()
@@ -676,28 +662,9 @@ export function DirectorSessionsPage() {
     };
     const computed = computePlannedEmailsForSession(nextActive, dataCache);
     const rawPlanned = computed.emails;
-    const dk = sessionStartsDateKey(nextActive);
-    let plannedEmails = rawPlanned;
-    if (accessToken && dk && rawPlanned.length > 0) {
-      try {
-        const list = await getProfilesBatch(accessToken, rawPlanned);
-        const byEmail = new Map<string, TeamProfile>();
-        (list ?? []).forEach((p) => {
-          const e = normalizeEmail((p as any)?.email);
-          if (e) byEmail.set(e, p);
-        });
-        plannedEmails = filterPlannedEmailsBySpecifiedAvailability(
-          rawPlanned,
-          dk,
-          byEmail,
-        );
-      } catch (_) {
-        plannedEmails = rawPlanned;
-      }
-    }
     const nextWithPlanned: DirectorRehearsalSession =
       computed.complete || rawPlanned.length > 0
-        ? { ...nextActive, plannedEmails }
+        ? { ...nextActive, plannedEmails: rawPlanned }
         : nextActive;
 
     const nextSessions = sessions.map((s) =>
@@ -871,8 +838,6 @@ export function DirectorSessionsPage() {
     void (async () => {
       const list = sessions ?? [];
       const rawBySessionId = new Map<string, string[]>();
-      const dateKeyBySessionId = new Map<string, string | null>();
-      const allEmails = new Set<string>();
 
       for (const session of list) {
         const slugs = Array.from(
@@ -892,32 +857,6 @@ export function DirectorSessionsPage() {
         const computed = computePlannedEmailsForSession(session, dataCache);
         const raw = computed.emails;
         rawBySessionId.set(session.id, raw);
-        dateKeyBySessionId.set(session.id, sessionStartsDateKey(session));
-        for (const e of raw) {
-          const ne = normalizeEmail(e);
-          if (ne) allEmails.add(ne);
-        }
-      }
-
-      let profileByEmail = new Map<string, TeamProfile>();
-      let profilesFetchOk = false;
-      if (allEmails.size > 0) {
-        try {
-          const profs = await getProfilesBatch(
-            accessToken,
-            Array.from(allEmails),
-          );
-          if (cancelled) return;
-          profilesFetchOk = true;
-          profileByEmail = new Map();
-          (profs ?? []).forEach((p) => {
-            const e = normalizeEmail((p as any)?.email);
-            if (e) profileByEmail.set(e, p);
-          });
-        } catch (_) {
-          profilesFetchOk = false;
-          profileByEmail = new Map();
-        }
       }
 
       if (cancelled) return;
@@ -926,23 +865,14 @@ export function DirectorSessionsPage() {
       const nextSessions = list.map((session) => {
         if (!rawBySessionId.has(session.id)) return session;
         const raw = rawBySessionId.get(session.id) ?? [];
-        const dk = dateKeyBySessionId.get(session.id) ?? null;
-        const nextEmails =
-          profilesFetchOk && dk
-            ? filterPlannedEmailsBySpecifiedAvailability(
-                raw,
-                dk,
-                profileByEmail,
-              )
-            : raw;
         if (
           plannedEmailsFingerprint(session.plannedEmails) ===
-          plannedEmailsFingerprint(nextEmails)
+          plannedEmailsFingerprint(raw)
         ) {
           return session;
         }
         changed = true;
-        return { ...session, plannedEmails: nextEmails };
+        return { ...session, plannedEmails: raw };
       });
       if (!changed) return;
       void persist(nextSessions);

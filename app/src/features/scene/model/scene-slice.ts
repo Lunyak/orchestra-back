@@ -748,6 +748,7 @@ export const sceneSlice = createSlice({
         sceneData: SceneData | null;
         steps: ScriptStep[];
         theaterLayout: TheaterLayout;
+        /** Если не передан — сохраняем страницу по id выбранного шага (пул с сервера / регидрация). */
         currentPage?: number;
         isSceneReady: boolean;
         serverShadow?: {
@@ -758,10 +759,26 @@ export const sceneSlice = createSlice({
         } | null;
       }>,
     ) {
+      const prevSteps = state.steps;
+      const prevPage = state.currentPage;
+      const prevSelectedId = prevSteps[prevPage]?.id ?? null;
+
       state.sceneData = action.payload.sceneData;
-      state.steps = ensureNonEmptySteps(action.payload.steps);
+      const nextSteps = ensureNonEmptySteps(action.payload.steps);
+      state.steps = nextSteps;
       state.theaterLayout = action.payload.theaterLayout;
-      state.currentPage = action.payload.currentPage ?? 0;
+
+      const payloadPage = action.payload.currentPage;
+      const safeMax = Math.max(0, nextSteps.length - 1);
+      if (payloadPage !== undefined) {
+        state.currentPage = payloadPage;
+      } else if (prevSelectedId != null) {
+        const idx = nextSteps.findIndex((s) => s.id === prevSelectedId);
+        state.currentPage = idx !== -1 ? idx : Math.min(prevPage, safeMax);
+      } else {
+        state.currentPage = Math.min(prevPage, safeMax);
+      }
+
       state.isSceneReady = action.payload.isSceneReady;
       state.hasLocalEdits = false;
       state.stepsRevision += 1;

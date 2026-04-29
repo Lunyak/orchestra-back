@@ -27,7 +27,7 @@ export class DirectorSessionsController {
 
   /**
    * Опубликованные сессии других пользователей, где email текущего пользователя
-   * в plannedEmails или participants (для календаря занятости / вызовов).
+   * в plannedEmails, participants или в отмеченных roleRehearsalPicks слотов.
    * Должен быть выше :id, иначе id = "invitations".
    */
   @Get('invitations')

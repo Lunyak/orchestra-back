@@ -239,7 +239,7 @@ export function KanbanBoardPage({
     setRolesError(null);
     Promise.all([
       getProjectRoles(accessToken, projectName),
-      getMyTroupe(accessToken).catch(() => null),
+      getMyTroupe(accessToken, { project: projectName }).catch(() => null),
       getProjectMembers(accessToken, projectName).catch(() => null),
     ])
       .then(([rolesRes, troupeRes, projectMembers]) => {

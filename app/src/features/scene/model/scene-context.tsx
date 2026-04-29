@@ -15,6 +15,7 @@ import {
   getPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
@@ -354,15 +355,35 @@ function useSceneOperations() {
           const localRoles = loadSceneRolesFromStorage(effectiveProject);
           if (localRoles) minimalSceneData.sceneRoles = localRoles;
         }
+
+        const nextStepsPayload = normalizedSteps.length ? normalizedSteps : steps;
+        const wasReady = store.getState().scene.isSceneReady;
+        let bootstrapPage: number | undefined;
+        if (!wasReady && typeof window !== "undefined" && nextStepsPayload.length > 0) {
+          const idRaw = localStorage.getItem(`selectedStepId:${effectiveProject}`);
+          const pageRaw = localStorage.getItem(`selectedStepPage:${effectiveProject}`);
+          const sid = idRaw != null && idRaw !== "" ? Number(idRaw) : Number.NaN;
+          const sp = pageRaw != null && pageRaw !== "" ? Number(pageRaw) : Number.NaN;
+          let idx = -1;
+          if (Number.isFinite(sid)) {
+            idx = nextStepsPayload.findIndex((s: any) => s.id === sid);
+          }
+          if (idx === -1 && Number.isFinite(sp)) {
+            idx = Math.max(0, Math.min(Math.floor(sp), nextStepsPayload.length - 1));
+          }
+          if (idx !== -1) bootstrapPage = idx;
+        }
+
         dispatch(
           sceneActions.hydrateScene({
             sceneData: minimalSceneData,
             theaterLayout: normalizedLayout,
-            steps: normalizedSteps.length ? normalizedSteps : steps,
+            steps: nextStepsPayload,
+            ...(bootstrapPage !== undefined ? { currentPage: bootstrapPage } : {}),
             isSceneReady: true,
             serverShadow: {
               sceneData: minimalSceneData,
-              steps: normalizedSteps.length ? normalizedSteps : steps,
+              steps: nextStepsPayload,
               theaterLayout: normalizedLayout,
               lightChannels: normalizedLightChannels,
             },
@@ -1342,12 +1363,24 @@ function useSceneProviderEffects() {
       return;
     }
 
+    if (!isSceneReady) return;
+
     if (projectName && restoredProjectRef.current !== projectName) {
       const storedIdRaw = localStorage.getItem(`selectedStepId:${projectName}`);
       const storedId = storedIdRaw ? Number(storedIdRaw) : null;
-      if (storedId != null) {
-        const idx = steps.findIndex((s) => s.id === storedId);
-        if (idx !== -1 && idx !== currentPage) dispatch(sceneActions.setCurrentPage(idx));
+      const storedPageRaw = localStorage.getItem(`selectedStepPage:${projectName}`);
+      const storedPage = storedPageRaw != null ? Number(storedPageRaw) : NaN;
+
+      let targetIdx: number | null = null;
+      if (storedId != null && Number.isFinite(storedId)) {
+        const byId = steps.findIndex((s) => s.id === storedId);
+        if (byId !== -1) targetIdx = byId;
+      }
+      if (targetIdx == null && Number.isFinite(storedPage) && steps.length > 0) {
+        targetIdx = Math.max(0, Math.min(Math.floor(storedPage), steps.length - 1));
+      }
+      if (targetIdx != null && targetIdx !== currentPage) {
+        dispatch(sceneActions.setCurrentPage(targetIdx));
       }
       restoredProjectRef.current = projectName;
       return;
@@ -1365,10 +1398,11 @@ function useSceneProviderEffects() {
     if (currentPage > steps.length - 1) {
       dispatch(sceneActions.setCurrentPage(steps.length - 1));
     }
-  }, [projectName, steps, currentPage, dispatch]);
+  }, [projectName, steps, currentPage, dispatch, isSceneReady]);
 
   useEffect(() => {
     if (!projectName) return;
+    if (!isSceneReady) return;
     // Same race as with sceneRoles: don't persist previous project's selection
     // into the new project's localStorage key on project switch.
     if (lastProjectForSelectedStepSaveRef.current !== projectName) {
@@ -1379,7 +1413,14 @@ function useSceneProviderEffects() {
     if (selectedId != null) {
       localStorage.setItem(`selectedStepId:${projectName}`, String(selectedId));
     }
-  }, [projectName, steps, currentPage]);
+    try {
+      if (steps.length > 0) {
+        localStorage.setItem(`selectedStepPage:${projectName}`, String(currentPage));
+      }
+    } catch {
+      // ignore
+    }
+  }, [projectName, steps, currentPage, isSceneReady]);
 
   const roleAssignmentsKey = useMemo(
     () => JSON.stringify((sceneData as any)?.roleAssignments ?? null),

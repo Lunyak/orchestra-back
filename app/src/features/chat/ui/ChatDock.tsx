@@ -1,7 +1,5 @@
-import dayjs from "dayjs";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth";
-import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { disconnectChatSocket, getChatSocket } from "../../../realtime/chat-socket";
 import {
@@ -12,25 +10,11 @@ import {
   type ChatConversationItem,
   type ChatMessageItem,
 } from "../../../sync/api/chat";
-import { getMyProfile, getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
+import { getMyProfile } from "../../../sync/api/profile";
+import { ChatDockMessagesContent } from "./ChatDockMessagesContent";
 import "./ChatDock.css";
 
 const CHAT_PAGE_SIZE = 20;
-
-function shortEmail(email: string) {
-  const e = email.trim().toLowerCase();
-  const at = e.indexOf("@");
-  return at > 0 ? e.slice(0, at) : e;
-}
-
-function chatAuthorLabel(profile: TeamProfile | null | undefined, email: string): string {
-  const p = profile ?? null;
-  const display = String(p?.displayName ?? "").trim();
-  if (display) return display;
-  const full = `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim();
-  if (full) return full;
-  return shortEmail(email);
-}
 
 function conversationLabel(
   c: ChatConversationItem,
@@ -64,8 +48,6 @@ export function ChatDock() {
   const scrollRestoreRef = useRef<{ fromTop: number; fromHeight: number } | null>(null);
   const olderInFlightRef = useRef(false);
   const wasLoadingMsgsRef = useRef(false);
-  const authorProfilesRef = useRef<Record<string, TeamProfile | null>>({});
-  const [, authorProfilesTick] = useState(0);
   const activeIdRef = useRef<string | null>(null);
   const openRef = useRef(false);
   const myEmailRef = useRef<string | null>(null);
@@ -218,33 +200,6 @@ export function ChatDock() {
       cancelled = true;
     };
   }, [open, activeId]);
-
-  useEffect(() => {
-    if (!open || !accessToken || !messages.length) return;
-    const need = [...new Set(messages.map((m) => m.authorEmail.trim().toLowerCase()))];
-    const missing = need.filter((e) => !(e in authorProfilesRef.current));
-    if (!missing.length) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const rows = await getProfilesBatch(accessToken, missing);
-        if (cancelled) return;
-        for (const e of missing) {
-          const p = rows.find((r) => r.email.trim().toLowerCase() === e);
-          authorProfilesRef.current[e] = p ?? null;
-        }
-        authorProfilesTick((n) => n + 1);
-      } catch {
-        for (const e of missing) {
-          authorProfilesRef.current[e] = null;
-        }
-        authorProfilesTick((n) => n + 1);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, accessToken, messages]);
 
   const lastVisibleMessageId = messages.length ? messages[messages.length - 1]!.id : null;
 
@@ -556,40 +511,11 @@ export function ChatDock() {
                     ) : null}
                   </div>
                 ) : null}
-                {messages.map((m) => {
-                  const mine =
-                    myEmail != null &&
-                    m.authorEmail.trim().toLowerCase() === myEmail;
-                  const norm = m.authorEmail.trim().toLowerCase();
-                  const prof = authorProfilesRef.current[norm];
-                  const label = chatAuthorLabel(prof ?? undefined, m.authorEmail);
-                  const avatarSrc =
-                    prof && String(prof.avatarUrl ?? "").trim()
-                      ? String(prof.avatarUrl).trim()
-                      : null;
-                  return (
-                    <article
-                      key={m.id}
-                      className={`chat-dock-msg ${mine ? "chat-dock-msg--mine" : ""}`}
-                    >
-                      <div className="chat-dock-msg-row">
-                        <MiniAvatar
-                          src={avatarSrc}
-                          label={label}
-                          size={28}
-                          title={m.authorEmail}
-                        />
-                        <div className="chat-dock-msg-col">
-                          <div className="chat-dock-msg-meta">
-                            <span title={m.authorEmail}>{label}</span>
-                            <span>{dayjs(m.createdAt).format("DD.MM HH:mm")}</span>
-                          </div>
-                          <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                <ChatDockMessagesContent
+                  accessToken={accessToken}
+                  messages={messages}
+                  myEmail={myEmail}
+                />
                 <div className="chat-dock-messages-end" aria-hidden />
                 {showJumpToBottom ? (
                   <button

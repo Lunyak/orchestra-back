@@ -18,7 +18,6 @@ import {
 import {
   loadSessionsForRangeThunk,
   profileAvailabilityActions,
-  profileAvailabilityCacheKey,
   selectAvailabilityFlags,
   selectAvailabilitySessionsForActiveRange,
   selectProfileCalendarState,
@@ -64,10 +63,9 @@ export function ProfileAvailabilityTab() {
     dispatch(fetchMyProfileThunk({ accessToken }));
   }, [accessToken, dispatch]);
 
-  /** Сессии: свои (режиссёр) + приглашения (GET /director-sessions/invitations) — после развёртывания дня или модалки. */
+  /** Свои сессии + приглашения за видимый месяц; при смене месяца или входе на вкладку — повторный запрос (без кэша «не стучать дважды»). */
   useEffect(() => {
     if (!accessToken) return;
-    if (!dayPanelOpen && !sessionDetailModalId) return;
     dispatch(profileAvailabilityActions.clearAvailabilityError());
     dispatch(
       loadSessionsForRangeThunk({
@@ -76,19 +74,7 @@ export function ProfileAvailabilityTab() {
         toIso: calendarState.toIso,
       }),
     );
-    dispatch(
-      profileAvailabilityActions.setActiveRangeKey({
-        value: profileAvailabilityCacheKey(calendarState.fromIso, calendarState.toIso),
-      }),
-    );
-  }, [
-    accessToken,
-    calendarState.fromIso,
-    calendarState.toIso,
-    dayPanelOpen,
-    sessionDetailModalId,
-    dispatch,
-  ]);
+  }, [accessToken, calendarState.fromIso, calendarState.toIso, dispatch]);
 
   const availabilityCalendar = useMemo(
     () => (((form as any).availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>),
@@ -252,15 +238,11 @@ export function ProfileAvailabilityTab() {
             {dayPanelOpen ? "Свернуть блок дня" : "Развернуть блок дня"}
           </Button>
         </div>
-        {!dayPanelOpen && !sessionDetailModalId ? (
-          <div className="profile-availability-hint" style={{ marginTop: 6 }}>
-            Список сессий не запрашивается, пока вы не развернёте блок дня, не выберете день в календаре или не
-            откроете карточку сессии. Сюда попадают ваши сессии как у режиссёра и{" "}
-            <strong>опубликованные</strong> сессии, куда вас вызвал другой пользователь (ваш email в плане вызова
-            или в списке участников). Это не значит, что вы режиссёр — просто вы приглашены в чужую карточку
-            сессии.
-          </div>
-        ) : null}
+        <div className="profile-availability-hint" style={{ marginTop: 6 }}>
+          Сюда попадают ваши сессии как у режиссёра и <strong>опубликованные</strong> сессии, куда вас вызвали (email
+          в плане, среди участников или в отмеченных ролях слота). Чужая сессия в списке не означает, что вы
+          режиссёр.
+        </div>
 
         {dayPanelOpen && (
           <div ref={dayPanelRef} className="profile-availability-panel">

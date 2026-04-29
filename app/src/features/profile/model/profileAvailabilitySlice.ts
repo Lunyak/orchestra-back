@@ -22,7 +22,6 @@ export type ProfileAvailabilityState = {
   byRangeKey: Record<string, DirectorSession[] | undefined>;
   loading: boolean;
   error: string | null;
-  activeRangeKey: string;
 };
 
 function defaultCalendarState(): CalendarSectionState {
@@ -41,7 +40,7 @@ function defaultCalendarState(): CalendarSectionState {
 
 /** Ключ кэша сессий в занятости (суффикс при смене схемы — сброс старых данных без приглашений). */
 export function profileAvailabilityCacheKey(fromIso: string, toIso: string) {
-  return [String(fromIso ?? "").trim(), String(toIso ?? "").trim(), "v3inv"].join("|");
+  return [String(fromIso ?? "").trim(), String(toIso ?? "").trim(), "v4inv"].join("|");
 }
 
 const initialState: ProfileAvailabilityState = {
@@ -49,7 +48,6 @@ const initialState: ProfileAvailabilityState = {
   byRangeKey: {},
   loading: false,
   error: null,
-  activeRangeKey: "",
 };
 
 export const loadSessionsForRangeThunk = createAsyncThunk<
@@ -98,16 +96,6 @@ export const loadSessionsForRangeThunk = createAsyncThunk<
       return rejectWithValue("Не удалось загрузить события сессий");
     }
   },
-  {
-    condition: ({ fromIso, toIso }, { getState }) => {
-      const s = (getState() as any).profileAvailability as ProfileAvailabilityState | undefined;
-      if (!s) return true;
-      if (s.loading) return false;
-      const key = profileAvailabilityCacheKey(fromIso, toIso);
-      if (s.byRangeKey[key]) return false;
-      return true;
-    },
-  },
 );
 
 export const profileAvailabilitySlice = createSlice({
@@ -131,9 +119,6 @@ export const profileAvailabilitySlice = createSlice({
         toIso,
       };
     },
-    setActiveRangeKey(state, action: PayloadAction<{ value: string }>) {
-      state.activeRangeKey = String(action.payload.value ?? "");
-    },
     clearAvailabilityError(state) {
       state.error = null;
     },
@@ -147,7 +132,6 @@ export const profileAvailabilitySlice = createSlice({
       state.loading = false;
       state.error = null;
       state.byRangeKey[action.payload.rangeKey] = action.payload.sessions;
-      state.activeRangeKey = action.payload.rangeKey;
     });
     b.addCase(loadSessionsForRangeThunk.rejected, (state, action) => {
       state.loading = false;
@@ -166,7 +150,9 @@ export function selectProfileCalendarState(state: RootState): CalendarSectionSta
 export function selectAvailabilitySessionsForActiveRange(state: RootState): DirectorSession[] {
   const s = (state as any).profileAvailability as ProfileAvailabilityState | undefined;
   if (!s) return [];
-  const list = s.byRangeKey?.[s.activeRangeKey];
+  const { fromIso, toIso } = s.calendarState ?? defaultCalendarState();
+  const key = profileAvailabilityCacheKey(fromIso, toIso);
+  const list = s.byRangeKey?.[key];
   return Array.isArray(list) ? list : [];
 }
 

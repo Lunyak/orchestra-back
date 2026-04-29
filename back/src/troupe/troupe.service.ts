@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -48,6 +49,24 @@ function filterAvailabilityByMonth<T extends Record<string, unknown>>(
 export class TroupeService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Добавление/удаление в труппу с экрана «по проекту» — только владелец этого проекта. */
+  private async assertUserOwnsProject(userId: string, projectSlugRaw: unknown) {
+    const slug =
+      typeof projectSlugRaw === 'string' ? projectSlugRaw.trim() : '';
+    if (!slug) {
+      throw new BadRequestException('query "project" (slug) is required');
+    }
+    const project = await this.prisma.project.findFirst({
+      where: { slug, deletedAt: null, ownerId: userId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new ForbiddenException(
+        'Только владелец проекта может добавлять или удалять участников труппы',
+      );
+    }
+  }
+
   private async getOrCreateMyTroupe(userId: string) {
     const existing = await this.prisma.troupe.findUnique({
       where: { ownerUserId: userId },
@@ -58,29 +77,52 @@ export class TroupeService {
     });
   }
 
-  async getMyTroupeWithMembers(userId: string, month?: unknown) {
-    const troupe = await this.prisma.troupe.findUnique({
-      where: { ownerUserId: userId },
-    });
-    if (!troupe) {
-      return { troupe: null, members: [] };
+  async getMyTroupeWithMembers(
+    userId: string,
+    month?: unknown,
+    projectSlugRaw?: unknown,
+  ) {
+    const projectSlug =
+      typeof projectSlugRaw === 'string' ? projectSlugRaw.trim() : '';
+    if (!projectSlug) {
+      throw new BadRequestException('query "project" (slug) is required');
     }
 
-    const members = await this.prisma.troupeMember.findMany({
-      where: { troupeId: troupe.id },
-      orderBy: { createdAt: 'desc' },
+    const project = await this.prisma.project.findFirst({
+      where: {
+        slug: projectSlug,
+        deletedAt: null,
+        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
+      },
       select: {
         id: true,
-        troupeId: true,
-        userId: true,
-        email: true,
+        slug: true,
+        name: true,
         createdAt: true,
+        updatedAt: true,
+        ownerId: true,
+        owner: { select: { id: true, email: true } },
+        members: {
+          select: {
+            id: true,
+            user: { select: { email: true } },
+          },
+        },
       },
     });
+    if (!project) {
+      throw new NotFoundException('Project not found or access denied');
+    }
 
-    const emails = members
-      .map((m) => m.email.trim().toLowerCase())
-      .filter(Boolean);
+    const emailSet = new Set<string>();
+    const ownerEmail = project.owner?.email?.trim().toLowerCase() ?? '';
+    if (ownerEmail) emailSet.add(ownerEmail);
+    for (const m of project.members) {
+      const e = m.user.email?.trim().toLowerCase();
+      if (e) emailSet.add(e);
+    }
+    const emails = [...emailSet];
+
     const profiles = emails.length
       ? await this.prisma.userProfile.findMany({
           where: { email: { in: emails } },
@@ -97,43 +139,83 @@ export class TroupeService {
         })
       : [];
 
-    const profileByEmail = new Map(profiles.map((p) => [p.email, p]));
+    const profileByEmail = new Map(
+      profiles.map((p) => [p.email.trim().toLowerCase(), p]),
+    );
     const monthRange = parseMonthFilter(month);
 
+    const ownTroupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+
+    const isDirectorOfThisProject = project.ownerId === userId;
+    const troupeMemberIdByEmail = new Map<string, string>();
+    if (isDirectorOfThisProject && ownTroupe) {
+      const troupeMembers = await this.prisma.troupeMember.findMany({
+        where: { troupeId: ownTroupe.id, email: { in: emails } },
+        select: { id: true, email: true },
+      });
+      for (const tm of troupeMembers) {
+        troupeMemberIdByEmail.set(
+          tm.email.trim().toLowerCase(),
+          tm.id,
+        );
+      }
+    }
+
+    const orderedEmails: string[] = [];
+    if (ownerEmail) orderedEmails.push(ownerEmail);
+    for (const m of project.members) {
+      const e = m.user.email?.trim().toLowerCase();
+      if (e && e !== ownerEmail) orderedEmails.push(e);
+    }
+
+    const scheduleMembers = orderedEmails.map((email) => {
+      const raw = profileByEmail.get(email) ?? null;
+      const profile =
+        raw && monthRange
+          ? {
+              ...raw,
+              availabilityCalendar: filterAvailabilityByMonth(
+                raw.availabilityCalendar,
+                monthRange.first,
+                monthRange.last,
+              ),
+              availabilityTimeRanges: filterAvailabilityByMonth(
+                raw.availabilityTimeRanges,
+                monthRange.first,
+                monthRange.last,
+              ),
+            }
+          : raw;
+      const troupeMemberId = troupeMemberIdByEmail.get(email) ?? null;
+      const stableId = troupeMemberId ?? `pteam:${project.id}:${email}`;
+      return {
+        id: stableId,
+        troupeId: ownTroupe?.id ?? project.id,
+        email,
+        createdAt: project.createdAt.toISOString(),
+        profile,
+        troupeMemberId,
+      };
+    });
+
     return {
-      troupe: {
-        id: troupe.id,
-        title: troupe.title,
-        createdAt: troupe.createdAt,
-        updatedAt: troupe.updatedAt,
-      },
-      members: members.map((m) => {
-        const raw = profileByEmail.get(m.email.trim().toLowerCase()) ?? null;
-        const profile =
-          raw && monthRange
-            ? {
-                ...raw,
-                availabilityCalendar: filterAvailabilityByMonth(
-                  raw.availabilityCalendar,
-                  monthRange.first,
-                  monthRange.last,
-                ),
-                availabilityTimeRanges: filterAvailabilityByMonth(
-                  raw.availabilityTimeRanges,
-                  monthRange.first,
-                  monthRange.last,
-                ),
-              }
-            : raw;
-        return {
-          ...m,
-          profile,
-        };
-      }),
+      troupe: ownTroupe
+        ? {
+            id: ownTroupe.id,
+            title: ownTroupe.title,
+            createdAt: ownTroupe.createdAt,
+            updatedAt: ownTroupe.updatedAt,
+          }
+        : null,
+      members: scheduleMembers,
     };
   }
 
-  async addMember(userId: string, rawEmail: unknown) {
+  async addMember(userId: string, rawEmail: unknown, projectSlug?: unknown) {
+    await this.assertUserOwnsProject(userId, projectSlug);
     const troupe = await this.getOrCreateMyTroupe(userId);
     const email = normalizeEmail(rawEmail);
 
@@ -207,7 +289,8 @@ export class TroupeService {
     return updated;
   }
 
-  async removeMember(userId: string, memberId: string) {
+  async removeMember(userId: string, memberId: string, projectSlug?: unknown) {
+    await this.assertUserOwnsProject(userId, projectSlug);
     const troupe = await this.prisma.troupe.findUnique({
       where: { ownerUserId: userId },
     });

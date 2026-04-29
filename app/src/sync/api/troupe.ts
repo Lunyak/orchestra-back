@@ -14,15 +14,20 @@ export interface TroupeMemberItem {
   email: string;
   createdAt: string;
   profile: TeamProfile | null;
+  /** Id строки в TroupeMember режиссёра; только для владельца проекта и email из его труппы. */
+  troupeMemberId?: string | null;
 }
 
 export async function getMyTroupe(
   accessToken: string,
-  opts?: { month?: string },
+  opts: { month?: string; project: string },
 ): Promise<{ troupe: TroupeSummary | null; members: TroupeMemberItem[] }> {
   const { data } = await api.get("/troupe", {
     headers: { Authorization: `Bearer ${accessToken}` },
-    params: opts?.month ? { month: opts.month } : undefined,
+    params: {
+      project: opts.project,
+      ...(opts.month ? { month: opts.month } : {}),
+    },
   });
   return data;
 }
@@ -30,11 +35,15 @@ export async function getMyTroupe(
 export async function addTroupeMember(
   accessToken: string,
   email: string,
+  opts: { project: string },
 ): Promise<TroupeMemberItem> {
   const { data } = await api.post(
     "/troupe/members",
     { email: email.trim() },
-    { headers: { Authorization: `Bearer ${accessToken}` } },
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      params: { project: opts.project },
+    },
   );
   return data;
 }
@@ -42,9 +51,11 @@ export async function addTroupeMember(
 export async function removeTroupeMember(
   accessToken: string,
   memberId: string,
+  opts: { project: string },
 ): Promise<void> {
   await api.delete(`/troupe/members/${encodeURIComponent(memberId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    params: { project: opts.project },
   });
 }
 

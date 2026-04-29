@@ -21,8 +21,16 @@ export class TroupeController {
   constructor(private readonly troupeService: TroupeService) {}
 
   @Get()
-  getMyTroupe(@Req() req: any, @Query('month') month?: string) {
-    return this.troupeService.getMyTroupeWithMembers(req.user.userId, month);
+  getMyTroupe(
+    @Req() req: any,
+    @Query('month') month?: string,
+    @Query('project') project?: string,
+  ) {
+    return this.troupeService.getMyTroupeWithMembers(
+      req.user.userId,
+      month,
+      project,
+    );
   }
 
   @Patch()
@@ -31,12 +39,20 @@ export class TroupeController {
   }
 
   @Post('members')
-  addMember(@Req() req: any, @Body() body: AddTroupeMemberDto) {
-    return this.troupeService.addMember(req.user.userId, body?.email);
+  addMember(
+    @Req() req: any,
+    @Body() body: AddTroupeMemberDto,
+    @Query('project') project?: string,
+  ) {
+    return this.troupeService.addMember(req.user.userId, body?.email, project);
   }
 
   @Delete('members/:memberId')
-  removeMember(@Req() req: any, @Param('memberId') memberId: string) {
-    return this.troupeService.removeMember(req.user.userId, memberId);
+  removeMember(
+    @Req() req: any,
+    @Param('memberId') memberId: string,
+    @Query('project') project?: string,
+  ) {
+    return this.troupeService.removeMember(req.user.userId, memberId, project);
   }
 }

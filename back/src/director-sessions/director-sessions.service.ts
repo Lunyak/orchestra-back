@@ -11,12 +11,18 @@ import { RolesService } from '../roles/roles.service';
 import { UpsertMyDirectorSessionCommentDto } from './dto/upsert-my-director-session-comment.dto';
 
 type DirectorSlotRef = { projectSlug: string; stepId: number };
+type DirectorSlotRoleRehearsalPick = {
+  roleKey: string;
+  email: string;
+  checked?: boolean;
+};
 type DirectorSessionSlot = {
   id: string;
   offsetMin: number;
   durationMin: number;
   ref?: DirectorSlotRef;
   notes?: string;
+  roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 type DirectorSessionParticipantStatus =
   | 'unknown'
@@ -110,6 +116,33 @@ function normalizePlannedEmails(value: unknown): string[] | undefined {
   }
   const uniq = Array.from(new Set(out)).slice(0, 500);
   return uniq.length ? uniq : [];
+}
+
+function isRoleRehearsalPickChecked(p: DirectorSlotRoleRehearsalPick | undefined): boolean {
+  if (!p) return false;
+  const c = (p as { checked?: unknown }).checked;
+  return c === true || c === 1;
+}
+
+function sessionPayloadInvitesEmail(
+  cur: DirectorRehearsalSession | undefined,
+  email: string,
+): boolean {
+  if (!cur || !email) return false;
+  const planned = Array.isArray(cur.plannedEmails) ? cur.plannedEmails : [];
+  if (planned.some((x) => normEmail(String(x ?? '')) === email)) return true;
+  const parts = Array.isArray(cur.participants) ? cur.participants : [];
+  if (parts.some((p) => normEmail(String((p as any)?.email ?? '')) === email))
+    return true;
+  for (const sl of cur.slots ?? []) {
+    const picks = (sl as DirectorSessionSlot).roleRehearsalPicks;
+    if (!Array.isArray(picks)) continue;
+    for (const p of picks) {
+      if (!isRoleRehearsalPickChecked(p)) continue;
+      if (normEmail(String(p.email ?? '')) === email) return true;
+    }
+  }
+  return false;
 }
 
 function getDatePartsInTimeZone(
@@ -384,7 +417,8 @@ export class DirectorSessionsService {
   }
 
   /**
-   * Сессии чужих режиссёров: email в plannedEmails или participants, только с publishedAt.
+   * Сессии чужих режиссёров: email в plannedEmails, participants или отмеченных
+   * roleRehearsalPicks слотов; только с publishedAt.
    * Для календаря занятости приглашённого актёра.
    */
   async listPublishedInvitationsForEmail(
@@ -424,21 +458,14 @@ export class DirectorSessionsService {
       .map((r) => r.payload as any as DirectorRehearsalSession | undefined)
       .filter((cur): cur is DirectorRehearsalSession => {
         if (!cur || !String((cur as any).publishedAt ?? '').trim()) return false;
-        const planned = Array.isArray((cur as any).plannedEmails)
-          ? ((cur as any).plannedEmails as any[])
-          : [];
-        if (planned.some((x) => normEmail(String(x ?? '')) === email)) return true;
-        const parts = Array.isArray((cur as any).participants)
-          ? ((cur as any).participants as any[])
-          : [];
-        return parts.some((p) => normEmail(String(p?.email ?? '')) === email);
+        return sessionPayloadInvitesEmail(cur, email);
       });
 
     return { sessions };
   }
 
   /**
-   * Сессия: владелец (режиссёр) или приглашённый (email в participants / plannedEmails).
+   * Сессия: владелец (режиссёр) или приглашённый (participants / plannedEmails / picks).
    */
   async get(
     userId: string,
@@ -465,14 +492,7 @@ export class DirectorSessionsService {
     const cur = row?.payload as any as DirectorRehearsalSession | undefined;
     if (!cur) throw new NotFoundException('Session not found');
 
-    const inParticipants = (cur.participants ?? []).some(
-      (p: any) => normEmail(String(p?.email ?? '')) === email,
-    );
-    const plannedRaw = Array.isArray(cur.plannedEmails) ? cur.plannedEmails : [];
-    const inPlanned = plannedRaw.some(
-      (e: any) => normEmail(String(e ?? '')) === email,
-    );
-    if (!inParticipants && !inPlanned) {
+    if (!sessionPayloadInvitesEmail(cur, email)) {
       throw new ForbiddenException('Нет доступа к этой сессии');
     }
     if (!String((cur as any).publishedAt ?? '').trim()) {
@@ -776,7 +796,10 @@ export class DirectorSessionsService {
   private async buildParticipantsForSession(
     userId: string,
     session: DirectorRehearsalSession,
-  ): Promise<DirectorSessionParticipant[]> {
+  ): Promise<{
+    participants: DirectorSessionParticipant[];
+    neededEmails: string[];
+  }> {
     const needed = await this.collectNeededEmailsForSession(userId, session);
     const dateKey = getDateKey(session.startsAt);
     if (!dateKey) throw new BadRequestException('Invalid session startsAt');
@@ -841,7 +864,7 @@ export class DirectorSessionsService {
         `Нельзя опубликовать сессию: среди нужных по слотам никто не отметил присутствие в профиле на ${dateKey}`,
       );
     }
-    return merged;
+    return { participants: merged, neededEmails: needed };
   }
 
   private async collectNeededEmailsForSession(
@@ -909,6 +932,16 @@ export class DirectorSessionsService {
           const emails = assignmentMap.get(key) ?? [];
           for (const email of emails) neededEmails.add(normEmail(email));
         }
+      }
+    }
+
+    for (const sl of session.slots ?? []) {
+      const picks = (sl as DirectorSessionSlot).roleRehearsalPicks;
+      if (!Array.isArray(picks)) continue;
+      for (const p of picks) {
+        if (!isRoleRehearsalPickChecked(p)) continue;
+        const em = normEmail(String(p.email ?? ''));
+        if (em && looksLikeEmail(em)) neededEmails.add(em);
       }
     }
 
@@ -1055,15 +1088,23 @@ export class DirectorSessionsService {
             .slice(0, 4000) || null
         : (session.comment ?? null);
 
-    const participants = await this.buildParticipantsForSession(
-      userId,
-      session,
-    );
+    const { participants, neededEmails } =
+      await this.buildParticipantsForSession(userId, session);
+    const plannedSet = new Set<string>();
+    for (const e of normalizePlannedEmails(session.plannedEmails) ?? []) {
+      plannedSet.add(normEmail(e));
+    }
+    for (const e of neededEmails) {
+      const n = normEmail(e);
+      if (n) plannedSet.add(n);
+    }
+    const mergedPlanned = Array.from(plannedSet).filter((e) => looksLikeEmail(e));
     const nowIso = new Date().toISOString();
     const updated: DirectorRehearsalSession = {
       ...session,
       comment: nextComment,
       participants,
+      plannedEmails: mergedPlanned,
       publishedAt: nowIso,
       updatedAt: nowIso,
     };
