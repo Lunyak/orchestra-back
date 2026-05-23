@@ -1,15 +1,10 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@shared/core/button/Button";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
-import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
-import { fetchMyProfileThunk, selectMyProfile } from "../../../features/profile/model/profileDataSlice";
-import {
-  fetchProjectRolesThunk,
-  selectProfileRolesFlags,
-  selectProjectRoles,
-} from "../../../features/profile/model/profileRolesSlice";
+import { useMyProfileQuery } from "../../../features/profile/api/profile-api";
+import { useProjectRolesQuery } from "../../../features/project/api/project-api";
 
 function normalizeEmail(v: unknown): string {
   return String(v ?? "").trim().toLowerCase();
@@ -18,22 +13,21 @@ function normalizeEmail(v: unknown): string {
 export function ProfileRoleWorkTab() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
-  const profile = useAppSelector(selectMyProfile);
-  const roles = useAppSelector(selectProjectRoles);
-  const flags = useAppSelector(selectProfileRolesFlags);
+  const { data: profile } = useMyProfileQuery(undefined, { skip: !accessToken });
+  const {
+    isFetching: rolesLoading,
+    error: rolesQueryError,
+    data: rolesRes,
+  } = useProjectRolesQuery(projectName!, {
+    skip: !accessToken || !projectName,
+  });
 
-  useEffect(() => {
-    if (!accessToken) return;
-    dispatch(fetchMyProfileThunk({ accessToken }));
-  }, [accessToken, dispatch]);
-
-  useEffect(() => {
-    if (!accessToken || !projectName) return;
-    dispatch(fetchProjectRolesThunk({ accessToken, projectName }));
-  }, [accessToken, dispatch, projectName]);
+  const roles = rolesRes?.roles ?? [];
+  const rolesError = rolesQueryError
+    ? String((rolesQueryError as { message?: string }).message ?? "Не удалось загрузить роли")
+    : null;
 
   const myAssignedRoles = useMemo(() => {
     const me = normalizeEmail(profile?.email ?? "");
@@ -61,11 +55,11 @@ export function ProfileRoleWorkTab() {
         </Button>
       </div>
 
-      {flags.error ? <div className="settings-invite-error">{flags.error}</div> : null}
-      {flags.loading ? <div style={{ fontSize: 12, opacity: 0.7 }}>Загрузка ролей…</div> : null}
+      {rolesError ? <div className="settings-invite-error">{rolesError}</div> : null}
+      {rolesLoading ? <div style={{ fontSize: 12, opacity: 0.7 }}>Загрузка ролей…</div> : null}
 
       <div style={{ display: "grid", gap: 8, maxWidth: 720 }}>
-        {myAssignedRoles.length === 0 && !flags.loading ? (
+        {myAssignedRoles.length === 0 && !rolesLoading ? (
           <div style={{ fontSize: 12, opacity: 0.7 }}>
             Роли не назначены на ваш email (или профиль ещё не загружен). Назначения делаются в карточке сцены на доске.
           </div>
@@ -106,4 +100,3 @@ export function ProfileRoleWorkTab() {
     </div>
   );
 }
-

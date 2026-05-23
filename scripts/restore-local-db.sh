@@ -17,8 +17,11 @@ echo ">>> Копирование дампа в контейнер postgres..."
 "${COMPOSE[@]}" cp "$DUMP" postgres:/tmp/orchestra_restore.dump
 
 echo ">>> pg_restore (ожидайте, возможны предупреждения)..."
-"${COMPOSE[@]}" exec -T postgres pg_restore -U orkestr -d dophamin_orkestr --no-owner --no-acl --clean --if-exists -v /tmp/orchestra_restore.dump
+# Git Bash (MSYS) на Windows подменяет /tmp/... на C:/Users/.../Temp/... — pg_restore ищет файл на хосте.
+export MSYS_NO_PATHCONV=1
+CONTAINER_DUMP="//tmp/orchestra_restore.dump"
+"${COMPOSE[@]}" exec -T postgres pg_restore -U orkestr -d dophamin_orkestr --no-owner --no-acl --clean --if-exists -v "$CONTAINER_DUMP"
 
-"${COMPOSE[@]}" exec -T postgres rm -f /tmp/orchestra_restore.dump
+"${COMPOSE[@]}" exec -T postgres rm -f "$CONTAINER_DUMP"
 
 echo "Готово. DBeaver: localhost:5432, БД dophamin_orkestr, пользователь orkestr (см. docker-compose.yml)."

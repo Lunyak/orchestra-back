@@ -21,6 +21,12 @@ build/
 electron-vite-project/out/
 electron-vite-project/dist/
 
+# Capacitor mobile
+mobile/node_modules/
+mobile/android/app/build/
+mobile/ios/App/Pods/
+mobile/ios/DerivedData/
+
 # Prisma generated (back)
 back/prisma/generated/
 
@@ -37,3 +43,5 @@ back/prisma/generated/
 /CHANGELOG-ROLE-FIX.md
 
 /.env
+
+backups/

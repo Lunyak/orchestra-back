@@ -1,0 +1,29 @@
+{
+  "name": "orchestra-mobile",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Orchestra — мобильное приложение (Capacitor)",
+  "scripts": {
+    "build:web": "cd ../web && npm run build:mobile",
+    "cap:sync": "npm run build:web && npx cap sync",
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios",
+    "android": "npm run cap:sync && npx cap run android",
+    "ios": "npm run cap:sync && npx cap run ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "typescript": "^5.2.2"
+  },
+  "capacitor": {
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  }
+}

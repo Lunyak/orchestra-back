@@ -1,0 +1,54 @@
+.offline-pack-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  margin: 0 0 8px;
+  font-size: 13px;
+  background: rgba(30, 40, 55, 0.85);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.offline-pack-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.offline-pack-status__dot.online {
+  background: #3dd68c;
+}
+
+.offline-pack-status__dot.offline {
+  background: #f5a623;
+}
+
+.offline-pack-status__text {
+  flex: 1;
+  min-width: 140px;
+  opacity: 0.9;
+}
+
+.offline-pack-status__btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: none;
+  background: #4a7cff;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.offline-pack-status__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.offline-pack-status__hint {
+  width: 100%;
+  font-size: 12px;
+  opacity: 0.75;
+}

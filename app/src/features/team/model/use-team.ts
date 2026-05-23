@@ -1,100 +1,109 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
+import type { ProjectMemberInfo } from "../../../sync/api/projects";
 import {
-  getProjectMembers,
-  inviteToProject,
-  removeProjectMember,
-  updateProjectMemberRole,
-  type ProjectMemberInfo,
-} from "../../../sync/api/projects";
+  useInviteProjectMemberMutation,
+  useProjectMembersQuery,
+  useRemoveProjectMemberMutation,
+  useUpdateProjectMemberRoleMutation,
+} from "../../project/api/project-api";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
+import type { OrchestraQueryError } from "../../../shared/api/rtk/axios-base-query";
+import { shouldLoadProjectMembers } from "./team-page-utils";
+
+function membersQueryStatus(error: unknown): number | undefined {
+  const e = error as OrchestraQueryError | undefined;
+  return typeof e?.status === "number" ? e.status : undefined;
+}
 
 export function useTeam() {
   const location = useLocation();
   const { accessToken } = useAuth();
   const { projectName } = useProject();
-  const [projectMembers, setProjectMembers] = useState<ProjectMemberInfo[]>([]);
-  const [projectOwner, setProjectOwner] = useState<
-    { id: string; email: string; displayName?: string | null } | null
-  >(null);
+  const fetchMembers = useMemo(
+    () => shouldLoadProjectMembers(location.pathname),
+    [location.pathname],
+  );
+
+  const {
+    data: membersData,
+    error: membersError,
+    isFetching: membersFetching,
+    refetch: refetchMembers,
+  } = useProjectMembersQuery(projectName, {
+    skip: !accessToken || !projectName || !fetchMembers,
+  });
+
+  const [inviteProjectMember] = useInviteProjectMemberMutation();
+  const [updateProjectMemberRoleMut] = useUpdateProjectMemberRoleMutation();
+  const [removeProjectMemberMut] = useRemoveProjectMemberMutation();
+
   const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (
-      (location.pathname !== "/settings" &&
-        location.pathname !== "/board" &&
-        location.pathname !== "/troupe" &&
-        location.pathname !== "/sessions" &&
-        !location.pathname.startsWith("/sessions/")) ||
-      !accessToken ||
-      !projectName
-    )
+    if (!fetchMembers) return;
+    if (membersFetching) return;
+    if (membersData) {
+      setIsProjectOwner(true);
       return;
-    setIsProjectOwner(null);
-    getProjectMembers(accessToken, projectName)
-      .then((res) => {
-        setProjectMembers(res.members ?? []);
-        setProjectOwner(res.owner ?? null);
-        setIsProjectOwner(true);
-      })
-      .catch((err: any) => {
-        if (err?.response?.status === 403) {
-          setIsProjectOwner(false);
-          setProjectMembers([]);
-          setProjectOwner(null);
-        } else {
-          setIsProjectOwner(true);
-          setProjectMembers([]);
-          setProjectOwner(null);
-        }
-      });
-  }, [location.pathname, accessToken, projectName]);
+    }
+    if (membersQueryStatus(membersError) === 403) {
+      setIsProjectOwner(false);
+      return;
+    }
+    if (membersError) {
+      setIsProjectOwner(true);
+    }
+  }, [fetchMembers, membersData, membersError, membersFetching]);
+
+  const projectMembers: ProjectMemberInfo[] = membersData?.members ?? [];
+  const projectOwner = membersData?.owner ?? null;
 
   const refreshMembers = useCallback(async () => {
-    if (!accessToken || !projectName) return;
-    try {
-      const res = await getProjectMembers(accessToken, projectName);
-      setProjectMembers(res.members ?? []);
-      setProjectOwner(res.owner ?? null);
-    } catch {
-      setProjectMembers([]);
-      setProjectOwner(null);
-    }
-  }, [accessToken, projectName]);
+    if (!accessToken || !projectName || !fetchMembers) return;
+    await refetchMembers();
+  }, [accessToken, fetchMembers, projectName, refetchMembers]);
 
   const invite = useCallback(async () => {
     const email = inviteEmail.trim();
     if (!email || !accessToken || !projectName) return;
     setInviteError(null);
     try {
-      await inviteToProject(accessToken, projectName, email);
+      await inviteProjectMember({ projectSlug: projectName, email }).unwrap();
       setInviteEmail("");
-      const res = await getProjectMembers(accessToken, projectName);
-      setProjectMembers(res.members ?? []);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as {
+        status?: number;
+        data?: { message?: string };
+        message?: string;
+      };
       setInviteError(
-        err?.response?.data?.message ??
-          (err?.response?.status === 404
+        e?.data?.message ??
+          (e?.status === 404
             ? "Пользователь с таким email не найден"
-            : "Не удалось пригласить")
+            : "Не удалось пригласить"),
       );
     }
-  }, [accessToken, inviteEmail, projectName]);
+  }, [accessToken, inviteEmail, inviteProjectMember, projectName]);
 
   const updateMemberRole = useCallback(
     async (memberId: string, role: "editor" | "viewer") => {
       if (!accessToken || !projectName) return;
       try {
-        await updateProjectMemberRole(accessToken, projectName, memberId, role);
-        await refreshMembers();
-      } catch (err: any) {
-        alert(err?.response?.data?.message ?? "Не удалось изменить права");
+        await updateProjectMemberRoleMut({
+          projectSlug: projectName,
+          memberId,
+          role,
+        }).unwrap();
+      } catch (err: unknown) {
+        const e = err as { data?: { message?: string }; message?: string };
+        alert(e?.data?.message ?? e?.message ?? "Не удалось изменить права");
       }
     },
-    [accessToken, projectName, refreshMembers]
+    [accessToken, projectName, updateProjectMemberRoleMut],
   );
 
   const removeMember = useCallback(
@@ -105,13 +114,16 @@ export function useTeam() {
       )
         return;
       try {
-        await removeProjectMember(accessToken, projectName, memberId);
-        await refreshMembers();
-      } catch (err: any) {
-        alert(err?.response?.data?.message ?? "Не удалось удалить участника");
+        await removeProjectMemberMut({
+          projectSlug: projectName,
+          memberId,
+        }).unwrap();
+      } catch (err: unknown) {
+        const e = err as { data?: { message?: string }; message?: string };
+        alert(e?.data?.message ?? e?.message ?? "Не удалось удалить участника");
       }
     },
-    [accessToken, projectName, refreshMembers]
+    [accessToken, projectName, removeProjectMemberMut],
   );
 
   return {

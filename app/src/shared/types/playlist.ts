@@ -8,5 +8,7 @@ export interface PlaylistTrack {
   remoteUrl?: string;
   /** Ключ в хранилище — для запроса свежей ссылки, когда remoteUrl истёк */
   remoteKey?: string;
+  /** Локальный путь после офлайн-загрузки (Capacitor / Electron) */
+  filePath?: string;
 }
 

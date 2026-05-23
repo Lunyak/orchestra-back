@@ -4,194 +4,64 @@ import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField"
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
+import { Fragment, useSyncExternalStore, type CSSProperties } from "react";
 import {
-  Fragment,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type CSSProperties,
-} from "react";
-import { useProject } from "../../features/project";
-import { useTeam } from "../../features/team";
-import {
-  fetchMyTroupe,
-  troupeAddMember,
-  troupeInviteMemberToProject,
-  troupePatchTitle,
-  troupeRemoveMember,
-} from "../../features/troupe/model/troupe-slice";
+  getTroupeNarrowLayoutSnapshot,
+  isoDate,
+  memberLabel,
+  monthKey,
+  subscribeTroupeNarrowLayout,
+  useTroupePage,
+} from "../../features/troupe";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
-import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import "./style.css";
 
 dayjs.locale("ru");
 
-function isoDate(d: Date): string {
-  return dayjs(d).format("YYYY-MM-DD");
-}
-
-function monthKey(d: Date): string {
-  return dayjs(d).format("YYYY-MM");
-}
-
-function dateFromMonthKey(key: string): Date | null {
-  const m = /^(\d{4})-(\d{2})$/.exec(key.trim());
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]) - 1;
-  if (!Number.isFinite(y) || mo < 0 || mo > 11) return null;
-  return new Date(y, mo, 1);
-}
-
-function readStoredTroupeMonth(): Date {
-  if (typeof window === "undefined") return new Date();
-  try {
-    const saved = localStorage.getItem("troupe-month");
-    if (!saved) return new Date();
-    const t = saved.trim();
-    const fromKey = dateFromMonthKey(t);
-    if (fromKey) return fromKey;
-    if (t.includes("T") || t.length > 7) {
-      return new Date();
-    }
-    const legacy = new Date(t);
-    return !isNaN(legacy.getTime())
-      ? dayjs(legacy).startOf("month").toDate()
-      : new Date();
-  } catch {
-    return new Date();
-  }
-}
-
-function memberLabel(m: {
-  email: string;
-  profile: {
-    displayName?: string | null;
-    firstName?: string | null;
-    lastName?: string | null;
-    avatarUrl?: string | null;
-  } | null;
-}): string {
-  const p = m.profile;
-  const display = String(p?.displayName ?? "").trim();
-  if (display) return display;
-  const full =
-    `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim();
-  if (full) return full;
-  return m.email;
-}
-
-const TROUPE_NARROW_MQ = "(max-width: 720px)";
-
-function useTroupeNarrowLayout(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      if (typeof window === "undefined") return () => {};
-      const mq = window.matchMedia(TROUPE_NARROW_MQ);
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    () =>
-      typeof window !== "undefined"
-        ? window.matchMedia(TROUPE_NARROW_MQ).matches
-        : false,
+export function TroupePage() {
+  const narrowLayout = useSyncExternalStore(
+    subscribeTroupeNarrowLayout,
+    getTroupeNarrowLayoutSnapshot,
     () => false,
   );
-}
 
-export function TroupePage() {
-  const dispatch = useAppDispatch();
-  const { projectName, isProjectsLoaded, projectsLoading } = useProject();
-  const { isProjectOwner } = useTeam();
-  const accessToken = useAppSelector((s) => s.auth.accessToken);
-  const troupe = useAppSelector((s) => s.troupe.troupe);
-  const members = useAppSelector((s) => s.troupe.members);
-  const loading = useAppSelector((s) => s.troupe.loading);
-  const error = useAppSelector((s) => s.troupe.error);
-  const adding = useAppSelector((s) => s.troupe.adding);
-  const addError = useAppSelector((s) => s.troupe.addError);
-  const removingIds = useAppSelector((s) => s.troupe.removingIds);
-  const invitingIds = useAppSelector((s) => s.troupe.invitingIds);
-  const inviteErrorByMemberId = useAppSelector(
-    (s) => s.troupe.inviteErrorByMemberId,
-  );
-  const patchingTitle = useAppSelector((s) => s.troupe.patchingTitle);
-  const patchTitleError = useAppSelector((s) => s.troupe.patchTitleError);
-  const scheduleRefreshing = useAppSelector((s) => s.troupe.scheduleRefreshing);
-
-  const [titleDraft, setTitleDraft] = useState("");
-  const [email, setEmail] = useState("");
-  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState<Date>(() =>
-    readStoredTroupeMonth(),
-  );
-
-  const narrowLayout = useTroupeNarrowLayout();
-
-  useEffect(() => {
-    if (!accessToken) return;
-    if (!isProjectsLoaded || projectsLoading) return;
-    if (!projectName) return;
-    void dispatch(
-      fetchMyTroupe({ month: monthKey(currentMonth), project: projectName }),
-    );
-  }, [
+  const {
     accessToken,
+    adding,
+    addError,
+    addMemberByEmail,
+    canManageProjectTroupe,
     currentMonth,
-    dispatch,
-    isProjectsLoaded,
+    days,
+    email,
+    error,
+    inviteErrorByMemberId,
+    inviteSelectedToProject,
+    invitingIds,
+    loading,
+    members,
+    patchTitleError,
+    patchingTitle,
     projectName,
-    projectsLoading,
-  ]);
-
-  useEffect(() => {
-    if (troupe?.title != null) setTitleDraft(troupe.title);
-  }, [troupe?.id, troupe?.title]);
-
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      localStorage.setItem("troupe-month", monthKey(currentMonth));
-    } catch {
-      // ignore
-    }
-  }, [currentMonth]);
-
-  const days = useMemo(() => {
-    const start = dayjs(currentMonth).startOf("month");
-    const n = start.daysInMonth();
-    return Array.from({ length: n }, (_v, i) => start.add(i, "day").toDate());
-  }, [currentMonth]);
-
-  const todayIso = isoDate(new Date());
-
-  useEffect(() => {
-    setSelectedDayIso((prev) => {
-      if (!prev) return null;
-      return days.some((d) => isoDate(d) === prev) ? prev : null;
-    });
-  }, [currentMonth, days]);
-
-  const selectedMember = useMemo(
-    () =>
-      selectedMemberId
-        ? (members.find((m) => m.id === selectedMemberId) ?? null)
-        : null,
-    [members, selectedMemberId],
-  );
-
-  useEffect(() => {
-    if (!selectedMemberId) return;
-    if (!members.some((m) => m.id === selectedMemberId))
-      setSelectedMemberId(null);
-  }, [members, selectedMemberId]);
+    removeSelectedFromTroupe,
+    removingIds,
+    saveTitle,
+    scheduleRefreshing,
+    selectedDayIso,
+    selectedMember,
+    selectedMemberId,
+    setCurrentMonth,
+    setEmail,
+    setSelectedDayIso,
+    setSelectedMemberId,
+    setTitleDraft,
+    titleDraft,
+    todayIso,
+    troupe,
+  } = useTroupePage();
 
   if (!accessToken)
     return <div>Нужно войти, чтобы открыть страницу труппы.</div>;
-
-  const canManageProjectTroupe = isProjectOwner === true;
 
   return (
     <div className="app-layout troupe-layout">
@@ -232,9 +102,7 @@ export function TroupePage() {
                       !titleDraft.trim() ||
                       titleDraft.trim() === (troupe?.title ?? "").trim()
                     }
-                    onClick={() =>
-                      void dispatch(troupePatchTitle({ title: titleDraft }))
-                    }
+                    onClick={() => void saveTitle()}
                   >
                     {patchingTitle ? "Сохранение…" : "Сохранить"}
                   </Button>
@@ -330,27 +198,8 @@ export function TroupePage() {
                         disabled={
                           !selectedMember || !!invitingIds[selectedMember.id]
                         }
-                        onClick={async () => {
-                          if (!selectedMember || !projectName) return;
-                          const res = await dispatch(
-                            troupeInviteMemberToProject({
-                              memberId: selectedMember.id,
-                              email: selectedMember.email,
-                              projectSlug: projectName,
-                              role: "viewer",
-                            }),
-                          );
-                          if (
-                            troupeInviteMemberToProject.fulfilled.match(res) &&
-                            projectName
-                          ) {
-                            void dispatch(
-                              fetchMyTroupe({
-                                month: monthKey(currentMonth),
-                                project: projectName,
-                              }),
-                            );
-                          }
+                        onClick={() => {
+                          void inviteSelectedToProject();
                         }}
                         title={
                           selectedMember
@@ -372,13 +221,8 @@ export function TroupePage() {
                           !!removingIds[String(selectedMember.troupeMemberId)]
                         }
                         onClick={() => {
-                          if (!selectedMember?.troupeMemberId) return;
                           if (!confirm("Удалить участника из труппы?")) return;
-                          dispatch(
-                            troupeRemoveMember({
-                              memberId: selectedMember.troupeMemberId,
-                            }),
-                          );
+                          void removeSelectedFromTroupe();
                         }}
                         title={
                           selectedMember?.troupeMemberId
@@ -616,13 +460,8 @@ export function TroupePage() {
                     type="button"
                     className="troupe-form-row__btn troupe-invite-card__submit"
                     disabled={adding || !email.trim() || !projectName}
-                    onClick={async () => {
-                      const value = email.trim();
-                      if (!value) return;
-                      const res = await dispatch(
-                        troupeAddMember({ email: value }),
-                      );
-                      if (troupeAddMember.fulfilled.match(res)) setEmail("");
+                    onClick={() => {
+                      void addMemberByEmail();
                     }}
                   >
                     {adding ? "Добавление…" : "Добавить"}

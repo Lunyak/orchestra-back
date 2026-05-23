@@ -1,16 +1,16 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import { getMyProfile, getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
+import { profileApi } from "../../profile/api/profile-api";
+import type { TeamProfile } from "../../../sync/api/profile";
+import { projectApi } from "../../project/api/project-api";
+import { troupeApi } from "../../troupe/api/troupe-api";
 import {
   addProjectRoleNote,
   cleanupProjectImages,
-  getProjectMembers,
   getProjectRoleNotes,
-  getProjectRoles,
   type ProjectRoleInfo,
   type RoleNoteItem,
 } from "../../../sync/api/projects";
-import { getMyTroupe } from "../../../sync/api/troupe";
 import {
   encodeDirectorRefsNoteContent,
   encodeRoleWorkbookNoteContent,
@@ -165,7 +165,7 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
   },
   { accessToken: string; projectSlug: string; roleId: string },
   { state: RootState; rejectValue: string }
->("roleWorkbook/load", async ({ accessToken, projectSlug, roleId }, { getState, rejectWithValue }) => {
+>("roleWorkbook/load", async ({ accessToken, projectSlug, roleId }, { getState, rejectWithValue, dispatch }) => {
   try {
     const state = getState() as any;
     const myEmailFromState = normalizeEmail(state?.profileData?.profile?.email ?? "");
@@ -173,25 +173,41 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
     const notesPromise = getProjectRoleNotes(accessToken, projectSlug, roleId);
 
     const rolesFromState =
-      state?.profileRoles?.loadedProjectName === projectSlug && Array.isArray(state?.profileRoles?.roles)
-        ? (state.profileRoles.roles as ProjectRoleInfo[])
-        : null;
-    const rolesPromise = rolesFromState ? null : getProjectRoles(accessToken, projectSlug).catch(() => null);
+      projectApi.endpoints.projectRoles.select(projectSlug)(state)?.data?.roles ?? null;
+    const rolesPromise = rolesFromState
+      ? null
+      : dispatch(projectApi.endpoints.projectRoles.initiate(projectSlug))
+          .unwrap()
+          .catch(() => null);
 
-    const troupeFromState = Array.isArray(state?.troupe?.members) ? state.troupe.members : null;
+    const troupeFromState =
+      troupeApi.endpoints.myTroupe.select({ project: projectSlug })(state)?.data?.members ?? null;
     const troupePromise = troupeFromState
       ? null
-      : getMyTroupe(accessToken, { project: projectSlug }).catch(() => null);
+      : dispatch(troupeApi.endpoints.myTroupe.initiate({ project: projectSlug }))
+          .unwrap()
+          .catch(() => null);
 
-    const myProfilePromise = myEmailFromState ? null : getMyProfile(accessToken).catch(() => null);
+    const myProfilePromise = myEmailFromState
+      ? null
+      : dispatch(profileApi.endpoints.myProfile.initiate())
+          .unwrap()
+          .catch(() => null);
 
     const ownerLoadedFromState = Boolean(state?.roleWorkbook?.projectOwnerLoaded);
     const ownerEmailFromState = normalizeEmail(state?.roleWorkbook?.projectOwnerEmail ?? "");
+    const membersFromCache = projectApi.endpoints.projectMembers.select(projectSlug)(state)?.data;
     const ownerPromise =
-      ownerLoadedFromState ? null : getProjectMembers(accessToken, projectSlug).catch((e: any) => {
-        if (e?.response?.status === 403) return null;
-        return null;
-      });
+      ownerLoadedFromState
+        ? null
+        : membersFromCache
+          ? { owner: membersFromCache.owner }
+          : dispatch(projectApi.endpoints.projectMembers.initiate(projectSlug))
+              .unwrap()
+              .catch((e: { status?: number }) => {
+                if (e?.status === 403) return null;
+                return null;
+              });
 
     const [notesRes, rolesRes, troupeRes, myProfile, membersRes] = await Promise.all([
       notesPromise,
@@ -243,7 +259,9 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
     })();
 
     const profiles = allowedActorEmails.length
-      ? await getProfilesBatch(accessToken, allowedActorEmails).catch(() => [])
+      ? await dispatch(profileApi.endpoints.profilesBatch.initiate(allowedActorEmails))
+          .unwrap()
+          .catch(() => [])
       : [];
     const snapshot = canViewActorWorkbook && selectedActorEmail
       ? pickLatestWorkbookSnapshotForActor(notesRes?.notes ?? [], selectedActorEmail)
@@ -346,10 +364,12 @@ export const saveDirectorRefsThunk = createAsyncThunk<
     const myEmail = normalizeEmail(s?.myEmail ?? "");
     let ownerEmail = normalizeEmail(s?.projectOwnerEmail ?? "");
     if (!s?.projectOwnerLoaded) {
-      const members = await getProjectMembers(accessToken, projectSlug).catch((e: any) => {
-        if (e?.response?.status === 403) return null;
-        return null;
-      });
+      const members = await dispatch(projectApi.endpoints.projectMembers.initiate(projectSlug))
+        .unwrap()
+        .catch((e: { status?: number }) => {
+          if (e?.status === 403) return null;
+          return null;
+        });
       ownerEmail = normalizeEmail(members?.owner?.email ?? "");
       dispatch(roleWorkbookActions.setProjectOwner({ ownerEmail: ownerEmail || null }));
     }

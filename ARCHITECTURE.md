@@ -1,115 +1,102 @@
 # Архитектура проекта Orchestra
 
-## 📁 Структура проекта
+## Структура монорепозитория
 
 ```
-orchestra-servises/
-├── app/          # 🎯 ОСНОВНАЯ ЛОГИКА ПРИЛОЖЕНИЯ (shared code)
-│   └── src/
-│       ├── App.tsx           # Корневой компонент с провайдерами
-│       ├── routes.tsx        # Конфигурация маршрутов
-│       ├── features/         # Фичи приложения (Feature-Sliced Design)
-│       │   ├── auth/        # Аутентификация
-│       │   ├── project/     # Управление проектами
-│       │   ├── scene/       # Управление сценами
-│       │   ├── script-ui/   # UI состояние скрипта
-│       │   └── team/        # Команда проекта
-│       ├── pages/           # Страницы приложения
-│       │   ├── login/
-│       │   ├── spectacle/   # Главная страница спектакля
-│       │   ├── rehearsals/  # Страница репетиций
-│       │   ├── profile/     # Профиль пользователя
-│       │   └── settings/    # Настройки
-│       ├── components/      # Переиспользуемые UI компоненты
-│       ├── shared/          # Общие типы и утилиты
-│       │   ├── types/
-│       │   ├── utils/
-│       │   └── platform/
-│       └── sync/            # API и синхронизация
-│
-├── web/          # 🌐 WEB платформа
-│   └── src/
-│       ├── main.tsx         # Entry point
-│       ├── AppShell.tsx     # Обёртка, импортирует @app/App
-│       └── components/
-│           └── AppErrorBoundary.tsx  # Error boundary для web
-│
-├── desktop/      # 💻 DESKTOP платформа (Electron)
-│   └── src/
-│       ├── App.tsx          # Desktop обёртка с локальной синхронизацией
-│       └── sync/
-│           └── localPush.ts # Синхронизация локальных данных
-│
-├── admin/        # 👤 ADMIN панель
-└── back/         # ⚙️ BACKEND (Node.js)
+orchestra-back/
+├── app/src/           # Общая логика (web + mobile через Capacitor)
+│   ├── app/           # App shell, роутер, StoreProvider
+│   ├── features/      # Домены (FSD-подобно)
+│   ├── pages/         # Точки входа маршрутов (часто re-export из features)
+│   ├── shared/        # UI-kit, store, RTK, platform
+│   └── sync/          # HTTP-клиент, типы, desktop/offline
+├── web/               # Vite, entry, proxy
+├── mobile/            # Capacitor-оболочка
+└── back/              # API-сервер
 ```
 
-## 🎯 Принципы организации кода
+## Принципы
 
-### 1. Монорепозиторий с shared code
+### Монорепозиторий
 
-- **`/app/`** — основная логика, компоненты, фичи (используется web + desktop)
-- **`/web/`** — специфичные для web вещи (entry point, error boundary)
-- **`/desktop/`** — специфичные для desktop вещи (локальная синхронизация)
+- **`app/src`** — вся продуктовая логика; `web` и `mobile` только собирают и инициализируют платформу.
+- Алиасы: `@app/*`, `@shared/*` (см. `web/tsconfig.json`).
 
-### 2. Feature-Sliced Design в папке features
+### Features
 
-Каждая фича содержит:
-- `model/` — логика (контексты, хуки)
-- `ui/` — компоненты (если есть)
-- `index.ts` — публичное API фичи
+Каждая фича по возможности:
 
-### 3. Разделение ответственности
-
-- **App.tsx** — только провайдеры и layout
-- **routes.tsx** — маршруты и lazy-импорты страниц
-- **pages/** — страницы с бизнес-логикой
-- **components/** — переиспользуемые UI компоненты
-- **features/** — изолированные фичи с логикой
-
-### 4. Импорты
-
-Настроены алиасы в `tsconfig.json`:
-```json
-{
-  "paths": {
-    "@app": ["../app/src"],
-    "@app/*": ["../app/src/*"],
-    "@shared": ["../app/src/shared"],
-    "@shared/*": ["../app/src/shared/*"]
-  }
-}
+```
+features/<name>/
+  api/          # RTK injectEndpoints (server-state)
+  model/        # хуки, утилиты, slices
+  ui/           # компоненты
+  index.ts      # публичный API
 ```
 
-## 🔄 Как работает маршрутизация
+**Не добавляем** новые React Context для server-state — используем Redux + RTK Query.
 
-1. **Entry point** (`web/src/main.tsx` или `desktop/src/main.tsx`)
-   - Создаёт `<HashRouter>`
-   - Оборачивает в `<AppErrorBoundary>`
-   - Рендерит `<App />` из `@app/App`
+### Pages
 
-2. **App.tsx** (`app/src/App.tsx`)
-   - Настраивает провайдеры (Auth, Platform, Project, Scene, ScriptUI)
-   - Проверяет аутентификацию
-   - Рендерит `<AppRoutes />`
+- **`pages/<route>/`** — тонкий слой для роутера: re-export `FeaturePage` или обёртка.
+- Бизнес-логика страницы — в `features/*/model/use*Page.ts` + `features/*/ui/*Page.tsx`.
 
-3. **routes.tsx** (`app/src/routes.tsx`)
-   - Содержит все lazy-импорты страниц
-   - Определяет роуты через `<Routes>` и `<Route>`
-   - Обёрнуто в `<Suspense>` для lazy-загрузки
+### Client-state vs server-state
 
-## 🚀 Как добавить новую страницу
+| Тип | Где |
+|-----|-----|
+| Списки, профили, роли, участники проекта | RTK Query (`orchestraApi`) |
+| Сцена, черновики шагов, UI панелей | Redux slices + локальный `useState` |
+| Auth token | auth slice + `getAccessToken()` в `axiosBaseQuery` |
 
-1. Создать компонент страницы в `app/src/pages/my-page/MyPage.tsx`
-2. Добавить lazy-импорт в `app/src/routes.tsx`:
-   ```tsx
-   const MyPage = lazy(() => 
-     import("./pages/my-page/MyPage").then(m => ({ default: m.MyPage }))
-   );
-   ```
-3. Добавить роут:
-   ```tsx
-   <Route path="/my-page" element={<MyPage />} />
-   ```
+Подробнее: `app/src/shared/api/rtk/README.md`.
 
-Готово! Страница доступна и в web, и в desktop.
+## Features (актуально)
+
+| Feature | Назначение |
+|---------|------------|
+| `auth` | Вход, токен |
+| `project` | Текущий проект, RTK: roles, members |
+| `scene` | Сцена, шаги, sync runner, thunks |
+| `script-ui` | Плейлист, панели, edit mode |
+| `team` | `useTeam()` — участники на settings/board/troupe/sessions |
+| `spectacle` | Оболочка главной страницы (вкладки script/theater/board/…) |
+| `theater` | 3D театр (заморожен по рефакторингу) |
+| `rehearsals` | Репетиции + RTK |
+| `director-sessions` | Сессии режиссёра + RTK |
+| `troupe` | Расписание труппы, RTK `myTroupe` + `useTroupePage` |
+| `profile`, `role-workbook`, `kanban` (model) | По доменам |
+
+## RTK Query
+
+- Единый API: `shared/api/rtk/orchestra-api.ts`.
+- Регистрация эндпоинтов: side-effect импорты в `shared/api/rtk/register-api.ts`.
+- `setupListeners(store.dispatch)` в `shared/store/store.ts` — обновление при возврате на вкладку.
+
+Добавление эндпоинта:
+
+1. `features/<domain>/api/*-api.ts` → `orchestraApi.injectEndpoints`.
+2. Импорт файла уже есть в `register-api.ts` (или добавить строку).
+3. В хуке: `useXQuery(slug, { skip: !token || !slug })`.
+
+## Маршрутизация
+
+1. `web/src/main.tsx` → `App` из `app/src/app/App.tsx`.
+2. `App` — провайдеры (`StoreProvider`, Auth, Project, Scene, …) + `AppRoutes`.
+3. `app/src/app/router/AppRouteDeclarations.tsx` — lazy-импорты из `pages/*`.
+
+## Новая страница
+
+1. `features/foo/ui/FooPage.tsx` + при необходимости `model/useFooPage.ts`.
+2. `pages/foo/FooPage.tsx` → `export { FooPage } from "../../features/foo";`
+3. Lazy-роут в `AppRouteDeclarations.tsx`.
+
+## sync/api
+
+Остаётся для:
+
+- типов ответов;
+- вызовов вне React (thunks, desktop, prefetch);
+- постепенной миграции UI на RTK по мере касания экрана.
+
+3D театр и тяжёлый scene sync не трогаем без отдельной задачи.

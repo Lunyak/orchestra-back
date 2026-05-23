@@ -40,10 +40,12 @@ if command -v mc >/dev/null 2>&1; then
 else
   LOCAL_URL="${ORCHESTRA_MINIO_LOCAL:-http://host.docker.internal:9000}"
   echo ">>> Назначение (docker + minio/mc): $LOCAL_URL"
+  # Git Bash (MSYS) на Windows подменяет /bin/sh на C:/Program Files/Git/.../sh — ломает docker run.
+  export MSYS_NO_PATHCONV=1
   # У образа minio/mc ENTRYPOINT = mc → без --entrypoint аргумент sh уходит в mc как «команда».
   docker run --rm \
     --add-host=host.docker.internal:host-gateway \
-    --entrypoint /bin/sh \
+    --entrypoint //bin/sh \
     -e "REMOTE_URL=$REMOTE_URL" \
     -e "REMOTE_USER=$REMOTE_USER" \
     -e "REMOTE_PASS=$REMOTE_PASS" \

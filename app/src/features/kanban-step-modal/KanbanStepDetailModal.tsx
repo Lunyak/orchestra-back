@@ -80,11 +80,9 @@ export type KanbanStepDetailModalProps = {
   getRoleActors: (step: ScriptStep, role: string) => string[];
   displayRoleTitle: (role: string) => string;
   resolveRoleInfo: (role: string) => ProjectRoleInfo | null;
-  accessToken: string | null;
   projectName: string | null;
   projectRoles: ProjectRoleInfo[];
   roleAssignmentMembers: KanbanStepRolesAdminMember[];
-  onProjectRolesUpdated: (roles: ProjectRoleInfo[]) => void;
 };
 
 type ModalTab = "info" | "script";
@@ -99,11 +97,9 @@ export function KanbanStepDetailModal({
   getRoleActors,
   displayRoleTitle,
   resolveRoleInfo,
-  accessToken,
   projectName,
   projectRoles,
   roleAssignmentMembers,
-  onProjectRolesUpdated,
 }: KanbanStepDetailModalProps) {
   const [tab, setTab] = useState<ModalTab>("info");
   const statusSelectOptions: CustomSelectOption[] = STATUSES.map((statusItem) => ({
@@ -274,12 +270,10 @@ export function KanbanStepDetailModal({
                 </div>
               )}
               <KanbanStepRolesAdminPanel
-                accessToken={accessToken}
                 projectName={projectName}
                 projectRoles={projectRoles}
                 members={roleAssignmentMembers}
                 missingSceneRoles={missingSceneRoles}
-                onProjectRolesUpdated={onProjectRolesUpdated}
               />
             </div>
           </>

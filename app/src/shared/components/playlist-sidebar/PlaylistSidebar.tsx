@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addScenePlaylistTracksFromPathsDesktop,
   deleteScenePlaylistTrackDesktop,
@@ -8,6 +8,8 @@ import {
   uploadScenePlaylistWeb,
 } from "../../../features/scene/model/scene-slice";
 import { getDesktopApi } from "../../platform/desktop-api";
+import { createAudioFadeController } from "../../media/audio-fade";
+import { resolveOfflineMediaUrl } from "../../platform/media-url";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
 import { Buttons } from "../buttons/Buttons";
@@ -47,10 +49,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
   const [activeAudioKey, setActiveAudioKey] = useState<"a" | "b">("a");
-  const fadeTimers = useRef<{ a: number | null; b: number | null }>({
-    a: null,
-    b: null,
-  });
+  const audioFade = useMemo(() => createAudioFadeController(), []);
   const playRequestId = useRef(0);
   const messageTimerRef = useRef<number | null>(null);
 
@@ -181,32 +180,28 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [activeAudioKey, currentTrack]);
 
   const resolveTrackSrc = useCallback(
-    (file: string, remoteUrl?: string) => {
-      // Desktop should prefer local files to avoid network delays during show.
-      if (getDesktopApi()) {
-        const url = new URL(
-          `project-audio://${encodeURIComponent(projectName)}/`,
-        );
-        url.pathname = `/${file}`;
-        return url.toString();
+    (file: string, remoteUrl?: string, filePath?: string) => {
+      if (getDesktopApi() || filePath) {
+        return resolveOfflineMediaUrl({
+          projectSlug: projectName,
+          kind: "playlist",
+          fileName: file,
+          filePath,
+          remoteUrl,
+        });
       }
       if (remoteUrl) return remoteUrl;
-      const url = new URL(
-        `project-audio://${encodeURIComponent(projectName)}/`,
-      );
-      url.pathname = `/${file}`;
-      return url.toString();
+      return file;
     },
     [projectName],
   );
 
-  const clearFadeTimer = useCallback((key: "a" | "b") => {
-    const timer = fadeTimers.current[key];
-    if (timer) {
-      window.clearInterval(timer);
-      fadeTimers.current[key] = null;
-    }
-  }, []);
+  const clearFadeTimer = useCallback(
+    (key: "a" | "b") => {
+      audioFade.clear(key);
+    },
+    [audioFade],
+  );
 
   const preloadOne = useCallback(async (src: string, runId: number) => {
     const audio = preloadAudioRef.current ?? new Audio();
@@ -274,7 +269,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       const t = playlist[i];
       if (runId !== preloadRunIdRef.current) break;
       setPreloadStatusById((prev) => ({ ...prev, [t.id]: "loading" }));
-      const src = resolveTrackSrc(t.file, t.remoteUrl);
+      const src = resolveTrackSrc(t.file, t.remoteUrl, t.filePath);
       try {
         await preloadOne(src, runId);
         if (runId !== preloadRunIdRef.current) break;
@@ -341,34 +336,20 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     };
   }, [clearFadeTimer, crossfadeEnabled]);
 
-  const runFade = useCallback((
-    audio: HTMLAudioElement,
-    key: "a" | "b",
-    from: number,
-    to: number,
-    duration: number,
-    onDone?: () => void,
-  ) => {
-    if (!audio) return;
-    clearFadeTimer(key);
-    const safeDuration = Math.max(0, duration);
-    if (safeDuration === 0) {
-      audio.volume = to;
-      onDone?.();
-      return;
-    }
-    const start = Date.now();
-    audio.volume = from;
-    fadeTimers.current[key] = window.setInterval(() => {
-      const elapsed = Date.now() - start;
-      const ratio = Math.min(1, elapsed / safeDuration);
-      audio.volume = from + (to - from) * ratio;
-      if (ratio >= 1) {
-        clearFadeTimer(key);
-        onDone?.();
-      }
-    }, 30);
-  }, [clearFadeTimer]);
+  const runFade = useCallback(
+    (
+      audio: HTMLAudioElement,
+      key: "a" | "b",
+      from: number,
+      to: number,
+      duration: number,
+      onDone?: () => void,
+    ) => {
+      if (!audio) return;
+      audioFade.run(audio, key, from, to, duration, onDone);
+    },
+    [audioFade],
+  );
 
 
   const playTrack = useCallback(async (track: PlaylistTrack) => {
@@ -413,7 +394,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
     if (isSameTrack && activeAudio.paused) {
       clearFadeTimer(activeAudioKey);
-      const src = resolveTrackSrc(track.file, track.remoteUrl);
+      const src = resolveTrackSrc(track.file, track.remoteUrl, track.filePath);
       if (activeAudio.src !== src) {
         activeAudio.src = src;
       }
@@ -454,7 +435,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       clearFadeTimer(activeAudioKey);
     }
 
-    const src = resolveTrackSrc(track.file, track.remoteUrl);
+    const src = resolveTrackSrc(track.file, track.remoteUrl, track.filePath);
     if (inactiveAudio.src !== src) {
       inactiveAudio.src = src;
     }

@@ -1,13 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../../features/auth";
 import { useProject } from "../../../../features/project";
 import { useScene } from "../../../../features/scene";
 import { useScriptUI } from "../../../../features/script-ui";
-import { useAppDispatch, useAppSelector } from "../../../store/hooks";
-import {
-  fetchProjectRolesThunk,
-  selectProjectRoles,
-} from "../../../../features/profile/model/profileRolesSlice";
+import { useProjectRolesQuery } from "../../../../features/project/api/project-api";
 import type { ProjectRoleInfo } from "../../../../sync/api/projects";
 import type { SceneData, SceneRolesDataV1, SceneRoleLinkV1 } from "../../../../features/scene";
 import type { ScriptStep } from "../../../types/script";
@@ -43,11 +40,12 @@ function getRoleLabel(role: ProjectRoleInfo) {
 }
 
 export function StepRolesPanel({ step }: { step: ScriptStep }) {
-  const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { projectName } = useProject();
-  const accessToken = useAppSelector((s) => (s as any).auth?.accessToken ?? null) as string | null;
-  const roles = useAppSelector(selectProjectRoles);
+  const { accessToken } = useAuth();
+  const skipRoles = !accessToken || !projectName;
+  const { data: rolesRes } = useProjectRolesQuery(projectName!, { skip: skipRoles });
+  const roles = rolesRes?.roles ?? [];
   const { isEditing } = useScriptUI();
 
   const { sceneData, setSceneData } = useScene();
@@ -70,11 +68,6 @@ export function StepRolesPanel({ step }: { step: ScriptStep }) {
       // ignore
     }
   }, [collapseKey, collapsed]);
-
-  useEffect(() => {
-    if (!accessToken || !projectName) return;
-    void dispatch(fetchProjectRolesThunk({ accessToken, projectName }));
-  }, [accessToken, projectName, dispatch]);
 
   const attachedByRoleId: Record<string, SceneRoleLinkV1> = useMemo(() => {
     const raw = (sceneData as any)?.sceneRoles as SceneRolesDataV1 | undefined;

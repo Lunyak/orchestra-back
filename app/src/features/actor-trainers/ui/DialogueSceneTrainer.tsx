@@ -4,26 +4,22 @@ import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../mode
 import { shuffle, tokenizeText, type WordToken } from "../model/wordTokens";
 import "./dialogue-style.css";
 
-type Exercise = {
-  id: string;
-  lineId: string;
-  stepId: number;
-  stepTitle: string;
-  role: string;
-  text: string;
-  target: WordToken[];
-  shuffled: WordToken[];
-};
-
 function readDoneSet(storageKey?: string): Set<string> {
   if (!storageKey) return new Set<string>();
   if (typeof window === "undefined") return new Set<string>();
   const raw = localStorage.getItem(storageKey);
   if (!raw) return new Set<string>();
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return new Set<string>();
-    return new Set(parsed.map((x) => String(x ?? "")).filter(Boolean));
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.map((x) => String(x ?? "")).filter(Boolean));
+    }
+    if (parsed && typeof parsed === "object" && Array.isArray((parsed as { doneIds?: unknown }).doneIds)) {
+      return new Set(
+        (parsed as { doneIds: unknown[] }).doneIds.map((x) => String(x ?? "")).filter(Boolean),
+      );
+    }
+    return new Set<string>();
   } catch {
     return new Set<string>();
   }
@@ -38,6 +34,17 @@ function persistDoneSet(storageKey: string | undefined, next: Set<string>) {
     // ignore
   }
 }
+
+type Exercise = {
+  id: string;
+  lineId: string;
+  stepId: number;
+  stepTitle: string;
+  role: string;
+  text: string;
+  target: WordToken[];
+  shuffled: WordToken[];
+};
 
 function findNextUndone(exercises: Exercise[], done: Set<string>, fromIndex: number): number {
   if (exercises.length === 0) return 0;
@@ -93,11 +100,13 @@ function isAutoToken(t: WordToken): boolean {
 function RoleLinePuzzle({
   ex,
   done,
+  active,
   onDone,
   onResetDone,
 }: {
   ex: Exercise;
   done: boolean;
+  active: boolean;
   onDone: () => void;
   onResetDone: () => void;
 }) {
@@ -123,9 +132,10 @@ function RoleLinePuzzle({
   };
 
   useEffect(() => {
+    if (done) return;
     resetState();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ex.id]);
+  }, [ex.id, done]);
 
   useEffect(() => {
     poolRef.current = pool;
@@ -178,16 +188,35 @@ function RoleLinePuzzle({
     return () => window.clearTimeout(t);
   }, [answer.length, ex.target.length, onDone]);
 
-  return (
-    <div className="dialogue-my-line" data-done={done ? "true" : "false"} data-mistake={mistake ? "true" : "false"}>
-      <div className="dialogue-my-line-head">
-        <div className="dialogue-my-line-role">{ex.role}</div>
-        <div className="dialogue-my-line-actions">
-          {done ? (
+  if (done) {
+    return (
+      <div className="dialogue-my-line" data-done="true" data-mistake="false">
+        <div className="dialogue-my-line-head">
+          <div className="dialogue-my-line-role-row">
+            <div className="dialogue-my-line-role">{ex.role}</div>
+            {active ? <span className="dialogue-now-badge">Сейчас</span> : null}
+          </div>
+          <div className="dialogue-my-line-actions">
             <button type="button" className="dialogue-btn" onClick={onResetDone}>
               “не пройдено”
             </button>
-          ) : null}
+          </div>
+        </div>
+        <div className="dialogue-answer dialogue-answer--done">
+          <span>{ex.text}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="dialogue-my-line" data-done="false" data-mistake={mistake ? "true" : "false"}>
+      <div className="dialogue-my-line-head">
+        <div className="dialogue-my-line-role-row">
+          <div className="dialogue-my-line-role">{ex.role}</div>
+          {active ? <span className="dialogue-now-badge">Сейчас</span> : null}
+        </div>
+        <div className="dialogue-my-line-actions">
           <button
             type="button"
             className="dialogue-btn"
@@ -297,9 +326,6 @@ export function DialogueSceneTrainer({
   useEffect(() => {
     setActiveExerciseIndex((i) => Math.max(0, Math.min(i, Math.max(0, exercises.length - 1))));
   }, [exercises.length]);
-  useEffect(() => {
-    setActiveExerciseIndex((i) => findNextUndone(exercises, doneIds, i));
-  }, [doneIds, exercises]);
 
   const activeExercise = exercises[activeExerciseIndex] ?? null;
 
@@ -320,6 +346,7 @@ export function DialogueSceneTrainer({
     next.add(id);
     setDoneIds(next);
     persistDoneSet(storageKey, next);
+    setActiveExerciseIndex((i) => findNextUndone(exercises, next, i + 1));
   };
 
   const markUndone = (id: string) => {
@@ -357,18 +384,16 @@ export function DialogueSceneTrainer({
 
     const roleLabel = line.role ? String(line.role) : "—";
     const isMine = line.role && desiredRoleKeySet.has(normalizeRoleKey(line.role));
-    if (!isMine || !activeExercise) {
+    if (!isMine) {
       return (
-        <div className={`dialogue-line ${isMine ? "dialogue-line--mine" : ""}`}>
+        <div className="dialogue-line">
           <div className="dialogue-role">{roleLabel}</div>
           <div className="dialogue-text">{line.text}</div>
         </div>
       );
     }
 
-    const ex =
-      exercises.find((e) => e.lineId === line.id) ??
-      null;
+    const ex = exercises.find((e) => e.lineId === line.id) ?? null;
     if (!ex) {
       return (
         <div className="dialogue-line dialogue-line--mine">
@@ -378,7 +403,7 @@ export function DialogueSceneTrainer({
       );
     }
 
-    const isActive = activeExercise.lineId === line.id;
+    const isActive = activeExercise?.lineId === line.id;
     const done = doneIds.has(ex.id);
 
     return (
@@ -386,6 +411,7 @@ export function DialogueSceneTrainer({
         <RoleLinePuzzle
           ex={ex}
           done={done}
+          active={isActive}
           onDone={() => {
             markDone(ex.id);
           }}
@@ -404,6 +430,12 @@ export function DialogueSceneTrainer({
           </div>
           <div className="dialogue-toolbar-meta">
             Пройдено <b>{doneCount}</b> / {total} (осталось {left})
+            {activeExercise ? (
+              <>
+                {" "}
+                · сейчас реплика <b>{activeExerciseIndex + 1}</b> / {total}
+              </>
+            ) : null}
           </div>
         </div>
         <div className="dialogue-toolbar-actions">
@@ -426,6 +458,7 @@ export function DialogueSceneTrainer({
                 const next = new Set<string>();
                 setDoneIds(next);
                 persistDoneSet(storageKey, next);
+                setActiveExerciseIndex(0);
               }}
             >
               сброс прогресса
@@ -436,7 +469,11 @@ export function DialogueSceneTrainer({
 
       <div className="dialogue-scroll">
         {allLines.length === 0 ? (
-          <div className="dialogue-empty">Нет текста в выбранных шагах.</div>
+          <div className="dialogue-empty">
+            {selectedStepIds.length === 0
+              ? "Выберите шаги для тренировки в настройках выше."
+              : "Нет текста в выбранных шагах (проверьте поле «Текст» в шагах)."}
+          </div>
         ) : (
           allLines.map((line) => (
             <div

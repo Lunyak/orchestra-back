@@ -42,7 +42,7 @@ interface API {
 
 declare global {
   interface Window {
-    api: API;
+    api?: API;
   }
 }
 

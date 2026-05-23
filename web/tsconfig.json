@@ -33,7 +33,8 @@
     "src/**/*.tsx",
     "src/**/*.d.ts",
     "../app/src/shared/types/**/*.ts",
-    "../app/src/shared/types/**/*.d.ts"
+    "../app/src/shared/types/**/*.d.ts",
+    "../app/src/shared/platform/capacitor-shims.d.ts"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -11,7 +11,7 @@ import React, {
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import { useNavigate } from "react-router-dom";
-import { fetchProjectRolesThunk, selectProjectRoles } from "../../../../features/profile/model/profileRolesSlice";
+import { useProjectRolesQuery } from "../../../../features/project/api/project-api";
 import type { SceneRolesDataV1 } from "../../../../features/scene";
 import {
   selectActiveStepMarkdownContext,
@@ -697,7 +697,10 @@ export function ScriptMarkdownPreview({
   const navigate = useNavigate();
   const ui = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectName, sceneName));
   const accessToken = useAppSelector((s) => s.auth.accessToken);
-  const roles = useAppSelector(selectProjectRoles);
+  const { data: rolesRes } = useProjectRolesQuery(projectName, {
+    skip: !accessToken || !projectName,
+  });
+  const roles = rolesRes?.roles ?? [];
   const sceneData = useAppSelector((s) => (s as any).scene?.sceneData ?? null) as any;
   const { activeMarkdown: markdown, currentStep, activeField } = useAppSelector((s) =>
     selectActiveStepMarkdownContext(s, projectName, sceneName),
@@ -765,11 +768,6 @@ export function ScriptMarkdownPreview({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [lightbox]);
-
-  useEffect(() => {
-    if (!accessToken || !projectName) return;
-    void dispatch(fetchProjectRolesThunk({ accessToken, projectName }));
-  }, [accessToken, projectName, dispatch]);
 
   const imageUrlCacheRef = useRef(new Map<string, string>());
 

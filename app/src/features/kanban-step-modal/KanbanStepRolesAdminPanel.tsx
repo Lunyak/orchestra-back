@@ -1,16 +1,19 @@
 import cn from "classnames";
 import { useMemo, useState } from "react";
+import { useAuth } from "../auth/model/auth-context";
+import {
+  projectApi,
+  useCreateProjectRoleMutation,
+  useDeleteProjectRoleMutation,
+  useSetProjectRoleAssignmentsMutation,
+} from "../project/api/project-api";
 import { Button } from "../../shared/core/button/Button";
 import { InlineTextField } from "../../shared/core/inline-text-field/InlineTextField";
 import { LabeledCheckbox } from "../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
-import {
-  createProjectRole,
-  deleteProjectRole,
-  getProjectRoles,
-  setProjectRoleAssignments,
-  type ProjectRoleInfo,
-} from "../../sync/api/projects";
+import type { OrchestraQueryError } from "../../shared/api/rtk/axios-base-query";
+import { useAppDispatch } from "../../shared/store/hooks";
+import type { ProjectRoleInfo } from "../../sync/api/projects";
 import "./KanbanStepRolesAdminPanel.css";
 
 export type KanbanStepRolesAdminMember = {
@@ -39,27 +42,36 @@ function memberLabel(m: KanbanStepRolesAdminMember): string {
   return m.email;
 }
 
+function mutationErrorMessage(e: unknown, fallback: string): string {
+  const err = e as OrchestraQueryError | undefined;
+  return String(err?.message ?? fallback);
+}
+
 export type KanbanStepRolesAdminPanelProps = {
-  accessToken: string | null;
   projectName: string | null;
   projectRoles: ProjectRoleInfo[];
   members: KanbanStepRolesAdminMember[];
   missingSceneRoles: string[];
-  onProjectRolesUpdated: (roles: ProjectRoleInfo[]) => void;
 };
 
 export function KanbanStepRolesAdminPanel({
-  accessToken,
   projectName,
   projectRoles,
   members,
   missingSceneRoles,
-  onProjectRolesUpdated,
 }: KanbanStepRolesAdminPanelProps) {
+  const dispatch = useAppDispatch();
+  const { accessToken } = useAuth();
   const [createTitle, setCreateTitle] = useState("");
   const [activeRoleId, setActiveRoleId] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [createProjectRole, { isLoading: creating }] = useCreateProjectRoleMutation();
+  const [deleteProjectRole, { isLoading: deleting }] = useDeleteProjectRoleMutation();
+  const [setRoleAssignments, { isLoading: assigning }] =
+    useSetProjectRoleAssignmentsMutation();
+
+  const busy = creating || deleting || assigning;
 
   const activeRole = useMemo(
     () => projectRoles.find((r) => r.id === activeRoleId) ?? null,
@@ -72,30 +84,25 @@ export function KanbanStepRolesAdminPanel({
     );
   }, [projectRoles]);
 
-  const reloadRoles = async () => {
-    if (!accessToken || !projectName) return;
-    const res = await getProjectRoles(accessToken, projectName);
-    onProjectRolesUpdated(res.roles ?? []);
+  const patchRolesCache = (roles: ProjectRoleInfo[]) => {
+    if (!projectName) return;
+    dispatch(
+      projectApi.util.updateQueryData("projectRoles", projectName, (draft) => {
+        draft.roles = roles;
+      }),
+    );
   };
 
   const createRole = async () => {
     if (!accessToken || !projectName) return;
     const title = createTitle.trim();
     if (!title) return;
-    setBusy(true);
     setError(null);
     try {
-      await createProjectRole(accessToken, projectName, {
-        title,
-        aliases: [],
-      });
+      await createProjectRole({ projectSlug: projectName, title, aliases: [] }).unwrap();
       setCreateTitle("");
-      await reloadRoles();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Не удалось создать роль";
-      setError(msg);
-    } finally {
-      setBusy(false);
+      setError(mutationErrorMessage(e, "Не удалось создать роль"));
     }
   };
 
@@ -106,16 +113,15 @@ export function KanbanStepRolesAdminPanel({
         ? window.confirm(`Удалить роль “${activeRole.title}”?`)
         : true;
     if (!ok) return;
-    setBusy(true);
     setError(null);
     try {
-      await deleteProjectRole(accessToken, projectName, activeRole.id);
+      await deleteProjectRole({
+        projectSlug: projectName,
+        roleId: activeRole.id,
+      }).unwrap();
       setActiveRoleId((prev) => (prev === activeRole.id ? null : prev));
-      await reloadRoles();
     } catch {
       setError("Не удалось удалить роль");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -130,15 +136,23 @@ export function KanbanStepRolesAdminPanel({
     if (!e) return;
     if (cur.has(e)) cur.delete(e);
     else cur.add(e);
-    const next = Array.from(cur).sort();
+    const nextEmails = Array.from(cur).sort();
     const nextRoles = projectRoles.map((r) =>
-      r.id === roleId ? { ...r, emails: next } : r,
+      r.id === roleId ? { ...r, emails: nextEmails } : r,
     );
-    onProjectRolesUpdated(nextRoles);
+    patchRolesCache(nextRoles);
     try {
-      await setProjectRoleAssignments(accessToken, projectName, roleId, next);
+      await setRoleAssignments({
+        projectSlug: projectName,
+        roleId,
+        emails: nextEmails,
+      }).unwrap();
     } catch {
-      await reloadRoles();
+      dispatch(
+        projectApi.util.invalidateTags([
+          { type: "ProjectRoles", id: projectName },
+        ]),
+      );
     }
   };
 
@@ -189,7 +203,10 @@ export function KanbanStepRolesAdminPanel({
             <button
               key={r.id}
               type="button"
-              className={cn("kanban-roles-admin__list-item", isActive && "kanban-roles-admin__list-item_active")}
+              className={cn(
+                "kanban-roles-admin__list-item",
+                isActive && "kanban-roles-admin__list-item_active",
+              )}
               onClick={() => setActiveRoleId(r.id)}
             >
               <div className="kanban-roles-admin__list-title">{r.title}</div>
@@ -210,7 +227,12 @@ export function KanbanStepRolesAdminPanel({
         <div>
           <div className="kanban-roles-admin__assign-head">
             <span className="kanban-roles-admin__assign-title">{activeRole.title}</span>
-            <button type="button" className="kanban-roles-admin__danger" onClick={deleteRole} disabled={busy}>
+            <button
+              type="button"
+              className="kanban-roles-admin__danger"
+              onClick={deleteRole}
+              disabled={busy}
+            >
               Удалить
             </button>
           </div>

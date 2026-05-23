@@ -8,18 +8,29 @@ import { installViewportHeightCssVars } from "@app/shared/platform/viewport";
 
 installViewportHeightCssVars();
 
-const baseUrl = String(import.meta.env.BASE_URL || "/");
-const routerBasename = baseUrl === "/" ? undefined : baseUrl.replace(/\/$/, "");
+async function bootstrap() {
+  if (import.meta.env.VITE_CAPACITOR === "1") {
+    const { initCapacitorPlatform } = await import(
+      "@app/shared/platform/mobile/init"
+    );
+    await initCapacitorPlatform();
+  }
 
-const router = createBrowserRouter(
-  [{ path: "*", element: <App /> }],
-  routerBasename ? { basename: routerBasename } : undefined,
-);
+  const baseUrl = String(import.meta.env.BASE_URL || "/");
+  const routerBasename = baseUrl === "/" ? undefined : baseUrl.replace(/\/$/, "");
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <AppErrorBoundary>
-      <RouterProvider router={router} />
-    </AppErrorBoundary>
-  </React.StrictMode>,
-);
+  const router = createBrowserRouter(
+    [{ path: "*", element: <App /> }],
+    routerBasename ? { basename: routerBasename } : undefined,
+  );
+
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <AppErrorBoundary>
+        <RouterProvider router={router} />
+      </AppErrorBoundary>
+    </React.StrictMode>,
+  );
+}
+
+void bootstrap();

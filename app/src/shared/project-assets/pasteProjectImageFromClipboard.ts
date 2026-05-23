@@ -1,4 +1,9 @@
 import { getDesktopApi } from "../platform/desktop-api";
+import {
+  desktopAddProjectImage,
+  desktopReadProjectScene,
+  desktopSaveProjectScene,
+} from "../platform/desktop-methods";
 import { ensureProject } from "../../sync/api/projects";
 
 type ClipboardLikeEvent = {
@@ -91,7 +96,8 @@ export async function pasteProjectImageFromClipboard(
   let localFilePath: string | undefined;
   try {
     const buffer = await file.arrayBuffer();
-    const res = await desktopApi.addProjectImage(
+    const res = await desktopAddProjectImage(
+      desktopApi,
       options.projectSlug,
       buffer,
       file.type,
@@ -104,7 +110,7 @@ export async function pasteProjectImageFromClipboard(
       return null;
     }
 
-    markdownPath = res.markdownPath as string;
+    markdownPath = String(res.markdownPath ?? "");
     localFilePath = typeof res.filePath === "string" ? (res.filePath as string) : undefined;
   } catch (err) {
     console.error("Failed to paste image:", err);
@@ -137,22 +143,32 @@ export async function pasteProjectImageFromClipboard(
               (options.persistRemoteToScene ?? true) && !!options.sceneName;
 
             if (shouldPersist && options.sceneName) {
-              const current = await desktopApi.readProjectScene(
+              const current = await desktopReadProjectScene(
+                desktopApi,
                 options.projectSlug,
                 options.sceneName,
               );
+              const base =
+                current && typeof current === "object"
+                  ? (current as Record<string, unknown>)
+                  : {};
 
               const images = {
-                ...(current?.images as
+                ...(base.images as
                   | Record<string, { remoteKey?: string; remoteUrl?: string }>
                   | undefined),
                 [filename]: { remoteKey, remoteUrl },
               };
 
-              await desktopApi.saveProjectScene(options.projectSlug, options.sceneName, {
-                ...current,
-                images,
-              });
+              await desktopSaveProjectScene(
+                desktopApi,
+                options.projectSlug,
+                options.sceneName,
+                {
+                  ...base,
+                  images,
+                },
+              );
             }
           }
         }

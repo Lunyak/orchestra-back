@@ -1,7 +1,7 @@
 import "../App.css";
 import { useAuth, useAuthBootstrap } from "../features/auth";
 import { ProjectProvider } from "../features/project";
-import { SceneProvider } from "../features/scene";
+import { SceneSyncRunner } from "../features/scene";
 import { ScriptUIProvider } from "../features/script-ui";
 import { LoginPage } from "../pages/login/LoginPage";
 import { ResetPasswordPage } from "../pages/login/ResetPasswordPage";
@@ -42,14 +42,14 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
 
   return (
     <ProjectProvider>
-      <SceneProvider>
+      <SceneSyncRunner>
         <ScriptUIProvider>
           <>
             <AppRoutes />
             <ChatDock />
           </>
         </ScriptUIProvider>
-      </SceneProvider>
+      </SceneSyncRunner>
     </ProjectProvider>
   );
 }

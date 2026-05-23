@@ -1,10 +1,12 @@
-export type DesktopApi = Record<string, any>;
+import type { PlatformApi } from "./platform-api";
+
+export type DesktopApi = PlatformApi;
 
 export function getDesktopApi(): DesktopApi | null {
   if (typeof window === "undefined") return null;
-  const candidate = (window as any).api;
+  const candidate = window.api;
   if (!candidate || typeof candidate !== "object") return null;
-  return candidate as DesktopApi;
+  return candidate;
 }
 
 export function requireDesktopApi(feature?: string): DesktopApi {

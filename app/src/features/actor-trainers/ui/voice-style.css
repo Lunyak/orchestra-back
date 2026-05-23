@@ -1,4 +1,4 @@
-.voice-trainer {
+﻿.voice-trainer {
   display: grid;
   gap: var(--spacing-5);
 }
@@ -20,7 +20,6 @@
 
 .voice-warn {
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-5);
   background: var(--color-bg-transparent-1);
   font-size: var(--font-size-md);
@@ -29,7 +28,6 @@
 
 .voice-card {
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-6);
   background: var(--color-bg-transparent-1);
   display: grid;
@@ -70,7 +68,6 @@
   grid-template-columns: 140px 1fr;
   gap: var(--spacing-5);
   padding: var(--spacing-4) var(--spacing-5);
-  border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-transparent-1);
 }
@@ -97,7 +94,6 @@
 
 .voice-finished {
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-5);
   background: color-mix(in srgb, var(--color-success-accent) 10%, var(--color-bg-transparent-1));
   display: grid;
@@ -120,7 +116,6 @@
 
 .voice-panel {
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-5);
   background: var(--color-bg-transparent-1);
   display: grid;
@@ -161,7 +156,6 @@
   font-size: var(--font-size-md);
   opacity: var(--opacity-visible);
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-3) var(--spacing-5);
   background: var(--color-bg-transparent-1);
 }
@@ -183,7 +177,6 @@
   gap: var(--spacing-3);
   align-items: center;
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-2) var(--spacing-4);
   background: var(--color-bg-transparent-1);
 }
@@ -195,7 +188,6 @@
 
 .voice-select-input {
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
   padding: var(--spacing-2) var(--spacing-4);
   background: var(--color-bg-transparent-2);
   color: inherit;
@@ -210,7 +202,6 @@
   font-size: var(--font-size-md);
   opacity: var(--opacity-visible);
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-full);
   padding: var(--spacing-2) var(--spacing-4);
   background: var(--color-bg-transparent-1);
 }
@@ -221,7 +212,6 @@
 
 .voice-btn {
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-lg);
   padding: var(--spacing-4) var(--spacing-5);
   background: var(--color-bg-transparent-2);
   color: inherit;
@@ -243,7 +233,6 @@
 .voice-ptt {
   min-width: 125px;
   min-height: var(--height-button-lg);
-  border-radius: var(--radius-xl);
   border-color: var(--color-danger-light);
   background: color-mix(in srgb, var(--color-danger-light) 22%, var(--color-bg-transparent-2));
   font-weight: var(--font-weight-bold);
@@ -276,7 +265,6 @@
 
 .voice-transcript {
   border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-4) var(--spacing-5);
   background: var(--color-bg-transparent-1);
   font-size: var(--font-size-md);

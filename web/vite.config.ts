@@ -26,6 +26,11 @@ export default defineConfig(({ mode }) => {
   const basePath = String(env.VITE_BASE_PATH || "/");
   // DEV_PROXY_API — явный URL для прокси (compose: http://back:3000). Иначе в Docker — back:3000, на хосте — rawBase или localhost.
   const proxyTarget = resolveApiProxyTarget(rawBase);
+  const isMobileBuild = mode === "mobile" || env.VITE_CAPACITOR === "1";
+  const capacitorStub = path.resolve(
+    __dirname,
+    "../app/src/shared/platform/capacitor-web-stub.ts",
+  );
   return {
     base: basePath,
     optimizeDeps: {
@@ -39,6 +44,13 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
+        ...(isMobileBuild
+          ? {}
+          : {
+              "@capacitor/core": capacitorStub,
+              "@capacitor/network": capacitorStub,
+              "@capacitor/filesystem": capacitorStub,
+            }),
         "@shared": path.resolve(__dirname, "../app/src/shared"),
         "@app": path.resolve(__dirname, "../app/src"),
         react: path.resolve(__dirname, "node_modules/react"),

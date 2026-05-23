@@ -7,6 +7,7 @@ import {
 import type { RootState } from "../../../shared/store/store";
 import type { ScriptStep } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
+import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
 import {
   createActorAnnotation,
   deleteActorAnnotation,
@@ -185,7 +186,7 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
 
   if (api) {
     try {
-      const scene = await api.readProjectScene(args.projectSlug, args.sceneName);
+      const scene = await desktopReadProjectScene(api, args.projectSlug, args.sceneName);
       const fromFile = {
         playlistOptions: normalizePlaylistOptions((scene as any)?.playlist),
         soundsOptions: normalizeSoundsOptions((scene as any)?.sounds),

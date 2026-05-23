@@ -1,4 +1,4 @@
-.dialogue-trainer {
+﻿.dialogue-trainer {
   display: grid;
   gap: var(--spacing-5);
 }
@@ -10,7 +10,6 @@
   justify-content: space-between;
   flex-wrap: wrap;
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-5) var(--spacing-6);
   background: var(--color-bg-transparent-1);
 }
@@ -39,14 +38,12 @@
   align-items: center;
   font-size: var(--font-size-base);
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-full);
   padding: var(--spacing-3) var(--spacing-5);
   background: var(--color-bg-transparent-1);
 }
 
 .dialogue-btn {
   border: none;
-  border-radius: var(--radius-lg);
   padding: var(--spacing-3) var(--spacing-3);
   background: var(--color-bg-transparent-2);
   color: inherit;
@@ -67,7 +64,6 @@
 
 .dialogue-scroll {
   border: 1px solid var(--color-border-visible);
-  border-radius: var(--radius-xl);
   background: var(--color-bg-transparent-1);
   padding: var(--spacing-5);
   max-height: 70vh;
@@ -98,7 +94,6 @@
   grid-template-columns: 140px 1fr;
   gap: var(--spacing-5);
   padding: var(--spacing-4) var(--spacing-5);
-  border-radius: var(--radius-xl);
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-transparent-1);
 }
@@ -122,22 +117,58 @@
   background: transparent;
 }
 
-.dialogue-line--active .dialogue-my-line {
-  outline: 2px solid var(--color-blue-border);
-}
-
 .dialogue-my-line {
+  position: relative;
   border: 1px solid var(--color-border-accent);
-  border-radius: var(--radius-xl);
   padding: var(--spacing-5);
-  background: var(--color-blue-highlight-bg);
+  background: var(--color-bg-transparent-1);
   display: grid;
   gap: var(--spacing-4);
 }
 
+/* Нужно пройти */
+.dialogue-my-line:not([data-done="true"]) {
+  border-width: 2px;
+  border-color: var(--color-blue-border);
+  background: color-mix(in srgb, var(--color-blue-highlight-bg) 62%, var(--color-bg-transparent-1));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-blue-border) 24%, transparent),
+    0 12px 32px color-mix(in srgb, var(--color-blue-border) 14%, transparent);
+}
+
+/* Сейчас на этом этапе */
+.dialogue-line--active .dialogue-my-line {
+  border-color: color-mix(in srgb, var(--color-active-ascent) 55%, var(--color-border-accent));
+  padding-left: calc(var(--spacing-5) + 6px);
+  background: color-mix(in srgb, var(--color-active-ascent) 22%, var(--color-bg-transparent-1));
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--color-active-ascent) 28%, transparent),
+    0 12px 32px color-mix(in srgb, var(--color-active-ascent) 16%, transparent);
+}
+
+.dialogue-line--active .dialogue-my-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--color-active-ascent);
+}
+
+.dialogue-line--active .dialogue-my-line[data-done="true"] {
+  background: color-mix(
+    in srgb,
+    var(--color-success-accent) 2%,
+    color-mix(in srgb, var(--color-active-ascent) 18%, var(--color-bg-transparent-1))
+  );
+}
+
 .dialogue-my-line[data-done="true"] {
-  border-color: rgba(34, 197, 94, 0.35);
-  background: rgba(34, 197, 94, 0.06);
+  background: color-mix(in srgb, var(--color-success-accent) 38%, transparent);
+  border-color: color-mix(in srgb, var(--color-success-accent) 35%, var(--color-border-accent));
+  color: var(--color-text-primary);
+  font-weight: 500;
 }
 
 .dialogue-my-line[data-mistake="true"] {
@@ -162,11 +193,31 @@
   flex-wrap: wrap;
 }
 
+.dialogue-my-line-role-row {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .dialogue-my-line-role {
   font-size: var(--font-size-base);
   opacity: var(--opacity-bright);
   text-transform: uppercase;
   letter-spacing: 0.06em;
+}
+
+.dialogue-now-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--spacing-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-active-ascent);
+  border: 1px solid color-mix(in srgb, var(--color-active-ascent) 55%, transparent);
+  background: color-mix(in srgb, var(--color-active-ascent) 18%, transparent);
 }
 
 .dialogue-my-line-actions {
@@ -182,6 +233,10 @@
   line-height: var(--line-height-normal);
 }
 
+.dialogue-answer--done {
+  font-weight: 500;
+}
+
 .dialogue-muted {
   font-size: var(--font-size-base);
   opacity: var(--opacity-muted);
@@ -195,7 +250,6 @@
 
 .dialogue-token {
   border: none;
-  border-radius: var(--radius-full);
   padding: var(--spacing-3) var(--spacing-3);
   background: var(--color-bg-transparent-2);
   color: inherit;

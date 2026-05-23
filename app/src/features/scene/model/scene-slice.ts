@@ -2,6 +2,15 @@ import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/tool
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import type { RootState } from "../../../shared/store/store";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
+import {
+  desktopAddProjectAudio,
+  desktopDeleteProjectAudio,
+  desktopPickProjectAudio,
+  desktopPickProjectSound,
+  desktopPickProjectSoundIcon,
+  desktopReadProjectScene,
+  desktopSaveProjectScene,
+} from "../../../shared/platform/desktop-methods";
 import { createId } from "../../../shared/utils/createId";
 import { uploadProjectFile } from "../../../sync/api/files";
 import { ensureProject } from "../../../sync/api/projects";
@@ -40,6 +49,8 @@ export interface SceneData {
   sceneRoles?: SceneRolesDataV1;
   /** Записанные актёрские реплики (озвучка ролей), синхронизируются как часть сцены. */
   voiceLines?: SceneVoiceLines;
+  /** Изображения сцены (ключ → метаданные файла). */
+  images?: Record<string, { remoteKey?: string; remoteUrl?: string }>;
 }
 
 export type SceneRoleLinkV1 = {
@@ -393,7 +404,7 @@ export const setSoundIcon = createAsyncThunk<
     throw new Error("Недоступен выбор иконки");
   }
 
-  const res = await desktopApi.pickProjectSoundIcon(projectSlug, projectId || undefined);
+  const res = await desktopPickProjectSoundIcon(desktopApi, projectSlug, projectId || undefined);
   if (!res?.ok) {
     // canceled is not an error: no state change
     if (res?.canceled) {
@@ -434,7 +445,7 @@ export const pickSceneSoundsDesktop = createAsyncThunk<
   if (!desktopApi) {
     throw new Error("Desktop API недоступен");
   }
-  const res = await desktopApi.pickProjectSound(args.projectSlug);
+  const res = await desktopPickProjectSound(desktopApi, args.projectSlug);
   if (!res?.ok) {
     if (res?.canceled) return { projectSlug: args.projectSlug, sounds: [] };
     throw new Error(res?.error ?? "Не удалось выбрать звук");
@@ -510,9 +521,9 @@ async function persistScenePlaylistToDesktop(
     throw new Error("Desktop API недоступен");
   }
 
-  const current = await desktopApi.readProjectScene(projectSlug, sceneName);
-  const payload = { ...current, playlist };
-  const result = await desktopApi.saveProjectScene(projectSlug, sceneName, payload);
+  const current = await desktopReadProjectScene(desktopApi, projectSlug, sceneName);
+  const payload = { ...(current && typeof current === "object" ? current : {}), playlist };
+  const result = await desktopSaveProjectScene(desktopApi, projectSlug, sceneName, payload);
   if (!result?.ok) {
     throw new Error(result?.error ?? "Не удалось сохранить плейлист");
   }
@@ -541,7 +552,7 @@ export const pickScenePlaylistTracksDesktop = createAsyncThunk<
     throw new Error("Desktop API недоступен");
   }
 
-  const res = await desktopApi.pickProjectAudio(args.projectSlug);
+  const res = await desktopPickProjectAudio(desktopApi, args.projectSlug);
   if (!res?.ok) {
     if (res?.canceled) {
       const state = api.getState() as RootState;
@@ -626,7 +637,7 @@ export const addScenePlaylistTracksFromPathsDesktop = createAsyncThunk<
   const desktopApi = getDesktopApi();
   if (!desktopApi) throw new Error("Desktop API недоступен");
 
-  const res = await desktopApi.addProjectAudio(args.projectSlug, args.filePaths);
+  const res = await desktopAddProjectAudio(desktopApi, args.projectSlug, args.filePaths);
   if (!res?.ok) {
     throw new Error(res?.error ?? "Не удалось добавить аудио");
   }
@@ -711,7 +722,7 @@ export const deleteScenePlaylistTrackDesktop = createAsyncThunk<
   if (!desktopApi) throw new Error("Desktop API недоступен");
 
   try {
-    const res = await desktopApi.deleteProjectAudio(args.projectSlug, args.file);
+    const res = await desktopDeleteProjectAudio(desktopApi, args.projectSlug, args.file);
     if (!res?.ok) {
       console.error("[playlist] deleteProjectAudio failed:", res?.error);
     }

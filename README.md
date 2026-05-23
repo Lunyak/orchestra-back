@@ -50,6 +50,7 @@ orchestra-servises/
 ├── web/               # Веб-фронтенд
 ├── admin/             # Админ-панель
 ├── desktop/           # Electron-приложение (отдельный репо)
+├── mobile/            # Capacitor — Android / iOS, офлайн-пакет (см. mobile/README.md)
 ├── docs/              # Документация
 │   └── LOGS.md       # Руководство по логам
 ├── scripts/           # Скрипты автоматизации

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth";
-import { useAppSelector } from "../../../shared/store/hooks";
+import { useProject } from "../../project";
+import { useMyTroupeQuery } from "../../troupe/api/troupe-api";
 import { disconnectChatSocket, getChatSocket } from "../../../realtime/chat-socket";
 import {
   fetchChatConversations,
@@ -10,7 +11,7 @@ import {
   type ChatConversationItem,
   type ChatMessageItem,
 } from "../../../sync/api/chat";
-import { getMyProfile } from "../../../sync/api/profile";
+import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { ChatDockMessagesContent } from "./ChatDockMessagesContent";
 import "./ChatDock.css";
 
@@ -26,7 +27,12 @@ function conversationLabel(
 
 export function ChatDock() {
   const { accessToken } = useAuth();
-  const myTroupe = useAppSelector((s) => s.troupe.troupe);
+  const { projectName } = useProject();
+  const { data: troupeData } = useMyTroupeQuery(
+    { project: projectName || "fools" },
+    { skip: !accessToken || !projectName },
+  );
+  const myTroupe = troupeData?.troupe ?? null;
   const [open, setOpen] = useState(false);
   const [conversations, setConversations] = useState<ChatConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -37,7 +43,11 @@ export function ChatDock() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
-  const [myEmail, setMyEmail] = useState<string | null>(null);
+  const { data: myProfile } = useMyProfileQuery(undefined, { skip: !accessToken });
+  const myEmail = useMemo(
+    () => myProfile?.email?.trim().toLowerCase() ?? null,
+    [myProfile?.email],
+  );
   const [expanded, setExpanded] = useState(false);
   const [unreadByConv, setUnreadByConv] = useState<Record<string, number>>({});
   const [toggleAttention, setToggleAttention] = useState(false);
@@ -59,22 +69,9 @@ export function ChatDock() {
     if (!accessToken) {
       disconnectChatSocket();
       setOpen(false);
-      setMyEmail(null);
       setUnreadByConv({});
       return;
     }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const profile = await getMyProfile(accessToken);
-        if (!cancelled) setMyEmail(profile.email.trim().toLowerCase());
-      } catch {
-        if (!cancelled) setMyEmail(null);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
   }, [accessToken]);
 
   useEffect(() => {

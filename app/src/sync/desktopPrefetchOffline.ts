@@ -1,5 +1,9 @@
 import type { ScriptStep, TheaterLayout } from "../shared/types/script";
 import { getDesktopApi } from "../shared/platform/desktop-api";
+import {
+  desktopReadProjectScene,
+  desktopSaveProjectScene,
+} from "../shared/platform/desktop-methods";
 import { DEFAULT_THEATER_LAYOUT } from "../features/scene/model/scene-slice";
 import {
   collectMarkdownImagePrefetchTargets,
@@ -179,7 +183,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       images: Object.keys(images).length ? images : (base as any)?.images,
     };
 
-    const saveRes = await desktop.saveProjectScene(args.projectSlug, "script", payload, {
+    const saveRes = await desktopSaveProjectScene(desktop, args.projectSlug, "script", payload, {
       skipOutbox: true,
     });
     if (!saveRes?.ok) {
@@ -187,7 +191,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       return { downloaded, skipped, errors, rehydratePayload: null };
     }
 
-    const fresh = await desktop.readProjectScene(args.projectSlug, "script");
+    const fresh = await desktopReadProjectScene(desktop, args.projectSlug, "script");
     if (!fresh || typeof fresh !== "object") {
       return { downloaded, skipped, errors, rehydratePayload: null };
     }

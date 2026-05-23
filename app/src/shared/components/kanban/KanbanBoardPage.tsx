@@ -1,16 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../features/auth";
+import { mergeKanbanRoleAssignmentMembers } from "../../../features/kanban/model/kanban-role-members";
 import { KanbanStepDetailModal } from "../../../features/kanban-step-modal/KanbanStepDetailModal";
 import type { KanbanStepRolesAdminMember } from "../../../features/kanban-step-modal/KanbanStepRolesAdminPanel";
+import {
+  useProjectMembersQuery,
+  useProjectRolesQuery,
+} from "../../../features/project/api/project-api";
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
+import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
 import type { ScriptStep } from "../../types/script";
-import { getMyTroupe, type TroupeMemberItem } from "../../../sync/api/troupe";
-import {
-  getProjectMembers,
-  getProjectRoles,
-  type ProjectRoleInfo,
-} from "../../../sync/api/projects";
+import type { ProjectRoleInfo } from "../../../sync/api/projects";
+import type { TroupeMemberItem } from "../../../sync/api/troupe";
 import "./style.css";
 import { Button } from "@shared/core/button/Button";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
@@ -219,95 +221,34 @@ export function KanbanBoardPage({
     string[]
   >;
 
-  const [projectRoles, setProjectRoles] = useState<ProjectRoleInfo[]>([]);
-  const [troupeMembers, setTroupeMembers] = useState<TroupeMemberItem[]>([]);
-  const [roleAssignmentMembers, setRoleAssignmentMembers] = useState<KanbanStepRolesAdminMember[]>([]);
-  const [rolesLoading, setRolesLoading] = useState(false);
-  const [rolesError, setRolesError] = useState<string | null>(null);
+  const skipRoles = !accessToken || !projectName;
+  const {
+    data: rolesRes,
+    isLoading: rolesLoading,
+    error: rolesQueryError,
+  } = useProjectRolesQuery(projectName, { skip: skipRoles });
+  const { data: troupeRes } = useMyTroupeQuery(
+    { project: projectName },
+    { skip: skipRoles },
+  );
+  const { data: projectMembersRes } = useProjectMembersQuery(projectName, {
+    skip: skipRoles,
+  });
 
-  useEffect(() => {
-    if (!accessToken || !projectName) {
-      setProjectRoles([]);
-      setTroupeMembers([]);
-      setRoleAssignmentMembers([]);
-      setRolesLoading(false);
-      setRolesError(null);
-      return;
-    }
-    let cancelled = false;
-    setRolesLoading(true);
-    setRolesError(null);
-    Promise.all([
-      getProjectRoles(accessToken, projectName),
-      getMyTroupe(accessToken, { project: projectName }).catch(() => null),
-      getProjectMembers(accessToken, projectName).catch(() => null),
-    ])
-      .then(([rolesRes, troupeRes, projectMembers]) => {
-        if (cancelled) return;
-        setProjectRoles(rolesRes?.roles ?? []);
-        setTroupeMembers(((troupeRes as any)?.members ?? []) as TroupeMemberItem[]);
+  const projectRoles = rolesRes?.roles ?? [];
+  const troupeMembers = (troupeRes?.members ?? []) as TroupeMemberItem[];
 
-        const membersFromTroupe = (((troupeRes as any)?.members ?? []) as any[])
-          .map((m) => ({
-            email: normalizeEmail(String((m as any)?.email ?? "")),
-            profile: (m as any)?.profile ?? null,
-          }))
-          .filter((m) => Boolean(m.email));
+  const rolesError = rolesQueryError
+    ? String(
+        (rolesQueryError as { message?: string }).message ??
+          "Не удалось загрузить роли/труппу",
+      )
+    : null;
 
-        const membersFromProject = (() => {
-          const out: KanbanStepRolesAdminMember[] = [];
-          const ownerEmail = normalizeEmail(String(projectMembers?.owner?.email ?? ""));
-          if (ownerEmail) {
-            out.push({
-              email: ownerEmail,
-              profile: projectMembers?.owner?.displayName
-                ? { displayName: projectMembers.owner.displayName }
-                : null,
-            });
-          }
-          for (const m of projectMembers?.members ?? []) {
-            const em = normalizeEmail(String(m?.user?.email ?? ""));
-            if (!em) continue;
-            out.push({
-              email: em,
-              profile: m?.user?.displayName ? { displayName: m.user.displayName } : null,
-            });
-          }
-          return out;
-        })();
-
-        const uniq = new Map<string, KanbanStepRolesAdminMember>();
-        const merged = [...membersFromTroupe, ...membersFromProject];
-        for (const m of merged) {
-          if (!m.email) continue;
-          const prev = uniq.get(m.email);
-          if (!prev) {
-            uniq.set(m.email, m);
-            continue;
-          }
-          if (!prev.profile && m.profile) uniq.set(m.email, { ...prev, profile: m.profile });
-        }
-        const list = Array.from(uniq.values()).sort((a, b) => {
-          const la = `${String(a.profile?.displayName ?? "").trim() || a.email} (${a.email})`;
-          const lb = `${String(b.profile?.displayName ?? "").trim() || b.email} (${b.email})`;
-          return la.localeCompare(lb, "ru");
-        });
-        setRoleAssignmentMembers(list);
-      })
-      .catch((e: any) => {
-        if (cancelled) return;
-        setProjectRoles([]);
-        setTroupeMembers([]);
-        setRoleAssignmentMembers([]);
-        setRolesError(e?.message ? String(e.message) : "Не удалось загрузить роли/труппу");
-      })
-      .finally(() => {
-        if (!cancelled) setRolesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, projectName]);
+  const roleAssignmentMembers = useMemo(
+    () => mergeKanbanRoleAssignmentMembers(troupeRes, projectMembersRes),
+    [troupeRes, projectMembersRes],
+  );
 
   const troupeAsMembers = useMemo((): MemberInfo[] => {
     const list = Array.isArray(troupeMembers) ? troupeMembers : [];
@@ -727,11 +668,9 @@ export function KanbanBoardPage({
           getRoleActors={getRoleActors}
           displayRoleTitle={displayRoleTitle}
           resolveRoleInfo={resolveRoleInfo}
-          accessToken={accessToken}
           projectName={projectName}
           projectRoles={projectRoles}
           roleAssignmentMembers={roleAssignmentMembers}
-          onProjectRolesUpdated={setProjectRoles}
         />
       )}
     </div>

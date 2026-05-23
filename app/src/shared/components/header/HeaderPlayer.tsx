@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   pickSceneSoundsDesktop,
   sceneActions,
@@ -7,6 +7,13 @@ import {
 } from "../../../features/scene/model/scene-slice";
 import { ensureProject } from "../../../sync/api/projects";
 import { getDesktopApi } from "../../platform/desktop-api";
+import {
+  desktopDeleteProjectSound,
+  desktopReadProjectScene,
+  desktopSaveProjectScene,
+} from "../../platform/desktop-methods";
+import { createAudioFadeController } from "../../media/audio-fade";
+import { resolveOfflineMediaUrl } from "../../platform/media-url";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import "./style.css";
 
@@ -90,7 +97,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const [showSettings, setShowSettings] = useState(false);
   const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
-  const fadeTimers = useRef<Record<number, number | null>>({});
+  const audioFade = useMemo(() => createAudioFadeController(), []);
   const messageTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const iconInputRef = useRef<HTMLInputElement | null>(null);
@@ -261,9 +268,9 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       return;
     }
     try {
-      const current = await desktopApi.readProjectScene(projectName, sceneName);
+      const current = await desktopReadProjectScene(desktopApi, projectName, sceneName);
       const payload = {
-        ...current,
+        ...(current && typeof current === "object" ? current : {}),
         sounds: nextTracks.map((track) => {
           const orig = sounds.find((s) => s.id === track.id);
           return {
@@ -285,7 +292,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           };
         }),
       };
-      const result = await desktopApi.saveProjectScene(
+      const result = await desktopSaveProjectScene(
+        desktopApi,
         projectName,
         sceneName,
         payload,
@@ -353,7 +361,8 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     const desktopApi = getDesktopApi();
     if (desktopApi) {
       try {
-        const res = await desktopApi.deleteProjectSound(
+        const res = await desktopDeleteProjectSound(
+          desktopApi,
           projectName,
           track.file ?? track.filePath ?? track.url,
         );
@@ -379,11 +388,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   };
 
   const clearFadeTimer = (trackId: number) => {
-    const timer = fadeTimers.current[trackId];
-    if (timer) {
-      window.clearInterval(timer);
-      fadeTimers.current[trackId] = null;
-    }
+    audioFade.clear(trackId);
   };
 
   const runFade = (
@@ -395,38 +400,22 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   ) => {
     const audio = audioRefs.current[trackId];
     if (!audio) return;
-    clearFadeTimer(trackId);
-    const safeDuration = Math.max(0, duration);
-    if (safeDuration === 0) {
-      audio.volume = to;
-      onDone?.();
-      return;
-    }
-    const start = Date.now();
-    audio.volume = from;
-    fadeTimers.current[trackId] = window.setInterval(() => {
-      const elapsed = Date.now() - start;
-      const ratio = Math.min(1, elapsed / safeDuration);
-      audio.volume = from + (to - from) * ratio;
-      if (ratio >= 1) {
-        clearFadeTimer(trackId);
-        onDone?.();
-      }
-    }, 30);
+    audioFade.run(audio, trackId, from, to, duration, onDone);
   };
 
-  const resolveSoundSrc = (file: string) => {
-    const url = new URL(`project-sounds://${encodeURIComponent(projectName)}/`);
-    url.pathname = `/${file}`;
-    return url.toString();
-  };
-
-  /** URL для воспроизведения: при filePath — локальный файл (project-sounds), иначе remoteUrl или project-sounds по имени. */
+  /** URL для воспроизведения: локальный filePath (офлайн) или remoteUrl. */
   const getPlaybackSrc = (track: LoadedTrack) => {
-    const localName = track.file ?? (track.filePath ? track.filePath.replace(/^.*[/\\]/, "") : null);
-    if (track.filePath && localName) return resolveSoundSrc(localName);
-    if (track.remoteUrl && /^https?:\/\//i.test(track.remoteUrl)) return track.remoteUrl;
-    return resolveSoundSrc(track.file ?? track.url);
+    const fileName =
+      track.file ??
+      (track.filePath ? track.filePath.replace(/^.*[/\\]/, "") : "") ??
+      track.url;
+    return resolveOfflineMediaUrl({
+      projectSlug: projectName,
+      kind: "sound",
+      fileName,
+      filePath: track.filePath,
+      remoteUrl: track.remoteUrl ?? track.url,
+    });
   };
 
   const toggleTrack = (track: LoadedTrack) => {

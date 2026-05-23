@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Orchestra</string>
+    <string name="title_activity_main">Orchestra</string>
+    <string name="package_name">com.orchestra.app</string>
+    <string name="custom_url_scheme">com.orchestra.app</string>
+</resources>
