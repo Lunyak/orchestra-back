@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Buttons } from "../../../shared/components/buttons/Buttons";
 import type { ScriptStep } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
-import { shuffle, tokenizeText, type WordToken } from "../model/wordTokens";
+import {
+  shuffle,
+  stripLeadingPunctuationTokens,
+  tokenizeText,
+  type WordToken,
+} from "../model/wordTokens";
 import "./dialogue-style.css";
 
 function readDoneSet(storageKey?: string): Set<string> {
@@ -97,6 +103,10 @@ function isAutoToken(t: WordToken): boolean {
   return false;
 }
 
+function answerTokensForDisplay(answer: WordToken[]): WordToken[] {
+  return stripLeadingPunctuationTokens(answer);
+}
+
 function RoleLinePuzzle({
   ex,
   done,
@@ -190,22 +200,13 @@ function RoleLinePuzzle({
 
   if (done) {
     return (
-      <div className="dialogue-my-line" data-done="true" data-mistake="false">
-        <div className="dialogue-my-line-head">
-          <div className="dialogue-my-line-role-row">
-            <div className="dialogue-my-line-role">{ex.role}</div>
-            {active ? <span className="dialogue-now-badge">Сейчас</span> : null}
-          </div>
-          <div className="dialogue-my-line-actions">
-            <button type="button" className="dialogue-btn" onClick={onResetDone}>
-              “не пройдено”
-            </button>
-          </div>
-        </div>
-        <div className="dialogue-answer dialogue-answer--done">
-          <span>{ex.text}</span>
-        </div>
-      </div>
+      <>
+        <div className="dialogue-role">{ex.role}</div>
+        <div className="dialogue-text">{ex.text}</div>
+        <Buttons.TextButton type="button" className="dialogue-undone-btn" onClick={onResetDone}>
+          не пройдено
+        </Buttons.TextButton>
+      </>
     );
   }
 
@@ -217,24 +218,26 @@ function RoleLinePuzzle({
           {active ? <span className="dialogue-now-badge">Сейчас</span> : null}
         </div>
         <div className="dialogue-my-line-actions">
-          <button
+          <Buttons.TextButton
             type="button"
-            className="dialogue-btn"
+            className="dialogue-reset-btn"
             onClick={() => {
               resetState();
             }}
           >
             сбросить
-          </button>
+          </Buttons.TextButton>
         </div>
       </div>
 
       <div className="dialogue-answer">
-        {answer.length === 0 ? (
-          <span className="dialogue-muted">кликай слова по порядку…</span>
-        ) : (
-          <span>{answer.map((t) => t.text).join(" ")}</span>
-        )}
+        {(() => {
+          const visible = answerTokensForDisplay(answer);
+          if (visible.length === 0) {
+            return <span className="dialogue-muted">кликай слова по порядку…</span>;
+          }
+          return <span>{visible.map((t) => t.text).join(" ")}</span>;
+        })()}
       </div>
 
       <div className="dialogue-pool">
@@ -290,7 +293,9 @@ export function DialogueSceneTrainer({
       if (line.kind !== "utterance") continue;
       if (!line.role) continue;
       if (!desiredRoleKeySet.has(normalizeRoleKey(line.role))) continue;
-      const tokens = tokenizeText(line.text, { includePunctuation: true });
+      const tokens = stripLeadingPunctuationTokens(
+        tokenizeText(line.text, { includePunctuation: true }),
+      );
       if (tokens.length < 1) continue;
       const seed = Number(String(line.stepId ?? 0)) + line.text.length * 17;
       out.push({
@@ -321,13 +326,31 @@ export function DialogueSceneTrainer({
 
   const total = exercises.length;
   const left = Math.max(0, total - doneCount);
+  const allDone = total > 0 && left === 0;
 
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
+
   useEffect(() => {
     setActiveExerciseIndex((i) => Math.max(0, Math.min(i, Math.max(0, exercises.length - 1))));
   }, [exercises.length]);
 
-  const activeExercise = exercises[activeExerciseIndex] ?? null;
+  // «Сейчас» — всегда первая непройденная (не зависший индекс 0 после reload)
+  useEffect(() => {
+    if (allDone || exercises.length === 0) return;
+    const current = exercises[activeExerciseIndex];
+    if (current && !doneIds.has(current.id)) return;
+    const next = findNextUndone(exercises, doneIds, 0);
+    if (next !== activeExerciseIndex) setActiveExerciseIndex(next);
+  }, [allDone, activeExerciseIndex, doneIds, exercises]);
+
+  const activeExerciseIndexResolved = useMemo(() => {
+    if (allDone) return activeExerciseIndex;
+    const current = exercises[activeExerciseIndex];
+    if (current && !doneIds.has(current.id)) return activeExerciseIndex;
+    return findNextUndone(exercises, doneIds, 0);
+  }, [activeExerciseIndex, allDone, doneIds, exercises]);
+
+  const activeExercise = exercises[activeExerciseIndexResolved] ?? null;
 
   const lineRefs = useRef(new Map<string, HTMLDivElement>());
   const setLineRef = (id: string, el: HTMLDivElement | null) => {
@@ -342,11 +365,13 @@ export function DialogueSceneTrainer({
   }, [activeExercise?.lineId]);
 
   const markDone = (id: string) => {
-    const next = new Set(doneIds);
-    next.add(id);
-    setDoneIds(next);
-    persistDoneSet(storageKey, next);
-    setActiveExerciseIndex((i) => findNextUndone(exercises, next, i + 1));
+    setDoneIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      persistDoneSet(storageKey, next);
+      setActiveExerciseIndex((i) => findNextUndone(exercises, next, i + 1));
+      return next;
+    });
   };
 
   const markUndone = (id: string) => {
@@ -358,15 +383,12 @@ export function DialogueSceneTrainer({
 
   const goPrevMyLine = () => {
     if (!activeExercise) return;
-    for (let i = Math.max(0, activeExerciseIndex - 1); i >= 0; i -= 1) {
-      setActiveExerciseIndex(i);
-      return;
-    }
+    setActiveExerciseIndex((i) => Math.max(0, i - 1));
   };
 
   const goNextMyLine = () => {
     if (!activeExercise) return;
-    if (activeExerciseIndex < exercises.length - 1) setActiveExerciseIndex(activeExerciseIndex + 1);
+    setActiveExerciseIndex((i) => Math.min(exercises.length - 1, i + 1));
   };
 
   const goNextUndone = () => {
@@ -386,7 +408,7 @@ export function DialogueSceneTrainer({
     const isMine = line.role && desiredRoleKeySet.has(normalizeRoleKey(line.role));
     if (!isMine) {
       return (
-        <div className="dialogue-line">
+        <div className="dialogue-line dialogue-line--other">
           <div className="dialogue-role">{roleLabel}</div>
           <div className="dialogue-text">{line.text}</div>
         </div>
@@ -403,11 +425,13 @@ export function DialogueSceneTrainer({
       );
     }
 
-    const isActive = activeExercise?.lineId === line.id;
     const done = doneIds.has(ex.id);
+    const isActive = !allDone && !done && activeExercise?.lineId === line.id;
 
     return (
-      <div className={`dialogue-line dialogue-line--mine ${isActive ? "dialogue-line--active" : ""}`}>
+      <div
+        className={`dialogue-line dialogue-line--mine ${done ? "dialogue-line--done" : ""} ${isActive ? "dialogue-line--active" : ""}`}
+      >
         <RoleLinePuzzle
           ex={ex}
           done={done}
@@ -422,20 +446,28 @@ export function DialogueSceneTrainer({
   };
 
   return (
-    <div className="dialogue-trainer">
+    <div className="dialogue-trainer" data-all-done={allDone ? "true" : "false"}>
       <div className="dialogue-toolbar">
         <div className="dialogue-toolbar-main">
           <div className="dialogue-toolbar-title">
-            Диалоговый тренажёр — роль <b>{role || "—"}</b>
+            Роль <b>{role || "—"}</b>
           </div>
           <div className="dialogue-toolbar-meta">
-            Пройдено <b>{doneCount}</b> / {total} (осталось {left})
-            {activeExercise ? (
+            {allDone ? (
               <>
-                {" "}
-                · сейчас реплика <b>{activeExerciseIndex + 1}</b> / {total}
+                Пройдено <b>{doneCount}</b> / {total} — <b>весь блок завершён</b>
               </>
-            ) : null}
+            ) : (
+              <>
+                Пройдено <b>{doneCount}</b> / {total} (осталось {left})
+                {activeExercise ? (
+                  <>
+                    {" "}
+                    · сейчас реплика <b>{activeExerciseIndexResolved + 1}</b>
+                  </>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
         <div className="dialogue-toolbar-actions">
@@ -468,6 +500,14 @@ export function DialogueSceneTrainer({
       </div>
 
       <div className="dialogue-scroll">
+        {allDone ? (
+          <div className="dialogue-finished" role="status">
+            <div className="dialogue-finished-title">Все реплики пройдены</div>
+            <div className="dialogue-finished-meta">
+              Вы успешно собрали все фразы выбранных сцен. Можно пройти ещё раз или сбросить прогресс.
+            </div>
+          </div>
+        ) : null}
         {allLines.length === 0 ? (
           <div className="dialogue-empty">
             {selectedStepIds.length === 0

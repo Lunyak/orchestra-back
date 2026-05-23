@@ -1,6 +1,11 @@
+import cn from "classnames";
+import { useMemo } from "react";
 import { DialogueSceneTrainer } from "../../actor-trainers/ui/DialogueSceneTrainer";
 import { VoiceDialogueTrainer } from "../../actor-trainers/ui/VoiceDialogueTrainer";
 import { WordOrderTrainer } from "../../actor-trainers/ui/WordOrderTrainer";
+import { Button } from "../../../shared/core/button/Button";
+import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
+import { LabeledCheckbox } from "../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { useActorPage } from "../model/useActorPage";
 import "./style.css";
 
@@ -10,8 +15,6 @@ export function ActorPageView() {
     projectName,
     onProjectChange,
     steps,
-    focusMode,
-    setFocusMode,
     settingsHidden,
     setSettingsHidden,
     profileLoading,
@@ -41,6 +44,41 @@ export function ActorPageView() {
     openStepInScript,
   } = useActorPage();
 
+  const projectSelectOptions = useMemo(
+    () => projects.map((slug) => ({ value: slug, label: slug })),
+    [projects],
+  );
+
+  const roleSelectOptions = useMemo(
+    () =>
+      rolesForActor.map((r) => ({
+        value: String(r.id),
+        label: String(r.title ?? r.key ?? r.id),
+      })),
+    [rolesForActor],
+  );
+
+  const roleSelectPlaceholder = rolesLoading
+    ? "Загрузка ролей…"
+    : myEmail
+      ? "Нет ролей для вашего пользователя"
+      : "Профиль не загружен";
+
+  const stepPickerDisabled = !effectiveRoleInfo || phraseSteps.length === 0;
+
+  const toggleStepSelection = (stepId: number, nextChecked: boolean) => {
+    setSelectedStepIds((prev) => {
+      if (prev === "all") {
+        if (nextChecked) return "all";
+        return phraseSteps.map((x) => x.stepId).filter((id) => id !== stepId);
+      }
+      const set = new Set(prev);
+      if (nextChecked) set.add(stepId);
+      else set.delete(stepId);
+      return Array.from(set.values()).sort((a, b) => a - b);
+    });
+  };
+
   return (
     <div className="app-layout actor-layout">
       <div className="app-content">
@@ -53,23 +91,13 @@ export function ActorPageView() {
 
             <div className="actor-topbar">
               <div className="actor-topbar-actions">
-                <button
+                <Button
+                  className={cn("actor-topbar-btn", !settingsHidden ? "is-active" : "secondary")}
                   type="button"
-                  className="actor-topbar-btn"
-                  data-active={focusMode ? "true" : "false"}
-                  onClick={() => setFocusMode((v) => !v)}
-                  title="Скрыть левое меню навигации и сосредоточиться на тренировке"
-                >
-                  {focusMode ? "Фокус: вкл" : "Фокус"}
-                </button>
-                <button
-                  type="button"
-                  className="actor-topbar-btn"
-                  data-active={settingsHidden ? "true" : "false"}
                   onClick={() => setSettingsHidden((v) => !v)}
                 >
                   {settingsHidden ? "Показать настройки" : "Скрыть настройки"}
-                </button>
+                </Button>
               </div>
               <div className="actor-topbar-meta">
                 Проект: <b>{projectName || "—"}</b> · Роль: <b>{effectiveRoleTitle || "—"}</b> · Сцены:{" "}
@@ -81,19 +109,16 @@ export function ActorPageView() {
               <div className="actor-controls">
                 <label className="actor-field">
                   <div className="actor-label">Проект</div>
-                  <select
-                    className="actor-select"
-                    value={projectName}
-                    onChange={(e) => onProjectChange(e.target.value)}
+                  <CustomSelect
+                    value={projects.length > 0 ? projectName : ""}
+                    options={projectSelectOptions}
+                    onChange={onProjectChange}
+                    placeholder="Выберите проект"
+                    noOptionsLabel="Проектов нет"
                     disabled={projects.length === 0}
-                  >
-                    {projects.length === 0 ? <option value="">Проектов нет</option> : null}
-                    {projects.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
+                    triggerClassName="actor-select"
+                    aria-label="Проект"
+                  />
                 </label>
 
                 <label className="actor-field">
@@ -110,31 +135,16 @@ export function ActorPageView() {
 
                 <label className="actor-field">
                   <div className="actor-label">Роль</div>
-                  <select
-                    className="actor-select"
+                  <CustomSelect
                     value={effectiveRoleInfo?.id != null ? String(effectiveRoleInfo.id) : ""}
-                    onChange={(e) => setRoleId(e.target.value)}
+                    options={roleSelectOptions}
+                    onChange={setRoleId}
+                    placeholder={roleSelectPlaceholder}
+                    noOptionsLabel={roleSelectPlaceholder}
                     disabled={!myEmail || rolesLoading || rolesForActor.length === 0}
-                  >
-                    {rolesForActor.length === 0 ? (
-                      <option value="">
-                        {rolesLoading
-                          ? "Загрузка ролей…"
-                          : myEmail
-                            ? "Нет ролей для вашего пользователя"
-                            : "Профиль не загружен"}
-                      </option>
-                    ) : null}
-                    {rolesForActor.map((r) => (
-                      <option key={String(r.id)} value={String(r.id)}>
-                        {String(r.title ?? r.key ?? r.id)}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="actor-hint">
-                    Реплики ищутся по спикеру в тексте шага (<b>[[РОЛЬ]]</b> или <b>РОЛЬ: текст</b>) и
-                    сопоставляются по ключу роли и алиасам.
-                  </div>
+                    triggerClassName="actor-select"
+                    aria-label="Роль"
+                  />
                   {!canPickAnyRole && myEmail && rolesForActor.length === 0 && !rolesLoading ? (
                     <div className="actor-hint">
                       Похоже, роли не назначены на ваш email. Назначьте себя на роль в карточке сцены на доске{" "}
@@ -150,22 +160,22 @@ export function ActorPageView() {
                   <div className="actor-label">Сцены (шаги) для тренировки</div>
                   <div className="actor-step-picker">
                     <div className="actor-step-picker-actions">
-                      <button
+                      <Button
+                        className="actor-step-btn secondary"
                         type="button"
-                        className="actor-step-btn"
                         onClick={() => setSelectedStepIds("all")}
-                        disabled={!effectiveRoleInfo || phraseSteps.length === 0}
+                        disabled={stepPickerDisabled}
                       >
                         Все ({totalInAllSteps})
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        className="actor-step-btn secondary"
                         type="button"
-                        className="actor-step-btn"
                         onClick={() => setSelectedStepIds([])}
-                        disabled={!effectiveRoleInfo || phraseSteps.length === 0}
+                        disabled={stepPickerDisabled}
                       >
                         Очистить
-                      </button>
+                      </Button>
                       <div className="actor-step-picker-meta">
                         Выбрано:{" "}
                         <b>
@@ -190,71 +200,51 @@ export function ActorPageView() {
                           const examples = (phrasesByStep.get(s.stepId) ?? []).slice(0, 2);
                           return (
                             <div key={s.stepId} className="actor-step-item">
-                              <input
-                                type="checkbox"
+                              <LabeledCheckbox
+                                className="actor-step-item-check"
+                                id={`actor-step-${s.stepId}`}
                                 checked={checked}
-                                onChange={(e) => {
-                                  const nextChecked = e.target.checked;
-                                  setSelectedStepIds((prev) => {
-                                    if (prev === "all") {
-                                      if (nextChecked) return "all";
-                                      return phraseSteps
-                                        .map((x) => x.stepId)
-                                        .filter((id) => id !== s.stepId);
-                                    }
-                                    const set = new Set(prev);
-                                    if (nextChecked) set.add(s.stepId);
-                                    else set.delete(s.stepId);
-                                    return Array.from(set.values()).sort((a, b) => a - b);
-                                  });
-                                }}
-                                aria-label={`Выбрать шаг ${s.stepTitle}`}
-                              />
-                              <div className="actor-step-main">
-                                <div className="actor-step-title">
-                                  {s.stepTitle}{" "}
-                                  <span className="actor-step-id">#{s.stepId}</span>
-                                </div>
-                                {examples.length > 0 ? (
-                                  <div className="actor-step-examples">
-                                    {examples.map((ex, idx) => (
-                                      <div
-                                        key={`${s.stepId}-ex-${idx}`}
-                                        className="actor-step-example"
-                                      >
-                                        “{String(ex.text).slice(0, 90)}
-                                        {ex.text.length > 90 ? "…" : ""}”
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
+                                onChange={(nextChecked) => toggleStepSelection(s.stepId, nextChecked)}
+                              >
+                                <span className="actor-step-main">
+                                  <span className="actor-step-title">
+                                    {s.stepTitle}{" "}
+                                    <span className="actor-step-id">#{s.stepId}</span>
+                                  </span>
+                                  {examples.length > 0 ? (
+                                    <span className="actor-step-examples">
+                                      {examples.map((ex, idx) => (
+                                        <span
+                                          key={`${s.stepId}-ex-${idx}`}
+                                          className="actor-step-example"
+                                        >
+                                          “{String(ex.text).slice(0, 90)}
+                                          {ex.text.length > 90 ? "…" : ""}”
+                                        </span>
+                                      ))}
+                                    </span>
+                                  ) : null}
+                                </span>
+                              </LabeledCheckbox>
                               <span
                                 className="actor-step-count"
                                 title="Количество реплик вашей роли в этом шаге"
                               >
                                 {s.count}
                               </span>
-                              <button
+                              <Button
+                                className="actor-step-open secondary"
                                 type="button"
-                                className="actor-step-open"
-                                onClick={(ev) => {
-                                  ev.preventDefault();
-                                  ev.stopPropagation();
-                                  openStepInScript(s.stepId);
-                                }}
+                                onClick={() => openStepInScript(s.stepId)}
                                 title="Открыть этот шаг в сценарии"
                               >
                                 Открыть
-                              </button>
+                              </Button>
                             </div>
                           );
                         })
                       )}
                     </div>
-                  </div>
-                  <div className="actor-hint">
-                    “Сцена” здесь = шаг сценария (карточка). Тренажёр берёт реплики только из выбранных шагов.
                   </div>
                 </label>
               </div>
@@ -269,33 +259,27 @@ export function ActorPageView() {
               </div>
 
               <div className="actor-mode-tabs" role="tablist" aria-label="Режим тренировки">
-                <button
+                <Button
+                  className={cn("actor-mode-tab", trainerMode === "dialogue" ? "is-active" : "secondary")}
                   type="button"
-                  className={`actor-mode-tab ${trainerMode === "dialogue" ? "active" : ""}`}
                   onClick={() => setTrainerMode("dialogue")}
-                  role="tab"
-                  aria-selected={trainerMode === "dialogue"}
                 >
                   Диалог
-                </button>
-                <button
+                </Button>
+                <Button
+                  className={cn("actor-mode-tab", trainerMode === "cards" ? "is-active" : "secondary")}
                   type="button"
-                  className={`actor-mode-tab ${trainerMode === "cards" ? "active" : ""}`}
                   onClick={() => setTrainerMode("cards")}
-                  role="tab"
-                  aria-selected={trainerMode === "cards"}
                 >
                   Переставь слова (карточки)
-                </button>
-                <button
+                </Button>
+                <Button
+                  className={cn("actor-mode-tab", trainerMode === "voice" ? "is-active" : "secondary")}
                   type="button"
-                  className={`actor-mode-tab ${trainerMode === "voice" ? "active" : ""}`}
                   onClick={() => setTrainerMode("voice")}
-                  role="tab"
-                  aria-selected={trainerMode === "voice"}
                 >
                   Голос
-                </button>
+                </Button>
               </div>
 
               {trainerMode === "dialogue" ? (

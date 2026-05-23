@@ -109,3 +109,17 @@
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.custom-select__person {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  min-width: 0;
+}
+
+.custom-select__person-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -1,16 +1,29 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import cn from "classnames";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScriptStep } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
 import { tokenizeWords } from "../model/wordTokens";
+import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { api } from "../../../sync/api/client";
+import { getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
+import { useAuth } from "../../auth";
+import { useProjectRolesQuery } from "../../project/api/project-api";
 import { useProject } from "../../project";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
-import { selectVoiceTrainerUi, voiceTrainerUiActions } from "../model/voiceTrainerUiSlice";
+import { normalizeActorKey } from "../../actor/model/actor-page-helpers";
+import type { ProjectRoleInfo } from "../../../sync/api/projects";
+import {
+  selectVoiceTrainerUi,
+  voiceTrainerUiActions,
+  type PartnerVoiceSource,
+} from "../model/voiceTrainerUiSlice";
 import {
   uploadVoiceLineTakeWeb,
   type SceneVoiceLineEntry,
   type SceneVoiceLineTake,
 } from "../../scene/model/scene-slice";
+import { Button } from "../../../shared/core/button/Button";
+import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
 import "./voice-style.css";
 
 type VoiceExercise = {
@@ -493,6 +506,78 @@ async function fetchBackendTtsVoices(): Promise<BackendTtsVoice[]> {
     .filter((v) => v.name);
 }
 
+function findPreferredTake(
+  entry: SceneVoiceLineEntry | undefined,
+  perfId: string,
+): SceneVoiceLineTake | null {
+  if (!entry) return null;
+  const list = entry.takesByPerformer?.[perfId] ?? [];
+  if (list.length === 0) return null;
+  const preferredId = entry.preferredTakeIdByPerformer?.[perfId];
+  if (preferredId) {
+    const found = list.find((t) => t.id === preferredId);
+    if (found) return found;
+  }
+  return list[list.length - 1] ?? null;
+}
+
+function projectRoleKeys(role: ProjectRoleInfo): string[] {
+  const out: string[] = [];
+  if (role.key) out.push(normalizeRoleKey(role.key));
+  if (role.title) out.push(normalizeRoleKey(role.title));
+  for (const a of role.aliases ?? []) {
+    const k = normalizeRoleKey(String(a ?? ""));
+    if (k) out.push(k);
+  }
+  return out;
+}
+
+function findProjectRoleForScriptKey(
+  scriptRoleKey: string,
+  projectRoles: ProjectRoleInfo[],
+): ProjectRoleInfo | null {
+  const wanted = normalizeRoleKey(scriptRoleKey);
+  if (!wanted) return null;
+  for (const role of projectRoles) {
+    if (projectRoleKeys(role).includes(wanted)) return role;
+  }
+  return null;
+}
+
+function actorDisplayName(profile: TeamProfile | null | undefined, email: string): string {
+  const first = String(profile?.firstName ?? "").trim();
+  const last = String(profile?.lastName ?? "").trim();
+  const full = `${first} ${last}`.trim();
+  if (full) return full;
+  const display = String(profile?.displayName ?? "").trim();
+  if (display) return display;
+  return String(email ?? "").trim() || "—";
+}
+
+function actorsAssignedToProjectRole(role: ProjectRoleInfo): Array<{ id: string; label: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ id: string; label: string }> = [];
+  for (const raw of role.emails ?? []) {
+    const label = String(raw ?? "").trim();
+    const id = normalizeActorKey(label);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, label: label || id });
+  }
+  return out;
+}
+
+function partnerSourceSelectValue(
+  src: PartnerVoiceSource | undefined,
+  actors: Array<{ id: string }>,
+): string {
+  if (src?.kind === "performer") {
+    const id = normalizeActorKey(src.performerId);
+    if (actors.some((a) => a.id === id)) return `p:${id}`;
+  }
+  return actors[0] ? `p:${actors[0].id}` : "";
+}
+
 function findNextUndoneIndex(
   exercises: VoiceExercise[],
   done: Set<string>,
@@ -535,8 +620,13 @@ export function VoiceDialogueTrainer({
     const first = roleKeys && roleKeys.length ? normalizeRoleKey(String(roleKeys[0] ?? "")) : "";
     return first || normalizeRoleKey(role);
   }, [role, roleKeys]);
+  const { accessToken } = useAuth();
   const { projectName } = useProject();
   const dispatch = useAppDispatch();
+  const { data: rolesRes } = useProjectRolesQuery(projectName!, {
+    skip: !accessToken || !projectName,
+  });
+  const projectRoles = useMemo(() => rolesRes?.roles ?? [], [rolesRes?.roles]);
   const uiKey = storageKey || `voiceTrainer:${projectName || "project"}:${primaryRoleKey || "role"}`;
   const ui = useAppSelector((s) => selectVoiceTrainerUi(s, uiKey));
   const voiceLines = useAppSelector((s) => s.scene.sceneData?.voiceLines);
@@ -663,6 +753,18 @@ export function VoiceDialogueTrainer({
   }, [uiKey]);
 
   const [voices, setVoices] = useState<BackendTtsVoice[]>([]);
+  const [controlsHidden, setControlsHidden] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("voiceTrainer:controlsHidden") === "true";
+  });
+  const [profileByEmail, setProfileByEmail] = useState<Record<string, TeamProfile | null>>({});
+  const profileByEmailRef = useRef(profileByEmail);
+  profileByEmailRef.current = profileByEmail;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("voiceTrainer:controlsHidden", String(controlsHidden));
+  }, [controlsHidden]);
+
   const voiceName = ui.ttsVoiceName;
   const [ttsDiag, setTtsDiag] = useState<{
     lastRequestedAt: number | null;
@@ -888,6 +990,49 @@ export function VoiceDialogueTrainer({
       opts?.onError?.({ code: "audio-playback-failed", message: "" });
     }
   };
+
+  const speakPartnerLine = useCallback(
+    (
+      params: { lineId: string; roleKey: string; text: string },
+      opts?: { onEnd?: () => void; onError?: () => void },
+    ) => {
+      const text = stripParentheses(params.text);
+      if (!text) {
+        opts?.onEnd?.();
+        return;
+      }
+      const roleKey = normalizeRoleKey(params.roleKey);
+      const entry =
+        params.lineId && voiceLines?.byLineId
+          ? (voiceLines.byLineId[params.lineId] as SceneVoiceLineEntry | undefined)
+          : undefined;
+
+      const projectRole = findProjectRoleForScriptKey(roleKey, projectRoles);
+      const assignedActors = projectRole ? actorsAssignedToProjectRole(projectRole) : [];
+      const saved = roleKey ? ui.partnerVoiceByRoleKey?.[roleKey] : undefined;
+      let performerId =
+        saved?.kind === "performer" ? normalizeActorKey(saved.performerId) : "";
+      if (!performerId || !assignedActors.some((a) => a.id === performerId)) {
+        performerId = assignedActors[0]?.id ?? "";
+      }
+
+      if (performerId && params.lineId) {
+        const take = findPreferredTake(entry, performerId);
+        const url = take?.remoteUrl;
+        if (url) {
+          playUrl(url, { onEnd: opts?.onEnd, onError: () => opts?.onError?.(), label: "voice-line" });
+          return;
+        }
+      }
+
+      if (supported.tts) {
+        requestSpeak(ttsPartnerLine(text), { onEnd: opts?.onEnd, onError: () => opts?.onError?.() });
+        return;
+      }
+      opts?.onEnd?.();
+    },
+    [playUrl, projectRoles, requestSpeak, supported.tts, ui.partnerVoiceByRoleKey, voiceLines?.byLineId],
+  );
 
   const recRef = useRef<any | null>(null);
   const [listening, setListening] = useState(false);
@@ -1227,9 +1372,14 @@ export function VoiceDialogueTrainer({
         setIndex(nextIndex);
       };
 
-      if (supported.tts && nextPartnerTextTts) {
+      const np = current.nextPartner;
+      const npRoleKey = normalizeRoleKey(np?.role ?? "");
+      if (np && npRoleKey) {
         cancelSpeech();
-        requestSpeak(nextPartnerTextTts, { onEnd: after, onError: () => after() });
+        speakPartnerLine(
+          { lineId: np.lineId, roleKey: npRoleKey, text: np.text },
+          { onEnd: after, onError: () => after() },
+        );
       } else {
         after();
       }
@@ -1292,9 +1442,14 @@ export function VoiceDialogueTrainer({
       setIndex(nextIndex);
     };
 
-    if (supported.tts && nextPartnerTextTts) {
+    const np = current.nextPartner;
+    const npRoleKey = normalizeRoleKey(np?.role ?? "");
+    if (np && npRoleKey) {
       cancelSpeech();
-      requestSpeak(nextPartnerTextTts, { onEnd: after, onError: () => after() });
+      speakPartnerLine(
+        { lineId: np.lineId, roleKey: npRoleKey, text: np.text },
+        { onEnd: after, onError: () => after() },
+      );
     } else {
       after();
     }
@@ -1306,107 +1461,159 @@ export function VoiceDialogueTrainer({
   const total = exercises.length;
   const left = Math.max(0, total - doneCount);
 
+  const partnerRolesInScene = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const line of allLines) {
+      if (line.kind !== "utterance" || !line.role) continue;
+      const rk = normalizeRoleKey(line.role);
+      if (!rk || desiredRoleKeySet.has(rk)) continue;
+      if (!map.has(rk)) map.set(rk, line.role);
+    }
+    return Array.from(map.entries())
+      .map(([roleKey, roleTitle]) => ({ roleKey, roleTitle }))
+      .sort((a, b) => a.roleTitle.localeCompare(b.roleTitle, "ru"));
+  }, [allLines, desiredRoleKeySet]);
+
+  const actorsByPartnerRole = useMemo(() => {
+    const out: Record<string, Array<{ id: string; label: string }>> = {};
+    for (const { roleKey } of partnerRolesInScene) {
+      const projectRole = findProjectRoleForScriptKey(roleKey, projectRoles);
+      out[roleKey] = projectRole ? actorsAssignedToProjectRole(projectRole) : [];
+    }
+    return out;
+  }, [partnerRolesInScene, projectRoles]);
+
+  const assignedActorEmails = useMemo(() => {
+    const seen = new Set<string>();
+    for (const list of Object.values(actorsByPartnerRole)) {
+      for (const a of list) {
+        if (a.id) seen.add(a.id);
+      }
+    }
+    return Array.from(seen);
+  }, [actorsByPartnerRole]);
+
+  useEffect(() => {
+    if (!accessToken || assignedActorEmails.length === 0) return;
+    const missing = assignedActorEmails.filter((e) => !(e in profileByEmailRef.current));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await getProfilesBatch(accessToken, missing);
+        if (cancelled) return;
+        setProfileByEmail((prev) => {
+          const next = { ...prev };
+          for (const e of missing) {
+            const p = rows.find((r) => normalizeActorKey(r.email) === e);
+            next[e] = p ?? null;
+          }
+          return next;
+        });
+      } catch {
+        if (cancelled) return;
+        setProfileByEmail((prev) => {
+          const next = { ...prev };
+          for (const e of missing) next[e] = null;
+          return next;
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, assignedActorEmails]);
+
+  const renderActorSelectPerson = useCallback(
+    (option: { value: string } | null) => {
+      if (!option?.value.startsWith("p:")) return "—";
+      const id = normalizeActorKey(option.value.slice(2));
+      const prof = profileByEmail[id];
+      const name = actorDisplayName(prof, id);
+      const avatar = String(prof?.avatarUrl ?? "").trim() || null;
+      return (
+        <span className="custom-select__person">
+          <MiniAvatar src={avatar} label={name} size={24} title={id} />
+          <span className="custom-select__person-name">{name}</span>
+        </span>
+      );
+    },
+    [profileByEmail],
+  );
+
+  const partnerRoleSelectOptions = useMemo(
+    () =>
+      partnerRolesInScene.map(({ roleKey, roleTitle }) => {
+        const actors = actorsByPartnerRole[roleKey] ?? [];
+        return {
+          roleKey,
+          roleTitle,
+          actors,
+          options: actors.map((a) => {
+            const prof = profileByEmail[a.id];
+            return {
+              value: `p:${a.id}`,
+              label: actorDisplayName(prof, a.label),
+            };
+          }),
+        };
+      }),
+    [actorsByPartnerRole, partnerRolesInScene, profileByEmail],
+  );
+
+  useEffect(() => {
+    for (const { roleKey } of partnerRolesInScene) {
+      const actors = actorsByPartnerRole[roleKey] ?? [];
+      if (actors.length === 0) continue;
+      const saved = ui.partnerVoiceByRoleKey?.[roleKey];
+      const savedOk =
+        saved?.kind === "performer" &&
+        actors.some((a) => a.id === normalizeActorKey(saved.performerId));
+      if (savedOk) continue;
+      dispatch(
+        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+          uiKey,
+          roleKey,
+          source: { kind: "performer", performerId: actors[0]!.id },
+        }),
+      );
+    }
+  }, [actorsByPartnerRole, dispatch, partnerRolesInScene, ui.partnerVoiceByRoleKey, uiKey]);
+
+  const voiceSelectOptions = useMemo(
+    () => [
+      { value: "auto", label: "Авто (по умолчанию)" },
+      ...voices.map((v) => ({
+        value: v.name,
+        label: `${v.name}${v.locale ? ` (${v.locale})` : ""}`,
+      })),
+    ],
+    [voices],
+  );
+
+  const checkModeOptions = useMemo(
+    () => [
+      { value: "full", label: "1 раз (целиком)" },
+      { value: "sentences", label: "По предложениям" },
+    ],
+    [],
+  );
+
   if (!current) {
     return <div className="voice-empty">Нет реплик для голосового режима.</div>;
   }
 
   const prevText = current.prev?.text ? stripParentheses(current.prev.text) : "";
-  const prevTextTts = ttsPartnerLine(prevText);
-  const nextPartnerText = current.nextPartner?.text ? stripParentheses(current.nextPartner.text) : "";
-  const nextPartnerTextTts = ttsPartnerLine(nextPartnerText);
   const myTextNoRemarks = stripParentheses(current.textRaw);
   const prevLineId = current.prev?.lineId ?? "";
   const prevRoleKey = normalizeRoleKey(current.prev?.role ?? "");
 
-  const prevEntry: SceneVoiceLineEntry | undefined =
-    prevLineId && voiceLines?.byLineId ? (voiceLines.byLineId[prevLineId] as any) : undefined;
-
-  const findPreferredTake = (
-    entry: SceneVoiceLineEntry | undefined,
-    perfId: string,
-  ): SceneVoiceLineTake | null => {
-    if (!entry) return null;
-    const list = entry.takesByPerformer?.[perfId] ?? [];
-    if (list.length === 0) return null;
-    const preferredId = entry.preferredTakeIdByPerformer?.[perfId];
-    if (preferredId) {
-      const found = list.find((t) => t.id === preferredId);
-      if (found) return found;
-    }
-    return list[list.length - 1] ?? null;
-  };
-
-  const availablePerformersForPrevRole = useMemo(() => {
-    const out: Array<{ id: string; label: string }> = [];
-    const seen = new Set<string>();
-    const byLine = voiceLines?.byLineId ?? {};
-    if (!prevRoleKey) return out;
-    for (const entry of Object.values(byLine)) {
-      if (!entry) continue;
-      if (String((entry as any).roleKey ?? "") !== prevRoleKey) continue;
-      const tmap = (entry as any).takesByPerformer ?? {};
-      for (const [pid, list] of Object.entries(tmap as Record<string, SceneVoiceLineTake[]>)) {
-        if (!pid || seen.has(pid)) continue;
-        if (!Array.isArray(list) || list.length === 0) continue;
-        const anyLabel = list.find((t) => t.performerLabel)?.performerLabel ?? null;
-        out.push({ id: pid, label: String(anyLabel ?? pid) });
-        seen.add(pid);
-      }
-    }
-    out.sort((a, b) => a.label.localeCompare(b.label, "ru"));
-    return out;
-  }, [prevRoleKey, voiceLines?.byLineId]);
-
-  const partnerSource = prevRoleKey ? ui.partnerVoiceByRoleKey?.[prevRoleKey] : undefined;
-
   const speakPrev = (opts?: { onEnd?: () => void; onError?: () => void }) => {
-    const text = prevText;
-    if (!text) {
+    if (!prevText || !prevRoleKey || !prevLineId) {
       opts?.onEnd?.();
       return;
     }
-    const src = partnerSource ?? ({ kind: "auto" as const });
-
-    const pickAnyPreferredTake = (entry: SceneVoiceLineEntry | undefined): SceneVoiceLineTake | null => {
-      if (!entry) return null;
-      let best: SceneVoiceLineTake | null = null;
-      for (const [pid, list] of Object.entries(entry.takesByPerformer ?? {})) {
-        if (!pid || !Array.isArray(list) || list.length === 0) continue;
-        const t = findPreferredTake(entry, pid) ?? null;
-        if (!t) continue;
-        if (!best) {
-          best = t;
-          continue;
-        }
-        const a = Date.parse(String(best.createdAt ?? "")) || 0;
-        const b = Date.parse(String(t.createdAt ?? "")) || 0;
-        if (b >= a) best = t;
-      }
-      return best;
-    };
-
-    if (src.kind === "auto") {
-      const take = pickAnyPreferredTake(prevEntry);
-      const url = take?.remoteUrl;
-      if (url) {
-        playUrl(url, { onEnd: opts?.onEnd, onError: () => opts?.onError?.(), label: "voice-line:auto" });
-        return;
-      }
-      // fallthrough to TTS
-    }
-    if (src.kind === "performer" && prevLineId) {
-      const take = findPreferredTake(prevEntry, src.performerId);
-      const url = take?.remoteUrl;
-      if (url) {
-        playUrl(url, { onEnd: opts?.onEnd, onError: () => opts?.onError?.(), label: "voice-line" });
-        return;
-      }
-    }
-    if (supported.tts) {
-      requestSpeak(prevTextTts || text, { onEnd: opts?.onEnd, onError: () => opts?.onError?.() });
-      return;
-    }
-    opts?.onEnd?.();
+    speakPartnerLine({ lineId: prevLineId, roleKey: prevRoleKey, text: prevText }, opts);
   };
 
   const saveLastTakeAsPreferred = async () => {
@@ -1603,172 +1810,186 @@ export function VoiceDialogueTrainer({
               </div>
             </div>
           ) : null}
-          <div className="voice-actions">
-            <button
-              type="button"
-              className="voice-btn"
-              disabled={!prevText}
-              onClick={() => speakPrev()}
-              title="Озвучить предыдущую реплику"
-            >
-              Озвучить предыдущую
-            </button>
-
-            <button
-              type="button"
-              className={`voice-btn ${showText ? "voice-btn--primary" : ""}`}
-              onClick={() =>
-                dispatch(
-                  voiceTrainerUiActions.setVoiceShowText({
-                    uiKey,
-                    value: !showText,
-                  }),
-                )
-              }
-              title="Режим показа текста во всём тренажёре"
-            >
-              {showText ? "Текст: показан" : "Текст: скрыт"}
-            </button>
-
-            <label className="voice-select">
-              <span className="voice-select-label">Голос</span>
-              <select
-                className="voice-select-input"
-                value={voiceName}
-                onChange={(e) =>
-                  dispatch(
-                    voiceTrainerUiActions.setVoiceTtsVoiceName({
-                      uiKey,
-                      value: e.target.value,
-                    }),
-                  )
-                }
-                disabled={!supported.tts}
+          <div className="voice-controls">
+            <div className="voice-controls-head">
+              <span className="voice-controls-title">Настройки тренажёра</span>
+              <Button
+                type="button"
+                className={cn("voice-controls-toggle", !controlsHidden ? "is-active" : "secondary")}
+                onClick={() => setControlsHidden((v) => !v)}
               >
-                <option value="auto">Авто (по умолчанию)</option>
-                {voices.map((v) => (
-                  <option key={v.name} value={v.name}>
-                    {v.name}{v.locale ? ` (${v.locale})` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="voice-checkbox">
-              <input
-                type="checkbox"
-                checked={autoFlow}
-                onChange={(e) =>
-                  dispatch(
-                    voiceTrainerUiActions.setVoiceAutoFlow({
-                      uiKey,
-                      value: e.target.checked,
-                    }),
-                  )
-                }
-              />
-              авто (переход)
-            </label>
-            <label className="voice-select">
-              <span className="voice-select-label">Проверка</span>
-              <select
-                className="voice-select-input"
-                value={checkMode}
-                onChange={(e) =>
-                  dispatch(
-                    voiceTrainerUiActions.setVoiceCheckMode({
-                      uiKey,
-                      value: e.target.value === "sentences" ? "sentences" : "full",
-                    }),
-                  )
-                }
-              >
-                <option value="full">1 раз (целиком)</option>
-                <option value="sentences">По предложениям</option>
-              </select>
-            </label>
-            <label
-              className="voice-checkbox"
-              title="Параллельно распознаванию речи будет записываться аудио вашей реплики (для сохранения)"
-            >
-              <input
-                type="checkbox"
-                checked={ui.recordTakes}
-                onChange={(e) =>
-                  dispatch(
-                    voiceTrainerUiActions.setVoiceRecordTakes({
-                      uiKey,
-                      value: e.target.checked,
-                    }),
-                  )
-                }
-              />
-              сохранять дубль
-            </label>
-            {prevRoleKey ? (
-              <label className="voice-select" title="Если есть записи — можно выбрать живую озвучку партнёра по роли">
-                <span className="voice-select-label">Партнёр</span>
-                <select
-                  className="voice-select-input"
-                  value={
-                    partnerSource?.kind === "performer"
-                      ? `p:${partnerSource.performerId}`
-                      : partnerSource?.kind === "tts"
-                        ? "tts"
-                        : "auto"
-                  }
-                  onChange={(e) => {
-                    const v = String(e.target.value);
-                    if (v === "auto") {
+                {controlsHidden ? "Показать настройки" : "Скрыть настройки"}
+              </Button>
+            </div>
+
+            {!controlsHidden ? (
+              <div className="voice-controls-body">
+                <div className="voice-controls-selects">
+                  <div className="voice-select">
+                    <span className="voice-select-label">Голос</span>
+                    <CustomSelect
+                      value={voiceName}
+                      options={voiceSelectOptions}
+                      onChange={(next) =>
+                        dispatch(
+                          voiceTrainerUiActions.setVoiceTtsVoiceName({
+                            uiKey,
+                            value: next,
+                          }),
+                        )
+                      }
+                      disabled={!supported.tts}
+                      triggerClassName="voice-select-trigger"
+                      aria-label="Голос"
+                    />
+                  </div>
+                  <div className="voice-select">
+                    <span className="voice-select-label">Проверка</span>
+                    <CustomSelect
+                      value={checkMode}
+                      options={checkModeOptions}
+                      onChange={(next) =>
+                        dispatch(
+                          voiceTrainerUiActions.setVoiceCheckMode({
+                            uiKey,
+                            value: next === "sentences" ? "sentences" : "full",
+                          }),
+                        )
+                      }
+                      triggerClassName="voice-select-trigger"
+                      aria-label="Режим проверки"
+                    />
+                  </div>
+                  {partnerRoleSelectOptions.length > 0 ? (
+                    <div className="voice-controls-roles">
+                      <div className="voice-controls-roles-title">Озвучка ролей в сцене</div>
+                      <div className="voice-controls-roles-hint">
+                        Выберите актёра, назначенного на роль. Если у него нет записи для реплики — включится
+                        робот (TTS).
+                      </div>
+                      <div className="voice-controls-roles-grid">
+                        {partnerRoleSelectOptions.map(({ roleKey, roleTitle, actors, options }) => (
+                          <div
+                            key={roleKey}
+                            className="voice-select voice-select--role"
+                            title="Актёр, чей дубль слушать для этой роли"
+                          >
+                            <span className="voice-select-label">{roleTitle}</span>
+                            {actors.length > 0 ? (
+                              <CustomSelect
+                                value={partnerSourceSelectValue(
+                                  ui.partnerVoiceByRoleKey?.[roleKey],
+                                  actors,
+                                )}
+                                options={options}
+                                renderValue={(option) => renderActorSelectPerson(option)}
+                                renderOption={(option) => renderActorSelectPerson(option)}
+                                onChange={(v) => {
+                                  if (!v.startsWith("p:")) return;
+                                  const pid = normalizeActorKey(v.slice(2));
+                                  if (!pid) return;
+                                  dispatch(
+                                    voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+                                      uiKey,
+                                      roleKey,
+                                      source: { kind: "performer", performerId: pid },
+                                    }),
+                                  );
+                                }}
+                                triggerClassName="voice-select-trigger voice-select-trigger--person"
+                                optionClassName="custom-select__option--person"
+                                aria-label={`Актёр для роли ${roleTitle}`}
+                              />
+                            ) : (
+                              <div className="voice-select-empty">Нет актёров на роли</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <label className="voice-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={autoFlow}
+                      onChange={(e) =>
+                        dispatch(
+                          voiceTrainerUiActions.setVoiceAutoFlow({
+                            uiKey,
+                            value: e.target.checked,
+                          }),
+                        )
+                      }
+                    />
+                    авто (переход)
+                  </label>
+                  <label
+                    className="voice-checkbox"
+                    title="Параллельно распознаванию речи будет записываться аудио вашей реплики (для сохранения)"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={ui.recordTakes}
+                      onChange={(e) =>
+                        dispatch(
+                          voiceTrainerUiActions.setVoiceRecordTakes({
+                            uiKey,
+                            value: e.target.checked,
+                          }),
+                        )
+                      }
+                    />
+                    сохранять дубль
+                  </label>
+                </div>
+
+                <div className="voice-controls-actions voice-actions">
+                  <button
+                    type="button"
+                    className="voice-btn"
+                    disabled={!prevText}
+                    onClick={() => speakPrev()}
+                    title="Озвучить предыдущую реплику"
+                  >
+                    Озвучить предыдущую
+                  </button>
+                  <button
+                    type="button"
+                    className={`voice-btn ${showText ? "voice-btn--primary" : ""}`}
+                    onClick={() =>
                       dispatch(
-                        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+                        voiceTrainerUiActions.setVoiceShowText({
                           uiKey,
-                          roleKey: prevRoleKey,
-                          source: { kind: "auto" },
+                          value: !showText,
                         }),
-                      );
-                      return;
+                      )
                     }
-                    if (v === "tts") {
-                      dispatch(
-                        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
-                          uiKey,
-                          roleKey: prevRoleKey,
-                          source: { kind: "tts" },
-                        }),
-                      );
-                      return;
-                    }
-                    if (v.startsWith("p:")) {
-                      const pid = v.slice(2);
-                      dispatch(
-                        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
-                          uiKey,
-                          roleKey: prevRoleKey,
-                          source: { kind: "performer", performerId: pid },
-                        }),
-                      );
-                    }
-                  }}
-                >
-                  <option value="auto">Авто (если есть записи)</option>
-                  <option value="tts">Робот (TTS)</option>
-                  {availablePerformersForPrevRole.map((p) => (
-                    <option key={p.id} value={`p:${p.id}`}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {storageKey ? (
-              <>
-                <button type="button" className="voice-btn" onClick={resetProgressCurrent} title="Сбросить текущую реплику">
-                  Сбросить текущую
-                </button>
-                <button type="button" className="voice-btn" onClick={resetProgressAll} title="Сбросить весь прогресс">
-                  Сбросить прогресс
-                </button>
-              </>
+                    title="Режим показа текста во всём тренажёре"
+                  >
+                    {showText ? "Текст: показан" : "Текст: скрыт"}
+                  </button>
+                  {storageKey ? (
+                    <>
+                      <button
+                        type="button"
+                        className="voice-btn"
+                        onClick={resetProgressCurrent}
+                        title="Сбросить текущую реплику"
+                      >
+                        Сбросить текущую
+                      </button>
+                      <button
+                        type="button"
+                        className="voice-btn"
+                        onClick={resetProgressAll}
+                        title="Сбросить весь прогресс"
+                      >
+                        Сбросить прогресс
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
           </div>
           <div className="voice-hint">
@@ -1831,7 +2052,7 @@ export function VoiceDialogueTrainer({
                     }
                     className={[
                       "voice-line",
-                      isMine ? "voice-line--mine" : "voice-line--partner",
+                      isMine ? "voice-line--mine" : "voice-line--other",
                       isDone ? "voice-line--done" : "",
                       isActive ? "voice-line--active" : "",
                       isMine && ex ? "voice-line--clickable" : "",
@@ -1861,7 +2082,7 @@ export function VoiceDialogueTrainer({
                       ) : null}
                       {(showText || (current?.lineId && revealedLineIds.has(current.lineId))) && currentTarget ? (
                         <div className="voice-target">
-                          Сейчас: “{String(currentTarget).slice(0, 160)}{String(currentTarget).length > 160 ? "…" : ""}”
+                          “{String(currentTarget).slice(0, 160)}{String(currentTarget).length > 160 ? "…" : ""}”
                         </div>
                       ) : null}
                       {(showText || (current?.lineId && revealedLineIds.has(current.lineId))) && lastAccepted ? (

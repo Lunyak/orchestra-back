@@ -1,5 +1,6 @@
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import type { ScriptStep } from "../../../shared/types/script";
+import { stripLeadingPunctuation } from "./wordTokens";
 
 export type RolePhraseSource = {
   lineId: string;
@@ -40,7 +41,7 @@ function cleanUtteranceText(raw: string): string {
   s = markdownToPlainText(s);
   // Parentheses in this project are stage remarks the actor doesn't speak.
   s = s.replace(/\([^)]*\)/g, " ");
-  return s.replace(/\s+/g, " ").trim();
+  return stripLeadingPunctuation(s.replace(/\s+/g, " ").trim());
 }
 
 function parseLineSpeaker(line: string): { role: string; rest: string } | null {

@@ -1,5 +1,28 @@
 /* Shared compact icon actions: steps sidebar, playlist, sessions list */
 
+.ui-text-button {
+  border: 1px solid var(--color-border-strong);
+  padding: var(--spacing-2) var(--spacing-4);
+  background: var(--color-bg-transparent-2);
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  line-height: 1.35;
+  transition: var(--transition-colors);
+}
+
+.ui-text-button:hover:not(:disabled) {
+  background: var(--color-bg-hover);
+  border-color: var(--color-border-visible);
+}
+
+.ui-text-button:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
 .icon-action-add {
   width: 22px;
   height: 22px;

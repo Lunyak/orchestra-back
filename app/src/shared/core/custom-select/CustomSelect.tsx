@@ -1,5 +1,5 @@
 import cn from "classnames";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import "./style.css";
 
 export type CustomSelectOption = {
@@ -21,6 +21,11 @@ type CustomSelectProps = {
   disabled?: boolean;
   id?: string;
   "aria-label"?: string;
+  renderValue?: (option: CustomSelectOption | null) => React.ReactNode;
+  renderOption?: (
+    option: CustomSelectOption,
+    state: { isSelected: boolean },
+  ) => React.ReactNode;
 };
 
 export function CustomSelect({
@@ -36,6 +41,8 @@ export function CustomSelect({
   disabled = false,
   id,
   "aria-label": ariaLabel,
+  renderValue,
+  renderOption,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -106,7 +113,9 @@ export function CustomSelect({
         aria-controls={listboxId}
         aria-label={ariaLabel}
       >
-        <span className="custom-select__label">{triggerLabel}</span>
+        <span className="custom-select__label">
+          {renderValue ? renderValue(selectedOption) : triggerLabel}
+        </span>
         <span className="custom-select__chevron">▾</span>
       </button>
       {isOpen && !isDisabled ? (
@@ -136,7 +145,9 @@ export function CustomSelect({
                   setIsOpen(false);
                 }}
               >
-                {option.label}
+                {renderOption
+                  ? renderOption(option, { isSelected })
+                  : option.label}
               </button>
             );
           })}

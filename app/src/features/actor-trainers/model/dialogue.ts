@@ -1,5 +1,6 @@
 import type { ScriptStep } from "../../../shared/types/script";
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
+import { stripLeadingPunctuation } from "./wordTokens";
 
 export type DialogueLine = {
   id: string;
@@ -44,7 +45,7 @@ function cleanText(raw: string): string {
   // Parentheses in this project are stage remarks the actor doesn't speak.
   // Nested parentheses are rare; simple removal is sufficient.
   s = s.replace(/\([^)]*\)/g, " ");
-  return s.replace(/\s+/g, " ").trim();
+  return stripLeadingPunctuation(s.replace(/\s+/g, " ").trim());
 }
 
 function parseLineSpeaker(line: string): { role: string; rest: string } | null {

@@ -9,9 +9,10 @@
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  border: 1px solid var(--color-border-visible);
+  border: 1px solid var(--field-control-border);
   padding: var(--spacing-5) var(--spacing-6);
-  background: var(--color-bg-transparent-1);
+  background: var(--field-control-bg);
+  box-shadow: var(--field-control-inset);
 }
 
 .dialogue-toolbar-title {
@@ -63,8 +64,8 @@
 }
 
 .dialogue-scroll {
-  border: 1px solid var(--color-border-visible);
-  background: var(--color-bg-transparent-1);
+  border: 1px solid var(--field-control-border);
+  background: color-mix(in srgb, var(--field-control-bg) 72%, var(--color-bg-secondary));
   padding: var(--spacing-5);
   max-height: 70vh;
   overflow: auto;
@@ -84,18 +85,52 @@
 
 .dialogue-stage {
   font-size: var(--font-size-base);
-  opacity: var(--opacity-medium);
   font-style: italic;
-  padding: var(--spacing-2) var(--spacing-3);
+  color: var(--color-text-muted);
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  border: 1px dashed var(--color-border-visible);
+  background: var(--color-bg-transparent-1);
+  line-height: var(--line-height-normal);
 }
 
 .dialogue-line {
   display: grid;
-  grid-template-columns: 140px 1fr;
+  grid-template-columns: minmax(96px, 140px) 1fr;
   gap: var(--spacing-5);
-  padding: var(--spacing-4) var(--spacing-5);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-transparent-1);
+  align-items: start;
+}
+
+.dialogue-line--other {
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  min-height: var(--field-control-min-height);
+  border: 1px solid var(--field-control-border);
+  background: var(--color-bg-quaternary);
+  box-shadow: var(--field-control-inset);
+  color: var(--color-text-lighter);
+  transition:
+    border-color var(--transition-normal),
+    background var(--transition-normal);
+}
+
+.dialogue-line--other:hover {
+  border-color: var(--field-control-border-hover);
+  background: var(--field-control-bg-hover);
+}
+
+.dialogue-line--other .dialogue-role {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-label);
+  opacity: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: var(--line-height-normal);
+}
+
+.dialogue-line--other .dialogue-text {
+  font-size: var(--field-control-font-size);
+  color: var(--color-text-lighter);
+  line-height: var(--line-height-normal);
 }
 
 .dialogue-role {
@@ -110,11 +145,63 @@
   line-height: var(--line-height-normal);
 }
 
-.dialogue-line--mine {
+.dialogue-line--mine:not(.dialogue-line--done) {
   display: block;
   padding: 0;
   border: 0;
   background: transparent;
+}
+
+.dialogue-line--done {
+  position: relative;
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  min-height: var(--field-control-min-height);
+  border-width: 2px;
+  background: color-mix(in srgb, var(--color-success-accent) 38%, var(--field-control-bg));
+  border-color: color-mix(in srgb, var(--color-success-accent) 35%, var(--field-control-border));
+  box-shadow:
+    var(--field-control-inset),
+    0 0 0 3px color-mix(in srgb, var(--color-success-accent) 22%, transparent);
+  color: var(--color-text-lighter);
+}
+
+.dialogue-line--done .dialogue-role {
+  color: var(--color-text-label);
+  font-weight: var(--font-weight-bold);
+  opacity: 1;
+}
+
+.dialogue-line--done .dialogue-text {
+  font-size: var(--field-control-font-size);
+  color: var(--color-text-lighter);
+}
+
+.dialogue-line--done .dialogue-text {
+  transition: padding-right 0.15s ease;
+}
+
+.dialogue-line--done:hover .dialogue-text,
+.dialogue-line--done:focus-within .dialogue-text {
+  padding-right: 7.5rem;
+}
+
+.dialogue-line--done .dialogue-undone-btn.ui-text-button {
+  position: absolute;
+  top: 50%;
+  right: var(--spacing-5);
+  transform: translateY(-50%);
+  z-index: 1;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.dialogue-line--done:hover .dialogue-undone-btn,
+.dialogue-line--done:focus-within .dialogue-undone-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .dialogue-my-line {
@@ -136,8 +223,8 @@
     0 12px 32px color-mix(in srgb, var(--color-blue-border) 14%, transparent);
 }
 
-/* Сейчас на этом этапе */
-.dialogue-line--active .dialogue-my-line {
+/* Сейчас на этом этапе (только непройденные) */
+.dialogue-line--active .dialogue-my-line:not([data-done="true"]) {
   border-color: color-mix(in srgb, var(--color-active-ascent) 55%, var(--color-border-accent));
   padding-left: calc(var(--spacing-5) + 6px);
   background: color-mix(in srgb, var(--color-active-ascent) 22%, var(--color-bg-transparent-1));
@@ -146,7 +233,7 @@
     0 12px 32px color-mix(in srgb, var(--color-active-ascent) 16%, transparent);
 }
 
-.dialogue-line--active .dialogue-my-line::before {
+.dialogue-line--active .dialogue-my-line:not([data-done="true"])::before {
   content: "";
   position: absolute;
   left: 0;
@@ -156,19 +243,27 @@
   background: var(--color-active-ascent);
 }
 
-.dialogue-line--active .dialogue-my-line[data-done="true"] {
-  background: color-mix(
-    in srgb,
-    var(--color-success-accent) 2%,
-    color-mix(in srgb, var(--color-active-ascent) 18%, var(--color-bg-transparent-1))
-  );
+.dialogue-finished {
+  border: 1px solid color-mix(in srgb, var(--color-success-accent) 45%, var(--color-border-visible));
+  padding: var(--spacing-5) var(--spacing-6);
+  background: color-mix(in srgb, var(--color-success-accent) 14%, var(--color-bg-transparent-1));
+  display: grid;
+  gap: var(--spacing-3);
 }
 
-.dialogue-my-line[data-done="true"] {
-  background: color-mix(in srgb, var(--color-success-accent) 38%, transparent);
-  border-color: color-mix(in srgb, var(--color-success-accent) 35%, var(--color-border-accent));
-  color: var(--color-text-primary);
-  font-weight: 500;
+.dialogue-finished-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-success-accent);
+}
+
+.dialogue-finished-meta {
+  font-size: var(--font-size-base);
+  opacity: var(--opacity-visible);
+}
+
+.dialogue-trainer[data-all-done="true"] .dialogue-toolbar-meta b {
+  color: var(--color-success-accent);
 }
 
 .dialogue-my-line[data-mistake="true"] {
@@ -233,10 +328,6 @@
   line-height: var(--line-height-normal);
 }
 
-.dialogue-answer--done {
-  font-weight: 500;
-}
-
 .dialogue-muted {
   font-size: var(--font-size-base);
   opacity: var(--opacity-muted);
@@ -296,9 +387,9 @@
     gap: var(--spacing-2);
   }
 
-  .dialogue-role {
+  .dialogue-line--other .dialogue-role,
+  .dialogue-line--done .dialogue-role {
     font-size: var(--font-size-sm);
-    opacity: var(--opacity-medium);
   }
 
   .dialogue-btn {

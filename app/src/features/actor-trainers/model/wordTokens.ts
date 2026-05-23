@@ -12,6 +12,19 @@ function normalizeToken(text: string): string {
     .replace(/ё/g, "е");
 }
 
+/** Ведущая пунктуация из режиссёрского текста («. Богатые…» → «Богатые…»). */
+export function stripLeadingPunctuation(text: string): string {
+  return String(text ?? "")
+    .replace(/^[\s.,;:!?…—–\-«»"'„“”]+/u, "")
+    .trim();
+}
+
+export function stripLeadingPunctuationTokens(tokens: WordToken[]): WordToken[] {
+  let i = 0;
+  while (i < tokens.length && tokens[i]?.kind === "punct") i += 1;
+  return i > 0 ? tokens.slice(i) : tokens;
+}
+
 export function tokenizeText(
   text: string,
   opts: { includePunctuation?: boolean } = {},

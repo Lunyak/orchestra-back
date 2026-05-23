@@ -30,11 +30,6 @@ export function useActorPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
-  const [focusMode, setFocusMode] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("actorPage:focusMode") === "true";
-  });
-
   const [settingsHidden, setSettingsHidden] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
     const stored = localStorage.getItem("actorPage:settingsHidden");
@@ -95,23 +90,8 @@ export function useActorPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem("actorPage:focusMode", String(focusMode));
-    if (focusMode) setSettingsHidden(true);
-  }, [focusMode]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     localStorage.setItem("actorPage:settingsHidden", String(settingsHidden));
   }, [settingsHidden]);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (focusMode) document.body.dataset.actorFocus = "true";
-    else delete (document.body.dataset as Record<string, string>).actorFocus;
-    return () => {
-      delete (document.body.dataset as Record<string, string>).actorFocus;
-    };
-  }, [focusMode]);
 
   const roleKeysMentionedInScript = useMemo(() => {
     const set = new Set<string>();
@@ -431,8 +411,6 @@ export function useActorPage() {
     projectName,
     onProjectChange,
     steps,
-    focusMode,
-    setFocusMode,
     settingsHidden,
     setSettingsHidden,
     profileLoading,

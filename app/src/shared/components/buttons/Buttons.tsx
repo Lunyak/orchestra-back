@@ -32,6 +32,12 @@ export type CloseButtonProps = IconActionButtonProps & {
   variant?: "floating" | "inline" | "markdownLightbox";
 };
 
+function TextButton({ className, type = "button", ...rest }: IconActionButtonProps) {
+  return (
+    <button type={type} className={cn("ui-text-button", className)} {...rest} />
+  );
+}
+
 function CloseButton({ className, variant = "inline", type = "button", children = "×", ...rest }: CloseButtonProps) {
   const variantClass =
     variant === "floating"
@@ -50,4 +56,5 @@ export const Buttons = {
   AddButton,
   CloseButton,
   DeleteButton,
+  TextButton,
 };
