@@ -478,14 +478,14 @@ model GlobalLightPlot {
 model TheaterLayout {
   id             String @id @default(cuid())
   sceneId        String @unique
-  hallWidth      Int
-  hallDepth      Int
-  wallHeight     Int
-  stageWidth     Int
-  stageDepth     Int
-  stageHeight    Int
-  stageZ         Int
-  audienceStartZ Int
+  hallWidth      Float
+  hallDepth      Float
+  wallHeight     Float
+  stageWidth     Float
+  stageDepth     Float
+  stageHeight    Float
+  stageZ         Float
+  audienceStartZ Float
   seatRows       Int
   seatsPerRow    Int
   seatSpacing    Float
@@ -641,8 +641,84 @@ model Troupe {
 
   members            TroupeMember[]
   chatConversations  ChatConversation[]
+  premises           Premise[]
 
   @@index([ownerUserId])
+}
+
+enum PremiseKind {
+  OWNED
+  RENTED
+}
+
+enum PremiseMemberRole {
+  owner
+  manager
+  tenant
+  viewer
+}
+
+enum PremiseSlotStatus {
+  confirmed
+  pending
+  cancelled
+}
+
+/// Физическое помещение труппы (своё или снимаемое).
+model Premise {
+  id        String      @id @default(cuid())
+  troupeId  String
+  name      String
+  kind      PremiseKind @default(OWNED)
+  address   String?
+  capacity  Int?
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  troupe  Troupe          @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  members PremiseMember[]
+  slots   PremiseSlot[]
+
+  @@index([troupeId])
+}
+
+/// Участник помещения (любой email, не обязательно из труппы).
+model PremiseMember {
+  id        String            @id @default(cuid())
+  premiseId String
+  email     String
+  role      PremiseMemberRole @default(viewer)
+  canBook   Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  premise Premise @relation(fields: [premiseId], references: [id], onDelete: Cascade)
+
+  @@unique([premiseId, email])
+  @@index([email])
+  @@index([premiseId])
+}
+
+/// Слот занятости помещения.
+model PremiseSlot {
+  id             String            @id @default(cuid())
+  premiseId      String
+  startsAt       DateTime
+  durationMin    Int
+  title          String
+  purpose        String?
+  rentalNotes    String?
+  contactEmail   String?
+  contactName    String?
+  status         PremiseSlotStatus @default(confirmed)
+  createdByEmail String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  premise Premise @relation(fields: [premiseId], references: [id], onDelete: Cascade)
+
+  @@index([premiseId, startsAt])
 }
 
 enum ChatConversationKind {
