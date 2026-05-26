@@ -96,17 +96,18 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
     id: "light",
     label: "Свет в текст",
     group: "Оркестр",
-    resolve: (): ScriptEditorInsertResolveResult => ({
+    resolve: (ctx): ScriptEditorInsertResolveResult => ({
       state: "ok",
       submenu: {
-        children: Array.from({ length: 8 }, (_, i) => {
+        children: Array.from({ length: Math.max(8, ctx.lightChannels.length) }, (_, i) => {
           const slot = i + 1;
+          const label = String(ctx.lightChannels[i] ?? "").split("|", 1)[0]?.trim();
           return {
             id: `light:${slot}`,
-            label: `Канал ${slot}`,
+            label: label ? `${slot}: ${label}` : `Канал ${slot}`,
             pick: {
               kind: "snippet",
-              text: `\n\n{{light:${slot}|СВЕТ}} — канал ${slot}\n\n`,
+              text: `\n\n{{light:${slot}|${label || "СВЕТ"}}} — канал ${slot}\n\n`,
             },
           };
         }),

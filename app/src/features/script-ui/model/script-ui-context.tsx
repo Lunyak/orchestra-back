@@ -3,21 +3,12 @@ import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { scriptUiActions, selectScriptUi } from "./script-ui-slice";
 
 export interface ScriptUIContextValue {
-  showRequisites: boolean;
-  setShowRequisites: (v: boolean | ((prev: boolean) => boolean)) => void;
-  toggleRequisites: () => void;
   showPlaylistSidebar: boolean;
   setShowPlaylistSidebar: (v: boolean | ((prev: boolean) => boolean)) => void;
   togglePlaylist: () => void;
   showHeaderSounds: boolean;
   setShowHeaderSounds: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleHeaderSounds: () => void;
-  showStepRoles: boolean;
-  setShowStepRoles: (v: boolean | ((prev: boolean) => boolean)) => void;
-  toggleStepRoles: () => void;
-  showScriptEditorTools: boolean;
-  setShowScriptEditorTools: (v: boolean | ((prev: boolean) => boolean)) => void;
-  toggleScriptEditorTools: () => void;
   isStepsCollapsed: boolean;
   setIsStepsCollapsed: (v: boolean | ((prev: boolean) => boolean)) => void;
   toggleStepsCollapsed: () => void;
@@ -69,15 +60,6 @@ export function useScriptUI(): ScriptUIContextValue {
   const dispatch = useAppDispatch();
   const ui = useAppSelector(selectScriptUi);
 
-  const setShowRequisites = useCallback(
-    (v: boolean | ((prev: boolean) => boolean)) => {
-      const next = typeof v === "function" ? (v as any)(ui.showRequisites) : v;
-      dispatch(scriptUiActions.setShowRequisites({ value: Boolean(next) }));
-    },
-    [dispatch, ui.showRequisites],
-  );
-  const toggleRequisites = useCallback(() => dispatch(scriptUiActions.toggleRequisites()), [dispatch]);
-
   const setShowPlaylistSidebar = useCallback(
     (v: boolean | ((prev: boolean) => boolean)) => {
       const next = typeof v === "function" ? (v as any)(ui.showPlaylistSidebar) : v;
@@ -95,27 +77,6 @@ export function useScriptUI(): ScriptUIContextValue {
     [dispatch, ui.showHeaderSounds],
   );
   const toggleHeaderSounds = useCallback(() => dispatch(scriptUiActions.toggleHeaderSounds()), [dispatch]);
-
-  const setShowStepRoles = useCallback(
-    (v: boolean | ((prev: boolean) => boolean)) => {
-      const next = typeof v === "function" ? (v as any)(ui.showStepRoles) : v;
-      dispatch(scriptUiActions.setShowStepRoles({ value: Boolean(next) }));
-    },
-    [dispatch, ui.showStepRoles],
-  );
-  const toggleStepRoles = useCallback(() => dispatch(scriptUiActions.toggleStepRoles()), [dispatch]);
-
-  const setShowScriptEditorTools = useCallback(
-    (v: boolean | ((prev: boolean) => boolean)) => {
-      const next = typeof v === "function" ? (v as any)(ui.showScriptEditorTools) : v;
-      dispatch(scriptUiActions.setShowScriptEditorTools({ value: Boolean(next) }));
-    },
-    [dispatch, ui.showScriptEditorTools],
-  );
-  const toggleScriptEditorTools = useCallback(
-    () => dispatch(scriptUiActions.toggleScriptEditorTools()),
-    [dispatch],
-  );
 
   const setIsStepsCollapsed = useCallback(
     (v: boolean | ((prev: boolean) => boolean)) => {
@@ -183,21 +144,12 @@ export function useScriptUI(): ScriptUIContextValue {
   );
 
   return {
-    showRequisites: ui.showRequisites,
-    setShowRequisites,
-    toggleRequisites,
     showPlaylistSidebar: ui.showPlaylistSidebar,
     setShowPlaylistSidebar,
     togglePlaylist,
     showHeaderSounds: ui.showHeaderSounds,
     setShowHeaderSounds,
     toggleHeaderSounds,
-    showStepRoles: ui.showStepRoles,
-    setShowStepRoles,
-    toggleStepRoles,
-    showScriptEditorTools: ui.showScriptEditorTools,
-    setShowScriptEditorTools,
-    toggleScriptEditorTools,
     isStepsCollapsed: ui.isStepsCollapsed,
     setIsStepsCollapsed,
     toggleStepsCollapsed,

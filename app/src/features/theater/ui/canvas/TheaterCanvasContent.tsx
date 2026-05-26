@@ -35,7 +35,7 @@ export type TheaterCanvasContentProps = {
   alignGuidesEnabled: boolean;
   activeAlignGuides: ActiveAlignGuide[];
   onAlignGuidesChange: (guides: ActiveAlignGuide[]) => void;
-  activeTab: "spotlights" | "models" | "layout" | "decor";
+  activeTab: "spotlights" | "models" | "view" | "layout" | "decor";
   editMode: "spotlights" | "models" | "decor";
   decorPlaceMode: boolean;
   isDragging: boolean;

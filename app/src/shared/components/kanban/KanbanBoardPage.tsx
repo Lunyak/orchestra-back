@@ -13,6 +13,11 @@ import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
 import type { ScriptStep } from "../../types/script";
 import type { ProjectRoleInfo } from "../../../sync/api/projects";
 import type { TroupeMemberItem } from "../../../sync/api/troupe";
+import {
+  loadActorStepNote,
+  selectActorNote,
+} from "../../../features/show-script/model/show-script-slice";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import "./style.css";
 import { Button } from "@shared/core/button/Button";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
@@ -184,11 +189,16 @@ export function KanbanBoardPage({
 }: {
   members?: MemberInfo[];
 }) {
+  const dispatch = useAppDispatch();
   const { accessToken } = useAuth();
   const { projectName } = useProject();
   const { sceneData, steps, setSteps } = useScene();
+  const actorNoteSceneName = String(sceneData?.name ?? "script").trim() || "script";
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [openedStepId, setOpenedStepId] = useState<number | null>(null);
+  const [expandedCommentStepIds, setExpandedCommentStepIds] = useState<Set<number>>(
+    () => new Set(),
+  );
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>(""); // normalized role key
   const [actorFilter, setActorFilter] = useState<string>("");
@@ -430,6 +440,8 @@ export function KanbanBoardPage({
     });
   }, [actorFilter, normalizedQuery, normalizedSteps, onlyUnassigned, roleFilter, projectRoles, troupeMembers, sceneData]);
 
+  const actorNotesByKey = useAppSelector((s) => s.showScript.actorNotesByKey);
+
   const columns = useMemo(() => {
     const byStatus = new Map<KanbanStatus, ScriptStep[]>();
     STATUSES.forEach((s) => byStatus.set(s.id, []));
@@ -456,6 +468,30 @@ export function KanbanBoardPage({
     const text = openedStep.playMarkdown ?? openedStep.markdown;
     return extractRolesSmart(text);
   }, [openedStep]);
+
+  useEffect(() => {
+    if (!accessToken || !projectName) return;
+    filteredSteps.forEach((step) => {
+      const cacheKey = `${projectName}:${actorNoteSceneName}:${step.id}`;
+      const entry = actorNotesByKey[cacheKey];
+      if (entry) return;
+      void dispatch(
+        loadActorStepNote({
+          cacheKey,
+          projectSlug: projectName,
+          sceneName: actorNoteSceneName,
+          stepId: step.id,
+        }),
+      );
+    });
+  }, [
+    accessToken,
+    actorNoteSceneName,
+    actorNotesByKey,
+    dispatch,
+    filteredSteps,
+    projectName,
+  ]);
 
   const onCardDragStart = (ev: React.DragEvent, id: number) => {
     ev.dataTransfer.setData("text/plain", String(id));
@@ -569,11 +605,16 @@ export function KanbanBoardPage({
             <section
               key={st.id}
               className="kanban-col"
+              style={
+                {
+                  "--kanban-col-accent": st.headerBg,
+                } as React.CSSProperties
+              }
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDropToColumn(e, st.id)}
               aria-label={st.label}
             >
-              <div className="kanban-col-head" style={{ backgroundColor: st.headerBg }}>
+              <div className="kanban-col-head">
                 <div className="kanban-col-title-row">
                   <h3 className="kanban-col-title">{st.label}</h3>
                   <span className="kanban-col-count">{col.length}</span>
@@ -586,14 +627,18 @@ export function KanbanBoardPage({
                   const text = s.playMarkdown ?? s.markdown;
                   const roles = extractRolesSmart(text);
                   const isDragging = draggedId === s.id;
-                  const assignedCount = roles.filter((r) => {
-                    return getRoleActors(s, r).length > 0;
-                  }).length;
-
+                  const noteCacheKey = `${projectName ?? ""}:${actorNoteSceneName}:${s.id}`;
+                  const noteText = String(actorNotesByKey[noteCacheKey]?.text ?? "").trim();
+                  const isCommentExpanded = expandedCommentStepIds.has(s.id);
                   return (
                     <div
                       key={s.id}
                       className={`kanban-card ${isDragging ? "dragging" : ""}`}
+                      style={
+                        {
+                          "--kanban-card-accent": st.headerBg,
+                        } as React.CSSProperties
+                      }
                       draggable
                       onDragStart={(e) => onCardDragStart(e, s.id)}
                       onDragEnd={() => setDraggedId(null)}
@@ -607,6 +652,14 @@ export function KanbanBoardPage({
                       }}
                       aria-label={`Сцена: ${s.title}`}
                     >
+                      <span className="kanban-card-meta">
+                        {typeof s.durationMin === "number" &&
+                          Number.isFinite(s.durationMin) &&
+                          s.durationMin > 0 ? (
+                            <span className="kanban-card-duration">{s.durationMin} мин</span>
+                          ) : null}
+                        <span className="kanban-card-id">#{s.id}</span>
+                      </span>
                       <div className="kanban-card-title">{s.title}</div>
                       {roles.length > 0 && (
                         <div className="kanban-card-roles" aria-label="Роли в сцене">
@@ -620,24 +673,42 @@ export function KanbanBoardPage({
                           )}
                         </div>
                       )}
-                      <div className="kanban-card-footer">
-                        <div className="kanban-card-footer-left">
-                          <span className="kanban-card-id">#{s.id}</span>
-                          {typeof s.durationMin === "number" &&
-                            Number.isFinite(s.durationMin) &&
-                            s.durationMin > 0 && (
-                              <span className="kanban-card-duration" title="Длительность шага">
-                                {s.durationMin} мин
-                              </span>
-                            )}
-                          {roles.length > 0 && (
-                            <span className="kanban-card-assign">
-                              {assignedCount}/{roles.length}
-                            </span>
-                          )}
+                      {noteText && isCommentExpanded ? (
+                        <div
+                          className="kanban-card-note"
+                          data-expanded="true"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="kanban-card-note__full">{noteText}</div>
                         </div>
-                        <span className="kanban-card-action">Подробнее</span>
-                      </div>
+                      ) : null}
+                      {noteText ? (
+                        <button
+                          type="button"
+                          className="kanban-card-note__toggle"
+                          aria-label={
+                            isCommentExpanded
+                              ? "Свернуть комментарий"
+                              : "Открыть комментарий"
+                          }
+                          aria-expanded={isCommentExpanded}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedCommentStepIds((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(s.id)) {
+                                next.delete(s.id);
+                              } else {
+                                next.add(s.id);
+                              }
+                              return next;
+                            });
+                          }}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        >
+                          <span aria-hidden="true">▾</span>
+                        </button>
+                      ) : null}
                     </div>
                   );
                 })}

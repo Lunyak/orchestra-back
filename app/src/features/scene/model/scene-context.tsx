@@ -4,7 +4,16 @@ import { writeTheaterLayoutDraft } from "../../theater/model/theater-layout-draf
 import { useProject } from "../../project/model/project-context";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { store } from "../../../shared/store/store";
-import { sceneActions, type SceneData, type SceneRoleLinkV1, type SceneRolesDataV1 } from "./scene-slice";
+import {
+  sceneActions,
+  type SceneData,
+  type SceneLightFaderV1,
+  type SceneLightFadersDataV1,
+  type SceneLightProgramV1,
+  type SceneLightProgramsDataV1,
+  type SceneRoleLinkV1,
+  type SceneRolesDataV1,
+} from "./scene-slice";
 import { useSceneOperations } from "./scene-operations";
 import { useSceneSyncEffects } from "./scene-sync-effects";
 import {
@@ -188,4 +197,12 @@ export function useScene(): SceneContextValue {
 }
 
 export { DEFAULT_THEATER_LAYOUT } from "./scene-slice";
-export type { SceneData, SceneRoleLinkV1, SceneRolesDataV1 };
+export type {
+  SceneData,
+  SceneLightFaderV1,
+  SceneLightFadersDataV1,
+  SceneLightProgramV1,
+  SceneLightProgramsDataV1,
+  SceneRoleLinkV1,
+  SceneRolesDataV1,
+};

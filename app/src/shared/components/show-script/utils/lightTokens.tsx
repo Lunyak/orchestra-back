@@ -169,7 +169,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
           result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-b`));
         } else {
           const index = Number(String(rawIndex ?? ""));
-          if (Number.isFinite(index) && index >= 1 && index <= 8) {
+          if (Number.isFinite(index) && index >= 1 && index <= lightChannels.length) {
             const channelValue = lightChannels[index - 1] ?? "";
             const parsed = parseLightChannel(channelValue);
             const overrideRaw = String(rawColor ?? "").trim();
@@ -287,7 +287,7 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
             );
           } else {
             const index = Number(String(rawIndex ?? ""));
-            if (Number.isFinite(index) && index >= 1 && index <= 8) {
+            if (Number.isFinite(index) && index >= 1 && index <= lightChannels.length) {
               const channelValue = lightChannels[index - 1] ?? "";
               const parsed = parseLightChannel(channelValue);
               const overrideRaw = String(rawColor ?? "").trim();

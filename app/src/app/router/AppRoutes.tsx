@@ -10,16 +10,10 @@ import { getRouteMeta } from "./routeMeta";
 export function AppRoutes() {
   const location = useLocation();
   const {
-    showRequisites,
-    toggleRequisites,
     showPlaylistSidebar,
     togglePlaylist,
     showHeaderSounds,
     toggleHeaderSounds,
-    showStepRoles,
-    toggleStepRoles,
-    showScriptEditorTools,
-    toggleScriptEditorTools,
     isStepsCollapsed,
     toggleStepsCollapsed,
     mobilePlaylistOpen,
@@ -76,16 +70,10 @@ export function AppRoutes() {
   const scriptState: ComponentProps<typeof Header>["scriptState"] =
     shouldShowScriptState
       ? {
-          showRequisites,
-          onToggleRequisites: toggleRequisites,
           showPlaylist: isPlaylistVisible,
           onTogglePlaylist: handleTogglePlaylist,
           showHeaderSounds,
           onToggleHeaderSounds: toggleHeaderSounds,
-          showRoles: showStepRoles,
-          onToggleRoles: toggleStepRoles,
-          showScriptEditorTools,
-          onToggleScriptEditorTools: toggleScriptEditorTools,
           isStepsCollapsed: isHeaderStepsCollapsed,
           onToggleStepsCollapsed: handleToggleSteps,
         }

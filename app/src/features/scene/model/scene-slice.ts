@@ -39,11 +39,56 @@ export interface SceneData {
    * Хранится внутри sceneData, чтобы сохраняться в локальный project scene JSON.
    */
   sceneRoles?: SceneRolesDataV1;
+  /** Настройка пульта света: ползунки и их привязки к каналам. */
+  lightFaders?: SceneLightFadersDataV1;
+  /** Сохранённые программы света: паттерны состояний ползунков. */
+  lightPrograms?: SceneLightProgramsDataV1;
   /** Записанные актёрские реплики (озвучка ролей), синхронизируются как часть сцены. */
   voiceLines?: SceneVoiceLines;
   /** Изображения сцены (ключ → метаданные файла). */
   images?: Record<string, { remoteKey?: string; remoteUrl?: string }>;
 }
+
+export type SceneLightFaderLinkV1 = {
+  channel: number;
+  spotlightId?: number;
+};
+
+export type SceneLightFaderV1 = {
+  id: number;
+  label: string;
+  channel?: number;
+  spotlightId?: number;
+  intensity?: number;
+  enabled?: boolean;
+  color?: string;
+  links: SceneLightFaderLinkV1[];
+};
+
+export type SceneLightFadersDataV1 = {
+  v: 1;
+  count?: number;
+  faders: SceneLightFaderV1[];
+};
+
+export type SceneLightProgramFaderStateV1 = {
+  faderId: number;
+  intensity?: number;
+  enabled?: boolean;
+  color?: string;
+};
+
+export type SceneLightProgramV1 = {
+  id: number;
+  label: string;
+  faders: SceneLightProgramFaderStateV1[];
+};
+
+export type SceneLightProgramsDataV1 = {
+  v: 1;
+  activeProgramId?: number;
+  programs: SceneLightProgramV1[];
+};
 
 export type SceneRoleLinkV1 = {
   roleId: string;

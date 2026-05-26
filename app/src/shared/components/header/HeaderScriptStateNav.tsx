@@ -1,16 +1,10 @@
 import React from "react";
 
 export interface HeaderScriptStateProps {
-  showRequisites: boolean;
-  onToggleRequisites: () => void;
   showPlaylist: boolean;
   onTogglePlaylist: () => void;
   showHeaderSounds: boolean;
   onToggleHeaderSounds: () => void;
-  showRoles: boolean;
-  onToggleRoles: () => void;
-  showScriptEditorTools: boolean;
-  onToggleScriptEditorTools: () => void;
   isStepsCollapsed: boolean;
   onToggleStepsCollapsed: () => void;
 }
@@ -33,13 +27,6 @@ const icons = {
       <circle cx="18" cy="16" r="3" />
     </svg>
   ),
-  requisite: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
-      <path d="M13 6l6-3 3 3-3 6-3 3" />
-      <path d="M9.5 17.5L21 9v3l-9.5 9.5-3-3z" />
-    </svg>
-  ),
   sounds: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
@@ -47,30 +34,13 @@ const icons = {
       <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
     </svg>
   ),
-  roles: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  ),
-  tools: (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.2 2.2-2.8-2.8 2-2.4z" />
-    </svg>
-  ),
 };
 
 export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
-  showRequisites,
-  onToggleRequisites,
   showPlaylist,
   onTogglePlaylist,
   showHeaderSounds,
   onToggleHeaderSounds,
-  showRoles,
-  onToggleRoles,
-  showScriptEditorTools,
-  onToggleScriptEditorTools,
   isStepsCollapsed,
   onToggleStepsCollapsed,
 }) => (
@@ -104,36 +74,6 @@ export const HeaderScriptStateNav: React.FC<HeaderScriptStateProps> = ({
       aria-pressed={showHeaderSounds}
     >
       <span className="header-nav-icon">{icons.sounds}</span>
-    </button>
-    <button
-      type="button"
-      className={`header-nav-btn ${showRequisites ? "active" : ""}`}
-      onClick={onToggleRequisites}
-      title={showRequisites ? "Скрыть реквизит" : "Показать реквизит"}
-      aria-label={showRequisites ? "Скрыть реквизит" : "Показать реквизит"}
-      aria-pressed={showRequisites}
-    >
-      <span className="header-nav-icon">{icons.requisite}</span>
-    </button>
-    <button
-      type="button"
-      className={`header-nav-btn ${showScriptEditorTools ? "active" : ""}`}
-      onClick={onToggleScriptEditorTools}
-      title={showScriptEditorTools ? "Скрыть инструменты" : "Показать инструменты"}
-      aria-label={showScriptEditorTools ? "Скрыть инструменты" : "Показать инструменты"}
-      aria-pressed={showScriptEditorTools}
-    >
-      <span className="header-nav-icon">{icons.tools}</span>
-    </button>
-    <button
-      type="button"
-      className={`header-nav-btn ${showRoles ? "active" : ""}`}
-      onClick={onToggleRoles}
-      title={showRoles ? "Скрыть роли" : "Показать роли"}
-      aria-label={showRoles ? "Скрыть роли" : "Показать роли"}
-      aria-pressed={showRoles}
-    >
-      <span className="header-nav-icon">{icons.roles}</span>
     </button>
   </nav>
 );

@@ -6,6 +6,7 @@ import { TheaterControlsSpotlightsTab } from "./controls/TheaterControlsSpotligh
 import { TheaterControlsModelsTab } from "./controls/TheaterControlsModelsTab";
 import { TheaterControlsDecorTab } from "./controls/TheaterControlsDecorTab";
 import { TheaterControlsLayoutTab } from "./controls/TheaterControlsLayoutTab";
+import { TheaterControlsViewTab } from "./controls/TheaterControlsViewTab";
 import { TheaterControlsOutlinerSection } from "./controls/TheaterControlsOutlinerSection";
 
 export type TheaterControlsProps = {
@@ -26,11 +27,6 @@ export function TheaterControls({
     setActiveTab,
     setEditMode,
     showControls,
-    canUndoTheater,
-    canRedoTheater,
-    undoTheater,
-    redoTheater,
-    currentStep,
   } = vm;
   const [showKeyboardHints, setShowKeyboardHints] = useState(false);
 
@@ -46,25 +42,9 @@ export function TheaterControls({
 
   return (
     <div
-      className={`theater-controls${controlsInPanel ? " theater-controls-panel" : ""}`}
+      className={`theater-controls${controlsInPanel ? " theater-controls-panel theater-controls--stage-brutal" : ""}`}
     >
       <div className="theater-tabs" role="tablist" aria-label="Раздел настроек театра">
-        <div className="theater-history-actions">
-          <TheaterBtn
-            disabled={!currentStep || !canUndoTheater}
-            onClick={undoTheater}
-            title="Отменить (Ctrl+Z)"
-          >
-            Отменить
-          </TheaterBtn>
-          <TheaterBtn
-            disabled={!currentStep || !canRedoTheater}
-            onClick={redoTheater}
-            title="Повторить (Ctrl+Y)"
-          >
-            Повторить
-          </TheaterBtn>
-        </div>
         <TheaterBtn
           active={activeTab === "spotlights"}
           onClick={() => {
@@ -91,6 +71,9 @@ export function TheaterControls({
           }}
         >
           Декор
+        </TheaterBtn>
+        <TheaterBtn active={activeTab === "view"} onClick={() => setActiveTab("view")}>
+          Вид
         </TheaterBtn>
         <TheaterBtn active={activeTab === "layout"} onClick={() => setActiveTab("layout")}>
           План
@@ -139,6 +122,7 @@ export function TheaterControls({
       {activeTab === "spotlights" ? <TheaterControlsSpotlightsTab vm={vm} /> : null}
       {activeTab === "models" ? <TheaterControlsModelsTab vm={vm} /> : null}
       {activeTab === "decor" ? <TheaterControlsDecorTab vm={vm} /> : null}
+      {activeTab === "view" ? <TheaterControlsViewTab vm={vm} /> : null}
       {activeTab === "layout" ? <TheaterControlsLayoutTab vm={vm} /> : null}
     </div>
   );

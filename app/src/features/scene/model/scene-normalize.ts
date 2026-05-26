@@ -5,8 +5,15 @@ import { mergeTheaterLayoutExtras } from "../../theater/model/theater-layout-ext
 import { DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 
 export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
-  const out = Array.from({ length: 8 }, () => "");
-  (rows ?? []).forEach((r: unknown) => {
+  const normalizedRows = Array.isArray(rows) ? rows : [];
+  const maxIndex = normalizedRows.reduce((acc, r: unknown) => {
+    const row = r as { index?: number | string; raw?: unknown };
+    if (!String(row?.raw ?? "").trim()) return acc;
+    const idx = typeof row?.index === "number" ? row.index : Number(row?.index ?? -1);
+    return Number.isFinite(idx) && idx >= 0 ? Math.max(acc, Math.trunc(idx)) : acc;
+  }, 7);
+  const out = Array.from({ length: Math.max(8, maxIndex + 1) }, () => "");
+  normalizedRows.forEach((r: unknown) => {
     const row = r as { index?: number | string; raw?: unknown };
     const idx = typeof row?.index === "number" ? row.index : Number(row?.index ?? -1);
     if (!Number.isFinite(idx) || idx < 0 || idx >= out.length) return;
@@ -16,13 +23,8 @@ export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
 }
 
 export function normalizeLightChannelsLoose(raw: unknown): string[] {
-  const out = Array.from({ length: 8 }, () => "");
-  if (Array.isArray(raw)) {
-    raw.forEach((r, i) => {
-      if (i < 8) out[i] = String(r ?? "");
-    });
-  }
-  return out;
+  if (!Array.isArray(raw)) return Array.from({ length: 8 }, () => "");
+  return Array.from({ length: Math.max(8, raw.length) }, (_, i) => String(raw[i] ?? ""));
 }
 
 export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | null {

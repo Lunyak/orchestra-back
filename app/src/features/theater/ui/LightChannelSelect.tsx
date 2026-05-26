@@ -23,8 +23,8 @@ export function LightChannelSelect({
   emptyLabel = "—",
   className,
 }: LightChannelSelectProps) {
-  const options = buildLightChannelSelectOptions(lightChannels);
   const slot = parseLightChannelSlot(value);
+  const options = buildLightChannelSelectOptions(lightChannels, slot ?? undefined);
   const normalized = slot != null ? formatLightChannelSlot(slot) : "";
 
   return (

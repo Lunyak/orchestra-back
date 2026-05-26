@@ -35,7 +35,7 @@ export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
   canPlaceDecor: boolean;
   canDrawOutline: boolean;
   spotlightAimMode: "point" | "cell";
-  activeTab: "spotlights" | "models" | "decor" | "layout";
+  activeTab: "spotlights" | "models" | "view" | "decor" | "layout";
   onSelectSpotlight: (
     id: number,
     additive?: boolean,
@@ -245,7 +245,6 @@ export function TheaterFloorPlanSvg({
             <g key={`door-${doorOverlay.id}`}>
               <rect
                 {...rect}
-                rx={2}
                 className={[
                   "theater-floor-plan-door",
                   canEditDoor ? "theater-floor-plan-door--editable" : "",
@@ -294,7 +293,6 @@ export function TheaterFloorPlanSvg({
             <g key={`recess-${recessOverlay.id}`}>
               <rect
                 {...rect}
-                rx={2}
                 className={[
                   "theater-floor-plan-recess",
                   canEditDoor ? "theater-floor-plan-recess--editable" : "",

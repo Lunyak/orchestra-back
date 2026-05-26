@@ -114,7 +114,6 @@ export function RoleAvatarEditor({
               </button>
             ) : null}
           </div>
-          <div className="role-avatar-editor__hint">Можно вставить картинку из буфера (Ctrl+V)</div>
           {error ? <div className="role-avatar-editor__error">{error}</div> : null}
         </div>
       ) : (

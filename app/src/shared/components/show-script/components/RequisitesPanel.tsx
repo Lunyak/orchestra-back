@@ -1,11 +1,29 @@
-import React, { useEffect, useState } from "react";
-import { useProject } from "../../../../features/project";
+import React from "react";
 import type { ScriptRequisite } from "../../../types/script";
+
+type RequisiteAssigneeField = "setupAssignees" | "removeAssignees";
+
+type RequisiteAssigneeOption = {
+  value: string;
+  label: string;
+};
+
+function assigneesToInputValue(values: string[] | undefined): string {
+  return (values ?? []).join(", ");
+}
+
+function inputValueToAssignees(value: string): string[] {
+  return value
+    .split(/[,\n;]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 export function RequisitesPanel({
   show,
   isEditing,
   requisites,
+  assigneeOptions = [],
   hasCopiedRequisites,
   newRequisite,
   setNewRequisite,
@@ -15,10 +33,12 @@ export function RequisitesPanel({
   onAdd,
   onToggle,
   onRemove,
+  onAssigneesChange,
 }: {
   show: boolean;
   isEditing: boolean;
   requisites: ScriptRequisite[];
+  assigneeOptions?: RequisiteAssigneeOption[];
   hasCopiedRequisites: boolean;
   newRequisite: string;
   setNewRequisite: React.Dispatch<React.SetStateAction<string>>;
@@ -28,44 +48,23 @@ export function RequisitesPanel({
   onAdd: () => void;
   onToggle: (requisiteId: number) => void;
   onRemove: (requisiteId: number) => void;
+  onAssigneesChange: (
+    requisiteId: number,
+    field: RequisiteAssigneeField,
+    assignees: string[],
+  ) => void;
 }) {
+  const assigneeListId = React.useId();
+
   if (!show) return null;
 
-  const { projectName } = useProject();
-  const collapseKey = `requisitesPanel:collapsed:${projectName || "unknown"}`;
-  const [collapsed, setCollapsed] = useState<boolean>(() => {
-    try {
-      return (typeof window !== "undefined" ? localStorage.getItem(collapseKey) : null) === "1";
-    } catch {
-      return false;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      if (typeof window === "undefined") return;
-      localStorage.setItem(collapseKey, collapsed ? "1" : "0");
-    } catch {
-      // ignore
-    }
-  }, [collapseKey, collapsed]);
-
   return (
-    <aside className="requisites-panel" data-collapsed={collapsed ? "true" : "false"}>
+    <section className="requisites-panel">
       <div className="requisites-header">
         <div className="requisites-header-left">
           <span>Реквизит</span>
           <span className="requisites-count">{requisites.length}</span>
         </div>
-        <button
-          type="button"
-          className="requisites-toggle"
-          onClick={() => setCollapsed((v) => !v)}
-          title={collapsed ? "Развернуть панель реквизита" : "Свернуть панель реквизита"}
-          aria-label={collapsed ? "Развернуть панель реквизита" : "Свернуть панель реквизита"}
-        >
-          {collapsed ? "⟩" : "⟨"}
-        </button>
         <div className="requisites-actions">
           <button
             type="button"
@@ -123,13 +122,15 @@ export function RequisitesPanel({
           <div className="requisites-empty">Нет реквизита</div>
         ) : (
           requisites.map((item) => (
-            <label key={item.id} className="requisite-item">
-              <input
-                type="checkbox"
-                checked={item.checked}
-                onChange={() => onToggle(item.id)}
-              />
-              <span>{item.label}</span>
+            <div key={item.id} className="requisite-item">
+              <label className="requisite-item-main">
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  onChange={() => onToggle(item.id)}
+                />
+                <span>{item.label}</span>
+              </label>
               {isEditing ? (
                 <button
                   type="button"
@@ -139,11 +140,52 @@ export function RequisitesPanel({
                   ×
                 </button>
               ) : null}
-            </label>
+              <div className="requisite-assignees">
+                <label className="requisite-assignee-field">
+                  <span>Выставить</span>
+                  <input
+                    type="text"
+                    list={assigneeListId}
+                    value={assigneesToInputValue(item.setupAssignees)}
+                    placeholder="Кто выставляет"
+                    onChange={(event) =>
+                      onAssigneesChange(
+                        item.id,
+                        "setupAssignees",
+                        inputValueToAssignees(event.target.value),
+                      )
+                    }
+                  />
+                </label>
+                <label className="requisite-assignee-field">
+                  <span>Унести</span>
+                  <input
+                    type="text"
+                    list={assigneeListId}
+                    value={assigneesToInputValue(item.removeAssignees)}
+                    placeholder="Кто уносит"
+                    onChange={(event) =>
+                      onAssigneesChange(
+                        item.id,
+                        "removeAssignees",
+                        inputValueToAssignees(event.target.value),
+                      )
+                    }
+                  />
+                </label>
+              </div>
+            </div>
           ))
         )}
       </div>
-    </aside>
+      {assigneeOptions.length > 0 ? (
+        <datalist id={assigneeListId}>
+          {assigneeOptions.map((option) => (
+            <option key={option.value} value={option.value} label={option.label} />
+          ))}
+        </datalist>
+      ) : null}
+    </section>
   );
 }
 

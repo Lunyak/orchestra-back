@@ -31,7 +31,7 @@ export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: Spotligh
 <TheaterCollapsibleSection
             sectionId="spotlights-lightplot"
             title="Схема света"
-            summary="Каналы 1–8, связь с 3D"
+            summary="Каналы света, связь с 3D"
             badge={spotlightLinkBadge}
             defaultOpen
           >

@@ -249,7 +249,7 @@ export const LightPlotPage = () => {
           </div>
         </div>
         <p className="light-plot-link-hint">
-          Каналы 1–8 совпадают с подсветкой в сценарии. На шаге: схема {linkStats.fixtures},
+          Каналы света совпадают с подсветкой в сценарии. На шаге: схема {linkStats.fixtures},
           3D {linkStats.spotlights}, слотов {linkStats.linkedSlots}.
           {selectedLightSlot
             ? ` Подсветка слота ${selectedLightSlot} (задаётся в сценарии).`

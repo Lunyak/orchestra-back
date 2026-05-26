@@ -12,7 +12,7 @@ export type TheaterViewPrefs = {
   floorPlanExpanded: boolean;
   spectaclePreviewMode: boolean;
   alignGuidesEnabled: boolean;
-  activeTab: "spotlights" | "models" | "layout" | "decor";
+  activeTab: "spotlights" | "models" | "view" | "layout" | "decor";
   outlineDrawMode: boolean;
   /** Режим «Настройки сцены» (панели слева/справа вместо «Музыка и шаги»). */
   swapTheaterPanels: boolean;
@@ -70,7 +70,13 @@ function readHexColor(value: unknown, fallback: string) {
 }
 
 function readTab(value: unknown): TheaterViewPrefs["activeTab"] {
-  if (value === "spotlights" || value === "models" || value === "layout" || value === "decor") {
+  if (
+    value === "spotlights" ||
+    value === "models" ||
+    value === "view" ||
+    value === "layout" ||
+    value === "decor"
+  ) {
     return value;
   }
   return DEFAULT_THEATER_VIEW_PREFS.activeTab;

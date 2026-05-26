@@ -12,8 +12,8 @@ export function ScriptMarkdownToolbar({
 }: {
   isEditing: boolean;
   onToggleEditing: () => void;
-  markdownMode: "notes" | "play" | "explication";
-  onSetMarkdownMode: (mode: "notes" | "play" | "explication") => void;
+  markdownMode: "notes" | "play" | "explication" | "comments" | "requisites" | "light";
+  onSetMarkdownMode: (mode: "notes" | "play" | "explication" | "comments" | "requisites" | "light") => void;
   annotations: {
     mode: boolean;
     onToggleMode: () => void;
@@ -38,6 +38,36 @@ export function ScriptMarkdownToolbar({
         role="tablist"
         aria-label="Режим шага"
       >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={markdownMode === "light"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "light"}
+          onClick={() => onSetMarkdownMode("light")}
+        >
+          Свет
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={markdownMode === "requisites"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "requisites"}
+          onClick={() => onSetMarkdownMode("requisites")}
+        >
+          Реквизит
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={markdownMode === "comments"}
+          className="script-markdown-tab"
+          data-active={markdownMode === "comments"}
+          onClick={() => onSetMarkdownMode("comments")}
+        >
+          Комментарии
+        </button>
         <button
           type="button"
           role="tab"

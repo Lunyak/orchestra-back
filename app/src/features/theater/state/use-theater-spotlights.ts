@@ -1,5 +1,7 @@
 import { tc } from "../../../shared/styles/theme-color";
-import { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
+import { useScene } from "../../scene";
+import { applyFaderBindingsToSpotlights } from "../model/theater-light-fader-bindings";
 import type { ScriptStep, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
 import { DEFAULT_SPOTLIGHTS } from "../model/theater-defaults";
 import {
@@ -107,6 +109,7 @@ export function useTheaterSpotlights({
   rehearsalSpotlights,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
+  const { sceneData } = useScene();
   const spotlightsRaw = currentStep?.theaterSpotlights;
   const spotlights = spotlightsRaw ?? [];
   const displaySpotlights =
@@ -139,6 +142,9 @@ export function useTheaterSpotlights({
           color: item.color,
           enabled: item.enabled ?? true,
           channel: Number.isFinite(item.channel) ? item.channel : nextId,
+          ...(Number.isFinite(item.faderId)
+            ? { faderId: Math.max(1, Math.trunc(item.faderId!)) }
+            : {}),
           isRgb: item.isRgb ?? false,
           ...(item.hidden ? { hidden: true } : {}),
           ...(Number.isFinite(item.gridCol)
@@ -155,10 +161,21 @@ export function useTheaterSpotlights({
   const updateSpotlights = useCallback(
     (next: TheaterSpotlight[]) => {
       recordTheaterHistory();
-      updateCurrentStep({ theaterSpotlights: normalizeSpotlights(next) });
+      const bound = applyFaderBindingsToSpotlights(
+        normalizeSpotlights(next),
+        sceneData?.lightFaders,
+      );
+      updateCurrentStep({ theaterSpotlights: bound });
     },
-    [normalizeSpotlights, recordTheaterHistory, updateCurrentStep],
+    [normalizeSpotlights, recordTheaterHistory, sceneData?.lightFaders, updateCurrentStep],
   );
+
+  useEffect(() => {
+    if (!currentStep?.id || !spotlightsRaw?.length) return;
+    const bound = applyFaderBindingsToSpotlights(spotlightsRaw, sceneData?.lightFaders);
+    if (bound === spotlightsRaw) return;
+    updateCurrentStep({ theaterSpotlights: bound });
+  }, [currentStep?.id, sceneData?.lightFaders, spotlightsRaw, updateCurrentStep]);
 
   const cloneSpotlights = useCallback(
     (items: TheaterSpotlight[]) => cloneTheaterSpotlights(items),
@@ -268,6 +285,7 @@ export function useTheaterSpotlights({
         id: nextId,
         label: `${source.label} (копия)`,
         channel: nextId,
+        faderId: nextId,
         position: [
           source.position[0] + 0.35,
           source.position[1],
@@ -301,6 +319,7 @@ export function useTheaterSpotlights({
       color: tc("--color-warning"),
       enabled: true,
       channel: nextId,
+      faderId: nextId,
       isRgb: false,
     };
     updateSpotlights([...base, nextItem]);
@@ -322,6 +341,7 @@ export function useTheaterSpotlights({
       color: tc("--color-text-white"),
       enabled: true,
       channel: nextId,
+      faderId: nextId,
       isRgb: true,
     };
     updateSpotlights([...base, nextItem]);
@@ -367,6 +387,7 @@ export function useTheaterSpotlights({
             : batchSpotlightColors[index % batchSpotlightColors.length],
           enabled: true,
           channel: nextId,
+          faderId: nextId,
           isRgb,
         };
       });
@@ -415,7 +436,7 @@ export function useTheaterSpotlights({
   const assignSpotlightChannelsSequential = useCallback(
     (scope: SpotlightLayoutScope) => {
       patchSpotlightsInScope(scope, (items) => assignSequentialChannelsOrdered(items));
-      setDecorActionMessage("Каналы 1–8 назначены слева направо");
+      setDecorActionMessage("Каналы света назначены слева направо");
     },
     [patchSpotlightsInScope, setDecorActionMessage],
   );
@@ -437,7 +458,8 @@ export function useTheaterSpotlights({
           : THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
         color: isRgb ? tc("--color-light-sky") : tc("--color-warning"),
         enabled: true,
-        channel: Math.min(8, index + 1),
+        channel: index + 1,
+        faderId: index + 1,
         isRgb,
       }));
       updateSpotlights([...base, ...created]);
@@ -690,7 +712,7 @@ export function useTheaterSpotlights({
         assignSequentialChannelsOrdered,
       ),
     );
-    setDecorActionMessage("Каналы 1–8 назначены выбранным софитам");
+    setDecorActionMessage("Каналы света назначены выбранным софитам");
   }, [ensureSpotlights, multiSelectedSpotlightIds, setDecorActionMessage, updateSpotlights]);
 
   return {

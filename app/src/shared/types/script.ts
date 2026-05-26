@@ -30,6 +30,10 @@ export interface ScriptRequisite {
   id: number;
   label: string;
   checked: boolean;
+  /** Кто выставляет/подготавливает реквизит для шага. */
+  setupAssignees?: string[];
+  /** Кто уносит/убирает реквизит после шага. */
+  removeAssignees?: string[];
 }
 
 export interface LightFixture {
@@ -47,7 +51,7 @@ export interface LightCue {
   id: number;
   /** Секунды от начала шага */
   tSec: number;
-  /** Канал 1–8 (строка, как в lightPlot) */
+  /** Номер светового канала (строка, как в lightPlot) */
   channel: string;
   intensity?: number;
   enabled?: boolean;
@@ -65,6 +69,8 @@ export interface TheaterSpotlight {
   /** Скрыт в редакторе (данные сохраняются) */
   hidden?: boolean;
   channel?: number;
+  /** Номер ползунка пульта, к которому привязан софит. */
+  faderId?: number;
   isRgb?: boolean;
   /** Привязка цели к ячейке сетки сцены (столбец, ряд от задника) */
   gridCol?: number;

@@ -17,14 +17,26 @@ import type { KanbanStepRolesAdminMember } from "./KanbanStepRolesAdminPanel";
 import { normalizeActorEmail } from "./kanbanStepCastDisplay";
 import "./KanbanStepRoleDetailPanel.css";
 
-function memberLabel(m: KanbanStepRolesAdminMember): string {
+function memberLabel(m: KanbanStepRolesAdminMember): {
+  firstLine: string;
+  secondLine: string | null;
+  title: string;
+} {
   const p = m.profile ?? null;
+  const firstName = String(p?.firstName ?? "").trim();
+  const lastName = String(p?.lastName ?? "").trim();
+  if (firstName || lastName) {
+    const firstLine = firstName || lastName;
+    const secondLine = firstName && lastName ? lastName : null;
+    return {
+      firstLine,
+      secondLine,
+      title: [firstName, lastName].filter(Boolean).join(" "),
+    };
+  }
   const display = String(p?.displayName ?? "").trim();
-  if (display) return `${display} (${m.email})`;
-  const full =
-    `${String(p?.firstName ?? "").trim()} ${String(p?.lastName ?? "").trim()}`.trim();
-  if (full) return `${full} (${m.email})`;
-  return m.email;
+  if (display) return { firstLine: display, secondLine: null, title: display };
+  return { firstLine: "Участник", secondLine: null, title: "Участник" };
 }
 
 function mutationErrorMessage(e: unknown, fallback: string): string {
@@ -221,17 +233,20 @@ export function KanbanStepRoleDetailPanel({
                 disabled={busy}
                 onClick={() => void toggleAssignment(email)}
                 aria-pressed={checked}
-                title={label}
+                title={label.title}
               >
                 <MiniAvatar
                   src={String(m.profile?.avatarUrl ?? "").trim() || null}
-                  label={label}
+                  label={label.title}
                   size={42}
                 />
-                <span className="kanban-role-detail__actor-name">{label}</span>
-                <span className="kanban-role-detail__actor-state">
-                  {checked ? "Играет" : "Добавить"}
+                <span className="kanban-role-detail__actor-name">
+                  <span>{label.firstLine}</span>
+                  {label.secondLine ? <span>{label.secondLine}</span> : null}
                 </span>
+                {checked ? (
+                  <span className="kanban-role-detail__actor-state">Играет</span>
+                ) : null}
               </button>
             );
           })}

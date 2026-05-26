@@ -23,20 +23,20 @@ export function parseLightChannelSlot(
   if (raw == null) return null;
   if (typeof raw === "number" && Number.isFinite(raw)) {
     const slot = Math.trunc(raw);
-    return slot >= 1 && slot <= LIGHT_CHANNEL_SLOT_COUNT ? slot : null;
+    return slot >= 1 ? slot : null;
   }
   const trimmed = String(raw).trim();
   if (!trimmed) return null;
   const asNum = Number(trimmed);
   if (Number.isFinite(asNum)) {
     const slot = Math.trunc(asNum);
-    return slot >= 1 && slot <= LIGHT_CHANNEL_SLOT_COUNT ? slot : null;
+    return slot >= 1 ? slot : null;
   }
   return null;
 }
 
 export function formatLightChannelSlot(slot: number): string {
-  return String(Math.max(1, Math.min(LIGHT_CHANNEL_SLOT_COUNT, Math.trunc(slot))));
+  return String(Math.max(1, Math.trunc(slot)));
 }
 
 export function assignSequentialChannelsToSpotlights(
@@ -48,7 +48,7 @@ export function assignSequentialChannelsToSpotlights(
   );
   const channelById = new Map<number, number>();
   ordered.forEach((item, index) => {
-    channelById.set(item.id, Math.min(LIGHT_CHANNEL_SLOT_COUNT, index + 1));
+    channelById.set(item.id, index + 1);
   });
   return spotlights.map((item) => {
     const slot = channelById.get(item.id);
@@ -64,7 +64,7 @@ export function assignSequentialChannelsOrdered(
   const ordered = sortSpotlightsByX(spotlights);
   const channelById = new Map<number, number>();
   ordered.forEach((item, index) => {
-    channelById.set(item.id, Math.min(LIGHT_CHANNEL_SLOT_COUNT, index + 1));
+    channelById.set(item.id, index + 1);
   });
   return spotlights.map((item) => {
     const slot = channelById.get(item.id);
@@ -90,17 +90,16 @@ export function resolveLightChannelDisplayColor(
   return resolveLightColor(parsed.label, parsed.color);
 }
 
-export function buildLightChannelSelectOptions(lightChannels: string[]): {
+export function buildLightChannelSelectOptions(lightChannels: string[], minCount = LIGHT_CHANNEL_SLOT_COUNT): {
   value: string;
   label: string;
   slot: number;
 }[] {
-  return Array.from({ length: LIGHT_CHANNEL_SLOT_COUNT }, (_, index) => {
+  return Array.from({ length: Math.max(LIGHT_CHANNEL_SLOT_COUNT, minCount, lightChannels.length) }, (_, index) => {
     const slot = index + 1;
-    const label = resolveLightChannelLabel(lightChannels, slot);
     return {
       value: formatLightChannelSlot(slot),
-      label: `${slot}: ${label}`,
+      label: `к ${slot}`,
       slot,
     };
   });
@@ -224,8 +223,8 @@ export function mergeSpotlightsFromLightPlot(
       );
     }
 
+    const fallbackLabel = fixture.label?.trim() || `Софит ${fixture.id}`;
     const patch = {
-      label: fixture.label?.trim() || `Софит ${fixture.id}`,
       position: [wx, 6, wz] as [number, number, number],
       target: [targetX, 1, targetZ] as [number, number, number],
       angleDeg: Math.round(12 + Math.min(40, beamLen * 6)),
@@ -240,7 +239,7 @@ export function mergeSpotlightsFromLightPlot(
       const nextId = result.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
       result.push({
         id: nextId,
-        label: patch.label,
+        label: fallbackLabel,
         position: patch.position,
         target: patch.target,
         angleDeg: patch.angleDeg,

@@ -16,6 +16,26 @@ import { ChatDockMessagesContent } from "./ChatDockMessagesContent";
 import "./ChatDock.css";
 
 const CHAT_PAGE_SIZE = 20;
+const CHAT_DOCK_VISIBILITY_EVENT = "orchestra:chat-dock-visibility";
+const CHAT_DOCK_HIDDEN_STORAGE_KEY = "orchestra:chat-dock-hidden";
+
+function readChatDockHidden(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(CHAT_DOCK_HIDDEN_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function persistChatDockHidden(hidden: boolean) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(CHAT_DOCK_HIDDEN_STORAGE_KEY, String(hidden));
+  } catch {
+    // ignore
+  }
+}
 
 function conversationLabel(
   c: ChatConversationItem,
@@ -34,6 +54,7 @@ export function ChatDock() {
   );
   const myTroupe = troupeData?.troupe ?? null;
   const [open, setOpen] = useState(false);
+  const [dockHidden, setDockHidden] = useState(readChatDockHidden);
   const [conversations, setConversations] = useState<ChatConversationItem[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
@@ -73,6 +94,22 @@ export function ChatDock() {
       return;
     }
   }, [accessToken]);
+
+  useEffect(() => {
+    const onVisibilityChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ hidden?: boolean }>).detail;
+      const nextHidden = detail?.hidden ?? true;
+      setDockHidden(nextHidden);
+      persistChatDockHidden(nextHidden);
+      if (nextHidden) {
+        setOpen(false);
+        setExpanded(false);
+      }
+    };
+
+    window.addEventListener(CHAT_DOCK_VISIBILITY_EVENT, onVisibilityChange);
+    return () => window.removeEventListener(CHAT_DOCK_VISIBILITY_EVENT, onVisibilityChange);
+  }, []);
 
   useEffect(() => {
     if (!accessToken) {
@@ -367,7 +404,7 @@ export function ChatDock() {
     }
   }, [draft, activeId, sending]);
 
-  if (!accessToken) return null;
+  if (!accessToken || dockHidden) return null;
 
   const activeConv = conversations.find((c) => c.id === activeId);
   const activeTitle = activeConv ? conversationLabel(activeConv, myTroupe) : "Чат";

@@ -252,7 +252,8 @@
 
 .kanban-step-modal-panel .kanban-step-cast-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(176px, 176px));
+  justify-content: start;
   gap: 14px;
 }
 
@@ -260,23 +261,32 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 14px 12px;
-  border: 1px solid var(--color-border-visible);
-  background: var(--color-bg-transparent-1);
+  gap: 10px;
+  padding: 6px 6px 10px;
+  border: 1px solid var(--stage-brutal-border);
+  border-top: 2px solid var(--color-active-ascent);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0 18%, transparent 18% 100%),
+    var(--color-bg-transparent-1);
   border-radius: 0;
   min-width: 0;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
 }
 
 .kanban-step-modal-panel .kanban-step-cast-tile .role-playing-card {
-  --role-card-w: 136px;
-  --role-card-h: 190px;
+  --role-card-w: 164px;
+  --role-card-h: 252px;
+  box-shadow:
+    0 18px 34px rgba(0, 0, 0, 0.42),
+    0 0 22px rgba(255, 125, 52, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.82) inset,
+    0 -3px 0 rgba(255, 255, 255, 0.04) inset;
 }
 
 .kanban-step-cast-tile__cast {
   width: 100%;
   padding-top: 8px;
-  border-top: 1px dashed var(--color-border-visible);
+  border-top: 1px solid var(--stage-brutal-border);
 }
 
 .kanban-step-cast-tile__actors {
@@ -285,7 +295,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .kanban-step-cast-tile__actor {
@@ -293,21 +303,42 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding: 5px 7px 5px 5px;
+  border: 1px solid var(--stage-brutal-border);
+  border-left: 3px solid var(--color-active-ascent);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 20%, transparent 20% 100%),
+    var(--stage-brutal-tag-bg);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.22);
+}
+
+.kanban-step-cast-tile__actor .mini-avatar {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.28);
+  filter: saturate(0.9) contrast(1.08);
 }
 
 .kanban-step-cast-tile__actor-name {
-  font-size: 12px;
-  line-height: 1.25;
-  color: var(--color-text-ui);
+  font-size: 11px;
+  line-height: 1.15;
+  color: var(--color-text-primary);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .kanban-step-cast-tile__empty {
-  font-size: 12px;
-  color: var(--color-text-muted);
+  font-size: 11px;
+  color: var(--color-text-tertiary);
   text-align: center;
+  padding: 7px 8px;
+  border: 1px dashed var(--stage-brutal-border);
+  background: rgba(0, 0, 0, 0.12);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .kanban-step-cast-tile__warn {
@@ -315,6 +346,7 @@
   line-height: 1.35;
   color: var(--color-text-tertiary);
   text-align: center;
+  max-width: 150px;
 }
 
 .kanban-step-modal__subnav {
@@ -352,26 +384,6 @@
 
 .kanban-step-modal__body_roles-admin {
   padding-top: 14px;
-}
-
-.kanban-step-modal__roles-link {
-  margin-top: 12px;
-  width: 100%;
-  text-align: left;
-  border: 1px solid var(--color-border-visible);
-  background: var(--color-bg-transparent-1);
-  color: var(--color-text-ui);
-  padding: 10px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 0;
-}
-
-.kanban-step-modal__roles-link:hover {
-  background: var(--color-bg-hover);
-  border-color: var(--color-active-ascent);
-  color: var(--color-text-primary);
 }
 
 .kanban-chip.kanban-chip--person {

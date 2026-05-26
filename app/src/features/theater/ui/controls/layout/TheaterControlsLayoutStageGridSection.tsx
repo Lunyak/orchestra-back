@@ -17,8 +17,8 @@ export function TheaterControlsLayoutStageGridSection({ vm }: LayoutSectionProps
               Сетка повторяет контур сцены. Ряд 1 — у задника, последний — у авансцены. При
               смене формы зала пересчитывается вместе с полом.
             </p>
-            <div className="theater-btn-row theater-btn-row--3">
-              <TheaterField label="Столбцы">
+            <div className="theater-stage-grid-fields">
+              <TheaterField label="Столбцы" className="theater-field--stacked">
                 <input
                   type="number"
                   className="native-text-input"
@@ -33,7 +33,7 @@ export function TheaterControlsLayoutStageGridSection({ vm }: LayoutSectionProps
                   }
                 />
               </TheaterField>
-              <TheaterField label="Ряды">
+              <TheaterField label="Ряды" className="theater-field--stacked">
                 <input
                   type="number"
                   className="native-text-input"

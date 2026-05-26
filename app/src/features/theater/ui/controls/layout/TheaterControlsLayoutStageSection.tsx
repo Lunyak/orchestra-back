@@ -6,7 +6,6 @@ import {
   resolveStageOutlinePoints,
 } from "../../../model/theater-custom-outline";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
-import { TheaterStageLayoutGuide } from "../../TheaterStageLayoutGuide";
 import type { TheaterStageShape } from "../../../../../shared/types/script";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { getStageFrontZBounds, labelM } from "../../../model/theater-metrics";
@@ -29,7 +28,6 @@ export function TheaterControlsLayoutStageSection({ vm, layout }: LayoutSectionP
         badge={isCustomStageOutline ? "Свой контур" : undefined}
         defaultOpen={isCustomStageOutline}
       >
-        <TheaterStageLayoutGuide layout={vm.layout} compact />
 <div className="theater-layout-grid">
             <TheaterField label="Форма сцены">
               <select
@@ -154,16 +152,6 @@ export function TheaterControlsLayoutStageSection({ vm, layout }: LayoutSectionP
         ) : null}
           {(vm.layout.stageShape ?? "rectangle") === "custom" ? (
             <div className="theater-custom-outline-panel">
-              <p className="theater-custom-outline-hint">
-                <strong>Рисование:</strong> включите «Рисовать вершины», разверните план (+) и
-                кликайте по залу — каждый клик добавляет точку контура (до 24). Сторона к залу
-                остаётся без стены.
-              </p>
-              <p className="theater-custom-outline-hint">
-                <strong>Редактирование:</strong> клик по кружку выделяет вершину; перетаскивание
-                двигает её. Delete или «Удалить вершину» — убрать выделенную (минимум{" "}
-                {MIN_STAGE_OUTLINE_POINTS} точки).
-              </p>
               <div className="theater-custom-outline-actions">
                 <TheaterBtn
                   active={vm.outlineDrawMode}

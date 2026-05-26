@@ -24,7 +24,7 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
         onRevealAllHidden={vm.revealAllHiddenInScene}
         onIsolateSelection={vm.isolateSceneSelection}
       />
-      <section className="theater-camera-bookmarks">
+      <section className="theater-camera-bookmarks theater-camera-bookmarks--stage-brutal">
         <div className="theater-layout-title">Закладки камеры</div>
         <div className="theater-spotlight-batch theater-camera-bookmark-form">
           <TheaterField label="Название">

@@ -1,6 +1,7 @@
 .role-playing-card {
   --role-card-w: 136px;
   --role-card-h: 190px;
+  --role-card-accent: var(--color-active-ascent);
   width: var(--role-card-w);
   height: var(--role-card-h);
   box-sizing: border-box;
@@ -8,22 +9,33 @@
   display: block;
   border-radius: 0;
   overflow: hidden;
-  border: 1px solid rgba(8, 8, 10, 0.92);
+  border: 1px solid var(--stage-brutal-border-strong);
   background:
-    radial-gradient(circle at 50% 46%, rgba(40, 32, 24, 0.04), transparent 34%),
-    linear-gradient(180deg, #fffef8 0%, #f7f2e7 100%);
-  box-shadow:
-    0 8px 18px rgba(0, 0, 0, 0.24),
-    inset 0 0 0 5px rgba(255, 255, 255, 0.72);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 12%, transparent 12% 100%),
+    var(--stage-brutal-surface-deep);
+  box-shadow: var(--stage-brutal-shadow-card);
   position: relative;
 }
 
 .role-playing-card::before {
-  content: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background:
+    var(--stage-brutal-diagonal-mark),
+    linear-gradient(90deg, var(--role-card-accent) 0 3px, transparent 3px 100%);
+  opacity: 0.78;
+  pointer-events: none;
 }
 
 .role-playing-card::after {
-  content: none;
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--stage-brutal-bottom-vignette);
+  pointer-events: none;
 }
 
 .role-playing-card_sm {
@@ -39,9 +51,8 @@
 .role-playing-card__art {
   position: absolute;
   inset: 0;
+  z-index: 1;
   border: 0;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(35, 28, 22, 0.08), transparent 58%);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -52,18 +63,26 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  filter: saturate(0.92) contrast(1.12);
 }
 
 .role-playing-card__placeholder {
-  font-family: Georgia, "Times New Roman", serif;
+  position: relative;
+  z-index: 1;
+  width: 58%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 34px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  color: rgba(23, 18, 26, 0.82);
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  color: #ffffff;
   text-transform: uppercase;
-  padding: 8px;
+  padding: 0;
   text-align: center;
   line-height: 1.1;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.58);
 }
 
 .role-playing-card_sm .role-playing-card__placeholder {
@@ -76,23 +95,46 @@
 
 .role-playing-card__footer {
   position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 10px;
+  left: 12px;
+  right: 12px;
+  bottom: 11px;
   z-index: 4;
-  padding: 4px 5px;
-  text-align: center;
-  border: 1px solid var(--color-active-ascent);
-  background: var(--color-active-ascent);
+  padding: 6px 8px 6px 10px;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-left: 3px solid var(--role-card-accent);
+  border-radius: 0;
+  background:
+    linear-gradient(90deg, rgba(255, 125, 52, 0.18), transparent 34%),
+    var(--stage-brutal-panel);
+  box-shadow:
+    4px 4px 0 rgba(0, 0, 0, 0.34),
+    0 1px 0 rgba(255, 255, 255, 0.08) inset;
   min-width: 0;
+  transform: skewX(-4deg);
+}
+
+.role-playing-card__footer::before {
+  content: "";
+  position: absolute;
+  right: 7px;
+  top: -1px;
+  width: 20px;
+  height: 2px;
+  border-radius: 0;
+  background: var(--role-card-accent);
+  opacity: 0.9;
 }
 
 .role-playing-card__title {
   font-size: 10px;
-  font-weight: 800;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-  color: var(--color-bg-base);
+  font-weight: 900;
+  line-height: 1.12;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  transform: skewX(4deg);
   overflow: hidden;
   text-overflow: ellipsis;
   word-break: normal;
@@ -111,25 +153,31 @@
 }
 
 .role-playing-card_sm .role-playing-card__footer {
-  left: 15px;
-  right: 15px;
-  bottom: 6px;
+  left: 7px;
+  right: 7px;
+  bottom: 7px;
   padding: 3px 4px;
+  border-radius: 0;
 }
 
 .role-playing-card_lg .role-playing-card__footer {
-  left: 32px;
-  right: 32px;
-  bottom: 13px;
-  padding: 5px 6px;
+  left: 15px;
+  right: 15px;
+  bottom: 14px;
+  padding: 7px 10px 8px;
+  border-radius: 0;
 }
 
 .role-playing-card_interactive {
   cursor: pointer;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .role-playing-card_interactive:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+  transform: translateY(-3px);
+  border-color: rgba(255, 125, 52, 0.54);
+  box-shadow: var(--stage-brutal-shadow-card-hover);
 }

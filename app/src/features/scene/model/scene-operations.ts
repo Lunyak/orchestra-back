@@ -18,6 +18,7 @@ import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
+import { applyFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
 import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
 import { stepTheaterSyncPayload } from "../../theater/model/theater-step-models";
 import {
@@ -32,6 +33,12 @@ import {
   normalizeLightChannelsFromServer,
   normalizeTheaterLayoutFromServer,
 } from "./scene-normalize";
+
+function normalizeRequisiteAssignees(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
+    : [];
+}
 
 export function useSceneOperations() {
   const dispatch = useAppDispatch();
@@ -122,6 +129,8 @@ export function useSceneOperations() {
                   id: Number(r?.sourceId ?? r?.id ?? 0),
                   label: String(r?.label ?? ""),
                   checked: Boolean(r?.checked),
+                  setupAssignees: normalizeRequisiteAssignees(r?.setupAssignees),
+                  removeAssignees: normalizeRequisiteAssignees(r?.removeAssignees),
                 }))
               : [],
             lightPlot: Array.isArray(st?.lightPlot)
@@ -157,8 +166,20 @@ export function useSceneOperations() {
                   color: sp?.color ?? undefined,
                   enabled: Boolean(sp?.enabled),
                   channel: sp?.channel ?? undefined,
+                  faderId:
+                    typeof sp?.faderId === "number" && Number.isFinite(sp.faderId)
+                      ? sp.faderId
+                      : undefined,
                   isRgb: sp?.isRgb ?? undefined,
                   hidden: sp?.hidden === true ? true : undefined,
+                  gridCol:
+                    typeof sp?.gridCol === "number" && Number.isFinite(sp.gridCol)
+                      ? sp.gridCol
+                      : undefined,
+                  gridRow:
+                    typeof sp?.gridRow === "number" && Number.isFinite(sp.gridRow)
+                      ? sp.gridRow
+                      : undefined,
                 }))
               : [],
           }))
@@ -224,8 +245,34 @@ export function useSceneOperations() {
           const localRoles = loadSceneRolesFromStorage(effectiveProject);
           if (localRoles) minimalSceneData.sceneRoles = localRoles;
         }
+        const serverLightFaders = (scene as any)?.lightFaders ?? null;
+        if (serverLightFaders && typeof serverLightFaders === "object" && (serverLightFaders as any).v === 1) {
+          minimalSceneData.lightFaders = serverLightFaders;
+        }
+        const serverLightPrograms = (scene as any)?.lightPrograms ?? null;
+        if (serverLightPrograms && typeof serverLightPrograms === "object" && (serverLightPrograms as any).v === 1) {
+          minimalSceneData.lightPrograms = serverLightPrograms;
+        }
 
-        const nextStepsPayload = normalizedSteps.length ? normalizedSteps : steps;
+        const normalizedStepsWithBindings =
+          minimalSceneData.lightFaders?.v === 1
+            ? normalizedSteps.map((step) => {
+                if (!Array.isArray(step.theaterSpotlights) || step.theaterSpotlights.length === 0) {
+                  return step;
+                }
+                const bound = applyFaderBindingsToSpotlights(
+                  step.theaterSpotlights,
+                  minimalSceneData.lightFaders,
+                );
+                return bound === step.theaterSpotlights
+                  ? step
+                  : { ...step, theaterSpotlights: bound };
+              })
+            : normalizedSteps;
+
+        const nextStepsPayload = normalizedStepsWithBindings.length
+          ? normalizedStepsWithBindings
+          : steps;
         const wasReady = store.getState().scene.isSceneReady;
         let bootstrapPage: number | undefined;
         if (!wasReady && typeof window !== "undefined" && nextStepsPayload.length > 0) {
@@ -476,6 +523,14 @@ export function useSceneOperations() {
                           (payload as any)?.sceneRoles ??
                           (serverShadow?.sceneData as any)?.sceneRoles ??
                           undefined,
+                        lightFaders:
+                          (payload as any)?.lightFaders ??
+                          (serverShadow?.sceneData as any)?.lightFaders ??
+                          undefined,
+                        lightPrograms:
+                          (payload as any)?.lightPrograms ??
+                          (serverShadow?.sceneData as any)?.lightPrograms ??
+                          undefined,
                         playlist: Array.isArray((payload as any)?.playlist)
                           ? (payload as any).playlist
                           : [],
@@ -562,6 +617,8 @@ export function useSceneOperations() {
                           id: Number(r?.sourceId ?? r?.id ?? 0),
                           label: String(r?.label ?? ""),
                           checked: Boolean(r?.checked),
+                          setupAssignees: normalizeRequisiteAssignees(r?.setupAssignees),
+                          removeAssignees: normalizeRequisiteAssignees(r?.removeAssignees),
                         }))
                       : [],
                     lightPlot: Array.isArray(st?.lightPlot)
@@ -689,8 +746,14 @@ export function useSceneOperations() {
           const prevSceneRoles = (serverShadow?.sceneData as any)?.sceneRoles ?? null;
           const nextSceneRoles = (payloadForServer as any)?.sceneRoles ?? null;
           const sceneRolesChanged = stableStringify(prevSceneRoles) !== stableStringify(nextSceneRoles);
+          const prevLightFaders = (serverShadow?.sceneData as any)?.lightFaders ?? null;
+          const nextLightFaders = (payloadForServer as any)?.lightFaders ?? null;
+          const lightFadersChanged = stableStringify(prevLightFaders) !== stableStringify(nextLightFaders);
+          const prevLightPrograms = (serverShadow?.sceneData as any)?.lightPrograms ?? null;
+          const nextLightPrograms = (payloadForServer as any)?.lightPrograms ?? null;
+          const lightProgramsChanged = stableStringify(prevLightPrograms) !== stableStringify(nextLightPrograms);
 
-          if (!serverShadow || nameChanged || sceneRolesChanged) {
+          if (!serverShadow || nameChanged || sceneRolesChanged || lightFadersChanged || lightProgramsChanged) {
             const scenePayload: any = {
               id: sceneId,
               projectId,
@@ -699,6 +762,12 @@ export function useSceneOperations() {
             };
             if (!serverShadow || sceneRolesChanged) {
               scenePayload.sceneRoles = nextSceneRoles;
+            }
+            if (!serverShadow || lightFadersChanged) {
+              scenePayload.lightFaders = nextLightFaders;
+            }
+            if (!serverShadow || lightProgramsChanged) {
+              scenePayload.lightPrograms = nextLightPrograms;
             }
             changes.push({
               id: createId(),
@@ -985,6 +1054,14 @@ export function useSceneOperations() {
                   sceneRoles:
                     (payloadForServer as any)?.sceneRoles ??
                     (serverShadow?.sceneData as any)?.sceneRoles ??
+                    undefined,
+                  lightFaders:
+                    (payloadForServer as any)?.lightFaders ??
+                    (serverShadow?.sceneData as any)?.lightFaders ??
+                    undefined,
+                  lightPrograms:
+                    (payloadForServer as any)?.lightPrograms ??
+                    (serverShadow?.sceneData as any)?.lightPrograms ??
                     undefined,
                   playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
                   sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],

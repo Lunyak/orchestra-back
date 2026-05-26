@@ -52,6 +52,12 @@ function mergeSoundsPreservingLocalFilePath(localSounds: any, serverSounds: any)
   });
 }
 
+function normalizeRequisiteAssignees(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
+    : [];
+}
+
 export async function resyncDesktopProject(
   accessToken: string,
   projectSlug: string,
@@ -105,6 +111,8 @@ export async function resyncDesktopProject(
                       id: Number(r?.sourceId ?? r?.id ?? 0),
                       label: String(r?.label ?? ""),
                       checked: Boolean(r?.checked),
+                      setupAssignees: normalizeRequisiteAssignees(r?.setupAssignees),
+                      removeAssignees: normalizeRequisiteAssignees(r?.removeAssignees),
                     }))
                   : [],
                 lightPlot: Array.isArray(st?.lightPlot)
@@ -141,7 +149,20 @@ export async function resyncDesktopProject(
                       color: sp?.color ?? undefined,
                       enabled: Boolean(sp?.enabled),
                       channel: sp?.channel ?? undefined,
+                      faderId:
+                        typeof sp?.faderId === "number" && Number.isFinite(sp.faderId)
+                          ? sp.faderId
+                          : undefined,
                       isRgb: sp?.isRgb ?? undefined,
+                      hidden: sp?.hidden === true ? true : undefined,
+                      gridCol:
+                        typeof sp?.gridCol === "number" && Number.isFinite(sp.gridCol)
+                          ? sp.gridCol
+                          : undefined,
+                      gridRow:
+                        typeof sp?.gridRow === "number" && Number.isFinite(sp.gridRow)
+                          ? sp.gridRow
+                          : undefined,
                     }))
                   : [],
               }))

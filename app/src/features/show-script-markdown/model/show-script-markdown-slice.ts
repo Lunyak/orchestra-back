@@ -33,17 +33,18 @@ type AnnotationsEntry = {
   error: string | null;
 };
 
-export type ShowScriptMarkdownMode = "notes" | "play" | "explication";
+export type ShowScriptMarkdownMode = "notes" | "play" | "explication" | "comments" | "requisites" | "light";
 
 type SceneUiState = {
   markdownMode: ShowScriptMarkdownMode;
+  playOriginalMode: boolean;
   annotationsMode: boolean;
   playlistOptions: { id: number; title: string }[];
   soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
   selectedTrackId: number | null;
   selectedSoundId: number | null;
-  lightChannels: string[]; // length 8
-  selectedLightSlot: number; // 1..8
+  lightChannels: string[];
+  selectedLightSlot: number;
 };
 
 export interface ShowScriptMarkdownState {
@@ -63,6 +64,7 @@ function getSceneKey(projectSlug: string, sceneName: string): SceneKey {
 function getUiStorageKeys(projectSlug: string, sceneName: string) {
   return {
     markdownModeStorageKey: `showScript:markdownMode:${projectSlug}:${sceneName}`,
+    playOriginalModeStorageKey: `showScript:playOriginalMode:${projectSlug}:${sceneName}`,
     annotationsModeStorageKey: `showScript:annotationsMode:${projectSlug}:${sceneName}`,
   };
 }
@@ -70,6 +72,7 @@ function getUiStorageKeys(projectSlug: string, sceneName: string) {
 function defaultSceneUi(): SceneUiState {
   return {
     markdownMode: "notes",
+    playOriginalMode: false,
     annotationsMode: true,
     playlistOptions: [],
     soundsOptions: [],
@@ -103,7 +106,7 @@ function normalizeLightChannels(raw: unknown): string[] {
   const mapped = raw.map((value) =>
     typeof value === "number" ? String(value) : String(value ?? ""),
   );
-  return Array.from({ length: 8 }, (_, i) => mapped[i] ?? "");
+  return Array.from({ length: Math.max(8, mapped.length) }, (_, i) => mapped[i] ?? "");
 }
 
 function normalizePlaylistOptions(raw: unknown): { id: number; title: string }[] {
@@ -140,13 +143,24 @@ export const initShowScriptMarkdownUi = createAsyncThunk<
   if (typeof window === "undefined") return { sceneKey, ui: {} };
   const keys = getUiStorageKeys(args.projectSlug, args.sceneName);
   const storedMarkdown = localStorage.getItem(keys.markdownModeStorageKey);
+  const storedPlayOriginal = localStorage.getItem(keys.playOriginalModeStorageKey);
   const storedAnnotations = localStorage.getItem(keys.annotationsModeStorageKey);
   const ui: Partial<SceneUiState> = {};
-  if (storedMarkdown === "notes" || storedMarkdown === "play" || storedMarkdown === "explication") {
+  if (
+    storedMarkdown === "notes" ||
+    storedMarkdown === "play" ||
+    storedMarkdown === "explication" ||
+    storedMarkdown === "comments" ||
+    storedMarkdown === "requisites" ||
+    storedMarkdown === "light"
+  ) {
     ui.markdownMode = storedMarkdown;
   }
   if (storedAnnotations != null) {
     ui.annotationsMode = storedAnnotations === "true";
+  }
+  if (storedPlayOriginal != null) {
+    ui.playOriginalMode = storedPlayOriginal === "true";
   }
   return { sceneKey, ui };
 });
@@ -307,6 +321,15 @@ export const showScriptMarkdownSlice = createSlice({
       entry.markdownMode = action.payload.mode;
       state.uiBySceneKey[sceneKey] = entry;
     },
+    setPlayOriginalMode(
+      state,
+      action: PayloadAction<{ projectSlug: string; sceneName: string; enabled: boolean }>,
+    ) {
+      const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
+      const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
+      entry.playOriginalMode = action.payload.enabled;
+      state.uiBySceneKey[sceneKey] = entry;
+    },
     setAnnotationsMode(
       state,
       action: PayloadAction<{ projectSlug: string; sceneName: string; enabled: boolean }>,
@@ -351,7 +374,7 @@ export const showScriptMarkdownSlice = createSlice({
       const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
       const n = Number(action.payload.slot);
       entry.selectedLightSlot = Number.isFinite(n)
-        ? Math.max(1, Math.min(8, Math.trunc(n)))
+        ? Math.max(1, Math.trunc(n))
         : 1;
       state.uiBySceneKey[sceneKey] = entry;
     },
@@ -499,7 +522,9 @@ export const selectActiveStepMarkdownContext = createSelector(
     const currentStep = steps[currentPage];
     const activeMarkdownField: "markdown" | "playMarkdown" | "explicationMarkdown" =
       ui.markdownMode === "play"
-        ? "playMarkdown"
+        ? ui.playOriginalMode
+          ? "markdown"
+          : "playMarkdown"
         : ui.markdownMode === "explication"
           ? "explicationMarkdown"
           : "markdown";

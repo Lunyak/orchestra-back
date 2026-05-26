@@ -252,17 +252,12 @@ export function KanbanStepDetailModal({
                       actorEmails={getRoleActors(step, role)}
                       members={roleAssignmentMembers}
                       accessToken={accessToken}
+                      onOpenRole={openRoleDetail}
+                      onOpenRolesAdmin={() => setInfoSubPage("roles-admin")}
                     />
                   ))}
                 </div>
               )}
-              <button
-                type="button"
-                className="kanban-step-modal__roles-link"
-                onClick={() => setInfoSubPage("roles-admin")}
-              >
-                Назначить актёров и редактировать роли →
-              </button>
             </div>
           </>
         ) : (

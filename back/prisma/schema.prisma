@@ -218,6 +218,10 @@ model Scene {
   name      String
   /// Метаданные сцены (в т.ч. привязки ролей к шагам: sceneRoles v1)
   sceneRoles Json?
+  /// Настройка пульта света: фейдеры, количество фейдеров и привязки
+  lightFaders Json?
+  /// Программы света: сохранённые состояния фейдеров
+  lightPrograms Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -458,6 +462,11 @@ model TheaterSpotlight {
   enabled   Boolean
   channel   Int
   isRgb     Boolean
+  /// Номер фейдера пульта, к которому привязан софит.
+  faderId   Int?
+  hidden    Boolean @default(false)
+  gridCol   Int?
+  gridRow   Int?
 
   step      Step    @relation(fields: [stepId], references: [id])
 }

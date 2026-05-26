@@ -2,14 +2,9 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 
 export type ScriptUiState = {
-  showRequisites: boolean;
   showPlaylistSidebar: boolean;
   showHeaderSounds: boolean;
   isStepsCollapsed: boolean;
-  /** Панель "Роли в сцене" (StepRolesPanel) */
-  showStepRoles: boolean;
-  /** Панель инструментов редактора сценария (музыка/свет) */
-  showScriptEditorTools: boolean;
 
   /**
    * Мобильные оверлеи панелей (НЕ persist'им).
@@ -40,12 +35,9 @@ function storedBool(key: string, defaultValue: boolean): boolean {
 function persistBooleans(state: ScriptUiState) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem("showRequisites", String(state.showRequisites));
     localStorage.setItem("showPlaylistSidebar", String(state.showPlaylistSidebar));
     localStorage.setItem("showHeaderSounds", String(state.showHeaderSounds));
     localStorage.setItem("isStepsCollapsed", String(state.isStepsCollapsed));
-    localStorage.setItem("showStepRoles", String(state.showStepRoles));
-    localStorage.setItem("showScriptEditorTools", String(state.showScriptEditorTools));
   } catch {
     // ignore
   }
@@ -53,12 +45,9 @@ function persistBooleans(state: ScriptUiState) {
 
 function defaultState(): ScriptUiState {
   return {
-    showRequisites: false,
     showPlaylistSidebar: true,
     showHeaderSounds: true,
     isStepsCollapsed: false,
-    showStepRoles: false,
-    showScriptEditorTools: false,
     mobilePlaylistOpen: false,
     mobileStepsOpen: false,
     isEditing: false,
@@ -71,12 +60,9 @@ function initialStateFromStorage(): ScriptUiState {
   const base = defaultState();
   return {
     ...base,
-    showRequisites: storedBool("showRequisites", base.showRequisites),
     showPlaylistSidebar: storedBool("showPlaylistSidebar", base.showPlaylistSidebar),
     showHeaderSounds: storedBool("showHeaderSounds", base.showHeaderSounds),
     isStepsCollapsed: storedBool("isStepsCollapsed", base.isStepsCollapsed),
-    showStepRoles: storedBool("showStepRoles", base.showStepRoles),
-    showScriptEditorTools: storedBool("showScriptEditorTools", base.showScriptEditorTools),
   };
 }
 
@@ -86,25 +72,13 @@ export const scriptUiSlice = createSlice({
   reducers: {
     initScriptUi(state) {
       const base = defaultState();
-      state.showRequisites = storedBool("showRequisites", base.showRequisites);
       state.showPlaylistSidebar = storedBool("showPlaylistSidebar", base.showPlaylistSidebar);
       state.showHeaderSounds = storedBool("showHeaderSounds", base.showHeaderSounds);
       state.isStepsCollapsed = storedBool("isStepsCollapsed", base.isStepsCollapsed);
-      state.showStepRoles = storedBool("showStepRoles", base.showStepRoles);
-      state.showScriptEditorTools = storedBool("showScriptEditorTools", base.showScriptEditorTools);
       // Эфемерные поля — сброс при init; theater-панели восстанавливаются в useSpectaclePage.
       state.mobilePlaylistOpen = false;
       state.mobileStepsOpen = false;
       state.isEditing = false;
-      persistBooleans(state);
-    },
-
-    setShowRequisites(state, action: PayloadAction<{ value: boolean }>) {
-      state.showRequisites = Boolean(action.payload.value);
-      persistBooleans(state);
-    },
-    toggleRequisites(state) {
-      state.showRequisites = !state.showRequisites;
       persistBooleans(state);
     },
 
@@ -132,24 +106,6 @@ export const scriptUiSlice = createSlice({
     },
     toggleStepsCollapsed(state) {
       state.isStepsCollapsed = !state.isStepsCollapsed;
-      persistBooleans(state);
-    },
-
-    setShowStepRoles(state, action: PayloadAction<{ value: boolean }>) {
-      state.showStepRoles = Boolean(action.payload.value);
-      persistBooleans(state);
-    },
-    toggleStepRoles(state) {
-      state.showStepRoles = !state.showStepRoles;
-      persistBooleans(state);
-    },
-
-    setShowScriptEditorTools(state, action: PayloadAction<{ value: boolean }>) {
-      state.showScriptEditorTools = Boolean(action.payload.value);
-      persistBooleans(state);
-    },
-    toggleScriptEditorTools(state) {
-      state.showScriptEditorTools = !state.showScriptEditorTools;
       persistBooleans(state);
     },
 

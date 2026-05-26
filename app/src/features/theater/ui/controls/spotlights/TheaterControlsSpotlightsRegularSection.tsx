@@ -5,11 +5,17 @@ import {
   spotlightMatchesChannelSlot,
 } from "../../../model/theater-light-channel-link";
 import { LightChannelSelect } from "../../LightChannelSelect";
+import {
+  formatCompactFaderLabel,
+  resolveSpotlightFaderId,
+} from "../../../model/theater-light-fader-bindings";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn, TheaterField } from "../../theater-controls-ui";
+import { useScene } from "../../../../scene";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsRegularSection({ vm, spot }: SpotlightsSectionProps) {
+  const { sceneData } = useScene();
   const {
     spotlightBatchCount,
     setSpotlightBatchCount,
@@ -24,6 +30,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
     spotlightLinkBadge,
     spotlightCountBadge,
     lightChannels,
+    lightFaders,
     selectedLightSlot,
   } = spot;
   return (
@@ -59,22 +66,58 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                 >
                   {item.label}
                 </TheaterBtn>
-                <label className="theater-spotlight-channel">
-                  Канал
+                <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="Канал">
                   <LightChannelSelect
                     lightChannels={lightChannels}
                     value={formatLightChannelSlot(item.channel ?? item.id)}
                     allowEmpty={false}
-                    onChange={(channel) =>
+                    onChange={(channel) => {
+                      const nextChannel = Math.max(1, Number(channel) || 1);
+                      const faderId = resolveSpotlightFaderId(item, sceneData?.lightFaders);
                       vm.updateSpotlight(item.id, {
-                        channel: Math.max(1, Number(channel) || 1),
-                      })
-                    }
+                        channel: nextChannel,
+                        faderId,
+                      });
+                      spot.bindSpotlightToFader(faderId, item.id, nextChannel);
+                    }}
                     disabled={!vm.currentStep}
-                    className="native-text-input theater-channel-input"
+                    className="native-text-input theater-channel-input theater-channel-input--channel"
                   />
                 </label>
+                <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="Фейдер">
+                  <select
+                    className="native-text-input theater-channel-input theater-channel-input--fader"
+                    value={String(resolveSpotlightFaderId(item, sceneData?.lightFaders))}
+                    disabled={!vm.currentStep}
+                    onChange={(event) => {
+                      const faderId = Math.max(1, Number(event.target.value) || 1);
+                      const channel = item.channel ?? item.id;
+                      vm.updateSpotlight(item.id, {
+                        faderId,
+                      });
+                      spot.bindSpotlightToFader(faderId, item.id, channel);
+                    }}
+                  >
+                    {Array.from(
+                      {
+                        length: Math.max(
+                          lightFaders.length,
+                          resolveSpotlightFaderId(item, sceneData?.lightFaders),
+                          8,
+                        ),
+                      },
+                      (_, index) => {
+                      const faderId = index + 1;
+                      return (
+                        <option key={faderId} value={faderId}>
+                          {formatCompactFaderLabel(faderId)}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
                 <TheaterBtn
+                  className="theater-btn--visibility"
                   active={item.enabled !== false}
                   onClick={() =>
                     vm.updateSpotlight(item.id, {
@@ -84,7 +127,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                   disabled={!vm.currentStep}
                   title={item.enabled === false ? "Включить" : "Выключить"}
                 >
-                  {item.enabled === false ? "Выкл" : "Вкл"}
+                  <span className="theater-spotlight-power-dot" />
                 </TheaterBtn>
                 <TheaterBtn
                   className="theater-btn--danger"

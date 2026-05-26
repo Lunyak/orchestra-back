@@ -21,7 +21,7 @@
   position: fixed;
   inset: 0;
   z-index: 0;
-  background: transparent;
+  background: var(--color-bg-primary);
   pointer-events: auto;
 }
 
@@ -42,7 +42,7 @@
   border: none;
   border-left: none;
   /* border-radius: 0 8px 8px 0; */
-  background: var(--color-bg-primary);
+  background: transparent;
   color: var(--color-bg-tertiary);
   /* box-shadow: 2px 0 8px rgba(0, 0, 0, 0.14); */
   cursor: pointer;
@@ -809,6 +809,19 @@
 .header-nav-btn.header-nav-btn--settings.active {
   color: var(--color-text-primary)beb;
   background: var(--color-header-pink-bg);
+}
+
+.header-nav-btn.header-nav-btn--chat {
+  color: var(--color-header-orange);
+}
+
+.header-nav-btn.header-nav-btn--chat:hover {
+  color: var(--color-text-sky);
+}
+
+.header-nav-btn.header-nav-btn--chat.is-muted {
+  color: var(--color-text-dim);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .header-nav-icon {

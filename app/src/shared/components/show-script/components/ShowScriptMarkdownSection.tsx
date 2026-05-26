@@ -8,6 +8,12 @@ import {
   type ScriptEditorInsertMenuPick,
 } from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
+import { useScene, type SceneLightFadersDataV1 } from "../../../../features/scene";
+import {
+  loadActorStepNote,
+  saveActorStepNote,
+  selectActorNote,
+} from "../../../../features/show-script/model/show-script-slice";
 import {
   createAnnotation,
   deleteAnnotation,
@@ -27,6 +33,7 @@ import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptStep } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
 import { insertAtSelection } from "../utils/insertAtCursor";
+import { ScriptLightChannelsPanel } from "./ScriptLightChannelsPanel";
 import { ScriptMarkdownCodemirror, type ScriptMarkdownEditorHandle } from "./ScriptMarkdownCodemirror";
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
 
@@ -56,16 +63,10 @@ interface IProps {
     selectedText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => void;
+  requisitesPane?: React.ReactNode;
   renderBody?: (args: {
     markdownPane: React.ReactNode;
     currentStep: ScriptStep | undefined;
-    controls: null | {
-      lightChannels: string[];
-      onLightChannelsChange: (next: string[]) => void;
-      selectedLightSlot: number;
-      onSelectedLightSlotChange: (slot: number) => void;
-      onInsertText: (text: string) => void;
-    };
   }) => React.ReactNode;
   /**
    * Откладывает загрузку CodeMirror / превью (отдельные чанки) до первого показа;
@@ -82,10 +83,12 @@ export function ShowScriptMarkdownSection({
   onTrackLinkClick,
   onSoundLinkClick,
   onCreateStepFromSelection,
+  requisitesPane,
   renderBody,
   lazyScriptBody = false,
 }: IProps) {
   const dispatch = useAppDispatch();
+  const { sceneData, setSceneData } = useScene();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const sceneDataRevision = useAppSelector((s) => (s as any).scene?.sceneDataRevision ?? 0);
   const serverShadowRevision = useAppSelector((s) => (s as any).scene?.serverShadowRevision ?? 0);
@@ -97,6 +100,10 @@ export function ShowScriptMarkdownSection({
   const soundsOptions = ui.soundsOptions;
   const lightChannels = ui.lightChannels;
   const selectedLightSlot = ui.selectedLightSlot;
+  const lightFaders =
+    sceneData?.lightFaders && sceneData.lightFaders.v === 1
+      ? sceneData.lightFaders
+      : null;
 
   const {
     isEditing,
@@ -112,6 +119,7 @@ export function ShowScriptMarkdownSection({
   const [newAnnotation, setNewAnnotation] = useState<NewAnnotationDraft | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [insertMenu, setInsertMenu] = useState<{ x: number; y: number } | null>(null);
+  const [stepCommentDraft, setStepCommentDraft] = useState("");
 
   /** Секции по `###` в превью (rehypeKadrSections) + TOC «Картины» — для пьесы тоже, иначе в режиме play блоки пропадают. */
   const kadrLayoutEnabled =
@@ -168,6 +176,27 @@ export function ShowScriptMarkdownSection({
     ed?.setSelection(pos, pos);
   };
 
+  const togglePlayOriginalMode = () => {
+    const next = !ui.playOriginalMode;
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          `showScript:playOriginalMode:${projectSlug}:${sceneName}`,
+          String(next),
+        );
+      }
+    } catch {
+      // ignore
+    }
+    dispatch(
+      showScriptMarkdownActions.setPlayOriginalMode({
+        projectSlug,
+        sceneName,
+        enabled: next,
+      }),
+    );
+  };
+
   useEffect(() => {
     void dispatch(initShowScriptMarkdownUi({ projectSlug, sceneName }));
     void dispatch(loadSceneScriptMarkdownMeta({ projectSlug, sceneName }));
@@ -192,12 +221,21 @@ export function ShowScriptMarkdownSection({
     currentStep?.id != null
       ? `${projectSlug}:${sceneName}:${currentStep.id}:${activeField}`
       : null;
+  const stepCommentCacheKey =
+    currentStep?.id != null ? `${projectSlug}:${sceneName}:${currentStep.id}` : null;
+  const stepCommentEntry = useAppSelector((s) =>
+    stepCommentCacheKey ? selectActorNote(s, stepCommentCacheKey) : null,
+  );
   const annotationsEntry = useAppSelector((s) =>
     annotationsCacheKey ? selectAnnotations(s, annotationsCacheKey) : null,
   );
   const annotations = annotationsEntry?.items ?? [];
   const annotationsLoading = annotationsEntry?.loading ?? false;
   const annotationsError = annotationsEntry?.error ?? null;
+
+  useEffect(() => {
+    setStepCommentDraft(stepCommentEntry?.text ?? "");
+  }, [stepCommentEntry?.text, stepCommentCacheKey]);
 
   // Аннотации: загрузка для текущего шага + поля (markdown / playMarkdown)
   useEffect(() => {
@@ -206,6 +244,7 @@ export function ShowScriptMarkdownSection({
       setActiveAnnotationId(null);
       return;
     }
+    if (markdownMode === "comments" || markdownMode === "requisites" || markdownMode === "light") return;
     const cacheKey = `${projectSlug}:${sceneName}:${currentStep.id}:${activeField}`;
     void dispatch(
       loadActorAnnotations({
@@ -220,9 +259,37 @@ export function ShowScriptMarkdownSection({
     activeField,
     currentStep?.id,
     dispatch,
+    markdownMode,
     projectSlug,
     sceneName,
   ]);
+
+  useEffect(() => {
+    if (currentStep?.id == null || !stepCommentCacheKey) return;
+    void dispatch(
+      loadActorStepNote({
+        cacheKey: stepCommentCacheKey,
+        projectSlug,
+        sceneName,
+        stepId: currentStep.id,
+      }),
+    );
+  }, [currentStep?.id, dispatch, projectSlug, sceneName, stepCommentCacheKey]);
+
+  const saveStepComment = () => {
+    if (!currentStep || !stepCommentCacheKey) return;
+    const next = stepCommentDraft.trim();
+    if (next === String(stepCommentEntry?.text ?? "").trim()) return;
+    void dispatch(
+      saveActorStepNote({
+        cacheKey: stepCommentCacheKey,
+        projectSlug,
+        sceneName,
+        stepId: currentStep.id,
+        text: next,
+      }),
+    );
+  };
 
   const insertIntoActiveMarkdown = (text: string) => {
     if (!currentStep) return;
@@ -296,6 +363,7 @@ export function ShowScriptMarkdownSection({
       {
         playlistOptions,
         soundsOptions,
+        lightChannels,
         activeMarkdown: String(activeMarkdown ?? ""),
         canInsertImage: Boolean(tokenForAssets),
         canCopySelection,
@@ -308,6 +376,7 @@ export function ShowScriptMarkdownSection({
     scriptEditorInsertDefinitions,
     playlistOptions,
     soundsOptions,
+    lightChannels,
     activeMarkdown,
     tokenForAssets,
   ]);
@@ -480,9 +549,86 @@ export function ShowScriptMarkdownSection({
         }
       />
 
-      {isEditing ? (
+      {markdownMode === "light" ? (
+        <div className="script-step-light-pane">
+          <ScriptLightChannelsPanel
+            lightChannels={lightChannels}
+            selectedLightSlot={selectedLightSlot}
+            lightFaders={lightFaders}
+            onLightChannelsChange={(next) => {
+              dispatch(
+                showScriptMarkdownActions.setLightChannels({
+                  projectSlug,
+                  sceneName,
+                  lightChannels: next,
+                }),
+              );
+            }}
+            onSelectedLightSlotChange={(slot) => {
+              dispatch(
+                showScriptMarkdownActions.setSelectedLightSlot({
+                  projectSlug,
+                  sceneName,
+                  slot,
+                }),
+              );
+            }}
+            onLightFadersChange={(next: SceneLightFadersDataV1) => {
+              setSceneData((prev) => ({
+                ...(prev ?? {}),
+                lightFaders: next,
+              }));
+            }}
+            spotlights={currentStep.theaterSpotlights}
+            onSpotlightsChange={(next) => updateStepField(currentStep.id, "theaterSpotlights", next)}
+            onInsertText={insertIntoActiveMarkdown}
+          />
+        </div>
+      ) : markdownMode === "requisites" ? (
+        <div className="script-step-requisites-pane">
+          {requisitesPane}
+        </div>
+      ) : markdownMode === "comments" ? (
+        <div className="script-step-comment-pane">
+          <textarea
+            id={`step-comment-${currentStep.id}`}
+            className="script-step-comment-pane__input"
+            value={stepCommentDraft}
+            rows={10}
+            disabled={Boolean(stepCommentEntry?.loading)}
+            placeholder="Заметки, договорённости и комментарии к этому шагу…"
+            onChange={(e) => setStepCommentDraft(e.target.value)}
+            onBlur={saveStepComment}
+          />
+          <div className="script-step-comment-pane__hint">
+            {stepCommentEntry?.saving
+              ? "Сохраняем…"
+              : stepCommentEntry?.error
+                ? stepCommentEntry.error
+                : "Сохраняется при выходе из поля."}
+          </div>
+        </div>
+      ) : isEditing ? (
         <div className="form-group form-group-grow">
           <ScriptStepHeader currentStep={currentStep} updateStep={updateStepField} />
+          {markdownMode === "play" ? (
+            <div className="script-play-text-switch">
+              <button
+                type="button"
+                className="script-play-text-switch__btn"
+                data-active={ui.playOriginalMode ? "true" : "false"}
+                onClick={togglePlayOriginalMode}
+                title={
+                  ui.playOriginalMode
+                    ? "Показать подготовленный текст"
+                    : "Показать оригинальный текст"
+                }
+                aria-pressed={ui.playOriginalMode}
+              >
+                ОРИГИНАЛ
+              </button>
+            </div>
+          ) : null}
           <div className="script-markdown-editor-split">
             {kadrLayoutEnabled && tocEnabled ? (
               <div className="script-markdown-toc" aria-label="Картины">
@@ -571,6 +717,24 @@ export function ShowScriptMarkdownSection({
         </div>
       ) : (
         <div className="form-group">
+          {markdownMode === "play" ? (
+            <div className="script-play-text-switch">
+              <button
+                type="button"
+                className="script-play-text-switch__btn"
+                data-active={ui.playOriginalMode ? "true" : "false"}
+                onClick={togglePlayOriginalMode}
+                title={
+                  ui.playOriginalMode
+                    ? "Показать подготовленный текст"
+                    : "Показать оригинальный текст"
+                }
+                aria-pressed={ui.playOriginalMode}
+              >
+                ОРИГИНАЛ
+              </button>
+            </div>
+          ) : null}
           {lazyScriptBody ? (
             <Suspense
               key={`${markdownMode}-ro`}
@@ -610,36 +774,9 @@ export function ShowScriptMarkdownSection({
     </div>
   ) : null;
 
-  const controls =
-    isEditing
-      ? {
-        lightChannels,
-        selectedLightSlot,
-        onLightChannelsChange: (next: string[]) => {
-          dispatch(
-            showScriptMarkdownActions.setLightChannels({
-              projectSlug,
-              sceneName,
-              lightChannels: next,
-            }),
-          );
-        },
-        onSelectedLightSlotChange: (slot: number) => {
-          dispatch(
-            showScriptMarkdownActions.setSelectedLightSlot({
-              projectSlug,
-              sceneName,
-              slot,
-            }),
-          );
-        },
-        onInsertText: insertIntoActiveMarkdown,
-      }
-      : null;
-
   return (
     <>
-      {renderBody ? renderBody({ markdownPane, currentStep, controls }) : markdownPane}
+      {renderBody ? renderBody({ markdownPane, currentStep }) : markdownPane}
       <ScriptEditorInsertContextMenu
         open={insertMenu != null}
         anchorX={insertMenu?.x ?? 0}

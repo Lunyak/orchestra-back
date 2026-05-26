@@ -114,22 +114,27 @@ export async function flushDesktopOutbox(
   const changes: SyncChange[] = [];
 
   for (const [sceneId, pack] of sceneDeltaBySceneId.entries()) {
+    const scenePayload: any = {
+      id: sceneId,
+      projectId,
+      name: pack.name,
+      updatedAt: nowIso,
+    };
+    const d = pack.delta ?? {};
+    if (d.sceneRoles) scenePayload.sceneRoles = d.sceneRoles;
+    if (d.lightFaders) scenePayload.lightFaders = d.lightFaders;
+    if (d.lightPrograms) scenePayload.lightPrograms = d.lightPrograms;
+
     changes.push({
       id: createId(),
       entityType: "Scene",
       entityId: sceneId,
       operation: "update",
-      payload: {
-        id: sceneId,
-        projectId,
-        name: pack.name,
-        updatedAt: nowIso,
-      },
+      payload: scenePayload,
       createdAt: nowIso,
     });
 
     // Normalize delta keys into dedicated sync entities (rawJson is not sent/stored anymore).
-    const d = pack.delta ?? {};
     if (Array.isArray(d.playlist)) {
       for (const it of d.playlist) {
         const sourceId = typeof it?.id === "number" ? it.id : null;
@@ -184,7 +189,7 @@ export async function flushDesktopOutbox(
     }
 
     if (Array.isArray(d.lightChannels)) {
-      d.lightChannels.slice(0, 32).forEach((raw: any, index: number) => {
+      d.lightChannels.forEach((raw: any, index: number) => {
         changes.push({
           id: createId(),
           entityType: "GlobalLightChannel",

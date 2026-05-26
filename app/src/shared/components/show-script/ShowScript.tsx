@@ -1,15 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
 import { useScriptUI } from '../../../features/script-ui';
-import { selectShowScriptMarkdownUi, showScriptMarkdownActions } from '../../../features/show-script-markdown/model/show-script-markdown-slice';
-import { Button } from '../../core/button/Button';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
 import { ScriptRequisite, ScriptStep } from "../../types/script";
 import { RequisitesPanel } from "./components/RequisitesPanel";
 import { ShowScriptMarkdownSection } from "./components/ShowScriptMarkdownSection";
-import { StepRolesPanel } from "./components/StepRolesPanel";
-import ControlsScript from "./controls-script/ControlsScript";
 import './style.css';
 
 
@@ -17,7 +13,6 @@ export const ShowScript: React.FC = () => {
   const { projectName } = useProject();
   const projectSlug = projectName || "fools";
   const sceneName = "script";
-  const dispatch = useAppDispatch();
 
   const {
     steps,
@@ -38,18 +33,32 @@ export const ShowScript: React.FC = () => {
   const requisitesClipboardRef = useRef<ScriptRequisite[] | null>(null);
 
   const {
-    showRequisites,
-    showStepRoles,
-    showScriptEditorTools,
     isEditing,
     setIsEditing,
   } = useScriptUI();
 
   const currentStep = steps[currentPage];
   const currentRequisites = currentStep?.requisites ?? [];
-  const markdownUi = useAppSelector((s) => selectShowScriptMarkdownUi(s, projectSlug, sceneName));
-  const annotationsMode = markdownUi.annotationsMode;
-
+  const { data: troupeData } = useMyTroupeQuery(
+    { project: projectSlug },
+    { skip: !projectSlug },
+  );
+  const requisiteAssigneeOptions = useMemo(
+    () =>
+      (troupeData?.members ?? [])
+        .map((member) => {
+          const email = String(member.email ?? "").trim();
+          const fullName = [member.profile?.firstName, member.profile?.lastName]
+            .map((part) => String(part ?? "").trim())
+            .filter(Boolean)
+            .join(" ");
+          const name = member.profile?.displayName?.trim() || fullName || email;
+          if (!name) return null;
+          return { value: name, label: name };
+        })
+        .filter((item): item is { value: string; label: string } => Boolean(item)),
+    [troupeData?.members],
+  );
   const updateStepField = <K extends keyof ScriptStep>(
     id: number,
     field: K,
@@ -72,13 +81,31 @@ export const ShowScript: React.FC = () => {
     updateStepField(currentStep.id, 'requisites', nextRequisites);
   };
 
+  const updateRequisiteAssignees = (
+    requisiteId: number,
+    field: "setupAssignees" | "removeAssignees",
+    assignees: string[],
+  ) => {
+    if (!currentStep) return;
+    const nextRequisites = currentRequisites.map((item) =>
+      item.id === requisiteId ? { ...item, [field]: assignees } : item
+    );
+    updateStepField(currentStep.id, 'requisites', nextRequisites);
+  };
+
   const addRequisite = () => {
     if (!currentStep) return;
     const label = newRequisite.trim();
     if (!label) return;
     const nextId =
       currentRequisites.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
-    const nextItem: ScriptRequisite = { id: nextId, label, checked: false };
+    const nextItem: ScriptRequisite = {
+      id: nextId,
+      label,
+      checked: false,
+      setupAssignees: [],
+      removeAssignees: [],
+    };
     updateStepField(currentStep.id, 'requisites', [...currentRequisites, nextItem]);
     setNewRequisite('');
   };
@@ -145,48 +172,33 @@ export const ShowScript: React.FC = () => {
           onTrackLinkClick={handleTrackLinkClick}
           onSoundLinkClick={handleSoundLinkClick}
           onCreateStepFromSelection={createStepFromSelection}
-          renderBody={({ markdownPane, controls }) =>
+          requisitesPane={
+            currentStep ? (
+              <RequisitesPanel
+                show
+                isEditing={isEditing}
+                requisites={currentRequisites}
+                assigneeOptions={requisiteAssigneeOptions}
+                hasCopiedRequisites={hasCopiedRequisites}
+                newRequisite={newRequisite}
+                setNewRequisite={setNewRequisite}
+                onCopy={copyRequisites}
+                onPaste={pasteRequisites}
+                onResetAll={resetRequisites}
+                onAdd={addRequisite}
+                onToggle={toggleRequisite}
+                onRemove={removeRequisite}
+                onAssigneesChange={updateRequisiteAssignees}
+              />
+            ) : null
+          }
+          renderBody={({ markdownPane }) =>
             currentStep ? (
               <div className="script-step-editor">
                 <div className="script-step-body">
                   <div className="script-step-main">
                     {markdownPane}
                   </div>
-                  {(showStepRoles || showRequisites || (showScriptEditorTools && isEditing && controls)) ? (
-                    <div className="script-step-asides">
-                      <ControlsScript
-                        light={
-                          showScriptEditorTools && isEditing && controls
-                            ? {
-                                lightChannels: controls.lightChannels,
-                                onLightChannelsChange: controls.onLightChannelsChange,
-                                selectedLightSlot: controls.selectedLightSlot,
-                                onSelectedLightSlotChange: controls.onSelectedLightSlotChange,
-                                onInsertText: controls.onInsertText,
-                              }
-                            : null
-                        }
-                      >
-                        {showStepRoles ? <StepRolesPanel step={currentStep} /> : null}
-                        {showRequisites ? (
-                          <RequisitesPanel
-                            show={showRequisites}
-                            isEditing={isEditing}
-                            requisites={currentRequisites}
-                            hasCopiedRequisites={hasCopiedRequisites}
-                            newRequisite={newRequisite}
-                            setNewRequisite={setNewRequisite}
-                            onCopy={copyRequisites}
-                            onPaste={pasteRequisites}
-                            onResetAll={resetRequisites}
-                            onAdd={addRequisite}
-                            onToggle={toggleRequisite}
-                            onRemove={removeRequisite}
-                          />
-                        ) : null}
-                      </ControlsScript>
-                    </div>
-                  ) : null}
                 </div>
               </div>
             ) : null

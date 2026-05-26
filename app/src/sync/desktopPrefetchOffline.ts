@@ -20,13 +20,8 @@ function isHttpUrl(u: string | undefined | null): boolean {
 }
 
 function normalizeLightChannelsLoose(raw: unknown): string[] {
-  const out = Array.from({ length: 8 }, () => "");
-  if (Array.isArray(raw)) {
-    raw.forEach((r, i) => {
-      if (i < 8) out[i] = String(r ?? "");
-    });
-  }
-  return out;
+  if (!Array.isArray(raw)) return Array.from({ length: 8 }, () => "");
+  return Array.from({ length: Math.max(8, raw.length) }, (_, i) => String(raw[i] ?? ""));
 }
 
 /**
@@ -44,6 +39,8 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     playlist?: any[];
     sounds?: any[];
     sceneRoles?: unknown;
+    lightFaders?: unknown;
+    lightPrograms?: unknown;
   };
   normalizedSteps: ScriptStep[];
   normalizedLayout: TheaterLayout;
@@ -192,6 +189,8 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       playlist,
       sounds,
       sceneRoles: args.minimalSceneData.sceneRoles ?? (base as any)?.sceneRoles,
+      lightFaders: args.minimalSceneData.lightFaders ?? (base as any)?.lightFaders,
+      lightPrograms: args.minimalSceneData.lightPrograms ?? (base as any)?.lightPrograms,
       images: Object.keys(images).length ? images : (base as any)?.images,
       theaterOfflineManifest: {
         modelCount: theaterOffline.modelCount,
@@ -233,6 +232,8 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       playlist: Array.isArray(f.playlist) ? f.playlist : [],
       sounds: Array.isArray(f.sounds) ? f.sounds : [],
       sceneRoles: f.sceneRoles,
+      lightFaders: f.lightFaders,
+      lightPrograms: f.lightPrograms,
       images: f.images && typeof f.images === "object" ? f.images : undefined,
     };
 

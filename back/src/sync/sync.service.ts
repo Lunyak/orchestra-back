@@ -62,6 +62,36 @@ export class SyncService {
     return [x, y, z];
   }
 
+  private normalizeOptionalInt(v: any): number | null {
+    if (v === null || v === undefined || v === '') return null;
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n)) return null;
+    return Math.trunc(n);
+  }
+
+  private mapTheaterSpotlightRow(stepId: string, sp: any) {
+    const sourceId = this.normalizeInt(sp?.id, -1);
+    if (sourceId <= 0) return null;
+    const label = this.normalizeString(sp?.label, `Spotlight ${sourceId}`);
+    return {
+      stepId,
+      sourceId,
+      label,
+      position: this.normalizeVec3(sp?.position, [0, 6, 6]),
+      target: this.normalizeVec3(sp?.target, [0, 1, 2]),
+      angleDeg: this.normalizeInt(sp?.angleDeg, 20),
+      intensity: this.normalizeFloat(sp?.intensity, 0.7),
+      color: this.normalizeString(sp?.color, '#ffffff'),
+      enabled: this.normalizeBool(sp?.enabled, true),
+      channel: this.normalizeInt(sp?.channel, sourceId),
+      isRgb: this.normalizeBool(sp?.isRgb, false),
+      faderId: this.normalizeOptionalInt(sp?.faderId),
+      hidden: this.normalizeBool(sp?.hidden, false),
+      gridCol: this.normalizeOptionalInt(sp?.gridCol),
+      gridRow: this.normalizeOptionalInt(sp?.gridRow),
+    };
+  }
+
   private projectIdFromCompoundId(
     value: string | null | undefined,
   ): string | null {
@@ -243,41 +273,9 @@ export class SyncService {
 
     const theaterSpotlightsData = parsed.flatMap((st) =>
       (st.theaterSpotlights ?? [])
-        .map((sp: any) => {
-          const sourceId = this.normalizeInt(sp?.id, -1);
-          if (sourceId <= 0) return null;
-          const label = this.normalizeString(
-            sp?.label,
-            `Spotlight ${sourceId}`,
-          );
-          return {
-            stepId: st.id,
-            sourceId,
-            label,
-            position: this.normalizeVec3(sp?.position, [0, 6, 6]),
-            target: this.normalizeVec3(sp?.target, [0, 1, 2]),
-            angleDeg: this.normalizeInt(sp?.angleDeg, 20),
-            intensity: this.normalizeFloat(sp?.intensity, 0.7),
-            color: this.normalizeString(sp?.color, '#ffffff'),
-            enabled: this.normalizeBool(sp?.enabled, true),
-            channel: this.normalizeInt(sp?.channel, sourceId),
-            isRgb: this.normalizeBool(sp?.isRgb, false),
-          };
-        })
+        .map((sp: any) => this.mapTheaterSpotlightRow(st.id, sp))
         .filter(Boolean),
-    ) as Array<{
-      stepId: string;
-      sourceId: number;
-      label: string;
-      position: [number, number, number];
-      target: [number, number, number];
-      angleDeg: number;
-      intensity: number;
-      color: string;
-      enabled: boolean;
-      channel: number;
-      isRgb: boolean;
-    }>;
+    ) as Prisma.TheaterSpotlightCreateManyInput[];
 
     // Upsert steps + overwrite nested свет/3D данные из legacy-снапшота сцены.
     const stepUpserts = parsed.map((st) =>
@@ -526,18 +524,36 @@ export class SyncService {
     const nextSceneRoles = hasSceneRoles
       ? (payload?.sceneRoles ?? null)
       : undefined;
+    const hasLightFaders = Object.prototype.hasOwnProperty.call(
+      payload ?? {},
+      'lightFaders',
+    );
+    const nextLightFaders = hasLightFaders
+      ? (payload?.lightFaders ?? null)
+      : undefined;
+    const hasLightPrograms = Object.prototype.hasOwnProperty.call(
+      payload ?? {},
+      'lightPrograms',
+    );
+    const nextLightPrograms = hasLightPrograms
+      ? (payload?.lightPrograms ?? null)
+      : undefined;
 
     const result = await this.prisma.scene.upsert({
       where: { id: payload.id },
       update: {
         name: payload.name,
         ...(hasSceneRoles ? { sceneRoles: nextSceneRoles } : {}),
+        ...(hasLightFaders ? { lightFaders: nextLightFaders } : {}),
+        ...(hasLightPrograms ? { lightPrograms: nextLightPrograms } : {}),
       },
       create: {
         id: payload.id,
         name: payload.name,
         projectId: payload.projectId,
         sceneRoles: hasSceneRoles ? nextSceneRoles : null,
+        lightFaders: hasLightFaders ? nextLightFaders : null,
+        lightPrograms: hasLightPrograms ? nextLightPrograms : null,
       },
     });
 
@@ -1035,44 +1051,8 @@ export class SyncService {
 
       if (Array.isArray(theaterSpotlightsValue)) {
         const data = theaterSpotlightsValue
-          .map((sp: any) => {
-            const sourceId = this.normalizeInt(sp?.id, -1);
-            if (sourceId <= 0) return null;
-            const label = this.normalizeString(
-              sp?.label,
-              `Spotlight ${sourceId}`,
-            );
-            return {
-              stepId,
-              sourceId,
-              label,
-              position: this.normalizeVec3(sp?.position, [0, 6, 6]),
-              target: this.normalizeVec3(sp?.target, [0, 1, 2]),
-              angleDeg: this.normalizeInt(sp?.angleDeg, 20),
-              intensity: this.normalizeFloat(sp?.intensity, 0.7),
-              color: this.normalizeString(sp?.color, '#ffffff'),
-              enabled: this.normalizeBool(sp?.enabled, true),
-              channel: this.normalizeInt(sp?.channel, sourceId),
-              isRgb: this.normalizeBool(sp?.isRgb, false),
-            };
-          })
-          .filter(
-            (
-              x,
-            ): x is {
-              stepId: string;
-              sourceId: number;
-              label: string;
-              position: [number, number, number];
-              target: [number, number, number];
-              angleDeg: number;
-              intensity: number;
-              color: string;
-              enabled: boolean;
-              channel: number;
-              isRgb: boolean;
-            } => x !== null,
-          );
+          .map((sp: any) => this.mapTheaterSpotlightRow(stepId, sp))
+          .filter((x): x is Prisma.TheaterSpotlightCreateManyInput => x !== null);
         tx.push(this.prisma.theaterSpotlight.deleteMany({ where: { stepId } }));
         if (data.length)
           tx.push(this.prisma.theaterSpotlight.createMany({ data }));
@@ -1346,6 +1326,9 @@ export class SyncService {
         id: scene.id,
         projectId: scene.projectId,
         name: scene.name,
+        sceneRoles: scene.sceneRoles,
+        lightFaders: scene.lightFaders,
+        lightPrograms: scene.lightPrograms,
         updatedAt: scene.updatedAt,
       },
       ...(wantSteps ? { steps } : {}),

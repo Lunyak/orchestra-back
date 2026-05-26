@@ -1,6 +1,7 @@
 export type ScriptEditorInsertMenuContext = {
   playlistOptions: { id: number; title: string }[];
   soundsOptions: { id: number; title: string }[];
+  lightChannels: string[];
   /** Текущий markdown шага — для нумерации «Картина N». */
   activeMarkdown: string;
   /** Есть ли токен для загрузки картинки. */

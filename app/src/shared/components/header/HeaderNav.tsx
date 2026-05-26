@@ -2,6 +2,27 @@ import React from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ENABLE_3D_THEATER } from "../../build-features";
 
+const CHAT_DOCK_VISIBILITY_EVENT = "orchestra:chat-dock-visibility";
+const CHAT_DOCK_HIDDEN_STORAGE_KEY = "orchestra:chat-dock-hidden";
+
+function readChatDockHidden(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(CHAT_DOCK_HIDDEN_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function persistChatDockHidden(hidden: boolean) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(CHAT_DOCK_HIDDEN_STORAGE_KEY, String(hidden));
+  } catch {
+    // ignore
+  }
+}
+
 const navItems: { path: string; label: string; navClass: string; icon: React.ReactNode }[] = [
   {
     path: "/",
@@ -132,6 +153,16 @@ export const HeaderNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname || "/";
+  const [chatDockHidden, setChatDockHidden] = React.useState(readChatDockHidden);
+
+  const toggleChatDock = () => {
+    const nextHidden = !chatDockHidden;
+    setChatDockHidden(nextHidden);
+    persistChatDockHidden(nextHidden);
+    window.dispatchEvent(
+      new CustomEvent(CHAT_DOCK_VISIBILITY_EVENT, { detail: { hidden: nextHidden } }),
+    );
+  };
 
   return (
     <nav className="header-nav" aria-label="Навигация">
@@ -153,6 +184,29 @@ export const HeaderNav: React.FC = () => {
           </button>
         );
       })}
+      <span className="header-script-state-sep" aria-hidden />
+      <button
+        type="button"
+        className={`header-nav-btn header-nav-btn--chat ${chatDockHidden ? "is-muted" : ""}`}
+        onClick={toggleChatDock}
+        title={chatDockHidden ? "Показать чат" : "Скрыть чат"}
+        aria-label={chatDockHidden ? "Показать чат" : "Скрыть чат"}
+        aria-pressed={chatDockHidden}
+      >
+        <span className="header-nav-icon">
+          {chatDockHidden ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.35-4.05" />
+              <path d="M4.4 8.2A8.5 8.5 0 0 1 12.5 3h.5a8.48 8.48 0 0 1 8 8v.5" />
+              <path d="M3 3l18 18" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+          )}
+        </span>
+      </button>
     </nav>
   );
 };

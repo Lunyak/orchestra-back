@@ -11,6 +11,8 @@ export type KanbanStepRoleCastTileProps = {
   actorEmails: string[];
   members: KanbanStepRolesAdminMember[];
   accessToken?: string | null;
+  onOpenRole: (roleId: string) => void;
+  onOpenRolesAdmin: () => void;
 };
 
 export function KanbanStepRoleCastTile({
@@ -20,11 +22,20 @@ export function KanbanStepRoleCastTile({
   actorEmails,
   members,
   accessToken,
+  onOpenRole,
+  onOpenRolesAdmin,
 }: KanbanStepRoleCastTileProps) {
   const cardRole = roleInfo ?? { title: roleTitle, avatarKey: undefined };
   const actors = (actorEmails ?? [])
     .map((email) => String(email ?? "").trim())
     .filter(Boolean);
+  const openRole = () => {
+    if (roleInfo?.id) {
+      onOpenRole(roleInfo.id);
+      return;
+    }
+    onOpenRolesAdmin();
+  };
 
   return (
     <article className="kanban-step-cast-tile" aria-label={`Роль ${roleTitle}`}>
@@ -33,6 +44,7 @@ export function KanbanStepRoleCastTile({
         accessToken={accessToken}
         size="md"
         title={roleTitle}
+        onClick={openRole}
       />
 
       <div className="kanban-step-cast-tile__cast">
@@ -58,7 +70,7 @@ export function KanbanStepRoleCastTile({
 
       {roleInfo == null ? (
         <div className="kanban-step-cast-tile__warn">
-          Роль не заведена в проекте — создайте карточку ниже.
+          Роль не заведена в проекте — нажмите карточку, чтобы перейти к ролям.
         </div>
       ) : null}
     </article>

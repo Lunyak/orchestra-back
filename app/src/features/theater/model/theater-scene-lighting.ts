@@ -20,7 +20,7 @@ export const THEATER_SPOTLIGHT_RGB_INTENSITY_MULT = 2.2;
 export const THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY = 2;
 export const THEATER_SPOTLIGHT_RGB_DEFAULT_UI_INTENSITY = 2.4;
 
-/** Ползунок яркости софита в панели и настройках. */
+/** Фейдер яркости софита в панели и настройках. */
 export const THEATER_SPOTLIGHT_UI_INTENSITY_MIN = 0;
 export const THEATER_SPOTLIGHT_UI_INTENSITY_MAX = 16;
 export const THEATER_SPOTLIGHT_UI_INTENSITY_STEP = 0.1;

@@ -18,6 +18,7 @@ import { TheaterBtn } from "./theater-controls-ui";
 import { TheaterFloorPlan } from "./TheaterFloorPlan";
 import { TheaterModelFocusPanel } from "./TheaterModelFocusPanel";
 import { TheaterSpotlightFocusPanel } from "./TheaterSpotlightFocusPanel";
+import { TheaterLightConsolePanel } from "./TheaterLightConsolePanel";
 import { TheaterCanvasShell } from "./canvas/TheaterCanvasShell";
 import { TheaterCanvasContent } from "./canvas/TheaterCanvasContent";
 import "./style.css";
@@ -298,6 +299,31 @@ export const TheaterScene = ({
           onPickGridCell={(col, row) => vm.aimActiveSpotlightToGridCell(col, row)}
         />
       ) : null}
+      <div className="theater-canvas-history-actions" aria-label="История изменений сцены">
+        <button
+          type="button"
+          className="theater-canvas-history-btn"
+          disabled={!vm.currentStep || !vm.canUndoTheater}
+          onClick={vm.undoTheater}
+          title="Отменить (Ctrl+Z)"
+        >
+          ↶
+        </button>
+        <button
+          type="button"
+          className="theater-canvas-history-btn"
+          disabled={!vm.currentStep || !vm.canRedoTheater}
+          onClick={vm.redoTheater}
+          title="Повторить (Ctrl+Y)"
+        >
+          ↷
+        </button>
+      </div>
+      <TheaterLightConsolePanel
+        projectName={vm.projectName}
+        spotlights={vm.displaySpotlights}
+        updateSpotlights={vm.updateSpotlights}
+      />
       <TheaterCanvasShell
         camera={initialCamera}
         backgroundColor={vm.sceneBackgroundColor}

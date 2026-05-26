@@ -67,69 +67,70 @@ export function TheaterStageLayoutGuide({ layout, compact = false }: TheaterStag
         <ShapePreview shape={shape} />
         <div className="theater-stage-layout-guide-caption">
           <strong>{STAGE_SHAPE_LABELS[shape]}</strong>
-          {shape === "rectangle" ? (
+          {!compact && shape === "rectangle" ? (
             <span>Стены параллельны, без сужения к залу.</span>
-          ) : shape === "custom" ? (
+          ) : !compact && shape === "custom" ? (
             <span>
               Вершины на плане — линия стен; можно весь периметр зала или только сцену. К зрителям —
               без стены.
             </span>
-          ) : shape === "trapezoid" ? (
+          ) : !compact && shape === "trapezoid" ? (
             <span>
               {portalOn
                 ? `Зад: ${geom.stageBackWidth} м → зал: ${geom.prosceniumWidth} м`
                 : "Портал выключен — на плане как прямоугольник."}
             </span>
-          ) : (
+          ) : !compact ? (
             <span>
               Крылья {geom.stageBackWidth} м, «ножка» {geom.prosceniumWidth} м
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
       {!compact ? (
-        <div className="theater-stage-layout-guide-note">
-          <p>
-            <strong>Серый прямоугольник на плане — весь зал</strong> (поля «Ширина» и «Глубина»).
-            Он всегда прямоугольный — это габарит помещения и рядов кресел.
-          </p>
-          <p>
-            <strong>Коричневый контур — стены по вашему полигону</strong> (часто весь зал по серому
-            прямоугольнику, можно и только сцену). «Подогнать зал и контур» вписывает полигон в
-            габариты зала, а не в маленькую трапецию сцены.
-          </p>
-          {sameWidth && shape !== "rectangle" ? (
-            <p className="theater-stage-layout-guide-warn">
-              Сейчас ширина у задней стены и у зала одинаковые — контур почти не отличить от
-              прямоугольника. Разведите эти два числа (например 12 м и 8 м).
+        <>
+          <div className="theater-stage-layout-guide-note">
+            <p>
+              <strong>Серый прямоугольник на плане — весь зал</strong> (поля «Ширина» и «Глубина»).
+              Он всегда прямоугольный — это габарит помещения и рядов кресел.
             </p>
-          ) : null}
-        </div>
+            <p>
+              <strong>Коричневый контур — стены по вашему полигону</strong> (часто весь зал по серому
+              прямоугольнику, можно и только сцену). «Подогнать зал и контур» вписывает полигон в
+              габариты зала, а не в маленькую трапецию сцены.
+            </p>
+            {sameWidth && shape !== "rectangle" ? (
+              <p className="theater-stage-layout-guide-warn">
+                Сейчас ширина у задней стены и у зала одинаковые — контур почти не отличить от
+                прямоугольника. Разведите эти два числа (например 12 м и 8 м).
+              </p>
+            ) : null}
+          </div>
+          <ul className="theater-stage-layout-guide-legend">
+            <li>
+              <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--hall" />
+              Зал (весь прямоугольник)
+            </li>
+            <li>
+              <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--stage" />
+              Сцена (контур + стены)
+            </li>
+            <li>
+              <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--audience" />
+              Граница зала / кресла
+            </li>
+            <li>
+              <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--recess" />
+              Ниша (углубление в стену)
+            </li>
+            <li>
+              <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--door" />
+              Дверь (проём)
+            </li>
+          </ul>
+        </>
       ) : null}
-
-      <ul className="theater-stage-layout-guide-legend">
-        <li>
-          <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--hall" />
-          Зал (весь прямоугольник)
-        </li>
-        <li>
-          <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--stage" />
-          Сцена (контур + стены)
-        </li>
-        <li>
-          <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--audience" />
-          Граница зала / кресла
-        </li>
-        <li>
-          <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--recess" />
-          Ниша (углубление в стену)
-        </li>
-        <li>
-          <span className="theater-stage-layout-guide-swatch theater-stage-layout-guide-swatch--door" />
-          Дверь (проём)
-        </li>
-      </ul>
     </div>
   );
 }

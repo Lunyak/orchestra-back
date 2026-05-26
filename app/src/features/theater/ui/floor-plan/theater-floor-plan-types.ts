@@ -9,7 +9,7 @@ export type TheaterFloorPlanProps = {
   showSpotlightGuideLines: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
-  activeTab: "spotlights" | "models" | "decor" | "layout";
+  activeTab: "spotlights" | "models" | "view" | "decor" | "layout";
   editMode: "spotlights" | "models" | "decor";
   decorPlaceMode: boolean;
   modelTransformMode: "translate" | "rotate" | "scale";
