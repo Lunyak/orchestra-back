@@ -9,49 +9,26 @@ export function formatCompactFaderLabel(faderId: number): string {
   return `ф ${Math.max(1, Math.trunc(faderId))}`;
 }
 
-/** Фейдер, к которому привязан софит, по данным пульта (links / spotlightId). */
-export function resolveFaderIdForSpotlight(
-  spotlightId: number,
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
-): number | undefined {
-  if (!lightFaders || lightFaders.v !== 1) return undefined;
-  for (const fader of lightFaders.faders) {
-    if (fader.spotlightId === spotlightId) return fader.id;
-    if (fader.links?.some((link) => link.spotlightId === spotlightId)) {
-      return fader.id;
-    }
-  }
-  return undefined;
-}
-
-export function resolveSpotlightFaderId(
-  spotlight: TheaterSpotlight,
-  lightFaders?: SceneLightFadersDataV1 | null,
-): number {
+/** Номер фейдера на софите: только явное поле, иначе совпадает с id софита. */
+export function readSpotlightFaderId(spotlight: TheaterSpotlight): number {
   if (Number.isFinite(spotlight.faderId)) {
     return Math.max(1, Math.trunc(spotlight.faderId!));
   }
-  const fromFader = resolveFaderIdForSpotlight(spotlight.id, lightFaders);
-  if (fromFader != null) return fromFader;
   return spotlight.id;
 }
 
 export function spotlightBelongsToFader(
   spotlight: TheaterSpotlight,
-  fader: SceneLightFaderV1,
-  lightFaders?: SceneLightFadersDataV1 | null,
+  faderId: number,
 ): boolean {
-  return resolveSpotlightFaderId(spotlight, lightFaders) === fader.id;
+  return readSpotlightFaderId(spotlight) === faderId;
 }
 
 export function getSpotlightsBoundToFader(
-  fader: SceneLightFaderV1,
+  faderId: number,
   spotlights: TheaterSpotlight[],
-  lightFaders?: SceneLightFadersDataV1 | null,
 ): TheaterSpotlight[] {
-  return spotlights.filter((spotlight) =>
-    spotlightBelongsToFader(spotlight, fader, lightFaders),
-  );
+  return spotlights.filter((spotlight) => spotlightBelongsToFader(spotlight, faderId));
 }
 
 export function mergeFaderSpotlightLink(
@@ -63,26 +40,52 @@ export function mergeFaderSpotlightLink(
   const withoutSpotlight = prevLinks.filter((link) => link.spotlightId !== spotlightId);
   return {
     ...fader,
-    channel: fader.channel ?? channel,
+    channel,
     spotlightId,
     links: [...withoutSpotlight, { channel, spotlightId }],
   };
 }
 
-/** Восстанавливает faderId на софитах из сохранённых привязок пульта (links / spotlightId). */
-export function applyFaderBindingsToSpotlights(
-  spotlights: TheaterSpotlight[],
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
-): TheaterSpotlight[] {
-  if (!lightFaders || lightFaders.v !== 1 || lightFaders.faders.length === 0) {
-    return spotlights;
-  }
-  let changed = false;
-  const next = spotlights.map((spotlight) => {
-    const fromFader = resolveFaderIdForSpotlight(spotlight.id, lightFaders);
-    if (fromFader == null || spotlight.faderId === fromFader) return spotlight;
-    changed = true;
-    return { ...spotlight, faderId: fromFader };
+/** Софит может быть только на одном фейдере: снимаем его с остальных. */
+export function detachSpotlightFromOtherFaders(
+  faders: SceneLightFaderV1[],
+  targetFaderId: number,
+  spotlightId: number,
+): SceneLightFaderV1[] {
+  return faders.map((fader) => {
+    if (fader.id === targetFaderId) return fader;
+    const links = (fader.links ?? []).filter((link) => link.spotlightId !== spotlightId);
+    const spotlightIdField =
+      fader.spotlightId === spotlightId
+        ? links.find((link) => link.spotlightId != null)?.spotlightId
+        : fader.spotlightId;
+    if (links.length === (fader.links ?? []).length && spotlightIdField === fader.spotlightId) {
+      return fader;
+    }
+    return { ...fader, links, spotlightId: spotlightIdField };
   });
-  return changed ? next : spotlights;
+}
+
+export function bindSpotlightOnFaderBoard(
+  faders: SceneLightFaderV1[],
+  faderId: number,
+  spotlightId: number,
+  channel: number,
+): SceneLightFaderV1[] {
+  const exists = faders.some((item) => item.id === faderId);
+  const detached = detachSpotlightFromOtherFaders(faders, faderId, spotlightId);
+  const base = exists
+    ? detached.find((item) => item.id === faderId)!
+    : {
+        id: faderId,
+        label: formatCompactFaderLabel(faderId),
+        channel,
+        intensity: 1,
+        enabled: true,
+        links: [] as { channel: number; spotlightId?: number }[],
+      };
+  const nextFader = mergeFaderSpotlightLink(base, spotlightId, channel);
+  return exists
+    ? detached.map((item) => (item.id === faderId ? nextFader : item))
+    : [...detached, nextFader];
 }

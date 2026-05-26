@@ -85,7 +85,7 @@ function createSpotlightForChannel(args: {
   const z = 4 + Math.floor(spread / 5) * 0.9;
   return {
     id: args.id,
-    label: args.label || `Софит ${args.channel}`,
+    label: args.label || `Софит ${args.id}`,
     position: [x, 6, z],
     target: [x * 0.45, 1, 1],
     angleDeg: 22,
@@ -152,7 +152,6 @@ export function ScriptLightChannelsPanel({
       if (!channel) continue;
       const parsed = parseLightChannel(lightChannels[channel - 1] ?? "");
       const color = normalizeChannelColor(fader.color ?? parsed.color, "#facc15");
-      const label = parsed.label || `Канал ${channel}`;
       const spotlight = findSpotlightForFader(fader, nextSpotlights);
 
       if (spotlight) {
@@ -160,7 +159,6 @@ export function ScriptLightChannelsPanel({
           item.id === spotlight.id
             ? {
                 ...item,
-                label,
                 channel,
                 faderId: fader.id,
                 intensity: fader.intensity ?? item.intensity,
@@ -178,7 +176,7 @@ export function ScriptLightChannelsPanel({
         createSpotlightForChannel({
           id: nextId,
           channel,
-          label,
+          label: `Софит ${nextId}`,
           color,
           faderId: fader.id,
           intensity: fader.intensity,
@@ -205,13 +203,11 @@ export function ScriptLightChannelsPanel({
     if (!spotlights || !onSpotlightsChange) return;
     const parsed = parseLightChannel(raw);
     const color = normalizeChannelColor(parsed.color, "");
-    const label = parsed.label || `Канал ${slot}`;
     onSpotlightsChange(
       spotlights.map((spotlight) =>
         spotlight.channel === slot
           ? {
               ...spotlight,
-              label,
               ...(color ? { color } : {}),
             }
           : spotlight,

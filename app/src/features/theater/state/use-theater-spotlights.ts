@@ -1,7 +1,5 @@
 import { tc } from "../../../shared/styles/theme-color";
-import { useCallback, useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
-import { useScene } from "../../scene";
-import { applyFaderBindingsToSpotlights } from "../model/theater-light-fader-bindings";
+import { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
 import type { ScriptStep, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
 import { DEFAULT_SPOTLIGHTS } from "../model/theater-defaults";
 import {
@@ -109,7 +107,6 @@ export function useTheaterSpotlights({
   rehearsalSpotlights,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
-  const { sceneData } = useScene();
   const spotlightsRaw = currentStep?.theaterSpotlights;
   const spotlights = spotlightsRaw ?? [];
   const displaySpotlights =
@@ -130,9 +127,16 @@ export function useTheaterSpotlights({
     (items: TheaterSpotlight[]) =>
       items.map((item, index) => {
         const nextId = Number(item.id) || index + 1;
+        const rawLabel = item.label?.trim();
+        const labelLooksLikeChannel =
+          typeof rawLabel === "string" &&
+          (/^(канал)\s*\d+$/i.test(rawLabel) || /^к\s*\d+$/i.test(rawLabel));
         return {
           id: nextId,
-          label: item.label?.trim() || `Софит ${nextId}`,
+          label:
+            rawLabel && !labelLooksLikeChannel
+              ? rawLabel
+              : `Софит ${nextId}`,
           position: item.position ?? [0, 6, 6],
           target: item.target ?? [0, 1, 2],
           angleDeg: Number.isFinite(item.angleDeg) ? item.angleDeg : 20,
@@ -161,21 +165,10 @@ export function useTheaterSpotlights({
   const updateSpotlights = useCallback(
     (next: TheaterSpotlight[]) => {
       recordTheaterHistory();
-      const bound = applyFaderBindingsToSpotlights(
-        normalizeSpotlights(next),
-        sceneData?.lightFaders,
-      );
-      updateCurrentStep({ theaterSpotlights: bound });
+      updateCurrentStep({ theaterSpotlights: normalizeSpotlights(next) });
     },
-    [normalizeSpotlights, recordTheaterHistory, sceneData?.lightFaders, updateCurrentStep],
+    [normalizeSpotlights, recordTheaterHistory, updateCurrentStep],
   );
-
-  useEffect(() => {
-    if (!currentStep?.id || !spotlightsRaw?.length) return;
-    const bound = applyFaderBindingsToSpotlights(spotlightsRaw, sceneData?.lightFaders);
-    if (bound === spotlightsRaw) return;
-    updateCurrentStep({ theaterSpotlights: bound });
-  }, [currentStep?.id, sceneData?.lightFaders, spotlightsRaw, updateCurrentStep]);
 
   const cloneSpotlights = useCallback(
     (items: TheaterSpotlight[]) => cloneTheaterSpotlights(items),

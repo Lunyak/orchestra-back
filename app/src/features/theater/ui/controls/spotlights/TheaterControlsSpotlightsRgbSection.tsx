@@ -7,15 +7,13 @@ import {
 import { LightChannelSelect } from "../../LightChannelSelect";
 import {
   formatCompactFaderLabel,
-  resolveSpotlightFaderId,
+  readSpotlightFaderId,
 } from "../../../model/theater-light-fader-bindings";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn, TheaterField } from "../../theater-controls-ui";
-import { useScene } from "../../../../scene";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSectionProps) {
-  const { sceneData } = useScene();
   const {
     spotlightBatchCount,
     setSpotlightBatchCount,
@@ -72,7 +70,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                     allowEmpty={false}
                     onChange={(channel) => {
                       const nextChannel = Math.max(1, Number(channel) || 1);
-                      const faderId = resolveSpotlightFaderId(item, sceneData?.lightFaders);
+                      const faderId = readSpotlightFaderId(item);
                       vm.updateSpotlight(item.id, {
                         channel: nextChannel,
                         faderId,
@@ -86,7 +84,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                 <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="Фейдер">
                   <select
                     className="native-text-input theater-channel-input theater-channel-input--fader"
-                    value={String(resolveSpotlightFaderId(item, sceneData?.lightFaders))}
+                    value={String(readSpotlightFaderId(item))}
                     disabled={!vm.currentStep}
                     onChange={(event) => {
                       const faderId = Math.max(1, Number(event.target.value) || 1);
@@ -101,7 +99,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                       {
                         length: Math.max(
                           lightFaders.length,
-                          resolveSpotlightFaderId(item, sceneData?.lightFaders),
+                          readSpotlightFaderId(item),
                           8,
                         ),
                       },

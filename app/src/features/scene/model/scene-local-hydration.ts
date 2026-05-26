@@ -6,7 +6,6 @@ import { normalizePersistedTheaterLayout } from "../../theater/model/theater-met
 import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
 import { normalizeLightChannelsLoose } from "./scene-normalize";
-import { applyFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
 
 export async function hydrateSceneFromLocalPack(
   projectSlug: string,
@@ -38,25 +37,15 @@ export async function hydrateSceneFromLocalPack(
           ? (f.images as SceneData["images"])
           : undefined,
     };
-    const stepsWithBindings = stepsOut.map((step) => {
-      if (!Array.isArray(step.theaterSpotlights) || step.theaterSpotlights.length === 0) {
-        return step;
-      }
-      const bound = applyFaderBindingsToSpotlights(
-        step.theaterSpotlights,
-        sceneData.lightFaders,
-      );
-      return bound === step.theaterSpotlights ? step : { ...step, theaterSpotlights: bound };
-    });
     dispatch(
       sceneActions.hydrateScene({
         sceneData,
-        steps: stepsWithBindings,
+        steps: stepsOut,
         theaterLayout,
         isSceneReady: true,
         serverShadow: {
           sceneData,
-          steps: stepsWithBindings,
+          steps: stepsOut,
           theaterLayout,
           lightChannels: lc,
         },

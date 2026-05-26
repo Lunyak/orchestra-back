@@ -122,7 +122,7 @@ export function TheaterLightConsolePanel({
   );
 
   const getSpotlightsForFader = (fader: SceneLightFadersDataV1["faders"][number]) =>
-    getSpotlightsBoundToFader(fader, spotlights, sceneData?.lightFaders);
+    getSpotlightsBoundToFader(fader.id, spotlights);
 
   const updateFaders = (next: SceneLightFadersDataV1) => {
     setSceneData((prev) => ({

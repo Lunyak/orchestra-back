@@ -18,7 +18,6 @@ import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
-import { applyFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
 import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
 import { stepTheaterSyncPayload } from "../../theater/model/theater-step-models";
 import {
@@ -254,25 +253,7 @@ export function useSceneOperations() {
           minimalSceneData.lightPrograms = serverLightPrograms;
         }
 
-        const normalizedStepsWithBindings =
-          minimalSceneData.lightFaders?.v === 1
-            ? normalizedSteps.map((step) => {
-                if (!Array.isArray(step.theaterSpotlights) || step.theaterSpotlights.length === 0) {
-                  return step;
-                }
-                const bound = applyFaderBindingsToSpotlights(
-                  step.theaterSpotlights,
-                  minimalSceneData.lightFaders,
-                );
-                return bound === step.theaterSpotlights
-                  ? step
-                  : { ...step, theaterSpotlights: bound };
-              })
-            : normalizedSteps;
-
-        const nextStepsPayload = normalizedStepsWithBindings.length
-          ? normalizedStepsWithBindings
-          : steps;
+        const nextStepsPayload = normalizedSteps.length ? normalizedSteps : steps;
         const wasReady = store.getState().scene.isSceneReady;
         let bootstrapPage: number | undefined;
         if (!wasReady && typeof window !== "undefined" && nextStepsPayload.length > 0) {

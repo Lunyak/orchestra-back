@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { countStepLightChannelLinks } from "../../model/theater-light-channel-link";
-import { mergeFaderSpotlightLink } from "../../model/theater-light-fader-bindings";
+import { bindSpotlightOnFaderBoard } from "../../model/theater-light-fader-bindings";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 import { useTheaterControlsLightChannels } from "./use-theater-controls-light-channels";
 import { useScene } from "../../../scene";
@@ -50,25 +50,11 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
     (faderId: number, spotlightId: number, channel: number) => {
       setSceneData((prev) => {
         const current = prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [];
-        const exists = current.some((item) => item.id === faderId);
-        const baseFader = exists
-          ? current.find((item) => item.id === faderId)!
-          : {
-              id: faderId,
-              label: `ф ${faderId}`,
-              channel,
-              intensity: 1,
-              enabled: true,
-              links: [] as { channel: number; spotlightId?: number }[],
-            };
-        const nextFader = mergeFaderSpotlightLink(baseFader, spotlightId, channel);
         return {
           ...(prev ?? {}),
           lightFaders: {
             v: 1,
-            faders: exists
-              ? current.map((item) => (item.id === faderId ? nextFader : item))
-              : [...current, nextFader],
+            faders: bindSpotlightOnFaderBoard(current, faderId, spotlightId, channel),
           },
         };
       });
