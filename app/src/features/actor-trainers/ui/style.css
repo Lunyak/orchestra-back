@@ -162,6 +162,65 @@
   opacity: var(--opacity-medium);
 }
 
+.actor-trainer-source-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-3);
+}
+
+.actor-trainer-source-tab {
+  border: 1px solid var(--color-border-strong);
+  padding: var(--spacing-3) var(--spacing-5);
+  background: var(--color-bg-transparent-2);
+  color: inherit;
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  transition: var(--transition-colors);
+}
+
+.actor-trainer-source-tab.is-active {
+  border-color: var(--color-blue-border);
+  background: var(--color-blue-highlight-bg);
+}
+
+.actor-trainer-prompt {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  opacity: var(--opacity-high);
+}
+
+.actor-trainer-textarea-block {
+  width: 100%;
+}
+
+.actor-trainer-textarea--ok {
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.actor-trainer-textarea--bad {
+  border-color: var(--color-error-border);
+}
+
+.actor-trainer-row--inline {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  flex-wrap: wrap;
+}
+
+.actor-trainer-pass-select {
+  min-width: 96px;
+}
+
+.actor-trainer-hint--inline {
+  border-top: none;
+  padding-top: 0;
+}
+
+.actor-trainer-kbd-hint {
+  font-size: var(--font-size-sm);
+}
+
 @media (max-width: 720px) {
   .actor-trainer-panel {
     padding: var(--spacing-5);

@@ -1,3 +1,4 @@
+import { tc } from "../../../../shared/styles/theme-color";
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
@@ -37,40 +38,40 @@ export const DancerModel = ({ tone }: { tone?: string | null }) => {
     }
   });
 
-  const skin = tone || "#cbd5f5";
-  const cloth = tone || "#94a3b8";
-  const dark = tone || "#64748b";
+  const skin = tone || tc("--color-text-light");
+  const cloth = tone || tc("--color-text-muted");
+  const dark = tone || tc("--color-text-dimmer");
 
   return (
     <group ref={rootRef}>
-      <mesh position={[0, 1.6, 0]} castShadow>
+      <mesh position={[0, 1.6, 0]}>
         <sphereGeometry args={[0.22, 20, 20]} />
         <meshStandardMaterial color={skin} />
       </mesh>
-      <mesh position={[0, 1.05, 0]} castShadow>
+      <mesh position={[0, 1.05, 0]}>
         <cylinderGeometry args={[0.22, 0.28, 0.9, 18]} />
         <meshStandardMaterial color={cloth} />
       </mesh>
       <group ref={leftArmRef} position={[-0.38, 1.3, 0]}>
-        <mesh position={[0, -0.3, 0]} castShadow>
+        <mesh position={[0, -0.3, 0]}>
           <cylinderGeometry args={[0.08, 0.08, 0.6, 12]} />
           <meshStandardMaterial color={dark} />
         </mesh>
       </group>
       <group ref={rightArmRef} position={[0.38, 1.3, 0]}>
-        <mesh position={[0, -0.3, 0]} castShadow>
+        <mesh position={[0, -0.3, 0]}>
           <cylinderGeometry args={[0.08, 0.08, 0.6, 12]} />
           <meshStandardMaterial color={dark} />
         </mesh>
       </group>
       <group ref={leftLegRef} position={[-0.16, 0.9, 0]}>
-        <mesh position={[0, -0.45, 0]} castShadow>
+        <mesh position={[0, -0.45, 0]}>
           <cylinderGeometry args={[0.1, 0.1, 0.9, 12]} />
           <meshStandardMaterial color={dark} />
         </mesh>
       </group>
       <group ref={rightLegRef} position={[0.16, 0.9, 0]}>
-        <mesh position={[0, -0.45, 0]} castShadow>
+        <mesh position={[0, -0.45, 0]}>
           <cylinderGeometry args={[0.1, 0.1, 0.9, 12]} />
           <meshStandardMaterial color={dark} />
         </mesh>

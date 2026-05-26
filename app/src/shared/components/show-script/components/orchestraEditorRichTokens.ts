@@ -249,25 +249,25 @@ function resolveChip(
   if (rawType === "blackout") {
     const label = "Блекаут";
     const color =
-      resolveLightColor(label, "#000000", rawPipe || undefined) ?? "#000000";
+      resolveLightColor(label, "var(--color-text-black)000", rawPipe || undefined) ?? "var(--color-text-black)000";
     const textColor = getReadableTextColor(color);
     return {
       label,
       classNames: "markdown-light-chip",
       title: full,
-      style: `background-color:${color};color:${textColor ?? "#f8fafc"};border: none;`,
+      style: `background-color:${color};color:${textColor ?? "var(--color-text-bright)"};border: none;`,
     };
   }
 
   if (rawType === "b") {
     const label = "ЗТМ";
-    const color = resolveLightColor(label, "#000000", rawPipe || undefined) ?? "#000000";
+    const color = resolveLightColor(label, "var(--color-text-black)000", rawPipe || undefined) ?? "var(--color-text-black)000";
     const textColor = getReadableTextColor(color);
     return {
       label,
       classNames: "markdown-light-chip",
         title: full,
-        style: `background-color:${color};color:${textColor ?? "#f8fafc"}; border: none;`,
+        style: `background-color:${color};color:${textColor ?? "var(--color-text-bright)"}; border: none;`,
     };
   }
 
@@ -299,7 +299,7 @@ function resolveChip(
       classNames: "markdown-light-chip",
       title: full,
       style: color
-        ? `background-color:${color};color:${textColor ?? "#f8fafc"};border-color:transparent;`
+        ? `background-color:${color};color:${textColor ?? "var(--color-text-bright)"};border-color:transparent;`
         : undefined,
     };
   }

@@ -253,6 +253,7 @@ export async function flushDesktopOutbox(
         order: up.order,
         requisites: Array.isArray(up.step?.requisites) ? up.step.requisites : [],
         lightPlot: Array.isArray(up.step?.lightPlot) ? up.step.lightPlot : [],
+        lightCues: Array.isArray(up.step?.lightCues) ? up.step.lightCues : [],
         theaterModels: Array.isArray(up.step?.theaterModels) ? up.step.theaterModels : [],
         theaterSpotlights: Array.isArray(up.step?.theaterSpotlights)
           ? up.step.theaterSpotlights

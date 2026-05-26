@@ -1,4 +1,5 @@
 import React from "react";
+import { themeColorToHex } from "../../../styles/theme-color";
 
 export type HastNode =
   | { type: "root"; children?: HastNode[] }
@@ -36,41 +37,42 @@ export function resolveLightColor(
     return raw;
   }
   const palette: Record<string, string> = {
-    blue: "#2563eb",
-    red: "#ef4444",
-    green: "#22c55e",
-    yellow: "#f59e0b",
-    white: "#f8fafc",
-    black: "#0f172a",
-    orange: "#f97316",
-    purple: "#a855f7",
-    pink: "#ec4899",
-    cyan: "#22d3ee",
-    magenta: "#d946ef",
-    "синий": "#2563eb",
-    "голубой": "#38bdf8",
-    "красный": "#ef4444",
-    "зеленый": "#22c55e",
-    "желтый": "#f59e0b",
-    "белый": "#f8fafc",
-    "черный": "#0f172a",
-    "оранжевый": "#f97316",
-    "фиолетовый": "#a855f7",
-    "розовый": "#ec4899",
+    blue: "var(--color-primary)",
+    red: "var(--color-error)",
+    green: "var(--color-success-accent)",
+    yellow: "var(--color-light-yellow)",
+    white: "var(--color-text-bright)",
+    black: "var(--color-surface-1)",
+    orange: "var(--color-light-orange)",
+    purple: "var(--color-light-purple)",
+    pink: "var(--color-light-pink)",
+    cyan: "var(--color-light-cyan)",
+    magenta: "var(--color-light-magenta)",
+    "синий": "var(--color-primary)",
+    "голубой": "var(--color-light-sky)",
+    "красный": "var(--color-error)",
+    "зеленый": "var(--color-success-accent)",
+    "желтый": "var(--color-light-yellow)",
+    "белый": "var(--color-text-bright)",
+    "черный": "var(--color-surface-1)",
+    "оранжевый": "var(--color-light-orange)",
+    "фиолетовый": "var(--color-light-purple)",
+    "розовый": "var(--color-light-pink)",
   };
   return palette[raw] ?? null;
 }
 
 export function getReadableTextColor(color?: string | null): string | undefined {
   if (!color) return undefined;
-  const hex = color.startsWith("#") ? color.slice(1) : "";
-  if (hex.length !== 6) return undefined;
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
+  const hex = themeColorToHex(color);
+  if (!hex) return undefined;
+  const raw = hex.slice(1);
+  const r = parseInt(raw.slice(0, 2), 16);
+  const g = parseInt(raw.slice(2, 4), 16);
+  const b = parseInt(raw.slice(4, 6), 16);
   if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return undefined;
   const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-  return luminance > 0.6 ? "#0f172a" : "#f8fafc";
+  return luminance > 0.6 ? "var(--color-surface-1)" : "var(--color-text-bright)";
 }
 
 export function isColorOverrideToken(raw?: string | null): boolean {
@@ -163,7 +165,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
           );
         } else if (rawType?.toLowerCase() === "b") {
           const label = "ЗТМ";
-          const color = resolveLightColor(label, "#000000", rawColor) ?? "#000000";
+          const color = resolveLightColor(label, "var(--color-text-black)000", rawColor) ?? "var(--color-text-black)000";
           result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-b`));
         } else {
           const index = Number(String(rawIndex ?? ""));
@@ -272,7 +274,7 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
             );
           } else if (rawType?.toLowerCase() === "blackout") {
             const label = "Блекаут";
-            const color = resolveLightColor(label, "#000000", rawColor) ?? "#000000";
+            const color = resolveLightColor(label, "var(--color-text-black)000", rawColor) ?? "var(--color-text-black)000";
             const textColor = getReadableTextColor(color);
             out.push(
               hastSpan(["markdown-light-chip"], [hastText(label)], {

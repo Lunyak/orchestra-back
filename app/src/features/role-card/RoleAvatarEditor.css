@@ -1,0 +1,85 @@
+.role-avatar-editor {
+  display: flex;
+  justify-content: center;
+}
+
+.role-avatar-editor__card-wrap {
+  display: inline-grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.role-avatar-editor__card-frame {
+  position: relative;
+}
+
+.role-avatar-editor__hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+  text-align: center;
+  max-width: 160px;
+}
+
+.role-avatar-editor__error {
+  max-width: 160px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--color-danger-light, #ffb4b4);
+  text-align: center;
+}
+
+.role-avatar-editor__upload-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  border: 2px dashed rgba(0, 0, 0, 0.22);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(10, 10, 10, 0.9);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  cursor: pointer;
+}
+
+.role-avatar-editor__upload-overlay:hover {
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.role-avatar-editor__upload-overlay:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.role-avatar-editor__remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.88);
+  color: rgba(20, 20, 20, 0.9);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.role-avatar-editor__remove:hover {
+  background: rgba(255, 245, 245, 0.96);
+  color: rgba(170, 20, 20, 0.95);
+}
+
+.role-avatar-editor__remove:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}

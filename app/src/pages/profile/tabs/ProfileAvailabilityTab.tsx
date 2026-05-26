@@ -198,7 +198,7 @@ export function ProfileAvailabilityTab() {
             {profileFlags.error}
           </div>
         ) : profileFlags.ok ? (
-          <div style={{ color: "#7ee787", fontSize: 12 }}>{profileFlags.ok}</div>
+          <div style={{ color: "var(--color-status-success-bright)", fontSize: 12 }}>{profileFlags.ok}</div>
         ) : null}
       </div>
 

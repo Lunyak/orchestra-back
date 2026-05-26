@@ -7,6 +7,10 @@ import { LocalFileStorageService } from '../files/local-file-storage.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncChangeDto } from './dto/sync-change.dto';
+import {
+  clientTheaterModelToPrisma,
+  flattenClientTheaterModels,
+} from './theater-model-sync';
 
 @Injectable()
 export class SyncService {
@@ -205,27 +209,17 @@ export class SyncService {
     }>;
 
     const theaterModelsData = parsed.flatMap((st) =>
-      (st.theaterModels ?? [])
-        .map((m: any) => {
-          const sourceId = this.normalizeInt(m?.id, -1);
-          if (sourceId <= 0) return null;
-          const name = this.normalizeString(m?.name, `Model ${sourceId}`);
-          const type = this.normalizeString(m?.type, 'builtin');
-          return {
-            stepId: st.id,
-            sourceId,
-            name,
-            type,
-            builtin:
-              typeof m?.builtin === 'string' && m.builtin.trim()
-                ? m.builtin.trim()
-                : null,
-            allowOutOfBounds: this.normalizeBool(m?.allowOutOfBounds, false),
-            position: this.normalizeVec3(m?.position, [0, 0, 0]),
-            rotation: this.normalizeVec3(m?.rotation, [0, 0, 0]),
-            scale: this.normalizeVec3(m?.scale, [1, 1, 1]),
-          };
-        })
+      flattenClientTheaterModels(st)
+        .map((m: any) =>
+          clientTheaterModelToPrisma(
+            st.id,
+            m,
+            (v, fb) => this.normalizeVec3(v, fb),
+            (v, fb) => this.normalizeInt(v, fb),
+            (v, fb) => this.normalizeString(v, fb),
+            (v, fb) => this.normalizeBool(v, fb),
+          ),
+        )
         .filter(Boolean),
     ) as Array<{
       stepId: string;
@@ -233,10 +227,18 @@ export class SyncService {
       name: string;
       type: string;
       builtin: string | null;
+      file: string | null;
+      kind: string;
       allowOutOfBounds: boolean;
       position: [number, number, number];
       rotation: [number, number, number];
       scale: [number, number, number];
+      decorSize: unknown;
+      decorColor: string | null;
+      decorTexture: string | null;
+      decorTextureRepeat: number | null;
+      decorTextureMode: string | null;
+      decorTextureFaces: unknown;
     }>;
 
     const theaterSpotlightsData = parsed.flatMap((st) =>
@@ -329,7 +331,11 @@ export class SyncService {
         ? [this.prisma.stepLightPlot.createMany({ data: lightPlotData })]
         : []),
       ...(theaterModelsData.length
-        ? [this.prisma.theaterModel.createMany({ data: theaterModelsData })]
+        ? [
+            this.prisma.theaterModel.createMany({
+              data: theaterModelsData as Prisma.TheaterModelCreateManyInput[],
+            }),
+          ]
         : []),
       ...(theaterSpotlightsData.length
         ? [
@@ -725,6 +731,30 @@ export class SyncService {
     if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
 
+  private buildTheaterLayoutExtras(payload: any): Prisma.InputJsonValue | undefined {
+    const keys = [
+      'stageShape',
+      'stageFrontZ',
+      'stageBackWidth',
+      'prosceniumWidth',
+      'prosceniumHeight',
+      'prosceniumEnabled',
+      'tJunctionZ',
+      'wallRecesses',
+      'stageOutline',
+      'stageOutlineOpenEdges',
+      'zones',
+      'zoneGrid',
+    ];
+    const extras: Record<string, unknown> = {};
+    for (const key of keys) {
+      if (payload?.[key] !== undefined) extras[key] = payload[key];
+    }
+    return Object.keys(extras).length > 0
+      ? (extras as Prisma.InputJsonObject)
+      : undefined;
+  }
+
   private async applyTheaterLayoutChange(
     operation: string,
     payload: any,
@@ -740,6 +770,7 @@ export class SyncService {
     }
     const num = (v: any, fallback: number) =>
       v != null && Number.isFinite(Number(v)) ? Number(v) : fallback;
+    const extras = this.buildTheaterLayoutExtras(payload);
     await this.prisma.theaterLayout.upsert({
       where: { sceneId },
       update: {
@@ -761,6 +792,8 @@ export class SyncService {
         doorWidth: num(payload?.doorWidth, 0),
         doorHeight: num(payload?.doorHeight, 0),
         doorZ: num(payload?.doorZ, 0),
+        doors: Array.isArray(payload?.doors) ? payload.doors : undefined,
+        extras,
       },
       create: {
         sceneId,
@@ -782,6 +815,8 @@ export class SyncService {
         doorWidth: num(payload?.doorWidth, 0),
         doorHeight: num(payload?.doorHeight, 0),
         doorZ: num(payload?.doorZ, 0),
+        doors: Array.isArray(payload?.doors) ? payload.doors : undefined,
+        extras,
       },
     });
     if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
@@ -898,6 +933,7 @@ export class SyncService {
       const requisitesValue = payload.requisites;
       const lightPlotValue = payload.lightPlot;
       const theaterModelsValue = payload.theaterModels;
+      const theaterDecorValue = payload.theaterDecor;
       const theaterSpotlightsValue = payload.theaterSpotlights;
 
       const tx: any[] = [];
@@ -971,45 +1007,30 @@ export class SyncService {
           tx.push(this.prisma.stepLightPlot.createMany({ data }));
       }
 
-      if (Array.isArray(theaterModelsValue)) {
-        const data = theaterModelsValue
-          .map((m: any) => {
-            const sourceId = this.normalizeInt(m?.id, -1);
-            if (sourceId <= 0) return null;
-            const name = this.normalizeString(m?.name, `Model ${sourceId}`);
-            const type = this.normalizeString(m?.type, 'builtin');
-            return {
+      if (Array.isArray(theaterModelsValue) || Array.isArray(theaterDecorValue)) {
+        const flat = flattenClientTheaterModels({
+          theaterModels: Array.isArray(theaterModelsValue) ? theaterModelsValue : [],
+          theaterDecor: Array.isArray(theaterDecorValue) ? theaterDecorValue : [],
+        });
+        const data = flat
+          .map((m: any) =>
+            clientTheaterModelToPrisma(
               stepId,
-              sourceId,
-              name,
-              type,
-              builtin:
-                typeof m?.builtin === 'string' && m.builtin.trim()
-                  ? m.builtin.trim()
-                  : null,
-              allowOutOfBounds: this.normalizeBool(m?.allowOutOfBounds, false),
-              position: this.normalizeVec3(m?.position, [0, 0, 0]),
-              rotation: this.normalizeVec3(m?.rotation, [0, 0, 0]),
-              scale: this.normalizeVec3(m?.scale, [1, 1, 1]),
-            };
-          })
-          .filter(
-            (
-              x,
-            ): x is {
-              stepId: string;
-              sourceId: number;
-              name: string;
-              type: string;
-              builtin: string | null;
-              allowOutOfBounds: boolean;
-              position: [number, number, number];
-              rotation: [number, number, number];
-              scale: [number, number, number];
-            } => x !== null,
-          );
+              m,
+              (v, fb) => this.normalizeVec3(v, fb),
+              (v, fb) => this.normalizeInt(v, fb),
+              (v, fb) => this.normalizeString(v, fb),
+              (v, fb) => this.normalizeBool(v, fb),
+            ),
+          )
+          .filter((x): x is NonNullable<typeof x> => x !== null);
         tx.push(this.prisma.theaterModel.deleteMany({ where: { stepId } }));
-        if (data.length) tx.push(this.prisma.theaterModel.createMany({ data }));
+        if (data.length)
+          tx.push(
+            this.prisma.theaterModel.createMany({
+              data: data as Prisma.TheaterModelCreateManyInput[],
+            }),
+          );
       }
 
       if (Array.isArray(theaterSpotlightsValue)) {

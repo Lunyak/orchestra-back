@@ -1,4 +1,7 @@
-import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
+import type { ScriptStep, TheaterDoor, TheaterLayout } from "../../../shared/types/script";
+import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
+import { normalizeDoors } from "../../theater/model/theater-doors";
+import { mergeTheaterLayoutExtras } from "../../theater/model/theater-layout-extras";
 import { DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 
 export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
@@ -29,22 +32,48 @@ export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | 
     v != null && Number.isFinite(Number(v)) ? Number(v) : fallback;
   const int = (v: unknown, fallback: number) =>
     v != null && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : fallback;
-  return {
-    hallWidth: int(r.hallWidth, DEFAULT_THEATER_LAYOUT.hallWidth),
-    hallDepth: int(r.hallDepth, DEFAULT_THEATER_LAYOUT.hallDepth),
-    wallHeight: int(r.wallHeight, DEFAULT_THEATER_LAYOUT.wallHeight),
-    audienceStartZ: int(r.audienceStartZ, DEFAULT_THEATER_LAYOUT.audienceStartZ),
-    seatRows: int(r.seatRows, DEFAULT_THEATER_LAYOUT.seatRows),
-    seatsPerRow: int(r.seatsPerRow, DEFAULT_THEATER_LAYOUT.seatsPerRow),
-    seatSpacing: num(r.seatSpacing, DEFAULT_THEATER_LAYOUT.seatSpacing),
-    rowSpacing: num(r.rowSpacing, DEFAULT_THEATER_LAYOUT.rowSpacing),
-    rowRise: num(r.rowRise, DEFAULT_THEATER_LAYOUT.rowRise),
-    aisleWidth: num(r.aisleWidth, DEFAULT_THEATER_LAYOUT.aisleWidth),
-    aisleCenterX: num(r.aisleCenterX, DEFAULT_THEATER_LAYOUT.aisleCenterX),
-    doorWidth: num(r.doorWidth, DEFAULT_THEATER_LAYOUT.doorWidth),
-    doorHeight: num(r.doorHeight, DEFAULT_THEATER_LAYOUT.doorHeight),
-    doorZ: num(r.doorZ, DEFAULT_THEATER_LAYOUT.doorZ),
+  const parseDoors = (raw: unknown): TheaterDoor[] | undefined => {
+    if (!Array.isArray(raw)) return undefined;
+    return normalizeDoors(
+      raw.map((item, index) => {
+        const row = item as Record<string, unknown>;
+        return {
+          id: int(row.id, index + 1),
+          wall: String(row.wall ?? "left") as TheaterDoor["wall"],
+          pos: num(row.pos, num(row.doorZ, 0)),
+          width: num(row.width, num(row.doorWidth, DEFAULT_THEATER_LAYOUT.doorWidth)),
+          height: num(row.height, num(row.doorHeight, DEFAULT_THEATER_LAYOUT.doorHeight)),
+        };
+      }),
+      {
+        hallWidth: num(r.hallWidth, DEFAULT_THEATER_LAYOUT.hallWidth),
+        hallDepth: num(r.hallDepth, DEFAULT_THEATER_LAYOUT.hallDepth),
+        wallHeight: num(r.wallHeight, DEFAULT_THEATER_LAYOUT.wallHeight),
+      },
+    );
   };
+  return normalizePersistedTheaterLayout(
+    mergeTheaterLayoutExtras(
+      {
+        hallWidth: num(r.hallWidth, DEFAULT_THEATER_LAYOUT.hallWidth),
+        hallDepth: num(r.hallDepth, DEFAULT_THEATER_LAYOUT.hallDepth),
+        wallHeight: num(r.wallHeight, DEFAULT_THEATER_LAYOUT.wallHeight),
+        audienceStartZ: num(r.audienceStartZ, DEFAULT_THEATER_LAYOUT.audienceStartZ),
+        seatRows: int(r.seatRows, DEFAULT_THEATER_LAYOUT.seatRows),
+        seatsPerRow: int(r.seatsPerRow, DEFAULT_THEATER_LAYOUT.seatsPerRow),
+        seatSpacing: num(r.seatSpacing, DEFAULT_THEATER_LAYOUT.seatSpacing),
+        rowSpacing: num(r.rowSpacing, DEFAULT_THEATER_LAYOUT.rowSpacing),
+        rowRise: num(r.rowRise, DEFAULT_THEATER_LAYOUT.rowRise),
+        aisleWidth: num(r.aisleWidth, DEFAULT_THEATER_LAYOUT.aisleWidth),
+        aisleCenterX: num(r.aisleCenterX, DEFAULT_THEATER_LAYOUT.aisleCenterX),
+        doorWidth: num(r.doorWidth, DEFAULT_THEATER_LAYOUT.doorWidth),
+        doorHeight: num(r.doorHeight, DEFAULT_THEATER_LAYOUT.doorHeight),
+        doorZ: num(r.doorZ, DEFAULT_THEATER_LAYOUT.doorZ),
+        doors: parseDoors(r.doors),
+      },
+      r.extras ?? r,
+    ),
+  );
 }
 
 export function extractReferencedRemoteImageKeysFromSteps(steps: ScriptStep[]): Set<string> {

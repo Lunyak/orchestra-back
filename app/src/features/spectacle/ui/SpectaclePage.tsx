@@ -2,6 +2,7 @@ import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import React, { Suspense } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
+import "./style.css";
 import { HeaderPlayer } from "../../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptStepsSidebar } from "../../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
@@ -67,14 +68,17 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     setIsStepsCollapsed,
     setMobilePlaylistOpen,
     setMobileStepsOpen,
-    setTheaterControlsHostRef,
+    setTheaterMainControlsHostRef,
+    setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowStepsSidebar,
     shouldSwapPanels,
     showHeaderSounds,
     showPlaylistSidebar,
+    showTheaterControls,
     steps,
-    theaterControlsHost,
+    theaterMainControlsHost,
+    theaterOutlinerHost,
     theaterLayout,
     togglePanels,
     togglePlaylist,
@@ -162,13 +166,33 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     </div>
   ) : null;
 
-  const theaterControlsNode = isTheaterView ? (
-    <aside ref={setTheaterControlsHostRef} className="theater-settings-sidebar" />
+  const theaterMainControlsNode = isTheaterView ? (
+    <aside
+      ref={setTheaterMainControlsHostRef}
+      className="theater-settings-sidebar theater-settings-sidebar--left"
+      aria-label="Настройки 3D-театра"
+    />
   ) : null;
 
+  const theaterOutlinerNode = isTheaterView ? (
+    <aside
+      ref={setTheaterOutlinerHostRef}
+      className="theater-settings-sidebar theater-settings-sidebar--right theater-outliner-sidebar"
+      aria-label="Элементы сцены"
+    />
+  ) : null;
+
+  const showTheaterSettingsPanel =
+    isTheaterView && shouldSwapPanels && showTheaterControls;
+
+  /** Шаги на 3D-театре — только в режиме «Музыка и шаги». */
+  const theaterRehearsalMode = isTheaterView && !shouldSwapPanels;
+  const showStepsSidebar =
+    shouldShowStepsSidebar && (!isTheaterView || theaterRehearsalMode);
+
   const stepsSidebarNode =
-    ((!isMobile && shouldShowStepsSidebar && !isStepsCollapsed) ||
-      (isMobile && mobileStepsOpen && shouldShowStepsSidebar && !isStepsCollapsed)) ? (
+    ((!isMobile && showStepsSidebar && !isStepsCollapsed) ||
+      (isMobile && mobileStepsOpen && showStepsSidebar && !isStepsCollapsed)) ? (
       <div
         className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobileStepsOpen ? "open" : ""}`}
       >
@@ -202,12 +226,11 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     <div className="app-layout">
       {isTheaterView ? (
         <>
-          {(isMobile ? mobilePlaylistOpen : showPlaylistSidebar) && (
-            <div style={{ display: shouldSwapPanels ? "none" : "block" }}>
-              {playlistNode}
-            </div>
-          )}
-          {shouldSwapPanels ? theaterControlsNode : null}
+          {(isMobile ? mobilePlaylistOpen : showPlaylistSidebar) &&
+          !shouldSwapPanels ? (
+            playlistNode
+          ) : null}
+          {showTheaterSettingsPanel ? theaterMainControlsNode : null}
         </>
       ) : (
         playlistNode
@@ -246,7 +269,12 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
                 onTheaterLayoutChange={setTheaterLayout}
                 isPanelsSwapped={shouldSwapPanels}
                 onTogglePanels={togglePanels}
-                controlsHost={shouldSwapPanels ? theaterControlsHost : null}
+                mainControlsHost={
+                  showTheaterSettingsPanel ? theaterMainControlsHost : null
+                }
+                outlinerHost={
+                  showTheaterSettingsPanel ? theaterOutlinerHost : null
+                }
                 controlsInPanel={shouldSwapPanels}
               />
             </Suspense>
@@ -275,10 +303,11 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
           {activeView === "sessions" && <Outlet />}
         </main>
       </div>
+      {showTheaterSettingsPanel ? theaterOutlinerNode : null}
       {stepsSidebarNode}
       {!isMobile && !compactMainChrome && (
         <div className="desktop-panel-buttons" aria-label="Панели">
-          {shouldShowStepsSidebar && isStepsCollapsed && (
+          {showStepsSidebar && isStepsCollapsed && (
             <button
               type="button"
               className="desktop-panel-btn"
@@ -288,7 +317,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
               Шаги
             </button>
           )}
-          {!showPlaylistSidebar && (
+          {!showPlaylistSidebar && (!isTheaterView || theaterRehearsalMode) && (
             <button
               type="button"
               className="desktop-panel-btn"

@@ -93,7 +93,7 @@ const ControlsScript: FC<IProps> = ({ light, children }) => {
                                         const parsed = parseLightChannel(value);
                                         const hexColor = /^#[0-9a-f]{6}$/i.test(String(parsed.color ?? "").trim())
                                             ? String(parsed.color).trim()
-                                            : "#2563eb";
+                                            : "var(--color-primary)";
                                         return (
                                             <label
                                                 key={`light-${index + 1}`}

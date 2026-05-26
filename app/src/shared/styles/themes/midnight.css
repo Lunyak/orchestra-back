@@ -1,0 +1,21 @@
+html[data-theme="midnight"] {
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #0b1220;
+  --color-bg-tertiary: #38bdf8;
+  --color-active-ascent: #38bdf8;
+  --color-bg-quaternary: #1e293b;
+  --color-text-tertiary: #7dd3fc;
+  --color-text-label: #93c5fd;
+  --color-button-primary: #0284c7;
+  --color-button-secondary: #0891b2;
+  --color-primary: #0ea5e9;
+  --color-primary-light: #38bdf8;
+  --color-link: #7dd3fc;
+  --color-link-hover: #bae6fd;
+  --field-control-border-hover: rgba(56, 189, 248, 0.45);
+  --field-control-border-focus: rgba(56, 189, 248, 0.72);
+  --field-control-focus-ring: rgba(56, 189, 248, 0.28);
+  --color-accent-orange: rgba(56, 189, 248, 0.92);
+  --color-header-bg: #0c4a6e;
+  --color-theater-sidebar-bg: #0b1220;
+}

@@ -8,9 +8,9 @@
   max-height: min(420px, calc(100vh - 16px));
   overflow: auto;
   padding: 6px 0;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  background: var(--color-bg-primary, #0f172a);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--color-border-muted);
+  background: var(--color-bg-primary, var(--color-surface-1));
+  box-shadow: 0 12px 40px var(--color-shadow-menu);
 }
 
 .script-editor-insert-menu__title {
@@ -18,13 +18,13 @@
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.95);
+  color: var(--color-text-muted-bright);
 }
 
 .script-editor-insert-menu__sep {
   height: 1px;
   margin: 6px 8px;
-  background: rgba(148, 163, 184, 0.22);
+  background: var(--color-border-panel);
 }
 
 .script-editor-insert-menu__item {
@@ -35,7 +35,7 @@
   border: none;
 
   background: transparent;
-  color: var(--color-text-primary, #e2e8f0);
+  color: var(--color-text-primary, var(--color-text-ui));
   font: inherit;
   font-size: 13px;
   text-align: left;
@@ -48,7 +48,7 @@
 
 .script-editor-insert-menu__item:disabled {
   cursor: not-allowed;
-  color: rgba(148, 163, 184, 0.55);
+  color: var(--color-text-muted-alpha);
 }
 
 .script-editor-insert-menu--sub {

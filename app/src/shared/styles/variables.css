@@ -1,4 +1,5 @@
-:root {
+html[data-theme="orchestra"],
+html:not([data-theme]) {
   /* ===== ЦВЕТА ===== */
 
   /* Основные фоновые цвета */
@@ -31,6 +32,16 @@
   --color-border-medium: rgba(255, 255, 255, 0.10);
   --color-border-visible: rgba(255, 255, 255, 0.12);
   --color-border-strong: rgba(255, 255, 255, 0.14);
+  --color-border-emphasis: rgba(255, 255, 255, 0.26);
+  --color-border-input: rgba(255, 255, 255, 0.18);
+  --color-border-input-soft: rgba(255, 255, 255, 0.15);
+  --color-border-faint: rgba(255, 255, 255, 0.06);
+  --color-border-muted: rgba(148, 163, 184, 0.35);
+  --color-border-panel: rgba(148, 163, 184, 0.22);
+  --color-border-panel-soft: rgba(148, 163, 184, 0.18);
+  --color-border-panel-faint: rgba(148, 163, 184, 0.15);
+  --color-border-panel-subtle: rgba(148, 163, 184, 0.12);
+  --color-border-dashed: #4b5563;
   --color-border-accent: rgba(14, 15, 15, 0.15);
 
   /* Нативные поля (.native-select / .native-text-input) — тот же тон, что карточки и list-item */
@@ -41,11 +52,6 @@
   --field-control-border-focus: rgba(231, 138, 78, 0.72);
   --field-control-focus-ring: rgba(231, 138, 78, 0.28);
   --field-control-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  --field-control-radius: 10px;
-  --field-control-padding-y: 8px;
-  --field-control-padding-x: 12px;
-  --field-control-font-size: var(--font-size-md);
-  --field-control-min-height: 38px;
   --field-control-text: var(--color-text-lighter);
   /* стрелка в цвете подписей/лейблов как на остальных UI */
   --field-control-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23a9b664' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -63,18 +69,45 @@
   --color-blue-border: rgba(96, 165, 250, 0.45);
   --color-blue-highlight: rgba(120, 180, 255, 0.45);
   --color-blue-highlight-bg: rgba(120, 180, 255, 0.10);
+  --color-blue-border-hover: rgba(96, 165, 250, 0.55);
+  --color-blue-bg-hover: rgba(37, 99, 235, 0.22);
+  --color-blue-bg-soft: rgba(37, 99, 235, 0.14);
+  --color-blue-shadow: rgba(37, 99, 235, 0.18);
+  --color-blue-focus-outline: rgba(120, 180, 255, 0.75);
+  --color-primary-border-soft: rgba(59, 130, 246, 0.35);
+  --color-primary-hover-alpha: #1d4fd8b5;
+  --color-link-alpha: rgba(147, 197, 253, 0.92);
 
   /* Зеленые цвета (success) */
   --color-success: #10b981;
   --color-success-dark: #059669;
   --color-success-accent: #22c55e;
   --color-success-border: #16a34a;
+  --color-success-shadow: rgba(34, 197, 94, 0.4);
+  --color-status-success: rgba(46, 160, 67, 0.85);
+  --color-status-success-bg: rgba(46, 160, 67, 0.08);
+  --color-status-success-bg-medium: rgba(46, 160, 67, 0.22);
+  --color-status-success-text: rgba(126, 231, 135, 0.95);
+  --color-status-success-bright: #7ee787;
+  --color-status-info: rgba(88, 166, 255, 0.85);
+  --color-status-info-bg-light: rgba(96, 165, 250, 0.10);
+  --color-status-info-bg-medium: rgba(88, 166, 255, 0.22);
+  --color-status-info-bg-faint: rgba(88, 166, 255, 0.12);
+  --color-status-info-stripe: rgba(88, 166, 255, 0.35);
+  --color-status-error: rgba(248, 81, 73, 0.85);
+  --color-status-error-bg: rgba(248, 81, 73, 0.06);
+  --color-status-error-bg-medium: rgba(248, 81, 73, 0.22);
+  --color-status-error-border: rgba(248, 81, 73, 0.35);
+  --color-status-error-text: rgba(248, 81, 73, 0.95);
 
   /* Красные цвета (danger/error) */
   --color-danger: #b91c1c;
   --color-danger-hover: #dc2626;
   --color-danger-light: #f87171;
   --color-danger-lighter: #fecaca;
+  --color-danger-border-soft: rgba(239, 68, 68, 0.35);
+  --color-danger-bg-strong: rgba(185, 28, 28, 0.85);
+  --color-danger-bg-hover-strong: rgba(220, 38, 38, 0.95);
   --color-error: #ef4444;
   --color-error-bg: rgba(239, 68, 68, 0.08);
   --color-error-border: rgba(239, 68, 68, 0.5);
@@ -86,6 +119,63 @@
   /* Желтые цвета (warning/accent) */
   --color-warning: #fbbf24;
   --color-warning-text: rgba(255, 190, 120, 0.95);
+  --color-warning-bg: rgba(251, 191, 36, 0.12);
+  --color-warning-border: rgba(251, 191, 36, 0.38);
+  --color-warning-text-bright: rgba(253, 224, 71, 0.96);
+  --color-warning-inset: rgba(251, 191, 36, 0.5);
+  --color-warning-bright: #facc15;
+  --color-warning-text-soft: #fde68a;
+  --color-warning-bg-medium: rgba(245, 158, 11, 0.2);
+  --color-warning-border-medium: rgba(245, 158, 11, 0.55);
+  --color-danger-text-soft: #fca5a5;
+  --color-danger-emissive: #7f1d1d;
+  --color-danger-bg-medium: rgba(239, 68, 68, 0.14);
+  --color-danger-border-medium: rgba(239, 68, 68, 0.4);
+  --color-highlight-yellow: rgba(250, 204, 21, 0.28);
+  --color-highlight-yellow-outline: rgba(250, 204, 21, 0.8);
+  --color-text-slate: #cbd5e1;
+  --color-markdown-preloader-glow: #7aa8ff;
+  --color-script-accent: #e78a4e;
+  --color-surface-script: rgba(17, 24, 39, 0.6);
+  --color-surface-script-input: rgba(30, 41, 59, 0.6);
+  --color-surface-inset: rgba(2, 6, 23, 0.35);
+  --color-surface-inset-soft: rgba(2, 6, 23, 0.18);
+  --color-surface-inset-medium: rgba(2, 6, 23, 0.5);
+  --color-surface-inset-strong: rgba(2, 6, 23, 0.78);
+  --color-border-slate-strong: rgba(31, 41, 55, 0.8);
+  --color-border-blue-soft: rgba(96, 165, 250, 0.12);
+  --color-border-blue-medium: rgba(96, 165, 250, 0.5);
+  --color-border-blue-text: rgba(191, 219, 254, 0.7);
+  --color-focus-outline-strong: rgba(120, 180, 255, 0.85);
+  --color-text-bright-alpha: rgba(248, 250, 252, 0.95);
+  --color-text-ui-alpha: rgba(226, 232, 240, 0.9);
+  --color-text-on-dark: rgba(255, 255, 255, 0.9);
+  --color-error-highlight: rgba(228, 6, 6, 0.16);
+  --color-muted-bg-medium: rgba(148, 163, 184, 0.24);
+  --color-slate-600: #475569;
+
+  /* 3D-модели (театр) */
+  --color-3d-wood-light: #8b5e34;
+  --color-3d-wood: #6b4423;
+  --color-3d-wood-dark: #3b2f1e;
+  --color-3d-wood-accent: #9f6b3d;
+  --color-3d-wood-gold: #d1a05a;
+  --color-3d-wood-brown: #7c4f2a;
+  --color-3d-wood-tan: #6b4f2b;
+  --color-3d-gold: #a16207;
+  --color-3d-black: #0b0b0b;
+
+  /* Акцент оранжевый (труппа, активные элементы) */
+  --color-accent-orange: rgba(231, 138, 78, 0.92);
+  --color-accent-orange-strong: rgba(231, 139, 78, 0.778);
+  --color-accent-orange-bg: rgba(231, 138, 78, 0.22);
+  --color-accent-orange-bg-soft: rgba(231, 138, 78, 0.2);
+  --color-accent-orange-bg-medium: rgba(231, 138, 78, 0.24);
+  --color-accent-orange-border: rgba(231, 139, 78, 0.75);
+  --color-accent-orange-ring: rgba(231, 138, 78, 0.28);
+  --color-accent-orange-ring-soft: rgba(231, 138, 78, 0.25);
+  --color-accent-blue-strong: rgba(96, 165, 250, 0.92);
+  --color-accent-blue-bg-medium: rgba(96, 165, 250, 0.24);
 
   /* Текстовые цвета */
   --color-text-primary: #fff;
@@ -106,12 +196,154 @@
   --color-text-blue: #bfdbfe;
   --color-text-dark: #213547;
   --color-text-placeholder: #6b7280;
+  --color-text-ui: #e2e8f0;
+  --color-text-high: rgba(255, 255, 255, 0.95);
+  --color-text-black: #000000;
+  --color-text-slate-strong: rgba(203, 213, 225, 0.95);
+  --color-text-muted-bright: rgba(148, 163, 184, 0.95);
+  --color-text-muted-strong: rgba(148, 163, 184, 0.88);
+  --color-text-muted-alpha: rgba(148, 163, 184, 0.55);
+  --color-text-dim-alpha: rgba(148, 163, 184, 0.5);
+  --color-text-dimmer-alpha: rgba(100, 116, 139, 0.88);
+  --color-text-placeholder-alpha: rgba(148, 163, 184, 0.75);
+  --color-script-heading-warm: #fdba74;
+  --color-script-link: #93c5fd;
+
+  /* Поверхности и оверлеи */
+  --color-surface-elevated: rgba(30, 41, 59, 0.95);
+  --color-surface-floating: rgba(15, 23, 42, 0.92);
+  --color-surface-panel: rgba(20, 20, 20, 0.95);
+  --color-surface-overlay-dark: rgba(2, 6, 23, 0.55);
+  --color-surface-overlay-dark-hover: rgba(2, 6, 23, 0.75);
+  --color-empty-project-bg: rgba(15, 23, 42, 0.7);
+  --color-login-shadow: rgba(15, 23, 42, 0.8);
+  --color-theater-sidebar-bg: #1f2a37;
+  --color-overlay-strong: rgba(0, 0, 0, 0.6);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-bg-scrim: rgba(0, 0, 0, 0.20);
+  --color-bg-scrim-soft: rgba(0, 0, 0, 0.2);
+  --color-bg-scrim-faint: rgba(0, 0, 0, 0.12);
+  --color-bg-scrim-subtle: rgba(0, 0, 0, 0.10);
+  --color-shadow-menu: rgba(0, 0, 0, 0.45);
+  --color-shadow-panel: rgba(0, 0, 0, 0.35);
+  --color-shadow-card: rgba(0, 0, 0, 0.28);
+  --color-text-bright-soft: rgba(248, 250, 252, 0.88);
+  --color-text-ui-strong: rgba(226, 232, 240, 0.95);
+  --color-text-ui-medium: rgba(226, 232, 240, 0.92);
+  --color-text-ui-soft: rgba(226, 232, 240, 0.85);
+  --color-text-muted-high: rgba(148, 163, 184, 0.9);
+  --color-text-sky: #e0f2fe;
+  --color-text-mint: #d1fae5;
+  --color-text-dark-soft: #0b0f14;
+  --color-border-faint-top: rgba(255, 255, 255, 0.07);
+  --color-border-faint-muted: rgba(148, 163, 184, 0.14);
+  --color-border-dimmer: rgba(100, 116, 139, 0.55);
+  --color-border-dimmer-soft: rgba(100, 116, 139, 0.4);
+  --color-border-dimmer-strong: rgba(100, 116, 139, 0.65);
+  --color-border-slate-panel: rgba(51, 65, 85, 0.9);
+  --color-blue-solid: rgba(96, 165, 250, 0.9);
+  --color-blue-border-soft: rgba(96, 165, 250, 0.35);
+  --color-gray-solid: rgba(75, 85, 99, 0.9);
+  --color-panel-bg: rgba(30, 41, 59, 0.92);
+  --color-panel-bg-soft: rgba(15, 23, 42, 0.65);
+  --color-panel-bg-deep: rgba(17, 24, 39, 0.96);
+  --color-panel-gradient-top: rgba(15, 23, 42, 0.95);
+  --color-surface-script-strong: rgba(17, 24, 39, 0.72);
+  --color-error-panel-bg: rgba(88, 28, 28, 0.9);
+  --color-error-solid: rgba(248, 113, 113, 0.95);
+  --color-error-glow: rgba(248, 113, 113, 0.18);
+  --color-error-glow-border: rgba(248, 113, 113, 0.28);
+  --color-error-ring: rgba(248, 113, 113, 0.12);
+  --color-error-border-soft: rgba(248, 113, 113, 0.45);
+  --color-error-border-faint: rgba(248, 113, 113, 0.35);
+  --color-error-bg-deep: rgba(127, 29, 29, 0.25);
+  --color-success-solid: rgba(34, 197, 94, 0.95);
+  --color-success-border-soft: rgba(34, 197, 94, 0.35);
+  --color-success-bg-soft: rgba(34, 197, 94, 0.22);
+  --color-success-glow: rgba(34, 197, 94, 0.16);
+  --color-success-ring: rgba(34, 197, 94, 0.12);
+  --color-success-surface: rgba(236, 253, 245, 0.96);
+  --color-success-emerald: #34d399;
+  --color-teal-dark: #134e4a;
+  --color-teal-border: rgba(19, 78, 74, 0.9);
+  --color-purple-deep: #6017ce;
+  --color-highlight-gold: rgb(220, 199, 8);
+  --color-muted-bg-soft: rgba(148, 163, 184, 0.2);
+  --color-playlist-accent: rgba(252, 188, 81, 1);
+  --color-playlist-accent-deep: rgba(252, 163, 17, 0.95);
+  --color-playlist-accent-border: rgba(252, 188, 81, 0.22);
+  --color-playlist-accent-glow: rgba(252, 188, 81, 0.14);
+  --color-playlist-accent-outline: rgba(252, 188, 81, 0.65);
+  --color-range-track: rgba(0, 0, 0, 0.25);
+  --color-range-thumb: rgba(255, 255, 255, 0.92);
+  --color-range-thumb-border: rgba(17, 24, 39, 0.9);
+  --color-checkbox-label: rgba(248, 250, 252, 0.88);
+  --color-checkbox-border: rgba(231, 138, 78, 0.82);
+  --color-checkbox-outline: rgba(231, 138, 78, 0.65);
+  --color-checkbox-bg: rgba(8, 10, 14, 0.72);
+  --color-checkbox-bg-hover: rgba(12, 14, 18, 0.88);
+  --color-checkbox-bg-disabled: rgba(8, 10, 14, 0.4);
+  --color-checkbox-checked-bg: rgba(231, 138, 78, 0.45);
+  --color-checkbox-checked-border: rgba(231, 138, 78, 0.4);
+  --color-checkbox-disabled-border: rgba(231, 138, 78, 0.35);
+  --color-accent-orange-hover: rgba(243, 170, 112, 0.95);
+  --color-accent-orange-grid: rgba(231, 138, 78, 0.26);
+  --color-list-item-hover: #3a4b61;
+  --color-header-bg: #2c3e50;
+  --color-header-surface: rgba(15, 23, 42, 0.82);
+  --color-header-surface-soft: rgba(15, 23, 42, 0.78);
+  --color-header-accent-border: rgba(252, 188, 81, 0.7);
+  --color-header-accent-ring: rgba(252, 188, 81, 0.18);
+  --color-header-accent-ring-strong: rgba(252, 188, 81, 0.35);
+  --color-header-text-strong: rgba(226, 232, 240, 0.98);
+  --color-header-blue-ring: rgba(96, 165, 250, 0.18);
+  --color-header-orange: #fb923c;
+  --color-header-pink-bg: rgba(244, 114, 182, 0.22);
+  --color-header-sky: #bae6fd;
+  --color-header-violet: #ddd6fe;
+  --color-header-violet-light: #ede9fe;
+  --color-header-orange-light: #ffedd5;
+  --color-header-sky-light: #f0f9ff;
+  --color-header-green: #86efac;
+  --color-header-green-light: #ecfdf5;
+  --color-header-pink: #f9a8d4;
+  --color-header-pink-light: #fce7f3;
+  --color-header-indigo: #c7d2fe;
+  --color-header-indigo-light: #eef2ff;
+
+  /* Плейлист — градиенты */
+  --color-panel-gradient-bottom: rgba(2, 6, 23, 0.85);
+  --color-panel-gradient-bottom-deep: rgba(2, 6, 23, 0.86);
+  --color-panel-overlay: rgba(15, 23, 42, 0.6);
+  --color-blue-glow: rgba(96, 165, 250, 0.18);
+  --color-success-glow-strong: rgba(34, 197, 94, 0.18);
+  --color-success-ring-light: rgba(34, 197, 94, 0.18);
+  --color-sky-outline: rgba(125, 211, 252, 0.6);
+
+  /* Sessions / расписание */
+  --color-text-faint: rgba(255, 255, 255, 0.38);
+  --color-focus-ring-soft: rgba(165, 220, 255, 0.14);
+  --color-blue-outline-dashed: rgba(96, 165, 250, 0.65);
+  --color-success-inset-border: rgba(126, 231, 135, 0.65);
+  --color-status-success-bg-strong: rgba(46, 160, 67, 0.28);
+  --color-status-error-border-strong: rgba(248, 81, 73, 0.45);
+  --color-status-error-bg-light: rgba(248, 81, 73, 0.1);
+  --color-border-dark-soft: rgba(15, 23, 42, 0.22);
+  --color-border-dark-faint: rgba(15, 23, 42, 0.2);
+  --color-github-red: #f85149;
+  --color-overlay-deep: rgba(12, 12, 12, 0.92);
+
+  /* Корневые / Vite-шаблон */
+  --color-root-bg: #242424;
+  --color-root-text: rgba(255, 255, 255, 0.87);
 
   /* Прозрачные фоны */
+  --color-bg-transparent-0: rgba(255, 255, 255, 0.02);
   --color-bg-transparent-1: rgba(255, 255, 255, 0.03);
   --color-bg-transparent-2: rgba(255, 255, 255, 0.04);
   --color-bg-transparent-3: rgba(255, 255, 255, 0.05);
   --color-bg-transparent-4: rgba(255, 255, 255, 0.06);
+  --color-bg-transparent-5: rgba(255, 255, 255, 0.14);
   --color-bg-transparent-dark-1: rgba(0, 0, 0, 0.18);
   --color-bg-transparent-dark-2: rgba(0, 0, 0, 0.22);
   --color-bg-hover: rgba(255, 255, 255, 0.1);
@@ -138,11 +370,20 @@
   --color-button-primary: #e78a4e;
   --color-button-secondary: #22c55e;
   --color-button-danger: #b91c1c;
+}
 
+:root {
   /* ===== РАЗМЕРЫ ===== */
 
   /* Контейнеры */
   --width-content-page: 1440px;
+
+  /* Нативные поля — размеры (цвета задаются темой) */
+  --field-control-radius: 10px;
+  --field-control-padding-y: 8px;
+  --field-control-padding-x: 12px;
+  --field-control-font-size: var(--font-size-md);
+  --field-control-min-height: 38px;
 
   /* Border radius */
   --radius-xs: 4px;
@@ -272,8 +513,44 @@
   --shadow-2xl: 0 20px 60px var(--color-shadow-strong);
   --shadow-modal: 0 25px 50px var(--color-shadow-overlay), 0 0 0 1px var(--color-border-accent);
   --shadow-inset: inset 0 0 6px var(--color-shadow-medium);
-  --shadow-focus: 0 0 0 1px rgba(59, 130, 246, 0.6);
+  --shadow-focus-ring: rgba(59, 130, 246, 0.6);
+  --shadow-focus: 0 0 0 1px var(--shadow-focus-ring);
   --shadow-glow-warning: 0 0 6px var(--color-shadow-glow-warning);
+
+  /* Скроллбар */
+  --scrollbar-size: 10px;
+  --scrollbar-radius: 999px;
+  --scrollbar-thumb: rgba(148, 163, 184, 0.45);
+  --scrollbar-thumb-hover: rgba(203, 213, 225, 0.65);
+  --scrollbar-track: rgba(2, 6, 23, 0.2);
+
+  /* Kanban-колонки */
+  --kanban-col-raw: rgba(71, 85, 105, 0.55);
+  --kanban-col-text-learned: rgba(30, 58, 138, 0.5);
+  --kanban-col-almost-ready: rgba(146, 64, 14, 0.45);
+  --kanban-col-ready: rgba(21, 128, 61, 0.45);
+
+  /* Палитра света (сценография) */
+  --color-light-blue: #2563eb;
+  --color-light-red: #ef4444;
+  --color-light-green: #22c55e;
+  --color-light-yellow: #f59e0b;
+  --color-light-white: #f8fafc;
+  --color-light-black: #0f172a;
+  --color-light-orange: #f97316;
+  --color-light-purple: #a855f7;
+  --color-light-pink: #ec4899;
+  --color-light-cyan: #22d3ee;
+  --color-light-magenta: #d946ef;
+  --color-light-sky: #38bdf8;
+
+  /* Кнопки — hover/active */
+  --color-button-primary-hover: color-mix(in srgb, var(--color-button-primary) 92%, white);
+  --color-button-primary-active: color-mix(in srgb, var(--color-button-primary) 85%, black);
+  --color-button-secondary-hover: color-mix(in srgb, var(--color-button-secondary) 92%, white);
+  --color-button-secondary-active: color-mix(in srgb, var(--color-button-secondary) 85%, black);
+  --color-button-danger-hover: var(--color-danger-hover);
+  --color-button-danger-active: color-mix(in srgb, var(--color-danger) 85%, black);
 
   /* ===== ТИПОГРАФИКА ДЛЯ СЦЕНАРИЯ ===== */
   /* Заголовки: без засечек (Inter) */
@@ -298,11 +575,12 @@
   --color-bg-steps: var(--color-bg-quaternary);
 }
 
+html[data-theme="light"] {
+  color-scheme: light;
+}
 
-/* Light theme (опционально) */
-@media (prefers-color-scheme: light) {
-  :root {
-    /* --color-text-primary: #213547; */
-    /* --color-bg-primary: #ffffff; */
-  }
+html[data-theme="orchestra"],
+html[data-theme="midnight"],
+html[data-theme="custom"] {
+  color-scheme: dark;
 }

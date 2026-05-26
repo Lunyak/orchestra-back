@@ -5,6 +5,7 @@ import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { useMyProfileQuery } from "../../../features/profile/api/profile-api";
 import { useProjectRolesQuery } from "../../../features/project/api/project-api";
+import { RolePlayingCard } from "../../../features/role-card/RolePlayingCard";
 
 function normalizeEmail(v: unknown): string {
   return String(v ?? "").trim().toLowerCase();
@@ -43,10 +44,10 @@ export function ProfileRoleWorkTab() {
 
   return (
     <div style={{ display: "grid", gap: 10, marginTop: 8 }}>
-      <div style={{ fontSize: 13, fontWeight: 700 }}>Работа над ролью</div>
+      <div style={{ fontSize: 13, fontWeight: 700 }}>Рисунок роли</div>
       <div style={{ fontSize: 12, opacity: 0.75 }}>
-        Здесь собраны роли, назначенные на ваш email. Создание ролей и назначения актёров — в карточке сцены на доске
-        готовности.
+        Здесь собраны роли, назначенные на ваш email. Для каждой роли — тетрадь с рисунком роли: обстоятельства,
+        биография, сверхзадача, работа по сценам. Назначения — в карточке сцены на доске готовности.
       </div>
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -58,7 +59,7 @@ export function ProfileRoleWorkTab() {
       {rolesError ? <div className="settings-invite-error">{rolesError}</div> : null}
       {rolesLoading ? <div style={{ fontSize: 12, opacity: 0.7 }}>Загрузка ролей…</div> : null}
 
-      <div style={{ display: "grid", gap: 8, maxWidth: 720 }}>
+      <div className="profile-role-work-grid">
         {myAssignedRoles.length === 0 && !rolesLoading ? (
           <div style={{ fontSize: 12, opacity: 0.7 }}>
             Роли не назначены на ваш email (или профиль ещё не загружен). Назначения делаются в карточке сцены на доске.
@@ -68,28 +69,15 @@ export function ProfileRoleWorkTab() {
         {myAssignedRoles.map((r) => (
           <div
             key={String(r.id)}
-            style={{
-              border: "1px solid rgba(255,255,255,0.12)",
-              padding: 10,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-            }}
+            className="profile-role-work-card"
+            title="Открыть рисунок роли"
           >
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 800 }}>{String(r.title ?? r.key ?? r.id)}</div>
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>
-                назначено: {(r.emails ?? []).length}
-              </div>
-            </div>
-            <Button
-              className="primary"
-              type="button"
+            <RolePlayingCard
+              role={r}
+              accessToken={accessToken}
+              size="md"
               onClick={() => navigate(`/role-workbook/${encodeURIComponent(String(r.id))}`)}
-            >
-              Открыть
-            </Button>
+            />
           </div>
         ))}
       </div>

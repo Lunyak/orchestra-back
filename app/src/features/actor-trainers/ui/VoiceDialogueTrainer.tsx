@@ -15,7 +15,9 @@ import type { ProjectRoleInfo } from "../../../sync/api/projects";
 import {
   selectVoiceTrainerUi,
   voiceTrainerUiActions,
+  VOICE_PASS_RATIO_OPTIONS,
   type PartnerVoiceSource,
+  type VoicePassRatioPercent,
 } from "../model/voiceTrainerUiSlice";
 import {
   uploadVoiceLineTakeWeb,
@@ -349,6 +351,16 @@ function softStemRu(word: string): string {
     "ах",
     "ам",
     "ям",
+    "ала",
+    "али",
+    "ало",
+    "ал",
+    "ых",
+    "их",
+    "ым",
+    "им",
+    "ов",
+    "ев",
     "ом",
     "ем",
     "ой",
@@ -448,7 +460,6 @@ function matchStats(expected: string[], spoken: string[]): { matched: number; ra
   return { matched, ratio: matched / expected.length };
 }
 
-const PASS_RATIO = 0.85;
 const BASE_MAX_LISTEN_MS = 45_000;
 const LONG_MONOLOGUE_MAX_LISTEN_MS = 70_000;
 const AUTO_RESTART_DELAY_MS = 250;
@@ -745,6 +756,8 @@ export function VoiceDialogueTrainer({
 
   const autoFlow = ui.autoFlow;
   const checkMode = ui.checkMode;
+  const passRatioPercent = ui.passRatioPercent;
+  const passRatio = passRatioPercent / 100;
   const showText = ui.showText;
 
   const [revealedLineIds, setRevealedLineIds] = useState<Set<string>>(() => new Set());
@@ -1345,7 +1358,7 @@ export function VoiceDialogueTrainer({
     const spokenTokens = tokensForScore(spokenText);
     const fullExpected = expectedTokens ?? [];
     const { ratio: fullRatio } = matchStats(fullExpected, spokenTokens);
-    const fullOk = fullExpected.length > 0 ? fullRatio >= PASS_RATIO : false;
+    const fullOk = fullExpected.length > 0 ? fullRatio >= passRatio : false;
 
     // If user said the whole line well enough — accept immediately (even in sentence mode).
     if (fullOk) {
@@ -1396,7 +1409,7 @@ export function VoiceDialogueTrainer({
     const sIdx = Math.max(0, Math.min(sentenceIndex, Math.max(0, sentenceTokens.length - 1)));
     const expected = sentenceTokens[sIdx] ?? [];
     const { ratio } = matchStats(expected, spokenTokens);
-    const ok = expected.length > 0 ? ratio >= PASS_RATIO : false;
+    const ok = expected.length > 0 ? ratio >= passRatio : false;
     setResult({ ratio, ok });
     if (!ok) return;
 
@@ -1596,6 +1609,15 @@ export function VoiceDialogueTrainer({
       { value: "full", label: "1 раз (целиком)" },
       { value: "sentences", label: "По предложениям" },
     ],
+    [],
+  );
+
+  const passRatioOptions = useMemo(
+    () =>
+      VOICE_PASS_RATIO_OPTIONS.map((value) => ({
+        value: String(value),
+        label: `${value}%`,
+      })),
     [],
   );
 
@@ -1858,6 +1880,25 @@ export function VoiceDialogueTrainer({
                       }
                       triggerClassName="voice-select-trigger"
                       aria-label="Режим проверки"
+                    />
+                  </div>
+                  <div className="voice-select">
+                    <span className="voice-select-label">Порог зачёта</span>
+                    <CustomSelect
+                      value={String(passRatioPercent)}
+                      options={passRatioOptions}
+                      onChange={(next) => {
+                        const parsed = Number(next);
+                        if (!VOICE_PASS_RATIO_OPTIONS.includes(parsed as VoicePassRatioPercent)) return;
+                        dispatch(
+                          voiceTrainerUiActions.setVoicePassRatioPercent({
+                            uiKey,
+                            value: parsed as VoicePassRatioPercent,
+                          }),
+                        );
+                      }}
+                      triggerClassName="voice-select-trigger"
+                      aria-label="Минимальная точность для зачёта"
                     />
                   </div>
                   {partnerRoleSelectOptions.length > 0 ? (
@@ -2199,7 +2240,8 @@ export function VoiceDialogueTrainer({
                         </div>
                         {result ? (
                           <div className={`voice-result ${result.ok ? "ok" : "bad"}`}>
-                            {result.ok ? "Похоже, верно." : "Не совпадает достаточно."} Точность:{" "}
+                            {result.ok ? "Похоже, верно." : `Не совпадает достаточно (нужно ≥${passRatioPercent}%).`}{" "}
+                            Точность:{" "}
                             <b>{Math.round(result.ratio * 100)}%</b>
                           </div>
                         ) : null}

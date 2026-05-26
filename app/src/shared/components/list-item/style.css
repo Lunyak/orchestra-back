@@ -5,8 +5,8 @@
     padding: 4px 8px;
 
     text-align: left;
-    background: #333b52;
-    color: #fff;
+    background: var(--color-bg-quaternary);
+    color: var(--color-text-primary);
     border: none;
     cursor: pointer;
     width: 100%;
@@ -22,7 +22,7 @@
 }
 
 .list-item:hover {
-    background: #3a4b61;
+    background: var(--color-list-item-hover);
 }
 
 /* Не затирать оранжевый active серым hover — чуть темнее tertiary */

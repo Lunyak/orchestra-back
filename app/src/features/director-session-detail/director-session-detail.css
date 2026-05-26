@@ -20,7 +20,7 @@
   justify-content: center;
   border: none;
 
-  /* background: rgba(255, 255, 255, 0.06); */
+  /* background: var(--color-border-faint); */
   color: inherit;
   font-size: 22px;
   line-height: 1;
@@ -30,7 +30,7 @@
 
 .director-session-detail-modal__close:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--color-bg-hover);
 }
 
 .director-session-detail-modal__body {
@@ -74,9 +74,9 @@
 }
 
 .director-session-page__card {
-  /* border: 1px solid rgba(255, 255, 255, 0.12); */
+  /* border: 1px solid var(--color-border-visible); */
   padding: 12px;
-  /* background: rgba(255, 255, 255, 0.04); */
+  /* background: var(--color-bg-transparent-2); */
 }
 
 .director-session-page__card-title {
@@ -94,7 +94,7 @@
   margin: 0;
 }
 
-/* Скролл: max-height + overflow; thumb/track — глобально в App.css (:root, *::-webkit-scrollbar). */
+/* Скролл: max-height + overflow; thumb/track — глобально в shared/styles/global.css. */
 .director-session-page__called-scroll {
   max-height: 300px;
   overflow-y: auto;
@@ -159,7 +159,7 @@
   align-items: flex-start;
   gap: 10px;
   padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-bg-hover);
   background: rgba(0, 0, 0, 0.1);
   min-height: 38px;
   box-sizing: border-box;
@@ -200,22 +200,22 @@
 }
 
 .director-session-page__called-status--ok {
-  color: #7ee787;
+  color: var(--color-status-success-bright);
   opacity: 0.95;
 }
 
 .director-session-page__called-status--warn {
-  color: #fbbf24;
+  color: var(--color-warning);
   opacity: 0.95;
 }
 
 .director-session-page__called-status--bad {
-  color: #f87171;
+  color: var(--color-danger-light);
   opacity: 0.95;
 }
 
 .director-session-page__called-status--confirmed {
-  color: #7ee787;
+  color: var(--color-status-success-bright);
   opacity: 0.98;
 }
 
@@ -226,7 +226,7 @@
 }
 
 .director-session-page__slot {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-bg-hover);
   background: rgba(0, 0, 0, 0.1);
   padding: 10px;
   display: flex;

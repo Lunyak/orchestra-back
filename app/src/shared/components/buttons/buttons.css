@@ -28,7 +28,7 @@
   height: 22px;
   border: none;
   background: inherit;
-  color: #fff;
+  color: var(--color-text-primary);
   cursor: pointer;
   font-size: 14px;
   line-height: 22px;
@@ -36,11 +36,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* background-color: #1d4ed8; */
+  /* background-color: var(--color-primary-dark); */
 }
 
 .icon-action-add:hover:not(:disabled) {
-  background: #1d4fd8b5;
+  background: var(--color-primary-hover-alpha);
 }
 
 .icon-action-add:disabled {
@@ -50,7 +50,7 @@
 
 .icon-action-delete {
   border: none;
-  color: #fff;
+  color: var(--color-text-primary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -63,8 +63,8 @@
   /* top: 7px; */
   width: 16px;
   height: 16px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(185, 28, 28, 0.85);
+  border: 1px solid var(--color-danger-border-soft);
+  background: var(--color-danger-bg-strong);
   font-size: 16px;
 }
 
@@ -75,13 +75,13 @@
   top: 7px;
   width: 16px;
   height: 16px;
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(185, 28, 28, 0.85);
+  border: 1px solid var(--color-danger-border-soft);
+  background: var(--color-danger-bg-strong);
   font-size: 16px;
 }
 
 .icon-action-delete--playlist:hover {
-  background: rgba(220, 38, 38, 0.95);
+  background: var(--color-danger-bg-hover-strong);
 }
 
 /* Script step row */
@@ -92,7 +92,7 @@
   width: 22px;
   height: 22px;
   border-radius: 6px;
-  background: #b91c1c;
+  background: var(--color-danger);
   font-size: 14px;
   line-height: 22px;
   transform: translateY(-50%);
@@ -102,16 +102,16 @@
 }
 
 .icon-action-delete--step:hover {
-  background: #dc2626;
+  background: var(--color-danger-hover);
 }
 
 .icon-action-close {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(2, 6, 23, 0.55);
-  color: #e2e8f0;
+  border: 1px solid var(--color-border-visible);
+  background: var(--color-surface-overlay-dark);
+  color: var(--color-text-ui);
   cursor: pointer;
   font-size: 22px;
   line-height: 1;
@@ -119,8 +119,8 @@
 }
 
 .icon-action-close:hover {
-  background: rgba(2, 6, 23, 0.75);
-  border-color: rgba(96, 165, 250, 0.55);
+  background: var(--color-surface-overlay-dark-hover);
+  border-color: var(--color-blue-border-hover);
 }
 
 .icon-action-close--floating {

@@ -11,10 +11,10 @@ export type KanbanStatusConfig = {
 };
 
 export const STATUSES: KanbanStatusConfig[] = [
-  { id: "raw", label: "Черновик", hint: "", headerBg: "rgba(71, 85, 105, 0.55)" },
-  { id: "text-learned", label: "Нужно взять", hint: "", headerBg: "rgba(30, 58, 138, 0.5)" },
-  { id: "almost-ready", label: "Репетируем", hint: "", headerBg: "rgba(146, 64, 14, 0.45)" },
-  { id: "ready", label: "Готова", hint: "", headerBg: "rgba(21, 128, 61, 0.45)" },
+  { id: "raw", label: "Черновик", hint: "", headerBg: "var(--kanban-col-raw)" },
+  { id: "text-learned", label: "Нужно взять", hint: "", headerBg: "var(--kanban-col-text-learned)" },
+  { id: "almost-ready", label: "Репетируем", hint: "", headerBg: "var(--kanban-col-almost-ready)" },
+  { id: "ready", label: "Готова", hint: "", headerBg: "var(--kanban-col-ready)" },
 ];
 
 export function statusOf(step: ScriptStep): KanbanStatus {

@@ -1,0 +1,206 @@
+          <div className="theater-layout-title">Стены и форма сцены</div>
+          <p className="theater-layout-hint theater-layout-hint--lead">
+            Контур сцены задаётся формой и размерами ниже. На вкладке «План» перетаскивайте
+            двери и углубления по стенам.
+          </p>
+          <div className="theater-layout-grid">
+            <TheaterField label="Форма сцены">
+              <select
+                className="native-text-input"
+                value={layout.stageShape ?? "rectangle"}
+                onChange={(event) =>
+                  updateLayout({
+                    stageShape: event.target.value as TheaterStageShape,
+                    prosceniumEnabled:
+                      event.target.value === "trapezoid" ? true : layout.prosceniumEnabled,
+                  })
+                }
+              >
+                {(Object.keys(STAGE_SHAPE_LABELS) as TheaterStageShape[]).map((shape) => (
+                  <option key={shape} value={shape}>
+                    {STAGE_SHAPE_LABELS[shape]}
+                  </option>
+                ))}
+              </select>
+            </TheaterField>
+            <TheaterField label="Арка у зала">
+              <LabeledCheckbox
+                checked={layout.prosceniumEnabled === true}
+                disabled={(layout.stageShape ?? "rectangle") !== "trapezoid"}
+                onChange={(checked) => updateLayout({ prosceniumEnabled: checked })}
+              >
+                Портал включён
+              </LabeledCheckbox>
+            </TheaterField>
+          </div>
+          {(layout.stageShape ?? "rectangle") !== "rectangle" ? (
+            <div className="theater-layout-grid">
+              <TheaterField label={labelM("Ширина у задней стены")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={2}
+                  max={layout.hallWidth}
+                  step={0.5}
+                  value={layout.stageBackWidth ?? layout.hallWidth}
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateLayout({
+                      stageBackWidth: Number(event.target.value) || layout.hallWidth,
+                    })
+                  }
+                />
+              </TheaterField>
+              <TheaterField
+                label={
+                  (layout.stageShape ?? "rectangle") === "t-shape"
+                    ? labelM("Ширина «ножки»")
+                    : labelM("Ширина у зала")
+                }
+              >
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={2}
+                  max={layout.hallWidth}
+                  step={0.5}
+                  value={layout.prosceniumWidth ?? layout.hallWidth}
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateLayout({
+                      prosceniumWidth: Number(event.target.value) || layout.hallWidth,
+                    })
+                  }
+                />
+              </TheaterField>
+              {(layout.stageShape ?? "rectangle") === "t-shape" ? (
+                <TheaterField label={labelM("Перелом Т (Z)")}>
+                  <input
+                    type="number"
+                    className="native-text-input"
+                    step={0.5}
+                    value={layout.tJunctionZ ?? 0}
+                    onFocus={beginTheaterHistoryTransaction}
+                    onBlur={endTheaterHistoryTransaction}
+                    onChange={(event) =>
+                      updateLayout({ tJunctionZ: Number(event.target.value) || 0 })
+                    }
+                  />
+                </TheaterField>
+              ) : null}
+              {layout.prosceniumEnabled && (layout.stageShape ?? "rectangle") === "trapezoid" ? (
+                <TheaterField label={labelM("Высота арки")}>
+                  <input
+                    type="number"
+                    className="native-text-input"
+                    min={2}
+                    max={layout.wallHeight}
+                    step={0.1}
+                    value={layout.prosceniumHeight ?? layout.wallHeight}
+                    onFocus={beginTheaterHistoryTransaction}
+                    onBlur={endTheaterHistoryTransaction}
+                    onChange={(event) =>
+                      updateLayout({
+                        prosceniumHeight: Number(event.target.value) || layout.wallHeight,
+                      })
+                    }
+                  />
+                </TheaterField>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="theater-layout-title">Углубления в стенах</div>
+          <div className="theater-door-list">
+            {layoutRecesses.map((recess) => (
+              <TheaterBtn
+                key={recess.id}
+                active={recess.id === activeRecessId}
+                onClick={() => setActiveRecessId(recess.id)}
+                title={`${THEATER_RECESS_WALL_LABELS[recess.wall]} · ${recess.width}×${recess.depth} м`}
+              >
+                #{recess.id} {THEATER_RECESS_WALL_LABELS[recess.wall]}
+              </TheaterBtn>
+            ))}
+          </motion.div>
+          <div className="theater-door-actions">
+            <TheaterBtn onClick={() => addWallRecess("left")}>+ Левая ниша</TheaterBtn>
+            <TheaterBtn onClick={() => addWallRecess("right")}>+ Правая</TheaterBtn>
+            <TheaterBtn onClick={() => addWallRecess("back")}>+ Задняя</TheaterBtn>
+            <TheaterBtn
+              onClick={removeActiveWallRecess}
+              disabled={layoutRecesses.length === 0 || activeRecessId == null}
+            >
+              Удалить
+            </TheaterBtn>
+          </div>
+          {activeRecessId != null ? (
+            <div className="theater-layout-grid">
+              <TheaterField label="Стена">
+                <select
+                  className="native-text-input"
+                  value={
+                    layoutRecesses.find((item) => item.id === activeRecessId)?.wall ?? "left"
+                  }
+                  onChange={(event) =>
+                    updateActiveWallRecess({
+                      wall: event.target.value as "left" | "right" | "back",
+                    })
+                  }
+                >
+                  <option value="left">Левая</option>
+                  <option value="right">Правая</option>
+                  <option value="back">Задняя</option>
+                </select>
+              </TheaterField>
+              <TheaterField label={labelM("Позиция")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  step={0.5}
+                  value={layoutRecesses.find((item) => item.id === activeRecessId)?.pos ?? 0}
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateActiveWallRecess({ pos: Number(event.target.value) || 0 })
+                  }
+                />
+              </TheaterField>
+              <TheaterField label={labelM("Длина")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={0.6}
+                  max={4}
+                  step={0.1}
+                  value={layoutRecesses.find((item) => item.id === activeRecessId)?.width ?? 1.5}
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateActiveWallRecess({
+                      width: Math.max(0.6, Number(event.target.value) || 1.5),
+                    })
+                  }
+                />
+              </TheaterField>
+              <TheaterField label={labelM("Глубина")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={0.3}
+                  max={2.5}
+                  step={0.1}
+                  value={layoutRecesses.find((item) => item.id === activeRecessId)?.depth ?? 0.8}
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateActiveWallRecess({
+                      depth: Math.max(0.3, Number(event.target.value) || 0.8),
+                    })
+                  }
+                />
+              </TheaterField>
+            </div>
+          ) : null}
+          <div className="theater-layout-title">Двери</div>

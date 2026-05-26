@@ -1,3 +1,4 @@
+import { tc } from "../../../../shared/styles/theme-color";
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -12,20 +13,24 @@ export const FileModelInstance = ({
   onObjectReady,
   onSelect,
   onActivate,
+  onContextMenu,
   isSelected,
   isHovered,
   onHoverChange,
+  passThroughPointerEvents,
 }: {
   model: TheaterModel;
   url: string;
   isActive?: boolean;
   onActiveObjectChange?: (node: THREE.Group | null, id: number) => void;
   onObjectReady?: (node: THREE.Group | null, id: number) => void;
-  onSelect?: () => void;
+  onSelect?: (additive?: boolean) => void;
   onActivate?: () => void;
+  onContextMenu?: (modelId: number, clientX: number, clientY: number) => void;
   isSelected?: boolean;
   isHovered?: boolean;
   onHoverChange?: (next: boolean) => void;
+  passThroughPointerEvents?: boolean;
 }) => {
   const groupRef = useRef<THREE.Group | null>(null);
   const gltf = useGLTF(url);
@@ -103,15 +108,15 @@ export const FileModelInstance = ({
           data.originalEmissive = standard.emissive.clone();
         }
         if (isSelected) {
-          standard.color.set("#ef4444");
+          standard.color.set(tc("--color-error"));
           if (standard.emissive) {
-            standard.emissive.set("#7f1d1d");
+            standard.emissive.set(tc("--color-danger-emissive"));
             standard.emissiveIntensity = 0.4;
           }
         } else if (isHovered) {
-          standard.color.set("#3b82f6");
+          standard.color.set(tc("--color-primary-light"));
           if (standard.emissive) {
-            standard.emissive.set("#1d4ed8");
+            standard.emissive.set(tc("--color-primary-dark"));
             standard.emissiveIntensity = 0.35;
           }
         } else {
@@ -132,18 +137,33 @@ export const FileModelInstance = ({
       rotation={model.rotation}
       scale={model.scale}
       onPointerDown={(event) => {
+        if (passThroughPointerEvents) return;
         event.stopPropagation();
-        onSelect?.();
+        if (event.button !== 0) return;
+        onSelect?.(event.nativeEvent.shiftKey);
+      }}
+      onContextMenu={(event) => {
+        if (passThroughPointerEvents) return;
+        event.stopPropagation();
+        event.nativeEvent.preventDefault();
+        onContextMenu?.(
+          model.id,
+          event.nativeEvent.clientX,
+          event.nativeEvent.clientY,
+        );
       }}
       onDoubleClick={(event) => {
+        if (passThroughPointerEvents) return;
         event.stopPropagation();
         onActivate?.();
       }}
       onPointerOver={(event) => {
+        if (passThroughPointerEvents) return;
         event.stopPropagation();
         onHoverChange?.(true);
       }}
       onPointerOut={(event) => {
+        if (passThroughPointerEvents) return;
         event.stopPropagation();
         onHoverChange?.(false);
       }}

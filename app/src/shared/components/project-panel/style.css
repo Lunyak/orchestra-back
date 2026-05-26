@@ -3,7 +3,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  color: #e2e8f0;
+  color: var(--color-text-ui);
   font-size: 12px;
 }
 
@@ -12,9 +12,9 @@
 }
 
 .project-panel .custom-select__trigger {
-  background: #1f2937;
-  color: #e2e8f0;
-  border: 1px solid #374151;
+  background: var(--color-border-default);
+  color: var(--color-text-ui);
+  border: 1px solid var(--color-border-light);
   padding: 4px 8px;
   height: 29.5px;
   min-height: 29.5px;
@@ -26,9 +26,9 @@
 }
 
 .project-panel input {
-  background: #1f2937;
-  color: #e2e8f0;
-  border: 1px solid #374151;
+  background: var(--color-border-default);
+  color: var(--color-text-ui);
+  border: 1px solid var(--color-border-light);
   height: 25.5px;
   font-size: 12px;
   min-width: 160px;
@@ -41,13 +41,13 @@
 }
 
 .project-panel button:hover {
-  background: #1d4ed8;
+  background: var(--color-primary-dark);
 }
 
 .project-panel .project-delete {
-  background: #b91c1c;
+  background: var(--color-danger);
 }
 
 .project-panel .project-delete:hover {
-  background: #dc2626;
+  background: var(--color-danger-hover);
 }

@@ -1,0 +1,135 @@
+.role-playing-card {
+  --role-card-w: 136px;
+  --role-card-h: 190px;
+  width: var(--role-card-w);
+  height: var(--role-card-h);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: block;
+  border-radius: 0;
+  overflow: hidden;
+  border: 1px solid rgba(8, 8, 10, 0.92);
+  background:
+    radial-gradient(circle at 50% 46%, rgba(40, 32, 24, 0.04), transparent 34%),
+    linear-gradient(180deg, #fffef8 0%, #f7f2e7 100%);
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.24),
+    inset 0 0 0 5px rgba(255, 255, 255, 0.72);
+  position: relative;
+}
+
+.role-playing-card::before {
+  content: none;
+}
+
+.role-playing-card::after {
+  content: none;
+}
+
+.role-playing-card_sm {
+  --role-card-w: 72px;
+  --role-card-h: 102px;
+}
+
+.role-playing-card_lg {
+  --role-card-w: 160px;
+  --role-card-h: 224px;
+}
+
+.role-playing-card__art {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(35, 28, 22, 0.08), transparent 58%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.role-playing-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.role-playing-card__placeholder {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  color: rgba(23, 18, 26, 0.82);
+  text-transform: uppercase;
+  padding: 8px;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.role-playing-card_sm .role-playing-card__placeholder {
+  font-size: 20px;
+}
+
+.role-playing-card_lg .role-playing-card__placeholder {
+  font-size: 44px;
+}
+
+.role-playing-card__footer {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 10px;
+  z-index: 4;
+  padding: 4px 5px;
+  text-align: center;
+  border: 1px solid var(--color-active-ascent);
+  background: var(--color-active-ascent);
+  min-width: 0;
+}
+
+.role-playing-card__title {
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  color: var(--color-bg-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  overflow-wrap: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.role-playing-card_sm .role-playing-card__title {
+  font-size: 8px;
+}
+
+.role-playing-card_lg .role-playing-card__title {
+  font-size: 13px;
+}
+
+.role-playing-card_sm .role-playing-card__footer {
+  left: 15px;
+  right: 15px;
+  bottom: 6px;
+  padding: 3px 4px;
+}
+
+.role-playing-card_lg .role-playing-card__footer {
+  left: 32px;
+  right: 32px;
+  bottom: 13px;
+  padding: 5px 6px;
+}
+
+.role-playing-card_interactive {
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.role-playing-card_interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+}

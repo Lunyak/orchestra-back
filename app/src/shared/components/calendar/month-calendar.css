@@ -1,13 +1,13 @@
 /* Компактный календарь-месяц: ровная сетка, без скругления у ячеек дней */
 
 .month-cal {
-  --month-cal-line: var(--color-border-visible, rgba(255, 255, 255, 0.12));
-  --month-cal-surface: rgba(255, 255, 255, 0.03);
-  --month-cal-surface-hover: rgba(255, 255, 255, 0.07);
+  --month-cal-line: var(--color-border-visible, var(--color-border-visible));
+  --month-cal-surface: var(--color-bg-transparent-1);
+  --month-cal-surface-hover: var(--color-border-faint-top);
   --month-cal-present: rgba(96, 255, 140, 0.14);
   --month-cal-absent: rgba(255, 120, 120, 0.14);
   --month-cal-selected-ring: rgba(231, 138, 78, 0.85);
-  --month-cal-today-ring: rgba(231, 138, 78, 0.35);
+  --month-cal-today-ring: var(--color-checkbox-disabled-border);
 }
 
 .month-cal__heading {
@@ -38,7 +38,7 @@
 .month-cal__nav-btn {
   padding: 7px 12px;
   border-radius: 0;
-  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.14));
+  border: 1px solid var(--color-border-strong, var(--color-bg-transparent-5));
   background: var(--month-cal-surface);
   color: inherit;
   cursor: pointer;
@@ -49,7 +49,7 @@
 
 .month-cal__nav-btn:hover {
   background: var(--month-cal-surface-hover);
-  border-color: var(--color-border-accent, rgba(148, 163, 184, 0.2));
+  border-color: var(--color-border-accent, var(--color-muted-bg-soft));
 }
 
 .month-cal__month-label {
@@ -112,11 +112,11 @@
 
 .month-cal__cell--other-month {
   color: rgba(255, 255, 255, 0.32);
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--color-bg-scrim-faint);
 }
 
 .month-cal__cell--other-month:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-bg-transparent-2);
 }
 
 .month-cal__cell--other-month.month-cal__cell--present {
@@ -168,7 +168,7 @@
 
 .month-cal__cell--today .month-cal__cell-num {
   font-weight: 800;
-  color: var(--color-bg-tertiary, #e78a4e);
+  color: var(--color-bg-tertiary, var(--color-script-accent));
 }
 
 .month-cal__dots {
@@ -183,7 +183,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: rgba(120, 180, 255, 0.85);
+  background: var(--color-focus-outline-strong);
 }
 
 .month-cal__status-mark {

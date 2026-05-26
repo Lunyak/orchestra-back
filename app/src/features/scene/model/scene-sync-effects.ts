@@ -12,6 +12,8 @@ import { getClientInstanceId } from "../../../realtime/clientInstanceId";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
+import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
+import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
 import { sceneActions, DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 import { loadSceneRolesFromStorage, saveSceneRolesToStorage } from "./scene-roles-storage";
 import { useSceneOperations } from "./scene-operations";
@@ -85,7 +87,13 @@ export function useSceneSyncEffects() {
         dispatch(
           sceneActions.hydrateScene({
             sceneData: mergedScene || null,
-            theaterLayout: (mergedScene as any)?.theaterLayout ?? DEFAULT_THEATER_LAYOUT,
+            theaterLayout: resolveInitialTheaterLayout(
+              projectName,
+              (mergedScene as any)?.theaterLayout
+                ? normalizePersistedTheaterLayout((mergedScene as any).theaterLayout)
+                : undefined,
+              DEFAULT_THEATER_LAYOUT,
+            ),
             steps: (mergedScene as any)?.steps ?? [],
             currentPage: 0,
             isSceneReady: true,

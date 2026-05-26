@@ -18,15 +18,39 @@ import {
 
 function queryErrorMessage(error: unknown, fallback: string): string {
   const e = error as OrchestraQueryError | undefined;
-  return String(e?.message ?? fallback);
+  const dataMessage =
+    e?.data && typeof e.data === "object" && "message" in e.data
+      ? (e.data as { message?: unknown }).message
+      : null;
+  return String(dataMessage ?? e?.message ?? fallback);
+}
+
+function queryErrorStatus(error: unknown): number | undefined {
+  const e = error as OrchestraQueryError | undefined;
+  return typeof e?.status === "number" ? e.status : undefined;
+}
+
+function normalizeEmail(email: string | null | undefined): string {
+  return String(email ?? "").trim().toLowerCase();
 }
 
 export type TroupePageViewModel = ReturnType<typeof useTroupePage>;
 
 export function useTroupePage() {
   const { accessToken } = useAuth();
-  const { projectName, isProjectsLoaded, projectsLoading } = useProject();
-  const { isProjectOwner } = useTeam();
+  const {
+    onProjectChange,
+    projectName,
+    projects,
+    isProjectsLoaded,
+    projectsLoading,
+  } = useProject();
+  const {
+    isProjectOwner,
+    projectMembers,
+    projectMembersLoading,
+    projectOwner,
+  } = useTeam();
 
   const [titleDraft, setTitleDraft] = useState("");
   const [email, setEmail] = useState("");
@@ -106,6 +130,13 @@ export function useTroupePage() {
     [members, selectedMemberId],
   );
 
+  const selectedMemberInProject = useMemo(() => {
+    const email = normalizeEmail(selectedMember?.email);
+    if (!email) return false;
+    if (normalizeEmail(projectOwner?.email) === email) return true;
+    return projectMembers.some((member) => normalizeEmail(member.user.email) === email);
+  }, [projectMembers, projectOwner?.email, selectedMember?.email]);
+
   useEffect(() => {
     if (!selectedMemberId) return;
     if (!members.some((m) => m.id === selectedMemberId)) {
@@ -127,6 +158,13 @@ export function useTroupePage() {
   const inviteSelectedToProject = useCallback(async () => {
     if (!selectedMember || !projectName) return;
     const id = selectedMember.id;
+    if (selectedMemberInProject) {
+      setInviteErrorByMemberId((p) => ({
+        ...p,
+        [id]: "Этот человек уже есть в проекте.",
+      }));
+      return;
+    }
     setInvitingIds((p) => ({ ...p, [id]: true }));
     setInviteErrorByMemberId((p) => {
       const next = { ...p };
@@ -142,7 +180,10 @@ export function useTroupePage() {
     } catch (e: unknown) {
       setInviteErrorByMemberId((p) => ({
         ...p,
-        [id]: queryErrorMessage(e, "Не удалось добавить в проект"),
+        [id]:
+          queryErrorStatus(e) === 409
+            ? "Этот человек уже есть в проекте."
+            : queryErrorMessage(e, "Не удалось добавить в проект"),
       }));
     } finally {
       setInvitingIds((p) => {
@@ -151,7 +192,12 @@ export function useTroupePage() {
         return next;
       });
     }
-  }, [inviteProjectMemberMut, projectName, selectedMember]);
+  }, [
+    inviteProjectMemberMut,
+    projectName,
+    selectedMember,
+    selectedMemberInProject,
+  ]);
 
   const removeSelectedFromTroupe = useCallback(async () => {
     if (!selectedMember?.troupeMemberId || !projectName) return;
@@ -201,9 +247,13 @@ export function useTroupePage() {
     invitingIds,
     loading,
     members,
+    onProjectChange,
     patchTitleError,
     patchingTitle,
     projectName,
+    projects,
+    projectsLoading,
+    projectMembersLoading,
     removeSelectedFromTroupe,
     removingIds,
     saveTitle,
@@ -211,6 +261,7 @@ export function useTroupePage() {
     selectedDayIso,
     selectedMember,
     selectedMemberId,
+    selectedMemberInProject,
     setCurrentMonth,
     setEmail,
     setSelectedDayIso,

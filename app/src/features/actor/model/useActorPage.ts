@@ -309,7 +309,7 @@ export function useActorPage() {
     if (!projectName || !myEmail || !roleKey) return "";
     return [
       "actorTrainer",
-      "wordOrder",
+      "phraseWrite",
       projectName,
       normalizeActorKey(myEmail),
       roleKey,

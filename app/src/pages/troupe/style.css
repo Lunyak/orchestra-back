@@ -56,14 +56,14 @@
 }
 
 .troupe-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-visible);
   padding: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-bg-transparent-2);
 }
 
 .troupe-error {
   margin-top: 8px;
-  color: #ff7b72;
+  color: var(--color-danger-light);
   font-size: 12px;
 }
 
@@ -87,30 +87,30 @@
   height: 10px;
   border-radius: 3px;
   display: inline-block;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--color-border-input-soft);
 }
 
 .troupe-dot.free {
-  background: rgba(46, 160, 67, 0.85);
+  background: var(--color-status-success);
 }
 
 .troupe-dot.partial {
-  background: rgba(88, 166, 255, 0.85);
+  background: var(--color-status-info);
 }
 
 .troupe-dot.busy {
-  background: rgba(248, 81, 73, 0.85);
+  background: var(--color-status-error);
 }
 
 .troupe-dot.unknown {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-border-visible);
 }
 
 .troupe-schedule {
   margin-top: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-visible);
   overflow: auto;
-  background: rgba(0, 0, 0, 0.12);
+  background: var(--color-bg-scrim-faint);
 }
 
 .troupe-grid {
@@ -122,8 +122,8 @@
   --troupe-grid-span: 32;
   --troupe-mark-w: 1px;
   --troupe-mark-overlap: 1px;
-  --troupe-mark-orange: rgba(231, 138, 78, 0.92);
-  --troupe-mark-blue: rgba(96, 165, 250, 0.92);
+  --troupe-mark-orange: var(--color-accent-orange);
+  --troupe-mark-blue: var(--color-accent-blue-strong);
 
   display: grid;
   grid-template-columns: var(--troupe-label-w, 240px) repeat(var(--troupe-day-count), var(--troupe-day-w, 28px));
@@ -159,7 +159,7 @@
 }
 
 .troupe-header-cell--day-head:focus-visible {
-  outline: 2px solid rgba(96, 165, 250, 0.45);
+  outline: 2px solid var(--color-blue-border);
   outline-offset: 2px;
 }
 
@@ -181,22 +181,22 @@
 
 .troupe-header-cell.troupe-header-cell--today:not(.troupe-header-cell--col-selected) .troupe-header-day-num,
 .troupe-header-cell.troupe-header-cell--today:not(.troupe-header-cell--col-selected) .troupe-header-day-wd {
-  color: #fff;
+  color: var(--color-text-primary);
   opacity: 1;
 }
 
 .troupe-header-cell.troupe-header-cell--col-selected .troupe-header-day-num,
 .troupe-header-cell.troupe-header-cell--col-selected .troupe-header-day-wd {
-  color: #fff;
+  color: var(--color-text-primary);
   opacity: 1;
 }
 
 .troupe-header-cell.troupe-header-cell--today:not(.troupe-header-cell--col-selected) {
-  background: rgba(231, 138, 78, 0.22);
+  background: var(--color-accent-orange-bg);
 }
 
 .troupe-header-cell.troupe-header-cell--col-selected {
-  background: rgba(96, 165, 250, 0.24);
+  background: var(--color-accent-blue-bg-medium);
 }
 
 .troupe-header-cell.troupe-header-cell--today::before {
@@ -310,8 +310,8 @@
 
 .troupe-cell {
   box-sizing: border-box;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--color-border-faint);
+  border-bottom: 1px solid var(--color-border-faint);
   /* padding: 4px 6px; */
   min-height: 28px;
   display: flex;
@@ -323,7 +323,7 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--color-surface-panel);
   backdrop-filter: blur(6px);
 
   display: flex;
@@ -337,9 +337,9 @@
   left: 0;
   z-index: 6;
   justify-content: flex-start;
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--color-surface-panel);
   backdrop-filter: blur(6px);
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid var(--color-border-visible);
 }
 
 .troupe-actor-cell {
@@ -350,7 +350,7 @@
 }
 
 .troupe-actor-cell.selected {
-  background: rgba(231, 139, 78, 0.778);
+  background: var(--color-accent-orange-strong);
 }
 
 .troupe-actor-cell.selected .troupe-actor-row {
@@ -360,7 +360,7 @@
 
 .troupe-actor-cell.selected .troupe-actor-name,
 .troupe-actor-cell.selected .troupe-actor-email {
-  color: #fff;
+  color: var(--color-text-primary);
   opacity: 1;
 }
 
@@ -396,6 +396,19 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.troupe-project-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.troupe-project-field__label {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.8;
 }
 
 .troupe-project-select {
@@ -458,9 +471,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--color-border-input);
+  background: var(--color-border-subtle);
+  color: var(--color-text-high);
   font-size: 16px;
   line-height: 1;
   font-weight: 700;
@@ -473,8 +486,8 @@
 }
 
 .troupe-month-nav button:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.26);
+  background: var(--color-bg-transparent-5);
+  border-color: var(--color-border-emphasis);
 }
 
 .troupe-month-nav button:active {
@@ -483,7 +496,7 @@
 
 .troupe-month-nav button:focus-visible {
   outline: none;
-  border-color: rgba(231, 139, 78, 0.75);
+  border-color: var(--color-accent-orange-border);
   box-shadow: 0 0 0 2px rgba(231, 139, 78, 0.25);
 }
 
@@ -503,8 +516,8 @@
 
 .troupe-form-row__btn {
   padding: 8px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border-input);
+  background: var(--color-border-subtle);
   color: inherit;
   font-weight: 600;
   cursor: pointer;
@@ -531,62 +544,62 @@
 }
 
 .troupe-day-cell.free {
-  background: rgba(46, 160, 67, 0.22);
+  background: var(--color-status-success-bg-medium);
 }
 
 .troupe-day-cell.partial {
-  background: rgba(88, 166, 255, 0.22);
+  background: var(--color-status-info-bg-medium);
   background-image: repeating-linear-gradient(
     135deg,
-    rgba(88, 166, 255, 0.35) 0px,
-    rgba(88, 166, 255, 0.35) 6px,
-    rgba(88, 166, 255, 0.12) 6px,
-    rgba(88, 166, 255, 0.12) 12px
+    var(--color-status-info-stripe) 0px,
+    var(--color-status-info-stripe) 6px,
+    var(--color-status-info-bg-faint) 6px,
+    var(--color-status-info-bg-faint) 12px
   );
 }
 
 .troupe-day-cell.busy {
-  background: rgba(248, 81, 73, 0.22);
+  background: var(--color-status-error-bg-medium);
 }
 
 .troupe-day-cell.unknown {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-bg-transparent-0);
 }
 
 .troupe-day-cell.free.selected {
-  background-color: rgba(46, 160, 67, 0.22);
+  background-color: var(--color-status-success-bg-medium);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.2),
-    rgba(231, 138, 78, 0.2)
+    var(--color-accent-orange-bg-soft),
+    var(--color-accent-orange-bg-soft)
   );
 }
 
 .troupe-day-cell.partial.selected {
-  background-color: rgba(88, 166, 255, 0.22);
+  background-color: var(--color-status-info-bg-medium);
   background-image:
-    linear-gradient(rgba(231, 138, 78, 0.2), rgba(231, 138, 78, 0.2)),
+    linear-gradient(var(--color-accent-orange-bg-soft), var(--color-accent-orange-bg-soft)),
     repeating-linear-gradient(
       135deg,
-      rgba(88, 166, 255, 0.35) 0px,
-      rgba(88, 166, 255, 0.35) 6px,
-      rgba(88, 166, 255, 0.12) 6px,
-      rgba(88, 166, 255, 0.12) 12px
+      var(--color-status-info-stripe) 0px,
+      var(--color-status-info-stripe) 6px,
+      var(--color-status-info-bg-faint) 6px,
+      var(--color-status-info-bg-faint) 12px
     );
 }
 
 .troupe-day-cell.busy.selected {
-  background-color: rgba(248, 81, 73, 0.22);
+  background-color: var(--color-status-error-bg-medium);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.2),
-    rgba(231, 138, 78, 0.2)
+    var(--color-accent-orange-bg-soft),
+    var(--color-accent-orange-bg-soft)
   );
 }
 
 .troupe-day-cell.unknown.selected {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--color-bg-transparent-0);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.2),
-    rgba(231, 138, 78, 0.2)
+    var(--color-accent-orange-bg-soft),
+    var(--color-accent-orange-bg-soft)
   );
 }
 
@@ -600,18 +613,18 @@
   font-size: 11px;
   padding: 4px 8px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-border-input);
+  background: var(--color-border-faint);
   color: inherit;
   cursor: pointer;
 }
 
 .troupe-mini-btn:hover {
-  background: rgba(255, 255, 255, 0.10);
+  background: var(--color-border-medium);
 }
 
 .troupe-mini-btn.danger {
-  border-color: rgba(248, 81, 73, 0.35);
+  border-color: var(--color-status-error-border);
 }
 
 @media (max-width: 720px) {
@@ -624,7 +637,7 @@
     order: 10;
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--color-bg-hover);
   }
 
   .troupe-layout .main-content {
@@ -745,6 +758,13 @@
     align-items: stretch;
   }
 
+  .troupe-project-field {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
   .troupe-actions-right .troupe-project-select {
     max-width: none;
     width: 100%;
@@ -856,5 +876,19 @@
   .troupe-calendar-hint--mobile {
     display: block;
   }
+}
+
+.premises-troupe-link {
+  margin: 4px 0 0;
+}
+
+.premises-troupe-link a {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.premises-troupe-link a:hover {
+  color: var(--color-text-primary);
 }
 

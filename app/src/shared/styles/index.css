@@ -1,5 +1,8 @@
 /* Главный файл стилей - импортируйте его в App или index.css */
 @import url("https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=IBM+Plex+Mono:wght@400&display=swap");
 @import './variables.css';
-
-/* Вы можете добавить сюда дополнительные глобальные стили или утилиты */
+@import './global.css';
+@import './themes/light.css';
+@import './themes/midnight.css';
+@import '../layout/app-shell.css';
+@import '../core/native-fields/style.css';

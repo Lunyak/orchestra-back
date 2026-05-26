@@ -22,8 +22,8 @@
 }
 
 .profile-tab-btn {
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-bg-transparent-5);
+  background: var(--color-border-faint);
   color: var(--color-text-lighter);
   padding: 8px 12px;
   font-size: 12px;
@@ -44,14 +44,28 @@
 .profile-tabs-disabled-note {
   margin-top: 10px;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-bg-transparent-5);
+  background: var(--color-bg-transparent-2);
   font-size: 12px;
   opacity: 0.9;
 }
 
 .profile-tab-content {
   margin-top: 8px;
+}
+
+.profile-role-work-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px;
+  max-width: 100%;
+}
+
+.profile-role-work-card {
+  display: grid;
+  justify-items: center;
+  width: 136px;
 }
 
 /* Вкладка «Занятость»: подсказки и панель дня */
@@ -74,8 +88,8 @@
   font-size: 12px;
   line-height: 1.45;
   opacity: 0.88;
-  border: 1px solid var(--color-border-visible, rgba(255, 255, 255, 0.12));
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border-visible, var(--color-border-visible));
+  background: var(--color-bg-transparent-2);
   border-radius: 0;
 }
 
@@ -112,8 +126,8 @@
 .profile-availability-panel {
   margin-top: 8px;
   border-radius: 0;
-  border: 1px solid var(--color-border-visible, rgba(255, 255, 255, 0.12));
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border-visible, var(--color-border-visible));
+  background: var(--color-bg-transparent-2);
   padding: 12px;
 }
 
@@ -122,7 +136,7 @@
   font-size: 14px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .profile-availability-section-label {
@@ -185,7 +199,7 @@
 }
 
 .profile-availability-session-link {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-visible);
   border-radius: 0;
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.1);
@@ -202,7 +216,7 @@ button.profile-availability-session-link {
 }
 
 .profile-availability-session-link--muted {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-bg-transparent-2);
 }
 
 .profile-availability-session-title {

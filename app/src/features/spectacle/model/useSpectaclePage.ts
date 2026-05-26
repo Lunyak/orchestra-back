@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../../auth";
 import { useMyProfileQuery } from "../../profile/api/profile-api";
@@ -7,6 +7,7 @@ import { useScene } from "../../scene";
 import { useScriptUI } from "../../script-ui";
 import { useTeam } from "../../team";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
+import { patchTheaterViewPrefs, readTheaterViewPrefs } from "../../theater/model/theater-view-prefs-storage";
 import type { SpectacleActiveView } from "./spectacle-page-types";
 
 export type SpectaclePageViewModel = ReturnType<typeof useSpectaclePage>;
@@ -53,7 +54,30 @@ export function useSpectaclePage() {
     setIsEditing,
     swapTheaterPanels: shouldSwapPanels,
     togglePanels,
+    showTheaterControls,
+    setShowTheaterControls,
+    setSwapTheaterPanels,
+    toggleTheaterControls,
   } = useScriptUI();
+
+  useLayoutEffect(() => {
+    if (!projectName) return;
+    const prefs = readTheaterViewPrefs(projectName);
+    setSwapTheaterPanels(prefs.swapTheaterPanels);
+    setShowTheaterControls(prefs.showTheaterControls);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restore only on project switch
+  }, [projectName]);
+
+  const togglePanelsWithPersist = useCallback(() => {
+    const nextSwap = !shouldSwapPanels;
+    togglePanels();
+    if (projectName) {
+      patchTheaterViewPrefs(projectName, {
+        swapTheaterPanels: nextSwap,
+        ...(nextSwap ? { showTheaterControls: true } : {}),
+      });
+    }
+  }, [projectName, shouldSwapPanels, togglePanels]);
 
   const prevIsEditingRef = useRef(isEditing);
   useEffect(() => {
@@ -87,10 +111,16 @@ export function useSpectaclePage() {
     };
   }, [isMobile, mobilePlaylistOpen, mobileStepsOpen]);
 
-  const [theaterControlsHost, setTheaterControlsHost] =
+  const [theaterMainControlsHost, setTheaterMainControlsHost] =
     useState<HTMLDivElement | null>(null);
-  const setTheaterControlsHostRef = useCallback((node: HTMLDivElement | null) => {
-    setTheaterControlsHost(node);
+  const setTheaterMainControlsHostRef = useCallback((node: HTMLDivElement | null) => {
+    setTheaterMainControlsHost(node);
+  }, []);
+
+  const [theaterOutlinerHost, setTheaterOutlinerHost] =
+    useState<HTMLDivElement | null>(null);
+  const setTheaterOutlinerHostRef = useCallback((node: HTMLDivElement | null) => {
+    setTheaterOutlinerHost(node);
   }, []);
 
   const activeView: SpectacleActiveView =
@@ -174,16 +204,21 @@ export function useSpectaclePage() {
     setIsStepsCollapsed,
     setMobilePlaylistOpen,
     setMobileStepsOpen,
-    setTheaterControlsHostRef,
+    setTheaterMainControlsHostRef,
+    setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowStepsSidebar,
     shouldSwapPanels,
     showHeaderSounds,
     showPlaylistSidebar,
+    showTheaterControls,
     steps,
-    theaterControlsHost,
+    theaterMainControlsHost,
+    theaterOutlinerHost,
     theaterLayout,
-    togglePanels,
+    togglePanels: togglePanelsWithPersist,
+    toggleTheaterControls,
     togglePlaylist,
+    setShowTheaterControls,
   };
 }

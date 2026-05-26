@@ -1,4 +1,6 @@
-import "../App.css";
+import "../index.css";
+import { bootstrapTheme } from "../shared/styles/theme/apply-theme";
+import { ThemeProvider } from "../shared/styles/theme/ThemeProvider";
 import { useAuth, useAuthBootstrap } from "../features/auth";
 import { ProjectProvider } from "../features/project";
 import { SceneSyncRunner } from "../features/scene";
@@ -13,6 +15,8 @@ import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
 import { Route, Routes } from "react-router-dom";
 import { ChatDock } from "../features/chat";
+
+bootstrapTheme();
 
 export interface AppProps {
   /** После логина/регистрации (только desktop — выгрузка локальных данных). */
@@ -56,12 +60,13 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
 
 export default function App({ onAfterLogin, onPushAllLocal, onResyncProject }: AppProps) {
   return (
-    <StoreProvider>
-      <SpectaclePageLockGuard />
-      <PlatformProvider value={{ onPushAllLocal, onResyncProject }}>
-        <AuthenticatedApp onAfterLogin={onAfterLogin} />
-      </PlatformProvider>
-    </StoreProvider>
+    <ThemeProvider>
+      <StoreProvider>
+        <SpectaclePageLockGuard />
+        <PlatformProvider value={{ onPushAllLocal, onResyncProject }}>
+          <AuthenticatedApp onAfterLogin={onAfterLogin} />
+        </PlatformProvider>
+      </StoreProvider>
+    </ThemeProvider>
   );
 }
-

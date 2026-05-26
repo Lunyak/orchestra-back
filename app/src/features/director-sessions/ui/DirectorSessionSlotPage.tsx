@@ -531,8 +531,8 @@ export function DirectorSessionSlotPage() {
                     overflow: "auto",
                     padding: 10,
                     borderRadius: 10,
-                    border: "1px solid rgba(255,255,255,0.10)",
-                    background: "rgba(0,0,0,0.20)",
+                    border: "1px solid var(--color-border-medium)",
+                    background: "var(--color-bg-scrim)",
                     fontSize: 12,
                     lineHeight: 1.35,
                   }}
@@ -599,8 +599,8 @@ export function DirectorSessionSlotPage() {
                   height: 34,
                   padding: "0 12px",
                   borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid var(--color-border-strong)",
+                  background: "var(--color-bg-transparent-3)",
                   color: "inherit",
                   cursor: "pointer",
                   fontWeight: 800,
@@ -618,8 +618,8 @@ export function DirectorSessionSlotPage() {
                   height: 34,
                   padding: "0 12px",
                   borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid var(--color-border-strong)",
+                  background: "var(--color-bg-transparent-3)",
                   color: "inherit",
                   cursor: "pointer",
                   fontWeight: 800,
@@ -760,15 +760,15 @@ export function DirectorSessionSlotPage() {
                       textAlign: "left",
                       borderRadius: 12,
                       border: isSelected
-                        ? "1px solid rgba(96,165,250,0.55)"
+                        ? "1px solid var(--color-blue-border-hover)"
                         : ok
-                          ? "1px solid rgba(46,160,67,0.28)"
-                          : "1px solid rgba(248,81,73,0.22)",
+                          ? "1px solid var(--color-success-border-soft)"
+                          : "1px solid var(--color-status-error-bg-medium)",
                       background: isSelected
-                        ? "rgba(96,165,250,0.10)"
+                        ? "var(--color-status-info-bg-light)"
                         : ok
-                          ? "rgba(46,160,67,0.08)"
-                          : "rgba(248,81,73,0.06)",
+                          ? "var(--color-status-success-bg)"
+                          : "var(--color-status-error-bg)",
                       padding: "10px 10px",
                       cursor: "pointer",
                       color: "inherit",
@@ -789,7 +789,7 @@ export function DirectorSessionSlotPage() {
                       {ok ? (
                         <span
                           style={{
-                            color: "rgba(126, 231, 135, 0.95)",
+                            color: "var(--color-status-success-text)",
                             fontWeight: 800,
                           }}
                         >
@@ -798,7 +798,7 @@ export function DirectorSessionSlotPage() {
                       ) : (
                         <span
                           style={{
-                            color: "rgba(248, 81, 73, 0.95)",
+                            color: "var(--color-status-error-text)",
                             fontWeight: 800,
                           }}
                         >

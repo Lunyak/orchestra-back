@@ -24,6 +24,30 @@ interface PlaylistSidebarProps {
 
 const EMPTY_PLAYLIST: PlaylistTrack[] = [];
 
+type PlaylistCarryover = {
+  audio: HTMLAudioElement;
+  track: PlaylistTrack;
+  projectName: string;
+  sceneName: string;
+  progress: number;
+  duration: number;
+  volume: number;
+};
+
+let playlistCarryover: PlaylistCarryover | null = null;
+
+function clearPlaylistCarryover() {
+  if (!playlistCarryover) return;
+  try {
+    playlistCarryover.audio.pause();
+    playlistCarryover.audio.removeAttribute("src");
+    playlistCarryover.audio.load();
+  } catch {
+    // Best-effort cleanup only.
+  }
+  playlistCarryover = null;
+}
+
 export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   projectName,
   sceneName = "script",
@@ -52,6 +76,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const audioFade = useMemo(() => createAudioFadeController(), []);
   const playRequestId = useRef(0);
   const messageTimerRef = useRef<number | null>(null);
+  const currentTrackRef = useRef<PlaylistTrack | null>(currentTrack);
+  const activeAudioKeyRef = useRef<"a" | "b">(activeAudioKey);
+  const volumeRef = useRef(volume);
+  const progressRef = useRef(progress);
+  const durationRef = useRef(duration);
+  const projectNameRef = useRef(projectName);
+  const sceneNameRef = useRef(sceneName);
 
   const [preloadRunning, setPreloadRunning] = useState(false);
   const [preloadDone, setPreloadDone] = useState(0);
@@ -74,6 +105,34 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const progressPercent =
     duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
   const volumePercent = Math.min(100, Math.max(0, volume * 100));
+
+  useEffect(() => {
+    currentTrackRef.current = currentTrack;
+  }, [currentTrack]);
+
+  useEffect(() => {
+    activeAudioKeyRef.current = activeAudioKey;
+  }, [activeAudioKey]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    progressRef.current = progress;
+  }, [progress]);
+
+  useEffect(() => {
+    durationRef.current = duration;
+  }, [duration]);
+
+  useEffect(() => {
+    projectNameRef.current = projectName;
+  }, [projectName]);
+
+  useEffect(() => {
+    sceneNameRef.current = sceneName;
+  }, [sceneName]);
 
   const showMessage = (message: string) => {
     setUiMessage(message);
@@ -195,6 +254,123 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     },
     [projectName],
   );
+
+  const restoreCarryover = useCallback(
+    async (track: PlaylistTrack) => {
+      const carryover = playlistCarryover;
+      const targetAudio = audioRefA.current;
+      if (!carryover || !targetAudio) return;
+      if (carryover.projectName !== projectName || carryover.sceneName !== sceneName) {
+        return;
+      }
+      if (Number(carryover.track.id) !== Number(track.id)) return;
+
+      playRequestId.current += 1;
+      const requestId = playRequestId.current;
+      const sourceAudio = carryover.audio;
+      const sourceTime = sourceAudio.currentTime || carryover.progress || 0;
+      const sourceDuration = Number.isFinite(sourceAudio.duration)
+        ? sourceAudio.duration
+        : carryover.duration;
+      const sourceVolume = Number.isFinite(sourceAudio.volume)
+        ? sourceAudio.volume
+        : carryover.volume;
+      const sourceWasPlaying = !sourceAudio.paused && !sourceAudio.ended;
+
+      setActiveAudioKey("a");
+      setCurrentTrack(track);
+      setVolume(sourceVolume);
+      setProgress(sourceTime);
+      setDuration(Number.isFinite(sourceDuration) ? sourceDuration : 0);
+      setIsPlaying(sourceWasPlaying);
+
+      targetAudio.src = sourceAudio.src;
+      targetAudio.currentTime = sourceTime;
+      targetAudio.volume = sourceVolume;
+      targetAudio.loop = sourceAudio.loop;
+      targetAudio.muted = false;
+      tagPlayRequest(targetAudio, requestId, targetAudio.src);
+
+      playlistCarryover = null;
+
+      if (!sourceWasPlaying) {
+        try {
+          sourceAudio.pause();
+          sourceAudio.removeAttribute("src");
+          sourceAudio.load();
+        } catch {
+          // Best-effort cleanup only.
+        }
+        return;
+      }
+
+      try {
+        await targetAudio.play();
+        if (requestId !== playRequestId.current) {
+          targetAudio.pause();
+          return;
+        }
+        sourceAudio.pause();
+        sourceAudio.removeAttribute("src");
+        sourceAudio.load();
+      } catch (error) {
+        console.error("Ошибка восстановления воспроизведения:", error);
+        playlistCarryover = carryover;
+      }
+    },
+    [projectName, sceneName],
+  );
+
+  useEffect(() => {
+    const carryover = playlistCarryover;
+    if (!carryover) return;
+    if (carryover.projectName !== projectName || carryover.sceneName !== sceneName) return;
+    const track = playlist.find(
+      (item) => Number(item.id) === Number(carryover.track.id),
+    );
+    if (!track) return;
+    void restoreCarryover(track);
+  }, [playlist, projectName, sceneName, restoreCarryover]);
+
+  useEffect(() => {
+    return () => {
+      const track = currentTrackRef.current;
+      const activeAudio =
+        activeAudioKeyRef.current === "a" ? audioRefA.current : audioRefB.current;
+      if (!track || !activeAudio || activeAudio.paused || !activeAudio.src) return;
+
+      clearPlaylistCarryover();
+
+      const carryoverAudio = new Audio(activeAudio.src);
+      const progressValue = activeAudio.currentTime || progressRef.current || 0;
+      const durationValue = Number.isFinite(activeAudio.duration)
+        ? activeAudio.duration
+        : durationRef.current;
+      const volumeValue = Number.isFinite(activeAudio.volume)
+        ? activeAudio.volume
+        : volumeRef.current;
+
+      carryoverAudio.currentTime = progressValue;
+      carryoverAudio.volume = volumeValue;
+      carryoverAudio.loop = activeAudio.loop;
+      carryoverAudio.muted = false;
+
+      playlistCarryover = {
+        audio: carryoverAudio,
+        track,
+        projectName: projectNameRef.current,
+        sceneName: sceneNameRef.current,
+        progress: progressValue,
+        duration: durationValue,
+        volume: volumeValue,
+      };
+
+      carryoverAudio.play().catch((error) => {
+        console.error("Ошибка продолжения воспроизведения:", error);
+        clearPlaylistCarryover();
+      });
+    };
+  }, []);
 
   const clearFadeTimer = useCallback(
     (key: "a" | "b") => {

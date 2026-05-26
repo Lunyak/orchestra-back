@@ -1,0 +1,47 @@
+            </TheaterField>
+          </div>
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-walls-3d"
+            title="Стены в 3D"
+            summary="Видимость и высота"
+          >
+            <div className="theater-compact-checks">
+              <LabeledCheckbox
+                checked={wallsHideFromCamera}
+                disabled={wallsHidden}
+                onChange={setWallsHideFromCamera}
+              >
+                Скрыть перед камерой
+              </LabeledCheckbox>
+              <LabeledCheckbox
+                checked={wallsOpaque}
+                disabled={wallsHidden}
+                onChange={(checked) => {
+                  setWallsOpaque(checked);
+                  if (checked) setWallsHidden(false);
+                }}
+              >
+                Непрозрачные
+              </LabeledCheckbox>
+              <LabeledCheckbox
+                checked={wallsHidden}
+                onChange={(checked) => {
+                  setWallsHidden(checked);
+                  if (checked) setWallsOpaque(false);
+                }}
+              >
+                Скрыть все
+              </LabeledCheckbox>
+            </div>
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-stage"
+            title="Контур и форма"
+            summary={layoutShapeLabel}
+            badge={isCustomStageOutline ? "Свой контур" : undefined}
+            defaultOpen={isCustomStageOutline}
+          >
+          <TheaterStageLayoutGuide layout={layout} compact />

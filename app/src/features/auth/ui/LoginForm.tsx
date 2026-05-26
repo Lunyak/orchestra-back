@@ -1,3 +1,4 @@
+import "./login.css";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import React, { useState } from "react";

@@ -1,10 +1,17 @@
 import { Button } from "@shared/core/button/Button";
+import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { Fragment, useSyncExternalStore, type CSSProperties } from "react";
+import {
+  Fragment,
+  useMemo,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
+import { Link } from "react-router-dom";
 import {
   getTroupeNarrowLayoutSnapshot,
   isoDate,
@@ -40,9 +47,13 @@ export function TroupePage() {
     invitingIds,
     loading,
     members,
+    onProjectChange,
     patchTitleError,
     patchingTitle,
     projectName,
+    projects,
+    projectsLoading,
+    projectMembersLoading,
     removeSelectedFromTroupe,
     removingIds,
     saveTitle,
@@ -50,6 +61,7 @@ export function TroupePage() {
     selectedDayIso,
     selectedMember,
     selectedMemberId,
+    selectedMemberInProject,
     setCurrentMonth,
     setEmail,
     setSelectedDayIso,
@@ -59,6 +71,11 @@ export function TroupePage() {
     todayIso,
     troupe,
   } = useTroupePage();
+
+  const projectSelectOptions = useMemo(
+    () => projects.map((slug) => ({ value: slug, label: slug })),
+    [projects],
+  );
 
   if (!accessToken)
     return <div>Нужно войти, чтобы открыть страницу труппы.</div>;
@@ -71,6 +88,9 @@ export function TroupePage() {
             <div className="troupe-header">
               <div>
                 <h2 className="troupe-header__title">Труппа</h2>
+                <p className="premises-troupe-link">
+                  <Link to="/premises">Помещения и аренда →</Link>
+                </p>
               </div>
             </div>
 
@@ -190,28 +210,57 @@ export function TroupePage() {
                   )}
                 </div>
                 <div className="troupe-actions-right">
-                  {canManageProjectTroupe && projectName ? (
+                  {canManageProjectTroupe ? (
                     <>
+                      <label className="troupe-project-field">
+                        <span className="troupe-project-field__label">
+                          Проект
+                        </span>
+                        <CustomSelect
+                          value={projects.length > 0 ? projectName : ""}
+                          options={projectSelectOptions}
+                          onChange={onProjectChange}
+                          placeholder="Выберите проект"
+                          noOptionsLabel="Проектов нет"
+                          disabled={projects.length === 0 || projectsLoading}
+                          triggerClassName="troupe-project-select"
+                          aria-label="Проект для добавления участника"
+                        />
+                      </label>
                       <Button
                         className="primary"
                         type="button"
                         disabled={
-                          !selectedMember || !!invitingIds[selectedMember.id]
+                          !projectName ||
+                          !selectedMember ||
+                          projectMembersLoading ||
+                          selectedMemberInProject ||
+                          !!invitingIds[selectedMember.id]
                         }
                         onClick={() => {
                           void inviteSelectedToProject();
                         }}
                         title={
-                          selectedMember
-                            ? `Добавить в проект`
-                            : "Выбери участника"
+                          !projectName
+                            ? "Выберите проект"
+                            : projectMembersLoading
+                              ? "Проверяем участников проекта"
+                            : selectedMember
+                              ? selectedMemberInProject
+                                ? "Этот человек уже есть в проекте"
+                                : `Добавить в проект «${projectName}»`
+                              : "Выбери участника"
                         }
                       >
                         {selectedMember && invitingIds[selectedMember.id]
                           ? "…"
-                          : narrowLayout
-                            ? "В проект"
-                            : "Добавить в проект"}
+                          : projectMembersLoading
+                            ? "Проверка…"
+                            : selectedMemberInProject
+                              ? "Уже в проекте"
+                              : narrowLayout
+                                ? "В проект"
+                                : "Добавить в проект"}
                       </Button>
                       <Button
                         type="button"
@@ -253,6 +302,11 @@ export function TroupePage() {
                   </Button>
                 </div>
               </div>
+              {selectedMember && selectedMemberInProject ? (
+                <div className="troupe-hint troupe-hint--after-form">
+                  {memberLabel(selectedMember)} уже есть в проекте «{projectName}».
+                </div>
+              ) : null}
               {selectedMember && inviteErrorByMemberId[selectedMember.id] ? (
                 <div className="troupe-error">
                   {inviteErrorByMemberId[selectedMember.id]}

@@ -1,0 +1,52 @@
+            </div>
+          ) : null}
+          </TheaterCollapsibleSection>
+
+          {(layout.stageShape ?? "rectangle") !== "custom" ? (
+          <>
+          <TheaterCollapsibleSection
+            sectionId="layout-recesses"
+            title="Ниши"
+            summary="Углубления в стенах"
+            badge={layoutRecesses.length > 0 ? String(layoutRecesses.length) : undefined}
+          >
+          <div className="theater-door-list">
+
+---
+
+          <div className="theater-btn-row theater-btn-row--3">
+            <TheaterBtn onClick={() => addWallRecess("left")}>+ Лев.</TheaterBtn>
+            <TheaterBtn onClick={() => addWallRecess("right")}>+ Прав.</TheaterBtn>
+            <TheaterBtn onClick={() => addWallRecess("back")}>+ Задн.</TheaterBtn>
+          </div>
+          <TheaterBtn
+            onClick={removeActiveWallRecess}
+            disabled={layoutRecesses.length === 0 || activeRecessId == null}
+          >
+            Удалить нишу
+          </TheaterBtn>
+
+---
+
+            </div>
+          ) : null}
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-doors"
+            title="Двери"
+            summary="Проёмы в стенах"
+            badge={layoutDoors.length > 0 ? String(layoutDoors.length) : undefined}
+          >
+          <div className="theater-door-list">
+
+---
+
+          <p className="theater-layout-hint">
+            На плане: перетаскивание дверей; кружки — ширина проёма.
+          </p>
+          </TheaterCollapsibleSection>
+          </>
+          ) : null}
+        </div>
+      )}

@@ -1,6 +1,9 @@
 import React, { useCallback } from "react";
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
+import { writeTheaterLayoutDraft } from "../../theater/model/theater-layout-draft-storage";
+import { useProject } from "../../project/model/project-context";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { store } from "../../../shared/store/store";
 import { sceneActions, type SceneData, type SceneRoleLinkV1, type SceneRolesDataV1 } from "./scene-slice";
 import { useSceneOperations } from "./scene-operations";
 import { useSceneSyncEffects } from "./scene-sync-effects";
@@ -59,6 +62,7 @@ export const SceneProvider = SceneSyncRunner;
 
 export function useScene(): SceneContextValue {
   const dispatch = useAppDispatch();
+  const { projectName } = useProject();
   const {
     sceneData,
     steps,
@@ -109,13 +113,12 @@ export function useScene(): SceneContextValue {
 
   const setTheaterLayout = useCallback(
     (next: SetStateAction<TheaterLayout>) => {
-      const resolved =
-        typeof next === "function"
-          ? (next as (prev: TheaterLayout) => TheaterLayout)(theaterLayout)
-          : next;
-      dispatch(sceneActions.setTheaterLayout(resolved));
+      dispatch(sceneActions.setTheaterLayout(next));
+      if (projectName) {
+        writeTheaterLayoutDraft(projectName, store.getState().scene.theaterLayout);
+      }
     },
-    [dispatch, theaterLayout],
+    [dispatch, projectName],
   );
 
   const setCurrentPage = useCallback(

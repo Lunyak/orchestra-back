@@ -479,7 +479,7 @@ export function DirectorSessionDetailPanel({
                             </div>
                           ) : null}
                           {attendanceOk ? (
-                            <p className="director-session-page__attendance-note" style={{ color: "#7ee787" }}>
+                            <p className="director-session-page__attendance-note" style={{ color: "var(--color-status-success-bright)" }}>
                               {attendanceOk}
                             </p>
                           ) : null}

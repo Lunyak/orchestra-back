@@ -7,8 +7,8 @@
   font-weight: var(--font-weight-normal);
 
   color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color: var(--color-root-text);
+  background-color: var(--color-root-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -28,11 +28,4 @@ a:hover {
 body, h1, h2, h3, h4, h5, h6 {
   margin: 0;
   padding: 0;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: var(--color-text-dark);
-    background-color: var(--color-text-white);
-  }
 }

@@ -1,0 +1,61 @@
+import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
+import { TheaterBtn, TheaterSelect } from "../../theater-controls-ui";
+import type { LayoutSectionProps } from "./types";
+
+export function TheaterControlsLayoutTemplateSection({ vm, layout }: LayoutSectionProps) {
+  const { hallTemplatePick, setHallTemplatePick, hallTemplateOptions } = layout;
+
+  return (
+    <>
+      <TheaterCollapsibleSection
+            sectionId="layout-template"
+            title="Шаблон и экспорт"
+            summary="Готовые залы и выгрузка плана"
+            defaultOpen
+          >
+            <TheaterSelect
+              label="Шаблон зала"
+              value={hallTemplatePick}
+              options={hallTemplateOptions}
+              onChange={(nextValue) => {
+                if (!nextValue) return;
+                vm.applyHallTemplate(nextValue);
+                setHallTemplatePick("");
+              }}
+              disabled={!vm.currentStep}
+              placeholder="Применить шаблон…"
+            />
+            <div className="theater-btn-row theater-btn-row--3">
+              <TheaterBtn
+                onClick={vm.exportFloorPlanSvg}
+                disabled={!vm.currentStep}
+                title="SVG"
+              >
+                SVG
+              </TheaterBtn>
+              <TheaterBtn
+                onClick={() => void vm.exportFloorPlanPng()}
+                disabled={!vm.currentStep}
+                title="PNG"
+              >
+                PNG
+              </TheaterBtn>
+              <TheaterBtn
+                onClick={vm.exportFloorPlanPdf}
+                disabled={!vm.currentStep}
+                title="Печать / PDF"
+              >
+                PDF
+              </TheaterBtn>
+            </div>
+            <TheaterBtn
+              onClick={() => void vm.copyFloorPlanToClipboard()}
+              disabled={!vm.currentStep}
+              title="Скопировать план в буфер обмена как PNG"
+            >
+              План в буфер
+            </TheaterBtn>
+          </TheaterCollapsibleSection>
+    </>
+  );
+}

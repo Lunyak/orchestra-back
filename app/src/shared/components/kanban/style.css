@@ -21,7 +21,7 @@
   margin: 0;
   font-size: 22px;
   letter-spacing: 0.2px;
-  color: #e78a4e;
+  color: var(--color-script-accent);
 }
 
 .kanban-subtitle {
@@ -37,8 +37,8 @@
   align-items: end;
   margin-bottom: 14px;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-bg-transparent-1);
   align-items: center;
 }
 
@@ -55,8 +55,8 @@
 
 .kanban-tool input:not([type="checkbox"]),
 .kanban-tool select {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-border-faint);
+  border: 1px solid var(--color-bg-transparent-5);
 
   padding: 8px 10px;
   color: inherit;
@@ -75,8 +75,8 @@
 .kanban-tool-reset {
   height: 38px;
   padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-bg-transparent-5);
+  background: var(--color-bg-transparent-3);
   color: inherit;
   cursor: pointer;
 }
@@ -89,15 +89,15 @@
 }
 
 .kanban-col {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-transparent-2);
+  border: 1px solid var(--color-border-subtle);
   overflow: hidden;
   min-height: 180px;
 }
 
 .kanban-col-head {
   padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--color-border-subtle);
   /* background: задаётся из STATUSES.headerBg в KanbanBoardPage */
   background: rgba(0, 0, 0, 0.22);
 }
@@ -117,7 +117,7 @@
 .kanban-col-count {
   font-size: 12px;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-visible);
 }
 
 .kanban-col-hint {
@@ -137,10 +137,10 @@
   cursor: grab;
   user-select: none;
   background: var(--color-bg-secondary);
-  /* border: 1px solid rgba(255, 255, 255, 0.10); */
+  /* border: 1px solid var(--color-border-medium); */
   padding: 10px 10px 8px;
   transition: transform 0.08s ease, border-color 0.12s ease;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .kanban-card:hover {
@@ -156,7 +156,7 @@
   font-weight: 600;
   font-size: 13px;
   line-height: 1.25;
-  color: #e78a4e;
+  color: var(--color-script-accent);
 }
 
 .kanban-card-roles {
@@ -169,9 +169,9 @@
 .kanban-chip {
   font-size: 11px;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--color-bg-transparent-5);
   opacity: 0.9;
-  background-color: rgba(37, 99, 235, 0.16);
+  background-color: var(--color-blue-bg);
 }
 
 .kanban-chip.more {
@@ -197,8 +197,8 @@
 .kanban-card-duration {
   padding: 1px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border-visible);
+  background: var(--color-bg-transparent-1);
   opacity: 0.9;
   white-space: nowrap;
 }
@@ -277,8 +277,8 @@
   white-space: pre-wrap;
   font-size: 12px;
   line-height: 1.4;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: var(--color-bg-transparent-2);
+  border: 1px solid var(--color-border-medium);
   border-radius: 12px;
   padding: 10px;
 }

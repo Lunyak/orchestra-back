@@ -1,4 +1,5 @@
 import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
+import "../../features/auth/ui/login.css";
 import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getApiBaseUrl } from "../../sync/api/client";

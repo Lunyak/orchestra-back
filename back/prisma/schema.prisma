@@ -281,6 +281,8 @@ model ProjectRole {
   /// Отображаемое имя роли.
   title       String
   description String?
+  /// Ключ изображения в хранилище проекта (projectId/image/...).
+  avatarKey   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -427,10 +429,18 @@ model TheaterModel {
   name            String
   type            String
   builtin         String?
+  file            String?
+  kind            String   @default("prop")
   allowOutOfBounds Boolean @default(false)
   position        Json
   rotation        Json
   scale           Json
+  decorSize         Json?
+  decorColor        String?
+  decorTexture      String?
+  decorTextureRepeat Float?
+  decorTextureMode   String?
+  decorTextureFaces  Json?
 
   step            Step    @relation(fields: [stepId], references: [id])
 }
@@ -496,6 +506,8 @@ model TheaterLayout {
   doorHeight     Float
   doorZ          Float
   rowRise        Float
+  doors          Json?
+  extras         Json?
 
   scene          Scene  @relation(fields: [sceneId], references: [id])
 }

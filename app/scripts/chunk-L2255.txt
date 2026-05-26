@@ -1,0 +1,47 @@
+          <TheaterCollapsibleSection
+            sectionId="layout-stage-grid"
+            title="Сетка сцены"
+            summary="Столбцы и ряды на полу"
+            badge={`${stageGrid.cols}×${stageGrid.rows}`}
+            defaultOpen
+          >
+            <p className="theater-layout-hint">
+              Сетка повторяет контур сцены. Ряд 1 — у задника, последний — у авансцены. При
+              смене формы зала пересчитывается вместе с полом.
+            </p>
+            <div className="theater-btn-row theater-btn-row--3">
+              <TheaterField label="Столбцы">
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={1}
+                  max={12}
+                  value={stageGrid.cols}
+                  disabled={!currentStep}
+                  onChange={(event) =>
+                    updateLayoutZoneGrid({
+                      cols: Math.max(1, Math.min(12, Number(event.target.value) || 1)),
+                    })
+                  }
+                />
+              </TheaterField>
+              <TheaterField label="Ряды">
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={1}
+                  max={8}
+                  value={stageGrid.rows}
+                  disabled={!currentStep}
+                  onChange={(event) =>
+                    updateLayoutZoneGrid({
+                      rows: Math.max(1, Math.min(8, Number(event.target.value) || 1)),
+                    })
+                  }
+                />
+              </TheaterField>
+            </div>
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-seats"

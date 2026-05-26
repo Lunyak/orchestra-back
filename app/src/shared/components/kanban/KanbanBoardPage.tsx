@@ -620,16 +620,6 @@ export function KanbanBoardPage({
                           )}
                         </div>
                       )}
-                      {roles.length > 0 && (
-                        <div className="kanban-muted" style={{ marginTop: 8, lineHeight: 1.35 }}>
-                          {roles.slice(0, 2).map((r) => (
-                            <div key={`cast-${s.id}-${r}`}>
-                              <b>{displayRoleTitle(r)}</b>: {formatActorList(getRoleActors(s, r))}
-                            </div>
-                          ))}
-                          {roles.length > 2 && <div>+ ещё {roles.length - 2} рол.</div>}
-                        </div>
-                      )}
                       <div className="kanban-card-footer">
                         <div className="kanban-card-footer-left">
                           <span className="kanban-card-id">#{s.id}</span>

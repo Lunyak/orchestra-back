@@ -20,6 +20,7 @@ import {
   setPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
 import { getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
+import { ThemeSettingsSection } from "../../../features/settings/ui/ThemeSettingsSection";
 import "./style.css";
 
 export function SettingsPage() {
@@ -133,19 +134,26 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="app-layout">
+    <div className="app-layout settings-layout">
       <div className="app-content">
-        <main className="main-content settings-main">
+        <main className="main-content">
           <div className="settings-view">
             <div className="settings-view-header">
-              <h2>Настройки проекта</h2>
+              <div>
+                <h2 className="settings-view-title">Настройки</h2>
+                <p className="settings-view-subtitle">
+                  Проект: <b>{projectName || "не выбран"}</b>
+                </p>
+              </div>
               <Button type="button" className="danger" onClick={logout}>
                 Выйти из аккаунта
               </Button>
             </div>
-            <p>Текущий проект: {projectName || "—"}</p>
-            <section className="settings-project-section settings-sync-live">
-              <h3>Синхронизация с сервером во время спектакля</h3>
+            <ThemeSettingsSection />
+            <section className="settings-card settings-sync-live">
+              <h3 className="settings-card__title">
+                Синхронизация с сервером во время спектакля
+              </h3>
               <p className="settings-sync-hint">
                 По событию с сервера сцена подтягивается без перезагрузки
                 страницы. Полная перезагрузка вкладки при обычной работе чаще
@@ -182,8 +190,10 @@ export function SettingsPage() {
               </LabeledCheckbox>
             </section>
             {showOrchestraWebPageLock ? (
-              <section className="settings-project-section settings-sync-live">
-                <h3>Страница на dopamin / orkestr</h3>
+              <section className="settings-card settings-sync-live">
+                <h3 className="settings-card__title">
+                  Страница на dopamin / orkestr
+                </h3>
                 <p className="settings-sync-hint">
                   Пока включено: нельзя уйти на другой маршрут приложения без
                   подтверждения, браузер предупредит при перезагрузке или
@@ -208,8 +218,10 @@ export function SettingsPage() {
               </section>
             ) : null}
             {(onPushAllLocal || onResyncProject) && (
-              <section className="settings-sync">
-                <h3>Синхронизация локальных данных</h3>
+              <section className="settings-card settings-sync">
+                <h3 className="settings-card__title">
+                  Синхронизация локальных данных
+                </h3>
                 <p className="settings-sync-hint">
                   Вы можете выгрузить все локальные проекты и сцены с этого
                   компьютера на сервер. Используйте это, если раньше работали
@@ -218,19 +230,19 @@ export function SettingsPage() {
                   перезаписаны.
                 </p>
                 {onPushAllLocal && (
-                  <button type="button" onClick={handlePushAllLocal}>
+                  <Button type="button" className="primary" onClick={handlePushAllLocal}>
                     Выгрузить все локальные данные на сервер
-                  </button>
+                  </Button>
                 )}
                 {onResyncProject && (
-                  <button type="button" onClick={handleResync}>
+                  <Button type="button" onClick={handleResync}>
                     Подтянуть отличия с сервера (resync)
-                  </button>
+                  </Button>
                 )}
               </section>
             )}
-            <section className="settings-project-section">
-              <h2>Создание проекта</h2>
+            <section className="settings-card">
+              <h3 className="settings-card__title">Создание проекта</h3>
               <div className="settings-project-create">
                 <input
                   type="text"
@@ -249,22 +261,22 @@ export function SettingsPage() {
               </div>
             </section>
 
-            <section className="settings-project-section">
-              <h2>Бот</h2>
+            <section className="settings-card">
+              <h3 className="settings-card__title">Бот</h3>
               <p>
                 Подключите Telegram-бота (своим токеном) и управляйте
                 переменными для шаблонов сообщений.
               </p>
               <Button
                 type="button"
-                className="pri"
+                className="primary"
                 onClick={() => navigate("/settings/bot")}
               >
                 Настройки бота
               </Button>
             </section>
 
-            <section className="settings-invite">
+            <section className="settings-card settings-invite">
               {isProjectOwner === false ? (
                 <p className="settings-invite-forbidden">
                   Только владелец проекта может приглашать участников и
@@ -272,7 +284,7 @@ export function SettingsPage() {
                 </p>
               ) : (
                 <>
-                  <h3 className="settings-privet-title">
+                  <h3 className="settings-card__title settings-privet-title">
                     Права участников в проекте
                   </h3>
                   <div className="settings-invite-row">

@@ -1,0 +1,63 @@
+            </TheaterField>
+            <div className="theater-layout-subtitle">Число мест</div>
+            <p className="theater-layout-hint">
+              Enter в поле — сохранить сетку. «Зал по контуру» / «Места → зал» — только для
+              своего контура.
+            </p>
+            {isCustomStageOutline ? (
+              <div className="theater-custom-outline-fit-row">
+                <TheaterField label="Целевое мест">
+                  <input
+                    type="number"
+                    className="native-text-input"
+                    min={1}
+                    max={2000}
+                    step={1}
+                    value={outlineFitSeats}
+                    onFocus={() => {
+                      outlineFitSeatsFocusedRef.current = true;
+                    }}
+                    onBlur={() => {
+                      outlineFitSeatsFocusedRef.current = false;
+                      commitOutlineFitSeats();
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.currentTarget.blur();
+                      }
+                    }}
+                    onChange={(event) =>
+                      setOutlineFitSeats(Math.max(1, Number(event.target.value) || 1))
+                    }
+                  />
+                </TheaterField>
+                <TheaterBtn
+                  onClick={() => {
+                    beginTheaterHistoryTransaction();
+                    fitLayoutFromOutline(outlineFitSeats);
+                    endTheaterHistoryTransaction();
+                  }}
+                  title="Зал по нарисованному контуру"
+                >
+                  Зал ← контур
+                </TheaterBtn>
+                <TheaterBtn
+                  onClick={() => {
+                    beginTheaterHistoryTransaction();
+                    fitLayoutToSeatCount(outlineFitSeats);
+                    endTheaterHistoryTransaction();
+                  }}
+                  title="Зал и контур под число мест"
+                >
+                  Места → зал
+                </TheaterBtn>
+              </div>
+            ) : null}
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-hall-size"
+            title="Габариты зала"
+            summary="Ширина, глубина, ряды"
+            badge={layoutHallBadge}
+          >

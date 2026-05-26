@@ -6,11 +6,11 @@
 }
 
 .light-plot-panel {
-  background: #0f172a;
-  border: 1px solid #1f2937;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-border-default);
   border-radius: 8px;
   padding: 12px;
-  color: #e2e8f0;
+  color: var(--color-text-ui);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -24,7 +24,7 @@
   justify-content: space-between;
   font-size: 13px;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--color-text-bright);
 }
 
 .light-plot-actions {
@@ -33,9 +33,9 @@
 }
 
 .light-plot-action {
-  background: #1f2937;
-  color: #e2e8f0;
-  border: 1px solid #374151;
+  background: var(--color-border-default);
+  color: var(--color-text-ui);
+  border: 1px solid var(--color-border-light);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
@@ -43,13 +43,34 @@
 }
 
 .light-plot-action:hover:not(:disabled) {
-  border-color: #60a5fa;
-  color: #fff;
+  border-color: var(--color-accent-blue);
+  color: var(--color-text-primary);
 }
 
 .light-plot-action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.light-plot-link-hint,
+.light-plot-link-message {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.light-plot-link-message {
+  color: var(--color-success-accent);
+}
+
+.light-plot-channel-select {
+  min-width: 120px;
+}
+
+.light-plot-dot--slot-active {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 .light-plot-map {
@@ -58,8 +79,8 @@
   grid-template-rows: repeat(var(--light-rows), 36px);
   gap: 6px;
   min-height: 240px;
-  background: #111827;
-  border: 1px dashed #1f2937;
+  background: var(--color-surface-3);
+  border: 1px dashed var(--color-border-default);
   border-radius: 8px;
   padding: 8px;
   position: relative;
@@ -71,7 +92,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 12px;
 }
 
@@ -81,14 +102,14 @@
   align-items: center;
   justify-content: center;
   gap: 2px;
-  background: #1f2937;
-  border: 1px solid #334155;
+  background: var(--color-border-default);
+  border: 1px solid var(--color-border-lighter);
   border-radius: 6px;
   padding: 2px 4px;
   text-align: center;
   font-size: 10px;
   line-height: 1.1;
-  color: #e2e8f0;
+  color: var(--color-text-ui);
   position: relative;
   cursor: crosshair;
 }
@@ -99,12 +120,12 @@
   left: 50%;
   width: var(--length, 54px);
   height: 2px;
-  background: #fbbf24;
+  background: var(--color-warning);
   transform-origin: left center;
   transform: translateY(-50%) rotate(var(--angle, 0deg));
   opacity: 0.9;
   border-radius: 999px;
-  box-shadow: 0 0 6px rgba(251, 191, 36, 0.5);
+  box-shadow: 0 0 6px var(--color-warning-inset);
 }
 
 .light-plot-ray::after {
@@ -113,7 +134,7 @@
   right: -6px;
   top: 50%;
   transform: translateY(-50%);
-  border-left: 6px solid #fbbf24;
+  border-left: 6px solid var(--color-warning);
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
 }
@@ -123,7 +144,7 @@
 }
 
 .light-plot-dot-channel {
-  color: #38bdf8;
+  color: var(--color-light-sky);
 }
 
 .light-plot-add {
@@ -134,17 +155,17 @@
 
 .light-plot-add input,
 .light-plot-add select {
-  background: #1f2937;
-  color: #e2e8f0;
-  border: 1px solid #374151;
+  background: var(--color-border-default);
+  color: var(--color-text-ui);
+  border: 1px solid var(--color-border-light);
   border-radius: 6px;
   padding: 4px 6px;
   font-size: 12px;
 }
 
 .light-plot-add button {
-  background: #2563eb;
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-text-primary);
   border: none;
   border-radius: 6px;
   padding: 4px 10px;
@@ -168,9 +189,9 @@
 
 .light-plot-item input,
 .light-plot-item select {
-  background: #0f172a;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: var(--color-surface-1);
+  color: var(--color-text-ui);
+  border: 1px solid var(--color-border-lighter);
   border-radius: 6px;
   padding: 4px 6px;
   font-size: 12px;
@@ -179,11 +200,127 @@
 .light-plot-remove {
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 16px;
   cursor: pointer;
 }
 
 .light-plot-remove:hover {
-  color: #f8fafc;
+  color: var(--color-text-bright);
+}
+
+.light-cue-export-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 8px 0 4px;
+}
+
+.light-cue-timeline {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-lighter);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.light-cue-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.light-cue-timeline-meta {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.light-cue-scrub {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.light-cue-scrub input[type="range"] {
+  flex: 1;
+  min-width: 120px;
+}
+
+.light-cue-scrub button {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-lighter);
+  border-radius: 6px;
+  color: var(--color-text-ui);
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.light-cue-scrub button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.light-cue-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border-lighter);
+}
+
+.light-cue-marker {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  padding: 0;
+  cursor: pointer;
+}
+
+.light-cue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.light-cue-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 72px auto auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.light-cue-row input,
+.light-cue-row select {
+  background: var(--color-surface-1);
+  color: var(--color-text-ui);
+  border: 1px solid var(--color-border-lighter);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.light-cue-enabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.light-cue-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
 }

@@ -110,6 +110,27 @@ export class ProjectsService {
       if (key.startsWith(prefix)) referenced.add(key);
     }
 
+    const roleRows = await this.prisma.projectRole.findMany({
+      where: { projectId },
+      select: { avatarKey: true },
+      take: 5000,
+    });
+    for (const r of roleRows) {
+      const key = typeof r.avatarKey === 'string' ? r.avatarKey.trim() : '';
+      if (key && key.startsWith(prefix)) referenced.add(key);
+    }
+
+    const roleNoteRows = await this.prisma.projectRoleNote.findMany({
+      where: { role: { projectId } },
+      select: { content: true },
+      take: 20000,
+    });
+    for (const n of roleNoteRows) {
+      this.extractReferencedImageKeysFromMarkdown(String(n.content ?? '')).forEach(
+        (k) => referenced.add(k),
+      );
+    }
+
     // List stored image keys and delete those that are not referenced.
     if (this.useLocalStorage()) {
       // Local storage GC not implemented (dev). In prod we use MinIO.

@@ -15,10 +15,16 @@ import {
   encodeDirectorRefsNoteContent,
   encodeRoleWorkbookNoteContent,
   pickLatestDirectorRefsSnapshotForRole,
+  normalizeSceneArc,
+  normalizeDirectorQuestion,
   pickLatestWorkbookSnapshotForActor,
+  type RoleDirectorQuestion,
   type DirectorReferenceImage,
   type RoleDirectorRefsSnapshot,
   type RoleDirectorRefsDataV1,
+  type RoleRelationshipEntry,
+  collectInboundMentions,
+  type InboundRoleMention,
   type RoleWorkbookDataV1,
   type RoleWorkbookSnapshot,
 } from "./roleWorkbookNote";
@@ -60,6 +66,9 @@ export type RoleWorkbookState = {
   directorRefsLastSavedAtIso: string | null;
 
   lastCleanupAtIso: string | null;
+
+  /** Что другие актёры написали об этой роли в своих тетрадках. */
+  inboundMentions: InboundRoleMention[];
 };
 
 function normalizeEmail(v: unknown): string {
@@ -74,13 +83,26 @@ function defaultDraft(actorEmail: string): RoleWorkbookDataV1 {
   return {
     v: 1,
     actorEmail: normalizeEmail(actorEmail),
+    givenCircumstances: "",
     biography: "",
+    socialPortrait: "",
+    relationships: "",
+    relationshipEntries: [],
     superObjective: "",
+    obstacles: "",
+    eventSeries: "",
+    transformationStart: "",
+    transformationEnd: "",
+    transformationTurningPoint: "",
     appearance: "",
     referenceImages: [],
     referenceLinksLegacy: [],
     preparation: "",
     sceneArcs: [],
+    directorQuestions: [],
+    rehearsalDone: "",
+    rehearsalTodo: "",
+    rehearsalNextStep: "",
   };
 }
 
@@ -117,6 +139,7 @@ const initialState: RoleWorkbookState = {
   directorRefsDraft: defaultDirectorRefsDraft(""),
   directorRefsLastSavedAtIso: null,
   lastCleanupAtIso: null,
+  inboundMentions: [],
 };
 
 function cleanupThrottleKey(projectSlug: string) {
@@ -162,6 +185,7 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
     draft: RoleWorkbookDataV1;
     directorRefsSnapshot: RoleDirectorRefsSnapshot | null;
     directorRefsDraft: RoleDirectorRefsDataV1;
+    inboundMentions: InboundRoleMention[];
   },
   { accessToken: string; projectSlug: string; roleId: string },
   { state: RootState; rejectValue: string }
@@ -258,8 +282,32 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
       return allowedActorEmails[0] ?? "";
     })();
 
-    const profiles = allowedActorEmails.length
-      ? await dispatch(profileApi.endpoints.profilesBatch.initiate(allowedActorEmails))
+    const allRoles = Array.isArray(roles) ? roles : [];
+    const notesByRoleId = new Map<string, RoleNoteItem[]>();
+    notesByRoleId.set(roleId, notesRes?.notes ?? []);
+
+    const peerRoles = allRoles.filter((r) => String(r.id) !== String(roleId));
+    const peerNotesList = await Promise.all(
+      peerRoles.map((r) =>
+        getProjectRoleNotes(accessToken, projectSlug, r.id)
+          .then((res) => ({ roleId: r.id, notes: res?.notes ?? [] }))
+          .catch(() => ({ roleId: r.id, notes: [] as RoleNoteItem[] })),
+      ),
+    );
+    for (const p of peerNotesList) notesByRoleId.set(String(p.roleId), p.notes);
+
+    const inboundMentions = collectInboundMentions({
+      targetRoleId: roleId,
+      projectRoles: allRoles,
+      notesByRoleId,
+    });
+
+    const profileEmailSet = new Set<string>([
+      ...allowedActorEmails,
+      ...inboundMentions.map((m) => normalizeEmail(m.actorEmail)).filter(Boolean),
+    ]);
+    const profiles = profileEmailSet.size
+      ? await dispatch(profileApi.endpoints.profilesBatch.initiate([...profileEmailSet]))
           .unwrap()
           .catch(() => [])
       : [];
@@ -294,6 +342,7 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
       draft,
       directorRefsSnapshot,
       directorRefsDraft,
+      inboundMentions,
     };
   } catch (e: any) {
     return rejectWithValue(String(e?.message ?? "Не удалось загрузить страницу роли"));
@@ -322,10 +371,13 @@ export const saveRoleWorkbookThunk = createAsyncThunk<
       v: 1,
       actorEmail: myEmail,
       savedAtIso: new Date().toISOString(),
+      directorQuestions: (draft.directorQuestions ?? [])
+        .map((q) => normalizeDirectorQuestion(q))
+        .filter(Boolean) as RoleWorkbookDataV1["directorQuestions"],
       referenceImages: (draft as any)?.referenceImages?.map((x: any) => ({
         key: String(x?.key ?? "").trim(),
         url: typeof x?.url === "string" ? String(x.url).trim() || undefined : undefined,
-        token: `orchestra-image:${encodeURIComponent(String(x?.key ?? "").trim())}`,
+        token: `![reference](orchestra-image:${encodeURIComponent(String(x?.key ?? "").trim())})`,
         caption: String(x?.caption ?? "").trim() || undefined,
       })) ?? [],
     });
@@ -385,7 +437,7 @@ export const saveDirectorRefsThunk = createAsyncThunk<
         .map((x) => ({
           key: String(x?.key ?? "").trim(),
           url: typeof (x as any)?.url === "string" ? String((x as any).url).trim() || undefined : undefined,
-          token: `orchestra-image:${encodeURIComponent(String((x as any)?.key ?? "").trim())}`,
+          token: `![reference](orchestra-image:${encodeURIComponent(String((x as any)?.key ?? "").trim())})`,
           caption: String(x?.caption ?? "").trim() || undefined,
         }))
         .filter((x) => Boolean(x.key))
@@ -456,6 +508,19 @@ export const roleWorkbookSlice = createSlice({
     ) {
       (state.draft as any)[action.payload.key] = action.payload.value;
     },
+    setDraftRelationshipEntries(state, action: PayloadAction<{ value: RoleRelationshipEntry[] }>) {
+      const raw = Array.isArray(action.payload.value) ? action.payload.value : [];
+      state.draft.relationshipEntries = raw
+        .map((x) => ({
+          targetRoleId: String(x?.targetRoleId ?? "").trim(),
+          text: String(x?.text ?? ""),
+        }))
+        .filter((x) => Boolean(x.targetRoleId))
+        .slice(0, 80);
+    },
+    patchRoleInfo(state, action: PayloadAction<{ role: ProjectRoleInfo }>) {
+      state.roleInfo = action.payload.role;
+    },
     setDraftReferences(state, action: PayloadAction<{ value: string[] }>) {
       // legacy: keep, but not used in UI anymore
       state.draft.referenceLinksLegacy = (action.payload.value ?? [])
@@ -496,15 +561,26 @@ export const roleWorkbookSlice = createSlice({
     setDraftSceneArcs(state, action: PayloadAction<{ value: any[] }>) {
       const raw = Array.isArray(action.payload.value) ? action.payload.value : [];
       state.draft.sceneArcs = raw
-        .map((x) => ({
-          stepId: x?.stepId == null ? undefined : Number(x.stepId),
-          stepTitle: typeof x?.stepTitle === "string" ? x.stepTitle : undefined,
-          text: String(x?.text ?? ""),
-        }))
-        // Keep items even with empty text when stepId is present:
-        // the arc list is a structural "scene list" bound to script steps.
-        .filter((x) => (x.stepId != null && Number.isFinite(Number(x.stepId))) || Boolean(String(x.text ?? "").trim()))
-        .slice(0, 200);
+        .map((x) => normalizeSceneArc(x))
+        .filter(Boolean)
+        .slice(0, 200) as RoleWorkbookDataV1["sceneArcs"];
+    },
+    setDraftDirectorQuestions(state, action: PayloadAction<{ value: RoleDirectorQuestion[] }>) {
+      const raw = Array.isArray(action.payload.value) ? action.payload.value : [];
+      state.draft.directorQuestions = raw
+        .map((x) => {
+          const stepIdNum = x?.stepId == null ? undefined : Number(x.stepId);
+          const stepId =
+            stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0
+              ? Math.floor(stepIdNum)
+              : undefined;
+          return {
+            text: String(x?.text ?? ""),
+            stepId,
+            stepTitle: typeof x?.stepTitle === "string" ? x.stepTitle : undefined,
+          };
+        })
+        .slice(0, 80);
     },
     resetDraftFromSnapshot(state) {
       const email = state.selectedActorEmail || state.myEmail || "";
@@ -576,6 +652,7 @@ export const roleWorkbookSlice = createSlice({
       state.loading = true;
       state.error = null;
       state.directorRefsError = null;
+      state.inboundMentions = [];
     });
     b.addCase(loadRoleWorkbookThunk.fulfilled, (state, action) => {
       state.loading = false;
@@ -593,13 +670,18 @@ export const roleWorkbookSlice = createSlice({
       state.troupeEmails = action.payload.troupeEmails;
       state.allowedActorEmails = action.payload.allowedActorEmails;
       const map: Record<string, TeamProfile | null> = {};
-      for (const em of action.payload.allowedActorEmails) map[em] = null;
+      const profileEmails = new Set<string>([
+        ...(action.payload.allowedActorEmails ?? []),
+        ...(action.payload.inboundMentions ?? []).map((m) => normalizeEmail(m.actorEmail)),
+      ]);
+      for (const em of profileEmails) map[em] = null;
       for (const p of action.payload.profiles ?? []) {
         const em = normalizeEmail(p?.email ?? "");
         if (!em) continue;
         map[em] = p;
       }
       state.profilesByEmail = map;
+      state.inboundMentions = action.payload.inboundMentions ?? [];
       state.selectedActorEmail = action.payload.selectedActorEmail;
       state.snapshot = action.payload.snapshot;
       state.draft = action.payload.draft;

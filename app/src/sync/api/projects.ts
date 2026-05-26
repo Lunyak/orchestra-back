@@ -81,6 +81,7 @@ export type ProjectRoleInfo = {
   key: string;
   title: string;
   description?: string | null;
+  avatarKey?: string | null;
   aliases: string[];
   emails: string[];
 };
@@ -99,7 +100,7 @@ export async function getProjectRoles(
 export async function createProjectRole(
   accessToken: string,
   projectSlug: string,
-  body: { title: string; description?: string; aliases?: string[] },
+  body: { title: string; description?: string; aliases?: string[]; avatarKey?: string | null },
 ): Promise<{ ok: boolean; roleId: string }> {
   const { data } = await api.post(
     `/projects/${encodeURIComponent(projectSlug)}/roles`,
@@ -113,7 +114,7 @@ export async function updateProjectRole(
   accessToken: string,
   projectSlug: string,
   roleId: string,
-  body: { title: string; description?: string; aliases?: string[] },
+  body: { title?: string; description?: string; aliases?: string[]; avatarKey?: string | null },
 ): Promise<{ ok: boolean; roleId: string }> {
   const { data } = await api.put(
     `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}`,

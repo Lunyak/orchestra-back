@@ -95,6 +95,7 @@ export class RolesService {
         key: r.key,
         title: r.title,
         description: r.description,
+        avatarKey: r.avatarKey ?? null,
         aliases: (r.aliases ?? []).map((a) => a.title),
         emails: (r.assignments ?? []).map((a) => a.email),
       })),
@@ -105,13 +106,27 @@ export class RolesService {
     userId: string,
     projectSlug: string,
     roleId: string | null,
-    body: { title: string; description?: string; aliases?: string[] },
+    body: {
+      title?: string;
+      description?: string;
+      aliases?: string[];
+      avatarKey?: string | null;
+    },
   ) {
     const project = await this.assertUserHasProjectAccessBySlug(
       userId,
       projectSlug,
     );
-    const title = String(body?.title ?? '').trim();
+
+    const existing = roleId
+      ? await this.prisma.projectRole.findFirst({
+          where: { id: roleId, projectId: project.id },
+        })
+      : null;
+    if (roleId && !existing) throw new BadRequestException('Role not found');
+
+    const titleInput = String(body?.title ?? '').trim();
+    const title = titleInput || String(existing?.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
     const key = normalizeRoleKey(title);
     if (!key) throw new BadRequestException('invalid title');
@@ -119,37 +134,61 @@ export class RolesService {
     const description =
       body?.description != null
         ? String(body.description).trim() || null
-        : null;
+        : undefined;
+
+    const avatarKey =
+      body?.avatarKey === null
+        ? null
+        : body?.avatarKey != null
+          ? String(body.avatarKey).trim() || null
+          : undefined;
+
     const aliases = Array.isArray(body?.aliases)
       ? body.aliases
           .map((x) => String(x ?? '').trim())
           .filter(Boolean)
           .slice(0, 50)
-      : [];
+      : null;
+
+    const data: Prisma.ProjectRoleUpdateInput = { title, key };
+    if (description !== undefined) data.description = description;
+    if (avatarKey !== undefined) data.avatarKey = avatarKey;
 
     const role = roleId
       ? await this.prisma.projectRole.update({
           where: { id: roleId },
-          data: { title, description, key, projectId: project.id },
+          data,
         })
       : await this.prisma.projectRole.upsert({
           where: { projectId_key: { projectId: project.id, key } },
-          update: { title, description },
-          create: { projectId: project.id, title, key, description },
+          update: {
+            title,
+            ...(description !== undefined ? { description } : {}),
+            ...(avatarKey !== undefined ? { avatarKey } : {}),
+          },
+          create: {
+            projectId: project.id,
+            title,
+            key,
+            description: description ?? null,
+            avatarKey: avatarKey ?? null,
+          },
         });
 
-    // replace aliases
-    await this.prisma.projectRoleAlias.deleteMany({
-      where: { roleId: role.id },
-    });
-    const aliasRows = aliases
-      .map((a) => ({ roleId: role.id, title: a, key: normalizeRoleKey(a) }))
-      .filter((x) => x.key);
-    if (aliasRows.length) {
-      await this.prisma.projectRoleAlias.createMany({
-        data: aliasRows,
-        skipDuplicates: true,
+    // replace aliases when provided
+    if (aliases != null) {
+      await this.prisma.projectRoleAlias.deleteMany({
+        where: { roleId: role.id },
       });
+      const aliasRows = aliases
+        .map((a) => ({ roleId: role.id, title: a, key: normalizeRoleKey(a) }))
+        .filter((x) => x.key);
+      if (aliasRows.length) {
+        await this.prisma.projectRoleAlias.createMany({
+          data: aliasRows,
+          skipDuplicates: true,
+        });
+      }
     }
 
     return { ok: true, roleId: role.id };

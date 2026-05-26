@@ -5,6 +5,7 @@ import { useProject } from "../../../../features/project";
 import { useScene } from "../../../../features/scene";
 import { useScriptUI } from "../../../../features/script-ui";
 import { useProjectRolesQuery } from "../../../../features/project/api/project-api";
+import { RolePlayingCard } from "../../../../features/role-card/RolePlayingCard";
 import type { ProjectRoleInfo } from "../../../../sync/api/projects";
 import type { SceneData, SceneRolesDataV1, SceneRoleLinkV1 } from "../../../../features/scene";
 import type { ScriptStep } from "../../../types/script";
@@ -342,11 +343,19 @@ export function StepRolesPanel({ step }: { step: ScriptStep }) {
             return (
               <div key={link.roleId} className="step-role-item">
                 <div className="step-role-top">
+                  <RolePlayingCard
+                    role={role ?? { title, avatarKey: null }}
+                    accessToken={accessToken}
+                    size="sm"
+                    onClick={() =>
+                      navigate(`/role-workbook/${encodeURIComponent(String(link.roleId))}`)
+                    }
+                  />
                   <button
                     type="button"
                     className="step-role-title-link"
                     onClick={() => navigate(`/role-workbook/${encodeURIComponent(String(link.roleId))}`)}
-                    title="Открыть страницу роли"
+                    title="Открыть рисунок роли"
                   >
                     {title}
                   </button>

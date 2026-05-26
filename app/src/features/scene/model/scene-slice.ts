@@ -17,22 +17,14 @@ import { ensureProject } from "../../../sync/api/projects";
 import type { PlaylistTrack } from "../../../shared/types/playlist";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 
-export const DEFAULT_THEATER_LAYOUT: TheaterLayout = {
-  hallWidth: 9,
-  hallDepth: 6,
-  wallHeight: 6,
-  audienceStartZ: 3,
-  seatRows: 4,
-  seatsPerRow: 7,
-  seatSpacing: 1.1,
-  rowSpacing: 0.8,
-  rowRise: 0.25,
-  aisleWidth: 1.2,
-  aisleCenterX: 0,
-  doorWidth: 1.2,
-  doorHeight: 2.2,
-  doorZ: -6,
-};
+import { DEFAULT_THEATER_LAYOUT } from "../../theater/model/theater-defaults";
+import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
+
+export type TheaterLayoutUpdater =
+  | TheaterLayout
+  | ((prev: TheaterLayout) => TheaterLayout);
+
+export { DEFAULT_THEATER_LAYOUT };
 
 export interface SceneData {
   name?: string;
@@ -872,8 +864,12 @@ export const sceneSlice = createSlice({
       state.hasLocalEdits = true;
       state.stepsRevision += 1;
     },
-    setTheaterLayout(state, action: PayloadAction<TheaterLayout>) {
-      state.theaterLayout = action.payload;
+    setTheaterLayout(state, action: PayloadAction<TheaterLayoutUpdater>) {
+      const resolved =
+        typeof action.payload === "function"
+          ? action.payload(state.theaterLayout)
+          : action.payload;
+      state.theaterLayout = normalizePersistedTheaterLayout(resolved);
       state.hasLocalEdits = true;
     },
     setCurrentPage(state, action: PayloadAction<number>) {

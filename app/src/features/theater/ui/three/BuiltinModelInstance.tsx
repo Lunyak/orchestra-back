@@ -1,30 +1,101 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { TheaterModel } from "../../../../shared/types/script";
+import {
+  getFurnitureBounds,
+  isSeatableBuiltin,
+  isHumanTheaterBuiltin,
+} from "../../model/theater-furniture-metrics";
 import { BuiltinModel } from "./BuiltinModel";
 
+function getBuiltinSelectionBox(
+  model: TheaterModel,
+): { size: [number, number, number]; center: [number, number, number] } | null {
+  if (model.builtin && isSeatableBuiltin(model.builtin)) {
+    const [width, height, depth] = getFurnitureBounds(model.builtin);
+    return {
+      size: [width, Math.max(0.55, height), Math.max(0.42, depth)],
+      center: [0, height / 2, 0],
+    };
+  }
+
+  if (isHumanTheaterBuiltin(model.builtin)) {
+    const seated =
+      model.builtin === "humanSitting" || model.builtin === "humanSmoothSitting";
+    return {
+      size: seated ? [0.7, 1.25, 0.85] : [0.7, 1.8, 0.7],
+      center: seated ? [0, 0.62, 0.08] : [0, 0.9, 0],
+    };
+  }
+
+  return null;
+}
+
 export const BuiltinModelInstance = ({
+  projectName,
   model,
   isActive,
   onActiveObjectChange,
   onObjectReady,
   onSelect,
   onActivate,
+  onContextMenu,
   isSelected,
   isHovered,
   onHoverChange,
+  passThroughPointerEvents,
 }: {
+  projectName: string;
   model: TheaterModel;
   isActive?: boolean;
   onActiveObjectChange?: (node: THREE.Group | null, id: number) => void;
   onObjectReady?: (node: THREE.Group | null, id: number) => void;
-  onSelect?: () => void;
+  onSelect?: (additive?: boolean) => void;
   onActivate?: () => void;
+  onContextMenu?: (modelId: number, clientX: number, clientY: number) => void;
   isSelected?: boolean;
   isHovered?: boolean;
   onHoverChange?: (next: boolean) => void;
+  passThroughPointerEvents?: boolean;
 }) => {
   const groupRef = useRef<THREE.Group | null>(null);
+  const selectionBox = getBuiltinSelectionBox(model);
+
+  const handlePointerDown = (event: any) => {
+    if (passThroughPointerEvents) return;
+    event.stopPropagation();
+    if (event.button !== 0) return;
+    onSelect?.(event.nativeEvent.shiftKey);
+  };
+
+  const handleContextMenu = (event: any) => {
+    if (passThroughPointerEvents) return;
+    event.stopPropagation();
+    event.nativeEvent.preventDefault();
+    onContextMenu?.(
+      model.id,
+      event.nativeEvent.clientX,
+      event.nativeEvent.clientY,
+    );
+  };
+
+  const handleDoubleClick = (event: any) => {
+    if (passThroughPointerEvents) return;
+    event.stopPropagation();
+    onActivate?.();
+  };
+
+  const handlePointerOver = (event: any) => {
+    if (passThroughPointerEvents) return;
+    event.stopPropagation();
+    onHoverChange?.(true);
+  };
+
+  const handlePointerOut = (event: any) => {
+    if (passThroughPointerEvents) return;
+    event.stopPropagation();
+    onHoverChange?.(false);
+  };
 
   useEffect(() => {
     if (!isActive || !onActiveObjectChange) return;
@@ -44,24 +115,36 @@ export const BuiltinModelInstance = ({
       position={model.position}
       rotation={model.rotation}
       scale={model.scale}
-      onPointerDown={(event) => {
-        event.stopPropagation();
-        onSelect?.();
-      }}
-      onDoubleClick={(event) => {
-        event.stopPropagation();
-        onActivate?.();
-      }}
-      onPointerOver={(event) => {
-        event.stopPropagation();
-        onHoverChange?.(true);
-      }}
-      onPointerOut={(event) => {
-        event.stopPropagation();
-        onHoverChange?.(false);
-      }}
+      onPointerDown={handlePointerDown}
+      onContextMenu={handleContextMenu}
+      onDoubleClick={handleDoubleClick}
+      onPointerOver={handlePointerOver}
+      onPointerOut={handlePointerOut}
     >
-      <BuiltinModel kind={model.builtin} isSelected={isSelected} isHovered={isHovered} />
+      <BuiltinModel
+        projectName={projectName}
+        model={model}
+        isSelected={isSelected}
+        isHovered={isHovered}
+      />
+      {selectionBox ? (
+        <mesh
+          position={selectionBox.center}
+          onPointerDown={handlePointerDown}
+          onContextMenu={handleContextMenu}
+          onDoubleClick={handleDoubleClick}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
+        >
+          <boxGeometry args={selectionBox.size} />
+          <meshBasicMaterial
+            transparent
+            opacity={0.001}
+            depthWrite={false}
+            colorWrite={false}
+          />
+        </mesh>
+      ) : null}
     </group>
   );
 };

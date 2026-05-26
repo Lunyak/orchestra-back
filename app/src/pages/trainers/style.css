@@ -14,10 +14,10 @@
 }
 
 .trainer-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-visible);
   border-radius: 12px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-bg-transparent-2);
 }
 
 .trainer-card-title {
@@ -43,8 +43,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-bg-transparent-5);
+  background: var(--color-border-faint);
   color: var(--color-text-lighter);
   border-radius: 999px;
   padding: 8px 12px;

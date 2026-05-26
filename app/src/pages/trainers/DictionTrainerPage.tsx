@@ -288,10 +288,10 @@ export function DictionTrainerPage() {
                           <div
                             key={a.id}
                             style={{
-                              border: "1px solid rgba(255,255,255,0.10)",
+                              border: "1px solid var(--color-border-medium)",
                               borderRadius: 10,
                               padding: 10,
-                              background: "rgba(255,255,255,0.03)",
+                              background: "var(--color-bg-transparent-1)",
                               display: "grid",
                               gap: 6,
                             }}

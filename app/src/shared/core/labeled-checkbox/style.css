@@ -6,7 +6,7 @@ label.labeled-checkbox {
   margin: 0;
   cursor: pointer;
   user-select: none;
-  color: rgba(248, 250, 252, 0.88);
+  color: var(--color-checkbox-label);
   font-size: 13px;
   line-height: 1.35;
 }
@@ -18,7 +18,7 @@ label.labeled-checkbox:has(.labeled-checkbox__input:disabled) {
 
 /*
  * Кастомная отрисовка: в неотмеченном состоянии нативный чекбокс часто остаётся светлым;
- * рамка и фон в тон канбана (#e78a4e).
+ * рамка и фон в тон канбана (var(--color-script-accent)).
  */
 .labeled-checkbox__input {
   box-sizing: border-box;
@@ -30,38 +30,38 @@ label.labeled-checkbox:has(.labeled-checkbox__input:disabled) {
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  border: 2px solid rgba(231, 138, 78, 0.82);
-  background-color: rgba(8, 10, 14, 0.72);
+  border: 2px solid var(--color-checkbox-border);
+  background-color: var(--color-checkbox-bg);
   background-repeat: no-repeat;
   background-position: center;
   background-size: 11px 11px;
 }
 
 .labeled-checkbox__input:hover:not(:disabled) {
-  border-color: rgba(243, 170, 112, 0.95);
-  background-color: rgba(12, 14, 18, 0.88);
+  border-color: var(--color-accent-orange-hover);
+  background-color: var(--color-checkbox-bg-hover);
 }
 
 .labeled-checkbox__input:checked {
-  border-color: #e78a4e;
-  background-color: #e78a4e;
+  border-color: var(--color-script-accent);
+  background-color: var(--color-script-accent);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 6.2 5.1 8.8 9.5 3.4' stroke='%23f8fafc' stroke-width='1.85' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 .labeled-checkbox__input:focus-visible {
-  outline: 2px solid rgba(231, 138, 78, 0.65);
+  outline: 2px solid var(--color-checkbox-outline);
   outline-offset: 2px;
 }
 
 .labeled-checkbox__input:disabled {
   cursor: not-allowed;
-  border-color: rgba(231, 138, 78, 0.35);
-  background-color: rgba(8, 10, 14, 0.4);
+  border-color: var(--color-checkbox-disabled-border);
+  background-color: var(--color-checkbox-bg-disabled);
 }
 
 .labeled-checkbox__input:disabled:checked {
-  background-color: rgba(231, 138, 78, 0.45);
-  border-color: rgba(231, 138, 78, 0.4);
+  background-color: var(--color-checkbox-checked-bg);
+  border-color: var(--color-checkbox-checked-border);
 }
 
 .labeled-checkbox__text {

@@ -1,0 +1,135 @@
+      {activeTab === "layout" && (
+        <div className="theater-layout-panel">
+          <TheaterCollapsibleSection
+            sectionId="layout-template"
+            title="Шаблон и экспорт"
+            summary="Готовые залы и выгрузка плана"
+            defaultOpen
+          >
+            <TheaterSelect
+              label="Шаблон зала"
+              value={hallTemplatePick}
+              options={hallTemplateOptions}
+              onChange={(nextValue) => {
+                if (!nextValue) return;
+                applyHallTemplate(nextValue);
+                setHallTemplatePick("");
+              }}
+              disabled={!currentStep}
+              placeholder="Применить шаблон…"
+            />
+            <div className="theater-btn-row theater-btn-row--3">
+              <TheaterBtn
+                onClick={exportFloorPlanSvg}
+                disabled={!currentStep}
+                title="SVG"
+              >
+                SVG
+              </TheaterBtn>
+              <TheaterBtn
+                onClick={() => void exportFloorPlanPng()}
+                disabled={!currentStep}
+                title="PNG"
+              >
+                PNG
+              </TheaterBtn>
+              <TheaterBtn
+                onClick={exportFloorPlanPdf}
+                disabled={!currentStep}
+                title="Печать / PDF"
+              >
+                PDF
+              </TheaterBtn>
+            </div>
+            <TheaterBtn
+              onClick={() => void copyFloorPlanToClipboard()}
+              disabled={!currentStep}
+              title="Скопировать план в буфер обмена как PNG"
+            >
+              План в буфер
+            </TheaterBtn>
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-view"
+            title="Вид и план"
+            summary="Сетка, кресла, режимы просмотра"
+            badge={layoutHallBadge}
+            defaultOpen
+          >
+            <div className="theater-compact-checks">
+              <LabeledCheckbox checked={showSeats} onChange={setShowSeats}>
+                Кресла
+              </LabeledCheckbox>
+              <LabeledCheckbox checked={showGrid} onChange={setShowGrid}>
+                Сетка
+              </LabeledCheckbox>
+              <LabeledCheckbox checked={snapToGrid} onChange={setSnapToGrid}>
+                Привязка X/Z
+              </LabeledCheckbox>
+              <LabeledCheckbox
+                checked={alignGuidesEnabled}
+                onChange={setAlignGuidesEnabled}
+              >
+                Направляющие
+              </LabeledCheckbox>
+              <LabeledCheckbox checked={showFloorPlan} onChange={setShowFloorPlan}>
+                План сверху
+              </LabeledCheckbox>
+              {showFloorPlan ? (
+                <LabeledCheckbox
+                  checked={floorPlanExpanded}
+                  onChange={setFloorPlanExpanded}
+                >
+                  План развёрнут
+                </LabeledCheckbox>
+              ) : null}
+              <LabeledCheckbox
+                checked={spectaclePreviewMode}
+                onChange={setSpectaclePreviewMode}
+              >
+                Просмотр
+              </LabeledCheckbox>
+              <LabeledCheckbox
+                checked={stepRehearsalMode}
+                onChange={setStepRehearsalMode}
+              >
+                Репетиция шага
+              </LabeledCheckbox>
+            </div>
+            <TheaterField label={labelM("Шаг сетки")}>
+              <input
+                type="number"
+                className="native-text-input"
+                min={0.1}
+                step={0.1}
+                value={gridStep}
+                onChange={(event) =>
+                  setGridStep(Math.max(0.1, Number(event.target.value) || 0.1))
+                }
+              />
+            </TheaterField>
+            <TheaterBtn
+              disabled={!currentStep || (currentStep.lightCues?.length ?? 0) === 0}
+              title="Скопировать таймлайн light cue в буфер"
+              onClick={() => void copyLightCuesToClipboard(lightChannels)}
+            >
+              Cue → буфер
+            </TheaterBtn>
+            {floorPlanExpanded ? (
+              <p className="theater-layout-hint">
+                Колёсико — масштаб, Alt+перетаскивание — сдвиг плана.
+              </p>
+            ) : null}
+          </TheaterCollapsibleSection>
+
+          <TheaterCollapsibleSection
+            sectionId="layout-seats"
+            title="Кресла"
+            summary="Позиция рядов и число мест"
+            badge={layoutSeatBadge}
+            defaultOpen
+          >
+            <p className="theater-layout-hint">
+              Z: ползунок ниже или перетаскивание блока кресел в 3D.
+            </p>

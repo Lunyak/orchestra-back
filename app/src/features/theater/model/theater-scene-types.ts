@@ -7,6 +7,9 @@ export type TheaterSceneProps = {
   onTheaterLayoutChange?: Dispatch<SetStateAction<TheaterLayout>>;
   isPanelsSwapped?: boolean;
   onTogglePanels?: () => void;
+  /** @deprecated use mainControlsHost */
   controlsHost?: HTMLElement | null;
+  mainControlsHost?: HTMLElement | null;
+  outlinerHost?: HTMLElement | null;
   controlsInPanel?: boolean;
 };

@@ -128,6 +128,7 @@ export function useTeam() {
 
   return {
     projectMembers,
+    projectMembersLoading: membersFetching,
     projectOwner,
     isProjectOwner,
     inviteEmail,

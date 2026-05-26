@@ -1,22 +1,88 @@
 import type { TeamProfile } from "../../../sync/api/profile";
-import type { RoleNoteItem } from "../../../sync/api/projects";
+import type { ProjectRoleInfo, RoleNoteItem } from "../../../sync/api/projects";
 
 export const ROLE_WORKBOOK_MARKER = "[[ROLE_WORKBOOK_V1]]";
 export const ROLE_DIRECTOR_REFS_MARKER = "[[ROLE_DIRECTOR_REFS_V1]]";
 
+export type RoleDirectorQuestion = {
+  text: string;
+  stepId?: number;
+  stepTitle?: string;
+};
+
+export type RoleRelationshipEntry = {
+  targetRoleId: string;
+  text: string;
+};
+
 export type RoleSceneArc = {
   stepId?: number;
   stepTitle?: string;
+  /** Что происходит с персонажем в сцене. */
   text: string;
 };
+
+/** Собирает текст сцены из единого поля или из промежуточного формата с 4 полями. */
+export function sceneArcDisplayText(raw: Partial<RoleSceneArc> & Record<string, unknown> | null | undefined): string {
+  const direct = String(raw?.text ?? "").trim();
+  if (direct) return direct;
+
+  const parts: string[] = [];
+  const objective = String(raw?.objective ?? "").trim();
+  const action = String(raw?.action ?? "").trim();
+  const result = String(raw?.result ?? "").trim();
+  const shift = String(raw?.shift ?? "").trim();
+  if (objective) parts.push(`Задача: ${objective}`);
+  if (action) parts.push(`Действие: ${action}`);
+  if (result) parts.push(`Результат: ${result}`);
+  if (shift) parts.push(`Сдвиг: ${shift}`);
+  return parts.join("\n");
+}
+
+export function sceneArcHasContent(arc: Partial<RoleSceneArc> | null | undefined): boolean {
+  return Boolean(sceneArcDisplayText(arc as any));
+}
+
+export function normalizeSceneArc(raw: Partial<RoleSceneArc> | null | undefined): RoleSceneArc | null {
+  const stepIdNum = raw?.stepId == null ? undefined : Number(raw.stepId);
+  const stepId =
+    stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0 ? Math.floor(stepIdNum) : undefined;
+  const stepTitle = typeof raw?.stepTitle === "string" ? raw.stepTitle : undefined;
+  const text = sceneArcDisplayText(raw as any);
+
+  if (!text && stepId == null) return null;
+
+  return { stepId, stepTitle, text };
+}
 
 export type RoleWorkbookDataV1 = {
   v: 1;
   /** Client timestamp to resolve ties between server note times. */
   savedAtIso?: string;
   actorEmail: string;
+  /** Данные обстоятельства: время, место, среда пьесы. */
+  givenCircumstances: string;
+  /** Биография и внерамочная жизнь. */
   biography: string;
-  superObjective: string; // сквозное действие
+  /** Социальный портрет: возраст, профессия, среда, речь, привычки. */
+  socialPortrait: string;
+  /** Отношения с другими персонажами (общие заметки, legacy). */
+  relationships: string;
+  /** Отношения к конкретным персонажам пьесы. */
+  relationshipEntries: RoleRelationshipEntry[];
+  /** Сверхзадача и сквозное действие. */
+  superObjective: string;
+  /** Препятствия на пути к цели. */
+  obstacles: string;
+  /** Событийный ряд: ключевые события жизни героя в пьесе. */
+  eventSeries: string;
+  /** Кем был в начале пьесы. */
+  transformationStart: string;
+  /** Кем стал к финалу. */
+  transformationEnd: string;
+  /** Главный перелом / поворотная точка. */
+  transformationTurningPoint: string;
+  /** Внешность, пластика, голос. */
   appearance: string;
   /** New: image refs (remote keys). */
   referenceImages: DirectorReferenceImage[];
@@ -24,7 +90,27 @@ export type RoleWorkbookDataV1 = {
   referenceLinksLegacy: string[];
   preparation: string; // заметки "как готовиться"
   sceneArcs: RoleSceneArc[];
+  /** Вопросы режиссёру по роли и сценам. */
+  directorQuestions: RoleDirectorQuestion[];
+  /** Репетиционный чеклист: что отработано. */
+  rehearsalDone: string;
+  /** Что ещё не отработано. */
+  rehearsalTodo: string;
+  /** Следующий шаг на ближайшую репетицию. */
+  rehearsalNextStep: string;
 };
+
+export function normalizeDirectorQuestion(
+  raw: Partial<RoleDirectorQuestion> | null | undefined,
+): RoleDirectorQuestion | null {
+  const text = String(raw?.text ?? "").trim();
+  if (!text) return null;
+  const stepIdNum = raw?.stepId == null ? undefined : Number(raw.stepId);
+  const stepId =
+    stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0 ? Math.floor(stepIdNum) : undefined;
+  const stepTitle = typeof raw?.stepTitle === "string" ? raw.stepTitle : undefined;
+  return { text, stepId, stepTitle };
+}
 
 export type RoleWorkbookSnapshot = {
   data: RoleWorkbookDataV1;
@@ -97,7 +183,7 @@ export function decodeRoleWorkbookNoteContent(content: string): RoleWorkbookData
       return {
         key,
         url: url || undefined,
-        token: token || `orchestra-image:${encodeURIComponent(key)}`,
+        token: token || `![reference](orchestra-image:${encodeURIComponent(key)})`,
         caption: caption || undefined,
       };
     })
@@ -105,29 +191,51 @@ export function decodeRoleWorkbookNoteContent(content: string): RoleWorkbookData
     .slice(0, 200) as DirectorReferenceImage[];
   const arcsRaw = Array.isArray(parsed.sceneArcs) ? parsed.sceneArcs : [];
   const sceneArcs: RoleSceneArc[] = arcsRaw
-    .map((a: any) => {
-      const text = String(a?.text ?? "").trim();
-      if (!text) return null;
-      const stepIdNum = a?.stepId == null ? undefined : Number(a.stepId);
-      const stepId =
-        stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0 ? Math.floor(stepIdNum) : undefined;
-      const stepTitle = typeof a?.stepTitle === "string" ? a.stepTitle : undefined;
-      return { stepId, stepTitle, text };
-    })
+    .map((a: any) => normalizeSceneArc(a))
     .filter(Boolean)
     .slice(0, 200) as RoleSceneArc[];
+
+  const relEntriesRaw = Array.isArray(parsed.relationshipEntries) ? parsed.relationshipEntries : [];
+  const relationshipEntries: RoleRelationshipEntry[] = relEntriesRaw
+    .map((it: any) => {
+      const targetRoleId = String(it?.targetRoleId ?? "").trim();
+      const text = String(it?.text ?? "").trim();
+      if (!targetRoleId) return null;
+      return { targetRoleId, text };
+    })
+    .filter(Boolean)
+    .slice(0, 80) as RoleRelationshipEntry[];
+
+  const questionsRaw = Array.isArray(parsed.directorQuestions) ? parsed.directorQuestions : [];
+  const directorQuestions: RoleDirectorQuestion[] = questionsRaw
+    .map((it: any) => normalizeDirectorQuestion(it))
+    .filter(Boolean)
+    .slice(0, 80) as RoleDirectorQuestion[];
 
   return {
     v: 1,
     savedAtIso: savedAtIso || undefined,
     actorEmail,
+    givenCircumstances: String(parsed.givenCircumstances ?? ""),
     biography: String(parsed.biography ?? ""),
+    socialPortrait: String(parsed.socialPortrait ?? ""),
+    relationships: String(parsed.relationships ?? ""),
+    relationshipEntries,
     superObjective: String(parsed.superObjective ?? ""),
+    obstacles: String(parsed.obstacles ?? ""),
+    eventSeries: String(parsed.eventSeries ?? ""),
+    transformationStart: String(parsed.transformationStart ?? ""),
+    transformationEnd: String(parsed.transformationEnd ?? ""),
+    transformationTurningPoint: String(parsed.transformationTurningPoint ?? ""),
     appearance: String(parsed.appearance ?? ""),
     referenceImages,
     referenceLinksLegacy,
     preparation: String(parsed.preparation ?? ""),
     sceneArcs,
+    directorQuestions,
+    rehearsalDone: String(parsed.rehearsalDone ?? ""),
+    rehearsalTodo: String(parsed.rehearsalTodo ?? ""),
+    rehearsalNextStep: String(parsed.rehearsalNextStep ?? ""),
   };
 }
 
@@ -189,7 +297,7 @@ export function decodeDirectorRefsNoteContent(content: string): RoleDirectorRefs
       return {
         key,
         url: url || undefined,
-        token: token || `orchestra-image:${encodeURIComponent(key)}`,
+        token: token || `![reference](orchestra-image:${encodeURIComponent(key)})`,
         caption: caption || undefined,
       };
     })
@@ -229,6 +337,75 @@ export function pickLatestDirectorRefsSnapshotForRole(
     else if (isBetter(snap, best)) best = snap;
   }
   return best;
+}
+
+/** Что другие актёры написали о текущем персонаже в своих тетрадках (блок «отношения»). */
+export type InboundRoleMention = {
+  sourceRoleId: string;
+  sourceRoleTitle: string;
+  sourceRoleAvatarKey?: string | null;
+  actorEmail: string;
+  text: string;
+  updatedAtIso: string;
+};
+
+export function collectInboundMentions(params: {
+  targetRoleId: string;
+  projectRoles: ProjectRoleInfo[];
+  notesByRoleId: Map<string, RoleNoteItem[]> | Record<string, RoleNoteItem[]>;
+}): InboundRoleMention[] {
+  const target = String(params.targetRoleId ?? "").trim();
+  if (!target) return [];
+
+  const roleById = new Map<string, ProjectRoleInfo>();
+  for (const r of params.projectRoles ?? []) roleById.set(String(r.id), r);
+
+  const notesMap =
+    params.notesByRoleId instanceof Map
+      ? params.notesByRoleId
+      : new Map(Object.entries(params.notesByRoleId ?? {}));
+
+  const out: InboundRoleMention[] = [];
+
+  for (const [sourceRoleId, notes] of notesMap.entries()) {
+    if (String(sourceRoleId) === target) continue;
+    const sourceRole = roleById.get(String(sourceRoleId));
+    const sourceRoleTitle = String(sourceRole?.title ?? sourceRole?.key ?? sourceRoleId).trim();
+    const sourceRoleAvatarKey = sourceRole?.avatarKey ?? null;
+
+    const actorEmails = new Set<string>();
+    for (const n of notes ?? []) {
+      const data = decodeRoleWorkbookNoteContent(String(n?.content ?? ""));
+      if (!data) continue;
+      const em = normalizeEmail(data.actorEmail);
+      if (em) actorEmails.add(em);
+    }
+
+    for (const actorEmail of actorEmails) {
+      const snap = pickLatestWorkbookSnapshotForActor(notes ?? [], actorEmail);
+      if (!snap) continue;
+      const updatedAtIso = String(
+        snap.data.savedAtIso || snap.note.updatedAt || snap.note.createdAt || "",
+      ).trim();
+
+      for (const entry of snap.data.relationshipEntries ?? []) {
+        if (String(entry.targetRoleId) !== target) continue;
+        const text = String(entry.text ?? "").trim();
+        if (!text) continue;
+        out.push({
+          sourceRoleId: String(sourceRoleId),
+          sourceRoleTitle,
+          sourceRoleAvatarKey,
+          actorEmail,
+          text,
+          updatedAtIso,
+        });
+      }
+    }
+  }
+
+  out.sort((a, b) => +new Date(b.updatedAtIso || 0) - +new Date(a.updatedAtIso || 0));
+  return out;
 }
 
 export function actorLabel(p: TeamProfile | null, email: string): string {

@@ -34,6 +34,9 @@ export interface ScriptUIContextValue {
   swapTheaterPanels: boolean;
   setSwapTheaterPanels: React.Dispatch<React.SetStateAction<boolean>>;
   togglePanels: () => void;
+  showTheaterControls: boolean;
+  setShowTheaterControls: (v: boolean | ((prev: boolean) => boolean)) => void;
+  toggleTheaterControls: () => void;
 }
 
 export function ScriptUIProvider({ children }: { children: React.ReactNode }) {
@@ -166,6 +169,19 @@ export function useScriptUI(): ScriptUIContextValue {
   );
   const togglePanels = useCallback(() => dispatch(scriptUiActions.togglePanels()), [dispatch]);
 
+  const setShowTheaterControls = useCallback(
+    (v: boolean | ((prev: boolean) => boolean)) => {
+      const next =
+        typeof v === "function" ? (v as (prev: boolean) => boolean)(ui.showTheaterControls) : v;
+      dispatch(scriptUiActions.setShowTheaterControls({ value: Boolean(next) }));
+    },
+    [dispatch, ui.showTheaterControls],
+  );
+  const toggleTheaterControls = useCallback(
+    () => dispatch(scriptUiActions.toggleTheaterControls()),
+    [dispatch],
+  );
+
   return {
     showRequisites: ui.showRequisites,
     setShowRequisites,
@@ -198,5 +214,8 @@ export function useScriptUI(): ScriptUIContextValue {
     swapTheaterPanels: ui.swapTheaterPanels,
     setSwapTheaterPanels,
     togglePanels,
+    showTheaterControls: ui.showTheaterControls,
+    setShowTheaterControls,
+    toggleTheaterControls,
   };
 }

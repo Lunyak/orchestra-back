@@ -2,7 +2,7 @@ import cn from "classnames";
 import { useMemo } from "react";
 import { DialogueSceneTrainer } from "../../actor-trainers/ui/DialogueSceneTrainer";
 import { VoiceDialogueTrainer } from "../../actor-trainers/ui/VoiceDialogueTrainer";
-import { WordOrderTrainer } from "../../actor-trainers/ui/WordOrderTrainer";
+import { PhraseWriteTrainer } from "../../actor-trainers/ui/PhraseWriteTrainer";
 import { Button } from "../../../shared/core/button/Button";
 import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
 import { LabeledCheckbox } from "../../../shared/core/labeled-checkbox/LabeledCheckbox";
@@ -267,11 +267,11 @@ export function ActorPageView() {
                   Диалог
                 </Button>
                 <Button
-                  className={cn("actor-mode-tab", trainerMode === "cards" ? "is-active" : "secondary")}
+                  className={cn("actor-mode-tab", trainerMode === "write" ? "is-active" : "secondary")}
                   type="button"
-                  onClick={() => setTrainerMode("cards")}
+                  onClick={() => setTrainerMode("write")}
                 >
-                  Переставь слова (карточки)
+                  Напиши фразу
                 </Button>
                 <Button
                   className={cn("actor-mode-tab", trainerMode === "voice" ? "is-active" : "secondary")}
@@ -301,8 +301,11 @@ export function ActorPageView() {
                   performerLabel={myEmail || undefined}
                 />
               ) : (
-                <WordOrderTrainer
-                  phrases={filteredPhrases}
+                <PhraseWriteTrainer
+                  steps={steps}
+                  role={effectiveRoleTitle}
+                  roleKeys={effectiveRoleKeys}
+                  selectedStepIds={selectedStepIdsForTraining}
                   storageKey={trainerStorageKey || undefined}
                 />
               )}

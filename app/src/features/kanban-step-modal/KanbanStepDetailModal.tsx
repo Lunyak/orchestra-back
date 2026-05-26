@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useAuth } from "../auth/model/auth-context";
 import {
   STATUSES,
   statusOf,
@@ -10,7 +11,6 @@ import {
 } from "../../shared/core/custom-select/CustomSelect";
 import { InlineTextField } from "../../shared/core/inline-text-field/InlineTextField";
 import { Modal } from "../../shared/core/modal/Modal";
-import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import type { ScriptStep } from "../../shared/types/script";
 import type { ProjectRoleInfo } from "../../sync/api/projects";
 import "./KanbanStepDetailModal.css";
@@ -18,57 +18,10 @@ import {
   KanbanStepRolesAdminPanel,
   type KanbanStepRolesAdminMember,
 } from "./KanbanStepRolesAdminPanel";
+import { KanbanStepRoleCastTile } from "./KanbanStepRoleCastTile";
+import { KanbanStepRoleDetailPanel } from "./KanbanStepRoleDetailPanel";
 
 const KanbanStepMarkdownPanel = lazy(() => import("./KanbanStepMarkdownPanel"));
-
-function normalizeActorEmail(v: unknown): string {
-  return String(v ?? "")
-    .trim()
-    .toLowerCase();
-}
-
-function findAssignmentMember(
-  members: KanbanStepRolesAdminMember[],
-  rawEmail: string,
-): KanbanStepRolesAdminMember | null {
-  const e = normalizeActorEmail(rawEmail);
-  if (!e) return null;
-  return members.find((m) => normalizeActorEmail(m.email) === e) ?? null;
-}
-
-/** Подпись на чипе: имя и фамилия, иначе displayName, иначе email. */
-function actorChipDisplay(
-  m: KanbanStepRolesAdminMember | null,
-  fallbackEmail: string,
-): { label: string; avatarUrl: string | null; title: string } {
-  const email = String(fallbackEmail ?? "").trim();
-  if (!m?.profile) {
-    return { label: email || "?", avatarUrl: null, title: email };
-  }
-  const p = m.profile;
-  const full =
-    `${String(p.firstName ?? "").trim()} ${String(p.lastName ?? "").trim()}`.trim();
-  if (full) {
-    return {
-      label: full,
-      avatarUrl: String(p.avatarUrl ?? "").trim() || null,
-      title: email ? `${full} (${email})` : full,
-    };
-  }
-  const display = String(p.displayName ?? "").trim();
-  if (display) {
-    return {
-      label: display,
-      avatarUrl: String(p.avatarUrl ?? "").trim() || null,
-      title: email ? `${display} (${email})` : display,
-    };
-  }
-  return {
-    label: email || "?",
-    avatarUrl: String(p.avatarUrl ?? "").trim() || null,
-    title: email,
-  };
-}
 
 export type KanbanStepDetailModalProps = {
   step: ScriptStep;
@@ -86,6 +39,7 @@ export type KanbanStepDetailModalProps = {
 };
 
 type ModalTab = "info" | "script";
+type InfoSubPage = "overview" | "roles-admin" | "role-detail";
 
 export function KanbanStepDetailModal({
   step,
@@ -101,7 +55,10 @@ export function KanbanStepDetailModal({
   projectRoles,
   roleAssignmentMembers,
 }: KanbanStepDetailModalProps) {
+  const { accessToken } = useAuth();
   const [tab, setTab] = useState<ModalTab>("info");
+  const [infoSubPage, setInfoSubPage] = useState<InfoSubPage>("overview");
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const statusSelectOptions: CustomSelectOption[] = STATUSES.map((statusItem) => ({
     value: statusItem.id,
     label: statusItem.label,
@@ -109,18 +66,38 @@ export function KanbanStepDetailModal({
 
   useEffect(() => {
     setTab("info");
+    setInfoSubPage("overview");
+    setSelectedRoleId(null);
   }, [step.id]);
 
-  const missingSceneRoles = openedRoles.filter(
-    (r) => resolveRoleInfo(r) == null,
+  const selectedRole = useMemo(
+    () => projectRoles.find((r) => r.id === selectedRoleId) ?? null,
+    [projectRoles, selectedRoleId],
   );
+
+  const isRoleDetailPage = tab === "info" && infoSubPage === "role-detail";
+  const isRolesAdminPage = tab === "info" && infoSubPage === "roles-admin";
+  const isSubNavPage = isRolesAdminPage || isRoleDetailPage;
+
+  const missingSceneRoles = openedRoles.filter((r) => resolveRoleInfo(r) == null);
+
+  const openRoleDetail = (roleId: string) => {
+    setSelectedRoleId(roleId);
+    setInfoSubPage("role-detail");
+  };
+
+  const modalAriaLabel = isRoleDetailPage
+    ? `Роль: ${selectedRole?.title ?? ""}`
+    : isRolesAdminPage
+      ? `Назначения ролей: ${step.title}`
+      : `Сцена: ${step.title}`;
 
   return (
     <Modal
       isOpen
       onClose={onClose}
       panelClassName="kanban-step-modal-panel"
-      ariaLabel={`Сцена: ${step.title}`}
+      ariaLabel={modalAriaLabel}
     >
       <div className="kanban-step-modal__head">
         <div>
@@ -137,35 +114,84 @@ export function KanbanStepDetailModal({
         </button>
       </div>
 
-      <div
-        className="kanban-step-modal__tabs"
-        role="tablist"
-        aria-label="Раздел карточки"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "info"}
-          className="kanban-step-modal__tab"
-          data-active={tab === "info" ? "true" : "false"}
-          onClick={() => setTab("info")}
+      {!isSubNavPage ? (
+        <div
+          className="kanban-step-modal__tabs"
+          role="tablist"
+          aria-label="Раздел карточки"
         >
-          Карточка
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "script"}
-          className="kanban-step-modal__tab"
-          data-active={tab === "script" ? "true" : "false"}
-          onClick={() => setTab("script")}
-        >
-          Сценарий
-        </button>
-      </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "info"}
+            className="kanban-step-modal__tab"
+            data-active={tab === "info" ? "true" : "false"}
+            onClick={() => {
+              setTab("info");
+              setInfoSubPage("overview");
+              setSelectedRoleId(null);
+            }}
+          >
+            Карточка
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === "script"}
+            className="kanban-step-modal__tab"
+            data-active={tab === "script" ? "true" : "false"}
+            onClick={() => setTab("script")}
+          >
+            Сценарий
+          </button>
+        </div>
+      ) : (
+        <div className="kanban-step-modal__subnav">
+          <button
+            type="button"
+            className="kanban-step-modal__back"
+            onClick={() => {
+              if (isRoleDetailPage) {
+                setInfoSubPage("roles-admin");
+                setSelectedRoleId(null);
+                return;
+              }
+              setInfoSubPage("overview");
+              setSelectedRoleId(null);
+            }}
+          >
+            {isRoleDetailPage ? "← Назад к ролям" : "← Назад к карточке"}
+          </button>
+          <div className="kanban-step-modal__subnav-title">
+            {isRoleDetailPage ? selectedRole?.title ?? "Роль" : "Назначения ролей"}
+          </div>
+        </div>
+      )}
 
-      <div className="kanban-step-modal__body">
-        {tab === "info" ? (
+      <div
+        className={`kanban-step-modal__body${isSubNavPage ? " kanban-step-modal__body_roles-admin" : ""}`}
+      >
+        {isRoleDetailPage && selectedRoleId && !selectedRole ? (
+          <div className="kanban-muted">Загрузка роли…</div>
+        ) : isRoleDetailPage && selectedRole && projectName ? (
+          <KanbanStepRoleDetailPanel
+            projectName={projectName}
+            role={selectedRole}
+            projectRoles={projectRoles}
+            members={roleAssignmentMembers}
+            onDeleted={() => {
+              setInfoSubPage("roles-admin");
+              setSelectedRoleId(null);
+            }}
+          />
+        ) : isRolesAdminPage ? (
+          <KanbanStepRolesAdminPanel
+            projectName={projectName}
+            projectRoles={projectRoles}
+            missingSceneRoles={missingSceneRoles}
+            onOpenRole={openRoleDetail}
+          />
+        ) : tab === "info" ? (
           <>
             <div className="kanban-field__container">
               <label className="kanban-field">
@@ -216,65 +242,27 @@ export function KanbanStepDetailModal({
                   ).
                 </div>
               ) : (
-                <div className="kanban-roles-grid">
+                <div className="kanban-step-cast-grid">
                   {openedRoles.map((role) => (
-                    <label key={role} className="kanban-role-row">
-                      <span className="kanban-role-name">
-                        {displayRoleTitle(role)}
-                      </span>
-                      <div className="kanban-role-input-wrap">
-                        <div
-                          style={{ display: "flex", gap: 6, flexWrap: "wrap" }}
-                        >
-                          {getRoleActors(step, role).length > 0 ? (
-                            getRoleActors(step, role).map((a) => {
-                              const member = findAssignmentMember(
-                                roleAssignmentMembers,
-                                a,
-                              );
-                              const { label, avatarUrl, title } = actorChipDisplay(
-                                member,
-                                a,
-                              );
-                              return (
-                                <span
-                                  key={`${role}:${a}`}
-                                  className="kanban-chip kanban-chip--person"
-                                  title={title}
-                                >
-                                  <MiniAvatar
-                                    src={avatarUrl}
-                                    label={label}
-                                    size={18}
-                                    title={title}
-                                  />
-                                  <span className="kanban-chip__person-name">
-                                    {label}
-                                  </span>
-                                </span>
-                              );
-                            })
-                          ) : (
-                            <span className="kanban-muted">—</span>
-                          )}
-                        </div>
-                        {resolveRoleInfo(role) == null && (
-                          <div className="kanban-role-hint warn">
-                            Роль не заведена в проекте. Создай её ниже в блоке
-                            «Создание и назначения ролей».
-                          </div>
-                        )}
-                      </div>
-                    </label>
+                    <KanbanStepRoleCastTile
+                      key={role}
+                      roleKey={role}
+                      roleTitle={displayRoleTitle(role)}
+                      roleInfo={resolveRoleInfo(role)}
+                      actorEmails={getRoleActors(step, role)}
+                      members={roleAssignmentMembers}
+                      accessToken={accessToken}
+                    />
                   ))}
                 </div>
               )}
-              <KanbanStepRolesAdminPanel
-                projectName={projectName}
-                projectRoles={projectRoles}
-                members={roleAssignmentMembers}
-                missingSceneRoles={missingSceneRoles}
-              />
+              <button
+                type="button"
+                className="kanban-step-modal__roles-link"
+                onClick={() => setInfoSubPage("roles-admin")}
+              >
+                Назначить актёров и редактировать роли →
+              </button>
             </div>
           </>
         ) : (

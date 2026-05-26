@@ -1,0 +1,17 @@
+Source asset: Background Posed Humans Pack / Quaternius
+Source page: https://quaternius.com/packs/backgroundposedhumans.html
+Source download used: https://drive.google.com/drive/folders/18dWyZlA53euzsc1WobITqFYLcT5sFULz?usp=sharing
+Original creator/distributor: Quaternius
+License shown on source page: Creative Commons Zero (CC0)
+Included license text: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+License checked: 2026-05-09 JST
+
+Source page notes observed:
+- Models: 28
+- Formats: FBX, OBJ, Blend
+- License: CC0
+- Source description says the assets are free to use in personal and commercial projects.
+
+This information is provided to reduce license-checking friction. It is not
+legal advice or a rights warranty.

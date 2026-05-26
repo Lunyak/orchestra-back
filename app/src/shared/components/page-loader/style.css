@@ -1,7 +1,7 @@
 /* Shared skeleton tokens */
 .sk {
-  --sk-bg: rgba(255, 255, 255, 0.06);
-  --sk-hi: rgba(255, 255, 255, 0.12);
+  --sk-bg: var(--color-border-faint);
+  --sk-hi: var(--color-border-visible);
   background: linear-gradient(90deg, var(--sk-bg) 0%, var(--sk-hi) 50%, var(--sk-bg) 100%);
   background-size: 200% 100%;
   animation: sk-shimmer 1.15s ease-in-out infinite;

@@ -1,9 +1,16 @@
-import { IsArray, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsArray,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpsertProjectRoleDto {
+  @IsOptional()
   @IsString()
   @MaxLength(80)
-  title!: string;
+  title?: string;
 
   @IsOptional()
   @IsString()
@@ -14,4 +21,11 @@ export class UpsertProjectRoleDto {
   @IsOptional()
   @IsArray()
   aliases?: string[];
+
+  /** Storage key for role portrait (playing card). Pass null to clear. */
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(500)
+  avatarKey?: string | null;
 }

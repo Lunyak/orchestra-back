@@ -7,10 +7,15 @@ export type PartnerVoiceSource =
   | { kind: "tts" }
   | { kind: "performer"; performerId: string };
 
+export const VOICE_PASS_RATIO_OPTIONS = [70, 75, 80, 85, 90, 95] as const;
+export type VoicePassRatioPercent = (typeof VOICE_PASS_RATIO_OPTIONS)[number];
+export const DEFAULT_VOICE_PASS_RATIO_PERCENT: VoicePassRatioPercent = 80;
+
 export type VoiceTrainerUiState = {
   uiKey: string;
   autoFlow: boolean;
   checkMode: VoiceTrainerCheckMode;
+  passRatioPercent: VoicePassRatioPercent;
   ttsVoiceName: string;
   recordTakes: boolean;
   showText: boolean;
@@ -55,15 +60,31 @@ function defaultUi(uiKey: string): VoiceTrainerUiState {
     typeof window !== "undefined" ? localStorage.getItem("voiceDialogue:checkMode") : null;
   const legacyAutoFlow =
     typeof window !== "undefined" ? localStorage.getItem("voiceDialogue:autoFlow") : null;
+  const legacyPassRatio =
+    typeof window !== "undefined" ? localStorage.getItem("voiceDialogue:passRatioPercent") : null;
+  const parsedLegacyPassRatio = Number(legacyPassRatio);
+  const passRatioPercent: VoicePassRatioPercent = VOICE_PASS_RATIO_OPTIONS.includes(
+    parsedLegacyPassRatio as VoicePassRatioPercent,
+  )
+    ? (parsedLegacyPassRatio as VoicePassRatioPercent)
+    : DEFAULT_VOICE_PASS_RATIO_PERCENT;
   return {
     uiKey,
     autoFlow: legacyAutoFlow == null ? true : legacyAutoFlow === "true",
     checkMode: legacyCheckMode === "sentences" ? "sentences" : "full",
+    passRatioPercent,
     ttsVoiceName: legacyVoiceName || "auto",
     recordTakes: true,
     showText: false,
     partnerVoiceByRoleKey: {},
   };
+}
+
+function normalizePassRatioPercent(value: unknown): VoicePassRatioPercent {
+  const n = Number(value);
+  return VOICE_PASS_RATIO_OPTIONS.includes(n as VoicePassRatioPercent)
+    ? (n as VoicePassRatioPercent)
+    : DEFAULT_VOICE_PASS_RATIO_PERCENT;
 }
 
 export const voiceTrainerUiSlice = createSlice({
@@ -102,6 +123,7 @@ export const voiceTrainerUiSlice = createSlice({
         uiKey,
         autoFlow: typeof parsedObj?.autoFlow === "boolean" ? parsedObj.autoFlow : base.autoFlow,
         checkMode,
+        passRatioPercent: normalizePassRatioPercent(parsedObj?.passRatioPercent ?? base.passRatioPercent),
         ttsVoiceName:
           typeof parsedObj?.ttsVoiceName === "string" && parsedObj.ttsVoiceName.trim()
             ? parsedObj.ttsVoiceName
@@ -141,6 +163,24 @@ export const voiceTrainerUiSlice = createSlice({
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("voiceDialogue:checkMode", next.checkMode);
+        } catch {}
+      }
+    },
+    setVoicePassRatioPercent(
+      state,
+      action: PayloadAction<{ uiKey: string; value: VoicePassRatioPercent }>,
+    ) {
+      const { uiKey, value } = action.payload;
+      const entry = state.byKey[uiKey] ?? defaultUi(uiKey);
+      const next: VoiceTrainerUiState = {
+        ...entry,
+        passRatioPercent: normalizePassRatioPercent(value),
+      };
+      state.byKey[uiKey] = next;
+      persist(next);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("voiceDialogue:passRatioPercent", String(next.passRatioPercent));
         } catch {}
       }
     },
@@ -194,6 +234,12 @@ export const voiceTrainerUiReducer = voiceTrainerUiSlice.reducer;
 
 export function selectVoiceTrainerUi(state: RootState, uiKey: string): VoiceTrainerUiState {
   const key = String(uiKey ?? "").trim();
-  return state.voiceTrainerUi?.byKey?.[key] ?? defaultUi(key);
+  const stored = state.voiceTrainerUi?.byKey?.[key];
+  if (!stored) return defaultUi(key);
+  return {
+    ...defaultUi(key),
+    ...stored,
+    passRatioPercent: normalizePassRatioPercent(stored.passRatioPercent),
+  };
 }
 

@@ -117,6 +117,27 @@ export const projectApi = orchestraApi.injectEndpoints({
         { type: "ProjectRoles", id: projectSlug },
       ],
     }),
+
+    updateProjectRole: build.mutation<
+      { ok: boolean; roleId: string },
+      {
+        projectSlug: string;
+        roleId: string;
+        title?: string;
+        description?: string;
+        aliases?: string[];
+        avatarKey?: string | null;
+      }
+    >({
+      query: ({ projectSlug, roleId, title, description, aliases, avatarKey }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}`,
+        method: "PUT",
+        data: { title, description, aliases, avatarKey },
+      }),
+      invalidatesTags: (_r, _e, { projectSlug }) => [
+        { type: "ProjectRoles", id: projectSlug },
+      ],
+    }),
   }),
 });
 
@@ -129,4 +150,5 @@ export const {
   useCreateProjectRoleMutation,
   useDeleteProjectRoleMutation,
   useSetProjectRoleAssignmentsMutation,
+  useUpdateProjectRoleMutation,
 } = projectApi;

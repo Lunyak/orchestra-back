@@ -51,7 +51,6 @@ export const StrawGridModel = ({
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.01, 0]}
-        receiveShadow
         raycast={ignoreRaycast}
       >
         <planeGeometry args={[size, size]} />

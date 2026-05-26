@@ -6,7 +6,7 @@
   box-sizing: border-box;
   width: 100%;
   font: inherit;
-  color: #fff;
+  color: var(--color-text-primary);
   border: none;
   /* Стабильная высота строки списка: три текстовых зоны, даже если часть пустая */
   grid-template-rows: auto auto minmax(calc(12px * 1.35), auto);
@@ -46,13 +46,13 @@
 }
 
 .session__step-item__badge--in-session {
-  background: rgba(251, 191, 36, 0.12);
-  color: rgba(253, 224, 71, 0.96);
-  border: 1px solid rgba(251, 191, 36, 0.38);
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text-bright);
+  border: 1px solid var(--color-warning-border);
 }
 
 .session__step-item--booked:not(.session__step-item--selected) {
-  box-shadow: inset 3px 0 0 rgba(251, 191, 36, 0.5);
+  box-shadow: inset 3px 0 0 var(--color-warning-inset);
 }
 
 .session__step-item__status {
@@ -77,8 +77,8 @@
   white-space: pre-wrap;
   overflow: auto;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-bg-hover);
+  background: var(--color-bg-scrim-soft);
   font-size: 12px;
   line-height: 1.35;
   box-sizing: border-box;
@@ -87,15 +87,15 @@
 
 .session__step-item--selected {
   background: var(--color-bg-tertiary);
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .session__step-item--ok {
-  background: rgba(46, 160, 67, 0.08);
+  background: var(--color-status-success-bg);
 }
 
 .session__step-item--bad {
-  background: rgba(248, 81, 73, 0.06);
+  background: var(--color-status-error-bg);
 }
 
 .director-session-page__preview {
@@ -109,7 +109,7 @@
 
   span {
     font-size: 12px;
-    color: #fff;
+    color: var(--color-text-primary);
   }
 }
 

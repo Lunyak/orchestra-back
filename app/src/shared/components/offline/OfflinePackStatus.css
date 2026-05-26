@@ -8,7 +8,7 @@
   font-size: 13px;
   background: rgba(30, 40, 55, 0.85);
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .offline-pack-status__dot {
@@ -37,7 +37,7 @@
   border-radius: 6px;
   border: none;
   background: #4a7cff;
-  color: #fff;
+  color: var(--color-text-primary);
   font-size: 13px;
   cursor: pointer;
 }

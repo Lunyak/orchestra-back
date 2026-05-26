@@ -39,6 +39,18 @@ const TroupePage = lazy(() =>
   })),
 );
 
+const PremisesPage = lazy(() =>
+  import("../../pages/premises/PremisesPage").then((m) => ({
+    default: m.PremisesPage,
+  })),
+);
+
+const PremiseDetailPage = lazy(() =>
+  import("../../pages/premises/PremiseDetailPage").then((m) => ({
+    default: m.PremiseDetailPage,
+  })),
+);
+
 const SettingsPage = lazy(() =>
   import("../../pages/settings/SettingsPage/SettingsPage").then((m) => ({
     default: m.SettingsPage,
@@ -153,6 +165,8 @@ export function AppRouteDeclarations() {
       />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/troupe" element={<TroupePage />} />
+      <Route path="/premises" element={<PremisesPage />} />
+      <Route path="/premises/:premiseId" element={<PremiseDetailPage />} />
       <Route path="/roles" element={<Navigate to="/board" replace />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/bot" element={<SettingsBotPage />} />

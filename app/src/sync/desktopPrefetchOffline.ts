@@ -1,10 +1,12 @@
 import type { ScriptStep, TheaterLayout } from "../shared/types/script";
+import { collectTheaterOfflineAssets } from "../features/theater/model/theater-offline-assets";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import {
   desktopReadProjectScene,
   desktopSaveProjectScene,
 } from "../shared/platform/desktop-methods";
 import { DEFAULT_THEATER_LAYOUT } from "../features/scene/model/scene-slice";
+import { normalizePersistedTheaterLayout } from "../features/theater/model/theater-metrics";
 import {
   collectMarkdownImagePrefetchTargets,
   httpUrlToImageFileName,
@@ -72,7 +74,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
   ) => Promise<any>;
 
   const downloadOne = async (opts: {
-    kind: "playlist" | "sound" | "sound-icon" | "image";
+    kind: "playlist" | "sound" | "sound-icon" | "image" | "model" | "decor-texture";
     fileName: string;
     url: string;
   }) => {
@@ -171,6 +173,16 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       await downloadOne({ kind: "image", fileName: name, url: urlStr });
     }
 
+    const theaterOffline = collectTheaterOfflineAssets(args.normalizedSteps);
+    for (const asset of theaterOffline.assets) {
+      if (!asset.remoteUrl || !isHttpUrl(asset.remoteUrl)) continue;
+      await downloadOne({
+        kind: asset.kind === "model" ? "model" : "decor-texture",
+        fileName: asset.fileName,
+        url: asset.remoteUrl,
+      });
+    }
+
     const payload: Record<string, unknown> = {
       ...base,
       name: args.minimalSceneData.name ?? (base as any)?.name ?? "script",
@@ -181,6 +193,17 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       sounds,
       sceneRoles: args.minimalSceneData.sceneRoles ?? (base as any)?.sceneRoles,
       images: Object.keys(images).length ? images : (base as any)?.images,
+      theaterOfflineManifest: {
+        modelCount: theaterOffline.modelCount,
+        textureCount: theaterOffline.textureCount,
+        remoteCount: theaterOffline.remoteCount,
+        assets: theaterOffline.assets.map((item) => ({
+          kind: item.kind,
+          fileName: item.fileName,
+          relativePath: item.relativePath,
+          hasRemote: Boolean(item.remoteUrl),
+        })),
+      },
     };
 
     const saveRes = await desktopSaveProjectScene(desktop, args.projectSlug, "script", payload, {
@@ -197,7 +220,10 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     }
 
     const f = fresh as any;
-    const theaterLayout = (f.theaterLayout as TheaterLayout) ?? args.normalizedLayout ?? DEFAULT_THEATER_LAYOUT;
+    const rawLayout = (f.theaterLayout as TheaterLayout | undefined) ?? args.normalizedLayout;
+    const theaterLayout = rawLayout
+      ? normalizePersistedTheaterLayout(rawLayout)
+      : DEFAULT_THEATER_LAYOUT;
     const lc = Array.isArray(f.lightChannels)
       ? normalizeLightChannelsLoose(f.lightChannels)
       : args.normalizedLightChannels;

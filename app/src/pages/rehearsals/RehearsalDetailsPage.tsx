@@ -134,10 +134,10 @@ export function RehearsalDetailsPage() {
         <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
           <div
             style={{
-              border: "1px solid rgba(255,255,255,0.12)",
+              border: "1px solid var(--color-border-visible)",
               borderRadius: 12,
               padding: 12,
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--color-bg-transparent-2)",
             }}
           >
             <div style={{ fontWeight: 800, fontSize: 14 }}>{rehearsal.title}</div>
@@ -158,17 +158,17 @@ export function RehearsalDetailsPage() {
 
           <div
             style={{
-              border: "1px solid rgba(255,255,255,0.12)",
+              border: "1px solid var(--color-border-visible)",
               borderRadius: 12,
               padding: 12,
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--color-bg-transparent-2)",
             }}
           >
             <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Мой комментарий к сессии</div>
             <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
               {commentLoading ? <div style={{ fontSize: 12, opacity: 0.7 }}>Загрузка…</div> : null}
               {commentSaving ? <div style={{ fontSize: 12, opacity: 0.7 }}>Сохранение…</div> : null}
-              {!commentSaving && commentMsg ? <div style={{ fontSize: 12, color: "#7ee787" }}>{commentMsg}</div> : null}
+              {!commentSaving && commentMsg ? <div style={{ fontSize: 12, color: "var(--color-status-success-bright)" }}>{commentMsg}</div> : null}
               {commentErr ? (
                 <div className="settings-invite-error" style={{ margin: 0 }}>
                   {commentErr}
@@ -241,10 +241,10 @@ export function RehearsalDetailsPage() {
 
           <div
             style={{
-              border: "1px solid rgba(255,255,255,0.12)",
+              border: "1px solid var(--color-border-visible)",
               borderRadius: 12,
               padding: 12,
-              background: "rgba(255,255,255,0.04)",
+              background: "var(--color-bg-transparent-2)",
             }}
           >
             <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>Участники</div>
@@ -261,8 +261,8 @@ export function RehearsalDetailsPage() {
                       gap: 10,
                       padding: "6px 8px",
                       borderRadius: 10,
-                      border: "1px solid rgba(255,255,255,0.10)",
-                      background: "rgba(0,0,0,0.10)",
+                      border: "1px solid var(--color-border-medium)",
+                      background: "var(--color-bg-scrim-subtle)",
                       fontSize: 12,
                     }}
                   >

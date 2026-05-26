@@ -18,6 +18,12 @@ import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
+import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
+import { stepTheaterSyncPayload } from "../../theater/model/theater-step-models";
+import {
+  resolveInitialTheaterLayout,
+  writeTheaterLayoutDraft,
+} from "../../theater/model/theater-layout-draft-storage";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
 import { loadSceneRolesFromStorage } from "./scene-roles-storage";
 import { hydrateSceneFromLocalPack } from "./scene-local-hydration";
@@ -129,18 +135,17 @@ export function useSceneOperations() {
                   length: f?.length ?? undefined,
                 }))
               : [],
-            theaterModels: Array.isArray(st?.theaterModels)
-              ? st.theaterModels.map((m: any) => ({
-                  id: Number(m?.sourceId ?? m?.id ?? 0),
-                  name: String(m?.name ?? ""),
-                  type: m?.type ?? undefined,
-                  builtin: m?.builtin ?? undefined,
-                  allowOutOfBounds: Boolean(m?.allowOutOfBounds),
-                  position: m?.position,
-                  rotation: m?.rotation,
-                  scale: m?.scale,
+            lightCues: Array.isArray((st as any)?.lightCues)
+              ? (st as any).lightCues.map((cue: any) => ({
+                  id: Number(cue?.id ?? 0),
+                  tSec: Number(cue?.tSec ?? 0),
+                  channel: String(cue?.channel ?? ""),
+                  intensity:
+                    typeof cue?.intensity === "number" ? cue.intensity : undefined,
+                  enabled: cue?.enabled ?? undefined,
                 }))
-              : [],
+              : undefined,
+            ...resolveStepTheaterFromApi(st),
             theaterSpotlights: Array.isArray(st?.theaterSpotlights)
               ? st.theaterSpotlights.map((sp: any) => ({
                   id: Number(sp?.sourceId ?? sp?.id ?? 0),
@@ -153,6 +158,7 @@ export function useSceneOperations() {
                   enabled: Boolean(sp?.enabled),
                   channel: sp?.channel ?? undefined,
                   isRgb: sp?.isRgb ?? undefined,
+                  hidden: sp?.hidden === true ? true : undefined,
                 }))
               : [],
           }))
@@ -198,8 +204,11 @@ export function useSceneOperations() {
           (Array.isArray(theaterLayouts) ? theaterLayouts : []).find(
             (tl: any) => String(tl?.sceneId ?? "") === String(scene.id),
           ) ?? null;
-        const normalizedLayout =
-          normalizeTheaterLayoutFromServer(layoutRow) ?? DEFAULT_THEATER_LAYOUT;
+        const normalizedLayout = resolveInitialTheaterLayout(
+          effectiveProject,
+          normalizeTheaterLayoutFromServer(layoutRow),
+          DEFAULT_THEATER_LAYOUT,
+        );
 
         const minimalSceneData: any = {
           name: scene.name,
@@ -439,9 +448,10 @@ export function useSceneOperations() {
                       order: index,
                       requisites: Array.isArray((step as any)?.requisites) ? (step as any).requisites : [],
                       lightPlot: Array.isArray((step as any)?.lightPlot) ? (step as any).lightPlot : [],
-                      theaterModels: Array.isArray((step as any)?.theaterModels)
-                        ? (step as any).theaterModels
+                      lightCues: Array.isArray((step as any)?.lightCues)
+                        ? (step as any).lightCues
                         : [],
+                      ...stepTheaterSyncPayload(step as ScriptStep),
                       theaterSpotlights: Array.isArray((step as any)?.theaterSpotlights)
                         ? (step as any).theaterSpotlights
                         : [],
@@ -565,7 +575,19 @@ export function useSceneOperations() {
                           length: f?.length ?? undefined,
                         }))
                       : [],
-                    theaterModels: Array.isArray(st?.theaterModels) ? st.theaterModels : [],
+                    lightCues: Array.isArray(st?.lightCues)
+                      ? st.lightCues.map((cue: any) => ({
+                          id: Number(cue?.id ?? 0),
+                          tSec: Number(cue?.tSec ?? 0),
+                          channel: String(cue?.channel ?? ""),
+                          intensity:
+                            typeof cue?.intensity === "number"
+                              ? cue.intensity
+                              : undefined,
+                          enabled: cue?.enabled ?? undefined,
+                        }))
+                      : undefined,
+                    ...resolveStepTheaterFromApi(st),
                     theaterSpotlights: Array.isArray(st?.theaterSpotlights) ? st.theaterSpotlights : [],
                   }))
                   .filter((x: any) => Number.isFinite(x.id) && x.id > 0) as ScriptStep[];
@@ -612,8 +634,11 @@ export function useSceneOperations() {
                   (Array.isArray((pull as any)?.theaterLayouts) ? (pull as any).theaterLayouts : []).find(
                     (tl: any) => String(tl?.sceneId ?? "") === sceneId,
                   ) ?? null;
-                const normalizedLayout =
-                  normalizeTheaterLayoutFromServer(layoutRow) ?? DEFAULT_THEATER_LAYOUT;
+                const normalizedLayout = resolveInitialTheaterLayout(
+                  effectiveProject,
+                  normalizeTheaterLayoutFromServer(layoutRow),
+                  DEFAULT_THEATER_LAYOUT,
+                );
 
                 const shadowSceneData: any = {
                   name: sceneRow?.name ?? "script",
@@ -879,7 +904,8 @@ export function useSceneOperations() {
               kanbanOrder: step.kanbanOrder ?? null,
               requisites: step.requisites ?? [],
               lightPlot: step.lightPlot ?? [],
-              theaterModels: (step as any)?.theaterModels ?? [],
+              lightCues: (step as any)?.lightCues ?? [],
+              ...stepTheaterSyncPayload(step),
               theaterSpotlights: (step as any)?.theaterSpotlights ?? [],
               order,
             });
@@ -911,7 +937,10 @@ export function useSceneOperations() {
                 order: index,
                 requisites: Array.isArray((step as any)?.requisites) ? (step as any).requisites : [],
                 lightPlot: Array.isArray((step as any)?.lightPlot) ? (step as any).lightPlot : [],
-                theaterModels: Array.isArray((step as any)?.theaterModels) ? (step as any).theaterModels : [],
+                lightCues: Array.isArray((step as any)?.lightCues)
+                  ? (step as any).lightCues
+                  : [],
+                ...stepTheaterSyncPayload(step as ScriptStep),
                 theaterSpotlights: Array.isArray((step as any)?.theaterSpotlights)
                   ? (step as any).theaterSpotlights
                   : [],
@@ -968,6 +997,9 @@ export function useSceneOperations() {
               }),
             );
             dispatch(sceneActions.markSaved());
+            if (projectName) {
+              writeTheaterLayoutDraft(projectName, theaterLayout);
+            }
           }
         }
       }

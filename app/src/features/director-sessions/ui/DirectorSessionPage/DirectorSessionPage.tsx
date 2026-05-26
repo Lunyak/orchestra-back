@@ -948,7 +948,7 @@ export function DirectorSessionPage() {
                               {ok ? (
                                 <span
                                   style={{
-                                    color: "rgba(126, 231, 135, 0.95)",
+                                    color: "var(--color-status-success-text)",
                                     fontWeight: 800,
                                   }}
                                 >
@@ -957,7 +957,7 @@ export function DirectorSessionPage() {
                               ) : (
                                 <span
                                   style={{
-                                    color: "rgba(248, 81, 73, 0.95)",
+                                    color: "var(--color-status-error-text)",
                                     fontWeight: 800,
                                   }}
                                 >

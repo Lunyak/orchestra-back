@@ -8,7 +8,7 @@
   border: 1px solid var(--color-border-visible);
   background: var(--color-surface-2);
   color: var(--color-text-lighter);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px var(--color-shadow-panel);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -46,7 +46,7 @@
   line-height: 18px;
   text-align: center;
   background: #e11d48;
-  color: #fff;
+  color: var(--color-text-primary);
   border: 2px solid var(--color-surface-2, #1a1a1f);
   box-sizing: border-box;
 }
@@ -54,7 +54,7 @@
 .chat-dock-toggle--has-unread {
   border-color: rgba(244, 63, 94, 0.55);
   box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.35),
+    0 10px 30px var(--color-shadow-panel),
     0 0 0 1px rgba(244, 63, 94, 0.2);
 }
 
@@ -66,12 +66,12 @@
   0%,
   100% {
     box-shadow:
-      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 10px 30px var(--color-shadow-panel),
       0 0 0 0 rgba(244, 63, 94, 0);
   }
   50% {
     box-shadow:
-      0 10px 30px rgba(0, 0, 0, 0.35),
+      0 10px 30px var(--color-shadow-panel),
       0 0 0 6px rgba(244, 63, 94, 0.35);
   }
 }
@@ -88,7 +88,7 @@
   border: 1px solid var(--color-border-visible);
   background: var(--color-bg-modal);
   color: var(--color-text-lighter);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 20px 50px var(--color-shadow-menu);
   text-align: left;
   overflow: hidden;
 }
@@ -213,7 +213,7 @@
   line-height: 20px;
   text-align: center;
   background: #e11d48;
-  color: #fff;
+  color: var(--color-text-primary);
 }
 
 .chat-dock-conv-btn--unread:not(.chat-dock-conv-btn--active) {
@@ -262,7 +262,7 @@
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 6px 20px var(--color-shadow-panel);
 }
 
 .chat-dock-scroll-down:hover {
@@ -303,8 +303,8 @@
 
 .chat-dock-msg--mine {
   align-self: flex-end;
-  background: rgba(37, 99, 235, 0.22);
-  border-color: rgba(96, 165, 250, 0.35);
+  background: var(--color-blue-bg-hover);
+  border-color: var(--color-blue-border-soft);
 }
 
 .chat-dock-msg-row {

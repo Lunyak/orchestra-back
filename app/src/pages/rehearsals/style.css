@@ -57,8 +57,8 @@
 
 .rehearsals-day {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border-visible);
+  background: var(--color-bg-transparent-2);
   color: inherit;
   padding: 10px 8px;
   cursor: pointer;
@@ -68,8 +68,8 @@
 }
 
 .rehearsals-day.active {
-  border-color: rgba(120, 180, 255, 0.45);
-  background: rgba(120, 180, 255, 0.10);
+  border-color: var(--color-blue-highlight);
+  background: var(--color-blue-highlight-bg);
 }
 
 .rehearsals-day-top {
@@ -90,8 +90,8 @@
   flex-wrap: wrap;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-bg-transparent-1);
 }
 
 .rehearsals-tool {
@@ -106,8 +106,8 @@
 }
 
 .rehearsals-tool input {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-border-faint);
+  border: 1px solid var(--color-bg-transparent-5);
   border-radius: 10px;
   padding: 8px 10px;
   color: inherit;
@@ -118,8 +118,8 @@
   height: 38px;
   padding: 0 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--color-bg-transparent-5);
+  background: var(--color-bg-transparent-3);
   color: inherit;
   cursor: pointer;
 }
@@ -140,8 +140,8 @@
 
 .rehearsals-panel {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-bg-transparent-1);
   padding: 12px;
 }
 
@@ -166,7 +166,7 @@
 
 .rehearsals-table th,
 .rehearsals-table td {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--color-border-subtle);
   padding: 8px 8px;
   vertical-align: top;
 }
@@ -206,7 +206,7 @@
 }
 
 .rehearsals-item.active {
-  /* background-color: #333b52; */
+  /* background-color: var(--color-bg-quaternary); */
 }
 
 .rehearsals-item.bad {
@@ -257,8 +257,8 @@
 }
 
 .rehearsals-person select {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--color-border-faint);
+  border: 1px solid var(--color-bg-transparent-5);
   border-radius: 10px;
   padding: 8px 10px;
   color: inherit;

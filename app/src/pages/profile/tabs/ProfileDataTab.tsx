@@ -219,8 +219,8 @@ export function ProfileDataTab() {
               width: 44,
               height: 44,
               objectFit: "cover",
-              border: "1px solid rgba(255,255,255,0.14)",
-              background: "rgba(255,255,255,0.06)",
+              border: "1px solid var(--color-border-strong)",
+              background: "var(--color-bg-transparent-4)",
             }}
             referrerPolicy="no-referrer"
             onError={(e) => {
@@ -236,7 +236,7 @@ export function ProfileDataTab() {
       ) : null}
 
       {flags.error ? <div className="settings-invite-error">{flags.error}</div> : null}
-      {flags.ok ? <div style={{ color: "#7ee787", fontSize: 13 }}>{flags.ok}</div> : null}
+      {flags.ok ? <div style={{ color: "var(--color-status-success-bright)", fontSize: 13 }}>{flags.ok}</div> : null}
 
       <div className="profile-legal-links">
         Документы:{" "}

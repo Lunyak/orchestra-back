@@ -40,7 +40,7 @@ export function OfflinePackStatus() {
     setMessage(null);
     try {
       await syncFromServer(accessToken, projectName);
-      setMessage("Синхронизация запущена. Медиа качаются в фоне.");
+      setMessage("Синхронизация запущена. Медиа и текстуры театра качаются в фоне.");
     } catch (e: any) {
       setMessage(e?.message ?? "Не удалось синхронизировать");
     } finally {

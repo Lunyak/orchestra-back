@@ -1,0 +1,102 @@
+            </TheaterField>
+          </div>
+          <motion.div className="theater-layout-title">Двери</motion.div>
+          <div className="theater-door-list">
+            {layoutDoors.map((door) => (
+              <TheaterBtn
+                key={door.id}
+                active={door.id === activeDoorId}
+                onClick={() => setActiveDoorId(door.id)}
+                title={`${THEATER_DOOR_WALL_LABELS[door.wall]} · ${door.width}×${door.height} м`}
+              >
+                #{door.id} {THEATER_DOOR_WALL_LABELS[door.wall]}
+              </TheaterBtn>
+            ))}
+          </div>
+          <div className="theater-door-actions">
+            <TheaterBtn onClick={() => addDoor("left")}>+ Левая</TheaterBtn>
+            <TheaterBtn onClick={() => addDoor("right")}>+ Правая</TheaterBtn>
+            <TheaterBtn onClick={() => addDoor("back")}>+ Задняя</TheaterBtn>
+            <TheaterBtn
+              onClick={removeActiveDoor}
+              disabled={layoutDoors.length <= 1 || activeDoorId == null}
+            >
+              Удалить
+            </TheaterBtn>
+          </div>
+          {activeDoorId != null ? (
+            <div className="theater-layout-grid">
+              <TheaterField label="Стена">
+                <select
+                  className="native-text-input"
+                  value={layoutDoors.find((door) => door.id === activeDoorId)?.wall ?? "left"}
+                  onChange={(event) =>
+                    updateActiveDoor({
+                      wall: event.target.value as "left" | "right" | "back" | "front",
+                    })
+                  }
+                >
+                  <option value="left">Левая</option>
+                  <option value="right">Правая</option>
+                  <option value="back">Задняя (сцена)</option>
+                  <option value="front">Передняя (зал)</option>
+                </select>
+              </TheaterField>
+              <TheaterField label={labelM("Позиция")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  step={0.5}
+                  value={
+                    layoutDoors.find((door) => door.id === activeDoorId)?.pos ?? 0
+                  }
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateActiveDoor({ pos: Number(event.target.value) || 0 })
+                  }
+                />
+              </TheaterField>
+              <TheaterField label={labelM("Ширина")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={0.8}
+                  max={3}
+                  step={0.1}
+                  value={
+                    layoutDoors.find((door) => door.id === activeDoorId)?.width ?? 1.2
+                  }
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateActiveDoor({
+                      width: Math.max(0.8, Number(event.target.value) || 1.2),
+                    })
+                  }
+                />
+              </TheaterField>
+              <TheaterField label={labelM("Высота")}>
+                <input
+                  type="number"
+                  className="native-text-input"
+                  min={1.5}
+                  step={0.1}
+                  value={
+                    layoutDoors.find((door) => door.id === activeDoorId)?.height ?? 2.2
+                  }
+                  onFocus={beginTheaterHistoryTransaction}
+                  onBlur={endTheaterHistoryTransaction}
+                  onChange={(event) =>
+                    updateActiveDoor({
+                      height: Math.max(1.5, Number(event.target.value) || 2.2),
+                    })
+                  }
+                />
+              </TheaterField>
+            </div>
+          ) : null}
+          <p className="theater-layout-hint">
+            На плане (вкладка «План»): перетаскивайте двери на стенах; кружки — ширина
+            проёма. Можно добавить несколько дверей на разные стены.
+          </p>

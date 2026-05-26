@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 
-export type ActorTrainerMode = "dialogue" | "cards" | "voice";
+export type ActorTrainerMode = "dialogue" | "write" | "voice";
 
 export type ActorTrainerUiState = {
   uiKey: string;
@@ -29,8 +29,10 @@ function safeParse(raw: string | null): any {
   }
 }
 
-function isMode(v: unknown): v is ActorTrainerMode {
-  return v === "dialogue" || v === "cards" || v === "voice";
+function normalizeTrainerMode(v: unknown): ActorTrainerMode {
+  if (v === "cards") return "write";
+  if (v === "dialogue" || v === "write" || v === "voice") return v;
+  return "dialogue";
 }
 
 function defaultUi(uiKey: string): ActorTrainerUiState {
@@ -66,7 +68,7 @@ export const actorTrainerUiSlice = createSlice({
       const next: ActorTrainerUiState = {
         ...base,
         uiKey,
-        trainerMode: isMode(parsedObj?.trainerMode) ? parsedObj.trainerMode : base.trainerMode,
+        trainerMode: normalizeTrainerMode(parsedObj?.trainerMode ?? base.trainerMode),
       };
 
       state.byKey[uiKey] = next;
@@ -75,7 +77,7 @@ export const actorTrainerUiSlice = createSlice({
     setTrainerMode(state, action: PayloadAction<{ uiKey: string; value: ActorTrainerMode }>) {
       const uiKey = String(action.payload.uiKey ?? "").trim();
       if (!uiKey) return;
-      const value: ActorTrainerMode = isMode(action.payload.value) ? action.payload.value : "dialogue";
+      const value = normalizeTrainerMode(action.payload.value);
 
       const entry = state.byKey[uiKey] ?? defaultUi(uiKey);
       const next: ActorTrainerUiState = { ...entry, uiKey, trainerMode: value };

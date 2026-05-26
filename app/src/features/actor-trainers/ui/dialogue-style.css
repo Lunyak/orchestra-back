@@ -64,13 +64,15 @@
 }
 
 .dialogue-scroll {
+  --trainer-line-py: 5px;
+  --trainer-line-min-h: 30px;
   border: 1px solid var(--field-control-border);
   background: color-mix(in srgb, var(--field-control-bg) 72%, var(--color-bg-secondary));
   padding: var(--spacing-5);
   max-height: 70vh;
   overflow: auto;
   display: grid;
-  gap: var(--spacing-4);
+  gap: var(--spacing-1);
 }
 
 .dialogue-line-wrap {
@@ -87,7 +89,7 @@
   font-size: var(--font-size-base);
   font-style: italic;
   color: var(--color-text-muted);
-  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  padding: var(--trainer-line-py) var(--field-control-padding-x);
   border: 1px dashed var(--color-border-visible);
   background: var(--color-bg-transparent-1);
   line-height: var(--line-height-normal);
@@ -101,8 +103,8 @@
 }
 
 .dialogue-line--other {
-  padding: var(--field-control-padding-y) var(--field-control-padding-x);
-  min-height: var(--field-control-min-height);
+  padding: var(--trainer-line-py) var(--field-control-padding-x);
+  min-height: var(--trainer-line-min-h);
   border: 1px solid var(--field-control-border);
   background: var(--color-bg-quaternary);
   box-shadow: var(--field-control-inset);
@@ -154,8 +156,8 @@
 
 .dialogue-line--done {
   position: relative;
-  padding: var(--field-control-padding-y) var(--field-control-padding-x);
-  min-height: var(--field-control-min-height);
+  padding: var(--trainer-line-py) var(--field-control-padding-x);
+  min-height: var(--trainer-line-min-h);
   border-width: 2px;
   background: color-mix(in srgb, var(--color-success-accent) 38%, var(--field-control-bg));
   border-color: color-mix(in srgb, var(--color-success-accent) 35%, var(--field-control-border));
@@ -207,10 +209,10 @@
 .dialogue-my-line {
   position: relative;
   border: 1px solid var(--color-border-accent);
-  padding: var(--spacing-5);
+  padding: var(--spacing-4);
   background: var(--color-bg-transparent-1);
   display: grid;
-  gap: var(--spacing-4);
+  gap: var(--spacing-3);
 }
 
 /* Нужно пройти */
@@ -226,7 +228,7 @@
 /* Сейчас на этом этапе (только непройденные) */
 .dialogue-line--active .dialogue-my-line:not([data-done="true"]) {
   border-color: color-mix(in srgb, var(--color-active-ascent) 55%, var(--color-border-accent));
-  padding-left: calc(var(--spacing-5) + 6px);
+  padding-left: calc(var(--spacing-4) + 6px);
   background: color-mix(in srgb, var(--color-active-ascent) 22%, var(--color-bg-transparent-1));
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--color-active-ascent) 28%, transparent),
@@ -362,6 +364,79 @@
 .dialogue-mistake {
   font-size: var(--font-size-base);
   color: var(--color-danger-light);
+}
+
+.dialogue-write-input {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid var(--field-control-border);
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  background: var(--field-control-bg);
+  color: inherit;
+  font-weight: inherit;
+  font-size: var(--field-control-font-size);
+  line-height: var(--line-height-normal);
+  font-family: inherit;
+  box-shadow: var(--field-control-inset);
+  transition:
+    border-color var(--transition-normal),
+    background var(--transition-normal);
+}
+
+.dialogue-write-input:focus {
+  outline: none;
+  border-color: var(--field-control-border-hover);
+  background: var(--field-control-bg-hover);
+}
+
+.dialogue-write-input--ok {
+  border-color: color-mix(in srgb, var(--color-success-accent) 45%, var(--field-control-border));
+  background: color-mix(in srgb, var(--color-success-accent) 10%, var(--field-control-bg));
+}
+
+.dialogue-write-input--bad {
+  border-color: var(--color-error-border);
+  background: var(--color-error-bg);
+}
+
+.dialogue-write-actions {
+  display: flex;
+  gap: var(--spacing-4);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dialogue-write-result {
+  font-size: var(--font-size-base);
+  color: var(--color-danger-light);
+}
+
+.dialogue-write-result--ok {
+  color: var(--color-success-accent);
+}
+
+.dialogue-write-issues {
+  margin: var(--spacing-3) 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: var(--spacing-2);
+}
+
+.dialogue-write-issues li {
+  line-height: var(--line-height-normal);
+}
+
+.dialogue-write-issues li::marker {
+  color: var(--color-danger-light);
+}
+
+.dialogue-pass-chip {
+  gap: var(--spacing-3);
+}
+
+.dialogue-pass-select {
+  min-width: 88px;
 }
 
 @media (max-width: 720px) {

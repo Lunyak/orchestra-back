@@ -1,5 +1,5 @@
 .rehearsals-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--color-border-visible);
   background: var(--color-bg-secondary);
   padding: 12px;
   max-width: 500px;

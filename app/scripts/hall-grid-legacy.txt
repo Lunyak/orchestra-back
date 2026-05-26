@@ -1,0 +1,124 @@
+         >
+              Вращение
+            </TheaterBtn>
+            <TheaterBtn
+              active={modelTransformMode === "scale"}
+              onClick={() => {
+                setEditMode("models");
+                setModelTransformMode("scale");
+              }}
+              disabled={!activeModel || editMode !== "models"}
+            >
+              Масштаб
+            </TheaterBtn>
+          </div>
+        </>
+      )}
+      {activeTab === "layout" && (
+        <>
+          <div className="theater-layout-title">План зала</div>
+          <div className="theater-layout-grid">
+            <TheaterField label="Ширина">
+              <input
+                type="number"
+                className="native-text-input"
+                min={6}
+                step={0.5}
+                value={layout.hallWidth}
+                onChange={(event) =>
+                  updateLayout({ hallWidth: Number(event.target.value) || 0 })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Глубина">
+              <input
+                type="number"
+                className="native-text-input"
+                min={6}
+                step={0.5}
+                value={layout.hallDepth}
+                onChange={(event) =>
+                  updateLayout({ hallDepth: Number(event.target.value) || 0 })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Проход W">
+              <input
+                type="number"
+                className="native-text-input"
+                min={0}
+                step={0.1}
+                value={layout.aisleWidth}
+                onChange={(event) =>
+                  updateLayout({ aisleWidth: Number(event.target.value) || 0 })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Проход X">
+              <input
+                type="number"
+                className="native-text-input"
+                step={0.1}
+                value={layout.aisleCenterX}
+                onChange={(event) =>
+                  updateLayout({ aisleCenterX: Number(event.target.value) || 0 })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Рядов">
+              <input
+                type="number"
+                className="native-text-input"
+                min={0}
+                step={1}
+                value={layout.seatRows}
+                onChange={(event) =>
+                  updateLayout({
+                    seatRows: Math.max(0, Number(event.target.value) || 0),
+                  })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Мест/ряд">
+              <input
+                type="number"
+                className="native-text-input"
+                min={1}
+                step={1}
+                value={layout.seatsPerRow}
+                onChange={(event) =>
+                  updateLayout({
+                    seatsPerRow: Math.max(1, Number(event.target.value) || 1),
+                  })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Подъем">
+              <input
+                type="number"
+                className="native-text-input"
+                min={0}
+                step={0.05}
+                value={layout.rowRise}
+                onChange={(event) =>
+                  updateLayout({ rowRise: Number(event.target.value) || 0 })
+                }
+              />
+            </TheaterField>
+            <TheaterField label="Дверь Z">
+              <input
+                type="number"
+                className="native-text-input"
+                step={0.5}
+                value={layout.doorZ}
+                onChange={(event) =>
+                  updateLayout({ doorZ: Number(event.target.value) || 0 })
+                }
+              />
+            </TheaterField>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

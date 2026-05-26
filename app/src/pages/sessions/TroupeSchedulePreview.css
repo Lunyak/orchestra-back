@@ -20,10 +20,10 @@
 
 /* День сессии: единая оранжевая заливка поверх ячеек (без inset-бордеров по строкам) */
 .troupe-schedule-preview--session-window .troupe-header-cell.focus {
-  background-color: rgba(20, 20, 20, 0.95);
+  background-color: var(--color-surface-panel);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.24),
-    rgba(231, 138, 78, 0.24)
+    var(--color-accent-orange-bg-medium),
+    var(--color-accent-orange-bg-medium)
   );
   box-shadow: none;
 }
@@ -33,39 +33,39 @@
 }
 
 .troupe-schedule-preview--session-window .troupe-day-cell.free.focus {
-  background-color: rgba(46, 160, 67, 0.22);
+  background-color: var(--color-status-success-bg-medium);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.26),
-    rgba(231, 138, 78, 0.26)
+    var(--color-accent-orange-grid),
+    var(--color-accent-orange-grid)
   );
 }
 
 .troupe-schedule-preview--session-window .troupe-day-cell.partial.focus {
-  background-color: rgba(88, 166, 255, 0.22);
+  background-color: var(--color-status-info-bg-medium);
   background-image:
-    linear-gradient(rgba(231, 138, 78, 0.26), rgba(231, 138, 78, 0.26)),
+    linear-gradient(var(--color-accent-orange-grid), var(--color-accent-orange-grid)),
     repeating-linear-gradient(
       135deg,
-      rgba(88, 166, 255, 0.35) 0px,
-      rgba(88, 166, 255, 0.35) 6px,
-      rgba(88, 166, 255, 0.12) 6px,
-      rgba(88, 166, 255, 0.12) 12px
+      var(--color-status-info-stripe) 0px,
+      var(--color-status-info-stripe) 6px,
+      var(--color-status-info-bg-faint) 6px,
+      var(--color-status-info-bg-faint) 12px
     );
 }
 
 .troupe-schedule-preview--session-window .troupe-day-cell.busy.focus {
-  background-color: rgba(248, 81, 73, 0.22);
+  background-color: var(--color-status-error-bg-medium);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.26),
-    rgba(231, 138, 78, 0.26)
+    var(--color-accent-orange-grid),
+    var(--color-accent-orange-grid)
   );
 }
 
 .troupe-schedule-preview--session-window .troupe-day-cell.unknown.focus {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: var(--color-bg-transparent-0);
   background-image: linear-gradient(
-    rgba(231, 138, 78, 0.26),
-    rgba(231, 138, 78, 0.26)
+    var(--color-accent-orange-grid),
+    var(--color-accent-orange-grid)
   );
 }
 

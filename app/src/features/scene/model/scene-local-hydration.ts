@@ -2,6 +2,8 @@ import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
 import type { AppDispatch } from "../../../shared/store/store";
+import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
+import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
 import { normalizeLightChannelsLoose } from "./scene-normalize";
 
@@ -15,8 +17,12 @@ export async function hydrateSceneFromLocalPack(
     const fresh = await desktopReadProjectScene(api, projectSlug, "script");
     if (!fresh || typeof fresh !== "object") return false;
     const f = fresh as Record<string, unknown>;
-    const theaterLayout =
-      (f.theaterLayout as TheaterLayout) ?? DEFAULT_THEATER_LAYOUT;
+    const rawLayout = f.theaterLayout as TheaterLayout | undefined;
+    const theaterLayout = resolveInitialTheaterLayout(
+      projectSlug,
+      rawLayout ? normalizePersistedTheaterLayout(rawLayout) : undefined,
+      DEFAULT_THEATER_LAYOUT,
+    );
     const lc = normalizeLightChannelsLoose(f.lightChannels);
     const stepsOut = Array.isArray(f.steps) ? (f.steps as ScriptStep[]) : [];
     const sceneData: SceneData = {

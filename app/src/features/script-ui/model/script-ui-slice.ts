@@ -21,8 +21,10 @@ export type ScriptUiState = {
 
   /** Режим редактирования (не persist'им) */
   isEditing: boolean;
-  /** Перестановка панелей в театре (не persist'им, как и раньше) */
+  /** Перестановка панелей в театре (persist per-project в theater-view-prefs). */
   swapTheaterPanels: boolean;
+  /** Правая панель настроек 3D-театра (persist per-project в theater-view-prefs). */
+  showTheaterControls: boolean;
 };
 
 function storedBool(key: string, defaultValue: boolean): boolean {
@@ -60,7 +62,8 @@ function defaultState(): ScriptUiState {
     mobilePlaylistOpen: false,
     mobileStepsOpen: false,
     isEditing: false,
-    swapTheaterPanels: true,
+    swapTheaterPanels: false,
+    showTheaterControls: true,
   };
 }
 
@@ -89,11 +92,10 @@ export const scriptUiSlice = createSlice({
       state.isStepsCollapsed = storedBool("isStepsCollapsed", base.isStepsCollapsed);
       state.showStepRoles = storedBool("showStepRoles", base.showStepRoles);
       state.showScriptEditorTools = storedBool("showScriptEditorTools", base.showScriptEditorTools);
-      // Non-persisted fields should be reset on init (matches previous behavior)
+      // Эфемерные поля — сброс при init; theater-панели восстанавливаются в useSpectaclePage.
       state.mobilePlaylistOpen = false;
       state.mobileStepsOpen = false;
       state.isEditing = false;
-      state.swapTheaterPanels = true;
       persistBooleans(state);
     },
 
@@ -182,6 +184,17 @@ export const scriptUiSlice = createSlice({
     },
     togglePanels(state) {
       state.swapTheaterPanels = !state.swapTheaterPanels;
+      if (state.swapTheaterPanels) {
+        state.showTheaterControls = true;
+      } else {
+        state.showPlaylistSidebar = true;
+      }
+    },
+    setShowTheaterControls(state, action: PayloadAction<{ value: boolean }>) {
+      state.showTheaterControls = Boolean(action.payload.value);
+    },
+    toggleTheaterControls(state) {
+      state.showTheaterControls = !state.showTheaterControls;
     },
   },
 });

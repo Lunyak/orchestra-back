@@ -1,0 +1,46 @@
+          {(layout.stageShape ?? "rectangle") === "custom" ? (
+            <motion.div className="theater-custom-outline-panel">
+              <p className="theater-custom-outline-hint">
+                <strong>Рисование:</strong> включите «Рисовать вершины», разверните план (+) и
+                кликайте по залу — каждый клик добавляет точку контура (до 24). Сторона к залу
+                остаётся без стены.
+              </p>
+              <p className="theater-custom-outline-hint">
+                <strong>Редактирование:</strong> клик по кружку выделяет вершину; перетаскивание
+                двигает её. Delete или «Удалить вершину» — убрать выделенную (минимум{" "}
+                {MIN_STAGE_OUTLINE_POINTS} точки).
+              </p>
+              <div className="theater-spotlight-batch">
+                <TheaterBtn
+                  active={outlineDrawMode}
+                  onClick={() => setOutlineDrawMode(!outlineDrawMode)}
+                >
+                  {outlineDrawMode ? "Рисование: вкл" : "Рисовать вершины"}
+                </TheaterBtn>
+                <TheaterBtn
+                  onClick={() => removeActiveOutlineVertex()}
+                  disabled={
+                    activeOutlineVertexIndex == null ||
+                    resolveStageOutlinePoints(layout).length <= MIN_STAGE_OUTLINE_POINTS
+                  }
+                >
+                  Удалить вершину
+                </TheaterBtn>
+                <TheaterBtn onClick={() => removeLastOutlinePoint()}>− Последняя</TheaterBtn>
+                <TheaterBtn onClick={() => seedStageOutlineFromCurrentShape()}>
+                  Из текущей формы
+                </TheaterBtn>
+                <TheaterBtn onClick={() => resetStageOutlineToRectangle()}>
+                  Прямоугольник
+                </TheaterBtn>
+              </motion.div>
+              <TheaterField label="Вершин / выделена">
+                <span className="theater-custom-outline-count">
+                  {resolveStageOutlinePoints(layout).length}
+                  {activeOutlineVertexIndex != null
+                    ? ` · #${activeOutlineVertexIndex + 1}`
+                    : " · —"}
+                </span>
+              </TheaterField>
+            </motion.div>
+          ) : null}
