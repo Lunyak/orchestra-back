@@ -14,6 +14,7 @@ import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
+import { applySceneFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
 import { sceneActions, DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 import { loadSceneRolesFromStorage, saveSceneRolesToStorage } from "./scene-roles-storage";
 import { useSceneOperations } from "./scene-operations";
@@ -84,9 +85,14 @@ export function useSceneSyncEffects() {
           scene && typeof scene === "object"
             ? { ...(scene as any), sceneRoles: (scene as any)?.sceneRoles ?? localRoles ?? undefined }
             : scene;
+        const localSceneData = mergedScene || null;
+        const localSteps = applySceneFaderBindingsToSpotlights(
+          (localSceneData as any)?.steps ?? [],
+          (localSceneData as any)?.lightFaders,
+        );
         dispatch(
           sceneActions.hydrateScene({
-            sceneData: mergedScene || null,
+            sceneData: localSceneData,
             theaterLayout: resolveInitialTheaterLayout(
               projectName,
               (mergedScene as any)?.theaterLayout
@@ -94,7 +100,7 @@ export function useSceneSyncEffects() {
                 : undefined,
               DEFAULT_THEATER_LAYOUT,
             ),
-            steps: (mergedScene as any)?.steps ?? [],
+            steps: localSteps,
             currentPage: 0,
             isSceneReady: true,
           }),

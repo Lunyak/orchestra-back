@@ -1,4 +1,5 @@
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
+import { applySceneFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
 import type { AppDispatch } from "../../../shared/store/store";
@@ -24,7 +25,6 @@ export async function hydrateSceneFromLocalPack(
       DEFAULT_THEATER_LAYOUT,
     );
     const lc = normalizeLightChannelsLoose(f.lightChannels);
-    const stepsOut = Array.isArray(f.steps) ? (f.steps as ScriptStep[]) : [];
     const sceneData: SceneData = {
       name: f.name as string | undefined,
       playlist: Array.isArray(f.playlist) ? (f.playlist as SceneData["playlist"]) : [],
@@ -37,6 +37,10 @@ export async function hydrateSceneFromLocalPack(
           ? (f.images as SceneData["images"])
           : undefined,
     };
+    const stepsOut = applySceneFaderBindingsToSpotlights(
+      Array.isArray(f.steps) ? (f.steps as ScriptStep[]) : [],
+      sceneData.lightFaders,
+    );
     dispatch(
       sceneActions.hydrateScene({
         sceneData,

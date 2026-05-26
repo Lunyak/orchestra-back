@@ -1052,7 +1052,7 @@ export class SyncService {
       if (Array.isArray(theaterSpotlightsValue)) {
         const data = theaterSpotlightsValue
           .map((sp: any) => this.mapTheaterSpotlightRow(stepId, sp))
-          .filter((x): x is Prisma.TheaterSpotlightCreateManyInput => x !== null);
+          .filter(Boolean) as Prisma.TheaterSpotlightCreateManyInput[];
         tx.push(this.prisma.theaterSpotlight.deleteMany({ where: { stepId } }));
         if (data.length)
           tx.push(this.prisma.theaterSpotlight.createMany({ data }));

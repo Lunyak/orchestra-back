@@ -7,6 +7,8 @@ import {
 } from "react";
 import { useScene } from "../../scene";
 import { useScriptUI } from "../../script-ui";
+import { useAppSelector } from "../../../shared/store/hooks";
+import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import type {
   ScriptStep,
   TheaterLayout,
@@ -48,7 +50,10 @@ export function useTheaterScene({
   theaterLayout,
   onTheaterLayoutChange,
 }: UseTheaterSceneArgs) {
-  const { steps, currentPage, updateStep } = useScene();
+  const { steps, currentPage, updateStep, sceneData } = useScene();
+  const selectedLightSlot = useAppSelector((state) =>
+    selectShowScriptMarkdownUi(state, projectName || "", "script"),
+  ).selectedLightSlot;
   const currentStep = steps[currentPage];
   const layout = theaterLayout ?? DEFAULT_THEATER_LAYOUT;
   const {
@@ -203,6 +208,8 @@ export function useTheaterScene({
     setEditMode,
     setDecorActionMessage,
     rehearsalSpotlights,
+    lightFaders: sceneData?.lightFaders,
+    consoleChannel: selectedLightSlot > 0 ? selectedLightSlot : undefined,
   });
   const {
     spotlights,

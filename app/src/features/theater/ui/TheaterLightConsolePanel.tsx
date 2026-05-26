@@ -7,7 +7,12 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import type { TheaterSpotlight } from "../../../shared/types/script";
 import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
-import { getSpotlightsBoundToFader } from "../model/theater-light-fader-bindings";
+import {
+  effectiveSpotlightUiIntensity,
+  getSpotlightsBoundToFader,
+  readFaderLevel,
+  readSpotlightBaseUiIntensity,
+} from "../model/theater-light-fader-bindings";
 
 type TheaterLightConsolePanelProps = {
   projectName: string;
@@ -121,8 +126,15 @@ export function TheaterLightConsolePanel({
     [faders.faders],
   );
 
+  const consoleChannel =
+    selectedLightSlot > 0 ? selectedLightSlot : undefined;
+  const faderMatchOptions = useMemo(
+    () => (consoleChannel != null ? { consoleChannel } : undefined),
+    [consoleChannel],
+  );
+
   const getSpotlightsForFader = (fader: SceneLightFadersDataV1["faders"][number]) =>
-    getSpotlightsBoundToFader(fader.id, spotlights);
+    getSpotlightsBoundToFader(fader, spotlights, faderMatchOptions);
 
   const updateFaders = (next: SceneLightFadersDataV1) => {
     setSceneData((prev) => ({
@@ -148,19 +160,6 @@ export function TheaterLightConsolePanel({
     updateFaders(nextFaders);
   };
 
-  const patchSpotlightsForFader = (
-    fader: SceneLightFadersDataV1["faders"][number],
-    patch: Partial<Pick<TheaterSpotlight, "intensity" | "color">>,
-  ) => {
-    const affectedIds = new Set(getSpotlightsForFader(fader).map((spotlight) => spotlight.id));
-    if (affectedIds.size === 0) return;
-    updateSpotlights(
-      spotlights.map((spotlight) =>
-        affectedIds.has(spotlight.id) ? { ...spotlight, ...patch } : spotlight,
-      ),
-    );
-  };
-
   const patchFader = (
     faderId: number,
     patch: Partial<SceneLightFadersDataV1["faders"][number]>,
@@ -169,13 +168,6 @@ export function TheaterLightConsolePanel({
       fader.id === faderId ? { ...fader, ...patch } : fader,
     );
     updateFaders({ ...faders, faders: nextFaders });
-
-    const nextFader = nextFaders.find((item) => item.id === faderId);
-    if (!nextFader) return;
-    patchSpotlightsForFader(nextFader, {
-      ...(patch.intensity != null ? { intensity: patch.intensity } : {}),
-      ...(patch.color ? { color: patch.color } : {}),
-    });
   };
 
   const applyProgram = (program = activeProgram) => {
@@ -198,25 +190,6 @@ export function TheaterLightConsolePanel({
           : fader;
       }),
     });
-    const patchBySpotlightId = new Map<number, Partial<TheaterSpotlight>>();
-    for (const fader of faders.faders) {
-      const state = stateByFader.get(fader.id);
-      if (!state) continue;
-      for (const spotlight of getSpotlightsForFader(fader)) {
-        patchBySpotlightId.set(spotlight.id, {
-          intensity: state.intensity ?? spotlight.intensity,
-          color: state.color ?? spotlight.color,
-        });
-      }
-    }
-    if (patchBySpotlightId.size > 0) {
-      updateSpotlights(
-        spotlights.map((spotlight) => ({
-          ...spotlight,
-          ...(patchBySpotlightId.get(spotlight.id) ?? {}),
-        })),
-      );
-    }
   };
 
   const saveProgramSnapshot = () => {
@@ -335,9 +308,17 @@ export function TheaterLightConsolePanel({
                   (fader.spotlightId != null
                     ? spotlights.find((item) => item.id === fader.spotlightId)
                   : null) ?? getSpotlightsForFader(fader)[0];
-                const storedValue = fader.intensity ?? linkedSpotlight?.intensity ?? 1;
-                const muted = fader.enabled === false;
-                const value = muted ? 0 : storedValue;
+                const faderLevel = readFaderLevel(fader);
+                const muted = fader.enabled === false || faderLevel <= 0;
+                const value = muted ? 0 : faderLevel;
+                const baseLight =
+                  linkedSpotlight != null
+                    ? readSpotlightBaseUiIntensity(linkedSpotlight)
+                    : null;
+                const outputLight =
+                  linkedSpotlight != null
+                    ? effectiveSpotlightUiIntensity(linkedSpotlight, fader)
+                    : null;
                 const color = /^#[0-9a-f]{6}$/i.test(String(fader.color ?? linkedSpotlight?.color ?? "").trim())
                   ? String(fader.color ?? linkedSpotlight?.color).trim()
                   : "#ffffff";
@@ -349,12 +330,22 @@ export function TheaterLightConsolePanel({
                       data-active={!muted}
                       onClick={() => {
                         const nextMuted = !muted;
+                        const prevLevel =
+                          typeof fader.intensity === "number" && fader.intensity > 0
+                            ? fader.intensity
+                            : 1;
                         patchFader(fader.id, {
                           enabled: !nextMuted,
-                          intensity: nextMuted ? 0 : Math.max(storedValue, 1),
+                          intensity: nextMuted ? 0 : prevLevel,
                         });
                       }}
-                      title={muted ? "Вернуть яркость фейдера" : "Фейдер в 0%"}
+                      title={
+                        muted
+                          ? "Вернуть фейдер"
+                          : outputLight != null && baseLight != null
+                            ? `Фейдер 0% (свет софита ${baseLight.toFixed(1)})`
+                            : "Фейдер в 0%"
+                      }
                     />
                     <input
                       className="theater-light-console-fader__range"
@@ -378,7 +369,14 @@ export function TheaterLightConsolePanel({
                       onChange={(event) => patchFader(fader.id, { color: event.target.value })}
                       title="Цвет фейдера"
                     />
-                    <span className="theater-light-console-fader__value">
+                    <span
+                      className="theater-light-console-fader__value"
+                      title={
+                        outputLight != null && baseLight != null
+                          ? `На сцене: ${outputLight.toFixed(1)} (${baseLight.toFixed(1)} × ${(value || 0).toFixed(2)})`
+                          : undefined
+                      }
+                    >
                       {Math.round(value * 100)}
                     </span>
                     <span className="theater-light-console-fader__name">

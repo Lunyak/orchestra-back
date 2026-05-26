@@ -5,6 +5,10 @@ import {
   type SceneLightProgramsDataV1,
 } from "../../../../features/scene";
 import type { TheaterSpotlight } from "../../../types/script";
+import {
+  getSpotlightsBoundToFader,
+  spotlightMatchesFader,
+} from "../../../../features/theater/model/theater-light-fader-bindings";
 import { parseLightChannel } from "../utils/lightTokens";
 
 const DEFAULT_SPOTLIGHT_INTENSITY = 2;
@@ -59,16 +63,13 @@ function findSpotlightForFader(
   fader: SceneLightFaderV1,
   spotlights: TheaterSpotlight[],
 ): TheaterSpotlight | undefined {
+  const bound = getSpotlightsBoundToFader(fader, spotlights);
+  if (bound.length > 0) return bound[0];
   if (fader.spotlightId != null) {
     const byId = spotlights.find((item) => item.id === fader.spotlightId);
-    if (byId) return byId;
+    if (byId && spotlightMatchesFader(byId, fader)) return byId;
   }
-  const linkedId = fader.links.find((link) => link.spotlightId != null)?.spotlightId;
-  if (linkedId != null) {
-    const byLinkedId = spotlights.find((item) => item.id === linkedId);
-    if (byLinkedId) return byLinkedId;
-  }
-  return spotlights.find((item) => (item.faderId ?? item.id) === fader.id);
+  return undefined;
 }
 
 function createSpotlightForChannel(args: {
@@ -161,8 +162,6 @@ export function ScriptLightChannelsPanel({
                 ...item,
                 channel,
                 faderId: fader.id,
-                intensity: fader.intensity ?? item.intensity,
-                enabled: fader.enabled ?? item.enabled,
                 color,
               }
             : item,
@@ -179,8 +178,6 @@ export function ScriptLightChannelsPanel({
           label: `Софит ${nextId}`,
           color,
           faderId: fader.id,
-          intensity: fader.intensity,
-          enabled: fader.enabled,
         }),
       );
     }
@@ -597,21 +594,6 @@ export function ScriptLightChannelsPanel({
                         : fader;
                     }),
                   });
-                  if (spotlights && onSpotlightsChange) {
-                    onSpotlightsChange(
-                      spotlights.map((spotlight) => {
-                        const faderId = spotlight.faderId ?? spotlight.id;
-                        const state = stateByFader.get(faderId);
-                        return state
-                          ? {
-                              ...spotlight,
-                              intensity: state.intensity ?? spotlight.intensity,
-                              color: state.color ?? spotlight.color,
-                            }
-                          : spotlight;
-                      }),
-                    );
-                  }
                 }}
               >
                 Применить

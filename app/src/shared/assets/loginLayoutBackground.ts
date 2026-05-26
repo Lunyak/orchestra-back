@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import loginPageBackgroundUrl from "./login-page.png";
 
-/** URL обрабатывает Vite (в т.ч. base); так надёжнее, чем url() в CSS с /@fs/ и кириллицей в пути. */
+/** URL через Vite; в CSS — фон страницы `--login-photo`. */
 export const loginLayoutBackgroundStyle: CSSProperties = {
-  backgroundImage: `url(${loginPageBackgroundUrl})`,
+  ["--login-photo" as string]: `url(${loginPageBackgroundUrl})`,
 };

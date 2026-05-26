@@ -1,4 +1,5 @@
 import { syncPull, syncPullScene } from "./api/entity-sync";
+import { mapTheaterSpotlightFromApi } from "../features/theater/model/theater-light-fader-bindings";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "./desktopOutbox";
 
@@ -139,31 +140,7 @@ export async function resyncDesktopProject(
                     }))
                   : [],
                 theaterSpotlights: Array.isArray(st?.theaterSpotlights)
-                  ? st.theaterSpotlights.map((sp: any) => ({
-                      id: Number(sp?.sourceId ?? sp?.id ?? 0),
-                      label: String(sp?.label ?? ""),
-                      position: sp?.position,
-                      target: sp?.target,
-                      angleDeg: Number(sp?.angleDeg ?? 0),
-                      intensity: Number(sp?.intensity ?? 0),
-                      color: sp?.color ?? undefined,
-                      enabled: Boolean(sp?.enabled),
-                      channel: sp?.channel ?? undefined,
-                      faderId:
-                        typeof sp?.faderId === "number" && Number.isFinite(sp.faderId)
-                          ? sp.faderId
-                          : undefined,
-                      isRgb: sp?.isRgb ?? undefined,
-                      hidden: sp?.hidden === true ? true : undefined,
-                      gridCol:
-                        typeof sp?.gridCol === "number" && Number.isFinite(sp.gridCol)
-                          ? sp.gridCol
-                          : undefined,
-                      gridRow:
-                        typeof sp?.gridRow === "number" && Number.isFinite(sp.gridRow)
-                          ? sp.gridRow
-                          : undefined,
-                    }))
+                  ? st.theaterSpotlights.map((sp: any) => mapTheaterSpotlightFromApi(sp))
                   : [],
               }))
               .filter((x: any) => Number.isFinite(x.id) && x.id > 0)

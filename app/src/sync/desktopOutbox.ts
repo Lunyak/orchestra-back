@@ -1,8 +1,10 @@
 import { syncPush } from "./api/entity-sync";
 import type { SyncChange } from "./api/types/sync";
+import { mapTheaterSpotlightToSync } from "../features/theater/model/theater-light-fader-bindings";
 import { ensureProject } from "./api/projects";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { createId } from "../shared/utils/createId";
+import type { TheaterSpotlight } from "../shared/types/script";
 
 export type FlushDesktopOutboxResult = {
   hadOutbox: boolean;
@@ -261,7 +263,9 @@ export async function flushDesktopOutbox(
         lightCues: Array.isArray(up.step?.lightCues) ? up.step.lightCues : [],
         theaterModels: Array.isArray(up.step?.theaterModels) ? up.step.theaterModels : [],
         theaterSpotlights: Array.isArray(up.step?.theaterSpotlights)
-          ? up.step.theaterSpotlights
+          ? up.step.theaterSpotlights.map((sp: TheaterSpotlight) =>
+              mapTheaterSpotlightToSync(sp),
+            )
           : [],
         updatedAt: nowIso,
       },

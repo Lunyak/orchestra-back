@@ -11,8 +11,8 @@ variables:
   DEP_PROXY: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}"
   NODE_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/node:${NODE_VERSION}-alpine"
   POSTGRES_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/postgres:16-alpine"
-  DOCKER_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:24"
-  DOCKER_DIND_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/docker:24-dind"
+  DEPLOY_HOST: "213.226.126.196"
+  DEPLOY_REPO_SYNC: "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd"
 
 # Кэш node_modules
 default:
@@ -55,58 +55,8 @@ test:back:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
-# Сборка Docker-образов (бэкенд).
-# Runner с тегом orchestra должен быть docker-executor с privileged=true и volume "/certs/client".
-# См. https://docs.gitlab.com/ci/docker/using_docker_build/#use-docker-in-docker-with-tls-enabled
-build:back:
-  stage: build
-  image: ${DOCKER_IMAGE}
-  services:
-    - name: ${DOCKER_DIND_IMAGE}
-      alias: docker
-  variables:
-    DOCKER_HOST: tcp://docker:2376
-    DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_TLS_VERIFY: 1
-    DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
-    DOCKER_DRIVER: overlay2
-  before_script:
-    # docker login не требует локальный daemon; build — требует. Ждём dind.
-    - |
-      echo "Waiting for Docker daemon (dind)..."
-      ready=0
-      for i in $(seq 1 60); do
-        if docker info >/dev/null 2>&1; then
-          ready=1
-          echo "Docker daemon is ready (attempt $i)."
-          break
-        fi
-        echo "Attempt $i/60: daemon not reachable yet..."
-        sleep 2
-      done
-      if [ "$ready" -ne 1 ]; then
-        echo "ERROR: Docker daemon at $DOCKER_HOST is not available."
-        echo "Check runner: executor=docker, privileged=true, volumes=[\"/certs/client\"]."
-        exit 1
-      fi
-    - docker info
-  script:
-    - cd back
-    # Dependency Proxy requires auth for docker build pulls
-    - |
-      if [ -n "${CI_DEPENDENCY_PROXY_SERVER:-}" ] && [ -n "${CI_DEPENDENCY_PROXY_USER:-}" ] && [ -n "${CI_DEPENDENCY_PROXY_PASSWORD:-}" ]; then
-        echo "$CI_DEPENDENCY_PROXY_PASSWORD" | docker login -u "$CI_DEPENDENCY_PROXY_USER" --password-stdin "$CI_DEPENDENCY_PROXY_SERVER"
-      elif [ -n "${CI_REGISTRY:-}" ] && [ -n "${CI_REGISTRY_USER:-}" ] && [ -n "${CI_REGISTRY_PASSWORD:-}" ]; then
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-      else
-        echo "WARN: no dependency proxy/registry credentials found; build may fail when pulling base images"
-      fi
-    - docker build --build-arg NODE_IMAGE=${NODE_IMAGE} -t orkestr-back:$CI_COMMIT_SHORT_SHA -t orkestr-back:latest .
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-# Деплой на VPS: postgres + back + bot + dozzle
-deploy:
-  stage: deploy
+# Общий SSH-доступ к VPS (runner без DinD — сборка и деплой на хосте с Docker).
+.deploy_ssh:
   image: alpine:latest
   before_script:
     - apk add --no-cache openssh-client
@@ -114,12 +64,30 @@ deploy:
     - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+# Сборка образов на VPS (тот же Docker, что и в deploy).
+build:back:
+  extends: .deploy_ssh
+  stage: build
   script:
-    - ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose up -d --build postgres back bot dozzle"
+    - |
+      ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} \
+        "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose build back bot"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-  variables:
-    DEPLOY_HOST: "213.226.126.196"
+
+# Деплой на VPS: postgres + back + bot + dozzle
+deploy:
+  extends: .deploy_ssh
+  stage: deploy
+  needs:
+    - build:back
+  script:
+    - |
+      ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} \
+        "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose up -d postgres back bot dozzle"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 # Опционально: пуш образов в GitLab Container Registry
 # push:back:
 #   stage: build

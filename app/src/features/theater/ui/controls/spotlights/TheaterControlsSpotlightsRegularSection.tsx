@@ -71,12 +71,11 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                     allowEmpty={false}
                     onChange={(channel) => {
                       const nextChannel = Math.max(1, Number(channel) || 1);
+                      vm.updateSpotlight(item.id, { channel: nextChannel });
                       const faderId = readSpotlightFaderId(item);
-                      vm.updateSpotlight(item.id, {
-                        channel: nextChannel,
-                        faderId,
-                      });
-                      spot.bindSpotlightToFader(faderId, item.id, nextChannel);
+                      if (faderId != null) {
+                        spot.bindSpotlightToFader(faderId, item.id, nextChannel);
+                      }
                     }}
                     disabled={!vm.currentStep}
                     className="native-text-input theater-channel-input theater-channel-input--channel"
@@ -85,24 +84,28 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                 <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="Фейдер">
                   <select
                     className="native-text-input theater-channel-input theater-channel-input--fader"
-                    value={String(readSpotlightFaderId(item))}
+                    value={
+                      readSpotlightFaderId(item) != null
+                        ? String(readSpotlightFaderId(item))
+                        : ""
+                    }
                     disabled={!vm.currentStep}
                     onChange={(event) => {
-                      const faderId = Math.max(1, Number(event.target.value) || 1);
+                      const raw = event.target.value.trim();
+                      if (!raw) {
+                        vm.updateSpotlight(item.id, { faderId: undefined });
+                        return;
+                      }
+                      const faderId = Math.max(1, Number(raw) || 1);
                       const channel = item.channel ?? item.id;
-                      vm.updateSpotlight(item.id, {
-                        faderId,
-                      });
+                      vm.updateSpotlight(item.id, { faderId });
                       spot.bindSpotlightToFader(faderId, item.id, channel);
                     }}
                   >
+                    <option value="">—</option>
                     {Array.from(
                       {
-                        length: Math.max(
-                          lightFaders.length,
-                          readSpotlightFaderId(item),
-                          8,
-                        ),
+                        length: Math.max(lightFaders.length, 8),
                       },
                       (_, index) => {
                       const faderId = index + 1;

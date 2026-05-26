@@ -50,6 +50,11 @@ import {
   resolveStageGrid,
   formatGridCellLabel,
 } from "../model/theater-zone-grid";
+import type { SceneLightFadersDataV1 } from "../../scene/model/scene-slice";
+import {
+  applyFadersToSpotlightsForDisplay,
+  type FaderMatchOptions,
+} from "../model/theater-light-fader-bindings";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterSpotlightsArgs = {
@@ -65,6 +70,9 @@ export type UseTheaterSpotlightsArgs = {
   setEditMode: (mode: TheaterEditMode) => void;
   setDecorActionMessage: (message: string | null) => void;
   rehearsalSpotlights: TheaterSpotlight[] | null;
+  lightFaders?: SceneLightFadersDataV1 | null;
+  /** Активный канал на пульте — фейдеры применяются только к софитам этого канала. */
+  consoleChannel?: number;
 };
 
 const batchSpotlightColors = [
@@ -105,6 +113,8 @@ export function useTheaterSpotlights({
   setEditMode,
   setDecorActionMessage,
   rehearsalSpotlights,
+  lightFaders,
+  consoleChannel,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
   const spotlightsRaw = currentStep?.theaterSpotlights;
@@ -116,7 +126,17 @@ export function useTheaterSpotlights({
     activeSpotlightId != null
       ? displaySpotlights.find((item) => item.id === activeSpotlightId)
       : undefined;
-  const renderSpotlights = rehearsalSpotlights ?? displaySpotlights;
+  const faderMatchOptions = useMemo((): FaderMatchOptions | undefined => {
+    if (consoleChannel == null || !Number.isFinite(consoleChannel) || consoleChannel <= 0) {
+      return undefined;
+    }
+    return { consoleChannel: Math.trunc(consoleChannel) };
+  }, [consoleChannel]);
+
+  const renderSpotlights = useMemo(() => {
+    const base = rehearsalSpotlights ?? displaySpotlights;
+    return applyFadersToSpotlightsForDisplay(base, lightFaders, faderMatchOptions);
+  }, [displaySpotlights, faderMatchOptions, lightFaders, rehearsalSpotlights]);
   const visibleSpotlights = useMemo(
     () => renderSpotlights.filter((spotlight) => !spotlight.hidden),
     [renderSpotlights],
@@ -198,6 +218,9 @@ export function useTheaterSpotlights({
             delete next.gridCol;
             delete next.gridRow;
           }
+          if ("faderId" in patch && patch.faderId == null) {
+            delete next.faderId;
+          }
           return next;
         }),
       );
@@ -278,7 +301,6 @@ export function useTheaterSpotlights({
         id: nextId,
         label: `${source.label} (копия)`,
         channel: nextId,
-        faderId: nextId,
         position: [
           source.position[0] + 0.35,
           source.position[1],
@@ -312,7 +334,6 @@ export function useTheaterSpotlights({
       color: tc("--color-warning"),
       enabled: true,
       channel: nextId,
-      faderId: nextId,
       isRgb: false,
     };
     updateSpotlights([...base, nextItem]);
@@ -334,7 +355,6 @@ export function useTheaterSpotlights({
       color: tc("--color-text-white"),
       enabled: true,
       channel: nextId,
-      faderId: nextId,
       isRgb: true,
     };
     updateSpotlights([...base, nextItem]);
@@ -380,7 +400,6 @@ export function useTheaterSpotlights({
             : batchSpotlightColors[index % batchSpotlightColors.length],
           enabled: true,
           channel: nextId,
-          faderId: nextId,
           isRgb,
         };
       });
@@ -452,7 +471,6 @@ export function useTheaterSpotlights({
         color: isRgb ? tc("--color-light-sky") : tc("--color-warning"),
         enabled: true,
         channel: index + 1,
-        faderId: index + 1,
         isRgb,
       }));
       updateSpotlights([...base, ...created]);

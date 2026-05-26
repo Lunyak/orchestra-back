@@ -87,9 +87,10 @@ export function ResetPasswordPage() {
             входа.
           </p>
         ) : null}
-        <label>
+        <label className="login-form__label">
           Новый пароль
           <input
+            className="login-form__input"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
