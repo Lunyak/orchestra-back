@@ -61,7 +61,15 @@ test:back:
   before_script:
     - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
-    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+    # SSH_PRIVATE_KEY can be either:
+    # - a multiline private key string, or
+    # - a GitLab "File" variable (then $SSH_PRIVATE_KEY is a path to the temp file)
+    - |
+      if [ -f "${SSH_PRIVATE_KEY:-}" ]; then
+        tr -d '\r' < "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+      else
+        echo "${SSH_PRIVATE_KEY:-}" | tr -d '\r' > ~/.ssh/id_rsa
+      fi
     - chmod 600 ~/.ssh/id_rsa
     - ssh-keyscan -H ${DEPLOY_HOST} >> ~/.ssh/known_hosts 2>/dev/null || true
 
