@@ -6,7 +6,7 @@ import { DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 
 export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
   const normalizedRows = Array.isArray(rows) ? rows : [];
-  const maxIndex = normalizedRows.reduce((acc, r: unknown) => {
+  const maxIndex = normalizedRows.reduce<number>((acc, r: unknown) => {
     const row = r as { index?: number | string; raw?: unknown };
     if (!String(row?.raw ?? "").trim()) return acc;
     const idx = typeof row?.index === "number" ? row.index : Number(row?.index ?? -1);

@@ -202,6 +202,8 @@ export function useTheaterViewPrefs(
     alignGuidesEnabled,
     activeTab,
     outlineDrawMode,
+    swapTheaterPanels,
+    showTheaterControls: showControls,
     spotlightAimMode,
     dutyLightEnabled,
     sceneBackgroundColor,

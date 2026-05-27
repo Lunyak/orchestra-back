@@ -94,7 +94,7 @@ export function normalizeTheaterZones(
   const normalized: TheaterZone[] = [];
   for (const raw of zones.slice(0, MAX_THEATER_ZONES)) {
     if (!raw || typeof raw !== "object") continue;
-    const record = raw as Record<string, unknown>;
+    const record = raw as unknown as Record<string, unknown>;
     const id = Math.trunc(Number(record.id));
     if (!Number.isFinite(id) || id <= 0 || seen.has(id)) continue;
     seen.add(id);

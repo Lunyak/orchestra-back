@@ -14,11 +14,13 @@ import { InstancedFurnitureLayer } from "../three/InstancedFurnitureLayer";
 import { BuiltinModelInstance } from "../three/BuiltinModelInstance";
 import { FileModelInstance } from "../three/FileModelInstance";
 import { TheaterOrbitControls } from "../three/TheaterOrbitControls";
+import type { TheaterCameraState } from "../../model/theater-camera-storage";
+import type { SceneOutlinerKind } from "../../model/theater-scene-outliner";
 
 export type TheaterCanvasContentProps = {
   projectName: string;
   layout: TheaterLayout;
-  initialCamera: { position: [number, number, number]; fov: number };
+  initialCamera: TheaterCameraState;
   showEditorHelpers: boolean;
   showSeats: boolean;
   showGrid: boolean;
@@ -46,7 +48,7 @@ export type TheaterCanvasContentProps = {
   visibleSpotlights: TheaterSpotlight[];
   activeSpotlightId: number | undefined;
   multiSelectedSpotlightIds: number[];
-  pulseTarget: { kind: "spotlight" | "model" | "door" | "recess"; id: number } | null;
+  pulseTarget: { kind: SceneOutlinerKind | "recess"; id: number } | null;
   onSpotlightTargetChange: (id: number, target: [number, number, number]) => void;
   onSpotlightPositionChange: (id: number, position: [number, number, number]) => void;
   onSpotlightSelect: (id: number, additive?: boolean) => void;
@@ -71,8 +73,8 @@ export type TheaterCanvasContentProps = {
   onModelTransformStart: () => void;
   onModelTransformEnd: () => void;
   onModelTransformChange: () => void;
-  onActiveObjectChange: (object: THREE.Object3D | null) => void;
-  onObjectReady: (id: number, object: THREE.Object3D) => void;
+  onActiveObjectChange: (node: THREE.Object3D | null, id: number) => void;
+  onObjectReady: (node: THREE.Object3D | null, id: number) => void;
   onDecorPlace: (position: [number, number, number]) => void;
   audienceSeatsHighlight: boolean;
   onAudienceStartZPreview: (z: number) => void;

@@ -47,7 +47,7 @@ function FurnitureInstanceGroup({
       ? group.color
       : resolveDecorColor({ builtin: group.builtin }) ?? tc("--color-surface-2");
 
-  const stop = (event: ThreeEvent<PointerEvent>) => event.stopPropagation();
+  const stop = (event: ThreeEvent<PointerEvent | MouseEvent>) => event.stopPropagation();
 
   return (
     <Instances limit={Math.max(group.models.length, 1)}>

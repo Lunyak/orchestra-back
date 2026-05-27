@@ -456,13 +456,13 @@ export function alignStageOutlineToHall(
     roundM(z + deltaZ),
   ]);
 
-  const after = outlineBoundingBox(shifted);
+  const after = outlineBoundingBox(shifted as [number, number][]);
   const overflowBack = after.minZ - targetBackZ;
   if (overflowBack < -0.08) {
     shifted = shifted.map(([x, z]) => [x, roundM(z - overflowBack)]);
   }
 
-  return shifted;
+  return shifted as [number, number][];
 }
 
 /**

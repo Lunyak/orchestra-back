@@ -25,10 +25,7 @@ const DEFAULT_DOOR_HEIGHT = 2.2;
 
 function clampDoor(
   door: TheaterDoor,
-  layout: Pick<
-    TheaterLayout,
-    "hallWidth" | "hallDepth" | "wallHeight" | "audienceStartZ" | "stageBackWidth" | "prosceniumWidth"
-  >,
+  layout: Pick<TheaterLayout, "hallWidth" | "hallDepth" | "wallHeight">,
 ): TheaterDoor {
   const geom = resolveStageGeometry(layout as TheaterLayout);
   const halfD = layout.hallDepth / 2;

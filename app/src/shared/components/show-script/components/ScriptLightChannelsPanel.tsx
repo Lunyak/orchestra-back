@@ -53,7 +53,7 @@ function createDefaultPrograms(): SceneLightProgramsDataV1 {
   };
 }
 
-function normalizeChannelColor(raw: string | undefined, fallback = "#facc15") {
+function normalizeChannelColor(raw: string | null | undefined, fallback = "#facc15") {
   return /^#[0-9a-f]{6}$/i.test(String(raw ?? "").trim())
     ? String(raw).trim()
     : fallback;

@@ -1,4 +1,5 @@
 import type { ScriptStep, TheaterLayout } from "../shared/types/script";
+import type { SceneLightFadersDataV1 } from "../features/scene/model/scene-slice";
 import { applySceneFaderBindingsToSpotlights } from "../features/theater/model/theater-light-fader-bindings";
 import { collectTheaterOfflineAssets } from "../features/theater/model/theater-offline-assets";
 import { getDesktopApi } from "../shared/platform/desktop-api";
@@ -183,7 +184,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
 
     const stepsForOffline = applySceneFaderBindingsToSpotlights(
       args.normalizedSteps,
-      args.minimalSceneData.lightFaders,
+      args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
     );
 
     const payload: Record<string, unknown> = {
@@ -245,7 +246,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
 
     const stepsOut = applySceneFaderBindingsToSpotlights(
       Array.isArray(f.steps) && f.steps.length ? (f.steps as ScriptStep[]) : stepsForOffline,
-      sceneData.lightFaders,
+      sceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
     );
 
     const rehydratePayload: Record<string, unknown> = {

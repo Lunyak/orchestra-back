@@ -128,6 +128,20 @@ export const SpotlightItem = ({
   }, [displayPosition, displayTarget]);
   const isHighlighted = isActive || isSelected;
   const highlightFocus = tc("--color-active-ascent");
+  const beamLineObject = useMemo(() => {
+    const material = new THREE.LineBasicMaterial({
+      color: isHighlighted ? highlightFocus : config.color || tc("--color-warning"),
+      transparent: true,
+      opacity: isHighlighted ? 0.72 : 0.28,
+      depthWrite: false,
+    });
+    return new THREE.Line(beamLineGeometry, material);
+  }, [
+    beamLineGeometry,
+    config.color,
+    highlightFocus,
+    isHighlighted,
+  ]);
   const sourceColor = isHighlighted
     ? highlightFocus
     : config.color || tc("--color-warning");
@@ -205,18 +219,7 @@ export const SpotlightItem = ({
         />
       )}
       {showGuideLine && labelVisible && isEnabled ? (
-        <line geometry={beamLineGeometry} raycast={() => null}>
-          <lineBasicMaterial
-            color={
-              isHighlighted
-                ? highlightFocus
-                : config.color || tc("--color-warning")
-            }
-            transparent
-            opacity={isHighlighted ? 0.72 : 0.28}
-            depthWrite={false}
-          />
-        </line>
+        <primitive object={beamLineObject} raycast={() => null} />
       ) : null}
       {showHelpers &&
         isActive &&

@@ -22,7 +22,7 @@ export function readSpotlightFaderId(spotlight: TheaterSpotlight): number | unde
 
 export function readSpotlightChannel(spotlight: TheaterSpotlight): number | undefined {
   const raw = spotlight.channel;
-  if (raw === null || raw === undefined || raw === "") return undefined;
+  if (raw === null || raw === undefined) return undefined;
   const n = typeof raw === "number" ? raw : Number(raw);
   if (!Number.isFinite(n) || n <= 0) return undefined;
   return Math.trunc(n);

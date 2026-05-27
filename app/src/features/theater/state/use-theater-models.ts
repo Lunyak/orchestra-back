@@ -136,7 +136,7 @@ export function useTheaterModels({
       }
     > | null
   >(null);
-  const modelObjectMapRef = useRef<Map<number, THREE.Group>>(new Map());
+  const modelObjectMapRef = useRef<Map<number, THREE.Object3D>>(new Map());
   const [modelTransformMode, setModelTransformMode] = useState<
     "translate" | "rotate" | "scale"
   >("translate");
@@ -147,7 +147,7 @@ export function useTheaterModels({
   const [pendingSnapModelId, setPendingSnapModelId] = useState<number | null>(
     null,
   );
-  const [activeModelObject, setActiveModelObject] = useState<THREE.Group | null>(
+  const [activeModelObject, setActiveModelObject] = useState<THREE.Object3D | null>(
     null,
   );
   const [activeModelObjectId, setActiveModelObjectId] = useState<number | null>(
@@ -170,13 +170,13 @@ export function useTheaterModels({
   }, []);
 
   const handleActiveObjectChange = useCallback(
-    (node: THREE.Group | null, id: number) => {
+    (node: THREE.Object3D | null, id: number) => {
       setActiveModelObject(node);
       setActiveModelObjectId(node ? id : null);
     },
     [],
   );
-  const handleObjectReady = useCallback((node: THREE.Group | null, id: number) => {
+  const handleObjectReady = useCallback((node: THREE.Object3D | null, id: number) => {
     if (node) {
       modelObjectMapRef.current.set(id, node);
     } else {

@@ -2,10 +2,10 @@ import { tc } from "../../../../../shared/styles/theme-color";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { DECOR_CATALOG } from "../../../model/theater-decor-catalog";
 import {
-  DECOR_TEXTURE_FACE_OPTIONS,
   DECOR_TEXTURE_MODES,
   DECOR_TEXTURE_PRESETS,
 } from "../../../model/theater-decor-textures";
+import { DECOR_TEXTURE_FACE_OPTIONS } from "../../../model/theater-decor-faces";
 import { DecorTexturePreview } from "../../DecorTexturePreview";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { labelM } from "../../../model/theater-metrics";
@@ -43,7 +43,7 @@ export function TheaterControlsDecorSizeSection({ vm, decor }: DecorSectionProps
             >
               <div className="theater-layout-grid">
                 <TheaterRangeField
-                  label={`Ширина ${labelM((activeParametricSize ?? draftDecorSize)[0])}`}
+                  label={labelM("Ширина")}
                   min={0.2}
                   max={Math.max(2, vm.layout.hallWidth)}
                   step={0.1}
@@ -52,7 +52,7 @@ export function TheaterControlsDecorSizeSection({ vm, decor }: DecorSectionProps
                   {...historyTx}
                 />
                 <TheaterRangeField
-                  label={`Высота ${labelM((activeParametricSize ?? draftDecorSize)[1])}`}
+                  label={labelM("Высота")}
                   min={0.1}
                   max={Math.max(1, vm.layout.wallHeight)}
                   step={0.1}
@@ -61,7 +61,7 @@ export function TheaterControlsDecorSizeSection({ vm, decor }: DecorSectionProps
                   {...historyTx}
                 />
                 <TheaterRangeField
-                  label={`Глубина ${labelM((activeParametricSize ?? draftDecorSize)[2])}`}
+                  label={labelM("Глубина")}
                   min={0.05}
                   max={2}
                   step={0.05}

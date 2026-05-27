@@ -241,6 +241,7 @@ export function useActorPage() {
         ].filter(Boolean);
         const count = extractRolePhrasesFromSteps({
           steps,
+          role: String(r.title ?? r.key ?? ""),
           roleKeys: keys,
           preferField: "playMarkdown",
         }).length;

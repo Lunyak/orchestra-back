@@ -9,6 +9,7 @@ import {
 } from "../model/theater-camera-storage";
 import { countMatchingBuiltin } from "../model/theater-model-align";
 import { splitModelsForFurnitureInstancing } from "../model/theater-furniture-instancing";
+import type { ModelPlacementPreset } from "../model/theater-model-placement";
 import {
   focusCameraForModel,
   requestTheaterCameraFocus,
@@ -192,34 +193,38 @@ export const TheaterScene = ({
       }
     : null;
 
-  const modelFocusPanelProps =
-    vm.activeModel && showModelFocusPanel
-      ? {
-          modelName: vm.activeModel.name,
-          transformMode: vm.modelTransformMode,
-          matchingBuiltinCount: modelFocusMatchingCount,
-          showDecorActions: isDecorTab,
-          hidden: vm.activeModel.hidden === true,
-          onToggleHidden: () =>
-            vm.updateModel(vm.activeModel.id, {
-              hidden: vm.activeModel.hidden !== true,
-            }),
-          onPickTransform: (mode: "translate" | "rotate" | "scale") => {
-            vm.exitDecorPlaceMode();
-            vm.setEditMode(isDecorTab ? "decor" : "models");
-            vm.setModelTransformMode(mode);
-          },
-          onRotateQuarter: (direction: "cw" | "ccw") => vm.rotateActiveModel(direction),
-          onPlace: isDecorTab ? (preset) => vm.placeActiveModel(preset) : undefined,
-          onAlign: isDecorTab ? (axis: "x" | "z") => vm.alignModelsByActive(axis) : undefined,
-          onDistribute: isDecorTab
-            ? (axis: "x" | "z") => vm.distributeModelsByActive(axis)
-            : undefined,
-          onClone: () => vm.cloneModel(vm.activeModel.id),
-          onMirror: isDecorTab ? (axis: "x" | "z") => vm.mirrorModel(vm.activeModel.id, axis) : undefined,
-          onDelete: () => vm.removeModel(vm.activeModel.id),
-        }
-      : null;
+  const modelFocusPanelProps = (() => {
+    const activeModel = vm.activeModel;
+    if (!activeModel || !showModelFocusPanel) return null;
+    const modelId = activeModel.id;
+    return {
+      modelName: activeModel.name,
+      transformMode: vm.modelTransformMode,
+      matchingBuiltinCount: modelFocusMatchingCount,
+      showDecorActions: isDecorTab,
+      hidden: activeModel.hidden === true,
+      onToggleHidden: () =>
+        vm.updateModel(modelId, {
+          hidden: activeModel.hidden !== true,
+        }),
+      onPickTransform: (mode: "translate" | "rotate" | "scale") => {
+        vm.exitDecorPlaceMode();
+        vm.setEditMode(isDecorTab ? "decor" : "models");
+        vm.setModelTransformMode(mode);
+      },
+      onRotateQuarter: (direction: "cw" | "ccw") => vm.rotateActiveModel(direction),
+      onPlace: isDecorTab
+        ? (preset: ModelPlacementPreset) => vm.placeActiveModel(preset)
+        : undefined,
+      onAlign: isDecorTab ? (axis: "x" | "z") => vm.alignModelsByActive(axis) : undefined,
+      onDistribute: isDecorTab
+        ? (axis: "x" | "z") => vm.distributeModelsByActive(axis)
+        : undefined,
+      onClone: () => vm.cloneModel(modelId),
+      onMirror: isDecorTab ? (axis: "x" | "z") => vm.mirrorModel(modelId, axis) : undefined,
+      onDelete: () => vm.removeModel(modelId),
+    };
+  })();
 
   return (
     <div className="theater-scene">
@@ -384,7 +389,7 @@ export const TheaterScene = ({
           }}
           resolveModelSrc={vm.resolveModelSrc}
           activeModelObject={vm.activeModelObject}
-          activeModelObjectId={vm.activeModelObjectId}
+          activeModelObjectId={vm.activeModelObjectId ?? undefined}
           modelTransformMode={vm.modelTransformMode}
           onModelTransformStart={vm.handleModelTransformStart}
           onModelTransformEnd={vm.handleModelTransformEnd}
