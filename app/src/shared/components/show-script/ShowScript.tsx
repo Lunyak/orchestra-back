@@ -168,6 +168,7 @@ export const ShowScript: React.FC = () => {
         <ShowScriptMarkdownSection
           projectSlug={projectSlug}
           sceneName={sceneName}
+          inlineMarkdownTabs={false}
           updateStepField={updateStepField}
           onTrackLinkClick={handleTrackLinkClick}
           onSoundLinkClick={handleSoundLinkClick}

@@ -3,7 +3,6 @@ import { bracketMatching, indentOnInput } from "@codemirror/language";
 import { markdown } from "@codemirror/lang-markdown";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
-  drawSelection,
   dropCursor,
   EditorView,
   highlightActiveLine,
@@ -17,11 +16,7 @@ import {
   useRef,
 } from "react";
 import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
-import { markdownLiveConceal } from "./markdownLiveConceal";
-import {
-  markdownHeadingSectionBlockWrappers,
-  orchestraEditorRichTokens,
-} from "./orchestraEditorRichTokens";
+import { orchestraEditorRichTokens } from "./orchestraEditorRichTokens";
 import { scriptMarkdownEditorSyntaxHighlighting } from "./scriptMarkdownEditorHighlight";
 
 export type ScriptMarkdownEditorHandle = {
@@ -158,7 +153,6 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
         doc: start,
         extensions: [
           history(),
-          drawSelection(),
           dropCursor(),
           highlightActiveLine(),
           EditorView.lineWrapping,
@@ -167,8 +161,6 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
           indentOnInput(),
           markdown(),
           scriptMarkdownEditorSyntaxHighlighting,
-          markdownLiveConceal(),
-          markdownHeadingSectionBlockWrappers(),
           orchestraEditorRichTokens(
             () => lightChannelsRef.current,
             () => onTrackLinkClickRef.current,

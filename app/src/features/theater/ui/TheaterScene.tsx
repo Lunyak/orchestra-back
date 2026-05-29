@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAppEditorViewMenuRender } from "@shared/components/app-editor-menubar";
 import { useTheaterScene } from "../model/use-theater-scene";
 import type { TheaterSceneProps } from "../model/theater-scene-types";
 import { useStageGridHighlight } from "../scene/use-stage-grid-highlight";
@@ -15,6 +16,7 @@ import {
   requestTheaterCameraFocus,
 } from "../model/theater-camera-focus";
 import { TheaterControls } from "./TheaterControls";
+import { TheaterEditorViewMenu } from "./menubar/TheaterEditorViewMenu";
 import { TheaterBtn } from "./theater-controls-ui";
 import { TheaterFloorPlan } from "./TheaterFloorPlan";
 import { TheaterModelFocusPanel } from "./TheaterModelFocusPanel";
@@ -23,6 +25,7 @@ import { TheaterLightConsolePanel } from "./TheaterLightConsolePanel";
 import { TheaterCanvasShell } from "./canvas/TheaterCanvasShell";
 import { TheaterCanvasContent } from "./canvas/TheaterCanvasContent";
 import "./style.css";
+import "./theater-editor-sidebar.css";
 
 export type { TheaterSceneProps } from "../model/theater-scene-types";
 
@@ -32,8 +35,6 @@ export const TheaterScene = ({
   onTheaterLayoutChange,
   isPanelsSwapped,
   onTogglePanels,
-  controlsHost,
-  mainControlsHost,
   outlinerHost,
   controlsInPanel,
 }: TheaterSceneProps) => {
@@ -48,20 +49,26 @@ export const TheaterScene = ({
   const isModelEditMode = vm.editMode === "models" || vm.editMode === "decor";
   const showEditorHelpers = !vm.spectaclePreviewMode;
 
-  const resolvedMainHost = mainControlsHost ?? controlsHost;
+  const showEditorChrome = controlsInPanel && vm.showControls;
 
-  const mainControlsRender =
-    controlsInPanel && resolvedMainHost
-      ? createPortal(
-          <TheaterControls vm={vm} controlsInPanel panel="main" />,
-          resolvedMainHost,
-        )
-      : null;
+  useAppEditorViewMenuRender(
+    "theater-view-menu",
+    10,
+    () => <TheaterEditorViewMenu vm={vm} />,
+  );
 
-  const outlinerRender =
+  const toolbarRender = showEditorChrome ? (
+    <TheaterControls vm={vm} controlsInPanel panel="toolbar" />
+  ) : null;
+
+  const sidebarRender =
     controlsInPanel && outlinerHost
       ? createPortal(
-          <TheaterControls vm={vm} controlsInPanel panel="outliner" />,
+          <TheaterControls
+            vm={vm}
+            controlsInPanel
+            panel="sidebar"
+          />,
           outlinerHost,
         )
       : null;
@@ -227,7 +234,25 @@ export const TheaterScene = ({
   })();
 
   return (
-    <div className="theater-scene">
+    <div
+      className={[
+        "theater-scene",
+        showEditorChrome ? "theater-scene--editor-chrome" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {sidebarRender}
+      <div
+        className={[
+          "theater-scene-main",
+          showEditorChrome ? "theater-scene-main--with-rail" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        {toolbarRender}
+        <div className="theater-scene-body">
       {onTogglePanels && (
         <div className="theater-panels-toggle">
           <TheaterBtn
@@ -236,15 +261,13 @@ export const TheaterScene = ({
             title={
               isPanelsSwapped
                 ? "Плейлист слева и шаги справа, сцена на весь экран"
-                : "Слева — настройки, справа — элементы сцены"
+                : "Слева — вкладки (включая «Обзор»), справа — содержимое"
             }
           >
             {isPanelsSwapped ? "Музыка и шаги" : "Настройки сцены"}
           </TheaterBtn>
         </div>
       )}
-      {mainControlsRender}
-      {outlinerRender}
       {showSpotlightFocusPanel && spotlightFocusPanelProps ? (
         <TheaterSpotlightFocusPanel {...spotlightFocusPanelProps} />
       ) : null}
@@ -328,6 +351,7 @@ export const TheaterScene = ({
         projectName={vm.projectName}
         spotlights={vm.displaySpotlights}
         updateSpotlights={vm.updateSpotlights}
+        collapsed={!vm.lightConsoleExpanded}
       />
       <TheaterCanvasShell
         camera={initialCamera}
@@ -387,7 +411,6 @@ export const TheaterScene = ({
             const model = vm.models.find((item) => item.id === id);
             if (model) requestTheaterCameraFocus(focusCameraForModel(model));
           }}
-          resolveModelSrc={vm.resolveModelSrc}
           activeModelObject={vm.activeModelObject}
           activeModelObjectId={vm.activeModelObjectId ?? undefined}
           modelTransformMode={vm.modelTransformMode}
@@ -408,6 +431,8 @@ export const TheaterScene = ({
           onAudienceDragEnd={vm.endTheaterHistoryTransaction}
         />
       </TheaterCanvasShell>
+        </div>
+      </div>
     </div>
   );
 };

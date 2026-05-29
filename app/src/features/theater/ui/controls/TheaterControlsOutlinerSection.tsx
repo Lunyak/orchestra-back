@@ -7,7 +7,7 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
   const [bookmarkLabel, setBookmarkLabel] = useState("");
 
   return (
-    <>
+    <div className="theater-editor-scene-panel">
       <TheaterSceneOutliner
         groups={vm.sceneOutlinerGroups}
         activeSpotlightId={vm.activeSpotlightId}
@@ -24,8 +24,8 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
         onRevealAllHidden={vm.revealAllHiddenInScene}
         onIsolateSelection={vm.isolateSceneSelection}
       />
-      <section className="theater-camera-bookmarks theater-camera-bookmarks--stage-brutal">
-        <div className="theater-layout-title">Закладки камеры</div>
+      <section className="theater-editor-panel-block theater-camera-bookmarks theater-camera-bookmarks--editor">
+        <div className="theater-editor-panel-heading">Закладки камеры</div>
         <div className="theater-spotlight-batch theater-camera-bookmark-form">
           <TheaterField label="Название">
             <input
@@ -69,6 +69,6 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
           <p className="theater-layout-hint">Нет сохранённых ракурсов</p>
         )}
       </section>
-    </>
+    </div>
   );
 }

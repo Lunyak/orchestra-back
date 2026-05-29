@@ -42,11 +42,17 @@ export function ActorPageView() {
     dialogueStorageKey,
     voiceStorageKey,
     openStepInScript,
+    projectItems,
+    currentProjectDisplayName,
   } = useActorPage();
 
   const projectSelectOptions = useMemo(
-    () => projects.map((slug) => ({ value: slug, label: slug })),
-    [projects],
+    () =>
+      projectItems.map((project) => ({
+        value: project.slug,
+        label: project.name || project.slug,
+      })),
+    [projectItems],
   );
 
   const roleSelectOptions = useMemo(
@@ -100,7 +106,7 @@ export function ActorPageView() {
                 </Button>
               </div>
               <div className="actor-topbar-meta">
-                Проект: <b>{projectName || "—"}</b> · Роль: <b>{effectiveRoleTitle || "—"}</b> · Сцены:{" "}
+                Проект: <b>{currentProjectDisplayName || "—"}</b> · Роль: <b>{effectiveRoleTitle || "—"}</b> · Сцены:{" "}
                 <b>{scenesLabel}</b>
               </div>
             </div>

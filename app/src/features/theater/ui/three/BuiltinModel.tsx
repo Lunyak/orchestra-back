@@ -11,7 +11,9 @@ import { resolveDecorTextureFaces } from "../../model/theater-decor-faces";
 import {
   BENCH_METRICS,
   CHAIR_METRICS,
+  ROUND_TABLE_METRICS,
   SOFA_METRICS,
+  TABLE_METRICS,
 } from "../../model/theater-furniture-metrics";
 import { DecorTexturedMaterial } from "./DecorTexturedMaterial";
 import { HangingFabricModel } from "./HangingFabricModel";
@@ -212,27 +214,92 @@ export const BuiltinModel = ({
     return null;
   }
 
+  if (kind === "table") {
+    const topY = TABLE_METRICS.height - TABLE_METRICS.topThickness / 2;
+    const legHeight = TABLE_METRICS.height - TABLE_METRICS.topThickness;
+    const legCenterY = legHeight / 2;
+    const halfW = TABLE_METRICS.width / 2 - TABLE_METRICS.legInset;
+    const halfD = TABLE_METRICS.depth / 2 - TABLE_METRICS.legInset;
+    const legPositions: [number, number][] = [
+      [-halfW, -halfD],
+      [halfW, -halfD],
+      [-halfW, halfD],
+      [halfW, halfD],
+    ];
+    return (
+      <group>
+        <mesh position={[0, topY, 0]}>
+          <boxGeometry
+            args={[TABLE_METRICS.width, TABLE_METRICS.topThickness, TABLE_METRICS.depth]}
+          />
+          <meshStandardMaterial color={tone || tc("--color-3d-wood-light")} />
+        </mesh>
+        {legPositions.map(([x, z]) => (
+          <mesh key={`${x}:${z}`} position={[x, legCenterY, z]}>
+            <boxGeometry
+              args={[
+                TABLE_METRICS.legThickness,
+                legHeight,
+                TABLE_METRICS.legThickness,
+              ]}
+            />
+            <meshStandardMaterial color={tone || tc("--color-3d-wood")} />
+          </mesh>
+        ))}
+      </group>
+    );
+  }
   if (kind === "roundTable") {
     return (
       <group>
         <mesh position={[0, 0.5, 0]}>
-          <cylinderGeometry args={[0.8, 0.8, 0.08, 24]} />
+          <cylinderGeometry
+            args={[
+              ROUND_TABLE_METRICS.radius,
+              ROUND_TABLE_METRICS.radius,
+              ROUND_TABLE_METRICS.topThickness,
+              24,
+            ]}
+          />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-light")} />
         </mesh>
         <mesh position={[0, 0.25, 0]}>
-          <cylinderGeometry args={[0.12, 0.12, 0.5, 16]} />
+          <cylinderGeometry
+            args={[
+              ROUND_TABLE_METRICS.pedestalRadius,
+              ROUND_TABLE_METRICS.pedestalRadius,
+              ROUND_TABLE_METRICS.pedestalHeight,
+              16,
+            ]}
+          />
           <meshStandardMaterial color={tone || tc("--color-3d-wood")} />
         </mesh>
         <mesh position={[0, 0.05, 0]}>
-          <cylinderGeometry args={[0.35, 0.35, 0.06, 20]} />
+          <cylinderGeometry
+            args={[
+              ROUND_TABLE_METRICS.baseRadius,
+              ROUND_TABLE_METRICS.baseRadius,
+              ROUND_TABLE_METRICS.baseHeight,
+              20,
+            ]}
+          />
           <meshStandardMaterial color={tone || tc("--color-3d-wood")} />
         </mesh>
       </group>
     );
   }
   if (kind === "chair") {
-    const seatCenterY = CHAIR_METRICS.seatHeight;
-    const legHeight = CHAIR_METRICS.seatHeight - CHAIR_METRICS.seatThickness / 2;
+    const seatCenterY = CHAIR_METRICS.seatHeight - CHAIR_METRICS.seatThickness / 2;
+    const legHeight = CHAIR_METRICS.seatHeight - CHAIR_METRICS.seatThickness;
+    const legY = legHeight / 2;
+    const legX = CHAIR_METRICS.width / 2 - CHAIR_METRICS.legInset;
+    const legZ = CHAIR_METRICS.depth / 2 - CHAIR_METRICS.legInset;
+    const legPositions: [number, number][] = [
+      [-legX, -legZ],
+      [legX, -legZ],
+      [-legX, legZ],
+      [legX, legZ],
+    ];
     return (
       <group>
         <mesh position={[0, seatCenterY, 0]}>
@@ -257,41 +324,36 @@ export const BuiltinModel = ({
           />
           <meshStandardMaterial color={tone || tc("--color-border-default")} />
         </mesh>
-        <mesh position={[-0.2, legHeight / 2, -0.2]}>
-          <boxGeometry args={[CHAIR_METRICS.legThickness, legHeight, CHAIR_METRICS.legThickness]} />
-          <meshStandardMaterial color={tone || tc("--color-surface-1")} />
-        </mesh>
-        <mesh position={[0.2, legHeight / 2, -0.2]}>
-          <boxGeometry args={[CHAIR_METRICS.legThickness, legHeight, CHAIR_METRICS.legThickness]} />
-          <meshStandardMaterial color={tone || tc("--color-surface-1")} />
-        </mesh>
-        <mesh position={[-0.2, legHeight / 2, 0.2]}>
-          <boxGeometry args={[CHAIR_METRICS.legThickness, legHeight, CHAIR_METRICS.legThickness]} />
-          <meshStandardMaterial color={tone || tc("--color-surface-1")} />
-        </mesh>
-        <mesh position={[0.2, legHeight / 2, 0.2]}>
-          <boxGeometry args={[CHAIR_METRICS.legThickness, legHeight, CHAIR_METRICS.legThickness]} />
-          <meshStandardMaterial color={tone || tc("--color-surface-1")} />
-        </mesh>
+        {legPositions.map(([x, z]) => (
+          <mesh key={`${x}:${z}`} position={[x, legY, z]}>
+            <boxGeometry
+              args={[CHAIR_METRICS.legThickness, legHeight, CHAIR_METRICS.legThickness]}
+            />
+            <meshStandardMaterial color={tone || tc("--color-surface-1")} />
+          </mesh>
+        ))}
       </group>
     );
   }
   if (kind === "bench") {
-    const legHeight = BENCH_METRICS.seatHeight - BENCH_METRICS.seatThickness / 2;
+    const seatCenterY = BENCH_METRICS.seatHeight - BENCH_METRICS.seatThickness / 2;
+    const legHeight = BENCH_METRICS.seatHeight - BENCH_METRICS.seatThickness;
+    const legY = legHeight / 2;
+    const legX = BENCH_METRICS.width / 2 - BENCH_METRICS.legInset;
     return (
       <group>
-        <mesh position={[0, BENCH_METRICS.seatHeight, 0]}>
+        <mesh position={[0, seatCenterY, 0]}>
           <boxGeometry
             args={[BENCH_METRICS.width, BENCH_METRICS.seatThickness, BENCH_METRICS.depth]}
           />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-tan")} />
         </mesh>
-        <mesh position={[-0.55, legHeight / 2, 0]}>
-          <boxGeometry args={[BENCH_METRICS.legThickness, legHeight, BENCH_METRICS.depth * 0.75]} />
+        <mesh position={[-legX, legY, 0]}>
+          <boxGeometry args={[BENCH_METRICS.legThickness, legHeight, BENCH_METRICS.depth * 0.8]} />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-dark")} />
         </mesh>
-        <mesh position={[0.55, legHeight / 2, 0]}>
-          <boxGeometry args={[BENCH_METRICS.legThickness, legHeight, BENCH_METRICS.depth * 0.75]} />
+        <mesh position={[legX, legY, 0]}>
+          <boxGeometry args={[BENCH_METRICS.legThickness, legHeight, BENCH_METRICS.depth * 0.8]} />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-dark")} />
         </mesh>
       </group>

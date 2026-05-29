@@ -7,6 +7,7 @@ import { LabeledCheckbox } from "../../../shared/core/labeled-checkbox/LabeledCh
 import type { TheaterModel } from "../../../shared/types/script";
 
 export const BUILTIN_MODEL_OPTIONS: CustomSelectOption[] = [
+  { value: "table", label: "Стол" },
   { value: "roundTable", label: "Круглый стол" },
   { value: "chair", label: "Стул" },
   { value: "sofa", label: "Диван" },

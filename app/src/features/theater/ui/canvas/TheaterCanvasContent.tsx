@@ -12,7 +12,7 @@ import { TheaterAlignGuides } from "../three/TheaterAlignGuides";
 import { SpotlightItem } from "../three/SpotlightItem";
 import { InstancedFurnitureLayer } from "../three/InstancedFurnitureLayer";
 import { BuiltinModelInstance } from "../three/BuiltinModelInstance";
-import { FileModelInstance } from "../three/FileModelInstance";
+import { FileModelInstanceLoader } from "../three/FileModelInstanceLoader";
 import { TheaterOrbitControls } from "../three/TheaterOrbitControls";
 import type { TheaterCameraState } from "../../model/theater-camera-storage";
 import type { SceneOutlinerKind } from "../../model/theater-scene-outliner";
@@ -66,7 +66,6 @@ export type TheaterCanvasContentProps = {
   onModelContextMenu: (id: number) => void;
   onModelHoverChange: (id: number | null) => void;
   onModelActivate: (id: number) => void;
-  resolveModelSrc: (file: string) => string;
   activeModelObject: THREE.Object3D | null;
   activeModelObjectId: number | undefined;
   modelTransformMode: "translate" | "rotate" | "scale";
@@ -132,7 +131,6 @@ export function TheaterCanvasContent({
   onModelContextMenu,
   onModelHoverChange,
   onModelActivate,
-  resolveModelSrc,
   activeModelObject,
   activeModelObjectId,
   modelTransformMode,
@@ -290,10 +288,10 @@ export function TheaterCanvasContent({
           }
           if (model.file) {
             return (
-              <FileModelInstance
+              <FileModelInstanceLoader
                 key={model.id}
+                projectName={projectName}
                 model={model}
-                url={resolveModelSrc(model.file)}
                 isActive={isActive}
                 onActiveObjectChange={onActiveObjectChange}
                 onObjectReady={onObjectReady}

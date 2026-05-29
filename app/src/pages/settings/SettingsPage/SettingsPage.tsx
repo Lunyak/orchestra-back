@@ -29,7 +29,9 @@ export function SettingsPage() {
   const { onPushAllLocal, onResyncProject } = usePlatform();
   const {
     projectName,
+    currentProjectDisplayName,
     createProject,
+    updateProjectDisplayName,
   } = useProject();
   const {
     projectMembers,
@@ -45,6 +47,9 @@ export function SettingsPage() {
   } = useTeam();
 
   const [newProjectName, setNewProjectName] = useState("");
+  const [projectNameDraft, setProjectNameDraft] = useState("");
+  const [projectNameSaving, setProjectNameSaving] = useState(false);
+  const [projectNameError, setProjectNameError] = useState<string | null>(null);
   const [pauseRemoteSceneUpdates, setPauseRemoteSceneUpdatesState] = useState(
     () => getPauseRemoteSceneUpdates(),
   );
@@ -71,6 +76,11 @@ export function SettingsPage() {
     }
     return Array.from(new Set(out)).filter(Boolean);
   }, [projectMembers, projectOwner?.email]);
+
+  useEffect(() => {
+    setProjectNameDraft(currentProjectDisplayName || "");
+    setProjectNameError(null);
+  }, [currentProjectDisplayName, projectName]);
 
   useEffect(() => {
     if (!accessToken || memberEmails.length === 0) {
@@ -104,6 +114,23 @@ export function SettingsPage() {
     if (!value) return;
     await createProject(value);
     setNewProjectName("");
+  };
+
+  const handleRenameProject = async () => {
+    const value = projectNameDraft.trim();
+    if (!projectName || !value) return;
+    setProjectNameSaving(true);
+    setProjectNameError(null);
+    try {
+      await updateProjectDisplayName(value);
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { message?: string } }; message?: string };
+      setProjectNameError(
+        e?.response?.data?.message ?? e?.message ?? "Не удалось сохранить имя проекта",
+      );
+    } finally {
+      setProjectNameSaving(false);
+    }
   };
 
   const handlePushAllLocal = () => {
@@ -142,7 +169,7 @@ export function SettingsPage() {
               <div>
                 <h2 className="settings-view-title">Настройки</h2>
                 <p className="settings-view-subtitle">
-                  Проект: <b>{projectName || "не выбран"}</b>
+                  Проект: <b>{currentProjectDisplayName || "не выбран"}</b>
                 </p>
               </div>
               <Button type="button" className="danger" onClick={logout}>
@@ -217,6 +244,48 @@ export function SettingsPage() {
                 </label>
               </section>
             ) : null}
+            <section className="settings-card">
+              <h3 className="settings-card__title">Название проекта</h3>
+              <div className="settings-project-create">
+                <input
+                  type="text"
+                  value={projectNameDraft}
+                  onChange={(event) => {
+                    setProjectNameDraft(event.target.value);
+                    setProjectNameError(null);
+                  }}
+                  placeholder="Название проекта"
+                  disabled={!projectName || projectNameSaving || isProjectOwner === false}
+                />
+                <Button
+                  type="button"
+                  className="primary"
+                  onClick={handleRenameProject}
+                  disabled={
+                    !projectName ||
+                    projectNameSaving ||
+                    !projectNameDraft.trim() ||
+                    projectNameDraft.trim() === currentProjectDisplayName.trim() ||
+                    isProjectOwner === false
+                  }
+                >
+                  {projectNameSaving ? "Сохранение…" : "Сохранить"}
+                </Button>
+              </div>
+              <p className="settings-sync-hint">
+                Меняется только видимое имя. Технический slug проекта остаётся:
+                {" "}
+                <b>{projectName || "—"}</b>
+              </p>
+              {isProjectOwner === false ? (
+                <div className="settings-invite-forbidden">
+                  Только владелец проекта может менять название.
+                </div>
+              ) : null}
+              {projectNameError ? (
+                <div className="settings-invite-error">{projectNameError}</div>
+              ) : null}
+            </section>
             {(onPushAllLocal || onResyncProject) && (
               <section className="settings-card settings-sync">
                 <h3 className="settings-card__title">

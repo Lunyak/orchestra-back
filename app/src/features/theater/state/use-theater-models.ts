@@ -10,6 +10,9 @@ import {
 } from "react";
 import * as THREE from "three";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
+import { encodeOrchestraModelRef } from "../../../shared/project-assets/orchestraModelRef";
+import { ensureProject } from "../../../sync/api/projects";
+import { uploadProjectFile } from "../../../sync/api/files";
 import type {
   ScriptStep,
   TheaterLayout,
@@ -48,8 +51,26 @@ import {
 } from "../model/theater-step-models";
 import { cloneTheaterSpotlights } from "./use-theater-spotlights";
 import type { TheaterEditMode } from "./use-theater-selection";
+import { resolveTheaterModelFileUrlSync } from "../model/theater-model-asset-url";
 
 const MODEL_TRANSFORM_HISTORY_GRACE_MS = 400;
+
+const THEATER_MODEL_FILE_ACCEPT =
+  ".glb,.gltf,model/gltf-binary,model/gltf+json";
+
+function readAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem("accessToken");
+  } catch {
+    return null;
+  }
+}
+
+function modelDisplayNameFromFileName(fileName: string): string {
+  const base = fileName.replace(/^.*[/\\]/, "").trim();
+  return base.replace(/\.[^.]+$/, "") || base || "Модель";
+}
 
 export function cloneTheaterModels(source: TheaterModel[]): TheaterModel[] {
   return source.map((item) => ({
@@ -141,7 +162,7 @@ export function useTheaterModels({
     "translate" | "rotate" | "scale"
   >("translate");
   const [builtinModelKey, setBuiltinModelKey] = useState<TheaterModel["builtin"]>(
-    "roundTable",
+    "table",
   );
   const [hoveredModelId, setHoveredModelId] = useState<number | null>(null);
   const [pendingSnapModelId, setPendingSnapModelId] = useState<number | null>(
@@ -278,12 +299,8 @@ export function useTheaterModels({
     );
 
     const resolveModelSrc = useCallback(
-      (file: string) => {
-        const url = new URL(`project-models://${encodeURIComponent(projectName)}/`);
-        url.pathname = `/${file}`;
-        return url.toString();
-      },
-      [projectName]
+      (file: string) => resolveTheaterModelFileUrlSync(projectName, file) ?? "",
+      [projectName],
     );
 
     const copyModelsFromPreviousStep = () => {
@@ -341,27 +358,13 @@ export function useTheaterModels({
 
 
 
-    const addModel = async () => {
-      if (!currentStep) return;
-      try {
-        const desktopApi = getDesktopApi();
-        if (!desktopApi?.pickProjectModel) {
-          console.error(
-            "pickProjectModel is not available. Restart the Electron process to reload preload."
-          );
-          return;
-        }
-        const result = await desktopApi.pickProjectModel(projectName);
-        if (!result?.ok) {
-          if (result?.canceled) return;
-          console.error("Failed to pick model:", result?.error);
-          return;
-        }
+    const appendFileModel = useCallback(
+      (fileRef: string, displayName: string) => {
         const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
         const nextItem: TheaterModel = {
           id: nextId,
-          name: result.name || `Модель ${nextId}`,
-          file: result.file,
+          name: displayName || `Модель ${nextId}`,
+          file: fileRef,
           type: "file",
           allowOutOfBounds: false,
           ignoreCollisions: false,
@@ -373,14 +376,79 @@ export function useTheaterModels({
         updateCurrentStep({ theaterActiveModelId: nextId });
         setPendingSnapModelId(nextId);
         setEditMode("models");
-      } catch (err) {
-        console.error("Failed to add model:", err);
+      },
+      [models, updateCurrentStep, updateModels],
+    );
+
+    const addModelFromWebUpload = useCallback(() => {
+      if (!currentStep) return;
+      const token = readAccessToken();
+      if (!token) {
+        setDecorActionMessage("Войдите в аккаунт, чтобы загрузить модель");
+        return;
       }
+
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = THEATER_MODEL_FILE_ACCEPT;
+      input.multiple = false;
+      input.onchange = () => {
+        const file = input.files?.[0] ?? null;
+        if (!file) return;
+        void (async () => {
+          try {
+            const project = await ensureProject(
+              token,
+              projectName,
+              `Проект ${projectName}`,
+            );
+            const { key } = await uploadProjectFile(token, {
+              projectId: project.id,
+              type: "model",
+              file,
+            });
+            appendFileModel(
+              encodeOrchestraModelRef(key),
+              modelDisplayNameFromFileName(file.name),
+            );
+            setDecorActionMessage(null);
+          } catch (err) {
+            console.error("Failed to upload model:", err);
+            setDecorActionMessage("Не удалось загрузить модель");
+          }
+        })();
+      };
+      input.click();
+    }, [appendFileModel, currentStep, projectName, setDecorActionMessage]);
+
+    const addModel = async () => {
+      if (!currentStep) return;
+      const desktopApi = getDesktopApi();
+      if (desktopApi?.pickProjectModel) {
+        try {
+          const result = await desktopApi.pickProjectModel(projectName);
+          if (!result?.ok) {
+            if (result?.canceled) return;
+            console.error("Failed to pick model:", result?.error);
+            return;
+          }
+          appendFileModel(
+            String(result.file ?? "").trim(),
+            String(result.name ?? "").trim() || `Модель`,
+          );
+        } catch (err) {
+          console.error("Failed to add model:", err);
+        }
+        return;
+      }
+
+      addModelFromWebUpload();
     };
 
     const addBuiltinModel = () => {
       const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
       const builtinNames: Record<string, string> = {
+        table: "Стол",
         roundTable: "Круглый стол",
         chair: "Стул",
         sofa: "Диван",
@@ -404,7 +472,7 @@ export function useTheaterModels({
         builtinModelKey === "humanSmoothSitting";
       const nextItem: TheaterModel = {
         id: nextId,
-        name: builtinNames[builtinModelKey ?? "roundTable"] || `Модель ${nextId}`,
+        name: builtinNames[builtinModelKey ?? "table"] || `Модель ${nextId}`,
         type: "builtin",
         builtin: builtinModelKey,
         allowOutOfBounds: false,

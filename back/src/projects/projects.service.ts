@@ -17,6 +17,11 @@ export interface CreateProjectDto {
   description?: string;
 }
 
+export interface UpdateProjectDto {
+  name?: string;
+  description?: string | null;
+}
+
 export interface AddMemberDto {
   userId: string;
   role?: string;
@@ -283,6 +288,42 @@ export class ProjectsService {
             theaterLayout: true,
           },
         },
+      },
+    });
+  }
+
+  async updateProject(userId: string, slug: string, dto: UpdateProjectDto) {
+    const project = await this.prisma.project.findFirst({
+      where: { slug, deletedAt: null, ownerId: userId },
+      select: { id: true },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found or not owned by user');
+    }
+
+    const data: Prisma.ProjectUpdateInput = {};
+    if (dto.name !== undefined) {
+      const name = String(dto.name).trim();
+      if (!name) throw new BadRequestException('name is required');
+      data.name = name;
+    }
+    if (dto.description !== undefined) {
+      const description =
+        dto.description == null ? null : String(dto.description).trim();
+      data.description = description || null;
+    }
+    if (Object.keys(data).length === 0) {
+      throw new BadRequestException('No project fields to update');
+    }
+
+    return this.prisma.project.update({
+      where: { id: project.id },
+      data,
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
       },
     });
   }

@@ -10,6 +10,7 @@ export type DecorCatalogKey =
   | "sofa"
   | "bench"
   | "blackCube"
+  | "table"
   | "roundTable";
 
 export type DecorCatalogEntry = {
@@ -95,8 +96,16 @@ export const DECOR_CATALOG: DecorCatalogEntry[] = [
     defaultColor: "#111111",
   },
   {
-    key: "roundTable",
+    key: "table",
     label: "Стол",
+    builtin: "table",
+    parametric: false,
+    defaultSize: [1, 1, 1],
+    defaultColor: "#8b6914",
+  },
+  {
+    key: "roundTable",
+    label: "Круглый стол",
     builtin: "roundTable",
     parametric: false,
     defaultSize: [1, 1, 1],

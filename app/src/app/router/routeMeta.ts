@@ -12,6 +12,11 @@ function isScriptStateRoute(pathname: string) {
   return pathname === "/" || pathname === "/light-plot" || isTheaterRoute(pathname);
 }
 
+/** Главная страница сценария (markdown). */
+export function isScriptMarkdownRoute(pathname: string) {
+  return pathname === "/";
+}
+
 function isSessionsRoute(pathname: string) {
   return pathname === "/sessions" || pathname.startsWith("/sessions/");
 }

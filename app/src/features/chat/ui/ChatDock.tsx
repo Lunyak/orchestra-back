@@ -14,28 +14,13 @@ import {
 import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { ChatDockMessagesContent } from "./ChatDockMessagesContent";
 import "./ChatDock.css";
+import {
+  CHAT_DOCK_VISIBILITY_EVENT,
+  persistChatDockHidden,
+  readChatDockHidden,
+} from "../../../shared/chat/chat-dock-visibility";
 
 const CHAT_PAGE_SIZE = 20;
-const CHAT_DOCK_VISIBILITY_EVENT = "orchestra:chat-dock-visibility";
-const CHAT_DOCK_HIDDEN_STORAGE_KEY = "orchestra:chat-dock-hidden";
-
-function readChatDockHidden(): boolean {
-  try {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(CHAT_DOCK_HIDDEN_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function persistChatDockHidden(hidden: boolean) {
-  try {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(CHAT_DOCK_HIDDEN_STORAGE_KEY, String(hidden));
-  } catch {
-    // ignore
-  }
-}
 
 function conversationLabel(
   c: ChatConversationItem,

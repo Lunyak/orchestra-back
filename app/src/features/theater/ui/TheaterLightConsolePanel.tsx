@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useScene, type SceneLightFadersDataV1, type SceneLightProgramsDataV1 } from "../../scene";
 import {
   selectShowScriptMarkdownUi,
@@ -18,6 +18,8 @@ type TheaterLightConsolePanelProps = {
   projectName: string;
   spotlights: TheaterSpotlight[];
   updateSpotlights: (next: TheaterSpotlight[]) => void;
+  /** Управление с левой вкладки «Пульт»; без кнопки «Пульт света» внизу. */
+  collapsed: boolean;
 };
 
 function createDefaultFaders(): SceneLightFadersDataV1 {
@@ -85,10 +87,10 @@ export function TheaterLightConsolePanel({
   projectName,
   spotlights,
   updateSpotlights,
+  collapsed,
 }: TheaterLightConsolePanelProps) {
   const dispatch = useAppDispatch();
   const { sceneData, setSceneData } = useScene();
-  const [collapsed, setCollapsed] = useState(false);
   const programSaveTimerRef = useRef<number | null>(null);
   const activeProgramIdRef = useRef<number | null>(null);
   const { lightChannels, selectedLightSlot } = useAppSelector((state) =>
@@ -234,15 +236,6 @@ export function TheaterLightConsolePanel({
       data-collapsed={collapsed}
       aria-label="Пульт света"
     >
-      <button
-        type="button"
-        className="theater-light-console__toggle"
-        onClick={() => setCollapsed((prev) => !prev)}
-      >
-        <span>Пульт света</span>
-        <span>{collapsed ? "▴" : "▾"}</span>
-      </button>
-
       {!collapsed ? (
         <div className="theater-light-console__body">
           <div className="theater-light-console__program-bar">

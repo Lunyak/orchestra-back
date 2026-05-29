@@ -4,6 +4,7 @@ import {
   filterSceneOutlinerGroups,
   isSceneOutlinerItemActive,
   resolveSceneOutlinerGroupVisibility,
+  sceneOutlinerKindTypeClass,
   type SceneOutlinerGroup,
   type SceneOutlinerItem,
 } from "../model/theater-scene-outliner";
@@ -52,38 +53,38 @@ export function TheaterSceneOutliner({
   const visibleCount = countSceneOutlinerItems(filteredGroups);
 
   return (
-    <div className="theater-scene-outliner">
-      <div className="theater-scene-outliner-header">
-        <span>Элементы сцены</span>
-        <span className="theater-scene-outliner-count">
+    <div className="theater-editor-scene">
+      <div className="theater-editor-panel-heading">Сцена</div>
+      <div className="theater-editor-outliner-toolbar">
+        <input
+          type="search"
+          className="theater-editor-outliner-filter native-text-input"
+          placeholder="Фильтр…"
+          value={filter}
+          disabled={disabled}
+          onChange={(event) => setFilter(event.target.value)}
+        />
+        <span className="theater-editor-outliner-count" title="Элементов на сцене">
           {filter.trim() ? `${visibleCount}/${totalCount}` : totalCount}
         </span>
       </div>
-      <input
-        type="search"
-        className="theater-scene-outliner-filter native-text-input"
-        placeholder="Поиск по названию…"
-        value={filter}
-        disabled={disabled}
-        onChange={(event) => setFilter(event.target.value)}
-      />
       {onShowHiddenChange ? (
-        <label className="theater-scene-outliner-hidden-toggle">
+        <label className="theater-editor-outliner-toggle">
           <input
             type="checkbox"
             checked={showHidden}
             disabled={disabled}
             onChange={(event) => onShowHiddenChange(event.target.checked)}
           />
-          <span>Показывать скрытые</span>
+          <span>Скрытые</span>
         </label>
       ) : null}
       {onRevealAllHidden || onIsolateSelection ? (
-        <div className="theater-scene-outliner-actions">
+        <div className="theater-editor-outliner-actions">
           {onRevealAllHidden ? (
             <button
               type="button"
-              className="theater-scene-outliner-action"
+              className="theater-editor-outliner-action"
               disabled={disabled}
               onClick={onRevealAllHidden}
             >
@@ -93,7 +94,7 @@ export function TheaterSceneOutliner({
           {onIsolateSelection ? (
             <button
               type="button"
-              className="theater-scene-outliner-action"
+              className="theater-editor-outliner-action"
               disabled={disabled}
               title="Скрыть всё, кроме выбранного"
               onClick={onIsolateSelection}
@@ -103,19 +104,23 @@ export function TheaterSceneOutliner({
           ) : null}
         </div>
       ) : null}
-      <div className="theater-scene-outliner-groups">
+      <div
+        className="theater-editor-outliner-listbox"
+        role="listbox"
+        aria-label="Элементы сцены"
+      >
         {filteredGroups.length === 0 ? (
-          <p className="theater-scene-outliner-empty">Ничего не найдено</p>
+          <p className="theater-editor-outliner-empty">Ничего не найдено</p>
         ) : (
           filteredGroups.map((group) => {
             const isCollapsed = collapsed[group.id] ?? false;
             const groupVisibility = resolveSceneOutlinerGroupVisibility(group);
             return (
-              <section key={group.id} className="theater-scene-outliner-group">
-                <div className="theater-scene-outliner-group-head">
+              <section key={group.id} className="theater-editor-outliner-group">
+                <div className="theater-editor-outliner-group-head">
                   <button
                     type="button"
-                    className="theater-scene-outliner-group-toggle"
+                    className="theater-editor-outliner-option theater-editor-outliner-option--group"
                     disabled={disabled}
                     onClick={() =>
                       setCollapsed((prev) => ({
@@ -124,15 +129,25 @@ export function TheaterSceneOutliner({
                       }))
                     }
                   >
-                    <span>{isCollapsed ? "▸" : "▾"}</span>
-                    <span>
-                      {group.title} ({group.items.length})
+                    <span
+                      className={[
+                        "theater-editor-outliner-opener",
+                        isCollapsed ? "theater-editor-outliner-opener--closed" : "theater-editor-outliner-opener--open",
+                      ].join(" ")}
+                      aria-hidden
+                    />
+                    <span className="theater-editor-outliner-type Group" aria-hidden />
+                    <span className="theater-editor-outliner-name">
+                      {group.title}
+                    </span>
+                    <span className="theater-editor-outliner-meta">
+                      {group.items.length}
                     </span>
                   </button>
                   {groupVisibility.hideableCount > 0 && onToggleGroupVisibility ? (
                     <button
                       type="button"
-                      className="theater-scene-outliner-group-visibility"
+                      className="theater-editor-outliner-visibility"
                       disabled={disabled}
                       title={
                         groupVisibility.allHidden
@@ -143,13 +158,12 @@ export function TheaterSceneOutliner({
                         onToggleGroupVisibility(group.id, groupVisibility.allHidden)
                       }
                     >
-                      {groupVisibility.allHidden ? "Показать" : "Скрыть"}
+                      {groupVisibility.allHidden ? "◌" : "◉"}
                     </button>
                   ) : null}
                 </div>
-                {!isCollapsed ? (
-                  <ul className="theater-scene-outliner-list">
-                    {group.items.map((item) => {
+                {!isCollapsed
+                  ? group.items.map((item) => {
                       const active = isSceneOutlinerItemActive(item, {
                         spotlightId: activeSpotlightId,
                         modelId: activeModelId,
@@ -158,61 +172,69 @@ export function TheaterSceneOutliner({
                       });
                       const pulsing =
                         pulseTarget?.kind === item.kind && pulseTarget.id === item.id;
+                      const typeClass = sceneOutlinerKindTypeClass(item.kind);
                       return (
-                        <li key={`${item.kind}-${item.id}`}>
-                          <div
+                        <div
+                          key={`${item.kind}-${item.id}`}
+                          className={[
+                            "theater-editor-outliner-row",
+                            pulsing ? "theater-editor-outliner-row--pulse" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={active}
                             className={[
-                              "theater-scene-outliner-row",
-                              pulsing ? "theater-scene-outliner-row--pulse" : "",
+                              "theater-editor-outliner-option",
+                              active ? "theater-editor-outliner-option--active" : "",
+                              item.muted ? "theater-editor-outliner-option--muted" : "",
                             ]
                               .filter(Boolean)
                               .join(" ")}
+                            style={{ paddingLeft: "22px" }}
+                            disabled={disabled}
+                            title={
+                              item.meta ? `${item.label} · ${item.meta}` : item.label
+                            }
+                            onClick={(event) => onFocusItem(item, event.shiftKey)}
+                            onDoubleClick={() => onFocusItem(item, false)}
                           >
+                            <span className="theater-editor-outliner-spacer" aria-hidden />
+                            <span
+                              className={`theater-editor-outliner-type ${typeClass}`}
+                              aria-hidden
+                            />
+                            <span className="theater-editor-outliner-name">
+                              {item.label}
+                            </span>
+                            {item.meta ? (
+                              <span className="theater-editor-outliner-meta">
+                                {item.meta}
+                              </span>
+                            ) : null}
+                          </button>
+                          {item.canHide && onToggleVisibility ? (
                             <button
                               type="button"
-                              className={[
-                                "theater-scene-outliner-item",
-                                active ? "theater-scene-outliner-item--active" : "",
-                                item.muted ? "theater-scene-outliner-item--muted" : "",
-                              ]
-                                .filter(Boolean)
-                                .join(" ")}
+                              className="theater-editor-outliner-visibility"
                               disabled={disabled}
-                              title={
-                                item.meta ? `${item.label} · ${item.meta}` : item.label
-                              }
-                              onClick={(event) => onFocusItem(item, event.shiftKey)}
+                              title={item.hidden ? "Показать в 3D" : "Скрыть в 3D"}
+                              aria-label={item.hidden ? "Показать" : "Скрыть"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onToggleVisibility(item);
+                              }}
                             >
-                              <span className="theater-scene-outliner-item-label">
-                                {item.label}
-                              </span>
-                              {item.meta ? (
-                                <span className="theater-scene-outliner-item-meta">
-                                  {item.meta}
-                                </span>
-                              ) : null}
+                              {item.hidden ? "◌" : "◉"}
                             </button>
-                            {item.canHide && onToggleVisibility ? (
-                              <button
-                                type="button"
-                                className="theater-scene-outliner-visibility"
-                                disabled={disabled}
-                                title={item.hidden ? "Показать в 3D" : "Скрыть в 3D"}
-                                aria-label={item.hidden ? "Показать" : "Скрыть"}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  onToggleVisibility(item);
-                                }}
-                              >
-                                {item.hidden ? "◌" : "◉"}
-                              </button>
-                            ) : null}
-                          </div>
-                        </li>
+                          ) : null}
+                        </div>
                       );
-                    })}
-                  </ul>
-                ) : null}
+                    })
+                  : null}
               </section>
             );
           })

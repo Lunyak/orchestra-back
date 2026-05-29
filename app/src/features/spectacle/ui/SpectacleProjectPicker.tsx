@@ -1,7 +1,9 @@
 import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
+import type { ProjectSummary } from "../../../sync/api/types/project";
 
 export type SpectacleProjectPickerProps = {
   projects: string[];
+  projectItems?: ProjectSummary[];
   projectName: string;
   projectsLoading: boolean;
   onProjectChange: (slug: string) => void;
@@ -9,12 +11,17 @@ export type SpectacleProjectPickerProps = {
 
 export function SpectacleProjectPicker({
   projects,
+  projectItems,
   projectName,
   projectsLoading,
   onProjectChange,
 }: SpectacleProjectPickerProps) {
   const hasProjects = projects.length > 0;
-  const projectSelectOptions = projects.map((slug) => ({ value: slug, label: slug }));
+  const projectSelectOptions =
+    projectItems?.map((project) => ({
+      value: project.slug,
+      label: project.name || project.slug,
+    })) ?? projects.map((slug) => ({ value: slug, label: slug }));
 
   return (
     <div className="spectacle-project-bar">

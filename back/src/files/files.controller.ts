@@ -136,7 +136,11 @@ export class FilesController {
                   ? 'audio/mp4'
                   : ext === '.flac'
                     ? 'audio/flac'
-                    : 'application/octet-stream';
+                    : ext === '.glb'
+                      ? 'model/gltf-binary'
+                      : ext === '.gltf'
+                        ? 'model/gltf+json'
+                        : 'application/octet-stream';
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', String(st.size));
         const stream = createReadStream(filePath);
@@ -165,7 +169,11 @@ export class FilesController {
                 ? 'audio/mp4'
                 : ext === '.flac'
                   ? 'audio/flac'
-                  : 'application/octet-stream');
+                  : ext === '.glb'
+                    ? 'model/gltf-binary'
+                    : ext === '.gltf'
+                      ? 'model/gltf+json'
+                      : 'application/octet-stream');
       res.setHeader('Content-Type', contentType);
       if (contentLength != null) {
         res.setHeader('Content-Length', String(contentLength));
@@ -214,7 +222,11 @@ export class FilesController {
                           ? 'image/webp'
                           : ext === '.svg'
                             ? 'image/svg+xml'
-                            : 'application/octet-stream';
+                            : ext === '.glb'
+                              ? 'model/gltf-binary'
+                              : ext === '.gltf'
+                                ? 'model/gltf+json'
+                                : 'application/octet-stream';
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Length', String(st.size));
       const stream = createReadStream(filePath);

@@ -1,4 +1,5 @@
 import type { ScriptStep, TheaterModel } from "../../../shared/types/script";
+import { decodeOrchestraModelKey } from "../../../shared/project-assets/orchestraModelRef";
 import { readStepTheaterModels } from "./theater-step-models";
 import {
   getDecorTextureFilePath,
@@ -45,12 +46,29 @@ function collectFromModel(
   seen: Set<string>,
 ) {
   if (model.type === "file" && model.file?.trim()) {
-    const relativePath = model.file.trim().replace(/^\/+/, "");
-    pushUnique(list, seen, {
-      kind: "model",
-      fileName: safeFileName(relativePath),
-      relativePath,
-    });
+    const fileRef = model.file.trim();
+    const orchestraKey = decodeOrchestraModelKey(fileRef);
+    if (/^https?:\/\//i.test(fileRef)) {
+      pushUnique(list, seen, {
+        kind: "model",
+        fileName: safeFileName(fileRef),
+        relativePath: fileRef,
+        remoteUrl: fileRef,
+      });
+    } else if (orchestraKey) {
+      pushUnique(list, seen, {
+        kind: "model",
+        fileName: safeFileName(orchestraKey),
+        relativePath: fileRef,
+      });
+    } else {
+      const relativePath = fileRef.replace(/^\/+/, "");
+      pushUnique(list, seen, {
+        kind: "model",
+        fileName: safeFileName(relativePath),
+        relativePath,
+      });
+    }
   }
   const textureRef = model.decorTexture?.trim();
   if (!textureRef || isDecorTexturePreset(textureRef)) return;

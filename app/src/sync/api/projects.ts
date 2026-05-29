@@ -39,6 +39,21 @@ export async function ensureProject(
   }
 }
 
+export async function updateProject(
+  accessToken: string,
+  slug: string,
+  body: { name?: string; description?: string | null },
+): Promise<ProjectSummary> {
+  const { data } = await api.patch<ProjectSummary>(
+    `/projects/${encodeURIComponent(slug)}`,
+    body,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  return data;
+}
+
 export async function inviteToProject(
   accessToken: string,
   slug: string,

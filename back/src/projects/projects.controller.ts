@@ -56,6 +56,11 @@ export class ProjectsController {
     return this.projectsService.createProject(req.user.userId, body);
   }
 
+  @Patch(':slug')
+  updateProject(@Req() req: any, @Param('slug') slug: string, @Body() body: any) {
+    return this.projectsService.updateProject(req.user.userId, slug, body);
+  }
+
   @Post(':slug/members')
   addMember(@Req() req: any, @Param('slug') slug: string, @Body() body: any) {
     return this.projectsService.addMember(req.user.userId, slug, body);

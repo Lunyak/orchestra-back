@@ -11,23 +11,26 @@ export type FurnitureSeatMetrics = {
   facingOffset: number;
 };
 
+/** Размеры в метрах; seatHeight — высота верха сиденья от пола. */
 export const CHAIR_METRICS = {
-  width: 0.5,
-  depth: 0.52,
+  width: 0.54,
+  depth: 0.58,
   seatHeight: 0.45,
-  seatThickness: 0.08,
-  backHeight: 0.66,
+  seatThickness: 0.09,
+  backHeight: 0.52,
   backThickness: 0.08,
-  backZ: -0.22,
-  legThickness: 0.06,
+  backZ: -0.25,
+  legThickness: 0.07,
+  legInset: 0.06,
 } as const;
 
 export const BENCH_METRICS = {
-  width: 1.4,
-  depth: 0.38,
+  width: 2.0,
+  depth: 0.5,
   seatHeight: 0.45,
-  seatThickness: 0.08,
-  legThickness: 0.06,
+  seatThickness: 0.09,
+  legThickness: 0.08,
+  legInset: 0.2,
 } as const;
 
 export const SOFA_METRICS = {
@@ -40,6 +43,24 @@ export const SOFA_METRICS = {
   backZ: -0.35,
   armWidth: 0.12,
   armHeight: 0.62,
+} as const;
+
+export const TABLE_METRICS = {
+  width: 1.0,
+  depth: 2.5,
+  height: 0.75,
+  topThickness: 0.06,
+  legThickness: 0.09,
+  legInset: 0.14,
+} as const;
+
+export const ROUND_TABLE_METRICS = {
+  radius: 0.9,
+  topThickness: 0.08,
+  pedestalRadius: 0.14,
+  pedestalHeight: 0.5,
+  baseRadius: 0.4,
+  baseHeight: 0.06,
 } as const;
 
 export function isHumanTheaterBuiltin(
@@ -76,7 +97,7 @@ export function getFurnitureSeatMetrics(
       seatHeight: BENCH_METRICS.seatHeight,
       seatThickness: BENCH_METRICS.seatThickness,
       depth: BENCH_METRICS.depth,
-      seatOffsetZ: 0.44,
+      seatOffsetZ: BENCH_METRICS.depth * 0.35,
       facingOffset: 0,
     };
   }
@@ -97,7 +118,7 @@ export function getFurnitureSeatMetrics(
     seatHeight: CHAIR_METRICS.seatHeight,
     seatThickness: CHAIR_METRICS.seatThickness,
     depth: CHAIR_METRICS.depth,
-    seatOffsetZ: 0.44,
+    seatOffsetZ: CHAIR_METRICS.depth * 0.38,
     facingOffset: 0,
   };
 }
@@ -115,7 +136,7 @@ export function getFurnitureBounds(
     case "bench":
       return [
         BENCH_METRICS.width,
-        BENCH_METRICS.seatHeight,
+        BENCH_METRICS.seatHeight + BENCH_METRICS.seatThickness,
         BENCH_METRICS.depth,
       ];
     case "chair":
@@ -124,6 +145,12 @@ export function getFurnitureBounds(
         CHAIR_METRICS.seatHeight + CHAIR_METRICS.backHeight,
         CHAIR_METRICS.depth,
       ];
+    case "table":
+      return [TABLE_METRICS.width, TABLE_METRICS.height, TABLE_METRICS.depth];
+    case "roundTable": {
+      const diameter = ROUND_TABLE_METRICS.radius * 2;
+      return [diameter, 1.05, diameter];
+    }
     case "blackCube":
       return [1, 1, 1];
     default:

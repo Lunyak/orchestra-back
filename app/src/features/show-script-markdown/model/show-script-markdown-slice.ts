@@ -38,6 +38,8 @@ export type ShowScriptMarkdownMode = "notes" | "play" | "explication" | "comment
 type SceneUiState = {
   markdownMode: ShowScriptMarkdownMode;
   playOriginalMode: boolean;
+  /** Оглавление «Картины» в режиме редактирования (notes / play / explication). */
+  editorTocEnabled: boolean;
   annotationsMode: boolean;
   playlistOptions: { id: number; title: string }[];
   soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
@@ -65,6 +67,7 @@ function getUiStorageKeys(projectSlug: string, sceneName: string) {
   return {
     markdownModeStorageKey: `showScript:markdownMode:${projectSlug}:${sceneName}`,
     playOriginalModeStorageKey: `showScript:playOriginalMode:${projectSlug}:${sceneName}`,
+    editorTocStorageKey: `showScript:editorToc:${projectSlug}:${sceneName}`,
     annotationsModeStorageKey: `showScript:annotationsMode:${projectSlug}:${sceneName}`,
   };
 }
@@ -73,6 +76,7 @@ function defaultSceneUi(): SceneUiState {
   return {
     markdownMode: "notes",
     playOriginalMode: false,
+    editorTocEnabled: true,
     annotationsMode: true,
     playlistOptions: [],
     soundsOptions: [],
@@ -144,6 +148,7 @@ export const initShowScriptMarkdownUi = createAsyncThunk<
   const keys = getUiStorageKeys(args.projectSlug, args.sceneName);
   const storedMarkdown = localStorage.getItem(keys.markdownModeStorageKey);
   const storedPlayOriginal = localStorage.getItem(keys.playOriginalModeStorageKey);
+  const storedEditorToc = localStorage.getItem(keys.editorTocStorageKey);
   const storedAnnotations = localStorage.getItem(keys.annotationsModeStorageKey);
   const ui: Partial<SceneUiState> = {};
   if (
@@ -161,6 +166,9 @@ export const initShowScriptMarkdownUi = createAsyncThunk<
   }
   if (storedPlayOriginal != null) {
     ui.playOriginalMode = storedPlayOriginal === "true";
+  }
+  if (storedEditorToc != null) {
+    ui.editorTocEnabled = storedEditorToc === "true";
   }
   return { sceneKey, ui };
 });
@@ -328,6 +336,15 @@ export const showScriptMarkdownSlice = createSlice({
       const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
       const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
       entry.playOriginalMode = action.payload.enabled;
+      state.uiBySceneKey[sceneKey] = entry;
+    },
+    setEditorTocEnabled(
+      state,
+      action: PayloadAction<{ projectSlug: string; sceneName: string; enabled: boolean }>,
+    ) {
+      const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
+      const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
+      entry.editorTocEnabled = action.payload.enabled;
       state.uiBySceneKey[sceneKey] = entry;
     },
     setAnnotationsMode(

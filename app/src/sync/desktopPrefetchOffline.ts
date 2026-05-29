@@ -2,6 +2,7 @@ import type { ScriptStep, TheaterLayout } from "../shared/types/script";
 import type { SceneLightFadersDataV1 } from "../features/scene/model/scene-slice";
 import { applySceneFaderBindingsToSpotlights } from "../features/theater/model/theater-light-fader-bindings";
 import { collectTheaterOfflineAssets } from "../features/theater/model/theater-offline-assets";
+import { decodeOrchestraModelKey } from "../shared/project-assets/orchestraModelRef";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import {
   desktopReadProjectScene,
@@ -174,6 +175,25 @@ export async function prefetchDesktopOfflineAfterSync(args: {
 
     const theaterOffline = collectTheaterOfflineAssets(args.normalizedSteps);
     for (const asset of theaterOffline.assets) {
+      if (asset.kind === "model") {
+        const orchestraKey = decodeOrchestraModelKey(asset.relativePath);
+        if (orchestraKey) {
+          try {
+            const { url } = await getPlayUrl(args.accessToken, orchestraKey);
+            const u = String(url ?? "").trim();
+            if (isHttpUrl(u)) {
+              await downloadOne({
+                kind: "model",
+                fileName: asset.fileName,
+                url: u,
+              });
+            }
+          } catch {
+            /* offline / expired token */
+          }
+          continue;
+        }
+      }
       if (!asset.remoteUrl || !isHttpUrl(asset.remoteUrl)) continue;
       await downloadOne({
         kind: asset.kind === "model" ? "model" : "decor-texture",

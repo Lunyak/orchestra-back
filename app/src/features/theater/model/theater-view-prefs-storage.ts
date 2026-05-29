@@ -12,7 +12,9 @@ export type TheaterViewPrefs = {
   floorPlanExpanded: boolean;
   spectaclePreviewMode: boolean;
   alignGuidesEnabled: boolean;
-  activeTab: "spotlights" | "models" | "view" | "layout" | "decor";
+  activeTab: "navigate" | "spotlights" | "models" | "view" | "layout" | "decor";
+  /** Пульт света внизу сцены (вкладка «Пульт» слева только переключает это). */
+  lightConsoleExpanded: boolean;
   outlineDrawMode: boolean;
   /** Режим «Настройки сцены» (панели слева/справа вместо «Музыка и шаги»). */
   swapTheaterPanels: boolean;
@@ -48,6 +50,7 @@ export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
   dutyLightEnabled: true,
   sceneBackgroundColor: "#6b7280",
   showSpotlightGuideLines: true,
+  lightConsoleExpanded: false,
 };
 
 export function theaterViewPrefsStorageKey(projectName: string) {
@@ -70,7 +73,9 @@ function readHexColor(value: unknown, fallback: string) {
 }
 
 function readTab(value: unknown): TheaterViewPrefs["activeTab"] {
+  if (value === "console") return "spotlights";
   if (
+    value === "navigate" ||
     value === "spotlights" ||
     value === "models" ||
     value === "view" ||
@@ -138,6 +143,12 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
       showSpotlightGuideLines: readBool(
         parsed.showSpotlightGuideLines,
         DEFAULT_THEATER_VIEW_PREFS.showSpotlightGuideLines,
+      ),
+      lightConsoleExpanded: readBool(
+        parsed.lightConsoleExpanded,
+        parsed.activeTab === "console"
+          ? true
+          : DEFAULT_THEATER_VIEW_PREFS.lightConsoleExpanded,
       ),
     };
   } catch {

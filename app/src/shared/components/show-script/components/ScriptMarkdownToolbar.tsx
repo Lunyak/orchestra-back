@@ -1,154 +1,80 @@
 import { Button } from "@shared/core/button/Button";
+import type { ShowScriptMarkdownMode } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
+import { ScriptMarkdownTabs } from "./ScriptMarkdownTabs";
 
 export function ScriptMarkdownToolbar({
-  isEditing,
-  onToggleEditing,
   markdownMode,
   onSetMarkdownMode,
-  annotations,
-  onInsertImage,
-  onInsertKadr,
+  playOriginalMode,
+  onTogglePlayOriginal,
+  showTabs = true,
   editorToggles,
 }: {
-  isEditing: boolean;
-  onToggleEditing: () => void;
-  markdownMode: "notes" | "play" | "explication" | "comments" | "requisites" | "light";
-  onSetMarkdownMode: (mode: "notes" | "play" | "explication" | "comments" | "requisites" | "light") => void;
-  annotations: {
-    mode: boolean;
-    onToggleMode: () => void;
-    loading: boolean;
-    error: string | null;
-    count: number;
-    onClearSelectionState: () => void;
-  };
-  onInsertImage?: () => void;
-  onInsertKadr?: () => void;
+  markdownMode: ShowScriptMarkdownMode;
+  onSetMarkdownMode: (mode: ShowScriptMarkdownMode) => void;
+  playOriginalMode?: boolean;
+  onTogglePlayOriginal?: () => void;
+  showTabs?: boolean;
   editorToggles?: null | {
     tocEnabled: boolean;
     onToggleToc: () => void;
   };
 }) {
-  const annotationsMode = annotations.mode;
+  if (!showTabs && !editorToggles) return null;
+
+  const showPlayOriginalToggle =
+    showTabs && markdownMode === "play" && onTogglePlayOriginal != null;
 
   return (
     <div className="script-markdown-toolbar">
-      <div
-        className="script-markdown-tabs"
-        role="tablist"
-        aria-label="Режим шага"
-      >
+      {showTabs ? (
+        <ScriptMarkdownTabs
+          markdownMode={markdownMode}
+          onSetMarkdownMode={onSetMarkdownMode}
+          tabsClassName="script-markdown-tabs"
+          tabClassName="script-markdown-tab"
+          activeTabClassName="script-markdown-tab--active"
+        />
+      ) : null}
+      {showPlayOriginalToggle ? (
         <button
           type="button"
-          role="tab"
-          aria-selected={markdownMode === "light"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "light"}
-          onClick={() => onSetMarkdownMode("light")}
+          className={[
+            "script-play-original-toggle",
+            playOriginalMode ? "script-play-original-toggle--active" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={onTogglePlayOriginal}
+          title={
+            playOriginalMode
+              ? "Показан оригинал — нажмите для отредактированного"
+              : "Показан отредактированный — нажмите для оригинала"
+          }
+          aria-pressed={playOriginalMode}
         >
-          Свет
+          Оригинал
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={markdownMode === "requisites"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "requisites"}
-          onClick={() => onSetMarkdownMode("requisites")}
-        >
-          Реквизит
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={markdownMode === "comments"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "comments"}
-          onClick={() => onSetMarkdownMode("comments")}
-        >
-          Комментарии
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={markdownMode === "notes"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "notes"}
-          onClick={() => onSetMarkdownMode("notes")}
-        >
-          Схема
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={markdownMode === "explication"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "explication"}
-          onClick={() => onSetMarkdownMode("explication")}
-        >
-          Экспликация
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={markdownMode === "play"}
-          className="script-markdown-tab"
-          data-active={markdownMode === "play"}
-          onClick={() => onSetMarkdownMode("play")}
-        >
-          Текст
-        </button>
+      ) : null}
+      {editorToggles ? (
         <div className="show-script__control-wrap">
           <Button
             variant="ghost"
             className="show-script__rail-btn"
-            onClick={onToggleEditing}
+            data-role="toc-toggle"
+            onClick={editorToggles.onToggleToc}
             title={
-              isEditing
-                ? "Перейти в режим чтения"
-                : "Перейти в режим редактирования"
+              editorToggles.tocEnabled
+                ? "Скрыть оглавление"
+                : "Показать оглавление"
             }
-            aria-pressed={isEditing}
-            data-active={isEditing ? "true" : "false"}
+            aria-pressed={editorToggles.tocEnabled}
+            data-active={editorToggles.tocEnabled ? "true" : "false"}
           >
-            {isEditing ? "📖" : "✏️"}
-          </Button>
-          {isEditing && editorToggles ? (
-            <Button
-              variant="ghost"
-              className="show-script__rail-btn"
-              data-role="toc-toggle"
-              onClick={editorToggles.onToggleToc}
-              title={
-                editorToggles.tocEnabled
-                  ? "Скрыть оглавление"
-                  : "Показать оглавление"
-              }
-              aria-pressed={editorToggles.tocEnabled}
-              data-active={editorToggles.tocEnabled ? "true" : "false"}
-            >
-              &#129526;
-            </Button>
-          ) : null}
-          <Button
-            variant="ghost"
-            className="show-script__rail-btn"
-            disabled={isEditing}
-            onClick={annotations.onToggleMode}
-            title={
-              isEditing
-                ? "Метки работают в режиме чтения"
-                : annotationsMode
-                  ? "Выключить метки"
-                  : "Включить метки"
-            }
-            aria-pressed={annotationsMode}
-            data-active={annotationsMode ? "true" : "false"}
-          >
-            🏷️
+            &#129526;
           </Button>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

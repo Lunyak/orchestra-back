@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildScriptEditorInsertMenuRows,
   defaultScriptEditorInsertDefinitions,
@@ -9,6 +9,11 @@ import {
 } from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
 import { useScene, type SceneLightFadersDataV1 } from "../../../../features/scene";
+import {
+  subscribeScriptTokenizeRequests,
+  wrapMarkdownMatchesAsTokens,
+  wrapNextMarkdownMatchAsToken,
+} from "../../app-editor-menubar";
 import {
   loadActorStepNote,
   saveActorStepNote,
@@ -21,7 +26,6 @@ import {
   loadActorAnnotations,
   loadSceneScriptMarkdownMeta,
   selectActiveStepMarkdownContext,
-  selectAnnotations,
   selectShowScriptMarkdownUi,
   showScriptMarkdownActions,
   updateAnnotation,
@@ -45,7 +49,6 @@ const ScriptMarkdownPreviewLazy = lazy(() =>
   import("./ScriptMarkdownPreview").then((m) => ({ default: m.ScriptMarkdownPreview })),
 );
 import { ScriptMarkdownToolbar } from "./ScriptMarkdownToolbar";
-import { ScriptStepHeader } from "./ScriptStepHeader";
 
 interface IProps {
   projectSlug: string;
@@ -73,6 +76,8 @@ interface IProps {
    * для канбан-модалки + граница Suspense по режиму (схема / экспликация / текст × чтение|редактирование).
    */
   lazyScriptBody?: boolean;
+  /** Табы режима шага в теле страницы (на главной — в menubar). */
+  inlineMarkdownTabs?: boolean;
 }
 
 export function ShowScriptMarkdownSection({
@@ -86,6 +91,7 @@ export function ShowScriptMarkdownSection({
   requisitesPane,
   renderBody,
   lazyScriptBody = false,
+  inlineMarkdownTabs = true,
 }: IProps) {
   const dispatch = useAppDispatch();
   const { sceneData, setSceneData } = useScene();
@@ -125,24 +131,7 @@ export function ShowScriptMarkdownSection({
   const kadrLayoutEnabled =
     markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
 
-  const tocStorageKey = `showScript:editorToc:${projectSlug}:${sceneName}`;
-  const [tocEnabled, setTocEnabled] = useState<boolean>(() => {
-    try {
-      if (typeof window === "undefined") return true;
-      const v = localStorage.getItem(tocStorageKey);
-      return v == null ? true : v === "true";
-    } catch {
-      return true;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      if (typeof window !== "undefined") localStorage.setItem(tocStorageKey, String(tocEnabled));
-    } catch {
-      // ignore
-    }
-  }, [tocEnabled, tocStorageKey]);
+  const editorTocEnabled = ui.editorTocEnabled;
 
   const scriptEditorInsertDefinitions = useMemo(
     () =>
@@ -176,7 +165,7 @@ export function ShowScriptMarkdownSection({
     ed?.setSelection(pos, pos);
   };
 
-  const togglePlayOriginalMode = () => {
+  const togglePlayOriginalMode = useCallback(() => {
     const next = !ui.playOriginalMode;
     try {
       if (typeof window !== "undefined") {
@@ -195,7 +184,7 @@ export function ShowScriptMarkdownSection({
         enabled: next,
       }),
     );
-  };
+  }, [dispatch, projectSlug, sceneName, ui.playOriginalMode]);
 
   useEffect(() => {
     void dispatch(initShowScriptMarkdownUi({ projectSlug, sceneName }));
@@ -226,12 +215,6 @@ export function ShowScriptMarkdownSection({
   const stepCommentEntry = useAppSelector((s) =>
     stepCommentCacheKey ? selectActorNote(s, stepCommentCacheKey) : null,
   );
-  const annotationsEntry = useAppSelector((s) =>
-    annotationsCacheKey ? selectAnnotations(s, annotationsCacheKey) : null,
-  );
-  const annotations = annotationsEntry?.items ?? [];
-  const annotationsLoading = annotationsEntry?.loading ?? false;
-  const annotationsError = annotationsEntry?.error ?? null;
 
   useEffect(() => {
     setStepCommentDraft(stepCommentEntry?.text ?? "");
@@ -311,6 +294,34 @@ export function ShowScriptMarkdownSection({
       updateStepField(currentStep.id, activeMarkdownField, nextValue);
     }
   };
+
+  useEffect(() => {
+    return subscribeScriptTokenizeRequests(({ query, mode }) => {
+      if (!currentStep) return { value: String(activeMarkdown ?? ""), count: 0 };
+
+      const ed = markdownRef.current;
+      const currentValue = ed?.getDoc() ?? String(activeMarkdown ?? "");
+      const selection = ed?.getSelection();
+      const result =
+        mode === "next"
+          ? wrapNextMarkdownMatchAsToken(currentValue, query, selection?.to ?? 0)
+          : wrapMarkdownMatchesAsTokens(currentValue, query);
+
+      if (result.count === 0) return result;
+
+      if (ed) {
+        const cursor = result.selection?.to ?? selection?.to ?? 0;
+        ed.applyDocument(result.value, cursor);
+        if (result.selection) {
+          ed.setSelection(result.selection.from, result.selection.to);
+        }
+      } else {
+        updateStepField(currentStep.id, activeMarkdownField, result.value);
+      }
+
+      return result;
+    });
+  }, [activeMarkdown, activeMarkdownField, currentStep, updateStepField]);
 
   const handleInsertImage = async () => {
     if (!currentStep) return;
@@ -487,67 +498,60 @@ export function ShowScriptMarkdownSection({
 
   const markdownPane = currentStep ? (
     <div className="script-markdown-pane" data-markdown-mode={markdownMode}>
-      <ScriptMarkdownToolbar
-        isEditing={isEditing}
-        onToggleEditing={() => setIsEditing((p: boolean) => !p)}
-        markdownMode={markdownMode}
-        onSetMarkdownMode={(mode) => {
-          try {
-            if (typeof window !== "undefined") {
-              localStorage.setItem(
-                `showScript:markdownMode:${projectSlug}:${sceneName}`,
-                mode,
-              );
+      {inlineMarkdownTabs ? (
+        <ScriptMarkdownToolbar
+          markdownMode={markdownMode}
+          showTabs={inlineMarkdownTabs}
+          playOriginalMode={ui.playOriginalMode}
+          onTogglePlayOriginal={togglePlayOriginalMode}
+          onSetMarkdownMode={(mode) => {
+            try {
+              if (typeof window !== "undefined") {
+                localStorage.setItem(
+                  `showScript:markdownMode:${projectSlug}:${sceneName}`,
+                  mode,
+                );
+              }
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
-          }
-          dispatch(
-            showScriptMarkdownActions.setMarkdownMode({
-              projectSlug,
-              sceneName,
-              mode,
-            }),
-          );
-        }}
-        annotations={{
-          mode: annotationsMode,
-          onToggleMode: () => {
             dispatch(
-              showScriptMarkdownActions.setAnnotationsMode({
+              showScriptMarkdownActions.setMarkdownMode({
                 projectSlug,
                 sceneName,
-                enabled: !annotationsMode,
+                mode,
               }),
             );
-          },
-          loading: annotationsLoading,
-          error: annotationsError,
-          count: annotations.length,
-          onClearSelectionState: () => {
-            setNewAnnotation(null);
-            setActiveAnnotationId(null);
-          },
-        }}
-        onInsertImage={handleInsertImage}
-        onInsertKadr={() => {
-          if (!currentStep) return;
-          const exp = String(activeMarkdown ?? "");
-          const count = (exp.match(/^###\s*Картина\b/gim) ?? []).length;
-          const nextN = count + 1;
-          insertIntoActiveMarkdown(
-            `\n\n### Картина ${nextN}\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`,
-          );
-        }}
-        editorToggles={
-          isEditing && kadrLayoutEnabled
-            ? {
-                tocEnabled,
-                onToggleToc: () => setTocEnabled((p) => !p),
-              }
-            : null
-        }
-      />
+          }}
+          editorToggles={
+            isEditing && kadrLayoutEnabled
+              ? {
+                  tocEnabled: editorTocEnabled,
+                  onToggleToc: () => {
+                    const next = !editorTocEnabled;
+                    try {
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem(
+                          `showScript:editorToc:${projectSlug}:${sceneName}`,
+                          String(next),
+                        );
+                      }
+                    } catch {
+                      // ignore
+                    }
+                    dispatch(
+                      showScriptMarkdownActions.setEditorTocEnabled({
+                        projectSlug,
+                        sceneName,
+                        enabled: next,
+                      }),
+                    );
+                  },
+                }
+              : null
+          }
+        />
+      ) : null}
 
       {markdownMode === "light" ? (
         <div className="script-step-light-pane">
@@ -609,28 +613,16 @@ export function ShowScriptMarkdownSection({
           </div>
         </div>
       ) : isEditing ? (
-        <div className="form-group form-group-grow">
-          <ScriptStepHeader currentStep={currentStep} updateStep={updateStepField} />
-          {markdownMode === "play" ? (
-            <div className="script-play-text-switch">
-              <button
-                type="button"
-                className="script-play-text-switch__btn"
-                data-active={ui.playOriginalMode ? "true" : "false"}
-                onClick={togglePlayOriginalMode}
-                title={
-                  ui.playOriginalMode
-                    ? "Показать подготовленный текст"
-                    : "Показать оригинальный текст"
-                }
-                aria-pressed={ui.playOriginalMode}
-              >
-                ОРИГИНАЛ
-              </button>
-            </div>
-          ) : null}
+        <div
+          className={[
+            "form-group form-group-grow",
+            kadrLayoutEnabled ? "script-markdown-edit--kadr" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           <div className="script-markdown-editor-split">
-            {kadrLayoutEnabled && tocEnabled ? (
+            {kadrLayoutEnabled && editorTocEnabled ? (
               <div className="script-markdown-toc" aria-label="Картины">
                 <div className="script-markdown-toc__title">Картины</div>
                 {tocItems.length ? (
@@ -673,7 +665,9 @@ export function ShowScriptMarkdownSection({
                     key={`md-${currentStep.id}-${String(activeMarkdownField)}`}
                     ref={markdownRef}
                     id={`markdown-${currentStep.id}`}
-                    className={markdownMode === "play" ? "script-markdown-cm--play-as-preview" : undefined}
+                    className={
+                      kadrLayoutEnabled ? "script-markdown-cm--kadr-layout" : undefined
+                    }
                     value={String(activeMarkdown ?? "")}
                     projectSlug={projectSlug}
                     accessToken={accessToken}
@@ -695,7 +689,9 @@ export function ShowScriptMarkdownSection({
                   key={`md-${currentStep.id}-${String(activeMarkdownField)}`}
                   ref={markdownRef}
                   id={`markdown-${currentStep.id}`}
-                  className={markdownMode === "play" ? "script-markdown-cm--play-as-preview" : undefined}
+                  className={
+                    kadrLayoutEnabled ? "script-markdown-cm--kadr-layout" : undefined
+                  }
                   value={String(activeMarkdown ?? "")}
                   projectSlug={projectSlug}
                   accessToken={accessToken}
@@ -717,24 +713,6 @@ export function ShowScriptMarkdownSection({
         </div>
       ) : (
         <div className="form-group">
-          {markdownMode === "play" ? (
-            <div className="script-play-text-switch">
-              <button
-                type="button"
-                className="script-play-text-switch__btn"
-                data-active={ui.playOriginalMode ? "true" : "false"}
-                onClick={togglePlayOriginalMode}
-                title={
-                  ui.playOriginalMode
-                    ? "Показать подготовленный текст"
-                    : "Показать оригинальный текст"
-                }
-                aria-pressed={ui.playOriginalMode}
-              >
-                ОРИГИНАЛ
-              </button>
-            </div>
-          ) : null}
           {lazyScriptBody ? (
             <Suspense
               key={`${markdownMode}-ro`}
@@ -743,6 +721,7 @@ export function ShowScriptMarkdownSection({
               <ScriptMarkdownPreviewLazy
                 projectName={projectSlug}
                 sceneName={sceneName}
+                showStepTitle={inlineMarkdownTabs}
                 onTrackLinkClick={onTrackLinkClick}
                 onSoundLinkClick={onSoundLinkClick}
                 newAnnotation={newAnnotation}
@@ -758,6 +737,7 @@ export function ShowScriptMarkdownSection({
             <ScriptMarkdownPreview
               projectName={projectSlug}
               sceneName={sceneName}
+              showStepTitle={inlineMarkdownTabs}
               onTrackLinkClick={onTrackLinkClick}
               onSoundLinkClick={onSoundLinkClick}
               newAnnotation={newAnnotation}

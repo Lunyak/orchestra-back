@@ -1,11 +1,12 @@
 import {
+  EditorSelection,
   RangeSetBuilder,
+  Transaction,
   type EditorState,
   type Extension,
   type SelectionRange,
 } from "@codemirror/state";
 import {
-  BlockWrapper,
   Decoration,
   DecorationSet,
   EditorView,
@@ -83,64 +84,20 @@ const ORCH_TOKEN_RE =
 const TRACK_OR_PLAYLIST_LINK_RE =
   /\[([^\]]*)\]\(\s*(track|playlist)\s*:\s*([^)]+?)\s*\)/gi;
 
-function selectionTouches(
+const PARENTHETICAL_RE = /\([^()\n]+\)/g;
+
+/** Каретка строго внутри токена (не на границе) — иначе «мигают» соседние лейблы. */
+function selectionInsideToken(
   sel: SelectionRange,
   from: number,
   to: number,
 ): boolean {
   if (!sel.empty) return sel.from < to && sel.to > from;
-  return sel.from >= from && sel.from <= to;
-}
-
-function selectionIntersectsLine(
-  sel: SelectionRange,
-  lineFrom: number,
-  lineTo: number,
-): boolean {
-  return sel.from <= lineTo && sel.to >= lineFrom;
+  return sel.from > from && sel.from < to;
 }
 
 function looksLikeFenceLine(text: string): boolean {
   return /^\s{0,3}```/.test(text);
-}
-
-/** Строка ATX-заголовка (вне кода по строкам ```). */
-const ATX_HEADING_LINE_RE = /^\s{0,3}#{1,6}(\s+|\s*$)/u;
-
-function buildHeadingSectionBlockWrappers(state: EditorState) {
-  const doc = state.doc;
-  const starts: number[] = [];
-  let inFence = false;
-  for (let li = 1; li <= doc.lines; li++) {
-    const line = doc.line(li);
-    const t = line.text;
-    if (looksLikeFenceLine(t)) {
-      inFence = !inFence;
-      continue;
-    }
-    if (inFence) continue;
-    if (ATX_HEADING_LINE_RE.test(t)) starts.push(line.from);
-  }
-  const ranges = starts.map((from, i) => ({
-    from,
-    /*
-     * В @codemirror/view для block wrappers активность считается как from <= pos && to >= pos.
-     * При to = начало следующего заголовка обе секции активны на одной позиции — вторая
-     * вкладывается в первую (два div.cm-md-heading-section подряд). Конец секции — позиция
-     * перед первым символом следующего ATX-заголовка.
-     */
-    to: i + 1 < starts.length ? starts[i + 1]! - 1 : doc.length,
-    // У каждой секции свой набор атрибутов — иначе BlockWrapper.eq() считает обёртки
-    // одинаковыми и вкладывает следующую в DOM предыдущей (см. getBlockPos в @codemirror/view).
-    value: BlockWrapper.create({
-      tagName: "div",
-      attributes: {
-        class: "cm-md-heading-section",
-        "data-cm-heading-from": String(from),
-      },
-    }),
-  }));
-  return BlockWrapper.set(ranges, true);
 }
 
 function spansOverlap(
@@ -164,6 +121,11 @@ function normalizeTrackPayload(value: string) {
 }
 
 type RichSpan = { from: number; to: number; deco: Decoration };
+
+/** Скрытый исходник без replace-виджета — поверх отдельный Decoration.widget (без cm-widgetBuffer у текста). */
+const HIDDEN_SOURCE = Decoration.replace({});
+
+type TokenOverlay = { from: number; to: number; widget: WidgetType };
 
 function subtractIntervals(
   from: number,
@@ -440,28 +402,6 @@ class OrchestraImagePreviewWidget extends WidgetType {
   }
 }
 
-/** Скрывает `### ` в DOM; уровень нужен для eq и отладки. */
-class HiddenAtxHeadingPrefixWidget extends WidgetType {
-  constructor(readonly level: number) {
-    super();
-  }
-
-  eq(other: HiddenAtxHeadingPrefixWidget) {
-    return this.level === other.level;
-  }
-
-  toDOM() {
-    const el = document.createElement("span");
-    el.className = "cm-md-atx-heading-slot";
-    el.setAttribute("aria-hidden", "true");
-    return el;
-  }
-
-  ignoreEvent() {
-    return false;
-  }
-}
-
 class TrackLinkChipWidget extends WidgetType {
   constructor(
     readonly raw: string,
@@ -525,35 +465,29 @@ function buildRichDecorations(
   getOnTrackLinkClick: () => ((trackId: number) => void) | undefined,
   getImageCtx: () => EditorImageCtx,
   view: EditorView,
-): DecorationSet {
+): { decorations: DecorationSet; hiddenAtomic: DecorationSet } {
   const sel = state.selection.main;
   const b = new RangeSetBuilder<Decoration>();
+  const hiddenB = new RangeSetBuilder<Decoration>();
   const doc = state.doc;
 
   for (let li = 1; li <= doc.lines; li++) {
     const line = doc.line(li);
     const text = line.text;
-    const lineRevealed = selectionIntersectsLine(sel, line.from, line.to);
     const spans: RichSpan[] = [];
+    const tokenOverlays: TokenOverlay[] = [];
     let headingForMarks: { ht: number; level: number } | null = null;
 
+    const pushHidden = (from: number, to: number) => {
+      spans.push({ from, to, deco: HIDDEN_SOURCE });
+    };
+
     if (!looksLikeFenceLine(text)) {
-      const hm = /^(\s{0,3})(#{1,6})(\s+|\s*$)/u.exec(text);
+      const hm = /^(\s{0,3})(#{1,3})(\s+|\s*$)/u.exec(text);
       if (hm) {
-        const hf = line.from + hm.index;
-        const ht = hf + hm[0].length;
+        const ht = line.from + hm.index + hm[0].length;
         const level = hm[2].length;
-        if (!lineRevealed) {
-          spans.push({
-            from: hf,
-            to: ht,
-            deco: Decoration.replace({
-              widget: new HiddenAtxHeadingPrefixWidget(level),
-              inclusive: true,
-            }),
-          });
-          headingForMarks = { ht, level };
-        }
+        headingForMarks = { ht, level };
       }
     }
 
@@ -562,40 +496,35 @@ function buildRichDecorations(
     while ((m = ORCH_TOKEN_RE.exec(text)) !== null) {
       const from = line.from + m.index;
       const to = from + m[0].length;
+      if (selectionInsideToken(sel, from, to)) continue;
       if (m[7]) {
         const parsed = parseOrchestraImageFromMarkdown(m[0]);
         if (parsed) {
           if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
-          const revealRaw = selectionTouches(sel, from, to);
-          spans.push({
+          pushHidden(from, to);
+          tokenOverlays.push({
             from,
             to,
-            deco: Decoration.replace({
-              widget: new OrchestraImagePreviewWidget(
-                m[0],
-                parsed.alt,
-                parsed.key,
-                getImageCtx,
-                () => view,
-                revealRaw,
-              ),
-              inclusive: true,
-            }),
+            widget: new OrchestraImagePreviewWidget(
+              m[0],
+              parsed.alt,
+              parsed.key,
+              getImageCtx,
+              () => view,
+              false,
+            ),
           });
           continue;
         }
       }
-      if (selectionTouches(sel, from, to)) continue;
       const spec = resolveChip(m[0], m, lightChannels);
       if (!spec) continue;
       if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
-      spans.push({
+      pushHidden(from, to);
+      tokenOverlays.push({
         from,
         to,
-        deco: Decoration.replace({
-          widget: new OrchestraChipWidget(m[0], spec),
-          inclusive: true,
-        }),
+        widget: new OrchestraChipWidget(m[0], spec),
       });
     }
 
@@ -604,7 +533,7 @@ function buildRichDecorations(
     while ((tm = TRACK_OR_PLAYLIST_LINK_RE.exec(text)) !== null) {
       const from = line.from + tm.index;
       const to = from + tm[0].length;
-      if (selectionTouches(sel, from, to)) continue;
+      if (selectionInsideToken(sel, from, to)) continue;
       if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
       const innerLabel = String(tm[1] ?? "").trim();
       const payload = normalizeTrackPayload(String(tm[3] ?? ""));
@@ -614,25 +543,52 @@ function buildRichDecorations(
         innerLabel.length > 28
           ? `${innerLabel.slice(0, 28)}…`
           : innerLabel || "▶";
+      pushHidden(from, to);
+      tokenOverlays.push({
+        from,
+        to,
+        widget: new TrackLinkChipWidget(
+          tm[0],
+          display,
+          numericId,
+          getOnTrackLinkClick,
+        ),
+      });
+    }
+
+    PARENTHETICAL_RE.lastIndex = 0;
+    let pm: RegExpExecArray | null;
+    while ((pm = PARENTHETICAL_RE.exec(text)) !== null) {
+      const from = line.from + pm.index;
+      const to = from + pm[0].length;
+      const before = text[pm.index - 1] ?? "";
+      if (before === "]") continue;
+      if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
       spans.push({
         from,
         to,
-        deco: Decoration.replace({
-          widget: new TrackLinkChipWidget(
-            tm[0],
-            display,
-            numericId,
-            getOnTrackLinkClick,
-          ),
-          inclusive: true,
-        }),
+        deco: Decoration.mark({ class: "cm-md-parenthetical-remark" }),
       });
     }
 
     const picked = pickNonOverlapping(spans);
+    for (const s of picked) {
+      if (s.deco === HIDDEN_SOURCE) {
+        hiddenB.add(s.from, s.to, HIDDEN_SOURCE);
+      }
+    }
     const lineAdds: RichSpan[] = [...picked];
+    for (const s of picked) {
+      const overlay = tokenOverlays.find((o) => o.from === s.from && o.to === s.to);
+      if (!overlay) continue;
+      lineAdds.push({
+        from: overlay.from,
+        to: overlay.from,
+        deco: Decoration.widget({ widget: overlay.widget, side: -1 }),
+      });
+    }
 
-    if (headingForMarks && !lineRevealed && headingForMarks.ht < line.to) {
+    if (headingForMarks && headingForMarks.ht < line.to) {
       const ht = headingForMarks.ht;
       const level = headingForMarks.level;
       const obstacles: Array<{ from: number; to: number }> = [];
@@ -661,7 +617,7 @@ function buildRichDecorations(
     }
   }
 
-  return b.finish();
+  return { decorations: b.finish(), hiddenAtomic: hiddenB.finish() };
 }
 
 /**
@@ -676,20 +632,26 @@ export function orchestraEditorRichTokens(
 ): Extension {
   const plugin = ViewPlugin.fromClass(
     class {
-      decorations: DecorationSet;
+      decorations: DecorationSet = Decoration.none;
+      hiddenAtomic: DecorationSet = Decoration.none;
       lastChannelStamp = "";
       lastImageCtxStamp = "";
       constructor(readonly view: EditorView) {
         const ch = getLightChannels();
         this.lastChannelStamp = ch.join("\n");
         this.lastImageCtxStamp = editorImageCtxStamp(getImageCtx());
-        this.decorations = buildRichDecorations(
-          view.state,
+        this.applyBuild(view.state, ch);
+      }
+      applyBuild(state: EditorState, ch: string[]) {
+        const built = buildRichDecorations(
+          state,
           ch,
           getOnTrackLinkClick,
           getImageCtx,
-          view,
+          this.view,
         );
+        this.decorations = built.decorations;
+        this.hiddenAtomic = built.hiddenAtomic;
       }
       update(u: ViewUpdate) {
         const ch = getLightChannels();
@@ -704,28 +666,39 @@ export function orchestraEditorRichTokens(
         ) {
           this.lastChannelStamp = stamp;
           this.lastImageCtxStamp = iStamp;
-          this.decorations = buildRichDecorations(
-            u.state,
-            ch,
-            getOnTrackLinkClick,
-            getImageCtx,
-            this.view,
-          );
+          this.applyBuild(u.state, ch);
+        }
+        if (
+          u.selectionSet &&
+          !u.transactions.some((t) => t.annotation(Transaction.userEvent) === "select.fix")
+        ) {
+          const sel = u.state.selection.main;
+          if (sel.empty) {
+            let pos = sel.head;
+            let moved = false;
+            this.hiddenAtomic.between(0, u.state.doc.length, (from, to) => {
+              if (pos > from && pos < to) {
+                pos = to;
+                moved = true;
+              }
+            });
+            if (moved) {
+              u.view.dispatch({
+                selection: EditorSelection.cursor(pos),
+                annotations: Transaction.userEvent.of("select.fix"),
+              });
+            }
+          }
         }
       }
     },
-    { decorations: (v) => v.decorations },
+    {
+      decorations: (v) => v.decorations,
+      provide: (p) =>
+        EditorView.atomicRanges.of((view) => view.plugin(p)?.hiddenAtomic ?? Decoration.none),
+    },
   );
 
   return [plugin];
 }
 
-/**
- * Оборачивает в DOM фрагмент от `# …` до следующего `# …` (как блоки в превью), чтобы чипы и строки
- * текста были внутри одной «карточки».
- */
-export function markdownHeadingSectionBlockWrappers(): Extension {
-  return EditorView.blockWrappers.of((view) =>
-    buildHeadingSectionBlockWrappers(view.state),
-  );
-}

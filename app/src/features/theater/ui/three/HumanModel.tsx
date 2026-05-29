@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import type { TheaterModel } from "../../../../shared/types/script";
+import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
 
 type HumanBuiltin = Extract<
   TheaterModel["builtin"],
@@ -10,10 +11,10 @@ type HumanBuiltin = Extract<
 >;
 
 const HUMAN_MODEL_URLS: Record<HumanBuiltin, string> = {
-  humanStanding: "/theater/humans/human-standing.glb",
-  humanSitting: "/theater/humans/human-sitting.glb",
-  humanSmoothStanding: "/theater/humans/human-standing.glb",
-  humanSmoothSitting: "/theater/humans/human-sitting.glb",
+  humanStanding: resolvePublicAssetUrl("theater/humans/human-standing.glb"),
+  humanSitting: resolvePublicAssetUrl("theater/humans/human-sitting.glb"),
+  humanSmoothStanding: resolvePublicAssetUrl("theater/humans/human-standing.glb"),
+  humanSmoothSitting: resolvePublicAssetUrl("theater/humans/human-sitting.glb"),
 };
 
 const DEFAULT_HUMAN_COLORS = {

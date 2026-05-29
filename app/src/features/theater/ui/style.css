@@ -1,4 +1,6 @@
 .theater-scene {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -7,6 +9,30 @@
   background: var(--color-text-secondary);
   border: 1px solid var(--color-border-default);
   position: relative;
+}
+
+.theater-scene-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.theater-scene-main--with-rail {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.theater-scene-body {
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.theater-scene-body > .theater-canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .theater-canvas {
@@ -271,8 +297,6 @@
 
 .theater-controls {
   position: absolute;
-  top: 12px;
-  left: 12px;
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -297,34 +321,19 @@
   padding: var(--spacing-6);
 }
 
-.theater-controls.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) {
+.theater-controls-settings.theater-controls--stage-brutal {
   position: relative;
   z-index: 1;
-  padding: var(--spacing-4) var(--spacing-10) var(--spacing-8) var(--spacing-2);
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-3);
+  padding: 10px;
   background: transparent;
   color: var(--color-text-lighter);
-  overflow-y: scroll;
+  overflow-y: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-active-ascent) 42%, transparent) transparent;
-}
-
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-tabs {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--spacing-2);
-  padding: 0 0 var(--spacing-3);
-  border: 0;
-  border-bottom: 1px solid var(--stage-brutal-border);
-  background: transparent;
-  box-shadow: none;
-}
-
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-tabs > * {
-  position: relative;
-  z-index: 1;
 }
 
 .theater-spotlight-list {
@@ -399,15 +408,18 @@
   color: var(--color-text-lighter);
 }
 
-.theater-controls-outliner-panel .theater-scene-outliner {
-  flex: 1;
-  min-height: 0;
-  max-height: none;
+.theater-controls--editor-sidebar.theater-controls-outliner-panel {
+  padding: 0;
+  gap: 0;
   overflow: hidden;
 }
 
-.theater-controls-outliner-panel .theater-scene-outliner-list {
-  max-height: none;
+.theater-controls--editor-sidebar .theater-right-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .theater-camera-bookmarks.theater-camera-bookmarks--stage-brutal {
@@ -1325,7 +1337,7 @@ input.theater-scene-outliner-filter.native-text-input[type="search"]:focus-visib
   line-height: 1.35;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-btn.button {
+.theater-controls-settings.theater-controls--stage-brutal .theater-btn.button {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
@@ -1338,14 +1350,14 @@ input.theater-scene-outliner-filter.native-text-input[type="search"]:focus-visib
   box-shadow: none;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-btn.button:hover:not(:disabled) {
+.theater-controls-settings.theater-controls--stage-brutal .theater-btn.button:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--color-active-ascent) 58%, var(--stage-brutal-border));
   background: rgba(255, 255, 255, 0.04);
   color: var(--color-text-primary);
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-btn.button.is-active,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-btn.button:not(.secondary) {
+.theater-controls-settings.theater-controls--stage-brutal .theater-btn.button.is-active,
+.theater-controls-settings.theater-controls--stage-brutal .theater-btn.button:not(.secondary) {
   border-color: color-mix(in srgb, var(--color-active-ascent) 74%, var(--stage-brutal-border));
   background:
     linear-gradient(180deg, rgba(231, 138, 78, 0.12), rgba(231, 138, 78, 0.04)),
@@ -1354,14 +1366,14 @@ input.theater-scene-outliner-filter.native-text-input[type="search"]:focus-visib
   text-shadow: var(--stage-brutal-type-shadow);
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-field,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-range-field,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-color-field {
+.theater-controls-settings.theater-controls--stage-brutal .theater-field,
+.theater-controls-settings.theater-controls--stage-brutal .theater-range-field,
+.theater-controls-settings.theater-controls--stage-brutal .theater-color-field {
   width: 100%;
   box-sizing: border-box;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-label {
+.theater-controls-settings.theater-controls--stage-brutal .theater-label {
   color: var(--color-text-label);
   font-size: 11px;
   font-weight: var(--font-weight-bold);
@@ -1369,13 +1381,13 @@ input.theater-scene-outliner-filter.native-text-input[type="search"]:focus-visib
   text-transform: uppercase;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-field .custom-select {
+.theater-controls-settings.theater-controls--stage-brutal .theater-field .custom-select {
   width: 100%;
   min-width: 0;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-select.custom-select__trigger,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-field .native-text-input {
+.theater-controls-settings.theater-controls--stage-brutal .theater-select.custom-select__trigger,
+.theater-controls-settings.theater-controls--stage-brutal .theater-field .native-text-input {
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -1389,19 +1401,19 @@ input.theater-scene-outliner-filter.native-text-input[type="search"]:focus-visib
   font-size: 12px;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-select.custom-select__trigger:hover,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-field .native-text-input:hover {
+.theater-controls-settings.theater-controls--stage-brutal .theater-select.custom-select__trigger:hover,
+.theater-controls-settings.theater-controls--stage-brutal .theater-field .native-text-input:hover {
   border-color: color-mix(in srgb, var(--color-active-ascent) 58%, var(--stage-brutal-border));
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-select.custom-select__trigger:focus-visible,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-field .native-text-input:focus {
+.theater-controls-settings.theater-controls--stage-brutal .theater-select.custom-select__trigger:focus-visible,
+.theater-controls-settings.theater-controls--stage-brutal .theater-field .native-text-input:focus {
   border-color: var(--color-active-ascent);
   outline: none;
   box-shadow: 0 0 0 1px rgba(231, 138, 78, 0.22);
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .custom-select__dropdown {
+.theater-controls-settings.theater-controls--stage-brutal .custom-select__dropdown {
   border-radius: 0;
   border: 1px solid var(--stage-brutal-border);
   background: rgba(10, 11, 14, 0.98);
@@ -1410,24 +1422,24 @@ input.theater-scene-outliner-filter.native-text-input[type="search"]:focus-visib
     0 14px 28px rgba(0, 0, 0, 0.4);
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .custom-select__option {
+.theater-controls-settings.theater-controls--stage-brutal .custom-select__option {
   color: var(--color-text-lighter);
   font-family: var(--font-family-script-label);
   font-size: 12px;
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .custom-select__option:hover,
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .custom-select__option:focus-visible {
+.theater-controls-settings.theater-controls--stage-brutal .custom-select__option:hover,
+.theater-controls-settings.theater-controls--stage-brutal .custom-select__option:focus-visible {
   background: rgba(231, 138, 78, 0.2);
   color: var(--color-text-primary);
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .custom-select__option--selected {
+.theater-controls-settings.theater-controls--stage-brutal .custom-select__option--selected {
   background: rgba(231, 138, 78, 0.28);
   color: var(--color-text-primary);
 }
 
-.theater-controls--stage-brutal:not(.theater-controls-outliner-panel) .theater-color-input {
+.theater-controls-settings.theater-controls--stage-brutal .theater-color-input {
   border-radius: 0;
   border-color: var(--stage-brutal-border);
   background: rgba(0, 0, 0, 0.22);

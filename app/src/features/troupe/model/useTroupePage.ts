@@ -41,6 +41,8 @@ export function useTroupePage() {
   const {
     onProjectChange,
     projectName,
+    projectItems,
+    currentProjectDisplayName,
     projects,
     isProjectsLoaded,
     projectsLoading,
@@ -251,6 +253,8 @@ export function useTroupePage() {
     patchTitleError,
     patchingTitle,
     projectName,
+    projectItems,
+    currentProjectDisplayName,
     projects,
     projectsLoading,
     projectMembersLoading,

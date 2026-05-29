@@ -28,6 +28,7 @@ export type TheaterPrefsSlice = TheaterViewPrefs & {
   setDutyLightEnabled: (value: boolean) => void;
   setSceneBackgroundColor: (value: string) => void;
   setShowSpotlightGuideLines: (value: boolean) => void;
+  setLightConsoleExpanded: Dispatch<SetStateAction<boolean>>;
   showSpotlights: boolean;
   setShowSpotlights: (value: boolean) => void;
   showOnlyActiveSpotlight: boolean;

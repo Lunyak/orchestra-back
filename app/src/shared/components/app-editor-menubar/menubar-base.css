@@ -1,0 +1,318 @@
+/* Shared menubar — three.js editor–inspired (used app-wide and in theater) */
+
+.theater-editor-menubar {
+  flex: 0 0 36px;
+  width: 100%;
+  min-height: 36px;
+  max-height: 36px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid #222;
+  background: #111;
+  color: #888;
+}
+
+.theater-editor-menubar__track {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  width: 100%;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.theater-editor-menubar__menus {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  height: 100%;
+}
+
+.theater-editor-menubar__menu {
+  position: relative;
+  flex: 0 0 auto;
+  height: 100%;
+  border-right: 1px solid #222;
+}
+
+.theater-editor-menubar__menu-title {
+  display: block;
+  padding: 0 12px;
+  color: #888;
+  font-size: 13px;
+  line-height: 36px;
+  cursor: default;
+  user-select: none;
+}
+
+.theater-editor-menubar__menu:hover .theater-editor-menubar__menu-title,
+.theater-editor-menubar__menu--open .theater-editor-menubar__menu-title {
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.theater-editor-menubar__options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: none;
+  min-width: 140px;
+  padding: 5px 0;
+  border: 1px solid #222;
+  background: #111;
+  box-shadow: 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+.theater-editor-menubar__menu:hover .theater-editor-menubar__options,
+.theater-editor-menubar__menu--open .theater-editor-menubar__options,
+.theater-editor-menubar__menu:focus-within .theater-editor-menubar__options {
+  display: block;
+}
+
+.theater-editor-menubar__option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 5px 12px;
+  border: 0;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.theater-editor-menubar__option:hover {
+  color: #fff;
+  background: #08f;
+}
+
+.theater-editor-menubar__option--active {
+  color: #ccc;
+  background: rgba(21, 60, 94, 0.85);
+}
+
+.theater-editor-menubar__option--meta {
+  cursor: default;
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 500;
+}
+
+.theater-editor-menubar__option--meta:hover {
+  color: #888;
+  background: transparent;
+}
+
+.theater-editor-menubar__option--separator {
+  height: 1px;
+  margin: 4px 0;
+  padding: 0;
+  background: #222;
+  pointer-events: none;
+  cursor: default;
+}
+
+.theater-editor-menubar__submenu-group {
+  position: relative;
+}
+
+.theater-editor-menubar__option--submenu-title {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: default;
+  user-select: none;
+}
+
+.theater-editor-menubar__option--submenu-title::after {
+  content: none;
+}
+
+.theater-editor-menubar__submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  z-index: 21;
+  display: none;
+  min-width: 240px;
+  padding: 5px 0 0;
+  border: 1px solid #222;
+  background: #111;
+  box-shadow: 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}
+
+.theater-editor-menubar__submenu-group:hover .theater-editor-menubar__submenu,
+.theater-editor-menubar__submenu-group:focus-within .theater-editor-menubar__submenu {
+  display: block;
+}
+
+.theater-editor-menubar__option--toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.theater-editor-menubar__option--toggle::before {
+  content: " ";
+  display: inline-block;
+  width: 16px;
+}
+
+.theater-editor-menubar__option--toggle-on::before {
+  content: "✔";
+  font-size: 12px;
+}
+
+.theater-editor-menubar__option--toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.theater-editor-menubar__option--toggle:disabled:hover {
+  color: #888;
+  background: transparent;
+}
+
+.theater-editor-menubar__submenu--seats {
+  min-width: 280px;
+}
+
+.theater-editor-menubar__submenu-fields {
+  margin-top: 4px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid #222;
+}
+
+.theater-editor-menubar__submenu-fields--seats {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 4px;
+}
+
+.theater-editor-menubar__field-meta {
+  margin: 0 0 8px;
+  color: #555;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.theater-editor-menubar__field-row--range {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.theater-editor-menubar__range-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theater-editor-menubar__range {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 18px;
+  margin: 0;
+  accent-color: #08f;
+  background: linear-gradient(
+    to right,
+    #08f 0%,
+    #08f var(--range-fill, 0%),
+    #333 var(--range-fill, 0%),
+    #333 100%
+  );
+}
+
+.theater-editor-menubar__range-value {
+  flex: 0 0 auto;
+  min-width: 2.2em;
+  color: #888;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.theater-editor-menubar__field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  cursor: default;
+}
+
+.theater-editor-menubar__field-label {
+  flex: 0 0 auto;
+  color: #666;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.theater-editor-menubar__field-input.native-text-input {
+  flex: 1 1 auto;
+  width: 72px;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  padding: 2px 6px;
+  border: 1px solid #333;
+  border-radius: 0;
+  background: #222;
+  color: #aaa;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.theater-editor-menubar__field-input.native-text-input:focus {
+  border-color: #08f;
+  outline: none;
+}
+
+.theater-editor-menubar__field-color {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid #333;
+  border-radius: 0;
+  background: #222;
+  cursor: pointer;
+}
+
+.theater-editor-menubar__field-action {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: #222;
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.theater-editor-menubar__field-action:hover:not(:disabled) {
+  color: #fff;
+  background: #08f;
+}
+
+.theater-editor-menubar__field-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

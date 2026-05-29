@@ -54,7 +54,7 @@ dayjs.locale("ru");
 
 export function DirectorSessionSlotPage() {
   const { accessToken } = useAuth();
-  const { projects } = useProject();
+  const { projects, projectItems } = useProject();
   const navigate = useNavigate();
 
   const { sessionId, slotId } = useParams();
@@ -86,6 +86,16 @@ export function DirectorSessionSlotPage() {
         .filter(Boolean)
         .sort((a, b) => a.localeCompare(b, "ru")),
     [projects],
+  );
+  const projectLabelBySlug = useMemo(
+    () =>
+      new Map(
+        projectItems.map((project) => [
+          project.slug,
+          project.name || project.slug,
+        ]),
+      ),
+    [projectItems],
   );
 
   const projectFilterStorageKey = useMemo(
@@ -506,7 +516,11 @@ export function DirectorSessionSlotPage() {
               {slot.ref ? (
                 <>
                   <div>
-                    Проект: <b>{slot.ref.projectSlug}</b>
+                    Проект:{" "}
+                    <b>
+                      {projectLabelBySlug.get(slot.ref.projectSlug) ??
+                        slot.ref.projectSlug}
+                    </b>
                   </div>
                   <div>
                     Шаг: <b>#{slot.ref.stepId}</b>
@@ -648,7 +662,7 @@ export function DirectorSessionSlotPage() {
               >
                 {visibleProjects.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {projectLabelBySlug.get(p) ?? p}
                   </option>
                 ))}
               </select>

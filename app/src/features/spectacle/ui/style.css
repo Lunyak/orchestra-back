@@ -118,7 +118,7 @@
 }
 
 .theater-settings-sidebar--right {
-  --theater-sidebar-width: 320px;
+  --theater-sidebar-width: 350px;
   position: relative;
   overflow: hidden;
   border-left: 1px solid var(--color-border-panel-subtle);

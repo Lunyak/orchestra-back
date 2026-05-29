@@ -7,6 +7,7 @@ import {
   sceneActions,
   uploadScenePlaylistWeb,
 } from "../../../features/scene/model/scene-slice";
+import { invokePlaylistPlay } from "../../../features/scene/model/scene-playback-bridge";
 import { getDesktopApi } from "../../platform/desktop-api";
 import { createAudioFadeController } from "../../media/audio-fade";
 import { resolveOfflineMediaUrl } from "../../platform/media-url";
@@ -14,12 +15,14 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
 import { Buttons } from "../buttons/Buttons";
 import { ListItem } from "../list-item/ListItem";
+import { PlaylistBottomControls } from "./PlaylistBottomControls";
 import "./style.css";
 
 interface PlaylistSidebarProps {
   projectName: string;
   sceneName?: string;
   onRegisterPlayHandler?: (handler: (trackId: number) => void) => void;
+  mode?: "full" | "player" | "list";
 }
 
 const EMPTY_PLAYLIST: PlaylistTrack[] = [];
@@ -36,22 +39,57 @@ type PlaylistCarryover = {
 
 let playlistCarryover: PlaylistCarryover | null = null;
 
-function clearPlaylistCarryover() {
-  if (!playlistCarryover) return;
+function getCarryoverRegistry() {
+  const root = window as typeof window & {
+    __orchestraPlaylistCarryovers?: Set<HTMLAudioElement>;
+  };
+  if (!root.__orchestraPlaylistCarryovers) {
+    root.__orchestraPlaylistCarryovers = new Set<HTMLAudioElement>();
+  }
+  return root.__orchestraPlaylistCarryovers;
+}
+
+function stopCarryoverAudio(audio: HTMLAudioElement) {
   try {
-    playlistCarryover.audio.pause();
-    playlistCarryover.audio.removeAttribute("src");
-    playlistCarryover.audio.load();
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
   } catch {
     // Best-effort cleanup only.
   }
-  playlistCarryover = null;
+}
+
+function clearPlaylistCarryover() {
+  const registry = getCarryoverRegistry();
+  if (playlistCarryover) {
+    stopCarryoverAudio(playlistCarryover.audio);
+    registry.delete(playlistCarryover.audio);
+    playlistCarryover = null;
+  }
+  registry.forEach((audio) => {
+    stopCarryoverAudio(audio);
+    registry.delete(audio);
+  });
+}
+
+function registerPlaylistCarryover(audio: HTMLAudioElement) {
+  getCarryoverRegistry().add(audio);
+}
+
+function unregisterPlaylistCarryover(audio: HTMLAudioElement) {
+  getCarryoverRegistry().delete(audio);
+}
+
+function disposePlaylistCarryover(audio: HTMLAudioElement) {
+  unregisterPlaylistCarryover(audio);
+  stopCarryoverAudio(audio);
 }
 
 export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   projectName,
   sceneName = "script",
   onRegisterPlayHandler,
+  mode = "full",
 }) => {
   const dispatch = useAppDispatch();
   const playlist = useAppSelector(
@@ -186,6 +224,23 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [currentTrack, playlist]);
 
   useEffect(() => {
+    if (!currentTrack) return;
+    const stillExists = playlist.some(
+      (track) => Number(track.id) === Number(currentTrack.id),
+    );
+    if (stillExists) return;
+
+    const audioA = audioRefA.current;
+    const audioB = audioRefB.current;
+    audioA?.pause();
+    audioB?.pause();
+    setCurrentTrack(playlist[0] ?? null);
+    setIsPlaying(false);
+    setProgress(0);
+    setDuration(0);
+  }, [currentTrack, playlist]);
+
+  useEffect(() => {
     const audio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
     if (audio) {
       if (!isPlaying) {
@@ -294,13 +349,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       playlistCarryover = null;
 
       if (!sourceWasPlaying) {
-        try {
-          sourceAudio.pause();
-          sourceAudio.removeAttribute("src");
-          sourceAudio.load();
-        } catch {
-          // Best-effort cleanup only.
-        }
+        disposePlaylistCarryover(sourceAudio);
         return;
       }
 
@@ -308,14 +357,14 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         await targetAudio.play();
         if (requestId !== playRequestId.current) {
           targetAudio.pause();
+          disposePlaylistCarryover(sourceAudio);
           return;
         }
-        sourceAudio.pause();
-        sourceAudio.removeAttribute("src");
-        sourceAudio.load();
+        disposePlaylistCarryover(sourceAudio);
       } catch (error) {
         console.error("Ошибка восстановления воспроизведения:", error);
         playlistCarryover = carryover;
+        registerPlaylistCarryover(sourceAudio);
       }
     },
     [projectName, sceneName],
@@ -324,11 +373,17 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   useEffect(() => {
     const carryover = playlistCarryover;
     if (!carryover) return;
-    if (carryover.projectName !== projectName || carryover.sceneName !== sceneName) return;
+    if (carryover.projectName !== projectName || carryover.sceneName !== sceneName) {
+      clearPlaylistCarryover();
+      return;
+    }
     const track = playlist.find(
       (item) => Number(item.id) === Number(carryover.track.id),
     );
-    if (!track) return;
+    if (!track) {
+      clearPlaylistCarryover();
+      return;
+    }
     void restoreCarryover(track);
   }, [playlist, projectName, sceneName, restoreCarryover]);
 
@@ -364,6 +419,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         duration: durationValue,
         volume: volumeValue,
       };
+      registerPlaylistCarryover(carryoverAudio);
 
       carryoverAudio.play().catch((error) => {
         console.error("Ошибка продолжения воспроизведения:", error);
@@ -533,6 +589,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     const inactiveAudio = activeAudioKey === "a" ? audioRefB.current : audioRefA.current;
     const inactiveKey = activeAudioKey === "a" ? "b" : "a";
     if (!activeAudio || !inactiveAudio) return;
+    clearPlaylistCarryover();
     const fadeMs = track.fadeMs ?? 500;
     playRequestId.current += 1;
     const requestId = playRequestId.current;
@@ -667,27 +724,11 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [onRegisterPlayHandler, playById]);
 
   const togglePlayback = () => {
-    const audio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
-    if (!audio) return;
     if (!currentTrack) return;
-    if (audio.paused) {
-      audio
-        .play()
-        .then(() => {
-          runFade(audio, activeAudioKey, audio.volume, volume, currentTrack.fadeMs ?? 500);
-          setIsPlaying(true);
-        })
-        .catch((error) => {
-          console.error("Ошибка воспроизведения:", error);
-        });
-    } else {
-      audio.pause();
-      setIsPlaying(false);
-    }
+    void playTrack(currentTrack);
   };
 
-  const handleVolumeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const nextValue = Number(event.target.value);
+  const setPlayerVolume = (nextValue: number) => {
     setVolume(nextValue);
     const audio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
     if (audio && !audio.paused) {
@@ -695,8 +736,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
   };
 
-  const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const nextValue = Number(event.target.value);
+  const seekPlayer = (nextValue: number) => {
     const audio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
     if (!audio || !Number.isFinite(nextValue)) return;
     audio.currentTime = nextValue;
@@ -891,14 +931,50 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const addButtonTitle = desktopAvailable
     ? "Добавить аудио"
     : "Добавить аудио (веб)";
+  const showPlayer = mode !== "list";
+  const showSidebar = mode !== "player";
+  const currentTrackIndex = currentTrack
+    ? playlist.findIndex((track) => Number(track.id) === Number(currentTrack.id))
+    : -1;
+  const canGoPrevTrack = currentTrackIndex > 0;
+  const canGoNextTrack =
+    currentTrackIndex >= 0 && currentTrackIndex < playlist.length - 1;
+
+  const playTrackAt = (index: number) => {
+    const track = playlist[index];
+    if (!track) return;
+    if (showPlayer) {
+      void playTrack(track);
+      return;
+    }
+    invokePlaylistPlay(track.id);
+  };
+
+  const playPreviousTrack = () => {
+    if (!canGoPrevTrack) return;
+    playTrackAt(currentTrackIndex - 1);
+  };
+
+  const playNextTrack = () => {
+    if (!canGoNextTrack) return;
+    playTrackAt(currentTrackIndex + 1);
+  };
 
   return (
-    <aside
-      className={`playlist-sidebar ${isDragOver ? "drag-over" : ""}`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <>
+      {showPlayer ? (
+        <div className="playlist-audio-host" aria-hidden="true">
+          <audio ref={audioRefA} />
+          <audio ref={audioRefB} />
+        </div>
+      ) : null}
+      {showSidebar ? (
+        <aside
+          className={`playlist-sidebar ${isDragOver ? "drag-over" : ""}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
       <input
         ref={fileInputRef}
         type="file"
@@ -918,55 +994,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         }}
       />
       <div className="playlist-player">
-        <audio ref={audioRefA} />
-        <audio ref={audioRefB} />
-        {currentTrack && (
-          <div
-            className={`playlist-current ${isPlaying ? "playing" : ""}`}
-          >
-            <div className="playlist-current-title">{currentTrack.title}</div>
-            <div className="playlist-eq" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-        )}
-        <div className="playlist-controls compact">
-          <div className="playlist-controls-row">
-            <button
-              className="playlist-play-btn"
-              onClick={togglePlayback}
-              disabled={!currentTrack}
-            >
-              {isPlaying ? "Пауза" : "Играть"}
-            </button>
-            <button
-              type="button"
-              className="playlist-toggle-btn"
-              onClick={() => setIsEditMode((p) => !p)}
-              aria-pressed={isEditMode}
-              title={isEditMode ? "Закрыть настройки плейлиста" : "Настройки плейлиста"}
-              aria-label={isEditMode ? "Закрыть настройки плейлиста" : "Настройки плейлиста"}
-            >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.7 1.7 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.7 1.7 0 0 0-1.82-.33 1.7 1.7 0 0 0-1 1.54V22a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.7 1.7 0 0 0-1-1.54 1.7 1.7 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.54-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.54V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.7 1.7 0 0 0 1 1.54 1.7 1.7 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.54 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.7 1.7 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-          </div>
+        {(isEditMode || uiMessage) ? (
+          <div className="playlist-controls compact">
           {isEditMode ? (
             <div className="playlist-controls-row">
               <button
@@ -992,41 +1021,6 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
             </div>
           ) : null}
           {uiMessage && <div className="playlist-empty">{uiMessage}</div>}
-          <div className="playlist-progress">
-            <input
-              type="range"
-              min={0}
-              max={duration || 0}
-              step={0.01}
-              value={Math.min(progress, duration || 0)}
-              style={
-                {
-                  ["--range-fill" as unknown as string]: `${progressPercent}%`,
-                } as React.CSSProperties
-              }
-              onChange={handleSeek}
-              disabled={!currentTrack || duration <= 0}
-            />
-            <div className="playlist-timecode">
-              {formatTime(progress)} / {formatTime(duration)}
-            </div>
-          </div>
-          <div className="playlist-volume">
-            <span>Громкость</span>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={volume}
-              style={
-                {
-                  ["--range-fill" as unknown as string]: `${volumePercent}%`,
-                } as React.CSSProperties
-              }
-              onChange={handleVolumeChange}
-            />
-          </div>
           {isEditMode && (
             <label className="playlist-crossfade">
               <input
@@ -1038,7 +1032,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               <span className="playlist-crossfade__text">Кроссфейд</span>
             </label>
           )}
-        </div>
+          </div>
+        ) : null}
 
       </div>
       <div className="playlist-tracks">
@@ -1092,7 +1087,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               <div className="playlist-track-row-top">
                 <button
                   className="playlist-track-btn"
-                  onClick={() => playTrack(track)}
+                  onClick={() => {
+                    if (showPlayer) {
+                      void playTrack(track);
+                      return;
+                    }
+                    invokePlaylistPlay(track.id);
+                  }}
                   title={track.title}
                 >
                   {editingId === track.id ? (
@@ -1205,6 +1206,29 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           aria-label={addButtonTitle}
         />
       </div>
-    </aside>
+        </aside>
+      ) : null}
+      {showPlayer ? (
+        <PlaylistBottomControls
+          currentTrack={currentTrack}
+          isPlaying={isPlaying}
+          progress={progress}
+          duration={duration}
+          volume={volume}
+          progressPercent={progressPercent}
+          volumePercent={volumePercent}
+          isEditMode={isEditMode}
+          canGoPrev={canGoPrevTrack}
+          canGoNext={canGoNextTrack}
+          onPrevTrack={playPreviousTrack}
+          onNextTrack={playNextTrack}
+          onTogglePlayback={togglePlayback}
+          onToggleEditMode={() => setIsEditMode((p) => !p)}
+          onSeek={seekPlayer}
+          onVolumeChange={setPlayerVolume}
+          formatTime={formatTime}
+        />
+      ) : null}
+    </>
   );
 };

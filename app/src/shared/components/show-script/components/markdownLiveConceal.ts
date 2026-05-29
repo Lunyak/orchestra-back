@@ -74,7 +74,7 @@ function buildConcealSet(view: EditorView): DecorationSet {
         b.add(
           node.from,
           node.to,
-          Decoration.mark({ class: "cm-md-concealed", inclusive: true }),
+          Decoration.mark({ class: "cm-md-concealed" }),
         );
       },
     });

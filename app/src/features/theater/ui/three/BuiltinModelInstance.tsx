@@ -8,6 +8,13 @@ import {
 } from "../../model/theater-furniture-metrics";
 import { BuiltinModel } from "./BuiltinModel";
 
+const FURNITURE_SELECTION_BUILTINS = new Set<NonNullable<TheaterModel["builtin"]>>([
+  "table",
+  "roundTable",
+  "cabinet",
+  "blackCube",
+]);
+
 function getBuiltinSelectionBox(
   model: TheaterModel,
 ): { size: [number, number, number]; center: [number, number, number] } | null {
@@ -15,6 +22,14 @@ function getBuiltinSelectionBox(
     const [width, height, depth] = getFurnitureBounds(model.builtin);
     return {
       size: [width, Math.max(0.55, height), Math.max(0.42, depth)],
+      center: [0, height / 2, 0],
+    };
+  }
+
+  if (model.builtin && FURNITURE_SELECTION_BUILTINS.has(model.builtin)) {
+    const [width, height, depth] = getFurnitureBounds(model.builtin);
+    return {
+      size: [width, height, depth],
       center: [0, height / 2, 0],
     };
   }

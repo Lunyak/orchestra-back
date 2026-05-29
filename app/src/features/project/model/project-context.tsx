@@ -1,14 +1,18 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
 import { syncPush } from "../../../sync/api/entity-sync";
-import { ensureProject, fetchProjects } from "../../../sync/api/projects";
+import { ensureProject, fetchProjects, updateProject } from "../../../sync/api/projects";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
 import { createId } from "../../../shared/utils/createId";
+import type { ProjectSummary } from "../../../sync/api/types/project";
 import { useAuth } from "../../auth/model/auth-context";
 import { isDirectorSessionsSlug } from "../../director-sessions/directorSessionsSync";
 
 export interface ProjectContextValue {
   projects: string[];
+  projectItems: ProjectSummary[];
   projectName: string;
+  currentProject: ProjectSummary | null;
+  currentProjectDisplayName: string;
   setProjectName: (name: string) => void;
   loadProjects: (prefer?: string) => Promise<void>;
   /** true после первой попытки загрузки списка проектов (успех/ошибка). */
@@ -17,19 +21,131 @@ export interface ProjectContextValue {
   projectsLoading: boolean;
   onProjectChange: (name: string) => void;
   createProject: (name: string) => Promise<void>;
+  updateProjectDisplayName: (name: string) => Promise<void>;
   deleteProject: (name: string) => Promise<void>;
   ensureRemoteProject: (token?: string | null) => Promise<string | null>;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
+const PROJECT_DISPLAY_NAME_KEY_PREFIX = "projectDisplayName:";
+
+const CYRILLIC_TRANSLIT: Record<string, string> = {
+  а: "a",
+  б: "b",
+  в: "v",
+  г: "g",
+  д: "d",
+  е: "e",
+  ё: "e",
+  ж: "zh",
+  з: "z",
+  и: "i",
+  й: "y",
+  к: "k",
+  л: "l",
+  м: "m",
+  н: "n",
+  о: "o",
+  п: "p",
+  р: "r",
+  с: "s",
+  т: "t",
+  у: "u",
+  ф: "f",
+  х: "h",
+  ц: "c",
+  ч: "ch",
+  ш: "sh",
+  щ: "sch",
+  ъ: "",
+  ы: "y",
+  ь: "",
+  э: "e",
+  ю: "yu",
+  я: "ya",
+};
+
+function projectDisplayNameKey(slug: string) {
+  return `${PROJECT_DISPLAY_NAME_KEY_PREFIX}${slug}`;
+}
+
+function readStoredProjectDisplayName(slug: string): string | null {
+  try {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(projectDisplayNameKey(slug));
+  } catch {
+    return null;
+  }
+}
+
+function storeProjectDisplayName(slug: string, name: string) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(projectDisplayNameKey(slug), name);
+  } catch {
+    // ignore
+  }
+}
+
+function removeStoredProjectDisplayName(slug: string) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(projectDisplayNameKey(slug));
+  } catch {
+    // ignore
+  }
+}
+
+function slugifyProjectName(name: string): string {
+  const transliterated = Array.from(name.trim().toLowerCase().normalize("NFKD"))
+    .map((char) => {
+      if (CYRILLIC_TRANSLIT[char] != null) return CYRILLIC_TRANSLIT[char];
+      if (/[a-z0-9]/.test(char)) return char;
+      return "-";
+    })
+    .join("");
+
+  return transliterated
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+}
+
+function makeUniqueProjectSlug(name: string, usedSlugs: string[]): string {
+  const used = new Set(usedSlugs.map((slug) => slug.trim()).filter(Boolean));
+  const base = slugifyProjectName(name) || `project-${Date.now().toString(36)}`;
+  if (!used.has(base)) return base;
+  for (let i = 2; i < 1000; i += 1) {
+    const candidate = `${base}-${i}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`;
+}
+
+function desktopProjectSummary(slug: string): ProjectSummary {
+  return {
+    id: slug,
+    slug,
+    name: readStoredProjectDisplayName(slug) || slug,
+    description: null,
+  };
+}
+
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const { accessToken, logout } = useAuth();
   const [projects, setProjects] = useState<string[]>([]);
+  const [projectItems, setProjectItems] = useState<ProjectSummary[]>([]);
   const [projectName, setProjectName] = useState("");
   const [isProjectsLoaded, setIsProjectsLoaded] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const ensureRemoteInFlightRef = React.useRef<Record<string, Promise<string | null> | undefined>>({});
+
+  const currentProject = React.useMemo(
+    () => projectItems.find((project) => project.slug === projectName) ?? null,
+    [projectItems, projectName],
+  );
+  const currentProjectDisplayName = currentProject?.name || projectName;
 
   const getDesktopApi = useCallback(() => {
     const api = getPlatformDesktopApi();
@@ -54,12 +170,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     setProjectsLoading(true);
     try {
       const desktopApi = getDesktopApi();
-      const listRaw = desktopApi
-        ? await desktopApi.listProjects()
+      const listRaw: ProjectSummary[] = desktopApi
+        ? (await desktopApi.listProjects()).map(desktopProjectSummary)
         : accessToken
-          ? (await fetchProjects(accessToken)).map((project) => project.slug)
+          ? await fetchProjects(accessToken)
           : [];
-      const list = listRaw.filter((slug) => !isDirectorSessionsSlug(slug));
+      const items = listRaw.filter((project) => !isDirectorSessionsSlug(project.slug));
+      const list = items.map((project) => project.slug);
+      setProjectItems(items);
       setProjects(list);
       const stored = localStorage.getItem("selectedProject") || "";
       // Не затирать выбранный проект при каждом loadProjects (смена токена, повторный mount):
@@ -81,6 +199,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       
       setProjects([]);
+      setProjectItems([]);
     } finally {
       setProjectsLoading(false);
       setIsProjectsLoaded(true);
@@ -98,7 +217,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       const inFlight = ensureRemoteInFlightRef.current[inFlightKey];
       if (inFlight) return await inFlight;
       try {
-        const p = ensureProject(tokenToUse, projectName, `Проект ${projectName}`)
+        const p = ensureProject(
+          tokenToUse,
+          projectName,
+          currentProjectDisplayName || `Проект ${projectName}`,
+        )
           .then((project) => {
             localStorage.setItem(key, project.id);
             return project.id;
@@ -117,7 +240,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
     },
-    [accessToken, projectName]
+    [accessToken, currentProjectDisplayName, projectName]
   );
 
   const onProjectChange = useCallback(
@@ -132,25 +255,69 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     async (name: string) => {
       const value = name.trim();
       if (!value) return;
+      const slug = makeUniqueProjectSlug(value, projects);
       const desktopApi = getDesktopApi();
       if (desktopApi) {
-        const result = await desktopApi.createProject(value);
+        const result = await desktopApi.createProject(slug);
         if (!result?.ok || !result.name) {
           console.error("createProject failed:", result?.error);
           return;
         }
+        storeProjectDisplayName(result.name, value);
         await loadProjects(result.name);
         return;
       }
       if (!accessToken) return;
       try {
-        await ensureProject(accessToken, value, `Проект ${value}`);
-        await loadProjects(value);
+        const project = await ensureProject(accessToken, slug, value);
+        await loadProjects(project.slug);
       } catch (error) {
         console.error("createProject failed:", error);
       }
     },
-    [accessToken, ensureProject, getDesktopApi, loadProjects]
+    [accessToken, getDesktopApi, loadProjects, projects]
+  );
+
+  const updateProjectDisplayName = useCallback(
+    async (name: string) => {
+      const value = name.trim();
+      if (!projectName || !value) return;
+
+      storeProjectDisplayName(projectName, value);
+      setProjectItems((prev) =>
+        prev.map((project) =>
+          project.slug === projectName ? { ...project, name: value } : project,
+        ),
+      );
+
+      if (!accessToken || getDesktopApi()) return;
+      try {
+        const updated = await updateProject(accessToken, projectName, { name: value });
+        setProjectItems((prev) =>
+          prev.map((project) =>
+            project.slug === updated.slug ? { ...project, ...updated } : project,
+          ),
+        );
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          const ensured = await ensureProject(accessToken, projectName, value);
+          setProjectItems((prev) => {
+            const exists = prev.some((project) => project.slug === ensured.slug);
+            if (!exists) return [...prev, ensured];
+            return prev.map((project) =>
+              project.slug === ensured.slug
+                ? { ...project, ...ensured, name: value }
+                : project,
+            );
+          });
+          storeProjectDisplayName(projectName, value);
+          return;
+        }
+        await loadProjects(projectName);
+        throw error;
+      }
+    },
+    [accessToken, getDesktopApi, loadProjects, projectName],
   );
 
   const deleteProject = useCallback(
@@ -187,6 +354,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         }
         localStorage.removeItem(`projectId:${name}`);
       }
+      removeStoredProjectDisplayName(name);
       await loadProjects();
     },
     [accessToken, getDesktopApi, loadProjects]
@@ -212,13 +380,17 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const value: ProjectContextValue = {
     projects,
+    projectItems,
     projectName,
+    currentProject,
+    currentProjectDisplayName,
     setProjectName,
     loadProjects,
     isProjectsLoaded,
     projectsLoading,
     onProjectChange,
     createProject,
+    updateProjectDisplayName,
     deleteProject,
     ensureRemoteProject,
   };

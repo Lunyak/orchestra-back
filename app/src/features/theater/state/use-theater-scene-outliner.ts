@@ -104,7 +104,13 @@ export function useTheaterSceneOutliner({
   );
 
   const selectAllVisibleInEditMode = useCallback(() => {
-    if (activeTab === "spotlights") {
+    const tab =
+      activeTab === "navigate"
+        ? editMode
+        : activeTab === "view" || activeTab === "layout"
+          ? null
+          : activeTab;
+    if (tab === "spotlights") {
       const ids = visibleSpotlights.map((item) => item.id);
       if (ids.length === 0) return;
       setMultiSelectedSpotlightIds(ids);
@@ -112,7 +118,7 @@ export function useTheaterSceneOutliner({
       setDecorActionMessage(`Выбрано софитов: ${ids.length}`);
       return;
     }
-    if (activeTab === "models") {
+    if (tab === "models") {
       const ids = visibleModels
         .filter((item) => !isTheaterDecorModel(item))
         .map((item) => item.id);
@@ -123,7 +129,7 @@ export function useTheaterSceneOutliner({
       setDecorActionMessage(`Выбрано объектов: ${ids.length}`);
       return;
     }
-    if (activeTab === "decor") {
+    if (tab === "decor") {
       const ids = visibleModels
         .filter((item) => isTheaterDecorModel(item))
         .map((item) => item.id);
@@ -135,6 +141,7 @@ export function useTheaterSceneOutliner({
     }
   }, [
     activeTab,
+    editMode,
     setEditMode,
     setDecorActionMessage,
     setMultiSelectedModelIds,

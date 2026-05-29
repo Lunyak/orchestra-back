@@ -3,6 +3,8 @@
   background-color: var(--color-bg-secondary);
   width: 100%;
   max-width: var(--width-sidebar-max);
+  height: 100%;
+  min-height: 0;
 }
 
 .steps-sidebar-wrapper.mobile {
@@ -68,9 +70,8 @@
   flex-direction: column;
   gap: 12px;
   box-sizing: border-box;
-  height: 100vh;
-  height: 100dvh;
-  height: var(--app-height, 100dvh);
+  height: 100%;
+  min-height: 0;
   position: relative;
   z-index: 1;
 }
@@ -91,7 +92,8 @@
 }
 
 .script-sidebar-content {
-  height: var(--app-height, 100dvh);
+  height: 100%;
+  min-height: 0;
   width: 100%;
   max-width: 300px;
   padding: 12px;

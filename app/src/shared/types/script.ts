@@ -83,6 +83,7 @@ export interface TheaterModel {
   file?: string;
   type?: "file" | "builtin";
   builtin?:
+    | "table"
     | "roundTable"
     | "chair"
     | "sofa"

@@ -36,6 +36,7 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
   setDutyLightEnabled: (value: boolean) => void;
   setSceneBackgroundColor: (value: string) => void;
   setShowSpotlightGuideLines: (value: boolean) => void;
+  setLightConsoleExpanded: Dispatch<SetStateAction<boolean>>;
   showSpotlights: boolean;
   setShowSpotlights: (value: boolean) => void;
   showOnlyActiveSpotlight: boolean;
@@ -106,6 +107,9 @@ export function useTheaterViewPrefs(
   const [showSpotlightGuideLines, setShowSpotlightGuideLines] = useState(
     () => readTheaterViewPrefs(projectName).showSpotlightGuideLines,
   );
+  const [lightConsoleExpanded, setLightConsoleExpanded] = useState(
+    () => readTheaterViewPrefs(projectName).lightConsoleExpanded,
+  );
   const [showSpotlights, setShowSpotlights] = useState(true);
   const [showOnlyActiveSpotlight, setShowOnlyActiveSpotlight] = useState(false);
 
@@ -129,6 +133,7 @@ export function useTheaterViewPrefs(
     setDutyLightEnabled(prefs.dutyLightEnabled);
     setSceneBackgroundColor(prefs.sceneBackgroundColor);
     setShowSpotlightGuideLines(prefs.showSpotlightGuideLines);
+    setLightConsoleExpanded(prefs.lightConsoleExpanded);
     skipPersistRef.current = true;
   }, [projectName]);
 
@@ -162,6 +167,7 @@ export function useTheaterViewPrefs(
       dutyLightEnabled,
       sceneBackgroundColor,
       showSpotlightGuideLines,
+      lightConsoleExpanded,
     });
   }, [
     projectName,
@@ -185,6 +191,7 @@ export function useTheaterViewPrefs(
     dutyLightEnabled,
     sceneBackgroundColor,
     showSpotlightGuideLines,
+    lightConsoleExpanded,
   ]);
 
   return {
@@ -208,6 +215,7 @@ export function useTheaterViewPrefs(
     dutyLightEnabled,
     sceneBackgroundColor,
     showSpotlightGuideLines,
+    lightConsoleExpanded,
     setShowGrid,
     setShowStageGrid,
     setSnapToGrid,
@@ -226,6 +234,7 @@ export function useTheaterViewPrefs(
     setDutyLightEnabled,
     setSceneBackgroundColor,
     setShowSpotlightGuideLines,
+    setLightConsoleExpanded,
     showSpotlights,
     setShowSpotlights,
     showOnlyActiveSpotlight,

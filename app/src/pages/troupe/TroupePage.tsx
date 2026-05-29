@@ -70,11 +70,17 @@ export function TroupePage() {
     titleDraft,
     todayIso,
     troupe,
+    projectItems,
+    currentProjectDisplayName,
   } = useTroupePage();
 
   const projectSelectOptions = useMemo(
-    () => projects.map((slug) => ({ value: slug, label: slug })),
-    [projects],
+    () =>
+      projectItems.map((project) => ({
+        value: project.slug,
+        label: project.name || project.slug,
+      })),
+    [projectItems],
   );
 
   if (!accessToken)
@@ -144,7 +150,7 @@ export function TroupePage() {
                     {projectName ? (
                       <>
                         {" "}
-                        · проект: <b>{projectName}</b>
+                        · проект: <b>{currentProjectDisplayName}</b>
                       </>
                     ) : null}
                   </div>
@@ -248,7 +254,7 @@ export function TroupePage() {
                             : selectedMember
                               ? selectedMemberInProject
                                 ? "Этот человек уже есть в проекте"
-                                : `Добавить в проект «${projectName}»`
+                                : `Добавить в проект «${currentProjectDisplayName}»`
                               : "Выбери участника"
                         }
                       >
@@ -304,7 +310,8 @@ export function TroupePage() {
               </div>
               {selectedMember && selectedMemberInProject ? (
                 <div className="troupe-hint troupe-hint--after-form">
-                  {memberLabel(selectedMember)} уже есть в проекте «{projectName}».
+                  {memberLabel(selectedMember)} уже есть в проекте «
+                  {currentProjectDisplayName}».
                 </div>
               ) : null}
               {selectedMember && inviteErrorByMemberId[selectedMember.id] ? (
@@ -379,7 +386,7 @@ export function TroupePage() {
                   {members.length === 0 ? (
                     <div className="troupe-cell troupe-empty">
                       {projectName
-                        ? `В проекте «${projectName}» пока нет участников.`
+                        ? `В проекте «${currentProjectDisplayName}» пока нет участников.`
                         : "Нет активного проекта — выберите проект в шапке приложения."}
                     </div>
                   ) : (

@@ -25,7 +25,13 @@ export type ActorPageViewModel = ReturnType<typeof useActorPage>;
 
 export function useActorPage() {
   const { accessToken } = useAuth();
-  const { projects, projectName, onProjectChange } = useProject();
+  const {
+    projects,
+    projectItems,
+    projectName,
+    currentProjectDisplayName,
+    onProjectChange,
+  } = useProject();
   const { steps, syncFromServer, isSceneReady } = useScene();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
@@ -409,7 +415,9 @@ export function useActorPage() {
 
   return {
     projects,
+    projectItems,
     projectName,
+    currentProjectDisplayName,
     onProjectChange,
     steps,
     settingsHidden,

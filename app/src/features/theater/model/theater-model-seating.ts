@@ -70,8 +70,7 @@ export function seatHumanOnFurniture(
     metrics.seatOffsetZ * scaleZ,
     rotationY,
   );
-  const seatTopY =
-    furniture.position[1] + (metrics.seatHeight + metrics.seatThickness / 2) * scaleY;
+  const seatTopY = furniture.position[1] + metrics.seatHeight * scaleY;
   const originY = seatTopY - SITTING_HUMAN_SEAT_ANCHOR_Y * nextScale[1];
 
   return {

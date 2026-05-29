@@ -66,8 +66,12 @@
 }
 
 .script-step-title {
-  font-weight: 700;
+  width: 100%;
+  box-sizing: border-box;
   margin-bottom: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .realtime-banner {
@@ -191,6 +195,11 @@
 }
 
 .script-markdown-pane {
+  --script-markdown-line-height: 1.5;
+  --script-markdown-paragraph-gap: 0.75em;
+  --script-markdown-content-padding-x: 10px;
+  --script-markdown-content-padding-top: 8px;
+  --script-markdown-content-padding-bottom: 10px;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -205,8 +214,18 @@
 }
 
 @media (max-width: 980px) {
+  .script-markdown-pane {
+    --script-markdown-content-padding-bottom: 170px;
+  }
+
   .script-step-body {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .script-markdown-pane {
+    --script-markdown-content-padding-bottom: 200px;
   }
 }
 
@@ -276,7 +295,34 @@
   border-color: var(--color-accent-blue);
 }
 
-.script-markdown-tab[data-active="true"] {
+.script-play-original-toggle {
+  flex: 0 0 auto;
+  margin: 0 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 0;
+  background: var(--color-bg-primary);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.script-play-original-toggle:hover {
+  border-color: var(--color-accent-blue);
+  color: var(--color-text-primary);
+}
+
+.script-play-original-toggle--active {
+  border-color: var(--color-accent-blue);
+  background: rgba(0, 136, 255, 0.12);
+  color: var(--color-accent-blue);
+}
+
+.script-markdown-tab[data-active="true"],
+.script-markdown-tab--active {
   background: var(--color-bg-tertiary);
   /* border-color: var(--color-bg-tertiary); */
   color: var(--color-text-primary);
@@ -287,8 +333,59 @@
 
 }
 
+.script-markdown-tab-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  flex: 0 0 auto;
+}
+
+.script-markdown-tab-menu__chevron {
+  margin-left: 4px;
+  font-size: 9px;
+  opacity: 0.75;
+}
+
+.script-markdown-tab-options {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-primary);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.18);
+}
+
+.script-markdown-tab-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.script-markdown-tab-option:hover {
+  background: var(--color-bg-hover);
+}
+
+.script-markdown-tab-option--active {
+  color: var(--color-accent-blue);
+  background: var(--color-bg-tertiary);
+}
+
 /* @supports (background-color: color-mix(in oklab, black 50%, white)) {
-  .script-markdown-tab[data-active="true"] {
+  .script-markdown-tab[data-active="true"],
+  .script-markdown-tab--active {
     background-color:
       color-mix(in oklab, var(--color-bg-primary) 96%, black);
   }
@@ -604,17 +701,26 @@
   p {
     margin: 0;
     font-size: 14px;
-    line-height: 1.5;
+    line-height: var(--script-markdown-line-height);
   }
 
   /* Два абзаца по `\n\n` в md — два <p>; отступ заметнее, чем одиночный <br> внутри абзаца. */
   p + p {
-    margin-top: 0.75em;
+    margin-top: var(--script-markdown-paragraph-gap);
   }
 
   /* p:nth-child(2n) {
       background-color: var(--color-bg-primary);
     } */
+}
+
+.markdown-preview.markdown-preview--kadr {
+  padding:
+    var(--script-markdown-content-padding-top)
+    var(--script-markdown-content-padding-x)
+    var(--script-markdown-content-padding-bottom);
+  background: var(--color-bg-secondary);
+  box-sizing: border-box;
 }
 
 @supports (background-color: color-mix(in oklab, black 50%, white)) {
@@ -625,7 +731,7 @@
 
 .markdown-kadr {
   margin: 10px 0;
-  padding: 12px 14px 14px;
+  padding: 0;
   background: var(--color-bg-secondary);
   border: none;
   min-width: 0;
@@ -641,6 +747,10 @@
   font-size: 16px;
   line-height: 1.2;
   color: var(--color-text-bright);
+}
+
+.markdown-parenthetical-remark {
+  font-style: italic;
 }
 
 .markdown-kadr__grid {
@@ -1124,6 +1234,29 @@
   min-height: 0;
 }
 
+/* Редактирование notes / play / explication: та же колонка и прокрутка, что у .markdown-preview */
+.script-markdown-edit--kadr {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  align-items: stretch;
+}
+
+.script-markdown-edit--kadr .script-markdown-editor-split {
+  width: 100%;
+  max-width: var(--width-content-page);
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+.script-markdown-edit--kadr .script-markdown-editor-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .script-markdown-editor-split {
   flex: 1;
   min-height: 0;
@@ -1470,44 +1603,80 @@
 }
 
 .script-markdown-cm .cm-line.cm-line-para-gap {
-  padding-top: 4px;
+  padding-top: var(--script-markdown-paragraph-gap);
 }
 
 /*
- * Вкладка «Текст» (play): фон и карточки как у превью (.markdown-preview + .markdown-kadr),
- * без отдельной «плашки» редактора на --color-bg-primary.
+ * Редактор notes / play / explication: фон и карточки как у превью (.markdown-preview + .markdown-kadr),
+ * без отдельной «плашки» CodeMirror.
  */
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-editor {
-  background-color: transparent !important;
+.script-markdown-cm.script-markdown-cm--kadr-layout {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex !important;
+  flex-direction: column;
+  background-color: var(--color-bg-secondary) !important;
   border: none !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-scroller {
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-scroller {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
   background-color: transparent !important;
 }
 
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-content {
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-content {
   color: var(--color-text-primary);
+  font-family: var(--font-family-script-body);
+  padding:
+    var(--script-markdown-content-padding-top)
+    var(--script-markdown-content-padding-x)
+    var(--script-markdown-content-padding-bottom);
+  box-sizing: border-box;
 }
 
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-activeLine {
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-activeLine {
   background-color: transparent !important;
 }
 
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-md-heading-section {
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-md-heading-section {
   margin: 10px 0;
-  padding: 12px 14px 14px;
+  padding: 0;
+  background: var(--color-bg-secondary);
+  border: none;
   border-radius: 0;
+  box-sizing: border-box;
+  color: var(--color-text-primary);
+  width: 100%;
 }
 
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-content > .cm-md-heading-section:first-child {
-  padding-top: 12px;
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-line {
+  font-size: 14px;
+  line-height: var(--script-markdown-line-height);
 }
 
-.script-markdown-pane[data-markdown-mode="play"] .script-markdown-cm.script-markdown-cm--play-as-preview .cm-md-heading-section + .cm-md-heading-section {
-  padding-top: 14px;
+.script-markdown-cm .cm-md-parenthetical-remark {
+  font-style: italic;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-content > .cm-md-heading-section:first-child {
+  padding-top: 0;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-md-heading-section + .cm-md-heading-section {
+  padding-top: 0;
 }
 
 /* CodeMirror: компактные чипы вместо сырого {{…}} / [[…]] / orchestra-image */
@@ -1594,7 +1763,7 @@
   object-position: center;
 }
 
-/* Только скрыть пустой <img> буфера; размеры — как в базовой теме CM (иначе posAtCoords видит «чужие» rects). */
+/* Только скрыть служебный буфер CM; его размеры нужны самому редактору для корректной каретки. */
 .script-markdown-cm .cm-widgetBuffer {
   opacity: 0;
   pointer-events: none;
@@ -1656,7 +1825,7 @@
 
 /* ATX-заголовок в CM: маркеры скрыты виджетом, тело — как в превью (.script-content h3) */
 .script-markdown-cm .cm-md-atx-heading-slot {
-  display: inline-block;
+  display: inline;
   width: 0;
   max-width: 0;
   margin: 0;
@@ -2120,4 +2289,51 @@
       outline: none;
     }
   }
+}
+
+/* Главная (/): компактнее кадры, симметричные отступы (scrollbar-gutter с обеих сторон). */
+.main-content.show-script {
+  padding: 8px;
+  scrollbar-gutter: stable both-edges;
+}
+
+.main-content.show-script .show-script {
+  align-items: stretch;
+}
+
+.main-content.show-script .show-script,
+.main-content.show-script .script-content,
+.main-content.show-script .script-step-editor,
+.main-content.show-script .script-step-body,
+.main-content.show-script .script-step-main,
+.main-content.show-script .script-markdown-pane,
+.main-content.show-script .form-group {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.main-content.show-script .markdown-preview {
+  scrollbar-gutter: stable both-edges;
+  max-width: min(100%, var(--width-content-page));
+}
+
+.main-content.show-script .markdown-kadr {
+  margin: 2px 0;
+}
+
+.main-content.show-script .script-markdown-edit--kadr .script-markdown-editor-split {
+  max-width: min(100%, var(--width-content-page));
+}
+
+.main-content.show-script .script-markdown-cm.script-markdown-cm--kadr-layout .cm-md-heading-section {
+  margin: 2px 0;
+}
+
+.main-content.show-script .script-markdown-cm.script-markdown-cm--kadr-layout .cm-content > .cm-md-heading-section:first-child {
+  padding-top: 0;
+}
+
+.main-content.show-script .script-markdown-cm.script-markdown-cm--kadr-layout .cm-md-heading-section + .cm-md-heading-section {
+  padding-top: 0;
 }

@@ -13,6 +13,23 @@ import { formatLightChannelSlot } from "./theater-light-channel-link";
 
 export type SceneOutlinerKind = "spotlight" | "model" | "decor" | "door" | "layout";
 
+/** CSS-класс типа в духе three.js editor (#outliner .Mesh, .Light, …). */
+export function sceneOutlinerKindTypeClass(kind: SceneOutlinerKind): string {
+  switch (kind) {
+    case "spotlight":
+      return "Light";
+    case "model":
+    case "decor":
+      return "Mesh";
+    case "door":
+      return "Object3D";
+    case "layout":
+      return "Scene";
+    default:
+      return "Object3D";
+  }
+}
+
 export type SceneOutlinerItem = {
   id: number;
   kind: SceneOutlinerKind;

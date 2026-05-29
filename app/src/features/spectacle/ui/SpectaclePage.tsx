@@ -12,7 +12,6 @@ import {
   useSpectaclePage,
   type SpectaclePageViewModel,
 } from "../model/useSpectaclePage";
-import { SpectacleProjectPicker } from "./SpectacleProjectPicker";
 
 const LightPlotPage = React.lazy(() =>
   import("../../../shared/components/light-plot/LightPlotPage").then((m) => ({
@@ -54,12 +53,9 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     kanbanMembers,
     mobilePlaylistOpen,
     mobileStepsOpen,
-    onProjectChange,
     projectName,
     projects,
-    projectsLoading,
     pushSceneAfterSoundsSave,
-    registerPlaylistPlay,
     registerSoundToggle,
     reorderSteps,
     sceneData,
@@ -68,7 +64,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     setIsStepsCollapsed,
     setMobilePlaylistOpen,
     setMobileStepsOpen,
-    setTheaterMainControlsHostRef,
     setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowStepsSidebar,
@@ -77,7 +72,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     showPlaylistSidebar,
     showTheaterControls,
     steps,
-    theaterMainControlsHost,
     theaterOutlinerHost,
     theaterLayout,
     togglePanels,
@@ -97,24 +91,15 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   }
 
   if (!projectName) {
-    const showPicker = projects.length > 0;
     return (
       <div className="app-layout">
         <div className="app-content">
-          {showPicker ? (
-            <SpectacleProjectPicker
-              projects={projects}
-              projectName={projectName}
-              projectsLoading={projectsLoading}
-              onProjectChange={onProjectChange}
-            />
-          ) : null}
           <main className="main-content">
             <div className="empty-project">
               <h2>Проект не выбран</h2>
               <p>
-                {showPicker
-                  ? "Выберите проект в списке выше или в настройках."
+                {projects.length > 0
+                  ? "Выберите проект в меню «Проект» в верхней панели или в настройках."
                   : "Создайте проект в настройках или дождитесь загрузки списка."}
               </p>
               <button
@@ -145,9 +130,10 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     );
   }
 
+  const forceHidePlaylistPanel = isTheaterView && shouldSwapPanels;
   const playlistNode = !compactMainChrome ? (
     <div
-      className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobilePlaylistOpen ? "open" : ""} ${(!isMobile && !showPlaylistSidebar) || (isMobile && !mobilePlaylistOpen) ? "hidden" : ""}`}
+      className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobilePlaylistOpen ? "open" : ""} ${forceHidePlaylistPanel || (!isMobile && !showPlaylistSidebar) || (isMobile && !mobilePlaylistOpen) ? "hidden" : ""}`}
     >
       {isMobile && (
         <button
@@ -161,17 +147,9 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       <PlaylistSidebar
         projectName={projectDisplay}
         sceneName="script"
-        onRegisterPlayHandler={registerPlaylistPlay}
+        mode="list"
       />
     </div>
-  ) : null;
-
-  const theaterMainControlsNode = isTheaterView ? (
-    <aside
-      ref={setTheaterMainControlsHostRef}
-      className="theater-settings-sidebar theater-settings-sidebar--left"
-      aria-label="Настройки 3D-театра"
-    />
   ) : null;
 
   const theaterOutlinerNode = isTheaterView ? (
@@ -226,22 +204,12 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     <div className="app-layout">
       {isTheaterView ? (
         <>
-          {(isMobile ? mobilePlaylistOpen : showPlaylistSidebar) &&
-          !shouldSwapPanels ? (
-            playlistNode
-          ) : null}
-          {showTheaterSettingsPanel ? theaterMainControlsNode : null}
+          {playlistNode}
         </>
       ) : (
         playlistNode
       )}
       <div className="app-content">
-        <SpectacleProjectPicker
-          projects={projects}
-          projectName={projectName}
-          projectsLoading={projectsLoading}
-          onProjectChange={onProjectChange}
-        />
         <OfflinePackStatus />
         {showHeaderSounds && !compactMainChrome && !isMobile && (
           <div className="sounds-bar">
@@ -269,9 +237,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
                 onTheaterLayoutChange={setTheaterLayout}
                 isPanelsSwapped={shouldSwapPanels}
                 onTogglePanels={togglePanels}
-                mainControlsHost={
-                  showTheaterSettingsPanel ? theaterMainControlsHost : null
-                }
                 outlinerHost={
                   showTheaterSettingsPanel ? theaterOutlinerHost : null
                 }

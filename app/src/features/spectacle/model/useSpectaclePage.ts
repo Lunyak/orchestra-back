@@ -111,12 +111,6 @@ export function useSpectaclePage() {
     };
   }, [isMobile, mobilePlaylistOpen, mobileStepsOpen]);
 
-  const [theaterMainControlsHost, setTheaterMainControlsHost] =
-    useState<HTMLDivElement | null>(null);
-  const setTheaterMainControlsHostRef = useCallback((node: HTMLDivElement | null) => {
-    setTheaterMainControlsHost(node);
-  }, []);
-
   const [theaterOutlinerHost, setTheaterOutlinerHost] =
     useState<HTMLDivElement | null>(null);
   const setTheaterOutlinerHostRef = useCallback((node: HTMLDivElement | null) => {
@@ -204,7 +198,6 @@ export function useSpectaclePage() {
     setIsStepsCollapsed,
     setMobilePlaylistOpen,
     setMobileStepsOpen,
-    setTheaterMainControlsHostRef,
     setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowStepsSidebar,
@@ -213,7 +206,6 @@ export function useSpectaclePage() {
     showPlaylistSidebar,
     showTheaterControls,
     steps,
-    theaterMainControlsHost,
     theaterOutlinerHost,
     theaterLayout,
     togglePanels: togglePanelsWithPersist,

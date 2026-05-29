@@ -9,6 +9,7 @@ import type {
 import { zoneOutlineFromBand } from "./theater-zone-grid";
 import { resolveLayoutZones } from "./theater-zones";
 import { resolveLayoutDoors } from "./theater-doors";
+import { getFurnitureBounds } from "./theater-furniture-metrics";
 import { getChairMetrics } from "./theater-metrics";
 import { resolveSpotlightWashLineZ } from "./spotlight-batch-layout";
 import {
@@ -356,6 +357,13 @@ function resolveModelFootprint(model: TheaterModel): {
     return {
       halfW: (chair.width / 2) * model.scale[0],
       halfD: (chair.depth / 2) * model.scale[2],
+    };
+  }
+  if (model.builtin === "table" || model.builtin === "roundTable") {
+    const [width, , depth] = getFurnitureBounds(model.builtin);
+    return {
+      halfW: (width / 2) * model.scale[0],
+      halfD: (depth / 2) * model.scale[2],
     };
   }
   const scaleW = 0.5 * model.scale[0];

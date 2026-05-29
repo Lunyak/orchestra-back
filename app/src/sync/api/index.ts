@@ -25,6 +25,7 @@ export {
   inviteToProject,
   removeProjectMember,
   setProjectRoleAssignments,
+  updateProject,
   updateProjectMemberRole,
   updateProjectRole,
   type ProjectMemberInfo,

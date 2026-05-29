@@ -14,14 +14,15 @@ export function buildProjectAssetUrl(
   projectName: string,
   relativePath: string,
 ): string {
+  const slug = String(projectName ?? "").trim() || "_";
   const normalized = relativePath.replace(/\\/g, "/").replace(/^\/+/, "");
   const encodedPath = normalized
     .split("/")
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join("/");
-  const projectId = readProjectIdFromStorage(projectName);
-  const baseUrl = new URL(`${scheme}://${encodeURIComponent(projectName)}/`);
+  const projectId = readProjectIdFromStorage(String(projectName ?? "").trim());
+  const baseUrl = new URL(`${scheme}://${encodeURIComponent(slug)}/`);
   baseUrl.pathname = projectId
     ? `/${encodeURIComponent(projectId)}/${encodedPath}`
     : `/${encodedPath}`;

@@ -678,6 +678,7 @@ export function ScriptMarkdownPreview({
   activeAnnotationId,
   setActiveAnnotationId,
   readModeActivateEdit,
+  showStepTitle = true,
 }: {
   projectName: string;
   sceneName?: string;
@@ -692,6 +693,7 @@ export function ScriptMarkdownPreview({
   setActiveAnnotationId: React.Dispatch<React.SetStateAction<string | null>>;
   /** Режим чтения: клик по тексту (не по кнопкам/ссылкам) включает редактирование. */
   readModeActivateEdit?: () => void;
+  showStepTitle?: boolean;
 }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -1203,7 +1205,9 @@ export function ScriptMarkdownPreview({
         onPointerDownCapture={readModeActivateEdit ? onReadModePointerDown : undefined}
         onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
       >
-        <div className="script-step-title">{currentStep?.title}</div>
+        {showStepTitle && currentStep?.title ? (
+          <div className="script-step-title">{currentStep.title}</div>
+        ) : null}
         <MarkdownPreviewImageContext.Provider value={markdownPreviewImageCtx}>
         <ReactMarkdown
           urlTransform={urlTransform}

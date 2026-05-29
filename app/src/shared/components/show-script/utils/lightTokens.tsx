@@ -99,6 +99,35 @@ function renderLightChip(label: string, color: string | null, key: string) {
   );
 }
 
+function renderParentheticalRemarks(text: string, keyPrefix: string): React.ReactNode[] {
+  const pattern = /\([^()\n]+\)/g;
+  const result: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let counter = 0;
+
+  while ((match = pattern.exec(text)) !== null) {
+    const raw = match[0];
+    const start = match.index;
+    if (start > lastIndex) {
+      result.push(text.slice(lastIndex, start));
+    }
+    result.push(
+      <em key={`${keyPrefix}-remark-${counter}`} className="markdown-parenthetical-remark">
+        {raw}
+      </em>,
+    );
+    counter += 1;
+    lastIndex = start + raw.length;
+  }
+
+  if (lastIndex < text.length) {
+    result.push(text.slice(lastIndex));
+  }
+
+  return result;
+}
+
 export function createRenderLightTokens(lightChannels: string[]) {
   return function renderLightTokens(
     node: React.ReactNode,
@@ -115,7 +144,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
         const [raw, , rawType, rawIndex, rawColor, , rawLabel] = match;
         const start = match.index;
         if (start > lastIndex) {
-          result.push(node.slice(lastIndex, start));
+          result.push(...renderParentheticalRemarks(node.slice(lastIndex, start), `${keyPrefix}-${counter}-pre`));
         }
         if (rawLabel != null) {
           const normalized = String(rawLabel).trim();
@@ -187,7 +216,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
         lastIndex = start + raw.length;
       }
       if (lastIndex < node.length) {
-        result.push(node.slice(lastIndex));
+        result.push(...renderParentheticalRemarks(node.slice(lastIndex), `${keyPrefix}-${counter}-tail`));
       }
       return result;
     }
@@ -196,6 +225,7 @@ export function createRenderLightTokens(lightChannels: string[]) {
     }
     if (React.isValidElement(node)) {
       if (node.type === "code" || node.type === "pre") return node;
+      if (node.type === "em") return node;
       if (node.props?.children == null) return node;
       return React.cloneElement(
         node,
