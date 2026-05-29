@@ -16,6 +16,7 @@ import { FileModelInstanceLoader } from "../three/FileModelInstanceLoader";
 import { TheaterOrbitControls } from "../three/TheaterOrbitControls";
 import type { TheaterCameraState } from "../../model/theater-camera-storage";
 import type { SceneOutlinerKind } from "../../model/theater-scene-outliner";
+import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
 
 export type TheaterCanvasContentProps = {
   projectName: string;
@@ -37,7 +38,7 @@ export type TheaterCanvasContentProps = {
   alignGuidesEnabled: boolean;
   activeAlignGuides: ActiveAlignGuide[];
   onAlignGuidesChange: (guides: ActiveAlignGuide[]) => void;
-  activeTab: "spotlights" | "models" | "view" | "layout" | "decor";
+  activeTab: TheaterViewPrefs["activeTab"];
   editMode: "spotlights" | "models" | "decor";
   decorPlaceMode: boolean;
   isDragging: boolean;

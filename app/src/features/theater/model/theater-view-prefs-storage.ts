@@ -91,7 +91,7 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
   try {
     const raw = localStorage.getItem(theaterViewPrefsStorageKey(projectName));
     if (!raw) return DEFAULT_THEATER_VIEW_PREFS;
-    const parsed = JSON.parse(raw) as Partial<TheaterViewPrefs>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
       showGrid: readBool(parsed.showGrid, DEFAULT_THEATER_VIEW_PREFS.showGrid),
       showStageGrid: readBool(

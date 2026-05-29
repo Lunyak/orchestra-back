@@ -1,4 +1,5 @@
 import type { TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../../shared/types/script";
+import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
 
 export type TheaterFloorPlanProps = {
   layout: TheaterLayout;
@@ -9,7 +10,7 @@ export type TheaterFloorPlanProps = {
   showSpotlightGuideLines: boolean;
   expanded: boolean;
   onToggleExpanded: () => void;
-  activeTab: "spotlights" | "models" | "view" | "decor" | "layout";
+  activeTab: TheaterViewPrefs["activeTab"];
   editMode: "spotlights" | "models" | "decor";
   decorPlaceMode: boolean;
   modelTransformMode: "translate" | "rotate" | "scale";

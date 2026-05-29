@@ -12,6 +12,7 @@ import {
   footprintToRect,
 } from "./theater-floor-plan-svg-utils";
 import type { TheaterFloorPlanGeometry } from "./use-theater-floor-plan-geometry";
+import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
 
 export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
   svgRef: RefObject<SVGSVGElement | null>;
@@ -35,7 +36,7 @@ export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
   canPlaceDecor: boolean;
   canDrawOutline: boolean;
   spotlightAimMode: "point" | "cell";
-  activeTab: "spotlights" | "models" | "view" | "decor" | "layout";
+  activeTab: TheaterViewPrefs["activeTab"];
   onSelectSpotlight: (
     id: number,
     additive?: boolean,
