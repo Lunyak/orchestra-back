@@ -1,6 +1,7 @@
-import { useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
+import { setPlayerDockHidden } from "../../player/player-prefs";
+import { usePlayerDockHidden } from "../../player/usePlayerDockHidden";
 import type { PlaylistTrack } from "../../types/playlist";
 
 type PlaylistBottomControlsProps = {
@@ -42,23 +43,10 @@ export function PlaylistBottomControls({
   onVolumeChange,
   formatTime,
 }: PlaylistBottomControlsProps) {
-  const [hidden, setHidden] = useState(false);
+  const { playerDockHidden } = usePlayerDockHidden();
 
   if (typeof document === "undefined") return null;
-  if (hidden) {
-    return createPortal(
-      <button
-        type="button"
-        className="playlist-bottom-player-reveal"
-        onClick={() => setHidden(false)}
-        aria-label="Показать проигрыватель"
-        title="Показать проигрыватель"
-      >
-        <span className="playlist-bottom-player__play-icon" aria-hidden />
-      </button>,
-      document.body,
-    );
-  }
+  if (playerDockHidden) return null;
 
   return createPortal(
     <div className="playlist-bottom-player" aria-label="Управление проигрывателем">
@@ -173,7 +161,7 @@ export function PlaylistBottomControls({
         <button
           type="button"
           className="playlist-bottom-player__hide"
-          onClick={() => setHidden(true)}
+          onClick={() => setPlayerDockHidden(true)}
           aria-label="Скрыть проигрыватель"
           title="Скрыть проигрыватель"
         >

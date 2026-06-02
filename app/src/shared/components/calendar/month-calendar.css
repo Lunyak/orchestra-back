@@ -92,8 +92,8 @@
   border-radius: 0;
   border: none;
   margin: 0;
-  padding: 6px 4px 18px;
-  min-height: 48px;
+  padding: 5px 3px 4px;
+  min-height: 72px;
   background: var(--month-cal-surface);
   color: inherit;
   cursor: pointer;
@@ -192,4 +192,60 @@
   position: absolute;
   bottom: 3px;
   line-height: 1;
+}
+
+.month-cal__events {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.month-cal__event {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  padding: 2px 3px;
+  border-left: 2px solid rgba(136, 136, 136, 0.65);
+  background: rgba(0, 0, 0, 0.22);
+  text-align: left;
+  line-height: 1.15;
+  pointer-events: none;
+}
+
+.month-cal__event--published {
+  border-left-color: #08f;
+  background: rgba(0, 136, 255, 0.14);
+}
+
+.month-cal__event-time {
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.month-cal__event-title {
+  font-size: 9px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.82;
+}
+
+.month-cal__event-more {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.65;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.month-cal__cell--selected .month-cal__event--published {
+  background: rgba(0, 136, 255, 0.22);
 }

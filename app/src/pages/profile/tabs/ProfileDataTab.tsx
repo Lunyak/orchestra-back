@@ -1,5 +1,6 @@
 import { Button } from "@shared/core/button/Button";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
+import { MiniAvatar } from "@shared/core/mini-avatar/MiniAvatar";
 import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../../../features/auth";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
@@ -83,196 +84,221 @@ export function ProfileDataTab() {
     };
   }, [accessToken, dispatch, flags.saving, mainFormSignature, profile?.email]);
 
-  if (!accessToken) return <div>Нужно войти, чтобы редактировать профиль.</div>;
+  const avatarUrl = String((form as any).avatarUrl ?? "").trim();
+  const avatarLabel = useMemo(() => {
+    const display = String((form as any).displayName ?? "").trim();
+    if (display) return display;
+    const full = [String((form as any).firstName ?? "").trim(), String((form as any).lastName ?? "").trim()]
+      .filter(Boolean)
+      .join(" ");
+    if (full) return full;
+    return String(profile?.email ?? "Профиль");
+  }, [form, profile?.email]);
+
+  if (!accessToken) {
+    return <div className="profile-tab-page profile-hint">Нужно войти, чтобы редактировать профиль.</div>;
+  }
 
   return (
-    <div className="profile-form">
-      <p className="profile-subtitle">
-        Email: <b>{profile?.email ?? "—"}</b>
+    <div className="profile-tab-page">
+      <div className="profile-tab-main">
+        <div className="profile-tab-head">
+          <div className="profile-tab-title">Данные профиля</div>
+          {flags.saving ? (
+            <div className="profile-save-hint">Автосохранение…</div>
+          ) : flags.ok ? (
+            <div className="profile-save-hint profile-save-hint--ok">{flags.ok}</div>
+          ) : null}
+        </div>
+
+        <p className="profile-hint profile-tab-lead">
+        Имя, Telegram и аватар сохраняются автоматически примерно через секунду после правки. Email привязан к
+        аккаунту и не редактируется здесь.
       </p>
-      <p style={{ fontSize: 12, opacity: 0.72, marginTop: 4, marginBottom: 12 }}>
-        Имя, Telegram и ссылка на аватар сохраняются автоматически примерно через секунду после правки. При
-        ошибке сохранения сообщение появится ниже.
-      </p>
 
-      <label>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>Отображаемое имя</div>
-        <InlineTextField
-          value={String((form as any).displayName ?? "")}
-          onChange={(e) =>
-            dispatch(
-              profileDataActions.setProfileFormField({
-                key: "displayName",
-                value: e.target.value,
-              }),
-            )
-          }
-          placeholder="например: Сергей"
-        />
-      </label>
-
-      <div className="profile-form-row">
-        <label>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Имя</div>
-          <InlineTextField
-            value={String((form as any).firstName ?? "")}
-            onChange={(e) =>
-              dispatch(profileDataActions.setProfileFormField({ key: "firstName", value: e.target.value }))
-            }
-          />
-        </label>
-        <label>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Фамилия</div>
-          <InlineTextField
-            value={String((form as any).lastName ?? "")}
-            onChange={(e) =>
-              dispatch(profileDataActions.setProfileFormField({ key: "lastName", value: e.target.value }))
-            }
-          />
-        </label>
-      </div>
-
-      <div className="profile-form-row">
-        <label>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Telegram username</div>
-          <InlineTextField
-            value={String((form as any).telegramUsername ?? "")}
-            onChange={(e) =>
-              dispatch(
-                profileDataActions.setProfileFormField({
-                  key: "telegramUsername",
-                  value: e.target.value,
-                }),
-              )
-            }
-            placeholder="@username"
-          />
-        </label>
-        <label>
-          <div style={{ fontSize: 12, opacity: 0.7 }}>Telegram id</div>
-          <InlineTextField
-            value={String((form as any).telegramId ?? "")}
-            onChange={(e) =>
-              dispatch(profileDataActions.setProfileFormField({ key: "telegramId", value: e.target.value }))
-            }
-            placeholder="123456789"
-          />
-        </label>
-      </div>
-
-      <label>
-        <div style={{ fontSize: 12, opacity: 0.7 }}>Avatar URL</div>
-        <InlineTextField
-          value={String((form as any).avatarUrl ?? "")}
-          onChange={(e) =>
-            dispatch(profileDataActions.setProfileFormField({ key: "avatarUrl", value: e.target.value }))
-          }
-          placeholder="https://..."
-        />
-      </label>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
-        <input
-          ref={avatarInputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          style={{ display: "none" }}
-          onChange={async (e) => {
-            const f = e.target.files?.[0] ?? null;
-            if (!f || !accessToken) return;
-            dispatch(profileDataActions.clearProfileMessages());
-            await dispatch(uploadAvatarThunk({ accessToken, file: f }));
-            try {
-              if (avatarInputRef.current) avatarInputRef.current.value = "";
-            } catch {}
-          }}
-        />
-        <Button
-          className="primary"
-          type="button"
-          disabled={!accessToken || flags.avatarUploading}
-          onClick={() => avatarInputRef.current?.click()}
-        >
-          {flags.avatarUploading ? "Загрузка…" : "Загрузить аватар"}
-        </Button>
-        {String((form as any).avatarUrl ?? "").trim() ? (
-          <Button
-            className="danger"
-            type="button"
-            disabled={flags.avatarUploading}
-            onClick={() =>
-              dispatch(profileDataActions.setProfileFormField({ key: "avatarUrl", value: "" }))
-            }
-            title="Удалить ссылку на аватар (файл в хранилище останется)"
-          >
-            Убрать аватар
-          </Button>
-        ) : null}
-      </div>
-
-      {String((form as any).avatarUrl ?? "").trim() ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
-          <img
-            src={String((form as any).avatarUrl ?? "").trim()}
-            alt="avatar preview"
-            style={{
-              width: 44,
-              height: 44,
-              objectFit: "cover",
-              border: "1px solid var(--color-border-strong)",
-              background: "var(--color-bg-transparent-4)",
-            }}
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              try {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              } catch {}
-            }}
-          />
-          <div style={{ fontSize: 12, opacity: 0.75, lineHeight: "14px" }}>
-            Мини‑аватар будет показываться рядом с вашим именем в списках (труппа, роли, сессии).
+      <div className="profile-panel profile-data">
+        <div className="profile-data-hero">
+          <MiniAvatar src={avatarUrl || null} label={avatarLabel} size={72} title={avatarLabel} />
+          <div className="profile-data-hero__body">
+            <div className="profile-data-hero__name">{avatarLabel}</div>
+            <div className="profile-data-hero__email">{profile?.email ?? "—"}</div>
+            <div className="profile-data-hero__actions">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="profile-avatar-input"
+                onChange={async (e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (!f || !accessToken) return;
+                  dispatch(profileDataActions.clearProfileMessages());
+                  await dispatch(uploadAvatarThunk({ accessToken, file: f }));
+                  try {
+                    if (avatarInputRef.current) avatarInputRef.current.value = "";
+                  } catch {}
+                }}
+              />
+              <Button
+                type="button"
+                className="secondary"
+                disabled={!accessToken || flags.avatarUploading}
+                onClick={() => avatarInputRef.current?.click()}
+              >
+                {flags.avatarUploading ? "Загрузка…" : "Загрузить фото"}
+              </Button>
+              {avatarUrl ? (
+                <Button
+                  className="danger"
+                  type="button"
+                  disabled={flags.avatarUploading}
+                  onClick={() =>
+                    dispatch(profileDataActions.setProfileFormField({ key: "avatarUrl", value: "" }))
+                  }
+                  title="Удалить ссылку на аватар (файл в хранилище останется)"
+                >
+                  Убрать
+                </Button>
+              ) : null}
+            </div>
+            <p className="profile-hint profile-data-hero__hint">
+              Мини‑аватар показывается рядом с именем в списках труппы, ролей и сессий.
+            </p>
           </div>
         </div>
-      ) : null}
 
-      {flags.error ? <div className="settings-invite-error">{flags.error}</div> : null}
-      {flags.ok ? <div style={{ color: "var(--color-status-success-bright)", fontSize: 13 }}>{flags.ok}</div> : null}
+        <div className="profile-data-sections profile-form">
+          <section className="profile-data-section">
+            <h3 className="profile-data-section__title">Как вас видят</h3>
+            <label className="profile-field">
+              <span className="profile-field__label">Отображаемое имя</span>
+              <InlineTextField
+                value={String((form as any).displayName ?? "")}
+                onChange={(e) =>
+                  dispatch(
+                    profileDataActions.setProfileFormField({
+                      key: "displayName",
+                      value: e.target.value,
+                    }),
+                  )
+                }
+                placeholder="например: Сергей"
+              />
+            </label>
+          </section>
 
-      <div className="profile-legal-links">
-        Документы:{" "}
-        <a href="/terms" target="_blank" rel="noreferrer">
-          Пользовательское соглашение
-        </a>{" "}
-        ·{" "}
-        <a href="/privacy" target="_blank" rel="noreferrer">
-          Политика обработки персональных данных
-        </a>
+          <section className="profile-data-section">
+            <h3 className="profile-data-section__title">Имя и фамилия</h3>
+            <div className="profile-form-row">
+              <label className="profile-field">
+                <span className="profile-field__label">Имя</span>
+                <InlineTextField
+                  value={String((form as any).firstName ?? "")}
+                  onChange={(e) =>
+                    dispatch(profileDataActions.setProfileFormField({ key: "firstName", value: e.target.value }))
+                  }
+                />
+              </label>
+              <label className="profile-field">
+                <span className="profile-field__label">Фамилия</span>
+                <InlineTextField
+                  value={String((form as any).lastName ?? "")}
+                  onChange={(e) =>
+                    dispatch(profileDataActions.setProfileFormField({ key: "lastName", value: e.target.value }))
+                  }
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="profile-data-section">
+            <h3 className="profile-data-section__title">Telegram</h3>
+            <div className="profile-form-row">
+              <label className="profile-field">
+                <span className="profile-field__label">Username</span>
+                <InlineTextField
+                  value={String((form as any).telegramUsername ?? "")}
+                  onChange={(e) =>
+                    dispatch(
+                      profileDataActions.setProfileFormField({
+                        key: "telegramUsername",
+                        value: e.target.value,
+                      }),
+                    )
+                  }
+                  placeholder="@username"
+                />
+              </label>
+              <label className="profile-field">
+                <span className="profile-field__label">ID</span>
+                <InlineTextField
+                  value={String((form as any).telegramId ?? "")}
+                  onChange={(e) =>
+                    dispatch(profileDataActions.setProfileFormField({ key: "telegramId", value: e.target.value }))
+                  }
+                  placeholder="123456789"
+                />
+              </label>
+            </div>
+          </section>
+
+          <details className="profile-data-advanced">
+            <summary className="profile-data-advanced__summary">Ссылка на аватар (URL)</summary>
+            <label className="profile-field">
+              <span className="profile-field__label">Avatar URL</span>
+              <InlineTextField
+                value={String((form as any).avatarUrl ?? "")}
+                onChange={(e) =>
+                  dispatch(profileDataActions.setProfileFormField({ key: "avatarUrl", value: e.target.value }))
+                }
+                placeholder="https://..."
+              />
+            </label>
+          </details>
+        </div>
+
+        {flags.error ? <div className="settings-invite-error profile-data__error">{flags.error}</div> : null}
       </div>
 
-      <div className="profile-danger-zone">
-        <div className="profile-danger-title">Опасная зона</div>
-        <div className="profile-danger-text">
-          Удаление профиля очистит данные профиля (имя, ник, телефон, аватар, календарь доступности). Аккаунт
-          останется, и вы сможете заполнить профиль заново.
-        </div>
-        <button
-          type="button"
-          className="profile-danger-btn"
-          disabled={!accessToken || flags.deletingProfile}
-          onClick={async () => {
-            if (!accessToken) return;
-            const okConfirm = window.confirm(
-              "Удалить данные профиля? Это очистит ник/имя/телефон/аватар/календарь. Аккаунт останется.",
-            );
-            if (!okConfirm) return;
-            dispatch(profileDataActions.clearProfileMessages());
-            await dispatch(deleteProfileDataThunk({ accessToken }));
-          }}
-        >
-          {flags.deletingProfile ? "Удаление…" : "Удалить данные профиля"}
-        </button>
+        <footer className="profile-data-footer">
+          <div className="profile-legal-links">
+            Документы:{" "}
+            <a href="/terms" target="_blank" rel="noreferrer">
+              Пользовательское соглашение
+            </a>{" "}
+            ·{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer">
+              Политика обработки персональных данных
+            </a>
+          </div>
+          <div className="profile-data-deletion">
+            <p className="profile-hint profile-data-deletion__text">
+              Вы вправе потребовать удаления персональных данных в профиле (имя, контакты, аватар, календарь
+              занятости) без удаления учётной записи — после этого профиль можно заполнить заново. Порядок и
+              основания — в{" "}
+              <a href="/privacy" target="_blank" rel="noreferrer">
+                политике обработки персональных данных
+              </a>
+              .
+            </p>
+            <button
+              type="button"
+              className="profile-data-deletion__action"
+              disabled={!accessToken || flags.deletingProfile}
+              onClick={async () => {
+                if (!accessToken) return;
+                const okConfirm = window.confirm(
+                  "Удалить персональные данные профиля (имя, контакты, аватар, календарь занятости)? Учётная запись сохранится.",
+                );
+                if (!okConfirm) return;
+                dispatch(profileDataActions.clearProfileMessages());
+                await dispatch(deleteProfileDataThunk({ accessToken }));
+              }}
+            >
+              {flags.deletingProfile ? "Удаление…" : "Удалить данные профиля"}
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );
 }
-

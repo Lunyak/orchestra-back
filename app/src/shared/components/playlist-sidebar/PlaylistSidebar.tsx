@@ -15,6 +15,7 @@ import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
 import { Buttons } from "../buttons/Buttons";
 import { ListItem } from "../list-item/ListItem";
+import { usePlayerVolume } from "../../player/usePlayerVolume";
 import { PlaylistBottomControls } from "./PlaylistBottomControls";
 import "./style.css";
 
@@ -103,7 +104,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const [editingTitle, setEditingTitle] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(0.8);
+  const { volume, setVolume } = usePlayerVolume();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);

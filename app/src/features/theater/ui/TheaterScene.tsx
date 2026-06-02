@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAppEditorViewMenuRender } from "@shared/components/app-editor-menubar";
-import { useTheaterScene } from "../model/use-theater-scene";
+import { useTheaterScene, type TheaterSceneViewModel } from "../model/use-theater-scene";
 import type { TheaterSceneProps } from "../model/theater-scene-types";
 import { useStageGridHighlight } from "../scene/use-stage-grid-highlight";
 import {
@@ -48,8 +48,9 @@ export const TheaterScene = ({
 
   const isModelEditMode = vm.editMode === "models" || vm.editMode === "decor";
   const showEditorHelpers = !vm.spectaclePreviewMode;
-
-  const showEditorChrome = controlsInPanel && vm.showControls;
+  const mobileTheaterLayout = useMobileTheaterLayout();
+  const controlsInSidebar = Boolean(controlsInPanel);
+  const showEditorChrome = controlsInSidebar && vm.showControls && !mobileTheaterLayout;
 
   useAppEditorViewMenuRender(
     "theater-view-menu",
@@ -62,11 +63,11 @@ export const TheaterScene = ({
   ) : null;
 
   const sidebarRender =
-    controlsInPanel && outlinerHost
+    controlsInSidebar && outlinerHost
       ? createPortal(
           <TheaterControls
             vm={vm}
-            controlsInPanel
+            controlsInPanel={controlsInSidebar}
             panel="sidebar"
           />,
           outlinerHost,
@@ -238,6 +239,7 @@ export const TheaterScene = ({
       className={[
         "theater-scene",
         showEditorChrome ? "theater-scene--editor-chrome" : "",
+        mobileTheaterLayout ? "theater-scene--mobile-layout" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -268,6 +270,13 @@ export const TheaterScene = ({
           </TheaterBtn>
         </div>
       )}
+      {mobileTheaterLayout && controlsInSidebar && !vm.showControls ? (
+        <div className="theater-mobile-open-panel">
+          <TheaterBtn active={false} onClick={() => vm.setShowControls(true)}>
+            Панель
+          </TheaterBtn>
+        </div>
+      ) : null}
       {showSpotlightFocusPanel && spotlightFocusPanelProps ? (
         <TheaterSpotlightFocusPanel {...spotlightFocusPanelProps} />
       ) : null}
@@ -353,6 +362,11 @@ export const TheaterScene = ({
         updateSpotlights={vm.updateSpotlights}
         collapsed={!vm.lightConsoleExpanded}
       />
+      <TheaterMobileActionBar
+        vm={vm}
+        onTogglePanels={onTogglePanels}
+        isPanelsSwapped={isPanelsSwapped}
+      />
       <TheaterCanvasShell
         camera={initialCamera}
         backgroundColor={vm.sceneBackgroundColor}
@@ -436,3 +450,341 @@ export const TheaterScene = ({
     </div>
   );
 };
+
+function useMobileTheaterLayout() {
+  const readMobile = () => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(max-width: 1024px)").matches ||
+      window.matchMedia("(pointer: coarse)").matches
+    );
+  };
+
+  const [mobile, setMobile] = useState(readMobile);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 1024px)");
+    const pointer = window.matchMedia("(pointer: coarse)");
+    const update = () => setMobile(readMobile());
+    update();
+    media.addEventListener("change", update);
+    pointer.addEventListener("change", update);
+    window.addEventListener("resize", update);
+    return () => {
+      media.removeEventListener("change", update);
+      pointer.removeEventListener("change", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return mobile;
+}
+
+type TheaterMobileSheet = "view" | "objects" | "scene" | "save";
+
+type TheaterMobileActionBarProps = {
+  vm: TheaterSceneViewModel;
+  onTogglePanels?: () => void;
+  isPanelsSwapped?: boolean;
+};
+
+function theaterMobileSaveKey(projectName: string) {
+  return `orchestra-theater-mobile-save:${projectName || "default"}`;
+}
+
+function slugifyTheaterFilename(value: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9а-яё]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return slug || "theater";
+}
+
+function buildTheaterMobileSnapshot(vm: TheaterSceneViewModel) {
+  return {
+    version: 1,
+    savedAt: new Date().toISOString(),
+    projectName: vm.projectName,
+    step: vm.currentStep
+      ? {
+          id: vm.currentStep.id,
+          title: vm.currentStep.title,
+          page: vm.currentPage,
+        }
+      : null,
+    layout: vm.layout,
+    spotlights: vm.displaySpotlights,
+    models: vm.models,
+    active: {
+      tab: vm.activeTab,
+      modelId: vm.activeModelId ?? null,
+      spotlightId: vm.activeSpotlightId ?? null,
+    },
+    view: {
+      showGrid: vm.showGrid,
+      showStageGrid: vm.showStageGrid,
+      showSeats: vm.showSeats,
+      showFloorPlan: vm.showFloorPlan,
+      floorPlanExpanded: vm.floorPlanExpanded,
+      wallsHidden: vm.wallsHidden,
+      wallsOpaque: vm.wallsOpaque,
+      spectaclePreviewMode: vm.spectaclePreviewMode,
+    },
+  };
+}
+
+function serializeTheaterMobileSnapshot(vm: TheaterSceneViewModel) {
+  return JSON.stringify(buildTheaterMobileSnapshot(vm), null, 2);
+}
+
+function downloadTheaterMobileSnapshot(vm: TheaterSceneViewModel) {
+  const text = serializeTheaterMobileSnapshot(vm);
+  const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const title = vm.currentStep?.title?.trim() || vm.projectName;
+  anchor.href = url;
+  anchor.download = `${slugifyTheaterFilename(title)}-theater.json`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function TheaterMobileActionBar({
+  vm,
+  onTogglePanels,
+  isPanelsSwapped,
+}: TheaterMobileActionBarProps) {
+  const [sheet, setSheet] = useState<TheaterMobileSheet | null>(null);
+  const [saveMessage, setSaveMessage] = useState("Автосохранение активно");
+
+  const selectedTitle = useMemo(() => {
+    if (vm.activeModel) return vm.activeModel.name;
+    if (vm.activeSpotlight) return vm.activeSpotlight.label;
+    return vm.currentStep?.title || "Театр";
+  }, [vm.activeModel, vm.activeSpotlight, vm.currentStep?.title]);
+
+  const openSheet = (next: TheaterMobileSheet) => {
+    setSheet((current) => (current === next ? null : next));
+  };
+
+  const saveLocalSnapshot = () => {
+    try {
+      localStorage.setItem(
+        theaterMobileSaveKey(vm.projectName),
+        serializeTheaterMobileSnapshot(vm),
+      );
+      setSaveMessage("Снимок театра сохранён на устройстве");
+    } catch {
+      setSaveMessage("Не удалось сохранить на устройстве");
+    }
+  };
+
+  const copySnapshotJson = async () => {
+    try {
+      await navigator.clipboard.writeText(serializeTheaterMobileSnapshot(vm));
+      setSaveMessage("JSON театра скопирован");
+    } catch {
+      setSaveMessage("Не удалось скопировать JSON");
+    }
+  };
+
+  const downloadSnapshotJson = () => {
+    try {
+      downloadTheaterMobileSnapshot(vm);
+      setSaveMessage("JSON театра сохранён файлом");
+    } catch {
+      setSaveMessage("Не удалось сохранить файл");
+    }
+  };
+
+  return (
+    <div className="theater-mobile-actions" aria-label="Мобильные действия театра">
+      <div className="theater-mobile-actions__status">
+        <span>{selectedTitle}</span>
+        <strong>{saveMessage}</strong>
+      </div>
+      {sheet ? (
+        <section className="theater-mobile-sheet" aria-label="Быстрые действия">
+          <header className="theater-mobile-sheet__header">
+            <strong>
+              {sheet === "view"
+                ? "Вид"
+                : sheet === "objects"
+                  ? "Объекты"
+                  : sheet === "scene"
+                    ? "Сцена"
+                    : "Сохранить театр"}
+            </strong>
+            <button type="button" onClick={() => setSheet(null)}>
+              Закрыть
+            </button>
+          </header>
+          {sheet === "view" ? (
+            <div className="theater-mobile-sheet__grid">
+              <MobileActionButton
+                active={vm.showFloorPlan}
+                onClick={() => vm.setShowFloorPlan(!vm.showFloorPlan)}
+              >
+                2D план
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.showSeats}
+                onClick={() => vm.setShowSeats(!vm.showSeats)}
+              >
+                Кресла
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.showGrid}
+                onClick={() => vm.setShowGrid(!vm.showGrid)}
+              >
+                Сетка
+              </MobileActionButton>
+              <MobileActionButton
+                active={!vm.wallsHidden}
+                onClick={() => vm.setWallsHidden(!vm.wallsHidden)}
+              >
+                Стены
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.spectaclePreviewMode}
+                onClick={() => vm.setSpectaclePreviewMode(!vm.spectaclePreviewMode)}
+              >
+                Превью
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.showControls}
+                onClick={() => vm.setShowControls(!vm.showControls)}
+              >
+                Панели
+              </MobileActionButton>
+            </div>
+          ) : null}
+          {sheet === "objects" ? (
+            <div className="theater-mobile-sheet__grid">
+              <MobileActionButton
+                active={vm.activeTab === "spotlights"}
+                onClick={() => {
+                  vm.setActiveTab("spotlights");
+                  vm.setEditMode("spotlights");
+                }}
+              >
+                Софиты · {vm.displaySpotlights.length}
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.activeTab === "models"}
+                onClick={() => {
+                  vm.setActiveTab("models");
+                  vm.setEditMode("models");
+                }}
+              >
+                Модели · {vm.models.length}
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.activeTab === "decor"}
+                onClick={() => {
+                  vm.setActiveTab("decor");
+                  vm.setEditMode("decor");
+                }}
+              >
+                Декор
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.showSpotlights}
+                onClick={() => vm.setShowSpotlights(!vm.showSpotlights)}
+              >
+                Свет в 3D
+              </MobileActionButton>
+            </div>
+          ) : null}
+          {sheet === "scene" ? (
+            <div className="theater-mobile-sheet__grid">
+              <MobileActionButton
+                active={vm.activeTab === "layout"}
+                onClick={() => vm.setActiveTab("layout")}
+              >
+                План зала
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.lightConsoleExpanded}
+                onClick={() => vm.setLightConsoleExpanded((open) => !open)}
+              >
+                Пульт света
+              </MobileActionButton>
+              <MobileActionButton
+                active={vm.snapToGrid}
+                onClick={() => vm.setSnapToGrid(!vm.snapToGrid)}
+              >
+                Привязка
+              </MobileActionButton>
+              <MobileActionButton
+                active={!isPanelsSwapped}
+                onClick={() => onTogglePanels?.()}
+                disabled={!onTogglePanels}
+              >
+                Настройки
+              </MobileActionButton>
+            </div>
+          ) : null}
+          {sheet === "save" ? (
+            <div className="theater-mobile-sheet__stack">
+              <p>
+                Основные правки уже попадают в текущий шаг. Здесь можно сделать отдельный снимок
+                3D-театра для телефона или экспорта.
+              </p>
+              <MobileActionButton onClick={saveLocalSnapshot}>Сохранить на устройстве</MobileActionButton>
+              <MobileActionButton onClick={() => void copySnapshotJson()}>Копировать JSON</MobileActionButton>
+              <MobileActionButton onClick={downloadSnapshotJson}>Экспорт JSON</MobileActionButton>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+      <nav className="theater-mobile-actions__bar">
+        <MobileActionButton active={sheet === "view"} onClick={() => openSheet("view")}>
+          Вид
+        </MobileActionButton>
+        <MobileActionButton active={sheet === "objects"} onClick={() => openSheet("objects")}>
+          Объекты
+        </MobileActionButton>
+        <MobileActionButton active={sheet === "scene"} onClick={() => openSheet("scene")}>
+          Сцена
+        </MobileActionButton>
+        <MobileActionButton active={sheet === "save"} onClick={() => openSheet("save")}>
+          Сохранить
+        </MobileActionButton>
+      </nav>
+    </div>
+  );
+}
+
+type MobileActionButtonProps = {
+  active?: boolean;
+  disabled?: boolean;
+  children: ReactNode;
+  onClick: () => void;
+};
+
+function MobileActionButton({
+  active,
+  disabled,
+  children,
+  onClick,
+}: MobileActionButtonProps) {
+  return (
+    <button
+      type="button"
+      className={[
+        "theater-mobile-action-btn",
+        active ? "theater-mobile-action-btn--active" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}

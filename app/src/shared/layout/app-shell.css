@@ -37,7 +37,9 @@
 }
 
 .main-content-sessions {
-  background: var(--color-bg-secondary);
+  padding: 0;
+  overflow: auto;
+  background: #111;
 }
 
 @media (max-width: 979px) {
@@ -48,16 +50,29 @@
   .main-content {
     padding: 12px 12px 160px;
   }
+
+  .main-content-theater {
+    padding: 0;
+    overflow: hidden;
+  }
 }
 
 @media (max-width: 480px) {
   .main-content {
     padding: 8px 8px 190px;
   }
+
+  .main-content-theater {
+    padding: 0;
+  }
 }
 
 @media (max-width: 320px) {
   .main-content {
     padding: 6px 6px 200px;
+  }
+
+  .main-content-theater {
+    padding: 0;
   }
 }

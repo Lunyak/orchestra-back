@@ -253,6 +253,12 @@
   pointer-events: none;
 }
 
+.app-editor-menubar__panels-nav + .app-editor-menubar__panel-btn--player,
+.app-editor-menubar__panel-btn--player {
+  margin-left: 2px;
+}
+
+.app-editor-menubar__panel-btn--player + .app-editor-menubar__panel-btn--chat,
 .app-editor-menubar__panels-nav + .app-editor-menubar__panel-btn--chat,
 .app-editor-menubar__panel-btn--chat {
   margin-left: 2px;
@@ -262,9 +268,10 @@
   min-width: 210px;
 }
 
-.theater-editor-menubar__option--nav {
-  display: flex;
-  /* flex-direction: row; */
+/* Higher specificity so a late menubar-base re-import cannot restore display:block */
+.app-editor-menubar .theater-editor-menubar__option.theater-editor-menubar__option--nav {
+  display: inline-flex;
+  flex-direction: row;
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
@@ -280,7 +287,7 @@
   flex-wrap: nowrap;
 }
 
-.app-editor-menubar__nav-icon {
+.app-editor-menubar .app-editor-menubar__nav-icon {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -291,13 +298,13 @@
   color: inherit;
 }
 
-.app-editor-menubar__nav-icon svg {
+.app-editor-menubar .app-editor-menubar__nav-icon svg {
   display: block;
   width: 18px;
   height: 18px;
 }
 
-.app-editor-menubar__nav-label {
+.app-editor-menubar .app-editor-menubar__nav-label {
   display: flex;
   align-items: center;
 

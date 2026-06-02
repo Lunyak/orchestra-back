@@ -10,6 +10,13 @@ dayjs.locale("ru");
 
 export type MonthCalendarStatus = "present" | "absent";
 
+export type MonthCalendarEvent = {
+  id: string;
+  time: string;
+  title: string;
+  published?: boolean;
+};
+
 function isoYmd(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
@@ -46,20 +53,27 @@ export function MonthCalendar({
   onDayClick,
   statusByDate,
   dotsByDate,
+  eventsByDate,
   title,
   subtitle,
   weekDayLabels,
+  onDayDoubleClick,
+  showStatusMarks = true,
 }: {
   currentMonth: Date;
   selectedDate: string;
   onChangeMonth: (next: Date) => void;
   onSelectDate: (isoYmd: string) => void;
   onDayClick?: (isoYmd: string) => void;
+  onDayDoubleClick?: (isoYmd: string) => void;
   statusByDate?: Record<string, MonthCalendarStatus | undefined>;
   dotsByDate?: Record<string, number | undefined>;
+  eventsByDate?: Record<string, MonthCalendarEvent[] | undefined>;
   title?: string;
   subtitle?: string;
   weekDayLabels?: string[];
+  /** ✓/✗ в ячейке; для профиля занятости лучше выключить — фон ячейки уже показывает статус */
+  showStatusMarks?: boolean;
 }) {
   const labels = weekDayLabels ?? ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   const todayIso = useMemo(() => isoYmd(new Date()), []);
@@ -107,7 +121,11 @@ export function MonthCalendar({
         {calendarDays.map((dateObj) => {
           const date = isoYmd(dateObj);
           const status = statusByDate?.[date];
-          const dots = Math.max(0, Number(dotsByDate?.[date] ?? 0) || 0);
+          const dayEvents = eventsByDate?.[date] ?? [];
+          const dots = Math.max(
+            0,
+            Number(dotsByDate?.[date] ?? 0) || dayEvents.length || 0,
+          );
           const active = date === selectedDate;
           const isCurrentMonth = dayjs(dateObj).month() === dayjs(currentMonth).month();
           const isToday = date === todayIso;
@@ -122,6 +140,10 @@ export function MonthCalendar({
                 onSelectDate(date);
                 onDayClick?.(date);
               }}
+              onDoubleClick={() => {
+                onSelectDate(date);
+                onDayDoubleClick?.(date);
+              }}
               title={date}
               className={cn("month-cal__cell", {
                 "month-cal__cell--other-month": !isCurrentMonth,
@@ -132,14 +154,34 @@ export function MonthCalendar({
               })}
             >
               <span className="month-cal__cell-num">{dayjs(dateObj).date()}</span>
-              {dots > 0 && (
+              {dayEvents.length > 0 ? (
+                <span className="month-cal__events" aria-hidden>
+                  {dayEvents.slice(0, 2).map((ev) => (
+                    <span
+                      key={ev.id}
+                      className={cn("month-cal__event", {
+                        "month-cal__event--published": ev.published,
+                      })}
+                      title={`${ev.time} · ${ev.title}`}
+                    >
+                      <span className="month-cal__event-time">{ev.time}</span>
+                      <span className="month-cal__event-title">{ev.title}</span>
+                    </span>
+                  ))}
+                  {dayEvents.length > 2 ? (
+                    <span className="month-cal__event-more">
+                      +{dayEvents.length - 2}
+                    </span>
+                  ) : null}
+                </span>
+              ) : dots > 0 ? (
                 <span className="month-cal__dots">
                   {Array.from({ length: Math.min(dots, 3) }).map((_, i) => (
                     <span key={i} className="month-cal__dot" />
                   ))}
                 </span>
-              )}
-              {status ? (
+              ) : null}
+              {showStatusMarks && status ? (
                 <span className="month-cal__status-mark">{status === "present" ? "✓" : "✗"}</span>
               ) : null}
             </button>

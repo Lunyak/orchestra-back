@@ -1,7 +1,5 @@
 /* Left tool rail + right sidebar — three.js editor–inspired layout */
-@import "../../../shared/components/app-editor-menubar/menubar-base.css";
-
-/* Left tool rail + right sidebar */
+/* menubar-base is loaded via AppEditorMenubar/style.css — do not re-import here */
 
 .theater-controls.theater-controls--toolbar {
   position: relative;
@@ -287,7 +285,36 @@
 }
 
 .theater-editor-panel-heading--settings {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   border-top: 0;
+}
+
+.theater-mobile-hide-panel-btn {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid #333;
+  border-radius: 999px;
+  background: #161616;
+  color: #9cc8ff;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.theater-mobile-hide-panel-btn:hover {
+  border-color: #08f;
+  color: #fff;
+}
+
+@media (min-width: 1025px) {
+  .theater-mobile-hide-panel-btn {
+    display: none;
+  }
 }
 
 .theater-editor-scene > .theater-editor-panel-heading:first-child,

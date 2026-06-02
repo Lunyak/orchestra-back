@@ -114,13 +114,39 @@ export class TroupeService {
       throw new NotFoundException('Project not found or access denied');
     }
 
-    const emailSet = new Set<string>();
+    const ownTroupe = await this.prisma.troupe.findUnique({
+      where: { ownerUserId: userId },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+
+    const isDirectorOfThisProject = project.ownerId === userId;
     const ownerEmail = project.owner?.email?.trim().toLowerCase() ?? '';
+
+    const emailSet = new Set<string>();
     if (ownerEmail) emailSet.add(ownerEmail);
     for (const m of project.members) {
       const e = m.user.email?.trim().toLowerCase();
       if (e) emailSet.add(e);
     }
+
+    const troupeMemberIdByEmail = new Map<string, string>();
+    const troupeOnlyEmails: string[] = [];
+    if (isDirectorOfThisProject && ownTroupe) {
+      const troupeMembers = await this.prisma.troupeMember.findMany({
+        where: { troupeId: ownTroupe.id },
+        select: { id: true, email: true },
+      });
+      for (const tm of troupeMembers) {
+        const e = tm.email.trim().toLowerCase();
+        if (!e) continue;
+        troupeMemberIdByEmail.set(e, tm.id);
+        if (!emailSet.has(e)) {
+          emailSet.add(e);
+          troupeOnlyEmails.push(e);
+        }
+      }
+    }
+
     const emails = [...emailSet];
 
     const profiles = emails.length
@@ -144,31 +170,14 @@ export class TroupeService {
     );
     const monthRange = parseMonthFilter(month);
 
-    const ownTroupe = await this.prisma.troupe.findUnique({
-      where: { ownerUserId: userId },
-      select: { id: true, title: true, createdAt: true, updatedAt: true },
-    });
-
-    const isDirectorOfThisProject = project.ownerId === userId;
-    const troupeMemberIdByEmail = new Map<string, string>();
-    if (isDirectorOfThisProject && ownTroupe) {
-      const troupeMembers = await this.prisma.troupeMember.findMany({
-        where: { troupeId: ownTroupe.id, email: { in: emails } },
-        select: { id: true, email: true },
-      });
-      for (const tm of troupeMembers) {
-        troupeMemberIdByEmail.set(
-          tm.email.trim().toLowerCase(),
-          tm.id,
-        );
-      }
-    }
-
     const orderedEmails: string[] = [];
     if (ownerEmail) orderedEmails.push(ownerEmail);
     for (const m of project.members) {
       const e = m.user.email?.trim().toLowerCase();
       if (e && e !== ownerEmail) orderedEmails.push(e);
+    }
+    for (const e of troupeOnlyEmails) {
+      if (!orderedEmails.includes(e)) orderedEmails.push(e);
     }
 
     const scheduleMembers = orderedEmails.map((email) => {

@@ -8,6 +8,7 @@ import {
   speechTrainerUiActions,
   type SpeechMode,
 } from "../../features/trainers/model/speechTrainerUiSlice";
+import { TrainerDevNotice } from "../../features/trainers/ui/TrainerDevNotice";
 import "./style.css";
 
 type Phase = { label: string; seconds: number };
@@ -202,16 +203,18 @@ export function SpeechTrainerPage() {
     dispatch(speechTrainerUiActions.setSpeechPresetId({ value }));
 
   return (
-    <div className="app-layout">
+    <div className="app-layout trainers-layout">
       <div className="app-content">
         <main className="main-content">
           <div className="trainers-view">
-            <div className="trainer-row" style={{ justifyContent: "space-between" }}>
+            <TrainerDevNotice />
+
+            <div className="trainers-tab-head trainers-row--spread">
               <div>
-                <h2 style={{ marginBottom: 0 }}>Речь</h2>
-                <p className="trainers-subtitle">Дыхание + чтение с темпом (метроном).</p>
+                <div className="trainers-tab-title">Речь</div>
+                <p className="trainers-lead">Дыхание + чтение с темпом (метроном).</p>
               </div>
-              <div className="trainer-row">
+              <div className="trainers-toolbar">
                 <Button className="secondary" type="button" onClick={() => navigate("/profile")}>
                   Профиль
                 </Button>
@@ -221,7 +224,7 @@ export function SpeechTrainerPage() {
               </div>
             </div>
 
-            <div className="trainer-row" style={{ marginTop: 12 }}>
+            <div className="trainers-row trainers-row--mt">
               <button
                 type="button"
                 className="trainer-pill"
@@ -249,21 +252,19 @@ export function SpeechTrainerPage() {
             </div>
 
             {ui.mode === "breathing" ? (
-              <div className="trainer-card" style={{ marginTop: 12 }}>
+              <div className="trainer-card trainers-row--mt">
                 <div className="trainer-card-title">Цикл</div>
                 <div className="trainer-card-text">
                   Упрощённый цикл: вдох 4с → задержка 2с → выдох 6с. Держи плечи свободными.
                 </div>
 
-                <div style={{ marginTop: 12, fontSize: 14 }}>
-                  Фаза: <b>{phases[phaseIdx]?.label ?? "—"}</b> · осталось:{" "}
-                  <b>{phaseLeft}s</b>
+                <div className="trainers-phase">
+                  Фаза: <b>{phases[phaseIdx]?.label ?? "—"}</b> · осталось: <b>{phaseLeft}s</b>
                 </div>
 
-                <div className="trainer-row" style={{ marginTop: 12 }}>
+                <div className="trainers-row trainers-row--mt">
                   {!breathingOn ? (
                     <Button
-                      className="primary"
                       type="button"
                       onClick={() => {
                         setPhaseIdx(0);
@@ -289,15 +290,15 @@ export function SpeechTrainerPage() {
                 </div>
               </div>
             ) : (
-              <div className="trainer-card" style={{ marginTop: 12 }}>
+              <div className="trainer-card trainers-row--mt">
                 <div className="trainer-card-title">Чтение: темп, паузы, ударения</div>
                 <div className="trainer-card-text">
                   Включи метроном и читай текст на темп. Для паузировки используй маркер <b>||</b>. Если “сыпется”
                   дикция — снизь BPM.
                 </div>
 
-                <div className="trainer-row" style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>Текст:</div>
+                <div className="trainers-row trainers-row--mt">
+                  <span className="trainers-field-label">Текст</span>
                   <select
                     className="settings-invite-input"
                     value={preset.id}
@@ -305,7 +306,6 @@ export function SpeechTrainerPage() {
                       const v = String(e.target.value ?? "");
                       if (v === "base" || v === "stage" || v === "news") setPreset(v);
                     }}
-                    style={{ maxWidth: 260 }}
                   >
                     {presets.map((p) => (
                       <option key={p.id} value={p.id}>
@@ -333,8 +333,8 @@ export function SpeechTrainerPage() {
                   </button>
                 </div>
 
-                <div className="trainer-row" style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>BPM:</div>
+                <div className="trainers-row trainers-row--mt">
+                  <span className="trainers-field-label">BPM</span>
                   <input
                     type="range"
                     min={30}
@@ -343,11 +343,10 @@ export function SpeechTrainerPage() {
                     onChange={(e) =>
                       dispatch(speechTrainerUiActions.setSpeechMetronomeBpm({ value: Number(e.target.value) }))
                     }
-                    style={{ width: 220 }}
                   />
-                  <div style={{ fontSize: 12, fontWeight: 800 }}>{ui.metronomeBpm}</div>
+                  <span className="trainers-timer">{ui.metronomeBpm}</span>
                   {!ui.metronomeOn ? (
-                    <Button className="primary" type="button" onClick={startMetronome}>
+                    <Button type="button" onClick={startMetronome}>
                       Включить
                     </Button>
                   ) : (
@@ -356,15 +355,11 @@ export function SpeechTrainerPage() {
                     </Button>
                   )}
                   {ui.metronomeOn && metroReady ? (
-                    <div style={{ fontSize: 12, opacity: 0.7 }}>играет…</div>
+                    <span className="trainers-stat">играет…</span>
                   ) : null}
                 </div>
 
-                {ui.showText ? (
-                  <div style={{ marginTop: 12, fontSize: 14, lineHeight: "20px" }}>
-                    “{readingText}”
-                  </div>
-                ) : null}
+                {ui.showText ? <div className="trainers-reading-text">“{readingText}”</div> : null}
               </div>
             )}
           </div>

@@ -8,6 +8,7 @@ import {
   selectDictionTrainerUi,
   type DictionAttempt,
 } from "../../features/trainers/model/dictionTrainerUiSlice";
+import { TrainerDevNotice } from "../../features/trainers/ui/TrainerDevNotice";
 import "./style.css";
 
 function formatMs(ms: number): string {
@@ -105,16 +106,18 @@ export function DictionTrainerPage() {
   };
 
   return (
-    <div className="app-layout">
+    <div className="app-layout trainers-layout">
       <div className="app-content">
         <main className="main-content">
           <div className="trainers-view">
-            <div className="trainer-row" style={{ justifyContent: "space-between" }}>
+            <TrainerDevNotice />
+
+            <div className="trainers-tab-head trainers-row--spread">
               <div>
-                <h2 style={{ marginBottom: 0 }}>Дикция</h2>
-                <p className="trainers-subtitle">Скороговорки + замеры попыток.</p>
+                <div className="trainers-tab-title">Дикция</div>
+                <p className="trainers-lead">Скороговорки + замеры попыток.</p>
               </div>
-              <div className="trainer-row">
+              <div className="trainers-toolbar">
                 <Button className="secondary" type="button" onClick={() => navigate("/profile")}>
                   Профиль
                 </Button>
@@ -124,11 +127,11 @@ export function DictionTrainerPage() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+            <div className="trainers-stack trainers-row--mt">
               <div className="trainer-card">
                 <div className="trainer-card-title">Упражнение</div>
-                <div style={{ marginTop: 8 }}>
-                  <div className="trainer-row" style={{ marginBottom: 8 }}>
+                <div className="trainers-row--mt">
+                  <div className="trainers-row trainers-filter-row">
                     <button
                       type="button"
                       className="trainer-pill"
@@ -182,7 +185,7 @@ export function DictionTrainerPage() {
                   </select>
                 </div>
 
-                <div className="trainer-row" style={{ marginTop: 10 }}>
+                <div className="trainers-row trainers-row--mt">
                   <button
                     type="button"
                     className="trainer-pill"
@@ -191,10 +194,8 @@ export function DictionTrainerPage() {
                   >
                     {ui.showText ? "Текст: виден" : "Текст: скрыт"}
                   </button>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>
-                    Совет: сначала читай медленно и чётко, потом ускоряйся.
-                  </div>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>
+                  <span className="trainers-stat">Совет: сначала читай медленно и чётко, потом ускоряйся.</span>
+                  <span className="trainers-stat">
                     Попыток: <b>{selectedStats.count}</b>
                     {selectedStats.bestMs != null ? (
                       <>
@@ -208,23 +209,21 @@ export function DictionTrainerPage() {
                         · среднее (10): <b>{formatMs(selectedStats.avgMs)}</b>
                       </>
                     ) : null}
-                  </div>
+                  </span>
                 </div>
 
                 {ui.showText && selected ? (
-                  <div style={{ marginTop: 10, fontSize: 14, lineHeight: "20px" }}>
-                    “{selected.text}”
-                  </div>
+                  <div className="trainers-reading-text">“{selected.text}”</div>
                 ) : null}
               </div>
 
               <div className="trainer-card">
                 <div className="trainer-card-title">Попытка</div>
-                <div className="trainer-row" style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 12, opacity: 0.75 }}>Время:</div>
-                  <div style={{ fontSize: 16, fontWeight: 800 }}>{formatMs(elapsedMs)}</div>
+                <div className="trainers-row trainers-row--mt">
+                  <span className="trainers-field-label">Время</span>
+                  <span className="trainers-timer">{formatMs(elapsedMs)}</span>
                 </div>
-                <div style={{ marginTop: 10 }}>
+                <div className="trainers-row--mt">
                   <textarea
                     className="settings-invite-input"
                     value={note}
@@ -232,16 +231,15 @@ export function DictionTrainerPage() {
                     placeholder="Заметка (например: сбился на 2-й строке, ускорился к концу)…"
                     rows={3}
                     disabled={!running}
-                    style={{ maxWidth: "unset", width: "100%" }}
                   />
                 </div>
-                <div className="trainer-row" style={{ marginTop: 10 }}>
+                <div className="trainers-row trainers-row--mt">
                   {!running ? (
-                    <Button className="primary" type="button" onClick={start} disabled={!selected}>
+                    <Button type="button" onClick={start} disabled={!selected}>
                       Старт
                     </Button>
                   ) : (
-                    <Button className="primary" type="button" onClick={finish}>
+                    <Button type="button" onClick={finish}>
                       Завершить и сохранить
                     </Button>
                   )}
@@ -262,8 +260,8 @@ export function DictionTrainerPage() {
               </div>
 
               <div className="trainer-card">
-                <div className="trainer-row" style={{ justifyContent: "space-between" }}>
-                  <div className="trainer-card-title">История (последние 50)</div>
+                <div className="trainers-row trainers-row--spread">
+                  <div className="trainer-card-title trainers-panel__title--inline">История (последние 50)</div>
                   <Button
                     className="danger"
                     type="button"
@@ -275,9 +273,9 @@ export function DictionTrainerPage() {
                 </div>
 
                 {(ui.attempts ?? []).length === 0 ? (
-                  <div className="trainer-card-text">Пока пусто.</div>
+                  <p className="trainer-card-text trainers-row--mt">Пока пусто.</p>
                 ) : (
-                  <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                  <div className="trainers-history-list">
                     {[...(ui.attempts ?? [])]
                       .slice()
                       .reverse()
@@ -285,24 +283,15 @@ export function DictionTrainerPage() {
                       .map((a) => {
                         const ex = exercises.find((e) => e.id === a.exerciseId);
                         return (
-                          <div
-                            key={a.id}
-                            style={{
-                              border: "1px solid var(--color-border-medium)",
-                              borderRadius: 10,
-                              padding: 10,
-                              background: "var(--color-bg-transparent-1)",
-                              display: "grid",
-                              gap: 6,
-                            }}
-                          >
-                            <div style={{ fontSize: 12, fontWeight: 800 }}>
-                              {ex?.title ?? a.exerciseId} · {formatMs(a.durationMs)} {ex?.level ? `(ур. ${ex.level})` : ""}
+                          <div key={a.id} className="trainers-history-item">
+                            <div className="trainers-history-item__title">
+                              {ex?.title ?? a.exerciseId} · {formatMs(a.durationMs)}{" "}
+                              {ex?.level ? `(ур. ${ex.level})` : ""}
                             </div>
-                            <div style={{ fontSize: 11, opacity: 0.7 }}>
+                            <div className="trainers-history-item__meta">
                               {new Date(a.finishedAtIso).toLocaleString("ru-RU")}
                             </div>
-                            {a.note ? <div style={{ fontSize: 12, opacity: 0.85 }}>{a.note}</div> : null}
+                            {a.note ? <div className="trainers-history-item__note">{a.note}</div> : null}
                           </div>
                         );
                       })}

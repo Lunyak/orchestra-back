@@ -1,6 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import { useProject } from "../../../features/project";
 import { AppEditorChatToggle } from "./AppEditorChatToggle";
+import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
 import { AppEditorNavigationMenu } from "./AppEditorNavigationMenu";
 import { AppEditorProjectMenu } from "./AppEditorProjectMenu";
 import { useAppEditorMenubarCenter, useAppEditorMenubarToolbarActions, useAppEditorMenubarViewMenu } from "./AppEditorMenubarContext";
@@ -66,11 +67,12 @@ export function AppEditorMenubar() {
         <div className="app-editor-menubar__end">
           <div className="app-editor-menubar__actions">
             {toolbarActions}
+            <AppEditorPlayerToggle />
             <AppEditorChatToggle />
           </div>
           {projectName ? (
             <div className="app-editor-menubar__project-badge" title={projectName}>
-              Текущий: <strong>{currentProjectDisplayName}</strong>
+              <strong>{currentProjectDisplayName}</strong>
             </div>
           ) : null}
         </div>

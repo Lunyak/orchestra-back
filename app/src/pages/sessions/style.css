@@ -1,10 +1,524 @@
+/* Sessions — editor chrome (menubar / three.js editor palette) */
+
+.sessions-page,
+.director-session-page {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+  --sessions-accent: #08f;
+  --sessions-accent-bg: rgba(0, 136, 255, 0.12);
+  --sessions-active-bg: rgba(21, 60, 94, 0.85);
+  --sessions-focus-ring: rgba(0, 136, 255, 0.35);
+}
+
+.sessions-page.rehearsals-page {
+  margin: 0;
+  max-width: none;
+  padding: 10px 12px 24px;
+  color: var(--sessions-text);
+  background: var(--sessions-bg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.sessions-page .rehearsals-head {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sessions-border);
+}
+
+.sessions-page .rehearsals-meta {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--sessions-text);
+  line-height: 1.2;
+}
+
+.sessions-page .rehearsals-muted {
+  color: var(--sessions-text-muted);
+  opacity: 1;
+}
+
+.sessions-page .rehearsals-error {
+  color: #f66;
+  opacity: 1;
+}
+
+.sessions-page .rehearsals-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted);
+  opacity: 1;
+}
+
+.sessions-page .rehearsals-card,
+.director-session-page .rehearsals-card {
+  border: 1px solid var(--sessions-border);
+  border-radius: 0;
+  background: var(--sessions-panel);
+  padding: 10px 12px 12px;
+  box-shadow: none;
+}
+
+.sessions-page .rehearsals-card-title,
+.director-session-page .rehearsals-card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted);
+}
+
+.sessions-page .sessions-actions {
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--sessions-border);
+}
+
+.sessions-page .sessions-actions .button {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+}
+
+.sessions-page .list-item,
+.sessions-page .sessions-listItem-row {
+  background: var(--sessions-panel);
+  color: var(--sessions-text-strong);
+  border-radius: 0;
+}
+
+.sessions-page .list-item:hover:not(.active),
+.sessions-page .sessions-listItem-row:not(.active):hover {
+  background: var(--sessions-panel-hover);
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .list-item.active,
+.sessions-page .sessions-listItem-row.active {
+  background: var(--sessions-active-bg);
+  color: var(--sessions-text-strong);
+  box-shadow: none;
+}
+
+.sessions-page .list-item.active:hover,
+.sessions-page .sessions-listItem-row.active:hover {
+  background: color-mix(in srgb, var(--sessions-active-bg) 92%, #000);
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .sessions-sessionRow.active .list-item.active {
+  box-shadow: 0 0 0 1px var(--sessions-focus-ring);
+}
+
+.sessions-page .sessions-sessionRow__dragHandle {
+  color: var(--sessions-text-muted);
+}
+
+.sessions-page .rehearsals-item-title {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .button,
+.director-session-page .button {
+  background: var(--sessions-panel-hover);
+  color: #aaa;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sessions-page .button:hover:not(:disabled),
+.director-session-page .button:hover:not(:disabled) {
+  background: var(--sessions-accent);
+  color: #fff;
+}
+
+.sessions-page .button:disabled,
+.director-session-page .button:disabled {
+  opacity: 0.4;
+}
+
+.sessions-page .native-text-input,
+.sessions-page .native-select,
+.director-session-page .native-text-input,
+.director-session-page .native-select {
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 0;
+  color: #aaa;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.sessions-page .native-text-input:focus,
+.sessions-page .native-select:focus,
+.director-session-page .native-text-input:focus,
+.director-session-page .native-select:focus {
+  border-color: var(--sessions-accent);
+  outline: none;
+}
+
+.sessions-page .form-textarea textarea,
+.sessions-page .form-textarea .native-text-input {
+  background: #222;
+  border-color: #333;
+  border-radius: 0;
+  color: #aaa;
+}
+
+.sessions-page .sessions-slots-readonly__row {
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: var(--sessions-panel);
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .sessions-slots-readonly__row:hover {
+  background: var(--sessions-panel-hover);
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .sessions-slots-readonly__row.active {
+  background: var(--sessions-accent-bg);
+  box-shadow: 0 0 0 1px var(--sessions-focus-ring);
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .sessions-slots-readonly__time {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .sessions-slots-readonly__meta,
+.sessions-page .sessions-slots-readonly__notes {
+  color: var(--sessions-text);
+  opacity: 1;
+}
+
+.sessions-page .sessions-slots-empty {
+  border-radius: 0;
+  border-color: #333;
+  background: var(--sessions-bg-deep);
+  color: var(--sessions-text-muted);
+}
+
+.sessions-page .sessions-side-called {
+  margin-top: 0 !important;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
+}
+
+.sessions-page .director-session-page__called-item {
+  border: 1px solid var(--sessions-border);
+  border-radius: 0;
+  background: var(--sessions-bg-deep);
+}
+
+.sessions-page .director-session-page__called-item--confirmed {
+  background: rgba(46, 160, 67, 0.14);
+  border-color: rgba(126, 231, 135, 0.35);
+}
+
+.sessions-page .director-session-page__called-name {
+  color: var(--sessions-text-strong);
+}
+
+.sessions-page .icon-action-add {
+  border-radius: 0;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel-hover);
+  color: var(--sessions-text);
+}
+
+.sessions-page .icon-action-add:hover:not(:disabled) {
+  background: var(--sessions-accent);
+  border-color: var(--sessions-accent);
+  color: #fff;
+}
+
+/* Страница одной сессии */
+.director-session-page {
+  padding: 10px 12px 32px;
+  max-width: none;
+  color: var(--sessions-text);
+  background: var(--sessions-bg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.director-session-page__head {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--sessions-border);
+}
+
+.director-session-page__back {
+  font-size: 12px;
+  color: var(--sessions-text);
+  opacity: 1;
+}
+
+.director-session-page__back:hover {
+  color: var(--sessions-text-strong);
+}
+
+.director-session-page__title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--sessions-text-strong);
+}
+
+.director-session-page__meta {
+  color: var(--sessions-text-muted);
+  opacity: 1;
+}
+
+.director-session-page__grid {
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
+  border-radius: 0;
+}
+
+.director-session-page__preview-pre {
+  border: 1px solid var(--sessions-border);
+  border-radius: 0;
+  background: var(--sessions-bg-deep);
+  color: var(--sessions-text-strong);
+}
+
+.director-session-slots-panel__row.active {
+  box-shadow: 0 0 0 1px var(--sessions-focus-ring);
+}
+
+.director-session-page .director-session-page__called-item {
+  border: 1px solid var(--sessions-border);
+  border-radius: 0;
+  background: var(--sessions-bg-deep);
+}
+
+.sessions-page .sessions-modal,
+.director-session-page .sessions-modal {
+  border-radius: 0;
+  border-color: var(--sessions-border);
+  background: var(--sessions-panel);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
+}
+
+.sessions-page .sessions-modal-head button,
+.director-session-page .sessions-modal-head button {
+  border-radius: 0;
+  border-color: var(--sessions-border);
+  background: var(--sessions-panel-hover);
+}
+
+.sessions-page .sessions-modal-text,
+.director-session-page .sessions-modal-text {
+  border-top-color: var(--sessions-border);
+}
+
+.sessions-page .sessions-actions__btn-delete,
+.director-session-page .sessions-actions__btn-delete {
+  border-radius: 0;
+}
+
 /* Sessions page: layout classes historically named rehearsals-* */
 
 .sessions-layout {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+}
+
+.sessions-calendar-card {
+  padding: 10px 10px 12px;
+}
+
+.sessions-calendar-toolbar {
+  margin-bottom: 10px;
+}
+
+.sessions-calendar-toolbar .button {
+  width: 100%;
+}
+
+.sessions-page .sessions-calendar .month-cal {
+  --month-cal-line: var(--sessions-border, #222);
+  --month-cal-surface: var(--sessions-panel, #1b1b1b);
+  --month-cal-surface-hover: var(--sessions-panel-hover, #222);
+  --month-cal-selected-ring: rgba(0, 136, 255, 0.85);
+  --month-cal-today-ring: rgba(0, 136, 255, 0.35);
+}
+
+.sessions-page .sessions-calendar .month-cal__weekday {
+  background: var(--sessions-bg-deep, #0a0a0a);
+  color: var(--sessions-text-muted, #666);
+}
+
+.sessions-page .sessions-calendar .month-cal__nav-btn {
+  border-color: var(--sessions-border, #222);
+  background: var(--sessions-panel-hover, #222);
+  color: var(--sessions-text-strong, #ccc);
+}
+
+.sessions-page .sessions-calendar .month-cal__nav-btn:hover {
+  background: var(--sessions-accent, #08f);
+  border-color: var(--sessions-accent, #08f);
+  color: #fff;
+}
+
+.sessions-page .sessions-calendar .month-cal__month-label {
+  color: var(--sessions-text-strong, #ccc);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.sessions-page .sessions-calendar .month-cal__title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted, #666);
+}
+
+.sessions-page .sessions-calendar .month-cal__subtitle {
+  color: var(--sessions-text-muted, #666);
+  opacity: 1;
+}
+
+.sessions-day-panel {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sessions-border, #222);
+}
+
+.sessions-day-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sessions-day-panel__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sessions-text-strong, #ccc);
+}
+
+.sessions-day-panel__count {
+  flex-shrink: 0;
+}
+
+.sessions-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(240px, 32vh);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.sessions-day-list__empty {
+  padding: 8px 0;
+  line-height: 1.4;
+}
+
+.sessions-day-item {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid var(--sessions-border, #222);
+  background: var(--sessions-bg-deep, #0a0a0a);
+}
+
+.sessions-day-item--active {
+  box-shadow: 0 0 0 1px var(--sessions-focus-ring, rgba(0, 136, 255, 0.35));
+  background: var(--sessions-accent-bg, rgba(0, 136, 255, 0.12));
+}
+
+.sessions-day-item__main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  gap: 2px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.sessions-day-item__main:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sessions-day-item__time {
+  grid-row: 1 / span 2;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--sessions-text-strong, #ccc);
+}
+
+.sessions-day-item__title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sessions-text-strong, #ccc);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessions-day-item__badge {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted, #666);
+}
+
+.sessions-day-item__badge--published {
+  color: var(--sessions-accent, #08f);
+}
+
+.sessions-day-item__delete {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 4px;
+}
+
+.sessions-main-empty {
+  padding: 24px 16px;
+  max-width: 420px;
+  line-height: 1.45;
 }
 
 .sessions-side {
@@ -66,13 +580,7 @@
 
 .sessions-listItem-row {
   border: none;
-  background: var(--color-bg-quaternary);
   height: 40px;
-}
-
-.sessions-listItem-row.active {
-  border: none;
-  background: var(--color-bg-tertiary);
 }
 
 /* Список сессий и «Материалы»: одна обёртка ListItem + rehearsals-item внутри */
@@ -281,19 +789,15 @@
   pointer-events: none;
 }
 
-/* Страница одной сессии (план слотов + материал) */
+/* Страница одной сессии (план слотов + материал) — layout; chrome см. блок выше */
 .director-session-page {
-  padding: 12px 12px 40px;
   max-width: 1420px;
   margin: 0 auto;
   width: 100%;
-
   display: flex;
   align-items: center;
   flex-direction: column;
   justify-content: flex-start;
-
-  background: var(--color-bg-primary);
 }
 
 .director-session-page__head {
@@ -336,8 +840,7 @@
   width: 100%;
   max-width: 600px;
   box-sizing: border-box;
-
-  background: var(--color-bg-secondary);
+  padding: 12px;
 }
 
 .director-session-page__detail-grid {
@@ -368,7 +871,13 @@
 
 .session-slot {
   padding: 0;
-  background: var(--color-bg-tertiary);
+  background: var(--sessions-panel, var(--color-bg-tertiary));
+  border-radius: 0;
+}
+
+.director-session-page .session-slot {
+  background: var(--sessions-panel-hover);
+  border: 1px solid var(--sessions-border);
 }
 
 /* Страница одной сессии: слоты по графику полного состава ролей (интервалы / явка дня; без чекбоксов репетиции) */
@@ -388,7 +897,7 @@
   flex-wrap: wrap;
   gap: 8px 10px;
   align-items: center;
-  color: var(--color-text-primary);
+  color: var(--sessions-text, var(--color-text-primary));
 }
 
 .director-session-slots-panel__timeline {
@@ -400,13 +909,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 4px 0;
   padding: 10px;
-  /* width: 100%; */
+  border: 1px solid var(--sessions-border, var(--color-border-visible));
+  background: var(--sessions-panel, transparent);
+  box-sizing: border-box;
 }
 
 .director-session-slots-panel__row.active {
-  box-shadow: 0 0 0 2px var(--color-focus-ring-soft);
+  box-shadow: 0 0 0 1px var(--sessions-focus-ring, var(--color-focus-ring-soft));
 }
 
 .director-session-slots-panel__slot-main {
@@ -580,21 +1090,10 @@
   text-align: left;
   padding: 10px 12px;
   border: none;
-  background: var(--color-bg-quaternary);
   color: inherit;
   cursor: pointer;
   font: inherit;
   box-sizing: border-box;
-}
-
-.sessions-slots-readonly__row:hover {
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-primary);
-}
-
-.sessions-slots-readonly__row.active {
-  color: var(--color-text-primary);
-  background: var(--color-bg-tertiary);
 }
 
 .sessions-slots-readonly__time {
@@ -1019,6 +1518,10 @@
 
   .sessions-side {
     position: static;
+  }
+
+  .sessions-day-list {
+    max-height: none;
   }
 
   .sessions-panels {

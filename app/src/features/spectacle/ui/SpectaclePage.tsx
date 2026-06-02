@@ -64,6 +64,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     setIsStepsCollapsed,
     setMobilePlaylistOpen,
     setMobileStepsOpen,
+    setShowTheaterControls,
     setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowStepsSidebar,
@@ -152,16 +153,33 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     </div>
   ) : null;
 
-  const theaterOutlinerNode = isTheaterView ? (
+  const showTheaterSettingsHost = isTheaterView && shouldSwapPanels;
+  const theaterHostMounted =
+    showTheaterSettingsHost && (isMobile || showTheaterControls);
+
+  const theaterOutlinerNode = showTheaterSettingsHost ? (
     <aside
       ref={setTheaterOutlinerHostRef}
-      className="theater-settings-sidebar theater-settings-sidebar--right theater-outliner-sidebar"
-      aria-label="Элементы сцены"
-    />
+      className={cn(
+        "theater-settings-sidebar theater-settings-sidebar--right theater-outliner-sidebar",
+        isMobile && "mobile",
+        isMobile && showTheaterControls && "open",
+      )}
+      aria-label="Настройки 3D-сцены"
+      aria-hidden={isMobile ? !showTheaterControls : undefined}
+    >
+      {isMobile && showTheaterControls ? (
+        <button
+          type="button"
+          className="mobile-panel-close"
+          onClick={() => setShowTheaterControls(false)}
+          aria-label="Закрыть панель настроек"
+        >
+          ×
+        </button>
+      ) : null}
+    </aside>
   ) : null;
-
-  const showTheaterSettingsPanel =
-    isTheaterView && shouldSwapPanels && showTheaterControls;
 
   /** Шаги на 3D-театре — только в режиме «Музыка и шаги». */
   const theaterRehearsalMode = isTheaterView && !shouldSwapPanels;
@@ -237,9 +255,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
                 onTheaterLayoutChange={setTheaterLayout}
                 isPanelsSwapped={shouldSwapPanels}
                 onTogglePanels={togglePanels}
-                outlinerHost={
-                  showTheaterSettingsPanel ? theaterOutlinerHost : null
-                }
+                outlinerHost={theaterHostMounted ? theaterOutlinerHost : null}
                 controlsInPanel={shouldSwapPanels}
               />
             </Suspense>
@@ -268,7 +284,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
           {activeView === "sessions" && <Outlet />}
         </main>
       </div>
-      {showTheaterSettingsPanel ? theaterOutlinerNode : null}
+      {theaterHostMounted ? theaterOutlinerNode : null}
       {stepsSidebarNode}
       {!isMobile && !compactMainChrome && (
         <div className="desktop-panel-buttons" aria-label="Панели">
@@ -295,11 +311,17 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
         </div>
       )}
 
-      {isMobile && (mobilePlaylistOpen || mobileStepsOpen) && (
+      {isMobile &&
+        (mobilePlaylistOpen ||
+          mobileStepsOpen ||
+          (showTheaterSettingsHost && showTheaterControls)) && (
         <div
           className="mobile-overlay"
           onClick={() => {
             closeMobilePanels();
+            if (showTheaterSettingsHost && showTheaterControls) {
+              setShowTheaterControls(false);
+            }
           }}
         />
       )}

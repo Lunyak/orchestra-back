@@ -24,8 +24,11 @@ import {
   type SceneVoiceLineEntry,
   type SceneVoiceLineTake,
 } from "../../scene/model/scene-slice";
-import { Button } from "../../../shared/core/button/Button";
-import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
+import { Modal } from "../../../shared/core/modal/Modal";
+import { useAppEditorMenubarActionsRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
+import { useIsMobile } from "@shared/hooks/useIsMobile";
+import { useAudioInputDevices } from "@shared/media/useAudioInputDevices";
+import { VoiceTrainerSettingsPanel } from "./VoiceTrainerSettingsPanel";
 import "./voice-style.css";
 
 type VoiceExercise = {
@@ -578,17 +581,6 @@ function actorsAssignedToProjectRole(role: ProjectRoleInfo): Array<{ id: string;
   return out;
 }
 
-function partnerSourceSelectValue(
-  src: PartnerVoiceSource | undefined,
-  actors: Array<{ id: string }>,
-): string {
-  if (src?.kind === "performer") {
-    const id = normalizeActorKey(src.performerId);
-    if (actors.some((a) => a.id === id)) return `p:${id}`;
-  }
-  return actors[0] ? `p:${actors[0].id}` : "";
-}
-
 function findNextUndoneIndex(
   exercises: VoiceExercise[],
   done: Set<string>,
@@ -601,6 +593,377 @@ function findNextUndoneIndex(
     if (!done.has(exercises[idx]!.id)) return idx;
   }
   return null;
+}
+
+const voiceIconProps = {
+  width: 20,
+  height: 20,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2.2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
+
+function VoiceIconButton({
+  label,
+  title,
+  disabled,
+  active,
+  className,
+  onClick,
+  children,
+}: {
+  label: string;
+  title?: string;
+  disabled?: boolean;
+  active?: boolean;
+  className?: string;
+  onClick?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn("voice-icon-btn", active && "voice-icon-btn--active", className)}
+      disabled={disabled}
+      onClick={onClick}
+      aria-label={label}
+      title={title ?? label}
+    >
+      {children}
+    </button>
+  );
+}
+
+type VoiceLineControlsPanelProps = {
+  className?: string;
+  current: VoiceExercise;
+  sentenceTokens: string[][];
+  sentenceIndex: number;
+  showText: boolean;
+  revealedLineIds: Set<string>;
+  onToggleRevealLine: () => void;
+  currentTarget: string;
+  lastAccepted: string;
+  supported: { tts: boolean; stt: boolean };
+  listening: boolean;
+  left: number;
+  total: number;
+  pttStart: () => void;
+  pttStop: () => void;
+  beginListeningSession: (opts: { resetTranscript: boolean }) => void;
+  autoFlow: boolean;
+  autoCycleBusy: boolean;
+  runAuto: () => void;
+  lastTake: null | { blob: Blob; url: string; durationMs: number };
+  playUrl: (url: string, opts?: { label?: string }) => void;
+  voiceUpload: { uploading: boolean; error?: string | null };
+  projectName: string | null | undefined;
+  performerId: string;
+  saveLastTakeAsPreferred: () => void | Promise<void>;
+  index: number;
+  exercisesCount: number;
+  onPrev: () => void;
+  onNext: () => void;
+  myTextNoRemarks: string;
+  transcript: string;
+  interim: string;
+  result: null | { ratio: number; ok: boolean };
+  passRatioPercent: number;
+};
+
+function VoiceLineControlsPanel({
+  className,
+  current,
+  sentenceTokens,
+  sentenceIndex,
+  showText,
+  revealedLineIds,
+  onToggleRevealLine,
+  currentTarget,
+  lastAccepted,
+  supported,
+  listening,
+  left,
+  total,
+  pttStart,
+  pttStop,
+  beginListeningSession,
+  autoFlow,
+  autoCycleBusy,
+  runAuto,
+  lastTake,
+  playUrl,
+  voiceUpload,
+  projectName,
+  performerId,
+  saveLastTakeAsPreferred,
+  index,
+  exercisesCount,
+  onPrev,
+  onNext,
+  myTextNoRemarks,
+  transcript,
+  interim,
+  result,
+  passRatioPercent,
+}: VoiceLineControlsPanelProps) {
+  const lineRevealed = Boolean(current.lineId && revealedLineIds.has(current.lineId));
+  const showTarget = (showText || lineRevealed) && currentTarget;
+  const isSheet = Boolean(className?.includes("voice-panel--sheet"));
+  const sttBlocked = !supported.stt || (left === 0 && total > 0);
+
+  const pttButton = (
+    <button
+      type="button"
+      className={cn("voice-btn voice-ptt", isSheet && "voice-ptt--sheet")}
+      data-active={listening ? "true" : "false"}
+      disabled={sttBlocked}
+      onPointerDown={(e) => {
+        try {
+          (e.currentTarget as HTMLElement & { setPointerCapture?: (id: number) => void })?.setPointerCapture?.(
+            e.pointerId,
+          );
+        } catch {
+          /* ignore */
+        }
+        e.preventDefault();
+        pttStart();
+      }}
+      onPointerUp={(e) => {
+        e.preventDefault();
+        pttStop();
+      }}
+      onPointerCancel={() => pttStop()}
+      title="Нажми и держи — идёт запись. Отпусти — проверим."
+    >
+      {listening ? "Запись…" : isSheet ? "Удерживайте" : "Нажми и держи"}
+    </button>
+  );
+
+  const secondaryTools = (
+    <>
+      <VoiceIconButton
+        label="Продолжить запись"
+        title="Продолжить без сброса"
+        disabled={sttBlocked}
+        onClick={() => beginListeningSession({ resetTranscript: false })}
+      >
+        <svg {...voiceIconProps}>
+          <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3z" />
+          <path d="M19 11v1a7 7 0 0 1-14 0v-1" />
+          <path d="M12 18v3" />
+        </svg>
+      </VoiceIconButton>
+      {autoFlow ? (
+        <VoiceIconButton
+          label={autoCycleBusy ? "Остановить автоцикл" : "Автоцикл"}
+          title={
+            autoCycleBusy
+              ? "Прервать озвучку и запись"
+              : "Озвучить предыдущую и начать запись"
+          }
+          active={autoCycleBusy}
+          disabled={sttBlocked && !autoCycleBusy}
+          onClick={runAuto}
+        >
+          <svg {...voiceIconProps}>
+            <path d="M17 1l4 4-4 4" />
+            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <path d="M7 23l-4-4 4-4" />
+            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+          </svg>
+        </VoiceIconButton>
+      ) : null}
+      {!showText ? (
+        <VoiceIconButton
+          label={lineRevealed ? "Скрыть реплику" : "Показать реплику"}
+          active={lineRevealed}
+          onClick={onToggleRevealLine}
+        >
+          {lineRevealed ? (
+            <svg {...voiceIconProps}>
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+              <path d="M1 1l22 22" />
+              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+            </svg>
+          ) : (
+            <svg {...voiceIconProps}>
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          )}
+        </VoiceIconButton>
+      ) : null}
+      {lastTake ? (
+        <>
+          <VoiceIconButton
+            label="Прослушать дубль"
+            onClick={() => playUrl(lastTake.url, { label: "last-take" })}
+          >
+            <svg {...voiceIconProps}>
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </VoiceIconButton>
+          <VoiceIconButton
+            label="Сохранить как удачный дубль"
+            disabled={voiceUpload.uploading || !projectName || !performerId}
+            onClick={() => void saveLastTakeAsPreferred()}
+          >
+            <svg {...voiceIconProps}>
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+              <path d="M17 21v-8H7v8" />
+              <path d="M7 3v5h8" />
+            </svg>
+          </VoiceIconButton>
+        </>
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className={cn("voice-panel", className)}>
+      {sentenceTokens.length > 1 ? (
+        <div className="voice-progress">
+          Фраза: <b>{sentenceIndex + 1}</b> / {sentenceTokens.length}
+        </div>
+      ) : null}
+      {showTarget ? (
+        <div className="voice-target">
+          “{String(currentTarget).slice(0, 160)}
+          {String(currentTarget).length > 160 ? "…" : ""}”
+        </div>
+      ) : null}
+      {(showText || lineRevealed) && lastAccepted ? (
+        <div className="voice-muted">
+          Засчитано: “{String(lastAccepted).slice(0, 120)}
+          {String(lastAccepted).length > 120 ? "…" : ""}”
+        </div>
+      ) : null}
+
+      {isSheet ? (
+        <div className="voice-toolbar">
+          <span className="voice-toolbar__counter">
+            <b>{index + 1}</b> / {exercisesCount}
+          </span>
+          {pttButton}
+          <div className="voice-toolbar__row">
+            <VoiceIconButton
+              className="voice-icon-btn--nav"
+              label="Предыдущая реплика"
+              disabled={index <= 0}
+              onClick={onPrev}
+            >
+              <svg {...voiceIconProps} width={16} height={16}>
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </VoiceIconButton>
+            <div className="voice-toolbar__tools">{secondaryTools}</div>
+            <VoiceIconButton
+              className="voice-icon-btn--nav"
+              label="Следующая реплика"
+              disabled={index >= exercisesCount - 1}
+              onClick={onNext}
+            >
+              <svg {...voiceIconProps} width={16} height={16}>
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </VoiceIconButton>
+          </div>
+          {voiceUpload.uploading ? (
+            <div className="voice-toolbar__status">Сохраняю дубль…</div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="voice-actions">
+          {pttButton}
+          <button
+            type="button"
+            className="voice-btn"
+            disabled={sttBlocked}
+            onClick={() => beginListeningSession({ resetTranscript: false })}
+            title="Продолжить запись без сброса"
+          >
+            Продолжить
+          </button>
+          <button
+            type="button"
+            className={cn("voice-btn", autoCycleBusy && "voice-btn--primary")}
+            disabled={sttBlocked && !autoCycleBusy}
+            onClick={runAuto}
+            title={
+              autoCycleBusy
+                ? "Прервать озвучку и запись"
+                : "Озвучить предыдущую и начать запись"
+            }
+          >
+            {autoCycleBusy ? "■ цикл" : "▶ цикл"}
+          </button>
+          {!showText ? (
+            <button type="button" className="voice-btn" onClick={onToggleRevealLine}>
+              {lineRevealed ? "Скрыть эту реплику" : "Показать эту реплику"}
+            </button>
+          ) : null}
+          {lastTake ? (
+            <>
+              <button
+                type="button"
+                className="voice-btn"
+                onClick={() => playUrl(lastTake.url, { label: "last-take" })}
+                title="Прослушать последнюю запись"
+              >
+                ▶ дубль
+              </button>
+              <button
+                type="button"
+                className="voice-btn"
+                disabled={voiceUpload.uploading || !projectName || !performerId}
+                onClick={() => void saveLastTakeAsPreferred()}
+                title="Сохранить последнюю запись как удачный дубль"
+              >
+                {voiceUpload.uploading ? "Сохраняю…" : "Сохранить как удачный"}
+              </button>
+            </>
+          ) : null}
+          <div className="voice-spacer" />
+          <button type="button" className="voice-btn" disabled={index <= 0} onClick={onPrev}>
+            ←
+          </button>
+          <button type="button" className="voice-btn" disabled={index >= exercisesCount - 1} onClick={onNext}>
+            →
+          </button>
+        </div>
+      )}
+
+      {showText ? (
+        <div className="voice-textbox">
+          <div className="voice-text">{myTextNoRemarks || "—"}</div>
+        </div>
+      ) : null}
+
+      {transcript || interim || result || voiceUpload.error ? (
+        <div className="voice-recognition">
+          {transcript || interim ? (
+            <div className="voice-transcript">
+              {transcript ? <div>{transcript}</div> : null}
+              {interim ? <div className="voice-interim">{interim}</div> : null}
+            </div>
+          ) : null}
+          {result ? (
+            <div className={`voice-result ${result.ok ? "ok" : "bad"}`}>
+              {result.ok ? "Похоже, верно." : `Не совпадает достаточно (нужно ≥${passRatioPercent}%).`} Точность:{" "}
+              <b>{Math.round(result.ratio * 100)}%</b>
+            </div>
+          ) : null}
+          {voiceUpload.error ? <div className="voice-result bad">{voiceUpload.error}</div> : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function VoiceDialogueTrainer({
@@ -727,8 +1090,14 @@ export function VoiceDialogueTrainer({
   }, [exercises.length]);
 
   const current = exercises[index] ?? null;
+  const isMobile = useIsMobile();
+  const [lineSheetOpen, setLineSheetOpen] = useState(true);
+  useEffect(() => {
+    if (current?.lineId) setLineSheetOpen(true);
+  }, [current?.lineId]);
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
+    if (isMobile && lineSheetOpen) return;
     const el = activeLineRef.current;
     if (!el) return;
     try {
@@ -736,7 +1105,7 @@ export function VoiceDialogueTrainer({
     } catch {
       // ignore
     }
-  }, [current?.lineId]);
+  }, [current?.lineId, isMobile, lineSheetOpen]);
 
   const doneCount = useMemo(() => {
     let c = 0;
@@ -766,17 +1135,23 @@ export function VoiceDialogueTrainer({
   }, [uiKey]);
 
   const [voices, setVoices] = useState<BackendTtsVoice[]>([]);
-  const [controlsHidden, setControlsHidden] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("voiceTrainer:controlsHidden") === "true";
-  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileByEmail, setProfileByEmail] = useState<Record<string, TeamProfile | null>>({});
   const profileByEmailRef = useRef(profileByEmail);
   profileByEmailRef.current = profileByEmail;
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("voiceTrainer:controlsHidden", String(controlsHidden));
-  }, [controlsHidden]);
+
+  useAppEditorMenubarActionsRender("voice-settings", 22, () => (
+    <button
+      type="button"
+      className={cn("app-editor-menubar__panel-btn", settingsOpen && "app-editor-menubar__panel-btn--active")}
+      onClick={() => setSettingsOpen((open) => !open)}
+      title="Настройки голосового тренажёра"
+      aria-label="Настройки голосового тренажёра"
+      aria-pressed={settingsOpen}
+    >
+      🎙
+    </button>
+  ));
 
   const voiceName = ui.ttsVoiceName;
   const [ttsDiag, setTtsDiag] = useState<{
@@ -820,6 +1195,7 @@ export function VoiceDialogueTrainer({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const ttsSessionRef = useRef(0);
 
   const stopTtsAudio = () => {
     const a = audioRef.current;
@@ -865,10 +1241,12 @@ export function VoiceDialogueTrainer({
       return;
     }
 
+    const session = ++ttsSessionRef.current;
     const voice = voiceName && voiceName !== "auto" ? voiceName : undefined;
     api
       .post("/tts", { text: txt, voice }, { responseType: "blob" })
       .then((res) => {
+        if (session !== ttsSessionRef.current) return;
         const blob = res.data as Blob;
         const url = URL.createObjectURL(blob);
         audioUrlRef.current = url;
@@ -886,6 +1264,7 @@ export function VoiceDialogueTrainer({
             lastError: "",
           }));
         a.onended = () => {
+          if (session !== ttsSessionRef.current) return;
           setTtsDiag((p) => ({
             ...p,
             lastEvent: "end",
@@ -895,6 +1274,7 @@ export function VoiceDialogueTrainer({
           opts?.onEnd?.();
         };
         a.onerror = () => {
+          if (session !== ttsSessionRef.current) return;
           setTtsDiag((p) => ({
             ...p,
             lastEvent: "error",
@@ -905,7 +1285,9 @@ export function VoiceDialogueTrainer({
         };
         // Small delay gives the OS time to release mic audio session.
         window.setTimeout(() => {
+          if (session !== ttsSessionRef.current) return;
           a.play().catch(() => {
+            if (session !== ttsSessionRef.current) return;
             setTtsDiag((p) => ({
               ...p,
               lastEvent: "error",
@@ -917,6 +1299,7 @@ export function VoiceDialogueTrainer({
         }, 250);
       })
       .catch((e) => {
+        if (session !== ttsSessionRef.current) return;
         setTtsDiag((p) => ({
           ...p,
           lastEvent: "error",
@@ -955,6 +1338,7 @@ export function VoiceDialogueTrainer({
       opts?.onEnd?.();
       return;
     }
+    const session = ++ttsSessionRef.current;
     try {
       audioUrlRef.current = u;
       const a = new Audio(u);
@@ -971,6 +1355,7 @@ export function VoiceDialogueTrainer({
           lastError: "",
         }));
       a.onended = () => {
+        if (session !== ttsSessionRef.current) return;
         setTtsDiag((p) => ({
           ...p,
           lastEvent: "end",
@@ -980,6 +1365,7 @@ export function VoiceDialogueTrainer({
         opts?.onEnd?.();
       };
       a.onerror = () => {
+        if (session !== ttsSessionRef.current) return;
         setTtsDiag((p) => ({
           ...p,
           lastEvent: "error",
@@ -989,7 +1375,9 @@ export function VoiceDialogueTrainer({
         opts?.onError?.({ code: "audio-playback-failed", message: "" });
       };
       window.setTimeout(() => {
+        if (session !== ttsSessionRef.current) return;
         a.play().catch(() => {
+          if (session !== ttsSessionRef.current) return;
           setTtsDiag((p) => ({
             ...p,
             lastEvent: "error",
@@ -1104,11 +1492,75 @@ export function VoiceDialogueTrainer({
     setCurrentTarget("");
   }, [current?.id]);
 
+  const {
+    selectOptions: micSelectOptions,
+    selectedDeviceId: micDeviceId,
+    setSelectedDeviceId: setMicDeviceId,
+    refreshDevices: refreshMicDevices,
+    labelsReady: micLabelsReady,
+    getConstraints: getMicConstraints,
+  } = useAudioInputDevices();
+  const [micError, setMicError] = useState<string | null>(null);
+  const micDeviceIdRef = useRef(micDeviceId);
+  micDeviceIdRef.current = micDeviceId;
+
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recChunksRef = useRef<BlobPart[]>([]);
   const recStartedAtRef = useRef<number>(0);
   const [lastTake, setLastTake] = useState<null | { blob: Blob; url: string; durationMs: number }>(null);
+
+  const releaseMicStream = () => {
+    const stream = mediaStreamRef.current;
+    if (!stream) return;
+    try {
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      /* ignore */
+    }
+    mediaStreamRef.current = null;
+  };
+
+  const streamMatchesSelectedDevice = (stream: MediaStream) => {
+    const wantId = String(micDeviceIdRef.current ?? "").trim();
+    const track = stream.getAudioTracks()[0];
+    const currentId = String(track?.getSettings?.()?.deviceId ?? "").trim();
+    if (!wantId) return true;
+    return currentId === wantId;
+  };
+
+  const acquireMicStream = async (): Promise<MediaStream | null> => {
+    if (typeof window === "undefined") return null;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError("Браузер не поддерживает доступ к микрофону.");
+      return null;
+    }
+    const current = mediaStreamRef.current;
+    if (current?.active && streamMatchesSelectedDevice(current)) {
+      setMicError(null);
+      return current;
+    }
+    releaseMicStream();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia(getMicConstraints());
+      mediaStreamRef.current = stream;
+      setMicError(null);
+      void refreshMicDevices();
+      return stream;
+    } catch (e: unknown) {
+      const name = e && typeof e === "object" && "name" in e ? String((e as { name?: string }).name) : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setMicError("Нет доступа к микрофону. Разрешите запись в настройках браузера.");
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setMicError("Микрофон не найден. Выберите другое устройство ввода.");
+      } else if (name === "NotReadableError" || name === "TrackStartError") {
+        setMicError("Микрофон занят другим приложением или недоступен.");
+      } else {
+        setMicError("Не удалось подключить микрофон.");
+      }
+      return null;
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -1124,12 +1576,7 @@ export function VoiceDialogueTrainer({
         } catch {}
       }
       mediaRecorderRef.current = null;
-      if (mediaStreamRef.current) {
-        try {
-          mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-        } catch {}
-      }
-      mediaStreamRef.current = null;
+      releaseMicStream();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1149,10 +1596,10 @@ export function VoiceDialogueTrainer({
       return null;
     });
 
-    try {
-      const stream = mediaStreamRef.current ?? (await navigator.mediaDevices.getUserMedia({ audio: true }));
-      mediaStreamRef.current = stream;
+    const stream = mediaStreamRef.current ?? (await acquireMicStream());
+    if (!stream) return;
 
+    try {
       const preferTypes = [
         "audio/webm;codecs=opus",
         "audio/webm",
@@ -1179,7 +1626,7 @@ export function VoiceDialogueTrainer({
       };
       rec.start();
     } catch {
-      // ignore
+      setMicError("Не удалось начать запись аудио.");
     }
   };
 
@@ -1215,7 +1662,13 @@ export function VoiceDialogueTrainer({
   };
 
   const cancelSpeech = () => {
+    ttsSessionRef.current += 1;
     stopTtsAudio();
+    setTtsDiag((p) => ({
+      ...p,
+      lastEvent: "idle",
+      lastError: "",
+    }));
   };
 
   const scheduleSilenceStop = (token: number, silenceMs: number) => {
@@ -1712,21 +2165,25 @@ export function VoiceDialogueTrainer({
 
   const beginListeningSession = (opts: { resetTranscript: boolean }) => {
     if (!supported.stt) return;
-    void startTakeRecording();
-    const token = Date.now();
-    const maxMsEffective = pttActiveRef.current ? Math.max(maxListenMs, 120_000) : maxListenMs;
-    listenSessionRef.current = {
-      token,
-      startedAt: Date.now(),
-      maxMs: maxMsEffective,
-      requested: true,
-    };
-    lastActivityAtRef.current = Date.now();
-    // Allow some time to start speaking before we consider it "silence".
-    scheduleSilenceStop(token, INITIAL_SILENCE_MS);
-    if (stopTimerRef.current != null) window.clearTimeout(stopTimerRef.current);
-    stopTimerRef.current = window.setTimeout(() => stopListening(), maxMsEffective + 250);
-    startListening({ resetTranscript: opts.resetTranscript });
+    void (async () => {
+      const stream = await acquireMicStream();
+      if (!stream) return;
+      void startTakeRecording();
+      const token = Date.now();
+      const maxMsEffective = pttActiveRef.current ? Math.max(maxListenMs, 120_000) : maxListenMs;
+      listenSessionRef.current = {
+        token,
+        startedAt: Date.now(),
+        maxMs: maxMsEffective,
+        requested: true,
+      };
+      lastActivityAtRef.current = Date.now();
+      // Allow some time to start speaking before we consider it "silence".
+      scheduleSilenceStop(token, INITIAL_SILENCE_MS);
+      if (stopTimerRef.current != null) window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = window.setTimeout(() => stopListening(), maxMsEffective + 250);
+      startListening({ resetTranscript: opts.resetTranscript });
+    })();
   };
 
   const stopAndEvaluate = (delayMs: number) => {
@@ -1751,6 +2208,9 @@ export function VoiceDialogueTrainer({
 
   const skipPrevTtsForExerciseIdRef = useRef<string | null>(null);
 
+  const autoCycleBusy =
+    listening || ttsDiag.lastEvent === "request" || ttsDiag.lastEvent === "start";
+
   const runAuto = () => {
     if (!autoFlow) return;
     if (!supported.stt) return;
@@ -1758,7 +2218,14 @@ export function VoiceDialogueTrainer({
       setAllDoneDialog(true);
       return;
     }
-    // stop any current recognition and speech
+
+    if (autoCycleBusy) {
+      autoRunTokenRef.current += 1;
+      stopListening();
+      cancelSpeech();
+      return;
+    }
+
     stopListening();
     cancelSpeech();
 
@@ -1784,9 +2251,110 @@ export function VoiceDialogueTrainer({
     startRec();
   };
 
+  const toggleRevealCurrentLine = () => {
+    if (!current.lineId) return;
+    setRevealedLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(current.lineId)) next.delete(current.lineId);
+      else next.add(current.lineId);
+      return next;
+    });
+  };
+
+  const lineControlsProps: VoiceLineControlsPanelProps = {
+    current,
+    sentenceTokens,
+    sentenceIndex,
+    showText,
+    revealedLineIds,
+    onToggleRevealLine: toggleRevealCurrentLine,
+    currentTarget,
+    lastAccepted,
+    supported,
+    listening,
+    left,
+    total,
+    pttStart,
+    pttStop,
+    beginListeningSession,
+    autoFlow,
+    autoCycleBusy,
+    runAuto,
+    lastTake,
+    playUrl,
+    voiceUpload,
+    projectName,
+    performerId,
+    saveLastTakeAsPreferred,
+    index,
+    exercisesCount: exercises.length,
+    onPrev: () => setIndex((i) => Math.max(0, i - 1)),
+    onNext: () => setIndex((i) => Math.min(exercises.length - 1, i + 1)),
+    myTextNoRemarks,
+    transcript,
+    interim,
+    result,
+    passRatioPercent,
+  };
+
+  const settingsPanelProps = {
+    micError,
+    micDeviceId,
+    micSelectOptions,
+    micLabelsReady,
+    onMicDeviceChange: (next: string) => {
+      setMicDeviceId(next);
+      releaseMicStream();
+      void acquireMicStream();
+    },
+    voiceName,
+    voiceSelectOptions,
+    ttsEnabled: supported.tts,
+    onVoiceNameChange: (next: string) =>
+      dispatch(voiceTrainerUiActions.setVoiceTtsVoiceName({ uiKey, value: next })),
+    checkMode,
+    checkModeOptions,
+    onCheckModeChange: (next: string) =>
+      dispatch(
+        voiceTrainerUiActions.setVoiceCheckMode({
+          uiKey,
+          value: next === "sentences" ? "sentences" : "full",
+        }),
+      ),
+    passRatioPercent,
+    passRatioOptions,
+    onPassRatioChange: (value: VoicePassRatioPercent) =>
+      dispatch(voiceTrainerUiActions.setVoicePassRatioPercent({ uiKey, value })),
+    autoFlow,
+    onAutoFlowChange: (value: boolean) =>
+      dispatch(voiceTrainerUiActions.setVoiceAutoFlow({ uiKey, value })),
+    recordTakes: ui.recordTakes,
+    onRecordTakesChange: (value: boolean) =>
+      dispatch(voiceTrainerUiActions.setVoiceRecordTakes({ uiKey, value })),
+    partnerRoleSelectOptions,
+    partnerVoiceByRoleKey: ui.partnerVoiceByRoleKey,
+    onPartnerVoiceChange: (roleKey: string, performerId: string) =>
+      dispatch(
+        voiceTrainerUiActions.setPartnerVoiceSourceForRole({
+          uiKey,
+          roleKey,
+          source: { kind: "performer", performerId },
+        }),
+      ),
+    renderActorSelectPerson,
+    showText,
+    onShowTextChange: (value: boolean) =>
+      dispatch(voiceTrainerUiActions.setVoiceShowText({ uiKey, value })),
+    prevText,
+    onSpeakPrev: () => speakPrev(),
+    storageKey,
+    onResetProgressCurrent: resetProgressCurrent,
+    onResetProgressAll: resetProgressAll,
+  };
 
   return (
-    <div className="voice-trainer">
+    <>
+    <div className={cn("voice-trainer", isMobile && lineSheetOpen && "voice-trainer--sheet-open")}>
       <div className="voice-head">
         <div className="voice-title">
           Голос — роль <b>{role || "—"}</b>
@@ -1798,8 +2366,12 @@ export function VoiceDialogueTrainer({
 
       {!supported.stt ? (
         <div className="voice-warn">
-          На этой платформе нет поддержки распознавания речи (SpeechRecognition).
+          На этой платформе нет поддержки распознавания речи (SpeechRecognition). Попробуйте Chrome
+          или Edge.
         </div>
+      ) : null}
+      {supported.stt && micError && !settingsOpen ? (
+        <div className="voice-warn">{micError}</div>
       ) : null}
 
       <div className="voice-card">
@@ -1832,222 +2404,6 @@ export function VoiceDialogueTrainer({
               </div>
             </div>
           ) : null}
-          <div className="voice-controls">
-            <div className="voice-controls-head">
-              <span className="voice-controls-title">Настройки тренажёра</span>
-              <Button
-                type="button"
-                className={cn("voice-controls-toggle", !controlsHidden ? "is-active" : "secondary")}
-                onClick={() => setControlsHidden((v) => !v)}
-              >
-                {controlsHidden ? "Показать настройки" : "Скрыть настройки"}
-              </Button>
-            </div>
-
-            {!controlsHidden ? (
-              <div className="voice-controls-body">
-                <div className="voice-controls-selects">
-                  <div className="voice-select">
-                    <span className="voice-select-label">Голос</span>
-                    <CustomSelect
-                      value={voiceName}
-                      options={voiceSelectOptions}
-                      onChange={(next) =>
-                        dispatch(
-                          voiceTrainerUiActions.setVoiceTtsVoiceName({
-                            uiKey,
-                            value: next,
-                          }),
-                        )
-                      }
-                      disabled={!supported.tts}
-                      triggerClassName="voice-select-trigger"
-                      aria-label="Голос"
-                    />
-                  </div>
-                  <div className="voice-select">
-                    <span className="voice-select-label">Проверка</span>
-                    <CustomSelect
-                      value={checkMode}
-                      options={checkModeOptions}
-                      onChange={(next) =>
-                        dispatch(
-                          voiceTrainerUiActions.setVoiceCheckMode({
-                            uiKey,
-                            value: next === "sentences" ? "sentences" : "full",
-                          }),
-                        )
-                      }
-                      triggerClassName="voice-select-trigger"
-                      aria-label="Режим проверки"
-                    />
-                  </div>
-                  <div className="voice-select">
-                    <span className="voice-select-label">Порог зачёта</span>
-                    <CustomSelect
-                      value={String(passRatioPercent)}
-                      options={passRatioOptions}
-                      onChange={(next) => {
-                        const parsed = Number(next);
-                        if (!VOICE_PASS_RATIO_OPTIONS.includes(parsed as VoicePassRatioPercent)) return;
-                        dispatch(
-                          voiceTrainerUiActions.setVoicePassRatioPercent({
-                            uiKey,
-                            value: parsed as VoicePassRatioPercent,
-                          }),
-                        );
-                      }}
-                      triggerClassName="voice-select-trigger"
-                      aria-label="Минимальная точность для зачёта"
-                    />
-                  </div>
-                  {partnerRoleSelectOptions.length > 0 ? (
-                    <div className="voice-controls-roles">
-                      <div className="voice-controls-roles-title">Озвучка ролей в сцене</div>
-                      <div className="voice-controls-roles-hint">
-                        Выберите актёра, назначенного на роль. Если у него нет записи для реплики — включится
-                        робот (TTS).
-                      </div>
-                      <div className="voice-controls-roles-grid">
-                        {partnerRoleSelectOptions.map(({ roleKey, roleTitle, actors, options }) => (
-                          <div
-                            key={roleKey}
-                            className="voice-select voice-select--role"
-                            title="Актёр, чей дубль слушать для этой роли"
-                          >
-                            <span className="voice-select-label">{roleTitle}</span>
-                            {actors.length > 0 ? (
-                              <CustomSelect
-                                value={partnerSourceSelectValue(
-                                  ui.partnerVoiceByRoleKey?.[roleKey],
-                                  actors,
-                                )}
-                                options={options}
-                                renderValue={(option) => renderActorSelectPerson(option)}
-                                renderOption={(option) => renderActorSelectPerson(option)}
-                                onChange={(v) => {
-                                  if (!v.startsWith("p:")) return;
-                                  const pid = normalizeActorKey(v.slice(2));
-                                  if (!pid) return;
-                                  dispatch(
-                                    voiceTrainerUiActions.setPartnerVoiceSourceForRole({
-                                      uiKey,
-                                      roleKey,
-                                      source: { kind: "performer", performerId: pid },
-                                    }),
-                                  );
-                                }}
-                                triggerClassName="voice-select-trigger voice-select-trigger--person"
-                                optionClassName="custom-select__option--person"
-                                aria-label={`Актёр для роли ${roleTitle}`}
-                              />
-                            ) : (
-                              <div className="voice-select-empty">Нет актёров на роли</div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  <label className="voice-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={autoFlow}
-                      onChange={(e) =>
-                        dispatch(
-                          voiceTrainerUiActions.setVoiceAutoFlow({
-                            uiKey,
-                            value: e.target.checked,
-                          }),
-                        )
-                      }
-                    />
-                    авто (переход)
-                  </label>
-                  <label
-                    className="voice-checkbox"
-                    title="Параллельно распознаванию речи будет записываться аудио вашей реплики (для сохранения)"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={ui.recordTakes}
-                      onChange={(e) =>
-                        dispatch(
-                          voiceTrainerUiActions.setVoiceRecordTakes({
-                            uiKey,
-                            value: e.target.checked,
-                          }),
-                        )
-                      }
-                    />
-                    сохранять дубль
-                  </label>
-                </div>
-
-                <div className="voice-controls-actions voice-actions">
-                  <button
-                    type="button"
-                    className="voice-btn"
-                    disabled={!prevText}
-                    onClick={() => speakPrev()}
-                    title="Озвучить предыдущую реплику"
-                  >
-                    Озвучить предыдущую
-                  </button>
-                  <button
-                    type="button"
-                    className={`voice-btn ${showText ? "voice-btn--primary" : ""}`}
-                    onClick={() =>
-                      dispatch(
-                        voiceTrainerUiActions.setVoiceShowText({
-                          uiKey,
-                          value: !showText,
-                        }),
-                      )
-                    }
-                    title="Режим показа текста во всём тренажёре"
-                  >
-                    {showText ? "Текст: показан" : "Текст: скрыт"}
-                  </button>
-                  {storageKey ? (
-                    <>
-                      <button
-                        type="button"
-                        className="voice-btn"
-                        onClick={resetProgressCurrent}
-                        title="Сбросить текущую реплику"
-                      >
-                        Сбросить текущую
-                      </button>
-                      <button
-                        type="button"
-                        className="voice-btn"
-                        onClick={resetProgressAll}
-                        title="Сбросить весь прогресс"
-                      >
-                        Сбросить прогресс
-                      </button>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </div>
-          <div className="voice-hint">
-            Запись держится до {Math.round(maxListenMs / 1000)}с и не обрывается на коротких паузах.
-            {isLongMonologue ? " Длинный монолог: можно говорить кусочками." : ""}
-          </div>
-          <div className="voice-hint" style={{ maxWidth: 520 }}>
-            TTS:{" "}
-            <b>{supported.tts ? "есть" : "нет"}</b>, voices: <b>{ttsDiag.voicesCount}</b>
-            {ttsDiag.lastRequestedAt ? (
-              <>
-                {" "}
-                · последнее: <b>{ttsDiag.lastEvent}</b>
-                {ttsDiag.lastError ? <> · ошибка: {ttsDiag.lastError}</> : null}
-              </>
-            ) : null}
-          </div>
         </div>
 
         <div className="voice-script">
@@ -2114,142 +2470,8 @@ export function VoiceDialogueTrainer({
                     </div>
                   </div>
 
-                  {isActive ? (
-                    <div className="voice-panel">
-                      {sentenceTokens.length > 1 ? (
-                        <div className="voice-progress">
-                          Фраза: <b>{sentenceIndex + 1}</b> / {sentenceTokens.length}
-                        </div>
-                      ) : null}
-                      {(showText || (current?.lineId && revealedLineIds.has(current.lineId))) && currentTarget ? (
-                        <div className="voice-target">
-                          “{String(currentTarget).slice(0, 160)}{String(currentTarget).length > 160 ? "…" : ""}”
-                        </div>
-                      ) : null}
-                      {(showText || (current?.lineId && revealedLineIds.has(current.lineId))) && lastAccepted ? (
-                        <div className="voice-muted">Засчитано: “{String(lastAccepted).slice(0, 120)}{String(lastAccepted).length > 120 ? "…" : ""}”</div>
-                      ) : null}
-
-                      <div className="voice-actions">
-                        <button
-                          type="button"
-                          className="voice-btn voice-ptt"
-                          data-active={listening ? "true" : "false"}
-                          disabled={!supported.stt || (left === 0 && total > 0)}
-                          onPointerDown={(e) => {
-                            try { (e.currentTarget as any)?.setPointerCapture?.(e.pointerId); } catch {}
-                            e.preventDefault();
-                            pttStart();
-                          }}
-                          onPointerUp={(e) => {
-                            e.preventDefault();
-                            pttStop();
-                          }}
-                          onPointerCancel={() => pttStop()}
-                          title="Нажми и держи — идёт запись. Отпусти — проверим."
-                        >
-                          {listening ? "Запись…" : "Нажми и держи"}
-                        </button>
-                        <button
-                          type="button"
-                          className="voice-btn"
-                          disabled={!supported.stt || (left === 0 && total > 0)}
-                          onClick={() => {
-                            beginListeningSession({ resetTranscript: false });
-                          }}
-                          title="Продолжить запись без сброса"
-                        >
-                          Продолжить
-                        </button>
-                        <button
-                          type="button"
-                          className="voice-btn"
-                          disabled={!supported.stt || !autoFlow || (left === 0 && total > 0)}
-                          onClick={runAuto}
-                          title="Озвучить предыдущую и начать запись"
-                        >
-                          ▶ цикл
-                        </button>
-                        {!showText ? (
-                          <button
-                            type="button"
-                            className="voice-btn"
-                            onClick={() => {
-                              if (!current?.lineId) return;
-                              setRevealedLineIds((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(current.lineId)) next.delete(current.lineId);
-                                else next.add(current.lineId);
-                                return next;
-                              });
-                            }}
-                          >
-                            {current?.lineId && revealedLineIds.has(current.lineId)
-                              ? "Скрыть эту реплику"
-                              : "Показать эту реплику"}
-                          </button>
-                        ) : null}
-                        {lastTake ? (
-                          <>
-                            <button
-                              type="button"
-                              className="voice-btn"
-                              onClick={() => playUrl(lastTake.url, { label: "last-take" })}
-                              title="Прослушать последнюю запись"
-                            >
-                              ▶ дубль
-                            </button>
-                            <button
-                              type="button"
-                              className="voice-btn"
-                              disabled={voiceUpload.uploading || !projectName || !performerId}
-                              onClick={() => void saveLastTakeAsPreferred()}
-                              title="Сохранить последнюю запись как удачный дубль"
-                            >
-                              {voiceUpload.uploading ? "Сохраняю…" : "Сохранить как удачный"}
-                            </button>
-                          </>
-                        ) : null}
-                        <div className="voice-spacer" />
-                        <button type="button" className="voice-btn" disabled={index <= 0} onClick={() => setIndex((i) => Math.max(0, i - 1))}>
-                          ←
-                        </button>
-                        <button type="button" className="voice-btn" disabled={index >= exercises.length - 1} onClick={() => setIndex((i) => Math.min(exercises.length - 1, i + 1))}>
-                          →
-                        </button>
-                      </div>
-
-                      {showText ? (
-                        <div className="voice-textbox">
-                          <div className="voice-label">Текст (без ремарок)</div>
-                          <div className="voice-text">{myTextNoRemarks || "—"}</div>
-                        </div>
-                      ) : null}
-
-                      <div className="voice-recognition">
-                        <div className="voice-label">Распознано</div>
-                        <div className="voice-transcript">
-                          {transcript || interim ? (
-                            <>
-                              <div>{transcript}</div>
-                              {interim ? <div className="voice-interim">{interim}</div> : null}
-                            </>
-                          ) : (
-                            <div className="voice-muted">Пока пусто.</div>
-                          )}
-                        </div>
-                        {result ? (
-                          <div className={`voice-result ${result.ok ? "ok" : "bad"}`}>
-                            {result.ok ? "Похоже, верно." : `Не совпадает достаточно (нужно ≥${passRatioPercent}%).`}{" "}
-                            Точность:{" "}
-                            <b>{Math.round(result.ratio * 100)}%</b>
-                          </div>
-                        ) : null}
-                        {voiceUpload.error ? (
-                          <div className="voice-result bad">{voiceUpload.error}</div>
-                        ) : null}
-                      </div>
-                    </div>
+                  {isActive && !isMobile ? (
+                    <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--inline" />
                   ) : null}
                 </React.Fragment>
               );
@@ -2257,7 +2479,53 @@ export function VoiceDialogueTrainer({
           })()}
         </div>
       </div>
+
+      {isMobile ? (
+        lineSheetOpen ? (
+          <div className="voice-line-sheet" role="dialog" aria-label="Управление репликой">
+            <div className="voice-line-sheet__panel">
+              <div className="voice-line-sheet__head">
+                <span className="voice-line-sheet__title">{current.role}</span>
+                <button
+                  type="button"
+                  className="voice-line-sheet__collapse"
+                  onClick={() => setLineSheetOpen(false)}
+                >
+                  Свернуть
+                </button>
+              </div>
+              <div className="voice-line-sheet__scroll">
+                <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--sheet" />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="voice-line-sheet__reopen"
+            onClick={() => setLineSheetOpen(true)}
+          >
+            Управление репликой
+          </button>
+        )
+      ) : null}
     </div>
+
+    <Modal
+      isOpen={settingsOpen}
+      onClose={() => setSettingsOpen(false)}
+      panelClassName="voice-settings-modal"
+      ariaLabel="Настройки голосового тренажёра"
+    >
+      <div className="voice-settings-modal__head">
+        <div>
+          <div className="voice-settings-modal__label">Настройки</div>
+          <div className="voice-settings-modal__title">Голосовой тренажёр</div>
+        </div>
+      </div>
+      <VoiceTrainerSettingsPanel {...settingsPanelProps} className="voice-controls--modal" />
+    </Modal>
+    </>
   );
 }
 

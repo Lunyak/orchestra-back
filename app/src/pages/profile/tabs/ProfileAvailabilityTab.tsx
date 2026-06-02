@@ -4,7 +4,13 @@ import isoWeek from "dayjs/plugin/isoWeek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@shared/core/button/Button";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
+import { Modal } from "@shared/core/modal/Modal";
 import { CalendarSection } from "../../../shared/components/calendar/CalendarSection";
+import type { MonthCalendarEvent } from "../../../shared/components/calendar/MonthCalendar";
+import {
+  formatTimeHHMM,
+  getSessionStartLocalMinutes,
+} from "../../../features/director-sessions/model/session-page-utils";
 import { useAuth } from "../../../features/auth";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
@@ -35,10 +41,6 @@ function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
 
-function normalizeEmail(v: unknown): string {
-  return String(v ?? "").trim().toLowerCase();
-}
-
 export function ProfileAvailabilityTab() {
   const { accessToken } = useAuth();
   const dispatch = useAppDispatch();
@@ -54,8 +56,7 @@ export function ProfileAvailabilityTab() {
   const autoSaveTimerRef = useRef<number | null>(null);
 
   const selectedDate = calendarState.selectedDate;
-  const [dayPanelOpen, setDayPanelOpen] = useState(false);
-  const dayPanelRef = useRef<HTMLDivElement | null>(null);
+  const [dayModalOpen, setDayModalOpen] = useState(false);
   const [sessionDetailModalId, setSessionDetailModalId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,7 +64,6 @@ export function ProfileAvailabilityTab() {
     dispatch(fetchMyProfileThunk({ accessToken }));
   }, [accessToken, dispatch]);
 
-  /** Свои сессии + приглашения за видимый месяц; при смене месяца или входе на вкладку — повторный запрос (без кэша «не стучать дважды»). */
   useEffect(() => {
     if (!accessToken) return;
     dispatch(profileAvailabilityActions.clearAvailabilityError());
@@ -87,7 +87,6 @@ export function ProfileAvailabilityTab() {
   );
 
   const availabilitySignature = useMemo(() => {
-    // Only the fields used by session scheduling / troupe availability.
     return JSON.stringify({
       availabilityCalendar,
       availabilityTimeRanges,
@@ -102,7 +101,6 @@ export function ProfileAvailabilityTab() {
       return;
     }
 
-    // Wait for the initial profile load to set the baseline.
     if (!profile?.email) return;
 
     if (autoSaveBaselineRef.current == null) {
@@ -142,30 +140,39 @@ export function ProfileAvailabilityTab() {
       if (arr) arr.push(s);
       else grouped.set(date, [s]);
     }
+    for (const list of grouped.values()) {
+      list.sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+    }
     return grouped;
   }, [sessions]);
 
   const selectedDaySessionsAll = sessionsByDate.get(calendarState.selectedDate) ?? [];
-  /** Все сессии из GET /director-sessions — проект текущего пользователя (режиссёр); показываем в календаре целиком. */
-  const directorMonthSessions = useMemo(() => {
-    return (sessions ?? [])
-      .slice()
-      .sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
-  }, [sessions]);
 
   const dotsByDate = useMemo(() => {
     const out: Record<string, number> = {};
-    for (const s of directorMonthSessions) {
-      const date = isoDate(new Date(s.startsAt));
-      out[date] = (out[date] ?? 0) + 1;
+    for (const [date, list] of sessionsByDate.entries()) {
+      out[date] = list.length;
     }
     return out;
-  }, [directorMonthSessions]);
+  }, [sessionsByDate]);
 
-  useEffect(() => {
-    if (!dayPanelOpen) return;
-    dayPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [selectedDate, dayPanelOpen]);
+  const eventsByDate = useMemo(() => {
+    const out: Record<string, MonthCalendarEvent[]> = {};
+    for (const [date, list] of sessionsByDate.entries()) {
+      out[date] = list.map((s) => ({
+        id: s.id,
+        time: formatTimeHHMM(getSessionStartLocalMinutes(s.startsAt)),
+        title: String(s.title ?? "Сессия").trim() || "Сессия",
+      }));
+    }
+    return out;
+  }, [sessionsByDate]);
+
+  const calendarSelectedDateLabel = useMemo(
+    () => dayjs(calendarState.selectedDate).format("D MMMM YYYY"),
+    [calendarState.selectedDate],
+  );
+
   const selectedStatus = (availabilityCalendar[selectedDate] ?? null) as AvailabilityStatus | null;
   const selectedRanges = availabilityTimeRanges[selectedDate] ?? [];
 
@@ -176,237 +183,250 @@ export function ProfileAvailabilityTab() {
     [dispatch],
   );
 
-  const onCalendarDayClick = useCallback(
-    (date: string) => {
-      // MonthCalendar already selects date on click; we just раскрываем панель деталей.
-      void date;
-      setDayPanelOpen(true);
-    },
-    [],
-  );
+  const onCalendarDayClick = useCallback(() => {
+    setDayModalOpen(true);
+  }, []);
 
-  if (!accessToken) return <div>Нужно войти, чтобы управлять занятостью.</div>;
+  if (!accessToken) {
+    return <div className="profile-tab-page profile-hint">Нужно войти, чтобы управлять занятостью.</div>;
+  }
 
   return (
-    <div style={{ marginTop: 8 }}>
-      <div className="profile-availability-head">
-        <div className="profile-availability-title">Календарь занятости</div>
+    <div className="profile-tab-page profile-availability-page">
+      <div className="profile-tab-head">
+        <div className="profile-tab-title">Календарь занятости</div>
         {profileFlags.saving ? (
-          <div style={{ fontSize: 12, opacity: 0.75 }}>Автосохранение…</div>
+          <div className="profile-save-hint">Автосохранение…</div>
         ) : profileFlags.error ? (
           <div className="settings-invite-error" style={{ margin: 0 }}>
             {profileFlags.error}
           </div>
         ) : profileFlags.ok ? (
-          <div style={{ color: "var(--color-status-success-bright)", fontSize: 12 }}>{profileFlags.ok}</div>
+          <div className="profile-save-hint profile-save-hint--ok">{profileFlags.ok}</div>
         ) : null}
       </div>
 
-      <div className="profile-availability-intro">
+      <div className="profile-intro profile-availability-intro">
         <strong>Как отметить занятость</strong>
         <ol>
-          <li>Выберите день в сетке календаря ниже (активный день подсвечен).</li>
-          <li>В блоке «День» укажите статус: «Занят» — весь день недоступен, «Свободен» — доступны сессии.</li>
+          <li>Нажмите день в календаре — откроется окно настройки.</li>
+          <li>Выберите «Занят», «Свободен» или «Не отмечено».</li>
           <li>
-            Чтобы ограничить <strong>часы</strong>, когда вы на сессии: статус «Свободен», затем кнопка «+ Добавить
-            диапазон» и поля времени «с — по». Если диапазонов нет, считается, что свободны весь день.
+            При «Свободен» можно задать <strong>часы</strong> кнопкой «+ Добавить диапазон».
           </li>
         </ol>
+        <div className="profile-availability-legend">
+          <span className="profile-availability-legend-item">
+            <span className="profile-availability-legend-swatch profile-availability-legend-swatch--present" />
+            свободен
+          </span>
+          <span className="profile-availability-legend-item">
+            <span className="profile-availability-legend-swatch profile-availability-legend-swatch--absent" />
+            занят
+          </span>
+          <span className="profile-availability-legend-item">
+            <span className="profile-availability-legend-swatch profile-availability-legend-swatch--session" />
+            сессия
+          </span>
+        </div>
       </div>
 
-      <CalendarSection
-        storageMonthKey="profile-calendar-month"
-        initialSelectedDate={calendarState.selectedDate}
-        onStateChange={onCalendarStateChange}
-        onDayClick={onCalendarDayClick}
-        statusByDate={availabilityCalendar}
-        dotsByDate={dotsByDate}
-      />
-
       {flags.error ? (
-        <div className="settings-invite-error" style={{ marginTop: 8 }}>
-          {flags.error}
-        </div>
+        <div className="settings-invite-error profile-availability-load-error">{flags.error}</div>
       ) : null}
+      {flags.loading ? <div className="profile-save-hint">Загрузка сессий…</div> : null}
 
-      <div style={{ marginTop: 10 }}>
-        <div className="profile-availability-toolbar">
-          <div className="profile-availability-date-line">
-            Выбранный день в календаре: <b>{selectedDate}</b> ({dayjs(selectedDate).format("D MMMM YYYY")})
+      <div className="profile-availability-calendar-wrap">
+        <CalendarSection
+          className="profile-availability-calendar"
+          storageMonthKey="profile-calendar-month"
+          initialSelectedDate={calendarState.selectedDate}
+          onStateChange={onCalendarStateChange}
+          onDayClick={onCalendarDayClick}
+          statusByDate={availabilityCalendar}
+          dotsByDate={dotsByDate}
+          eventsByDate={eventsByDate}
+          showStatusMarks={false}
+          title="Занятость и сессии"
+          subtitle="Клик по дню — отметить занятость"
+        />
+      </div>
+
+      <Modal
+        isOpen={dayModalOpen}
+        onClose={() => setDayModalOpen(false)}
+        panelClassName="profile-availability-day-modal"
+        ariaLabelledBy="profile-availability-day-modal-title"
+      >
+        <div className="profile-availability-day-modal__head">
+          <h3 id="profile-availability-day-modal-title" className="profile-availability-day-modal__title">
+            {calendarSelectedDateLabel}
+          </h3>
+          <button
+            type="button"
+            className="profile-availability-day-modal__close"
+            onClick={() => setDayModalOpen(false)}
+            aria-label="Закрыть"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="profile-availability-day-modal__body">
+          <div className="profile-availability-section-label">Статус дня</div>
+          <div className="profile-availability-status-row">
+            <Button
+              className={selectedStatus == null ? "is-active" : "secondary"}
+              type="button"
+              onClick={() =>
+                dispatch(
+                  profileDataActions.setAvailabilityDayStatus({ date: selectedDate, status: null }),
+                )
+              }
+            >
+              Не отмечено
+            </Button>
+            <Button
+              className={selectedStatus === "present" ? "is-active" : "secondary"}
+              type="button"
+              onClick={() =>
+                dispatch(
+                  profileDataActions.setAvailabilityDayStatus({ date: selectedDate, status: "present" }),
+                )
+              }
+            >
+              Свободен
+            </Button>
+            <Button
+              className={selectedStatus === "absent" ? "danger is-active" : "secondary"}
+              type="button"
+              onClick={() =>
+                dispatch(
+                  profileDataActions.setAvailabilityDayStatus({ date: selectedDate, status: "absent" }),
+                )
+              }
+            >
+              Занят
+            </Button>
           </div>
-          <Button className="secondary" type="button" onClick={() => setDayPanelOpen((v) => !v)}>
-            {dayPanelOpen ? "Свернуть блок дня" : "Развернуть блок дня"}
-          </Button>
-        </div>
-        <div className="profile-availability-hint" style={{ marginTop: 6 }}>
-          Сюда попадают ваши сессии как у режиссёра и <strong>опубликованные</strong> сессии, куда вас вызвали (email
-          в плане, среди участников или в отмеченных ролях слота). Чужая сессия в списке не означает, что вы
-          режиссёр.
-        </div>
 
-        {dayPanelOpen && (
-          <div ref={dayPanelRef} className="profile-availability-panel">
-            <div className="profile-availability-panel-title">
-              {dayjs(selectedDate).format("D MMMM YYYY")} — занятость
-            </div>
-
-            <div>
-              <div className="profile-availability-section-label">Статус дня</div>
-              <div className="profile-availability-status-row">
-                <Button
-                  className={selectedStatus == null ? "is-active" : "secondary"}
-                  type="button"
-                  onClick={() => dispatch(profileDataActions.setAvailabilityDayStatus({ date: selectedDate, status: null }))}
-                >
-                  Не отмечено
-                </Button>
-                <Button
-                  className={selectedStatus === "present" ? "is-active" : "secondary"}
-                  type="button"
-                  onClick={() =>
-                    dispatch(profileDataActions.setAvailabilityDayStatus({ date: selectedDate, status: "present" }))
-                  }
-                >
-                  Свободен
-                </Button>
-                <Button
-                  className={selectedStatus === "absent" ? "danger is-active" : "secondary"}
-                  type="button"
-                  onClick={() =>
-                    dispatch(profileDataActions.setAvailabilityDayStatus({ date: selectedDate, status: "absent" }))
-                  }
-                >
-                  Занят
-                </Button>
-              </div>
+          <div className="profile-availability-time-block">
+            <div className="profile-availability-section-label">Окна доступности для сессий</div>
+            {selectedStatus !== "present" ? (
               <div className="profile-availability-hint">
-                Диапазоны времени учитываются при планировании слотов сессии. Время указано в вашем локальном часовом
-                поясе.
+                Поля времени появляются после выбора «Свободен». Если весь день занят — выберите «Занят».
               </div>
-            </div>
-
-            <div className="profile-availability-time-block">
-              <div className="profile-availability-section-label">Окна доступности для сессий</div>
-              {selectedStatus !== "present" ? (
-                <div className="profile-availability-hint">
-                  Поля времени появляются после выбора «Свободен»: так вы задаёте один или несколько интервалов
-                  доступности в этот день. Если весь день занят — выберите «Занят».
-                </div>
-              ) : selectedRanges.length === 0 ? (
-                <div className="profile-availability-hint">
-                  Интервалы не заданы — вы считаетесь доступным весь этот день. Нажмите «+ Добавить диапазон», если
-                  свободны только часть дня.
-                </div>
-              ) : (
-                <div className="profile-availability-time-ranges">
-                  {selectedRanges.map((r, idx) => (
-                    <div key={`${selectedDate}:${idx}`} className="profile-availability-time-row">
-                      <InlineTextField
-                        className="profile-availability-time-input"
-                        type="time"
-                        value={r.from}
-                        onChange={(e) => {
-                          const next = selectedRanges.slice();
-                          next[idx] = { ...next[idx]!, from: e.target.value };
-                          dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }));
-                        }}
-                      />
-                      <div className="profile-availability-time-sep">—</div>
-                      <InlineTextField
-                        className="profile-availability-time-input"
-                        type="time"
-                        value={r.to}
-                        onChange={(e) => {
-                          const next = selectedRanges.slice();
-                          next[idx] = { ...next[idx]!, to: e.target.value };
-                          dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }));
-                        }}
-                      />
-                      <Button
-                        className="danger"
-                        type="button"
-                        onClick={() => {
-                          const next = selectedRanges.slice();
-                          next.splice(idx, 1);
-                          dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }));
-                        }}
-                      >
-                        Удалить
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {selectedStatus === "present" && (
-                <div className="profile-availability-time-actions">
-                  <Button
-                    className="primary"
-                    type="button"
-                    onClick={() => {
-                      const next = [...selectedRanges, { from: "19:00", to: "21:00" }];
-                      dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }));
-                    }}
-                  >
-                    + Добавить диапазон
-                  </Button>
-                  {selectedRanges.length > 0 ? (
+            ) : selectedRanges.length === 0 ? (
+              <div className="profile-availability-hint">
+                Интервалы не заданы — доступен весь день. «+ Добавить диапазон», если свободны только часть дня.
+              </div>
+            ) : (
+              <div className="profile-availability-time-ranges">
+                {selectedRanges.map((r, idx) => (
+                  <div key={`${selectedDate}:${idx}`} className="profile-availability-time-row">
+                    <InlineTextField
+                      className="profile-availability-time-input"
+                      type="time"
+                      value={r.from}
+                      onChange={(e) => {
+                        const next = selectedRanges.slice();
+                        next[idx] = { ...next[idx]!, from: e.target.value };
+                        dispatch(
+                          profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }),
+                        );
+                      }}
+                    />
+                    <div className="profile-availability-time-sep">—</div>
+                    <InlineTextField
+                      className="profile-availability-time-input"
+                      type="time"
+                      value={r.to}
+                      onChange={(e) => {
+                        const next = selectedRanges.slice();
+                        next[idx] = { ...next[idx]!, to: e.target.value };
+                        dispatch(
+                          profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }),
+                        );
+                      }}
+                    />
                     <Button
                       className="danger"
                       type="button"
-                      onClick={() => dispatch(profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: [] }))}
+                      onClick={() => {
+                        const next = selectedRanges.slice();
+                        next.splice(idx, 1);
+                        dispatch(
+                          profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }),
+                        );
+                      }}
                     >
-                      Очистить время
+                      Удалить
                     </Button>
-                  ) : null}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
-            <div className="profile-availability-sessions-title">Режиссёрские сессии на {selectedDate}:</div>
-            <div className="profile-availability-sessions">
-              {selectedDaySessionsAll.length === 0 ? (
-                <div className="profile-availability-hint">Нет сессий в этот день.</div>
-              ) : (
-                selectedDaySessionsAll.map((s) => (
+            {selectedStatus === "present" && (
+              <div className="profile-availability-time-actions">
+                <Button
+                  className="primary"
+                  type="button"
+                  onClick={() => {
+                    const next = [...selectedRanges, { from: "19:00", to: "21:00" }];
+                    dispatch(
+                      profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: next }),
+                    );
+                  }}
+                >
+                  + Добавить диапазон
+                </Button>
+                {selectedRanges.length > 0 ? (
+                  <Button
+                    className="danger"
+                    type="button"
+                    onClick={() =>
+                      dispatch(
+                        profileDataActions.setTimeRangesForDate({ date: selectedDate, ranges: [] }),
+                      )
+                    }
+                  >
+                    Очистить время
+                  </Button>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="profile-availability-sessions-title">Сессии в этот день</div>
+          <div className="profile-availability-day-sessions__list profile-availability-day-sessions__list--modal">
+            {selectedDaySessionsAll.length === 0 ? (
+              <div className="profile-availability-hint">Нет сессий в этот день.</div>
+            ) : (
+              selectedDaySessionsAll.map((s) => {
+                const time = formatTimeHHMM(getSessionStartLocalMinutes(s.startsAt));
+                return (
                   <button
                     key={s.id}
                     type="button"
-                    className="profile-availability-session-link"
+                    className="profile-availability-day-session"
                     onClick={() => setSessionDetailModalId(s.id)}
                   >
-                    <div className="profile-availability-session-title">{s.title}</div>
-                    <div className="profile-availability-session-meta">
-                      {new Date(s.startsAt).toLocaleString("ru-RU")}
-                    </div>
+                    <span className="profile-availability-day-session__time">{time}</span>
+                    <span className="profile-availability-day-session__title">{s.title}</span>
                   </button>
-                ))
-              )}
-            </div>
+                );
+              })
+            )}
           </div>
-        )}
-      </div>
+        </div>
 
-      <div className="profile-availability-month-sessions">Режиссёрские сессии в этом месяце:</div>
-      <div className="profile-availability-sessions">
-        {directorMonthSessions.length === 0 ? (
-          <div className="profile-availability-hint">Пока нет сессий в этом месяце.</div>
-        ) : (
-          directorMonthSessions.slice(0, 40).map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className="profile-availability-session-link profile-availability-session-link--muted"
-              onClick={() => setSessionDetailModalId(s.id)}
-            >
-              <div className="profile-availability-session-title">{s.title}</div>
-              <div className="profile-availability-session-meta">{new Date(s.startsAt).toLocaleString("ru-RU")}</div>
-            </button>
-          ))
-        )}
-      </div>
-
-      {flags.loading ? <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>Загрузка сессий…</div> : null}
+        <div className="profile-availability-day-modal__foot">
+          <Button type="button" onClick={() => setDayModalOpen(false)}>
+            Готово
+          </Button>
+        </div>
+      </Modal>
 
       <DirectorSessionDetailModal
         isOpen={!!sessionDetailModalId}
@@ -417,4 +437,3 @@ export function ProfileAvailabilityTab() {
     </div>
   );
 }
-

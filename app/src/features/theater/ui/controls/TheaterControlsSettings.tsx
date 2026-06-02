@@ -31,6 +31,13 @@ export function TheaterControlsSettings({ vm }: TheaterControlsTabProps) {
       <div className="theater-editor-panel-heading theater-editor-panel-heading--settings">
 
         Параметры
+        <button
+          type="button"
+          className="theater-mobile-hide-panel-btn"
+          onClick={() => vm.setShowControls(false)}
+        >
+          Показать 3D
+        </button>
 
       </div>
 

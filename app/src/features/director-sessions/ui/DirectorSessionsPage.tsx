@@ -1,9 +1,12 @@
+import { CalendarSection } from "@shared/components/calendar/CalendarSection";
 import { Buttons } from "@shared/components/buttons/Buttons";
-import { ListItem } from "@shared/components/list-item/ListItem";
 import { Button } from "@shared/core/button/Button";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import cn from "classnames";
+import dayjs from "dayjs";
+import "dayjs/locale/ru";
 import React from "react";
+import { formatTimeHHMM, getSessionStartLocalMinutes } from "../model/session-page-utils";
 import "../../director-session-detail/director-session-detail.css";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
@@ -17,25 +20,23 @@ import {
 export type { DirectorSessionsPageViewModel } from "../model/useDirectorSessionsPage";
 export { useDirectorSessionsPage } from "../model/useDirectorSessionsPage";
 
+dayjs.locale("ru");
+
 export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewModel }) {
   const {
-    sessionsCount,
-    activeIndex,
-    sessions,
     activeSessionId,
     setActiveSessionId,
-    draggedSessionId,
-    setDraggedSessionId,
     navigateToSessionPage,
-    suppressSessionRowClickUntilRef,
-    cancelSessionRowLongPress,
-    onSessionRowPointerDown,
-    onSessionRowPointerMove,
     activeSession,
-    moveSessionDelta,
     deleteSession,
-    createSession,
-    moveSessionBefore,
+    createSessionForSelectedDate,
+    createSessionAtDate,
+    calendarState,
+    setCalendarState,
+    dotsByDate,
+    eventsByDate,
+    sessionsForSelectedDay,
+    calendarSelectedDateLabel,
     updateActiveSession,
     sessionDateInputId,
     sessionTimeInputId,
@@ -71,110 +72,107 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
 
         <div className="sessions-layout">
           <aside className="sessions-side">
-            <RehearsalsCard>
-              <div className="sessions-actions">
+            <RehearsalsCard className="sessions-calendar-card">
+              <div className="sessions-calendar-toolbar">
                 <Button
                   type="button"
-                  onClick={() =>
-                    activeSessionId &&
-                    void moveSessionDelta(activeSessionId, -1)
-                  }
-                  disabled={activeIndex <= 0}
-                  title="Переместить выбранную сессию вверх"
+                  onClick={() => void createSessionForSelectedDate()}
+                  title={`Создать сессию на ${calendarSelectedDateLabel}, 20:00`}
                 >
-                  ↑
+                  + Сессия на день
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() =>
-                    activeSessionId && void moveSessionDelta(activeSessionId, 1)
-                  }
-                  disabled={
-                    activeIndex < 0 || activeIndex === sessionsCount - 1
-                  }
-                  title="Переместить выбранную сессию вниз"
-                >
-                  ↓
-                </Button>
-                <Buttons.DeleteButton
-                  type="button"
-                  className="sessions-actions__btn-delete"
-                  onClick={() =>
-                    activeSessionId && void deleteSession(activeSessionId)
-                  }
-                  disabled={activeIndex < 0}
-                  title="Удалить выбранную сессию"
-                />
               </div>
-              <div className="sessions-list">
-                {(sessions ?? []).map((s, index) => (
-                  <div
-                    key={s.id}
-                    className={`sessions-sessionRow ${s.id === activeSessionId ? "active" : ""}`}
-                    title="Выбор: клик · открыть сессию: двойной клик или долгое нажатие"
-                    onClick={() => {
-                      if (Date.now() < suppressSessionRowClickUntilRef.current)
-                        return;
-                      setActiveSessionId(s.id);
-                    }}
-                    onDoubleClick={() => navigateToSessionPage(s.id)}
-                    onPointerDown={(e) => onSessionRowPointerDown(e, s.id)}
-                    onPointerMove={(e) => onSessionRowPointerMove(e, s.id)}
-                    onPointerUp={cancelSessionRowLongPress}
-                    onPointerCancel={cancelSessionRowLongPress}
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const dragId =
-                        e.dataTransfer.getData("text/plain") ||
-                        draggedSessionId;
-                      if (!dragId) return;
-                      void moveSessionBefore(dragId, s.id);
-                    }}
-                  >
-                    <ListItem
-                      className={`sessions-listItem-row ${s.id === activeSessionId ? "active" : ""} ${draggedSessionId === s.id ? "dragging" : ""}`}
-                    >
-                      <span
-                        className="sessions-sessionRow__dragHandle"
-                        draggable
-                        title="Перетащи за ручку, чтобы изменить порядок"
-                        role="presentation"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onDragStart={(e) => {
-                          cancelSessionRowLongPress();
-                          e.dataTransfer.setData("text/plain", s.id);
-                          e.dataTransfer.effectAllowed = "move";
-                          setDraggedSessionId(s.id);
-                        }}
-                        onDragEnd={() => setDraggedSessionId(null)}
-                      >
-                        ⋮⋮
-                      </span>
-                      <button
-                        type="button"
-                        className="rehearsals-item"
-                        title="Выбор — клик · страница сессии — двойной клик или долгое нажатие"
-                      >
-                        <div className="rehearsals-item-title">{s.title}</div>
-                      </button>
-                    </ListItem>
-                  </div>
-                ))}
-                <Buttons.AddButton
-                  type="button"
-                  onClick={createSession}
-                  title="Новая сессия"
-                  aria-label="Добавить сессию"
-                />
+
+              <CalendarSection
+                className="sessions-calendar"
+                storageMonthKey="director-sessions-calendar-month"
+                onStateChange={setCalendarState}
+                dotsByDate={dotsByDate}
+                eventsByDate={eventsByDate}
+                onDayDoubleClick={(date) => void createSessionAtDate(date)}
+                title="Календарь сессий"
+                subtitle="Клик — выбрать день · двойной клик по дню — новая сессия в 20:00"
+              />
+
+              <div className="sessions-day-panel">
+                <div className="sessions-day-panel__head">
+                  <span className="sessions-day-panel__title">
+                    {calendarSelectedDateLabel}
+                  </span>
+                  <span className="rehearsals-muted sessions-day-panel__count">
+                    {sessionsForSelectedDay.length
+                      ? `${sessionsForSelectedDay.length} сесс.`
+                      : "нет сессий"}
+                  </span>
+                </div>
+
+                <div className="sessions-day-list">
+                  {sessionsForSelectedDay.length === 0 ? (
+                    <div className="rehearsals-muted sessions-day-list__empty">
+                      На этот день сессий нет. Нажмите «+ Сессия на день» или
+                      сделайте двойной клик по дате в календаре.
+                    </div>
+                  ) : (
+                    sessionsForSelectedDay.map((s) => {
+                      const time = formatTimeHHMM(
+                        getSessionStartLocalMinutes(s.startsAt),
+                      );
+                      const published = Boolean(
+                        String(s.publishedAt ?? "").trim(),
+                      );
+                      const isActive = s.id === activeSessionId;
+                      return (
+                        <div
+                          key={s.id}
+                          className={cn("sessions-day-item", {
+                            "sessions-day-item--active": isActive,
+                          })}
+                        >
+                          <button
+                            type="button"
+                            className="sessions-day-item__main"
+                            onClick={() => setActiveSessionId(s.id)}
+                            onDoubleClick={() => navigateToSessionPage(s.id)}
+                            title="Клик — выбрать · двойной клик — план и материалы"
+                          >
+                            <span className="sessions-day-item__time">
+                              {time}
+                            </span>
+                            <span className="sessions-day-item__title">
+                              {s.title}
+                            </span>
+                            {published ? (
+                              <span className="sessions-day-item__badge sessions-day-item__badge--published">
+                                опубликована
+                              </span>
+                            ) : (
+                              <span className="sessions-day-item__badge">
+                                черновик
+                              </span>
+                            )}
+                          </button>
+                          <Buttons.DeleteButton
+                            type="button"
+                            className="sessions-day-item__delete"
+                            onClick={() => void deleteSession(s.id)}
+                            title="Удалить сессию"
+                            aria-label="Удалить сессию"
+                          />
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             </RehearsalsCard>
           </aside>
 
           <div className="sessions-main">
             {!activeSession ? (
-              <div className="rehearsals-muted">Выбери или создай сессию.</div>
+              <div className="rehearsals-muted sessions-main-empty">
+                Выберите день в календаре и создайте сессию или выберите существующую
+                в списке под календарём.
+              </div>
             ) : (
               <div className="sessions-panels">
                 <RehearsalsCard fluid>
@@ -843,13 +841,25 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
 export function DirectorSessionsPage() {
   const vm = useDirectorSessionsPage();
   if (vm.needsAuth) {
-    return <div className="rehearsals-muted">Нужно войти.</div>;
+    return (
+      <div className="rehearsals-page sessions-page">
+        <div className="rehearsals-muted">Нужно войти.</div>
+      </div>
+    );
   }
   if (vm.loading) {
-    return <div className="rehearsals-muted">Загрузка сессий…</div>;
+    return (
+      <div className="rehearsals-page sessions-page">
+        <div className="rehearsals-muted">Загрузка сессий…</div>
+      </div>
+    );
   }
   if (vm.error) {
-    return <div className="rehearsals-error">{vm.error}</div>;
+    return (
+      <div className="rehearsals-page sessions-page">
+        <div className="rehearsals-error">{vm.error}</div>
+      </div>
+    );
   }
   return <DirectorSessionsPageView vm={vm} />;
 }

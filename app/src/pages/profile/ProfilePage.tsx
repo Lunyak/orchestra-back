@@ -36,7 +36,17 @@ export function ProfilePage() {
     }
   }, [activeTab, dispatch]);
 
-  if (!accessToken) return <div>Нужно войти, чтобы открыть профиль.</div>;
+  if (!accessToken) {
+    return (
+      <div className="app-layout profile-layout">
+        <div className="app-content">
+          <main className="main-content main-content-profile">
+            <div className="profile-view profile-hint">Нужно войти, чтобы открыть профиль.</div>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   const setTab = (value: ProfileTabId) => {
     if (isTabDisabled(value)) return;
@@ -46,9 +56,9 @@ export function ProfilePage() {
   return (
     <div className="app-layout profile-layout">
       <div className="app-content">
-        <main className="main-content">
+        <main className="main-content main-content-profile">
           <div className="profile-view">
-            <h2>Профиль</h2>
+            <h1 className="profile-page-title">Профиль</h1>
             {isLimitedProductionMode ? (
               <div className="profile-tabs-disabled-note">
                 Некоторые разделы профиля временно недоступны в production. Страница в стадии разработки.
@@ -64,7 +74,7 @@ export function ProfilePage() {
                 aria-selected={activeTab === "profile"}
                 disabled={isTabDisabled("profile")}
               >
-                Данные профиля
+                Профиль
               </button>
               <button
                 type="button"

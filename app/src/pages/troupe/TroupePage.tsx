@@ -386,7 +386,9 @@ export function TroupePage() {
                   {members.length === 0 ? (
                     <div className="troupe-cell troupe-empty">
                       {projectName
-                        ? `В проекте «${currentProjectDisplayName}» пока нет участников.`
+                        ? canManageProjectTroupe
+                          ? "В труппе пока никого нет — добавьте участника по email ниже."
+                          : `В проекте «${currentProjectDisplayName}» пока нет участников.`
                         : "Нет активного проекта — выберите проект в шапке приложения."}
                     </div>
                   ) : (

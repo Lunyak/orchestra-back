@@ -94,27 +94,10 @@ export function useSpectaclePage() {
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 980);
+    const checkMobile = () => setIsMobile(window.innerWidth <= 1024);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  useEffect(() => {
-    if (isMobile && (mobilePlaylistOpen || mobileStepsOpen)) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobile, mobilePlaylistOpen, mobileStepsOpen]);
-
-  const [theaterOutlinerHost, setTheaterOutlinerHost] =
-    useState<HTMLDivElement | null>(null);
-  const setTheaterOutlinerHostRef = useCallback((node: HTMLDivElement | null) => {
-    setTheaterOutlinerHost(node);
   }, []);
 
   const activeView: SpectacleActiveView =
@@ -128,6 +111,46 @@ export function useSpectaclePage() {
               location.pathname.startsWith("/sessions/")
             ? "sessions"
             : "script";
+  const isTheaterView = activeView === "theater";
+
+  const [theaterOutlinerHost, setTheaterOutlinerHost] =
+    useState<HTMLDivElement | null>(null);
+  const appliedMobileTheaterPanelDefaultRef = useRef(false);
+  const setTheaterOutlinerHostRef = useCallback((node: HTMLDivElement | null) => {
+    setTheaterOutlinerHost(node);
+  }, []);
+
+  useEffect(() => {
+    if (
+      isMobile &&
+      (mobilePlaylistOpen || mobileStepsOpen || (isTheaterView && showTheaterControls))
+    ) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [
+    isMobile,
+    isTheaterView,
+    mobilePlaylistOpen,
+    mobileStepsOpen,
+    showTheaterControls,
+  ]);
+
+  useEffect(() => {
+    if (!isMobile || activeView !== "theater") {
+      appliedMobileTheaterPanelDefaultRef.current = false;
+      return;
+    }
+
+    if (!appliedMobileTheaterPanelDefaultRef.current) {
+      appliedMobileTheaterPanelDefaultRef.current = true;
+      setShowTheaterControls(false);
+    }
+  }, [activeView, isMobile, setShowTheaterControls]);
 
   useEffect(() => {
     localStorage.setItem("activeView", activeView);
@@ -137,7 +160,6 @@ export function useSpectaclePage() {
     activeView === "script" ||
     activeView === "light-plot" ||
     activeView === "theater";
-  const isTheaterView = activeView === "theater";
   const compactMainChrome = activeView === "board" || activeView === "sessions";
 
   const kanbanMembers = useMemo(

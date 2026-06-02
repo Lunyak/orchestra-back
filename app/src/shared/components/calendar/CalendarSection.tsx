@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { MonthCalendar, type MonthCalendarStatus } from "./MonthCalendar";
+import {
+  MonthCalendar,
+  type MonthCalendarEvent,
+  type MonthCalendarStatus,
+} from "./MonthCalendar";
 
 function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
@@ -29,20 +33,28 @@ export function CalendarSection({
   subtitle,
   statusByDate,
   dotsByDate,
+  eventsByDate,
   onDayClick,
+  onDayDoubleClick,
   initialSelectedDate,
   onStateChange,
   weekDayLabels,
+  className,
+  showStatusMarks,
 }: {
   storageMonthKey: string;
   title?: string;
   subtitle?: string;
+  className?: string;
   statusByDate?: Record<string, MonthCalendarStatus | undefined>;
   dotsByDate?: Record<string, number | undefined>;
+  eventsByDate?: Record<string, MonthCalendarEvent[] | undefined>;
   onDayClick?: (isoYmd: string) => void;
+  onDayDoubleClick?: (isoYmd: string) => void;
   initialSelectedDate?: string;
   onStateChange?: (state: CalendarSectionState) => void;
   weekDayLabels?: string[];
+  showStatusMarks?: boolean;
 }) {
   const [currentMonth, setCurrentMonth] = useState(() => {
     const saved = localStorage.getItem(storageMonthKey);
@@ -91,18 +103,23 @@ export function CalendarSection({
   ]);
 
   return (
-    <MonthCalendar
-      currentMonth={currentMonth}
-      selectedDate={selectedDate}
-      onChangeMonth={setCurrentMonth}
-      onSelectDate={setSelectedDate}
-      onDayClick={onDayClick}
-      statusByDate={statusByDate}
-      dotsByDate={dotsByDate}
-      title={title}
-      subtitle={subtitle}
-      weekDayLabels={weekDayLabels}
-    />
+    <div className={className}>
+      <MonthCalendar
+        currentMonth={currentMonth}
+        selectedDate={selectedDate}
+        onChangeMonth={setCurrentMonth}
+        onSelectDate={setSelectedDate}
+        onDayClick={onDayClick}
+        onDayDoubleClick={onDayDoubleClick}
+        statusByDate={statusByDate}
+        dotsByDate={dotsByDate}
+        eventsByDate={eventsByDate}
+        title={title}
+        subtitle={subtitle}
+        weekDayLabels={weekDayLabels}
+        showStatusMarks={showStatusMarks}
+      />
+    </div>
   );
 }
 

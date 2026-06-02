@@ -1,4 +1,8 @@
-﻿import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
+﻿import type { CalendarSectionState } from "@shared/components/calendar/CalendarSection";
+import type { MonthCalendarEvent } from "@shared/components/calendar/MonthCalendar";
+import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
+import dayjs from "dayjs";
+import "dayjs/locale/ru";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth";
@@ -8,6 +12,7 @@ import {
   computePlannedEmailsForSession,
   findDirectorSessionParticipant,
   formatSlotTime,
+  formatTimeHHMM,
   getSessionStartLocalMinutes,
   getLocalDateTimeParts,
   isDirectorSessionPublished,
@@ -100,6 +105,28 @@ export function useDirectorSessionsPage() {
   >(null);
 
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
+  const [calendarState, setCalendarState] = useState<CalendarSectionState>(() => {
+    const today = toDateKey(new Date());
+    const d = new Date(`${today}T12:00:00`);
+    const monthStart = new Date(d.getFullYear(), d.getMonth(), 1);
+    const monthEnd = new Date(
+      d.getFullYear(),
+      d.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999,
+    );
+    return {
+      currentMonth: d,
+      selectedDate: today,
+      monthStartDate: monthStart,
+      monthEndDate: monthEnd,
+      fromIso: monthStart.toISOString(),
+      toIso: monthEnd.toISOString(),
+    };
+  });
   /** Любой PUT без publishedAt в payload не должен «снимать» публикацию в UI; сервер уже мержит, клиент тоже. */
   const publishedAtBySessionIdRef = useRef<Map<string, string>>(new Map());
 
@@ -197,6 +224,54 @@ export function useDirectorSessionsPage() {
     [activeSessionId, sessions],
   );
 
+  const sessionsByDate = useMemo(() => {
+    const grouped = new Map<string, DirectorRehearsalSession[]>();
+    for (const session of sessions ?? []) {
+      const d = new Date(session.startsAt);
+      if (!Number.isFinite(d.getTime())) continue;
+      const key = toDateKey(d);
+      const arr = grouped.get(key);
+      if (arr) arr.push(session);
+      else grouped.set(key, [session]);
+    }
+    for (const list of grouped.values()) {
+      list.sort(
+        (a, b) =>
+          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+      );
+    }
+    return grouped;
+  }, [sessions]);
+
+  const dotsByDate = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [date, list] of sessionsByDate.entries()) {
+      out[date] = list.length;
+    }
+    return out;
+  }, [sessionsByDate]);
+
+  const eventsByDate = useMemo(() => {
+    const out: Record<string, MonthCalendarEvent[]> = {};
+    for (const [date, list] of sessionsByDate.entries()) {
+      out[date] = list.map((s) => ({
+        id: s.id,
+        time: formatTimeHHMM(getSessionStartLocalMinutes(s.startsAt)),
+        title: String(s.title ?? "Сессия").trim() || "Сессия",
+        published: isDirectorSessionPublished(s),
+      }));
+    }
+    return out;
+  }, [sessionsByDate]);
+
+  const sessionsForSelectedDay =
+    sessionsByDate.get(calendarState.selectedDate) ?? [];
+
+  const calendarSelectedDateLabel = useMemo(
+    () => dayjs(calendarState.selectedDate).format("D MMMM YYYY"),
+    [calendarState.selectedDate],
+  );
+
   const activeSessionPublished = Boolean(
     String(
       (activeSession as DirectorRehearsalSession | null)?.publishedAt ?? "",
@@ -221,6 +296,24 @@ export function useDirectorSessionsPage() {
       return slots[0]?.id ?? null;
     });
   }, [activeSessionId, activeSession, slotIdFromUrl]);
+
+  useEffect(() => {
+    if (!activeSession?.startsAt) return;
+    const dk = toDateKey(new Date(activeSession.startsAt));
+    if (!dk || dk === calendarState.selectedDate) return;
+    setCalendarState((prev) => ({ ...prev, selectedDate: dk }));
+  }, [activeSessionId, activeSession?.startsAt, calendarState.selectedDate]);
+
+  useEffect(() => {
+    const daySessions = sessionsByDate.get(calendarState.selectedDate) ?? [];
+    if (daySessions.length === 0) {
+      if (activeSessionId != null) setActiveSessionId(null);
+      return;
+    }
+    if (!daySessions.some((s) => s.id === activeSessionId)) {
+      setActiveSessionId(daySessions[0].id);
+    }
+  }, [calendarState.selectedDate, sessionsByDate, activeSessionId]);
 
   const sessionDateKey = useMemo(() => {
     if (!activeSession?.startsAt) return null;
@@ -363,19 +456,30 @@ export function useDirectorSessionsPage() {
     await persist(next);
   };
 
-  const createSession = async () => {
-    const now = new Date();
-    const nowIso = now.toISOString();
+  const createSessionAtDate = async (dateKey: string, timeLocal = "20:00") => {
+    const dk = String(dateKey ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) return;
+    const nowIso = new Date().toISOString();
+    const startsAt = new Date(`${dk}T${timeLocal}:00`).toISOString();
     const next: DirectorRehearsalSession = {
       id: createId(),
-      title: `Сессия ${now.toLocaleDateString()}`,
-      startsAt: nowIso,
+      title: `Сессия ${dayjs(dk).format("D MMM")}`,
+      startsAt,
       slots: [{ id: createId(), offsetMin: 0, durationMin: 30 }],
       updatedAt: nowIso,
     };
     const merged = [next, ...sessions];
     setActiveSessionId(next.id);
+    setCalendarState((prev) => ({ ...prev, selectedDate: dk }));
     await persist(merged);
+  };
+
+  const createSession = async () => {
+    await createSessionAtDate(calendarState.selectedDate);
+  };
+
+  const createSessionForSelectedDate = async () => {
+    await createSessionAtDate(calendarState.selectedDate);
   };
 
   const updateSessionById = async (
@@ -1072,6 +1176,14 @@ export function useDirectorSessionsPage() {
     moveSessionDelta,
     deleteSession,
     createSession,
+    createSessionAtDate,
+    createSessionForSelectedDate,
+    calendarState,
+    setCalendarState,
+    dotsByDate,
+    eventsByDate,
+    sessionsForSelectedDay,
+    calendarSelectedDateLabel,
     updateActiveSession,
     sessionCommentDraft,
     onSessionCommentChange,
