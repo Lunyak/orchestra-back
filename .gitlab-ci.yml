@@ -58,6 +58,9 @@ test:back:
 # Общий SSH-доступ к VPS (runner без DinD — сборка и деплой на хосте с Docker).
 .deploy_ssh:
   image: alpine:latest
+  variables:
+    # compose up ждёт healthcheck back/bot без вывода — sshd обрывает «тихую» сессию
+    SSH_OPTS: "-o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=40 -o ConnectTimeout=30"
   before_script:
     - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
@@ -79,7 +82,7 @@ build:back:
   stage: build
   script:
     - |
-      ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} \
+      ssh ${SSH_OPTS} root@${DEPLOY_HOST} \
         "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose build back bot"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
@@ -92,8 +95,35 @@ deploy:
     - build:back
   script:
     - |
-      ssh -o StrictHostKeyChecking=accept-new root@${DEPLOY_HOST} \
-        "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose up -d postgres back bot dozzle"
+      ssh ${SSH_OPTS} root@${DEPLOY_HOST} "export BRANCH='${CI_DEFAULT_BRANCH}'; bash -s" <<'EOS'
+      set -e
+      cd /opt/orchestra-back
+      git fetch --all --prune
+      git reset --hard "origin/${BRANCH}"
+      git clean -fd
+      # --no-wait: не держим SSH, пока compose ждёт healthcheck (миграции + Nest)
+      docker compose up -d --no-wait postgres back bot dozzle 2>/dev/null \
+        || docker compose up -d postgres back bot dozzle
+      echo "Waiting for orkestr-back health (up to 3 min)..."
+      deadline=$(( $(date +%s) + 180 ))
+      while [ "$(date +%s)" -lt "$deadline" ]; do
+        status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' orkestr-back 2>/dev/null || echo missing)"
+        echo "  orkestr-back: ${status}"
+        if [ "$status" = healthy ]; then
+          echo "Deploy OK: back is healthy"
+          exit 0
+        fi
+        if [ "$status" = unhealthy ]; then
+          echo "orkestr-back is unhealthy — recent logs:"
+          docker logs --tail 80 orkestr-back 2>&1 || true
+          exit 1
+        fi
+        sleep 5
+      done
+      echo "Timeout waiting for orkestr-back — recent logs:"
+      docker logs --tail 80 orkestr-back 2>&1 || true
+      exit 1
+      EOS
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 # Опционально: пуш образов в GitLab Container Registry
