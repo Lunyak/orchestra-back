@@ -16,5 +16,12 @@ export {
   toggleSofitChannel,
   formatSofitChannelsLabel,
 } from "./light-channel-roles";
+export { LightChannelsCountControls } from "./LightChannelsCountControls";
+export {
+  appendLightChannel,
+  removeLastLightChannel,
+  MAX_LIGHT_CHANNELS,
+  MIN_LIGHT_CHANNELS,
+} from "./light-channels-mutate";
 export { useLightConsoleState } from "./useLightConsoleState";
 export * from "./light-console-data";

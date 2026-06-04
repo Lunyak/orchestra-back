@@ -14,6 +14,7 @@ import {
 } from "../../platform/desktop-methods";
 import { createAudioFadeController } from "../../media/audio-fade";
 import { resolveOfflineMediaUrl } from "../../platform/media-url";
+import { registerSoundPlayHandler } from "../../../features/scene/model/scene-playback-bridge";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import "./style.css";
 
@@ -467,6 +468,17 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     };
     onRegisterToggleHandler(handler);
   }, [onRegisterToggleHandler]);
+
+  useEffect(() => {
+    registerSoundPlayHandler((soundId: number) => {
+      const id = Number(soundId);
+      if (!Number.isFinite(id)) return;
+      const target = tracksRef.current.find((t) => Number(t.id) === id) ?? null;
+      if (!target || target.isPlaying) return;
+      toggleTrack(target);
+    });
+    return () => registerSoundPlayHandler(undefined);
+  }, []);
 
   const handleVolumeChange = (track: LoadedTrack, value: number) => {
     const audio = audioRefs.current[track.id];

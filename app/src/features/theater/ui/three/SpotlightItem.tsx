@@ -7,12 +7,32 @@ import type { TheaterLayout, TheaterSpotlight } from "../../../../shared/types/s
 import { applyAlignGuideSnap } from "../../model/theater-align-guides";
 import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
 import {
+  formatChannelShort,
+  formatFaderShort,
+} from "../../../../shared/components/light-console/light-console-labels";
+import {
+  readSpotlightChannel,
+  readSpotlightFaderId,
+} from "../../model/theater-light-fader-bindings";
+import {
   theaterSpotlightDistance,
   theaterSpotlightLightIntensity,
   THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
   THEATER_SPOTLIGHT_DECAY,
   THEATER_SPOTLIGHT_PENUMBRA,
 } from "../../model/theater-scene-lighting";
+
+function formatSpotlightHeadLabel(config: TheaterSpotlight): string {
+  const channel = readSpotlightChannel(config) ?? config.id;
+  if (config.isRgb) {
+    return formatChannelShort(channel);
+  }
+  const faderId = readSpotlightFaderId(config);
+  if (faderId != null) {
+    return `${formatChannelShort(channel)} ${formatFaderShort(faderId)}`;
+  }
+  return formatChannelShort(channel);
+}
 
 export const SpotlightItem = ({
   config,
@@ -28,6 +48,7 @@ export const SpotlightItem = ({
   alignGuidesEnabled = false,
   onAlignGuidesChange,
   showHelpers,
+  showSpotlightLabels = false,
   showGuideLine = true,
   onTargetChange,
   onPositionChange,
@@ -51,6 +72,8 @@ export const SpotlightItem = ({
   alignGuidesEnabled?: boolean;
   onAlignGuidesChange?: (guides: ReturnType<typeof applyAlignGuideSnap>["guides"]) => void;
   showHelpers: boolean;
+  /** K / K+F над корпусом софита (все видимые в режиме софитов). */
+  showSpotlightLabels?: boolean;
   showGuideLine?: boolean;
   onTargetChange: (id: number, next: [number, number, number]) => void;
   onPositionChange: (id: number, next: [number, number, number]) => void;
@@ -115,7 +138,7 @@ export const SpotlightItem = ({
     [displayPosition, displayTarget],
   );
   const isEnabled = config.enabled ?? true;
-  const channelLabel = config.channel ?? config.id;
+  const headLabel = formatSpotlightHeadLabel(config);
   const isRgb = config.isRgb ?? false;
   const uiIntensity = config.intensity ?? THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
   const lightIntensity = theaterSpotlightLightIntensity(uiIntensity, isRgb);
@@ -145,8 +168,8 @@ export const SpotlightItem = ({
   const sourceColor = isHighlighted
     ? highlightFocus
     : config.color || tc("--color-warning");
-  const labelVisible = showHelpers || isHighlighted;
-  const fixtureVisible = showHelpers || isHighlighted;
+  const headLabelVisible = showSpotlightLabels || showHelpers || isHighlighted;
+  const helperVisible = showHelpers || isHighlighted;
 
   useEffect(() => {
     aimTarget.current.set(...config.target);
@@ -218,7 +241,7 @@ export const SpotlightItem = ({
           color={config.color || tc("--color-warning")}
         />
       )}
-      {showGuideLine && labelVisible && isEnabled ? (
+      {showGuideLine && helperVisible && isEnabled ? (
         <primitive object={beamLineObject} raycast={() => null} />
       ) : null}
       {showHelpers &&
@@ -304,7 +327,7 @@ export const SpotlightItem = ({
       <mesh
         ref={sourceRef}
         position={config.position}
-        visible={labelVisible}
+        visible={helperVisible}
         onPointerDown={(event) => {
           event.stopPropagation();
           onSelect?.(
@@ -332,7 +355,7 @@ export const SpotlightItem = ({
           toneMapped={false}
         />
       </mesh>
-      <group ref={fixtureRef} visible={fixtureVisible}>
+      <group ref={fixtureRef} visible={helperVisible}>
         <mesh rotation={[Math.PI / 2, 0, 0]}>
           <cylinderGeometry args={[0.28, 0.24, isRgb ? 0.24 : 0.6, 20]} />
           <meshStandardMaterial
@@ -360,11 +383,13 @@ export const SpotlightItem = ({
       </group>
       <Billboard
         position={[config.position[0], config.position[1] + 0.7, config.position[2]]}
-        visible={labelVisible}
+        visible={headLabelVisible}
       >
         <Text
           ref={labelRef}
-          fontSize={isActive ? 0.72 : isHighlighted ? 0.58 : 0.38}
+          fontSize={
+            isActive ? 0.34 : isHighlighted ? 0.28 : headLabel.length > 3 ? 0.2 : 0.17
+          }
           color={
             isHighlighted
               ? highlightFocus
@@ -378,13 +403,13 @@ export const SpotlightItem = ({
           anchorY="bottom"
           fontWeight={isHighlighted ? "bold" : "normal"}
         >
-          {String(channelLabel)}
+          {headLabel}
         </Text>
       </Billboard>
       <mesh
         ref={targetRef}
         position={config.target}
-        visible={labelVisible && isHighlighted}
+        visible={helperVisible && isHighlighted}
         onContextMenu={(event) => {
           event.stopPropagation();
           event.nativeEvent.preventDefault();

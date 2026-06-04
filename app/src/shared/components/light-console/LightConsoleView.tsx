@@ -7,6 +7,13 @@ import {
   readSpotlightBaseUiIntensity,
 } from "../../../features/theater/model/theater-light-fader-bindings";
 import type { LightConsoleViewProps } from "./light-console-data";
+import { LightChannelsCountControls } from "./LightChannelsCountControls";
+import {
+  formatChannelDefaultLabel,
+  formatChannelShort,
+  formatFaderDefaultLabel,
+  formatProgramShort,
+} from "./light-console-labels";
 import "./light-console.css";
 
 export function LightConsoleView({
@@ -23,6 +30,8 @@ export function LightConsoleView({
   onFaderCountChange,
   onPatchFader,
   onSaveActiveProgram,
+  onAppendLightChannel,
+  onRemoveLightChannel,
   className,
 }: LightConsoleViewProps) {
   const activeProgram =
@@ -49,19 +58,19 @@ export function LightConsoleView({
             const channelRaw = lightChannels[program.id - 1] ?? "";
             const channelParsed = parseLightChannel(channelRaw);
             const channelHint = channelParsed.label
-              ? `K${program.id} · ${channelParsed.label}`
-              : `K${program.id}`;
+              ? `${formatChannelShort(program.id)} · ${channelParsed.label}`
+              : formatChannelShort(program.id);
             return (
               <button
                 key={program.id}
                 type="button"
                 className="light-console__program"
                 data-active={program.id === activeProgram?.id}
-                title={`Программа ${program.id} — заливка (${channelHint})${program.label ? ` · ${program.label}` : ""}`}
+                title={`${formatProgramShort(program.id)} — заливка (${channelHint})${program.label ? ` · ${program.label}` : ""}`}
                 disabled={readOnly && program.id !== activeProgram?.id}
                 onClick={() => onSelectProgram?.(program.id)}
               >
-                {program.id}
+                {formatProgramShort(program.id)}
               </button>
             );
           })}
@@ -72,20 +81,27 @@ export function LightConsoleView({
                 type="number"
                 min={1}
                 max={64}
-                value={faders.count ?? faders.faders.length}
+                value={Math.max(faders.count ?? 0, faders.faders.length)}
                 disabled={readOnly}
                 onChange={(event) => onFaderCountChange(Number(event.target.value))}
               />
             </label>
+          ) : null}
+          {!compact && mode === "live" && onAppendLightChannel && onRemoveLightChannel ? (
+            <LightChannelsCountControls
+              channelCount={lightChannels.length}
+              onAppend={onAppendLightChannel}
+              onRemove={onRemoveLightChannel}
+            />
           ) : null}
         </div>
 
         {!compact && mode === "live" && activeProgram && !readOnly ? (
           <div className="light-console__program-note">
             <p className="light-console__program-note-text">
-              <strong>П{activeProgram.id}</strong> — пресет всего пульта (софиты + уровни). Нажали другую
-              кнопку П… — подставляется её look. После правки ползунков состояние само пишется в эту
-              программу (~1 с) или кнопкой ниже.
+              <strong>K{selectedLightSlot || 1}</strong> — память уровней F этого канала.{" "}
+              <strong>П{activeProgram.id}</strong> — заливка; «Сохранить в память П…» пишет все F со всех K. В
+              техкарту — только отмеченные K и <strong>«Записать свет»</strong> в ленте.
             </p>
             {onSaveActiveProgram ? (
               <button
@@ -93,7 +109,7 @@ export function LightConsoleView({
                 className="light-console__program-save-btn"
                 onClick={onSaveActiveProgram}
               >
-                Сохранить сейчас в П{activeProgram.id}
+                Сохранить в память П{activeProgram.id}
                 {activeProgram.label?.trim() ? ` (${activeProgram.label.trim()})` : ""}
               </button>
             ) : null}
@@ -108,7 +124,7 @@ export function LightConsoleView({
                 {lightChannels.map((raw, index) => {
                   const channel = index + 1;
                   const parsed = parseLightChannel(raw);
-                  const label = parsed.label || `Канал ${channel}`;
+                  const channelHint = formatChannelDefaultLabel(channel, parsed.label);
                   return (
                     <button
                       key={channel}
@@ -116,9 +132,10 @@ export function LightConsoleView({
                       className="light-console__channel"
                       data-active={selectedLightSlot === channel}
                       disabled={readOnly && selectedLightSlot !== channel}
+                      title={`${channelHint} — свои уровни F1–F${faders.count ?? faders.faders.length} для этого канала`}
                       onClick={() => onSelectChannel?.(channel)}
                     >
-                      {label}
+                      {formatChannelShort(channel)}
                     </button>
                   );
                 })}
@@ -169,26 +186,28 @@ export function LightConsoleView({
                       muted
                         ? "Вернуть фейдер"
                         : outputLight != null && baseLight != null
-                          ? `Фейдер 0% (свет софита ${baseLight.toFixed(1)})`
-                          : "Фейдер в 0%"
+                          ? `F${fader.id} в 0% (свет софита ${baseLight.toFixed(1)})`
+                          : `F${fader.id} в 0%`
                     }
                   />
-                  <input
-                    className="light-console-fader__range"
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.01}
-                    value={value}
-                    disabled={disabled}
-                    onChange={(event) => {
-                      const intensity = Number(event.target.value);
-                      onPatchFader?.(fader.id, {
-                        intensity,
-                        enabled: intensity > 0,
-                      });
-                    }}
-                  />
+                  <div className="light-console-fader__range-wrap">
+                    <input
+                      className="light-console-fader__range"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={value}
+                      disabled={disabled}
+                      onChange={(event) => {
+                        const intensity = Number(event.target.value);
+                        onPatchFader?.(fader.id, {
+                          intensity,
+                          enabled: intensity > 0,
+                        });
+                      }}
+                    />
+                  </div>
                   {!compact ? (
                     <input
                       className="light-console-fader__color"
@@ -209,7 +228,9 @@ export function LightConsoleView({
                   >
                     {Math.round(value * 100)}
                   </span>
-                  <span className="light-console-fader__name">{fader.label}</span>
+                  <span className="light-console-fader__name">
+                    {formatFaderDefaultLabel(fader.id, fader.label)}
+                  </span>
                 </div>
               );
             })}

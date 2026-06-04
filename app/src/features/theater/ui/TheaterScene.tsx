@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAppEditorViewMenuRender } from "@shared/components/app-editor-menubar";
+import { useScene } from "../../scene";
+import { patchSceneFaderFromSpotlightIntensity } from "../model/sync-spotlight-fader-level";
 import { useTheaterScene, type TheaterSceneViewModel } from "../model/use-theater-scene";
 import type { TheaterSceneProps } from "../model/theater-scene-types";
 import { useStageGridHighlight } from "../scene/use-stage-grid-highlight";
@@ -37,17 +39,31 @@ export const TheaterScene = ({
   onTogglePanels,
   outlinerHost,
   controlsInPanel,
+  embeddedLightRehearsal = false,
 }: TheaterSceneProps) => {
   const vm = useTheaterScene({
     projectName,
     theaterLayout,
     onTheaterLayoutChange,
   });
+  const { sceneData, setSceneData } = useScene();
 
-
+  useEffect(() => {
+    if (!embeddedLightRehearsal) return;
+    vm.setSpectaclePreviewMode(false);
+    vm.setActiveTab("spotlights");
+    vm.setEditMode("spotlights");
+    vm.setShowFloorPlan(false);
+    vm.setShowControls(false);
+    vm.setShowSpotlights(true);
+    vm.setLightConsoleExpanded(false);
+    vm.setSpotlightAimMode("point");
+  }, [embeddedLightRehearsal]);
 
   const isModelEditMode = vm.editMode === "models" || vm.editMode === "decor";
-  const showEditorHelpers = !vm.spectaclePreviewMode;
+  const showEditorHelpers = embeddedLightRehearsal
+    ? vm.activeTab === "spotlights"
+    : !vm.spectaclePreviewMode;
   const mobileTheaterLayout = useMobileTheaterLayout();
   const controlsInSidebar = Boolean(controlsInPanel);
   const showEditorChrome = controlsInSidebar && vm.showControls && !mobileTheaterLayout;
@@ -55,7 +71,7 @@ export const TheaterScene = ({
   useAppEditorViewMenuRender(
     "theater-view-menu",
     10,
-    () => <TheaterEditorViewMenu vm={vm} />,
+    () => (embeddedLightRehearsal ? null : <TheaterEditorViewMenu vm={vm} />),
   );
 
   const toolbarRender = showEditorChrome ? (
@@ -185,8 +201,17 @@ export const TheaterScene = ({
         onPickDragMode: (mode: "target" | "source") => vm.setDragMode(mode),
         onAngleChange: (angleDeg: number) =>
           vm.updateSpotlight(activeSpotlight.id, { angleDeg }),
-        onIntensityChange: (intensity: number) =>
-          vm.updateSpotlight(activeSpotlight.id, { intensity }),
+        onIntensityChange: (intensity: number) => {
+          vm.updateSpotlight(activeSpotlight.id, { intensity });
+          const nextFaders = patchSceneFaderFromSpotlightIntensity(
+            sceneData?.lightFaders ?? null,
+            activeSpotlight,
+            intensity,
+          );
+          if (nextFaders) {
+            setSceneData((prev) => ({ ...(prev ?? {}), lightFaders: nextFaders }));
+          }
+        },
         onColorChange: (color: string) =>
           vm.updateSpotlight(activeSpotlight.id, { color }),
         onInteractStart: vm.beginTheaterHistoryTransaction,
@@ -234,12 +259,15 @@ export const TheaterScene = ({
     };
   })();
 
+  const embedLight = embeddedLightRehearsal;
+
   return (
     <div
       className={[
         "theater-scene",
         showEditorChrome ? "theater-scene--editor-chrome" : "",
         mobileTheaterLayout ? "theater-scene--mobile-layout" : "",
+        embedLight ? "theater-scene--light-rehearsal-embed" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -255,7 +283,7 @@ export const TheaterScene = ({
       >
         {toolbarRender}
         <div className="theater-scene-body">
-      {onTogglePanels && (
+      {onTogglePanels && !embedLight && (
         <div className="theater-panels-toggle">
           <TheaterBtn
             active={!isPanelsSwapped}
@@ -283,7 +311,7 @@ export const TheaterScene = ({
       {showModelFocusPanel && modelFocusPanelProps ? (
         <TheaterModelFocusPanel {...modelFocusPanelProps} />
       ) : null}
-      {vm.showFloorPlan ? (
+      {vm.showFloorPlan && !embedLight ? (
         <TheaterFloorPlan
           layout={vm.layout}
           models={vm.visibleModels}
@@ -336,37 +364,43 @@ export const TheaterScene = ({
           onPickGridCell={(col, row) => vm.aimActiveSpotlightToGridCell(col, row)}
         />
       ) : null}
-      <div className="theater-canvas-history-actions" aria-label="История изменений сцены">
-        <button
-          type="button"
-          className="theater-canvas-history-btn"
-          disabled={!vm.currentStep || !vm.canUndoTheater}
-          onClick={vm.undoTheater}
-          title="Отменить (Ctrl+Z)"
-        >
-          ↶
-        </button>
-        <button
-          type="button"
-          className="theater-canvas-history-btn"
-          disabled={!vm.currentStep || !vm.canRedoTheater}
-          onClick={vm.redoTheater}
-          title="Повторить (Ctrl+Y)"
-        >
-          ↷
-        </button>
-      </div>
-      <TheaterLightConsolePanel
-        projectName={vm.projectName}
-        spotlights={vm.displaySpotlights}
-        updateSpotlights={vm.updateSpotlights}
-        collapsed={!vm.lightConsoleExpanded}
-      />
-      <TheaterMobileActionBar
-        vm={vm}
-        onTogglePanels={onTogglePanels}
-        isPanelsSwapped={isPanelsSwapped}
-      />
+      {!embedLight ? (
+        <div className="theater-canvas-history-actions" aria-label="История изменений сцены">
+          <button
+            type="button"
+            className="theater-canvas-history-btn"
+            disabled={!vm.currentStep || !vm.canUndoTheater}
+            onClick={vm.undoTheater}
+            title="Отменить (Ctrl+Z)"
+          >
+            ↶
+          </button>
+          <button
+            type="button"
+            className="theater-canvas-history-btn"
+            disabled={!vm.currentStep || !vm.canRedoTheater}
+            onClick={vm.redoTheater}
+            title="Повторить (Ctrl+Y)"
+          >
+            ↷
+          </button>
+        </div>
+      ) : null}
+      {!embedLight ? (
+        <TheaterLightConsolePanel
+          projectName={vm.projectName}
+          spotlights={vm.displaySpotlights}
+          updateSpotlights={vm.updateSpotlights}
+          collapsed={!vm.lightConsoleExpanded}
+        />
+      ) : null}
+      {!embedLight ? (
+        <TheaterMobileActionBar
+          vm={vm}
+          onTogglePanels={onTogglePanels}
+          isPanelsSwapped={isPanelsSwapped}
+        />
+      ) : null}
       <TheaterCanvasShell
         camera={initialCamera}
         backgroundColor={vm.sceneBackgroundColor}

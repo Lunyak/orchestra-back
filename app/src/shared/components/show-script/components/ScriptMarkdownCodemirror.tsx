@@ -16,6 +16,7 @@ import {
   useRef,
 } from "react";
 import { markdownHeadingSectionBlocks } from "./markdownHeadingSectionBlocks";
+import { markdownHideKadrAnchors } from "./markdownHideKadrAnchors";
 import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
 import { orchestraEditorRichTokens } from "./orchestraEditorRichTokens";
 import { scriptMarkdownEditorSyntaxHighlighting } from "./scriptMarkdownEditorHighlight";
@@ -164,6 +165,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
           EditorView.lineWrapping,
           markdownParagraphLineGaps,
           markdownHeadingSectionBlocks(() => kadrSectionBlocksRef.current),
+          markdownHideKadrAnchors(() => kadrSectionBlocksRef.current),
           bracketMatching(),
           indentOnInput(),
           markdown(),

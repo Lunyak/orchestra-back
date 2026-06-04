@@ -1,13 +1,37 @@
-import type { SceneLightFaderV1, SceneLightFadersDataV1 } from "../../scene/model/scene-slice";
+import type {
+  SceneLightFaderV1,
+  SceneLightFadersDataV1,
+  SceneLightProgramsDataV1,
+} from "../../scene/model/scene-slice";
+import type { StepLightKadrFaderStateV1 } from "../../../shared/types/script";
+import {
+  applyProgramFaderStatesToBoard,
+  readProgramChannelFaderStates,
+} from "../../../shared/components/light-console/light-console-data";
+import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";
 import type { ScriptStep, TheaterSpotlight } from "../../../shared/types/script";
-import { THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY } from "./theater-scene-lighting";
+import {
+  formatChannelShort,
+  formatFaderShort,
+} from "../../../shared/components/light-console/light-console-labels";
+import {
+  THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
+  THEATER_SPOTLIGHT_UI_INTENSITY_MAX,
+} from "./theater-scene-lighting";
 
 export function formatCompactChannelSlot(slot: number): string {
-  return `к ${Math.max(1, Math.trunc(slot))}`;
+  return formatChannelShort(slot);
 }
 
 export function formatCompactFaderLabel(faderId: number): string {
-  return `ф ${Math.max(1, Math.trunc(faderId))}`;
+  return formatFaderShort(faderId);
+}
+
+/** UI-яркость софита → уровень F (0…1) для общей доски пульта. */
+export function sceneFaderLevelFromSpotlightUiIntensity(uiIntensity: number): number {
+  const max = THEATER_SPOTLIGHT_UI_INTENSITY_MAX;
+  if (!Number.isFinite(uiIntensity) || max <= 0) return 0;
+  return Math.min(1, Math.max(0, uiIntensity / max));
 }
 
 export function hasSpotlightFaderId(spotlight: TheaterSpotlight): boolean {
@@ -74,12 +98,13 @@ export function spotlightMatchesFader(
   return spotChannel === assignmentChannel;
 }
 
-/** Привязка софита к фейдеру (без учёта выбранного канала на пульте). */
+/** Привязка софита к фейдеру (опционально с учётом активного K на пульте). */
 export function spotlightAssignedToFader(
   spotlight: TheaterSpotlight,
   fader: SceneLightFaderV1,
+  options?: FaderMatchOptions,
 ): boolean {
-  return spotlightMatchesFader(spotlight, fader);
+  return spotlightMatchesFader(spotlight, fader, options);
 }
 
 /** Уровень фейдера 0…1 (не яркость софита). Выключен или ≤0 → 0. */
@@ -133,7 +158,7 @@ export function applyFaderToSpotlightForDisplay(
   const faderId = readSpotlightFaderId(spotlight);
   if (faderId == null || !lightFaders || lightFaders.v !== 1) return spotlight;
   const fader = lightFaders.faders.find((item) => item.id === faderId);
-  if (!fader || !spotlightAssignedToFader(spotlight, fader)) return spotlight;
+  if (!fader || !spotlightMatchesFader(spotlight, fader, options)) return spotlight;
 
   const level = readFaderLevel(fader);
   if (level <= 0) {
@@ -143,8 +168,6 @@ export function applyFaderToSpotlightForDisplay(
       enabled: false,
     };
   }
-
-  if (!spotlightMatchesFader(spotlight, fader, options)) return spotlight;
 
   const faderColor = String(fader.color ?? "").trim();
   return {
@@ -164,6 +187,49 @@ export function applyFadersToSpotlightsForDisplay(
   return spotlights.map((spotlight) =>
     applyFaderToSpotlightForDisplay(spotlight, lightFaders, options),
   );
+}
+
+/**
+ * 3D/превью: у каждого софита уровни F своего K (снимок program[K]).
+ * Живая доска пульта — только для выбранного канала (liveConsoleChannel).
+ */
+export function applyFadersToSpotlightsPerChannelDisplay(
+  spotlights: TheaterSpotlight[],
+  lightFaders: SceneLightFadersDataV1 | null | undefined,
+  lightPrograms: SceneLightProgramsDataV1 | null | undefined,
+  liveConsoleChannel?: number,
+): TheaterSpotlight[] {
+  if (!lightFaders || lightFaders.v !== 1) return spotlights;
+  const liveChannel =
+    liveConsoleChannel != null && Number.isFinite(liveConsoleChannel) && liveConsoleChannel > 0
+      ? Math.trunc(liveConsoleChannel)
+      : undefined;
+  const hasPrograms = lightPrograms?.v === 1 && Array.isArray(lightPrograms.programs);
+
+  if (!hasPrograms) {
+    return applyFadersToSpotlightsForDisplay(
+      spotlights,
+      lightFaders,
+      liveChannel != null ? { consoleChannel: liveChannel } : undefined,
+    );
+  }
+
+  return spotlights.map((spotlight) => {
+    const spotChannel = readSpotlightChannel(spotlight);
+    if (spotChannel == null) return spotlight;
+
+    const useLiveBoard = liveChannel != null && spotChannel === liveChannel;
+    const faderBoard = useLiveBoard
+      ? lightFaders
+      : applyProgramFaderStatesToBoard(
+          lightFaders,
+          readProgramChannelFaderStates(lightPrograms!, spotChannel),
+        );
+
+    return applyFaderToSpotlightForDisplay(spotlight, faderBoard, {
+      consoleChannel: spotChannel,
+    });
+  });
 }
 
 function readFaderIdFromApiValue(value: unknown): number | undefined {
@@ -236,6 +302,120 @@ export function getSpotlightsBoundToFader(
   return spotlights.filter((spotlight) =>
     spotlightMatchesFader(spotlight, fader, options),
   );
+}
+
+export function readFaderBoardChannel(fader: SceneLightFaderV1): number {
+  return fader.channel ?? fader.links?.[0]?.channel ?? fader.id;
+}
+
+/** Фейдер относится к выбранному каналу K (привязка или софиты на этом K). */
+export function faderBelongsToConsoleChannel(
+  fader: SceneLightFaderV1,
+  channel: number,
+  spotlights: TheaterSpotlight[],
+): boolean {
+  const ch = Math.max(1, Math.trunc(channel));
+  if (readFaderBoardChannel(fader) === ch) return true;
+  if ((fader.links ?? []).some((link) => link.channel === ch)) return true;
+  return getSpotlightsBoundToFader(fader, spotlights, { consoleChannel: ch }).length > 0;
+}
+
+export function resolveKadrFaderChannel(
+  state: Pick<StepLightKadrFaderStateV1, "faderId" | "channel">,
+  fader?: SceneLightFaderV1 | null,
+): number {
+  const fromState = state.channel;
+  if (fromState != null && Number.isFinite(fromState) && fromState > 0) {
+    return Math.trunc(fromState);
+  }
+  if (fader) return readFaderBoardChannel(fader);
+  return Math.max(1, Math.trunc(state.faderId));
+}
+
+/**
+ * Снимок картины: только K, отмеченные в toggles (light-scheme-board__roles-toggles).
+ * На каждый K — вся доска (все F с уровнем > 0); для активного K — живая доска пульта.
+ */
+export function buildKadrFaderSnapshotFromSofitChannels(args: {
+  baseFaders: SceneLightFadersDataV1;
+  programs: SceneLightProgramsDataV1;
+  sofitChannels: number[];
+  liveChannel: number;
+  liveFaders: SceneLightFadersDataV1;
+  lightChannelsCount?: number;
+}): StepLightKadrFaderStateV1[] {
+  const liveCh = Math.max(1, Math.trunc(args.liveChannel) || 1);
+  const selected = normalizeSelectedRecordChannels(
+    args.sofitChannels,
+    args.lightChannelsCount ?? 64,
+  );
+  const byKey = new Map<string, StepLightKadrFaderStateV1>();
+
+  for (const channel of selected) {
+    const channelStates =
+      channel === liveCh ? null : readProgramChannelFaderStates(args.programs, channel);
+    if (channel !== liveCh && (!channelStates || channelStates.length === 0)) {
+      continue;
+    }
+
+    const board =
+      channel === liveCh
+        ? args.liveFaders
+        : applyProgramFaderStatesToBoard(args.baseFaders, channelStates!);
+
+    for (const fader of board.faders) {
+      const level = readFaderLevel(fader);
+      if (level <= 0.02) continue;
+      byKey.set(`${channel}:${fader.id}`, {
+        faderId: fader.id,
+        channel,
+        intensity: level,
+        enabled: (fader.enabled ?? true) && level > 0.02,
+      });
+    }
+  }
+
+  return [...byKey.values()].sort(
+    (a, b) => a.channel - b.channel || a.faderId - b.faderId,
+  );
+}
+
+/** @deprecated Используйте buildKadrFaderSnapshotFromSofitChannels — иначе F8 → K8. */
+export function buildKadrFaderSnapshotForStep(
+  faders: SceneLightFadersDataV1,
+  spotlights: TheaterSpotlight[] = [],
+  liveChannel?: number,
+): StepLightKadrFaderStateV1[] {
+  const ch =
+    liveChannel != null && Number.isFinite(liveChannel) && liveChannel > 0
+      ? Math.trunc(liveChannel)
+      : undefined;
+  const channelsWithSpotlights = new Set(
+    spotlights
+      .map((s) => readSpotlightChannel(s))
+      .filter((c): c is number => c != null && c > 0),
+  );
+
+  return faders.faders
+    .filter((fader) => {
+      const level = readFaderLevel(fader);
+      if (level <= 0.02) return false;
+      if (spotlights.length === 0) return true;
+      if (
+        ch != null &&
+        getSpotlightsBoundToFader(fader, spotlights, { consoleChannel: ch }).length > 0
+      ) {
+        return true;
+      }
+      if (getSpotlightsBoundToFader(fader, spotlights).length > 0) return true;
+      return channelsWithSpotlights.has(readFaderBoardChannel(fader));
+    })
+    .map((fader) => ({
+      faderId: fader.id,
+      channel: ch ?? readFaderBoardChannel(fader),
+      intensity: readFaderLevel(fader),
+      enabled: (fader.enabled ?? true) && readFaderLevel(fader) > 0.02,
+    }));
 }
 
 export function mergeFaderSpotlightLink(

@@ -236,6 +236,7 @@ export function TheaterCanvasContent({
             showSpotlights &&
             (!showOnlyActiveVisibleSpotlight || item.id === activeSpotlightId)
           }
+          showSpotlightLabels={showEditorHelpers && showSpotlights}
           showGuideLine={showSpotlightGuideLines}
           onTargetChange={onSpotlightTargetChange}
           onPositionChange={onSpotlightPositionChange}

@@ -50,11 +50,11 @@ import {
   resolveStageGrid,
   formatGridCellLabel,
 } from "../model/theater-zone-grid";
-import type { SceneLightFadersDataV1 } from "../../scene/model/scene-slice";
-import {
-  applyFadersToSpotlightsForDisplay,
-  type FaderMatchOptions,
-} from "../model/theater-light-fader-bindings";
+import type {
+  SceneLightFadersDataV1,
+  SceneLightProgramsDataV1,
+} from "../../scene/model/scene-slice";
+import { applyFadersToSpotlightsPerChannelDisplay } from "../model/theater-light-fader-bindings";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterSpotlightsArgs = {
@@ -71,7 +71,8 @@ export type UseTheaterSpotlightsArgs = {
   setDecorActionMessage: (message: string | null) => void;
   rehearsalSpotlights: TheaterSpotlight[] | null;
   lightFaders?: SceneLightFadersDataV1 | null;
-  /** Активный канал на пульте — фейдеры применяются только к софитам этого канала. */
+  lightPrograms?: SceneLightProgramsDataV1 | null;
+  /** Активный канал на пульте — живая доска только для этого K. */
   consoleChannel?: number;
 };
 
@@ -114,6 +115,7 @@ export function useTheaterSpotlights({
   setDecorActionMessage,
   rehearsalSpotlights,
   lightFaders,
+  lightPrograms,
   consoleChannel,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
@@ -126,17 +128,15 @@ export function useTheaterSpotlights({
     activeSpotlightId != null
       ? displaySpotlights.find((item) => item.id === activeSpotlightId)
       : undefined;
-  const faderMatchOptions = useMemo((): FaderMatchOptions | undefined => {
-    if (consoleChannel == null || !Number.isFinite(consoleChannel) || consoleChannel <= 0) {
-      return undefined;
-    }
-    return { consoleChannel: Math.trunc(consoleChannel) };
-  }, [consoleChannel]);
-
   const renderSpotlights = useMemo(() => {
     const base = rehearsalSpotlights ?? displaySpotlights;
-    return applyFadersToSpotlightsForDisplay(base, lightFaders, faderMatchOptions);
-  }, [displaySpotlights, faderMatchOptions, lightFaders, rehearsalSpotlights]);
+    return applyFadersToSpotlightsPerChannelDisplay(
+      base,
+      lightFaders,
+      lightPrograms,
+      consoleChannel,
+    );
+  }, [consoleChannel, displaySpotlights, lightFaders, lightPrograms, rehearsalSpotlights]);
   const visibleSpotlights = useMemo(
     () => renderSpotlights.filter((spotlight) => !spotlight.hidden),
     [renderSpotlights],

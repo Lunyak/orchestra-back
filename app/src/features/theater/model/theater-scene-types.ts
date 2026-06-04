@@ -14,4 +14,6 @@ export type TheaterSceneProps = {
   /** Правый сайдбар: outliner + свойства */
   outlinerHost?: HTMLElement | null;
   controlsInPanel?: boolean;
+  /** Встроенный режим на странице «Репетиция»: только 3D и наведение софитов, без полного редактора театра. */
+  embeddedLightRehearsal?: boolean;
 };

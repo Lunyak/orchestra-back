@@ -64,7 +64,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                 >
                   {item.label}
                 </TheaterBtn>
-                <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="Канал">
+                <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="K — канал">
                   <LightChannelSelect
                     lightChannels={lightChannels}
                     value={formatLightChannelSlot(item.channel ?? item.id)}
@@ -81,7 +81,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                     className="native-text-input theater-channel-input theater-channel-input--channel"
                   />
                 </label>
-                <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="Фейдер">
+                <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="F — фейдер">
                   <select
                     className="native-text-input theater-channel-input theater-channel-input--fader"
                     value={

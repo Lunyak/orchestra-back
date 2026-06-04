@@ -63,6 +63,8 @@ export interface StepLightKadrV1 {
 
 export type StepLightKadrFaderStateV1 = {
   faderId: number;
+  /** K на пульте при записи (не путать с faderId: F8 на K1 → channel 1). */
+  channel?: number;
   intensity?: number;
   enabled?: boolean;
 };

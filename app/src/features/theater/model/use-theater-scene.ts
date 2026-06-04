@@ -209,6 +209,7 @@ export function useTheaterScene({
     setDecorActionMessage,
     rehearsalSpotlights,
     lightFaders: sceneData?.lightFaders,
+    lightPrograms: sceneData?.lightPrograms,
     consoleChannel: selectedLightSlot > 0 ? selectedLightSlot : undefined,
   });
   const {

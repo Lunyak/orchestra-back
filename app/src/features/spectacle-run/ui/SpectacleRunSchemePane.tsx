@@ -8,20 +8,24 @@ import type { LightFixture, ScriptStep } from "../../../shared/types/script";
 import {
   fadersForKadrDisplay,
   findKadrById,
-  readStepLightKadrs,
+  readStepLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
 import {
   formatSofitChannelsLabel,
   resolveLightChannelRoles,
   toggleSofitChannel,
 } from "../../../shared/components/light-console/light-channel-roles";
+import { LightChannelsCountControls } from "../../../shared/components/light-console/LightChannelsCountControls";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import { buildLightSchemeLookModel } from "../../../shared/components/light-console/light-scheme-preview";
+import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { LightSchemeStageMap } from "../../../shared/components/light-console/LightSchemeStageMap";
 import { LightSchemeLookCard } from "../../../shared/components/light-console/LightSchemeLookCard";
+import { SpectacleRunTheaterEmbed } from "./SpectacleRunTheaterEmbed";
 import { LightConsoleView } from "../../../shared/components/light-console/LightConsoleView";
 import type { useLightConsoleState } from "../../../shared/components/light-console/useLightConsoleState";
 import type { SpectacleTapeItem } from "../model/spectacle-kadr-tape";
+import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../../../shared/components/show-script/script-markdown-tab-labels";
 
 export type SpectacleRunSchemePaneProps = {
   step: ScriptStep | null;
@@ -34,11 +38,14 @@ export type SpectacleRunSchemePaneProps = {
   selectedLightSlot: number;
   liveConsole: ReturnType<typeof useLightConsoleState>;
   liveStatus: string | null;
+  onLiveStatus?: (message: string | null) => void;
   onAddKadr?: () => void;
   nextKadrNo?: number;
-  onOpenPlotSetup?: () => void;
+  onOpenTechCard?: (stepIndex?: number) => void;
   onSyncPlotFrom3d?: () => void;
   canSyncPlotFrom3d?: boolean;
+  onAppendLightChannel?: () => void;
+  onRemoveLightChannel?: () => void;
 };
 
 export function SpectacleRunSchemePane({
@@ -52,11 +59,14 @@ export function SpectacleRunSchemePane({
   selectedLightSlot,
   liveConsole,
   liveStatus,
+  onLiveStatus,
   onAddKadr,
   nextKadrNo = 1,
-  onOpenPlotSetup,
+  onOpenTechCard,
   onSyncPlotFrom3d,
   canSyncPlotFrom3d = false,
+  onAppendLightChannel,
+  onRemoveLightChannel,
 }: SpectacleRunSchemePaneProps) {
   const [highlightedChannel, setHighlightedChannel] = useState<number | null>(null);
   const lightPlot = step?.lightPlot ?? [];
@@ -64,7 +74,10 @@ export function SpectacleRunSchemePane({
   const gridCols = 12;
   const gridRows = 20;
 
-  const kadrs = useMemo(() => readStepLightKadrs(step), [step?.lightKadrs, step?.id]);
+  const kadrs = useMemo(
+    () => readStepLightKadrsFromMarkdown(step),
+    [step?.markdown, step?.lightKadrs, step?.id],
+  );
   const activeKadr = useMemo(() => {
     if (!tapeItem?.kadrId) return kadrs.kadrs.find((k) => k.kadrNo === tapeItem?.kadrNo);
     return findKadrById(kadrs, tapeItem.kadrId);
@@ -128,7 +141,7 @@ export function SpectacleRunSchemePane({
   return (
     <div className="spectacle-run-scheme">
       <div className="light-scheme-board__roles">
-        <span className="light-scheme-board__roles-label">Софиты:</span>
+        <span className="light-scheme-board__roles-label">Каналы в картину:</span>
         <div className="light-scheme-board__roles-toggles">
           {lightChannels.map((_, index) => {
             const channel = index + 1;
@@ -156,28 +169,36 @@ export function SpectacleRunSchemePane({
         <span className="light-scheme-board__roles-summary">
           {formatSofitChannelsLabel(roles.sofitChannels)}
         </span>
+        {onAppendLightChannel && onRemoveLightChannel ? (
+          <LightChannelsCountControls
+            channelCount={lightChannels.length}
+            onAppend={onAppendLightChannel}
+            onRemove={onRemoveLightChannel}
+          />
+        ) : null}
       </div>
 
       {plotEmpty ? (
         <div className="spectacle-run-scheme__plot-setup" role="note">
           <p>
-            <strong>План софитов пуст</strong> — на схеме нечего подсвечивать. Один раз настройте
-            расстановку для этого шага (или подтяните из 3D), потом возвращайтесь в репетицию.
+            <strong>План софитов пуст</strong> — на схеме нечего подсвечивать. Картины и текст — в{" "}
+            <strong>{SCRIPT_MARKDOWN_NOTES_TAB_LABEL}</strong>, позиции софитов — в 3D-театре (кнопка
+            ниже).
           </p>
           <div className="spectacle-run-scheme__plot-setup-actions">
-            {onOpenPlotSetup ? (
+            {onOpenTechCard ? (
               <button
                 type="button"
                 className="spectacle-run__add-kadr-btn"
                 data-primary="true"
-                onClick={onOpenPlotSetup}
+                onClick={onOpenTechCard}
               >
-                Расстановка софитов
+                {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}
               </button>
             ) : null}
             {canSyncPlotFrom3d && onSyncPlotFrom3d ? (
               <button type="button" className="spectacle-run__add-kadr-btn" onClick={onSyncPlotFrom3d}>
-                Взять из 3D-сцены
+                Взять позиции из 3D
               </button>
             ) : null}
           </div>
@@ -190,29 +211,38 @@ export function SpectacleRunSchemePane({
         </p>
       ) : (
         <p className="spectacle-run-scheme__live-hint">
-          Изменения на пульте автоматически пишутся в текущую картину
+          <strong>Как записать свет:</strong> картина в ленте → на пульте всегда ваши{" "}
+          <strong>
+            F1–F{liveConsole.faders.count ?? liveConsole.faders.faders.length}
+          </strong>{" "}
+          → слева <strong>K3</strong>, подстройте
+          ползунки → <strong>K4</strong>, другие уровни (память на канал) → <strong>П3</strong> заливка →{" "}
+          <strong>«Записать свет»</strong> на каждом K или в конце.
         </p>
       )}
 
-      <div className="light-scheme-layout spectacle-run-scheme__map-row">
-        <LightSchemeStageMap
-          fixtures={lightPlot}
-          gridCols={gridCols}
-          gridRows={gridRows}
-          lookModel={lookModel}
-          selectedLightSlot={selectedLightSlot}
-          highlightedChannel={highlightedChannel}
-          editable={false}
-          emptyPlotHint="Нет точек на плане. Нажмите «Расстановка софитов» выше."
-          emptyPlotActionLabel={onOpenPlotSetup ? "Расстановка софитов" : undefined}
-          onEmptyPlotAction={onOpenPlotSetup}
-        />
+      <div className="light-scheme-layout spectacle-run-scheme__stage-row">
+        {ENABLE_3D_THEATER ? (
+          <SpectacleRunTheaterEmbed />
+        ) : (
+          <LightSchemeStageMap
+            fixtures={lightPlot}
+            gridCols={gridCols}
+            gridRows={gridRows}
+            lookModel={lookModel}
+            selectedLightSlot={selectedLightSlot}
+            highlightedChannel={highlightedChannel}
+            editable={false}
+            emptyPlotHint={`Нет точек на плане. «${SCRIPT_MARKDOWN_NOTES_TAB_LABEL}» или «Взять позиции из 3D» выше.`}
+            emptyPlotActionLabel={onOpenTechCard ? SCRIPT_MARKDOWN_NOTES_TAB_LABEL : undefined}
+            onEmptyPlotAction={onOpenTechCard}
+          />
+        )}
         <LightSchemeLookCard
           lookModel={lookModel}
           lightChannels={lightChannels}
           activeKadr={activeKadr}
           lightFaders={displayFaders}
-          sofitChannels={roles.sofitChannels}
           onHighlightChannel={setHighlightedChannel}
         />
       </div>
@@ -229,7 +259,19 @@ export function SpectacleRunSchemePane({
         onSelectProgram={liveConsole.selectProgram}
         onFaderCountChange={liveConsole.setFaderCount}
         onPatchFader={liveConsole.patchFader}
-        onSaveActiveProgram={liveConsole.saveProgramSnapshot}
+        onAppendLightChannel={onAppendLightChannel}
+        onRemoveLightChannel={onRemoveLightChannel}
+        onSaveActiveProgram={() => {
+          const pid = Math.max(
+            1,
+            Math.trunc(liveConsole.programs.activeProgramId ?? 1) || 1,
+          );
+          const prog = liveConsole.programs.programs.find((p) => p.id === pid);
+          liveConsole.saveProgramSnapshot();
+          onLiveStatus?.(
+            `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы). Карточка картины и тех. карта — после «Записать свет».`,
+          );
+        }}
         className="spectacle-run-scheme__console"
       />
     </div>

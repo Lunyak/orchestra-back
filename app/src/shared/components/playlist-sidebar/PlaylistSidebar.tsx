@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import {
   addScenePlaylistTracksFromPathsDesktop,
   deleteScenePlaylistTrackDesktop,
@@ -7,7 +7,13 @@ import {
   sceneActions,
   uploadScenePlaylistWeb,
 } from "../../../features/scene/model/scene-slice";
-import { invokePlaylistPlay } from "../../../features/scene/model/scene-playback-bridge";
+import {
+  invokePlaylistPlay,
+  getPlaylistActiveTrackId,
+  registerPlaylistSnapshotProvider,
+  setPlaylistActiveTrackId,
+  subscribePlaylistActiveTrack,
+} from "../../../features/scene/model/scene-playback-bridge";
 import { scriptUiActions } from "../../../features/script-ui/model/script-ui-slice";
 import { getDesktopApi } from "../../platform/desktop-api";
 import { createAudioFadeController } from "../../media/audio-fade";
@@ -789,6 +795,15 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     onRegisterPlayHandler(playById);
   }, [onRegisterPlayHandler, playById]);
 
+  useEffect(() => {
+    registerPlaylistSnapshotProvider(() => ({
+      trackId: currentTrack?.id ?? null,
+      trackTitle: currentTrack?.title,
+      fadeMs: currentTrack?.fadeMs,
+    }));
+    return () => registerPlaylistSnapshotProvider(undefined);
+  }, [currentTrack]);
+
   const togglePlayback = () => {
     if (!currentTrack) return;
     void playTrack(currentTrack);
@@ -999,8 +1014,30 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     : "Добавить аудио (веб)";
   const showPlayer = mode !== "list";
   const showSidebar = mode !== "player";
-  const currentTrackIndex = currentTrack
-    ? playlist.findIndex((track) => Number(track.id) === Number(currentTrack.id))
+
+  const sharedActiveTrackId = useSyncExternalStore(
+    subscribePlaylistActiveTrack,
+    getPlaylistActiveTrackId,
+    getPlaylistActiveTrackId,
+  );
+
+  const highlightedTrack = useMemo(() => {
+    if (sharedActiveTrackId != null) {
+      const fromShared = playlist.find(
+        (track) => Number(track.id) === Number(sharedActiveTrackId),
+      );
+      if (fromShared) return fromShared;
+    }
+    return currentTrack;
+  }, [sharedActiveTrackId, playlist, currentTrack]);
+
+  useEffect(() => {
+    if (!showPlayer) return;
+    setPlaylistActiveTrackId(currentTrack?.id ?? null);
+  }, [currentTrack, showPlayer]);
+
+  const currentTrackIndex = highlightedTrack
+    ? playlist.findIndex((track) => Number(track.id) === Number(highlightedTrack.id))
     : -1;
   const canGoPrevTrack = currentTrackIndex > 0;
   const canGoNextTrack =
@@ -1115,7 +1152,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           playlist.map((track, index) => (
             <ListItem
               key={track.id}
-              className={`playlist-track-row ${currentTrack?.id === track.id ? "active" : ""} ${isEditMode ? "edit-mode" : ""} ${dragOverTrackId === track.id ? "drag-over" : ""}`}
+              className={`playlist-track-row ${Number(highlightedTrack?.id) === Number(track.id) ? "active" : ""} ${isEditMode ? "edit-mode" : ""} ${dragOverTrackId === track.id ? "drag-over" : ""}`}
               draggable={isEditMode}
               onDragStart={(event) => {
                 if (!isEditMode) return;

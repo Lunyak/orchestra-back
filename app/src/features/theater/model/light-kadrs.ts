@@ -5,9 +5,32 @@ import type {
 } from "../../scene/model/scene-slice";
 import type { StepLightKadrV1, StepLightKadrsDataV1 } from "../../../shared/types/script";
 import { createId } from "../../../shared/utils/createId";
+import {
+  formatChannelShort,
+  formatFaderShort,
+  parseChannelFaderFromTokenPipe,
+  parseFaderTokenPipe,
+} from "../../../shared/components/light-console/light-console-labels";
+import {
+  buildKadrFaderSnapshotForStep,
+  buildKadrFaderSnapshotFromSofitChannels,
+  resolveKadrFaderChannel,
+} from "./theater-light-fader-bindings";
+import type { TheaterSpotlight } from "../../../shared/types/script";
 import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
 
 export const LIGHT_KADR_ANCHOR_RE = /<!--\s*lk:([a-zA-Z0-9_-]+)\s*-->/g;
+/** Строка markdown целиком — якорь id картины (служебная, не для показа). */
+export const LIGHT_KADR_ANCHOR_LINE_RE = /^\s*<!--\s*lk:([a-zA-Z0-9_-]+)\s*-->\s*$/i;
+
+export function isLightKadrAnchorLine(line: string): boolean {
+  return LIGHT_KADR_ANCHOR_LINE_RE.test(String(line ?? ""));
+}
+
+export function extractLightKadrIdFromAnchorLine(line: string): string | null {
+  const m = LIGHT_KADR_ANCHOR_LINE_RE.exec(String(line ?? "").trim());
+  return m?.[1] ?? null;
+}
 export const LIGHT_KADR_HEADING_RE = /^###\s*Картина\s+(\d+)\b/im;
 export const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*(.*)$/im;
 export const LIGHT_LINE_PREFIX = "- **Свет**:";
@@ -36,22 +59,52 @@ export function readStepLightKadrs(
   return normalizeLightKadrs(step?.lightKadrs ?? null);
 }
 
+/** Одна строка на пару K+F; при дублях в старых кадрах — оставляем последнюю. */
+export function dedupeKadrFaderStates(
+  rows: StepLightKadrFaderStateV1[],
+): StepLightKadrFaderStateV1[] {
+  const byKey = new Map<string, StepLightKadrFaderStateV1>();
+  for (const row of rows) {
+    if (row.faderId <= 0) continue;
+    const ch =
+      row.channel != null && Number.isFinite(row.channel) && row.channel > 0
+        ? Math.trunc(row.channel)
+        : 0;
+    const key = `${ch}:${row.faderId}`;
+    byKey.set(key, {
+      ...row,
+      faderId: row.faderId,
+      ...(ch > 0 ? { channel: ch } : {}),
+    });
+  }
+  return [...byKey.values()].sort(
+    (a, b) =>
+      (a.channel ?? 0) - (b.channel ?? 0) || a.faderId - b.faderId,
+  );
+}
+
 function normalizeLightKadr(raw: Partial<StepLightKadrV1> | null | undefined): StepLightKadrV1 | null {
   if (!raw || typeof raw.id !== "string" || !raw.id.trim()) return null;
   const kadrNo = Math.max(1, Math.trunc(Number(raw.kadrNo) || 1));
   const programId = Math.max(0, Math.trunc(Number(raw.programId) || 0));
-  const faders = Array.isArray(raw.faders)
-    ? raw.faders
-        .map((f) => ({
-          faderId: Math.max(1, Math.trunc(Number(f.faderId) || 0)),
-          intensity:
-            typeof f.intensity === "number" && Number.isFinite(f.intensity)
-              ? Math.min(1, Math.max(0, f.intensity))
-              : undefined,
-          enabled: f.enabled,
-        }))
-        .filter((f) => f.faderId > 0)
-    : [];
+  const faders = dedupeKadrFaderStates(
+    Array.isArray(raw.faders)
+      ? raw.faders
+          .map((f) => ({
+            faderId: Math.max(1, Math.trunc(Number(f.faderId) || 0)),
+            channel:
+              f.channel != null && Number.isFinite(Number(f.channel)) && Number(f.channel) > 0
+                ? Math.trunc(Number(f.channel))
+                : undefined,
+            intensity:
+              typeof f.intensity === "number" && Number.isFinite(f.intensity)
+                ? Math.min(1, Math.max(0, f.intensity))
+                : undefined,
+            enabled: f.enabled,
+          }))
+          .filter((f) => f.faderId > 0)
+      : [],
+  );
   return {
     id: raw.id.trim(),
     kadrNo,
@@ -105,6 +158,79 @@ export function scanMarkdownKadrSections(markdown: string): MarkdownKadrSection[
   return matches;
 }
 
+export function nextKadrNumberForStep(
+  step: { markdown?: string | null; lightKadrs?: StepLightKadrsDataV1 | null } | null | undefined,
+): number {
+  const sections = scanMarkdownKadrSections(String(step?.markdown ?? ""));
+  const fromMarkdown =
+    sections.length > 0 ? Math.max(...sections.map((s) => s.kadrNo)) : 0;
+  const kadrs = readStepLightKadrs(step);
+  const fromKadrs =
+    kadrs.kadrs.length > 0 ? Math.max(...kadrs.kadrs.map((k) => k.kadrNo)) : 0;
+  return Math.max(fromMarkdown, fromKadrs, 0) + 1;
+}
+
+/** Найти секцию картины в актуальном markdown (для ленты репетиции / записи). */
+export function resolveKadrSectionForTapeItem(
+  markdown: string,
+  item: {
+    kadrId: string | null;
+    kadrNo: number;
+    section?: MarkdownKadrSection | null;
+  },
+): MarkdownKadrSection | null {
+  const text = String(markdown ?? "");
+  const resolved =
+    findKadrSectionInMarkdown(text, {
+      id: item.kadrId,
+      kadrNo: item.kadrNo,
+      headingStart: item.section?.headingStart,
+    }) ??
+    (item.kadrId
+      ? scanMarkdownKadrSections(text).find((s) => s.id === item.kadrId) ?? null
+      : null);
+  return resolved ?? item.section ?? null;
+}
+
+export function findKadrSectionInMarkdown(
+  markdown: string,
+  target: { id?: string | null; kadrNo?: number; headingStart?: number },
+): MarkdownKadrSection | null {
+  const sections = scanMarkdownKadrSections(markdown);
+  if (sections.length === 0) return null;
+  if (target.id) {
+    const byId = sections.find((s) => s.id === target.id);
+    if (byId) return byId;
+  }
+  if (target.headingStart != null) {
+    const byPos = sections.find((s) => s.headingStart === target.headingStart);
+    if (byPos) return byPos;
+  }
+  if (target.kadrNo != null && target.kadrNo > 0) {
+    const byNo = sections.filter((s) => s.kadrNo === target.kadrNo);
+    if (byNo.length === 1) return byNo[0];
+  }
+  return null;
+}
+
+function mergeParsedIntoKadr(
+  base: StepLightKadrV1,
+  parsed: Partial<StepLightKadrV1> | null,
+): StepLightKadrV1 {
+  if (!parsed) return base;
+  const patch: Partial<StepLightKadrV1> = {};
+  if (parsed.blackout === true) {
+    patch.blackout = true;
+    patch.programId = 0;
+  } else if (parsed.programId != null && parsed.programId > 0) {
+    patch.programId = parsed.programId;
+  }
+  if (parsed.nextProgramId != null) patch.nextProgramId = parsed.nextProgramId;
+  if (parsed.note != null) patch.note = parsed.note;
+  if (parsed.faders && parsed.faders.length > 0) patch.faders = parsed.faders;
+  return normalizeLightKadr({ ...base, ...patch })!;
+}
+
 export function findKadrSectionAtOffset(
   markdown: string,
   offset: number,
@@ -139,16 +265,39 @@ export function buildKadrFromConsole(args: {
   title?: string;
   programId: number;
   faders: SceneLightFadersDataV1;
+  spotlights?: TheaterSpotlight[];
+  lightPrograms?: SceneLightProgramsDataV1 | null;
+  sofitChannels?: number[];
+  liveConsoleChannel?: number;
+  lightChannelsCount?: number;
   nextProgramId?: number;
   blackout?: boolean;
   note?: string;
 }): StepLightKadrV1 {
+  const liveCh = Math.max(1, Math.trunc(args.liveConsoleChannel ?? 1) || 1);
+  const faderStates = dedupeKadrFaderStates(
+    args.lightPrograms && args.sofitChannels?.length
+      ? buildKadrFaderSnapshotFromSofitChannels({
+          baseFaders: args.faders,
+          programs: args.lightPrograms,
+          sofitChannels: args.sofitChannels,
+          liveChannel: liveCh,
+          liveFaders: args.faders,
+          lightChannelsCount: args.lightChannelsCount,
+        })
+      : args.spotlights != null
+        ? buildKadrFaderSnapshotForStep(args.faders, args.spotlights, liveCh)
+        : buildKadrFaderSnapshot(args.faders).map((row) => ({
+            ...row,
+            channel: liveCh,
+          })),
+  );
   return {
     id: args.id,
     kadrNo: args.kadrNo,
     title: args.title,
     programId: args.programId,
-    faders: buildKadrFaderSnapshot(args.faders),
+    faders: faderStates,
     nextProgramId: args.nextProgramId,
     blackout: args.blackout,
     note: args.note,
@@ -181,23 +330,10 @@ export function formatLightKadrLine(
   },
 ): string {
   if (kadr.blackout || kadr.programId <= 0) {
-    return `${LIGHT_LINE_PREFIX} {{blackout}}`;
+    return `${LIGHT_LINE_PREFIX} {{lightpanel:${kadr.id}}}`;
   }
 
-  const label = programLabel(kadr.programId, options.programs ?? null, options.lightChannels);
-  const parts: string[] = [`{{program:${kadr.programId}|${label}}}`];
-
-  const faderTokens: string[] = [];
-  for (const state of [...kadr.faders].sort((a, b) => a.faderId - b.faderId)) {
-    if (state.enabled === false || (state.intensity ?? 0) <= 0.02) continue;
-    const def = options.lightFaders.faders.find((f) => f.id === state.faderId);
-    const pct = Math.round(Math.min(1, Math.max(0, state.intensity ?? 0)) * 100);
-    const flabel = def?.label?.trim() || `Ф${state.faderId}`;
-    faderTokens.push(`{{fader:${state.faderId}|${flabel} ${pct}%}}`);
-  }
-  if (faderTokens.length > 0) {
-    parts.push(faderTokens.join(" · "));
-  }
+  const parts: string[] = [`{{lightpanel:${kadr.id}}}`];
 
   if (kadr.nextProgramId != null && kadr.nextProgramId > 0) {
     const nextLabel = programLabel(
@@ -208,7 +344,7 @@ export function formatLightKadrLine(
     parts.push(`→ {{program:${kadr.nextProgramId}|${nextLabel}}}`);
   }
 
-  return `${LIGHT_LINE_PREFIX} ${parts.join(" · ")}`;
+  return `${LIGHT_LINE_PREFIX} ${parts.join(" ")}`;
 }
 
 export function ensureKadrAnchorInMarkdown(
@@ -297,22 +433,12 @@ export function applyKadrToFaders(
 }
 
 export function createKadrTemplateSnippet(kadrNo: number, kadrId: string): string {
-  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _не записано — «Записать в картину»_\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`;
+  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: репетиция — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n- **Звук**: _«Записать звук» вверху (трек в плейлисте)_\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`;
 }
 
 const TOKEN_PROGRAM_RE = /\{\{\s*program\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;
 const TOKEN_FADER_RE = /\{\{\s*fader\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;
 const TOKEN_BLACKOUT_RE = /\{\{\s*blackout\s*(?:\|\s*([^}]+?))?\s*}}/gi;
-
-function parsePercent(raw: string | undefined): number | undefined {
-  const text = String(raw ?? "").trim().replace(/,/g, ".");
-  if (!text) return undefined;
-  const m = text.match(/^(\d+(?:\.\d+)?)\s*%?$/);
-  if (!m) return undefined;
-  const n = Number(m[1]);
-  if (!Number.isFinite(n)) return undefined;
-  return Math.min(1, Math.max(0, n > 1 ? n / 100 : n));
-}
 
 export function parseLightKadrLine(line: string): Partial<StepLightKadrV1> | null {
   const trimmed = String(line ?? "").trim();
@@ -352,11 +478,14 @@ export function parseLightKadrLine(line: string): Partial<StepLightKadrV1> | nul
   for (const match of faderMatches) {
     const faderId = Math.max(1, Math.trunc(Number(match[1]) || 0));
     if (faderId <= 0) continue;
-    const intensity = parsePercent(match[2]);
+    const fromPipe = parseFaderTokenPipe(match[2], faderId);
+    const chF = parseChannelFaderFromTokenPipe(match[2], faderId);
+    const intensity = fromPipe.intensity;
     faders.push({
-      faderId,
-      intensity: intensity ?? 1,
-      enabled: (intensity ?? 1) > 0,
+      faderId: chF.faderId,
+      ...(chF.channel != null ? { channel: chF.channel } : {}),
+      intensity,
+      enabled: intensity > 0,
     });
   }
 
@@ -384,12 +513,49 @@ export function lightKadrsStableKey(data: StepLightKadrsDataV1 | null | undefine
   );
 }
 
+/** Удалить блок картины из тех. карты (от `### Картина` до следующего такого заголовка). */
+export function removeKadrSectionFromMarkdown(
+  markdown: string,
+  target: { id?: string | null; kadrNo?: number },
+): string {
+  const sections = scanMarkdownKadrSections(markdown);
+  const section =
+    (target.id ? sections.find((s) => s.id === target.id) : undefined) ??
+    (target.kadrNo != null ? sections.find((s) => s.kadrNo === target.kadrNo) : undefined);
+  if (!section) return String(markdown ?? "");
+  const text = String(markdown ?? "");
+  return text.slice(0, section.headingStart) + text.slice(section.sectionEnd);
+}
+
+/** Синхронизировать markdown шага и lightKadrs после удаления картины. */
+export function deleteKadrFromStepMarkdown(
+  step: { markdown?: string | null; lightKadrs?: StepLightKadrsDataV1 | null } | null | undefined,
+  target: { id?: string | null; kadrNo?: number },
+): { markdown: string; lightKadrs: StepLightKadrsDataV1 } {
+  const markdown = removeKadrSectionFromMarkdown(String(step?.markdown ?? ""), target);
+  const lightKadrs = syncLightKadrsFromMarkdown({
+    markdown,
+    kadrs: readStepLightKadrs(step),
+  });
+  return { markdown, lightKadrs };
+}
+
+/** Кадры по тех. карте: `step.markdown` — источник истины, JSON подчищается при чтении. */
+export function readStepLightKadrsFromMarkdown(
+  step: { markdown?: string | null; lightKadrs?: StepLightKadrsDataV1 | null } | null | undefined,
+): StepLightKadrsDataV1 {
+  return syncLightKadrsFromMarkdown({
+    markdown: String(step?.markdown ?? ""),
+    kadrs: readStepLightKadrs(step),
+  });
+}
+
 export function syncLightKadrsFromMarkdown(args: {
   markdown: string;
   kadrs: StepLightKadrsDataV1;
 }): StepLightKadrsDataV1 {
   const sections = scanMarkdownKadrSections(args.markdown);
-  if (sections.length === 0) return args.kadrs;
+  if (sections.length === 0) return { v: 1, kadrs: [] };
 
   const byId = new Map(args.kadrs.kadrs.map((k) => [k.id, { ...k }]));
   const nextKadrs: StepLightKadrV1[] = [];
@@ -409,13 +575,15 @@ export function syncLightKadrsFromMarkdown(args: {
       faders: [],
     };
 
-    const merged = normalizeLightKadr({
-      ...base,
-      id,
-      kadrNo: section.kadrNo,
-      title: section.headingTitle,
-      ...(parsed ?? {}),
-    })!;
+    const merged = mergeParsedIntoKadr(
+      normalizeLightKadr({
+        ...base,
+        id,
+        kadrNo: section.kadrNo,
+        title: section.headingTitle,
+      })!,
+      parsed,
+    );
     const prevSnapshot = existing
       ? lightKadrsStableKey({ v: 1, kadrs: [existing] })
       : "";

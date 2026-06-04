@@ -2,7 +2,9 @@ import {
   createKadrTemplateSnippet,
   createLightKadrId,
   type MarkdownKadrSection,
+  nextKadrNumberForStep,
   readStepLightKadrs,
+  readStepLightKadrsFromMarkdown,
   scanMarkdownKadrSections,
   syncLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
@@ -31,13 +33,16 @@ export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[]
     const stepTitle = String(step.title ?? "").trim() || `Шаг ${stepOrdinal}`;
     const markdown = String(step.markdown ?? "");
     const sections = scanMarkdownKadrSections(markdown);
-    const kadrs = readStepLightKadrs(step);
+    const kadrs = readStepLightKadrsFromMarkdown(step);
 
     if (sections.length > 0) {
       for (const section of sections) {
+        const sameNoCount = sections.filter((s) => s.kadrNo === section.kadrNo).length;
         const linked =
           (section.id ? kadrs.kadrs.find((k) => k.id === section.id) : undefined) ??
-          kadrs.kadrs.find((k) => k.kadrNo === section.kadrNo);
+          (sameNoCount === 1
+            ? kadrs.kadrs.find((k) => k.kadrNo === section.kadrNo)
+            : undefined);
         items.push({
           stepIndex,
           stepId: step.id,
@@ -47,22 +52,6 @@ export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[]
           kadrId: section.id ?? linked?.id ?? null,
           headingTitle: section.headingTitle,
           section,
-        });
-      }
-      return;
-    }
-
-    if (kadrs.kadrs.length > 0) {
-      for (const kadr of kadrs.kadrs) {
-        items.push({
-          stepIndex,
-          stepId: step.id,
-          stepTitle,
-          stepOrdinal,
-          kadrNo: kadr.kadrNo,
-          kadrId: kadr.id,
-          headingTitle: kadr.title?.trim() || `Картина ${kadr.kadrNo}`,
-          section: null,
         });
       }
       return;
@@ -84,6 +73,38 @@ export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[]
   return items;
 }
 
+export type SpectacleTapeStepGroup = {
+  stepIndex: number;
+  stepId: number;
+  stepOrdinal: number;
+  stepTitle: string;
+  items: Array<{ tapeIndex: number; item: SpectacleTapeItem }>;
+};
+
+/** Группы ленты по шагам сценария — для нижней полосы кадров. */
+export function buildSpectacleTapeStepGroups(
+  tape: SpectacleTapeItem[],
+): SpectacleTapeStepGroup[] {
+  const groups: SpectacleTapeStepGroup[] = [];
+  let group: SpectacleTapeStepGroup | null = null;
+
+  tape.forEach((item, tapeIndex) => {
+    if (!group || group.stepId !== item.stepId) {
+      group = {
+        stepIndex: item.stepIndex,
+        stepId: item.stepId,
+        stepOrdinal: item.stepOrdinal,
+        stepTitle: item.stepTitle,
+        items: [],
+      };
+      groups.push(group);
+    }
+    group.items.push({ tapeIndex, item });
+  });
+
+  return groups;
+}
+
 export function isLastTapeItemInStep(
   tape: SpectacleTapeItem[],
   index: number,
@@ -94,13 +115,7 @@ export function isLastTapeItemInStep(
   return !next || next.stepId !== item.stepId;
 }
 
-export function countKadrsInMarkdown(markdown: string): number {
-  return (String(markdown ?? "").match(/^###\s*Картина\b/gim) ?? []).length;
-}
-
-export function nextKadrNumberForStep(step: ScriptStep | null | undefined): number {
-  return countKadrsInMarkdown(String(step?.markdown ?? "")) + 1;
-}
+export { nextKadrNumberForStep } from "../../theater/model/light-kadrs";
 
 /** Добавить в markdown шага блок ### Картина N и синхронизировать lightKadrs. */
 export function appendKadrToStep(args: {
@@ -128,11 +143,14 @@ export function findTapeIndexForStepKadr(
     const byId = tape.findIndex((item) => item.kadrId === kadrId);
     if (byId >= 0) return byId;
   }
-  if (kadrNo != null && kadrNo > 0) {
+  if (stepIndex >= 0 && kadrNo != null && kadrNo > 0) {
     const byNo = tape.findIndex(
       (item) => item.stepIndex === stepIndex && item.kadrNo === kadrNo,
     );
     if (byNo >= 0) return byNo;
   }
-  return tape.findIndex((item) => item.stepIndex === stepIndex);
+  if (stepIndex >= 0) {
+    return tape.findIndex((item) => item.stepIndex === stepIndex);
+  }
+  return -1;
 }

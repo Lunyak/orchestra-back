@@ -288,7 +288,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       </div>
       {theaterHostMounted ? theaterOutlinerNode : null}
       {stepsSidebarNode}
-      {!isMobile && !compactMainChrome && (
+      {!isMobile && !compactMainChrome && activeView !== "light-plot" && (
         <div className="desktop-panel-buttons" aria-label="Панели">
           {showStepsSidebar && isStepsCollapsed && (
             <button

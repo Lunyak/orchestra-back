@@ -26,6 +26,7 @@ import {
   showScriptMarkdownActions,
 } from "../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useScriptUI } from "../../features/script-ui";
+import { scriptUiActions } from "../../features/script-ui/model/script-ui-slice";
 import { AppRouteDeclarations } from "./AppRouteDeclarations";
 import { getRouteMeta, isScriptMarkdownRoute } from "./routeMeta";
 import type { ShowScriptMarkdownMode } from "../../features/show-script-markdown/model/show-script-markdown-slice";
@@ -59,6 +60,10 @@ function AppRoutesContent() {
 
   const { shouldShowScriptState, isSpectacleLayoutRoute } = getRouteMeta(
     location.pathname,
+  );
+  const isLightPlotRoute = location.pathname === "/light-plot";
+  const spectacleRunTextHidden = useAppSelector(
+    (state) => state.scriptUi.spectacleRunTextHidden,
   );
   const showScriptMainChrome = isScriptMarkdownRoute(location.pathname);
   const { currentStep } = useAppSelector((state) =>
@@ -203,6 +208,10 @@ function AppRoutesContent() {
     toggleMobilePlaylist();
   }, [isMobile, togglePlaylist, setMobileStepsOpen, toggleMobilePlaylist]);
 
+  const handleToggleSpectacleRunText = useCallback(() => {
+    dispatch(scriptUiActions.toggleSpectacleRunTextHidden());
+  }, [dispatch]);
+
   const handleToggleSteps = useCallback(() => {
     if (!isMobile) {
       toggleStepsCollapsed();
@@ -297,6 +306,11 @@ function AppRoutesContent() {
           onToggleHeaderSounds={toggleHeaderSounds}
           isStepsCollapsed={isHeaderStepsCollapsed}
           onToggleStepsCollapsed={handleToggleSteps}
+          showSpectacleRunTextToggle={isLightPlotRoute}
+          spectacleRunTextHidden={spectacleRunTextHidden}
+          onToggleSpectacleRunText={
+            isLightPlotRoute ? handleToggleSpectacleRunText : undefined
+          }
         />
       ) : null,
   );

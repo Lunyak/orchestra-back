@@ -154,7 +154,7 @@ export function LightSchemeKadrBoard({
       ) : null}
 
       <div className="light-scheme-board__roles">
-        <span className="light-scheme-board__roles-label">Софиты на каналах:</span>
+        <span className="light-scheme-board__roles-label">Каналы в картину:</span>
         <div className="light-scheme-board__roles-toggles">
           {lightChannels.map((_, index) => {
             const channel = index + 1;
@@ -168,8 +168,8 @@ export function LightSchemeKadrBoard({
                 data-highlight={highlightedChannel === channel}
                 title={
                   active
-                    ? `K${channel} — софиты (нажмите, чтобы убрать)`
-                    : `K${channel} — заливка (нажмите, чтобы отметить софиты)`
+                    ? `K${channel} — в картину (нажмите, чтобы убрать)`
+                    : `K${channel} — не в картину (нажмите, чтобы добавить)`
                 }
                 onMouseEnter={() => setHighlightedChannel(channel)}
                 onMouseLeave={() => setHighlightedChannel(null)}
@@ -236,7 +236,6 @@ export function LightSchemeKadrBoard({
           lightChannels={lightChannels}
           activeKadr={activeKadr}
           lightFaders={displayFaders}
-          sofitChannels={roles.sofitChannels}
           onHighlightChannel={setHighlightedChannel}
         />
       </div>

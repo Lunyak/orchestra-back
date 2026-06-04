@@ -242,19 +242,21 @@
 
 .theater-light-console-fader {
   display: grid;
-  grid-template-rows: 22px 86px 22px 16px 18px;
+  grid-template-rows: 18px 80px 18px 14px 16px;
   justify-items: center;
-  gap: 5px;
-  flex: 0 0 54px;
-  min-width: 54px;
-  padding: 8px 6px;
+  gap: 3px;
+  flex: 0 0 42px;
+  min-width: 42px;
+  max-width: 42px;
+  padding: 5px 3px;
+  box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--stage-brutal-border, var(--color-border-default)) 76%, transparent);
   background: rgba(0, 0, 0, 0.18);
 }
 
 .theater-light-console-fader__power {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-danger, #e85d5d) 54%, rgba(0, 0, 0, 0.3));
@@ -267,17 +269,31 @@
   box-shadow: 0 0 12px color-mix(in srgb, var(--color-active-ascent) 45%, transparent);
 }
 
+.theater-light-console-fader__range-wrap {
+  width: 14px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  overflow: visible;
+}
+
 .theater-light-console-fader__range {
-  width: 86px;
-  height: 20px;
-  margin: 32px 0;
+  display: block;
+  width: 80px;
+  height: 12px;
+  margin: 0;
+  padding: 0;
   transform: rotate(-90deg);
+  transform-origin: center center;
   accent-color: var(--color-active-ascent);
+  cursor: pointer;
 }
 
 .theater-light-console-fader__color {
-  width: 26px;
-  height: 20px;
+  width: 22px;
+  height: 18px;
   padding: 0;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   background: transparent;
@@ -289,7 +305,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   line-height: 1;
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useScene } from "../../../features/scene";
 import type {
   SceneLightFadersDataV1,
   SceneLightProgramsDataV1,
@@ -13,6 +14,7 @@ import {
   scanMarkdownKadrSections,
 } from "../../../features/theater/model/light-kadrs";
 import { LightConsoleView } from "./LightConsoleView";
+import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../show-script/script-markdown-tab-labels";
 import { LightWorkflowGuide } from "./LightWorkflowGuide";
 import { recordLightKadrForSection } from "./light-kadr-record";
 import { useLightConsoleState } from "./useLightConsoleState";
@@ -100,6 +102,7 @@ export function LightKadrPanel({
     return kadrs.kadrs.find((k) => k.kadrNo === activeSection.kadrNo);
   }, [activeSection, kadrs.kadrs]);
 
+  const { sceneData } = useScene();
   const liveConsole = useLightConsoleState({
     projectName,
     spotlights: spotlights ?? [],
@@ -116,6 +119,12 @@ export function LightKadrPanel({
       lightFaders: liveConsole.faders,
       lightPrograms,
       programId: liveConsole.programs.activeProgramId ?? 1,
+      spotlights: spotlights ?? [],
+      liveConsoleChannel: liveConsole.selectedLightSlot,
+      lightChannelRoles:
+        sceneData?.lightChannelRoles && sceneData.lightChannelRoles.v === 1
+          ? sceneData.lightChannelRoles
+          : null,
     });
     if (!result) return;
     onUpdateStep({ lightKadrs: result.nextKadrs });
@@ -257,7 +266,8 @@ export function LightKadrPanel({
         </>
       ) : (
         <p className="light-kadr-panel__empty">
-          Нет <code>### Картина N</code> в тексте шага — добавьте на вкладке «Схема» / «Текст».
+          Нет <code>### Картина N</code> в тексте шага — добавьте на вкладке «
+          {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}» / «Текст».
         </p>
       )}
 

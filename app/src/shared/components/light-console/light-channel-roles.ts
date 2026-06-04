@@ -2,7 +2,8 @@ import type { SceneLightChannelRolesV1 } from "../../../features/scene/model/sce
 
 export const DEFAULT_SOFIT_CHANNELS = [1, 2];
 
-export function normalizeSofitChannels(
+/** Каналы, отмеченные в toggles — только они, без подстановки K1/K2 по умолчанию. */
+export function normalizeSelectedRecordChannels(
   raw: number[] | null | undefined,
   lightChannelsCount: number,
 ): number[] {
@@ -12,8 +13,16 @@ export function normalizeSofitChannels(
         .map((n) => Math.trunc(Number(n)))
         .filter((n) => Number.isFinite(n) && n >= 1 && n <= max)
     : [];
-  const unique = [...new Set(list)].sort((a, b) => a - b);
-  if (unique.length > 0) return unique;
+  return [...new Set(list)].sort((a, b) => a - b);
+}
+
+export function normalizeSofitChannels(
+  raw: number[] | null | undefined,
+  lightChannelsCount: number,
+): number[] {
+  const selected = normalizeSelectedRecordChannels(raw, lightChannelsCount);
+  if (selected.length > 0) return selected;
+  const max = Math.max(1, lightChannelsCount);
   return DEFAULT_SOFIT_CHANNELS.filter((n) => n <= max);
 }
 
@@ -21,7 +30,7 @@ export function resolveLightChannelRoles(
   raw: SceneLightChannelRolesV1 | null | undefined,
   lightChannelsCount: number,
 ): SceneLightChannelRolesV1 {
-  const sofitChannels = normalizeSofitChannels(raw?.sofitChannels, lightChannelsCount);
+  const sofitChannels = normalizeSelectedRecordChannels(raw?.sofitChannels, lightChannelsCount);
   return { v: 1, sofitChannels };
 }
 
@@ -30,7 +39,7 @@ export function toggleSofitChannel(
   channel: number,
   lightChannelsCount: number,
 ): SceneLightChannelRolesV1 {
-  const normalized = normalizeSofitChannels(roles.sofitChannels, lightChannelsCount);
+  const normalized = normalizeSelectedRecordChannels(roles.sofitChannels, lightChannelsCount);
   const next = normalized.includes(channel)
     ? normalized.filter((n) => n !== channel)
     : [...normalized, channel].sort((a, b) => a - b);

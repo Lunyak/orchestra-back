@@ -711,7 +711,7 @@
   min-width: auto;
 }
 
-/* «Текст»: [[РОЛЬ]] и реплика в одном потоке (как в редакторе), без flex-колонок. «Схема» / экспликация — без этого класса. */
+/* «Текст»: [[РОЛЬ]] и реплика в одном потоке (как в редакторе), без flex-колонок. «Тех. карта» / экспликация — без этого класса. */
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role {
   display: block;
   gap: 0;
@@ -849,6 +849,16 @@
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+}
+
+.markdown-light-kadr-call {
+  width: 100%;
+  margin: 4px 0 12px;
+  grid-column: 1 / -1;
+}
+
+.markdown-light-kadr-call .light-scheme-call {
+  max-height: none;
 }
 
 .markdown-kadr__right[data-empty="true"] {
@@ -1414,7 +1424,7 @@
   overflow-y: auto;
 }
 
-.script-light-panel {
+.script-light-channels {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -1427,7 +1437,7 @@
   box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.18);
 }
 
-.script-light-panel__header {
+.script-light-channels__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -1435,7 +1445,7 @@
   flex-wrap: wrap;
 }
 
-.script-light-panel__title {
+.script-light-channels__title {
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -1443,19 +1453,19 @@
   color: var(--color-text-primary);
 }
 
-.script-light-panel__hint {
+.script-light-channels__hint {
   margin-top: 4px;
   color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
 }
 
-.script-light-panel__hint span {
+.script-light-channels__hint span {
   color: var(--color-active-ascent);
   font-weight: 900;
 }
 
-.script-light-panel__actions {
+.script-light-channels__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -1549,116 +1559,14 @@
   box-shadow: 0 0 0 1px rgba(231, 138, 78, 0.16);
 }
 
-.script-light-select {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 8px 7px;
-  border: 1px solid var(--stage-brutal-border, var(--color-border-light));
-  background: rgba(0, 0, 0, 0.18);
-  color: var(--color-text-ui);
-  font-size: 12px;
-  outline: none;
-}
-
-.script-light-faders {
-  display: grid;
-  gap: 10px;
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--stage-brutal-border, var(--color-border-light)) 72%, transparent);
-}
-
-.script-light-faders__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.script-light-fader-list {
-  display: grid;
-  gap: 8px;
-}
-
-.script-light-fader-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(140px, 0.8fr) minmax(120px, 0.7fr) auto 36px auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.script-light-fader-row__num {
-  display: grid;
-  place-items: center;
-  height: 31px;
-  border: 1px solid var(--stage-brutal-border, var(--color-border-light));
-  background: rgba(0, 0, 0, 0.18);
-  color: color-mix(in srgb, var(--color-active-ascent) 72%, var(--color-text-muted));
-  font-size: 10px;
-  font-weight: 900;
-}
-
-.script-light-fader-meter {
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  min-height: 31px;
-  padding: 0 8px;
-  border: 1px solid var(--stage-brutal-border, var(--color-border-light));
-  background: rgba(0, 0, 0, 0.14);
-  color: var(--color-text-muted);
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.script-light-fader-meter input {
-  width: 100%;
-  accent-color: var(--color-active-ascent);
-}
-
-.script-light-program-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.script-light-program-btn {
-  padding: 8px 10px;
-  border: 1px solid var(--stage-brutal-border, var(--color-border-light));
-  background: rgba(0, 0, 0, 0.18);
-  color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  cursor: pointer;
-}
-
-.script-light-program-btn[data-active="true"],
 .script-light-action-btn[data-active="true"] {
   border-color: var(--color-active-ascent);
   color: var(--color-active-ascent);
 }
 
-.script-light-program-editor {
-  display: grid;
-  gap: 10px;
-}
-
 @media (max-width: 760px) {
   .script-light-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .script-light-fader-row {
-    grid-template-columns: 24px minmax(0, 1fr) auto;
-  }
-
-  .script-light-fader-row .script-light-select,
-  .script-light-fader-row .script-light-fader-meter {
-    grid-column: 2 / -1;
   }
 }
 
@@ -1720,6 +1628,11 @@
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-activeLine {
   background-color: transparent !important;
+}
+
+/* Служебная строка <!-- lk:uuid --> — в файле есть, в UI скрыта */
+.script-markdown-cm .cm-lk-anchor-hidden {
+  display: none !important;
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line {

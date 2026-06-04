@@ -24,7 +24,11 @@ export type ScriptUiState = {
   swapTheaterPanels: boolean;
   /** Правая панель настроек 3D-театра (persist per-project в theater-view-prefs). */
   showTheaterControls: boolean;
+  /** Скрыть текст шага на странице «Репетиция» (/light-plot). */
+  spectacleRunTextHidden: boolean;
 };
+
+const SPECTACLE_RUN_TEXT_HIDDEN_KEY = "orchestra-spectacle-run-text-hidden";
 
 function storedBool(key: string, defaultValue: boolean): boolean {
   if (typeof window === "undefined") return defaultValue;
@@ -63,7 +67,17 @@ function defaultState(): ScriptUiState {
     playlistCrossfadeEnabled: false,
     swapTheaterPanels: false,
     showTheaterControls: true,
+    spectacleRunTextHidden: false,
   };
+}
+
+function persistSpectacleRunTextHidden(hidden: boolean) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(SPECTACLE_RUN_TEXT_HIDDEN_KEY, hidden ? "1" : "0");
+  } catch {
+    // ignore
+  }
 }
 
 function initialStateFromStorage(): ScriptUiState {
@@ -77,6 +91,14 @@ function initialStateFromStorage(): ScriptUiState {
       "playlistCrossfadeEnabled",
       base.playlistCrossfadeEnabled,
     ),
+    spectacleRunTextHidden: (() => {
+      if (typeof window === "undefined") return base.spectacleRunTextHidden;
+      try {
+        return localStorage.getItem(SPECTACLE_RUN_TEXT_HIDDEN_KEY) === "1";
+      } catch {
+        return base.spectacleRunTextHidden;
+      }
+    })(),
   };
 }
 
@@ -93,6 +115,14 @@ export const scriptUiSlice = createSlice({
         "playlistCrossfadeEnabled",
         base.playlistCrossfadeEnabled,
       );
+      if (typeof window !== "undefined") {
+        try {
+          state.spectacleRunTextHidden =
+            localStorage.getItem(SPECTACLE_RUN_TEXT_HIDDEN_KEY) === "1";
+        } catch {
+          state.spectacleRunTextHidden = base.spectacleRunTextHidden;
+        }
+      }
       // Эфемерные поля — сброс при init; theater-панели восстанавливаются в useSpectaclePage.
       state.mobilePlaylistOpen = false;
       state.mobileStepsOpen = false;
@@ -186,6 +216,15 @@ export const scriptUiSlice = createSlice({
     },
     toggleTheaterControls(state) {
       state.showTheaterControls = !state.showTheaterControls;
+    },
+
+    setSpectacleRunTextHidden(state, action: PayloadAction<{ value: boolean }>) {
+      state.spectacleRunTextHidden = Boolean(action.payload.value);
+      persistSpectacleRunTextHidden(state.spectacleRunTextHidden);
+    },
+    toggleSpectacleRunTextHidden(state) {
+      state.spectacleRunTextHidden = !state.spectacleRunTextHidden;
+      persistSpectacleRunTextHidden(state.spectacleRunTextHidden);
     },
   },
 });

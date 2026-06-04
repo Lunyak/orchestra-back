@@ -38,14 +38,20 @@ import {
   createRenderLightTokens,
 } from "../utils/lightTokens";
 import { rehypeKadrSections } from "../utils/rehypeKadrSections";
-import { LightConsoleSplitView } from "../../light-console/LightConsoleSplitView";
-import { buildLightConsoleSplitModel } from "../../light-console/light-console-split";
+import { rehypeStripLightKadrAnchors } from "../utils/rehypeStripLightKadrAnchors";
 import { resolveLightFaders } from "../../light-console/light-console-data";
+import { buildLightSchemeLookModel } from "../../light-console/light-scheme-preview";
+import { LightSchemeLookCard } from "../../light-console/LightSchemeLookCard";
 import {
   findKadrById,
+  fadersForKadrDisplay,
   readStepLightKadrs,
+  scanMarkdownKadrSections,
 } from "../../../../features/theater/model/light-kadrs";
+import type { LightFixture } from "../../../types/script";
 import "../../light-console/light-console.css";
+
+const MarkdownKadrIdContext = createContext<string | null>(null);
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
 
@@ -649,6 +655,163 @@ function normalizeRoleToken(v: string) {
     .replace(/\s+/g, " ");
 }
 
+function MarkdownKadrSection({
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLElement> & { "data-lk-id"?: string }) {
+  const lkId = props["data-lk-id"];
+  return (
+    <section {...props}>
+      <MarkdownKadrIdContext.Provider
+        value={typeof lkId === "string" && lkId ? lkId : null}
+      >
+        {children}
+      </MarkdownKadrIdContext.Provider>
+    </section>
+  );
+}
+
+type MarkdownPreviewParagraphProps = {
+  children: React.ReactNode;
+  renderLightTokens: (children: React.ReactNode) => React.ReactNode;
+  renderLightPanel: (kadrId: string) => React.ReactNode | null;
+  hasRoleOrLightLabels: boolean;
+  onTrackLinkClick?: (trackId: number) => void;
+  onSoundLinkClick?: (soundId: number) => void;
+  playFromPayload: (payload: TrackLinkPayload) => void;
+  toggleSoundFromPayload: (payload: SoundLinkPayload) => void;
+  resolveSoundIconFromPayload: (payload: SoundLinkPayload) => string | null;
+};
+
+function MarkdownPreviewParagraph({
+  children,
+  renderLightTokens,
+  renderLightPanel,
+  hasRoleOrLightLabels,
+  onTrackLinkClick,
+  onSoundLinkClick,
+  playFromPayload,
+  toggleSoundFromPayload,
+  resolveSoundIconFromPayload,
+}: MarkdownPreviewParagraphProps) {
+  const kadrId = useContext(MarkdownKadrIdContext);
+  const rendered = renderLightTokens(children);
+  const { label, rest, kind } = splitLeadingLineLabel(rendered);
+  const leadingTrack = onTrackLinkClick ? getLeadingTrackPayload(rendered) : null;
+  const leadingSound = onSoundLinkClick ? getLeadingSoundPayload(rendered) : null;
+  if (!label) {
+    if (leadingTrack) {
+      const alignClass = hasRoleOrLightLabels
+        ? "markdown-dialog-line--track-align"
+        : "markdown-dialog-line--track-compact";
+      return (
+        <p className={`markdown-dialog-line markdown-dialog-line--label-track ${alignClass}`}>
+          <span className="markdown-dialog-label" aria-hidden="true">
+            <button
+              type="button"
+              className="markdown-track-play"
+              title="Воспроизвести"
+              onClick={() => playFromPayload(leadingTrack)}
+            >
+              ▶
+            </button>
+          </span>
+          <span className="markdown-dialog-text">{rendered}</span>
+        </p>
+      );
+    }
+    if (leadingSound) {
+      const alignClass = hasRoleOrLightLabels
+        ? "markdown-dialog-line--track-align"
+        : "markdown-dialog-line--track-compact";
+      return (
+        <p className={`markdown-dialog-line markdown-dialog-line--label-sound ${alignClass}`}>
+          <span className="markdown-dialog-label" aria-hidden="true">
+            <button
+              type="button"
+              className="markdown-sound-play"
+              title="Звук: воспроизвести/остановить"
+              onClick={() => toggleSoundFromPayload(leadingSound)}
+            >
+              ▶
+            </button>
+          </span>
+          <span className="markdown-dialog-text">{rendered}</span>
+        </p>
+      );
+    }
+
+    if (!hasRoleOrLightLabels) {
+      return <p>{rendered}</p>;
+    }
+    return (
+      <p className="markdown-dialog-line markdown-dialog-line--no-label">
+        <span className="markdown-dialog-label" aria-hidden="true" />
+        <span className="markdown-dialog-text">{rendered}</span>
+      </p>
+    );
+  }
+  let labelHasIcon = false;
+  const resolvedLabel =
+    kind === "sound"
+      ? (() => {
+          if (!onSoundLinkClick) return label;
+          const payload = getSoundPayloadFromLabelEl(label);
+          if (!payload) return label;
+          const iconUrl = resolveSoundIconFromPayload(payload);
+          if (!iconUrl) return label;
+          labelHasIcon = true;
+          return (
+            <span
+              className="markdown-sound-label markdown-sound-label--with-icon"
+              role="button"
+              tabIndex={0}
+              title="Звук: воспроизвести/остановить"
+              data-sound-id={"id" in payload ? String(payload.id) : undefined}
+              data-sound-name={"name" in payload ? String(payload.name) : undefined}
+              aria-label="Звук: воспроизвести/остановить"
+            >
+              <img
+                className="markdown-sound-label__img"
+                src={iconUrl}
+                alt=""
+                aria-hidden="true"
+              />
+              <span className="markdown-sound-label__fallback">SFX</span>
+            </span>
+          );
+        })()
+      : label;
+  if (kind === "light" && kadrId) {
+    const panel = renderLightPanel(kadrId);
+    if (panel) {
+      return <div className="markdown-light-kadr-call">{panel}</div>;
+    }
+  }
+  const kindClass =
+    kind === "light"
+      ? "markdown-dialog-line--label-light"
+      : kind === "play"
+        ? "markdown-dialog-line--label-play"
+        : kind === "sound"
+          ? "markdown-dialog-line--label-sound"
+          : "markdown-dialog-line--label-role";
+  return (
+    <p
+      className={[
+        "markdown-dialog-line",
+        kindClass,
+        labelHasIcon ? "markdown-dialog-line--label-has-icon" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span className="markdown-dialog-label">{resolvedLabel}</span>
+      <span className="markdown-dialog-text">{rest}</span>
+    </p>
+  );
+}
+
 function isInteractiveMarkdownPreviewTarget(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el?.closest) return false;
@@ -950,26 +1113,53 @@ export function ScriptMarkdownPreview({
     return /\.(mp3|wav|ogg|m4a|flac)$/i.test(href.trim());
   };
 
+  const markdownKadrSections = useMemo(
+    () => scanMarkdownKadrSections(markdownForPreview),
+    [markdownForPreview],
+  );
+  const markdownKadrIdLookups = useMemo(
+    () => markdownKadrSections.map((s) => ({ kadrNo: s.kadrNo, id: s.id })),
+    [markdownKadrSections],
+  );
+
   const renderLightPanel = useCallback(
     (kadrId: string) => {
-      const kadr = findKadrById(readStepLightKadrs(currentStep), kadrId);
+      const kadrs = readStepLightKadrs(currentStep);
+      const kadr = findKadrById(kadrs, kadrId);
       if (!kadr) return null;
-      const model = buildLightConsoleSplitModel({
-        programId: kadr.programId,
+      const section = markdownKadrSections.find((s) => s.id === kadrId) ?? null;
+      const baseFaders = resolveLightFaders(sceneData?.lightFaders);
+      const displayFaders = fadersForKadrDisplay(kadr, baseFaders);
+      const lightPlot = (Array.isArray(sceneData?.lightPlot)
+        ? sceneData.lightPlot
+        : []) as LightFixture[];
+      const lookModel = buildLightSchemeLookModel({
+        kadr,
+        sectionTitle: section?.headingTitle,
+        lightPlot,
         lightChannels,
-        faders: resolveLightFaders(sceneData?.lightFaders),
-        kadrFaderStates: kadr.faders,
+        lightFaders: displayFaders,
+        lightPrograms: sceneData?.lightPrograms ?? null,
+        lightChannelRoles: sceneData?.lightChannelRoles ?? null,
       });
       return (
-        <LightConsoleSplitView
-          model={model}
+        <LightSchemeLookCard
+          lookModel={lookModel}
           lightChannels={lightChannels}
-          readOnly
-          compact
+          activeKadr={kadr}
+          lightFaders={displayFaders}
         />
       );
     },
-    [currentStep, lightChannels, sceneData?.lightFaders],
+    [
+      currentStep,
+      lightChannels,
+      markdownKadrSections,
+      sceneData?.lightChannelRoles,
+      sceneData?.lightFaders,
+      sceneData?.lightPlot,
+      sceneData?.lightPrograms,
+    ],
   );
 
   const renderLightTokens = useMemo(
@@ -984,18 +1174,6 @@ export function ScriptMarkdownPreview({
   /** Блоки `.markdown-kadr` по заголовкам h1–h3 — и для текста пьесы (`play`), не только notes/explication. */
   const kadrLayoutEnabled =
     markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
-
-  const rehypePlugins = useMemo(() => {
-    const plugins: any[] = [];
-    if (annotationsMode) {
-      plugins.push(rehypeScriptTokens);
-      plugins.push([rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }]);
-    }
-    if (kadrLayoutEnabled) {
-      plugins.push([rehypeKadrSections, { enabled: true, headingMaxLevel: 3 }]);
-    }
-    return plugins;
-  }, [annotationsMode, rehypeScriptTokens, annotations, activeAnnotationId, kadrLayoutEnabled]);
 
   const hasRoleOrLightLabels = useMemo(
     () => markdownHasRoleLightOrPlayLineLabels(markdown || ""),
@@ -1077,6 +1255,55 @@ export function ScriptMarkdownPreview({
       onSoundLinkClick(Number(fromCache.id));
     }
   };
+
+  const markdownParagraphProps = useMemo(
+    (): Omit<MarkdownPreviewParagraphProps, "children"> => ({
+      renderLightTokens,
+      renderLightPanel,
+      hasRoleOrLightLabels,
+      onTrackLinkClick,
+      onSoundLinkClick,
+      playFromPayload,
+      toggleSoundFromPayload,
+      resolveSoundIconFromPayload,
+    }),
+    [
+      renderLightTokens,
+      renderLightPanel,
+      hasRoleOrLightLabels,
+      onTrackLinkClick,
+      onSoundLinkClick,
+      playFromPayload,
+      toggleSoundFromPayload,
+      resolveSoundIconFromPayload,
+    ],
+  );
+
+  const rehypePlugins = useMemo(() => {
+    const plugins: any[] = [rehypeStripLightKadrAnchors];
+    if (annotationsMode) {
+      plugins.push(rehypeScriptTokens);
+      plugins.push([rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }]);
+    }
+    if (kadrLayoutEnabled) {
+      plugins.push([
+        rehypeKadrSections,
+        {
+          enabled: true,
+          headingMaxLevel: 3,
+          kadrIdLookups: markdownKadrIdLookups,
+        },
+      ]);
+    }
+    return plugins;
+  }, [
+    annotationsMode,
+    rehypeScriptTokens,
+    annotations,
+    activeAnnotationId,
+    kadrLayoutEnabled,
+    markdownKadrIdLookups,
+  ]);
 
   const rangeTextLength = (range: Range) => {
     const fragment = range.cloneContents();
@@ -1244,117 +1471,12 @@ export function ScriptMarkdownPreview({
           remarkPlugins={[remarkBreaks]}
           rehypePlugins={rehypePlugins}
           components={{
-            p: ({ children }: { children: React.ReactNode }) => {
-              const rendered = renderLightTokens(children);
-              const { label, rest, kind } = splitLeadingLineLabel(rendered);
-              const leadingTrack = onTrackLinkClick ? getLeadingTrackPayload(rendered) : null;
-              const leadingSound = onSoundLinkClick ? getLeadingSoundPayload(rendered) : null;
-              if (!label) {
-                if (leadingTrack) {
-                  const alignClass = hasRoleOrLightLabels
-                    ? "markdown-dialog-line--track-align"
-                    : "markdown-dialog-line--track-compact";
-                  return (
-                    <p className={`markdown-dialog-line markdown-dialog-line--label-track ${alignClass}`}>
-                      <span className="markdown-dialog-label" aria-hidden="true">
-                        <button
-                          type="button"
-                          className="markdown-track-play"
-                          title="Воспроизвести"
-                          onClick={() => playFromPayload(leadingTrack)}
-                        >
-                          ▶
-                        </button>
-                      </span>
-                      <span className="markdown-dialog-text">{rendered}</span>
-                    </p>
-                  );
-                }
-                if (leadingSound) {
-                  const alignClass = hasRoleOrLightLabels
-                    ? "markdown-dialog-line--track-align"
-                    : "markdown-dialog-line--track-compact";
-                  return (
-                    <p className={`markdown-dialog-line markdown-dialog-line--label-sound ${alignClass}`}>
-                      <span className="markdown-dialog-label" aria-hidden="true">
-                        <button
-                          type="button"
-                          className="markdown-sound-play"
-                          title="Звук: воспроизвести/остановить"
-                          onClick={() => toggleSoundFromPayload(leadingSound)}
-                        >
-                          ▶
-                        </button>
-                      </span>
-                      <span className="markdown-dialog-text">{rendered}</span>
-                    </p>
-                  );
-                }
-
-                if (!hasRoleOrLightLabels) {
-                  return <p>{rendered}</p>;
-                }
-                return (
-                  <p className="markdown-dialog-line markdown-dialog-line--no-label">
-                    <span className="markdown-dialog-label" aria-hidden="true" />
-                    <span className="markdown-dialog-text">{rendered}</span>
-                  </p>
-                );
-              }
-              let labelHasIcon = false;
-              const resolvedLabel =
-                kind === "sound"
-                  ? (() => {
-                      if (!onSoundLinkClick) return label;
-                      const payload = getSoundPayloadFromLabelEl(label);
-                      if (!payload) return label;
-                      const iconUrl = resolveSoundIconFromPayload(payload);
-                      if (!iconUrl) return label;
-                      labelHasIcon = true;
-                      return (
-                        <span
-                          className="markdown-sound-label markdown-sound-label--with-icon"
-                          role="button"
-                          tabIndex={0}
-                          title="Звук: воспроизвести/остановить"
-                          data-sound-id={"id" in payload ? String(payload.id) : undefined}
-                          data-sound-name={"name" in payload ? String(payload.name) : undefined}
-                          aria-label="Звук: воспроизвести/остановить"
-                        >
-                          <img
-                            className="markdown-sound-label__img"
-                            src={iconUrl}
-                            alt=""
-                            aria-hidden="true"
-                          />
-                          <span className="markdown-sound-label__fallback">SFX</span>
-                        </span>
-                      );
-                    })()
-                  : label;
-              const kindClass =
-                kind === "light"
-                  ? "markdown-dialog-line--label-light"
-                  : kind === "play"
-                    ? "markdown-dialog-line--label-play"
-                    : kind === "sound"
-                      ? "markdown-dialog-line--label-sound"
-                  : "markdown-dialog-line--label-role";
-              return (
-                <p
-                  className={[
-                    "markdown-dialog-line",
-                    kindClass,
-                    labelHasIcon ? "markdown-dialog-line--label-has-icon" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  <span className="markdown-dialog-label">{resolvedLabel}</span>
-                  <span className="markdown-dialog-text">{rest}</span>
-                </p>
-              );
-            },
+            section: MarkdownKadrSection,
+            p: ({ children }: { children: React.ReactNode }) => (
+              <MarkdownPreviewParagraph {...markdownParagraphProps}>
+                {children}
+              </MarkdownPreviewParagraph>
+            ),
             li: ({ children }: { children: React.ReactNode }) => (
               <li>{renderLightTokens(children)}</li>
             ),

@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import type { LightSchemeLookModel } from "./light-scheme-preview";
-import { LightConsoleSplitView } from "./LightConsoleSplitView";
-import { buildLightConsoleSplitModel } from "./light-console-split";
+import {
+  buildKadrRecordFaderRows,
+  type LightFaderBoardRow,
+} from "./light-console-split";
 import type { SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
 import type { StepLightKadrV1 } from "../../types/script";
 import { formatSofitChannelsLabel } from "./light-channel-roles";
@@ -11,7 +13,6 @@ export type LightSchemeLookCardProps = {
   lightChannels: string[];
   activeKadr?: StepLightKadrV1 | null;
   lightFaders?: SceneLightFadersDataV1 | null;
-  sofitChannels?: number[];
   programLabelOverride?: string;
   onHighlightChannel?: (channel: number | null) => void;
 };
@@ -39,10 +40,29 @@ export function LightSchemeLookCard({
   lightChannels,
   activeKadr,
   lightFaders,
-  sofitChannels = [],
   onHighlightChannel,
 }: LightSchemeLookCardProps) {
-  const [showConsole, setShowConsole] = useState(false);
+  const recordRows = useMemo((): LightFaderBoardRow[] => {
+    if (!lightFaders || !activeKadr || !lookModel) return [];
+    return buildKadrRecordFaderRows({
+      kadrFaderStates: activeKadr.faders,
+      faders: lightFaders,
+      selectedChannels: lookModel.sofitChannels,
+      lightChannelsCount: lightChannels.length,
+    });
+  }, [
+    activeKadr,
+    activeKadr?.faders,
+    lightChannels.length,
+    lightFaders,
+    lookModel,
+    lookModel?.sofitChannels,
+  ]);
+
+  const channelsInKadr = useMemo((): number[] => {
+    const set = new Set(recordRows.map((row) => row.channel));
+    return [...set].sort((a, b) => a - b);
+  }, [recordRows]);
 
   if (!lookModel || !activeKadr) {
     return (
@@ -53,21 +73,6 @@ export function LightSchemeLookCard({
       </aside>
     );
   }
-
-  const splitModel =
-    lightFaders && showConsole
-      ? buildLightConsoleSplitModel({
-          programId: activeKadr.programId,
-          lightChannels,
-          faders: lightFaders,
-          kadrFaderStates: activeKadr.faders,
-          sofitChannels,
-          programLabel: lookModel.programLabel,
-        })
-      : null;
-
-  const sofitSummaries = lookModel.channelSummaries.filter((c) => c.role === "sofit");
-  const washSummary = lookModel.channelSummaries.find((c) => c.role === "wash");
 
   return (
     <aside className="light-scheme-call">
@@ -94,89 +99,40 @@ export function LightSchemeLookCard({
             >
               <span className="light-scheme-call__program-badge">П{lookModel.programId}</span>
               <span>{lookModel.programLabel}</span>
-              {washSummary && washSummary.faders.length > 0 ? (
-                <span className="light-scheme-call__program-meta">
-                  {washSummary.activeFaderCount}/{washSummary.totalFaderCount} фейдеров
-                </span>
-              ) : (
-                <span className="light-scheme-call__program-meta">
-                  {Math.round(lookModel.washIntensity * 100)}%
-                </span>
-              )}
             </div>
-            {washSummary?.faders
-              .filter((f) => f.intensity > 0)
-              .map((f) => (
-                <FaderRow
-                  key={f.faderId}
-                  label={f.label}
-                  pct={Math.round(f.intensity * 100)}
-                  color={f.color}
-                />
-              ))}
           </section>
 
-          {sofitSummaries.length > 0 ? (
-            <section className="light-scheme-call__block">
-              <div className="light-scheme-call__block-title">
-                Софиты · {formatSofitChannelsLabel(lookModel.sofitChannels)}
-              </div>
-              {sofitSummaries.map((channel) => (
+          <section className="light-scheme-call__block">
+            <div className="light-scheme-call__block-title">
+              Каналы
+              {lookModel.sofitChannels.length > 0
+                ? ` · ${formatSofitChannelsLabel(lookModel.sofitChannels)}`
+                : null}
+            </div>
+            {recordRows.length > 0 ? (
+              recordRows.map((f) => (
                 <div
-                  key={channel.channel}
-                  className="light-scheme-call__channel"
-                  onMouseEnter={() => onHighlightChannel?.(channel.channel)}
+                  key={`${f.channel}-${f.faderId}`}
+                  onMouseEnter={() => onHighlightChannel?.(f.channel)}
                   onMouseLeave={() => onHighlightChannel?.(null)}
                 >
-                  <div className="light-scheme-call__channel-head">
-                    <span>{channel.label}</span>
-                    <span className="light-scheme-call__channel-dots">
-                      {Array.from({ length: channel.totalFaderCount || 1 }, (_, i) => (
-                        <span
-                          key={i}
-                          className="light-scheme-call__dot"
-                          data-active={i < channel.activeFaderCount}
-                        />
-                      ))}
-                    </span>
-                  </div>
-                  {channel.faders
-                    .filter((f) => f.intensity > 0)
-                    .map((f) => (
-                      <FaderRow
-                        key={f.faderId}
-                        label={f.label}
-                        pct={Math.round(f.intensity * 100)}
-                        color={f.color}
-                      />
-                    ))}
-                  {channel.activeFaderCount === 0 ? (
-                    <div className="light-scheme-call__channel-empty">выключено</div>
-                  ) : null}
+                  <FaderRow
+                    label={f.label}
+                    pct={Math.round(f.intensity * 100)}
+                    color={f.color}
+                  />
                 </div>
-              ))}
-            </section>
-          ) : null}
+              ))
+            ) : (
+              <div className="light-scheme-call__channel-empty">
+                {lookModel.sofitChannels.length === 0
+                  ? "Отметьте каналы K в переключателях над схемой, затем «Записать свет»."
+                  : `Нет уровней на ${formatSofitChannelsLabel(lookModel.sofitChannels)}.`}
+              </div>
+            )}
+          </section>
         </>
       )}
-
-      <button
-        type="button"
-        className="light-scheme-call__toggle-console"
-        onClick={() => setShowConsole((v) => !v)}
-      >
-        {showConsole ? "Скрыть вид пульта" : "Показать как на пульте"}
-      </button>
-
-      {showConsole && splitModel ? (
-        <LightConsoleSplitView
-          model={splitModel}
-          lightChannels={lightChannels}
-          readOnly
-          compact
-          sofitHint={formatSofitChannelsLabel(sofitChannels)}
-        />
-      ) : null}
     </aside>
   );
 }

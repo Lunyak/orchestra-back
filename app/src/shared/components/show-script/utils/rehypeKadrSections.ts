@@ -87,6 +87,32 @@ function splitIntoSections(children: HastNode[], maxHeadingLevel: number): Secti
   return out.length ? out : [{ heading: null, level: null, body: children }];
 }
 
+export type KadrSectionIdLookup = { kadrNo: number; id: string | null };
+
+function headingPlainText(node: HastNode): string {
+  const parts: string[] = [];
+  const walk = (n: HastNode) => {
+    if (!n) return;
+    if (n.type === "text") parts.push(String((n as { value?: string }).value ?? ""));
+    const children = (n as HastNode).children;
+    if (Array.isArray(children)) children.forEach(walk);
+  };
+  walk(node);
+  return parts.join("").trim();
+}
+
+function resolveKadrIdFromHeading(
+  heading: HastNode | null,
+  lookups: KadrSectionIdLookup[] | undefined,
+): string | undefined {
+  if (!heading || !lookups?.length) return undefined;
+  const m = /Картина\s+(\d+)/i.exec(headingPlainText(heading));
+  if (!m) return undefined;
+  const kadrNo = Math.max(1, Math.trunc(Number(m[1]) || 1));
+  const id = lookups.find((s) => s.kadrNo === kadrNo)?.id;
+  return id ?? undefined;
+}
+
 function moveImagesToRight(body: HastNode[]): { left: HastNode[]; right: HastNode[] } {
   const left: HastNode[] = [];
   const right: HastNode[] = [];
@@ -105,7 +131,11 @@ function moveImagesToRight(body: HastNode[]): { left: HastNode[]; right: HastNod
   return { left, right };
 }
 
-export function rehypeKadrSections(opts?: { enabled?: boolean; headingMaxLevel?: number }) {
+export function rehypeKadrSections(opts?: {
+  enabled?: boolean;
+  headingMaxLevel?: number;
+  kadrIdLookups?: KadrSectionIdLookup[];
+}) {
   const enabled = Boolean(opts?.enabled ?? true);
   const maxHeadingLevel = Math.max(1, Math.min(6, Math.trunc(Number(opts?.headingMaxLevel ?? 3))));
 
@@ -135,12 +165,14 @@ export function rehypeKadrSections(opts?: { enabled?: boolean; headingMaxLevel?:
       );
       const grid = makeEl("div", ["markdown-kadr__grid"], {}, [leftWrap, rightWrap]);
 
+      const lkId = resolveKadrIdFromHeading(s.heading, opts?.kadrIdLookups);
       const sectionEl = makeEl(
         "section",
         ["markdown-kadr"],
         {
           "data-has-image": hasImage ? "true" : "false",
           "data-level": s.level != null ? String(s.level) : undefined,
+          "data-lk-id": lkId,
         },
         [grid],
       );

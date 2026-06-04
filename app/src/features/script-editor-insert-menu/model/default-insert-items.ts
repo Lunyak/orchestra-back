@@ -5,11 +5,11 @@ import type {
   ScriptEditorInsertResolveResult,
 } from "./types";
 
-import { createKadrTemplateSnippet, createLightKadrId } from "../../../features/theater/model/light-kadrs";
-
-function countKadrHeaders(text: string): number {
-  return (String(text).match(/^###\s*Картина\b/gim) ?? []).length;
-}
+import {
+  createKadrTemplateSnippet,
+  createLightKadrId,
+  nextKadrNumberForStep,
+} from "../../../features/theater/model/light-kadrs";
 
 export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinition[] = [
   {
@@ -121,7 +121,7 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
     label: "Картина (шаблон)",
     group: "Структура",
     resolve: (ctx) => {
-      const nextN = countKadrHeaders(ctx.activeMarkdown) + 1;
+      const nextN = nextKadrNumberForStep({ markdown: ctx.activeMarkdown });
       const kadrId = createLightKadrId();
       return {
         state: "ok",

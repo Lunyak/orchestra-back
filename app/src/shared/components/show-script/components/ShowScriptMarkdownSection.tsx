@@ -10,6 +10,7 @@ import {
 } from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
 import { useScene, type SceneLightFadersDataV1 } from "../../../../features/scene";
+import { patchSceneDataForLightChannelCount } from "../../light-console/light-channels-mutate";
 import {
   subscribeScriptTokenizeRequests,
   wrapMarkdownMatchesAsTokens,
@@ -145,7 +146,7 @@ export function ShowScriptMarkdownSection({
       lastSyncedLightKadrsKeyRef.current = "";
       return;
     }
-    const markdown = String(activeMarkdown ?? "");
+    const markdown = String(currentStep.markdown ?? "");
     const prev = readStepLightKadrs(currentStep);
     const synced = syncLightKadrsFromMarkdown({ markdown, kadrs: prev });
     const syncKey = `${currentStep.id}:${markdown.length}:${lightKadrsStableKey(synced)}`;
@@ -156,7 +157,7 @@ export function ShowScriptMarkdownSection({
     if (lastSyncedLightKadrsKeyRef.current === syncKey) return;
     lastSyncedLightKadrsKeyRef.current = syncKey;
     updateStepField(currentStep.id, "lightKadrs", synced);
-  }, [activeMarkdown, currentStep?.id, currentStep?.lightKadrs, updateStepField]);
+  }, [currentStep?.markdown, currentStep?.id, currentStep?.lightKadrs, updateStepField]);
 
   useEffect(() => {
     const ed = markdownRef.current;
@@ -690,7 +691,6 @@ export function ShowScriptMarkdownSection({
             }}
           />
           <ScriptLightChannelsPanel
-            channelsOnly
             lightChannels={lightChannels}
             selectedLightSlot={selectedLightSlot}
             lightFaders={lightFaders}
@@ -702,6 +702,10 @@ export function ShowScriptMarkdownSection({
                   lightChannels: next,
                 }),
               );
+              setSceneData((prev) => ({
+                ...(prev ?? {}),
+                ...patchSceneDataForLightChannelCount(prev, next, lightChannels.length),
+              }));
             }}
             onSelectedLightSlotChange={(slot) => {
               dispatch(

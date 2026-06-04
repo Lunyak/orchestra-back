@@ -1,8 +1,10 @@
 import type {
+  SceneLightChannelRolesV1,
   SceneLightFadersDataV1,
   SceneLightProgramsDataV1,
 } from "../../../features/scene/model/scene-slice";
-import type { StepLightKadrsDataV1 } from "../../types/script";
+import type { StepLightKadrsDataV1, TheaterSpotlight } from "../../types/script";
+import { resolveLightChannelRoles } from "./light-channel-roles";
 import {
   buildKadrFromConsole,
   createLightKadrId,
@@ -23,6 +25,11 @@ export type RecordLightKadrInput = {
   lightPrograms: SceneLightProgramsDataV1 | null | undefined;
   /** Активная программа на пульте (кнопка П1–П8). */
   programId: number;
+  /** Софиты шага — для записи F, привязанных к K3, K4 и т.д. */
+  spotlights?: TheaterSpotlight[];
+  /** Активный K на пульте при записи. */
+  liveConsoleChannel?: number;
+  lightChannelRoles?: SceneLightChannelRolesV1 | null;
 };
 
 export type RecordLightKadrResult = {
@@ -38,13 +45,28 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
   const faders = resolveLightFaders(input.lightFaders ?? undefined);
   const kadrId = input.section.id ?? input.existingKadrId ?? createLightKadrId();
   const programId = Math.max(1, Math.trunc(input.programId) || 1);
+  const existing = input.existingKadrId
+    ? findKadrById(input.kadrs, input.existingKadrId)
+    : undefined;
+
+  const roles = resolveLightChannelRoles(
+    input.lightChannelRoles,
+    input.lightChannels.length,
+  );
+  const liveCh = Math.max(1, Math.trunc(input.liveConsoleChannel ?? 1) || 1);
+  const programs = resolveLightPrograms(input.lightPrograms);
 
   const kadr = buildKadrFromConsole({
     id: kadrId,
-    kadrNo: input.section.kadrNo,
+    kadrNo: existing?.kadrNo ?? input.section.kadrNo,
     title: input.section.headingTitle,
     programId,
     faders,
+    spotlights: input.spotlights ?? [],
+    lightPrograms: programs,
+    sofitChannels: roles.sofitChannels,
+    liveConsoleChannel: liveCh,
+    lightChannelsCount: input.lightChannels.length,
   });
 
   const nextKadrs = upsertKadrInStep({ kadrs: input.kadrs, kadr });
@@ -62,9 +84,12 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
   ).length;
 
   const prev = input.existingKadrId ? findKadrById(input.kadrs, input.existingKadrId) : undefined;
-  const summary = prev
-    ? `Картина ${kadr.kadrNo}: обновлено · П${programId} · ${activeFaders} фейдер(ов) в look`
-    : `Картина ${kadr.kadrNo}: записано · П${programId} · ${activeFaders} фейдер(ов) в look`;
+  const summary =
+    activeFaders === 0
+      ? `Картина ${kadr.kadrNo}: П${programId} записана, но нет фейдеров >0% — поднимите F у софитов K3/K4`
+      : prev
+        ? `Картина ${kadr.kadrNo}: обновлено · П${programId} · ${activeFaders} фейдер(ов)`
+        : `Картина ${kadr.kadrNo}: записано · П${programId} · ${activeFaders} фейдер(ов)`;
 
   return { kadrId, nextKadrs, nextMarkdown, summary };
 }

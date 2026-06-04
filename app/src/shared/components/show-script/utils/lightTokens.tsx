@@ -1,4 +1,5 @@
 import React from "react";
+import { formatFaderChipDisplay } from "../../light-console/light-console-labels";
 import { themeColorToHex } from "../../../styles/theme-color";
 
 export type HastNode =
@@ -213,8 +214,7 @@ export function createRenderLightTokens(
           result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-program-${programId}`));
         } else if (rawType?.toLowerCase() === "fader") {
           const faderId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
-          const pct = String(rawColor ?? "").trim() || "100%";
-          const label = `ф.${faderId} ${pct}`;
+          const label = formatFaderChipDisplay(faderId, rawColor);
           result.push(renderLightChip(label, "var(--color-surface-3)", `${keyPrefix}-${counter}-fader-${faderId}`));
         } else if (rawType?.toLowerCase() === "lightpanel") {
           const kadrId = String(rawIndex ?? "").trim();
@@ -365,8 +365,7 @@ export function createRehypeScriptTokens(
             );
           } else if (rawType?.toLowerCase() === "fader") {
             const faderId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
-            const pct = String(rawColor ?? "").trim() || "100%";
-            const label = `ф.${faderId} ${pct}`;
+            const label = formatFaderChipDisplay(faderId, rawColor);
             out.push(hastSpan(["markdown-light-chip", "markdown-light-chip--fader"], [hastText(label)]));
           } else if (rawType?.toLowerCase() === "lightpanel") {
             const kadrId = String(rawIndex ?? "").trim();

@@ -7,11 +7,15 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import type { TheaterSpotlight } from "../../../shared/types/script";
 import {
+  applyProgramFaderStatesToBoard,
   buildCompleteLightFaders,
   coerceProgramId,
   createDefaultLightFaders,
   lightProgramsNeedNormalization,
+  readProgramChannelFaderStates,
   resolveLightPrograms,
+  upsertActiveProgramSnapshotFromAllChannels,
+  upsertProgramChannelSnapshot,
 } from "./light-console-data";
 
 type UseLightConsoleStateArgs = {
@@ -38,7 +42,9 @@ export function useLightConsoleState({
   const dispatch = useAppDispatch();
   const { sceneData, setSceneData } = useScene();
   const programSaveTimerRef = useRef<number | null>(null);
+  const channelSaveTimerRef = useRef<number | null>(null);
   const activeProgramIdRef = useRef<number | null>(null);
+  const editingChannelRef = useRef(1);
   const programsBootstrappedRef = useRef(false);
   const { lightChannels, selectedLightSlot } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
@@ -126,7 +132,13 @@ export function useLightConsoleState({
 
   const setFaderCount = (count: number) => {
     const nextCount = Math.max(1, Math.min(64, Math.trunc(count) || 1));
-    persistFaders(buildCompleteLightFaders({ ...faders, count: nextCount }));
+    persistFaders(
+      buildCompleteLightFaders({
+        v: 1,
+        count: nextCount,
+        faders: faders.faders.filter((item) => item.id <= nextCount),
+      }),
+    );
   };
 
   const patchFader = (
@@ -161,19 +173,52 @@ export function useLightConsoleState({
 
   const saveProgramSnapshot = useCallback(() => {
     if (!activeProgram || readOnly) return;
-    const snapshot = faders.faders.map((item) => ({
-      faderId: item.id,
-      intensity: item.intensity ?? 1,
-      enabled: item.enabled ?? true,
-      color: item.color,
-    }));
-    persistPrograms({
-      ...programs,
-      programs: programs.programs.map((program) =>
-        program.id === activeProgram.id ? { ...program, faders: snapshot } : program,
+    const channelCount = Math.max(1, lightChannels.length);
+    persistPrograms(
+      upsertActiveProgramSnapshotFromAllChannels(
+        programs,
+        activeProgram.id,
+        persistedFaders,
+        channelCount,
+        faders,
       ),
-    });
-  }, [activeProgram, faders.faders, persistPrograms, programs, readOnly]);
+    );
+  }, [
+    activeProgram,
+    faders,
+    lightChannels.length,
+    persistPrograms,
+    persistedFaders,
+    programs,
+    readOnly,
+  ]);
+
+  const saveChannelSnapshot = useCallback(
+    (channelId: number) => {
+      if (readOnly || fadersOverride) return;
+      const id = coerceProgramId(channelId);
+      if (id == null) return;
+      persistPrograms(upsertProgramChannelSnapshot(programs, id, faders));
+    },
+    [faders, fadersOverride, persistPrograms, programs, readOnly],
+  );
+
+  useEffect(() => {
+    if (readOnly || fadersOverride) return;
+    const channel = Math.max(1, editingChannelRef.current || selectedLightSlot || 1);
+    if (channelSaveTimerRef.current != null) {
+      window.clearTimeout(channelSaveTimerRef.current);
+    }
+    channelSaveTimerRef.current = window.setTimeout(() => {
+      saveChannelSnapshot(channel);
+      channelSaveTimerRef.current = null;
+    }, 550);
+    return () => {
+      if (channelSaveTimerRef.current != null) {
+        window.clearTimeout(channelSaveTimerRef.current);
+      }
+    };
+  }, [fadersOverride, fadersSnapshotKey, readOnly, saveChannelSnapshot, selectedLightSlot]);
 
   useEffect(() => {
     if (!activeProgram || readOnly || fadersOverride) return;
@@ -195,12 +240,35 @@ export function useLightConsoleState({
     };
   }, [activeProgram?.id, fadersOverride, fadersSnapshotKey, readOnly, saveProgramSnapshot]);
 
+  useEffect(() => {
+    editingChannelRef.current = Math.max(1, selectedLightSlot || 1);
+  }, [selectedLightSlot]);
+
   const selectChannel = (slot: number) => {
+    const max = Math.max(1, lightChannels.length);
+    const next = Math.max(1, Math.min(max, Math.trunc(slot) || 1));
+    const prev = editingChannelRef.current;
+
+    if (!readOnly && !fadersOverride && prev !== next) {
+      if (channelSaveTimerRef.current != null) {
+        window.clearTimeout(channelSaveTimerRef.current);
+        channelSaveTimerRef.current = null;
+      }
+      const programsAfterSave = upsertProgramChannelSnapshot(programs, prev, faders);
+      const channelStates = readProgramChannelFaderStates(programsAfterSave, next);
+      const nextFaders = applyProgramFaderStatesToBoard(faders, channelStates);
+      editingChannelRef.current = next;
+      persistPrograms(programsAfterSave);
+      persistFaders(nextFaders);
+    } else {
+      editingChannelRef.current = next;
+    }
+
     dispatch(
       showScriptMarkdownActions.setSelectedLightSlot({
         projectSlug: projectName,
         sceneName: "script",
-        slot,
+        slot: next,
       }),
     );
   };
@@ -213,23 +281,24 @@ export function useLightConsoleState({
     if (!program) return;
     activeProgramIdRef.current = id;
 
-    const stateByFader = new Map(program.faders.map((state) => [state.faderId, state]));
-    const nextFaders: SceneLightFadersDataV1 = {
-      v: 1,
-      count: faders.count,
-      faders: faders.faders.map((item) => {
-        const state = stateByFader.get(item.id);
-        return state
-          ? {
-              ...item,
-              intensity: state.intensity ?? item.intensity,
-              enabled: state.enabled ?? item.enabled,
-              color: state.color ?? item.color,
-            }
-          : item;
-      }),
-    };
-    const nextPrograms = resolveLightPrograms({ ...programs, activeProgramId: id });
+    if (channelSaveTimerRef.current != null) {
+      window.clearTimeout(channelSaveTimerRef.current);
+      channelSaveTimerRef.current = null;
+    }
+    const programsAfterChannelSave = upsertProgramChannelSnapshot(
+      programs,
+      editingChannelRef.current,
+      faders,
+    );
+    const nextFaders = applyProgramFaderStatesToBoard(
+      faders,
+      readProgramChannelFaderStates(programsAfterChannelSave, id),
+    );
+    editingChannelRef.current = id;
+    const nextPrograms = resolveLightPrograms({
+      ...programsAfterChannelSave,
+      activeProgramId: id,
+    });
 
     if (onProgramsChange) {
       onProgramsChange(nextPrograms);

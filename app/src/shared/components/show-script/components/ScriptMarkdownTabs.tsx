@@ -1,4 +1,5 @@
 import type { ShowScriptMarkdownMode } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
+import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../script-markdown-tab-labels";
 
 export const SCRIPT_MARKDOWN_TAB_ITEMS: ReadonlyArray<{
   mode: ShowScriptMarkdownMode;
@@ -6,7 +7,7 @@ export const SCRIPT_MARKDOWN_TAB_ITEMS: ReadonlyArray<{
 }> = [
   { mode: "play", label: "Текст" },
   { mode: "explication", label: "Экспликация" },
-  { mode: "notes", label: "Схема" },
+  { mode: "notes", label: SCRIPT_MARKDOWN_NOTES_TAB_LABEL },
   { mode: "comments", label: "Комментарии" },
   { mode: "requisites", label: "Реквизит" },
   { mode: "light", label: "Свет" },

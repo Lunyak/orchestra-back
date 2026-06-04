@@ -1,7 +1,54 @@
 .light-plot-mode-tabs {
   display: flex;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 10px;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.light-plot-mode-tabs__start {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.light-plot-mode-tabs--with-center {
+  position: relative;
+}
+
+.light-plot-mode-tabs__center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: min(520px, calc(100% - 280px));
+  min-width: 0;
+  padding: 0 8px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.light-plot-mode-tabs--with-center .light-plot-mode-tabs__start,
+.light-plot-mode-tabs--with-center .light-plot-mode-tabs__end {
+  position: relative;
+  z-index: 1;
+}
+
+.light-plot-mode-tabs__end {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.light-plot-mode-tabs:not(.light-plot-mode-tabs--with-center) .light-plot-mode-tabs__end {
+  flex: 1;
 }
 
 .light-plot-mode-tab {
@@ -20,17 +67,34 @@
   border-color: var(--color-active-ascent);
   color: var(--color-active-ascent);
   background: rgba(255, 180, 80, 0.08);
+  cursor: default;
+}
+
+.light-plot-mode-tab--link:hover,
+.light-plot-mode-tab--link:focus-visible {
+  border-color: var(--color-active-ascent);
+  color: var(--color-text-bright);
+  outline: none;
 }
 
 .light-plot-page {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   flex: 1;
-  flex: 1;
-  min-height: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.light-plot-page > .spectacle-run,
+.light-plot-page .spectacle-run-page-section {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 .light-plot-panel {
