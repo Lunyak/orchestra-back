@@ -5,6 +5,7 @@ import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField"
 import cn from "classnames";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import { useAuth } from "../../features/auth";
 import {
   premiseKindLabel,
@@ -12,6 +13,8 @@ import {
   useListPremisesQuery,
 } from "../../features/premises";
 import type { PremiseKind } from "../../sync/api/premises";
+import "../../pages/rehearsals/style.css";
+import "../../pages/sessions/style.css";
 import "./style.css";
 
 const kindOptions: { value: PremiseKind; label: string }[] = [
@@ -34,7 +37,11 @@ export function PremisesPage() {
   const premises = data?.premises ?? [];
 
   if (!accessToken) {
-    return <div>Нужно войти, чтобы открыть помещения.</div>;
+    return (
+      <div className="rehearsals-page sessions-page">
+        <div className="rehearsals-muted">Нужно войти, чтобы открыть помещения.</div>
+      </div>
+    );
   }
 
   async function handleCreate() {
@@ -62,107 +69,116 @@ export function PremisesPage() {
   return (
     <div className="app-layout premises-layout">
       <div className="app-content">
-        <main className="main-content">
-          <div className="premises-view">
-            <div className="premises-header">
-              <div>
-                <h2 className="premises-header__title">Помещения</h2>
-                <p className="premises-header__subtitle">
+        <main className="main-content main-content-premises">
+          <div className="rehearsals-page sessions-page">
+            <div className="rehearsals-head premises-page__head">
+              <div className="premises-page__head-main">
+                <div className="rehearsals-meta">Помещения</div>
+                <p className="rehearsals-muted premises-page__subtitle">
                   Календарь аренды и субаренды залов и студий
                 </p>
               </div>
-              <Link to="/troupe" className="premises-link-back">
-                ← Труппа
-              </Link>
+              <div className="premises-page__head-actions">
+                <Link to="/troupe" className="director-session-page__back">
+                  ← Труппа
+                </Link>
+              </div>
             </div>
 
-            <div className="premises-card">
-              <div className="premises-card__title">Новое помещение</div>
-              <FormInlineRow className="premises-form-row">
-                <InlineTextField
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Название, например «Большой зал»"
-                  maxLength={120}
-                  aria-label="Название помещения"
-                />
-                <CustomSelect
-                  value={kind}
-                  options={kindOptions}
-                  onChange={(v) => setKind(v as PremiseKind)}
-                  aria-label="Тип помещения"
-                />
-              </FormInlineRow>
-              <FormInlineRow className="premises-form-row">
-                <InlineTextField
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Адрес (необязательно)"
-                  maxLength={300}
-                  aria-label="Адрес"
-                />
-                <Button
-                  type="button"
-                  variant="primary"
-                  disabled={creating || !name.trim()}
-                  onClick={() => void handleCreate()}
-                >
-                  {creating ? "Создание…" : "Добавить"}
-                </Button>
-              </FormInlineRow>
-              {createError ? (
-                <div className="premises-error">{createError}</div>
-              ) : null}
-            </div>
+            <div className="premises-index">
+              <RehearsalsCard fluid>
+                <div className="rehearsals-card-title">Новое помещение</div>
+                <FormInlineRow className="premises-form-row">
+                  <InlineTextField
+                    className="native-text-input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Название, например «Большой зал»"
+                    maxLength={120}
+                    aria-label="Название помещения"
+                  />
+                  <CustomSelect
+                    value={kind}
+                    options={kindOptions}
+                    onChange={(v) => setKind(v as PremiseKind)}
+                    aria-label="Тип помещения"
+                  />
+                </FormInlineRow>
+                <FormInlineRow className="premises-form-row">
+                  <InlineTextField
+                    className="native-text-input"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="Адрес (необязательно)"
+                    maxLength={300}
+                    aria-label="Адрес"
+                  />
+                  <Button
+                    type="button"
+                    disabled={creating || !name.trim()}
+                    onClick={() => void handleCreate()}
+                  >
+                    {creating ? "Создание…" : "Добавить"}
+                  </Button>
+                </FormInlineRow>
+                {createError ? (
+                  <div className="rehearsals-error">{createError}</div>
+                ) : null}
+              </RehearsalsCard>
 
-            <div className="premises-card">
-              <div className="premises-card__title">Список помещений</div>
-              {isLoading ? (
-                <p className="premises-hint">Загрузка…</p>
-              ) : error ? (
-                <div className="premises-error">Не удалось загрузить помещения</div>
-              ) : premises.length === 0 ? (
-                <p className="premises-hint">
-                  Помещений пока нет. Создайте первое — оно привяжется к вашей
-                  труппе.
-                </p>
-              ) : (
-                <ul className="premises-list">
-                  {premises.map((p) => (
-                    <li key={p.id}>
-                      <Link
-                        to={`/premises/${p.id}`}
-                        className="premises-list-item"
-                      >
-                        <div className="premises-list-item__main">
-                          <span className="premises-list-item__name">{p.name}</span>
-                          <span
-                            className={cn(
-                              "premises-list-item__kind",
-                              p.kind === "OWNED"
-                                ? "premises-list-item__kind--owned"
-                                : "premises-list-item__kind--rented",
-                            )}
-                          >
-                            {premiseKindLabel(p.kind)}
-                          </span>
-                        </div>
-                        {p.address ? (
-                          <div className="premises-list-item__address">
-                            {p.address}
+              <RehearsalsCard fluid className="premises-index-list-card">
+                <div className="rehearsals-card-title">Список помещений</div>
+                {isLoading ? (
+                  <p className="rehearsals-muted">Загрузка…</p>
+                ) : error ? (
+                  <div className="rehearsals-error">
+                    Не удалось загрузить помещения
+                  </div>
+                ) : premises.length === 0 ? (
+                  <p className="rehearsals-muted">
+                    Помещений пока нет. Создайте первое — оно привяжется к вашей
+                    труппе.
+                  </p>
+                ) : (
+                  <ul className="premises-list sessions-list">
+                    {premises.map((p) => (
+                      <li key={p.id}>
+                        <Link
+                          to={`/premises/${p.id}`}
+                          className="premises-list-item"
+                        >
+                          <div className="premises-list-item__main">
+                            <span className="premises-list-item__name">
+                              {p.name}
+                            </span>
+                            <span
+                              className={cn(
+                                "premises-page__kind",
+                                p.kind === "OWNED"
+                                  ? "premises-page__kind--owned"
+                                  : "premises-page__kind--rented",
+                              )}
+                            >
+                              {premiseKindLabel(p.kind)}
+                            </span>
                           </div>
-                        ) : null}
-                        <div className="premises-list-item__meta">
-                          {p.troupeTitle}
-                          {p.canBook
-                            ? " · можно бронировать"
-                            : " · только просмотр"}
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                          {p.address ? (
+                            <div className="premises-list-item__address rehearsals-muted">
+                              {p.address}
+                            </div>
+                          ) : null}
+                          <div className="premises-list-item__meta rehearsals-muted">
+                            {p.troupeTitle}
+                            {p.canBook
+                              ? " · можно бронировать"
+                              : " · только просмотр"}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </RehearsalsCard>
             </div>
           </div>
         </main>

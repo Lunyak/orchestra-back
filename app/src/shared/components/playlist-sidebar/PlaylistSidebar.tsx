@@ -8,8 +8,16 @@ import {
   uploadScenePlaylistWeb,
 } from "../../../features/scene/model/scene-slice";
 import { invokePlaylistPlay } from "../../../features/scene/model/scene-playback-bridge";
+import { scriptUiActions } from "../../../features/script-ui/model/script-ui-slice";
 import { getDesktopApi } from "../../platform/desktop-api";
 import { createAudioFadeController } from "../../media/audio-fade";
+import {
+  buildPlaylistCacheKey,
+  fetchAndCachePlaylistTrack,
+  isWebMediaCacheEnabled,
+  isWebMediaCached,
+  resolveWebPlaylistPlaybackUrl,
+} from "../../media/web-media-cache";
 import { resolveOfflineMediaUrl } from "../../platform/media-url";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
@@ -97,9 +105,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     (s) => (s.scene.sceneData?.playlist as PlaylistTrack[] | undefined) ?? EMPTY_PLAYLIST,
   );
   const playlistUpload = useAppSelector((s) => s.scene.playlistUpload);
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [currentTrack, setCurrentTrack] = useState<PlaylistTrack | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const isEditMode = useAppSelector((s) => s.scriptUi.playlistEditMode);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
@@ -107,7 +116,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const { volume, setVolume } = usePlayerVolume();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [crossfadeEnabled, setCrossfadeEnabled] = useState(false);
+  const crossfadeEnabled = useAppSelector((s) => s.scriptUi.playlistCrossfadeEnabled);
   const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
@@ -294,22 +303,43 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
   }, [activeAudioKey, currentTrack]);
 
-  const resolveTrackSrc = useCallback(
-    (file: string, remoteUrl?: string, filePath?: string) => {
-      if (getDesktopApi() || filePath) {
+  const resolveTrackPlaybackSrc = useCallback(
+    async (track: PlaylistTrack) => {
+      if (getDesktopApi() || track.filePath) {
         return resolveOfflineMediaUrl({
           projectSlug: projectName,
           kind: "playlist",
-          fileName: file,
-          filePath,
-          remoteUrl,
+          fileName: track.file,
+          filePath: track.filePath,
+          remoteUrl: track.remoteUrl,
         });
       }
-      if (remoteUrl) return remoteUrl;
-      return file;
+      if (isWebMediaCacheEnabled()) {
+        return resolveWebPlaylistPlaybackUrl(projectName, track, accessToken);
+      }
+      const remote = String(track.remoteUrl ?? "").trim();
+      if (remote) return remote;
+      return track.file;
     },
-    [projectName],
+    [accessToken, projectName],
   );
+
+  useEffect(() => {
+    if (!isWebMediaCacheEnabled() || playlist.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const next: Record<number, "idle" | "loading" | "ready" | "error"> = {};
+      for (const track of playlist) {
+        const key = buildPlaylistCacheKey(projectName, track);
+        next[track.id] = (await isWebMediaCached(key)) ? "ready" : "idle";
+      }
+      if (cancelled) return;
+      setPreloadStatusById((prev) => ({ ...prev, ...next }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [playlist, projectName]);
 
   const restoreCarryover = useCallback(
     async (track: PlaylistTrack) => {
@@ -436,54 +466,88 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     [audioFade],
   );
 
-  const preloadOne = useCallback(async (src: string, runId: number) => {
-    const audio = preloadAudioRef.current ?? new Audio();
-    preloadAudioRef.current = audio;
-    // Do not interfere with the main player.
-    audio.preload = "auto";
-    audio.muted = true;
-    audio.volume = 0;
-    if (audio.src !== src) {
-      audio.src = src;
-    }
-    // Start request.
-    audio.load();
+  const preloadOne = useCallback(
+    async (track: PlaylistTrack, runId: number) => {
+      if (isWebMediaCacheEnabled()) {
+        await fetchAndCachePlaylistTrack(projectName, track, accessToken);
+        if (runId !== preloadRunIdRef.current) {
+          throw new Error("cancelled");
+        }
+        const src = await resolveWebPlaylistPlaybackUrl(projectName, track, accessToken);
+        if (!src) throw new Error("cache miss");
+        const audio = preloadAudioRef.current ?? new Audio();
+        preloadAudioRef.current = audio;
+        audio.preload = "auto";
+        audio.muted = true;
+        audio.volume = 0;
+        if (audio.src !== src) audio.src = src;
+        audio.load();
+        await new Promise<"ready">((resolve, reject) => {
+          const timeout = window.setTimeout(() => {
+            cleanup();
+            reject(new Error("preload timeout"));
+          }, 20000);
+          const onReady = () => {
+            cleanup();
+            resolve("ready");
+          };
+          const onErr = () => {
+            cleanup();
+            reject(new Error("preload error"));
+          };
+          const cleanup = () => {
+            window.clearTimeout(timeout);
+            audio.removeEventListener("canplay", onReady);
+            audio.removeEventListener("loadeddata", onReady);
+            audio.removeEventListener("error", onErr);
+          };
+          audio.addEventListener("canplay", onReady);
+          audio.addEventListener("loadeddata", onReady);
+          audio.addEventListener("error", onErr);
+        });
+        if (runId !== preloadRunIdRef.current) throw new Error("cancelled");
+        return;
+      }
 
-    // We only need "enough to start", not the full download.
-    const ready = await new Promise<"ready">((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        cleanup();
-        reject(new Error("preload timeout"));
-      }, 20000);
+      const src = await resolveTrackPlaybackSrc(track);
+      const audio = preloadAudioRef.current ?? new Audio();
+      preloadAudioRef.current = audio;
+      audio.preload = "auto";
+      audio.muted = true;
+      audio.volume = 0;
+      if (audio.src !== src) audio.src = src;
+      audio.load();
 
-      const onReady = () => {
-        cleanup();
-        resolve("ready");
-      };
-      const onErr = () => {
-        cleanup();
-        reject(new Error("preload error"));
-      };
-      const cleanup = () => {
-        window.clearTimeout(timeout);
-        audio.removeEventListener("canplay", onReady);
-        audio.removeEventListener("loadeddata", onReady);
-        audio.removeEventListener("loadedmetadata", onReady);
-        audio.removeEventListener("error", onErr);
-      };
+      await new Promise<"ready">((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          cleanup();
+          reject(new Error("preload timeout"));
+        }, 20000);
+        const onReady = () => {
+          cleanup();
+          resolve("ready");
+        };
+        const onErr = () => {
+          cleanup();
+          reject(new Error("preload error"));
+        };
+        const cleanup = () => {
+          window.clearTimeout(timeout);
+          audio.removeEventListener("canplay", onReady);
+          audio.removeEventListener("loadeddata", onReady);
+          audio.removeEventListener("loadedmetadata", onReady);
+          audio.removeEventListener("error", onErr);
+        };
+        audio.addEventListener("canplay", onReady);
+        audio.addEventListener("loadeddata", onReady);
+        audio.addEventListener("loadedmetadata", onReady);
+        audio.addEventListener("error", onErr);
+      });
 
-      audio.addEventListener("canplay", onReady);
-      audio.addEventListener("loadeddata", onReady);
-      audio.addEventListener("loadedmetadata", onReady);
-      audio.addEventListener("error", onErr);
-    });
-
-    if (runId !== preloadRunIdRef.current) {
-      // cancelled
-      throw new Error("cancelled");
-    }
-    return ready;
-  }, []);
+      if (runId !== preloadRunIdRef.current) throw new Error("cancelled");
+    },
+    [accessToken, projectName, resolveTrackPlaybackSrc],
+  );
 
   const preparePlaylist = useCallback(async () => {
     if (playlist.length === 0) return;
@@ -502,9 +566,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       const t = playlist[i];
       if (runId !== preloadRunIdRef.current) break;
       setPreloadStatusById((prev) => ({ ...prev, [t.id]: "loading" }));
-      const src = resolveTrackSrc(t.file, t.remoteUrl, t.filePath);
       try {
-        await preloadOne(src, runId);
+        await preloadOne(t, runId);
         if (runId !== preloadRunIdRef.current) break;
         setPreloadStatusById((prev) => ({ ...prev, [t.id]: "ready" }));
       } catch (e) {
@@ -519,7 +582,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     if (runId === preloadRunIdRef.current) {
       setPreloadRunning(false);
     }
-  }, [playlist, preloadOne, resolveTrackSrc]);
+  }, [playlist, preloadOne]);
 
   const cancelPrepare = useCallback(() => {
     preloadRunIdRef.current += 1;
@@ -591,11 +654,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     const inactiveKey = activeAudioKey === "a" ? "b" : "a";
     if (!activeAudio || !inactiveAudio) return;
     clearPlaylistCarryover();
-    const fadeMs = track.fadeMs ?? 500;
     playRequestId.current += 1;
     const requestId = playRequestId.current;
     const isSameTrack = currentTrack?.id === track.id;
     const isAudioPlaying = !activeAudio.paused;
+    const fadeInMs = track.fadeMs ?? 500;
+    const fadeOutMs =
+      !isSameTrack && currentTrack ? (currentTrack.fadeMs ?? 500) : fadeInMs;
 
     // Cancel any pending play on the other element when crossfade is disabled.
     // This closes the "two tracks playing" race when switching tracks quickly.
@@ -619,7 +684,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
     if (isSameTrack && isAudioPlaying) {
       const from = activeAudio.volume;
-      runFade(activeAudio, activeAudioKey, from, 0, fadeMs, () => {
+      runFade(activeAudio, activeAudioKey, from, 0, fadeOutMs, () => {
         activeAudio.pause();
         setIsPlaying(false);
       });
@@ -628,7 +693,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
     if (isSameTrack && activeAudio.paused) {
       clearFadeTimer(activeAudioKey);
-      const src = resolveTrackSrc(track.file, track.remoteUrl, track.filePath);
+      const src = await resolveTrackPlaybackSrc(track);
       if (activeAudio.src !== src) {
         activeAudio.src = src;
       }
@@ -640,7 +705,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           activeAudio.pause();
           return;
         }
-        runFade(activeAudio, activeAudioKey, activeAudio.volume, volume, fadeMs);
+        runFade(activeAudio, activeAudioKey, activeAudio.volume, volume, fadeInMs);
         setIsPlaying(true);
       } catch (error) {
         if (requestId !== playRequestId.current) return;
@@ -652,12 +717,12 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     if (isAudioPlaying) {
       const from = activeAudio.volume;
       if (crossfadeEnabled) {
-        runFade(activeAudio, activeAudioKey, from, 0, fadeMs, () => {
+        runFade(activeAudio, activeAudioKey, from, 0, fadeOutMs, () => {
           activeAudio.pause();
         });
       } else {
         await new Promise<void>((resolve) => {
-          runFade(activeAudio, activeAudioKey, from, 0, fadeMs, () => {
+          runFade(activeAudio, activeAudioKey, from, 0, fadeOutMs, () => {
             activeAudio.pause();
             resolve();
           });
@@ -669,7 +734,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       clearFadeTimer(activeAudioKey);
     }
 
-    const src = resolveTrackSrc(track.file, track.remoteUrl, track.filePath);
+    const src = await resolveTrackPlaybackSrc(track);
     if (inactiveAudio.src !== src) {
       inactiveAudio.src = src;
     }
@@ -686,7 +751,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         return;
       }
       setActiveAudioKey(inactiveKey);
-      runFade(inactiveAudio, inactiveKey, 0, volume, fadeMs);
+      runFade(inactiveAudio, inactiveKey, 0, volume, fadeInMs);
       setIsPlaying(true);
     } catch (error) {
       if (requestId !== playRequestId.current) return;
@@ -697,7 +762,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     clearFadeTimer,
     crossfadeEnabled,
     currentTrack,
-    resolveTrackSrc,
+    resolveTrackPlaybackSrc,
     runFade,
     volume,
   ]);
@@ -1027,7 +1092,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               <input
                 type="checkbox"
                 checked={crossfadeEnabled}
-                onChange={(event) => setCrossfadeEnabled(event.target.checked)}
+                onChange={(event) =>
+                  dispatch(
+                    scriptUiActions.setPlaylistCrossfadeEnabled({
+                      value: event.target.checked,
+                    }),
+                  )
+                }
               />
               <span className="playlist-crossfade__switch" aria-hidden="true" />
               <span className="playlist-crossfade__text">Кроссфейд</span>
@@ -1218,13 +1289,11 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           volume={volume}
           progressPercent={progressPercent}
           volumePercent={volumePercent}
-          isEditMode={isEditMode}
           canGoPrev={canGoPrevTrack}
           canGoNext={canGoNextTrack}
           onPrevTrack={playPreviousTrack}
           onNextTrack={playNextTrack}
           onTogglePlayback={togglePlayback}
-          onToggleEditMode={() => setIsEditMode((p) => !p)}
           onSeek={seekPlayer}
           onVolumeChange={setPlayerVolume}
           formatTime={formatTime}

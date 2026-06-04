@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useScene } from "../../../features/scene";
 import { useProject } from "../../../features/project/model/project-context";
 import { useAppSelector } from "../../../shared/store/hooks";
@@ -6,18 +6,29 @@ import { selectShowScriptMarkdownUi } from "../../../features/show-script-markdo
 import { LightFixture, ScriptStep } from "../../types/script";
 import {
   countStepLightChannelLinks,
-  fixtureMatchesChannelSlot,
   mergeLightPlotFromSpotlights,
   mergeSpotlightsFromLightPlot,
 } from "../../../features/theater/model/theater-light-channel-link";
 import { LightChannelSelect } from "../../../features/theater/ui/LightChannelSelect";
 import { LightCueTimeline, readStepLightCues } from "./LightCueTimeline";
 import { normalizeLightCues, formatLightCuesMarkdown } from "../../../features/theater/model/theater-light-cues";
+import { LightSchemeKadrBoard } from "../light-console/LightSchemeKadrBoard";
+import { SpectacleRunView } from "../../../features/spectacle-run/ui/SpectacleRunView";
+import "../../../features/spectacle-run/ui/style.css";
+import {
+  recordLightKadrForSection,
+  resolveActiveProgramId,
+} from "../light-console/light-kadr-record";
+import {
+  readStepLightKadrs,
+  scanMarkdownKadrSections,
+} from "../../../features/theater/model/light-kadrs";
+import "../light-console/light-console.css";
 import "./style.css";
 
 export const LightPlotPage = () => {
   const { projectName } = useProject();
-  const { steps, currentPage, updateStep } = useScene();
+  const { steps, currentPage, updateStep, sceneData, setSceneData } = useScene();
   const { lightChannels, selectedLightSlot } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
   );
@@ -30,10 +41,21 @@ export const LightPlotPage = () => {
   const [newLightAngle, setNewLightAngle] = useState(0);
   const [newLightLength, setNewLightLength] = useState(54);
   const [linkMessage, setLinkMessage] = useState<string | null>(null);
-  const draggingIdRef = useRef<number | null>(null);
+  const [activeLightKadrId, setActiveLightKadrId] = useState<string | null>(null);
+  const [pageMode, setPageMode] = useState<"run" | "plot">("run");
+  const [editPlot, setEditPlot] = useState(false);
+  const [schemeRecordMessage, setSchemeRecordMessage] = useState<string | null>(null);
   const lightGridCols = 12;
   const lightGridRows = 20;
   const currentStep = steps[currentPage];
+  const lightFaders =
+    sceneData?.lightFaders && sceneData.lightFaders.v === 1 ? sceneData.lightFaders : null;
+  const lightPrograms =
+    sceneData?.lightPrograms && sceneData.lightPrograms.v === 1 ? sceneData.lightPrograms : null;
+  const lightChannelRoles =
+    sceneData?.lightChannelRoles && sceneData.lightChannelRoles.v === 1
+      ? sceneData.lightChannelRoles
+      : null;
   const lightPlot = currentStep?.lightPlot ?? [];
   const spotlights = currentStep?.theaterSpotlights ?? [];
   const lightCues = useMemo(
@@ -197,28 +219,118 @@ export const LightPlotPage = () => {
     updateCurrentStepPlot(lightPlot.filter((item) => item.id !== fixtureId));
   };
 
-  const updateAimFromEvent = (
-    fixtureId: number,
-    event: React.PointerEvent<HTMLDivElement>,
-  ) => {
-    const target = event.currentTarget;
-    const rect = target.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = event.clientX - centerX;
-    const dy = event.clientY - centerY;
-    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-    const normalizedAngle = Math.round((angle + 360) % 360);
-    const length = Math.max(10, Math.round(Math.hypot(dx, dy)));
-    updateLightAim(fixtureId, normalizedAngle, length);
-  };
+  const recordKadrFromScheme = useCallback(() => {
+    if (!currentStep) return;
+    const markdown = String(currentStep.markdown ?? "");
+    const sections = scanMarkdownKadrSections(markdown);
+    if (sections.length === 0) {
+      setLinkMessage("В тексте шага нет ### Картина N — добавьте на вкладке «Схема» в сценарии");
+      return;
+    }
+    const kadrs = readStepLightKadrs(currentStep);
+    const resolvedId =
+      activeLightKadrId && kadrs.kadrs.some((k) => k.id === activeLightKadrId)
+        ? activeLightKadrId
+        : sections.find((s) => s.id)?.id ?? null;
+    const section =
+      (resolvedId ? sections.find((s) => s.id === resolvedId) : null) ?? sections[0];
+    if (!section) return;
+
+    const result = recordLightKadrForSection({
+      markdown,
+      section,
+      existingKadrId: resolvedId,
+      kadrs,
+      lightChannels,
+      lightFaders,
+      lightPrograms,
+      programId: resolveActiveProgramId(lightPrograms),
+    });
+    if (!result) return;
+
+    updateStep(currentStep.id, {
+      lightKadrs: result.nextKadrs,
+      markdown: result.nextMarkdown,
+    } as Partial<ScriptStep>);
+    setActiveLightKadrId(result.kadrId);
+    setSchemeRecordMessage(result.summary);
+    setLinkMessage(result.summary);
+  }, [
+    activeLightKadrId,
+    currentStep,
+    lightChannels,
+    lightFaders,
+    lightPrograms,
+    updateStep,
+  ]);
 
   return (
     <div className="light-plot-page">
+      <div className="light-plot-mode-tabs">
+        <button
+          type="button"
+          className="light-plot-mode-tab"
+          data-active={pageMode === "run"}
+          onClick={() => setPageMode("run")}
+        >
+          Репетиция
+        </button>
+        <button
+          type="button"
+          className="light-plot-mode-tab"
+          data-active={pageMode === "plot"}
+          onClick={() => setPageMode("plot")}
+        >
+          Расстановка
+        </button>
+      </div>
+
+      {pageMode === "run" ? (
+        <SpectacleRunView
+          onOpenPlotSetup={() => {
+            setPageMode("plot");
+            setEditPlot(true);
+          }}
+          onSyncPlotFrom3d={syncFromTheater}
+        />
+      ) : (
       <div className="light-plot-panel">
+        {currentStep ? (
+          <LightSchemeKadrBoard
+            step={currentStep}
+            markdown={String(currentStep.markdown ?? "")}
+            activeKadrId={activeLightKadrId}
+            onActiveKadrIdChange={setActiveLightKadrId}
+            lightChannels={lightChannels}
+            lightFaders={lightFaders}
+            lightPrograms={lightPrograms}
+            lightChannelRoles={lightChannelRoles}
+            onLightChannelRolesChange={(next) =>
+              setSceneData((prev) => ({ ...(prev ?? {}), lightChannelRoles: next }))
+            }
+            lightPlot={lightPlot}
+            gridCols={lightGridCols}
+            gridRows={lightGridRows}
+            selectedLightSlot={selectedLightSlot}
+            editPlot={editPlot}
+            onFixtureAimChange={updateLightAim}
+            onRecordKadr={recordKadrFromScheme}
+            recordMessage={schemeRecordMessage}
+          />
+        ) : null}
         <div className="light-plot-header">
-          <span>Схема света</span>
+          <span>Расстановка софитов</span>
           <div className="light-plot-actions">
+            <button
+              type="button"
+              className="light-plot-action"
+              data-active={editPlot ? "true" : "false"}
+              onClick={() => setEditPlot((v) => !v)}
+              disabled={!currentStep}
+              title="Редактировать позиции и каналы софитов на плане"
+            >
+              {editPlot ? "Готово" : "Редактировать расстановку"}
+            </button>
             <button
               type="button"
               className="light-plot-action"
@@ -256,71 +368,8 @@ export const LightPlotPage = () => {
             : ""}
         </p>
         {linkMessage ? <p className="light-plot-link-message">{linkMessage}</p> : null}
-        <div
-          className="light-plot-map"
-          style={
-            {
-              "--light-cols": lightGridCols,
-              "--light-rows": lightGridRows,
-            } as React.CSSProperties
-          }
-        >
-          {!currentStep ? (
-            <div className="light-plot-empty">Нет выбранного шага</div>
-          ) : lightPlot.length === 0 ? (
-            <div className="light-plot-empty">Софиты не добавлены</div>
-          ) : (
-            lightPlot.map((fixture) => {
-              const slotActive =
-                selectedLightSlot > 0 &&
-                fixtureMatchesChannelSlot(fixture, selectedLightSlot);
-              return (
-                <div
-                  key={fixture.id}
-                  className={[
-                    "light-plot-dot",
-                    slotActive ? "light-plot-dot--slot-active" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  style={{
-                    gridColumn: fixture.x,
-                    gridRow: fixture.y,
-                    ["--angle" as string]: `${fixture.angle ?? 0}deg`,
-                    ["--length" as string]: `${fixture.length ?? 54}px`,
-                  }}
-                  title={`${fixture.label} → канал ${fixture.channel || "—"}`}
-                  onPointerDown={(event) => {
-                    if (event.button !== 0) return;
-                    draggingIdRef.current = fixture.id;
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                    updateAimFromEvent(fixture.id, event);
-                  }}
-                  onPointerMove={(event) => {
-                    if (draggingIdRef.current !== fixture.id) return;
-                    updateAimFromEvent(fixture.id, event);
-                  }}
-                  onPointerUp={(event) => {
-                    if (draggingIdRef.current !== fixture.id) return;
-                    draggingIdRef.current = null;
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }}
-                  onPointerLeave={(event) => {
-                    if (draggingIdRef.current !== fixture.id) return;
-                    draggingIdRef.current = null;
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }}
-                >
-                  <span className="light-plot-dot-label">{fixture.label}</span>
-                  {fixture.channel ? (
-                    <span className="light-plot-dot-channel">{fixture.channel}</span>
-                  ) : null}
-                  <span className="light-plot-ray" />
-                </div>
-              );
-            })
-          )}
-        </div>
+        {editPlot ? (
+          <>
         <div className="light-plot-add">
           <input
             type="text"
@@ -448,6 +497,8 @@ export const LightPlotPage = () => {
             </div>
           ))}
         </div>
+          </>
+        ) : null}
         <div className="light-cue-export-row">
           <button
             type="button"
@@ -480,6 +531,7 @@ export const LightPlotPage = () => {
           }}
         />
       </div>
+      )}
     </div>
   );
 };

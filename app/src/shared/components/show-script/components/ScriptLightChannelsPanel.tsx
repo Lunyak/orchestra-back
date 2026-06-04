@@ -4,6 +4,7 @@ import {
   type SceneLightFadersDataV1,
   type SceneLightProgramsDataV1,
 } from "../../../../features/scene";
+import { resolveLightPrograms } from "../../light-console/light-console-data";
 import type { TheaterSpotlight } from "../../../types/script";
 import {
   getSpotlightsBoundToFader,
@@ -23,6 +24,8 @@ export type ScriptLightChannelsPanelProps = {
   spotlights?: TheaterSpotlight[];
   onSpotlightsChange?: (next: TheaterSpotlight[]) => void;
   onInsertText: (text: string) => void;
+  /** Скрыть пульт и программы — оставить только сетку каналов. */
+  channelsOnly?: boolean;
 };
 
 function createDefaultFaders(): SceneLightFadersDataV1 {
@@ -36,20 +39,6 @@ function createDefaultFaders(): SceneLightFadersDataV1 {
       enabled: true,
       links: [{ channel: index + 1 }],
     })),
-  };
-}
-
-function createDefaultPrograms(): SceneLightProgramsDataV1 {
-  return {
-    v: 1,
-    activeProgramId: 1,
-    programs: [
-      {
-        id: 1,
-        label: "Программа 1",
-        faders: [],
-      },
-    ],
   };
 }
 
@@ -109,6 +98,7 @@ export function ScriptLightChannelsPanel({
   spotlights,
   onSpotlightsChange,
   onInsertText,
+  channelsOnly = false,
 }: ScriptLightChannelsPanelProps) {
   const { sceneData, setSceneData } = useScene();
   const selectedSlot =
@@ -120,10 +110,7 @@ export function ScriptLightChannelsPanel({
     (sceneData?.lightFaders && sceneData.lightFaders.v === 1
       ? sceneData.lightFaders
       : createDefaultFaders());
-  const programs =
-    sceneData?.lightPrograms && sceneData.lightPrograms.v === 1
-      ? sceneData.lightPrograms
-      : createDefaultPrograms();
+  const programs = resolveLightPrograms(sceneData?.lightPrograms);
   const onLightFadersChange = (next: SceneLightFadersDataV1) => {
     if (externalOnLightFadersChange) {
       externalOnLightFadersChange(next);
@@ -339,6 +326,7 @@ export function ScriptLightChannelsPanel({
         })}
       </div>
 
+      {channelsOnly ? null : (
       <section className="script-light-faders" aria-label="Пульт света">
         <header className="script-light-faders__header">
           <div>
@@ -483,7 +471,9 @@ export function ScriptLightChannelsPanel({
           })}
         </div>
       </section>
+      )}
 
+      {channelsOnly ? null : (
       <section className="script-light-faders" aria-label="Программы света">
         <header className="script-light-faders__header">
           <div>
@@ -617,6 +607,7 @@ export function ScriptLightChannelsPanel({
           </div>
         ) : null}
       </section>
+      )}
     </section>
   );
 }

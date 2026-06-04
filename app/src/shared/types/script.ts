@@ -11,6 +11,8 @@ export interface ScriptStep {
   lightPlot?: LightFixture[];
   /** Таймлайн световых cue для шага */
   lightCues?: LightCue[];
+  /** Световые картины (look на границе ### Картина N) */
+  lightKadrs?: StepLightKadrsDataV1;
   theaterSpotlights?: TheaterSpotlight[];
   theaterActiveSpotlightId?: number;
   theaterModels?: TheaterModel[];
@@ -45,6 +47,30 @@ export interface LightFixture {
   angle?: number;
   length?: number;
 }
+
+/** Снимок света для картины (### Картина N + <!-- lk:id -->). */
+export interface StepLightKadrV1 {
+  id: string;
+  kadrNo: number;
+  title?: string;
+  programId: number;
+  faders: StepLightKadrFaderStateV1[];
+  nextProgramId?: number;
+  blackout?: boolean;
+  note?: string;
+  updatedAt?: string;
+}
+
+export type StepLightKadrFaderStateV1 = {
+  faderId: number;
+  intensity?: number;
+  enabled?: boolean;
+};
+
+export type StepLightKadrsDataV1 = {
+  v: 1;
+  kadrs: StepLightKadrV1[];
+};
 
 /** Ключевой кадр света на таймлайне шага (секунды от начала). */
 export interface LightCue {

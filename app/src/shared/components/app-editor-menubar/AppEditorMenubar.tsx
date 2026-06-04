@@ -1,6 +1,7 @@
 import { useState, type MouseEvent } from "react";
 import { useProject } from "../../../features/project";
 import { AppEditorChatToggle } from "./AppEditorChatToggle";
+import { AppEditorPlaylistEditToggle } from "./AppEditorPlaylistEditToggle";
 import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
 import { AppEditorNavigationMenu } from "./AppEditorNavigationMenu";
 import { AppEditorProjectMenu } from "./AppEditorProjectMenu";
@@ -68,6 +69,7 @@ export function AppEditorMenubar() {
           <div className="app-editor-menubar__actions">
             {toolbarActions}
             <AppEditorPlayerToggle />
+            <AppEditorPlaylistEditToggle />
             <AppEditorChatToggle />
           </div>
           {projectName ? (

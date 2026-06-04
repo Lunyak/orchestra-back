@@ -15,6 +15,7 @@ import {
   useImperativeHandle,
   useRef,
 } from "react";
+import { markdownHeadingSectionBlocks } from "./markdownHeadingSectionBlocks";
 import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
 import { orchestraEditorRichTokens } from "./orchestraEditorRichTokens";
 import { scriptMarkdownEditorSyntaxHighlighting } from "./scriptMarkdownEditorHighlight";
@@ -41,6 +42,8 @@ type Props = {
   lightChannels: string[];
   /** Клик по `[…](track:N)` / `[…](playlist:N)` в редакторе (числовой id). */
   onTrackLinkClick?: (trackId: number) => void;
+  /** Карточки секций по `###` (режим notes / play / explication). */
+  kadrSectionBlocks?: boolean;
 };
 
 /** Тема редактора: токены приложения, без gutter, active line без фона (чипы / inline-превью). */
@@ -91,6 +94,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       accessToken,
       lightChannels,
       onTrackLinkClick,
+      kadrSectionBlocks = false,
     },
     ref,
   ) {
@@ -107,6 +111,8 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
     };
     const lightChannelsKey = lightChannels.join("\0");
     const imageCtxKey = `${imageCtxRef.current.projectSlug}\0${imageCtxRef.current.accessToken ?? ""}`;
+    const kadrSectionBlocksRef = useRef(kadrSectionBlocks);
+    kadrSectionBlocksRef.current = kadrSectionBlocks;
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
     const onClipboardImagePasteRef = useRef(onClipboardImagePaste);
@@ -157,6 +163,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
           highlightActiveLine(),
           EditorView.lineWrapping,
           markdownParagraphLineGaps,
+          markdownHeadingSectionBlocks(() => kadrSectionBlocksRef.current),
           bracketMatching(),
           indentOnInput(),
           markdown(),
@@ -196,6 +203,12 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once; parent remounts via key on step/field
     }, []);
+
+    useEffect(() => {
+      const view = viewRef.current;
+      if (!view) return;
+      view.dispatch({});
+    }, [kadrSectionBlocks]);
 
     useEffect(() => {
       const view = viewRef.current;

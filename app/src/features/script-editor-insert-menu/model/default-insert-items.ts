@@ -5,6 +5,8 @@ import type {
   ScriptEditorInsertResolveResult,
 } from "./types";
 
+import { createKadrTemplateSnippet, createLightKadrId } from "../../../features/theater/model/light-kadrs";
+
 function countKadrHeaders(text: string): number {
   return (String(text).match(/^###\s*Картина\b/gim) ?? []).length;
 }
@@ -120,11 +122,12 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
     group: "Структура",
     resolve: (ctx) => {
       const nextN = countKadrHeaders(ctx.activeMarkdown) + 1;
+      const kadrId = createLightKadrId();
       return {
         state: "ok",
         pick: {
           kind: "snippet",
-          text: `\n\n### Картина ${nextN}\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`,
+          text: createKadrTemplateSnippet(nextN, kadrId),
         },
       };
     },

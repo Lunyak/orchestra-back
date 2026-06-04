@@ -1,4 +1,5 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   buildScriptEditorInsertMenuRows,
   defaultScriptEditorInsertDefinitions,
@@ -38,6 +39,15 @@ import type { ScriptStep } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
 import { insertAtSelection } from "../utils/insertAtCursor";
 import { ScriptLightChannelsPanel } from "./ScriptLightChannelsPanel";
+import { LightKadrPanel } from "../../light-console/LightKadrPanel";
+import "../../light-console/light-console.css";
+import {
+  findKadrSectionAtOffset,
+  lightKadrsStableKey,
+  readStepLightKadrs,
+  syncLightKadrsFromMarkdown,
+  scanMarkdownKadrSections,
+} from "../../../../features/theater/model/light-kadrs";
 import { ScriptMarkdownCodemirror, type ScriptMarkdownEditorHandle } from "./ScriptMarkdownCodemirror";
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
 
@@ -94,6 +104,7 @@ export function ShowScriptMarkdownSection({
   inlineMarkdownTabs = true,
 }: IProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { sceneData, setSceneData } = useScene();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const sceneDataRevision = useAppSelector((s) => (s as any).scene?.sceneDataRevision ?? 0);
@@ -106,10 +117,6 @@ export function ShowScriptMarkdownSection({
   const soundsOptions = ui.soundsOptions;
   const lightChannels = ui.lightChannels;
   const selectedLightSlot = ui.selectedLightSlot;
-  const lightFaders =
-    sceneData?.lightFaders && sceneData.lightFaders.v === 1
-      ? sceneData.lightFaders
-      : null;
 
   const {
     isEditing,
@@ -120,11 +127,50 @@ export function ShowScriptMarkdownSection({
     (s) => selectActiveStepMarkdownContext(s, projectSlug, sceneName),
   );
 
+  const lightFaders =
+    sceneData?.lightFaders && sceneData.lightFaders.v === 1
+      ? sceneData.lightFaders
+      : null;
+  const lightPrograms =
+    sceneData?.lightPrograms && sceneData.lightPrograms.v === 1
+      ? sceneData.lightPrograms
+      : null;
+
   const markdownRef = useRef<ScriptMarkdownEditorHandle | null>(null);
+  const lastSyncedLightKadrsKeyRef = useRef<string>("");
+
+  useEffect(() => {
+    if (currentStep?.id == null) {
+      setActiveLightKadrId(null);
+      lastSyncedLightKadrsKeyRef.current = "";
+      return;
+    }
+    const markdown = String(activeMarkdown ?? "");
+    const prev = readStepLightKadrs(currentStep);
+    const synced = syncLightKadrsFromMarkdown({ markdown, kadrs: prev });
+    const syncKey = `${currentStep.id}:${markdown.length}:${lightKadrsStableKey(synced)}`;
+    if (lightKadrsStableKey(prev) === lightKadrsStableKey(synced)) {
+      lastSyncedLightKadrsKeyRef.current = syncKey;
+      return;
+    }
+    if (lastSyncedLightKadrsKeyRef.current === syncKey) return;
+    lastSyncedLightKadrsKeyRef.current = syncKey;
+    updateStepField(currentStep.id, "lightKadrs", synced);
+  }, [activeMarkdown, currentStep?.id, currentStep?.lightKadrs, updateStepField]);
+
+  useEffect(() => {
+    const ed = markdownRef.current;
+    const sel = ed?.getSelection();
+    const offset = sel?.from ?? String(activeMarkdown ?? "").length;
+    const section = findKadrSectionAtOffset(String(activeMarkdown ?? ""), offset);
+    const nextId = section?.id ?? null;
+    setActiveLightKadrId((prev) => (prev === nextId ? prev : nextId));
+  }, [activeMarkdown, isEditing]);
 
   const [newAnnotation, setNewAnnotation] = useState<NewAnnotationDraft | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
   const [insertMenu, setInsertMenu] = useState<{ x: number; y: number } | null>(null);
+  const [activeLightKadrId, setActiveLightKadrId] = useState<string | null>(null);
   const [stepCommentDraft, setStepCommentDraft] = useState("");
 
   /** Секции по `###` в превью (rehypeKadrSections) + TOC «Картины» — для пьесы тоже, иначе в режиме play блоки пропадают. */
@@ -139,6 +185,11 @@ export function ShowScriptMarkdownSection({
         ? mergeInsertDefinitions(defaultScriptEditorInsertDefinitions, extraScriptEditorInsertItems)
         : defaultScriptEditorInsertDefinitions,
     [extraScriptEditorInsertItems],
+  );
+
+  const hasKadrSections = useMemo(
+    () => scanMarkdownKadrSections(String(activeMarkdown ?? "")).length > 0,
+    [activeMarkdown],
   );
 
   const tocItems = useMemo(() => {
@@ -553,9 +604,93 @@ export function ShowScriptMarkdownSection({
         />
       ) : null}
 
+      {markdownMode === "notes" && hasKadrSections ? (
+        <div className="script-kadr-light-banner" role="note">
+          <p>
+            Здесь — текст картин. Проход спектакля с лентой картин, схемой и пультом (запись вживую)
+            — на странице <strong>«Репетиция»</strong> в верхнем меню. Вкладка «Свет» — настройка
+            одного шага.
+          </p>
+          <div className="script-kadr-light-banner__actions">
+            <button
+              type="button"
+              className="script-kadr-light-banner__btn script-kadr-light-banner__btn--primary"
+              onClick={() => navigate("/light-plot")}
+            >
+              Репетиция спектакля
+            </button>
+            <button
+              type="button"
+              className="script-kadr-light-banner__btn"
+              onClick={() => {
+                try {
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem(
+                      `showScript:markdownMode:${projectSlug}:${sceneName}`,
+                      "light",
+                    );
+                  }
+                } catch {
+                  // ignore
+                }
+                dispatch(
+                  showScriptMarkdownActions.setMarkdownMode({
+                    projectSlug,
+                    sceneName,
+                    mode: "light",
+                  }),
+                );
+              }}
+            >
+              Свет этого шага
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {markdownMode === "light" ? (
         <div className="script-step-light-pane">
+          <div className="script-kadr-light-banner script-kadr-light-banner--compact" role="note">
+            <p>
+              Пульт для <strong>текущего шага</strong>. Сквозная лента по всем картинам спектакля —
+              страница <strong>«Репетиция»</strong> (верхнее меню).
+            </p>
+            <button
+              type="button"
+              className="script-kadr-light-banner__btn script-kadr-light-banner__btn--primary"
+              onClick={() => navigate("/light-plot")}
+            >
+              Открыть репетицию
+            </button>
+          </div>
+          <LightKadrPanel
+            projectName={projectSlug}
+            step={currentStep}
+            markdown={String(activeMarkdown ?? "")}
+            activeKadrId={activeLightKadrId}
+            onActiveKadrIdChange={setActiveLightKadrId}
+            lightChannels={lightChannels}
+            lightFaders={lightFaders}
+            lightPrograms={lightPrograms}
+            spotlights={currentStep?.theaterSpotlights}
+            onUpdateStep={(changes) => {
+              if (!currentStep) return;
+              if (changes.lightKadrs) {
+                updateStepField(currentStep.id, "lightKadrs", changes.lightKadrs);
+              }
+            }}
+            onUpdateMarkdown={(next) => {
+              if (!currentStep) return;
+              const ed = markdownRef.current;
+              if (ed) {
+                ed.applyDocument(next, ed.getSelection()?.from ?? next.length);
+              } else {
+                updateStepField(currentStep.id, activeMarkdownField, next);
+              }
+            }}
+          />
           <ScriptLightChannelsPanel
+            channelsOnly
             lightChannels={lightChannels}
             selectedLightSlot={selectedLightSlot}
             lightFaders={lightFaders}
@@ -583,7 +718,7 @@ export function ShowScriptMarkdownSection({
                 lightFaders: next,
               }));
             }}
-            spotlights={currentStep.theaterSpotlights}
+            spotlights={currentStep?.theaterSpotlights}
             onSpotlightsChange={(next) => updateStepField(currentStep.id, "theaterSpotlights", next)}
             onInsertText={insertIntoActiveMarkdown}
           />
@@ -668,6 +803,7 @@ export function ShowScriptMarkdownSection({
                     className={
                       kadrLayoutEnabled ? "script-markdown-cm--kadr-layout" : undefined
                     }
+                    kadrSectionBlocks={kadrLayoutEnabled}
                     value={String(activeMarkdown ?? "")}
                     projectSlug={projectSlug}
                     accessToken={accessToken}
@@ -692,6 +828,7 @@ export function ShowScriptMarkdownSection({
                   className={
                     kadrLayoutEnabled ? "script-markdown-cm--kadr-layout" : undefined
                   }
+                  kadrSectionBlocks={kadrLayoutEnabled}
                   value={String(activeMarkdown ?? "")}
                   projectSlug={projectSlug}
                   accessToken={accessToken}

@@ -32,6 +32,7 @@ export async function hydrateSceneFromLocalPack(
       sceneRoles: f.sceneRoles as SceneData["sceneRoles"],
       lightFaders: f.lightFaders as SceneData["lightFaders"],
       lightPrograms: f.lightPrograms as SceneData["lightPrograms"],
+      lightChannelRoles: f.lightChannelRoles as SceneData["lightChannelRoles"],
       images:
         f.images && typeof f.images === "object"
           ? (f.images as SceneData["images"])

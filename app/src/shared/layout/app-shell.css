@@ -42,6 +42,12 @@
   background: #111;
 }
 
+.main-content-premises {
+  padding: 0;
+  overflow: auto;
+  background: #111;
+}
+
 @media (max-width: 979px) {
   .app-layout {
     flex-direction: column;

@@ -38,6 +38,14 @@ import {
   createRenderLightTokens,
 } from "../utils/lightTokens";
 import { rehypeKadrSections } from "../utils/rehypeKadrSections";
+import { LightConsoleSplitView } from "../../light-console/LightConsoleSplitView";
+import { buildLightConsoleSplitModel } from "../../light-console/light-console-split";
+import { resolveLightFaders } from "../../light-console/light-console-data";
+import {
+  findKadrById,
+  readStepLightKadrs,
+} from "../../../../features/theater/model/light-kadrs";
+import "../../light-console/light-console.css";
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
 
@@ -942,13 +950,35 @@ export function ScriptMarkdownPreview({
     return /\.(mp3|wav|ogg|m4a|flac)$/i.test(href.trim());
   };
 
+  const renderLightPanel = useCallback(
+    (kadrId: string) => {
+      const kadr = findKadrById(readStepLightKadrs(currentStep), kadrId);
+      if (!kadr) return null;
+      const model = buildLightConsoleSplitModel({
+        programId: kadr.programId,
+        lightChannels,
+        faders: resolveLightFaders(sceneData?.lightFaders),
+        kadrFaderStates: kadr.faders,
+      });
+      return (
+        <LightConsoleSplitView
+          model={model}
+          lightChannels={lightChannels}
+          readOnly
+          compact
+        />
+      );
+    },
+    [currentStep, lightChannels, sceneData?.lightFaders],
+  );
+
   const renderLightTokens = useMemo(
-    () => createRenderLightTokens(lightChannels),
-    [lightChannels],
+    () => createRenderLightTokens(lightChannels, { renderLightPanel }),
+    [lightChannels, renderLightPanel],
   );
   const rehypeScriptTokens = useMemo(
-    () => createRehypeScriptTokens(lightChannels),
-    [lightChannels],
+    () => createRehypeScriptTokens(lightChannels, { renderLightPanel }),
+    [lightChannels, renderLightPanel],
   );
 
   /** Блоки `.markdown-kadr` по заголовкам h1–h3 — и для текста пьесы (`play`), не только notes/explication. */
@@ -1328,6 +1358,25 @@ export function ScriptMarkdownPreview({
             li: ({ children }: { children: React.ReactNode }) => (
               <li>{renderLightTokens(children)}</li>
             ),
+            span: ({
+              className,
+              children,
+              ...rest
+            }: React.HTMLAttributes<HTMLSpanElement> & { "data-lk-id"?: string }) => {
+              const lkId = rest["data-lk-id"];
+              if (className?.includes("markdown-light-split-host") && lkId) {
+                return (
+                  <span className="markdown-light-split-host">
+                    {renderLightPanel(String(lkId))}
+                  </span>
+                );
+              }
+              return (
+                <span className={className} {...rest}>
+                  {children}
+                </span>
+              );
+            },
             h1: ({ children }: { children: React.ReactNode }) => (
               <h1>{renderLightTokens(children)}</h1>
             ),

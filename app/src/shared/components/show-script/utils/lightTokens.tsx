@@ -128,14 +128,21 @@ function renderParentheticalRemarks(text: string, keyPrefix: string): React.Reac
   return result;
 }
 
-export function createRenderLightTokens(lightChannels: string[]) {
+export type LightTokenRenderOptions = {
+  renderLightPanel?: (kadrId: string) => React.ReactNode;
+};
+
+export function createRenderLightTokens(
+  lightChannels: string[],
+  options?: LightTokenRenderOptions,
+) {
   return function renderLightTokens(
     node: React.ReactNode,
     keyPrefix = "light",
   ): React.ReactNode {
     if (typeof node === "string") {
       const pattern =
-        /(\{\{\s*(light|b|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+        /(\{\{\s*(light|b|blackout|program|fader|lightpanel|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
       const result: React.ReactNode[] = [];
       let lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -192,10 +199,31 @@ export function createRenderLightTokens(lightChannels: string[]) {
               {labelText}
             </span>,
           );
-        } else if (rawType?.toLowerCase() === "b") {
-          const label = "ЗТМ";
+        } else if (rawType?.toLowerCase() === "b" || rawType?.toLowerCase() === "blackout") {
+          const label = rawType?.toLowerCase() === "blackout" ? "Блекаут" : "ЗТМ";
           const color = resolveLightColor(label, "var(--color-text-black)000", rawColor) ?? "var(--color-text-black)000";
           result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-b`));
+        } else if (rawType?.toLowerCase() === "program") {
+          const programId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
+          const labelOverride = String(rawColor ?? "").trim();
+          const channelValue = lightChannels[programId - 1] ?? "";
+          const parsed = parseLightChannel(channelValue);
+          const label = labelOverride || parsed.label || `П${programId}`;
+          const color = resolveLightColor(label, parsed.color) ?? "var(--color-active-ascent)";
+          result.push(renderLightChip(label, color, `${keyPrefix}-${counter}-program-${programId}`));
+        } else if (rawType?.toLowerCase() === "fader") {
+          const faderId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
+          const pct = String(rawColor ?? "").trim() || "100%";
+          const label = `ф.${faderId} ${pct}`;
+          result.push(renderLightChip(label, "var(--color-surface-3)", `${keyPrefix}-${counter}-fader-${faderId}`));
+        } else if (rawType?.toLowerCase() === "lightpanel") {
+          const kadrId = String(rawIndex ?? "").trim();
+          const panel = kadrId && options?.renderLightPanel ? options.renderLightPanel(kadrId) : null;
+          result.push(
+            <span key={`${keyPrefix}-${counter}-lightpanel`} className="markdown-light-split-host">
+              {panel ?? "пульт"}
+            </span>,
+          );
         } else {
           const index = Number(String(rawIndex ?? ""));
           if (Number.isFinite(index) && index >= 1 && index <= lightChannels.length) {
@@ -237,7 +265,10 @@ export function createRenderLightTokens(lightChannels: string[]) {
   };
 }
 
-export function createRehypeScriptTokens(lightChannels: string[]) {
+export function createRehypeScriptTokens(
+  lightChannels: string[],
+  options?: LightTokenRenderOptions,
+) {
   return () => {
     const hastText = (value: string): HastNode => ({ type: "text", value } as HastNode);
 
@@ -254,7 +285,7 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
       }) as HastNode;
 
     const pattern =
-      /(\{\{\s*(light|blackout|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+      /(\{\{\s*(light|blackout|program|fader|lightpanel|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
 
     const walk = (node: HastNode): HastNode => {
       if (!node) return node;
@@ -313,6 +344,35 @@ export function createRehypeScriptTokens(lightChannels: string[]) {
                   color: textColor || undefined,
                   borderColor: color ? "transparent" : undefined,
                 },
+              }),
+            );
+          } else if (rawType?.toLowerCase() === "program") {
+            const programId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
+            const labelOverride = String(rawColor ?? "").trim();
+            const channelValue = lightChannels[programId - 1] ?? "";
+            const parsed = parseLightChannel(channelValue);
+            const label = labelOverride || parsed.label || `П${programId}`;
+            const color = resolveLightColor(label, parsed.color) ?? "var(--color-active-ascent)";
+            const textColor = getReadableTextColor(color);
+            out.push(
+              hastSpan(["markdown-light-chip"], [hastText(label)], {
+                style: {
+                  backgroundColor: color || undefined,
+                  color: textColor || undefined,
+                  borderColor: color ? "transparent" : undefined,
+                },
+              }),
+            );
+          } else if (rawType?.toLowerCase() === "fader") {
+            const faderId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
+            const pct = String(rawColor ?? "").trim() || "100%";
+            const label = `ф.${faderId} ${pct}`;
+            out.push(hastSpan(["markdown-light-chip", "markdown-light-chip--fader"], [hastText(label)]));
+          } else if (rawType?.toLowerCase() === "lightpanel") {
+            const kadrId = String(rawIndex ?? "").trim();
+            out.push(
+              hastSpan(["markdown-light-split-host"], [hastText("")], {
+                "data-lk-id": kadrId || undefined,
               }),
             );
           } else {

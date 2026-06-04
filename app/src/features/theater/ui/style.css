@@ -84,10 +84,17 @@
   right: 72px;
   bottom: 14px;
   z-index: 4;
-  display: grid;
-  gap: 0;
-  color: var(--color-text-ui);
   pointer-events: none;
+}
+
+.theater-light-console .light-console {
+  pointer-events: auto;
+}
+
+.theater-light-console .light-console__body {
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(12px);
+  max-height: 236px;
 }
 
 .theater-light-console__toggle,

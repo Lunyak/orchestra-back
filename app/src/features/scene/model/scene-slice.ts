@@ -43,6 +43,8 @@ export interface SceneData {
   lightFaders?: SceneLightFadersDataV1;
   /** Сохранённые программы света: паттерны состояний ползунков. */
   lightPrograms?: SceneLightProgramsDataV1;
+  /** Роли каналов: какие каналы — софиты (остальные — заливки/RGB). */
+  lightChannelRoles?: SceneLightChannelRolesV1;
   /** Записанные актёрские реплики (озвучка ролей), синхронизируются как часть сцены. */
   voiceLines?: SceneVoiceLines;
   /** Изображения сцены (ключ → метаданные файла). */
@@ -88,6 +90,12 @@ export type SceneLightProgramsDataV1 = {
   v: 1;
   activeProgramId?: number;
   programs: SceneLightProgramV1[];
+};
+
+/** Какие каналы пульта считаются «софитными» в схеме (условное деление). */
+export type SceneLightChannelRolesV1 = {
+  v: 1;
+  sofitChannels: number[];
 };
 
 export type SceneRoleLinkV1 = {

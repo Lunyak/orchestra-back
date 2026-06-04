@@ -1,4 +1,32 @@
+.light-plot-mode-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.light-plot-mode-tab {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--stage-brutal-border, var(--color-border-default));
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.light-plot-mode-tab[data-active="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+  background: rgba(255, 180, 80, 0.08);
+}
+
 .light-plot-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -40,6 +68,12 @@
   padding: 4px 8px;
   font-size: 11px;
   cursor: pointer;
+}
+
+.light-plot-action[data-active="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+  background: rgba(255, 180, 80, 0.08);
 }
 
 .light-plot-action:hover:not(:disabled) {

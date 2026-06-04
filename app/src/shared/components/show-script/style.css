@@ -194,6 +194,61 @@
   gap: 12px;
 }
 
+.script-kadr-light-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-faint-muted);
+  background: rgba(255, 180, 80, 0.06);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-muted-bright);
+}
+
+.script-kadr-light-banner p {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+}
+
+.script-kadr-light-banner__btn {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-default);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-bright);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.script-kadr-light-banner__btn:hover {
+  border-color: var(--color-active-ascent);
+}
+
+.script-kadr-light-banner__btn--primary {
+  border-color: var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 14%, var(--color-bg-secondary));
+  color: var(--color-active-ascent);
+}
+
+.script-kadr-light-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.script-kadr-light-banner--compact {
+  margin-bottom: 12px;
+}
+
 .script-markdown-pane {
   --script-markdown-line-height: 1.5;
   --script-markdown-paragraph-gap: 0.75em;
@@ -719,6 +774,18 @@
     var(--script-markdown-content-padding-top)
     var(--script-markdown-content-padding-x)
     var(--script-markdown-content-padding-bottom);
+  background: var(--color-bg-primary);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.markdown-preview.markdown-preview--kadr .markdown-kadr {
+  margin: 0;
+  padding: 14px 12px 18px;
+  border: 1px solid var(--color-border-faint-muted);
+  border-radius: 10px;
   background: var(--color-bg-secondary);
   box-sizing: border-box;
 }
@@ -739,6 +806,8 @@
   color: var(--color-text-white)ce;
   width: 100%;
 }
+
+/* В режиме kadr-layout карточки задаёт markdown-preview--kadr / cm-kadr-section-line */
 
 .markdown-kadr h1,
 .markdown-kadr h2,
@@ -1341,11 +1410,12 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
 }
 
 .script-light-panel {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -1432,6 +1502,7 @@
   gap: 6px;
   align-items: center;
   min-width: 0;
+  padding-top: 8px;
   color: var(--color-text-muted);
 }
 
@@ -1649,6 +1720,31 @@
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-activeLine {
   background-color: transparent !important;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line {
+  background: var(--color-bg-secondary);
+  padding-left: 12px;
+  padding-right: 12px;
+  box-sizing: border-box;
+  border-left: 1px solid var(--color-border-faint-muted);
+  border-right: 1px solid var(--color-border-faint-muted);
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line--first {
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-faint-muted);
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line--last {
+  margin-bottom: 10px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--color-border-faint-muted);
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-md-heading-section {
@@ -2316,6 +2412,10 @@
 .main-content.show-script .markdown-preview {
   scrollbar-gutter: stable both-edges;
   max-width: min(100%, var(--width-content-page));
+}
+
+.main-content.show-script .markdown-preview.markdown-preview--kadr .markdown-kadr {
+  margin: 0;
 }
 
 .main-content.show-script .markdown-kadr {

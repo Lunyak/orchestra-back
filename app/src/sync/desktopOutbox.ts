@@ -261,6 +261,7 @@ export async function flushDesktopOutbox(
         requisites: Array.isArray(up.step?.requisites) ? up.step.requisites : [],
         lightPlot: Array.isArray(up.step?.lightPlot) ? up.step.lightPlot : [],
         lightCues: Array.isArray(up.step?.lightCues) ? up.step.lightCues : [],
+        lightKadrs: up.step?.lightKadrs ?? null,
         theaterModels: Array.isArray(up.step?.theaterModels) ? up.step.theaterModels : [],
         theaterSpotlights: Array.isArray(up.step?.theaterSpotlights)
           ? up.step.theaterSpotlights.map((sp: TheaterSpotlight) =>

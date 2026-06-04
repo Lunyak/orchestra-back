@@ -1,22 +1,25 @@
+import {
+  CalendarSection,
+  type CalendarSectionState,
+} from "@shared/components/calendar/CalendarSection";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { Modal } from "@shared/core/modal/Modal";
-import { MonthCalendar } from "@shared/components/calendar/MonthCalendar";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import { useAuth } from "../../features/auth";
 import { useMyProfileQuery } from "../../features/profile/api/profile-api";
 import {
   formatSlotTime,
   fromDatetimeLocalValue,
   isoDate,
-  monthKey,
   monthRangeIso,
   premiseKindLabel,
   premiseMemberRoleLabel,
@@ -39,6 +42,8 @@ import type {
   PremiseSlotItem,
   PremiseSlotStatus,
 } from "../../sync/api/premises";
+import "../../pages/rehearsals/style.css";
+import "../../pages/sessions/style.css";
 import "./style.css";
 
 dayjs.locale("ru");
@@ -94,6 +99,12 @@ function slotToForm(slot: PremiseSlotItem): SlotFormState {
   };
 }
 
+function slotTimeShort(slot: PremiseSlotItem): string {
+  const start = dayjs(slot.startsAt);
+  const end = start.add(slot.durationMin, "minute");
+  return `${start.format("HH:mm")} – ${end.format("HH:mm")}`;
+}
+
 function extractError(e: unknown, fallback: string): string {
   if (e && typeof e === "object" && "data" in e) {
     const msg = (e as { data?: { message?: string } }).data?.message;
@@ -110,8 +121,8 @@ export function PremiseDetailPage() {
   });
   const userEmail = myProfile?.email ?? "";
 
-  const [currentMonth, setCurrentMonth] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(() => isoDate(new Date()));
+  const [calendarState, setCalendarState] =
+    useState<CalendarSectionState | null>(null);
   const [slotModalOpen, setSlotModalOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<PremiseSlotItem | null>(null);
   const [slotForm, setSlotForm] = useState<SlotFormState>(() =>
@@ -124,7 +135,15 @@ export function PremiseDetailPage() {
   const [memberCanBook, setMemberCanBook] = useState(true);
   const [memberError, setMemberError] = useState<string | null>(null);
 
-  const range = useMemo(() => monthRangeIso(currentMonth), [currentMonth]);
+  const range = useMemo(
+    () =>
+      calendarState
+        ? { from: calendarState.fromIso, to: calendarState.toIso }
+        : monthRangeIso(new Date()),
+    [calendarState],
+  );
+  const selectedDate = calendarState?.selectedDate ?? isoDate(new Date());
+  const calendarSelectedDateLabel = dayjs(selectedDate).format("D MMMM YYYY");
 
   const {
     data: premise,
@@ -160,22 +179,42 @@ export function PremiseDetailPage() {
   const dots = useMemo(() => slotDotsByDate(slots), [slots]);
 
   if (!accessToken) {
-    return <div>Нужно войти.</div>;
+    return (
+      <div className="rehearsals-page sessions-page">
+        <div className="rehearsals-muted">Нужно войти.</div>
+      </div>
+    );
   }
 
   if (premiseLoading) {
-    return <div className="premises-layout">Загрузка…</div>;
+    return (
+      <div className="app-layout premises-layout">
+        <div className="app-content">
+          <main className="main-content main-content-premises">
+            <div className="rehearsals-page sessions-page">
+              <div className="rehearsals-muted">Загрузка…</div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
   }
 
   if (premiseError || !premise) {
     return (
-      <div className="premises-layout">
-        <div className="premises-error">
-          Помещение не найдено или нет доступа
+      <div className="app-layout premises-layout">
+        <div className="app-content">
+          <main className="main-content main-content-premises">
+            <div className="rehearsals-page sessions-page">
+              <div className="rehearsals-error">
+                Помещение не найдено или нет доступа
+              </div>
+              <Link to="/premises" className="director-session-page__back">
+                ← Все помещения
+              </Link>
+            </div>
+          </main>
         </div>
-        <Link to="/premises" className="premises-link-back">
-          ← Все помещения
-        </Link>
       </div>
     );
   }
@@ -269,231 +308,305 @@ export function PremiseDetailPage() {
   return (
     <div className="app-layout premises-layout">
       <div className="app-content">
-        <main className="main-content">
-          <div className="premises-view">
-            <div className="premises-header">
-              <div>
-                <h2 className="premises-header__title">{premise.name}</h2>
-                <p className="premises-header__subtitle">
+        <main className="main-content main-content-premises">
+          <div className="rehearsals-page sessions-page">
+            <div className="rehearsals-head premises-page__head">
+              <div className="premises-page__head-main">
+                <div className="premises-page__title-row">
+                  <div className="rehearsals-meta">{premise.name}</div>
                   <span
                     className={cn(
-                      "premises-list-item__kind",
+                      "premises-page__kind",
                       premise.kind === "OWNED"
-                        ? "premises-list-item__kind--owned"
-                        : "premises-list-item__kind--rented",
+                        ? "premises-page__kind--owned"
+                        : "premises-page__kind--rented",
                     )}
                   >
                     {premiseKindLabel(premise.kind)}
                   </span>
-                  {premise.address ? ` · ${premise.address}` : null}
-                  {premise.notes ? (
-                    <span className="premises-detail-notes">
-                      {" "}
-                      · {premise.notes}
-                    </span>
-                  ) : null}
-                </p>
-              </div>
-              <Link to="/premises" className="premises-link-back">
-                ← Все помещения
-              </Link>
-            </div>
-
-            <div className="premises-detail-grid">
-              <div className="premises-card premises-calendar-card">
-                <MonthCalendar
-                  currentMonth={currentMonth}
-                  selectedDate={selectedDate}
-                  onChangeMonth={setCurrentMonth}
-                  onSelectDate={setSelectedDate}
-                  dotsByDate={dots}
-                  title="Занятость"
-                  subtitle={`Месяц: ${monthKey(currentMonth)}`}
-                />
-                {slotsFetching ? (
-                  <p className="premises-hint">Обновление слотов…</p>
-                ) : null}
-              </div>
-
-              <div className="premises-card premises-slots-card">
-                <div className="premises-slots-card__head">
-                  <div className="premises-card__title">
-                    Слоты на {dayjs(selectedDate).format("D MMMM YYYY")}
-                  </div>
-                  {premise.canBook ? (
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={openCreateSlot}
-                    >
-                      Добавить слот
-                    </Button>
-                  ) : null}
                 </div>
-
-                {daySlots.length === 0 ? (
-                  <p className="premises-hint">На этот день броней нет</p>
-                ) : (
-                  <ul className="premises-slots-list">
-                    {daySlots.map((slot) => (
-                      <li key={slot.id} className="premises-slot-item">
-                        <div className="premises-slot-item__head">
-                          <span className="premises-slot-item__title">
-                            {slot.title}
-                          </span>
-                          <span
-                            className={cn(
-                              "premises-slot-item__status",
-                              `premises-slot-item__status--${slot.status}`,
-                            )}
-                          >
-                            {slotStatusLabel(slot.status)}
-                          </span>
-                        </div>
-                        <div className="premises-slot-item__time">
-                          {formatSlotTime(slot)}
-                        </div>
-                        {slot.purpose ? (
-                          <div className="premises-slot-item__field">
-                            <b>Для чего:</b> {slot.purpose}
-                          </div>
-                        ) : null}
-                        {slot.rentalNotes ? (
-                          <div className="premises-slot-item__field">
-                            <b>Аренда:</b> {slot.rentalNotes}
-                          </div>
-                        ) : null}
-                        {slot.contactEmail || slot.contactName ? (
-                          <div className="premises-slot-item__field">
-                            <b>Контакт:</b>{" "}
-                            {[slot.contactName, slot.contactEmail]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </div>
-                        ) : null}
-                        {canEditSlot(slot) ? (
-                          <div className="premises-slot-item__actions">
-                            <Button
-                              type="button"
-                              onClick={() => openEditSlot(slot)}
-                            >
-                              Изменить
-                            </Button>
-                            <Button
-                              type="button"
-                              className="danger"
-                              onClick={() => void handleDeleteSlot(slot)}
-                            >
-                              Удалить
-                            </Button>
-                          </div>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
+                {(premise.address || premise.notes) && (
+                  <p className="rehearsals-muted premises-page__subtitle">
+                    {[premise.address, premise.notes].filter(Boolean).join(" · ")}
+                  </p>
                 )}
               </div>
+              <div className="premises-page__head-actions">
+                <Link to="/premises" className="director-session-page__back">
+                  ← Все помещения
+                </Link>
+              </div>
             </div>
 
-            {premise.canManage ? (
-              <div className="premises-card">
-                <div className="premises-card__title">Участники помещения</div>
-                <p className="premises-hint">
-                  Любой email — арендаторы смогут бронировать слоты, если
-                  включено «может бронировать».
-                </p>
-                <FormInlineRow className="premises-form-row">
-                  <InlineTextField
-                    value={memberEmail}
-                    onChange={(e) => setMemberEmail(e.target.value)}
-                    placeholder="email@example.com"
-                    inputMode="email"
-                    autoComplete="email"
-                    aria-label="Email участника"
-                  />
-                  <CustomSelect
-                    value={memberRole}
-                    options={roleOptions}
-                    onChange={(v) => setMemberRole(v as PremiseMemberRole)}
-                    aria-label="Роль"
-                  />
-                  <label className="premises-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={memberCanBook}
-                      onChange={(e) => setMemberCanBook(e.target.checked)}
-                    />
-                    Может бронировать
-                  </label>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    disabled={addingMember || !memberEmail.trim()}
-                    onClick={() => void handleAddMember()}
-                  >
-                    {addingMember ? "…" : "Добавить"}
-                  </Button>
-                </FormInlineRow>
-                {memberError ? (
-                  <div className="premises-error">{memberError}</div>
-                ) : null}
+            <div className="sessions-layout">
+              <aside className="sessions-side">
+                <RehearsalsCard className="sessions-calendar-card">
+                  {premise.canBook ? (
+                    <div className="sessions-calendar-toolbar">
+                      <Button
+                        type="button"
+                        onClick={openCreateSlot}
+                        title={`Добавить слот на ${calendarSelectedDateLabel}`}
+                      >
+                        + Слот на день
+                      </Button>
+                    </div>
+                  ) : null}
 
-                <ul className="premises-members-list">
-                  {(membersData?.members ?? []).map((m) => (
-                    <li key={m.id} className="premises-member-item">
-                      <div className="premises-member-item__email">
-                        {m.email}
+                  <CalendarSection
+                    className="sessions-calendar"
+                    storageMonthKey={`premise-${premiseId}-calendar-month`}
+                    onStateChange={setCalendarState}
+                    dotsByDate={dots}
+                    onDayDoubleClick={() => {
+                      if (premise.canBook) openCreateSlot();
+                    }}
+                    title="Занятость"
+                    subtitle="Клик — выбрать день · двойной клик — новый слот"
+                    showStatusMarks={false}
+                  />
+
+                  {slotsFetching ? (
+                    <p className="rehearsals-muted premises-calendar-fetching">
+                      Обновление слотов…
+                    </p>
+                  ) : null}
+
+                  <div className="sessions-day-panel">
+                    <div className="sessions-day-panel__head">
+                      <span className="sessions-day-panel__title">
+                        {calendarSelectedDateLabel}
+                      </span>
+                      <span className="rehearsals-muted sessions-day-panel__count">
+                        {daySlots.length
+                          ? `${daySlots.length} сл.`
+                          : "нет слотов"}
+                      </span>
+                    </div>
+
+                    <div className="sessions-day-list">
+                      {daySlots.length === 0 ? (
+                        <div className="rehearsals-muted sessions-day-list__empty">
+                          На этот день броней нет.
+                          {premise.canBook
+                            ? " Нажмите «+ Слот на день» или сделайте двойной клик по дате."
+                            : null}
+                        </div>
+                      ) : (
+                        daySlots.map((slot) => (
+                          <div key={slot.id} className="sessions-day-item">
+                            <button
+                              type="button"
+                              className="sessions-day-item__main"
+                              onClick={() => openEditSlot(slot)}
+                              disabled={!canEditSlot(slot)}
+                              title={
+                                canEditSlot(slot)
+                                  ? "Открыть слот"
+                                  : "Только просмотр"
+                              }
+                            >
+                              <span className="sessions-day-item__time">
+                                {slotTimeShort(slot)}
+                              </span>
+                              <span className="sessions-day-item__title">
+                                {slot.title}
+                              </span>
+                              <span
+                                className={cn(
+                                  "sessions-day-item__badge",
+                                  slot.status === "confirmed" &&
+                                    "premises-day-item__badge--confirmed",
+                                  slot.status === "cancelled" &&
+                                    "premises-day-item__badge--cancelled",
+                                )}
+                              >
+                                {slotStatusLabel(slot.status)}
+                              </span>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </RehearsalsCard>
+              </aside>
+
+              <div className="sessions-main">
+                <RehearsalsCard fluid>
+                  <div className="sessions-slots-readonly">
+                    <div className="sessions-slots-readonly__head">
+                      <span className="rehearsals-section-title">
+                        Слоты на {calendarSelectedDateLabel}
+                      </span>
+                      {premise.canBook ? (
+                        <Button type="button" onClick={openCreateSlot}>
+                          Добавить слот
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    {daySlots.length === 0 ? (
+                      <div className="sessions-slots-empty rehearsals-muted">
+                        На этот день броней нет
                       </div>
+                    ) : (
+                      daySlots.map((slot) => (
+                        <div
+                          key={slot.id}
+                          className="sessions-slots-readonly__row"
+                        >
+                          <div className="sessions-slots-readonly__time">
+                            {formatSlotTime(slot)}
+                          </div>
+                          <div className="sessions-slots-readonly__meta">
+                            <strong>{slot.title}</strong>
+                            {" · "}
+                            {slotStatusLabel(slot.status)}
+                          </div>
+                          {slot.purpose ? (
+                            <div className="sessions-slots-readonly__notes">
+                              <b>Для чего:</b> {slot.purpose}
+                            </div>
+                          ) : null}
+                          {slot.rentalNotes ? (
+                            <div className="sessions-slots-readonly__notes">
+                              <b>Аренда:</b> {slot.rentalNotes}
+                            </div>
+                          ) : null}
+                          {slot.contactEmail || slot.contactName ? (
+                            <div className="sessions-slots-readonly__notes">
+                              <b>Контакт:</b>{" "}
+                              {[slot.contactName, slot.contactEmail]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </div>
+                          ) : null}
+                          {canEditSlot(slot) ? (
+                            <div className="premises-slot-row__actions">
+                              <Button
+                                type="button"
+                                onClick={() => openEditSlot(slot)}
+                              >
+                                Изменить
+                              </Button>
+                              <Button
+                                type="button"
+                                className="danger"
+                                onClick={() => void handleDeleteSlot(slot)}
+                              >
+                                Удалить
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </RehearsalsCard>
+
+                {premise.canManage ? (
+                  <RehearsalsCard fluid className="premises-members-card">
+                    <div className="rehearsals-card-title">
+                      Участники помещения
+                    </div>
+                    <p className="rehearsals-muted">
+                      Любой email — арендаторы смогут бронировать слоты, если
+                      включено «может бронировать».
+                    </p>
+                    <FormInlineRow className="premises-form-row">
+                      <InlineTextField
+                        value={memberEmail}
+                        onChange={(e) => setMemberEmail(e.target.value)}
+                        placeholder="email@example.com"
+                        inputMode="email"
+                        autoComplete="email"
+                        aria-label="Email участника"
+                      />
                       <CustomSelect
-                        value={m.role}
+                        value={memberRole}
                         options={roleOptions}
-                        onChange={(v) =>
-                          void updateMember({
-                            premiseId,
-                            memberId: m.id,
-                            body: { role: v as PremiseMemberRole },
-                          })
-                        }
-                        aria-label={`Роль ${m.email}`}
+                        onChange={(v) => setMemberRole(v as PremiseMemberRole)}
+                        aria-label="Роль"
                       />
                       <label className="premises-checkbox">
                         <input
                           type="checkbox"
-                          checked={m.canBook}
-                          onChange={(e) =>
-                            void updateMember({
-                              premiseId,
-                              memberId: m.id,
-                              body: { canBook: e.target.checked },
-                            })
-                          }
+                          checked={memberCanBook}
+                          onChange={(e) => setMemberCanBook(e.target.checked)}
                         />
-                        Бронь
+                        Может бронировать
                       </label>
                       <Button
                         type="button"
-                        className="danger"
-                        onClick={() => {
-                          if (!confirm(`Удалить ${m.email}?`)) return;
-                          void removeMember({ premiseId, memberId: m.id });
-                        }}
+                        disabled={addingMember || !memberEmail.trim()}
+                        onClick={() => void handleAddMember()}
                       >
-                        Удалить
+                        {addingMember ? "…" : "Добавить"}
                       </Button>
-                    </li>
-                  ))}
-                </ul>
+                    </FormInlineRow>
+                    {memberError ? (
+                      <div className="rehearsals-error">{memberError}</div>
+                    ) : null}
+
+                    <ul className="premises-members-list">
+                      {(membersData?.members ?? []).map((m) => (
+                        <li key={m.id} className="premises-member-item">
+                          <div className="premises-member-item__email">
+                            {m.email}
+                          </div>
+                          <CustomSelect
+                            value={m.role}
+                            options={roleOptions}
+                            onChange={(v) =>
+                              void updateMember({
+                                premiseId,
+                                memberId: m.id,
+                                body: { role: v as PremiseMemberRole },
+                              })
+                            }
+                            aria-label={`Роль ${m.email}`}
+                          />
+                          <label className="premises-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={m.canBook}
+                              onChange={(e) =>
+                                void updateMember({
+                                  premiseId,
+                                  memberId: m.id,
+                                  body: { canBook: e.target.checked },
+                                })
+                              }
+                            />
+                            Бронь
+                          </label>
+                          <Button
+                            type="button"
+                            className="danger"
+                            onClick={() => {
+                              if (!confirm(`Удалить ${m.email}?`)) return;
+                              void removeMember({ premiseId, memberId: m.id });
+                            }}
+                          >
+                            Удалить
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </RehearsalsCard>
+                ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
         </main>
       </div>
 
       <Modal
         isOpen={slotModalOpen}
-         onClose={() => setSlotModalOpen(false)}
+        onClose={() => setSlotModalOpen(false)}
         ariaLabel={editingSlot ? "Редактирование слота" : "Новый слот"}
-        panelClassName="premises-slot-modal"
+        panelClassName="premises-slot-modal-panel"
       >
         <div className="premises-slot-modal__inner">
           <h3 id="premise-slot-modal-title">
@@ -583,7 +696,6 @@ export function PremiseDetailPage() {
             </Button>
             <Button
               type="button"
-              variant="primary"
               disabled={creatingSlot || updatingSlot}
               onClick={() => void saveSlot()}
             >

@@ -7,6 +7,7 @@ import { useScene } from "../../scene";
 import { useScriptUI } from "../../script-ui";
 import { useTeam } from "../../team";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
+import { useIsMobile } from "../../../shared/hooks/useIsMobile";
 import { patchTheaterViewPrefs, readTheaterViewPrefs } from "../../theater/model/theater-view-prefs-storage";
 import type { SpectacleActiveView } from "./spectacle-page-types";
 
@@ -92,13 +93,7 @@ export function useSpectaclePage() {
     skip: !accessToken,
   });
 
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 1024);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  const isMobile = useIsMobile();
 
   const activeView: SpectacleActiveView =
     ENABLE_3D_THEATER && location.pathname === "/theater"

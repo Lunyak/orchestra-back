@@ -16,6 +16,10 @@ export type ScriptUiState = {
 
   /** Режим редактирования (не persist'им) */
   isEditing: boolean;
+  /** Редактирование плейлиста: fade, loop, порядок, подготовка (не persist'им) */
+  playlistEditMode: boolean;
+  /** Кроссфейд между треками плейлиста (list + player instance) */
+  playlistCrossfadeEnabled: boolean;
   /** Перестановка панелей в театре (persist per-project в theater-view-prefs). */
   swapTheaterPanels: boolean;
   /** Правая панель настроек 3D-театра (persist per-project в theater-view-prefs). */
@@ -38,6 +42,10 @@ function persistBooleans(state: ScriptUiState) {
     localStorage.setItem("showPlaylistSidebar", String(state.showPlaylistSidebar));
     localStorage.setItem("showHeaderSounds", String(state.showHeaderSounds));
     localStorage.setItem("isStepsCollapsed", String(state.isStepsCollapsed));
+    localStorage.setItem(
+      "playlistCrossfadeEnabled",
+      String(state.playlistCrossfadeEnabled),
+    );
   } catch {
     // ignore
   }
@@ -51,6 +59,8 @@ function defaultState(): ScriptUiState {
     mobilePlaylistOpen: false,
     mobileStepsOpen: false,
     isEditing: false,
+    playlistEditMode: false,
+    playlistCrossfadeEnabled: false,
     swapTheaterPanels: false,
     showTheaterControls: true,
   };
@@ -63,6 +73,10 @@ function initialStateFromStorage(): ScriptUiState {
     showPlaylistSidebar: storedBool("showPlaylistSidebar", base.showPlaylistSidebar),
     showHeaderSounds: storedBool("showHeaderSounds", base.showHeaderSounds),
     isStepsCollapsed: storedBool("isStepsCollapsed", base.isStepsCollapsed),
+    playlistCrossfadeEnabled: storedBool(
+      "playlistCrossfadeEnabled",
+      base.playlistCrossfadeEnabled,
+    ),
   };
 }
 
@@ -75,10 +89,15 @@ export const scriptUiSlice = createSlice({
       state.showPlaylistSidebar = storedBool("showPlaylistSidebar", base.showPlaylistSidebar);
       state.showHeaderSounds = storedBool("showHeaderSounds", base.showHeaderSounds);
       state.isStepsCollapsed = storedBool("isStepsCollapsed", base.isStepsCollapsed);
+      state.playlistCrossfadeEnabled = storedBool(
+        "playlistCrossfadeEnabled",
+        base.playlistCrossfadeEnabled,
+      );
       // Эфемерные поля — сброс при init; theater-панели восстанавливаются в useSpectaclePage.
       state.mobilePlaylistOpen = false;
       state.mobileStepsOpen = false;
       state.isEditing = false;
+      state.playlistEditMode = false;
       persistBooleans(state);
     },
 
@@ -133,6 +152,22 @@ export const scriptUiSlice = createSlice({
     },
     toggleEditing(state) {
       state.isEditing = !state.isEditing;
+    },
+
+    setPlaylistEditMode(state, action: PayloadAction<{ value: boolean }>) {
+      state.playlistEditMode = Boolean(action.payload.value);
+    },
+    togglePlaylistEditMode(state) {
+      state.playlistEditMode = !state.playlistEditMode;
+    },
+
+    setPlaylistCrossfadeEnabled(state, action: PayloadAction<{ value: boolean }>) {
+      state.playlistCrossfadeEnabled = Boolean(action.payload.value);
+      persistBooleans(state);
+    },
+    togglePlaylistCrossfade(state) {
+      state.playlistCrossfadeEnabled = !state.playlistCrossfadeEnabled;
+      persistBooleans(state);
     },
 
     setSwapTheaterPanels(state, action: PayloadAction<{ value: boolean }>) {

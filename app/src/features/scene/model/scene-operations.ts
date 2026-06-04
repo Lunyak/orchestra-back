@@ -159,6 +159,10 @@ export function useSceneOperations() {
                   enabled: cue?.enabled ?? undefined,
                 }))
               : undefined,
+            lightKadrs:
+              (st as any)?.lightKadrs && typeof (st as any).lightKadrs === "object"
+                ? (st as any).lightKadrs
+                : undefined,
             ...resolveStepTheaterFromApi(st),
             theaterSpotlights: Array.isArray(st?.theaterSpotlights)
               ? st.theaterSpotlights.map((sp: any) => mapTheaterSpotlightFromApi(sp))
@@ -233,6 +237,14 @@ export function useSceneOperations() {
         const serverLightPrograms = (scene as any)?.lightPrograms ?? null;
         if (serverLightPrograms && typeof serverLightPrograms === "object" && (serverLightPrograms as any).v === 1) {
           minimalSceneData.lightPrograms = serverLightPrograms;
+        }
+        const serverLightChannelRoles = (scene as any)?.lightChannelRoles ?? null;
+        if (
+          serverLightChannelRoles &&
+          typeof serverLightChannelRoles === "object" &&
+          (serverLightChannelRoles as any).v === 1
+        ) {
+          minimalSceneData.lightChannelRoles = serverLightChannelRoles;
         }
 
         const stepsBeforeRepair = normalizedSteps.length ? normalizedSteps : steps;
@@ -368,6 +380,7 @@ export function useSceneOperations() {
         theaterLayout: liveTheaterLayout,
         lightFaders: liveSceneData?.lightFaders ?? (current as any)?.lightFaders,
         lightPrograms: liveSceneData?.lightPrograms ?? (current as any)?.lightPrograms,
+        lightChannelRoles: liveSceneData?.lightChannelRoles ?? (current as any)?.lightChannelRoles,
         sceneRoles: liveSceneData?.sceneRoles ?? (current as any)?.sceneRoles,
         images,
         lightChannels: showScriptUi.lightChannels,
@@ -461,6 +474,10 @@ export function useSceneOperations() {
                           enabled: cue?.enabled ?? undefined,
                         }))
                       : undefined,
+                    lightKadrs:
+                      (st as any)?.lightKadrs && typeof (st as any).lightKadrs === "object"
+                        ? (st as any).lightKadrs
+                        : undefined,
                     ...resolveStepTheaterFromApi(st),
                     theaterSpotlights: Array.isArray(st?.theaterSpotlights)
                       ? st.theaterSpotlights.map((sp: any) => mapTheaterSpotlightFromApi(sp))
@@ -527,6 +544,10 @@ export function useSceneOperations() {
                   ...((sceneRow as any)?.lightPrograms && typeof (sceneRow as any).lightPrograms === "object"
                     ? { lightPrograms: (sceneRow as any).lightPrograms }
                     : {}),
+                  ...((sceneRow as any)?.lightChannelRoles &&
+                  typeof (sceneRow as any).lightChannelRoles === "object"
+                    ? { lightChannelRoles: (sceneRow as any).lightChannelRoles }
+                    : {}),
                 };
                 const shadowSteps = applySceneFaderBindingsToSpotlights(
                   prevSteps.length ? prevSteps : [],
@@ -583,8 +604,19 @@ export function useSceneOperations() {
           const prevLightPrograms = (serverShadowForDiff?.sceneData as any)?.lightPrograms ?? null;
           const nextLightPrograms = (payloadForServer as any)?.lightPrograms ?? null;
           const lightProgramsChanged = stableStringify(prevLightPrograms) !== stableStringify(nextLightPrograms);
+          const prevLightChannelRoles = (serverShadowForDiff?.sceneData as any)?.lightChannelRoles ?? null;
+          const nextLightChannelRoles = (payloadForServer as any)?.lightChannelRoles ?? null;
+          const lightChannelRolesChanged =
+            stableStringify(prevLightChannelRoles) !== stableStringify(nextLightChannelRoles);
 
-          if (!serverShadowForDiff || nameChanged || sceneRolesChanged || lightFadersChanged || lightProgramsChanged) {
+          if (
+            !serverShadowForDiff ||
+            nameChanged ||
+            sceneRolesChanged ||
+            lightFadersChanged ||
+            lightProgramsChanged ||
+            lightChannelRolesChanged
+          ) {
             const scenePayload: any = {
               id: sceneId,
               projectId,
@@ -599,6 +631,9 @@ export function useSceneOperations() {
             }
             if (!serverShadowForDiff || lightProgramsChanged) {
               scenePayload.lightPrograms = nextLightPrograms;
+            }
+            if (!serverShadowForDiff || lightChannelRolesChanged) {
+              scenePayload.lightChannelRoles = nextLightChannelRoles;
             }
             changes.push({
               id: createId(),
@@ -805,6 +840,7 @@ export function useSceneOperations() {
               requisites: step.requisites ?? [],
               lightPlot: step.lightPlot ?? [],
               lightCues: (step as any)?.lightCues ?? [],
+              lightKadrs: (step as any)?.lightKadrs ?? null,
               ...stepTheaterSyncPayload(step),
               theaterSpotlights: Array.isArray((step as any)?.theaterSpotlights)
                 ? (step as any).theaterSpotlights.map((sp: TheaterSpotlight) =>
@@ -844,6 +880,7 @@ export function useSceneOperations() {
                 lightCues: Array.isArray((step as any)?.lightCues)
                   ? (step as any).lightCues
                   : [],
+                lightKadrs: (step as any)?.lightKadrs ?? null,
                 ...stepTheaterSyncPayload(step as ScriptStep),
                 theaterSpotlights: Array.isArray((step as any)?.theaterSpotlights)
                   ? (step as any).theaterSpotlights.map((sp: TheaterSpotlight) =>
@@ -901,6 +938,10 @@ export function useSceneOperations() {
                   lightPrograms:
                     (payloadForServer as any)?.lightPrograms ??
                     (serverShadowForDiff?.sceneData as any)?.lightPrograms ??
+                    undefined,
+                  lightChannelRoles:
+                    (payloadForServer as any)?.lightChannelRoles ??
+                    (serverShadowForDiff?.sceneData as any)?.lightChannelRoles ??
                     undefined,
                   playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
                   sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],

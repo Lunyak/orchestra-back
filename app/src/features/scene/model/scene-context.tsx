@@ -7,6 +7,7 @@ import { store } from "../../../shared/store/store";
 import {
   sceneActions,
   type SceneData,
+  type SceneLightChannelRolesV1,
   type SceneLightFaderV1,
   type SceneLightFadersDataV1,
   type SceneLightProgramV1,
@@ -88,10 +89,13 @@ export function useScene(): SceneContextValue {
 
   const setSceneData = useCallback(
     (next: SetStateAction<SceneData | null>) => {
-      const resolved = typeof next === "function" ? (next as (prev: SceneData | null) => SceneData | null)(sceneData) : next;
+      const resolved =
+        typeof next === "function"
+          ? (next as (prev: SceneData | null) => SceneData | null)(store.getState().scene.sceneData)
+          : next;
       dispatch(sceneActions.setSceneData(resolved));
     },
-    [dispatch, sceneData],
+    [dispatch],
   );
 
   const setRoleAssignments = useCallback(
@@ -103,10 +107,13 @@ export function useScene(): SceneContextValue {
 
   const setSteps = useCallback(
     (next: SetStateAction<ScriptStep[]>) => {
-      const resolved = typeof next === "function" ? (next as (prev: ScriptStep[]) => ScriptStep[])(steps) : next;
+      const resolved =
+        typeof next === "function"
+          ? (next as (prev: ScriptStep[]) => ScriptStep[])(store.getState().scene.steps)
+          : next;
       dispatch(sceneActions.setSteps(resolved));
     },
-    [dispatch, steps],
+    [dispatch],
   );
 
   const updateStep = useCallback(
@@ -199,6 +206,7 @@ export function useScene(): SceneContextValue {
 export { DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 export type {
   SceneData,
+  SceneLightChannelRolesV1,
   SceneLightFaderV1,
   SceneLightFadersDataV1,
   SceneLightProgramV1,

@@ -5,7 +5,8 @@ import { VoiceDialogueTrainer } from "../../actor-trainers/ui/VoiceDialogueTrain
 import { PhraseWriteTrainer } from "../../actor-trainers/ui/PhraseWriteTrainer";
 import { Button } from "../../../shared/core/button/Button";
 import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
-import { useAppEditorMenubarActionsRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
+import { useAppEditorMenubarActionsRender, useAppEditorViewMenuRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
+import { AppEditorActorTrainerMenu } from "../../../shared/components/app-editor-menubar/AppEditorActorTrainerMenu";
 import { Modal } from "../../../shared/core/modal/Modal";
 import { useActorPage } from "../model/useActorPage";
 import "./style.css";
@@ -98,6 +99,14 @@ export function ActorPageView() {
     });
   };
 
+  useAppEditorViewMenuRender(
+    "actor-trainer-menu",
+    10,
+    () => (
+      <AppEditorActorTrainerMenu trainerMode={trainerMode} onSetTrainerMode={setTrainerMode} />
+    ),
+  );
+
   useAppEditorMenubarActionsRender("actor-settings", 20, () => (
     <button
       type="button"
@@ -116,8 +125,6 @@ export function ActorPageView() {
       <div className="app-content">
         <main className="main-content actor-main">
           <div className="actor-view">
-            <h2>Актёр</h2>
-
             <Modal
               isOpen={settingsOpen}
               onClose={() => setSettingsOpen(false)}
@@ -315,30 +322,6 @@ export function ActorPageView() {
             </Modal>
 
             <div className="actor-section">
-              <div className="actor-mode-tabs" role="tablist" aria-label="Режим тренировки">
-                <Button
-                  className={cn("actor-mode-tab", trainerMode === "dialogue" ? "is-active" : "secondary")}
-                  type="button"
-                  onClick={() => setTrainerMode("dialogue")}
-                >
-                  Диалог
-                </Button>
-                <Button
-                  className={cn("actor-mode-tab", trainerMode === "write" ? "is-active" : "secondary")}
-                  type="button"
-                  onClick={() => setTrainerMode("write")}
-                >
-                  Напиши фразу
-                </Button>
-                <Button
-                  className={cn("actor-mode-tab", trainerMode === "voice" ? "is-active" : "secondary")}
-                  type="button"
-                  onClick={() => setTrainerMode("voice")}
-                >
-                  Голос
-                </Button>
-              </div>
-
               {trainerMode === "dialogue" ? (
                 <DialogueSceneTrainer
                   steps={steps}

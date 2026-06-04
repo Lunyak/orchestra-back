@@ -186,9 +186,11 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   const showStepsSidebar =
     shouldShowStepsSidebar && (!isTheaterView || theaterRehearsalMode);
 
-  const stepsSidebarNode =
-    ((!isMobile && showStepsSidebar && !isStepsCollapsed) ||
-      (isMobile && mobileStepsOpen && showStepsSidebar && !isStepsCollapsed)) ? (
+  const stepsSidebarVisible =
+    showStepsSidebar &&
+    ((isMobile && mobileStepsOpen) || (!isMobile && !isStepsCollapsed));
+
+  const stepsSidebarNode = stepsSidebarVisible ? (
       <div
         className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobileStepsOpen ? "open" : ""}`}
       >

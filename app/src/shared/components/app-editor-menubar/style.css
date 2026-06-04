@@ -258,6 +258,12 @@
   margin-left: 2px;
 }
 
+.app-editor-menubar__panel-btn--player + .app-editor-menubar__panel-btn--playlist-edit,
+.app-editor-menubar__panel-btn--playlist-edit {
+  margin-left: 2px;
+}
+
+.app-editor-menubar__panel-btn--playlist-edit + .app-editor-menubar__panel-btn--chat,
 .app-editor-menubar__panel-btn--player + .app-editor-menubar__panel-btn--chat,
 .app-editor-menubar__panels-nav + .app-editor-menubar__panel-btn--chat,
 .app-editor-menubar__panel-btn--chat {

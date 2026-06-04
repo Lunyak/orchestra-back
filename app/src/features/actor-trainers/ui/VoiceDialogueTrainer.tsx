@@ -669,11 +669,164 @@ type VoiceLineControlsPanelProps = {
   onPrev: () => void;
   onNext: () => void;
   myTextNoRemarks: string;
-  transcript: string;
-  interim: string;
-  result: null | { ratio: number; ok: boolean };
-  passRatioPercent: number;
 };
+
+function renderVoiceLineBody(
+  line: DialogueLine,
+  opts: {
+    isActive: boolean;
+    isMine: boolean;
+    showText: boolean;
+    revealedLineIds: Set<string>;
+    listening: boolean;
+    transcript: string;
+    interim: string;
+    result: null | { ratio: number; ok: boolean };
+    passRatioPercent: number;
+  },
+) {
+  const {
+    isActive,
+    isMine,
+    showText,
+    revealedLineIds,
+    listening,
+    transcript,
+    interim,
+    result,
+    passRatioPercent,
+  } = opts;
+
+  if (isActive && isMine && (listening || transcript || interim || result)) {
+    return (
+      <>
+        <div className="voice-text voice-text--live">
+          {transcript ? <span>{transcript}</span> : null}
+          {interim ? (
+            <span className="voice-interim">
+              {transcript ? " " : ""}
+              {interim}
+            </span>
+          ) : null}
+          {!transcript && !interim && listening ? (
+            <span className="voice-interim voice-interim--placeholder">…</span>
+          ) : null}
+        </div>
+        {result ? (
+          <div
+            className={cn(
+              "voice-line-result",
+              result.ok ? "voice-line-result--ok" : "voice-line-result--bad",
+            )}
+          >
+            {result.ok ? "Похоже, верно." : `Не совпадает достаточно (нужно ≥${passRatioPercent}%).`} Точность:{" "}
+            <b>{Math.round(result.ratio * 100)}%</b>
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <div className="voice-text">
+      {isMine && !(showText || revealedLineIds.has(line.id)) ? "— текст скрыт —" : line.text}
+    </div>
+  );
+}
+
+const VOICE_LINE_SHEET_DISMISS_PX = 72;
+const VOICE_LINE_SHEET_TAP_PX = 6;
+
+function VoiceLineSheet({
+  expanded,
+  onExpandedChange,
+  children,
+}: {
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
+  children: React.ReactNode;
+}) {
+  const dragStartYRef = useRef<number | null>(null);
+  const dragOffsetRef = useRef(0);
+  const [dragOffsetY, setDragOffsetY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+
+  const finishDrag = useCallback(() => {
+    const offset = dragOffsetRef.current;
+    if (expanded) {
+      if (offset >= VOICE_LINE_SHEET_DISMISS_PX) {
+        onExpandedChange(false);
+      }
+    } else if (offset <= -VOICE_LINE_SHEET_DISMISS_PX || Math.abs(offset) < VOICE_LINE_SHEET_TAP_PX) {
+      onExpandedChange(true);
+    }
+    dragStartYRef.current = null;
+    dragOffsetRef.current = 0;
+    setDragOffsetY(0);
+    setDragging(false);
+  }, [expanded, onExpandedChange]);
+
+  const onHeadPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    dragStartYRef.current = event.clientY;
+    dragOffsetRef.current = 0;
+    setDragging(true);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const onHeadPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartYRef.current == null) return;
+    const deltaY = event.clientY - dragStartYRef.current;
+    const nextOffset = expanded ? Math.max(0, deltaY) : Math.min(0, deltaY);
+    dragOffsetRef.current = nextOffset;
+    setDragOffsetY(nextOffset);
+  };
+
+  const panelStyle = (() => {
+    if (dragging && expanded && dragOffsetY > 0) {
+      return {
+        maxHeight: `max(var(--voice-line-sheet-peek), calc(var(--voice-line-sheet-max) - ${dragOffsetY}px))`,
+      } as React.CSSProperties;
+    }
+    if (dragging && !expanded && dragOffsetY < 0) {
+      return {
+        maxHeight: `min(var(--voice-line-sheet-max), calc(var(--voice-line-sheet-peek) + ${-dragOffsetY}px))`,
+      } as React.CSSProperties;
+    }
+    return undefined;
+  })();
+
+  return (
+    <div
+      className={cn("voice-line-sheet", !expanded && "voice-line-sheet--collapsed")}
+      role="dialog"
+      aria-label="Управление репликой"
+    >
+      <div
+        className={cn(
+          "voice-line-sheet__panel",
+          !expanded && !dragging && dragOffsetY === 0 && "voice-line-sheet__panel--collapsed",
+          dragging && "voice-line-sheet__panel--dragging",
+        )}
+        style={panelStyle}
+      >
+        <div
+          className="voice-line-sheet__head"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Свернуть панель — потяните вниз" : "Развернуть панель — потяните вверх"}
+          onPointerDown={onHeadPointerDown}
+          onPointerMove={onHeadPointerMove}
+          onPointerUp={finishDrag}
+          onPointerCancel={finishDrag}
+        />
+        <div className="voice-line-sheet__scroll">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 function VoiceLineControlsPanel({
   className,
@@ -706,10 +859,6 @@ function VoiceLineControlsPanel({
   onPrev,
   onNext,
   myTextNoRemarks,
-  transcript,
-  interim,
-  result,
-  passRatioPercent,
 }: VoiceLineControlsPanelProps) {
   const lineRevealed = Boolean(current.lineId && revealedLineIds.has(current.lineId));
   const showTarget = (showText || lineRevealed) && currentTarget;
@@ -847,9 +996,6 @@ function VoiceLineControlsPanel({
 
       {isSheet ? (
         <div className="voice-toolbar">
-          <span className="voice-toolbar__counter">
-            <b>{index + 1}</b> / {exercisesCount}
-          </span>
           {pttButton}
           <div className="voice-toolbar__row">
             <VoiceIconButton
@@ -945,21 +1091,9 @@ function VoiceLineControlsPanel({
         </div>
       ) : null}
 
-      {transcript || interim || result || voiceUpload.error ? (
+      {voiceUpload.error ? (
         <div className="voice-recognition">
-          {transcript || interim ? (
-            <div className="voice-transcript">
-              {transcript ? <div>{transcript}</div> : null}
-              {interim ? <div className="voice-interim">{interim}</div> : null}
-            </div>
-          ) : null}
-          {result ? (
-            <div className={`voice-result ${result.ok ? "ok" : "bad"}`}>
-              {result.ok ? "Похоже, верно." : `Не совпадает достаточно (нужно ≥${passRatioPercent}%).`} Точность:{" "}
-              <b>{Math.round(result.ratio * 100)}%</b>
-            </div>
-          ) : null}
-          {voiceUpload.error ? <div className="voice-result bad">{voiceUpload.error}</div> : null}
+          <div className="voice-result bad">{voiceUpload.error}</div>
         </div>
       ) : null}
     </div>
@@ -1092,9 +1226,6 @@ export function VoiceDialogueTrainer({
   const current = exercises[index] ?? null;
   const isMobile = useIsMobile();
   const [lineSheetOpen, setLineSheetOpen] = useState(true);
-  useEffect(() => {
-    if (current?.lineId) setLineSheetOpen(true);
-  }, [current?.lineId]);
   const activeLineRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (isMobile && lineSheetOpen) return;
@@ -2291,10 +2422,6 @@ export function VoiceDialogueTrainer({
     onPrev: () => setIndex((i) => Math.max(0, i - 1)),
     onNext: () => setIndex((i) => Math.min(exercises.length - 1, i + 1)),
     myTextNoRemarks,
-    transcript,
-    interim,
-    result,
-    passRatioPercent,
   };
 
   const settingsPanelProps = {
@@ -2354,10 +2481,24 @@ export function VoiceDialogueTrainer({
 
   return (
     <>
-    <div className={cn("voice-trainer", isMobile && lineSheetOpen && "voice-trainer--sheet-open")}>
+    <div
+      className={cn(
+        "voice-trainer",
+        isMobile && lineSheetOpen && "voice-trainer--sheet-open",
+        isMobile && !lineSheetOpen && "voice-trainer--sheet-collapsed",
+      )}
+    >
       <div className="voice-head">
         <div className="voice-title">
-          Голос — роль <b>{role || "—"}</b>
+          <b>{role || "—"}</b>
+          {current?.stepTitle ? (
+            <>
+              <span className="voice-title__sep" aria-hidden="true">
+                |
+              </span>
+              <span className="voice-step">{current.stepTitle}</span>
+            </>
+          ) : null}
         </div>
         <div className="voice-meta">
           Пройдено <b>{doneCount}</b> / {total} (осталось {left})
@@ -2375,57 +2516,43 @@ export function VoiceDialogueTrainer({
       ) : null}
 
       <div className="voice-card">
-        <div className="voice-toolbar">
-          {allDoneDialog && total > 0 ? (
-            <div className="voice-finished">
-              <div className="voice-finished-title">Вы повторили весь текст.</div>
-              <div className="voice-actions">
-                <button
-                  type="button"
-                  className="voice-btn"
-                  onClick={() => {
-                    stopListening();
-                    cancelSpeech();
-                    setAllDoneDialog(false);
-                  }}
-                >
-                  Закончить
-                </button>
-                <button
-                  type="button"
-                  className="voice-btn voice-btn--primary"
-                  onClick={() => {
-                    resetProgressAll();
-                    setAllDoneDialog(false);
-                  }}
-                >
-                  Начать заново
-                </button>
-              </div>
+        {allDoneDialog && total > 0 ? (
+          <div className="voice-finished">
+            <div className="voice-finished-title">Вы повторили весь текст.</div>
+            <div className="voice-actions">
+              <button
+                type="button"
+                className="voice-btn"
+                onClick={() => {
+                  stopListening();
+                  cancelSpeech();
+                  setAllDoneDialog(false);
+                }}
+              >
+                Закончить
+              </button>
+              <button
+                type="button"
+                className="voice-btn voice-btn--primary"
+                onClick={() => {
+                  resetProgressAll();
+                  setAllDoneDialog(false);
+                }}
+              >
+                Начать заново
+              </button>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
 
         <div className="voice-script">
-          {(() => {
-            let lastStepId: number | null = null;
-            return allLines.map((line) => {
-              const stepHeader =
-                lastStepId !== line.stepId ? (
-                  <div key={`${line.stepId}:h`} className="voice-step">
-                    {line.stepTitle}
-                  </div>
-                ) : null;
-              lastStepId = line.stepId;
-
+          {(() =>
+            allLines.map((line) => {
               if (line.kind === "stage") {
                 return (
-                  <React.Fragment key={line.id}>
-                    {stepHeader}
-                    <div className="voice-line voice-line--stage">
-                      <div className="voice-text">{line.text}</div>
-                    </div>
-                  </React.Fragment>
+                  <div key={line.id} className="voice-line voice-line--stage">
+                    <div className="voice-text">{line.text}</div>
+                  </div>
                 );
               }
 
@@ -2438,7 +2565,6 @@ export function VoiceDialogueTrainer({
 
               return (
                 <React.Fragment key={line.id}>
-                  {stepHeader}
                   <div
                     ref={
                       isActive
@@ -2447,15 +2573,14 @@ export function VoiceDialogueTrainer({
                           }
                         : undefined
                     }
-                    className={[
+                    className={cn(
                       "voice-line",
                       isMine ? "voice-line--mine" : "voice-line--other",
-                      isDone ? "voice-line--done" : "",
-                      isActive ? "voice-line--active" : "",
-                      isMine && ex ? "voice-line--clickable" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
+                      isDone && "voice-line--done",
+                      isActive && "voice-line--active",
+                      isActive && isMine && listening && "voice-line--listening",
+                      isMine && ex && "voice-line--clickable",
+                    )}
                     onClick={() => {
                       if (!isMine || !ex) return;
                       setIndex(exIdx!);
@@ -2463,11 +2588,17 @@ export function VoiceDialogueTrainer({
                     title={isMine && ex ? "Перейти к реплике" : undefined}
                   >
                     <div className="voice-role">{lineRole}</div>
-                    <div className="voice-text">
-                      {isMine && !(showText || revealedLineIds.has(line.id))
-                        ? "— текст скрыт —"
-                        : line.text}
-                    </div>
+                    {renderVoiceLineBody(line, {
+                      isActive,
+                      isMine,
+                      showText,
+                      revealedLineIds,
+                      listening,
+                      transcript,
+                      interim,
+                      result,
+                      passRatioPercent,
+                    })}
                   </div>
 
                   {isActive && !isMobile ? (
@@ -2475,39 +2606,15 @@ export function VoiceDialogueTrainer({
                   ) : null}
                 </React.Fragment>
               );
-            });
-          })()}
+            })
+          )()}
         </div>
       </div>
 
       {isMobile ? (
-        lineSheetOpen ? (
-          <div className="voice-line-sheet" role="dialog" aria-label="Управление репликой">
-            <div className="voice-line-sheet__panel">
-              <div className="voice-line-sheet__head">
-                <span className="voice-line-sheet__title">{current.role}</span>
-                <button
-                  type="button"
-                  className="voice-line-sheet__collapse"
-                  onClick={() => setLineSheetOpen(false)}
-                >
-                  Свернуть
-                </button>
-              </div>
-              <div className="voice-line-sheet__scroll">
-                <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--sheet" />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="voice-line-sheet__reopen"
-            onClick={() => setLineSheetOpen(true)}
-          >
-            Управление репликой
-          </button>
-        )
+        <VoiceLineSheet expanded={lineSheetOpen} onExpandedChange={setLineSheetOpen}>
+          <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--sheet" />
+        </VoiceLineSheet>
       ) : null}
     </div>
 

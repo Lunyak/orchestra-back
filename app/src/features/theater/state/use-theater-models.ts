@@ -329,6 +329,9 @@ export function useTheaterModels({
         ...(previous.lightCues
           ? { lightCues: previous.lightCues.map((cue) => ({ ...cue })) }
           : {}),
+        ...(previous.lightKadrs
+          ? { lightKadrs: { ...previous.lightKadrs, kadrs: previous.lightKadrs.kadrs.map((k) => ({ ...k, faders: k.faders.map((f) => ({ ...f })) })) } }
+          : {}),
         theaterActiveSpotlightId: clonedSpotlights[0]?.id,
         theaterActiveModelId: clonedModels[0]?.id,
       });
@@ -349,6 +352,9 @@ export function useTheaterModels({
           : {}),
         ...(currentStep.lightCues
           ? { lightCues: currentStep.lightCues.map((cue) => ({ ...cue })) }
+          : {}),
+        ...(currentStep.lightKadrs
+          ? { lightKadrs: { ...currentStep.lightKadrs, kadrs: currentStep.lightKadrs.kadrs.map((k) => ({ ...k, faders: k.faders.map((f) => ({ ...f })) })) } }
           : {}),
         theaterActiveSpotlightId: clonedSpotlights[0]?.id,
         theaterActiveModelId: clonedModels[0]?.id,

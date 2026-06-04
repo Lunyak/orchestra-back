@@ -43,6 +43,7 @@ function AppRoutesContent() {
     showHeaderSounds,
     toggleHeaderSounds,
     isStepsCollapsed,
+    setIsStepsCollapsed,
     toggleStepsCollapsed,
     mobilePlaylistOpen,
     setMobilePlaylistOpen,
@@ -208,8 +209,18 @@ function AppRoutesContent() {
       return;
     }
     setMobilePlaylistOpen(false);
+    if (!mobileStepsOpen) {
+      setIsStepsCollapsed(false);
+    }
     toggleMobileSteps();
-  }, [isMobile, toggleStepsCollapsed, setMobilePlaylistOpen, toggleMobileSteps]);
+  }, [
+    isMobile,
+    mobileStepsOpen,
+    setIsStepsCollapsed,
+    toggleStepsCollapsed,
+    setMobilePlaylistOpen,
+    toggleMobileSteps,
+  ]);
 
   useAppEditorViewMenuRender(
     "script-markdown-menu",
