@@ -5,6 +5,7 @@ import {
   type PayloadAction,
 } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
+import { mergeLightChannelsPreferLonger } from "../../../shared/components/light-console/light-channels-mutate";
 import type { ScriptStep } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
@@ -105,16 +106,6 @@ function getDefaultAnnotationsForCacheKey(cacheKey: CacheKey): AnnotationsEntry 
   return created;
 }
 
-function mergeLightChannelsPreferLonger(prev: string[], loaded: string[]): string[] {
-  const len = Math.max(prev.length, loaded.length, 8);
-  return Array.from({ length: len }, (_, i) => {
-    const p = String(prev[i] ?? "");
-    const l = String(loaded[i] ?? "");
-    if (p.trim() && l.trim() && p.trim() !== l.trim()) return p;
-    return p.trim() ? p : l;
-  });
-}
-
 function normalizeLightChannels(raw: unknown): string[] {
   if (!Array.isArray(raw)) return Array.from({ length: 8 }, () => "");
   const mapped = raw.map((value) =>
@@ -206,13 +197,13 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
       sceneData && String(sceneData?.name ?? "") === String(args.sceneName ?? "")
         ? (sceneData as any)?.sounds
         : (sceneData as any)?.sounds;
-    const lightRaw = Array.isArray(serverShadow?.lightChannels)
-      ? serverShadow.lightChannels
-      : (sceneData as any)?.lightChannels;
+    const fromShadow = normalizeLightChannels(serverShadow?.lightChannels);
+    const fromScene = normalizeLightChannels((sceneData as any)?.lightChannels);
+    const lightChannels = mergeLightChannelsPreferLonger(fromScene, fromShadow);
     return {
       playlistOptions: normalizePlaylistOptions(playlistRaw),
       soundsOptions: normalizeSoundsOptions(soundsRaw),
-      lightChannels: normalizeLightChannels(lightRaw),
+      lightChannels,
     };
   };
 
@@ -224,12 +215,19 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
         soundsOptions: normalizeSoundsOptions((scene as any)?.sounds),
         lightChannels: normalizeLightChannels((scene as any)?.lightChannels),
       };
-      const fileHasLight = fromFile.lightChannels.some((x) => String(x ?? "").trim().length > 0);
+      const fromStore = getFromStore();
+      const mergedFile = {
+        ...fromFile,
+        lightChannels: mergeLightChannelsPreferLonger(
+          fromStore.lightChannels,
+          fromFile.lightChannels,
+        ),
+      };
+      const fileHasLight = mergedFile.lightChannels.some((x) => String(x ?? "").trim().length > 0);
       if (fromFile.playlistOptions.length > 0 || fromFile.soundsOptions.length > 0 || fileHasLight) {
-        return { sceneKey, ...fromFile };
+        return { sceneKey, ...mergedFile };
       }
       // If file is empty (common during sync/first run), prefer store snapshot.
-      const fromStore = getFromStore();
       if (
         fromStore.playlistOptions.length > 0 ||
         fromStore.soundsOptions.length > 0 ||
@@ -237,7 +235,7 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
       ) {
         return { sceneKey, ...fromStore };
       }
-      return { sceneKey, ...fromFile };
+      return { sceneKey, ...mergedFile };
     } catch {
       // Fall through to store-based meta.
     }

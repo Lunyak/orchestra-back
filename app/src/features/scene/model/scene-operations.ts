@@ -21,7 +21,10 @@ import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
-import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
+import {
+  selectShowScriptMarkdownUi,
+  showScriptMarkdownActions,
+} from "../../show-script-markdown/model/show-script-markdown-slice";
 import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
 import { stepTheaterSyncPayload } from "../../theater/model/theater-step-models";
 import {
@@ -41,6 +44,7 @@ import {
   normalizeLightChannelsFromServer,
   normalizeTheaterLayoutFromServer,
 } from "./scene-normalize";
+import { mergeLightChannelsPreferLonger } from "../../../shared/components/light-console/light-channels-mutate";
 
 function normalizeRequisiteAssignees(value: unknown): string[] {
   return Array.isArray(value)
@@ -224,6 +228,7 @@ export function useSceneOperations() {
           name: scene.name,
           playlist: normalizedPlaylist,
           sounds: normalizedSounds,
+          lightChannels: normalizedLightChannels,
         };
         const serverSceneRoles = (scene as any)?.sceneRoles ?? null;
         const isSceneRolesV1 = (v: any) =>
@@ -298,6 +303,13 @@ export function useSceneOperations() {
               theaterLayout: normalizedLayout,
               lightChannels: normalizedLightChannels,
             },
+          }),
+        );
+        dispatch(
+          showScriptMarkdownActions.setLightChannels({
+            projectSlug: effectiveProject,
+            sceneName: "script",
+            lightChannels: normalizedLightChannels,
           }),
         );
         dispatch(sceneActions.clearRealtimePullDeferred());
@@ -405,7 +417,10 @@ export function useSceneOperations() {
           projector: liveSceneData?.projector ?? (current as any)?.projector,
         }),
         images,
-        lightChannels: showScriptUi.lightChannels,
+        lightChannels: mergeLightChannelsPreferLonger(
+          Array.isArray(liveSceneData?.lightChannels) ? liveSceneData.lightChannels : [],
+          Array.isArray(showScriptUi.lightChannels) ? showScriptUi.lightChannels : [],
+        ),
       };
 
       if (desktopApi) {
@@ -560,6 +575,7 @@ export function useSceneOperations() {
                   name: sceneRow?.name ?? "script",
                   playlist: normalizedPlaylist,
                   sounds: normalizedSounds,
+                  lightChannels: normalizedLight,
                   ...(serverLightFaders && typeof serverLightFaders === "object"
                     ? { lightFaders: serverLightFaders }
                     : {}),
@@ -1001,12 +1017,17 @@ export function useSceneOperations() {
                     undefined,
                   playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
                   sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],
+                  lightChannels: Array.isArray((payloadForServer as any)?.lightChannels)
+                    ? (payloadForServer as any).lightChannels.map((x: any) => String(x ?? ""))
+                    : [],
                 },
                 steps: liveSteps,
                 theaterLayout: liveTheaterLayout,
-                lightChannels: Array.isArray(showScriptUi.lightChannels)
-                  ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
-                  : Array.from({ length: 8 }, () => ""),
+                lightChannels: Array.isArray((payloadForServer as any)?.lightChannels)
+                  ? (payloadForServer as any).lightChannels.map((x: any) => String(x ?? ""))
+                  : Array.isArray(showScriptUi.lightChannels)
+                    ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
+                    : Array.from({ length: 8 }, () => ""),
               }),
             );
             dispatch(sceneActions.markSaved());

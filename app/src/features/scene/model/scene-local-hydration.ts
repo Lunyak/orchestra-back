@@ -7,6 +7,7 @@ import { normalizePersistedTheaterLayout } from "../../theater/model/theater-met
 import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
 import { unpackProjectorMedia } from "../../projector/model/scene-projector-persist";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
+import { showScriptMarkdownActions } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { normalizeLightChannelsLoose } from "./scene-normalize";
 
 export async function hydrateSceneFromLocalPack(
@@ -48,6 +49,7 @@ export async function hydrateSceneFromLocalPack(
       lightFaders: f.lightFaders as SceneData["lightFaders"],
       lightPrograms: f.lightPrograms as SceneData["lightPrograms"],
       lightChannelRoles: f.lightChannelRoles as SceneData["lightChannelRoles"],
+      lightChannels: lc,
       images:
         f.images && typeof f.images === "object"
           ? (f.images as SceneData["images"])
@@ -69,6 +71,13 @@ export async function hydrateSceneFromLocalPack(
           theaterLayout,
           lightChannels: lc,
         },
+      }),
+    );
+    dispatch(
+      showScriptMarkdownActions.setLightChannels({
+        projectSlug,
+        sceneName: "script",
+        lightChannels: lc,
       }),
     );
     console.info("[sync] loaded scene from local offline pack");

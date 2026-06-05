@@ -10,6 +10,17 @@ export function defaultLightChannelLabel(channel: number): string {
   return `Канал ${Math.max(1, Math.trunc(channel))}`;
 }
 
+/** Не терять локально добавленные K-слоты при устаревшем снимке с сервера/файла. */
+export function mergeLightChannelsPreferLonger(prev: string[], loaded: string[]): string[] {
+  const len = Math.max(prev.length, loaded.length, 8);
+  return Array.from({ length: len }, (_, i) => {
+    const p = String(prev[i] ?? "");
+    const l = String(loaded[i] ?? "");
+    if (p.trim() && l.trim() && p.trim() !== l.trim()) return p;
+    return p.trim() ? p : l;
+  });
+}
+
 export function appendLightChannel(channels: string[]): string[] {
   if (channels.length >= MAX_LIGHT_CHANNELS) return channels;
   const channel = channels.length + 1;

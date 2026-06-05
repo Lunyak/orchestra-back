@@ -8,10 +8,9 @@ export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
   const normalizedRows = Array.isArray(rows) ? rows : [];
   const maxIndex = normalizedRows.reduce<number>((acc, r: unknown) => {
     const row = r as { index?: number | string; raw?: unknown };
-    if (!String(row?.raw ?? "").trim()) return acc;
     const idx = typeof row?.index === "number" ? row.index : Number(row?.index ?? -1);
     return Number.isFinite(idx) && idx >= 0 ? Math.max(acc, Math.trunc(idx)) : acc;
-  }, 7);
+  }, -1);
   const out = Array.from({ length: Math.max(8, maxIndex + 1) }, () => "");
   normalizedRows.forEach((r: unknown) => {
     const row = r as { index?: number | string; raw?: unknown };

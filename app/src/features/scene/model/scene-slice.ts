@@ -74,6 +74,8 @@ export interface SceneData {
   holdImages?: SceneHoldImage[];
   /** Заставка проектора и прочие настройки вывода. */
   projector?: SceneProjectorSettingsV1;
+  /** Глобальные каналы K1…Kn (подписи и цвета пульта). */
+  lightChannels?: string[];
 }
 
 export type SceneLightFaderLinkV1 = {

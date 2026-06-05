@@ -358,11 +358,18 @@ export function useSceneSyncEffects() {
     const shouldForceSaveMeta = metaChanged && !hasLocalEdits && lightDirtyVsServer;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
+      lightPlotSaveTimerRef.current = null;
     }
-    lightPlotSaveTimerRef.current = window.setTimeout(() => {
-      void saveStepsForLightPlot({ force: shouldForceSaveMeta });
-      lastSavedLightChannelsKeyRef.current = lightChannelsKey;
-    }, 600);
+    const runSave = () => {
+      void saveStepsForLightPlot({ force: shouldForceSaveMeta }).then(() => {
+        lastSavedLightChannelsKeyRef.current = lightChannelsKey;
+      });
+    };
+    if (shouldForceSaveMeta) {
+      runSave();
+      return;
+    }
+    lightPlotSaveTimerRef.current = window.setTimeout(runSave, 600);
     return () => {
       if (lightPlotSaveTimerRef.current) {
         window.clearTimeout(lightPlotSaveTimerRef.current);
