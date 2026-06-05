@@ -11,7 +11,7 @@ export function SpectacleRunStepText({ step }: SpectacleRunStepTextProps) {
     return <p className="spectacle-run-text__empty">Шаг не выбран</p>;
   }
 
-  const body = String(step.playMarkdown ?? step.markdown ?? "").trim();
+  const body = String(step.playMarkdown ?? "").trim();
   if (!body) {
     return (
       <div className="spectacle-run-text__empty">

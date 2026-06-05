@@ -321,6 +321,7 @@ export function SpectacleRunProjectorPanel() {
               run.projectorPlayback.videoId === video.id &&
               !run.projectorPlayback.playing &&
               run.isProjectorOpen;
+            const isMuted = run.isProjectorVideoMuted(video.id);
             return (
               <li key={video.id} className="spectacle-run-projector__video-item">
                 <ProjectorMediaTitle
@@ -330,6 +331,16 @@ export function SpectacleRunProjectorPanel() {
                   target={{ kind: "video", id: video.id }}
                 />
                 <div className="spectacle-run-projector__item-actions">
+                  <button
+                    type="button"
+                    className="spectacle-run-projector__mute-btn"
+                    data-muted={isMuted ? true : undefined}
+                    onClick={() => run.toggleProjectorVideoMute(video.id)}
+                    title={isMuted ? "Включить звук на проекторе" : "Выключить звук на проекторе"}
+                    aria-label={isMuted ? "Включить звук" : "Выключить звук"}
+                  >
+                    {isMuted ? "🔇" : "🔊"}
+                  </button>
                   <button
                     type="button"
                     className="spectacle-run-projector__play-btn"

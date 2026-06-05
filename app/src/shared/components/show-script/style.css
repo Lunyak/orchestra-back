@@ -857,10 +857,12 @@
   overscroll-behavior-x: contain;
 }
 
-.markdown-kadr__picture[data-empty="true"] {
-  border: 1px dashed var(--color-border-faint-muted);
-  border-radius: 8px;
-  background: color-mix(in oklab, var(--color-bg-primary) 92%, transparent);
+.markdown-kadr__split--no-picture {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.markdown-kadr__split--no-picture .markdown-kadr__light {
+  grid-column: 1;
 }
 
 .markdown-kadr__light {

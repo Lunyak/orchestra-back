@@ -22,6 +22,7 @@ import {
   openProjectorWindow,
   pauseProjectorVideo,
   resumeProjectorVideo,
+  sendProjectorVideoMuted,
   subscribeProjectorOutputErrors,
   subscribeProjectorPlayback,
 } from "../../projector/model/projector-playback-bridge";
@@ -68,6 +69,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     playing: boolean;
     mode: "video" | "hold" | "black";
   }>({ videoId: null, holdId: null, playing: false, mode: "black" });
+  const [projectorVideoMuted, setProjectorVideoMuted] = useState<Record<number, boolean>>({});
   const applyingTapeRef = useRef(false);
   const liveSaveTimerRef = useRef<number | null>(null);
   const tapeIndexRef = useRef(0);
@@ -322,11 +324,22 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     return true;
   }, []);
 
+  const resolveProjectorVideoMuted = useCallback(
+    (videoId: number) => projectorVideoMuted[Number(videoId)] ?? false,
+    [projectorVideoMuted],
+  );
+
   const playProjectorCue = useCallback(
     async (cue: KadrProjectorCue, statusLabel?: string) => {
       setProjectorDraft(cue);
       if (!ensureProjectorOpen()) return;
-      await applyKadrProjector(cue, projectorMediaCtx);
+      await applyKadrProjector(
+        cue,
+        projectorMediaCtx,
+        cue.mode === "video"
+          ? { videoMuted: resolveProjectorVideoMuted(cue.videoId) }
+          : undefined,
+      );
       const holdLabel =
         cue.mode === "hold" && cue.holdId != null
           ? holdImages.find((h) => Number(h.id) === cue.holdId)?.title?.trim() ||
@@ -339,7 +352,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
             : "Проектор: видео — окно на втором экране, F11 для полного экрана"),
       );
     },
-    [ensureProjectorOpen, holdImages, projectorMediaCtx],
+    [ensureProjectorOpen, holdImages, projectorMediaCtx, resolveProjectorVideoMuted],
   );
 
   const playProjectorVideo = useCallback(
@@ -382,6 +395,21 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       playProjectorVideo(id);
     },
     [playProjectorVideo, projectorPlayback.playing, projectorPlayback.videoId, videos],
+  );
+
+  const toggleProjectorVideoMute = useCallback(
+    (videoId: number) => {
+      const id = Number(videoId);
+      const nextMuted = !resolveProjectorVideoMuted(id);
+      setProjectorVideoMuted((prev) => ({ ...prev, [id]: nextMuted }));
+      if (projectorPlayback.videoId === id && isProjectorWindowOpen()) {
+        sendProjectorVideoMuted(nextMuted);
+      }
+      const video = videos.find((v) => Number(v.id) === id);
+      const label = video?.title?.trim() || `видео ${id}`;
+      setLiveStatus(nextMuted ? `🔇 ${label} — звук выключен` : `🔊 ${label} — звук включён`);
+    },
+    [projectorPlayback.videoId, resolveProjectorVideoMuted, videos],
   );
 
   const resetProjectorDraftAfterRemoval = useCallback(
@@ -471,7 +499,13 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         const soundCue = parseSoundLineInSection(markdown, section);
         applyKadrSound(soundCue);
         const projectorCue = parseProjectorLineInSection(markdown, section);
-        void applyKadrProjector(projectorCue, projectorMediaCtx);
+        void applyKadrProjector(
+          projectorCue,
+          projectorMediaCtx,
+          projectorCue?.mode === "video"
+            ? { videoMuted: resolveProjectorVideoMuted(projectorCue.videoId) }
+            : undefined,
+        );
         if (projectorCue) setProjectorDraft(projectorCue);
       }
 
@@ -494,7 +528,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       applyingTapeRef.current = false;
     },
-    [liveConsole, projectorMediaCtx, setCurrentPage],
+    [liveConsole, projectorMediaCtx, resolveProjectorVideoMuted, setCurrentPage],
   );
 
   useEffect(() => {
@@ -606,13 +640,20 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     updateStep(step.id, { markdown: result.nextMarkdown } as Partial<ScriptStep>);
     setLiveStatus(result.summary);
     if (isProjectorWindowOpen()) {
-      void applyKadrProjector(projectorDraft, projectorMediaCtx);
+      void applyKadrProjector(
+        projectorDraft,
+        projectorMediaCtx,
+        projectorDraft.mode === "video"
+          ? { videoMuted: resolveProjectorVideoMuted(projectorDraft.videoId) }
+          : undefined,
+      );
     }
   }, [
     clampedIndex,
     holdImages,
     projectorDraft,
     projectorMediaCtx,
+    resolveProjectorVideoMuted,
     steps,
     tape,
     updateStep,
@@ -770,6 +811,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     },
     playProjectorVideo,
     toggleProjectorVideo,
+    isProjectorVideoMuted: resolveProjectorVideoMuted,
+    toggleProjectorVideoMute,
     removeProjectorVideo,
     removeProjectorHold,
     projectorPlayback,

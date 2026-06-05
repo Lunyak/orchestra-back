@@ -49,6 +49,7 @@ export function ProjectorOutputPage() {
   });
   const loadHoldSeqRef = useRef(0);
   const loadVideoSeqRef = useRef(0);
+  const videoMutedRef = useRef(false);
 
   const requestFullscreen = useCallback(() => {
     const el = rootRef.current;
@@ -144,6 +145,12 @@ export function ProjectorOutputPage() {
 
   const applyMessage = useCallback(
     (msg: ProjectorMessage) => {
+      if (msg.type === "set-video-muted") {
+        videoMutedRef.current = msg.muted;
+        const video = videoRef.current;
+        if (video) video.muted = msg.muted;
+        return;
+      }
       if (msg.type === "pause-video") {
         const video = videoRef.current;
         if (video && !video.paused) {
@@ -188,6 +195,7 @@ export function ProjectorOutputPage() {
       if (msg.type === "show-video") {
         activeVideoIdRef.current = msg.videoId;
         activeHoldIdRef.current = msg.holdId;
+        videoMutedRef.current = msg.muted ?? false;
         pendingHoldRef.current = {
           storageKey: msg.holdStorageKey,
           fallbackSrc: msg.holdSrc,
@@ -216,6 +224,7 @@ export function ProjectorOutputPage() {
     if (mode !== "video" || !videoSrc || videoLoading) return;
     const video = videoRef.current;
     if (!video) return;
+    video.muted = videoMutedRef.current;
     video.load();
     const play = () => {
       void video.play().catch(() => {

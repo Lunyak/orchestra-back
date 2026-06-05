@@ -2128,6 +2128,8 @@ export function ScriptMarkdownPreview({
   /** Блоки `.markdown-kadr` по заголовкам h1–h3 — и для текста пьесы (`play`), не только notes/explication. */
   const kadrLayoutEnabled =
     markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
+  /** Колонка картинки + свет — только в тех. карте, не в тексте пьесы и экспликации. */
+  const kadrSplitLayoutEnabled = markdownMode === "notes";
 
   const hasRoleOrLightLabels = useMemo(
     () => markdownHasRoleLightOrPlayLineLabels(markdown || ""),
@@ -2250,6 +2252,7 @@ export function ScriptMarkdownPreview({
           enabled: true,
           headingMaxLevel: 3,
           kadrIdLookups: markdownKadrIdLookups,
+          splitLayoutEnabled: kadrSplitLayoutEnabled,
         },
       ]);
     }
@@ -2260,6 +2263,7 @@ export function ScriptMarkdownPreview({
     annotations,
     activeAnnotationId,
     kadrLayoutEnabled,
+    kadrSplitLayoutEnabled,
     markdownKadrIdLookups,
   ]);
 

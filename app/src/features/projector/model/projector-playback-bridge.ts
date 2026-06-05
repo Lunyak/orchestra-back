@@ -16,11 +16,13 @@ export type ProjectorShowVideo = {
   holdStorageKey: string | null;
   holdId: number | null;
   videoId: number;
+  muted?: boolean;
 };
 export type ProjectorBlack = { type: "black" };
 export type ProjectorReady = { type: "ready" };
 export type ProjectorPauseVideo = { type: "pause-video" };
 export type ProjectorResumeVideo = { type: "resume-video" };
+export type ProjectorSetVideoMuted = { type: "set-video-muted"; muted: boolean };
 
 export type ProjectorPlaybackState = {
   type: "playback-state";
@@ -44,6 +46,7 @@ export type ProjectorMessage =
   | ProjectorReady
   | ProjectorPauseVideo
   | ProjectorResumeVideo
+  | ProjectorSetVideoMuted
   | ProjectorPlaybackState
   | ProjectorOutputError;
 
@@ -173,4 +176,8 @@ export function pauseProjectorVideo(): void {
 
 export function resumeProjectorVideo(): void {
   sendProjectorMessage({ type: "resume-video" });
+}
+
+export function sendProjectorVideoMuted(muted: boolean): void {
+  sendProjectorMessage({ type: "set-video-muted", muted });
 }

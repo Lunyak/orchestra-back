@@ -136,6 +136,7 @@
   gap: 6px;
 }
 
+.spectacle-run-projector__mute-btn,
 .spectacle-run-projector__delete-btn {
   flex-shrink: 0;
   width: 28px;
@@ -148,6 +149,15 @@
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
+}
+
+.spectacle-run-projector__mute-btn[data-muted="true"] {
+  border-color: rgba(255, 200, 100, 0.45);
+  background: rgba(120, 90, 30, 0.35);
+}
+
+.spectacle-run-projector__mute-btn:hover {
+  filter: brightness(1.08);
 }
 
 .spectacle-run-projector__delete-btn:hover {
