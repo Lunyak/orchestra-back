@@ -1302,7 +1302,7 @@ export const sceneSlice = createSlice({
       state.sceneData = {
         ...(state.sceneData ?? {}),
         holdImages: next,
-        ...(projector ? { projector: { v: 1, ...projector } } : {}),
+        ...(projector ? { projector: { ...projector, v: 1 } } : {}),
       };
       state.hasLocalEdits = true;
       state.sceneDataRevision += 1;

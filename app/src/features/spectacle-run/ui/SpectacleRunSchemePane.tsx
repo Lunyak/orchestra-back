@@ -192,7 +192,7 @@ export function SpectacleRunSchemePane({
                 type="button"
                 className="spectacle-run__add-kadr-btn"
                 data-primary="true"
-                onClick={onOpenTechCard}
+                onClick={() => onOpenTechCard()}
               >
                 {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}
               </button>

@@ -61,7 +61,7 @@ export function LightKadrPanel({
   const [programSaveMessage, setProgramSaveMessage] = useState<string | null>(null);
   const [selectedKadrNo, setSelectedKadrNo] = useState<number | null>(null);
   const sections = useMemo(() => scanMarkdownKadrSections(markdown), [markdown]);
-  const kadrs = useMemo(() => readStepLightKadrs(step), [step?.lightKadrNo, step?.id]);
+  const kadrs = useMemo(() => readStepLightKadrs(step), [step?.lightKadrs, step?.id]);
 
   useEffect(() => {
     if (sections.length === 0) {

@@ -49,6 +49,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     sceneRoles?: unknown;
     lightFaders?: unknown;
     lightPrograms?: unknown;
+    lightChannelRoles?: unknown;
     videos?: unknown;
     holdImages?: unknown;
     projector?: unknown;

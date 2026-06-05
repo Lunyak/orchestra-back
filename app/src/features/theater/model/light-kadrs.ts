@@ -3,7 +3,11 @@ import type {
   SceneLightFadersDataV1,
   SceneLightProgramsDataV1,
 } from "../../scene/model/scene-slice";
-import type { StepLightKadrV1, StepLightKadrsDataV1 } from "../../../shared/types/script";
+import type {
+  StepLightKadrFaderStateV1,
+  StepLightKadrV1,
+  StepLightKadrsDataV1,
+} from "../../../shared/types/script";
 import { createId } from "../../../shared/utils/createId";
 import {
   formatChannelShort,

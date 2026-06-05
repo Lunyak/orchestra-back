@@ -29,7 +29,7 @@ export function LightPlotModeTabs({
           <button
             type="button"
             className="light-plot-mode-tab light-plot-mode-tab--link"
-            onClick={onOpenTechCard}
+            onClick={() => onOpenTechCard()}
             title={`Открыть ${SCRIPT_MARKDOWN_NOTES_TAB_LABEL} текущего шага в сценарии`}
           >
             {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}

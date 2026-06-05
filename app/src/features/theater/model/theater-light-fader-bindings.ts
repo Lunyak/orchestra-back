@@ -366,7 +366,7 @@ export function collectActiveEquipmentBindings(
   }
 
   return [...byKey.values()].sort(
-    (a, b) => a.channel - b.channel || a.faderId - b.faderId,
+    (a, b) => (a.channel ?? 0) - (b.channel ?? 0) || a.faderId - b.faderId,
   );
 }
 
@@ -485,7 +485,7 @@ export function buildKadrFaderSnapshotFromSofitChannels(args: {
   }
 
   return [...byKey.values()].sort(
-    (a, b) => a.channel - b.channel || a.faderId - b.faderId,
+    (a, b) => (a.channel ?? 0) - (b.channel ?? 0) || a.faderId - b.faderId,
   );
 }
 

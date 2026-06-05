@@ -907,7 +907,7 @@ function reactElementClassStr(el: React.ReactElement): string {
   return Array.isArray(className) ? className.join(" ") : String(className ?? "");
 }
 
-function isPlayLabelElement(node: unknown): node is React.ReactElement {
+function isPlayLabelElement(node: unknown): boolean {
   if (!React.isValidElement(node)) return false;
   return /\bmarkdown-play-label\b/.test(reactElementClassStr(node));
 }
@@ -2461,12 +2461,7 @@ export function ScriptMarkdownPreview({
               node: _node,
               ...rest
             }: React.HTMLAttributes<HTMLDivElement> & { node?: unknown }) => {
-              const cls =
-                typeof className === "string"
-                  ? className
-                  : Array.isArray(className)
-                    ? className.join(" ")
-                    : "";
+              const cls = typeof className === "string" ? className : "";
               if (cls.includes("markdown-kadr__light")) {
                 return (
                   <div className={className} {...rest}>
@@ -2651,9 +2646,14 @@ export function ScriptMarkdownPreview({
                 </a>
               );
             },
-            img: ({ node: _node, children: _children, ...imgProps }) => (
-              <MarkdownPreviewImage {...imgProps} />
-            ),
+            img: ({
+              node: _node,
+              children: _children,
+              ...imgProps
+            }: React.ImgHTMLAttributes<HTMLImageElement> & {
+              node?: unknown;
+              children?: React.ReactNode;
+            }) => <MarkdownPreviewImage {...imgProps} />,
             mark: ({ node, children, ...rest }: any) => {
               const id = (node as any)?.properties?.["data-anno-id"] as
                 | string

@@ -20,8 +20,8 @@ function stripChildren(nodes: HastNode[]): HastNode[] {
   const next: HastNode[] = [];
   for (const node of nodes) {
     if (isKadrAnchorNode(node)) continue;
-    if (Array.isArray((node as HastNode).children)) {
-      (node as HastNode).children = stripChildren((node as HastNode).children as HastNode[]);
+    if (Array.isArray((node as any).children)) {
+      (node as any).children = stripChildren((node as any).children as HastNode[]);
     }
     next.push(node);
   }
@@ -32,8 +32,8 @@ function stripChildren(nodes: HastNode[]): HastNode[] {
 export function rehypeStripLightKadrAnchors() {
   return function transformer(tree: HastNode) {
     if (!tree || tree.type !== "root") return;
-    const children = (tree as HastNode).children;
+    const children = (tree as any).children;
     if (!Array.isArray(children)) return;
-    (tree as HastNode).children = stripChildren(children);
+    (tree as any).children = stripChildren(children);
   };
 }

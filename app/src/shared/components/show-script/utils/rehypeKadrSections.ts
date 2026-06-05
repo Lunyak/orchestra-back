@@ -57,7 +57,7 @@ function nodePlainText(node: HastNode): string {
   const walk = (n: HastNode) => {
     if (!n) return;
     if (n.type === "text") parts.push(String((n as { value?: string }).value ?? ""));
-    const children = (n as HastNode).children;
+    const children = (n as any).children;
     if (Array.isArray(children)) children.forEach(walk);
   };
   walk(node);
@@ -90,7 +90,7 @@ function nodeHasLightPanelMarker(node: HastNode): boolean {
     if (n.type === "text" && /\{\{\s*lightpanel\s*:/i.test(String((n as any).value ?? ""))) {
       found = true;
     }
-    const children = (n as HastNode).children;
+    const children = (n as any).children;
     if (Array.isArray(children)) children.forEach(walk);
   };
   walk(node);
@@ -332,6 +332,7 @@ function extractImgsFromLi(node: HastNode): HastNode[] | null {
   }
 
   let sawPictureLabel = false;
+  const imgs: HastNode[] = [];
   const contentBlocks: HastNode[] = [];
   for (const block of inner) {
     if (isPictureLabelBlock(block)) {
@@ -346,7 +347,7 @@ function extractImgsFromLi(node: HastNode): HastNode[] | null {
   }
 
   if (!sawPictureLabel) return null;
-  const imgs = collectImgsFromBlocks(contentBlocks);
+  imgs.push(...collectImgsFromBlocks(contentBlocks));
   return imgs.length > 0 ? imgs : null;
 }
 

@@ -52,7 +52,7 @@ export function SpotlightListNameInput({
       title="Название"
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => onSelect(event.shiftKey)}
-      onFocus={(event) => onSelect(event.shiftKey)}
+      onFocus={() => onSelect(false)}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
