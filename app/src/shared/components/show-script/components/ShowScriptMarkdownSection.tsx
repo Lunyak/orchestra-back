@@ -704,6 +704,7 @@ export function ShowScriptMarkdownSection({
               );
               setSceneData((prev) => ({
                 ...(prev ?? {}),
+                lightChannels: next,
                 ...patchSceneDataForLightChannelCount(prev, next, lightChannels.length),
               }));
             }}

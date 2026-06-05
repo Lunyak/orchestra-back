@@ -105,6 +105,16 @@ function getDefaultAnnotationsForCacheKey(cacheKey: CacheKey): AnnotationsEntry 
   return created;
 }
 
+function mergeLightChannelsPreferLonger(prev: string[], loaded: string[]): string[] {
+  const len = Math.max(prev.length, loaded.length, 8);
+  return Array.from({ length: len }, (_, i) => {
+    const p = String(prev[i] ?? "");
+    const l = String(loaded[i] ?? "");
+    if (p.trim() && l.trim() && p.trim() !== l.trim()) return p;
+    return p.trim() ? p : l;
+  });
+}
+
 function normalizeLightChannels(raw: unknown): string[] {
   if (!Array.isArray(raw)) return Array.from({ length: 8 }, () => "");
   const mapped = raw.map((value) =>
@@ -407,7 +417,10 @@ export const showScriptMarkdownSlice = createSlice({
       const next = { ...prev };
       next.playlistOptions = action.payload.playlistOptions ?? [];
       next.soundsOptions = action.payload.soundsOptions ?? [];
-      next.lightChannels = normalizeLightChannels(action.payload.lightChannels);
+      next.lightChannels = mergeLightChannelsPreferLonger(
+        prev.lightChannels ?? [],
+        normalizeLightChannels(action.payload.lightChannels),
+      );
       if (next.selectedTrackId == null && next.playlistOptions.length > 0) {
         next.selectedTrackId = next.playlistOptions[0].id;
       }

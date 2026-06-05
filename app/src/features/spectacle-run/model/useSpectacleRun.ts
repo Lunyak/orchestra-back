@@ -115,6 +115,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     );
     setSceneData((prev) => ({
       ...(prev ?? {}),
+      lightChannels: next,
       ...patchSceneDataForLightChannelCount(prev, next, lightChannels.length),
     }));
     liveConsole.selectChannel(next.length);
@@ -135,6 +136,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     );
     setSceneData((prev) => ({
       ...(prev ?? {}),
+      lightChannels: next,
       ...patchSceneDataForLightChannelCount(prev, next, lightChannels.length),
     }));
     const slot = Math.min(

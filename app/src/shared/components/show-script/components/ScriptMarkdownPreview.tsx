@@ -816,7 +816,9 @@ function skipKadrMediaFieldPrefix(
     if (labels.includes(token)) {
       const n1 = flat[i + 1];
       if (n1 == null) return i + 1;
-      if (typeof n1 === "string" && /^\s*:\s*/.test(n1)) return i + 2;
+      // Skip label + standalone colon only; keep ": текст…" in rest for trimLeadingFieldColon.
+      if (typeof n1 === "string" && /^\s*:\s*$/.test(n1)) return i + 2;
+      return i + 1;
     }
   }
 

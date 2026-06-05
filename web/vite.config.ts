@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { fileURLToPath } from "url";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, type PluginOption } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,14 +19,47 @@ function resolveApiProxyTarget(rawBase: string): string {
   return "http://localhost:3000";
 }
 
-// Чистая веб-конфигурация Vite без Electron
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const rawBase = String(env.VITE_API_BASE_URL || "http://localhost:3000");
-  const basePath = String(env.VITE_BASE_PATH || "/");
+  const isDesktopBuild = mode === "desktop";
+  const basePath = isDesktopBuild ? "./" : String(env.VITE_BASE_PATH || "/");
   // DEV_PROXY_API — явный URL для прокси (compose: http://back:3000). Иначе в Docker — back:3000, на хосте — rawBase или localhost.
   const proxyTarget = resolveApiProxyTarget(rawBase);
   const isMobileBuild = mode === "mobile" || env.VITE_CAPACITOR === "1";
+  const electronEntry = path.resolve(__dirname, "../desktop/electron/main.ts");
+  const preloadEntry = path.resolve(__dirname, "../desktop/electron/preload.mjs");
+  const electronPlugins: PluginOption[] = isDesktopBuild
+    ? [
+        (await import("vite-plugin-electron")).default([
+          {
+            entry: electronEntry,
+            vite: {
+              build: {
+                rollupOptions: {
+                  external: ["obj2gltf", "fbx2gltf"],
+                },
+              },
+            },
+          },
+          {
+            entry: preloadEntry,
+            onstart(options) {
+              options.reload();
+            },
+            vite: {
+              build: {
+                rollupOptions: {
+                  output: {
+                    format: "esm",
+                  },
+                },
+              },
+            },
+          },
+        ]),
+      ]
+    : [];
   const capacitorStub = path.resolve(
     __dirname,
     "../app/src/shared/platform/capacitor-web-stub.ts",
@@ -82,6 +115,6 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    plugins: [react(), tsconfigPaths()],
+    plugins: [react(), tsconfigPaths(), ...electronPlugins],
   };
 });
