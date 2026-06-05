@@ -1,0 +1,5 @@
+ALTER TABLE "Scene"
+  ADD COLUMN IF NOT EXISTS "lightChannelRoles" JSONB;
+
+ALTER TABLE "Step"
+  ADD COLUMN IF NOT EXISTS "lightKadrs" JSONB;

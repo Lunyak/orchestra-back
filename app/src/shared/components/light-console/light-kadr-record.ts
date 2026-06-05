@@ -79,17 +79,25 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
     programs: input.lightPrograms,
   });
 
+  const totalFaders = kadr.faders.length;
   const activeFaders = kadr.faders.filter(
     (f) => (f.enabled ?? true) && (f.intensity ?? 0) > 0.02,
   ).length;
+  const offFaders = totalFaders - activeFaders;
 
   const prev = input.existingKadrId ? findKadrById(input.kadrs, input.existingKadrId) : undefined;
+  const faderSummary =
+    totalFaders === 0
+      ? "нет F с оборудованием на отмеченных K"
+      : offFaders > 0
+        ? `${activeFaders} вкл, ${offFaders} выкл`
+        : `${activeFaders} вкл`;
   const summary =
-    activeFaders === 0
-      ? `Картина ${kadr.kadrNo}: П${programId} записана, но нет фейдеров >0% — поднимите F у софитов K3/K4`
+    totalFaders === 0
+      ? `Картина ${kadr.kadrNo}: П${programId} · ${faderSummary}`
       : prev
-        ? `Картина ${kadr.kadrNo}: обновлено · П${programId} · ${activeFaders} фейдер(ов)`
-        : `Картина ${kadr.kadrNo}: записано · П${programId} · ${activeFaders} фейдер(ов)`;
+        ? `Картина ${kadr.kadrNo}: обновлено · П${programId} · ${faderSummary}`
+        : `Картина ${kadr.kadrNo}: записано · П${programId} · ${faderSummary}`;
 
   return { kadrId, nextKadrs, nextMarkdown, summary };
 }

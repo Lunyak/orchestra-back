@@ -14,7 +14,8 @@ import {
   WidgetType,
   type ViewUpdate,
 } from "@codemirror/view";
-import { getPlayUrl } from "../../../../sync/api/files";
+import { getPlayUrl, fetchImageStreamBlobUrl } from "../../../../sync/api/files";
+import { decodeOrchestraImageStorageKey } from "../../../utils/markdownImages";
 import {
   formatSpeakerLabelDisplay,
   getReadableTextColor,
@@ -27,31 +28,69 @@ type EditorImageCtx = { projectSlug: string; accessToken: string | null };
 
 const editorPlayUrlCache = new Map<string, string>();
 const editorPlayUrlInflight = new Map<string, Promise<string | undefined>>();
+const editorStreamInflight = new Map<string, Promise<string | undefined>>();
+
+function readEditorAccessToken(accessToken: string | null | undefined): string | null {
+  const token =
+    accessToken ??
+    (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
+  return token?.trim() ? token.trim() : null;
+}
+
+function normalizeEditorOrchestraImageKey(key: string): string {
+  return decodeOrchestraImageStorageKey(String(key ?? "").trim());
+}
+
+async function resolveEditorOrchestraImageStreamUrl(
+  accessToken: string | null | undefined,
+  key: string,
+): Promise<string | undefined> {
+  const storageKey = normalizeEditorOrchestraImageKey(key);
+  if (!storageKey) return undefined;
+  const token = readEditorAccessToken(accessToken);
+  if (!token) return undefined;
+
+  let pending = editorStreamInflight.get(storageKey);
+  if (!pending) {
+    pending = fetchImageStreamBlobUrl(token, storageKey)
+      .then((url) => url ?? undefined)
+      .catch(() => undefined)
+      .finally(() => {
+        editorStreamInflight.delete(storageKey);
+      });
+    editorStreamInflight.set(storageKey, pending);
+  }
+  return pending;
+}
 
 async function resolveEditorOrchestraImageUrl(
   accessToken: string | null | undefined,
   key: string,
 ): Promise<string | undefined> {
-  const cached = editorPlayUrlCache.get(key);
+  const storageKey = normalizeEditorOrchestraImageKey(key);
+  if (!storageKey) return undefined;
+
+  const streamUrl = await resolveEditorOrchestraImageStreamUrl(accessToken, storageKey);
+  if (streamUrl) return streamUrl;
+
+  const cached = editorPlayUrlCache.get(storageKey);
   if (cached) return cached;
-  const token =
-    accessToken ??
-    (typeof window !== "undefined"
-      ? window.localStorage.getItem("accessToken")
-      : null);
-  if (!token || !token.trim()) return undefined;
-  let pending = editorPlayUrlInflight.get(key);
+
+  const token = readEditorAccessToken(accessToken);
+  if (!token) return undefined;
+
+  let pending = editorPlayUrlInflight.get(storageKey);
   if (!pending) {
-    pending = getPlayUrl(token, key)
+    pending = getPlayUrl(token, storageKey)
       .then((r) => r.url || undefined)
       .catch(() => undefined)
       .finally(() => {
-        editorPlayUrlInflight.delete(key);
+        editorPlayUrlInflight.delete(storageKey);
       });
-    editorPlayUrlInflight.set(key, pending);
+    editorPlayUrlInflight.set(storageKey, pending);
   }
   const url = await pending;
-  if (url) editorPlayUrlCache.set(key, url);
+  if (url) editorPlayUrlCache.set(storageKey, url);
   return url;
 }
 
@@ -62,9 +101,9 @@ function parseOrchestraImageFromMarkdown(
   if (!encM) return null;
   let key = String(encM[1] ?? "").trim();
   try {
-    key = decodeURIComponent(key);
+    key = decodeOrchestraImageStorageKey(key);
   } catch {
-    /* keep encoded */
+    /* keep as-is */
   }
   const altM = /!\[([^\]]*)\]\(\s*orchestra-image:/i.exec(full);
   const alt = (altM?.[1] ?? "").trim() || "Картинка";
@@ -308,6 +347,7 @@ class OrchestraChipWidget extends WidgetType {
 
 class OrchestraImagePreviewWidget extends WidgetType {
   private cancelled = false;
+  private ownedBlobUrl: string | null = null;
 
   constructor(
     readonly raw: string,
@@ -333,6 +373,71 @@ class OrchestraImagePreviewWidget extends WidgetType {
 
   get estimatedHeight(): number {
     return (this.revealRaw ? 58 : 0) + 132;
+  }
+
+  private trackOwnedBlob(url: string) {
+    if (!url.startsWith("blob:")) return;
+    if (this.ownedBlobUrl && this.ownedBlobUrl !== url) {
+      URL.revokeObjectURL(this.ownedBlobUrl);
+    }
+    this.ownedBlobUrl = url;
+  }
+
+  private showImageError(
+    media: HTMLElement,
+    view: EditorView | null,
+  ) {
+    media.replaceChildren();
+    const err = document.createElement("span");
+    err.className =
+      "cm-md-orchestra-image-preview__ph cm-md-orchestra-image-preview__ph--err";
+    err.textContent = "⚠";
+    err.title = "Не удалось загрузить изображение";
+    media.appendChild(err);
+    view?.requestMeasure();
+  }
+
+  private mountImage(
+    media: HTMLElement,
+    view: EditorView | null,
+    url: string,
+    allowStreamRetry: boolean,
+  ) {
+    const img = document.createElement("img");
+    img.className = "cm-md-orchestra-image-preview__img";
+    img.alt = this.alt;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.referrerPolicy = "no-referrer";
+    img.title =
+      this.raw.length > 400 ? `${this.raw.slice(0, 400)}…` : this.raw;
+    img.onload = () => {
+      if (!this.cancelled) view?.requestMeasure();
+    };
+    img.onerror = () => {
+      if (this.cancelled) return;
+      if (!allowStreamRetry) {
+        this.showImageError(media, view);
+        return;
+      }
+      editorPlayUrlCache.delete(normalizeEditorOrchestraImageKey(this.key));
+      void resolveEditorOrchestraImageStreamUrl(
+        this.getImageCtx().accessToken,
+        this.key,
+      ).then((streamUrl) => {
+        if (this.cancelled) return;
+        if (!streamUrl) {
+          this.showImageError(media, view);
+          return;
+        }
+        this.trackOwnedBlob(streamUrl);
+        this.mountImage(media, view, streamUrl, false);
+      });
+    };
+    this.trackOwnedBlob(url);
+    img.src = url;
+    media.replaceChildren(img);
+    view?.requestMeasure();
   }
 
   toDOM() {
@@ -367,31 +472,8 @@ class OrchestraImagePreviewWidget extends WidgetType {
         view?.requestMeasure();
         return;
       }
-      const img = document.createElement("img");
-      img.className = "cm-md-orchestra-image-preview__img";
-      img.alt = this.alt;
-      img.loading = "lazy";
-      img.decoding = "async";
-      img.referrerPolicy = "no-referrer";
-      img.title =
-        this.raw.length > 400 ? `${this.raw.slice(0, 400)}…` : this.raw;
-      img.onload = () => {
-        if (!this.cancelled) view?.requestMeasure();
-      };
-      img.onerror = () => {
-        if (this.cancelled) return;
-        media.replaceChildren();
-        const err = document.createElement("span");
-        err.className =
-          "cm-md-orchestra-image-preview__ph cm-md-orchestra-image-preview__ph--err";
-        err.textContent = "⚠";
-        err.title = "Не удалось загрузить изображение";
-        media.appendChild(err);
-        view?.requestMeasure();
-      };
-      img.src = url;
-      media.replaceChildren(img);
-      view?.requestMeasure();
+      const allowStreamRetry = !url.startsWith("blob:");
+      this.mountImage(media, view, url, allowStreamRetry);
     });
 
     return wrap;
@@ -399,6 +481,10 @@ class OrchestraImagePreviewWidget extends WidgetType {
 
   destroy() {
     this.cancelled = true;
+    if (this.ownedBlobUrl) {
+      URL.revokeObjectURL(this.ownedBlobUrl);
+      this.ownedBlobUrl = null;
+    }
   }
 }
 

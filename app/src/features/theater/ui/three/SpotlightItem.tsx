@@ -6,14 +6,7 @@ import * as THREE from "three";
 import type { TheaterLayout, TheaterSpotlight } from "../../../../shared/types/script";
 import { applyAlignGuideSnap } from "../../model/theater-align-guides";
 import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
-import {
-  formatChannelShort,
-  formatFaderShort,
-} from "../../../../shared/components/light-console/light-console-labels";
-import {
-  readSpotlightChannel,
-  readSpotlightFaderId,
-} from "../../model/theater-light-fader-bindings";
+import { formatSpotlightChannelFaderShort } from "../../model/theater-spotlight-labels";
 import {
   theaterSpotlightDistance,
   theaterSpotlightLightIntensity,
@@ -21,18 +14,6 @@ import {
   THEATER_SPOTLIGHT_DECAY,
   THEATER_SPOTLIGHT_PENUMBRA,
 } from "../../model/theater-scene-lighting";
-
-function formatSpotlightHeadLabel(config: TheaterSpotlight): string {
-  const channel = readSpotlightChannel(config) ?? config.id;
-  if (config.isRgb) {
-    return formatChannelShort(channel);
-  }
-  const faderId = readSpotlightFaderId(config);
-  if (faderId != null) {
-    return `${formatChannelShort(channel)} ${formatFaderShort(faderId)}`;
-  }
-  return formatChannelShort(channel);
-}
 
 export const SpotlightItem = ({
   config,
@@ -138,7 +119,10 @@ export const SpotlightItem = ({
     [displayPosition, displayTarget],
   );
   const isEnabled = config.enabled ?? true;
-  const headLabel = formatSpotlightHeadLabel(config);
+  const isHighlighted = isActive || isSelected;
+  const headLabel = formatSpotlightChannelFaderShort(config);
+  const headLabelFontSize =
+    isActive ? 0.34 : isHighlighted ? 0.28 : headLabel.length > 3 ? 0.2 : 0.17;
   const isRgb = config.isRgb ?? false;
   const uiIntensity = config.intensity ?? THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
   const lightIntensity = theaterSpotlightLightIntensity(uiIntensity, isRgb);
@@ -149,7 +133,6 @@ export const SpotlightItem = ({
     ];
     return new THREE.BufferGeometry().setFromPoints(points);
   }, [displayPosition, displayTarget]);
-  const isHighlighted = isActive || isSelected;
   const highlightFocus = tc("--color-active-ascent");
   const beamLineObject = useMemo(() => {
     const material = new THREE.LineBasicMaterial({
@@ -387,9 +370,7 @@ export const SpotlightItem = ({
       >
         <Text
           ref={labelRef}
-          fontSize={
-            isActive ? 0.34 : isHighlighted ? 0.28 : headLabel.length > 3 ? 0.2 : 0.17
-          }
+          fontSize={headLabelFontSize}
           color={
             isHighlighted
               ? highlightFocus

@@ -19,10 +19,11 @@ import {
   selectShowScriptMarkdownUi,
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 import type { ActorAnnotation } from "../../../../sync/api/actor-notes";
-import { getPlayUrl } from "../../../../sync/api/files";
+import { fetchImageStreamBlobUrl, getPlayUrl } from "../../../../sync/api/files";
 import { getDesktopApi } from "../../../platform/desktop-api";
 import {
   httpUrlToImageFileName,
+  decodeOrchestraImageStorageKey,
   storageKeyToImageBasename,
 } from "../../../utils/markdownImages";
 import { Buttons } from "../../buttons/Buttons";
@@ -37,10 +38,13 @@ import {
   createRehypeScriptTokens,
   createRenderLightTokens,
 } from "../utils/lightTokens";
+import { expandKadrLabelBlockBreaks } from "../utils/expandKadrLabelBlockBreaks";
 import { rehypeKadrSections } from "../utils/rehypeKadrSections";
 import { rehypeStripLightKadrAnchors } from "../utils/rehypeStripLightKadrAnchors";
 import { resolveLightFaders } from "../../light-console/light-console-data";
 import { buildLightSchemeLookModel } from "../../light-console/light-scheme-preview";
+import { applyKadrProjector } from "../../../../features/spectacle-run/model/apply-kadr-projector";
+import { openProjectorWindow } from "../../../../features/projector/model/projector-playback-bridge";
 import { LightSchemeLookCard } from "../../light-console/LightSchemeLookCard";
 import {
   findKadrById,
@@ -52,8 +56,33 @@ import type { LightFixture } from "../../../types/script";
 import "../../light-console/light-console.css";
 
 const MarkdownKadrIdContext = createContext<string | null>(null);
+const MarkdownKadrLightColumnContext = createContext(false);
+const MarkdownKadrPictureColumnContext = createContext(false);
+const MarkdownKadrBodyContext = createContext(false);
+const MarkdownPreviewParagraphBridgeContext =
+  createContext<Omit<MarkdownPreviewParagraphProps, "children"> | null>(null);
+const MarkdownPreviewLightTokensBridgeContext =
+  createContext<((children: React.ReactNode) => React.ReactNode) | null>(null);
+
+type KadrMediaLookup = {
+  videos: Array<{ id: number; title?: string }>;
+  holdImages: Array<{ id: number; title?: string; remoteKey?: string }>;
+};
+
+const MarkdownKadrMediaContext = createContext<KadrMediaLookup>({
+  videos: [],
+  holdImages: [],
+});
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
+
+function looksLikeOpaqueMediaId(value: string): boolean {
+  const t = String(value ?? "").trim();
+  if (!t) return false;
+  if (/^[a-f0-9]{24,}$/i.test(t)) return true;
+  if (/^orchestra-image:/i.test(t)) return true;
+  return false;
+}
 
 function desktopOfflineImageFromCache(
   rawHref: string,
@@ -62,12 +91,7 @@ function desktopOfflineImageFromCache(
   if (!getDesktopApi()?.invoke) return undefined;
   if (rawHref.startsWith("orchestra-image:")) {
     const enc = rawHref.replace(/^orchestra-image:/i, "").trim();
-    let key: string;
-    try {
-      key = decodeURIComponent(enc);
-    } catch {
-      key = enc;
-    }
+    const key = decodeOrchestraImageStorageKey(enc);
     const bn = storageKeyToImageBasename(key);
     if (!bn) return undefined;
     return resolveImageSrc(`images/${bn}`);
@@ -84,9 +108,10 @@ const LINE_LABEL_CLASSNAMES = new Set([
   "markdown-light-chip", // lights: {{light:1}}
   "markdown-play-label", // music: {{play:123}}
   "markdown-sound-label", // sounds: {{sound:1}} / {{sfx:1}}
+  "markdown-video-label", // projector: {{video:1}}
 ]);
 
-type LineLabelKind = "role" | "light" | "play" | "sound";
+type LineLabelKind = "role" | "light" | "play" | "sound" | "video";
 
 function markdownHasRoleLightOrPlayLineLabels(markdown: string): boolean {
   const raw = String(markdown ?? "");
@@ -247,11 +272,13 @@ function getLineLabelKind(el: React.ReactElement): LineLabelKind | null {
   if (parts.includes("markdown-light-chip")) return "light";
   if (parts.includes("markdown-play-label")) return "play";
   if (parts.includes("markdown-sound-label")) return "sound";
+  if (parts.includes("markdown-video-label")) return "video";
   return null;
 }
 
 type TrackLinkPayload = { id: number } | { name: string };
 type SoundLinkPayload = { id: number } | { name: string };
+type VideoLinkPayload = { id: number };
 
 type MarkdownLightboxSlide = { src: string; alt: string };
 
@@ -292,16 +319,51 @@ const playUrlInflight = new Map<string, Promise<string | undefined>>();
 /** Presigned URL не запрашиваем, пока превью не близко к видимой области (как lazy-loading у нормальных CDN-клиентов). */
 const ORCH_IMAGE_IO_ROOT_MARGIN = "420px 0px 280px 0px";
 
+type MarkdownPreviewImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
+  /** Служебный HAST-узел react-markdown — не пробрасывать в DOM. */
+  node?: unknown;
+  children?: React.ReactNode;
+};
+
+function normalizeMarkdownImgSrc(src: unknown): string {
+  if (src == null) return "";
+  if (typeof src === "string") return src.trim();
+  if (Array.isArray(src)) return normalizeMarkdownImgSrc(src[0]);
+  return "";
+}
+
+function resolveOrchestraImageStorageKey(rawHref: string): string | null {
+  const raw = String(rawHref ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("orchestra-image:")) {
+    const encoded = raw.replace(/^orchestra-image:/i, "").trim();
+    const key = decodeOrchestraImageStorageKey(encoded);
+    return key || null;
+  }
+  const fromPublicUrl = /\/orchestra-media\/([^/?#]+\/image\/[^/?#]+)/i.exec(raw);
+  if (fromPublicUrl?.[1]) {
+    try {
+      return decodeURIComponent(fromPublicUrl[1]);
+    } catch {
+      return fromPublicUrl[1];
+    }
+  }
+  return null;
+}
+
 /** Must stay a stable module-level component so React does not remount every image on parent re-render. */
-function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+function MarkdownPreviewImage(props: MarkdownPreviewImageProps) {
   const ctx = useContext(MarkdownPreviewImageContext);
-  const { src, alt, onLoad, onError, ...rest } = props;
+  const inKadrPictureColumn = useContext(MarkdownKadrPictureColumnContext);
+  const { src: rawSrc, alt, onLoad, onError, node: _node, children: _children, ...rest } = props;
+  const src = normalizeMarkdownImgSrc(rawSrc);
   const accessToken = ctx?.accessToken ?? null;
   const resolveToLocal = ctx?.resolveImageSrc;
   const resolveSound = ctx?.resolveSoundIconFromPayload;
   const playUrlCache = ctx?.playUrlCache;
   const raw = String(src ?? "").trim();
   const isOrchestraImage = raw.startsWith("orchestra-image:");
+  const preferEagerOrchestraLoad = isOrchestraImage && inKadrPictureColumn;
   const initial =
     !ctx
       ? raw
@@ -316,22 +378,41 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
   const [state, setState] = useState<"loading" | "loaded" | "error">("loading");
   const [playUrlRetry, setPlayUrlRetry] = useState(0);
   const httpTriedLocalFallbackRef = useRef(false);
+  const orchestraLocalFallbackRef = useRef(false);
+  const orchestraStreamFallbackRef = useRef(false);
+  const blobUrlRef = useRef<string | null>(null);
   const orchSentinelRef = useRef<HTMLSpanElement | null>(null);
-  /** Для orchestra-image с сетевым play-url ждём intersection; кэш / desktop — без ожидания. */
-  const [orchInView, setOrchInView] = useState(() => !isOrchestraImage);
+  /** Для orchestra-image с сетевым play-url ждём intersection; в колонке кадра грузим сразу. */
+  const [orchInView, setOrchInView] = useState(() => !isOrchestraImage || preferEagerOrchestraLoad);
 
   useEffect(() => {
     setPlayUrlRetry(0);
     httpTriedLocalFallbackRef.current = false;
+    orchestraLocalFallbackRef.current = false;
+    orchestraStreamFallbackRef.current = false;
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
   }, [src]);
+
+  useEffect(
+    () => () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     const s = String(src ?? "").trim();
-    setOrchInView(!s.startsWith("orchestra-image:"));
-  }, [src]);
+    setOrchInView(!s.startsWith("orchestra-image:") || inKadrPictureColumn);
+  }, [src, inKadrPictureColumn]);
 
   useEffect(() => {
-    if (!isOrchestraImage || orchInView) return;
+    if (!isOrchestraImage || orchInView || preferEagerOrchestraLoad) return;
     const el = orchSentinelRef.current;
     if (!el) {
       setOrchInView(true);
@@ -373,12 +454,7 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
       }
       if (s.startsWith("orchestra-image:")) {
         const encoded = s.replace(/^orchestra-image:/i, "").trim();
-        let key: string;
-        try {
-          key = decodeURIComponent(encoded);
-        } catch {
-          key = encoded;
-        }
+        const key = decodeOrchestraImageStorageKey(encoded);
         const tryLocalOrchestra = () => {
           const localUrl = desktopOfflineImageFromCache(s, resolveToLocal);
           if (localUrl) {
@@ -452,19 +528,52 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
   const canOpen = Boolean(resolved);
   const altText = String(alt ?? "").trim();
 
-  const invalidatePlayUrlCacheAndRetry = () => {
-    if (!raw.startsWith("orchestra-image:")) return;
-    const encoded = raw.replace(/^orchestra-image:/i, "").trim();
-    let key: string;
-    try {
-      key = decodeURIComponent(encoded);
-    } catch {
-      key = encoded;
+  const tryOrchestraLocalFallback = () => {
+    if (!raw.startsWith("orchestra-image:") || orchestraLocalFallbackRef.current || !ctx?.resolveImageSrc) {
+      return false;
     }
+    const local = desktopOfflineImageFromCache(raw, ctx.resolveImageSrc);
+    if (!local) return false;
+    orchestraLocalFallbackRef.current = true;
+    setResolved(local);
+    setState("loading");
+    return true;
+  };
+
+  const tryOrchestraStreamFallback = (): boolean => {
+    if (orchestraStreamFallbackRef.current || !ctx) return false;
+    const key = resolveOrchestraImageStorageKey(raw);
+    if (!key) return false;
+    const token =
+      accessToken ??
+      (typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null);
+    if (!token?.trim()) return false;
+    orchestraStreamFallbackRef.current = true;
+    void fetchImageStreamBlobUrl(token, key).then((blobUrl) => {
+      if (!blobUrl) {
+        setState("error");
+        return;
+      }
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = blobUrl;
+      ctx.playUrlCache.current.delete(key);
+      setResolved(blobUrl);
+      setState("loading");
+    });
+    return true;
+  };
+
+  const invalidatePlayUrlCacheAndRetry = () => {
+    const key = resolveOrchestraImageStorageKey(raw);
+    if (!key || !ctx) return;
     setPlayUrlRetry((prev) => {
-      if (prev >= 2) return prev;
+      if (prev >= 3) {
+        setState("error");
+        return prev;
+      }
       ctx.playUrlCache.current.delete(key);
       setResolved("");
+      setState("loading");
       return prev + 1;
     });
   };
@@ -474,13 +583,15 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
       {...rest}
       src={resolved}
       alt={altText}
-      loading="lazy"
+      loading={preferEagerOrchestraLoad ? "eager" : "lazy"}
       decoding="async"
       onLoad={(e) => {
         setState("loaded");
         onLoad?.(e);
       }}
       onError={(e) => {
+        if (tryOrchestraLocalFallback()) return;
+        if (tryOrchestraStreamFallback()) return;
         if (
           /^https?:\/\//i.test(raw) &&
           !httpTriedLocalFallbackRef.current &&
@@ -495,9 +606,12 @@ function MarkdownPreviewImage(props: React.ImgHTMLAttributes<HTMLImageElement>) 
             return;
           }
         }
+        if (resolveOrchestraImageStorageKey(raw)) {
+          invalidatePlayUrlCacheAndRetry();
+          return;
+        }
         setState("error");
         onError?.(e);
-        invalidatePlayUrlCacheAndRetry();
       }}
     />
   ) : null;
@@ -560,6 +674,16 @@ function getLeadingTrackPayload(children: React.ReactNode): TrackLinkPayload | n
   if (!/\bmarkdown-track-link\b/.test(classStr)) return null;
   const rawId = (candidate.props as any)?.["data-track-id"];
   const rawName = (candidate.props as any)?.["data-track-name"];
+  const id = Number(rawId);
+  if (Number.isFinite(id) && id > 0) return { id };
+  const name = String(rawName ?? "").trim();
+  if (name) return { name };
+  return null;
+}
+
+function getPlayPayloadFromLabelEl(labelEl: React.ReactElement): TrackLinkPayload | null {
+  const rawId = (labelEl.props as any)?.["data-track-id"];
+  const rawName = (labelEl.props as any)?.["data-track-name"];
   const id = Number(rawId);
   if (Number.isFinite(id) && id > 0) return { id };
   const name = String(rawName ?? "").trim();
@@ -655,10 +779,640 @@ function normalizeRoleToken(v: string) {
     .replace(/\s+/g, " ");
 }
 
+function reactNodeHasRawLightPanelToken(node: React.ReactNode): boolean {
+  if (node == null || typeof node === "boolean") return false;
+  if (typeof node === "string" || typeof node === "number") {
+    return /\{\{\s*lightpanel\s*:/i.test(String(node));
+  }
+  if (Array.isArray(node)) return node.some(reactNodeHasRawLightPanelToken);
+  if (React.isValidElement(node)) {
+    return reactNodeHasRawLightPanelToken((node.props as { children?: React.ReactNode }).children);
+  }
+  return false;
+}
+
+function reactNodePlainText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(reactNodePlainText).join("");
+  if (React.isValidElement(node)) {
+    return reactNodePlainText((node.props as { children?: React.ReactNode }).children);
+  }
+  return "";
+}
+
+function skipKadrMediaFieldPrefix(
+  flat: React.ReactNode[],
+  labels: string[],
+  start = 0,
+): number {
+  let i = start;
+  while (i < flat.length && isIgnorableLeadingNode(flat[i])) i += 1;
+  if (i >= flat.length) return i;
+
+  const n0 = flat[i];
+  if (React.isValidElement(n0) && n0.type === "strong") {
+    const token = normalizeRoleToken(reactNodePlainText(n0));
+    if (labels.includes(token)) {
+      const n1 = flat[i + 1];
+      if (n1 == null) return i + 1;
+      if (typeof n1 === "string" && /^\s*:\s*/.test(n1)) return i + 2;
+    }
+  }
+
+  if (typeof n0 === "string") {
+    const labelPattern = labels.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+    const m = new RegExp(`^\\s*(?:\\*\\*)?(?:${labelPattern})(?:\\*\\*)?\\s*:\\s*`, "i").exec(n0);
+    if (m) return i + 1;
+  }
+
+  return start;
+}
+
+function skipKadrSoundFieldPrefix(flat: React.ReactNode[], start = 0): number {
+  return skipKadrMediaFieldPrefix(flat, ["звук"], start);
+}
+
+function skipKadrVideoFieldPrefix(flat: React.ReactNode[], start = 0): number {
+  return skipKadrMediaFieldPrefix(flat, ["видео", "проектор"], start);
+}
+
+const KADR_TEXT_FIELD_LABELS: Record<string, string> = {
+  "действие/задача": "Действие/задача",
+  действие: "Действие",
+  переход: "Переход",
+};
+
+function resolveKadrTextFieldLabel(flat: React.ReactNode[]): string {
+  for (const node of flat) {
+    if (React.isValidElement(node) && node.type === "strong") {
+      const token = normalizeRoleToken(reactNodePlainText(node));
+      if (KADR_TEXT_FIELD_LABELS[token]) return KADR_TEXT_FIELD_LABELS[token];
+    }
+    if (typeof node === "string") {
+      const token = normalizeRoleToken(node);
+      for (const key of Object.keys(KADR_TEXT_FIELD_LABELS)) {
+        if (token.startsWith(key)) return KADR_TEXT_FIELD_LABELS[key]!;
+      }
+    }
+  }
+  return "";
+}
+
+function splitKadrTextFieldLine(
+  rendered: React.ReactNode,
+): { label: string; rest: React.ReactNode[] } | null {
+  const flat = flattenInertSpans(React.Children.toArray(rendered));
+  const labels = Object.keys(KADR_TEXT_FIELD_LABELS);
+  const afterPrefix = skipKadrMediaFieldPrefix(flat, labels);
+  if (afterPrefix === 0) return null;
+  const label = resolveKadrTextFieldLabel(flat);
+  if (!label) return null;
+  return { label, rest: trimLeadingFieldColon(flat.slice(afterPrefix)) };
+}
+
+function trimLeadingSoundMetaSeparator(nodes: React.ReactNode[]): React.ReactNode[] {
+  if (nodes.length === 0) return nodes;
+  const first = nodes[0];
+  if (typeof first !== "string") return nodes;
+  const trimmed = first.replace(/^\s*[·•]\s*/, "");
+  if (!trimmed.trim()) return trimLeadingSoundMetaSeparator(nodes.slice(1));
+  if (trimmed === first) return nodes;
+  return [trimmed, ...nodes.slice(1)];
+}
+
+function trimLeadingFieldColon(nodes: React.ReactNode[]): React.ReactNode[] {
+  let i = 0;
+  while (i < nodes.length) {
+    const n = nodes[i];
+    if (isIgnorableLeadingNode(n)) {
+      i += 1;
+      continue;
+    }
+    if (typeof n === "string") {
+      const t = n.replace(/^\s*:\s*/, "");
+      if (!t.trim()) {
+        i += 1;
+        continue;
+      }
+      if (t !== n) return [t, ...nodes.slice(i + 1)];
+    }
+    break;
+  }
+  return nodes.slice(i);
+}
+
+function reactElementClassStr(el: React.ReactElement): string {
+  const className = (el.props as { className?: string }).className;
+  return Array.isArray(className) ? className.join(" ") : String(className ?? "");
+}
+
+function isPlayLabelElement(node: unknown): node is React.ReactElement {
+  if (!React.isValidElement(node)) return false;
+  return /\bmarkdown-play-label\b/.test(reactElementClassStr(node));
+}
+
+function findKadrTrackLinkInFlat(
+  flat: React.ReactNode[],
+  start = 0,
+): React.ReactElement | null {
+  for (let i = start; i < flat.length; i++) {
+    const n = flat[i];
+    if (!React.isValidElement(n)) continue;
+    if (/\bmarkdown-track-link\b/.test(reactElementClassStr(n))) return n;
+  }
+  return null;
+}
+
+function findKadrMediaChipInFlat(
+  flat: React.ReactNode[],
+  start = 0,
+): { index: number; mediaKind: "play" | "sound" | "video"; mediaLabel: React.ReactElement } | null {
+  for (let i = start; i < flat.length; i++) {
+    const n = flat[i];
+    if (!isLineLabelElement(n)) continue;
+    const kind = getLineLabelKind(n);
+    if (kind === "play" || kind === "sound" || kind === "video") {
+      return { index: i, mediaKind: kind, mediaLabel: n };
+    }
+  }
+  return null;
+}
+
+function buildSyntheticPlayChipFromTrackLink(trackEl: React.ReactElement): React.ReactElement {
+  const props = trackEl.props as Record<string, unknown>;
+  return (
+    <span
+      className="markdown-play-label"
+      role="button"
+      tabIndex={0}
+      title="Воспроизвести"
+      data-track-id={props["data-track-id"] as string | undefined}
+      data-track-name={props["data-track-name"] as string | undefined}
+    >
+      Play
+    </span>
+  );
+}
+
+function isKadrFieldNoiseNode(node: React.ReactNode): boolean {
+  if (node == null || typeof node === "boolean") return true;
+  if (typeof node === "string") {
+    const t = node.trim();
+    if (!t) return true;
+    if (/^\{\{[\s\S]*\}\}$/.test(t)) return true;
+    if (/^orchestra-image:/i.test(t)) return true;
+    if (looksLikeOpaqueMediaId(t)) return true;
+    return false;
+  }
+  if (!React.isValidElement(node)) return false;
+  const cls = reactElementClassStr(node);
+  if (/\bmarkdown-hold-label\b/.test(cls)) return true;
+  if (/\bmarkdown-kadr-hold-chip\b/.test(cls)) return true;
+  if (/\bmarkdown-video-label\b/.test(cls)) return true;
+  if (/\bmarkdown-hold-link\b/.test(cls)) return true;
+  if (/\bmarkdown-video-link\b/.test(cls)) return true;
+  if (isPlayLabelElement(node)) return true;
+  if (node.type === "em") {
+    const text = reactNodePlainText(node).toLowerCase().trim();
+    if (/записать проектор|не записано|ролик на экран/.test(text)) return true;
+    if (text === "заставка") return true;
+  }
+  if (node.type === "a") {
+    const href = String((node.props as { href?: string }).href ?? "").trim();
+    const linkText = reactNodePlainText(node).trim();
+    if (/^hold:/i.test(href)) return true;
+    if (/^orchestra-image:/i.test(href)) return true;
+    if (looksLikeOpaqueMediaId(linkText)) return true;
+  }
+  return false;
+}
+
+function collectKadrFieldRestNodes(
+  flat: React.ReactNode[],
+  afterPrefix: number,
+  chipIndex: number | null,
+  primaryLink: React.ReactElement | null,
+): React.ReactNode[] {
+  const rest: React.ReactNode[] = [];
+  for (let i = afterPrefix; i < flat.length; i++) {
+    if (chipIndex != null && i === chipIndex) continue;
+    if (primaryLink && flat[i] === primaryLink) continue;
+    const node = flat[i]!;
+    if (isKadrFieldNoiseNode(node)) continue;
+    rest.push(node);
+  }
+  return trimLeadingFieldColon(trimLeadingSoundMetaSeparator(rest));
+}
+
+function extractKadrTrackTitleFromRest(rest: React.ReactNode[]): string {
+  const flat = flattenInertSpans(rest);
+  for (const node of flat) {
+    if (!React.isValidElement(node)) continue;
+    if (/\bmarkdown-track-link\b/.test(reactElementClassStr(node))) {
+      const title = reactNodePlainText(node).trim();
+      if (title) return title;
+    }
+  }
+  const plain = flat
+    .filter((node) => !isPlayLabelElement(node))
+    .map(reactNodePlainText)
+    .join(" ")
+    .replace(/\s*[·•]\s*/g, " ")
+    .replace(/\d{1,3}\s*%/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain;
+}
+
+function extractKadrVideoTitleFromRest(rest: React.ReactNode[]): string {
+  const flat = flattenInertSpans(rest);
+  for (const node of flat) {
+    if (!React.isValidElement(node)) continue;
+    if (/\bmarkdown-video-link\b/.test(reactElementClassStr(node))) {
+      const title = reactNodePlainText(node).trim();
+      if (title && !looksLikeOpaqueMediaId(title)) return title;
+    }
+  }
+  return "";
+}
+
+function parseHoldHrefId(href?: string): number | null {
+  const trimmed = String(href ?? "").trim();
+  if (!/^hold:/i.test(trimmed)) return null;
+  const id = Math.trunc(Number(trimmed.replace(/^hold:/i, "").trim()) || 0);
+  return id > 0 ? id : null;
+}
+
+function findKadrHoldLinkInFlat(
+  flat: React.ReactNode[],
+  start = 0,
+): React.ReactElement | null {
+  for (let i = start; i < flat.length; i++) {
+    const n = flat[i];
+    if (!React.isValidElement(n)) continue;
+    const cls = reactElementClassStr(n);
+    if (/\bmarkdown-hold-link\b/.test(cls)) return n;
+    if (n.type === "a") {
+      const href = (n.props as { href?: string }).href;
+      if (parseHoldHrefId(href) != null) return n;
+    }
+  }
+  return null;
+}
+
+function resolveKadrHoldIdFromMediaSignals(
+  flat: React.ReactNode[],
+  media: KadrMediaLookup,
+): number | null {
+  for (const node of flattenInertSpans(flat)) {
+    if (!React.isValidElement(node)) continue;
+    const cls = reactElementClassStr(node);
+    if (/\bmarkdown-hold-link\b/.test(cls)) {
+      const id = parseNumericIdAttr(node, "data-hold-id");
+      if (id != null) return id;
+    }
+    if (node.type === "a") {
+      const href = (node.props as { href?: string }).href;
+      const holdId = parseHoldHrefId(href);
+      if (holdId != null) return holdId;
+      const trimmedHref = String(href ?? "").trim();
+      if (/^orchestra-image:/i.test(trimmedHref)) {
+        const enc = trimmedHref.replace(/^orchestra-image:/i, "").trim();
+        const key = decodeOrchestraImageStorageKey(enc);
+        const hold = media.holdImages.find(
+          (h) =>
+            String(h.remoteKey ?? "").trim() === key ||
+            String(h.remoteKey ?? "").trim() === enc,
+        );
+        if (hold) return Number(hold.id);
+      }
+    }
+  }
+
+  const plain = reactNodePlainText(flat);
+  for (const hold of media.holdImages) {
+    const key = String(hold.remoteKey ?? "").trim();
+    if (key && plain.includes(key)) return Number(hold.id);
+  }
+  if (/\{\{\s*hold\s*(?::\s*(\d+))?\s*}}/i.test(plain)) {
+    const m = /\{\{\s*hold\s*:\s*(\d+)\s*}}/i.exec(plain);
+    if (m) {
+      const id = Math.trunc(Number(m[1]) || 0);
+      if (id > 0) return id;
+    }
+    return null;
+  }
+  return null;
+}
+
+function looksLikeKadrHoldFieldContent(flat: React.ReactNode[]): boolean {
+  const plain = reactNodePlainText(flat).toLowerCase();
+  if (/\bзаставка\b/.test(plain)) return true;
+  if (/\{\{\s*hold\b/i.test(plain)) return true;
+  return findKadrHoldLinkInFlat(flat, 0) != null;
+}
+
+function extractKadrHoldTitleFromRest(rest: React.ReactNode[]): string {
+  const flat = flattenInertSpans(rest);
+  for (const node of flat) {
+    if (!React.isValidElement(node)) continue;
+    if (/\bmarkdown-hold-link\b/.test(reactElementClassStr(node))) {
+      const title = reactNodePlainText(node).trim();
+      if (title && !looksLikeOpaqueMediaId(title)) return title;
+    }
+  }
+  return "";
+}
+
+function parseNumericIdAttr(el: React.ReactElement, attr: string): number | null {
+  const raw = (el.props as Record<string, unknown>)[attr];
+  const id = Math.trunc(Number(raw) || 0);
+  return id > 0 ? id : null;
+}
+
+function resolveKadrVideoDisplayTitle(
+  rest: React.ReactNode[],
+  media: KadrMediaLookup,
+  ids: { videoId?: number | null; holdId?: number | null },
+  mode: "video" | "hold",
+): string {
+  const fromVideoLink = extractKadrVideoTitleFromRest(rest);
+  const fromHoldLink = extractKadrHoldTitleFromRest(rest);
+  const fromLink = mode === "hold" ? fromHoldLink || fromVideoLink : fromVideoLink || fromHoldLink;
+  if (fromLink) return fromLink;
+
+  if (ids.videoId != null) {
+    const video = media.videos.find((v) => Number(v.id) === ids.videoId);
+    const title = String(video?.title ?? "").trim();
+    if (title && !looksLikeOpaqueMediaId(title)) return title;
+    return `Видео ${ids.videoId}`;
+  }
+
+  if (ids.holdId != null) {
+    const hold = media.holdImages.find((h) => Number(h.id) === ids.holdId);
+    const title = String(hold?.title ?? "").trim();
+    if (title && !looksLikeOpaqueMediaId(title)) return title;
+    return "Заставка";
+  }
+
+  return mode === "hold" ? "Заставка" : "Видео";
+}
+
+function hasKadrVideoFieldSignals(flat: React.ReactNode[]): boolean {
+  if (skipKadrVideoFieldPrefix(flat, 0) > 0) return true;
+  if (findKadrMediaChipInFlat(flat, 0)?.mediaKind === "video") return true;
+  if (findKadrVideoLinkInFlat(flat, 0)) return true;
+  if (findKadrHoldLinkInFlat(flat, 0)) return true;
+  if (findKadrHoldChipInFlat(flat, 0)) return true;
+  const head = reactNodePlainText(flat.slice(0, 6)).toLowerCase();
+  return /(?:видео|проектор)\s*:/.test(head);
+}
+
+function findKadrHoldChipInFlat(
+  flat: React.ReactNode[],
+  start = 0,
+): React.ReactElement | null {
+  for (let i = start; i < flat.length; i++) {
+    const n = flat[i];
+    if (!React.isValidElement(n)) continue;
+    const cls = reactElementClassStr(n);
+    if (/\bmarkdown-kadr-hold-chip\b/.test(cls) || /\bmarkdown-hold-label\b/.test(cls)) {
+      return n;
+    }
+  }
+  return null;
+}
+
+function buildKadrPlayLabelChip(mediaLabel: React.ReactElement): React.ReactElement {
+  return React.cloneElement(
+    mediaLabel,
+    {
+      title: "Воспроизвести",
+    } as React.HTMLAttributes<HTMLElement>,
+    "Play",
+  );
+}
+
+function buildKadrHoldLabelChip(mediaLabel: React.ReactElement): React.ReactElement {
+  return React.cloneElement(
+    mediaLabel,
+    {
+      role: "button",
+      tabIndex: 0,
+      title: "Показать заставку на проекторе",
+    } as React.HTMLAttributes<HTMLElement>,
+    "HOLD",
+  );
+}
+
+function formatKadrSoundVolumeMeta(rest: React.ReactNode[]): string {
+  const text = rest.map(reactNodePlainText).join(" ").trim();
+  const withoutFade = text
+    .replace(/\s*[·•]\s*/g, " ")
+    .replace(
+      /(?:fade|затухание|fadeMs)\s*[:=]?\s*[\d.,]+\s*(?:ms|мс|s|с|sec|сек)?/gi,
+      " ",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+  const pctM = /(\d{1,3})\s*%/.exec(withoutFade);
+  if (pctM) return `${Math.min(100, Math.max(0, Math.trunc(Number(pctM[1]) || 0)))}%`;
+  return "";
+}
+
+function splitKadrSoundFieldLine(
+  rendered: React.ReactNode,
+): {
+  mediaLabel: React.ReactElement;
+  mediaKind: "play" | "sound";
+  rest: React.ReactNode[];
+} | null {
+  const flat = flattenInertSpans(React.Children.toArray(rendered));
+  const afterPrefix = skipKadrSoundFieldPrefix(flat, 0);
+  if (afterPrefix === 0) return null;
+
+  const chip = findKadrMediaChipInFlat(flat, afterPrefix);
+  const trackLink = findKadrTrackLinkInFlat(flat, afterPrefix);
+
+  if (chip && (chip.mediaKind === "play" || chip.mediaKind === "sound")) {
+    return {
+      mediaLabel: chip.mediaLabel,
+      mediaKind: chip.mediaKind,
+      rest: collectKadrFieldRestNodes(flat, afterPrefix, chip.index, null),
+    };
+  }
+
+  if (trackLink) {
+    return {
+      mediaLabel: buildSyntheticPlayChipFromTrackLink(trackLink),
+      mediaKind: "play",
+      rest: collectKadrFieldRestNodes(flat, afterPrefix, null, trackLink),
+    };
+  }
+
+  return null;
+}
+
+function splitKadrVideoFieldLine(
+  rendered: React.ReactNode,
+  media: KadrMediaLookup,
+): {
+  mediaLabel: React.ReactElement;
+  mediaKind: "video" | "hold";
+  videoId: number | null;
+  holdId: number | null;
+  rest: React.ReactNode[];
+} | null {
+  const flat = flattenInertSpans(React.Children.toArray(rendered));
+  if (!hasKadrVideoFieldSignals(flat)) return null;
+
+  let afterPrefix = skipKadrVideoFieldPrefix(flat, 0);
+  if (afterPrefix === 0) {
+    const head = reactNodePlainText(flat.slice(0, 6)).toLowerCase();
+    if (/(?:видео|проектор)\s*:/.test(head)) {
+      afterPrefix = skipKadrMediaFieldPrefix(flat, ["видео", "проектор"], 0);
+    }
+  }
+  const start = afterPrefix > 0 ? afterPrefix : 0;
+
+  const chip = findKadrMediaChipInFlat(flat, start);
+  if (chip?.mediaKind === "video") {
+    return {
+      mediaLabel: chip.mediaLabel,
+      mediaKind: "video",
+      videoId: parseNumericIdAttr(chip.mediaLabel, "data-video-id"),
+      holdId: null,
+      rest: collectKadrFieldRestNodes(flat, start, chip.index, null),
+    };
+  }
+
+  const holdChip = findKadrHoldChipInFlat(flat, start);
+  if (holdChip) {
+    return {
+      mediaLabel: holdChip,
+      mediaKind: "hold",
+      videoId: null,
+      holdId: parseNumericIdAttr(holdChip, "data-hold-id"),
+      rest: collectKadrFieldRestNodes(flat, start, flat.indexOf(holdChip), null),
+    };
+  }
+
+  const holdLink = findKadrHoldLinkInFlat(flat, start);
+  if (holdLink) {
+    const holdId =
+      parseNumericIdAttr(holdLink, "data-hold-id") ??
+      parseHoldHrefId((holdLink.props as { href?: string }).href);
+    return {
+      mediaLabel: buildSyntheticHoldChip(holdId),
+      mediaKind: "hold",
+      videoId: null,
+      holdId,
+      rest: collectKadrFieldRestNodes(flat, start, null, holdLink),
+    };
+  }
+
+  const videoLink = findKadrVideoLinkInFlat(flat, start);
+  if (videoLink) {
+    return {
+      mediaLabel: buildSyntheticVideoChipFromVideoLink(videoLink),
+      mediaKind: "video",
+      videoId: parseNumericIdAttr(videoLink, "data-video-id"),
+      holdId: null,
+      rest: collectKadrFieldRestNodes(flat, start, null, videoLink),
+    };
+  }
+
+  const tail = flat.slice(start);
+  if (looksLikeKadrHoldFieldContent(tail)) {
+    const holdId = resolveKadrHoldIdFromMediaSignals(tail, media);
+    const holdLink = findKadrHoldLinkInFlat(flat, start);
+    return {
+      mediaLabel: buildSyntheticHoldChip(holdId),
+      mediaKind: "hold",
+      videoId: null,
+      holdId,
+      rest: collectKadrFieldRestNodes(flat, start, null, holdLink),
+    };
+  }
+
+  return null;
+}
+
+function findKadrVideoLinkInFlat(
+  flat: React.ReactNode[],
+  start = 0,
+): React.ReactElement | null {
+  for (let i = start; i < flat.length; i++) {
+    const n = flat[i];
+    if (!React.isValidElement(n)) continue;
+    if (/\bmarkdown-video-link\b/.test(reactElementClassStr(n))) return n;
+  }
+  return null;
+}
+
+function buildSyntheticVideoChipFromVideoLink(videoEl: React.ReactElement): React.ReactElement {
+  const props = videoEl.props as Record<string, unknown>;
+  return (
+    <span
+      className="markdown-video-label"
+      role="button"
+      tabIndex={0}
+      title="Видео на проекторе"
+      data-video-id={props["data-video-id"] as string | undefined}
+    >
+      Play
+    </span>
+  );
+}
+
+function buildSyntheticHoldChip(holdId: number | null): React.ReactElement {
+  return (
+    <span
+      className="markdown-kadr-hold-chip"
+      role="button"
+      tabIndex={0}
+      title="Показать заставку на проекторе"
+      {...(holdId != null ? { "data-hold-id": String(holdId) } : {})}
+    >
+      HOLD
+    </span>
+  );
+}
+
+function MarkdownPreviewUl({
+  className,
+  children,
+  ...rest
+}: React.HTMLAttributes<HTMLUListElement>) {
+  const inKadrBody = useContext(MarkdownKadrBodyContext);
+  if (inKadrBody) {
+    return <div className="markdown-kadr__fields">{children}</div>;
+  }
+  return (
+    <ul className={className} {...rest}>
+      {children}
+    </ul>
+  );
+}
+
+function MarkdownPreviewLi({ children }: { children: React.ReactNode }) {
+  const inKadrBody = useContext(MarkdownKadrBodyContext);
+  const paragraphProps = useContext(MarkdownPreviewParagraphBridgeContext);
+  const renderLightTokens = useContext(MarkdownPreviewLightTokensBridgeContext);
+  if (inKadrBody && paragraphProps) {
+    return (
+      <MarkdownPreviewParagraph {...paragraphProps}>{children}</MarkdownPreviewParagraph>
+    );
+  }
+  return <li>{renderLightTokens ? renderLightTokens(children) : children}</li>;
+}
+
 function MarkdownKadrSection({
   children,
+  node: _node,
   ...props
-}: React.HTMLAttributes<HTMLElement> & { "data-lk-id"?: string }) {
+}: React.HTMLAttributes<HTMLElement> & { "data-lk-id"?: string; node?: unknown }) {
   const lkId = props["data-lk-id"];
   return (
     <section {...props}>
@@ -680,6 +1434,7 @@ type MarkdownPreviewParagraphProps = {
   onSoundLinkClick?: (soundId: number) => void;
   playFromPayload: (payload: TrackLinkPayload) => void;
   toggleSoundFromPayload: (payload: SoundLinkPayload) => void;
+  playVideoFromPayload: (payload: VideoLinkPayload) => void;
   resolveSoundIconFromPayload: (payload: SoundLinkPayload) => string | null;
 };
 
@@ -692,11 +1447,137 @@ function MarkdownPreviewParagraph({
   onSoundLinkClick,
   playFromPayload,
   toggleSoundFromPayload,
+  playVideoFromPayload,
   resolveSoundIconFromPayload,
 }: MarkdownPreviewParagraphProps) {
   const kadrId = useContext(MarkdownKadrIdContext);
+  const inKadrLightColumn = useContext(MarkdownKadrLightColumnContext);
+  const inKadrBody = useContext(MarkdownKadrBodyContext);
+  const kadrMedia = useContext(MarkdownKadrMediaContext);
   const rendered = renderLightTokens(children);
   const { label, rest, kind } = splitLeadingLineLabel(rendered);
+  if (inKadrLightColumn && kadrId) {
+    const panel = renderLightPanel(kadrId);
+    if (panel) {
+      return <div className="markdown-light-kadr-call">{panel}</div>;
+    }
+  }
+  if (inKadrLightColumn) {
+    return null;
+  }
+  if (kadrId && reactNodeHasRawLightPanelToken(rendered)) {
+    const panel = renderLightPanel(kadrId);
+    if (panel) {
+      return <div className="markdown-light-kadr-call">{panel}</div>;
+    }
+  }
+  if (inKadrBody || kadrId) {
+    const soundField = splitKadrSoundFieldLine(rendered);
+    if (soundField) {
+      const volumeMeta = formatKadrSoundVolumeMeta(soundField.rest);
+      const trackTitle =
+        extractKadrTrackTitleFromRest(soundField.rest) ||
+        (soundField.mediaKind === "sound"
+          ? reactNodePlainText(soundField.mediaLabel).trim()
+          : "");
+
+      if (soundField.mediaKind === "play") {
+        return (
+          <p className="markdown-dialog-line markdown-dialog-line--label-play">
+            <span className="markdown-dialog-label">
+              {buildKadrPlayLabelChip(soundField.mediaLabel)}
+            </span>
+            <span className="markdown-dialog-text">
+              {trackTitle}
+              {volumeMeta ? (
+                <>
+                  {" "}
+                  <em className="markdown-parenthetical-remark">· {volumeMeta}</em>
+                </>
+              ) : null}
+            </span>
+          </p>
+        );
+      }
+
+      if (soundField.mediaKind === "sound") {
+        const sfxTitle =
+          extractKadrTrackTitleFromRest(soundField.rest) ||
+          reactNodePlainText(soundField.mediaLabel).trim();
+        return (
+          <p className="markdown-dialog-line markdown-dialog-line--label-sound">
+            <span className="markdown-dialog-label">
+              {React.cloneElement(soundField.mediaLabel, { title: "Звук: воспроизвести/остановить" }, "SFX")}
+            </span>
+            <span className="markdown-dialog-text">
+              {sfxTitle}
+              {volumeMeta ? (
+                <>
+                  {" "}
+                  <em className="markdown-parenthetical-remark">· {volumeMeta}</em>
+                </>
+              ) : null}
+            </span>
+          </p>
+        );
+      }
+    }
+
+    const videoField = splitKadrVideoFieldLine(rendered, kadrMedia);
+    if (videoField) {
+      if (videoField.mediaKind === "video") {
+        const videoTitle = resolveKadrVideoDisplayTitle(
+          videoField.rest,
+          kadrMedia,
+          { videoId: videoField.videoId, holdId: videoField.holdId },
+          "video",
+        );
+        return (
+          <p className="markdown-dialog-line markdown-dialog-line--label-play">
+            <span className="markdown-dialog-label">
+              {buildKadrPlayLabelChip(
+                React.cloneElement(videoField.mediaLabel, {
+                  title: "Видео на проекторе",
+                }),
+              )}
+            </span>
+            <span className="markdown-dialog-text">{videoTitle}</span>
+          </p>
+        );
+      }
+      if (videoField.mediaKind === "hold") {
+        const holdTitle = resolveKadrVideoDisplayTitle(
+          videoField.rest,
+          kadrMedia,
+          { videoId: videoField.videoId, holdId: videoField.holdId },
+          "hold",
+        );
+        return (
+          <p className="markdown-dialog-line markdown-dialog-line--kadr-hold">
+            <span className="markdown-dialog-label">
+              {buildKadrHoldLabelChip(videoField.mediaLabel)}
+            </span>
+            <span className="markdown-dialog-text">{holdTitle}</span>
+          </p>
+        );
+      }
+    }
+
+    const textField = splitKadrTextFieldLine(rendered);
+    if (textField) {
+      const body = reactNodePlainText(textField.rest).trim();
+      return (
+        <p className="markdown-dialog-line markdown-dialog-line--kadr-field">
+          <span className="markdown-dialog-label">
+            <span className="markdown-kadr-field-label">{textField.label}</span>
+          </span>
+          <span className="markdown-dialog-text">
+            {body ? textField.rest : <em className="markdown-parenthetical-remark">…</em>}
+          </span>
+        </p>
+      );
+    }
+  }
   const leadingTrack = onTrackLinkClick ? getLeadingTrackPayload(rendered) : null;
   const leadingSound = onSoundLinkClick ? getLeadingSoundPayload(rendered) : null;
   if (!label) {
@@ -824,9 +1705,12 @@ function isInteractiveMarkdownPreviewTarget(target: EventTarget | null): boolean
         ".markdown-sound-play",
         ".markdown-light-chip",
         ".markdown-play-label",
+        ".markdown-video-label",
+        ".markdown-kadr-hold-chip",
         ".markdown-sound-label",
         ".markdown-speaker-label",
         ".markdown-track-link",
+        ".markdown-video-link",
         ".markdown-sound-link",
       ].join(", "),
     )
@@ -891,8 +1775,9 @@ export function ScriptMarkdownPreview({
       annotationsMode,
       annotations.length,
     );
-    if (annotationsMode && annotations.length > 0) return expanded;
-    return injectNbspParagraphsForTripleNewlines(expanded);
+    const withKadrBreaks = expandKadrLabelBlockBreaks(expanded);
+    if (annotationsMode && annotations.length > 0) return withKadrBreaks;
+    return injectNbspParagraphsForTripleNewlines(withKadrBreaks);
   }, [markdown, annotationsMode, annotations.length]);
 
   const onReadModePointerDown = (e: React.PointerEvent) => {
@@ -1108,6 +1993,72 @@ export function ScriptMarkdownPreview({
     return null;
   };
 
+  const resolveVideoLink = (href?: string): VideoLinkPayload | null => {
+    if (!href) return null;
+    const trimmed = href.trim();
+    if (!trimmed.startsWith("video:")) return null;
+    const payload = trimmed.replace(/^video:/i, "").trim();
+    const id = Number(payload);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    return { id: Math.trunc(id) };
+  };
+
+  const resolveHoldLink = (href?: string): { id: number } | null => {
+    if (!href) return null;
+    const trimmed = href.trim();
+    if (!trimmed.startsWith("hold:")) return null;
+    const payload = trimmed.replace(/^hold:/i, "").trim();
+    const id = Number(payload);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    return { id: Math.trunc(id) };
+  };
+
+  const kadrMediaLookup = useMemo<KadrMediaLookup>(
+    () => ({
+      videos: Array.isArray(sceneData?.videos) ? sceneData.videos : [],
+      holdImages: Array.isArray(sceneData?.holdImages) ? sceneData.holdImages : [],
+    }),
+    [sceneData?.videos, sceneData?.holdImages],
+  );
+
+  const playVideoFromPayload = useCallback(
+    (payload: VideoLinkPayload) => {
+      const videoId = Math.trunc(Number(payload.id) || 0);
+      if (videoId <= 0) return;
+      openProjectorWindow();
+      applyKadrProjector(
+        { mode: "video", videoId },
+        {
+          projectSlug: projectName,
+          videos: sceneData?.videos,
+          holdImages: sceneData?.holdImages,
+          projector: sceneData?.projector ?? null,
+        },
+      );
+    },
+    [projectName, sceneData?.videos, sceneData?.holdImages, sceneData?.projector],
+  );
+
+  const playHoldFromPayload = useCallback(
+    (holdId?: number | null) => {
+      openProjectorWindow();
+      const resolvedId =
+        holdId != null && Math.trunc(Number(holdId) || 0) > 0
+          ? Math.trunc(Number(holdId))
+          : undefined;
+      applyKadrProjector(
+        resolvedId != null ? { mode: "hold", holdId: resolvedId } : { mode: "hold" },
+        {
+          projectSlug: projectName,
+          videos: sceneData?.videos,
+          holdImages: sceneData?.holdImages,
+          projector: sceneData?.projector ?? null,
+        },
+      );
+    },
+    [projectName, sceneData?.videos, sceneData?.holdImages, sceneData?.projector],
+  );
+
   const isAudioLink = (href?: string) => {
     if (!href) return false;
     return /\.(mp3|wav|ogg|m4a|flac)$/i.test(href.trim());
@@ -1148,6 +2099,8 @@ export function ScriptMarkdownPreview({
           lightChannels={lightChannels}
           activeKadr={kadr}
           lightFaders={displayFaders}
+          boardFaders={baseFaders}
+          spotlights={currentStep?.theaterSpotlights ?? []}
         />
       );
     },
@@ -1159,6 +2112,7 @@ export function ScriptMarkdownPreview({
       sceneData?.lightFaders,
       sceneData?.lightPlot,
       sceneData?.lightPrograms,
+      currentStep?.theaterSpotlights,
     ],
   );
 
@@ -1265,6 +2219,7 @@ export function ScriptMarkdownPreview({
       onSoundLinkClick,
       playFromPayload,
       toggleSoundFromPayload,
+      playVideoFromPayload,
       resolveSoundIconFromPayload,
     }),
     [
@@ -1275,14 +2230,17 @@ export function ScriptMarkdownPreview({
       onSoundLinkClick,
       playFromPayload,
       toggleSoundFromPayload,
+      playVideoFromPayload,
       resolveSoundIconFromPayload,
     ],
   );
 
   const rehypePlugins = useMemo(() => {
     const plugins: any[] = [rehypeStripLightKadrAnchors];
-    if (annotationsMode) {
+    if (kadrLayoutEnabled || annotationsMode) {
       plugins.push(rehypeScriptTokens);
+    }
+    if (annotationsMode) {
       plugins.push([rehypeActorAnnotations, { annotations, activeId: activeAnnotationId }]);
     }
     if (kadrLayoutEnabled) {
@@ -1427,6 +2385,28 @@ export function ScriptMarkdownPreview({
       }
     }
 
+    const videoEl = target.closest?.(".markdown-video-label") as HTMLElement | null;
+    if (videoEl) {
+      const rawId = videoEl.getAttribute("data-video-id");
+      const id = Number(rawId);
+      if (Number.isFinite(id) && id > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        playVideoFromPayload({ id: Math.trunc(id) });
+        return;
+      }
+    }
+
+    const holdEl = target.closest?.(".markdown-kadr-hold-chip") as HTMLElement | null;
+    if (holdEl) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rawId = holdEl.getAttribute("data-hold-id");
+      const id = Number(rawId);
+      playHoldFromPayload(Number.isFinite(id) && id > 0 ? Math.trunc(id) : null);
+      return;
+    }
+
     const el = target.closest?.(".markdown-speaker-label") as HTMLElement | null;
     if (!el) return;
     const token = String(el.getAttribute("title") ?? "").trim();
@@ -1466,20 +2446,67 @@ export function ScriptMarkdownPreview({
           <div className="script-step-title">{currentStep.title}</div>
         ) : null}
         <MarkdownPreviewImageContext.Provider value={markdownPreviewImageCtx}>
+        <MarkdownPreviewParagraphBridgeContext.Provider value={markdownParagraphProps}>
+        <MarkdownPreviewLightTokensBridgeContext.Provider value={renderLightTokens}>
+        <MarkdownKadrMediaContext.Provider value={kadrMediaLookup}>
         <ReactMarkdown
           urlTransform={urlTransform}
           remarkPlugins={[remarkBreaks]}
           rehypePlugins={rehypePlugins}
           components={{
             section: MarkdownKadrSection,
+            div: ({
+              className,
+              children,
+              node: _node,
+              ...rest
+            }: React.HTMLAttributes<HTMLDivElement> & { node?: unknown }) => {
+              const cls =
+                typeof className === "string"
+                  ? className
+                  : Array.isArray(className)
+                    ? className.join(" ")
+                    : "";
+              if (cls.includes("markdown-kadr__light")) {
+                return (
+                  <div className={className} {...rest}>
+                    <MarkdownKadrLightColumnContext.Provider value>
+                      {children}
+                    </MarkdownKadrLightColumnContext.Provider>
+                  </div>
+                );
+              }
+              if (cls.includes("markdown-kadr__picture")) {
+                return (
+                  <div className={className} {...rest}>
+                    <MarkdownKadrPictureColumnContext.Provider value>
+                      {children}
+                    </MarkdownKadrPictureColumnContext.Provider>
+                  </div>
+                );
+              }
+              if (cls.includes("markdown-kadr__body")) {
+                return (
+                  <div className={className} {...rest}>
+                    <MarkdownKadrBodyContext.Provider value>
+                      {children}
+                    </MarkdownKadrBodyContext.Provider>
+                  </div>
+                );
+              }
+              return (
+                <div className={className} {...rest}>
+                  {children}
+                </div>
+              );
+            },
             p: ({ children }: { children: React.ReactNode }) => (
               <MarkdownPreviewParagraph {...markdownParagraphProps}>
                 {children}
               </MarkdownPreviewParagraph>
             ),
-            li: ({ children }: { children: React.ReactNode }) => (
-              <li>{renderLightTokens(children)}</li>
-            ),
+            ul: MarkdownPreviewUl,
+            li: MarkdownPreviewLi,
             span: ({
               className,
               children,
@@ -1575,6 +2602,38 @@ export function ScriptMarkdownPreview({
                   </button>
                 );
               }
+              const resolvedVideo = resolveVideoLink(href);
+              if (resolvedVideo) {
+                return (
+                  <button
+                    type="button"
+                    className="markdown-video-link"
+                    data-video-id={String(resolvedVideo.id)}
+                    onClick={() => playVideoFromPayload(resolvedVideo)}
+                  >
+                    {children}
+                  </button>
+                );
+              }
+              const resolvedHold = resolveHoldLink(href);
+              if (resolvedHold) {
+                const hold = kadrMediaLookup.holdImages.find(
+                  (h) => Number(h.id) === resolvedHold.id,
+                );
+                const label = String(hold?.title ?? "").trim();
+                const display =
+                  label && !looksLikeOpaqueMediaId(label) ? label : "Заставка";
+                return (
+                  <button
+                    type="button"
+                    className="markdown-hold-link"
+                    data-hold-id={String(resolvedHold.id)}
+                    onClick={() => playHoldFromPayload(resolvedHold.id)}
+                  >
+                    {display}
+                  </button>
+                );
+              }
               if (isAudioLink(href)) {
                 return (
                   <a
@@ -1592,7 +2651,9 @@ export function ScriptMarkdownPreview({
                 </a>
               );
             },
-            img: MarkdownPreviewImage,
+            img: ({ node: _node, children: _children, ...imgProps }) => (
+              <MarkdownPreviewImage {...imgProps} />
+            ),
             mark: ({ node, children, ...rest }: any) => {
               const id = (node as any)?.properties?.["data-anno-id"] as
                 | string
@@ -1652,6 +2713,9 @@ export function ScriptMarkdownPreview({
         >
           {markdownForPreview || "*Пусто*"}
         </ReactMarkdown>
+        </MarkdownKadrMediaContext.Provider>
+        </MarkdownPreviewLightTokensBridgeContext.Provider>
+        </MarkdownPreviewParagraphBridgeContext.Provider>
         </MarkdownPreviewImageContext.Provider>
       </div>
 

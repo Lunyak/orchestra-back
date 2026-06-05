@@ -5,7 +5,7 @@ import {
   type LightFaderBoardRow,
 } from "./light-console-split";
 import type { SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
-import type { StepLightKadrV1 } from "../../types/script";
+import type { StepLightKadrV1, TheaterSpotlight } from "../../types/script";
 import { formatSofitChannelsLabel } from "./light-channel-roles";
 
 export type LightSchemeLookCardProps = {
@@ -13,24 +13,49 @@ export type LightSchemeLookCardProps = {
   lightChannels: string[];
   activeKadr?: StepLightKadrV1 | null;
   lightFaders?: SceneLightFadersDataV1 | null;
+  /** Сцена с links — для фильтра «есть оборудование» (не kadr-display). */
+  boardFaders?: SceneLightFadersDataV1 | null;
+  spotlights?: TheaterSpotlight[];
   programLabelOverride?: string;
   onHighlightChannel?: (channel: number | null) => void;
 };
 
-function FaderRow({ label, pct, color }: { label: string; pct: number; color?: string }) {
+function FaderRow({
+  label,
+  pct,
+  color,
+  off,
+  equipmentLabel,
+}: {
+  label: string;
+  pct: number;
+  color?: string;
+  off?: boolean;
+  equipmentLabel?: string;
+}) {
+  const via = equipmentLabel ? ` · ${equipmentLabel}` : "";
   return (
-    <div className="light-scheme-call__fader" title={`${label} · ${pct}%`}>
+    <div
+      className={["light-scheme-call__fader", off ? "light-scheme-call__fader--off" : ""]
+        .filter(Boolean)
+        .join(" ")}
+      title={
+        off
+          ? `${label}${via} · выключен в картине`
+          : `${label}${via} · ${pct}%`
+      }
+    >
       <span className="light-scheme-call__fader-name">{label}</span>
       <div className="light-scheme-call__fader-bar">
         <div
           className="light-scheme-call__fader-fill"
           style={{
-            width: `${pct}%`,
+            width: off ? "0%" : `${pct}%`,
             backgroundColor: color ?? "var(--color-active-ascent)",
           }}
         />
       </div>
-      <span className="light-scheme-call__fader-pct">{pct}%</span>
+      <span className="light-scheme-call__fader-pct">{off ? "выкл" : `${pct}%`}</span>
     </div>
   );
 }
@@ -40,23 +65,30 @@ export function LightSchemeLookCard({
   lightChannels,
   activeKadr,
   lightFaders,
+  boardFaders,
+  spotlights = [],
   onHighlightChannel,
 }: LightSchemeLookCardProps) {
   const recordRows = useMemo((): LightFaderBoardRow[] => {
     if (!lightFaders || !activeKadr || !lookModel) return [];
+    const board = boardFaders ?? lightFaders;
     return buildKadrRecordFaderRows({
       kadrFaderStates: activeKadr.faders,
       faders: lightFaders,
+      boardFaders: board,
       selectedChannels: lookModel.sofitChannels,
       lightChannelsCount: lightChannels.length,
+      spotlights,
     });
   }, [
     activeKadr,
     activeKadr?.faders,
+    boardFaders,
     lightChannels.length,
     lightFaders,
     lookModel,
     lookModel?.sofitChannels,
+    spotlights,
   ]);
 
   const channelsInKadr = useMemo((): number[] => {
@@ -76,17 +108,11 @@ export function LightSchemeLookCard({
 
   return (
     <aside className="light-scheme-call">
-      <header className="light-scheme-call__head">
-        <div className="light-scheme-call__kadr">Картина {lookModel.kadrNo}</div>
-        <div className="light-scheme-call__title">{lookModel.title}</div>
-      </header>
-
       {lookModel.blackout ? (
         <div className="light-scheme-call__blackout">Блекаут</div>
       ) : (
         <>
           <section className="light-scheme-call__block">
-            <div className="light-scheme-call__block-title">Заливка</div>
             <div
               className="light-scheme-call__program"
               style={
@@ -112,7 +138,7 @@ export function LightSchemeLookCard({
             {recordRows.length > 0 ? (
               recordRows.map((f) => (
                 <div
-                  key={`${f.channel}-${f.faderId}`}
+                  key={`${f.channel}-${f.faderId}`}light-scheme-call__head
                   onMouseEnter={() => onHighlightChannel?.(f.channel)}
                   onMouseLeave={() => onHighlightChannel?.(null)}
                 >
@@ -120,6 +146,8 @@ export function LightSchemeLookCard({
                     label={f.label}
                     pct={Math.round(f.intensity * 100)}
                     color={f.color}
+                    off={!f.enabled}
+                    equipmentLabel={f.equipmentLabel}
                   />
                 </div>
               ))
@@ -127,7 +155,9 @@ export function LightSchemeLookCard({
               <div className="light-scheme-call__channel-empty">
                 {lookModel.sofitChannels.length === 0
                   ? "Отметьте каналы K в переключателях над схемой, затем «Записать свет»."
-                  : `Нет уровней на ${formatSofitChannelsLabel(lookModel.sofitChannels)}.`}
+                  : spotlights.length === 0
+                    ? "Нет софитов/RGB в 3D — привяжите оборудование к фейдерам в театре."
+                    : `Нет фейдеров с оборудованием на ${formatSofitChannelsLabel(lookModel.sofitChannels)} — проверьте привязку в 3D.`}
               </div>
             )}
           </section>

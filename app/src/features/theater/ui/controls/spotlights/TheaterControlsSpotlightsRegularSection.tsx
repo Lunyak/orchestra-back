@@ -11,6 +11,7 @@ import {
 } from "../../../model/theater-light-fader-bindings";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn, TheaterField } from "../../theater-controls-ui";
+import { SpotlightListNameInput } from "./SpotlightListNameInput";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsRegularSection({ vm, spot }: SpotlightsSectionProps) {
@@ -54,16 +55,17 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                   .filter(Boolean)
                   .join(" ")}
               >
-                <TheaterBtn
+                <SpotlightListNameInput
+                  item={item}
                   active={
                     item.id === vm.activeSpotlightId ||
                     vm.multiSelectedSpotlightIds.includes(item.id)
                   }
-                  onClick={(event) => vm.selectTheaterSpotlight(item.id, event.shiftKey)}
                   disabled={!vm.currentStep}
-                >
-                  {item.label}
-                </TheaterBtn>
+                  placeholder={`Софит ${item.id}`}
+                  onSelect={(shiftKey) => vm.selectTheaterSpotlight(item.id, shiftKey)}
+                  onLabelCommit={(label) => vm.updateSpotlight(item.id, { label })}
+                />
                 <label className="theater-spotlight-channel theater-spotlight-channel--compact" title="K — канал">
                   <LightChannelSelect
                     lightChannels={lightChannels}
@@ -94,6 +96,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                       const raw = event.target.value.trim();
                       if (!raw) {
                         vm.updateSpotlight(item.id, { faderId: undefined });
+                        spot.unbindSpotlightFromFader(item.id);
                         return;
                       }
                       const faderId = Math.max(1, Number(raw) || 1);

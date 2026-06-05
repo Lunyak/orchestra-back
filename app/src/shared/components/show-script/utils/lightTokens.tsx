@@ -143,7 +143,7 @@ export function createRenderLightTokens(
   ): React.ReactNode {
     if (typeof node === "string") {
       const pattern =
-        /(\{\{\s*(light|b|blackout|program|fader|lightpanel|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+        /(\{\{\s*(light|b|blackout|program|fader|lightpanel|play|sound|sfx|video|hold)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
       const result: React.ReactNode[] = [];
       let lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -198,6 +198,36 @@ export function createRenderLightTokens(
               data-sound-name={!Number.isFinite(id) ? payload : undefined}
             >
               {labelText}
+            </span>,
+          );
+        } else if (rawType?.toLowerCase() === "video") {
+          const payload = String(rawIndex ?? "").trim();
+          const labelText = String(rawColor ?? "").trim() || "Play";
+          const id = Number(payload);
+          result.push(
+            <span
+              key={`${keyPrefix}-${counter}-video`}
+              className="markdown-video-label"
+              role="button"
+              tabIndex={0}
+              title="Видео на проекторе"
+              data-video-id={Number.isFinite(id) ? String(id) : undefined}
+            >
+              {labelText}
+            </span>,
+          );
+        } else if (rawType?.toLowerCase() === "hold") {
+          const holdId = Math.trunc(Number(String(rawIndex ?? "").trim()) || 0);
+          result.push(
+            <span
+              key={`${keyPrefix}-${counter}-hold`}
+              className="markdown-kadr-hold-chip"
+              role="button"
+              tabIndex={0}
+              title="Показать заставку на проекторе"
+              data-hold-id={holdId > 0 ? String(holdId) : undefined}
+            >
+              HOLD
             </span>,
           );
         } else if (rawType?.toLowerCase() === "b" || rawType?.toLowerCase() === "blackout") {
@@ -285,7 +315,7 @@ export function createRehypeScriptTokens(
       }) as HastNode;
 
     const pattern =
-      /(\{\{\s*(light|blackout|program|fader|lightpanel|play|sound|sfx)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
+      /(\{\{\s*(light|blackout|program|fader|lightpanel|play|sound|sfx|video|hold)\s*(?::\s*([^}|]+?))?\s*(?:\|\s*([^}]+?))?\s*}})|(\[\[\s*([^\]]+?)\s*]])/gi;
 
     const walk = (node: HastNode): HastNode => {
       if (!node) return node;
@@ -331,6 +361,28 @@ export function createRehypeScriptTokens(
                 title: "Звук: воспроизвести/остановить",
                 "data-sound-id": Number.isFinite(id) ? String(id) : undefined,
                 "data-sound-name": !Number.isFinite(id) ? payload : undefined,
+              }),
+            );
+          } else if (rawType?.toLowerCase() === "video") {
+            const payload = String(rawIndex ?? "").trim();
+            const labelText = String(rawColor ?? "").trim() || "Play";
+            const id = Number(payload);
+            out.push(
+              hastSpan(["markdown-video-label"], [hastText(labelText)], {
+                role: "button",
+                tabIndex: 0,
+                title: "Видео на проекторе",
+                "data-video-id": Number.isFinite(id) ? String(id) : undefined,
+              }),
+            );
+          } else if (rawType?.toLowerCase() === "hold") {
+            const holdId = Math.trunc(Number(String(rawIndex ?? "").trim()) || 0);
+            out.push(
+              hastSpan(["markdown-kadr-hold-chip"], [hastText("HOLD")], {
+                role: "button",
+                tabIndex: 0,
+                title: "Показать заставку на проекторе",
+                "data-hold-id": holdId > 0 ? String(holdId) : undefined,
               }),
             );
           } else if (rawType?.toLowerCase() === "blackout") {

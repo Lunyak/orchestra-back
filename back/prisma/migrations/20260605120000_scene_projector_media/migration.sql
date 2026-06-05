@@ -1,0 +1,2 @@
+ALTER TABLE "Scene"
+  ADD COLUMN IF NOT EXISTS "projectorMedia" JSONB;

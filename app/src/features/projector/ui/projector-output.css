@@ -1,0 +1,39 @@
+.projector-output {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  background: #000;
+  overflow: hidden;
+  cursor: none;
+}
+
+.projector-output__media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.projector-output__placeholder {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.projector-output__error {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(90vw, 640px);
+  padding: 16px 20px;
+  border-radius: 8px;
+  background: rgba(20, 20, 20, 0.92);
+  color: #f3b0b0;
+  font-size: 14px;
+  text-align: center;
+  line-height: 1.45;
+  pointer-events: none;
+}

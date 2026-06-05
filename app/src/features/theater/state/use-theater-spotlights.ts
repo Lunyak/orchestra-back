@@ -156,7 +156,9 @@ export function useTheaterSpotlights({
           label:
             rawLabel && !labelLooksLikeChannel
               ? rawLabel
-              : `Софит ${nextId}`,
+              : item.isRgb
+                ? `RGB ${nextId}`
+                : `Софит ${nextId}`,
           position: item.position ?? [0, 6, 6],
           target: item.target ?? [0, 1, 2],
           angleDeg: Number.isFinite(item.angleDeg) ? item.angleDeg : 20,

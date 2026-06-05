@@ -4,7 +4,7 @@ import { getDesktopApi } from "./desktop-api";
 /** URL для <audio> / <img>: локальный файл на native или remote. */
 export function resolveOfflineMediaUrl(opts: {
   projectSlug: string;
-  kind: "playlist" | "sound";
+  kind: "playlist" | "sound" | "video" | "image";
   fileName: string;
   filePath?: string | null;
   remoteUrl?: string | null;
@@ -23,7 +23,7 @@ export function resolveOfflineMediaUrl(opts: {
         return filePath;
       }
     }
-    const scheme = opts.kind === "playlist" ? "project-audio" : "project-sounds";
+    const scheme = mediaSchemeForKind(opts.kind);
     const url = new URL(`${scheme}://${encodeURIComponent(opts.projectSlug)}/`);
     url.pathname = `/${opts.fileName || filePath.replace(/^.*[/\\]/, "")}`;
     return url.toString();
@@ -34,7 +34,7 @@ export function resolveOfflineMediaUrl(opts: {
 
   const api = getDesktopApi();
   if (api) {
-    const scheme = opts.kind === "playlist" ? "project-audio" : "project-sounds";
+    const scheme = mediaSchemeForKind(opts.kind);
     const url = new URL(`${scheme}://${encodeURIComponent(opts.projectSlug)}/`);
     url.pathname = `/${opts.fileName}`;
     return url.toString();
@@ -45,4 +45,11 @@ export function resolveOfflineMediaUrl(opts: {
 
 export function isOfflineNativePlatform(): boolean {
   return Capacitor.isNativePlatform() || Boolean(getDesktopApi()?.invoke);
+}
+
+function mediaSchemeForKind(kind: "playlist" | "sound" | "video" | "image"): string {
+  if (kind === "playlist") return "project-audio";
+  if (kind === "video") return "project-video";
+  if (kind === "image") return "project-images";
+  return "project-sounds";
 }

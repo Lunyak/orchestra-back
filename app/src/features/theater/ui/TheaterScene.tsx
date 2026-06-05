@@ -214,6 +214,8 @@ export const TheaterScene = ({
         },
         onColorChange: (color: string) =>
           vm.updateSpotlight(activeSpotlight.id, { color }),
+        onLabelChange: (label: string) =>
+          vm.updateSpotlight(activeSpotlight.id, { label }),
         onInteractStart: vm.beginTheaterHistoryTransaction,
         onInteractEnd: vm.endTheaterHistoryTransaction,
         onClone: () => vm.cloneSpotlight(activeSpotlight.id),

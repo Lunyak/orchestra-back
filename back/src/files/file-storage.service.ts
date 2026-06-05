@@ -73,7 +73,7 @@ export class FileStorageService {
   /** Сохранить файл в S3/MinIO и вернуть постоянную ссылку (без срока действия). */
   async uploadObject(params: {
     projectId: string;
-    type: 'playlist' | 'image' | 'sound' | 'model';
+    type: 'playlist' | 'image' | 'sound' | 'model' | 'video';
     fileName: string;
     buffer: Buffer;
     contentType?: string;

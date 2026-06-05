@@ -800,6 +800,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       trackId: currentTrack?.id ?? null,
       trackTitle: currentTrack?.title,
       fadeMs: currentTrack?.fadeMs,
+      volume: volumeRef.current,
     }));
     return () => registerPlaylistSnapshotProvider(undefined);
   }, [currentTrack]);

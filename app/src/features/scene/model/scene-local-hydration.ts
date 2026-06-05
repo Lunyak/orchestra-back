@@ -5,6 +5,7 @@ import { desktopReadProjectScene } from "../../../shared/platform/desktop-method
 import type { AppDispatch } from "../../../shared/store/store";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
+import { unpackProjectorMedia } from "../../projector/model/scene-projector-persist";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
 import { normalizeLightChannelsLoose } from "./scene-normalize";
 
@@ -25,10 +26,24 @@ export async function hydrateSceneFromLocalPack(
       DEFAULT_THEATER_LAYOUT,
     );
     const lc = normalizeLightChannelsLoose(f.lightChannels);
+    const projectorBag = unpackProjectorMedia(f.projectorMedia);
     const sceneData: SceneData = {
       name: f.name as string | undefined,
       playlist: Array.isArray(f.playlist) ? (f.playlist as SceneData["playlist"]) : [],
       sounds: Array.isArray(f.sounds) ? f.sounds : [],
+      videos:
+        projectorBag.videos.length > 0
+          ? projectorBag.videos
+          : Array.isArray(f.videos)
+            ? (f.videos as SceneData["videos"])
+            : [],
+      holdImages:
+        projectorBag.holdImages.length > 0
+          ? projectorBag.holdImages
+          : Array.isArray(f.holdImages)
+            ? (f.holdImages as SceneData["holdImages"])
+            : [],
+      projector: projectorBag.projector ?? (f.projector as SceneData["projector"]),
       sceneRoles: f.sceneRoles as SceneData["sceneRoles"],
       lightFaders: f.lightFaders as SceneData["lightFaders"],
       lightPrograms: f.lightPrograms as SceneData["lightPrograms"],

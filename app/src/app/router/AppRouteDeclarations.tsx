@@ -111,6 +111,12 @@ const ResetPasswordPage = lazy(() =>
   })),
 );
 
+const ProjectorOutputPage = lazy(() =>
+  import("../../features/projector/ui/ProjectorOutputPage").then((m) => ({
+    default: m.ProjectorOutputPage,
+  })),
+);
+
 export function AppRouteDeclarations() {
   const actorPageElement = ENABLE_ACTOR_PAGE ? (
     <ActorPage />
@@ -133,6 +139,7 @@ export function AppRouteDeclarations() {
   return (
     <Routes>
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/projector-output" element={<ProjectorOutputPage />} />
       <Route path="/" element={<SpectaclePage />} />
       <Route
         path="/theater"

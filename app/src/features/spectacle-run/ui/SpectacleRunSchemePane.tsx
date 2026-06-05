@@ -26,6 +26,7 @@ import { LightConsoleView } from "../../../shared/components/light-console/Light
 import type { useLightConsoleState } from "../../../shared/components/light-console/useLightConsoleState";
 import type { SpectacleTapeItem } from "../model/spectacle-kadr-tape";
 import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../../../shared/components/show-script/script-markdown-tab-labels";
+import { SpectacleRunProjectorPanel } from "../../projector/ui/SpectacleRunProjectorPanel";
 
 export type SpectacleRunSchemePaneProps = {
   step: ScriptStep | null;
@@ -243,9 +244,13 @@ export function SpectacleRunSchemePane({
           lightChannels={lightChannels}
           activeKadr={activeKadr}
           lightFaders={displayFaders}
+          boardFaders={baseFaders}
+          spotlights={step?.theaterSpotlights ?? []}
           onHighlightChannel={setHighlightedChannel}
         />
       </div>
+
+      <SpectacleRunProjectorPanel />
 
       <LightConsoleView
         mode="live"

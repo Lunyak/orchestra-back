@@ -32,7 +32,7 @@ export function recordSoundKadrForSection(
       cue = {
         playTrackIds: [snap.trackId],
         soundIds: [],
-        fadeMs: snap.fadeMs,
+        volume: snap.volume,
       };
     }
   }

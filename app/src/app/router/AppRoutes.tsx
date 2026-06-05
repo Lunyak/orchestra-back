@@ -332,7 +332,22 @@ function AppRoutesContent() {
   );
 }
 
+function ProjectorRoutesOnly() {
+  return (
+    <Suspense fallback={<PageLoader variant="view" label="Проектор…" />}>
+      <AppRouteDeclarations />
+    </Suspense>
+  );
+}
+
 export function AppRoutes() {
+  const location = useLocation();
+  const isProjectorOutput = location.pathname === "/projector-output";
+
+  if (isProjectorOutput) {
+    return <ProjectorRoutesOnly />;
+  }
+
   return (
     <AppEditorMenubarProvider>
       <div className="app-shell-with-menubar">

@@ -29,7 +29,7 @@ export class LocalFileStorageService {
   /** Сохранить файл на диск и вернуть постоянную ссылку (не истекает). */
   async uploadObject(params: {
     projectId: string;
-    type: 'playlist' | 'image' | 'sound' | 'model';
+    type: 'playlist' | 'image' | 'sound' | 'model' | 'video';
     fileName: string;
     buffer: Buffer;
     contentType?: string;

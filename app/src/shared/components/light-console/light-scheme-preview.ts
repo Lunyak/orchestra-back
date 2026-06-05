@@ -8,7 +8,7 @@ import type { LightFixture, StepLightKadrV1 } from "../../types/script";
 import { parseLightChannel, resolveLightColor } from "../show-script/utils/lightTokens";
 import { parseLightChannelSlot } from "../../../features/theater/model/theater-light-channel-link";
 import { buildLightConsoleSplitModel, type LightFaderBoardRow } from "./light-console-split";
-import { resolveLightChannelRoles } from "./light-channel-roles";
+import { resolveLightChannelRoles, resolveSofitChannelsForKadrDisplay } from "./light-channel-roles";
 
 export type FixtureLookState = {
   fixtureId: number;
@@ -99,12 +99,17 @@ export function buildLightSchemeLookModel(args: {
   lightChannelRoles: SceneLightChannelRolesV1 | null;
 }): LightSchemeLookModel {
   const roles = resolveLightChannelRoles(args.lightChannelRoles, args.lightChannels.length);
+  const sofitChannels = resolveSofitChannelsForKadrDisplay({
+    lightChannelRoles: args.lightChannelRoles,
+    kadr: args.kadr,
+    lightChannelsCount: args.lightChannels.length,
+  });
   const split = buildLightConsoleSplitModel({
     programId: args.kadr.programId,
     lightChannels: args.lightChannels,
     faders: args.lightFaders,
     kadrFaderStates: args.kadr.faders,
-    sofitChannels: roles.sofitChannels,
+    sofitChannels,
     programLabel:
       args.lightPrograms?.programs.find((p) => p.id === args.kadr.programId)?.label ?? undefined,
   });
@@ -115,14 +120,14 @@ export function buildLightSchemeLookModel(args: {
 
   const channelSummaries: ChannelLookSummary[] = [];
   const allChannels = new Set<number>([
-    ...roles.sofitChannels,
+    ...sofitChannels,
     split.washChannel,
     ...split.sofitFaders.map((r) => r.channel),
     ...split.washFaders.map((r) => r.channel),
   ]);
 
   for (const channel of [...allChannels].sort((a, b) => a - b)) {
-    const isSofit = roles.sofitChannels.includes(channel);
+    const isSofit = sofitChannels.includes(channel);
     const faders = isSofit
       ? split.sofitFaders.filter((r) => r.channel === channel)
       : channel === split.washChannel
@@ -169,7 +174,7 @@ export function buildLightSchemeLookModel(args: {
       : bound
         ? readFaderLevel(bound, args.kadr.faders)
         : 0;
-    const isSofitChannel = slot != null && roles.sofitChannels.includes(slot);
+    const isSofitChannel = slot != null && sofitChannels.includes(slot);
     const faderColor = bound?.color ?? null;
     const channelColor =
       slot != null
@@ -198,7 +203,7 @@ export function buildLightSchemeLookModel(args: {
     programLabel: split.programLabel,
     programColor,
     washIntensity,
-    sofitChannels: roles.sofitChannels,
+    sofitChannels,
     channelSummaries,
     fixtureStates,
   };

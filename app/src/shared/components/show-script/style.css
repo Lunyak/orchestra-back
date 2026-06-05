@@ -822,50 +822,133 @@
   font-style: italic;
 }
 
-.markdown-kadr__grid {
-  display: flex;
-  flex-direction: column;
+.markdown-kadr__split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
+  align-items: start;
+  margin: 0 0 12px;
+}
+
+.markdown-kadr__picture,
+.markdown-kadr__light {
+  min-width: 0;
+}
+
+.markdown-kadr__picture {
+  grid-column: 1;
+  min-height: 120px;
+  max-width: 100%;
+  display: flex;
   align-items: stretch;
+  justify-content: stretch;
+  overflow: clip;
 }
 
-.markdown-kadr__left {
-  min-width: 0;
-}
-
-.markdown-kadr__right {
-  min-width: 0;
-  min-height: 0;
-  /* Как раньше: горизонтальная полоса превью со скроллом, но под текстом (не колонка справа). */
+.markdown-kadr__picture:has(.markdown-image-btn:nth-child(2)) {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 200px;
-  grid-template-rows: repeat(auto-fill, 120px);
-  align-content: start;
-  justify-content: start;
-  /* row-gap заметнее при переносе / двух картинках подряд без пустой строки в md */
-  gap: 12px 14px;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(120px, auto);
+  gap: 12px;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
 }
 
+.markdown-kadr__picture[data-empty="true"] {
+  border: 1px dashed var(--color-border-faint-muted);
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--color-bg-primary) 92%, transparent);
+}
+
+.markdown-kadr__light {
+  grid-column: 2;
+  min-height: 120px;
+  max-width: 100%;
+}
+
+.markdown-kadr__light[data-empty="true"] {
+  min-height: 0;
+}
+
+.markdown-kadr__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.markdown-kadr__body .markdown-kadr__fields,
+.markdown-kadr__body > ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.markdown-kadr__body .markdown-kadr__field,
+.markdown-kadr__body > p {
+  margin: 0;
+}
+
+.markdown-preview--kadr .markdown-kadr__body .markdown-dialog-line {
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
+.markdown-preview--kadr .markdown-kadr__body .markdown-dialog-label {
+  flex: 0 0 auto;
+  min-width: 60px;
+  width: auto;
+}
+
+.markdown-preview--kadr .markdown-kadr__body .markdown-dialog-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.markdown-preview--kadr .markdown-kadr__body .markdown-dialog-line--kadr-field {
+  align-items: baseline;
+}
+
+.markdown-preview--kadr .markdown-kadr__body .markdown-dialog-line--kadr-field .markdown-kadr-field-label::after {
+  content: ":";
+  margin-left: 1px;
+}
+
+.markdown-kadr-field-label {
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-bright);
+  opacity: 0.82;
+  white-space: nowrap;
+}
+
+.markdown-preview--kadr .markdown-kadr__body .markdown-dialog-line--kadr-hold .markdown-dialog-text {
+  color: var(--color-text-bright);
+}
+
 .markdown-light-kadr-call {
   width: 100%;
-  margin: 4px 0 12px;
-  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .markdown-light-kadr-call .light-scheme-call {
   max-height: none;
 }
 
-.markdown-kadr__right[data-empty="true"] {
-  display: none;
-}
-
-.markdown-kadr__right p {
+.markdown-kadr__picture p,
+.markdown-kadr__light p {
   margin: 0;
 }
 
@@ -875,31 +958,36 @@
   max-height: 800px;
 }
 
-.markdown-kadr__right img {
+.markdown-kadr__picture img {
   width: 100%;
   height: 100%;
+  min-height: 120px;
   max-height: none;
   display: block;
   object-fit: cover;
+  border-radius: 8px;
 }
 
-.markdown-kadr__right .markdown-img-with-preloader {
+.markdown-kadr__picture .markdown-img-with-preloader {
   width: 100%;
   height: 100%;
+  min-height: 120px;
 }
 
-.markdown-kadr__right .markdown-preloader {
+.markdown-kadr__picture .markdown-preloader {
   width: 100%;
   height: 100%;
+  min-height: 120px;
 }
 
 .markdown-image-btn img {
   display: block;
 }
 
-.markdown-kadr__right .markdown-image-btn {
-  width: 200px;
-  height: 120px;
+.markdown-kadr__picture .markdown-image-btn {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
   flex: 0 0 auto;
 }
 
@@ -990,6 +1078,23 @@
 
 .markdown-img-with-preloader[data-state="loading"] img {
   opacity: 0;
+}
+
+.markdown-img-with-preloader[data-state="error"] img {
+  opacity: 0;
+}
+
+.markdown-img-with-preloader[data-state="error"]::after {
+  content: "⚠";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  color: var(--color-danger-lighter);
+  background: var(--color-surface-inset-soft);
+  border-radius: 10px;
+  pointer-events: none;
 }
 
 .markdown-img-with-preloader img {
@@ -2019,6 +2124,7 @@
 
 .markdown-dialog-line--label-track .markdown-track-link::before,
 .markdown-dialog-line--label-play .markdown-track-link::before,
+.markdown-dialog-line--label-play .markdown-video-link::before,
 .markdown-dialog-line--label-sound .markdown-sound-link::before {
   content: none;
 }
@@ -2085,7 +2191,9 @@
   color: var(--color-text-sky);
 }
 
-.markdown-play-label {
+.markdown-play-label,
+.markdown-video-label,
+.markdown-kadr-hold-chip {
   width: 60px;
   padding: 2px 9px;
   background: var(--color-surface-3);
@@ -2103,6 +2211,28 @@
   font-family: var(--font-family-script-body);
   box-sizing: border-box;
   height: 23px;
+}
+
+.markdown-kadr-hold-chip {
+  background: var(--color-surface-2);
+  color: var(--color-text-bright);
+  border: 1px solid var(--color-border-faint-muted);
+}
+
+.markdown-hold-label {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.markdown-hold-link {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
 }
 
 .markdown-sound-label {
@@ -2154,7 +2284,9 @@
   border: 0;
 }
 
-.markdown-play-label:hover {
+.markdown-play-label:hover,
+.markdown-video-label:hover,
+.markdown-kadr-hold-chip:hover {
   border-color: var(--color-accent-blue);
   color: var(--color-text-primary);
 }
@@ -2244,7 +2376,7 @@
   color: var(--color-text-primary);
 }
 
-.markdown-dialog-label :is(.markdown-speaker-label, .markdown-light-chip, .markdown-track-link, .markdown-play-label) {
+.markdown-dialog-label :is(.markdown-speaker-label, .markdown-light-chip, .markdown-track-link, .markdown-play-label, .markdown-video-label) {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;

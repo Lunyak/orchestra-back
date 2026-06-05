@@ -18,6 +18,7 @@ import {
 } from "./theater-light-fader-bindings";
 import type { TheaterSpotlight } from "../../../shared/types/script";
 import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
+import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";
 
 export const LIGHT_KADR_ANCHOR_RE = /<!--\s*lk:([a-zA-Z0-9_-]+)\s*-->/g;
 /** Строка markdown целиком — якорь id картины (служебная, не для показа). */
@@ -105,12 +106,17 @@ function normalizeLightKadr(raw: Partial<StepLightKadrV1> | null | undefined): S
           .filter((f) => f.faderId > 0)
       : [],
   );
+  const recordChannels = normalizeSelectedRecordChannels(
+    Array.isArray(raw.recordChannels) ? raw.recordChannels : undefined,
+    64,
+  );
   return {
     id: raw.id.trim(),
     kadrNo,
     title: typeof raw.title === "string" ? raw.title.trim() || undefined : undefined,
     programId,
     faders,
+    ...(recordChannels.length > 0 ? { recordChannels } : {}),
     nextProgramId:
       raw.nextProgramId != null && Number.isFinite(Number(raw.nextProgramId))
         ? Math.max(1, Math.trunc(Number(raw.nextProgramId)))
@@ -284,6 +290,7 @@ export function buildKadrFromConsole(args: {
           liveChannel: liveCh,
           liveFaders: args.faders,
           lightChannelsCount: args.lightChannelsCount,
+          spotlights: args.spotlights ?? [],
         })
       : args.spotlights != null
         ? buildKadrFaderSnapshotForStep(args.faders, args.spotlights, liveCh)
@@ -292,12 +299,17 @@ export function buildKadrFromConsole(args: {
             channel: liveCh,
           })),
   );
+  const recordChannels = normalizeSelectedRecordChannels(
+    args.sofitChannels,
+    args.lightChannelsCount ?? 64,
+  );
   return {
     id: args.id,
     kadrNo: args.kadrNo,
     title: args.title,
     programId: args.programId,
     faders: faderStates,
+    ...(recordChannels.length > 0 ? { recordChannels } : {}),
     nextProgramId: args.nextProgramId,
     blackout: args.blackout,
     note: args.note,
@@ -433,7 +445,7 @@ export function applyKadrToFaders(
 }
 
 export function createKadrTemplateSnippet(kadrNo: number, kadrId: string): string {
-  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: репетиция — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n- **Звук**: _«Записать звук» вверху (трек в плейлисте)_\n\n- **Мизансцена**:\n- **Действие/задача**:\n- **Переход**:\n`;
+  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: репетиция — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n\n- **Звук**: _«Записать звук» вверху (трек в плейлисте)_\n- **Видео**: _«Записать проектор» — ролик на экран_\n\n- **Картинка**:\n\n- **Действие/задача**: _например: дым-машина_\n- **Переход**:\n`;
 }
 
 const TOKEN_PROGRAM_RE = /\{\{\s*program\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;

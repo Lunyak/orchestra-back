@@ -2,6 +2,8 @@ export type PlaylistPlaybackSnapshot = {
   trackId: number | null;
   trackTitle?: string;
   fadeMs?: number;
+  /** Громкость плеера 0…1. */
+  volume?: number;
 };
 
 let playlistPlayHandler: ((trackId: number) => void) | undefined;
@@ -58,6 +60,7 @@ export function getPlaylistPlaybackSnapshot(): PlaylistPlaybackSnapshot {
     trackId,
     trackTitle: fromPlayer?.trackTitle,
     fadeMs: fromPlayer?.fadeMs,
+    volume: fromPlayer?.volume,
   };
 }
 

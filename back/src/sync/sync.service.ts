@@ -538,6 +538,20 @@ export class SyncService {
     const nextLightPrograms = hasLightPrograms
       ? (payload?.lightPrograms ?? null)
       : undefined;
+    const hasLightChannelRoles = Object.prototype.hasOwnProperty.call(
+      payload ?? {},
+      'lightChannelRoles',
+    );
+    const nextLightChannelRoles = hasLightChannelRoles
+      ? (payload?.lightChannelRoles ?? null)
+      : undefined;
+    const hasProjectorMedia = Object.prototype.hasOwnProperty.call(
+      payload ?? {},
+      'projectorMedia',
+    );
+    const nextProjectorMedia = hasProjectorMedia
+      ? (payload?.projectorMedia ?? null)
+      : undefined;
 
     const result = await this.prisma.scene.upsert({
       where: { id: payload.id },
@@ -546,6 +560,10 @@ export class SyncService {
         ...(hasSceneRoles ? { sceneRoles: nextSceneRoles } : {}),
         ...(hasLightFaders ? { lightFaders: nextLightFaders } : {}),
         ...(hasLightPrograms ? { lightPrograms: nextLightPrograms } : {}),
+        ...(hasLightChannelRoles
+          ? { lightChannelRoles: nextLightChannelRoles }
+          : {}),
+        ...(hasProjectorMedia ? { projectorMedia: nextProjectorMedia } : {}),
       },
       create: {
         id: payload.id,
@@ -554,6 +572,8 @@ export class SyncService {
         sceneRoles: hasSceneRoles ? nextSceneRoles : null,
         lightFaders: hasLightFaders ? nextLightFaders : null,
         lightPrograms: hasLightPrograms ? nextLightPrograms : null,
+        lightChannelRoles: hasLightChannelRoles ? nextLightChannelRoles : null,
+        projectorMedia: hasProjectorMedia ? nextProjectorMedia : null,
       },
     });
 
@@ -879,6 +899,14 @@ export class SyncService {
       });
     }
 
+    const hasLightKadrs = Object.prototype.hasOwnProperty.call(
+      payload ?? {},
+      'lightKadrs',
+    );
+    const nextLightKadrs = hasLightKadrs
+      ? (payload?.lightKadrs ?? null)
+      : undefined;
+
     const result = await this.prisma.step.upsert({
       where: { id: payload.id },
       update: {
@@ -904,6 +932,7 @@ export class SyncService {
             ? Math.trunc(Number(payload.kanbanOrder))
             : undefined,
         order: payload.order,
+        ...(hasLightKadrs ? { lightKadrs: nextLightKadrs } : {}),
       },
       create: {
         id: payload.id,
@@ -930,6 +959,7 @@ export class SyncService {
             ? Math.trunc(Number(payload.kanbanOrder))
             : null,
         order: payload.order,
+        lightKadrs: hasLightKadrs ? nextLightKadrs : null,
       },
     });
 
@@ -1329,6 +1359,8 @@ export class SyncService {
         sceneRoles: scene.sceneRoles,
         lightFaders: scene.lightFaders,
         lightPrograms: scene.lightPrograms,
+        lightChannelRoles: scene.lightChannelRoles,
+        projectorMedia: scene.projectorMedia,
         updatedAt: scene.updatedAt,
       },
       ...(wantSteps ? { steps } : {}),

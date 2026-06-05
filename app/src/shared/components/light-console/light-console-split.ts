@@ -1,6 +1,11 @@
 import type { SceneLightFaderV1, SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
 import type { StepLightKadrFaderStateV1 } from "../../types/script";
-import { resolveKadrFaderChannel } from "../../../features/theater/model/theater-light-fader-bindings";
+import {
+  collectActiveEquipmentBindings,
+  resolveKadrFaderChannel,
+} from "../../../features/theater/model/theater-light-fader-bindings";
+import { formatSpotlightChannelFaderWithName, resolveSpotlightDisplayName } from "../../../features/theater/model/theater-spotlight-labels";
+import type { TheaterSpotlight } from "../../types/script";
 import { parseLightChannel } from "../show-script/utils/lightTokens";
 import { normalizeSelectedRecordChannels, normalizeSofitChannels } from "./light-channel-roles";
 import {
@@ -18,6 +23,8 @@ export type LightFaderBoardRow = {
   intensity: number;
   enabled: boolean;
   color?: string;
+  /** Софит/RGB, из‑за которого строка в списке (для подсказки). */
+  equipmentLabel?: string;
 };
 
 export type LightConsoleSplitModel = {
@@ -69,35 +76,84 @@ function toBoardRow(
   };
 }
 
-/** Строки для техкарты: только K из toggles, подпись K{n} F{m}. */
+function toBoardRowFromKadrState(
+  fader: SceneLightFaderV1,
+  state: StepLightKadrFaderStateV1,
+  channel: number,
+): LightFaderBoardRow {
+  const raw =
+    typeof state.intensity === "number" && Number.isFinite(state.intensity)
+      ? Math.min(1, Math.max(0, state.intensity))
+      : 0;
+  const off = state.enabled === false || raw <= 0.02;
+  const level = off ? 0 : raw;
+  return {
+    faderId: state.faderId,
+    label: formatFaderDefaultLabel(fader.id, fader.label),
+    channel,
+    intensity: level,
+    enabled: !off,
+    color: fader.color,
+  };
+}
+
+/** Строки для техкарты: только K+F с активной привязкой в 3D (как в списке софитов). */
 export function buildKadrRecordFaderRows(args: {
   kadrFaderStates: StepLightKadrFaderStateV1[];
   faders: SceneLightFadersDataV1;
+  /** Доска с links для проверки привязок; если не задана — используется faders. */
+  boardFaders?: SceneLightFadersDataV1;
   selectedChannels: number[];
   lightChannelsCount?: number;
+  spotlights?: TheaterSpotlight[];
 }): LightFaderBoardRow[] {
-  const allow = new Set(
-    normalizeSelectedRecordChannels(args.selectedChannels, args.lightChannelsCount ?? 64),
-  );
-  const byKey = new Map<string, LightFaderBoardRow>();
+  const board = args.boardFaders ?? args.faders;
+  const spotlights = args.spotlights ?? [];
+  const bindings = collectActiveEquipmentBindings(spotlights, {
+    channels: args.selectedChannels,
+    lightChannelsCount: args.lightChannelsCount,
+    lightFaders: board,
+  });
 
+  const stateByKey = new Map<string, StepLightKadrFaderStateV1>();
   for (const state of args.kadrFaderStates) {
-    if (state.enabled === false || (state.intensity ?? 0) <= 0.02) continue;
     const def = args.faders.faders.find((fader) => fader.id === state.faderId);
     if (!def) continue;
     const channel = resolveKadrFaderChannel(state, def);
-    if (!allow.has(channel)) continue;
-    const key = `${channel}:${state.faderId}`;
-    byKey.set(key, {
-      ...toBoardRow(def, [state]),
-      channel,
-      label: `${formatChannelShort(channel)} ${formatFaderShort(state.faderId)}`,
-    });
+    stateByKey.set(`${channel}:${state.faderId}`, state);
   }
 
-  return [...byKey.values()].sort(
-    (a, b) => a.channel - b.channel || a.faderId - b.faderId,
-  );
+  return bindings.map(({ channel, faderId, spotlightId }) => {
+    const spotlight = spotlights.find((item) => item.id === spotlightId);
+    const equipmentLabel = spotlight ? resolveSpotlightDisplayName(spotlight) : `Софит ${spotlightId}`;
+    const def = args.faders.faders.find((fader) => fader.id === faderId);
+    if (!def) {
+      return {
+        faderId,
+        label: formatSpotlightChannelFaderWithName(channel, faderId, spotlight),
+        channel,
+        intensity: 0,
+        enabled: false,
+        equipmentLabel,
+      };
+    }
+    const state = stateByKey.get(`${channel}:${faderId}`);
+    const row = state
+      ? toBoardRowFromKadrState(def, state, channel)
+      : {
+          faderId,
+          label: formatFaderDefaultLabel(faderId, def.label),
+          channel,
+          intensity: 0,
+          enabled: false,
+          color: def.color,
+        };
+    return {
+      ...row,
+      label: formatSpotlightChannelFaderWithName(channel, faderId, spotlight),
+      equipmentLabel,
+    };
+  });
 }
 
 /** @deprecated Используйте buildKadrRecordFaderRows */

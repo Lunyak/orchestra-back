@@ -11,7 +11,7 @@ export async function getPlayUrl(
   return data;
 }
 
-export type UploadProjectFileType = "playlist" | "image" | "sound" | "model";
+export type UploadProjectFileType = "playlist" | "image" | "sound" | "model" | "video";
 
 export async function uploadProjectFile(
   accessToken: string,
@@ -30,25 +30,71 @@ export async function uploadProjectFile(
   return data;
 }
 
-export async function fetchSoundStreamBlobUrl(
-  accessToken: string,
+async function fetchStreamBlobUrl(
+  accessToken: string | null | undefined,
   key: string,
+  allowedPrefixes: string[],
 ): Promise<string | null> {
   try {
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     const { data } = await api.get<Blob>("/files/stream", {
       params: { key },
       responseType: "blob",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers,
     });
     if (!data || !(data instanceof Blob)) return null;
     if (data.size === 0) return null;
     const type = data.type;
     if (
       type &&
-      !type.startsWith("audio/") &&
-      type !== "application/octet-stream"
-    )
+      type !== "application/octet-stream" &&
+      !allowedPrefixes.some((prefix) => type.startsWith(prefix))
+    ) {
       return null;
+    }
+    return URL.createObjectURL(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSoundStreamBlobUrl(
+  accessToken: string | null | undefined,
+  key: string,
+): Promise<string | null> {
+  return fetchStreamBlobUrl(accessToken, key, ["audio/"]);
+}
+
+export async function fetchVideoStreamBlobUrl(
+  accessToken: string | null | undefined,
+  key: string,
+): Promise<string | null> {
+  return fetchStreamBlobUrl(accessToken, key, ["video/", "audio/"]);
+}
+
+export async function fetchImageStreamBlobUrl(
+  accessToken: string | null | undefined,
+  key: string,
+): Promise<string | null> {
+  try {
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    const { data } = await api.get<Blob>("/files/stream", {
+      params: { key },
+      responseType: "blob",
+      headers,
+    });
+    if (!data || !(data instanceof Blob)) return null;
+    if (data.size === 0) return null;
+    const type = (data.type || "").toLowerCase();
+    if (
+      type.startsWith("text/") ||
+      type.startsWith("application/json") ||
+      type.startsWith("application/xml")
+    ) {
+      return null;
+    }
     return URL.createObjectURL(data);
   } catch {
     return null;

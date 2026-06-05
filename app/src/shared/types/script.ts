@@ -55,6 +55,8 @@ export interface StepLightKadrV1 {
   title?: string;
   programId: number;
   faders: StepLightKadrFaderStateV1[];
+  /** K, отмеченные в toggles при «Записать свет». */
+  recordChannels?: number[];
   nextProgramId?: number;
   blackout?: boolean;
   note?: string;

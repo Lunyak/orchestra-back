@@ -1,4 +1,5 @@
 import type { SceneLightChannelRolesV1 } from "../../../features/scene/model/scene-slice";
+import type { StepLightKadrV1 } from "../../types/script";
 
 export const DEFAULT_SOFIT_CHANNELS = [1, 2];
 
@@ -32,6 +33,37 @@ export function resolveLightChannelRoles(
 ): SceneLightChannelRolesV1 {
   const sofitChannels = normalizeSelectedRecordChannels(raw?.sofitChannels, lightChannelsCount);
   return { v: 1, sofitChannels };
+}
+
+/** K для карточки картины: toggles сцены → снимок картины → каналы из faders. */
+export function resolveSofitChannelsForKadrDisplay(args: {
+  lightChannelRoles?: SceneLightChannelRolesV1 | null;
+  kadr?: StepLightKadrV1 | null;
+  lightChannelsCount: number;
+}): number[] {
+  const fromRoles = normalizeSelectedRecordChannels(
+    args.lightChannelRoles?.sofitChannels,
+    args.lightChannelsCount,
+  );
+  if (fromRoles.length > 0) return fromRoles;
+
+  const fromKadr = normalizeSelectedRecordChannels(
+    args.kadr?.recordChannels,
+    args.lightChannelsCount,
+  );
+  if (fromKadr.length > 0) return fromKadr;
+
+  if (args.kadr?.faders?.length) {
+    const channels = new Set<number>();
+    for (const state of args.kadr.faders) {
+      if (state.channel != null && Number.isFinite(state.channel) && state.channel > 0) {
+        channels.add(Math.trunc(state.channel));
+      }
+    }
+    if (channels.size > 0) return [...channels].sort((a, b) => a - b);
+  }
+
+  return [];
 }
 
 export function toggleSofitChannel(

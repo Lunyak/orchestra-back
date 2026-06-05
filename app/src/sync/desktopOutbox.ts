@@ -126,6 +126,7 @@ export async function flushDesktopOutbox(
     if (d.sceneRoles) scenePayload.sceneRoles = d.sceneRoles;
     if (d.lightFaders) scenePayload.lightFaders = d.lightFaders;
     if (d.lightPrograms) scenePayload.lightPrograms = d.lightPrograms;
+    if (d.lightChannelRoles) scenePayload.lightChannelRoles = d.lightChannelRoles;
 
     changes.push({
       id: createId(),

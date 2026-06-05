@@ -8,7 +8,9 @@ export const SOUND_KADR_LINE_RE = /^-\s*\*\*Звук\*\*:\s*(.*)$/im;
 export type KadrSoundCue = {
   playTrackIds: number[];
   soundIds: number[];
-  /** Длительность затухания/набора в мс (из текста «2 с», «1500 ms»). */
+  /** Громкость плеера 0…1 (в тексте «80%»). */
+  volume?: number;
+  /** @deprecated Старые строки; в новых кадрах не записываем. */
   fadeMs?: number;
 };
 
@@ -16,6 +18,7 @@ const TOKEN_PLAY_RE = /\{\{\s*play\s*:\s*(\d+)(?:\|([^}]+?))?\s*}}/gi;
 const TOKEN_SOUND_RE = /\{\{\s*(?:sound|sfx)\s*:\s*(\d+)(?:\|([^}]+?))?\s*}}/gi;
 const TOKEN_FADE_MS_RE =
   /(?:fade|затухание|fadeMs)\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*(ms|мс|s|с|sec|сек)?/gi;
+const TOKEN_VOLUME_RE = /(?:громкость\s*)?(\d{1,3})\s*%/gi;
 
 function parseFadeMs(raw: string, unit: string | undefined): number | undefined {
   const n = Number(String(raw).replace(",", "."));
@@ -35,11 +38,14 @@ export function parseSoundKadrLine(line: string): KadrSoundCue | null {
   TOKEN_PLAY_RE.lastIndex = 0;
   TOKEN_SOUND_RE.lastIndex = 0;
   TOKEN_FADE_MS_RE.lastIndex = 0;
+  TOKEN_VOLUME_RE.lastIndex = 0;
 
   const playMatches = [...trimmed.matchAll(TOKEN_PLAY_RE)];
   const soundMatches = [...trimmed.matchAll(TOKEN_SOUND_RE)];
   const fadeMatch = TOKEN_FADE_MS_RE.exec(trimmed);
+  const volumeMatch = TOKEN_VOLUME_RE.exec(trimmed);
   TOKEN_FADE_MS_RE.lastIndex = 0;
+  TOKEN_VOLUME_RE.lastIndex = 0;
 
   if (playMatches.length === 0 && soundMatches.length === 0) {
     const body = trimmed.replace(/^-\s*\*\*звук\*\*:\s*/i, "").trim();
@@ -59,9 +65,16 @@ export function parseSoundKadrLine(line: string): KadrSoundCue | null {
     fadeMs = parseFadeMs(fadeMatch[1], fadeMatch[2]);
   }
 
+  let volume: number | undefined;
+  if (volumeMatch) {
+    const pct = Math.trunc(Number(volumeMatch[1]) || 0);
+    if (pct >= 0 && pct <= 100) volume = pct / 100;
+  }
+
   return {
     playTrackIds: [...new Set(playTrackIds)],
     soundIds: [...new Set(soundIds)],
+    volume,
     fadeMs,
   };
 }
@@ -96,7 +109,8 @@ export function formatSoundKadrLine(
   for (const trackId of cue.playTrackIds) {
     const track = options.playlist?.find((t) => Number(t.id) === trackId);
     const label = track?.title?.trim() || `Трек ${trackId}`;
-    parts.push(`{{play:${trackId}|${label}}}`);
+    const safeTitle = label.replace(/\\/g, "\\\\").replace(/]/g, "\\]");
+    parts.push(`{{play:${trackId}}} [${safeTitle}](track:${trackId})`);
   }
 
   for (const soundId of cue.soundIds) {
@@ -105,9 +119,9 @@ export function formatSoundKadrLine(
     parts.push(`{{sound:${soundId}|${label}}}`);
   }
 
-  if (cue.fadeMs != null && cue.fadeMs > 0) {
-    const sec = cue.fadeMs / 1000;
-    parts.push(sec >= 1 && sec % 1 === 0 ? `затухание ${sec} с` : `fade ${cue.fadeMs} ms`);
+  if (cue.volume != null && Number.isFinite(cue.volume)) {
+    const pct = Math.round(Math.min(1, Math.max(0, cue.volume)) * 100);
+    parts.push(`${pct}%`);
   }
 
   if (parts.length === 0) {

@@ -1,0 +1,157 @@
+.spectacle-run-projector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.spectacle-run-projector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spectacle-run-projector__title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-bright);
+}
+
+.spectacle-run-projector__status {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.spectacle-run-projector__status--on {
+  color: #6fcf97;
+  font-weight: 700;
+}
+
+.spectacle-run-projector__actions,
+.spectacle-run-projector__cue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.spectacle-run-projector__cue-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.spectacle-run-projector__select {
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--color-text-ui);
+  font-size: 12px;
+}
+
+.spectacle-run-projector__hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.spectacle-run-projector__videos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spectacle-run-projector__video-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spectacle-run-projector__video-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--color-text-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+
+.spectacle-run-projector__rename-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(111, 207, 151, 0.45);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--color-text-bright);
+  font-size: 12px;
+}
+
+.spectacle-run-projector__play-btn {
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--color-text-bright);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.spectacle-run-projector__play-btn[data-primary="true"] {
+  border-color: rgba(111, 207, 151, 0.45);
+  background: rgba(47, 111, 72, 0.35);
+}
+
+.spectacle-run-projector__play-btn[data-paused="true"] {
+  border-color: rgba(255, 200, 100, 0.45);
+  background: rgba(120, 90, 30, 0.35);
+}
+
+.spectacle-run-projector__play-btn:hover {
+  filter: brightness(1.08);
+}
+
+.spectacle-run-projector__item-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.spectacle-run-projector__delete-btn {
+  flex-shrink: 0;
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border-default);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.spectacle-run-projector__delete-btn:hover {
+  color: #ffb4b4;
+  border-color: rgba(255, 120, 120, 0.45);
+  background: rgba(80, 30, 30, 0.45);
+}

@@ -17,6 +17,11 @@ import {
   storageKeyToImageBasename,
 } from "../shared/utils/markdownImages";
 import { getPlayUrl } from "./api/files";
+import {
+  normalizeHoldImages,
+  packProjectorMedia,
+  unpackProjectorMedia,
+} from "../features/projector/model/scene-projector-persist";
 
 function isHttpUrl(u: string | undefined | null): boolean {
   return Boolean(u && /^https?:\/\//i.test(String(u).trim()));
@@ -44,6 +49,9 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     sceneRoles?: unknown;
     lightFaders?: unknown;
     lightPrograms?: unknown;
+    videos?: unknown;
+    holdImages?: unknown;
+    projector?: unknown;
   };
   normalizedSteps: ScriptStep[];
   normalizedLayout: TheaterLayout;
@@ -207,6 +215,46 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
     );
 
+    const baseBag = unpackProjectorMedia((base as any)?.projectorMedia);
+    const videos =
+      Array.isArray((args.minimalSceneData as any)?.videos) &&
+      (args.minimalSceneData as any).videos.length > 0
+        ? (args.minimalSceneData as any).videos
+        : Array.isArray((base as any)?.videos)
+          ? (base as any).videos
+          : baseBag.videos;
+    const holdImages =
+      Array.isArray((args.minimalSceneData as any)?.holdImages) &&
+      (args.minimalSceneData as any).holdImages.length > 0
+        ? (args.minimalSceneData as any).holdImages
+        : Array.isArray((base as any)?.holdImages)
+          ? (base as any).holdImages
+          : baseBag.holdImages;
+    const projector =
+      (args.minimalSceneData as any)?.projector ??
+      (base as any)?.projector ??
+      baseBag.projector;
+    const projectorMedia = packProjectorMedia({
+      videos,
+      holdImages,
+      projector,
+    });
+
+    for (const hold of normalizeHoldImages(holdImages, projector)) {
+      const key = String(hold.remoteKey ?? "").trim();
+      if (!key) continue;
+      try {
+        const { url } = await getPlayUrl(args.accessToken, key);
+        const u = String(url ?? "").trim();
+        if (!u) continue;
+        const fileName = String(hold.file ?? storageKeyToImageBasename(key)).trim();
+        if (!fileName) continue;
+        await downloadOne({ kind: "image", fileName, url: u });
+      } catch {
+        /* offline / expired token */
+      }
+    }
+
     const payload: Record<string, unknown> = {
       ...base,
       name: args.minimalSceneData.name ?? (base as any)?.name ?? "script",
@@ -218,6 +266,12 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       sceneRoles: args.minimalSceneData.sceneRoles ?? (base as any)?.sceneRoles,
       lightFaders: args.minimalSceneData.lightFaders ?? (base as any)?.lightFaders,
       lightPrograms: args.minimalSceneData.lightPrograms ?? (base as any)?.lightPrograms,
+      lightChannelRoles:
+        args.minimalSceneData.lightChannelRoles ?? (base as any)?.lightChannelRoles,
+      videos,
+      holdImages,
+      projector,
+      projectorMedia,
       images: Object.keys(images).length ? images : (base as any)?.images,
       theaterOfflineManifest: {
         modelCount: theaterOffline.modelCount,
@@ -254,13 +308,28 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       ? normalizeLightChannelsLoose(f.lightChannels)
       : args.normalizedLightChannels;
 
+    const projectorBag = unpackProjectorMedia(f.projectorMedia);
     const sceneData = {
       name: f.name,
       playlist: Array.isArray(f.playlist) ? f.playlist : [],
       sounds: Array.isArray(f.sounds) ? f.sounds : [],
+      videos:
+        projectorBag.videos.length > 0
+          ? projectorBag.videos
+          : Array.isArray(f.videos)
+            ? f.videos
+            : [],
+      holdImages:
+        projectorBag.holdImages.length > 0
+          ? projectorBag.holdImages
+          : Array.isArray(f.holdImages)
+            ? f.holdImages
+            : [],
+      projector: projectorBag.projector ?? f.projector,
       sceneRoles: f.sceneRoles,
       lightFaders: f.lightFaders,
       lightPrograms: f.lightPrograms,
+      lightChannelRoles: f.lightChannelRoles,
       images: f.images && typeof f.images === "object" ? f.images : undefined,
     };
 

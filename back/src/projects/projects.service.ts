@@ -10,6 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileStorageService } from '../files/file-storage.service';
 import { LocalFileStorageService } from '../files/local-file-storage.service';
+import { extractReferencedImageKeysFromProjectorMedia } from './projector-media-gc';
 
 export interface CreateProjectDto {
   slug: string;
@@ -133,6 +134,19 @@ export class ProjectsService {
     for (const n of roleNoteRows) {
       this.extractReferencedImageKeysFromMarkdown(String(n.content ?? '')).forEach(
         (k) => referenced.add(k),
+      );
+    }
+
+    const sceneRows = await this.prisma.scene.findMany({
+      where: { projectId },
+      select: { projectorMedia: true },
+      take: 500,
+    });
+    for (const scene of sceneRows) {
+      extractReferencedImageKeysFromProjectorMedia(scene.projectorMedia).forEach(
+        (k) => {
+          if (k.startsWith(prefix)) referenced.add(k);
+        },
       );
     }
 

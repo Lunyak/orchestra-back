@@ -236,6 +236,8 @@ export function LightSchemeKadrBoard({
           lightChannels={lightChannels}
           activeKadr={activeKadr}
           lightFaders={displayFaders}
+          boardFaders={baseFaders}
+          spotlights={step?.theaterSpotlights ?? []}
           onHighlightChannel={setHighlightedChannel}
         />
       </div>

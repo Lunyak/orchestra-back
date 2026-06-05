@@ -10,6 +10,21 @@ export function stripMarkdownCodeFences(text: string): string {
   return String(text ?? "").replace(/```[\s\S]*?```/g, "");
 }
 
+/** Декодирует ключ из `orchestra-image:…` (в т.ч. старые двойные encodeURIComponent). */
+export function decodeOrchestraImageStorageKey(encoded: string): string {
+  let key = String(encoded ?? "").trim();
+  for (let i = 0; i < 2; i += 1) {
+    try {
+      const next = decodeURIComponent(key);
+      if (next === key) break;
+      key = next;
+    } catch {
+      break;
+    }
+  }
+  return key;
+}
+
 /** Последний сегмент ключа в хранилище — имя файла в папке images на диске. */
 export function storageKeyToImageBasename(key: string): string {
   const k = String(key ?? "").trim();

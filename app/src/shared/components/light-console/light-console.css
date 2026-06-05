@@ -744,7 +744,6 @@
   align-content: start;
   padding: 10px;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
-  border-radius: 8px;
   background: rgba(0, 0, 0, 0.28);
   min-width: 0;
   max-height: 420px;
@@ -814,9 +813,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px;
-  border: 1px solid var(--color-border-default);
-  border-radius: 6px;
   font-size: 12px;
   font-weight: 700;
   color: var(--color-text-bright);
@@ -912,6 +908,19 @@
   text-align: right;
   font-weight: 800;
   color: var(--color-text-muted-bright);
+}
+
+.light-scheme-call__fader--off {
+  opacity: 0.55;
+}
+
+.light-scheme-call__fader--off .light-scheme-call__fader-name {
+  color: var(--color-text-muted);
+}
+
+.light-scheme-call__fader--off .light-scheme-call__fader-pct {
+  color: var(--color-text-dimmer);
+  font-weight: 700;
 }
 
 .markdown-light-split-host {

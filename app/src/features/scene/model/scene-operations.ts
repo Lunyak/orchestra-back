@@ -1,4 +1,8 @@
-﻿import { useCallback, useRef } from "react";
+﻿import {
+  packProjectorMedia,
+  unpackProjectorMedia,
+} from "../../projector/model/scene-projector-persist";
+import { useCallback, useRef } from "react";
 import type { ScriptStep, TheaterSpotlight } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import {
@@ -246,6 +250,16 @@ export function useSceneOperations() {
         ) {
           minimalSceneData.lightChannelRoles = serverLightChannelRoles;
         }
+        const projectorBag = unpackProjectorMedia((scene as any)?.projectorMedia);
+        if (projectorBag.videos.length > 0) {
+          minimalSceneData.videos = projectorBag.videos;
+        }
+        if (projectorBag.holdImages.length > 0) {
+          minimalSceneData.holdImages = projectorBag.holdImages;
+        }
+        if (projectorBag.projector) {
+          minimalSceneData.projector = projectorBag.projector;
+        }
 
         const stepsBeforeRepair = normalizedSteps.length ? normalizedSteps : steps;
         const nextStepsPayload = applySceneFaderBindingsToSpotlights(
@@ -382,6 +396,14 @@ export function useSceneOperations() {
         lightPrograms: liveSceneData?.lightPrograms ?? (current as any)?.lightPrograms,
         lightChannelRoles: liveSceneData?.lightChannelRoles ?? (current as any)?.lightChannelRoles,
         sceneRoles: liveSceneData?.sceneRoles ?? (current as any)?.sceneRoles,
+        videos: liveSceneData?.videos ?? (current as any)?.videos ?? [],
+        holdImages: liveSceneData?.holdImages ?? (current as any)?.holdImages ?? [],
+        projector: liveSceneData?.projector ?? (current as any)?.projector,
+        projectorMedia: packProjectorMedia({
+          videos: liveSceneData?.videos ?? (current as any)?.videos,
+          holdImages: liveSceneData?.holdImages ?? (current as any)?.holdImages,
+          projector: liveSceneData?.projector ?? (current as any)?.projector,
+        }),
         images,
         lightChannels: showScriptUi.lightChannels,
       };
@@ -548,6 +570,14 @@ export function useSceneOperations() {
                   typeof (sceneRow as any).lightChannelRoles === "object"
                     ? { lightChannelRoles: (sceneRow as any).lightChannelRoles }
                     : {}),
+                  ...(() => {
+                    const bag = unpackProjectorMedia((sceneRow as any)?.projectorMedia);
+                    return {
+                      ...(bag.videos.length > 0 ? { videos: bag.videos } : {}),
+                      ...(bag.holdImages.length > 0 ? { holdImages: bag.holdImages } : {}),
+                      ...(bag.projector ? { projector: bag.projector } : {}),
+                    };
+                  })(),
                 };
                 const shadowSteps = applySceneFaderBindingsToSpotlights(
                   prevSteps.length ? prevSteps : [],
@@ -608,6 +638,18 @@ export function useSceneOperations() {
           const nextLightChannelRoles = (payloadForServer as any)?.lightChannelRoles ?? null;
           const lightChannelRolesChanged =
             stableStringify(prevLightChannelRoles) !== stableStringify(nextLightChannelRoles);
+          const prevProjectorMedia = packProjectorMedia({
+            videos: (serverShadowForDiff?.sceneData as any)?.videos,
+            holdImages: (serverShadowForDiff?.sceneData as any)?.holdImages,
+            projector: (serverShadowForDiff?.sceneData as any)?.projector,
+          });
+          const nextProjectorMedia = packProjectorMedia({
+            videos: (payloadForServer as any)?.videos,
+            holdImages: (payloadForServer as any)?.holdImages,
+            projector: (payloadForServer as any)?.projector,
+          });
+          const projectorMediaChanged =
+            stableStringify(prevProjectorMedia) !== stableStringify(nextProjectorMedia);
 
           if (
             !serverShadowForDiff ||
@@ -615,7 +657,8 @@ export function useSceneOperations() {
             sceneRolesChanged ||
             lightFadersChanged ||
             lightProgramsChanged ||
-            lightChannelRolesChanged
+            lightChannelRolesChanged ||
+            projectorMediaChanged
           ) {
             const scenePayload: any = {
               id: sceneId,
@@ -634,6 +677,9 @@ export function useSceneOperations() {
             }
             if (!serverShadowForDiff || lightChannelRolesChanged) {
               scenePayload.lightChannelRoles = nextLightChannelRoles;
+            }
+            if (!serverShadowForDiff || projectorMediaChanged) {
+              scenePayload.projectorMedia = nextProjectorMedia;
             }
             changes.push({
               id: createId(),
@@ -942,6 +988,16 @@ export function useSceneOperations() {
                   lightChannelRoles:
                     (payloadForServer as any)?.lightChannelRoles ??
                     (serverShadowForDiff?.sceneData as any)?.lightChannelRoles ??
+                    undefined,
+                  videos: Array.isArray((payloadForServer as any)?.videos)
+                    ? (payloadForServer as any).videos
+                    : [],
+                  holdImages: Array.isArray((payloadForServer as any)?.holdImages)
+                    ? (payloadForServer as any).holdImages
+                    : (serverShadowForDiff?.sceneData as any)?.holdImages ?? [],
+                  projector:
+                    (payloadForServer as any)?.projector ??
+                    (serverShadowForDiff?.sceneData as any)?.projector ??
                     undefined,
                   playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
                   sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],

@@ -19,6 +19,25 @@ import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 
 import { DEFAULT_THEATER_LAYOUT } from "../../theater/model/theater-defaults";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
+import { normalizeHoldImages } from "../../projector/model/scene-projector-persist";
+
+function mergeProjectorSceneDataOnHydrate(
+  incoming: SceneData | null,
+  prev: SceneData | null,
+): SceneData | null {
+  if (!incoming) return incoming;
+  if (!prev) return incoming;
+  const incomingHolds = normalizeHoldImages(incoming.holdImages, incoming.projector);
+  const prevHolds = normalizeHoldImages(prev.holdImages, prev.projector);
+  const incomingVideos = Array.isArray(incoming.videos) ? incoming.videos : [];
+  const prevVideos = Array.isArray(prev.videos) ? prev.videos : [];
+  return {
+    ...incoming,
+    videos: incomingVideos.length > 0 ? incoming.videos : prev.videos,
+    holdImages: incomingHolds.length > 0 ? incoming.holdImages : prev.holdImages,
+    projector: incoming.projector ?? prev.projector,
+  };
+}
 
 export type TheaterLayoutUpdater =
   | TheaterLayout
@@ -49,6 +68,12 @@ export interface SceneData {
   voiceLines?: SceneVoiceLines;
   /** Изображения сцены (ключ → метаданные файла). */
   images?: Record<string, { remoteKey?: string; remoteUrl?: string }>;
+  /** Видео для проектора (ролики спектакля). */
+  videos?: SceneVideo[];
+  /** Заставки проектора (картинки между роликами). */
+  holdImages?: SceneHoldImage[];
+  /** Заставка проектора и прочие настройки вывода. */
+  projector?: SceneProjectorSettingsV1;
 }
 
 export type SceneLightFaderLinkV1 = {
@@ -137,6 +162,35 @@ export type SceneVoiceLineEntry = {
 export type SceneVoiceLines = {
   version: 1;
   byLineId: Record<string, SceneVoiceLineEntry | undefined>;
+};
+
+export interface SceneVideo {
+  id: number;
+  title: string;
+  file: string;
+  remoteUrl?: string;
+  remoteKey?: string;
+  filePath?: string;
+}
+
+export interface SceneHoldImage {
+  id: number;
+  title: string;
+  file: string;
+  remoteUrl?: string;
+  remoteKey?: string;
+  filePath?: string;
+}
+
+export type SceneProjectorSettingsV1 = {
+  v: 1;
+  /** id заставки по умолчанию (после конца видео). */
+  defaultHoldId?: number;
+  /** @deprecated Мигрируется в holdImages при загрузке сцены. */
+  holdImageFile?: string;
+  holdImageRemoteKey?: string;
+  holdImageRemoteUrl?: string;
+  holdImageFilePath?: string;
 };
 
 export interface SceneSound {
@@ -237,6 +291,18 @@ function nextSoundIds(sounds: any[] | undefined, count: number): number[] {
 function nextPlaylistIds(playlist: PlaylistTrack[] | undefined, count: number): number[] {
   const list = Array.isArray(playlist) ? playlist : [];
   const maxId = list.reduce((acc, t) => Math.max(acc, Number(t?.id ?? 0)), 0);
+  return Array.from({ length: count }, (_v, i) => maxId + i + 1);
+}
+
+function nextVideoIds(videos: SceneVideo[] | undefined, count: number): number[] {
+  const list = Array.isArray(videos) ? videos : [];
+  const maxId = list.reduce((acc, v) => Math.max(acc, Number(v?.id ?? 0)), 0);
+  return Array.from({ length: count }, (_v, i) => maxId + i + 1);
+}
+
+function nextHoldImageIds(holdImages: SceneHoldImage[] | undefined, count: number): number[] {
+  const list = Array.isArray(holdImages) ? holdImages : [];
+  const maxId = list.reduce((acc, h) => Math.max(acc, Number(h?.id ?? 0)), 0);
   return Array.from({ length: count }, (_v, i) => maxId + i + 1);
 }
 
@@ -363,6 +429,92 @@ export const uploadSceneSoundsWeb = createAsyncThunk<
   }
 
   return { projectSlug, sounds: uploaded };
+});
+
+export const uploadSceneVideosWeb = createAsyncThunk<
+  { projectSlug: string; videos: SceneVideo[] },
+  { projectSlug: string; files: File[] }
+>("scene/uploadSceneVideosWeb", async (args, api) => {
+  const token = getAccessToken(api.getState as () => RootState);
+  if (!token) {
+    throw new Error("Нет токена авторизации");
+  }
+  const files = (args.files ?? []).filter(Boolean);
+  if (files.length === 0) return { projectSlug: args.projectSlug, videos: [] };
+
+  const projectSlug = args.projectSlug;
+  const cachedId =
+    typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectSlug}`) : null;
+  const projectId =
+    cachedId ??
+    (await ensureProject(token, projectSlug, `Проект ${projectSlug}`)).id;
+  if (!cachedId) ensureProjectIdCached(projectSlug, projectId);
+
+  const state = api.getState() as RootState;
+  const ids = nextVideoIds(state.scene.sceneData?.videos, files.length);
+
+  const uploaded: SceneVideo[] = [];
+  for (let i = 0; i < files.length; i += 1) {
+    const file = files[i];
+    const { key, url } = await uploadProjectFile(token, {
+      projectId,
+      type: "video",
+      file,
+    });
+    const title = file.name.replace(/\.[^.]+$/, "");
+    uploaded.push({
+      id: ids[i],
+      title,
+      file: file.name,
+      remoteKey: key,
+      remoteUrl: url,
+    });
+  }
+
+  return { projectSlug, videos: uploaded };
+});
+
+export const uploadSceneHoldImagesWeb = createAsyncThunk<
+  { projectSlug: string; holdImages: SceneHoldImage[] },
+  { projectSlug: string; files: File[] }
+>("scene/uploadSceneHoldImagesWeb", async (args, api) => {
+  const token = getAccessToken(api.getState as () => RootState);
+  if (!token) {
+    throw new Error("Нет токена авторизации");
+  }
+  const files = (args.files ?? []).filter(Boolean);
+  if (files.length === 0) return { projectSlug: args.projectSlug, holdImages: [] };
+
+  const projectSlug = args.projectSlug;
+  const cachedId =
+    typeof window !== "undefined" ? localStorage.getItem(`projectId:${projectSlug}`) : null;
+  const projectId =
+    cachedId ??
+    (await ensureProject(token, projectSlug, `Проект ${projectSlug}`)).id;
+  if (!cachedId) ensureProjectIdCached(projectSlug, projectId);
+
+  const state = api.getState() as RootState;
+  const ids = nextHoldImageIds(state.scene.sceneData?.holdImages, files.length);
+
+  const uploaded: SceneHoldImage[] = [];
+  for (let i = 0; i < files.length; i += 1) {
+    const file = files[i];
+    const { key, url } = await uploadProjectFile(token, {
+      projectId,
+      type: "image",
+      file,
+    });
+    const title = file.name.replace(/\.[^.]+$/, "");
+    uploaded.push({
+      id: ids[i],
+      title,
+      file: file.name,
+      remoteKey: key,
+      remoteUrl: url,
+    });
+  }
+
+  return { projectSlug, holdImages: uploaded };
 });
 
 export const uploadScenePlaylistWeb = createAsyncThunk<
@@ -819,7 +971,10 @@ export const sceneSlice = createSlice({
       const prevPage = state.currentPage;
       const prevSelectedId = prevSteps[prevPage]?.id ?? null;
 
-      state.sceneData = action.payload.sceneData;
+      state.sceneData = mergeProjectorSceneDataOnHydrate(
+        action.payload.sceneData,
+        state.sceneData,
+      );
       const nextSteps = ensureNonEmptySteps(action.payload.steps);
       state.steps = nextSteps;
       state.theaterLayout = action.payload.theaterLayout;
@@ -1067,6 +1222,96 @@ export const sceneSlice = createSlice({
       state.hasLocalEdits = true;
       state.sceneDataRevision += 1;
     },
+    addVideos(state, action: PayloadAction<SceneVideo[]>) {
+      const next = action.payload ?? [];
+      if (next.length === 0) return;
+      const prev = Array.isArray(state.sceneData?.videos) ? state.sceneData!.videos! : [];
+      state.sceneData = { ...(state.sceneData ?? {}), videos: [...prev, ...next] };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    updateSceneVideo(
+      state,
+      action: PayloadAction<{ id: number; changes: Partial<SceneVideo> }>,
+    ) {
+      const list = Array.isArray(state.sceneData?.videos) ? state.sceneData!.videos! : [];
+      const idx = list.findIndex((v) => Number(v?.id) === Number(action.payload.id));
+      if (idx === -1) return;
+      const next = [...list];
+      next[idx] = { ...next[idx], ...action.payload.changes };
+      state.sceneData = { ...(state.sceneData ?? {}), videos: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    updateSceneHoldImage(
+      state,
+      action: PayloadAction<{ id: number; changes: Partial<SceneHoldImage> }>,
+    ) {
+      const list = Array.isArray(state.sceneData?.holdImages) ? state.sceneData!.holdImages! : [];
+      const idx = list.findIndex((h) => Number(h?.id) === Number(action.payload.id));
+      if (idx === -1) return;
+      const next = [...list];
+      next[idx] = { ...next[idx], ...action.payload.changes };
+      state.sceneData = { ...(state.sceneData ?? {}), holdImages: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    removeSceneVideo(state, action: PayloadAction<number>) {
+      const id = Number(action.payload);
+      const prev = Array.isArray(state.sceneData?.videos) ? state.sceneData!.videos! : [];
+      const next = prev.filter((v) => Number(v?.id) !== id);
+      if (next.length === prev.length) return;
+      state.sceneData = { ...(state.sceneData ?? {}), videos: next };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    removeSceneHoldImage(state, action: PayloadAction<number>) {
+      const id = Number(action.payload);
+      const prev = Array.isArray(state.sceneData?.holdImages) ? state.sceneData!.holdImages! : [];
+      const removed = prev.find((h) => Number(h?.id) === id);
+      const next = prev.filter((h) => Number(h?.id) !== id);
+      if (next.length === prev.length) return;
+
+      const prevProjector = state.sceneData?.projector;
+      let projector: SceneProjectorSettingsV1 | undefined = prevProjector
+        ? { ...prevProjector }
+        : undefined;
+
+      if (projector) {
+        const defaultId = Number(projector.defaultHoldId);
+        if (defaultId === id || !next.some((h) => Number(h.id) === defaultId)) {
+          projector.defaultHoldId = next[0]?.id;
+        }
+        const removedKey = String(removed?.remoteKey ?? "").trim();
+        const legacyKey = String(projector.holdImageRemoteKey ?? "").trim();
+        if (
+          removedKey &&
+          (legacyKey === removedKey ||
+            String(projector.holdImageFile ?? "").trim() === String(removed?.file ?? "").trim())
+        ) {
+          delete projector.holdImageFile;
+          delete projector.holdImageRemoteKey;
+          delete projector.holdImageRemoteUrl;
+          delete projector.holdImageFilePath;
+        }
+        if (next.length === 0) {
+          delete projector.defaultHoldId;
+        }
+      }
+
+      state.sceneData = {
+        ...(state.sceneData ?? {}),
+        holdImages: next,
+        ...(projector ? { projector: { v: 1, ...projector } } : {}),
+      };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    setProjectorSettings(state, action: PayloadAction<SceneProjectorSettingsV1>) {
+      state.sceneData = { ...(state.sceneData ?? {}), projector: action.payload };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
   },
   extraReducers: (builder) => {
     const pending = (state: SceneState) => {
@@ -1203,6 +1448,34 @@ export const sceneSlice = createSlice({
         error: String(action?.error?.message ?? "Не удалось загрузить дубль"),
       };
     });
+    builder.addCase(uploadSceneVideosWeb.fulfilled, (state, action) => {
+      const next = action.payload?.videos ?? [];
+      if (next.length === 0) return;
+      const prev = Array.isArray(state.sceneData?.videos) ? state.sceneData!.videos! : [];
+      state.sceneData = { ...(state.sceneData ?? {}), videos: [...prev, ...next] };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
+    builder.addCase(uploadSceneHoldImagesWeb.fulfilled, (state, action) => {
+      const added = action.payload?.holdImages ?? [];
+      if (added.length === 0) return;
+      const prev = Array.isArray(state.sceneData?.holdImages) ? state.sceneData!.holdImages! : [];
+      const next = [...prev, ...added];
+      const prevProjector = state.sceneData?.projector;
+      const defaultHoldId =
+        prevProjector?.defaultHoldId != null
+          ? prevProjector.defaultHoldId
+          : next[0]?.id;
+      state.sceneData = {
+        ...(state.sceneData ?? {}),
+        holdImages: next,
+        projector: { v: 1, ...prevProjector, defaultHoldId },
+      };
+      state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    });
+
     builder.addCase(uploadVoiceLineTakeWeb.fulfilled, (state, action) => {
       state.voiceLinesUpload = { uploading: false, error: null };
       const { lineId, role, roleKey, performerId, take } = action.payload;

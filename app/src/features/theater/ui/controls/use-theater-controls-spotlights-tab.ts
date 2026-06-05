@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { countStepLightChannelLinks } from "../../model/theater-light-channel-link";
-import { bindSpotlightOnFaderBoard } from "../../model/theater-light-fader-bindings";
+import { bindSpotlightOnFaderBoard, detachSpotlightFromFaderBoard } from "../../model/theater-light-fader-bindings";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 import { useTheaterControlsLightChannels } from "./use-theater-controls-light-channels";
 import { useScene } from "../../../scene";
@@ -62,6 +62,22 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
     [setSceneData],
   );
 
+  const unbindSpotlightFromFader = useCallback(
+    (spotlightId: number) => {
+      setSceneData((prev) => {
+        const current = prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [];
+        return {
+          ...(prev ?? {}),
+          lightFaders: {
+            v: 1,
+            faders: detachSpotlightFromFaderBoard(current, spotlightId),
+          },
+        };
+      });
+    },
+    [setSceneData],
+  );
+
   return {
     lightChannels,
     lightFaders:
@@ -83,5 +99,6 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
     spotlightCountBadge,
     spotlightSourceHeightLabel,
     bindSpotlightToFader,
+    unbindSpotlightFromFader,
   };
 }

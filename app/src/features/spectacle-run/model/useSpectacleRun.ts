@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { showScriptMarkdownActions } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { useScene } from "../../scene";
-import type { SceneLightChannelRolesV1 } from "../../scene/model/scene-slice";
+import { sceneActions, type SceneLightChannelRolesV1 } from "../../scene/model/scene-slice";
 import {
   applyKadrToFaders,
   findKadrById,
@@ -10,8 +10,23 @@ import {
   resolveKadrSectionForTapeItem,
 } from "../../theater/model/light-kadrs";
 import { parseSoundLineInSection } from "../../theater/model/kadr-sound";
+import { parseProjectorLineInSection, type KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { applyKadrSound } from "./apply-kadr-sound";
+import { applyKadrProjector, showProjectorHold } from "./apply-kadr-projector";
 import { recordSoundKadrForSection } from "./record-kadr-sound";
+import { recordProjectorKadrForSection } from "./record-kadr-projector";
+import {
+  closeProjectorWindow,
+  isProjectorWindowOpen,
+  notifyProjectorReady,
+  openProjectorWindow,
+  pauseProjectorVideo,
+  resumeProjectorVideo,
+  subscribeProjectorOutputErrors,
+  subscribeProjectorPlayback,
+} from "../../projector/model/projector-playback-bridge";
+import type { ProjectorMediaContext } from "../../projector/model/projector-media";
+import { normalizeHoldImages } from "../../projector/model/scene-projector-persist";
 import { getPlaylistPlaybackSnapshot } from "../../scene/model/scene-playback-bridge";
 import { recordLightKadrForSection } from "../../../shared/components/light-console/light-kadr-record";
 import { formatChannelShort } from "../../../shared/components/light-console/light-console-labels";
@@ -45,6 +60,14 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const [tapeIndex, setTapeIndex] = useState(0);
   const textHidden = useAppSelector((state) => state.scriptUi.spectacleRunTextHidden);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
+  const [isProjectorOpen, setIsProjectorOpen] = useState(() => isProjectorWindowOpen());
+  const [projectorDraft, setProjectorDraft] = useState<KadrProjectorCue>({ mode: "hold" });
+  const [projectorPlayback, setProjectorPlayback] = useState<{
+    videoId: number | null;
+    holdId: number | null;
+    playing: boolean;
+    mode: "video" | "hold" | "black";
+  }>({ videoId: null, holdId: null, playing: false, mode: "black" });
   const applyingTapeRef = useRef(false);
   const liveSaveTimerRef = useRef<number | null>(null);
   const tapeIndexRef = useRef(0);
@@ -219,6 +242,218 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     }, 550);
   }, [flushLiveSave]);
 
+  const projectorMediaCtx = useMemo<ProjectorMediaContext>(
+    () => ({
+      projectSlug: projectName,
+      videos: sceneData?.videos ?? [],
+      holdImages: sceneData?.holdImages ?? [],
+      projector: sceneData?.projector ?? null,
+    }),
+    [projectName, sceneData?.holdImages, sceneData?.projector, sceneData?.videos],
+  );
+
+  const videos = projectorMediaCtx.videos ?? [];
+  const holdImages = useMemo(
+    () =>
+      normalizeHoldImages(
+        sceneData?.holdImages,
+        sceneData?.projector ?? undefined,
+      ),
+    [sceneData?.holdImages, sceneData?.projector],
+  );
+
+  useEffect(() => {
+    const unsubReady = notifyProjectorReady();
+    const unsubPlayback = subscribeProjectorPlayback((state) => {
+      setProjectorPlayback({
+        videoId: state.videoId,
+        holdId: state.holdId,
+        playing: state.playing,
+        mode: state.mode,
+      });
+    });
+    const unsubErrors = subscribeProjectorOutputErrors((error) => {
+      const label = error.scope === "hold" ? "заставку" : "видео";
+      setLiveStatus(`Проектор: не удалось показать ${label} — ${error.message}`);
+    });
+    return () => {
+      unsubReady();
+      unsubPlayback();
+      unsubErrors();
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setIsProjectorOpen(isProjectorWindowOpen());
+    }, 800);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const openProjector = useCallback(() => {
+    const win = openProjectorWindow();
+    if (!win) {
+      setLiveStatus("Браузер заблокировал окно — разрешите всплывающие окна");
+      return;
+    }
+    setIsProjectorOpen(true);
+    void showProjectorHold(projectorMediaCtx);
+    setLiveStatus("Проектор открыт — перенесите окно на второй экран и нажмите F11");
+  }, [projectorMediaCtx]);
+
+  const closeProjector = useCallback(() => {
+    closeProjectorWindow();
+    setIsProjectorOpen(false);
+    setProjectorPlayback({ videoId: null, holdId: null, playing: false, mode: "black" });
+    setLiveStatus("Проектор закрыт");
+  }, []);
+
+  const ensureProjectorOpen = useCallback((): boolean => {
+    if (isProjectorWindowOpen()) {
+      setIsProjectorOpen(true);
+      return true;
+    }
+    const win = openProjectorWindow();
+    if (!win) {
+      setLiveStatus("Браузер заблокировал окно — разрешите всплывающие окна");
+      return false;
+    }
+    setIsProjectorOpen(true);
+    return true;
+  }, []);
+
+  const playProjectorCue = useCallback(
+    async (cue: KadrProjectorCue, statusLabel?: string) => {
+      setProjectorDraft(cue);
+      if (!ensureProjectorOpen()) return;
+      await applyKadrProjector(cue, projectorMediaCtx);
+      const holdLabel =
+        cue.mode === "hold" && cue.holdId != null
+          ? holdImages.find((h) => Number(h.id) === cue.holdId)?.title?.trim() ||
+            `заставка ${cue.holdId}`
+          : "заставка";
+      setLiveStatus(
+        statusLabel ??
+          (cue.mode === "hold"
+            ? `Проектор: ${holdLabel} — окно на втором экране, F11 для полного экрана`
+            : "Проектор: видео — окно на втором экране, F11 для полного экрана"),
+      );
+    },
+    [ensureProjectorOpen, holdImages, projectorMediaCtx],
+  );
+
+  const playProjectorVideo = useCallback(
+    (videoId: number) => {
+      const video = videos.find((v) => Number(v.id) === Number(videoId));
+      const label = video?.title?.trim() || `видео ${videoId}`;
+      void playProjectorCue(
+        { mode: "video", videoId },
+        `▶ ${label} — на проекторе. Перенесите окно на 2-й экран, F11`,
+      );
+    },
+    [playProjectorCue, videos],
+  );
+
+  const toggleProjectorVideo = useCallback(
+    (videoId: number) => {
+      const id = Number(videoId);
+      if (
+        projectorPlayback.videoId === id &&
+        projectorPlayback.playing &&
+        isProjectorWindowOpen()
+      ) {
+        pauseProjectorVideo();
+        const video = videos.find((v) => Number(v.id) === id);
+        const label = video?.title?.trim() || `видео ${id}`;
+        setLiveStatus(`⏸ ${label} — пауза на проекторе`);
+        return;
+      }
+      if (
+        projectorPlayback.videoId === id &&
+        !projectorPlayback.playing &&
+        isProjectorWindowOpen()
+      ) {
+        resumeProjectorVideo();
+        const video = videos.find((v) => Number(v.id) === id);
+        const label = video?.title?.trim() || `видео ${id}`;
+        setLiveStatus(`▶ ${label} — продолжение на проекторе`);
+        return;
+      }
+      playProjectorVideo(id);
+    },
+    [playProjectorVideo, projectorPlayback.playing, projectorPlayback.videoId, videos],
+  );
+
+  const resetProjectorDraftAfterRemoval = useCallback(
+    (removed: { kind: "video"; id: number } | { kind: "hold"; id: number }) => {
+      if (removed.kind === "video") {
+        if (projectorDraft.mode === "video" && Number(projectorDraft.videoId) === removed.id) {
+          const nextHold = holdImages[0];
+          setProjectorDraft(
+            nextHold ? { mode: "hold", holdId: nextHold.id } : { mode: "hold" },
+          );
+        }
+        if (
+          projectorPlayback.videoId === removed.id &&
+          isProjectorWindowOpen()
+        ) {
+          void showProjectorHold(projectorMediaCtx);
+        }
+        return;
+      }
+      if (
+        projectorDraft.mode === "hold" &&
+        (projectorDraft.holdId == null || Number(projectorDraft.holdId) === removed.id)
+      ) {
+        const nextHold = holdImages.find((h) => Number(h.id) !== removed.id);
+        setProjectorDraft(
+          nextHold ? { mode: "hold", holdId: nextHold.id } : { mode: "hold" },
+        );
+      }
+      if (
+        projectorPlayback.mode === "hold" &&
+        projectorPlayback.holdId === removed.id &&
+        isProjectorWindowOpen()
+      ) {
+        const nextHold = holdImages.find((h) => Number(h.id) !== removed.id);
+        if (nextHold) {
+          void showProjectorHold(projectorMediaCtx, nextHold.id);
+        } else {
+          closeProjector();
+        }
+      }
+    },
+    [
+      closeProjector,
+      holdImages,
+      projectorDraft,
+      projectorMediaCtx,
+      projectorPlayback.holdId,
+      projectorPlayback.mode,
+      projectorPlayback.videoId,
+    ],
+  );
+
+  const removeProjectorVideo = useCallback(
+    (videoId: number) => {
+      dispatch(sceneActions.removeSceneVideo(videoId));
+      resetProjectorDraftAfterRemoval({ kind: "video", id: videoId });
+    },
+    [dispatch, resetProjectorDraftAfterRemoval],
+  );
+
+  const removeProjectorHold = useCallback(
+    (holdId: number) => {
+      dispatch(sceneActions.removeSceneHoldImage(holdId));
+      resetProjectorDraftAfterRemoval({ kind: "hold", id: holdId });
+    },
+    [dispatch, resetProjectorDraftAfterRemoval],
+  );
+
+  const previewProjectorDraft = useCallback(() => {
+    void playProjectorCue(projectorDraft);
+  }, [playProjectorCue, projectorDraft]);
+
   const applyTapeItem = useCallback(
     (item: SpectacleTapeItem, options?: { applyFaders?: boolean }) => {
       applyingTapeRef.current = true;
@@ -235,6 +470,9 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       if (section) {
         const soundCue = parseSoundLineInSection(markdown, section);
         applyKadrSound(soundCue);
+        const projectorCue = parseProjectorLineInSection(markdown, section);
+        void applyKadrProjector(projectorCue, projectorMediaCtx);
+        if (projectorCue) setProjectorDraft(projectorCue);
       }
 
       const kadrs = readStepLightKadrs(step);
@@ -256,7 +494,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       applyingTapeRef.current = false;
     },
-    [liveConsole, setCurrentPage],
+    [liveConsole, projectorMediaCtx, setCurrentPage],
   );
 
   useEffect(() => {
@@ -348,6 +586,38 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     updateStep(step.id, { markdown: result.nextMarkdown } as Partial<ScriptStep>);
     setLiveStatus(result.summary);
   }, [clampedIndex, sceneData?.playlist, sceneData?.sounds, steps, tape, updateStep]);
+
+  const recordProjectorToCurrentKadr = useCallback(() => {
+    const item = tape[clampedIndex];
+    if (!item?.section || item.isPlaceholder) return;
+    const step = steps[item.stepIndex];
+    if (!step) return;
+
+    const result = recordProjectorKadrForSection({
+      markdown: String(step.markdown ?? ""),
+      section: item.section,
+      videos: videos.map((v) => ({ id: v.id, title: v.title })),
+      holdImages: holdImages.map((h) => ({ id: h.id, title: h.title })),
+      cue: projectorDraft,
+    });
+
+    if (!result) return;
+
+    updateStep(step.id, { markdown: result.nextMarkdown } as Partial<ScriptStep>);
+    setLiveStatus(result.summary);
+    if (isProjectorWindowOpen()) {
+      void applyKadrProjector(projectorDraft, projectorMediaCtx);
+    }
+  }, [
+    clampedIndex,
+    holdImages,
+    projectorDraft,
+    projectorMediaCtx,
+    steps,
+    tape,
+    updateStep,
+    videos,
+  ]);
 
   const addKadrToCurrentStep = useCallback(() => {
     const item = tape[clampedIndex];
@@ -480,6 +750,31 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     canAddKadr: Boolean(currentStep),
     recordSoundToCurrentKadr,
     canRecordSound: Boolean(currentItem?.section && !currentItem?.isPlaceholder),
+    recordProjectorToCurrentKadr,
+    canRecordProjector: Boolean(currentItem?.section && !currentItem?.isPlaceholder),
+    canPreviewProjector: true,
+    projectorDraft,
+    setProjectorDraft,
+    videos,
+    holdImages,
+    isProjectorOpen,
+    openProjector,
+    closeProjector,
+    showProjectorHold: (holdId?: number) => {
+      const hold = holdId != null ? holdImages.find((h) => Number(h.id) === holdId) : null;
+      const label = hold?.title?.trim() || (holdId != null ? `заставка ${holdId}` : "заставка");
+      void playProjectorCue(
+        holdId != null ? { mode: "hold", holdId } : { mode: "hold" },
+        `Проектор: ${label}`,
+      );
+    },
+    playProjectorVideo,
+    toggleProjectorVideo,
+    removeProjectorVideo,
+    removeProjectorHold,
+    projectorPlayback,
+    previewProjectorDraft,
+    projectName,
     appendLightChannelSlot,
     removeLightChannelSlot,
   };

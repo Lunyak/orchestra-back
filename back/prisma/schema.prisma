@@ -222,6 +222,10 @@ model Scene {
   lightFaders Json?
   /// Программы света: сохранённые состояния фейдеров
   lightPrograms Json?
+  /// Какие K отмечены для записи в техкарту (toggles над схемой)
+  lightChannelRoles Json?
+  /// Видео проектора и заставка (v1: videos + projector)
+  projectorMedia Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -389,6 +393,8 @@ model Step {
   kanbanStatus String?
   kanbanOrder  Int?
   cast         Json?
+  /// Снимки картин света (фейдеры по K+F), синхронизируются с markdown
+  lightKadrs   Json?
   order        Int
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

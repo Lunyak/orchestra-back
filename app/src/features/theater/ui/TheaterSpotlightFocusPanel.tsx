@@ -1,4 +1,5 @@
 import type { TheaterSpotlight } from "../../../shared/types/script";
+import { useEffect, useState } from "react";
 import {
   THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
   THEATER_SPOTLIGHT_UI_INTENSITY_MAX,
@@ -6,6 +7,9 @@ import {
   THEATER_SPOTLIGHT_UI_INTENSITY_STEP,
 } from "../model/theater-scene-lighting";
 import { formatGridCellLabel } from "../model/theater-zone-grid";
+import {
+  formatSpotlightChannelFaderShort,
+} from "../model/theater-spotlight-labels";
 import { TheaterRangeField } from "./theater-controls-ui";
 import { tc } from "../../../shared/styles/theme-color";
 
@@ -21,6 +25,7 @@ export type TheaterSpotlightFocusPanelProps = {
   onAngleChange: (angleDeg: number) => void;
   onIntensityChange: (intensity: number) => void;
   onColorChange: (color: string) => void;
+  onLabelChange: (label: string) => void;
   onInteractStart?: () => void;
   onInteractEnd?: () => void;
   onClone?: () => void;
@@ -44,6 +49,7 @@ export function TheaterSpotlightFocusPanel({
   onAngleChange,
   onIntensityChange,
   onColorChange,
+  onLabelChange,
   onInteractStart,
   onInteractEnd,
   onClone,
@@ -56,6 +62,24 @@ export function TheaterSpotlightFocusPanel({
 }: TheaterSpotlightFocusPanelProps) {
   const enabled = spotlight.enabled !== false;
   const hidden = spotlight.hidden === true;
+  const defaultLabel = spotlight.isRgb ? `RGB ${spotlight.id}` : `Софит ${spotlight.id}`;
+  const [labelDraft, setLabelDraft] = useState(spotlight.label);
+
+  useEffect(() => {
+    setLabelDraft(spotlight.label);
+  }, [spotlight.id, spotlight.label]);
+
+  const commitLabel = () => {
+    const trimmed = labelDraft.trim();
+    const next = trimmed || defaultLabel;
+    if (next !== spotlight.label) {
+      onLabelChange(next);
+      return;
+    }
+    if (labelDraft !== spotlight.label) {
+      setLabelDraft(spotlight.label);
+    }
+  };
   const hasGridBinding =
     gridCol != null &&
     gridRow != null &&
@@ -71,9 +95,27 @@ export function TheaterSpotlightFocusPanel({
       onClick={(event) => event.stopPropagation()}
     >
       <div className="theater-focus-panel__title">
-        {spotlight.label}
-        <span className="theater-focus-panel__channel">
-          {spotlight.channel ?? spotlight.id}
+        <input
+          type="text"
+          className="native-text-input theater-focus-panel__title-input"
+          value={labelDraft}
+          placeholder={defaultLabel}
+          aria-label="Название софита"
+          onChange={(event) => setLabelDraft(event.target.value)}
+          onBlur={commitLabel}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === "Enter") {
+              event.currentTarget.blur();
+            }
+            if (event.key === "Escape") {
+              setLabelDraft(spotlight.label);
+              event.currentTarget.blur();
+            }
+          }}
+        />
+        <span className="theater-focus-panel__tech">
+          {formatSpotlightChannelFaderShort(spotlight)}
         </span>
       </div>
       <div className="theater-model-context-menu__row">

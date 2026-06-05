@@ -21,14 +21,15 @@ import { stat } from 'node:fs/promises';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FileStorageService } from './file-storage.service';
 import { LocalFileStorageService } from './local-file-storage.service';
+import { contentTypeForFileName } from './file-content-type';
 
 export class UploadFileDto {
   @IsString()
   projectId: string;
 
   @IsString()
-  @IsIn(['playlist', 'image', 'sound', 'model'])
-  type: 'playlist' | 'image' | 'sound' | 'model';
+  @IsIn(['playlist', 'image', 'sound', 'model', 'video'])
+  type: 'playlist' | 'image' | 'sound' | 'model' | 'video';
 }
 
 @Controller('files')
@@ -50,7 +51,7 @@ export class FilesController {
       storage: memoryStorage(),
       limits: {
         // Защита от случайной загрузки огромных файлов в память
-        fileSize: 100 * 1024 * 1024, // 100MB
+        fileSize: 500 * 1024 * 1024, // 500MB (видео для проектора)
       },
     }),
   )
@@ -122,25 +123,7 @@ export class FilesController {
         if (!st.isFile()) {
           return res.status(404).send('Not found');
         }
-        const ext = (
-          decoded.slice(decoded.lastIndexOf('.')) || ''
-        ).toLowerCase();
-        const contentType =
-          ext === '.mp3'
-            ? 'audio/mpeg'
-            : ext === '.wav'
-              ? 'audio/wav'
-              : ext === '.ogg'
-                ? 'audio/ogg'
-                : ext === '.m4a'
-                  ? 'audio/mp4'
-                  : ext === '.flac'
-                    ? 'audio/flac'
-                    : ext === '.glb'
-                      ? 'model/gltf-binary'
-                      : ext === '.gltf'
-                        ? 'model/gltf+json'
-                        : 'application/octet-stream';
+        const contentType = contentTypeForFileName(decoded);
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Length', String(st.size));
         const stream = createReadStream(filePath);
@@ -156,24 +139,8 @@ export class FilesController {
         contentType: s3ContentType,
         contentLength,
       } = await this.storage.getObjectStream(decoded);
-      const ext = (decoded.slice(decoded.lastIndexOf('.')) || '').toLowerCase();
       const contentType =
-        s3ContentType ||
-        (ext === '.mp3'
-          ? 'audio/mpeg'
-          : ext === '.wav'
-            ? 'audio/wav'
-            : ext === '.ogg'
-              ? 'audio/ogg'
-              : ext === '.m4a'
-                ? 'audio/mp4'
-                : ext === '.flac'
-                  ? 'audio/flac'
-                  : ext === '.glb'
-                    ? 'model/gltf-binary'
-                    : ext === '.gltf'
-                      ? 'model/gltf+json'
-                      : 'application/octet-stream');
+        s3ContentType || contentTypeForFileName(decoded);
       res.setHeader('Content-Type', contentType);
       if (contentLength != null) {
         res.setHeader('Content-Length', String(contentLength));
@@ -200,33 +167,7 @@ export class FilesController {
       if (!st.isFile()) {
         return res.status(404).send('Not found');
       }
-      const ext = (key.slice(key.lastIndexOf('.')) || '').toLowerCase();
-      const contentType =
-        ext === '.mp3'
-          ? 'audio/mpeg'
-          : ext === '.wav'
-            ? 'audio/wav'
-            : ext === '.ogg'
-              ? 'audio/ogg'
-              : ext === '.m4a'
-                ? 'audio/mp4'
-                : ext === '.flac'
-                  ? 'audio/flac'
-                  : ext === '.png'
-                    ? 'image/png'
-                    : ext === '.jpg' || ext === '.jpeg'
-                      ? 'image/jpeg'
-                      : ext === '.gif'
-                        ? 'image/gif'
-                        : ext === '.webp'
-                          ? 'image/webp'
-                          : ext === '.svg'
-                            ? 'image/svg+xml'
-                            : ext === '.glb'
-                              ? 'model/gltf-binary'
-                              : ext === '.gltf'
-                                ? 'model/gltf+json'
-                                : 'application/octet-stream';
+      const contentType = contentTypeForFileName(key);
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Length', String(st.size));
       const stream = createReadStream(filePath);
