@@ -59,9 +59,18 @@ export function ProjectorOutputPage() {
   const videoVolumeRef = useRef(1);
   const videoMutedRef = useRef(false);
 
-  const requestFullscreen = useCallback(() => {
+  const requestPresentationMode = useCallback(() => {
     const el = rootRef.current;
     if (!el) return;
+
+    try {
+      window.moveTo(0, 0);
+      window.resizeTo(window.screen.availWidth, window.screen.availHeight);
+    } catch {
+      // Браузер может запретить изменение геометрии окна.
+    }
+
+    if (document.fullscreenElement === el) return;
     void el.requestFullscreen?.().catch(() => {
       // Браузер может отклонить без жеста — оператор кликнет по экрану.
     });
@@ -159,6 +168,10 @@ export function ProjectorOutputPage() {
 
   const applyMessage = useCallback(
     (msg: ProjectorMessage) => {
+      if (msg.type === "ping") {
+        sendProjectorMessage({ type: "pong" });
+        return;
+      }
       if (msg.type === "set-video-volume") {
         videoVolumeRef.current = Math.max(0, Math.min(1, Number(msg.volume) || 0));
         const video = videoRef.current;
@@ -234,6 +247,7 @@ export function ProjectorOutputPage() {
         revokeVideoBlob();
         void loadHoldImage(msg.storageKey, msg.src);
         reportPlayback(null, msg.holdId, false, "hold");
+        requestPresentationMode();
         return;
       }
       if (msg.type === "show-video") {
@@ -254,21 +268,29 @@ export function ProjectorOutputPage() {
         setHoldSrc(null);
         revokeHoldBlob();
         void loadVideoSource(msg.storageKey, msg.src || null);
+        requestPresentationMode();
       }
     },
-    [applyVideoElementState, loadHoldImage, loadVideoSource, revokeHoldBlob, revokeVideoBlob],
+    [
+      applyVideoElementState,
+      loadHoldImage,
+      loadVideoSource,
+      requestPresentationMode,
+      revokeHoldBlob,
+      revokeVideoBlob,
+    ],
   );
 
   useEffect(() => {
     const unsub = subscribeProjectorMessages(applyMessage);
     sendProjectorMessage({ type: "ready" });
-    requestFullscreen();
+    requestPresentationMode();
     return () => {
       unsub();
       revokeHoldBlob();
       revokeVideoBlob();
     };
-  }, [applyMessage, requestFullscreen, revokeHoldBlob, revokeVideoBlob]);
+  }, [applyMessage, requestPresentationMode, revokeHoldBlob, revokeVideoBlob]);
 
   useEffect(() => {
     if (mode !== "video" || !videoSrc || videoLoading) return;
@@ -347,10 +369,10 @@ export function ProjectorOutputPage() {
   }, [revokeHoldBlob]);
 
   const handleRootClick = useCallback(() => {
-    if (!document.fullscreenElement) requestFullscreen();
+    requestPresentationMode();
     const video = videoRef.current;
     if (video && video.paused) void video.play().catch(() => undefined);
-  }, [requestFullscreen]);
+  }, [requestPresentationMode]);
 
   return (
     <div

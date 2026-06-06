@@ -18,10 +18,12 @@ import { applyKadrSound } from "./apply-kadr-sound";
 import { applyKadrProjector, showProjectorHold } from "./apply-kadr-projector";
 import {
   closeProjectorWindow,
+  ensureProjectorOutputOpen,
   isProjectorWindowOpen,
   notifyProjectorReady,
   openProjectorWindow,
   pauseProjectorVideo,
+  pingProjectorOutput,
   resumeProjectorVideo,
   seekProjectorVideo,
   sendProjectorVideoMuted,
@@ -264,6 +266,9 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       const label = error.scope === "hold" ? "заставку" : "видео";
       setLiveStatus(`Проектор: не удалось показать ${label} — ${error.message}`);
     });
+    void pingProjectorOutput().then((alive) => {
+      if (alive) setIsProjectorOpen(true);
+    });
     return () => {
       unsubReady();
       unsubPlayback();
@@ -304,18 +309,14 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     setLiveStatus("Проектор закрыт");
   }, []);
 
-  const ensureProjectorOpen = useCallback((): boolean => {
-    if (isProjectorWindowOpen()) {
+  const ensureProjectorOpen = useCallback(async (): Promise<boolean> => {
+    const open = await ensureProjectorOutputOpen({ focus: false });
+    if (open) {
       setIsProjectorOpen(true);
       return true;
     }
-    const win = openProjectorWindow();
-    if (!win) {
-      setLiveStatus("Браузер заблокировал окно — разрешите всплывающие окна");
-      return false;
-    }
-    setIsProjectorOpen(true);
-    return true;
+    setLiveStatus("Браузер заблокировал окно — разрешите всплывающие окна");
+    return false;
   }, []);
 
   const resolveProjectorVideoMuted = useCallback(
@@ -335,7 +336,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const playProjectorCue = useCallback(
     async (cue: KadrProjectorCue, statusLabel?: string) => {
       setProjectorDraft(cue);
-      if (!ensureProjectorOpen()) return;
+      if (!(await ensureProjectorOpen())) return;
       await applyKadrProjector(
         cue,
         projectorMediaCtx,
@@ -529,19 +530,21 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         if (applyPlayback) {
           const soundCue = parseSoundLineInSection(markdown, section);
           applyKadrSound(soundCue);
-          if (projectorCue) {
-            ensureProjectorOpen();
-          }
-          void applyKadrProjector(
-            projectorCue,
-            projectorMediaCtx,
-            projectorCue?.mode === "video"
-              ? {
-                  videoMuted: resolveProjectorVideoMuted(projectorCue.videoId),
-                  videoVolume: resolveProjectorVideoVolume(projectorCue.videoId),
-                }
-              : undefined,
-          );
+          void (async () => {
+            if (projectorCue) {
+              await ensureProjectorOpen();
+            }
+            await applyKadrProjector(
+              projectorCue,
+              projectorMediaCtx,
+              projectorCue?.mode === "video"
+                ? {
+                    videoMuted: resolveProjectorVideoMuted(projectorCue.videoId),
+                    videoVolume: resolveProjectorVideoVolume(projectorCue.videoId),
+                  }
+                : undefined,
+            );
+          })();
         }
       }
 

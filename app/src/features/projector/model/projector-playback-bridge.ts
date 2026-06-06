@@ -21,6 +21,8 @@ export type ProjectorShowVideo = {
 };
 export type ProjectorBlack = { type: "black" };
 export type ProjectorReady = { type: "ready" };
+export type ProjectorPing = { type: "ping" };
+export type ProjectorPong = { type: "pong" };
 export type ProjectorPauseVideo = { type: "pause-video" };
 export type ProjectorResumeVideo = { type: "resume-video" };
 export type ProjectorSetVideoMuted = { type: "set-video-muted"; muted: boolean };
@@ -50,6 +52,8 @@ export type ProjectorMessage =
   | ProjectorShowVideo
   | ProjectorBlack
   | ProjectorReady
+  | ProjectorPing
+  | ProjectorPong
   | ProjectorPauseVideo
   | ProjectorResumeVideo
   | ProjectorSetVideoMuted
@@ -66,6 +70,15 @@ export type ProjectorCommandMessage = Exclude<
 let projectorWindow: Window | null = null;
 let channel: BroadcastChannel | null = null;
 let lastMessage: ProjectorCommandMessage | null = null;
+let projectorOutputReachable = false;
+
+export type OpenProjectorWindowOptions = {
+  focus?: boolean;
+};
+
+function markProjectorOutputReachable(reachable: boolean): void {
+  projectorOutputReachable = reachable;
+}
 
 type PlaybackListener = (state: Omit<ProjectorPlaybackState, "type">) => void;
 const playbackListeners = new Set<PlaybackListener>();
@@ -97,7 +110,49 @@ function bumpOutputError(error: Omit<ProjectorOutputError, "type">) {
 }
 
 export function isProjectorWindowOpen(): boolean {
-  return projectorWindow != null && !projectorWindow.closed;
+  if (projectorWindow != null && !projectorWindow.closed) return true;
+  return projectorOutputReachable;
+}
+
+export function pingProjectorOutput(timeoutMs = 200): Promise<boolean> {
+  return new Promise((resolve) => {
+    const ch = getChannel();
+    let settled = false;
+    const finish = (alive: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      ch.removeEventListener("message", onMessage);
+      markProjectorOutputReachable(alive);
+      resolve(alive);
+    };
+    const onMessage = (ev: MessageEvent) => {
+      const msg = ev.data as ProjectorMessage;
+      if (msg?.type === "pong") finish(true);
+    };
+    ch.addEventListener("message", onMessage);
+    ch.postMessage({ type: "ping" });
+    const timer = window.setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
+export async function ensureProjectorOutputOpen(
+  options?: OpenProjectorWindowOptions,
+): Promise<boolean> {
+  const shouldFocus = options?.focus !== false;
+
+  if (projectorWindow != null && !projectorWindow.closed) {
+    if (shouldFocus) projectorWindow.focus();
+    markProjectorOutputReachable(true);
+    return true;
+  }
+
+  if (await pingProjectorOutput()) {
+    return true;
+  }
+
+  const win = openProjectorWindow({ focus: shouldFocus });
+  return win != null;
 }
 
 function projectorOutputPath(): string {
@@ -105,9 +160,12 @@ function projectorOutputPath(): string {
   return `${base}/projector-output`;
 }
 
-export function openProjectorWindow(): Window | null {
-  if (isProjectorWindowOpen()) {
-    projectorWindow?.focus();
+export function openProjectorWindow(options?: OpenProjectorWindowOptions): Window | null {
+  const shouldFocus = options?.focus !== false;
+
+  if (projectorWindow != null && !projectorWindow.closed) {
+    if (shouldFocus) projectorWindow.focus();
+    markProjectorOutputReachable(true);
     return projectorWindow;
   }
 
@@ -118,6 +176,10 @@ export function openProjectorWindow(): Window | null {
     "menubar=no,toolbar=no,location=no,status=no",
   );
 
+  if (projectorWindow) {
+    markProjectorOutputReachable(true);
+  }
+
   return projectorWindow;
 }
 
@@ -126,6 +188,7 @@ export function closeProjectorWindow(): void {
     projectorWindow.close();
   }
   projectorWindow = null;
+  markProjectorOutputReachable(false);
   bumpPlayback({ videoId: null, holdId: null, playing: false, mode: "black" });
 }
 
@@ -161,7 +224,9 @@ export function notifyProjectorReady(): () => void {
   const listener = (ev: MessageEvent) => {
     const msg = ev.data as ProjectorMessage;
     if (msg?.type === "ready") replayLastProjectorMessage();
+    if (msg?.type === "pong") markProjectorOutputReachable(true);
     if (msg?.type === "playback-state") {
+      markProjectorOutputReachable(true);
       bumpPlayback({
         videoId: msg.videoId,
         holdId: msg.holdId,
