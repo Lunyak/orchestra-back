@@ -115,6 +115,8 @@ export type SceneLightProgramV1 = {
 
 export type SceneLightProgramsDataV1 = {
   v: 1;
+  /** Явное число кнопок П на пульте (как faders.count). */
+  count?: number;
   activeProgramId?: number;
   programs: SceneLightProgramV1[];
 };

@@ -130,17 +130,6 @@ export function useLightConsoleState({
     persistPrograms(resolveLightPrograms(raw));
   }, [fadersOverride, persistPrograms, readOnly, sceneData?.lightPrograms]);
 
-  const setFaderCount = (count: number) => {
-    const nextCount = Math.max(1, Math.min(64, Math.trunc(count) || 1));
-    persistFaders(
-      buildCompleteLightFaders({
-        v: 1,
-        count: nextCount,
-        faders: faders.faders.filter((item) => item.id <= nextCount),
-      }),
-    );
-  };
-
   const patchFader = (
     faderId: number,
     patch: Partial<SceneLightFadersDataV1["faders"][number]>,
@@ -329,7 +318,6 @@ export function useLightConsoleState({
     activeProgram,
     selectChannel,
     selectProgram,
-    setFaderCount,
     patchFader,
     applyProgram,
     saveProgramSnapshot,

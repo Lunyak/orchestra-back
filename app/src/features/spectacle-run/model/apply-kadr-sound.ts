@@ -9,7 +9,14 @@ export function applyKadrSound(cue: KadrSoundCue | null | undefined) {
 
   const primaryTrack = cue.playTrackIds[0];
   if (primaryTrack != null && primaryTrack > 0) {
-    invokePlaylistPlay(primaryTrack);
+    const playOptions: {
+      volume?: number;
+      continueIfPlaying: boolean;
+    } = { continueIfPlaying: true };
+    if (cue.volume != null && Number.isFinite(cue.volume)) {
+      playOptions.volume = cue.volume;
+    }
+    invokePlaylistPlay(primaryTrack, playOptions);
   }
 
   for (const soundId of cue.soundIds) {

@@ -118,6 +118,12 @@ export type MarkdownImagePrefetchTarget =
   | { kind: "relative"; basename: string };
 
 const MARKDOWN_IMG_RE = /!\[[^\]]*\]\s*\(\s*([^)\s]+)\s*\)/g;
+const MARKDOWN_IMG_HREF_RE = /!\[[^\]]*\]\s*\(\s*([^)\s]+)\s*\)/;
+
+export function findFirstMarkdownImageHref(text: string): string | null {
+  const match = MARKDOWN_IMG_HREF_RE.exec(stripMarkdownCodeFences(String(text ?? "")));
+  return match?.[1]?.trim() ?? null;
+}
 
 /**
  * Все картинки из markdown шагов: orchestra-image:, http(s):, относительные images/…

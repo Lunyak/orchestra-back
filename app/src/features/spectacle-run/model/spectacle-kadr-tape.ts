@@ -2,9 +2,9 @@ import {
   createKadrTemplateSnippet,
   createLightKadrId,
   type MarkdownKadrSection,
-  nextKadrNumberForStep,
   readStepLightKadrs,
   readStepLightKadrsFromMarkdown,
+  renumberKadrSectionsInMarkdown,
   scanMarkdownKadrSections,
   syncLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
@@ -117,20 +117,56 @@ export function isLastTapeItemInStep(
 
 export { nextKadrNumberForStep } from "../../theater/model/light-kadrs";
 
-/** Добавить в markdown шага блок ### Картина N и синхронизировать lightKadrs. */
+export type InsertKadrAfterTarget = {
+  id?: string | null;
+  kadrNo?: number;
+};
+
+/** Вставить картину после указанной (или в конец шага) и перенумеровать 1…N. */
+export function insertKadrAfterInStep(args: {
+  step: ScriptStep;
+  after?: InsertKadrAfterTarget | null;
+  kadrId?: string;
+}): { nextMarkdown: string; nextKadrs: StepLightKadrsDataV1; kadrId: string; kadrNo: number } {
+  const markdown = String(args.step.markdown ?? "");
+  const kadrId = args.kadrId ?? createLightKadrId();
+  const sections = scanMarkdownKadrSections(markdown);
+
+  let insertAt = markdown.trimEnd().length;
+  let tempKadrNo = sections.length > 0 ? sections.length + 1 : 1;
+
+  if (args.after && sections.length > 0) {
+    const target =
+      (args.after.id ? sections.find((section) => section.id === args.after!.id) : undefined) ??
+      (args.after.kadrNo != null && args.after.kadrNo > 0
+        ? sections.find((section) => section.kadrNo === args.after!.kadrNo)
+        : undefined);
+    if (target) {
+      insertAt = target.sectionEnd;
+      tempKadrNo = target.kadrNo + 1;
+    }
+  }
+
+  const snippet = createKadrTemplateSnippet(tempKadrNo, kadrId);
+  const prefix = markdown.slice(insertAt, insertAt + 1) === "\n" || insertAt === 0 ? "" : "\n";
+  const insertedMarkdown = `${markdown.slice(0, insertAt)}${prefix}${snippet}${markdown.slice(insertAt)}`;
+  const nextMarkdown = renumberKadrSectionsInMarkdown(insertedMarkdown);
+  const prevKadrs = readStepLightKadrs(args.step);
+  const nextKadrs = syncLightKadrsFromMarkdown({ markdown: nextMarkdown, kadrs: prevKadrs });
+  const createdSection =
+    scanMarkdownKadrSections(nextMarkdown).find((section) => section.id === kadrId) ?? null;
+  const kadrNo = createdSection?.kadrNo ?? tempKadrNo;
+
+  return { nextMarkdown, nextKadrs, kadrId, kadrNo };
+}
+
+/** Добавить в конец markdown шага блок ### Картина N. */
 export function appendKadrToStep(args: {
   step: ScriptStep;
   kadrNo?: number;
   kadrId?: string;
 }): { nextMarkdown: string; nextKadrs: StepLightKadrsDataV1; kadrId: string; kadrNo: number } {
-  const markdown = String(args.step.markdown ?? "");
-  const kadrNo = args.kadrNo ?? nextKadrNumberForStep(args.step);
-  const kadrId = args.kadrId ?? createLightKadrId();
-  const snippet = createKadrTemplateSnippet(kadrNo, kadrId);
-  const nextMarkdown = `${markdown.trimEnd()}${snippet}`;
-  const prevKadrs = readStepLightKadrs(args.step);
-  const nextKadrs = syncLightKadrsFromMarkdown({ markdown: nextMarkdown, kadrs: prevKadrs });
-  return { nextMarkdown, nextKadrs, kadrId, kadrNo };
+  return insertKadrAfterInStep({ step: args.step, after: null, kadrId: args.kadrId });
 }
 
 export function findTapeIndexForStepKadr(

@@ -22,6 +22,12 @@ export interface SyncChange {
 
 export interface SyncPushRequest {
   changes: SyncChange[];
+  /** Точное название или slug проекта — для массового удаления / сброса / удаления проекта. */
+  destructiveConfirm?: string;
+}
+
+export interface SyncPushOptions {
+  destructiveConfirm?: string;
 }
 
 export interface SyncPullRequest {

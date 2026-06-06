@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import cn from "classnames";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useScene } from "../../scene";
 import { useAppDispatch } from "../../../shared/store/hooks";
 import {
@@ -9,12 +10,22 @@ import {
   type SceneVideo,
 } from "../../scene/model/scene-slice";
 import { useSpectacleRunContext } from "../../spectacle-run/model/spectacle-run-context";
+import type { ProjectorMediaContext } from "../model/projector-media";
+import { ProjectorMediaPreview } from "./ProjectorMediaPreview";
 import "./spectacle-run-projector.css";
 
 type RenameTarget = { kind: "video" | "hold"; id: number };
 
 function renameKey(target: RenameTarget): string {
   return `${target.kind}:${target.id}`;
+}
+
+function formatPlaybackTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const minutes = Math.floor(total / 60);
+  const rest = total % 60;
+  return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
 type ProjectorMediaTitleProps = {
@@ -27,7 +38,7 @@ type ProjectorMediaTitleProps = {
   onEditingNameChange: (value: string) => void;
   onApplyRename: (target: RenameTarget) => void;
   onCancelRename: () => void;
-  renameInputRef: RefObject<HTMLInputElement | null>;
+  renameInputRef: RefObject<HTMLInputElement>;
 };
 
 function ProjectorMediaTitle({
@@ -70,7 +81,7 @@ function ProjectorMediaTitle({
 
   return (
     <span
-      className="spectacle-run-projector__video-title"
+      className="spectacle-run-projector__card-title"
       title={`${display} — двойной клик, чтобы переименовать`}
       onDoubleClick={() => onStartRename(target, display)}
     >
@@ -79,14 +90,134 @@ function ProjectorMediaTitle({
   );
 }
 
+type ProjectorTapeCardProps = {
+  kind: "hold" | "video";
+  id: number;
+  title: string;
+  isActive: boolean;
+  isPaused?: boolean;
+  isMuted?: boolean;
+  projectorCtx: ProjectorMediaContext;
+  titleProps: Omit<ProjectorMediaTitleProps, "label" | "fallback" | "target">;
+  onPrimary: () => void;
+  onToggleMute?: () => void;
+  onDelete: () => void;
+  primaryLabel: string;
+  activePrimaryLabel: string;
+  pausedPrimaryLabel?: string;
+};
+
+function ProjectorTapeCard({
+  kind,
+  id,
+  title,
+  isActive,
+  isPaused = false,
+  isMuted = false,
+  projectorCtx,
+  titleProps,
+  onPrimary,
+  onToggleMute,
+  onDelete,
+  primaryLabel,
+  activePrimaryLabel,
+  pausedPrimaryLabel,
+}: ProjectorTapeCardProps) {
+  const primaryText = isActive ? activePrimaryLabel : isPaused ? (pausedPrimaryLabel ?? primaryLabel) : primaryLabel;
+  const renameTarget: RenameTarget = { kind, id };
+  const showMuteControl = kind === "video" && onToggleMute != null;
+
+  return (
+    <article
+      className={cn("spectacle-run-projector__card")}
+      data-active={isActive || undefined}
+      data-kind={kind}
+    >
+      <div className="spectacle-run-projector__card-preview">
+        <ProjectorMediaPreview
+          ctx={projectorCtx}
+          mode={kind === "hold" ? "hold" : "video"}
+          videoId={kind === "video" ? id : null}
+          holdId={kind === "hold" ? id : null}
+          title={title}
+          className="spectacle-run-projector__card-media"
+        />
+      </div>
+      <div className="spectacle-run-projector__card-body">
+        <ProjectorMediaTitle
+          {...titleProps}
+          label={title}
+          fallback={kind === "hold" ? `Заставка ${id}` : `Видео ${id}`}
+          target={renameTarget}
+        />
+        <div className="spectacle-run-projector__card-actions">
+          <div className="spectacle-run-projector__card-actions-row">
+            {showMuteControl ? (
+              <button
+                type="button"
+                className="spectacle-run-projector__btn spectacle-run-projector__btn--mute"
+                data-active={isMuted || undefined}
+                onClick={onToggleMute}
+                aria-label={isMuted ? "Включить звук" : "Выключить звук"}
+                title={isMuted ? "Включить звук" : "Выключить звук"}
+              >
+                {isMuted ? "Без звука" : "Со звуком"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="spectacle-run-projector__btn"
+              data-active={isActive || isPaused || undefined}
+              onClick={onPrimary}
+            >
+              {primaryText}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="spectacle-run-projector__btn spectacle-run-projector__btn--danger"
+            onClick={onDelete}
+            aria-label={`Удалить ${title}`}
+          >
+            Удалить
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function SpectacleRunProjectorPanel() {
   const run = useSpectacleRunContext();
-  const { saveStepsForLightPlot } = useScene();
+  const { saveStepsForLightPlot, sceneData } = useScene();
   const dispatch = useAppDispatch();
+
+  const projectorCtx = useMemo<ProjectorMediaContext>(
+    () => ({
+      projectSlug: run.projectName,
+      videos: run.videos,
+      holdImages: run.holdImages,
+      projector: sceneData?.projector ?? null,
+    }),
+    [run.holdImages, run.projectName, run.videos, sceneData?.projector],
+  );
 
   const [editingTarget, setEditingTarget] = useState<RenameTarget | null>(null);
   const [editingName, setEditingName] = useState("");
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+  const videos = run.videos;
+  const holdImages = run.holdImages;
+  const playback = run.projectorPlayback;
+  const activeVideoId = playback.mode === "video" ? playback.videoId : null;
+  const transportEnabled = run.isProjectorOpen && activeVideoId != null;
+  const duration = transportEnabled ? Math.max(0, playback.duration) : 0;
+  const currentTime = transportEnabled ? Math.max(0, Math.min(duration, playback.currentTime)) : 0;
+  const volumePercent = transportEnabled
+    ? Math.round(Math.max(0, Math.min(1, playback.volume)) * 100)
+    : activeVideoId != null
+      ? Math.round(run.resolveProjectorVideoVolume(activeVideoId) * 100)
+      : 100;
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -103,9 +234,6 @@ export function SpectacleRunProjectorPanel() {
 
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const holdInputRef = useRef<HTMLInputElement | null>(null);
-
-  const videos = run.videos;
-  const holdImages = run.holdImages;
 
   const startRename = (target: RenameTarget, currentTitle: string) => {
     setEditingTarget(target);
@@ -149,7 +277,7 @@ export function SpectacleRunProjectorPanel() {
         uploadSceneVideosWeb({ projectSlug: run.projectName, files: [...files] }),
       ).unwrap();
       await persistProjectorMedia();
-      run.setLiveStatus(`Добавлено видео: ${files.length}. Нажмите ▶ у ролика для проверки`);
+      run.setLiveStatus(`Добавлено видео: ${files.length}`);
     } catch (err) {
       run.setLiveStatus(String((err as Error)?.message ?? "Не удалось загрузить видео"));
     }
@@ -163,7 +291,7 @@ export function SpectacleRunProjectorPanel() {
         uploadSceneHoldImagesWeb({ projectSlug: run.projectName, files: [...files] }),
       ).unwrap();
       await persistProjectorMedia();
-      run.setLiveStatus(`Добавлено заставок: ${files.length}. Нажмите ▶ у картинки для проверки`);
+      run.setLiveStatus(`Добавлено заставок: ${files.length}`);
     } catch (err) {
       run.setLiveStatus(String((err as Error)?.message ?? "Не удалось загрузить заставки"));
     }
@@ -186,15 +314,7 @@ export function SpectacleRunProjectorPanel() {
     run.setLiveStatus(`Удалено: ${label}`);
   };
 
-  const draftSelectValue =
-    run.projectorDraft.mode === "hold"
-      ? run.projectorDraft.holdId != null
-        ? `hold:${run.projectorDraft.holdId}`
-        : "hold"
-      : String(run.projectorDraft.videoId);
-
   const editingKey = editingTarget ? renameKey(editingTarget) : null;
-
   const titleProps = {
     editingKey,
     editingName,
@@ -205,235 +325,170 @@ export function SpectacleRunProjectorPanel() {
     renameInputRef,
   };
 
+  const hasMedia = holdImages.length > 0 || videos.length > 0;
+
+  const handleSeek = (raw: string) => {
+    if (!transportEnabled) return;
+    run.seekProjectorVideoTime(Number(raw));
+  };
+
+  const handleVolume = (raw: string) => {
+    if (activeVideoId == null) return;
+    run.setProjectorVideoVolumeLevel(activeVideoId, Number(raw) / 100);
+  };
+
   return (
     <section className="spectacle-run-projector" aria-label="Проектор">
       <div className="spectacle-run-projector__head">
         <span className="spectacle-run-projector__title">Проектор</span>
+        <div className="spectacle-run-projector__toolbar">
+          <button
+            type="button"
+            className="spectacle-run-projector__btn"
+            data-active={run.isProjectorOpen || undefined}
+            onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
+          >
+            {run.isProjectorOpen ? "Закрыть окно" : "Открыть окно"}
+          </button>
+          <button
+            type="button"
+            className="spectacle-run-projector__btn"
+            onClick={() => videoInputRef.current?.click()}
+          >
+            + Видео
+          </button>
+          <input
+            ref={videoInputRef}
+            type="file"
+            accept="video/*"
+            multiple
+            hidden
+            onChange={(e) => void handleAddVideos(e.target.files)}
+          />
+          <button
+            type="button"
+            className="spectacle-run-projector__btn"
+            onClick={() => holdInputRef.current?.click()}
+            title="Картинки между роликами и после конца видео"
+          >
+            + Заставка
+          </button>
+          <input
+            ref={holdInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => void handleAddHoldImages(e.target.files)}
+          />
+        </div>
         <span
-          className={[
+          className={cn(
             "spectacle-run-projector__status",
-            run.isProjectorOpen ? "spectacle-run-projector__status--on" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+            run.isProjectorOpen && "spectacle-run-projector__status--on",
+          )}
         >
           {run.isProjectorOpen ? "выход открыт" : "выход закрыт"}
         </span>
       </div>
 
-      <p className="spectacle-run-projector__hint">
-        <strong>Как смотреть:</strong> у ролика или заставки — <strong>▶ Показать</strong> (откроется
-        окно для зала). На втором мониторе — F11. <strong>Двойной клик по названию</strong> —
-        переименовать. Для спектакля — «Записать в картину», потом ◀ ▶ в ленте.
-      </p>
-
-      <div className="spectacle-run-projector__actions">
-        <button
-          type="button"
-          className="spectacle-run__add-kadr-btn"
-          onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
-        >
-          {run.isProjectorOpen ? "Закрыть окно" : "Открыть окно"}
-        </button>
-
-        <button
-          type="button"
-          className="spectacle-run__add-kadr-btn"
-          onClick={() => videoInputRef.current?.click()}
-        >
-          + Видео
-        </button>
-        <input
-          ref={videoInputRef}
-          type="file"
-          accept="video/*"
-          multiple
-          hidden
-          onChange={(e) => void handleAddVideos(e.target.files)}
-        />
-
-        <button
-          type="button"
-          className="spectacle-run__add-kadr-btn"
-          onClick={() => holdInputRef.current?.click()}
-          title="Картинки между роликами и после конца видео"
-        >
-          + Заставка
-        </button>
-        <input
-          ref={holdInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={(e) => void handleAddHoldImages(e.target.files)}
-        />
-      </div>
-
-      {holdImages.length > 0 ? (
-        <ul className="spectacle-run-projector__videos" aria-label="Заставки проектора">
+      <div className="spectacle-run-projector__tape-wrap">
+        <div className="spectacle-run-projector__tape" role="list" aria-label="Медиа проектора">
+          {!hasMedia ? (
+            <p className="spectacle-run-projector__tape-empty">Добавьте видео или заставку</p>
+          ) : null}
           {holdImages.map((hold: SceneHoldImage) => {
             const isActive =
-              run.projectorPlayback.mode === "hold" &&
-              run.projectorPlayback.holdId === hold.id &&
+              playback.mode === "hold" &&
+              playback.holdId === hold.id &&
               run.isProjectorOpen;
+            const holdTitle = hold.title?.trim() || `Заставка ${hold.id}`;
             return (
-              <li key={hold.id} className="spectacle-run-projector__video-item">
-                <ProjectorMediaTitle
-                  {...titleProps}
-                  label={hold.title}
-                  fallback={`Заставка ${hold.id}`}
-                  target={{ kind: "hold", id: hold.id }}
-                />
-                <div className="spectacle-run-projector__item-actions">
-                  <button
-                    type="button"
-                    className="spectacle-run-projector__play-btn"
-                    data-primary={isActive ? true : undefined}
-                    onClick={() => run.showProjectorHold(hold.id)}
-                    title="Показать заставку на окне проектора"
-                  >
-                    {isActive ? "● Показана" : "▶ Показать"}
-                  </button>
-                  <button
-                    type="button"
-                    className="spectacle-run-projector__delete-btn"
-                    onClick={() => void handleRemoveHold(hold)}
-                    title="Удалить заставку"
-                    aria-label={`Удалить заставку ${hold.title?.trim() || hold.id}`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </li>
+              <ProjectorTapeCard
+                key={`hold-${hold.id}`}
+                kind="hold"
+                id={hold.id}
+                title={holdTitle}
+                isActive={isActive}
+                projectorCtx={projectorCtx}
+                titleProps={titleProps}
+                onPrimary={() => run.showProjectorHold(hold.id)}
+                onDelete={() => void handleRemoveHold(hold)}
+                primaryLabel="Показать"
+                activePrimaryLabel="На экране"
+              />
             );
           })}
-        </ul>
-      ) : null}
-
-      {videos.length > 0 ? (
-        <ul className="spectacle-run-projector__videos" aria-label="Загруженные ролики">
           {videos.map((video: SceneVideo) => {
             const isActive =
-              run.projectorPlayback.videoId === video.id &&
-              run.projectorPlayback.playing;
+              playback.videoId === video.id && playback.playing && run.isProjectorOpen;
             const isPausedSame =
-              run.projectorPlayback.videoId === video.id &&
-              !run.projectorPlayback.playing &&
-              run.isProjectorOpen;
+              playback.videoId === video.id &&
+              !playback.playing &&
+              run.isProjectorOpen &&
+              playback.mode === "video";
+            const videoTitle = video.title?.trim() || `Видео ${video.id}`;
             const isMuted = run.isProjectorVideoMuted(video.id);
             return (
-              <li key={video.id} className="spectacle-run-projector__video-item">
-                <ProjectorMediaTitle
-                  {...titleProps}
-                  label={video.title}
-                  fallback={`Видео ${video.id}`}
-                  target={{ kind: "video", id: video.id }}
-                />
-                <div className="spectacle-run-projector__item-actions">
-                  <button
-                    type="button"
-                    className="spectacle-run-projector__mute-btn"
-                    data-muted={isMuted ? true : undefined}
-                    onClick={() => run.toggleProjectorVideoMute(video.id)}
-                    title={isMuted ? "Включить звук на проекторе" : "Выключить звук на проекторе"}
-                    aria-label={isMuted ? "Включить звук" : "Выключить звук"}
-                  >
-                    {isMuted ? "🔇" : "🔊"}
-                  </button>
-                  <button
-                    type="button"
-                    className="spectacle-run-projector__play-btn"
-                    data-primary={isActive ? undefined : true}
-                    data-paused={isPausedSame ? true : undefined}
-                    onClick={() => run.toggleProjectorVideo(video.id)}
-                    title={
-                      isActive
-                        ? "Пауза на проекторе"
-                        : isPausedSame
-                          ? "Продолжить на проекторе"
-                          : "Запустить на окне проектора"
-                    }
-                  >
-                    {isActive ? "⏸ Пауза" : isPausedSame ? "▶ Продолжить" : "▶ Пуск"}
-                  </button>
-                  <button
-                    type="button"
-                    className="spectacle-run-projector__delete-btn"
-                    onClick={() => void handleRemoveVideo(video)}
-                    title="Удалить ролик"
-                    aria-label={`Удалить ролик ${video.title?.trim() || video.id}`}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </li>
+              <ProjectorTapeCard
+                key={`video-${video.id}`}
+                kind="video"
+                id={video.id}
+                title={videoTitle}
+                isActive={isActive}
+                isPaused={isPausedSame}
+                isMuted={isMuted}
+                projectorCtx={projectorCtx}
+                titleProps={titleProps}
+                onPrimary={() => run.toggleProjectorVideo(video.id)}
+                onToggleMute={() => run.toggleProjectorVideoMute(video.id)}
+                onDelete={() => void handleRemoveVideo(video)}
+                primaryLabel="Пуск"
+                activePrimaryLabel="Пауза"
+                pausedPrimaryLabel="Продолжить"
+              />
             );
           })}
-        </ul>
-      ) : null}
+        </div>
+      </div>
 
-      <div className="spectacle-run-projector__cue">
-        <span className="spectacle-run-projector__cue-label">В картину репетиции:</span>
-        <select
-          id="spectacle-projector-cue"
-          className="spectacle-run-projector__select"
-          value={draftSelectValue}
-          onChange={(e) => {
-            const val = e.target.value;
-            if (val === "hold") {
-              run.setProjectorDraft({ mode: "hold" });
-              return;
-            }
-            if (val.startsWith("hold:")) {
-              const id = Math.trunc(Number(val.slice(5)));
-              if (id > 0) run.setProjectorDraft({ mode: "hold", holdId: id });
-              return;
-            }
-            const id = Math.trunc(Number(val));
-            if (id > 0) run.setProjectorDraft({ mode: "video", videoId: id });
-          }}
-        >
-          {holdImages.length > 0 ? (
-            <>
-              <option value="hold">Заставка (по умолчанию)</option>
-              {holdImages.map((hold: SceneHoldImage) => (
-                <option key={hold.id} value={`hold:${hold.id}`}>
-                  {hold.title?.trim() || `Заставка ${hold.id}`}
-                </option>
-              ))}
-            </>
-          ) : (
-            <option value="hold">Заставка</option>
-          )}
-          {videos.map((video: SceneVideo) => (
-            <option key={video.id} value={String(video.id)}>
-              {video.title?.trim() || `Видео ${video.id}`}
-            </option>
-          ))}
-        </select>
-
-        {run.canRecordProjector ? (
-          <button
-            type="button"
-            className="spectacle-run__add-kadr-btn"
-            onClick={run.recordProjectorToCurrentKadr}
-            title="Сохранить в тех. карту текущей картины"
-          >
-            Записать в картину
-          </button>
-        ) : null}
-
-        {run.canPreviewProjector ? (
-          <button
-            type="button"
-            className="spectacle-run__add-kadr-btn"
-            onClick={run.previewProjectorDraft}
-            title="Показать выбранное в списке «В картину»"
-          >
-            ▶ Показать выбранное
-          </button>
-        ) : null}
+      <div className="spectacle-run-projector__transport">
+        <label className="spectacle-run-projector__slider-field">
+          <span className="spectacle-run-projector__slider-label">
+            Прогресс
+            <span className="spectacle-run-projector__slider-value">
+              {formatPlaybackTime(currentTime)} / {formatPlaybackTime(duration)}
+            </span>
+          </span>
+          <input
+            className="spectacle-run-projector__slider"
+            type="range"
+            min={0}
+            max={duration > 0 ? duration : 1}
+            step={0.1}
+            value={currentTime}
+            disabled={!transportEnabled || duration <= 0}
+            onChange={(e) => handleSeek(e.target.value)}
+            aria-label="Прогресс видео"
+          />
+        </label>
+        <label className="spectacle-run-projector__slider-field">
+          <span className="spectacle-run-projector__slider-label">
+            Громкость
+            <span className="spectacle-run-projector__slider-value">{volumePercent}%</span>
+          </span>
+          <input
+            className="spectacle-run-projector__slider"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={volumePercent}
+            disabled={activeVideoId == null}
+            onChange={(e) => handleVolume(e.target.value)}
+            aria-label="Громкость видео"
+          />
+        </label>
       </div>
     </section>
   );

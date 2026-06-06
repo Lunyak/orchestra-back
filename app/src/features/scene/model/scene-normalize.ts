@@ -23,7 +23,8 @@ export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
 
 export function normalizeLightChannelsLoose(raw: unknown): string[] {
   if (!Array.isArray(raw)) return Array.from({ length: 8 }, () => "");
-  return Array.from({ length: Math.max(8, raw.length) }, (_, i) => String(raw[i] ?? ""));
+  if (raw.length === 0) return Array.from({ length: 8 }, () => "");
+  return Array.from({ length: raw.length }, (_, i) => String(raw[i] ?? ""));
 }
 
 export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | null {

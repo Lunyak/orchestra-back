@@ -44,13 +44,17 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
     );
   }
 
+  const isProjectorOutput =
+    typeof window !== "undefined" &&
+    window.location.pathname.replace(/\/$/, "").endsWith("/projector-output");
+
   return (
     <ProjectProvider>
       <SceneSyncRunner>
         <ScriptUIProvider>
           <>
             <AppRoutes />
-            <ChatDock />
+            {!isProjectorOutput ? <ChatDock /> : null}
           </>
         </ScriptUIProvider>
       </SceneSyncRunner>

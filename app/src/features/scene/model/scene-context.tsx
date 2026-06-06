@@ -22,6 +22,7 @@ import {
   invokeSoundToggle,
   registerPlaylistPlayHandler,
   registerSoundToggleHandler,
+  type PlaylistPlayOptions,
 } from "./scene-playback-bridge";
 
 type SetStateAction<T> = T | ((prev: T) => T);
@@ -55,16 +56,32 @@ export interface SceneContextValue {
   saveStepsForLightPlot: (opts?: { force?: boolean }) => Promise<void>;
   pushSceneAfterSoundsSave: () => Promise<void>;
   syncFromServer: (token?: string | null, projectOverride?: string) => Promise<void>;
-  registerPlaylistPlay: (handler: (trackId: number) => void) => void;
-  handleTrackLinkClick: (trackId: number) => void;
+  registerPlaylistPlay: (handler: (trackId: number, options?: PlaylistPlayOptions) => void) => void;
+  handleTrackLinkClick: (trackId: number, options?: PlaylistPlayOptions) => void;
   registerSoundToggle: (handler: (soundId: number) => void) => void;
   handleSoundLinkClick: (soundId: number) => void;
 }
 
-/** Mounts scene sync side-effects (Redux-backed, not React Context state). */
-export function SceneSyncRunner({ children }: { children: React.ReactNode }) {
+function SceneSyncRunnerActive({ children }: { children: React.ReactNode }) {
   useSceneSyncEffects();
   return <>{children}</>;
+}
+
+/**
+ * Mounts scene sync side-effects (Redux-backed, not React Context state).
+ * Окно проектора (/projector-output) — отдельный window.open с пустым Redux;
+ * sync там не нужен и опасен (может затереть сервер устаревшим diff).
+ */
+export function SceneSyncRunner({ children }: { children: React.ReactNode }) {
+  const isProjectorOutput =
+    typeof window !== "undefined" &&
+    window.location.pathname.replace(/\/$/, "").endsWith("/projector-output");
+
+  if (isProjectorOutput) {
+    return <>{children}</>;
+  }
+
+  return <SceneSyncRunnerActive>{children}</SceneSyncRunnerActive>;
 }
 
 /** @deprecated Use SceneSyncRunner */
@@ -152,12 +169,15 @@ export function useScene(): SceneContextValue {
     [dispatch],
   );
 
-  const registerPlaylistPlay = useCallback((handler: (trackId: number) => void) => {
-    registerPlaylistPlayHandler(handler);
-  }, []);
+  const registerPlaylistPlay = useCallback(
+    (handler: (trackId: number, options?: PlaylistPlayOptions) => void) => {
+      registerPlaylistPlayHandler(handler);
+    },
+    [],
+  );
 
-  const handleTrackLinkClick = useCallback((trackId: number) => {
-    invokePlaylistPlay(trackId);
+  const handleTrackLinkClick = useCallback((trackId: number, options?: PlaylistPlayOptions) => {
+    invokePlaylistPlay(trackId, options);
   }, []);
 
   const registerSoundToggle = useCallback((handler: (soundId: number) => void) => {

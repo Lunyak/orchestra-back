@@ -17,6 +17,8 @@ export type KadrProjectorCue =
 const TOKEN_VIDEO_RE = /\{\{\s*video\s*:\s*(\d+)(?:\|([^}]+?))?\s*}}/gi;
 const TOKEN_HOLD_ID_RE = /\{\{\s*hold\s*:\s*(\d+)\s*}}/gi;
 const TOKEN_HOLD_BARE_RE = /\{\{\s*hold\s*}}/gi;
+const VIDEO_LINK_RE = /\[[^\]]*\]\(\s*video\s*:\s*(\d+)\s*\)/gi;
+const HOLD_LINK_RE = /\[[^\]]*\]\(\s*hold\s*:\s*(\d+)\s*\)/gi;
 
 function isVideoKadrLine(line: string): boolean {
   const trimmed = String(line ?? "").trim().toLowerCase();
@@ -30,20 +32,24 @@ export function parseProjectorKadrLine(line: string): KadrProjectorCue | null {
   TOKEN_VIDEO_RE.lastIndex = 0;
   TOKEN_HOLD_ID_RE.lastIndex = 0;
   TOKEN_HOLD_BARE_RE.lastIndex = 0;
+  VIDEO_LINK_RE.lastIndex = 0;
+  HOLD_LINK_RE.lastIndex = 0;
 
   const videoMatches = [...trimmed.matchAll(TOKEN_VIDEO_RE)];
+  const videoLinkMatches = [...trimmed.matchAll(VIDEO_LINK_RE)];
   const holdIdMatches = [...trimmed.matchAll(TOKEN_HOLD_ID_RE)];
+  const holdLinkMatches = [...trimmed.matchAll(HOLD_LINK_RE)];
   const holdBareMatches = [...trimmed.matchAll(TOKEN_HOLD_BARE_RE)];
 
-  if (videoMatches.length > 0) {
-    const videoId = Math.trunc(Number(videoMatches[0][1]) || 0);
-    if (videoId > 0) return { mode: "video", videoId };
-  }
+  const videoIdFromToken = videoMatches[0]?.[1];
+  const videoIdFromLink = videoLinkMatches[0]?.[1];
+  const resolvedVideoId = Math.trunc(Number(videoIdFromToken ?? videoIdFromLink) || 0);
+  if (resolvedVideoId > 0) return { mode: "video", videoId: resolvedVideoId };
 
-  if (holdIdMatches.length > 0) {
-    const holdId = Math.trunc(Number(holdIdMatches[0][1]) || 0);
-    if (holdId > 0) return { mode: "hold", holdId };
-  }
+  const holdIdFromToken = holdIdMatches[0]?.[1];
+  const holdIdFromLink = holdLinkMatches[0]?.[1];
+  const resolvedHoldId = Math.trunc(Number(holdIdFromToken ?? holdIdFromLink) || 0);
+  if (resolvedHoldId > 0) return { mode: "hold", holdId: resolvedHoldId };
 
   if (holdBareMatches.length > 0) return { mode: "hold" };
 
@@ -83,7 +89,7 @@ export function formatProjectorKadrLine(
       const hold = options?.holdImages?.find((h) => Number(h.id) === cue.holdId);
       const label = hold?.title?.trim() || `Заставка ${cue.holdId}`;
       const safeTitle = label.replace(/\\/g, "\\\\").replace(/]/g, "\\]");
-      return `${VIDEO_LINE_PREFIX} {{hold:${cue.holdId}}} [${safeTitle}](hold:${cue.holdId})`;
+      return `${VIDEO_LINE_PREFIX} [${safeTitle}](hold:${cue.holdId})`;
     }
     return `${VIDEO_LINE_PREFIX} {{hold}}`;
   }
@@ -91,7 +97,7 @@ export function formatProjectorKadrLine(
   const video = options?.videos?.find((v) => Number(v.id) === cue.videoId);
   const label = video?.title?.trim() || `Видео ${cue.videoId}`;
   const safeTitle = label.replace(/\\/g, "\\\\").replace(/]/g, "\\]");
-  return `${VIDEO_LINE_PREFIX} {{video:${cue.videoId}}} [${safeTitle}](video:${cue.videoId})`;
+  return `${VIDEO_LINE_PREFIX} [${safeTitle}](video:${cue.videoId})`;
 }
 
 export function upsertProjectorLineInSection(

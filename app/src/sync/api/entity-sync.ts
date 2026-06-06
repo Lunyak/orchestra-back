@@ -4,12 +4,21 @@ import type {
   SyncChange,
   SyncPullRequest,
   SyncPullResponse,
+  SyncPushOptions,
   SyncPushRequest,
 } from "./types/sync";
 
-export async function syncPush(accessToken: string, changes: SyncChange[]) {
+export async function syncPush(
+  accessToken: string,
+  changes: SyncChange[],
+  options?: SyncPushOptions,
+) {
   if (!changes.length) return;
-  await api.post<unknown>("/sync/push", { changes } as SyncPushRequest, {
+  const body: SyncPushRequest = { changes };
+  if (options?.destructiveConfirm?.trim()) {
+    body.destructiveConfirm = options.destructiveConfirm.trim();
+  }
+  await api.post<unknown>("/sync/push", body, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "x-orchestra-client-id": getClientInstanceId(),

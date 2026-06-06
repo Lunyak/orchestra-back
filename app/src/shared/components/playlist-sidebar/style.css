@@ -502,6 +502,22 @@
   white-space: nowrap;
 }
 
+:root {
+  --playlist-bottom-player-reserve: 136px;
+}
+
+@media (max-width: 720px) {
+  :root {
+    --playlist-bottom-player-reserve: 156px;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --playlist-bottom-player-reserve: 196px;
+  }
+}
+
 .playlist-bottom-player {
   position: fixed;
   left: 50%;

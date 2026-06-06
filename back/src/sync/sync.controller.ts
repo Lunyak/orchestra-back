@@ -39,6 +39,7 @@ export class SyncController {
       req.user.userId,
       body.changes ?? [],
       sourceClientId,
+      body.destructiveConfirm,
     );
   }
 

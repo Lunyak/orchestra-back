@@ -4,18 +4,12 @@ import type {
   SceneLightFadersDataV1,
   SceneLightProgramsDataV1,
 } from "../../../features/scene/model/scene-slice";
-import type { LightFixture, ScriptStep } from "../../../shared/types/script";
+import type { ScriptStep } from "../../../shared/types/script";
 import {
   fadersForKadrDisplay,
   findKadrById,
   readStepLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
-import {
-  formatSofitChannelsLabel,
-  resolveLightChannelRoles,
-  toggleSofitChannel,
-} from "../../../shared/components/light-console/light-channel-roles";
-import { LightChannelsCountControls } from "../../../shared/components/light-console/LightChannelsCountControls";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import { buildLightSchemeLookModel } from "../../../shared/components/light-console/light-scheme-preview";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
@@ -40,13 +34,7 @@ export type SpectacleRunSchemePaneProps = {
   liveConsole: ReturnType<typeof useLightConsoleState>;
   liveStatus: string | null;
   onLiveStatus?: (message: string | null) => void;
-  onAddKadr?: () => void;
-  nextKadrNo?: number;
-  onOpenTechCard?: (stepIndex?: number) => void;
-  onSyncPlotFrom3d?: () => void;
-  canSyncPlotFrom3d?: boolean;
-  onAppendLightChannel?: () => void;
-  onRemoveLightChannel?: () => void;
+  onOpenConsoleSettings?: () => void;
 };
 
 export function SpectacleRunSchemePane({
@@ -56,18 +44,12 @@ export function SpectacleRunSchemePane({
   lightFaders,
   lightPrograms,
   lightChannelRoles,
-  onLightChannelRolesChange,
+  onLightChannelRolesChange: _onLightChannelRolesChange,
   selectedLightSlot,
   liveConsole,
   liveStatus,
   onLiveStatus,
-  onAddKadr,
-  nextKadrNo = 1,
-  onOpenTechCard,
-  onSyncPlotFrom3d,
-  canSyncPlotFrom3d = false,
-  onAppendLightChannel,
-  onRemoveLightChannel,
+  onOpenConsoleSettings,
 }: SpectacleRunSchemePaneProps) {
   const [highlightedChannel, setHighlightedChannel] = useState<number | null>(null);
   const lightPlot = step?.lightPlot ?? [];
@@ -91,10 +73,6 @@ export function SpectacleRunSchemePane({
   const displayFaders = useMemo(
     () => (activeKadr ? fadersForKadrDisplay(activeKadr, baseFaders) : baseFaders),
     [activeKadr, baseFaders],
-  );
-  const roles = useMemo(
-    () => resolveLightChannelRoles(lightChannelRoles, lightChannels.length),
-    [lightChannelRoles, lightChannels.length],
   );
 
   const lookModel = useMemo(() => {
@@ -123,86 +101,20 @@ export function SpectacleRunSchemePane({
       <div className="spectacle-run-scheme spectacle-run-scheme--empty">
         <p>
           В шаге «{tapeItem.stepTitle}» пока нет картин. Добавьте первую — появится в ленте репетиции
-          и в тексте шага (<code>### Картина {nextKadrNo}</code>).
+          и в тексте шага (<code>### Картина 1</code>).
         </p>
-        {onAddKadr ? (
-          <button
-            type="button"
-            className="spectacle-run__add-kadr-btn"
-            data-primary="true"
-            onClick={onAddKadr}
-          >
-            + Картина {nextKadrNo}
-          </button>
-        ) : null}
       </div>
     );
   }
 
   return (
     <div className="spectacle-run-scheme">
-      <div className="light-scheme-board__roles">
-        <span className="light-scheme-board__roles-label">Каналы в картину:</span>
-        <div className="light-scheme-board__roles-toggles">
-          {lightChannels.map((_, index) => {
-            const channel = index + 1;
-            const active = roles.sofitChannels.includes(channel);
-            return (
-              <button
-                key={channel}
-                type="button"
-                className="light-scheme-board__role-btn"
-                data-active={active}
-                data-highlight={highlightedChannel === channel}
-                onMouseEnter={() => setHighlightedChannel(channel)}
-                onMouseLeave={() => setHighlightedChannel(null)}
-                onClick={() =>
-                  onLightChannelRolesChange(
-                    toggleSofitChannel(roles, channel, lightChannels.length),
-                  )
-                }
-              >
-                K{channel}
-              </button>
-            );
-          })}
-        </div>
-        <span className="light-scheme-board__roles-summary">
-          {formatSofitChannelsLabel(roles.sofitChannels)}
-        </span>
-        {onAppendLightChannel && onRemoveLightChannel ? (
-          <LightChannelsCountControls
-            channelCount={lightChannels.length}
-            onAppend={onAppendLightChannel}
-            onRemove={onRemoveLightChannel}
-          />
-        ) : null}
-      </div>
-
       {plotEmpty ? (
         <div className="spectacle-run-scheme__plot-setup" role="note">
           <p>
             <strong>План софитов пуст</strong> — на схеме нечего подсвечивать. Картины и текст — в{" "}
-            <strong>{SCRIPT_MARKDOWN_NOTES_TAB_LABEL}</strong>, позиции софитов — в 3D-театре (кнопка
-            ниже).
+            <strong>{SCRIPT_MARKDOWN_NOTES_TAB_LABEL}</strong>, позиции софитов — в 3D-театре ниже.
           </p>
-          <div className="spectacle-run-scheme__plot-setup-actions">
-            {onOpenTechCard ? (
-              <button
-                type="button"
-                className="spectacle-run__add-kadr-btn"
-                data-primary="true"
-                onClick={() => onOpenTechCard()}
-              >
-                {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}
-              </button>
-            ) : null}
-            {canSyncPlotFrom3d && onSyncPlotFrom3d ? (
-              <button type="button" className="spectacle-run__add-kadr-btn" onClick={onSyncPlotFrom3d}>
-                Взять позиции из 3D
-              </button>
-            ) : null}
-          </div>
         </div>
       ) : null}
 
@@ -217,8 +129,7 @@ export function SpectacleRunSchemePane({
             F1–F{liveConsole.faders.count ?? liveConsole.faders.faders.length}
           </strong>{" "}
           → слева <strong>K3</strong>, подстройте
-          ползунки → <strong>K4</strong>, другие уровни (память на канал) → <strong>П3</strong> заливка →{" "}
-          <strong>«Записать свет»</strong> на каждом K или в конце.
+          ползунки → <strong>K4</strong>, другие уровни (память на канал) → <strong>П3</strong> заливка.
         </p>
       )}
 
@@ -234,9 +145,7 @@ export function SpectacleRunSchemePane({
             selectedLightSlot={selectedLightSlot}
             highlightedChannel={highlightedChannel}
             editable={false}
-            emptyPlotHint={`Нет точек на плане. «${SCRIPT_MARKDOWN_NOTES_TAB_LABEL}» или «Взять позиции из 3D» выше.`}
-            emptyPlotActionLabel={onOpenTechCard ? SCRIPT_MARKDOWN_NOTES_TAB_LABEL : undefined}
-            onEmptyPlotAction={onOpenTechCard}
+            emptyPlotHint={`Нет точек на плане. Добавьте софиты в «${SCRIPT_MARKDOWN_NOTES_TAB_LABEL}» или расставьте в 3D-театре.`}
           />
         )}
         <LightSchemeLookCard
@@ -262,10 +171,8 @@ export function SpectacleRunSchemePane({
         consoleChannel={liveConsole.selectedLightSlot}
         onSelectChannel={liveConsole.selectChannel}
         onSelectProgram={liveConsole.selectProgram}
-        onFaderCountChange={liveConsole.setFaderCount}
+        onOpenSettings={onOpenConsoleSettings}
         onPatchFader={liveConsole.patchFader}
-        onAppendLightChannel={onAppendLightChannel}
-        onRemoveLightChannel={onRemoveLightChannel}
         onSaveActiveProgram={() => {
           const pid = Math.max(
             1,
@@ -274,7 +181,7 @@ export function SpectacleRunSchemePane({
           const prog = liveConsole.programs.programs.find((p) => p.id === pid);
           liveConsole.saveProgramSnapshot();
           onLiveStatus?.(
-            `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы). Карточка картины и тех. карта — после «Записать свет».`,
+            `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы).`,
           );
         }}
         className="spectacle-run-scheme__console"

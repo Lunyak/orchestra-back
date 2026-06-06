@@ -17,13 +17,20 @@ function reportPlayback(
   holdId: number | null,
   playing: boolean,
   mode: OutputMode,
+  video?: HTMLVideoElement | null,
 ) {
+  const currentTime = mode === "video" && video ? video.currentTime : 0;
+  const duration = mode === "video" && video && Number.isFinite(video.duration) ? video.duration : 0;
+  const volume = mode === "video" && video ? video.volume : 1;
   sendProjectorMessage({
     type: "playback-state",
     videoId,
     holdId,
     playing,
     mode,
+    currentTime,
+    duration,
+    volume,
   });
 }
 
@@ -49,6 +56,7 @@ export function ProjectorOutputPage() {
   });
   const loadHoldSeqRef = useRef(0);
   const loadVideoSeqRef = useRef(0);
+  const videoVolumeRef = useRef(1);
   const videoMutedRef = useRef(false);
 
   const requestFullscreen = useCallback(() => {
@@ -143,12 +151,48 @@ export function ProjectorOutputPage() {
     [revokeVideoBlob],
   );
 
+  const applyVideoElementState = useCallback((video: HTMLVideoElement) => {
+    const volume = Math.max(0, Math.min(1, videoVolumeRef.current));
+    video.volume = volume;
+    video.muted = videoMutedRef.current || volume === 0;
+  }, []);
+
   const applyMessage = useCallback(
     (msg: ProjectorMessage) => {
+      if (msg.type === "set-video-volume") {
+        videoVolumeRef.current = Math.max(0, Math.min(1, Number(msg.volume) || 0));
+        const video = videoRef.current;
+        if (video) {
+          applyVideoElementState(video);
+          reportPlayback(
+            activeVideoIdRef.current,
+            activeHoldIdRef.current,
+            !video.paused,
+            "video",
+            video,
+          );
+        }
+        return;
+      }
+      if (msg.type === "seek-video") {
+        const video = videoRef.current;
+        if (video && Number.isFinite(msg.time)) {
+          const duration = Number.isFinite(video.duration) ? video.duration : 0;
+          video.currentTime = Math.max(0, Math.min(duration, msg.time));
+          reportPlayback(
+            activeVideoIdRef.current,
+            activeHoldIdRef.current,
+            !video.paused,
+            "video",
+            video,
+          );
+        }
+        return;
+      }
       if (msg.type === "set-video-muted") {
         videoMutedRef.current = msg.muted;
         const video = videoRef.current;
-        if (video) video.muted = msg.muted;
+        if (video) applyVideoElementState(video);
         return;
       }
       if (msg.type === "pause-video") {
@@ -196,6 +240,12 @@ export function ProjectorOutputPage() {
         activeVideoIdRef.current = msg.videoId;
         activeHoldIdRef.current = msg.holdId;
         videoMutedRef.current = msg.muted ?? false;
+        videoVolumeRef.current =
+          msg.volume != null && Number.isFinite(msg.volume)
+            ? Math.max(0, Math.min(1, msg.volume))
+            : videoMutedRef.current
+              ? 0
+              : 1;
         pendingHoldRef.current = {
           storageKey: msg.holdStorageKey,
           fallbackSrc: msg.holdSrc,
@@ -206,7 +256,7 @@ export function ProjectorOutputPage() {
         void loadVideoSource(msg.storageKey, msg.src || null);
       }
     },
-    [loadHoldImage, loadVideoSource, revokeHoldBlob, revokeVideoBlob],
+    [applyVideoElementState, loadHoldImage, loadVideoSource, revokeHoldBlob, revokeVideoBlob],
   );
 
   useEffect(() => {
@@ -224,7 +274,7 @@ export function ProjectorOutputPage() {
     if (mode !== "video" || !videoSrc || videoLoading) return;
     const video = videoRef.current;
     if (!video) return;
-    video.muted = videoMutedRef.current;
+    applyVideoElementState(video);
     video.load();
     const play = () => {
       void video.play().catch(() => {
@@ -232,21 +282,39 @@ export function ProjectorOutputPage() {
           "video",
           "браузер не запустил видео — кликните по экрану проектора",
         );
-        reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, false, "video");
+        reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, false, "video", video);
       });
     };
     video.addEventListener("loadeddata", play);
     play();
     return () => video.removeEventListener("loadeddata", play);
-  }, [mode, videoSrc, videoLoading]);
+  }, [applyVideoElementState, mode, videoSrc, videoLoading]);
+
+  const handleVideoTimeUpdate = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || mode !== "video") return;
+    reportPlayback(
+      activeVideoIdRef.current,
+      activeHoldIdRef.current,
+      !video.paused,
+      "video",
+      video,
+    );
+  }, [mode]);
 
   const handleVideoPlay = useCallback(() => {
-    reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, true, "video");
+    reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, true, "video", videoRef.current);
   }, []);
 
   const handleVideoPause = useCallback(() => {
     if (mode === "video") {
-      reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, false, "video");
+      reportPlayback(
+        activeVideoIdRef.current,
+        activeHoldIdRef.current,
+        false,
+        "video",
+        videoRef.current,
+      );
     }
   }, [mode]);
 
@@ -265,7 +333,7 @@ export function ProjectorOutputPage() {
       "video",
       "не удалось воспроизвести видео — проверьте файл и перезагрузите страницу проектора",
     );
-    reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, false, "video");
+    reportPlayback(activeVideoIdRef.current, activeHoldIdRef.current, false, "video", videoRef.current);
   }, []);
 
   const handleHoldError = useCallback(() => {
@@ -310,6 +378,7 @@ export function ProjectorOutputPage() {
           playsInline
           onPlay={handleVideoPlay}
           onPause={handleVideoPause}
+          onTimeUpdate={handleVideoTimeUpdate}
           onEnded={handleVideoEnded}
           onError={handleVideoError}
         />

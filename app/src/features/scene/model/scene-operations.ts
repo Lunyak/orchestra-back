@@ -44,7 +44,9 @@ import {
   normalizeLightChannelsFromServer,
   normalizeTheaterLayoutFromServer,
 } from "./scene-normalize";
-import { mergeLightChannelsPreferLonger } from "../../../shared/components/light-console/light-channels-mutate";
+import {
+  resolveLightChannelsForPersist,
+} from "../../../shared/components/light-console/light-channels-mutate";
 
 function normalizeRequisiteAssignees(value: unknown): string[] {
   return Array.isArray(value)
@@ -383,6 +385,21 @@ export function useSceneOperations() {
     const liveTheaterLayout = liveScene.theaterLayout;
     const liveServerShadow = liveScene.serverShadow;
     const liveHasLocalEdits = liveScene.hasLocalEdits;
+    if (!liveScene.isSceneReady) return;
+
+    const shadowStepCount = Array.isArray(liveServerShadow?.steps)
+      ? liveServerShadow!.steps.length
+      : 0;
+    const localBehindServer =
+      shadowStepCount > 1 && liveSteps.length < shadowStepCount * 0.8;
+    if (localBehindServer && !liveHasLocalEdits) {
+      console.warn("[sync] skip push: local steps fewer than server baseline", {
+        local: liveSteps.length,
+        server: shadowStepCount,
+      });
+      return;
+    }
+
     const shouldSave = liveHasLocalEdits || Boolean(opts?.force);
     if (!shouldSave) return;
     const desktopApi = getDesktopApi();
@@ -398,6 +415,11 @@ export function useSceneOperations() {
           | Record<string, { remoteKey?: string; remoteUrl?: string }>
           | undefined,
         liveSteps,
+      );
+      const liveShowScriptUi = selectShowScriptMarkdownUi(
+        store.getState(),
+        projectName || "fools",
+        "script",
       );
       const payload: any = {
         ...(current ?? {}),
@@ -417,9 +439,9 @@ export function useSceneOperations() {
           projector: liveSceneData?.projector ?? (current as any)?.projector,
         }),
         images,
-        lightChannels: mergeLightChannelsPreferLonger(
-          Array.isArray(liveSceneData?.lightChannels) ? liveSceneData.lightChannels : [],
-          Array.isArray(showScriptUi.lightChannels) ? showScriptUi.lightChannels : [],
+        lightChannels: resolveLightChannelsForPersist(
+          liveShowScriptUi.lightChannels,
+          liveSceneData?.lightChannels,
         ),
       };
 
@@ -683,19 +705,29 @@ export function useSceneOperations() {
               updatedAt: nowIso,
             };
             if (!serverShadowForDiff || sceneRolesChanged) {
-              scenePayload.sceneRoles = nextSceneRoles;
+              if (!(nextSceneRoles == null && prevSceneRoles != null)) {
+                scenePayload.sceneRoles = nextSceneRoles;
+              }
             }
             if (!serverShadowForDiff || lightFadersChanged) {
-              scenePayload.lightFaders = nextLightFaders;
+              if (!(nextLightFaders == null && prevLightFaders != null)) {
+                scenePayload.lightFaders = nextLightFaders;
+              }
             }
             if (!serverShadowForDiff || lightProgramsChanged) {
-              scenePayload.lightPrograms = nextLightPrograms;
+              if (!(nextLightPrograms == null && prevLightPrograms != null)) {
+                scenePayload.lightPrograms = nextLightPrograms;
+              }
             }
             if (!serverShadowForDiff || lightChannelRolesChanged) {
-              scenePayload.lightChannelRoles = nextLightChannelRoles;
+              if (!(nextLightChannelRoles == null && prevLightChannelRoles != null)) {
+                scenePayload.lightChannelRoles = nextLightChannelRoles;
+              }
             }
             if (!serverShadowForDiff || projectorMediaChanged) {
-              scenePayload.projectorMedia = nextProjectorMedia;
+              if (!(nextProjectorMedia == null && prevProjectorMedia != null)) {
+                scenePayload.projectorMedia = nextProjectorMedia;
+              }
             }
             changes.push({
               id: createId(),
@@ -852,11 +884,11 @@ export function useSceneOperations() {
           // Global light channels (scene-level)
           const prevLight = Array.isArray(serverShadowForDiff?.lightChannels)
             ? serverShadowForDiff!.lightChannels
-            : Array.from({ length: 8 }, () => "");
+            : [];
           const nextLight = Array.isArray(payloadForServer.lightChannels)
             ? (payloadForServer.lightChannels as any[]).map((x: any) => String(x ?? ""))
-            : Array.from({ length: 8 }, () => "");
-          for (let i = 0; i < Math.max(prevLight.length, nextLight.length, 8); i++) {
+            : [];
+          for (let i = 0; i < nextLight.length; i++) {
             const a = String(prevLight[i] ?? "");
             const b = String(nextLight[i] ?? "");
             if (a === b) continue;
@@ -866,6 +898,16 @@ export function useSceneOperations() {
               entityId: `${sceneId}:lightChannel:${i}`,
               operation: "update",
               payload: { sceneId, index: i, raw: b, updatedAt: nowIso },
+              createdAt: nowIso,
+            });
+          }
+          for (let i = nextLight.length; i < prevLight.length; i++) {
+            changes.push({
+              id: createId(),
+              entityType: "GlobalLightChannel",
+              entityId: `${sceneId}:lightChannel:${i}`,
+              operation: "delete",
+              payload: { sceneId, index: i, updatedAt: nowIso },
               createdAt: nowIso,
             });
           }
@@ -954,9 +996,10 @@ export function useSceneOperations() {
               createdAt: nowIso,
             });
           });
+          const stepDeletes: SyncChange[] = [];
           Array.from(prevById.keys()).forEach((id) => {
             if (!newIds.has(id)) {
-              changes.push({
+              stepDeletes.push({
                 id: createId(),
                 entityType: "Step",
                 entityId: `${sceneId}:${id}`,
@@ -966,6 +1009,16 @@ export function useSceneOperations() {
               });
             }
           });
+          const stepDeleteThreshold = Math.max(2, Math.ceil(prevSteps.length * 0.4));
+          if (stepDeletes.length >= stepDeleteThreshold && !liveHasLocalEdits) {
+            console.warn("[sync] skip mass step delete in push", {
+              deleteCount: stepDeletes.length,
+              prevSteps: prevSteps.length,
+              liveSteps: liveSteps.length,
+            });
+          } else {
+            changes.push(...stepDeletes);
+          }
 
           if (changes.length > 0) {
             await syncPush(token, changes);

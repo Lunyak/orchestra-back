@@ -64,7 +64,7 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
             label: t.title,
             pick: {
               kind: "snippet",
-              text: `\n\n{{play:${t.id}}} [${t.title}](track:${t.id})\n\n`,
+              text: `\n\n[${t.title}](track:${t.id})\n\n`,
             },
           })),
         },

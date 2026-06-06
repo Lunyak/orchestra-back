@@ -138,7 +138,8 @@ export function LightSchemeLookCard({
             {recordRows.length > 0 ? (
               recordRows.map((f) => (
                 <div
-                  key={`${f.channel}-${f.faderId}`}light-scheme-call__head
+                  key={`${f.channel}-${f.faderId}`}
+                  className="light-scheme-call__fader-wrap"
                   onMouseEnter={() => onHighlightChannel?.(f.channel)}
                   onMouseLeave={() => onHighlightChannel?.(null)}
                 >

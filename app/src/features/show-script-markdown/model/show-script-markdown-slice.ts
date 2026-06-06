@@ -5,7 +5,7 @@ import {
   type PayloadAction,
 } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import { mergeLightChannelsPreferLonger } from "../../../shared/components/light-console/light-channels-mutate";
+import { mergeLightChannelsAtCount } from "../../../shared/components/light-console/light-channels-mutate";
 import type { ScriptStep } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
@@ -111,7 +111,8 @@ function normalizeLightChannels(raw: unknown): string[] {
   const mapped = raw.map((value) =>
     typeof value === "number" ? String(value) : String(value ?? ""),
   );
-  return Array.from({ length: Math.max(8, mapped.length) }, (_, i) => mapped[i] ?? "");
+  if (mapped.length === 0) return Array.from({ length: 8 }, () => "");
+  return Array.from({ length: mapped.length }, (_, i) => mapped[i] ?? "");
 }
 
 function normalizePlaylistOptions(raw: unknown): { id: number; title: string }[] {
@@ -199,7 +200,15 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
         : (sceneData as any)?.sounds;
     const fromShadow = normalizeLightChannels(serverShadow?.lightChannels);
     const fromScene = normalizeLightChannels((sceneData as any)?.lightChannels);
-    const lightChannels = mergeLightChannelsPreferLonger(fromScene, fromShadow);
+    const sceneChannelsRaw = (sceneData as any)?.lightChannels;
+    const sceneHasChannels = Array.isArray(sceneChannelsRaw) && sceneChannelsRaw.length > 0;
+    const primary = sceneHasChannels
+      ? fromScene
+      : fromShadow.length > 0
+        ? fromShadow
+        : fromScene;
+    const secondary = primary === fromScene ? fromShadow : fromScene;
+    const lightChannels = mergeLightChannelsAtCount(primary, secondary);
     return {
       playlistOptions: normalizePlaylistOptions(playlistRaw),
       soundsOptions: normalizeSoundsOptions(soundsRaw),
@@ -218,9 +227,9 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
       const fromStore = getFromStore();
       const mergedFile = {
         ...fromFile,
-        lightChannels: mergeLightChannelsPreferLonger(
-          fromStore.lightChannels,
+        lightChannels: mergeLightChannelsAtCount(
           fromFile.lightChannels,
+          fromStore.lightChannels,
         ),
       };
       const fileHasLight = mergedFile.lightChannels.some((x) => String(x ?? "").trim().length > 0);
@@ -415,9 +424,9 @@ export const showScriptMarkdownSlice = createSlice({
       const next = { ...prev };
       next.playlistOptions = action.payload.playlistOptions ?? [];
       next.soundsOptions = action.payload.soundsOptions ?? [];
-      next.lightChannels = mergeLightChannelsPreferLonger(
-        prev.lightChannels ?? [],
+      next.lightChannels = mergeLightChannelsAtCount(
         normalizeLightChannels(action.payload.lightChannels),
+        prev.lightChannels ?? [],
       );
       if (next.selectedTrackId == null && next.playlistOptions.length > 0) {
         next.selectedTrackId = next.playlistOptions[0].id;

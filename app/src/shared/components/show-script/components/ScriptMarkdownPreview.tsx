@@ -40,6 +40,12 @@ import {
 } from "../utils/lightTokens";
 import { expandKadrLabelBlockBreaks } from "../utils/expandKadrLabelBlockBreaks";
 import { rehypeKadrSections } from "../utils/rehypeKadrSections";
+import { KadrProjectorMediaPreview } from "./KadrProjectorMediaPreview";
+import { MarkdownTrackLink } from "./MarkdownTrackLink";
+import {
+  MarkdownKadrMediaContext,
+  type MarkdownKadrMediaLookup,
+} from "./markdown-kadr-media-context";
 import { rehypeStripLightKadrAnchors } from "../utils/rehypeStripLightKadrAnchors";
 import { resolveLightFaders } from "../../light-console/light-console-data";
 import { buildLightSchemeLookModel } from "../../light-console/light-scheme-preview";
@@ -52,6 +58,8 @@ import {
   readStepLightKadrs,
   scanMarkdownKadrSections,
 } from "../../../../features/theater/model/light-kadrs";
+import { parseSoundVolumeFromFieldBody } from "../../../../features/theater/model/kadr-sound";
+import type { PlaylistPlayOptions } from "../../../../features/scene/model/scene-playback-bridge";
 import type { LightFixture } from "../../../types/script";
 import "../../light-console/light-console.css";
 
@@ -59,20 +67,11 @@ const MarkdownKadrIdContext = createContext<string | null>(null);
 const MarkdownKadrLightColumnContext = createContext(false);
 const MarkdownKadrPictureColumnContext = createContext(false);
 const MarkdownKadrBodyContext = createContext(false);
+const MarkdownKadrSoundPlaybackContext = createContext<number | undefined>(undefined);
 const MarkdownPreviewParagraphBridgeContext =
   createContext<Omit<MarkdownPreviewParagraphProps, "children"> | null>(null);
 const MarkdownPreviewLightTokensBridgeContext =
   createContext<((children: React.ReactNode) => React.ReactNode) | null>(null);
-
-type KadrMediaLookup = {
-  videos: Array<{ id: number; title?: string }>;
-  holdImages: Array<{ id: number; title?: string; remoteKey?: string }>;
-};
-
-const MarkdownKadrMediaContext = createContext<KadrMediaLookup>({
-  videos: [],
-  holdImages: [],
-});
 
 const EMPTY_ANNOTATIONS: ActorAnnotation[] = [];
 
@@ -941,22 +940,6 @@ function findKadrMediaChipInFlat(
   return null;
 }
 
-function buildSyntheticPlayChipFromTrackLink(trackEl: React.ReactElement): React.ReactElement {
-  const props = trackEl.props as Record<string, unknown>;
-  return (
-    <span
-      className="markdown-play-label"
-      role="button"
-      tabIndex={0}
-      title="Воспроизвести"
-      data-track-id={props["data-track-id"] as string | undefined}
-      data-track-name={props["data-track-name"] as string | undefined}
-    >
-      Play
-    </span>
-  );
-}
-
 function isKadrFieldNoiseNode(node: React.ReactNode): boolean {
   if (node == null || typeof node === "boolean") return true;
   if (typeof node === "string") {
@@ -1007,26 +990,6 @@ function collectKadrFieldRestNodes(
   return trimLeadingFieldColon(trimLeadingSoundMetaSeparator(rest));
 }
 
-function extractKadrTrackTitleFromRest(rest: React.ReactNode[]): string {
-  const flat = flattenInertSpans(rest);
-  for (const node of flat) {
-    if (!React.isValidElement(node)) continue;
-    if (/\bmarkdown-track-link\b/.test(reactElementClassStr(node))) {
-      const title = reactNodePlainText(node).trim();
-      if (title) return title;
-    }
-  }
-  const plain = flat
-    .filter((node) => !isPlayLabelElement(node))
-    .map(reactNodePlainText)
-    .join(" ")
-    .replace(/\s*[·•]\s*/g, " ")
-    .replace(/\d{1,3}\s*%/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return plain;
-}
-
 function extractKadrVideoTitleFromRest(rest: React.ReactNode[]): string {
   const flat = flattenInertSpans(rest);
   for (const node of flat) {
@@ -1065,7 +1028,7 @@ function findKadrHoldLinkInFlat(
 
 function resolveKadrHoldIdFromMediaSignals(
   flat: React.ReactNode[],
-  media: KadrMediaLookup,
+  media: MarkdownKadrMediaLookup,
 ): number | null {
   for (const node of flattenInertSpans(flat)) {
     if (!React.isValidElement(node)) continue;
@@ -1135,7 +1098,7 @@ function parseNumericIdAttr(el: React.ReactElement, attr: string): number | null
 
 function resolveKadrVideoDisplayTitle(
   rest: React.ReactNode[],
-  media: KadrMediaLookup,
+  media: MarkdownKadrMediaLookup,
   ids: { videoId?: number | null; holdId?: number | null },
   mode: "video" | "hold",
 ): string {
@@ -1186,47 +1149,9 @@ function findKadrHoldChipInFlat(
   return null;
 }
 
-function buildKadrPlayLabelChip(mediaLabel: React.ReactElement): React.ReactElement {
-  return React.cloneElement(
-    mediaLabel,
-    {
-      title: "Воспроизвести",
-    } as React.HTMLAttributes<HTMLElement>,
-    "Play",
-  );
-}
-
-function buildKadrHoldLabelChip(mediaLabel: React.ReactElement): React.ReactElement {
-  return React.cloneElement(
-    mediaLabel,
-    {
-      role: "button",
-      tabIndex: 0,
-      title: "Показать заставку на проекторе",
-    } as React.HTMLAttributes<HTMLElement>,
-    "HOLD",
-  );
-}
-
-function formatKadrSoundVolumeMeta(rest: React.ReactNode[]): string {
-  const text = rest.map(reactNodePlainText).join(" ").trim();
-  const withoutFade = text
-    .replace(/\s*[·•]\s*/g, " ")
-    .replace(
-      /(?:fade|затухание|fadeMs)\s*[:=]?\s*[\d.,]+\s*(?:ms|мс|s|с|sec|сек)?/gi,
-      " ",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-  const pctM = /(\d{1,3})\s*%/.exec(withoutFade);
-  if (pctM) return `${Math.min(100, Math.max(0, Math.trunc(Number(pctM[1]) || 0)))}%`;
-  return "";
-}
-
 function splitKadrSoundFieldLine(
   rendered: React.ReactNode,
 ): {
-  mediaLabel: React.ReactElement;
   mediaKind: "play" | "sound";
   rest: React.ReactNode[];
 } | null {
@@ -1239,7 +1164,6 @@ function splitKadrSoundFieldLine(
 
   if (chip && (chip.mediaKind === "play" || chip.mediaKind === "sound")) {
     return {
-      mediaLabel: chip.mediaLabel,
       mediaKind: chip.mediaKind,
       rest: collectKadrFieldRestNodes(flat, afterPrefix, chip.index, null),
     };
@@ -1247,9 +1171,8 @@ function splitKadrSoundFieldLine(
 
   if (trackLink) {
     return {
-      mediaLabel: buildSyntheticPlayChipFromTrackLink(trackLink),
       mediaKind: "play",
-      rest: collectKadrFieldRestNodes(flat, afterPrefix, null, trackLink),
+      rest: collectKadrFieldRestNodes(flat, afterPrefix, null, null),
     };
   }
 
@@ -1258,9 +1181,8 @@ function splitKadrSoundFieldLine(
 
 function splitKadrVideoFieldLine(
   rendered: React.ReactNode,
-  media: KadrMediaLookup,
+  media: MarkdownKadrMediaLookup,
 ): {
-  mediaLabel: React.ReactElement;
   mediaKind: "video" | "hold";
   videoId: number | null;
   holdId: number | null;
@@ -1281,7 +1203,6 @@ function splitKadrVideoFieldLine(
   const chip = findKadrMediaChipInFlat(flat, start);
   if (chip?.mediaKind === "video") {
     return {
-      mediaLabel: chip.mediaLabel,
       mediaKind: "video",
       videoId: parseNumericIdAttr(chip.mediaLabel, "data-video-id"),
       holdId: null,
@@ -1292,7 +1213,6 @@ function splitKadrVideoFieldLine(
   const holdChip = findKadrHoldChipInFlat(flat, start);
   if (holdChip) {
     return {
-      mediaLabel: holdChip,
       mediaKind: "hold",
       videoId: null,
       holdId: parseNumericIdAttr(holdChip, "data-hold-id"),
@@ -1306,35 +1226,31 @@ function splitKadrVideoFieldLine(
       parseNumericIdAttr(holdLink, "data-hold-id") ??
       parseHoldHrefId((holdLink.props as { href?: string }).href);
     return {
-      mediaLabel: buildSyntheticHoldChip(holdId),
       mediaKind: "hold",
       videoId: null,
       holdId,
-      rest: collectKadrFieldRestNodes(flat, start, null, holdLink),
+      rest: collectKadrFieldRestNodes(flat, start, null, null),
     };
   }
 
   const videoLink = findKadrVideoLinkInFlat(flat, start);
   if (videoLink) {
     return {
-      mediaLabel: buildSyntheticVideoChipFromVideoLink(videoLink),
       mediaKind: "video",
       videoId: parseNumericIdAttr(videoLink, "data-video-id"),
       holdId: null,
-      rest: collectKadrFieldRestNodes(flat, start, null, videoLink),
+      rest: collectKadrFieldRestNodes(flat, start, null, null),
     };
   }
 
   const tail = flat.slice(start);
   if (looksLikeKadrHoldFieldContent(tail)) {
     const holdId = resolveKadrHoldIdFromMediaSignals(tail, media);
-    const holdLink = findKadrHoldLinkInFlat(flat, start);
     return {
-      mediaLabel: buildSyntheticHoldChip(holdId),
       mediaKind: "hold",
       videoId: null,
       holdId,
-      rest: collectKadrFieldRestNodes(flat, start, null, holdLink),
+      rest: collectKadrFieldRestNodes(flat, start, null, null),
     };
   }
 
@@ -1351,35 +1267,6 @@ function findKadrVideoLinkInFlat(
     if (/\bmarkdown-video-link\b/.test(reactElementClassStr(n))) return n;
   }
   return null;
-}
-
-function buildSyntheticVideoChipFromVideoLink(videoEl: React.ReactElement): React.ReactElement {
-  const props = videoEl.props as Record<string, unknown>;
-  return (
-    <span
-      className="markdown-video-label"
-      role="button"
-      tabIndex={0}
-      title="Видео на проекторе"
-      data-video-id={props["data-video-id"] as string | undefined}
-    >
-      Play
-    </span>
-  );
-}
-
-function buildSyntheticHoldChip(holdId: number | null): React.ReactElement {
-  return (
-    <span
-      className="markdown-kadr-hold-chip"
-      role="button"
-      tabIndex={0}
-      title="Показать заставку на проекторе"
-      {...(holdId != null ? { "data-hold-id": String(holdId) } : {})}
-    >
-      HOLD
-    </span>
-  );
 }
 
 function MarkdownPreviewUl({
@@ -1427,16 +1314,54 @@ function MarkdownKadrSection({
   );
 }
 
+function MarkdownPreviewTrackLink({
+  resolved,
+  onTrackLinkClick,
+  playFromPayload,
+  children,
+}: {
+  resolved: TrackLinkPayload;
+  onTrackLinkClick?: (trackId: number, options?: PlaylistPlayOptions) => void;
+  playFromPayload: (payload: TrackLinkPayload) => void;
+  children: React.ReactNode;
+}) {
+  const kadrSoundVolume = useContext(MarkdownKadrSoundPlaybackContext);
+  const trackId = "id" in resolved ? Number(resolved.id) : undefined;
+  const trackName = "name" in resolved ? String(resolved.name) : undefined;
+  const playOptions =
+    kadrSoundVolume != null ? { volume: kadrSoundVolume } : undefined;
+
+  return (
+    <MarkdownTrackLink
+      trackId={trackId}
+      trackName={trackName}
+      onClick={() => {
+        if ("id" in resolved) {
+          onTrackLinkClick?.(Number(resolved.id), playOptions);
+          return;
+        }
+        if ("name" in resolved) {
+          playFromPayload({ name: String(resolved.name) });
+        }
+      }}
+    >
+      {children}
+    </MarkdownTrackLink>
+  );
+}
+
 type MarkdownPreviewParagraphProps = {
   children: React.ReactNode;
   renderLightTokens: (children: React.ReactNode) => React.ReactNode;
   renderLightPanel: (kadrId: string) => React.ReactNode | null;
   hasRoleOrLightLabels: boolean;
-  onTrackLinkClick?: (trackId: number) => void;
+  playInlineLabels: boolean;
+  onTrackLinkClick?: (trackId: number, options?: PlaylistPlayOptions) => void;
   onSoundLinkClick?: (soundId: number) => void;
   playFromPayload: (payload: TrackLinkPayload) => void;
   toggleSoundFromPayload: (payload: SoundLinkPayload) => void;
   playVideoFromPayload: (payload: VideoLinkPayload) => void;
+  playHoldFromPayload: (holdId?: number | null) => void;
   resolveSoundIconFromPayload: (payload: SoundLinkPayload) => string | null;
 };
 
@@ -1445,11 +1370,13 @@ function MarkdownPreviewParagraph({
   renderLightTokens,
   renderLightPanel,
   hasRoleOrLightLabels,
+  playInlineLabels,
   onTrackLinkClick,
   onSoundLinkClick,
   playFromPayload,
   toggleSoundFromPayload,
   playVideoFromPayload,
+  playHoldFromPayload,
   resolveSoundIconFromPayload,
 }: MarkdownPreviewParagraphProps) {
   const kadrId = useContext(MarkdownKadrIdContext);
@@ -1476,93 +1403,65 @@ function MarkdownPreviewParagraph({
   if (inKadrBody || kadrId) {
     const soundField = splitKadrSoundFieldLine(rendered);
     if (soundField) {
-      const volumeMeta = formatKadrSoundVolumeMeta(soundField.rest);
-      const trackTitle =
-        extractKadrTrackTitleFromRest(soundField.rest) ||
-        (soundField.mediaKind === "sound"
-          ? reactNodePlainText(soundField.mediaLabel).trim()
-          : "");
-
-      if (soundField.mediaKind === "play") {
-        return (
-          <p className="markdown-dialog-line markdown-dialog-line--label-play">
+      const hasBody = reactNodePlainText(soundField.rest).trim().length > 0;
+      const kadrSoundVolume = parseSoundVolumeFromFieldBody(
+        reactNodePlainText(soundField.rest),
+      );
+      return (
+        <MarkdownKadrSoundPlaybackContext.Provider value={kadrSoundVolume}>
+          <p className="markdown-dialog-line markdown-dialog-line--kadr-field">
             <span className="markdown-dialog-label">
-              {buildKadrPlayLabelChip(soundField.mediaLabel)}
+              <span className="markdown-kadr-field-label">Звук</span>
             </span>
             <span className="markdown-dialog-text">
-              {trackTitle}
-              {volumeMeta ? (
-                <>
-                  {" "}
-                  <em className="markdown-parenthetical-remark">· {volumeMeta}</em>
-                </>
-              ) : null}
+              {hasBody ? (
+                soundField.rest
+              ) : (
+                <em className="markdown-parenthetical-remark">…</em>
+              )}
             </span>
           </p>
-        );
-      }
-
-      if (soundField.mediaKind === "sound") {
-        const sfxTitle =
-          extractKadrTrackTitleFromRest(soundField.rest) ||
-          reactNodePlainText(soundField.mediaLabel).trim();
-        return (
-          <p className="markdown-dialog-line markdown-dialog-line--label-sound">
-            <span className="markdown-dialog-label">
-              {React.cloneElement(soundField.mediaLabel, { title: "Звук: воспроизвести/остановить" }, "SFX")}
-            </span>
-            <span className="markdown-dialog-text">
-              {sfxTitle}
-              {volumeMeta ? (
-                <>
-                  {" "}
-                  <em className="markdown-parenthetical-remark">· {volumeMeta}</em>
-                </>
-              ) : null}
-            </span>
-          </p>
-        );
-      }
+        </MarkdownKadrSoundPlaybackContext.Provider>
+      );
     }
 
     const videoField = splitKadrVideoFieldLine(rendered, kadrMedia);
     if (videoField) {
-      if (videoField.mediaKind === "video") {
-        const videoTitle = resolveKadrVideoDisplayTitle(
-          videoField.rest,
-          kadrMedia,
-          { videoId: videoField.videoId, holdId: videoField.holdId },
-          "video",
-        );
-        return (
-          <p className="markdown-dialog-line markdown-dialog-line--label-play">
-            <span className="markdown-dialog-label">
-              {buildKadrPlayLabelChip(
-                React.cloneElement(videoField.mediaLabel, {
-                  title: "Видео на проекторе",
-                }),
-              )}
-            </span>
-            <span className="markdown-dialog-text">{videoTitle}</span>
-          </p>
-        );
-      }
-      if (videoField.mediaKind === "hold") {
-        const holdTitle = resolveKadrVideoDisplayTitle(
-          videoField.rest,
-          kadrMedia,
-          { videoId: videoField.videoId, holdId: videoField.holdId },
-          "hold",
-        );
-        return (
-          <p className="markdown-dialog-line markdown-dialog-line--kadr-hold">
-            <span className="markdown-dialog-label">
-              {buildKadrHoldLabelChip(videoField.mediaLabel)}
-            </span>
-            <span className="markdown-dialog-text">{holdTitle}</span>
-          </p>
-        );
-      }
+      const videoTitle = resolveKadrVideoDisplayTitle(
+        videoField.rest,
+        kadrMedia,
+        { videoId: videoField.videoId, holdId: videoField.holdId },
+        videoField.mediaKind,
+      );
+      const videoId = videoField.videoId;
+      const holdId = videoField.holdId;
+      const hasRest = reactNodePlainText(videoField.rest).trim().length > 0;
+      const previewMode = videoField.mediaKind === "hold" ? "hold" : "video";
+      return (
+        <p className="markdown-dialog-line markdown-dialog-line--kadr-field markdown-dialog-line--kadr-projector">
+          <span className="markdown-dialog-label">
+            <span className="markdown-kadr-field-label">Видео</span>
+          </span>
+          <span className="markdown-dialog-text markdown-dialog-text--kadr-projector">
+            <KadrProjectorMediaPreview
+              mode={previewMode}
+              videoId={videoId}
+              holdId={holdId}
+              title={videoTitle}
+              onActivate={() => {
+                if (previewMode === "video") {
+                  if (videoId != null && videoId > 0) {
+                    playVideoFromPayload({ id: videoId });
+                  }
+                  return;
+                }
+                playHoldFromPayload(holdId);
+              }}
+            />
+            {hasRest ? videoField.rest : null}
+          </span>
+        </p>
+      );
     }
 
     const textField = splitKadrTextFieldLine(rendered);
@@ -1624,7 +1523,7 @@ function MarkdownPreviewParagraph({
       );
     }
 
-    if (!hasRoleOrLightLabels) {
+    if (!hasRoleOrLightLabels || playInlineLabels) {
       return <p>{rendered}</p>;
     }
     return (
@@ -1739,7 +1638,7 @@ export function ScriptMarkdownPreview({
 }: {
   projectName: string;
   sceneName?: string;
-  onTrackLinkClick?: (trackId: number) => void;
+  onTrackLinkClick?: (trackId: number, options?: PlaylistPlayOptions) => void;
   onSoundLinkClick?: (soundId: number) => void;
   onCreateAnnotation: (draft: NewAnnotationDraft) => Promise<void>;
   onUpdateAnnotation: (id: string, noteText: string) => Promise<void>;
@@ -2015,12 +1914,14 @@ export function ScriptMarkdownPreview({
     return { id: Math.trunc(id) };
   };
 
-  const kadrMediaLookup = useMemo<KadrMediaLookup>(
+  const kadrMediaLookup = useMemo<MarkdownKadrMediaLookup>(
     () => ({
+      projectSlug: projectName,
       videos: Array.isArray(sceneData?.videos) ? sceneData.videos : [],
       holdImages: Array.isArray(sceneData?.holdImages) ? sceneData.holdImages : [],
+      projector: sceneData?.projector ?? null,
     }),
-    [sceneData?.videos, sceneData?.holdImages],
+    [projectName, sceneData?.videos, sceneData?.holdImages, sceneData?.projector],
   );
 
   const playVideoFromPayload = useCallback(
@@ -2073,6 +1974,13 @@ export function ScriptMarkdownPreview({
   const markdownKadrIdLookups = useMemo(
     () => markdownKadrSections.map((s) => ({ kadrNo: s.kadrNo, id: s.id })),
     [markdownKadrSections],
+  );
+  const kadrBlackoutIds = useMemo(
+    () =>
+      readStepLightKadrs(currentStep)
+        .kadrs.filter((k) => k.blackout)
+        .map((k) => k.id),
+    [currentStep],
   );
 
   const renderLightPanel = useCallback(
@@ -2219,22 +2127,26 @@ export function ScriptMarkdownPreview({
       renderLightTokens,
       renderLightPanel,
       hasRoleOrLightLabels,
+      playInlineLabels: markdownMode === "play",
       onTrackLinkClick,
       onSoundLinkClick,
       playFromPayload,
       toggleSoundFromPayload,
       playVideoFromPayload,
+      playHoldFromPayload,
       resolveSoundIconFromPayload,
     }),
     [
       renderLightTokens,
       renderLightPanel,
       hasRoleOrLightLabels,
+      markdownMode,
       onTrackLinkClick,
       onSoundLinkClick,
       playFromPayload,
       toggleSoundFromPayload,
       playVideoFromPayload,
+      playHoldFromPayload,
       resolveSoundIconFromPayload,
     ],
   );
@@ -2254,6 +2166,7 @@ export function ScriptMarkdownPreview({
           enabled: true,
           headingMaxLevel: 3,
           kadrIdLookups: markdownKadrIdLookups,
+          kadrBlackoutIds,
           splitLayoutEnabled: kadrSplitLayoutEnabled,
         },
       ]);
@@ -2267,6 +2180,7 @@ export function ScriptMarkdownPreview({
     kadrLayoutEnabled,
     kadrSplitLayoutEnabled,
     markdownKadrIdLookups,
+    kadrBlackoutIds,
   ]);
 
   const rangeTextLength = (range: Range) => {
@@ -2511,8 +2425,12 @@ export function ScriptMarkdownPreview({
             span: ({
               className,
               children,
+              node: _node,
               ...rest
-            }: React.HTMLAttributes<HTMLSpanElement> & { "data-lk-id"?: string }) => {
+            }: React.HTMLAttributes<HTMLSpanElement> & {
+              "data-lk-id"?: string;
+              node?: unknown;
+            }) => {
               const lkId = rest["data-lk-id"];
               if (className?.includes("markdown-light-split-host") && lkId) {
                 return (
@@ -2562,23 +2480,13 @@ export function ScriptMarkdownPreview({
               const resolved = resolveTrackLink(href);
               if (resolved && onTrackLinkClick) {
                 return (
-                  <button
-                    type="button"
-                    className="markdown-track-link"
-                    data-track-id={"id" in resolved ? String(resolved.id) : undefined}
-                    data-track-name={"name" in resolved ? String(resolved.name) : undefined}
-                    onClick={async () => {
-                      if ("id" in resolved) {
-                        onTrackLinkClick(Number(resolved.id));
-                        return;
-                      }
-                      if ("name" in resolved) {
-                        playFromPayload({ name: String(resolved.name) });
-                      }
-                    }}
+                  <MarkdownPreviewTrackLink
+                    resolved={resolved}
+                    onTrackLinkClick={onTrackLinkClick}
+                    playFromPayload={playFromPayload}
                   >
                     {children}
-                  </button>
+                  </MarkdownPreviewTrackLink>
                 );
               }
               const resolvedSound = resolveSoundLink(href);

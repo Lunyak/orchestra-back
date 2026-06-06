@@ -8,15 +8,18 @@ import type { ScriptStep } from "../../types/script";
 import { parseLightChannel, resolveLightColor } from "../show-script/utils/lightTokens";
 import {
   applyKadrToFaders,
+  deleteKadrFromStepMarkdown,
   findKadrById,
+  formatDeleteKadrConfirmMessage,
   readStepLightKadrs,
   recordKadrToMarkdown,
   scanMarkdownKadrSections,
 } from "../../../features/theater/model/light-kadrs";
 import { LightConsoleView } from "./LightConsoleView";
+import { LightConsoleSettingsModal } from "./LightConsoleSettingsModal";
 import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../show-script/script-markdown-tab-labels";
-import { LightWorkflowGuide } from "./LightWorkflowGuide";
 import { recordLightKadrForSection } from "./light-kadr-record";
+import { useLightConsoleLayoutSettings } from "./useLightConsoleLayoutSettings";
 import { useLightConsoleState } from "./useLightConsoleState";
 
 export type LightKadrPanelProps = {
@@ -107,6 +110,7 @@ export function LightKadrPanel({
     projectName,
     spotlights: spotlights ?? [],
   });
+  const layoutSettings = useLightConsoleLayoutSettings(projectName);
 
   const recordActiveKadr = () => {
     if (!step || !activeSection) return;
@@ -161,6 +165,39 @@ export function LightKadrPanel({
     );
   };
 
+  const deleteActiveKadr = () => {
+    if (!step || !activeSection) return;
+    const confirmMessage = formatDeleteKadrConfirmMessage(activeSection.headingTitle);
+    if (!window.confirm(confirmMessage)) return;
+
+    const deletedIndex = sections.findIndex(
+      (section) =>
+        section.headingStart === activeSection.headingStart &&
+        section.kadrNo === activeSection.kadrNo,
+    );
+    const { markdown: nextMarkdown, lightKadrs: nextKadrs } = deleteKadrFromStepMarkdown(step, {
+      id: activeSection.id,
+      kadrNo: activeSection.kadrNo,
+    });
+
+    onUpdateMarkdown(nextMarkdown);
+    onUpdateStep({ lightKadrs: nextKadrs });
+
+    const remaining = scanMarkdownKadrSections(nextMarkdown);
+    const nextIndex =
+      deletedIndex >= 0
+        ? Math.min(deletedIndex, Math.max(0, remaining.length - 1))
+        : 0;
+    const nextSection = remaining[nextIndex] ?? null;
+    setSelectedKadrNo(nextSection?.kadrNo ?? null);
+    onActiveKadrIdChange?.(nextSection?.id ?? null);
+    setRecordMessage(
+      remaining.length > 0
+        ? `Картина удалена · осталось ${remaining.length}`
+        : "Картина удалена",
+    );
+  };
+
   return (
     <div className="light-kadr-panel">
       <div className="light-kadr-panel__header">
@@ -202,6 +239,19 @@ export function LightKadrPanel({
             onClick={syncMarkdownLine}
           >
             Обновить строку в тексте
+          </button>
+          <button
+            type="button"
+            className="light-kadr-panel__action light-kadr-panel__action--danger"
+            disabled={!step || !activeSection}
+            onClick={deleteActiveKadr}
+            title={
+              activeSection
+                ? `Удалить «${activeSection.headingTitle}» и перенумеровать остальные`
+                : undefined
+            }
+          >
+            Удалить картину
           </button>
         </div>
       </div>
@@ -259,10 +309,6 @@ export function LightKadrPanel({
               );
             })}
           </div>
-          <p className="light-kadr-panel__strip-hint">
-            Нажмите нужную картину, затем настройте пульт и «Записать в картину N». В тексте связь
-            через строку <code>- **Свет**:</code> под этим заголовком.
-          </p>
         </>
       ) : (
         <p className="light-kadr-panel__empty">
@@ -271,7 +317,6 @@ export function LightKadrPanel({
         </p>
       )}
 
-      <LightWorkflowGuide />
       {recordMessage ? (
         <p className="light-kadr-panel__record-msg" role="status">
           {recordMessage}
@@ -300,7 +345,7 @@ export function LightKadrPanel({
         consoleChannel={liveConsole.selectedLightSlot}
         onSelectChannel={liveConsole.selectChannel}
         onSelectProgram={liveConsole.selectProgram}
-        onFaderCountChange={liveConsole.setFaderCount}
+        onOpenSettings={layoutSettings.openSettings}
         onPatchFader={liveConsole.patchFader}
         onSaveActiveProgram={() => {
           liveConsole.saveProgramSnapshot();
@@ -311,6 +356,12 @@ export function LightKadrPanel({
             `Программа П${pid}${label ? ` «${label}»` : ""} сохранена — все фейдеры на пульте`,
           );
         }}
+      />
+      <LightConsoleSettingsModal
+        isOpen={layoutSettings.settingsOpen}
+        layout={layoutSettings.layout}
+        onClose={layoutSettings.closeSettings}
+        onApply={layoutSettings.applyLayout}
       />
     </div>
   );

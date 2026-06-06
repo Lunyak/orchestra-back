@@ -461,14 +461,13 @@ export function buildKadrFaderSnapshotFromSofitChannels(args: {
 
     const channelStates =
       channel === liveCh ? null : readProgramChannelFaderStates(args.programs, channel);
-    if (channel !== liveCh && (!channelStates || channelStates.length === 0)) {
-      continue;
-    }
 
     const board =
       channel === liveCh
         ? args.liveFaders
-        : applyProgramFaderStatesToBoard(args.baseFaders, channelStates!);
+        : channelStates.length > 0
+          ? applyProgramFaderStatesToBoard(args.baseFaders, channelStates)
+          : args.baseFaders;
 
     for (const faderId of faderIds) {
       const fader = board.faders.find((item) => item.id === faderId);

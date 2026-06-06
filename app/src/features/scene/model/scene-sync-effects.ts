@@ -328,6 +328,12 @@ export function useSceneSyncEffects() {
 
   useEffect(() => {
     if (!isSceneReady || steps.length === 0) return;
+
+    const shadowStepCount = Array.isArray(serverShadow?.steps) ? serverShadow!.steps.length : 0;
+    const localBehindServer =
+      shadowStepCount > 1 && steps.length < shadowStepCount * 0.8;
+    if (localBehindServer) return;
+
     if (lastSavedLightChannelsKeyRef.current === null) {
       lastSavedLightChannelsKeyRef.current = lightChannelsKey;
     }
@@ -355,17 +361,17 @@ export function useSceneSyncEffects() {
 
     const shouldSave = hasLocalEdits || (metaChanged && lightDirtyVsServer);
     if (!shouldSave) return;
-    const shouldForceSaveMeta = metaChanged && !hasLocalEdits && lightDirtyVsServer;
+    const shouldSaveLightChannelsNow = metaChanged && lightDirtyVsServer;
     if (lightPlotSaveTimerRef.current) {
       window.clearTimeout(lightPlotSaveTimerRef.current);
       lightPlotSaveTimerRef.current = null;
     }
     const runSave = () => {
-      void saveStepsForLightPlot({ force: shouldForceSaveMeta }).then(() => {
+      void saveStepsForLightPlot({ force: shouldSaveLightChannelsNow }).then(() => {
         lastSavedLightChannelsKeyRef.current = lightChannelsKey;
       });
     };
-    if (shouldForceSaveMeta) {
+    if (shouldSaveLightChannelsNow) {
       runSave();
       return;
     }

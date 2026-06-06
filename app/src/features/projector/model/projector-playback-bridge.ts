@@ -17,12 +17,15 @@ export type ProjectorShowVideo = {
   holdId: number | null;
   videoId: number;
   muted?: boolean;
+  volume?: number;
 };
 export type ProjectorBlack = { type: "black" };
 export type ProjectorReady = { type: "ready" };
 export type ProjectorPauseVideo = { type: "pause-video" };
 export type ProjectorResumeVideo = { type: "resume-video" };
 export type ProjectorSetVideoMuted = { type: "set-video-muted"; muted: boolean };
+export type ProjectorSeekVideo = { type: "seek-video"; time: number };
+export type ProjectorSetVideoVolume = { type: "set-video-volume"; volume: number };
 
 export type ProjectorPlaybackState = {
   type: "playback-state";
@@ -30,6 +33,9 @@ export type ProjectorPlaybackState = {
   holdId: number | null;
   playing: boolean;
   mode: "video" | "hold" | "black";
+  currentTime?: number;
+  duration?: number;
+  volume?: number;
 };
 
 /** Ошибка загрузки/воспроизведения — только для экрана репетиции, не для зала. */
@@ -47,6 +53,8 @@ export type ProjectorMessage =
   | ProjectorPauseVideo
   | ProjectorResumeVideo
   | ProjectorSetVideoMuted
+  | ProjectorSeekVideo
+  | ProjectorSetVideoVolume
   | ProjectorPlaybackState
   | ProjectorOutputError;
 
@@ -159,6 +167,9 @@ export function notifyProjectorReady(): () => void {
         holdId: msg.holdId,
         playing: msg.playing,
         mode: msg.mode,
+        currentTime: msg.currentTime,
+        duration: msg.duration,
+        volume: msg.volume,
       });
     }
     if (msg?.type === "output-error") {
@@ -180,4 +191,12 @@ export function resumeProjectorVideo(): void {
 
 export function sendProjectorVideoMuted(muted: boolean): void {
   sendProjectorMessage({ type: "set-video-muted", muted });
+}
+
+export function seekProjectorVideo(time: number): void {
+  sendProjectorMessage({ type: "seek-video", time });
+}
+
+export function sendProjectorVideoVolume(volume: number): void {
+  sendProjectorMessage({ type: "set-video-volume", volume });
 }

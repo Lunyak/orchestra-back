@@ -54,6 +54,14 @@ export class SyncPushDto {
   @ValidateNested({ each: true })
   @Type(() => SyncChangeDto)
   changes: SyncChangeDto[];
+
+  /**
+   * Подтверждение опасных операций (массовое удаление, сброс сцены, удаление проекта).
+   * Должно совпадать с названием или slug проекта.
+   */
+  @IsOptional()
+  @IsString()
+  destructiveConfirm?: string;
 }
 
 export class SyncPullDto {

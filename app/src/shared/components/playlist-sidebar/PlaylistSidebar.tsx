@@ -10,9 +10,11 @@ import {
 import {
   invokePlaylistPlay,
   getPlaylistActiveTrackId,
+  registerPlaylistPauseHandler,
   registerPlaylistSnapshotProvider,
-  setPlaylistActiveTrackId,
   subscribePlaylistActiveTrack,
+  updatePlaylistVisualPlayback,
+  type PlaylistPlayOptions,
 } from "../../../features/scene/model/scene-playback-bridge";
 import { scriptUiActions } from "../../../features/script-ui/model/script-ui-slice";
 import { getDesktopApi } from "../../platform/desktop-api";
@@ -36,7 +38,7 @@ import "./style.css";
 interface PlaylistSidebarProps {
   projectName: string;
   sceneName?: string;
-  onRegisterPlayHandler?: (handler: (trackId: number) => void) => void;
+  onRegisterPlayHandler?: (handler: (trackId: number, options?: PlaylistPlayOptions) => void) => void;
   mode?: "full" | "player" | "list";
 }
 
@@ -654,7 +656,15 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   );
 
 
-  const playTrack = useCallback(async (track: PlaylistTrack) => {
+  const playTrack = useCallback(async (
+    track: PlaylistTrack,
+    playbackVolume?: number,
+    playOptions?: { continueIfPlaying?: boolean },
+  ) => {
+    const fadeTarget =
+      playbackVolume != null && Number.isFinite(playbackVolume)
+        ? Math.min(1, Math.max(0, playbackVolume))
+        : volumeRef.current;
     const activeAudio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
     const inactiveAudio = activeAudioKey === "a" ? audioRefB.current : audioRefA.current;
     const inactiveKey = activeAudioKey === "a" ? "b" : "a";
@@ -664,6 +674,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     const requestId = playRequestId.current;
     const isSameTrack = currentTrack?.id === track.id;
     const isAudioPlaying = !activeAudio.paused;
+    const continueIfPlaying = playOptions?.continueIfPlaying === true;
     const fadeInMs = track.fadeMs ?? 500;
     const fadeOutMs =
       !isSameTrack && currentTrack ? (currentTrack.fadeMs ?? 500) : fadeInMs;
@@ -689,6 +700,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     }
 
     if (isSameTrack && isAudioPlaying) {
+      if (continueIfPlaying) {
+        if (playbackVolume != null && Number.isFinite(playbackVolume)) {
+          const from = activeAudio.volume;
+          runFade(activeAudio, activeAudioKey, from, fadeTarget, fadeInMs);
+        }
+        return;
+      }
       const from = activeAudio.volume;
       runFade(activeAudio, activeAudioKey, from, 0, fadeOutMs, () => {
         activeAudio.pause();
@@ -711,7 +729,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           activeAudio.pause();
           return;
         }
-        runFade(activeAudio, activeAudioKey, activeAudio.volume, volume, fadeInMs);
+        runFade(activeAudio, activeAudioKey, activeAudio.volume, fadeTarget, fadeInMs);
         setIsPlaying(true);
       } catch (error) {
         if (requestId !== playRequestId.current) return;
@@ -757,7 +775,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
         return;
       }
       setActiveAudioKey(inactiveKey);
-      runFade(inactiveAudio, inactiveKey, 0, volume, fadeInMs);
+      runFade(inactiveAudio, inactiveKey, 0, fadeTarget, fadeInMs);
       setIsPlaying(true);
     } catch (error) {
       if (requestId !== playRequestId.current) return;
@@ -770,30 +788,59 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     currentTrack,
     resolveTrackPlaybackSrc,
     runFade,
-    volume,
   ]);
 
   const playById = useCallback(
-    (trackId: number) => {
+    (trackId: number, options?: PlaylistPlayOptions) => {
+      let playbackVolume: number | undefined;
+      if (options?.volume != null && Number.isFinite(options.volume)) {
+        const nextVolume = Math.min(1, Math.max(0, options.volume));
+        setVolume(nextVolume);
+        volumeRef.current = nextVolume;
+        playbackVolume = nextVolume;
+      }
       const target = playlist.find(
         (track) => Number(track.id) === Number(trackId),
       );
+      const continueIfPlaying = options?.continueIfPlaying !== false;
       if (target) {
-        playTrack(target);
+        void playTrack(target, playbackVolume, { continueIfPlaying });
         return;
       }
       const byIndex = playlist[Number(trackId) - 1];
       if (byIndex) {
-        playTrack(byIndex);
+        void playTrack(byIndex, playbackVolume, { continueIfPlaying });
       }
     },
-    [playlist, playTrack],
+    [playlist, playTrack, setVolume],
   );
 
   useEffect(() => {
     if (!onRegisterPlayHandler) return;
     onRegisterPlayHandler(playById);
   }, [onRegisterPlayHandler, playById]);
+
+  const pausePlayback = useCallback(() => {
+    clearFadeTimer("a");
+    clearFadeTimer("b");
+    const audioA = audioRefA.current;
+    const audioB = audioRefB.current;
+    try {
+      audioA?.pause();
+      audioB?.pause();
+      if (audioA) audioA.volume = 0;
+      if (audioB) audioB.volume = 0;
+    } catch {
+      // ignore
+    }
+    setIsPlaying(false);
+    updatePlaylistVisualPlayback(currentTrack?.id ?? null, false);
+  }, [clearFadeTimer, currentTrack]);
+
+  useEffect(() => {
+    registerPlaylistPauseHandler(pausePlayback);
+    return () => registerPlaylistPauseHandler(undefined);
+  }, [pausePlayback]);
 
   useEffect(() => {
     registerPlaylistSnapshotProvider(() => ({
@@ -807,6 +854,10 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
   const togglePlayback = () => {
     if (!currentTrack) return;
+    if (isPlaying) {
+      pausePlayback();
+      return;
+    }
     void playTrack(currentTrack);
   };
 
@@ -1033,9 +1084,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   }, [sharedActiveTrackId, playlist, currentTrack]);
 
   useEffect(() => {
-    if (!showPlayer) return;
-    setPlaylistActiveTrackId(currentTrack?.id ?? null);
-  }, [currentTrack, showPlayer]);
+    updatePlaylistVisualPlayback(currentTrack?.id ?? null, isPlaying);
+  }, [currentTrack, isPlaying]);
 
   const currentTrackIndex = highlightedTrack
     ? playlist.findIndex((track) => Number(track.id) === Number(highlightedTrack.id))

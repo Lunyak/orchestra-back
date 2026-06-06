@@ -1,0 +1,96 @@
+.light-console-settings-modal {
+  display: flex;
+  flex-direction: column;
+  max-width: min(420px, calc(100vw - 24px));
+}
+
+.light-console-settings-modal__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--stage-brutal-border, var(--color-border-default));
+}
+
+.light-console-settings-modal__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-bright);
+}
+
+.light-console-settings-modal__close {
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--stage-brutal-border, var(--color-border-default));
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-text-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.light-console-settings-modal__body {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.light-console-settings-modal__intro {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.light-console-settings-modal__field {
+  display: grid;
+  gap: 6px;
+}
+
+.light-console-settings-modal__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted-bright);
+}
+
+.light-console-settings-modal__input {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--stage-brutal-border, var(--color-border-default));
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-text-bright);
+  font-size: 13px;
+}
+
+.light-console-settings-modal__hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.light-console-settings-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px 16px;
+  border-top: 1px solid var(--stage-brutal-border, var(--color-border-default));
+}
+
+.light-console-settings-modal__btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--stage-brutal-border, var(--color-border-default));
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--color-text-lighter);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.light-console-settings-modal__btn--primary {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}

@@ -9,8 +9,7 @@ import {
   type ScriptEditorInsertMenuPick,
 } from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
-import { useScene, type SceneLightFadersDataV1 } from "../../../../features/scene";
-import { patchSceneDataForLightChannelCount } from "../../light-console/light-channels-mutate";
+import { useScene } from "../../../../features/scene";
 import {
   subscribeScriptTokenizeRequests,
   wrapMarkdownMatchesAsTokens,
@@ -39,7 +38,6 @@ import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptStep } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
 import { insertAtSelection } from "../utils/insertAtCursor";
-import { ScriptLightChannelsPanel } from "./ScriptLightChannelsPanel";
 import { LightKadrPanel } from "../../light-console/LightKadrPanel";
 import "../../light-console/light-console.css";
 import {
@@ -117,7 +115,6 @@ export function ShowScriptMarkdownSection({
   const playlistOptions = ui.playlistOptions;
   const soundsOptions = ui.soundsOptions;
   const lightChannels = ui.lightChannels;
-  const selectedLightSlot = ui.selectedLightSlot;
 
   const {
     isEditing,
@@ -607,11 +604,6 @@ export function ShowScriptMarkdownSection({
 
       {markdownMode === "notes" && hasKadrSections ? (
         <div className="script-kadr-light-banner" role="note">
-          <p>
-            Здесь — текст картин. Проход спектакля с лентой картин, схемой и пультом (запись вживую)
-            — на странице <strong>«Репетиция»</strong> в верхнем меню. Вкладка «Свет» — настройка
-            одного шага.
-          </p>
           <div className="script-kadr-light-banner__actions">
             <button
               type="button"
@@ -652,10 +644,6 @@ export function ShowScriptMarkdownSection({
       {markdownMode === "light" ? (
         <div className="script-step-light-pane">
           <div className="script-kadr-light-banner script-kadr-light-banner--compact" role="note">
-            <p>
-              Пульт для <strong>текущего шага</strong>. Сквозная лента по всем картинам спектакля —
-              страница <strong>«Репетиция»</strong> (верхнее меню).
-            </p>
             <button
               type="button"
               className="script-kadr-light-banner__btn script-kadr-light-banner__btn--primary"
@@ -689,43 +677,6 @@ export function ShowScriptMarkdownSection({
                 updateStepField(currentStep.id, activeMarkdownField, next);
               }
             }}
-          />
-          <ScriptLightChannelsPanel
-            lightChannels={lightChannels}
-            selectedLightSlot={selectedLightSlot}
-            lightFaders={lightFaders}
-            onLightChannelsChange={(next) => {
-              dispatch(
-                showScriptMarkdownActions.setLightChannels({
-                  projectSlug,
-                  sceneName,
-                  lightChannels: next,
-                }),
-              );
-              setSceneData((prev) => ({
-                ...(prev ?? {}),
-                lightChannels: next,
-                ...patchSceneDataForLightChannelCount(prev, next, lightChannels.length),
-              }));
-            }}
-            onSelectedLightSlotChange={(slot) => {
-              dispatch(
-                showScriptMarkdownActions.setSelectedLightSlot({
-                  projectSlug,
-                  sceneName,
-                  slot,
-                }),
-              );
-            }}
-            onLightFadersChange={(next: SceneLightFadersDataV1) => {
-              setSceneData((prev) => ({
-                ...(prev ?? {}),
-                lightFaders: next,
-              }));
-            }}
-            spotlights={currentStep?.theaterSpotlights}
-            onSpotlightsChange={(next) => updateStepField(currentStep.id, "theaterSpotlights", next)}
-            onInsertText={insertIntoActiveMarkdown}
           />
         </div>
       ) : markdownMode === "requisites" ? (

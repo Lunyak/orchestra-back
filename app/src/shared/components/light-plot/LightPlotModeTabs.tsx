@@ -1,17 +1,25 @@
 import type { ReactNode } from "react";
+import type { LightPlotMode } from "../../../features/script-ui/model/script-ui-slice";
 import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../show-script/script-markdown-tab-labels";
 
 export type LightPlotModeTabsProps = {
+  mode: LightPlotMode;
+  onModeChange: (mode: LightPlotMode) => void;
   onOpenTechCard?: (stepIndex?: number) => void;
   center?: ReactNode;
   trailing?: ReactNode;
 };
 
 export function LightPlotModeTabs({
+  mode,
+  onModeChange,
   onOpenTechCard,
   center = null,
   trailing = null,
 }: LightPlotModeTabsProps) {
+  const isRehearsal = mode === "rehearsal";
+  const isProgRun = mode === "prog-run";
+
   return (
     <div
       className={[
@@ -22,8 +30,23 @@ export function LightPlotModeTabs({
         .join(" ")}
     >
       <div className="light-plot-mode-tabs__start">
-        <button type="button" className="light-plot-mode-tab" data-active="true">
+        <button
+          type="button"
+          className="light-plot-mode-tab"
+          data-active={isRehearsal ? "true" : undefined}
+          aria-pressed={isRehearsal}
+          onClick={() => onModeChange("rehearsal")}
+        >
           Репетиция
+        </button>
+        <button
+          type="button"
+          className="light-plot-mode-tab"
+          data-active={isProgRun ? "true" : undefined}
+          aria-pressed={isProgRun}
+          onClick={() => onModeChange("prog-run")}
+        >
+          ПРОГОН
         </button>
         {onOpenTechCard ? (
           <button

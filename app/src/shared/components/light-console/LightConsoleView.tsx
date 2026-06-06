@@ -7,7 +7,6 @@ import {
   readSpotlightBaseUiIntensity,
 } from "../../../features/theater/model/theater-light-fader-bindings";
 import type { LightConsoleViewProps } from "./light-console-data";
-import { LightChannelsCountControls } from "./LightChannelsCountControls";
 import {
   formatChannelDefaultLabel,
   formatChannelShort,
@@ -27,11 +26,9 @@ export function LightConsoleView({
   consoleChannel,
   onSelectChannel,
   onSelectProgram,
-  onFaderCountChange,
   onPatchFader,
   onSaveActiveProgram,
-  onAppendLightChannel,
-  onRemoveLightChannel,
+  onOpenSettings,
   className,
 }: LightConsoleViewProps) {
   const activeProgram =
@@ -74,35 +71,20 @@ export function LightConsoleView({
               </button>
             );
           })}
-          {!compact && mode === "live" && onFaderCountChange ? (
-            <label className="light-console__fader-count">
-              <span>F</span>
-              <input
-                type="number"
-                min={1}
-                max={64}
-                value={Math.max(faders.count ?? 0, faders.faders.length)}
-                disabled={readOnly}
-                onChange={(event) => onFaderCountChange(Number(event.target.value))}
-              />
-            </label>
-          ) : null}
-          {!compact && mode === "live" && onAppendLightChannel && onRemoveLightChannel ? (
-            <LightChannelsCountControls
-              channelCount={lightChannels.length}
-              onAppend={onAppendLightChannel}
-              onRemove={onRemoveLightChannel}
-            />
+          {!compact && mode === "live" && !readOnly && onOpenSettings ? (
+            <button
+              type="button"
+              className="light-console__settings-btn"
+              onClick={onOpenSettings}
+              title="Число каналов K, фейдеров F и программ П"
+            >
+              Настройка пульта
+            </button>
           ) : null}
         </div>
 
         {!compact && mode === "live" && activeProgram && !readOnly ? (
           <div className="light-console__program-note">
-            <p className="light-console__program-note-text">
-              <strong>K{selectedLightSlot || 1}</strong> — память уровней F этого канала.{" "}
-              <strong>П{activeProgram.id}</strong> — заливка; «Сохранить в память П…» пишет все F со всех K. В
-              техкарту — только отмеченные K и <strong>«Записать свет»</strong> в ленте.
-            </p>
             {onSaveActiveProgram ? (
               <button
                 type="button"

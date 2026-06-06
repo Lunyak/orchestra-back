@@ -510,16 +510,32 @@ function resolveKadrIdFromHeading(
   return id ?? undefined;
 }
 
+function wrapKadrHeading(
+  heading: HastNode,
+  lkId: string | undefined,
+  blackoutIds: Set<string>,
+): HastNode {
+  if (!lkId || !blackoutIds.has(lkId)) return heading;
+  return makeEl("div", ["markdown-kadr__heading-row"], {}, [
+    heading,
+    makeEl("span", ["markdown-kadr-blackout-badge"], {}, [
+      { type: "text", value: "Блекаут" } as HastNode,
+    ]),
+  ]);
+}
+
 export function rehypeKadrSections(opts?: {
   enabled?: boolean;
   headingMaxLevel?: number;
   kadrIdLookups?: KadrSectionIdLookup[];
+  kadrBlackoutIds?: string[];
   /** Колонка «картинка + свет» — только тех. карта (`notes`). */
   splitLayoutEnabled?: boolean;
 }) {
   const enabled = Boolean(opts?.enabled ?? true);
   const splitLayoutEnabled = Boolean(opts?.splitLayoutEnabled ?? false);
   const maxHeadingLevel = Math.max(1, Math.min(6, Math.trunc(Number(opts?.headingMaxLevel ?? 3))));
+  const blackoutIds = new Set((opts?.kadrBlackoutIds ?? []).filter(Boolean));
 
   return function transformer(tree: HastNode) {
     if (!enabled) return;
@@ -532,7 +548,10 @@ export function rehypeKadrSections(opts?: {
     const nextChildren: HastNode[] = [];
     for (const s of sections) {
       const sectionChildren: HastNode[] = [];
-      if (s.heading) sectionChildren.push(s.heading);
+      const lkId = resolveKadrIdFromHeading(s.heading, opts?.kadrIdLookups);
+      if (s.heading) {
+        sectionChildren.push(wrapKadrHeading(s.heading, lkId, blackoutIds));
+      }
 
       let hasImage = false;
       if (splitLayoutEnabled) {
@@ -540,31 +559,44 @@ export function rehypeKadrSections(opts?: {
         hasImage = images.length > 0;
 
         const lightContent = toLightContentNodes(light);
-        const splitChildren: HastNode[] = [];
+        const lightEl = makeEl(
+          "div",
+          ["markdown-kadr__light"],
+          light ? {} : { "data-empty": "true" },
+          lightContent,
+        );
+
+        const hasRest = rest.some((n) => !isIgnorableWhitespaceText(n));
+        const splitLeft = hasImage
+          ? makeEl(
+              "div",
+              ["markdown-kadr__stack"],
+              {},
+              hasRest
+                ? [
+                    lightEl,
+                    makeEl("div", ["markdown-kadr__body", "markdown-kadr__body--in-stack"], {}, rest),
+                  ]
+                : [lightEl],
+            )
+          : lightEl;
+
+        const splitChildren: HastNode[] = [splitLeft];
         if (hasImage) {
           splitChildren.push(makeEl("div", ["markdown-kadr__picture"], {}, images));
         }
-        splitChildren.push(
-          makeEl(
-            "div",
-            ["markdown-kadr__light"],
-            light ? {} : { "data-empty": "true" },
-            lightContent,
-          ),
-        );
         const splitClass = hasImage
           ? ["markdown-kadr__split"]
           : ["markdown-kadr__split", "markdown-kadr__split--no-picture"];
         sectionChildren.push(makeEl("div", splitClass, {}, splitChildren));
 
-        if (rest.some((n) => !isIgnorableWhitespaceText(n))) {
+        if (!hasImage && hasRest) {
           sectionChildren.push(makeEl("div", ["markdown-kadr__body"], {}, rest));
         }
       } else if (s.body.some((n) => !isIgnorableWhitespaceText(n))) {
         sectionChildren.push(makeEl("div", ["markdown-kadr__body"], {}, s.body));
       }
 
-      const lkId = resolveKadrIdFromHeading(s.heading, opts?.kadrIdLookups);
       const sectionEl = makeEl(
         "section",
         ["markdown-kadr"],
@@ -572,6 +604,7 @@ export function rehypeKadrSections(opts?: {
           "data-has-image": hasImage ? "true" : "false",
           "data-level": s.level != null ? String(s.level) : undefined,
           "data-lk-id": lkId,
+          "data-blackout": lkId && blackoutIds.has(lkId) ? "true" : undefined,
         },
         sectionChildren,
       );

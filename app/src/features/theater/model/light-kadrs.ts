@@ -346,7 +346,7 @@ export function formatLightKadrLine(
   },
 ): string {
   if (kadr.blackout || kadr.programId <= 0) {
-    return `${LIGHT_LINE_PREFIX} {{lightpanel:${kadr.id}}}`;
+    return `${LIGHT_LINE_PREFIX} {{blackout|Блекаут}} {{lightpanel:${kadr.id}}}`;
   }
 
   const parts: string[] = [`{{lightpanel:${kadr.id}}}`];
@@ -449,7 +449,7 @@ export function applyKadrToFaders(
 }
 
 export function createKadrTemplateSnippet(kadrNo: number, kadrId: string): string {
-  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: репетиция — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n\n- **Звук**: _«Записать звук» вверху (трек в плейлисте)_\n- **Видео**: _«Записать проектор» — ролик на экран_\n\n- **Действие/задача**: _например: дым-машина_\n- **Переход**:\n`;
+  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: репетиция — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n\n- **Звук**: _трек из плейлиста — при создании картины_\n- **Видео**: _«Записать проектор» — ролик на экран_\n\n- **Действие/задача**: _например: дым-машина_\n- **Переход**:\n`;
 }
 
 const TOKEN_PROGRAM_RE = /\{\{\s*program\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;
@@ -532,23 +532,53 @@ export function lightKadrsStableKey(data: StepLightKadrsDataV1 | null | undefine
 /** Удалить блок картины из тех. карты (от `### Картина` до следующего такого заголовка). */
 export function removeKadrSectionFromMarkdown(
   markdown: string,
-  target: { id?: string | null; kadrNo?: number },
+  target: { id?: string | null; kadrNo?: number; headingStart?: number },
 ): string {
-  const sections = scanMarkdownKadrSections(markdown);
-  const section =
-    (target.id ? sections.find((s) => s.id === target.id) : undefined) ??
-    (target.kadrNo != null ? sections.find((s) => s.kadrNo === target.kadrNo) : undefined);
+  const section = findKadrSectionInMarkdown(markdown, target);
   if (!section) return String(markdown ?? "");
   const text = String(markdown ?? "");
   return text.slice(0, section.headingStart) + text.slice(section.sectionEnd);
 }
 
+/** Перенумеровать оставшиеся картины подряд: 1, 2, 3… (заголовок `### Картина N` и kadrNo в JSON). */
+export function renumberKadrSectionsInMarkdown(markdown: string): string {
+  const text = String(markdown ?? "");
+  const sections = scanMarkdownKadrSections(text);
+  if (sections.length === 0) return text;
+
+  let result = text;
+  for (let i = sections.length - 1; i >= 0; i -= 1) {
+    const section = sections[i];
+    const newNo = i + 1;
+    if (section.kadrNo === newNo) continue;
+
+    const slice = result.slice(section.headingStart);
+    const lineEnd = slice.indexOf("\n");
+    const headingLine = lineEnd >= 0 ? slice.slice(0, lineEnd) : slice;
+    const newHeadingLine = headingLine.replace(
+      /^###\s*Картина\s+\d+/i,
+      `### Картина ${newNo}`,
+    );
+    if (newHeadingLine === headingLine) continue;
+
+    const replaceEnd = section.headingStart + headingLine.length;
+    result = result.slice(0, section.headingStart) + newHeadingLine + result.slice(replaceEnd);
+  }
+  return result;
+}
+
+export function formatDeleteKadrConfirmMessage(headingTitle: string): string {
+  const label = String(headingTitle ?? "").trim() || "картину";
+  return `Удалить «${label}»?\n\nОстальные картины в шаге будут перенумерованы (1, 2, 3…).`;
+}
+
 /** Синхронизировать markdown шага и lightKadrs после удаления картины. */
 export function deleteKadrFromStepMarkdown(
   step: { markdown?: string | null; lightKadrs?: StepLightKadrsDataV1 | null } | null | undefined,
-  target: { id?: string | null; kadrNo?: number },
+  target: { id?: string | null; kadrNo?: number; headingStart?: number },
 ): { markdown: string; lightKadrs: StepLightKadrsDataV1 } {
-  const markdown = removeKadrSectionFromMarkdown(String(step?.markdown ?? ""), target);
+  const removed = removeKadrSectionFromMarkdown(String(step?.markdown ?? ""), target);
+  const markdown = renumberKadrSectionsInMarkdown(removed);
   const lightKadrs = syncLightKadrsFromMarkdown({
     markdown,
     kadrs: readStepLightKadrs(step),

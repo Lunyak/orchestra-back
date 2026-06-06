@@ -13,7 +13,7 @@ import {
 export async function applyKadrProjector(
   cue: KadrProjectorCue | null | undefined,
   ctx: ProjectorMediaContext,
-  options?: { videoMuted?: boolean },
+  options?: { videoMuted?: boolean; videoVolume?: number },
 ) {
   if (!isProjectorWindowOpen() || !cue) return;
 
@@ -51,7 +51,8 @@ export async function applyKadrProjector(
     holdStorageKey: defaultHold?.storageKey ?? null,
     holdId: defaultHoldId,
     videoId: cue.videoId,
-    muted: options?.videoMuted ?? false,
+    muted: options?.videoMuted ?? (options?.videoVolume ?? 1) === 0,
+    volume: options?.videoVolume ?? (options?.videoMuted ? 0 : 1),
   });
 }
 

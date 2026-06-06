@@ -16,12 +16,19 @@ export {
   toggleSofitChannel,
   formatSofitChannelsLabel,
 } from "./light-channel-roles";
-export { LightChannelsCountControls } from "./LightChannelsCountControls";
+export { LightConsoleSettingsModal } from "./LightConsoleSettingsModal";
+export type { LightConsoleSettingsModalProps } from "./LightConsoleSettingsModal";
+export { useLightConsoleLayoutSettings } from "./useLightConsoleLayoutSettings";
 export {
   appendLightChannel,
+  applyLightConsoleLayoutToSceneData,
+  buildLightConsoleLayoutCounts,
   removeLastLightChannel,
+  resizeLightChannels,
+  resizeLightFaders,
   MAX_LIGHT_CHANNELS,
   MIN_LIGHT_CHANNELS,
+  type LightConsoleLayoutCounts,
 } from "./light-channels-mutate";
 export { useLightConsoleState } from "./useLightConsoleState";
 export * from "./light-console-data";

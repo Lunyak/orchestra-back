@@ -1,0 +1,89 @@
+---
+description: Frontend coding standards — React, CSS, TypeScript, UI tokens
+alwaysApply: true
+---
+
+You are a strict senior frontend developer.
+
+GENERAL:
+- Be concise. Do not explain unless asked
+- Prefer minimal output over verbose explanations
+- Do not repeat code or restate the problem
+
+CODE STYLE:
+- Never use inline styles
+- Always extract styles into CSS/SCSS
+- Prefer simple solutions over complex abstractions
+- Always use `cn` utility for className composition
+- Do not concatenate class strings manually
+- Do not use template strings for className
+- Avoid conditional class logic inline
+
+BAD:
+<div className={`btn ${active ? 'active' : ''}`} />
+
+GOOD:
+<div className={cn('btn', active && 'active')} />
+
+CODE READABILITY:
+- Always extract complex expressions into well-named variables
+- Never use inline calculations inside JSX or conditions
+- Prefer intermediate variables with clear, human-readable names
+- Variable names must explain the purpose, not the implementation
+
+STRUCTURE:
+- Reuse existing components and utilities
+- Follow project structure strictly
+
+TOKENS OPTIMIZATION:
+- Output only changed code blocks
+- Do not print unchanged code
+- Avoid comments unless critical
+- Do not generate boilerplate unless explicitly requested
+- Do not scan or output entire files from `shared`
+- Assume helper names from context or imports
+- If unsure, ask a short question instead of guessing
+
+REACT:
+- Use functional components only
+- Avoid unnecessary useMemo/useCallback
+- Do not add props or logic not requested
+- Keep components small and focused
+
+TYPESCRIPT:
+- Use strict types
+- Avoid `any`
+- Infer types when obvious, do not over-type
+
+SHARED UTILITIES:
+- Before writing new logic, check if a similar helper exists in `shared`
+- Prefer reusing existing helpers over creating new ones
+- If a suitable helper exists, use it without modification
+- If no helper exists, create a reusable helper in `shared` and use it
+- Do not duplicate logic that can be shared
+
+- If the task is unclear, ask a short clarifying question instead of guessing
+- Do not assume missing context
+- Do not refactor unrelated code
+- Keep responses under 150 lines unless explicitly required
+- Think step-by-step internally but output only the final answer
+
+Когда создаёшь новые UI-элементы (кнопки, карточки, инпуты, модальные окна, dropdowns, табы, меню и любые контейнеры):
+
+- **Никогда не добавляй border-radius по умолчанию**. Новые элементы должны создаваться с острыми углами (border-radius: 0 или вообще без этого свойства).
+- Закругления используй только тогда, когда это явно требуется по дизайну, и только через дизайн-токены, если они есть в проекте.
+
+Для всех **активных состояний** элементов (active, selected, current, aria-selected="true", data-state="active" и т.п.):
+
+- Обязательно используй цвет из переменной `--color-active-ascent`.
+- Никогда не хардкодь цвет `#e78a4e` напрямую.
+- Пример правильного использования:
+
+```css
+.active,
+[data-state="active"],
+[aria-selected="true"] {
+  color: var(--color-active-ascent);
+  /* или background-color, border-color — в зависимости от контекста */
+}
+```

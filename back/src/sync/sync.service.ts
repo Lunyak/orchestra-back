@@ -345,23 +345,237 @@ export class SyncService {
     ]);
   }
 
+  private sceneIdFromEntityId(entityId?: string | null): string | null {
+    const raw = String(entityId ?? '').trim();
+    if (!raw) return null;
+    const scriptIdx = raw.indexOf(':script');
+    if (scriptIdx > 0) return raw.slice(0, scriptIdx + ':script'.length);
+    const colon = raw.indexOf(':');
+    return colon > 0 ? raw.slice(0, colon) : null;
+  }
+
+  private hasJsonValue(value: unknown): boolean {
+    if (value == null) return false;
+    if (typeof value === 'object') {
+      return Object.keys(value as object).length > 0;
+    }
+    return true;
+  }
+
+  private normalizeConfirmToken(value: string): string {
+    return value.trim().toLowerCase();
+  }
+
+  private matchesDestructiveConfirm(
+    project: { name: string; slug: string } | null | undefined,
+    confirm: string | null | undefined,
+  ): boolean {
+    if (!project || !confirm?.trim()) return false;
+    const token = this.normalizeConfirmToken(confirm);
+    return (
+      token === this.normalizeConfirmToken(project.name) ||
+      token === this.normalizeConfirmToken(project.slug)
+    );
+  }
+
+  private scenePayloadWouldNullWipe(
+    payload: any,
+    existing: {
+      sceneRoles: unknown;
+      lightFaders: unknown;
+      lightPrograms: unknown;
+      lightChannelRoles: unknown;
+      projectorMedia: unknown;
+    } | null,
+  ): boolean {
+    if (!existing) return false;
+    const pairs: Array<[string, unknown, unknown]> = [
+      ['sceneRoles', payload?.sceneRoles, existing.sceneRoles],
+      ['lightFaders', payload?.lightFaders, existing.lightFaders],
+      ['lightPrograms', payload?.lightPrograms, existing.lightPrograms],
+      ['lightChannelRoles', payload?.lightChannelRoles, existing.lightChannelRoles],
+      ['projectorMedia', payload?.projectorMedia, existing.projectorMedia],
+    ];
+    return pairs.some(([key, next, current]) => {
+      if (!Object.prototype.hasOwnProperty.call(payload ?? {}, key)) return false;
+      return next == null && this.hasJsonValue(current);
+    });
+  }
+
+  private async classifyDestructiveChanges(
+    changes: SyncChangeDto[],
+  ): Promise<Set<SyncChangeDto>> {
+    const destructive = new Set<SyncChangeDto>();
+    const sceneIds = new Set<string>();
+
+    for (const change of changes) {
+      if (change.entityType === 'Project' && change.operation === 'delete') {
+        destructive.add(change);
+      }
+      const sceneId =
+        String(change.payload?.sceneId ?? '').trim() ||
+        this.sceneIdFromEntityId(change.entityId);
+      if (sceneId) sceneIds.add(sceneId);
+    }
+
+    for (const sceneId of sceneIds) {
+      const [activeSteps, activePlaylist, activeSounds, existingScene] =
+        await Promise.all([
+          this.prisma.step.count({ where: { sceneId, deletedAt: null } }),
+          this.prisma.playlistItem.count({ where: { sceneId } }),
+          this.prisma.sound.count({ where: { sceneId } }),
+          this.prisma.scene.findUnique({
+            where: { id: sceneId },
+            select: {
+              sceneRoles: true,
+              lightFaders: true,
+              lightPrograms: true,
+              lightChannelRoles: true,
+              projectorMedia: true,
+            },
+          }),
+        ]);
+
+      const stepDeletes = changes.filter(
+        (c) =>
+          c.entityType === 'Step' &&
+          c.operation === 'delete' &&
+          this.sceneIdFromEntityId(c.entityId) === sceneId,
+      );
+      const stepDeleteThreshold = Math.max(2, Math.ceil(activeSteps * 0.4));
+      if (activeSteps > 0 && stepDeletes.length >= stepDeleteThreshold) {
+        stepDeletes.forEach((c) => destructive.add(c));
+      }
+
+      const playlistDeletes = changes.filter(
+        (c) =>
+          c.entityType === 'PlaylistItem' &&
+          c.operation === 'delete' &&
+          String(c.payload?.sceneId ?? '') === sceneId,
+      );
+      const playlistDeleteThreshold = Math.max(3, Math.ceil(activePlaylist * 0.4));
+      if (activePlaylist > 0 && playlistDeletes.length >= playlistDeleteThreshold) {
+        playlistDeletes.forEach((c) => destructive.add(c));
+      }
+
+      const soundDeletes = changes.filter(
+        (c) =>
+          c.entityType === 'Sound' &&
+          c.operation === 'delete' &&
+          String(c.payload?.sceneId ?? '') === sceneId,
+      );
+      const soundDeleteThreshold = Math.max(2, Math.ceil(activeSounds * 0.4));
+      if (activeSounds > 0 && soundDeletes.length >= soundDeleteThreshold) {
+        soundDeletes.forEach((c) => destructive.add(c));
+      }
+
+      for (const change of changes) {
+        if (
+          change.entityType === 'Scene' &&
+          change.operation !== 'delete' &&
+          String(change.payload?.id ?? '') === sceneId &&
+          this.scenePayloadWouldNullWipe(change.payload, existingScene)
+        ) {
+          destructive.add(change);
+        }
+      }
+    }
+
+    return destructive;
+  }
+
+  private async guardSyncPush(
+    changes: SyncChangeDto[],
+    destructiveConfirm?: string | null,
+  ): Promise<{
+    allowed: SyncChangeDto[];
+    confirmedProjectIds: Set<string>;
+    blockedCount: number;
+  }> {
+    if (!changes.length) {
+      return { allowed: [], confirmedProjectIds: new Set(), blockedCount: 0 };
+    }
+
+    const destructive = await this.classifyDestructiveChanges(changes);
+    if (!destructive.size) {
+      return {
+        allowed: changes,
+        confirmedProjectIds: new Set(),
+        blockedCount: 0,
+      };
+    }
+
+    const projectIds = new Set<string>();
+    for (const change of destructive) {
+      const projectId = await this.getProjectIdForChange(
+        change.entityType,
+        change.payload,
+      );
+      if (projectId) projectIds.add(projectId);
+    }
+
+    const confirmedProjectIds = new Set<string>();
+    for (const projectId of projectIds) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { id: true, name: true, slug: true },
+      });
+      if (this.matchesDestructiveConfirm(project, destructiveConfirm)) {
+        confirmedProjectIds.add(projectId);
+      }
+    }
+
+    const allowed: SyncChangeDto[] = [];
+    let blockedCount = 0;
+
+    for (const change of changes) {
+      if (!destructive.has(change)) {
+        allowed.push(change);
+        continue;
+      }
+      const projectId = await this.getProjectIdForChange(
+        change.entityType,
+        change.payload,
+      );
+      if (projectId && confirmedProjectIds.has(projectId)) {
+        allowed.push(change);
+        continue;
+      }
+      blockedCount += 1;
+      console.warn('[sync] blocked destructive change without project confirm', {
+        entityType: change.entityType,
+        operation: change.operation,
+        entityId: change.entityId,
+        projectId,
+        destructiveConfirm: destructiveConfirm ? '[provided]' : null,
+      });
+    }
+
+    return { allowed, confirmedProjectIds, blockedCount };
+  }
+
   async applyChanges(
     userId: string,
     changes: SyncChangeDto[],
     sourceClientId?: string | null,
+    destructiveConfirm?: string | null,
   ) {
+    const { allowed, confirmedProjectIds, blockedCount } =
+      await this.guardSyncPush(changes, destructiveConfirm);
+
     console.log('[sync] applyChanges called', {
       userId,
-      changesCount: changes.length,
+      changesCount: allowed.length,
+      blockedCount,
       sourceClientId: sourceClientId ?? null,
-      changes: changes.map((c) => ({
+      changes: allowed.map((c) => ({
         entityType: c.entityType,
         operation: c.operation,
         entityId: c.entityId,
       })),
     });
 
-    for (const change of changes) {
+    for (const change of allowed) {
       const { entityType, operation, payload } = change;
 
       console.log('[sync] processing change', {
@@ -382,7 +596,15 @@ export class SyncService {
           await this.applyProjectChange(userId, operation, payload);
         }
         if (entityType === 'Scene') {
-          await this.applySceneChange(userId, operation, payload, sourceClientId);
+          const allowNullWipe =
+            !!projectId && confirmedProjectIds.has(projectId);
+          await this.applySceneChange(
+            userId,
+            operation,
+            payload,
+            sourceClientId,
+            allowNullWipe,
+          );
         }
         if (entityType === 'Step') {
           await this.applyStepChange(userId, operation, payload, sourceClientId);
@@ -498,6 +720,7 @@ export class SyncService {
     operation: string,
     payload: any,
     sourceClientId?: string | null,
+    allowNullWipe = false,
   ) {
     if (operation === 'delete') {
       await this.prisma.scene.updateMany({
@@ -553,17 +776,76 @@ export class SyncService {
       ? (payload?.projectorMedia ?? null)
       : undefined;
 
+    const existing = await this.prisma.scene.findUnique({
+      where: { id: payload.id },
+      select: {
+        sceneRoles: true,
+        lightFaders: true,
+        lightPrograms: true,
+        lightChannelRoles: true,
+        projectorMedia: true,
+      },
+    });
+
+    const keepExistingJson = (
+      hasField: boolean,
+      nextValue: unknown,
+      currentValue: unknown,
+      fieldName: string,
+    ): boolean => {
+      if (!hasField) return false;
+      if (nextValue != null) return true;
+      if (!this.hasJsonValue(currentValue)) return true;
+      if (allowNullWipe) return true;
+      console.warn('[sync] blocked null overwrite of Scene field', {
+        sceneId: payload.id,
+        fieldName,
+      });
+      return false;
+    };
+
+    const applySceneRoles = keepExistingJson(
+      hasSceneRoles,
+      nextSceneRoles,
+      existing?.sceneRoles,
+      'sceneRoles',
+    );
+    const applyLightFaders = keepExistingJson(
+      hasLightFaders,
+      nextLightFaders,
+      existing?.lightFaders,
+      'lightFaders',
+    );
+    const applyLightPrograms = keepExistingJson(
+      hasLightPrograms,
+      nextLightPrograms,
+      existing?.lightPrograms,
+      'lightPrograms',
+    );
+    const applyLightChannelRoles = keepExistingJson(
+      hasLightChannelRoles,
+      nextLightChannelRoles,
+      existing?.lightChannelRoles,
+      'lightChannelRoles',
+    );
+    const applyProjectorMedia = keepExistingJson(
+      hasProjectorMedia,
+      nextProjectorMedia,
+      existing?.projectorMedia,
+      'projectorMedia',
+    );
+
     const result = await this.prisma.scene.upsert({
       where: { id: payload.id },
       update: {
         name: payload.name,
-        ...(hasSceneRoles ? { sceneRoles: nextSceneRoles } : {}),
-        ...(hasLightFaders ? { lightFaders: nextLightFaders } : {}),
-        ...(hasLightPrograms ? { lightPrograms: nextLightPrograms } : {}),
-        ...(hasLightChannelRoles
+        ...(applySceneRoles ? { sceneRoles: nextSceneRoles } : {}),
+        ...(applyLightFaders ? { lightFaders: nextLightFaders } : {}),
+        ...(applyLightPrograms ? { lightPrograms: nextLightPrograms } : {}),
+        ...(applyLightChannelRoles
           ? { lightChannelRoles: nextLightChannelRoles }
           : {}),
-        ...(hasProjectorMedia ? { projectorMedia: nextProjectorMedia } : {}),
+        ...(applyProjectorMedia ? { projectorMedia: nextProjectorMedia } : {}),
       },
       create: {
         id: payload.id,

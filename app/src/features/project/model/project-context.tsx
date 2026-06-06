@@ -328,6 +328,13 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         console.warn("deleteProject is available only in desktop mode");
         return;
       }
+      const projectMeta = projectItems.find((project) => project.slug === name);
+      const confirmLabel = projectMeta?.name ?? name;
+      const typed = window.prompt(
+        `Чтобы удалить проект, введите его название:\n${confirmLabel}`,
+      );
+      if (!typed?.trim()) return;
+
       const projectId = accessToken
         ? localStorage.getItem(`projectId:${name}`)
         : null;
@@ -339,16 +346,20 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (accessToken && projectId) {
         try {
           const nowIso = new Date().toISOString();
-          await syncPush(accessToken, [
-            {
-              id: createId(),
-              entityType: "Project",
-              entityId: projectId,
-              operation: "delete",
-              payload: { id: projectId, updatedAt: nowIso },
-              createdAt: nowIso,
-            },
-          ]);
+          await syncPush(
+            accessToken,
+            [
+              {
+                id: createId(),
+                entityType: "Project",
+                entityId: projectId,
+                operation: "delete",
+                payload: { id: projectId, updatedAt: nowIso },
+                createdAt: nowIso,
+              },
+            ],
+            { destructiveConfirm: typed.trim() },
+          );
         } catch (err) {
           console.error("deleteProject sync failed:", err);
         }
@@ -357,7 +368,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       removeStoredProjectDisplayName(name);
       await loadProjects();
     },
-    [accessToken, getDesktopApi, loadProjects]
+    [accessToken, getDesktopApi, loadProjects, projectItems]
   );
 
   useEffect(() => {

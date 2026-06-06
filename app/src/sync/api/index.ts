@@ -6,6 +6,7 @@ export type {
   SyncPullRequest,
   SyncPullResponse,
   SyncPushRequest,
+  SyncPushOptions,
 } from "./types/sync";
 
 export { api, getApiBaseUrl, setupApiInterceptors } from "./client";

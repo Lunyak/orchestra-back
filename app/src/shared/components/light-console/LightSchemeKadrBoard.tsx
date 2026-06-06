@@ -21,7 +21,6 @@ import { resolveLightFaders } from "./light-console-data";
 import { buildLightSchemeLookModel } from "./light-scheme-preview";
 import { LightSchemeStageMap } from "./LightSchemeStageMap";
 import { LightSchemeLookCard } from "./LightSchemeLookCard";
-import { LightWorkflowGuide } from "./LightWorkflowGuide";
 
 export type LightSchemeKadrBoardProps = {
   step: ScriptStep | null | undefined;
@@ -146,7 +145,6 @@ export function LightSchemeKadrBoard({
         ) : null}
       </div>
 
-      <LightWorkflowGuide variant="compact" />
       {recordMessage ? (
         <p className="light-kadr-panel__record-msg" role="status">
           {recordMessage}

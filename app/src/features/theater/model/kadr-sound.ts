@@ -16,6 +16,7 @@ export type KadrSoundCue = {
 
 const TOKEN_PLAY_RE = /\{\{\s*play\s*:\s*(\d+)(?:\|([^}]+?))?\s*}}/gi;
 const TOKEN_SOUND_RE = /\{\{\s*(?:sound|sfx)\s*:\s*(\d+)(?:\|([^}]+?))?\s*}}/gi;
+const TRACK_LINK_RE = /\[[^\]]*\]\(\s*track\s*:\s*(\d+)\s*\)/gi;
 const TOKEN_FADE_MS_RE =
   /(?:fade|затухание|fadeMs)\s*[:=]?\s*(\d+(?:[.,]\d+)?)\s*(ms|мс|s|с|sec|сек)?/gi;
 const TOKEN_VOLUME_RE = /(?:громкость\s*)?(\d{1,3})\s*%/gi;
@@ -37,23 +38,25 @@ export function parseSoundKadrLine(line: string): KadrSoundCue | null {
 
   TOKEN_PLAY_RE.lastIndex = 0;
   TOKEN_SOUND_RE.lastIndex = 0;
+  TRACK_LINK_RE.lastIndex = 0;
   TOKEN_FADE_MS_RE.lastIndex = 0;
   TOKEN_VOLUME_RE.lastIndex = 0;
 
   const playMatches = [...trimmed.matchAll(TOKEN_PLAY_RE)];
+  const trackLinkMatches = [...trimmed.matchAll(TRACK_LINK_RE)];
   const soundMatches = [...trimmed.matchAll(TOKEN_SOUND_RE)];
   const fadeMatch = TOKEN_FADE_MS_RE.exec(trimmed);
   const volumeMatch = TOKEN_VOLUME_RE.exec(trimmed);
   TOKEN_FADE_MS_RE.lastIndex = 0;
   TOKEN_VOLUME_RE.lastIndex = 0;
 
-  if (playMatches.length === 0 && soundMatches.length === 0) {
+  if (playMatches.length === 0 && trackLinkMatches.length === 0 && soundMatches.length === 0) {
     const body = trimmed.replace(/^-\s*\*\*звук\*\*:\s*/i, "").trim();
     if (!body || /^_/.test(body) || /не записано/i.test(body)) return null;
     return null;
   }
 
-  const playTrackIds = playMatches
+  const playTrackIds = [...playMatches, ...trackLinkMatches]
     .map((m) => Math.trunc(Number(m[1]) || 0))
     .filter((id) => id > 0);
   const soundIds = soundMatches
@@ -97,6 +100,16 @@ export function parseSoundLineInSection(
   return parseSoundKadrLine(`${SOUND_LINE_PREFIX} ${body}`);
 }
 
+export function parseSoundVolumeFromFieldBody(body: string): number | undefined {
+  TOKEN_VOLUME_RE.lastIndex = 0;
+  const volumeMatch = TOKEN_VOLUME_RE.exec(String(body ?? ""));
+  TOKEN_VOLUME_RE.lastIndex = 0;
+  if (!volumeMatch) return undefined;
+  const pct = Math.trunc(Number(volumeMatch[1]) || 0);
+  if (pct < 0 || pct > 100) return undefined;
+  return pct / 100;
+}
+
 export function formatSoundKadrLine(
   cue: KadrSoundCue,
   options: {
@@ -110,7 +123,7 @@ export function formatSoundKadrLine(
     const track = options.playlist?.find((t) => Number(t.id) === trackId);
     const label = track?.title?.trim() || `Трек ${trackId}`;
     const safeTitle = label.replace(/\\/g, "\\\\").replace(/]/g, "\\]");
-    parts.push(`{{play:${trackId}}} [${safeTitle}](track:${trackId})`);
+    parts.push(`[${safeTitle}](track:${trackId})`);
   }
 
   for (const soundId of cue.soundIds) {
@@ -119,13 +132,13 @@ export function formatSoundKadrLine(
     parts.push(`{{sound:${soundId}|${label}}}`);
   }
 
-  if (cue.volume != null && Number.isFinite(cue.volume)) {
+  if (cue.playTrackIds.length > 0 && cue.volume != null && Number.isFinite(cue.volume)) {
     const pct = Math.round(Math.min(1, Math.max(0, cue.volume)) * 100);
     parts.push(`${pct}%`);
   }
 
   if (parts.length === 0) {
-    return `${SOUND_LINE_PREFIX} _не записано — «Записать звук»_`;
+    return `${SOUND_LINE_PREFIX} _не записано — выберите трек при создании картины_`;
   }
 
   return `${SOUND_LINE_PREFIX} ${parts.join(" · ")}`;

@@ -1,6 +1,8 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 
+export type LightPlotMode = "rehearsal" | "prog-run";
+
 export type ScriptUiState = {
   showPlaylistSidebar: boolean;
   showHeaderSounds: boolean;
@@ -14,7 +16,7 @@ export type ScriptUiState = {
   mobilePlaylistOpen: boolean;
   mobileStepsOpen: boolean;
 
-  /** Режим редактирования (не persist'им) */
+  /** Режим редактирования сценария (persist в localStorage). */
   isEditing: boolean;
   /** Редактирование плейлиста: fade, loop, порядок, подготовка (не persist'им) */
   playlistEditMode: boolean;
@@ -26,9 +28,12 @@ export type ScriptUiState = {
   showTheaterControls: boolean;
   /** Скрыть текст шага на странице «Репетиция» (/light-plot). */
   spectacleRunTextHidden: boolean;
+  /** Режим страницы /light-plot: пошаговая репетиция или прогон. */
+  lightPlotMode: LightPlotMode;
 };
 
 const SPECTACLE_RUN_TEXT_HIDDEN_KEY = "orchestra-spectacle-run-text-hidden";
+const LIGHT_PLOT_MODE_KEY = "orchestra-light-plot-mode";
 
 function storedBool(key: string, defaultValue: boolean): boolean {
   if (typeof window === "undefined") return defaultValue;
@@ -46,6 +51,7 @@ function persistBooleans(state: ScriptUiState) {
     localStorage.setItem("showPlaylistSidebar", String(state.showPlaylistSidebar));
     localStorage.setItem("showHeaderSounds", String(state.showHeaderSounds));
     localStorage.setItem("isStepsCollapsed", String(state.isStepsCollapsed));
+    localStorage.setItem("isEditing", String(state.isEditing));
     localStorage.setItem(
       "playlistCrossfadeEnabled",
       String(state.playlistCrossfadeEnabled),
@@ -68,7 +74,27 @@ function defaultState(): ScriptUiState {
     swapTheaterPanels: false,
     showTheaterControls: true,
     spectacleRunTextHidden: false,
+    lightPlotMode: "rehearsal",
   };
+}
+
+function storedLightPlotMode(defaultValue: LightPlotMode): LightPlotMode {
+  if (typeof window === "undefined") return defaultValue;
+  try {
+    const stored = localStorage.getItem(LIGHT_PLOT_MODE_KEY);
+    return stored === "prog-run" ? "prog-run" : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+function persistLightPlotMode(mode: LightPlotMode) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(LIGHT_PLOT_MODE_KEY, mode);
+  } catch {
+    // ignore
+  }
 }
 
 function persistSpectacleRunTextHidden(hidden: boolean) {
@@ -87,6 +113,7 @@ function initialStateFromStorage(): ScriptUiState {
     showPlaylistSidebar: storedBool("showPlaylistSidebar", base.showPlaylistSidebar),
     showHeaderSounds: storedBool("showHeaderSounds", base.showHeaderSounds),
     isStepsCollapsed: storedBool("isStepsCollapsed", base.isStepsCollapsed),
+    isEditing: storedBool("isEditing", base.isEditing),
     playlistCrossfadeEnabled: storedBool(
       "playlistCrossfadeEnabled",
       base.playlistCrossfadeEnabled,
@@ -99,6 +126,7 @@ function initialStateFromStorage(): ScriptUiState {
         return base.spectacleRunTextHidden;
       }
     })(),
+    lightPlotMode: storedLightPlotMode(base.lightPlotMode),
   };
 }
 
@@ -111,6 +139,7 @@ export const scriptUiSlice = createSlice({
       state.showPlaylistSidebar = storedBool("showPlaylistSidebar", base.showPlaylistSidebar);
       state.showHeaderSounds = storedBool("showHeaderSounds", base.showHeaderSounds);
       state.isStepsCollapsed = storedBool("isStepsCollapsed", base.isStepsCollapsed);
+      state.isEditing = storedBool("isEditing", base.isEditing);
       state.playlistCrossfadeEnabled = storedBool(
         "playlistCrossfadeEnabled",
         base.playlistCrossfadeEnabled,
@@ -122,11 +151,11 @@ export const scriptUiSlice = createSlice({
         } catch {
           state.spectacleRunTextHidden = base.spectacleRunTextHidden;
         }
+        state.lightPlotMode = storedLightPlotMode(base.lightPlotMode);
       }
       // Эфемерные поля — сброс при init; theater-панели восстанавливаются в useSpectaclePage.
       state.mobilePlaylistOpen = false;
       state.mobileStepsOpen = false;
-      state.isEditing = false;
       state.playlistEditMode = false;
       persistBooleans(state);
     },
@@ -179,9 +208,11 @@ export const scriptUiSlice = createSlice({
 
     setIsEditing(state, action: PayloadAction<{ value: boolean }>) {
       state.isEditing = Boolean(action.payload.value);
+      persistBooleans(state);
     },
     toggleEditing(state) {
       state.isEditing = !state.isEditing;
+      persistBooleans(state);
     },
 
     setPlaylistEditMode(state, action: PayloadAction<{ value: boolean }>) {
@@ -225,6 +256,12 @@ export const scriptUiSlice = createSlice({
     toggleSpectacleRunTextHidden(state) {
       state.spectacleRunTextHidden = !state.spectacleRunTextHidden;
       persistSpectacleRunTextHidden(state.spectacleRunTextHidden);
+    },
+
+    setLightPlotMode(state, action: PayloadAction<{ mode: LightPlotMode }>) {
+      const mode = action.payload.mode === "prog-run" ? "prog-run" : "rehearsal";
+      state.lightPlotMode = mode;
+      persistLightPlotMode(mode);
     },
   },
 });

@@ -37,6 +37,7 @@ export function createDefaultLightPrograms(
   const n = Math.max(1, Math.trunc(count) || DEFAULT_LIGHT_PROGRAM_COUNT);
   return {
     v: 1,
+    count: n,
     activeProgramId: 1,
     programs: Array.from({ length: n }, (_, index) => {
       const id = index + 1;
@@ -47,8 +48,11 @@ export function createDefaultLightPrograms(
 
 export function buildCompleteLightFaders(
   persisted: SceneLightFadersDataV1 | undefined,
+  minFaderCount = 1,
 ): SceneLightFadersDataV1 {
-  const countHint = Math.max(1, Math.trunc(Number(persisted?.count) || 8));
+  const storedCount = Math.trunc(Number(persisted?.count) || 0);
+  const baseCount = storedCount > 0 ? storedCount : 8;
+  const countHint = Math.max(minFaderCount, baseCount);
   const maxIdInList = (persisted?.faders ?? []).reduce(
     (max, f) => Math.max(max, Math.trunc(Number(f.id) || 0)),
     0,
@@ -79,25 +83,33 @@ export function buildCompleteLightFaders(
         : [{ channel: fader.channel ?? id, spotlightId: fader.spotlightId }],
     });
   }
-  return {
-    v: 1,
-    count: maxFaderId,
-    faders: Array.from(byId.values()).sort((a, b) => a.id - b.id),
-  };
+  return { v: 1, count: maxFaderId, faders: Array.from(byId.values()).sort((a, b) => a.id - b.id) };
+}
+
+export function readLightProgramSlotCount(
+  raw: SceneLightProgramsDataV1 | null | undefined,
+): number {
+  const explicit = Math.trunc(Number(raw?.count) || 0);
+  const storedLen = Array.isArray(raw?.programs) ? raw.programs.length : 0;
+  if (explicit > 0) return explicit;
+  return storedLen;
 }
 
 export function resolveLightPrograms(
   raw: SceneLightProgramsDataV1 | null | undefined,
-  minCount = DEFAULT_LIGHT_PROGRAM_COUNT,
+  minCount?: number,
 ): SceneLightProgramsDataV1 {
+  const slotCount = readLightProgramSlotCount(raw);
+  const effectiveMin = minCount ?? (slotCount > 0 ? slotCount : DEFAULT_LIGHT_PROGRAM_COUNT);
   if (!raw || raw.v !== 1 || !Array.isArray(raw.programs) || raw.programs.length === 0) {
-    return createDefaultLightPrograms(minCount);
+    return createDefaultLightPrograms(effectiveMin);
   }
 
+  const maxId = Math.max(effectiveMin, slotCount);
   const byId = new Map<number, SceneLightProgramsDataV1["programs"][number]>();
   for (const program of raw.programs) {
     const id = coerceProgramId(program.id);
-    if (id == null) continue;
+    if (id == null || id > maxId) continue;
     byId.set(id, {
       ...program,
       id,
@@ -105,11 +117,6 @@ export function resolveLightPrograms(
       faders: Array.isArray(program.faders) ? program.faders : [],
     });
   }
-  const maxId = Math.max(
-    minCount,
-    ...Array.from(byId.keys()),
-    ...raw.programs.map((program) => coerceProgramId(program.id) ?? 0),
-  );
 
   const programs = Array.from({ length: maxId }, (_, index) => {
     const id = index + 1;
@@ -118,20 +125,49 @@ export function resolveLightPrograms(
 
   const activeId = coerceProgramId(raw.activeProgramId);
   const activeProgramId =
-    activeId != null && programs.some((program) => program.id === activeId)
+    activeId != null && activeId <= maxId
       ? activeId
       : (programs[0]?.id ?? 1);
 
-  return { v: 1, activeProgramId, programs };
+  return { v: 1, count: maxId, activeProgramId, programs };
+}
+
+export function resizeLightPrograms(
+  raw: SceneLightProgramsDataV1 | null | undefined,
+  count: number,
+): SceneLightProgramsDataV1 {
+  const nextCount = Math.max(1, Math.min(64, Math.trunc(Number(count)) || 1));
+  const byId = new Map<number, SceneLightProgramsDataV1["programs"][number]>();
+  for (const program of raw?.programs ?? []) {
+    const id = coerceProgramId(program.id);
+    if (id == null || id > nextCount) continue;
+    byId.set(id, {
+      ...program,
+      id,
+      label: formatProgramDefaultLabel(id, program.label),
+      faders: Array.isArray(program.faders) ? program.faders : [],
+    });
+  }
+  const programs = Array.from({ length: nextCount }, (_, index) => {
+    const id = index + 1;
+    return byId.get(id) ?? { id, label: formatProgramDefaultLabel(id), faders: [] };
+  });
+  const activeId = coerceProgramId(raw?.activeProgramId);
+  const activeProgramId =
+    activeId != null && activeId <= nextCount
+      ? activeId
+      : (programs[0]?.id ?? 1);
+  return { v: 1, count: nextCount, activeProgramId, programs };
 }
 
 export function lightProgramsNeedNormalization(
   raw: SceneLightProgramsDataV1 | null | undefined,
-  minCount = DEFAULT_LIGHT_PROGRAM_COUNT,
 ): boolean {
   if (!raw || raw.v !== 1 || !Array.isArray(raw.programs)) return true;
-  if (raw.programs.length < minCount) return true;
-  for (let id = 1; id <= minCount; id += 1) {
+  const slotCount = readLightProgramSlotCount(raw);
+  if (slotCount === 0) return true;
+  if (raw.programs.length !== slotCount) return true;
+  for (let id = 1; id <= slotCount; id += 1) {
     if (!raw.programs.some((program) => coerceProgramId(program.id) === id)) return true;
   }
   return false;
@@ -294,13 +330,11 @@ export type LightConsoleViewProps = {
   consoleChannel?: number;
   onSelectChannel?: (slot: number) => void;
   onSelectProgram?: (programId: number) => void;
-  onFaderCountChange?: (count: number) => void;
   onPatchFader?: (
     faderId: number,
     patch: Partial<SceneLightFadersDataV1["faders"][number]>,
   ) => void;
   onSaveActiveProgram?: () => void;
-  onAppendLightChannel?: () => void;
-  onRemoveLightChannel?: () => void;
+  onOpenSettings?: () => void;
   className?: string;
 };

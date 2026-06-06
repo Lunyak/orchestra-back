@@ -8,16 +8,8 @@ import { SpectacleRunContent } from "./SpectacleRunContent";
 import "../../../shared/components/light-console/light-console.css";
 import "./style.css";
 
-export type SpectacleRunViewProps = {
-  onOpenTechCard?: (stepIndex?: number) => void;
-  onSyncPlotFrom3d?: () => void;
-};
-
 /** Обёртка с провайдером состояния репетиции (контент без шапки — шапка в light-plot-mode-tabs). */
-export function SpectacleRunView({
-  onOpenTechCard,
-  onSyncPlotFrom3d,
-}: SpectacleRunViewProps) {
+export function SpectacleRunView() {
   const { projectName } = useProject();
   const { steps } = useScene();
   const { lightChannels } = useAppSelector((state) =>
@@ -32,10 +24,7 @@ export function SpectacleRunView({
 
   return (
     <SpectacleRunProvider value={run}>
-      <SpectacleRunContent
-        onOpenTechCard={onOpenTechCard}
-        onSyncPlotFrom3d={onSyncPlotFrom3d}
-      />
+      <SpectacleRunContent />
     </SpectacleRunProvider>
   );
 }

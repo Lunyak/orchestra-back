@@ -5,6 +5,7 @@ import {
   upsertSoundLineInSection,
 } from "../../theater/model/kadr-sound";
 import { getPlaylistPlaybackSnapshot } from "../../scene/model/scene-playback-bridge";
+import { readPlayerVolume } from "../../../shared/player/player-prefs";
 
 export type RecordSoundKadrInput = {
   markdown: string;
@@ -32,7 +33,7 @@ export function recordSoundKadrForSection(
       cue = {
         playTrackIds: [snap.trackId],
         soundIds: [],
-        volume: snap.volume,
+        volume: snap.volume ?? readPlayerVolume(),
       };
     }
   }
@@ -58,6 +59,9 @@ export function recordSoundKadrForSection(
       input.playlist?.find((t) => t.id === id)?.title ??
       getPlaylistPlaybackSnapshot().trackTitle;
     labels.push(title?.trim() ? `трек «${title.trim()}»` : `трек ${id}`);
+    if (cue.volume != null && Number.isFinite(cue.volume)) {
+      labels.push(`${Math.round(cue.volume * 100)}%`);
+    }
   }
   if (cue.soundIds.length > 0) {
     labels.push(`SFX ×${cue.soundIds.length}`);
