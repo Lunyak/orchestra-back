@@ -1,8 +1,5 @@
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
-import {
-  isProjectorWindowOpen,
-  sendProjectorMessage,
-} from "../../projector/model/projector-playback-bridge";
+import { sendProjectorMessage } from "../../projector/model/projector-playback-bridge";
 import {
   resolveDefaultHoldId,
   resolveProjectorHoldAsset,
@@ -15,7 +12,7 @@ export async function applyKadrProjector(
   ctx: ProjectorMediaContext,
   options?: { videoMuted?: boolean; videoVolume?: number },
 ) {
-  if (!isProjectorWindowOpen() || !cue) return;
+  if (!cue) return;
 
   const defaultHoldId = resolveDefaultHoldId(ctx);
   const defaultHold = resolveProjectorHoldAsset(ctx, defaultHoldId);
@@ -60,7 +57,6 @@ export function showProjectorHold(
   ctx: ProjectorMediaContext,
   holdId?: number | null,
 ) {
-  if (!isProjectorWindowOpen()) return;
   const resolvedId = holdId ?? resolveDefaultHoldId(ctx);
   const asset = resolveProjectorHoldAsset(ctx, resolvedId);
   sendProjectorMessage({

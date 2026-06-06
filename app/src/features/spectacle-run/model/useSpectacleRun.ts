@@ -529,11 +529,17 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         if (applyPlayback) {
           const soundCue = parseSoundLineInSection(markdown, section);
           applyKadrSound(soundCue);
+          if (projectorCue) {
+            ensureProjectorOpen();
+          }
           void applyKadrProjector(
             projectorCue,
             projectorMediaCtx,
             projectorCue?.mode === "video"
-              ? { videoMuted: resolveProjectorVideoMuted(projectorCue.videoId) }
+              ? {
+                  videoMuted: resolveProjectorVideoMuted(projectorCue.videoId),
+                  videoVolume: resolveProjectorVideoVolume(projectorCue.videoId),
+                }
               : undefined,
           );
         }
@@ -558,7 +564,15 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       applyingTapeRef.current = false;
     },
-    [lightPlotMode, liveConsole, projectorMediaCtx, resolveProjectorVideoMuted, setCurrentPage],
+    [
+      ensureProjectorOpen,
+      lightPlotMode,
+      liveConsole,
+      projectorMediaCtx,
+      resolveProjectorVideoMuted,
+      resolveProjectorVideoVolume,
+      setCurrentPage,
+    ],
   );
 
   useEffect(() => {
@@ -798,7 +812,10 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       const target = tape[clamped];
       if (target) {
         applyingTapeRef.current = true;
-        applyTapeItem(target);
+        applyTapeItem(
+          target,
+          isProgRun ? { applyPlayback: true } : undefined,
+        );
       }
 
       skipTapeApplyEffectRef.current = true;
@@ -808,6 +825,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     [
       applyTapeItem,
       flushLiveSaveAtIndex,
+      isProgRun,
       liveConsole.faders,
       liveConsole.programs,
       tape,
