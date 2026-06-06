@@ -1,10 +1,15 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useState,
   type Dispatch,
   type SetStateAction,
 } from "react";
+import {
+  resolveLightProgramMinCount,
+  resolveLightPrograms,
+} from "../../../shared/components/light-console/light-console-data";
 import { useScene } from "../../scene";
 import { useScriptUI } from "../../script-ui";
 import { useAppSelector } from "../../../shared/store/hooks";
@@ -51,9 +56,9 @@ export function useTheaterScene({
   onTheaterLayoutChange,
 }: UseTheaterSceneArgs) {
   const { steps, currentPage, updateStep, sceneData } = useScene();
-  const selectedLightSlot = useAppSelector((state) =>
+  const { selectedLightSlot, lightChannels } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName || "", "script"),
-  ).selectedLightSlot;
+  );
   const currentStep = steps[currentPage];
   const layout = theaterLayout ?? DEFAULT_THEATER_LAYOUT;
   const {
@@ -195,6 +200,15 @@ export function useTheaterScene({
 
 
 
+  const resolvedLightPrograms = useMemo(
+    () =>
+      resolveLightPrograms(
+        sceneData?.lightPrograms,
+        resolveLightProgramMinCount(lightChannels.length, sceneData?.lightPrograms),
+      ),
+    [lightChannels.length, sceneData?.lightPrograms],
+  );
+
   const spotlightsApi = useTheaterSpotlights({
     currentStep,
     updateCurrentStep,
@@ -209,7 +223,7 @@ export function useTheaterScene({
     setDecorActionMessage,
     rehearsalSpotlights,
     lightFaders: sceneData?.lightFaders,
-    lightPrograms: sceneData?.lightPrograms,
+    lightPrograms: resolvedLightPrograms,
     consoleChannel: selectedLightSlot > 0 ? selectedLightSlot : undefined,
   });
   const {

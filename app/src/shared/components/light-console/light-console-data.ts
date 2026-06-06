@@ -217,11 +217,7 @@ export function snapshotFadersForProgramFromAllChannels(
   >();
 
   for (let channel = 1; channel <= maxCh; channel += 1) {
-    const states = readProgramChannelFaderStates(programs, channel);
-    const board =
-      states.length > 0
-        ? applyProgramFaderStatesToBoard(baseFaders, states)
-        : baseFaders;
+    const board = buildFaderBoardForConsoleChannel(baseFaders, programs, channel);
     for (const fader of board.faders) {
       const level = readFaderLevelForSnapshot(fader);
       if (level <= 0.02) continue;
@@ -251,17 +247,22 @@ export function applyProgramFaderStatesToBoard(
   faders: SceneLightFadersDataV1,
   states: SceneLightProgramsDataV1["programs"][number]["faders"],
 ): SceneLightFadersDataV1 {
-  if (!states.length) return faders;
   const stateByFader = new Map(states.map((state) => [state.faderId, state]));
   return {
     ...faders,
     faders: faders.faders.map((item) => {
       const state = stateByFader.get(item.id);
-      if (!state) return item;
+      if (!state) {
+        return {
+          ...item,
+          intensity: 0,
+          enabled: false,
+        };
+      }
       return {
         ...item,
-        intensity: state.intensity ?? item.intensity,
-        enabled: state.enabled ?? item.enabled,
+        intensity: state.intensity ?? 0,
+        enabled: state.enabled ?? false,
         color: state.color ?? item.color,
       };
     }),
@@ -315,6 +316,46 @@ export function readProgramChannelFaderStates(
   const id = coerceProgramId(channelId);
   if (id == null) return [];
   return programs.programs.find((program) => program.id === id)?.faders ?? [];
+}
+
+export function resolveLightProgramMinCount(
+  lightChannelsCount: number,
+  programs?: SceneLightProgramsDataV1 | null,
+  minChannel = 0,
+): number {
+  const channelCount = Math.max(
+    1,
+    Math.trunc(lightChannelsCount) || 1,
+    Math.trunc(minChannel) || 0,
+  );
+  const stored = readLightProgramSlotCount(programs);
+  return Math.max(channelCount, stored, DEFAULT_LIGHT_PROGRAM_COUNT);
+}
+
+function zeroFaderBoardStates(
+  faders: SceneLightFadersDataV1,
+): SceneLightProgramsDataV1["programs"][number]["faders"] {
+  return faders.faders.map((fader) => ({
+    faderId: fader.id,
+    intensity: 0,
+    enabled: false,
+    color: fader.color,
+  }));
+}
+
+/** Доска F для канала K: живая доска, память program[K] или нули — не чужой K. */
+export function buildFaderBoardForConsoleChannel(
+  liveFaders: SceneLightFadersDataV1,
+  programs: SceneLightProgramsDataV1,
+  channel: number,
+  options?: { useLiveBoard?: boolean },
+): SceneLightFadersDataV1 {
+  if (options?.useLiveBoard) return liveFaders;
+  const channelStates = readProgramChannelFaderStates(programs, channel);
+  if (channelStates.length > 0) {
+    return applyProgramFaderStatesToBoard(liveFaders, channelStates);
+  }
+  return applyProgramFaderStatesToBoard(liveFaders, zeroFaderBoardStates(liveFaders));
 }
 
 export type LightConsoleMode = "live" | "kadr" | "compact";

@@ -6,7 +6,9 @@ import type {
 import type { StepLightKadrFaderStateV1 } from "../../../shared/types/script";
 import {
   applyProgramFaderStatesToBoard,
+  buildFaderBoardForConsoleChannel,
   readProgramChannelFaderStates,
+  resolveLightPrograms,
 } from "../../../shared/components/light-console/light-console-data";
 import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";
 import type { ScriptStep, TheaterSpotlight } from "../../../shared/types/script";
@@ -214,21 +216,22 @@ export function applyFadersToSpotlightsPerChannelDisplay(
     );
   }
 
+  const maxSpotChannel = spotlights.reduce(
+    (max, spotlight) => Math.max(max, readSpotlightChannel(spotlight) ?? 0),
+    liveChannel ?? 0,
+  );
+  const programs = resolveLightPrograms(lightPrograms, maxSpotChannel);
+
   return spotlights.map((spotlight) => {
     const spotChannel = readSpotlightChannel(spotlight);
     if (spotChannel == null) return spotlight;
 
     const useLiveBoard = liveChannel != null && spotChannel === liveChannel;
-    const faderBoard = useLiveBoard
-      ? lightFaders
-      : applyProgramFaderStatesToBoard(
-          lightFaders,
-          readProgramChannelFaderStates(lightPrograms!, spotChannel),
-        );
-
-    return applyFaderToSpotlightForDisplay(spotlight, faderBoard, {
-      consoleChannel: spotChannel,
+    const faderBoard = buildFaderBoardForConsoleChannel(lightFaders, programs, spotChannel, {
+      useLiveBoard,
     });
+
+    return applyFaderToSpotlightForDisplay(spotlight, faderBoard);
   });
 }
 
@@ -459,15 +462,11 @@ export function buildKadrFaderSnapshotFromSofitChannels(args: {
     const faderIds = equipmentFaderIdsOnChannel(channel, spotlights, args.baseFaders);
     if (faderIds.length === 0) continue;
 
-    let board = args.baseFaders;
-    if (channel === liveCh) {
-      board = args.liveFaders;
-    } else {
-      const channelStates = readProgramChannelFaderStates(args.programs, channel);
-      if (channelStates.length > 0) {
-        board = applyProgramFaderStatesToBoard(args.baseFaders, channelStates);
-      }
-    }
+    const programs = resolveLightPrograms(args.programs, channel);
+    const board =
+      channel === liveCh
+        ? args.liveFaders
+        : buildFaderBoardForConsoleChannel(args.baseFaders, programs, channel);
 
     for (const faderId of faderIds) {
       const fader = board.faders.find((item) => item.id === faderId);

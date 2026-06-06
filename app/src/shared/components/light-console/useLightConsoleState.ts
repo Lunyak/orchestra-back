@@ -9,10 +9,12 @@ import type { TheaterSpotlight } from "../../../shared/types/script";
 import {
   applyProgramFaderStatesToBoard,
   buildCompleteLightFaders,
+  buildFaderBoardForConsoleChannel,
   coerceProgramId,
   createDefaultLightFaders,
   lightProgramsNeedNormalization,
   readProgramChannelFaderStates,
+  resolveLightProgramMinCount,
   resolveLightPrograms,
   upsertActiveProgramSnapshotFromAllChannels,
   upsertProgramChannelSnapshot,
@@ -61,8 +63,12 @@ export function useLightConsoleState({
   );
   const faders = fadersOverride ?? persistedFaders;
   const programs = useMemo(
-    () => resolveLightPrograms(sceneData?.lightPrograms),
-    [sceneData?.lightPrograms],
+    () =>
+      resolveLightPrograms(
+        sceneData?.lightPrograms,
+        resolveLightProgramMinCount(lightChannels.length, sceneData?.lightPrograms),
+      ),
+    [lightChannels.length, sceneData?.lightPrograms],
   );
   const displayPrograms =
     activeProgramIdOverride != null
@@ -244,10 +250,13 @@ export function useLightConsoleState({
         channelSaveTimerRef.current = null;
       }
       const programsAfterSave = upsertProgramChannelSnapshot(programs, prev, faders);
-      const channelStates = readProgramChannelFaderStates(programsAfterSave, next);
-      const nextFaders = applyProgramFaderStatesToBoard(faders, channelStates);
+      const resolvedPrograms = resolveLightPrograms(
+        programsAfterSave,
+        resolveLightProgramMinCount(lightChannels.length, programsAfterSave, next),
+      );
+      const nextFaders = buildFaderBoardForConsoleChannel(faders, resolvedPrograms, next);
       editingChannelRef.current = next;
-      persistPrograms(programsAfterSave);
+      persistPrograms(resolvedPrograms);
       persistFaders(nextFaders);
     } else {
       editingChannelRef.current = next;
@@ -279,15 +288,16 @@ export function useLightConsoleState({
       editingChannelRef.current,
       faders,
     );
-    const nextFaders = applyProgramFaderStatesToBoard(
-      faders,
-      readProgramChannelFaderStates(programsAfterChannelSave, id),
+    const resolvedPrograms = resolveLightPrograms(
+      programsAfterChannelSave,
+      resolveLightProgramMinCount(lightChannels.length, programsAfterChannelSave, id),
     );
+    const nextFaders = buildFaderBoardForConsoleChannel(faders, resolvedPrograms, id);
     editingChannelRef.current = id;
-    const nextPrograms = resolveLightPrograms({
-      ...programsAfterChannelSave,
+    const nextPrograms = {
+      ...resolvedPrograms,
       activeProgramId: id,
-    });
+    };
 
     if (onProgramsChange) {
       onProgramsChange(nextPrograms);

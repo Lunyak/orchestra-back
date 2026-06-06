@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
 import { countStepLightChannelLinks } from "../../model/theater-light-channel-link";
 import { bindSpotlightOnFaderBoard, detachSpotlightFromFaderBoard } from "../../model/theater-light-fader-bindings";
+import {
+  buildCompleteLightFaders,
+  resolveLightProgramMinCount,
+  resolveLightPrograms,
+  upsertProgramChannelSnapshot,
+} from "../../../../shared/components/light-console/light-console-data";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 import { useTheaterControlsLightChannels } from "./use-theater-controls-light-channels";
 import { useScene } from "../../../scene";
@@ -50,16 +56,25 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
     (faderId: number, spotlightId: number, channel: number) => {
       setSceneData((prev) => {
         const current = prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [];
+        const ch = Math.max(1, Math.trunc(channel) || 1);
+        const nextFaderRows = bindSpotlightOnFaderBoard(current, faderId, spotlightId, ch);
+        const nextFaders = buildCompleteLightFaders({
+          v: 1,
+          count: nextFaderRows.length,
+          faders: nextFaderRows,
+        });
+        const programs = resolveLightPrograms(
+          prev?.lightPrograms,
+          resolveLightProgramMinCount(lightChannels.length, prev?.lightPrograms, ch),
+        );
         return {
           ...(prev ?? {}),
-          lightFaders: {
-            v: 1,
-            faders: bindSpotlightOnFaderBoard(current, faderId, spotlightId, channel),
-          },
+          lightFaders: nextFaders,
+          lightPrograms: upsertProgramChannelSnapshot(programs, ch, nextFaders),
         };
       });
     },
-    [setSceneData],
+    [lightChannels.length, setSceneData],
   );
 
   const unbindSpotlightFromFader = useCallback(

@@ -34,7 +34,11 @@ import {
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
 import { normalizeHoldImages } from "../../projector/model/scene-projector-persist";
 import { recordLightKadrForSection } from "../../../shared/components/light-console/light-kadr-record";
-import { resolveLightFaders, resolveLightPrograms } from "../../../shared/components/light-console/light-console-data";
+import {
+  resolveLightFaders,
+  resolveLightProgramMinCount,
+  resolveLightPrograms,
+} from "../../../shared/components/light-console/light-console-data";
 import { useLightConsoleLayoutSettings } from "../../../shared/components/light-console/useLightConsoleLayoutSettings";
 import { useLightConsoleState } from "../../../shared/components/light-console/useLightConsoleState";
 import type { ScriptStep } from "../../../shared/types/script";
@@ -124,8 +128,12 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     [sceneData?.lightFaders],
   );
   const lightPrograms = useMemo(
-    () => resolveLightPrograms(sceneData?.lightPrograms),
-    [sceneData?.lightPrograms],
+    () =>
+      resolveLightPrograms(
+        sceneData?.lightPrograms,
+        resolveLightProgramMinCount(lightChannels.length, sceneData?.lightPrograms),
+      ),
+    [lightChannels.length, sceneData?.lightPrograms],
   );
 
   const clampedIndex = tape.length === 0 ? 0 : Math.min(tapeIndex, tape.length - 1);
