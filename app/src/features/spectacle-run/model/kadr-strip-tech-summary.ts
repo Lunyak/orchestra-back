@@ -221,7 +221,8 @@ function formatVideoSummary(
     const projectorPreview = buildProjectorPreview(cue, media);
     if (cue.mode === "video") {
       const title = media.videos?.find((v) => v.id === cue.videoId)?.title?.trim();
-      const value = title ? title : `Видео ${cue.videoId}`;
+      const baseValue = title ? title : `Видео ${cue.videoId}`;
+      const value = cue.muted ? `${baseValue} · без звука` : baseValue;
       return { value, projectorPreview };
     }
 

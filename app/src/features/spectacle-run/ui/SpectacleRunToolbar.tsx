@@ -100,6 +100,13 @@ export function SpectacleRunProgRunToolbar() {
     <div className="spectacle-run__toolbar-actions" aria-label="Управление прогоном">
       <button
         type="button"
+        className="spectacle-run__prog-run-start-btn"
+        onClick={run.startProgRun}
+      >
+        Старт
+      </button>
+      <button
+        type="button"
         className="spectacle-run__prog-run-pause-btn"
         data-paused={progRunPaused ? "true" : undefined}
         aria-pressed={progRunPaused}

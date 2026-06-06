@@ -84,7 +84,13 @@ async function uploadKadrImageMarkdown(
   return `\n![${alt}](${token})\n`;
 }
 
-function parseProjectorSelectValue(value: string): KadrProjectorCue | null {
+function parseProjectorSelectValue(
+  value: string,
+  previousCue: KadrProjectorCue | null = null,
+): KadrProjectorCue | null {
+  const preserveMuted =
+    previousCue?.mode === "video" ? Boolean(previousCue.muted) : false;
+
   if (!value || value === "none") return null;
   if (value === "hold") return { mode: "hold" };
   if (value.startsWith("hold:")) {
@@ -92,7 +98,10 @@ function parseProjectorSelectValue(value: string): KadrProjectorCue | null {
     return holdId > 0 ? { mode: "hold", holdId } : { mode: "hold" };
   }
   const videoId = Math.trunc(Number(value) || 0);
-  return videoId > 0 ? { mode: "video", videoId } : null;
+  if (videoId <= 0) return null;
+  return preserveMuted
+    ? { mode: "video", videoId, muted: true }
+    : { mode: "video", videoId };
 }
 
 const DEFAULT_RUN_LABEL_SEC = 30;
@@ -391,6 +400,8 @@ export function CreateKadrModal({
     draft.projectorCue?.mode === "video" ? draft.projectorCue.videoId : null;
   const projectorPreviewHoldId =
     draft.projectorCue?.mode === "hold" ? (draft.projectorCue.holdId ?? null) : null;
+  const isProjectorVideo = draft.projectorCue?.mode === "video";
+  const projectorVideoMuted = isProjectorVideo && Boolean(draft.projectorCue?.muted);
   const projectorPreviewTitle =
     projectorPreviewMode === "video"
       ? videos.find((video) => video.id === projectorPreviewVideoId)?.title?.trim() ||
@@ -480,32 +491,61 @@ export function CreateKadrModal({
 
         <section className="create-kadr-modal__section">
           <h3 className="create-kadr-modal__section-title">Проектор</h3>
-          <label className="create-kadr-modal__field">
-            <span className="create-kadr-modal__label">Видео или заставка</span>
-            <select
-              className="create-kadr-modal__select"
-              value={projectorValue}
-              onChange={(e) =>
-                setDraft((prev) => ({
-                  ...prev,
-                  projectorCue: parseProjectorSelectValue(e.target.value),
-                }))
-              }
-            >
-              <option value="none">— без видео —</option>
-              <option value="hold">Заставка по умолчанию</option>
-              {holdImages.map((hold) => (
-                <option key={`hold-${hold.id}`} value={`hold:${hold.id}`}>
-                  Заставка: {hold.title?.trim() || hold.id}
-                </option>
-              ))}
-              {videos.map((video) => (
-                <option key={`video-${video.id}`} value={String(video.id)}>
-                  Видео: {video.title?.trim() || video.id}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="create-kadr-modal__projector-row">
+            <label className="create-kadr-modal__field create-kadr-modal__field--grow">
+              <span className="create-kadr-modal__label">Видео или заставка</span>
+              <select
+                className="create-kadr-modal__select"
+                value={projectorValue}
+                onChange={(e) =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    projectorCue: parseProjectorSelectValue(e.target.value, prev.projectorCue),
+                  }))
+                }
+              >
+                <option value="none">— без видео —</option>
+                <option value="hold">Заставка по умолчанию</option>
+                {holdImages.map((hold) => (
+                  <option key={`hold-${hold.id}`} value={`hold:${hold.id}`}>
+                    Заставка: {hold.title?.trim() || hold.id}
+                  </option>
+                ))}
+                {videos.map((video) => (
+                  <option key={`video-${video.id}`} value={String(video.id)}>
+                    Видео: {video.title?.trim() || video.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {isProjectorVideo ? (
+              <label
+                className={cn(
+                  "create-kadr-modal__check",
+                  "create-kadr-modal__check--projector-mute",
+                  projectorVideoMuted && "create-kadr-modal__check--active",
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={projectorVideoMuted}
+                  onChange={() =>
+                    setDraft((prev) => {
+                      if (prev.projectorCue?.mode !== "video") return prev;
+                      const nextMuted = !prev.projectorCue.muted;
+                      return {
+                        ...prev,
+                        projectorCue: nextMuted
+                          ? { ...prev.projectorCue, muted: true }
+                          : { mode: "video", videoId: prev.projectorCue.videoId },
+                      };
+                    })
+                  }
+                />
+                <span>Без звука</span>
+              </label>
+            ) : null}
+          </div>
           {projectorPreviewMode ? (
             <ProjectorMediaPreview
               ctx={projectorCtx}

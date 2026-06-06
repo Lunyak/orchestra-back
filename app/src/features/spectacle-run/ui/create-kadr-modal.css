@@ -58,6 +58,23 @@
   gap: 6px;
 }
 
+.create-kadr-modal__field--grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.create-kadr-modal__projector-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 8px;
+}
+
+.create-kadr-modal__check--projector-mute {
+  min-height: 34px;
+  align-self: end;
+}
+
 .create-kadr-modal__label {
   font-size: 11px;
   font-weight: 700;

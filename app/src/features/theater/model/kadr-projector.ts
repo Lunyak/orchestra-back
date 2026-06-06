@@ -12,12 +12,19 @@ export const VIDEO_KADR_LINE_RE = /^-\s*\*\*(?:Видео|Проектор)\*\*:
 
 export type KadrProjectorCue =
   | { mode: "hold"; holdId?: number }
-  | { mode: "video"; videoId: number };
+  | { mode: "video"; videoId: number; muted?: boolean };
+
+const VIDEO_MUTE_MODIFIERS = new Set(["mute", "silent", "без звука", "без_звука"]);
+
+function isVideoMutedModifier(value: string | undefined): boolean {
+  if (!value) return false;
+  return VIDEO_MUTE_MODIFIERS.has(value.trim().toLowerCase());
+}
 
 const TOKEN_VIDEO_RE = /\{\{\s*video\s*:\s*(\d+)(?:\|([^}]+?))?\s*}}/gi;
 const TOKEN_HOLD_ID_RE = /\{\{\s*hold\s*:\s*(\d+)\s*}}/gi;
 const TOKEN_HOLD_BARE_RE = /\{\{\s*hold\s*}}/gi;
-const VIDEO_LINK_RE = /\[[^\]]*\]\(\s*video\s*:\s*(\d+)\s*\)/gi;
+const VIDEO_LINK_RE = /\[[^\]]*\]\(\s*video\s*:\s*(\d+)(?:\s*\|\s*([^)]+?))?\s*\)/gi;
 const HOLD_LINK_RE = /\[[^\]]*\]\(\s*hold\s*:\s*(\d+)\s*\)/gi;
 
 function isVideoKadrLine(line: string): boolean {
@@ -42,9 +49,17 @@ export function parseProjectorKadrLine(line: string): KadrProjectorCue | null {
   const holdBareMatches = [...trimmed.matchAll(TOKEN_HOLD_BARE_RE)];
 
   const videoIdFromToken = videoMatches[0]?.[1];
+  const videoMuteFromToken = videoMatches[0]?.[2];
   const videoIdFromLink = videoLinkMatches[0]?.[1];
+  const videoMuteFromLink = videoLinkMatches[0]?.[2];
   const resolvedVideoId = Math.trunc(Number(videoIdFromToken ?? videoIdFromLink) || 0);
-  if (resolvedVideoId > 0) return { mode: "video", videoId: resolvedVideoId };
+  if (resolvedVideoId > 0) {
+    const muted =
+      isVideoMutedModifier(videoMuteFromToken) || isVideoMutedModifier(videoMuteFromLink);
+    return muted
+      ? { mode: "video", videoId: resolvedVideoId, muted: true }
+      : { mode: "video", videoId: resolvedVideoId };
+  }
 
   const holdIdFromToken = holdIdMatches[0]?.[1];
   const holdIdFromLink = holdLinkMatches[0]?.[1];
@@ -97,7 +112,23 @@ export function formatProjectorKadrLine(
   const video = options?.videos?.find((v) => Number(v.id) === cue.videoId);
   const label = video?.title?.trim() || `Видео ${cue.videoId}`;
   const safeTitle = label.replace(/\\/g, "\\\\").replace(/]/g, "\\]");
-  return `${VIDEO_LINE_PREFIX} [${safeTitle}](video:${cue.videoId})`;
+  const muteSuffix = cue.muted ? "|mute" : "";
+  return `${VIDEO_LINE_PREFIX} [${safeTitle}](video:${cue.videoId}${muteSuffix})`;
+}
+
+export function resolveKadrProjectorVideoOptions(
+  cue: KadrProjectorCue,
+  fallback?: {
+    resolveMuted?: (videoId: number) => boolean;
+    resolveVolume?: (videoId: number) => number;
+  },
+): { videoMuted: boolean; videoVolume: number } | undefined {
+  if (cue.mode !== "video") return undefined;
+
+  const videoMuted = cue.muted ?? fallback?.resolveMuted?.(cue.videoId) ?? false;
+  const videoVolume = videoMuted ? 0 : (fallback?.resolveVolume?.(cue.videoId) ?? 1);
+
+  return { videoMuted, videoVolume };
 }
 
 export function upsertProjectorLineInSection(

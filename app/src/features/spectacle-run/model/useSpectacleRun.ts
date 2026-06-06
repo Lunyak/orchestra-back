@@ -13,7 +13,7 @@ import {
 } from "../../theater/model/light-kadrs";
 import { invokePlaylistPause } from "../../scene/model/scene-playback-bridge";
 import { parseSoundLineInSection } from "../../theater/model/kadr-sound";
-import { parseProjectorLineInSection, type KadrProjectorCue } from "../../theater/model/kadr-projector";
+import { parseProjectorLineInSection, resolveKadrProjectorVideoOptions, type KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { applyKadrSound } from "./apply-kadr-sound";
 import { applyKadrProjector, showProjectorHold } from "./apply-kadr-projector";
 import {
@@ -340,12 +340,10 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       await applyKadrProjector(
         cue,
         projectorMediaCtx,
-        cue.mode === "video"
-          ? {
-              videoMuted: resolveProjectorVideoMuted(cue.videoId),
-              videoVolume: resolveProjectorVideoVolume(cue.videoId),
-            }
-          : undefined,
+        resolveKadrProjectorVideoOptions(cue, {
+          resolveMuted: resolveProjectorVideoMuted,
+          resolveVolume: resolveProjectorVideoVolume,
+        }),
       );
       const holdLabel =
         cue.mode === "hold" && cue.holdId != null
@@ -537,11 +535,11 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
             await applyKadrProjector(
               projectorCue,
               projectorMediaCtx,
-              projectorCue?.mode === "video"
-                ? {
-                    videoMuted: resolveProjectorVideoMuted(projectorCue.videoId),
-                    videoVolume: resolveProjectorVideoVolume(projectorCue.videoId),
-                  }
+              projectorCue
+                ? resolveKadrProjectorVideoOptions(projectorCue, {
+                    resolveMuted: resolveProjectorVideoMuted,
+                    resolveVolume: resolveProjectorVideoVolume,
+                  })
                 : undefined,
             );
           })();
@@ -883,6 +881,25 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     if (nextInTape >= 0) goToTapeIndex(nextInTape);
   }, [clampedIndex, currentItem, goToTapeIndex, tape]);
 
+  const startProgRun = useCallback(() => {
+    if (tape.length === 0) return;
+
+    if (progRunPausedRef.current) {
+      setProgRunPaused(false);
+      persistProgRunPaused(projectName, false);
+    }
+
+    const firstItem = tape[0];
+    if (!firstItem) return;
+
+    if (tapeIndexRef.current === 0) {
+      applyTapeItem(firstItem, { applyPlayback: true });
+      return;
+    }
+
+    goToTapeIndex(0);
+  }, [applyTapeItem, goToTapeIndex, projectName, tape]);
+
   const isLastInSpectacle = clampedIndex >= tape.length - 1;
   const isLastInStep = isLastTapeItemInStep(tape, clampedIndex);
   const canGoNext = !isLastInSpectacle;
@@ -910,6 +927,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     goNext,
     goNextStep,
     goToTapeIndex,
+    startProgRun,
     progRunPaused,
     progRunPlaybackEnabled,
     toggleProgRunPause,
