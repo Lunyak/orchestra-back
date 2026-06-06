@@ -4,6 +4,7 @@ import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { PageLoader } from "../../../shared/components/page-loader/PageLoader";
 import { useProject } from "../../project/model/project-context";
 import { useScene } from "../../scene";
+import { useSpectacleRunContext } from "../model/spectacle-run-context";
 
 const TheaterScene = lazy(() =>
   import("../../theater/ui/TheaterScene").then((mod) => ({ default: mod.TheaterScene })),
@@ -40,7 +41,9 @@ function TheaterFullscreenIcon({ expanded }: { expanded: boolean }) {
 export function SpectacleRunTheaterEmbed() {
   const { projectName } = useProject();
   const { theaterLayout, setTheaterLayout } = useScene();
+  const run = useSpectacleRunContext();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const showEmptySceneHint = run.currentStepTheaterEmpty && run.canCopyTheaterFromPreviousStep;
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen((value) => !value);
@@ -83,6 +86,16 @@ export function SpectacleRunTheaterEmbed() {
       )}
     >
       <div className="spectacle-run-theater-embed__toolbar">
+        {run.canCopyTheaterFromPreviousStep ? (
+          <button
+            type="button"
+            className="spectacle-run-theater-embed__copy-scene-btn"
+            title="Скопировать мебель, декор, софиты и реквизит с предыдущего шага"
+            onClick={run.copyTheaterFromPreviousStep}
+          >
+            Сцена ← шаг
+          </button>
+        ) : null}
         <button
           type="button"
           className={cn(
@@ -97,6 +110,12 @@ export function SpectacleRunTheaterEmbed() {
           <TheaterFullscreenIcon expanded={isFullscreen} />
         </button>
       </div>
+      {showEmptySceneHint ? (
+        <p className="spectacle-run-theater-embed__empty-hint" role="status">
+          Сцена в этом шаге пуста. Нажмите «Сцена ← шаг» или создайте картину — предложим скопировать
+          расстановку с предыдущего шага.
+        </p>
+      ) : null}
       <Suspense fallback={<PageLoader variant="view" label="Загрузка 3D…" />}>
         <TheaterScene
           projectName={projectName ?? "fools"}

@@ -49,6 +49,10 @@ import {
   readStepTheaterModels,
   writeStepTheaterModels,
 } from "../model/theater-step-models";
+import {
+  buildCopyStepTheaterScenePatch,
+  buildCopyStepTheaterScenePatchFromStep,
+} from "../model/copy-step-theater-scene";
 import { cloneTheaterSpotlights } from "./use-theater-spotlights";
 import type { TheaterEditMode } from "./use-theater-selection";
 import { resolveTheaterModelFileUrlSync } from "../model/theater-model-asset-url";
@@ -318,23 +322,7 @@ export function useTheaterModels({
       if (!currentStep || currentPage <= 0) return;
       const previous = steps[currentPage - 1];
       if (!previous) return;
-      const clonedSpotlights = cloneTheaterSpotlights(previous.theaterSpotlights ?? []);
-      const clonedModels = cloneTheaterModels(readStepTheaterModels(previous));
-      updateCurrentStep({
-        theaterSpotlights: clonedSpotlights,
-        ...writeStepTheaterModels(clonedModels),
-        ...(previous.lightPlot
-          ? { lightPlot: previous.lightPlot.map((fixture) => ({ ...fixture })) }
-          : {}),
-        ...(previous.lightCues
-          ? { lightCues: previous.lightCues.map((cue) => ({ ...cue })) }
-          : {}),
-        ...(previous.lightKadrs
-          ? { lightKadrs: { ...previous.lightKadrs, kadrs: previous.lightKadrs.kadrs.map((k) => ({ ...k, faders: k.faders.map((f) => ({ ...f })) })) } }
-          : {}),
-        theaterActiveSpotlightId: clonedSpotlights[0]?.id,
-        theaterActiveModelId: clonedModels[0]?.id,
-      });
+      updateCurrentStep(buildCopyStepTheaterScenePatchFromStep(previous));
       setDecorActionMessage("Сцена скопирована с предыдущего шага");
     }, [currentPage, currentStep, steps, updateCurrentStep]);
 
@@ -342,23 +330,15 @@ export function useTheaterModels({
       if (!currentStep || currentPage >= steps.length - 1) return;
       const nextStep = steps[currentPage + 1];
       if (!nextStep) return;
-      const clonedSpotlights = cloneTheaterSpotlights(displaySpotlights);
-      const clonedModels = cloneTheaterModels(models);
-      updateStep(nextStep.id, {
-        theaterSpotlights: clonedSpotlights,
-        ...writeStepTheaterModels(clonedModels),
-        ...(currentStep.lightPlot
-          ? { lightPlot: currentStep.lightPlot.map((fixture) => ({ ...fixture })) }
-          : {}),
-        ...(currentStep.lightCues
-          ? { lightCues: currentStep.lightCues.map((cue) => ({ ...cue })) }
-          : {}),
-        ...(currentStep.lightKadrs
-          ? { lightKadrs: { ...currentStep.lightKadrs, kadrs: currentStep.lightKadrs.kadrs.map((k) => ({ ...k, faders: k.faders.map((f) => ({ ...f })) })) } }
-          : {}),
-        theaterActiveSpotlightId: clonedSpotlights[0]?.id,
-        theaterActiveModelId: clonedModels[0]?.id,
-      });
+      updateStep(
+        nextStep.id,
+        buildCopyStepTheaterScenePatch({
+          spotlights: displaySpotlights,
+          models,
+          lightPlot: currentStep.lightPlot,
+          requisites: currentStep.requisites,
+        }),
+      );
       setDecorActionMessage(`Сцена скопирована на шаг «${nextStep.title}»`);
     }, [currentPage, currentStep, displaySpotlights, models, steps, updateStep]);
 

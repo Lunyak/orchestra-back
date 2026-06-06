@@ -506,6 +506,34 @@
   pointer-events: none;
 }
 
+.spectacle-run-theater-embed__copy-scene-btn {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--color-text-default);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.spectacle-run-theater-embed__copy-scene-btn:hover {
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+}
+
+.spectacle-run-theater-embed__empty-hint {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.2);
+}
+
 .spectacle-run-theater-embed__fullscreen-btn {
   display: flex;
   align-items: center;

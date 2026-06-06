@@ -166,6 +166,17 @@ export function SpectacleRunToolbarActions() {
         {tapeIndex + 1} / {tapeLen}
       </span>
 
+      {run.canCopyTheaterFromPreviousStep ? (
+        <button
+          type="button"
+          className="spectacle-run__add-kadr-btn spectacle-run__copy-scene-btn"
+          title="Скопировать мебель, декор, софиты и реквизит с предыдущего шага"
+          onClick={run.copyTheaterFromPreviousStep}
+        >
+          Сцена ← шаг
+        </button>
+      ) : null}
+
       {run.canAddKadr ? (
         <button
           type="button"

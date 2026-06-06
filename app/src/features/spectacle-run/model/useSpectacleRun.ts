@@ -51,6 +51,10 @@ import {
   type KadrModalMode,
 } from "./create-kadr-from-draft";
 import { persistProgRunPaused, readProgRunPaused } from "./prog-run-prefs-storage";
+import {
+  buildCopyStepTheaterScenePatchFromStep,
+  stepHasTheaterSceneContent,
+} from "../../theater/model/copy-step-theater-scene";
 
 function isKeyboardTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -109,8 +113,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const pendingTapeKadrIdRef = useRef<string | null>(null);
   const pendingTapeIndexAfterDeleteRef = useRef<number | null>(null);
   const skipTapeApplyEffectRef = useRef(false);
-  /** Первый заход в репетицию: не затирать общий пульт снимком картины (правки из 3D театра). */
-  const skipKadrFadersOnceRef = useRef(true);
+  const skipKadrFadersOnceRef = useRef(false);
   const stepsRef = useRef(steps);
   const tapeRef = useRef(tape);
   stepsRef.current = steps;
@@ -197,6 +200,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         markdown: result.nextMarkdown,
       } as Partial<ScriptStep>);
       setLiveStatus(result.summary);
+      void saveStepsForLightPlot({ force: true });
     },
     [
       lightChannels,
@@ -204,6 +208,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       liveConsole.programs,
       liveConsole.selectedLightSlot,
       sceneData?.lightChannelRoles,
+      saveStepsForLightPlot,
       updateStep,
     ],
   );
@@ -654,15 +659,30 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     [liveConsole.faders.faders, liveConsole.programs.activeProgramId],
   );
 
+  const flushPendingLiveSave = useCallback(() => {
+    if (liveSaveTimerRef.current != null) {
+      window.clearTimeout(liveSaveTimerRef.current);
+      liveSaveTimerRef.current = null;
+      flushLiveSaveAtIndex(tapeIndexRef.current);
+    }
+  }, [flushLiveSaveAtIndex]);
+
   useEffect(() => {
     if (applyingTapeRef.current) return;
     scheduleLiveSave();
     return () => {
-      if (liveSaveTimerRef.current != null) {
-        window.clearTimeout(liveSaveTimerRef.current);
-      }
+      flushPendingLiveSave();
     };
-  }, [consoleSnapshotKey, scheduleLiveSave]);
+  }, [consoleSnapshotKey, flushPendingLiveSave, scheduleLiveSave]);
+
+  useEffect(() => {
+    const onPageHide = () => {
+      flushPendingLiveSave();
+      void saveStepsForLightPlot({ force: true });
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [flushPendingLiveSave, saveStepsForLightPlot]);
 
   useEffect(() => {
     if (tape.length === 0) return;
@@ -671,11 +691,47 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     }
   }, [tape.length, tapeIndex]);
 
+  const previousStep =
+    currentItem && currentItem.stepIndex > 0 ? steps[currentItem.stepIndex - 1] : null;
+  const currentStepTheaterEmpty = currentStep ? !stepHasTheaterSceneContent(currentStep) : false;
+  const canCopyTheaterFromPreviousStep = Boolean(
+    previousStep && stepHasTheaterSceneContent(previousStep),
+  );
+
+  const copyTheaterFromPreviousStep = useCallback(() => {
+    if (!currentStep || !previousStep) return;
+    if (!stepHasTheaterSceneContent(previousStep)) {
+      setLiveStatus("На предыдущем шаге нет сцены для копирования");
+      return;
+    }
+    updateStep(currentStep.id, buildCopyStepTheaterScenePatchFromStep(previousStep));
+    setLiveStatus(`Сцена скопирована с шага «${previousStep.title}»`);
+    void saveStepsForLightPlot({ force: true });
+  }, [currentStep, previousStep, saveStepsForLightPlot, updateStep]);
+
   const addKadrToCurrentStep = useCallback(() => {
     if (!currentStep) return;
+
+    if (currentStepTheaterEmpty && previousStep && stepHasTheaterSceneContent(previousStep)) {
+      const shouldCopy = window.confirm(
+        `Сцена в шаге «${currentStep.title}» пуста.\n\nСкопировать расстановку (мебель, декор, софиты, реквизит) с шага «${previousStep.title}»?`,
+      );
+      if (shouldCopy) {
+        updateStep(currentStep.id, buildCopyStepTheaterScenePatchFromStep(previousStep));
+        void saveStepsForLightPlot({ force: true });
+        setLiveStatus(`Сцена скопирована с шага «${previousStep.title}»`);
+      }
+    }
+
     setKadrModalMode("create");
     setKadrModalOpen(true);
-  }, [currentStep]);
+  }, [
+    currentStep,
+    currentStepTheaterEmpty,
+    previousStep,
+    saveStepsForLightPlot,
+    updateStep,
+  ]);
 
   const editCurrentKadr = useCallback(() => {
     const item = tape[clampedIndex];
@@ -944,6 +1000,9 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     canDeleteKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentStep),
     nextKadrNo,
     canAddKadr: Boolean(currentStep),
+    canCopyTheaterFromPreviousStep,
+    currentStepTheaterEmpty,
+    copyTheaterFromPreviousStep,
     kadrModalOpen,
     kadrModalMode,
     closeKadrModal,

@@ -401,7 +401,8 @@ export function CreateKadrModal({
   const projectorPreviewHoldId =
     draft.projectorCue?.mode === "hold" ? (draft.projectorCue.holdId ?? null) : null;
   const isProjectorVideo = draft.projectorCue?.mode === "video";
-  const projectorVideoMuted = isProjectorVideo && Boolean(draft.projectorCue?.muted);
+  const projectorVideoMuted =
+    draft.projectorCue?.mode === "video" && Boolean(draft.projectorCue.muted);
   const projectorPreviewTitle =
     projectorPreviewMode === "video"
       ? videos.find((video) => video.id === projectorPreviewVideoId)?.title?.trim() ||
