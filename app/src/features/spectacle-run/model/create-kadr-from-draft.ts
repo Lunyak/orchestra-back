@@ -296,7 +296,7 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
   const { draft, kadrId, kadrNo } = args;
   let markdown = args.markdown;
   let kadrs = args.kadrs;
-  let section = args.section;
+  let section: MarkdownKadrSection | null = args.section;
 
   markdown = applyKadrHeadingTitle(markdown, section, draft.title);
   section = findSectionByKadrId(markdown, kadrId);

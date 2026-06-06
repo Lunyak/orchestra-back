@@ -343,7 +343,7 @@ function SpectacleRunKadrStripRehearsalChip({
 
           <img
 
-            src={imageSrc}
+            src={imageSrc ?? undefined}
 
             alt=""
 
@@ -483,7 +483,7 @@ function SpectacleRunKadrStripProgRunChip({
 
             <img
 
-              src={imageSrc}
+              src={imageSrc ?? undefined}
 
               alt=""
 

@@ -19,6 +19,15 @@ import {
   setConfirmBeforeRemoteScenePull,
   setPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
+import {
+  applyScriptPlayFontSizePx,
+  clampScriptPlayFontSizePx,
+  DEFAULT_SCRIPT_PLAY_FONT_SIZE_PX,
+  getScriptPlayFontSizePx,
+  MAX_SCRIPT_PLAY_FONT_SIZE_PX,
+  MIN_SCRIPT_PLAY_FONT_SIZE_PX,
+  setScriptPlayFontSizePx,
+} from "../../../shared/settings/scriptPlayFontSize";
 import { getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
 import { ThemeSettingsSection } from "../../../features/settings/ui/ThemeSettingsSection";
 import "./style.css";
@@ -59,6 +68,7 @@ export function SettingsPage() {
   const [spectaclePageLock, setSpectaclePageLockUi] = useState(() =>
     getSpectaclePageLockEnabled(),
   );
+  const [playFontSizePx, setPlayFontSizePxState] = useState(() => getScriptPlayFontSizePx());
   const showOrchestraWebPageLock = isOrchestraWebAppSubpath();
 
   const [profileByEmail, setProfileByEmail] = useState<
@@ -177,6 +187,34 @@ export function SettingsPage() {
               </Button>
             </div>
             <ThemeSettingsSection />
+            <section className="settings-card">
+              <h3 className="settings-card__title">Вкладка «Текст»</h3>
+              <p className="settings-sync-hint">
+                Размер шрифта для текста пьесы в сценарии (вкладка «Текст») и в панели текста на
+                странице репетиции. Сохраняется в браузере.
+              </p>
+              <label className="settings-script-font-size">
+                <span className="settings-script-font-size__label">Размер шрифта, px</span>
+                <input
+                  className="settings-script-font-size__input"
+                  type="number"
+                  min={MIN_SCRIPT_PLAY_FONT_SIZE_PX}
+                  max={MAX_SCRIPT_PLAY_FONT_SIZE_PX}
+                  step={1}
+                  value={playFontSizePx}
+                  onChange={(event) => {
+                    const next = clampScriptPlayFontSizePx(Number(event.target.value));
+                    setPlayFontSizePxState(next);
+                    setScriptPlayFontSizePx(next);
+                    applyScriptPlayFontSizePx(next);
+                  }}
+                />
+              </label>
+              <p className="settings-sync-hint">
+                По умолчанию: {DEFAULT_SCRIPT_PLAY_FONT_SIZE_PX}px. Допустимо:{" "}
+                {MIN_SCRIPT_PLAY_FONT_SIZE_PX}–{MAX_SCRIPT_PLAY_FONT_SIZE_PX}px.
+              </p>
+            </section>
             <section className="settings-card settings-sync-live">
               <h3 className="settings-card__title">
                 Синхронизация с сервером во время спектакля

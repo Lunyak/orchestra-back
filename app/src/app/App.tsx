@@ -1,4 +1,5 @@
 import "../index.css";
+import { applyScriptPlayFontSizePx } from "../shared/settings/scriptPlayFontSize";
 import { bootstrapTheme } from "../shared/styles/theme/apply-theme";
 import { ThemeProvider } from "../shared/styles/theme/ThemeProvider";
 import { useAuth, useAuthBootstrap } from "../features/auth";
@@ -17,6 +18,7 @@ import { Route, Routes } from "react-router-dom";
 import { ChatDock } from "../features/chat";
 
 bootstrapTheme();
+applyScriptPlayFontSizePx();
 
 export interface AppProps {
   /** После логина/регистрации (только desktop — выгрузка локальных данных). */

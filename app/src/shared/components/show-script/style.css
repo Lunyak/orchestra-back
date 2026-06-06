@@ -706,6 +706,14 @@
 }
 
 /* Вкладка «Текст» (play): ширина колонки лейбла по строке, без выравнивания по max всех реплик. */
+.markdown-preview.markdown-preview--play-inline-labels {
+  font-size: var(--script-font-size-body);
+}
+
+.markdown-preview.markdown-preview--play-inline-labels p {
+  font-size: inherit;
+}
+
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-label {
   flex: 0 0 auto;
   min-width: auto;
@@ -739,7 +747,7 @@
   line-clamp: unset;
   -webkit-box-orient: unset;
   font-weight: 100;
-  font-size: 12px;
+  font-size: var(--script-font-size-label);
   text-transform: capitalize !important;
 }
 
@@ -1903,6 +1911,10 @@
 }
 
 /* Как .markdown-kadr h1/h2 — белый; ### как h3 в сценарии — оранжевый */
+.script-markdown-editor-main--play .script-markdown-cm .cm-scroller {
+  font-size: var(--script-font-size-body);
+}
+
 .script-markdown-cm .cm-md-heading-body--1 {
   font-size: 1.32em;
   color: var(--color-text-bright);

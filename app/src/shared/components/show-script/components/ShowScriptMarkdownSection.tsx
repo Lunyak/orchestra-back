@@ -738,7 +738,12 @@ export function ShowScriptMarkdownSection({
             ) : null}
 
             <div
-              className="script-markdown-editor-main"
+              className={[
+                "script-markdown-editor-main",
+                markdownMode === "play" ? "script-markdown-editor-main--play" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onContextMenu={(event) => {
                 event.preventDefault();
                 setInsertMenu({ x: event.clientX, y: event.clientY });

@@ -394,7 +394,7 @@
 
 .spectacle-run-text__step-title {
   margin: 0 0 10px;
-  font-size: 16px;
+  font-size: var(--script-font-size-heading);
   color: var(--color-text-bright);
 }
 
@@ -405,8 +405,12 @@
 }
 
 .spectacle-run-text__body {
-  font-size: 14px;
+  font-size: var(--script-font-size-body);
   line-height: 1.5;
+}
+
+.spectacle-run-text__body.markdown-preview p {
+  font-size: inherit;
 }
 
 .spectacle-run-scheme {

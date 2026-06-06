@@ -356,6 +356,27 @@
     line-height: 1.45;
 }
 
+.settings-script-font-size {
+    display: grid;
+    gap: 6px;
+    max-width: 220px;
+}
+
+.settings-script-font-size__label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-ui);
+}
+
+.settings-script-font-size__input {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border-visible);
+    background: var(--field-control-bg);
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
 .settings-sync {
     display: flex;
     flex-wrap: wrap;
