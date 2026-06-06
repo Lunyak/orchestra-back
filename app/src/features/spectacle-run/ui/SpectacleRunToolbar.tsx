@@ -107,6 +107,17 @@ export function SpectacleRunProgRunToolbar() {
       >
         {progRunPaused ? "Продолжить" : "Пауза"}
       </button>
+      {run.canEditKadr ? (
+        <button
+          type="button"
+          className="spectacle-run__add-kadr-btn"
+          data-primary="true"
+          title="Редактировать выбранную картину"
+          onClick={run.editCurrentKadr}
+        >
+          Редактировать
+        </button>
+      ) : null}
       <span className="spectacle-run__tape-counter" aria-live="polite">
         {tapeIndex + 1} / {tapeLen}
       </span>

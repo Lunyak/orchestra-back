@@ -20,6 +20,7 @@ import { parseLightChannel } from "../../../shared/components/show-script/utils/
 import type { ScriptStep, StepLightKadrV1 } from "../../../shared/types/script";
 import { parseKadrTitleFromHeading } from "./create-kadr-from-draft";
 import { parseKadrLabelsInSection, type KadrRunLabel } from "./kadr-section-labels";
+import { parseKadrCommentRawInSection } from "./kadr-section-comment";
 import type { SpectacleTapeItem } from "./spectacle-kadr-tape";
 
 export type KadrStripProjectorPreview = {
@@ -32,6 +33,7 @@ export type KadrStripProjectorPreview = {
 export type KadrStripTechRow = {
   label: string;
   value: string;
+  multiline?: boolean;
   projectorPreview?: KadrStripProjectorPreview;
 };
 
@@ -302,6 +304,15 @@ export function buildKadrStripTechSummary(args: {
   }
 
   pushTextField(rows, "Действие", markdown, section, ACTION_FIELD_RE);
+
+  const commentRaw = parseKadrCommentRawInSection(markdown, section).trim();
+  if (commentRaw && !isKadrPlaceholderText(commentRaw)) {
+    rows.push({
+      label: "Комментарий",
+      value: commentRaw,
+      multiline: commentRaw.includes("\n"),
+    });
+  }
 
   const cornerLabels = parseKadrLabelsInSection(markdown, section);
 

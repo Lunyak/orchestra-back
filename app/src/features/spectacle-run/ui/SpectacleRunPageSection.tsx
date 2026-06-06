@@ -71,7 +71,7 @@ export function SpectacleRunPageSection({
         ) : (
           <SpectacleRunProgRunContent />
         )}
-        {lightPlotMode === "rehearsal" ? (
+        {lightPlotMode === "rehearsal" || run.canEditKadr ? (
           <CreateKadrModalHost lightChannels={lightChannels} />
         ) : null}
         {lightPlotMode === "rehearsal" ? (

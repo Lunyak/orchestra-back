@@ -65,13 +65,22 @@
 }
 
 .create-kadr-modal__input,
-.create-kadr-modal__select {
+.create-kadr-modal__select,
+.create-kadr-modal__textarea {
   min-height: 34px;
   padding: 0 10px;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   background: rgba(0, 0, 0, 0.25);
   color: var(--color-text-bright);
   font-size: 13px;
+}
+
+.create-kadr-modal__textarea {
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.45;
+  font-family: inherit;
 }
 
 .create-kadr-modal__checks {

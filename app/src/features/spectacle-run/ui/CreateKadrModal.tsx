@@ -660,6 +660,25 @@ export function CreateKadrModal({
         </section>
 
         <section className="create-kadr-modal__section">
+          <h3 className="create-kadr-modal__section-title">Комментарий</h3>
+          <p className="create-kadr-modal__hint">
+            Показывается на карточке в прогоне.
+          </p>
+          <label className="create-kadr-modal__field">
+            <span className="create-kadr-modal__label">Текст комментария</span>
+            <textarea
+              className="create-kadr-modal__textarea"
+              value={draft.commentText}
+              placeholder="Например: дождаться аплодисментов, затем блекаут"
+              rows={3}
+              onChange={(e) =>
+                setDraft((prev) => ({ ...prev, commentText: e.target.value }))
+              }
+            />
+          </label>
+        </section>
+
+        <section className="create-kadr-modal__section">
           <h3 className="create-kadr-modal__section-title">Переход</h3>
           <p className="create-kadr-modal__hint">
             Показывается внизу в прогоне при навигации, не на карточке.

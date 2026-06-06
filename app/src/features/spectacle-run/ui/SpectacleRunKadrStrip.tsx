@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type Ref } from "react";
 
 import cn from "classnames";
 
@@ -65,7 +65,7 @@ import { useKadrStripDragScroll } from "../model/useKadrStripDragScroll";
 
 import { useKadrStripImageSrc } from "../model/useKadrStripImageSrc";
 
-
+import { useProgRunKadrChipHeight } from "../model/useProgRunKadrChipHeight";
 
 export type SpectacleRunKadrStripVariant = "rehearsal" | "prog-run";
 
@@ -167,7 +167,7 @@ type KadrStripChipBaseProps = {
 
   onSelect: () => void;
 
-  chipRef?: RefObject<HTMLButtonElement | null>;
+  chipRef?: Ref<HTMLButtonElement>;
 
 };
 
@@ -219,7 +219,13 @@ function SpectacleRunKadrStripChipFieldValue({
 
     return (
 
-      <span className="spectacle-run-kadr-strip__chip-field-value" title={row.value}>
+      <span
+        className={cn(
+          "spectacle-run-kadr-strip__chip-field-value",
+          row.multiline && "spectacle-run-kadr-strip__chip-field-value--multiline",
+        )}
+        title={row.value}
+      >
 
         {row.value}
 
@@ -621,9 +627,25 @@ export function SpectacleRunKadrStrip({
 
   const trackRef = useRef<HTMLDivElement>(null);
 
+  const stripRef = useRef<HTMLElement>(null);
+
   const activeChipRef = useRef<HTMLButtonElement | null>(null);
 
   const { consumeDrag } = useKadrStripDragScroll(trackRef);
+
+  const chipHeightKey = useMemo(
+    () =>
+      tape
+        .map((item) => {
+          const step = steps[item.stepIndex];
+          const markdownLen = String(step?.markdown ?? "").length;
+          return `${item.kadrId ?? "ph"}:${item.kadrNo}:${markdownLen}`;
+        })
+        .join("|"),
+    [steps, tape],
+  );
+
+  useProgRunKadrChipHeight(isProgRun, stripRef, chipHeightKey);
 
 
 
@@ -660,11 +682,9 @@ export function SpectacleRunKadrStrip({
   return (
 
     <footer
-
+      ref={stripRef}
       className={cn("spectacle-run-kadr-strip", isProgRun && "spectacle-run-kadr-strip--prog-run")}
-
       aria-label="Лента картин по шагам"
-
     >
 
       <div ref={trackRef} className="spectacle-run-kadr-strip__track">

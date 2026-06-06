@@ -46,6 +46,10 @@ import {
   stripKadrSectionStandaloneImages,
 } from "./kadr-section-image";
 import {
+  parseKadrCommentRawInSection,
+  upsertKadrCommentInSection,
+} from "./kadr-section-comment";
+import {
   parseKadrTransitionRawInSection,
   upsertKadrTransitionInSection,
 } from "./kadr-section-transition";
@@ -82,6 +86,7 @@ export type CreateKadrDraft = {
   blackoutDurationSec: number | null;
   smokeDurationSec: number | null;
   transitionText: string;
+  commentText: string;
 };
 
 export function faderOptionKey(channel: number, faderId: number): string {
@@ -238,6 +243,7 @@ export function buildInitialCreateKadrDraft(args: {
     blackoutDurationSec: null,
     smokeDurationSec: null,
     transitionText: "",
+    commentText: "",
   };
 }
 
@@ -387,6 +393,12 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
     markdown = upsertKadrTransitionInSection(markdown, section, draft.transitionText.trim());
   }
 
+  if (draft.commentText.trim() || args.clearEmptyMedia) {
+    section = findSectionByKadrId(markdown, kadrId);
+    if (!section) return null;
+    markdown = upsertKadrCommentInSection(markdown, section, draft.commentText.trim());
+  }
+
   section = findSectionByKadrId(markdown, kadrId);
   if (!section) return null;
   if (draft.imageMarkdown.trim()) {
@@ -408,6 +420,7 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
   if (draft.imageMarkdown.trim()) parts.push("картинка");
   if (runLabels.length > 0) parts.push("метки");
   if (draft.transitionText.trim()) parts.push("переход");
+  if (draft.commentText.trim()) parts.push("комментарий");
 
   return {
     nextMarkdown: markdown,
@@ -474,6 +487,7 @@ export function buildEditKadrDraftFromTapeItem(args: {
     blackoutDurationSec: blackoutLabel?.seconds ?? null,
     smokeDurationSec: smokeLabel?.seconds ?? null,
     transitionText: parseKadrTransitionRawInSection(markdown, section),
+    commentText: parseKadrCommentRawInSection(markdown, section),
   };
 }
 

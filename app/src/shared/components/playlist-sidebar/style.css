@@ -545,6 +545,7 @@
     inset 0 1px 0 var(--color-border-faint-top);
   backdrop-filter: blur(14px);
   pointer-events: auto;
+  transform: translateY(-100px);
 }
 
 .playlist-bottom-player__transport {

@@ -50,6 +50,11 @@ import {
 } from "./create-kadr-from-draft";
 import { persistProgRunPaused, readProgRunPaused } from "./prog-run-prefs-storage";
 
+function isKeyboardTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
 export type UseSpectacleRunArgs = {
   projectName: string;
   steps: ScriptStep[];
@@ -696,7 +701,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       const insertAfter =
         kadrModalMode === "create" && !item.isPlaceholder
-          ? { kadrId: item.kadrId, kadrNo: item.kadrNo }
+          ? { id: item.kadrId, kadrNo: item.kadrNo }
           : null;
 
       const result =
@@ -720,6 +725,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       } as Partial<ScriptStep>);
       setKadrModalOpen(false);
       setLiveStatus(result.summary);
+      void saveStepsForLightPlot({ force: true });
     },
     [
       clampedIndex,
@@ -729,6 +735,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       liveConsole.faders,
       liveConsole.programs,
       liveConsole.selectedLightSlot,
+      saveStepsForLightPlot,
       sceneData?.playlist,
       sceneData?.sounds,
       steps,
@@ -826,6 +833,26 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   const goPrev = useCallback(() => goToTapeIndex(clampedIndex - 1), [clampedIndex, goToTapeIndex]);
   const goNext = useCallback(() => goToTapeIndex(clampedIndex + 1), [clampedIndex, goToTapeIndex]);
+
+  useEffect(() => {
+    if (!isProgRun || tape.length === 0 || kadrModalOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (isKeyboardTypingTarget(event.target)) return;
+
+      event.preventDefault();
+      if (event.key === "ArrowLeft") {
+        goToTapeIndex(tapeIndexRef.current - 1);
+        return;
+      }
+      goToTapeIndex(tapeIndexRef.current + 1);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [goToTapeIndex, isProgRun, kadrModalOpen, tape.length]);
 
   const goNextStep = useCallback(() => {
     if (!currentItem) return;
