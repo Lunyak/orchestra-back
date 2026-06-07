@@ -1,6 +1,6 @@
 import type { ScriptStep, TheaterLayout } from "../shared/types/script";
 import type { SceneLightFadersDataV1 } from "../features/scene/model/scene-slice";
-import { applySceneFaderBindingsToSpotlights } from "../features/theater/model/theater-light-fader-bindings";
+import { prepareSceneLightBindings } from "../features/theater/model/theater-light-fader-bindings";
 import { collectTheaterOfflineAssets } from "../features/theater/model/theater-offline-assets";
 import { decodeOrchestraModelKey } from "../shared/project-assets/orchestraModelRef";
 import { getDesktopApi } from "../shared/platform/desktop-api";
@@ -211,10 +211,14 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       });
     }
 
-    const stepsForOffline = applySceneFaderBindingsToSpotlights(
+    const offlineBindings = prepareSceneLightBindings(
       args.normalizedSteps,
       args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
     );
+    const stepsForOffline = offlineBindings.steps;
+    const offlineLightFaders =
+      offlineBindings.lightFaders ??
+      (args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined);
 
     const baseBag = unpackProjectorMedia((base as any)?.projectorMedia);
     const videos =
@@ -265,7 +269,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       playlist,
       sounds,
       sceneRoles: args.minimalSceneData.sceneRoles ?? (base as any)?.sceneRoles,
-      lightFaders: args.minimalSceneData.lightFaders ?? (base as any)?.lightFaders,
+      lightFaders: offlineLightFaders ?? (base as any)?.lightFaders,
       lightPrograms: args.minimalSceneData.lightPrograms ?? (base as any)?.lightPrograms,
       lightChannelRoles:
         args.minimalSceneData.lightChannelRoles ?? (base as any)?.lightChannelRoles,
@@ -334,10 +338,12 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       images: f.images && typeof f.images === "object" ? f.images : undefined,
     };
 
-    const stepsOut = applySceneFaderBindingsToSpotlights(
+    const prepared = prepareSceneLightBindings(
       Array.isArray(f.steps) && f.steps.length ? (f.steps as ScriptStep[]) : stepsForOffline,
       sceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
     );
+    sceneData.lightFaders = prepared.lightFaders ?? sceneData.lightFaders;
+    const stepsOut = prepared.steps;
 
     const rehydratePayload: Record<string, unknown> = {
       sceneData,

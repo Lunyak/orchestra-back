@@ -14,6 +14,11 @@ export type LightConsolePanelProps = {
   activeProgramIdOverride?: number | null;
   className?: string;
   onFadersChange?: (next: SceneLightFadersDataV1) => void;
+  onPatchFader?: (
+    faderId: number,
+    patch: Partial<SceneLightFadersDataV1["faders"][number]>,
+    selectedLightSlot: number,
+  ) => void;
 };
 
 export function LightConsolePanel({
@@ -25,6 +30,7 @@ export function LightConsolePanel({
   activeProgramIdOverride,
   className,
   onFadersChange,
+  onPatchFader,
 }: LightConsolePanelProps) {
   const vm = useLightConsoleState({
     projectName,
@@ -52,7 +58,14 @@ export function LightConsolePanel({
         onSelectChannel={vm.selectChannel}
         onSelectProgram={vm.selectProgram}
         onOpenSettings={canEditLayout ? layoutSettings.openSettings : undefined}
-        onPatchFader={readOnly ? undefined : vm.patchFader}
+        onPatchFader={
+          readOnly
+            ? undefined
+            : (faderId, patch) => {
+                vm.patchFader(faderId, patch);
+                onPatchFader?.(faderId, patch, vm.selectedLightSlot);
+              }
+        }
       />
       {canEditLayout ? (
         <LightConsoleSettingsModal

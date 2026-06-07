@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { countStepLightChannelLinks } from "../../model/theater-light-channel-link";
 import { bindSpotlightOnFaderBoard, detachSpotlightFromFaderBoard } from "../../model/theater-light-fader-bindings";
 import {
@@ -13,10 +13,11 @@ import { useScene } from "../../../scene";
 
 export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
   const { lightChannels, selectedLightSlot } = useTheaterControlsLightChannels();
-  const { sceneData, setSceneData } = useScene();
+  const { sceneData, setSceneData, saveStepsForLightPlot } = useScene();
   const [spotlightBatchCount, setSpotlightBatchCount] = useState(6);
   const [rgbBatchCount, setRgbBatchCount] = useState(4);
   const [spotlightLayoutRows, setSpotlightLayoutRows] = useState(2);
+  const bindingSaveTimerRef = useRef<number | null>(null);
 
   const {
     regularSpotlights,
@@ -52,6 +53,16 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
       };
     }, [vm.currentStep?.lightPlot, vm.displaySpotlights]);
 
+  const saveSpotlightFaderBinding = useCallback(() => {
+    if (bindingSaveTimerRef.current != null) {
+      window.clearTimeout(bindingSaveTimerRef.current);
+    }
+    bindingSaveTimerRef.current = window.setTimeout(() => {
+      void saveStepsForLightPlot({ force: true });
+      bindingSaveTimerRef.current = null;
+    }, 900);
+  }, [saveStepsForLightPlot]);
+
   const bindSpotlightToFader = useCallback(
     (faderId: number, spotlightId: number, channel: number) => {
       setSceneData((prev) => {
@@ -73,8 +84,9 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
           lightPrograms: upsertProgramChannelSnapshot(programs, ch, nextFaders),
         };
       });
+      saveSpotlightFaderBinding();
     },
-    [lightChannels.length, setSceneData],
+    [lightChannels.length, saveSpotlightFaderBinding, setSceneData],
   );
 
   const unbindSpotlightFromFader = useCallback(
@@ -89,8 +101,9 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
           },
         };
       });
+      saveSpotlightFaderBinding();
     },
-    [setSceneData],
+    [saveSpotlightFaderBinding, setSceneData],
   );
 
   return {

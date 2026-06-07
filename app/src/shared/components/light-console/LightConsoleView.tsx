@@ -127,10 +127,7 @@ export function LightConsoleView({
 
           <div className="light-console__faders">
             {faders.faders.map((fader) => {
-              const linkedSpotlight =
-                (fader.spotlightId != null
-                  ? spotlights.find((item) => item.id === fader.spotlightId)
-                  : null) ?? getSpotlightsForFader(fader)[0];
+              const linkedSpotlight = getSpotlightsForFader(fader)[0];
               const faderLevel = readFaderLevel(fader);
               const muted = fader.enabled === false || faderLevel <= 0;
               const value = muted ? 0 : faderLevel;

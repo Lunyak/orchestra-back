@@ -1,5 +1,5 @@
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
-import { applySceneFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
+import { prepareSceneLightBindings } from "../../theater/model/theater-light-fader-bindings";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
 import type { AppDispatch } from "../../../shared/store/store";
@@ -55,10 +55,12 @@ export async function hydrateSceneFromLocalPack(
           ? (f.images as SceneData["images"])
           : undefined,
     };
-    const stepsOut = applySceneFaderBindingsToSpotlights(
+    const prepared = prepareSceneLightBindings(
       Array.isArray(f.steps) ? (f.steps as ScriptStep[]) : [],
       sceneData.lightFaders,
     );
+    sceneData.lightFaders = prepared.lightFaders ?? sceneData.lightFaders;
+    const stepsOut = prepared.steps;
     dispatch(
       sceneActions.hydrateScene({
         sceneData,

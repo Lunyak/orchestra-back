@@ -6,6 +6,7 @@ import type {
 import type { StepLightKadrFaderStateV1 } from "../../../shared/types/script";
 import {
   applyProgramFaderStatesToBoard,
+  buildCompleteLightFaders,
   buildFaderBoardForConsoleChannel,
   readProgramChannelFaderStates,
   resolveLightPrograms,
@@ -65,6 +66,10 @@ export function readFaderChannelForSpotlight(
         item.spotlightId === spotlightId && Number.isFinite(item.channel),
     );
     if (link) return Math.max(1, Math.trunc(link.channel));
+    if (fader.spotlightId === spotlightId && Number.isFinite(fader.channel)) {
+      return Math.max(1, Math.trunc(fader.channel!));
+    }
+    return undefined;
   }
   if (Number.isFinite(fader.channel)) return Math.max(1, Math.trunc(fader.channel!));
   const firstLink = (fader.links ?? []).find((item) => Number.isFinite(item.channel));
@@ -532,10 +537,9 @@ export function mergeFaderSpotlightLink(
 ): SceneLightFaderV1 {
   const prevLinks = Array.isArray(fader.links) ? fader.links : [];
   const withoutSpotlight = prevLinks.filter((link) => link.spotlightId !== spotlightId);
+  const { channel: _channel, spotlightId: _spotlightId, ...rest } = fader;
   return {
-    ...fader,
-    channel,
-    spotlightId,
+    ...rest,
     links: [...withoutSpotlight, { channel, spotlightId }],
   };
 }
@@ -577,6 +581,42 @@ export function detachSpotlightFromFaderBoard(
   });
 }
 
+/** Синхронизирует links на доске пульта с spotlight.faderId (источник истины — шаг). */
+export function repairLightFaderLinksFromSpotlights(
+  steps: ScriptStep[],
+  lightFaders: SceneLightFadersDataV1 | null | undefined,
+): SceneLightFadersDataV1 | null | undefined {
+  if (!lightFaders || lightFaders.v !== 1 || !Array.isArray(lightFaders.faders)) {
+    return lightFaders;
+  }
+
+  let faderRows = lightFaders.faders;
+  let changed = false;
+
+  for (const step of steps) {
+    if (!Array.isArray(step.theaterSpotlights)) continue;
+    for (const spotlight of step.theaterSpotlights) {
+      const faderId = readSpotlightFaderId(spotlight);
+      const channel = readSpotlightChannel(spotlight);
+      if (faderId == null || channel == null) continue;
+
+      const bound = faderRows.find((item) => item.id === faderId);
+      if (bound && spotlightMatchesFader(spotlight, bound)) continue;
+
+      faderRows = bindSpotlightOnFaderBoard(faderRows, faderId, spotlight.id, channel);
+      changed = true;
+    }
+  }
+
+  if (!changed) return lightFaders;
+
+  return buildCompleteLightFaders({
+    v: 1,
+    count: Math.max(lightFaders.count, faderRows.length),
+    faders: faderRows,
+  });
+}
+
 /** Восстанавливает spotlight.faderId из scene.lightFaders после pull/локальной загрузки. */
 export function applySceneFaderBindingsToSpotlights(
   steps: ScriptStep[],
@@ -612,15 +652,7 @@ export function applySceneFaderBindingsToSpotlights(
     let stepChanged = false;
     const nextSpotlights = step.theaterSpotlights.map((spotlight) => {
       const spotChannel = readSpotlightChannel(spotlight);
-      if (hasSpotlightFaderId(spotlight) && lightFaders.faders.length > 0) {
-        const faderId = readSpotlightFaderId(spotlight)!;
-        const fader = lightFaders.faders.find((item) => item.id === faderId);
-        if (fader && !spotlightMatchesFader(spotlight, fader)) {
-          stepChanged = true;
-          const next = { ...spotlight };
-          delete next.faderId;
-          return next;
-        }
+      if (hasSpotlightFaderId(spotlight)) {
         return spotlight;
       }
       const binding = bindingBySpotlightId.get(spotlight.id);
@@ -640,6 +672,17 @@ export function applySceneFaderBindingsToSpotlights(
   });
 
   return changed ? nextSteps : steps;
+}
+
+/** Согласует шаги и lightFaders после load/save. */
+export function prepareSceneLightBindings(
+  steps: ScriptStep[],
+  lightFaders: SceneLightFadersDataV1 | null | undefined,
+): { steps: ScriptStep[]; lightFaders: SceneLightFadersDataV1 | null | undefined } {
+  const repairedFaders = repairLightFaderLinksFromSpotlights(steps, lightFaders);
+  const nextSteps = applySceneFaderBindingsToSpotlights(steps, repairedFaders);
+  const syncedFaders = repairLightFaderLinksFromSpotlights(nextSteps, repairedFaders);
+  return { steps: nextSteps, lightFaders: syncedFaders };
 }
 
 export function bindSpotlightOnFaderBoard(

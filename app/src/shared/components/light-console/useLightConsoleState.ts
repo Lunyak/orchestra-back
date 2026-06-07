@@ -92,7 +92,7 @@ export function useLightConsoleState({
   );
 
   const persistFaders = useCallback(
-    (next: SceneLightFadersDataV1) => {
+    (next: SceneLightFadersDataV1, syncChannelSnapshot = false) => {
       if (readOnly || fadersOverride) {
         onFadersChange?.(next);
         return;
@@ -101,12 +101,37 @@ export function useLightConsoleState({
         onFadersChange(next);
         return;
       }
-      setSceneData((prev) => ({
-        ...(prev ?? {}),
-        lightFaders: next,
-      }));
+      if (!syncChannelSnapshot) {
+        setSceneData((prev) => ({
+          ...(prev ?? {}),
+          lightFaders: next,
+        }));
+        return;
+      }
+      setSceneData((prev) => {
+        const channel = Math.max(1, editingChannelRef.current || selectedLightSlot || 1);
+        const prevPrograms =
+          prev?.lightPrograms && prev.lightPrograms.v === 1 ? prev.lightPrograms : programs;
+        const resolvedPrograms = resolveLightPrograms(
+          prevPrograms,
+          resolveLightProgramMinCount(lightChannels.length, prevPrograms, channel),
+        );
+        return {
+          ...(prev ?? {}),
+          lightFaders: next,
+          lightPrograms: upsertProgramChannelSnapshot(resolvedPrograms, channel, next),
+        };
+      });
     },
-    [fadersOverride, onFadersChange, readOnly, setSceneData],
+    [
+      fadersOverride,
+      lightChannels.length,
+      onFadersChange,
+      programs,
+      readOnly,
+      selectedLightSlot,
+      setSceneData,
+    ],
   );
 
   const persistPrograms = useCallback(
@@ -143,7 +168,7 @@ export function useLightConsoleState({
     const nextFaders = faders.faders.map((item) =>
       item.id === faderId ? { ...item, ...patch } : item,
     );
-    persistFaders({ ...faders, faders: nextFaders });
+    persistFaders({ ...faders, faders: nextFaders }, true);
   };
 
   const applyProgram = (program = activeProgram) => {

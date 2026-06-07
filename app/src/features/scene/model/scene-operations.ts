@@ -28,7 +28,7 @@ import {
 import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
 import { stepTheaterSyncPayload } from "../../theater/model/theater-step-models";
 import {
-  applySceneFaderBindingsToSpotlights,
+  prepareSceneLightBindings,
   mapTheaterSpotlightFromApi,
   mapTheaterSpotlightToSync,
 } from "../../theater/model/theater-light-fader-bindings";
@@ -47,6 +47,7 @@ import {
 import {
   resolveLightChannelsForPersist,
 } from "../../../shared/components/light-console/light-channels-mutate";
+import { prepareLightProgramsForPersist, buildCompleteLightFaders } from "../../../shared/components/light-console/light-console-data";
 
 function normalizeRequisiteAssignees(value: unknown): string[] {
   return Array.isArray(value)
@@ -269,10 +270,17 @@ export function useSceneOperations() {
         }
 
         const stepsBeforeRepair = normalizedSteps.length ? normalizedSteps : steps;
-        const nextStepsPayload = applySceneFaderBindingsToSpotlights(
+        const bindingsBeforeRepair = prepareSceneLightBindings(
           stepsBeforeRepair,
           minimalSceneData.lightFaders,
         );
+        const nextStepsPayload = bindingsBeforeRepair.steps;
+        if (
+          bindingsBeforeRepair.lightFaders &&
+          bindingsBeforeRepair.lightFaders !== minimalSceneData.lightFaders
+        ) {
+          minimalSceneData.lightFaders = bindingsBeforeRepair.lightFaders;
+        }
         const bindingsRepaired =
           stableStringify(nextStepsPayload) !== stableStringify(stepsBeforeRepair);
         const wasReady = store.getState().scene.isSceneReady;
@@ -421,13 +429,32 @@ export function useSceneOperations() {
         projectName || "fools",
         "script",
       );
+      const preparedBindings = prepareSceneLightBindings(
+        liveSteps,
+        liveSceneData?.lightFaders ?? (current as any)?.lightFaders,
+      );
+      const preparedSteps = preparedBindings.steps;
+      const preparedLightFaders =
+        preparedBindings.lightFaders ??
+        liveSceneData?.lightFaders ??
+        (current as any)?.lightFaders;
+      const persistedLightChannels = resolveLightChannelsForPersist(
+        liveShowScriptUi.lightChannels,
+        liveSceneData?.lightChannels,
+      );
+      const preparedLightPrograms = prepareLightProgramsForPersist({
+        lightFaders: buildCompleteLightFaders(preparedLightFaders ?? undefined),
+        lightPrograms: liveSceneData?.lightPrograms ?? (current as any)?.lightPrograms,
+        lightChannelsCount: persistedLightChannels.length,
+        activeChannel: liveShowScriptUi.selectedLightSlot,
+      });
       const payload: any = {
         ...(current ?? {}),
         ...(liveSceneData ?? {}),
-        steps: liveSteps,
+        steps: preparedSteps,
         theaterLayout: liveTheaterLayout,
-        lightFaders: liveSceneData?.lightFaders ?? (current as any)?.lightFaders,
-        lightPrograms: liveSceneData?.lightPrograms ?? (current as any)?.lightPrograms,
+        lightFaders: preparedLightFaders,
+        lightPrograms: preparedLightPrograms,
         lightChannelRoles: liveSceneData?.lightChannelRoles ?? (current as any)?.lightChannelRoles,
         sceneRoles: liveSceneData?.sceneRoles ?? (current as any)?.sceneRoles,
         videos: liveSceneData?.videos ?? (current as any)?.videos ?? [],
@@ -439,10 +466,41 @@ export function useSceneOperations() {
           projector: liveSceneData?.projector ?? (current as any)?.projector,
         }),
         images,
-        lightChannels: resolveLightChannelsForPersist(
-          liveShowScriptUi.lightChannels,
-          liveSceneData?.lightChannels,
-        ),
+        lightChannels: persistedLightChannels,
+      };
+
+      const commitSavedBaseline = (payloadForShadow: any, stepsForShadow: ScriptStep[]) => {
+        dispatch(
+          sceneActions.setServerShadow({
+            sceneData: {
+              ...(liveServerShadow?.sceneData ?? {}),
+              name: payloadForShadow.name,
+              sceneRoles: payloadForShadow.sceneRoles,
+              lightFaders: payloadForShadow.lightFaders,
+              lightPrograms: payloadForShadow.lightPrograms,
+              lightChannelRoles: payloadForShadow.lightChannelRoles,
+              videos: Array.isArray(payloadForShadow.videos) ? payloadForShadow.videos : [],
+              holdImages: Array.isArray(payloadForShadow.holdImages)
+                ? payloadForShadow.holdImages
+                : [],
+              projector: payloadForShadow.projector,
+              playlist: Array.isArray(payloadForShadow.playlist) ? payloadForShadow.playlist : [],
+              sounds: Array.isArray(payloadForShadow.sounds) ? payloadForShadow.sounds : [],
+              lightChannels: Array.isArray(payloadForShadow.lightChannels)
+                ? payloadForShadow.lightChannels.map((x: any) => String(x ?? ""))
+                : [],
+            },
+            steps: stepsForShadow,
+            theaterLayout: liveTheaterLayout,
+            lightChannels: Array.isArray(payloadForShadow.lightChannels)
+              ? payloadForShadow.lightChannels.map((x: any) => String(x ?? ""))
+              : Array.from({ length: 8 }, () => ""),
+          }),
+        );
+        dispatch(sceneActions.markSaved());
+        if (projectName) {
+          writeTheaterLayoutDraft(projectName, liveTheaterLayout);
+        }
       };
 
       if (desktopApi) {
@@ -450,6 +508,9 @@ export function useSceneOperations() {
         if (!result?.ok) {
           console.error("Failed to save scene:", result?.error);
           return;
+        }
+        if (!token) {
+          commitSavedBaseline(payload, preparedSteps);
         }
       }
 
@@ -617,10 +678,17 @@ export function useSceneOperations() {
                     };
                   })(),
                 };
-                const shadowSteps = applySceneFaderBindingsToSpotlights(
+                const shadowBindings = prepareSceneLightBindings(
                   prevSteps.length ? prevSteps : [],
                   serverLightFaders,
                 );
+                const shadowSteps = shadowBindings.steps;
+                if (
+                  shadowBindings.lightFaders &&
+                  shadowBindings.lightFaders !== serverLightFaders
+                ) {
+                  shadowSceneData.lightFaders = shadowBindings.lightFaders;
+                }
                 dispatch(
                   sceneActions.setServerShadow({
                     sceneData: shadowSceneData,
@@ -931,7 +999,7 @@ export function useSceneOperations() {
           const prevById = new Map<number, { step: ScriptStep; order: number }>();
           prevSteps.forEach((s, idx) => prevById.set(s.id, { step: s, order: idx }));
 
-          const newIds = new Set(liveSteps.map((s) => s.id));
+          const newIds = new Set(preparedSteps.map((s) => s.id));
           const stepFingerprint = (step: ScriptStep, order: number) =>
             stableStringify({
               title: step.title,
@@ -954,7 +1022,7 @@ export function useSceneOperations() {
               order,
             });
 
-          liveSteps.forEach((step, index) => {
+          preparedSteps.forEach((step, index) => {
             const stepKey = `${sceneId}:${step.id}`;
             const prev = prevById.get(step.id) ?? null;
             if (prev) {
@@ -1027,7 +1095,7 @@ export function useSceneOperations() {
               const prevKeys = serverShadowForDiff
                 ? extractReferencedRemoteImageKeysFromSteps(serverShadowForDiff.steps)
                 : new Set<string>();
-              const nextKeys = extractReferencedRemoteImageKeysFromSteps(liveSteps);
+              const nextKeys = extractReferencedRemoteImageKeysFromSteps(preparedSteps);
               let removed = 0;
               prevKeys.forEach((k) => {
                 if (!nextKeys.has(k)) removed += 1;
@@ -1036,59 +1104,13 @@ export function useSceneOperations() {
                 void cleanupProjectImages(token, projectName).catch(() => null);
               }
             } catch (_) {}
-            // after successful push: accept local state as new serverShadow baseline
-            dispatch(
-              sceneActions.setServerShadow({
-                sceneData: {
-                  ...(serverShadowForDiff?.sceneData ?? {}),
-                  name: nextSceneName,
-                  sceneRoles:
-                    (payloadForServer as any)?.sceneRoles ??
-                    (serverShadowForDiff?.sceneData as any)?.sceneRoles ??
-                    undefined,
-                  lightFaders:
-                    (payloadForServer as any)?.lightFaders ??
-                    (serverShadowForDiff?.sceneData as any)?.lightFaders ??
-                    undefined,
-                  lightPrograms:
-                    (payloadForServer as any)?.lightPrograms ??
-                    (serverShadowForDiff?.sceneData as any)?.lightPrograms ??
-                    undefined,
-                  lightChannelRoles:
-                    (payloadForServer as any)?.lightChannelRoles ??
-                    (serverShadowForDiff?.sceneData as any)?.lightChannelRoles ??
-                    undefined,
-                  videos: Array.isArray((payloadForServer as any)?.videos)
-                    ? (payloadForServer as any).videos
-                    : [],
-                  holdImages: Array.isArray((payloadForServer as any)?.holdImages)
-                    ? (payloadForServer as any).holdImages
-                    : (serverShadowForDiff?.sceneData as any)?.holdImages ?? [],
-                  projector:
-                    (payloadForServer as any)?.projector ??
-                    (serverShadowForDiff?.sceneData as any)?.projector ??
-                    undefined,
-                  playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
-                  sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],
-                  lightChannels: Array.isArray((payloadForServer as any)?.lightChannels)
-                    ? (payloadForServer as any).lightChannels.map((x: any) => String(x ?? ""))
-                    : [],
-                },
-                steps: liveSteps,
-                theaterLayout: liveTheaterLayout,
-                lightChannels: Array.isArray((payloadForServer as any)?.lightChannels)
-                  ? (payloadForServer as any).lightChannels.map((x: any) => String(x ?? ""))
-                  : Array.isArray(showScriptUi.lightChannels)
-                    ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
-                    : Array.from({ length: 8 }, () => ""),
-              }),
-            );
-            dispatch(sceneActions.markSaved());
-            if (projectName) {
-              writeTheaterLayoutDraft(projectName, liveTheaterLayout);
-            }
+            commitSavedBaseline(payloadForServer, preparedSteps);
+          } else {
+            commitSavedBaseline(payload, preparedSteps);
           }
         }
+      } else if (!desktopApi) {
+        commitSavedBaseline(payload, preparedSteps);
       }
     } catch (error) {
       console.error("Failed to save/push scene:", error);

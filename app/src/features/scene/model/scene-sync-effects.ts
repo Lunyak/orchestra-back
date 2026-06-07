@@ -14,9 +14,10 @@ import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
-import { applySceneFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
+import { prepareSceneLightBindings } from "../../theater/model/theater-light-fader-bindings";
 import { sceneActions, DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 import { loadSceneRolesFromStorage, saveSceneRolesToStorage } from "./scene-roles-storage";
+import { normalizeLightChannelsLoose } from "./scene-normalize";
 import { useSceneOperations } from "./scene-operations";
 
 export function useSceneSyncEffects() {
@@ -53,12 +54,15 @@ export function useSceneSyncEffects() {
     ((payload?: { projectId?: string; sourceClientId?: string | null }) => void) | null
   >(null);
   const realtimeConnectHandlerRef = useRef<(() => void) | null>(null);
+  const desktopLocalSceneLoadedRef = useRef(false);
+  const lastLocalEditAtRef = useRef(0);
 
   useEffect(() => {
     if (!projectName) return;
     dispatch(sceneActions.resetForProject());
     selectedStepIdRef.current = null;
     restoredProjectRef.current = null;
+    desktopLocalSceneLoadedRef.current = false;
 
     let cancelled = false;
     const loadScene = async () => {
@@ -86,25 +90,38 @@ export function useSceneSyncEffects() {
             ? { ...(scene as any), sceneRoles: (scene as any)?.sceneRoles ?? localRoles ?? undefined }
             : scene;
         const localSceneData = mergedScene || null;
-        const localSteps = applySceneFaderBindingsToSpotlights(
+        const lc = normalizeLightChannelsLoose((localSceneData as any)?.lightChannels);
+        const theaterLayout = resolveInitialTheaterLayout(
+          projectName,
+          (mergedScene as any)?.theaterLayout
+            ? normalizePersistedTheaterLayout((mergedScene as any).theaterLayout)
+            : undefined,
+          DEFAULT_THEATER_LAYOUT,
+        );
+        const prepared = prepareSceneLightBindings(
           (localSceneData as any)?.steps ?? [],
           (localSceneData as any)?.lightFaders,
         );
+        const sceneDataForHydrate =
+          localSceneData && prepared.lightFaders
+            ? { ...(localSceneData as any), lightFaders: prepared.lightFaders }
+            : localSceneData;
         dispatch(
           sceneActions.hydrateScene({
-            sceneData: localSceneData,
-            theaterLayout: resolveInitialTheaterLayout(
-              projectName,
-              (mergedScene as any)?.theaterLayout
-                ? normalizePersistedTheaterLayout((mergedScene as any).theaterLayout)
-                : undefined,
-              DEFAULT_THEATER_LAYOUT,
-            ),
-            steps: localSteps,
+            sceneData: sceneDataForHydrate,
+            theaterLayout,
+            steps: prepared.steps,
             currentPage: 0,
             isSceneReady: true,
+            serverShadow: {
+              sceneData: sceneDataForHydrate,
+              steps: prepared.steps,
+              theaterLayout,
+              lightChannels: lc,
+            },
           }),
         );
+        desktopLocalSceneLoadedRef.current = Array.isArray(prepared.steps) && prepared.steps.length > 0;
         selectedStepIdRef.current = null;
         restoredProjectRef.current = null;
       } catch (error) {
@@ -141,6 +158,7 @@ export function useSceneSyncEffects() {
 
   useEffect(() => {
     if (!accessToken || !projectName) return;
+    if (getDesktopApi()) return;
     const key = `${accessToken}:${projectName}`;
     if (lastSyncedKeyRef.current === key) return;
     lastSyncedKeyRef.current = key;
@@ -153,6 +171,15 @@ export function useSceneSyncEffects() {
       accessToken ?? (typeof window !== "undefined" ? localStorage.getItem("accessToken") : null);
 
     if (!token || !projectName) {
+      joinedProjectIdRef.current = null;
+      if (realtimePullTimerRef.current) {
+        window.clearTimeout(realtimePullTimerRef.current);
+        realtimePullTimerRef.current = null;
+      }
+      disconnectRealtimeSocket();
+      return;
+    }
+    if (getDesktopApi()) {
       joinedProjectIdRef.current = null;
       if (realtimePullTimerRef.current) {
         window.clearTimeout(realtimePullTimerRef.current);
@@ -199,6 +226,16 @@ export function useSceneSyncEffects() {
               deferred: true,
               at: new Date().toISOString(),
               reason: "local_edits",
+            }),
+          );
+          return;
+        }
+        if (Date.now() - lastLocalEditAtRef.current < 5000) {
+          dispatch(
+            sceneActions.setRealtimePullDeferred({
+              deferred: true,
+              at: new Date().toISOString(),
+              reason: "remote_pending",
             }),
           );
           return;
@@ -325,6 +362,12 @@ export function useSceneSyncEffects() {
     () => JSON.stringify(showScriptUi.lightChannels ?? null),
     [showScriptUi.lightChannels],
   );
+
+  useEffect(() => {
+    if (hasLocalEdits) {
+      lastLocalEditAtRef.current = Date.now();
+    }
+  }, [hasLocalEdits, stepsRevision, sceneDataRevision, theaterLayout, lightChannelsKey]);
 
   useEffect(() => {
     if (!isSceneReady || steps.length === 0) return;

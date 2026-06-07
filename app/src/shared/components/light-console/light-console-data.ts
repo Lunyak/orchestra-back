@@ -343,6 +343,25 @@ function zeroFaderBoardStates(
   }));
 }
 
+/** Перед save: снимок активного K из live-доски → program[K] (3D читает program, не lightFaders). */
+export function prepareLightProgramsForPersist(args: {
+  lightFaders: SceneLightFadersDataV1;
+  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightChannelsCount: number;
+  activeChannel: number;
+}): SceneLightProgramsDataV1 {
+  const channelCount = Math.max(1, Math.trunc(args.lightChannelsCount) || 1);
+  const activeChannel = Math.max(0, Math.trunc(args.activeChannel) || 0);
+  let programs = resolveLightPrograms(
+    args.lightPrograms,
+    resolveLightProgramMinCount(channelCount, args.lightPrograms, activeChannel),
+  );
+  if (activeChannel > 0) {
+    programs = upsertProgramChannelSnapshot(programs, activeChannel, args.lightFaders);
+  }
+  return programs;
+}
+
 /** Доска F для канала K: живая доска, память program[K] или нули — не чужой K. */
 export function buildFaderBoardForConsoleChannel(
   liveFaders: SceneLightFadersDataV1,

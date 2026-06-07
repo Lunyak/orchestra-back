@@ -2,7 +2,23 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createPortal } from "react-dom";
 import { useAppEditorViewMenuRender } from "@shared/components/app-editor-menubar";
 import { useScene } from "../../scene";
-import { patchSceneFaderFromSpotlightIntensity } from "../model/sync-spotlight-fader-level";
+import {
+  patchSceneFaderFromSpotlightIntensity,
+  patchSceneFaderLevel,
+} from "../model/sync-spotlight-fader-level";
+import {
+  readSpotlightChannel,
+  readSpotlightFaderId,
+} from "../model/theater-light-fader-bindings";
+import {
+  resolveLightProgramMinCount,
+  resolveLightPrograms,
+  upsertProgramChannelSnapshot,
+} from "../../../shared/components/light-console/light-console-data";
+import {
+  THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
+  THEATER_SPOTLIGHT_RGB_DEFAULT_UI_INTENSITY,
+} from "../model/theater-scene-lighting";
 import { useTheaterScene, type TheaterSceneViewModel } from "../model/use-theater-scene";
 import type { TheaterSceneProps } from "../model/theater-scene-types";
 import { useStageGridHighlight } from "../scene/use-stage-grid-highlight";
@@ -46,7 +62,7 @@ export const TheaterScene = ({
     theaterLayout,
     onTheaterLayoutChange,
   });
-  const { sceneData, setSceneData } = useScene();
+  const { sceneData, setSceneData, saveStepsForLightPlot } = useScene();
 
   useEffect(() => {
     if (!embeddedLightRehearsal) return;
@@ -189,10 +205,47 @@ export const TheaterScene = ({
         dragMode: vm.dragMode,
         showOnlyActive: vm.showOnlyActiveSpotlight,
         onShowOnlyActiveChange: vm.setShowOnlyActiveSpotlight,
-        onToggleEnabled: () =>
+        onToggleEnabled: () => {
+          const nextEnabled = !(activeSpotlight.enabled ?? true);
+          const currentIntensity =
+            typeof activeSpotlight.intensity === "number" && Number.isFinite(activeSpotlight.intensity)
+              ? activeSpotlight.intensity
+              : undefined;
+          const restoredIntensity = activeSpotlight.isRgb
+            ? THEATER_SPOTLIGHT_RGB_DEFAULT_UI_INTENSITY
+            : THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
+          const nextSpotlightPatch =
+            nextEnabled && (currentIntensity == null || currentIntensity <= 0)
+              ? { enabled: nextEnabled, intensity: restoredIntensity }
+              : { enabled: nextEnabled };
           vm.updateSpotlight(activeSpotlight.id, {
-            enabled: !(activeSpotlight.enabled ?? true),
-          }),
+            ...nextSpotlightPatch,
+          });
+
+          const faderId = readSpotlightFaderId(activeSpotlight);
+          const channel = readSpotlightChannel(activeSpotlight);
+          if (faderId != null && channel != null) {
+            setSceneData((prev) => {
+              const nextFaders = patchSceneFaderLevel(
+                prev?.lightFaders ?? sceneData?.lightFaders ?? null,
+                faderId,
+                nextEnabled ? 1 : 0,
+              );
+              const programs = resolveLightPrograms(
+                prev?.lightPrograms ?? sceneData?.lightPrograms,
+                resolveLightProgramMinCount(channel, prev?.lightPrograms ?? sceneData?.lightPrograms, channel),
+              );
+              return {
+                ...(prev ?? {}),
+                lightFaders: nextFaders,
+                lightPrograms: upsertProgramChannelSnapshot(programs, channel, nextFaders),
+              };
+            });
+          }
+          window.setTimeout(() => {
+            void saveStepsForLightPlot({ force: true });
+          }, 0);
+        },
         onToggleHidden: () =>
           vm.updateSpotlight(activeSpotlight.id, {
             hidden: activeSpotlight.hidden !== true,
