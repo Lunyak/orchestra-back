@@ -612,7 +612,7 @@ export function repairLightFaderLinksFromSpotlights(
 
   return buildCompleteLightFaders({
     v: 1,
-    count: Math.max(lightFaders.count, faderRows.length),
+    count: Math.max(lightFaders.count ?? faderRows.length, faderRows.length),
     faders: faderRows,
   });
 }

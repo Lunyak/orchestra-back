@@ -503,7 +503,7 @@ export function useSceneOperations() {
         );
         dispatch(sceneActions.markSaved());
         if (projectName) {
-          writeTheaterLayoutDraft(projectName, liveTheaterLayout);
+          commitTheaterLayoutBaseline(projectName, liveTheaterLayout);
         }
       };
 
@@ -513,16 +513,9 @@ export function useSceneOperations() {
           console.error("Failed to save scene:", result?.error);
           return;
         }
-<<<<<<< Updated upstream
         if (!token) {
           commitSavedBaseline(payload, preparedSteps);
         }
-=======
-        if (projectName) {
-          commitTheaterLayoutBaseline(projectName, liveTheaterLayout);
-        }
-        dispatch(sceneActions.markSaved());
->>>>>>> Stashed changes
       }
 
       if (token) {
@@ -1115,66 +1108,9 @@ export function useSceneOperations() {
                 void cleanupProjectImages(token, projectName).catch(() => null);
               }
             } catch (_) {}
-<<<<<<< Updated upstream
             commitSavedBaseline(payloadForServer, preparedSteps);
           } else {
             commitSavedBaseline(payload, preparedSteps);
-=======
-            // after successful push: accept local state as new serverShadow baseline
-            dispatch(
-              sceneActions.setServerShadow({
-                sceneData: {
-                  ...(serverShadowForDiff?.sceneData ?? {}),
-                  name: nextSceneName,
-                  sceneRoles:
-                    (payloadForServer as any)?.sceneRoles ??
-                    (serverShadowForDiff?.sceneData as any)?.sceneRoles ??
-                    undefined,
-                  lightFaders:
-                    (payloadForServer as any)?.lightFaders ??
-                    (serverShadowForDiff?.sceneData as any)?.lightFaders ??
-                    undefined,
-                  lightPrograms:
-                    (payloadForServer as any)?.lightPrograms ??
-                    (serverShadowForDiff?.sceneData as any)?.lightPrograms ??
-                    undefined,
-                  lightChannelRoles:
-                    (payloadForServer as any)?.lightChannelRoles ??
-                    (serverShadowForDiff?.sceneData as any)?.lightChannelRoles ??
-                    undefined,
-                  videos: Array.isArray((payloadForServer as any)?.videos)
-                    ? (payloadForServer as any).videos
-                    : [],
-                  holdImages: Array.isArray((payloadForServer as any)?.holdImages)
-                    ? (payloadForServer as any).holdImages
-                    : (serverShadowForDiff?.sceneData as any)?.holdImages ?? [],
-                  projector:
-                    (payloadForServer as any)?.projector ??
-                    (serverShadowForDiff?.sceneData as any)?.projector ??
-                    undefined,
-                  playlist: Array.isArray(payloadForServer.playlist) ? payloadForServer.playlist : [],
-                  sounds: Array.isArray(payloadForServer.sounds) ? payloadForServer.sounds : [],
-                  lightChannels: Array.isArray((payloadForServer as any)?.lightChannels)
-                    ? (payloadForServer as any).lightChannels.map((x: any) => String(x ?? ""))
-                    : [],
-                },
-                steps: liveSteps,
-                theaterLayout: liveTheaterLayout,
-                lightChannels: Array.isArray((payloadForServer as any)?.lightChannels)
-                  ? (payloadForServer as any).lightChannels.map((x: any) => String(x ?? ""))
-                  : Array.isArray(showScriptUi.lightChannels)
-                    ? showScriptUi.lightChannels.map((x: any) => String(x ?? ""))
-                    : Array.from({ length: 8 }, () => ""),
-              }),
-            );
-            dispatch(sceneActions.markSaved());
-            if (projectName && !desktopApi) {
-              commitTheaterLayoutBaseline(projectName, liveTheaterLayout);
-            }
-          } else if (projectName && !desktopApi) {
-            commitTheaterLayoutBaseline(projectName, liveTheaterLayout);
-            dispatch(sceneActions.markSaved());
->>>>>>> Stashed changes
           }
         }
       } else if (!desktopApi) {
