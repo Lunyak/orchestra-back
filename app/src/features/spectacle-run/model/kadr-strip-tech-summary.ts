@@ -51,7 +51,7 @@ type MediaLookup = {
   holdImages?: Array<{ id: number; title: string }>;
 };
 
-const ACTION_FIELD_RE = /^-\s*\*\*Действие\/задача\*\*:\s*(.*)$/im;
+const ACTION_FIELD_RE = /^-\s*\*\*Действие\/задача\*\*:\s*([^\n]*)/im;
 
 function stripKadrFieldMarkdown(text: string): string {
   return String(text ?? "")

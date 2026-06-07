@@ -4,7 +4,7 @@ import { normalizeLayoutWallRecessFields } from "./theater-wall-recesses";
 import type { TheaterStageShape } from "../../../shared/types/script";
 import { resolveStageGeometry, resolveStageShape } from "./theater-stage-geometry";
 import { normalizeStageOutlineFields } from "./theater-custom-outline";
-import { normalizeTheaterStageGridFields } from "./theater-zone-grid";
+import { normalizeTheaterZonesFields } from "./theater-zones";
 import { normalizeTheaterSurfaceMaterials } from "./theater-surface-materials";
 
 /** Все размеры сцены — в метрах (СИ). */
@@ -236,7 +236,7 @@ export function normalizeTheaterLayout(
     ...recessFields,
   });
 
-  const stageGridFields = normalizeTheaterStageGridFields(layout);
+  const stageGridFields = normalizeTheaterZonesFields(layout);
   const surfaceMaterialFields = normalizeTheaterSurfaceMaterials(layout);
 
   const doorFields = normalizeLayoutDoorsFields({

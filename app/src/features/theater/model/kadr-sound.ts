@@ -1,9 +1,9 @@
 import type { MarkdownKadrSection } from "./light-kadrs";
 
-const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*(.*)$/im;
+const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*([^\n]*)/im;
 
 export const SOUND_LINE_PREFIX = "- **Звук**:";
-export const SOUND_KADR_LINE_RE = /^-\s*\*\*Звук\*\*:\s*(.*)$/im;
+export const SOUND_KADR_LINE_RE = /^-\s*\*\*Звук\*\*:\s*([^\n]*)/im;
 
 export type KadrSoundCue = {
   playTrackIds: number[];

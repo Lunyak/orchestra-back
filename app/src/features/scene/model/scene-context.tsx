@@ -1,8 +1,12 @@
 import React, { useCallback } from "react";
 import type { ScriptStep, TheaterLayout } from "../../../shared/types/script";
-import { writeTheaterLayoutDraft } from "../../theater/model/theater-layout-draft-storage";
+import {
+  markTheaterLayoutDraftDirty,
+  writeTheaterLayoutDraft,
+} from "../../theater/model/theater-layout-draft-storage";
 import { useProject } from "../../project/model/project-context";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { isProjectorOutputWindow } from "../../projector/model/projector-playback-bridge";
 import { store } from "../../../shared/store/store";
 import {
   sceneActions,
@@ -73,11 +77,7 @@ function SceneSyncRunnerActive({ children }: { children: React.ReactNode }) {
  * sync там не нужен и опасен (может затереть сервер устаревшим diff).
  */
 export function SceneSyncRunner({ children }: { children: React.ReactNode }) {
-  const isProjectorOutput =
-    typeof window !== "undefined" &&
-    window.location.pathname.replace(/\/$/, "").endsWith("/projector-output");
-
-  if (isProjectorOutput) {
+  if (isProjectorOutputWindow()) {
     return <>{children}</>;
   }
 
@@ -148,6 +148,7 @@ export function useScene(): SceneContextValue {
     (next: SetStateAction<TheaterLayout>) => {
       dispatch(sceneActions.setTheaterLayout(next));
       if (projectName) {
+        markTheaterLayoutDraftDirty(projectName);
         writeTheaterLayoutDraft(projectName, store.getState().scene.theaterLayout);
       }
     },

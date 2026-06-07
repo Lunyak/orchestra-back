@@ -21,9 +21,9 @@ import { desktopAddProjectImage } from "../../../shared/platform/desktop-methods
 import { uploadProjectFile } from "../../../sync/api/files";
 import { ensureProject } from "../../../sync/api/projects";
 import {
-  buildFaderLevelsFromOptions,
   buildInitialCreateKadrDraft,
   listCreateKadrFaderOptions,
+  syncDraftFaderOptions,
   type CreateKadrDraft,
   type KadrModalMode,
 } from "../model/create-kadr-from-draft";
@@ -155,7 +155,7 @@ export function CreateKadrModal({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const imagePreviewUrlRef = useRef<string | null>(null);
   const wasOpenRef = useRef(false);
-  const prevFaderOptionKeysRef = useRef<string[]>([]);
+  const faderOptionsSyncedKeyRef = useRef("");
   const [draft, setDraft] = useState<CreateKadrDraft>(() =>
     buildInitialCreateKadrDraft({
       lightChannelsCount: lightChannels.length,
@@ -256,7 +256,7 @@ export function CreateKadrModal({
             spotlights,
           });
     setDraft(nextDraft);
-    prevFaderOptionKeysRef.current = [];
+    faderOptionsSyncedKeyRef.current = "";
     setImageError(null);
     setImagePreviewUrl(null);
     if (imagePreviewUrlRef.current) {
@@ -277,32 +277,44 @@ export function CreateKadrModal({
   ]);
 
   useEffect(() => {
-    const allOptionKeys = faderOptions.map((item) => item.key);
-    const prevKeys = prevFaderOptionKeysRef.current;
-    const newlyAppeared = allOptionKeys.filter((key) => !prevKeys.includes(key));
-    prevFaderOptionKeysRef.current = allOptionKeys;
+    if (!isOpen) return;
+    const optionKeys = faderOptions.map((item) => item.key).join("|");
+    if (optionKeys === faderOptionsSyncedKeyRef.current) return;
+    faderOptionsSyncedKeyRef.current = optionKeys;
 
-    if (newlyAppeared.length === 0) return;
-
-    const validKeys = new Set(allOptionKeys);
     setDraft((prev) => {
-      const kept = prev.includedFaderKeys.filter((key) => validKeys.has(key));
-      const toAdd = newlyAppeared.filter((key) => !kept.includes(key));
-      if (toAdd.length === 0) return prev;
-      const nextKeys = [...kept, ...toAdd];
-      const nextLevels = buildFaderLevelsFromOptions(faderOptions, prev.faderLevels);
-      return { ...prev, includedFaderKeys: nextKeys, faderLevels: nextLevels };
+      const synced = syncDraftFaderOptions(prev, faderOptions);
+      if (
+        synced.includedFaderKeys.length === prev.includedFaderKeys.length &&
+        synced.includedFaderKeys.every((key, index) => key === prev.includedFaderKeys[index]) &&
+        Object.keys(synced.faderLevels).length === Object.keys(prev.faderLevels).length &&
+        Object.entries(synced.faderLevels).every(
+          ([key, level]) => prev.faderLevels[key] === level,
+        )
+      ) {
+        return prev;
+      }
+      return { ...prev, ...synced };
     });
-  }, [faderOptions, recordChannelsKey]);
+  }, [faderOptions, isOpen, recordChannelsKey]);
 
-  const toggleFader = useCallback((key: string) => {
+  const toggleFader = useCallback((key: string, defaultLevel: number) => {
     setDraft((prev) => {
       const included = prev.includedFaderKeys.includes(key);
+      if (included) {
+        return {
+          ...prev,
+          includedFaderKeys: prev.includedFaderKeys.filter((item) => item !== key),
+        };
+      }
+      const level =
+        prev.faderLevels[key] != null
+          ? prev.faderLevels[key]
+          : Math.min(1, Math.max(0, defaultLevel));
       return {
         ...prev,
-        includedFaderKeys: included
-          ? prev.includedFaderKeys.filter((item) => item !== key)
-          : [...prev.includedFaderKeys, key],
+        includedFaderKeys: [...prev.includedFaderKeys, key],
+        faderLevels: { ...prev.faderLevels, [key]: level },
       };
     });
   }, []);
@@ -639,8 +651,7 @@ export function CreateKadrModal({
                   <div className="create-kadr-modal__fader-grid">
                     {faderOptions.map((item) => {
                       const checked = draft.includedFaderKeys.includes(item.key);
-                      const level =
-                        draft.faderLevels[item.key] ?? item.intensity;
+                      const level = draft.faderLevels[item.key] ?? 0;
                       const levelPct = Math.round(
                         Math.min(1, Math.max(0, level)) * 100,
                       );
@@ -657,7 +668,7 @@ export function CreateKadrModal({
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={() => toggleFader(item.key)}
+                              onChange={() => toggleFader(item.key, item.intensity)}
                             />
                             <span className="create-kadr-modal__fader-label">
                               {item.label}

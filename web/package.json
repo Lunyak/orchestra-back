@@ -9,7 +9,8 @@
     "dev:desktop": "vite --mode desktop",
     "build": "npx tsc && vite build",
     "build:mobile": "npx tsc && vite build --base ./ --mode mobile",
-    "build:desktop": "npx tsc && vite build --base ./ --mode desktop",
+    "build:desktop": "vite build --base ./ --mode desktop",
+    "package:mac": "npm run build:desktop && npm run build:mac --prefix ../desktop",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

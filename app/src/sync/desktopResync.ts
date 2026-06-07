@@ -233,3 +233,15 @@ export async function resyncDesktopProject(
     return { updatedScenes, totalScenes };
   }
 }
+
+/** Обёртка для PlatformContext: токен берётся из localStorage. */
+export async function resyncDesktopProjectFromSettings(
+  projectSlug: string,
+): Promise<{ updatedScenes: number; totalScenes: number }> {
+  const accessToken =
+    typeof window !== "undefined" ? localStorage.getItem("accessToken") : null;
+  if (!accessToken) {
+    throw new Error("Нужно войти в аккаунт перед resync");
+  }
+  return resyncDesktopProject(accessToken, projectSlug);
+}

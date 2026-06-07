@@ -2079,12 +2079,20 @@ export function ScriptMarkdownPreview({
       }
     };
 
-    compute();
-    const raf = requestAnimationFrame(compute);
-    const ro = new ResizeObserver(() => compute());
+    let roRaf: number | null = null;
+    const scheduleCompute = () => {
+      if (roRaf != null) return;
+      roRaf = requestAnimationFrame(() => {
+        roRaf = null;
+        compute();
+      });
+    };
+
+    scheduleCompute();
+    const ro = new ResizeObserver(scheduleCompute);
     ro.observe(root);
     return () => {
-      cancelAnimationFrame(raf);
+      if (roRaf != null) cancelAnimationFrame(roRaf);
       ro.disconnect();
     };
   }, [hasRoleOrLightLabels, markdown, markdownForPreview, kadrLayoutEnabled, markdownMode]);

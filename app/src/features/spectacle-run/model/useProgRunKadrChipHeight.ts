@@ -47,14 +47,26 @@ export function useProgRunKadrChipHeight(
       root.style.setProperty("--spectacle-run-kadr-strip-chip-height", `${height}px`);
     };
 
-    apply();
+    let roRaf: number | null = null;
+    const scheduleApply = () => {
+      if (roRaf != null) return;
+      roRaf = requestAnimationFrame(() => {
+        roRaf = null;
+        apply();
+      });
+    };
 
-    const observer = new ResizeObserver(() => apply());
+    scheduleApply();
+
+    const observer = new ResizeObserver(scheduleApply);
     observer.observe(root);
 
     const chips = root.querySelectorAll<HTMLElement>(CHIP_SELECTOR);
     chips.forEach((chip) => observer.observe(chip));
 
-    return () => observer.disconnect();
+    return () => {
+      if (roRaf != null) cancelAnimationFrame(roRaf);
+      observer.disconnect();
+    };
   }, [enabled, remeasureKey, stripRef]);
 }

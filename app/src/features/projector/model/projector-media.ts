@@ -53,6 +53,21 @@ function resolveProjectorMediaAsset(
 ): ProjectorMediaAsset {
   const enriched = enrichProjectorMediaRemoteKey(item);
   const storageKey = resolveProjectorStorageKey(enriched);
+  const offline = resolveOfflineMediaUrl({
+    projectSlug: ctx.projectSlug,
+    kind,
+    fileName: enriched.file,
+    filePath: enriched.filePath,
+    remoteUrl: enriched.remoteUrl,
+  });
+  const resolvedOffline = offline.trim();
+  const localSrc =
+    resolvedOffline && !isDirectObjectStorageUrl(resolvedOffline) ? resolvedOffline : null;
+
+  // Локальная копия на диске (filePath) — без повторной загрузки с сервера.
+  if (String(enriched.filePath ?? "").trim() && localSrc) {
+    return { storageKey: null, fallbackSrc: localSrc };
+  }
 
   const remote = String(enriched.remoteUrl ?? "").trim();
   if (/^https?:\/\//i.test(remote) && !isDirectObjectStorageUrl(remote)) {
@@ -61,17 +76,7 @@ function resolveProjectorMediaAsset(
     }
   }
 
-  const offline = resolveOfflineMediaUrl({
-    projectSlug: ctx.projectSlug,
-    kind,
-    fileName: enriched.file,
-    filePath: enriched.filePath,
-    remoteUrl: enriched.remoteUrl,
-  });
-  const resolved = offline.trim();
-  const fallbackSrc =
-    resolved && !isDirectObjectStorageUrl(resolved) ? resolved : null;
-  return { storageKey, fallbackSrc };
+  return { storageKey, fallbackSrc: localSrc };
 }
 
 export function resolveProjectorHoldAsset(

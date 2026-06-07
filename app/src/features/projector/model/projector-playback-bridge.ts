@@ -136,6 +136,64 @@ export function pingProjectorOutput(timeoutMs = 200): Promise<boolean> {
   });
 }
 
+const PROJECTOR_OUTPUT_ROUTE = "/projector-output";
+
+function usesHashProjectorRouting(): boolean {
+  if (typeof window === "undefined") return false;
+  return import.meta.env.MODE === "desktop" || window.location.protocol === "file:";
+}
+
+/** Текущее окно — вывод проектора (учитывает HashRouter в desktop/Electron). */
+export function isProjectorOutputWindow(): boolean {
+  if (typeof window === "undefined") return false;
+
+  if (usesHashProjectorRouting()) {
+    const hash = window.location.hash.replace(/^#/, "");
+    const normalized = hash.startsWith("/") ? hash : `/${hash}`;
+    return normalized.replace(/\/$/, "") === PROJECTOR_OUTPUT_ROUTE;
+  }
+
+  const pathname = window.location.pathname.replace(/\/$/, "");
+  const base = String(import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  const suffix = base ? `${base}${PROJECTOR_OUTPUT_ROUTE}` : PROJECTOR_OUTPUT_ROUTE;
+  return pathname === suffix || pathname.endsWith(PROJECTOR_OUTPUT_ROUTE);
+}
+
+function buildProjectorOutputUrl(): string {
+  if (typeof window === "undefined") return PROJECTOR_OUTPUT_ROUTE;
+
+  if (usesHashProjectorRouting()) {
+    const baseHref = window.location.href.split("#")[0];
+    return `${baseHref}#${PROJECTOR_OUTPUT_ROUTE}`;
+  }
+
+  const base = String(import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  const path = base ? `${base}${PROJECTOR_OUTPUT_ROUTE}` : PROJECTOR_OUTPUT_ROUTE;
+  return new URL(path, window.location.origin).toString();
+}
+
+export function waitForProjectorOutputReady(timeoutMs = 8000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const ch = getChannel();
+    let settled = false;
+    const finish = (alive: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      ch.removeEventListener("message", onMessage);
+      markProjectorOutputReachable(alive);
+      resolve(alive);
+    };
+    const onMessage = (ev: MessageEvent) => {
+      const msg = ev.data as ProjectorMessage;
+      if (msg?.type === "ready" || msg?.type === "pong") finish(true);
+    };
+    ch.addEventListener("message", onMessage);
+    ch.postMessage({ type: "ping" });
+    const timer = window.setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
 export async function ensureProjectorOutputOpen(
   options?: OpenProjectorWindowOptions,
 ): Promise<boolean> {
@@ -152,12 +210,8 @@ export async function ensureProjectorOutputOpen(
   }
 
   const win = openProjectorWindow({ focus: shouldFocus });
-  return win != null;
-}
-
-function projectorOutputPath(): string {
-  const base = String(import.meta.env.BASE_URL || "/").replace(/\/$/, "");
-  return `${base}/projector-output`;
+  if (!win) return false;
+  return waitForProjectorOutputReady();
 }
 
 export function openProjectorWindow(options?: OpenProjectorWindowOptions): Window | null {
@@ -169,7 +223,7 @@ export function openProjectorWindow(options?: OpenProjectorWindowOptions): Windo
     return projectorWindow;
   }
 
-  const url = new URL(projectorOutputPath(), window.location.origin).toString();
+  const url = buildProjectorOutputUrl();
   projectorWindow = window.open(
     url,
     "orchestra-projector",

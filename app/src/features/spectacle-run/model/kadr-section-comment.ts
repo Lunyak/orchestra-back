@@ -1,6 +1,6 @@
 import type { MarkdownKadrSection } from "../../theater/model/light-kadrs";
 
-const COMMENT_LINE_RE = /^-\s*\*\*Комментарий\*\*:\s*(.*)$/im;
+const COMMENT_LINE_RE = /^-\s*\*\*Комментарий\*\*:\s*([^\n]*)/im;
 const KADR_FIELD_LINE_RE = /^-\s*\*\*/;
 
 function stripKadrFieldMarkdown(text: string): string {

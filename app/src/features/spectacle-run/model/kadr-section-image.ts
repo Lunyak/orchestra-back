@@ -4,7 +4,7 @@ import {
 } from "../../theater/model/light-kadrs";
 import { findFirstMarkdownImageHref } from "../../../shared/utils/markdownImages";
 
-const TRANSITION_LINE_RE = /^-\s*\*\*Переход\*\*:\s*(.*)$/im;
+const TRANSITION_LINE_RE = /^-\s*\*\*Переход\*\*:\s*([^\n]*)/im;
 const STANDALONE_IMAGE_LINE_RE = /^\s*!\[[^\]]*\]\s*\([^)]+\)\s*$/;
 const IMAGE_MARKDOWN_RE = /!\[[^\]]*\]\s*\([^)]+\)/g;
 

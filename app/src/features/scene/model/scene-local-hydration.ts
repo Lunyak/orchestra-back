@@ -4,7 +4,11 @@ import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
 import type { AppDispatch } from "../../../shared/store/store";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
-import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
+import {
+  commitTheaterLayoutBaseline,
+  isTheaterLayoutDraftDirty,
+  resolveInitialTheaterLayout,
+} from "../../theater/model/theater-layout-draft-storage";
 import { unpackProjectorMedia } from "../../projector/model/scene-projector-persist";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
 import { showScriptMarkdownActions } from "../../show-script-markdown/model/show-script-markdown-slice";
@@ -75,6 +79,9 @@ export async function hydrateSceneFromLocalPack(
         },
       }),
     );
+    if (!isTheaterLayoutDraftDirty(projectSlug)) {
+      commitTheaterLayoutBaseline(projectSlug, theaterLayout);
+    }
     dispatch(
       showScriptMarkdownActions.setLightChannels({
         projectSlug,

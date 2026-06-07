@@ -1,7 +1,7 @@
 import type { MarkdownKadrSection } from "../../theater/model/light-kadrs";
 import { stripImageMarkdownFromTransitionLineValue } from "./kadr-section-image";
 
-const TRANSITION_LINE_RE = /^-\s*\*\*Переход\*\*:\s*(.*)$/im;
+const TRANSITION_LINE_RE = /^-\s*\*\*Переход\*\*:\s*([^\n]*)/im;
 
 function stripKadrFieldMarkdown(text: string): string {
   return String(text ?? "")

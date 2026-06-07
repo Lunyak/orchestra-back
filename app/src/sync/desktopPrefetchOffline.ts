@@ -83,7 +83,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
   ) => Promise<any>;
 
   const downloadOne = async (opts: {
-    kind: "playlist" | "sound" | "sound-icon" | "image" | "model" | "decor-texture";
+    kind: "playlist" | "sound" | "sound-icon" | "image" | "model" | "decor-texture" | "video";
     fileName: string;
     url: string;
   }) => {
@@ -221,20 +221,24 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       (args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined);
 
     const baseBag = unpackProjectorMedia((base as any)?.projectorMedia);
-    const videos =
+    const videosRaw =
       Array.isArray((args.minimalSceneData as any)?.videos) &&
       (args.minimalSceneData as any).videos.length > 0
         ? (args.minimalSceneData as any).videos
         : Array.isArray((base as any)?.videos)
           ? (base as any).videos
           : baseBag.videos;
-    const holdImages =
+    const videos = Array.isArray(videosRaw) ? videosRaw.map((v: any) => ({ ...v })) : [];
+    const holdImagesRaw =
       Array.isArray((args.minimalSceneData as any)?.holdImages) &&
       (args.minimalSceneData as any).holdImages.length > 0
         ? (args.minimalSceneData as any).holdImages
         : Array.isArray((base as any)?.holdImages)
           ? (base as any).holdImages
           : baseBag.holdImages;
+    const holdImages = Array.isArray(holdImagesRaw)
+      ? holdImagesRaw.map((h: any) => ({ ...h }))
+      : [];
     const projector =
       (args.minimalSceneData as any)?.projector ??
       (base as any)?.projector ??
@@ -245,18 +249,45 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       projector,
     });
 
-    for (const hold of normalizeHoldImages(holdImages, projector)) {
-      const key = String(hold.remoteKey ?? "").trim();
-      if (!key) continue;
-      try {
-        const { url } = await getPlayUrl(args.accessToken, key);
-        const u = String(url ?? "").trim();
-        if (!u) continue;
-        const fileName = String(hold.file ?? storageKeyToImageBasename(key)).trim();
-        if (!fileName) continue;
-        await downloadOne({ kind: "image", fileName, url: u });
-      } catch {
-        /* offline / expired token */
+    for (let i = 0; i < holdImages.length; i += 1) {
+      const hold = holdImages[i];
+      const key = String(hold?.remoteKey ?? "").trim();
+      let url = String(hold?.remoteUrl ?? "").trim();
+      if (key && !isHttpUrl(url)) {
+        try {
+          const play = await getPlayUrl(args.accessToken, key);
+          url = String(play.url ?? "").trim();
+        } catch {
+          /* offline / expired token */
+        }
+      }
+      const fileName = String(
+        hold?.file ?? (key ? storageKeyToImageBasename(key) : ""),
+      ).trim();
+      if (!fileName || !isHttpUrl(url)) continue;
+      const res = await downloadOne({ kind: "image", fileName, url });
+      if (res.ok && res.absolutePath) {
+        holdImages[i] = { ...hold, filePath: res.absolutePath };
+      }
+    }
+
+    for (let i = 0; i < videos.length; i += 1) {
+      const video = videos[i];
+      const key = String(video?.remoteKey ?? "").trim();
+      let url = String(video?.remoteUrl ?? "").trim();
+      if (key && !isHttpUrl(url)) {
+        try {
+          const play = await getPlayUrl(args.accessToken, key);
+          url = String(play.url ?? "").trim();
+        } catch {
+          /* offline / expired token */
+        }
+      }
+      const fileName = String(video?.file ?? "").trim();
+      if (!fileName || !isHttpUrl(url)) continue;
+      const res = await downloadOne({ kind: "video", fileName, url });
+      if (res.ok && res.absolutePath) {
+        videos[i] = { ...video, filePath: res.absolutePath };
       }
     }
 

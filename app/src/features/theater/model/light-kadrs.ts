@@ -37,7 +37,7 @@ export function extractLightKadrIdFromAnchorLine(line: string): string | null {
   return m?.[1] ?? null;
 }
 export const LIGHT_KADR_HEADING_RE = /^###\s*Картина\s+(\d+)\b/im;
-export const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*(.*)$/im;
+export const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*([^\n]*)/im;
 export const LIGHT_LINE_PREFIX = "- **Свет**:";
 
 export function createLightKadrId(): string {

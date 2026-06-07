@@ -47,6 +47,11 @@ export function isOfflineNativePlatform(): boolean {
   return Capacitor.isNativePlatform() || Boolean(getDesktopApi()?.invoke);
 }
 
+export function isLocalProjectMediaUrl(url: string | null | undefined): boolean {
+  const value = String(url ?? "").trim();
+  return /^project-(video|audio|images|sounds|sound-icons|models):/i.test(value);
+}
+
 function mediaSchemeForKind(kind: "playlist" | "sound" | "video" | "image"): string {
   if (kind === "playlist") return "project-audio";
   if (kind === "video") return "project-video";

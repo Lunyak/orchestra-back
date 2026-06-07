@@ -117,6 +117,20 @@ export function buildFaderLevelsFromOptions(
   return levels;
 }
 
+/** Поддерживает список фейдеров при смене каналов K: не включает новые F автоматически. */
+export function syncDraftFaderOptions(
+  draft: Pick<CreateKadrDraft, "includedFaderKeys" | "faderLevels">,
+  options: CreateKadrFaderOption[],
+): Pick<CreateKadrDraft, "includedFaderKeys" | "faderLevels"> {
+  const validKeys = new Set(options.map((item) => item.key));
+  const includedFaderKeys = draft.includedFaderKeys.filter((key) => validKeys.has(key));
+  const prunedLevels = Object.fromEntries(
+    Object.entries(draft.faderLevels).filter(([key]) => validKeys.has(key)),
+  ) as Record<string, number>;
+  const faderLevels = buildFaderLevelsFromOptions(options, prunedLevels);
+  return { includedFaderKeys, faderLevels };
+}
+
 function applyDraftFaderStates(
   kadr: StepLightKadrV1,
   draft: CreateKadrDraft,
@@ -237,7 +251,7 @@ export function buildInitialCreateKadrDraft(args: {
     blackout: false,
     programId: programs.activeProgramId ?? 1,
     recordChannels,
-    includedFaderKeys: faderOptions.map((item) => item.key),
+    includedFaderKeys: [],
     faderLevels: buildFaderLevelsFromOptions(faderOptions),
     imageMarkdown: "",
     blackoutDurationSec: null,
@@ -377,16 +391,6 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
     markdown = upsertProjectorLineInSection(markdown, section, projectorLine);
   }
 
-  const runLabels = buildKadrRunLabelsFromDraft({
-    blackoutDurationSec: draft.blackoutDurationSec,
-    smokeDurationSec: draft.smokeDurationSec,
-  });
-  if (runLabels.length > 0 || args.clearEmptyMedia) {
-    section = findSectionByKadrId(markdown, kadrId);
-    if (!section) return null;
-    markdown = upsertKadrLabelsInSection(markdown, section, runLabels);
-  }
-
   if (draft.transitionText.trim() || args.clearEmptyMedia) {
     section = findSectionByKadrId(markdown, kadrId);
     if (!section) return null;
@@ -405,6 +409,16 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
     markdown = insertKadrSectionImageAfterTransition(markdown, section, draft.imageMarkdown);
   } else if (args.clearEmptyMedia) {
     markdown = stripKadrSectionStandaloneImages(markdown, section);
+  }
+
+  const runLabels = buildKadrRunLabelsFromDraft({
+    blackoutDurationSec: draft.blackoutDurationSec,
+    smokeDurationSec: draft.smokeDurationSec,
+  });
+  if (runLabels.length > 0 || args.clearEmptyMedia) {
+    section = findSectionByKadrId(markdown, kadrId);
+    if (!section) return null;
+    markdown = upsertKadrLabelsInSection(markdown, section, runLabels);
   }
 
   kadrs = upsertKadrInStep({

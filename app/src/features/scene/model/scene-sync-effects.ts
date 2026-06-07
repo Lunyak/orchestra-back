@@ -13,8 +13,17 @@ import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
+<<<<<<< Updated upstream
 import { resolveInitialTheaterLayout } from "../../theater/model/theater-layout-draft-storage";
 import { prepareSceneLightBindings } from "../../theater/model/theater-light-fader-bindings";
+=======
+import {
+  commitTheaterLayoutBaseline,
+  isTheaterLayoutDraftDirty,
+  resolveInitialTheaterLayout,
+} from "../../theater/model/theater-layout-draft-storage";
+import { applySceneFaderBindingsToSpotlights } from "../../theater/model/theater-light-fader-bindings";
+>>>>>>> Stashed changes
 import { sceneActions, DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 import { loadSceneRolesFromStorage, saveSceneRolesToStorage } from "./scene-roles-storage";
 import { normalizeLightChannelsLoose } from "./scene-normalize";
@@ -102,6 +111,7 @@ export function useSceneSyncEffects() {
           (localSceneData as any)?.steps ?? [],
           (localSceneData as any)?.lightFaders,
         );
+<<<<<<< Updated upstream
         const sceneDataForHydrate =
           localSceneData && prepared.lightFaders
             ? { ...(localSceneData as any), lightFaders: prepared.lightFaders }
@@ -111,6 +121,20 @@ export function useSceneSyncEffects() {
             sceneData: sceneDataForHydrate,
             theaterLayout,
             steps: prepared.steps,
+=======
+        const theaterLayout = resolveInitialTheaterLayout(
+          projectName,
+          (mergedScene as any)?.theaterLayout
+            ? normalizePersistedTheaterLayout((mergedScene as any).theaterLayout)
+            : undefined,
+          DEFAULT_THEATER_LAYOUT,
+        );
+        dispatch(
+          sceneActions.hydrateScene({
+            sceneData: localSceneData,
+            theaterLayout,
+            steps: localSteps,
+>>>>>>> Stashed changes
             currentPage: 0,
             isSceneReady: true,
             serverShadow: {
@@ -121,7 +145,13 @@ export function useSceneSyncEffects() {
             },
           }),
         );
+<<<<<<< Updated upstream
         desktopLocalSceneLoadedRef.current = Array.isArray(prepared.steps) && prepared.steps.length > 0;
+=======
+        if (!isTheaterLayoutDraftDirty(projectName)) {
+          commitTheaterLayoutBaseline(projectName, theaterLayout);
+        }
+>>>>>>> Stashed changes
         selectedStepIdRef.current = null;
         restoredProjectRef.current = null;
       } catch (error) {

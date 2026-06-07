@@ -9,7 +9,7 @@ export type KadrRunLabel = {
 
 export const KADR_LABELS_LINE_PREFIX = "- **Метки**:";
 
-const LABELS_KADR_LINE_RE = /^-\s*\*\*Метки\*\*:\s*(.*)$/im;
+const LABELS_KADR_LINE_RE = /^-\s*\*\*Метки\*\*:\s*([^\n]*)/im;
 const TOKEN_BLACKOUT_SEC_RE = /\{\{\s*blackout-sec\s*:\s*(\d+)\s*}}/gi;
 const TOKEN_SMOKE_SEC_RE = /\{\{\s*smoke-sec\s*:\s*(\d+)\s*}}/gi;
 

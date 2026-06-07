@@ -14,6 +14,11 @@ export const THEATER_LAYOUT_EXTRA_KEYS = [
   "stageOutlineOpenEdges",
   "zones",
   "zoneGrid",
+  "stageFloorMaterial",
+  "hallFloorMaterial",
+  "backWallMaterial",
+  "sideWallsMaterial",
+  "portalMaterial",
 ] as const satisfies readonly (keyof TheaterLayout)[];
 
 export type TheaterLayoutExtraKey = (typeof THEATER_LAYOUT_EXTRA_KEYS)[number];

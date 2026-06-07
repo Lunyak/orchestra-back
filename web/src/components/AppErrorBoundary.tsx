@@ -4,6 +4,19 @@ interface AppErrorBoundaryState {
   error: Error | null;
 }
 
+/** Браузерный шум от ResizeObserver; не ломает UI, но Chrome шлёт его как window error. */
+function isBenignResizeObserverError(error: unknown, message?: string): boolean {
+  const text = [
+    error instanceof Error ? error.message : "",
+    error instanceof Error ? error.name : "",
+    typeof message === "string" ? message : "",
+    typeof error === "string" ? error : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return /resizeobserver loop/.test(text);
+}
+
 export class AppErrorBoundary extends React.Component<
   React.PropsWithChildren,
   AppErrorBoundaryState
@@ -23,6 +36,9 @@ export class AppErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
+    if (isBenignResizeObserverError(error)) {
+      return { error: null };
+    }
     return { error };
   }
 
@@ -32,6 +48,10 @@ export class AppErrorBoundary extends React.Component<
   }
 
   private handleGlobalError = (event: ErrorEvent) => {
+    if (isBenignResizeObserverError(event.error, event.message)) {
+      event.preventDefault();
+      return;
+    }
     const nextError =
       event.error instanceof Error
         ? event.error
@@ -42,6 +62,10 @@ export class AppErrorBoundary extends React.Component<
 
   private handleUnhandledRejection = (event: PromiseRejectionEvent) => {
     const reason = event.reason;
+    if (isBenignResizeObserverError(reason)) {
+      event.preventDefault();
+      return;
+    }
     const nextError =
       reason instanceof Error
         ? reason

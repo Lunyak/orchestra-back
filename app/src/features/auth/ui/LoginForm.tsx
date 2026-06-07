@@ -1,4 +1,5 @@
 import "./login.css";
+import { isAxiosError } from "axios";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import React, { useState } from "react";
@@ -24,8 +25,20 @@ export function LoginForm({
   const [resetLoading, setResetLoading] = useState(false);
 
   const apiBase = getApiBaseUrl();
-  const isLocal =
-    apiBase.includes("localhost") || apiBase.includes("127.0.0.1");
+  const isDesktop = import.meta.env.MODE === "desktop";
+
+  const formatAuthError = (err: unknown): string => {
+    if (isAxiosError(err) && !err.response) {
+      return `Сервер недоступен (${apiBase}). Проверьте интернет и адрес API.`;
+    }
+    const msg =
+      err &&
+      typeof err === "object" &&
+      "response" in err &&
+      (err as { response?: { data?: { message?: string } } }).response?.data
+        ?.message;
+    return typeof msg === "string" ? msg : "Ошибка входа";
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,13 +63,7 @@ export function LoginForm({
         await doLogin(emailNorm, password, onAfterLogin);
       }
     } catch (err: unknown) {
-      const msg =
-        err &&
-        typeof err === "object" &&
-        "response" in err &&
-        (err as { response?: { data?: { message?: string } } }).response?.data
-          ?.message;
-      setError(typeof msg === "string" ? msg : "Ошибка");
+      setError(formatAuthError(err));
     }
   };
 
@@ -76,6 +83,12 @@ export function LoginForm({
         <p className="login-form-subtitle">
           Войди в аккаунт, чтобы работать с проектами и сценарием на этом
           устройстве.
+          {isDesktop ? (
+            <>
+              {" "}
+              API: <code>{apiBase}</code>
+            </>
+          ) : null}
         </p>
 
         <label className="login-form__label">
@@ -116,13 +129,7 @@ export function LoginForm({
                       "Если такой email зарегистрирован, на почту ушло письмо со ссылкой. Проверьте папку «Спам».",
                     );
                   } catch (err: unknown) {
-                    const msg =
-                      err &&
-                      typeof err === "object" &&
-                      "response" in err &&
-                      (err as { response?: { data?: { message?: string } } })
-                        .response?.data?.message;
-                    setError(typeof msg === "string" ? msg : "Ошибка");
+                    setError(formatAuthError(err));
                   } finally {
                     setResetLoading(false);
                   }

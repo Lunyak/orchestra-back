@@ -1,14 +1,14 @@
 import type { MarkdownKadrSection } from "./light-kadrs";
 
-const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*(.*)$/im;
-const SOUND_KADR_LINE_RE = /^-\s*\*\*Звук\*\*:\s*(.*)$/im;
+const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*([^\n]*)/im;
+const SOUND_KADR_LINE_RE = /^-\s*\*\*Звук\*\*:\s*([^\n]*)/im;
 
 export const VIDEO_LINE_PREFIX = "- **Видео**:";
 
 /** @deprecated Старые кадры; новые записываем как «Видео». */
 export const PROJECTOR_LINE_PREFIX = "- **Проектор**:";
 
-export const VIDEO_KADR_LINE_RE = /^-\s*\*\*(?:Видео|Проектор)\*\*:\s*(.*)$/im;
+export const VIDEO_KADR_LINE_RE = /^-\s*\*\*(?:Видео|Проектор)\*\*:\s*([^\n]*)/im;
 
 export type KadrProjectorCue =
   | { mode: "hold"; holdId?: number }

@@ -99,6 +99,10 @@ export function ProjectorOutputPage() {
       setHoldLoading(true);
 
       try {
+        if (!storageKey && fallbackSrc) {
+          setHoldSrc(fallbackSrc);
+          return;
+        }
         if (storageKey) {
           const blobUrl = await fetchProjectorImageBlobUrl(storageKey);
           if (loadHoldSeqRef.current !== seq) return;
@@ -134,6 +138,10 @@ export function ProjectorOutputPage() {
       setVideoLoading(true);
 
       try {
+        if (!storageKey && fallbackSrc) {
+          setVideoSrc(fallbackSrc);
+          return;
+        }
         if (storageKey) {
           const blobUrl = await fetchProjectorVideoBlobUrl(storageKey);
           if (loadVideoSeqRef.current !== seq) return;

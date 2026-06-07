@@ -629,9 +629,13 @@ export function applySceneFaderBindingsToSpotlights(
   const bindingBySpotlightId = new Map<number, { faderId: number; channel: number }>();
   for (const fader of lightFaders.faders) {
     const assign = (spotlightId: number) => {
+      if (!Number.isFinite(spotlightId)) return;
       const channel = readFaderChannelForSpotlight(fader, spotlightId);
       if (channel == null) return;
-      bindingBySpotlightId.set(Math.trunc(spotlightId), { faderId: fader.id, channel });
+      bindingBySpotlightId.set(Math.trunc(spotlightId), {
+        faderId: fader.id,
+        channel: Math.trunc(channel),
+      });
     };
     if (typeof fader.spotlightId === "number" && Number.isFinite(fader.spotlightId)) {
       assign(fader.spotlightId);
@@ -655,7 +659,9 @@ export function applySceneFaderBindingsToSpotlights(
       if (hasSpotlightFaderId(spotlight)) {
         return spotlight;
       }
-      const binding = bindingBySpotlightId.get(spotlight.id);
+      const spotlightId = spotlight.id;
+      if (!Number.isFinite(spotlightId)) return spotlight;
+      const binding = bindingBySpotlightId.get(Math.trunc(spotlightId));
       if (
         binding == null ||
         spotChannel == null ||

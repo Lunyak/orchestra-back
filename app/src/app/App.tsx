@@ -16,6 +16,7 @@ import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
 import { Route, Routes } from "react-router-dom";
 import { ChatDock } from "../features/chat";
+import { isProjectorOutputWindow } from "../features/projector/model/projector-playback-bridge";
 
 bootstrapTheme();
 applyScriptPlayFontSizePx();
@@ -46,9 +47,7 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
     );
   }
 
-  const isProjectorOutput =
-    typeof window !== "undefined" &&
-    window.location.pathname.replace(/\/$/, "").endsWith("/projector-output");
+  const isProjectorOutput = isProjectorOutputWindow();
 
   return (
     <ProjectProvider>

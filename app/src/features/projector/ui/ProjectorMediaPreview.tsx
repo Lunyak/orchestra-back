@@ -30,6 +30,9 @@ export async function resolveProjectorPreviewSrc(
   if (mode === "hold") {
     const asset = resolveProjectorHoldAsset(ctx, holdId);
     if (!asset) return { src: null, blob: false };
+    if (!asset.storageKey && asset.fallbackSrc) {
+      return { src: asset.fallbackSrc, blob: false };
+    }
     if (asset.storageKey) {
       const blobUrl = await fetchProjectorImageBlobUrl(asset.storageKey);
       if (blobUrl) return { src: blobUrl, blob: true };
@@ -40,6 +43,9 @@ export async function resolveProjectorPreviewSrc(
   if (videoId == null || videoId <= 0) return { src: null, blob: false };
   const asset = resolveProjectorVideoAsset(ctx, videoId);
   if (!asset) return { src: null, blob: false };
+  if (!asset.storageKey && asset.fallbackSrc) {
+    return { src: asset.fallbackSrc, blob: false };
+  }
   if (asset.storageKey) {
     const blobUrl = await fetchProjectorVideoBlobUrl(asset.storageKey);
     if (blobUrl) return { src: blobUrl, blob: true };

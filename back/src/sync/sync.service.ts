@@ -1063,6 +1063,11 @@ export class SyncService {
       'stageOutlineOpenEdges',
       'zones',
       'zoneGrid',
+      'stageFloorMaterial',
+      'hallFloorMaterial',
+      'backWallMaterial',
+      'sideWallsMaterial',
+      'portalMaterial',
     ];
     const extras: Record<string, unknown> = {};
     for (const key of keys) {
