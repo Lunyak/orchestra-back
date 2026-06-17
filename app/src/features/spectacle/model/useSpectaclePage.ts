@@ -100,12 +100,14 @@ export function useSpectaclePage() {
       ? "theater"
       : location.pathname === "/light-plot"
         ? "light-plot"
-        : location.pathname === "/board"
-          ? "board"
-          : location.pathname === "/sessions" ||
-              location.pathname.startsWith("/sessions/")
-            ? "sessions"
-            : "script";
+        : location.pathname === "/notes-run"
+          ? "notes-run"
+          : location.pathname === "/board"
+            ? "board"
+            : location.pathname === "/sessions" ||
+                location.pathname.startsWith("/sessions/")
+              ? "sessions"
+              : "script";
   const isTheaterView = activeView === "theater";
 
   const [theaterOutlinerHost, setTheaterOutlinerHost] =
@@ -154,6 +156,7 @@ export function useSpectaclePage() {
   const shouldShowStepsSidebar =
     activeView === "script" ||
     activeView === "light-plot" ||
+    activeView === "notes-run" ||
     activeView === "theater";
   const compactMainChrome = activeView === "board" || activeView === "sessions";
 

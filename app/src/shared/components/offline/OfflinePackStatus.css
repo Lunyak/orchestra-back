@@ -47,6 +47,11 @@
   cursor: not-allowed;
 }
 
+.offline-pack-status__btn--secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border-subtle);
+}
+
 .offline-pack-status__hint {
   width: 100%;
   font-size: 12px;

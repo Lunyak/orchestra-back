@@ -78,6 +78,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const tape = useMemo(() => buildSpectacleKadrTape(steps), [steps]);
   const [tapeIndex, setTapeIndex] = useState(0);
   const [kadrModalOpen, setKadrModalOpen] = useState(false);
+  const kadrModalOpenRef = useRef(false);
   const [kadrModalMode, setKadrModalMode] = useState<KadrModalMode>("create");
   const textHidden = useAppSelector((state) => state.scriptUi.spectacleRunTextHidden);
   const lightPlotMode = useAppSelector((state) => state.scriptUi.lightPlotMode);
@@ -144,6 +145,17 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   tapeIndexRef.current = clampedIndex;
 
+  useEffect(() => {
+    kadrModalOpenRef.current = kadrModalOpen;
+  }, [kadrModalOpen]);
+
+  const cancelPendingLiveSave = useCallback(() => {
+    if (liveSaveTimerRef.current != null) {
+      window.clearTimeout(liveSaveTimerRef.current);
+      liveSaveTimerRef.current = null;
+    }
+  }, []);
+
   const liveConsole = useLightConsoleState({
     projectName,
     spotlights: currentStep?.theaterSpotlights ?? [],
@@ -158,6 +170,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         programs: typeof liveConsole.programs;
       },
     ) => {
+      if (kadrModalOpenRef.current) return;
+
       const item = tapeRef.current[index];
       const step = item ? stepsRef.current[item.stepIndex] : null;
       if (!item || !step || item.isPlaceholder) return;
@@ -227,6 +241,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   const scheduleLiveSave = useCallback(() => {
     if (applyingTapeRef.current) return;
+    if (kadrModalOpenRef.current) return;
     const item = tapeRef.current[tapeIndexRef.current];
     if (!item || item.isPlaceholder) return;
     const step = stepsRef.current[item.stepIndex];
@@ -732,11 +747,13 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     }
 
     setKadrModalMode("create");
+    cancelPendingLiveSave();
     setKadrModalOpen(true);
   }, [
     currentStep,
     currentStepTheaterEmpty,
     previousStep,
+    cancelPendingLiveSave,
     saveStepsForLightPlot,
     updateStep,
   ]);
@@ -744,9 +761,10 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const editCurrentKadr = useCallback(() => {
     const item = tape[clampedIndex];
     if (!item || item.isPlaceholder || !currentStep) return;
+    cancelPendingLiveSave();
     setKadrModalMode("edit");
     setKadrModalOpen(true);
-  }, [clampedIndex, currentStep, tape]);
+  }, [cancelPendingLiveSave, clampedIndex, currentStep, tape]);
 
   const closeKadrModal = useCallback(() => {
     setKadrModalOpen(false);
@@ -754,6 +772,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   const submitKadrModal = useCallback(
     (draft: CreateKadrDraft) => {
+      cancelPendingLiveSave();
+
       const item = tape[clampedIndex];
       if (!item) return;
       const step = steps[item.stepIndex];
@@ -802,12 +822,28 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         markdown: result.nextMarkdown,
         lightKadrs: result.nextKadrs,
       } as Partial<ScriptStep>);
+
+      const savedKadr = findKadrById(result.nextKadrs, result.kadrId);
+      if (savedKadr && !savedKadr.blackout && savedKadr.programId > 0) {
+        applyingTapeRef.current = true;
+        try {
+          liveConsole.persistFaders(applyKadrToFaders(savedKadr, liveConsole.faders));
+          liveConsole.persistPrograms({
+            ...liveConsole.programs,
+            activeProgramId: savedKadr.programId,
+          });
+        } finally {
+          applyingTapeRef.current = false;
+        }
+      }
+
       setKadrModalOpen(false);
       setLiveStatus(result.summary);
       void saveStepsForLightPlot({ force: true });
     },
     [
       clampedIndex,
+      cancelPendingLiveSave,
       holdImages,
       kadrModalMode,
       lightChannels,

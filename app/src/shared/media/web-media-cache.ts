@@ -193,3 +193,63 @@ export async function resolveWebPlaylistPlaybackUrl(
 
   return String(track.file ?? "").trim() || "";
 }
+
+export type PlaylistOfflineDownloadResult = {
+  downloaded: number;
+  skipped: number;
+  failed: number;
+  message: string;
+  errors: string[];
+};
+
+export async function downloadPlaylistTracksOffline(
+  projectSlug: string,
+  tracks: PlaylistTrack[],
+  accessToken: string | null,
+  opts?: {
+    onProgress?: (current: number, total: number, label: string) => void;
+  },
+): Promise<PlaylistOfflineDownloadResult> {
+  const errors: string[] = [];
+  let downloaded = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  if (!isWebMediaCacheEnabled()) {
+    return {
+      downloaded: 0,
+      skipped: 0,
+      failed: tracks.length,
+      message: "Кэш недоступен в этом режиме",
+      errors: ["web cache disabled"],
+    };
+  }
+
+  const list = Array.isArray(tracks) ? tracks : [];
+  for (let i = 0; i < list.length; i += 1) {
+    const track = list[i];
+    const label = String(track.title ?? track.file ?? `Трек ${track.id}`).trim();
+    opts?.onProgress?.(i + 1, list.length, label);
+    const cacheKey = buildPlaylistCacheKey(projectSlug, track);
+    if (await isWebMediaCached(cacheKey)) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      await fetchAndCachePlaylistTrack(projectSlug, track, accessToken);
+      downloaded += 1;
+    } catch (err) {
+      failed += 1;
+      errors.push(`${label}: ${String((err as Error)?.message ?? err)}`);
+    }
+  }
+
+  const message =
+    list.length === 0
+      ? "Плейлист пуст"
+      : failed > 0
+        ? `Музыка: скачано ${downloaded}, было ${skipped}, ошибок ${failed}`
+        : `Музыка готова офлайн: ${downloaded} новых, ${skipped} уже были`;
+
+  return { downloaded, skipped, failed, message, errors };
+}

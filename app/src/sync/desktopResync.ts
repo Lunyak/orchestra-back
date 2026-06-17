@@ -1,11 +1,14 @@
 import { syncPull, syncPullScene } from "./api/entity-sync";
-import { mapTheaterSpotlightFromApi } from "../features/theater/model/theater-light-fader-bindings";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "./desktopOutbox";
+import {
+  normalizeLightChannelsFromServer,
+  normalizeScriptStepsFromSyncApi,
+  normalizeTheaterLayoutFromServer,
+} from "../features/scene/model/scene-normalize";
 
 // rawJson больше не приходит с сервера; resync делаем только по шагам.
 const HEAVY_KEYS = ["steps"] as const;
-type HeavyKey = (typeof HEAVY_KEYS)[number];
 
 function stableStringify(value: any): string {
   if (value === null) return "null";
@@ -53,10 +56,28 @@ function mergeSoundsPreservingLocalFilePath(localSounds: any, serverSounds: any)
   });
 }
 
-function normalizeRequisiteAssignees(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
-    : [];
+function buildServerSceneRawFromPull(args: {
+  steps?: unknown;
+  theaterLayout?: unknown;
+  lightChannels?: unknown;
+  scene?: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  const scene = args.scene ?? null;
+  const normalizedLayout = normalizeTheaterLayoutFromServer(args.theaterLayout);
+  const normalizedLightChannels = Array.isArray(args.lightChannels)
+    ? normalizeLightChannelsFromServer(args.lightChannels)
+    : undefined;
+
+  return {
+    steps: normalizeScriptStepsFromSyncApi(args.steps),
+    ...(normalizedLayout ? { theaterLayout: normalizedLayout } : {}),
+    ...(normalizedLightChannels ? { lightChannels: normalizedLightChannels } : {}),
+    ...(scene?.lightFaders ? { lightFaders: scene.lightFaders } : {}),
+    ...(scene?.lightPrograms ? { lightPrograms: scene.lightPrograms } : {}),
+    ...(scene?.lightChannelRoles ? { lightChannelRoles: scene.lightChannelRoles } : {}),
+    ...(scene?.projectorMedia ? { projectorMedia: scene.projectorMedia } : {}),
+    ...(scene?.sceneRoles ? { sceneRoles: scene.sceneRoles } : {}),
+  };
 }
 
 export async function resyncDesktopProject(
@@ -79,8 +100,6 @@ export async function resyncDesktopProject(
       ? await (api as any).listProjectScenes(projectSlug)
       : [];
 
-  // Optimized: pull scenes one-by-one (no full project snapshot).
-  // Fallback to legacy syncPull if endpoint is unavailable.
   let updatedScenes = 0;
   let totalScenes = 0;
 
@@ -91,71 +110,29 @@ export async function resyncDesktopProject(
   try {
     for (const sceneName of sceneNamesToSync) {
       totalScenes += 1;
-      const { scene, steps } = await syncPullScene(accessToken, projectSlug, sceneName, {
+      const pull = await syncPullScene(accessToken, projectSlug, sceneName, {
         steps: true,
+        theaterLayout: true,
+        lightChannels: true,
       });
-      const serverRaw = {
-        steps: Array.isArray(steps)
-          ? steps
-              .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
-              .map((st: any) => ({
-                id: Number(st?.sourceId ?? 0),
-                title: String(st?.title ?? ""),
-                markdown: String(st?.markdown ?? ""),
-                playMarkdown: st?.playMarkdown ?? undefined,
-                explicationMarkdown: st?.explicationMarkdown ?? undefined,
-                durationMin: st?.durationMin ?? undefined,
-                kanbanStatus: st?.kanbanStatus ?? undefined,
-                kanbanOrder: st?.kanbanOrder ?? undefined,
-                requisites: Array.isArray(st?.requisites)
-                  ? st.requisites.map((r: any) => ({
-                      id: Number(r?.sourceId ?? r?.id ?? 0),
-                      label: String(r?.label ?? ""),
-                      checked: Boolean(r?.checked),
-                      setupAssignees: normalizeRequisiteAssignees(r?.setupAssignees),
-                      removeAssignees: normalizeRequisiteAssignees(r?.removeAssignees),
-                    }))
-                  : [],
-                lightPlot: Array.isArray(st?.lightPlot)
-                  ? st.lightPlot.map((f: any) => ({
-                      id: Number(f?.sourceId ?? f?.id ?? 0),
-                      label: String(f?.label ?? ""),
-                      channel: String(f?.channel ?? ""),
-                      x: Number(f?.x ?? 0),
-                      y: Number(f?.y ?? 0),
-                      angle: f?.angle ?? undefined,
-                      length: f?.length ?? undefined,
-                    }))
-                  : [],
-                theaterModels: Array.isArray(st?.theaterModels)
-                  ? st.theaterModels.map((m: any) => ({
-                      id: Number(m?.sourceId ?? m?.id ?? 0),
-                      name: String(m?.name ?? ""),
-                      type: m?.type ?? undefined,
-                      builtin: m?.builtin ?? undefined,
-                      allowOutOfBounds: Boolean(m?.allowOutOfBounds),
-                      position: m?.position,
-                      rotation: m?.rotation,
-                      scale: m?.scale,
-                    }))
-                  : [],
-                theaterSpotlights: Array.isArray(st?.theaterSpotlights)
-                  ? st.theaterSpotlights.map((sp: any) => mapTheaterSpotlightFromApi(sp))
-                  : [],
-              }))
-              .filter((x: any) => Number.isFinite(x.id) && x.id > 0)
-          : [],
-      };
+      const serverRaw = buildServerSceneRawFromPull({
+        steps: pull.steps,
+        theaterLayout: pull.theaterLayout,
+        lightChannels: pull.lightChannels,
+        scene: pull.scene as Record<string, unknown> | null,
+      });
       const localRaw = (await api.readProjectScene(projectSlug, sceneName)) ?? {};
 
-      // "Smart" merge:
-      // - server is source of truth for heavy structures
-      // - keep local-only meta keys (if any)
-      // - preserve desktop-only sound.filePath
       const next: any = { ...(isPlainObject(localRaw) ? localRaw : {}) };
 
       const metaLocal = pickMeta(localRaw);
       const metaServer = pickMeta(serverRaw);
+      if (Array.isArray(metaServer.sounds)) {
+        metaServer.sounds = mergeSoundsPreservingLocalFilePath(
+          metaLocal.sounds,
+          metaServer.sounds,
+        );
+      }
       Object.assign(next, metaLocal, metaServer);
 
       let changed = !deepEqualByStableStringify(metaLocal, metaServer);
@@ -179,9 +156,12 @@ export async function resyncDesktopProject(
 
     return { updatedScenes, totalScenes };
   } catch (err) {
-    // Legacy fallback: if per-scene pull isn't available, do full project pull.
     console.warn("[resync] pull-scene failed, fallback to syncPull", err);
-    const pull = await syncPull(accessToken, null, projectSlug, { steps: true });
+    const pull = await syncPull(accessToken, null, projectSlug, {
+      steps: true,
+      theaterLayout: true,
+      lightChannels: true,
+    });
     const serverScenes = Array.isArray(pull?.scenes) ? pull.scenes : [];
     const related = serverScenes.filter((s: any) => String(s?.projectId ?? "").trim());
 
@@ -194,23 +174,32 @@ export async function resyncDesktopProject(
       const serverSteps = Array.isArray((pull as any)?.steps)
         ? (pull as any).steps.filter((st: any) => String(st?.sceneId ?? "") === sceneId)
         : [];
-      const serverRaw = {
-        steps: serverSteps
-          .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
-          .map((st: any) => ({
-            id: Number(st?.sourceId ?? 0),
-            title: String(st?.title ?? ""),
-            markdown: String(st?.markdown ?? ""),
-            playMarkdown: st?.playMarkdown ?? undefined,
-            explicationMarkdown: st?.explicationMarkdown ?? undefined,
-          }))
-          .filter((x: any) => Number.isFinite(x.id) && x.id > 0),
-      };
+      const theaterLayoutRow = (Array.isArray((pull as any)?.theaterLayouts)
+        ? (pull as any).theaterLayouts
+        : []
+      ).find((row: any) => String(row?.sceneId ?? "") === sceneId);
+      const lightChannelRows = (Array.isArray((pull as any)?.lightChannels)
+        ? (pull as any).lightChannels
+        : []
+      ).filter((row: any) => String(row?.sceneId ?? "") === sceneId);
+
+      const serverRaw = buildServerSceneRawFromPull({
+        steps: serverSteps,
+        theaterLayout: theaterLayoutRow,
+        lightChannels: lightChannelRows,
+        scene: s as Record<string, unknown>,
+      });
       const localRaw = (await api.readProjectScene(projectSlug, sceneName)) ?? {};
       const next: any = { ...(isPlainObject(localRaw) ? localRaw : {}) };
 
       const metaLocal = pickMeta(localRaw);
       const metaServer = pickMeta(serverRaw);
+      if (Array.isArray(metaServer.sounds)) {
+        metaServer.sounds = mergeSoundsPreservingLocalFilePath(
+          metaLocal.sounds,
+          metaServer.sounds,
+        );
+      }
       Object.assign(next, metaLocal, metaServer);
       let changed = !deepEqualByStableStringify(metaLocal, metaServer);
 

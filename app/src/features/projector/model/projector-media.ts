@@ -1,4 +1,8 @@
-import { resolveOfflineMediaUrl } from "../../../shared/platform/media-url";
+import { getDesktopApi } from "../../../shared/platform/desktop-api";
+import { resolveBrowserPickedMediaUrl } from "../../../shared/platform/browser-picked-media";
+import { localProjectMediaDevUrl } from "../../../shared/platform/local-project-dev";
+import { isBrowserDevLocalProjects, resolveOfflineMediaUrl } from "../../../shared/platform/media-url";
+import { storageKeyToImageBasename } from "../../../shared/utils/markdownImages";
 import {
   fetchImageStreamBlobUrl,
   fetchVideoStreamBlobUrl,
@@ -46,27 +50,90 @@ export function resolveDefaultHoldId(ctx: ProjectorMediaContext): number | null 
   return Number(holds[0].id);
 }
 
+function projectorMediaFileName(
+  item: { file: string },
+  storageKey: string | null,
+  kind: "image" | "video",
+): string {
+  const direct = String(item.file ?? "")
+    .trim()
+    .replace(/^.*[/\\]/, "");
+  if (direct) return direct;
+  if (!storageKey) return "";
+  if (kind === "image") return storageKeyToImageBasename(storageKey);
+  return storageKey.replace(/\\/g, "/").split("/").filter(Boolean).pop() ?? "";
+}
+
+function desktopProjectMediaUrl(
+  projectSlug: string,
+  fileName: string,
+  kind: "image" | "video",
+): string | null {
+  const clean = String(fileName ?? "")
+    .trim()
+    .replace(/^.*[/\\]/, "");
+  if (!clean || !getDesktopApi()) return null;
+  const scheme = kind === "video" ? "project-video" : "project-images";
+  const url = new URL(`${scheme}://${encodeURIComponent(projectSlug)}/`);
+  url.pathname = `/${clean}`;
+  return url.toString();
+}
+
 function resolveProjectorMediaAsset(
   ctx: ProjectorMediaContext,
-  item: { remoteKey?: string; remoteUrl?: string; file: string; filePath?: string },
+  item: {
+    remoteKey?: string;
+    remoteUrl?: string;
+    file: string;
+    filePath?: string;
+    title?: string;
+  },
   kind: "image" | "video",
 ): ProjectorMediaAsset {
   const enriched = enrichProjectorMediaRemoteKey(item);
   const storageKey = resolveProjectorStorageKey(enriched);
+  const fileName = projectorMediaFileName(enriched, storageKey, kind);
+  const titleHint = String(enriched.title ?? "").trim();
+  const mediaKind = kind === "video" ? "video" : "image";
+
+  if (!getDesktopApi()) {
+    const picked = resolveBrowserPickedMediaUrl(fileName || enriched.file, titleHint, ctx.projectSlug);
+    if (picked) return { storageKey: null, fallbackSrc: picked };
+  }
+
+  const devLocal = localProjectMediaDevUrl(
+    ctx.projectSlug,
+    mediaKind,
+    fileName || enriched.file,
+    titleHint,
+  );
+  const desktopLocal = desktopProjectMediaUrl(ctx.projectSlug, fileName, kind);
+  const localPlay = desktopLocal ?? devLocal;
+
+  // Браузер + npm run dev: всегда с диска (Desktop/xxx), не с сервера.
+  if (isBrowserDevLocalProjects() && localPlay) {
+    return { storageKey: null, fallbackSrc: localPlay };
+  }
+
   const offline = resolveOfflineMediaUrl({
     projectSlug: ctx.projectSlug,
-    kind,
-    fileName: enriched.file,
+    kind: mediaKind,
+    fileName: fileName || enriched.file,
     filePath: enriched.filePath,
     remoteUrl: enriched.remoteUrl,
   });
   const resolvedOffline = offline.trim();
   const localSrc =
     resolvedOffline && !isDirectObjectStorageUrl(resolvedOffline) ? resolvedOffline : null;
+  const localPlayResolved = desktopLocal ?? devLocal;
 
-  // Локальная копия на диске (filePath) — без повторной загрузки с сервера.
-  if (String(enriched.filePath ?? "").trim() && localSrc) {
+  // Локальная копия на диске — без повторной загрузки с сервера.
+  if (localSrc && (String(enriched.filePath ?? "").trim() || localPlayResolved)) {
     return { storageKey: null, fallbackSrc: localSrc };
+  }
+
+  if (localPlayResolved) {
+    return { storageKey: null, fallbackSrc: localPlayResolved };
   }
 
   const remote = String(enriched.remoteUrl ?? "").trim();

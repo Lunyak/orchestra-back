@@ -22,6 +22,9 @@ import {
   packProjectorMedia,
   unpackProjectorMedia,
 } from "../features/projector/model/scene-projector-persist";
+import {
+  isDirectObjectStorageUrl,
+} from "../features/projector/model/projector-storage-key";
 
 function isHttpUrl(u: string | undefined | null): boolean {
   return Boolean(u && /^https?:\/\//i.test(String(u).trim()));
@@ -253,7 +256,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       const hold = holdImages[i];
       const key = String(hold?.remoteKey ?? "").trim();
       let url = String(hold?.remoteUrl ?? "").trim();
-      if (key && !isHttpUrl(url)) {
+      if (key && (!isHttpUrl(url) || isDirectObjectStorageUrl(url))) {
         try {
           const play = await getPlayUrl(args.accessToken, key);
           url = String(play.url ?? "").trim();
@@ -275,7 +278,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       const video = videos[i];
       const key = String(video?.remoteKey ?? "").trim();
       let url = String(video?.remoteUrl ?? "").trim();
-      if (key && !isHttpUrl(url)) {
+      if (key && (!isHttpUrl(url) || isDirectObjectStorageUrl(url))) {
         try {
           const play = await getPlayUrl(args.accessToken, key);
           url = String(play.url ?? "").trim();
@@ -321,6 +324,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
         })),
       },
     };
+    delete payload.lightNotesRun;
 
     const saveRes = await desktopSaveProjectScene(desktop, args.projectSlug, "script", payload, {
       skipOutbox: true,

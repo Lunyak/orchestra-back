@@ -504,7 +504,7 @@ html:not([data-theme]) {
   --z-index-controls: 3;
   --z-index-sidebar: 5;
   --z-index-overlay: 10;
-  --z-index-modal: 50;
+  --z-index-modal: 1200;
   --z-index-header: 1000;
 
   /* Transitions */

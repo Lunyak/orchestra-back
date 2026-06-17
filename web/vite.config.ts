@@ -4,6 +4,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { defineConfig, loadEnv, type PluginOption } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
+import { viteLocalProjectsPlugin } from "./vite-local-projects-plugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,7 +20,7 @@ function resolveApiProxyTarget(rawBase: string): string {
   return "http://localhost:3000";
 }
 
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(async ({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   const rawBase = String(env.VITE_API_BASE_URL || "http://localhost:3000");
   const isDesktopBuild = mode === "desktop";
@@ -73,6 +74,7 @@ export default defineConfig(async ({ mode }) => {
         "@codemirror/commands",
         "@codemirror/language",
         "@codemirror/lang-markdown",
+        "jszip",
       ],
     },
     resolve: {
@@ -88,6 +90,7 @@ export default defineConfig(async ({ mode }) => {
         "@app": path.resolve(__dirname, "../app/src"),
         react: path.resolve(__dirname, "node_modules/react"),
         "react-dom": path.resolve(__dirname, "node_modules/react-dom"),
+        jszip: path.resolve(__dirname, "node_modules/jszip"),
         "react/jsx-runtime": path.resolve(
           __dirname,
           "node_modules/react/jsx-runtime.js",
@@ -115,6 +118,11 @@ export default defineConfig(async ({ mode }) => {
         },
       },
     },
-    plugins: [react(), tsconfigPaths(), ...electronPlugins],
+    plugins: [
+      react(),
+      tsconfigPaths(),
+      ...(command === "serve" ? [viteLocalProjectsPlugin(__dirname)] : []),
+      ...electronPlugins,
+    ],
   };
 });

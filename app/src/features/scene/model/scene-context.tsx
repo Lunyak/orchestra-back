@@ -28,6 +28,7 @@ import {
   registerSoundToggleHandler,
   type PlaylistPlayOptions,
 } from "./scene-playback-bridge";
+import type { ProjectorMediaOfflineDownloadResult } from "../../../sync/desktopProjectorMediaOffline";
 
 type SetStateAction<T> = T | ((prev: T) => T);
 
@@ -55,11 +56,29 @@ export interface SceneContextValue {
     | null;
   clearRealtimePullDeferred: () => void;
   addStep: (atPage?: number) => void;
+  seedScenarioFromPlayText: (text: string) => void;
+  splitStepFromSelection: (args: {
+    sourceStepId: number;
+    targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
+    selectedText: string;
+    trimmedSourceText: string;
+  }) => void;
   deleteStep: (id: number) => void;
   reorderSteps: (fromIndex: number, toIndex: number) => void;
   saveStepsForLightPlot: (opts?: { force?: boolean }) => Promise<void>;
   pushSceneAfterSoundsSave: () => Promise<void>;
   syncFromServer: (token?: string | null, projectOverride?: string) => Promise<void>;
+  downloadProjectorMediaForOffline: (opts?: {
+    onProgress?: (current: number, total: number, label: string) => void;
+  }) => Promise<ProjectorMediaOfflineDownloadResult>;
+  syncAndDownloadProjectorMediaForOffline: (opts?: {
+    onProgress?: (current: number, total: number, label: string) => void;
+  }) => Promise<ProjectorMediaOfflineDownloadResult>;
+  importDevMediaFolder: (opts?: { force?: boolean }) => Promise<{
+    message: string;
+    videos: import("./scene-slice").SceneVideo[];
+    holdImages: import("./scene-slice").SceneHoldImage[];
+  }>;
   registerPlaylistPlay: (handler: (trackId: number, options?: PlaylistPlayOptions) => void) => void;
   handleTrackLinkClick: (trackId: number, options?: PlaylistPlayOptions) => void;
   registerSoundToggle: (handler: (soundId: number) => void) => void;
@@ -101,7 +120,7 @@ export function useScene(): SceneContextValue {
     realtimePullDeferredAt,
     realtimePullDeferredReason,
   } = useAppSelector((s) => s.scene);
-  const { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave } =
+  const { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave, downloadProjectorMediaForOffline, syncAndDownloadProjectorMediaForOffline, importDevMediaFolder } =
     useSceneOperations();
 
   const setSceneData = useCallback(
@@ -164,6 +183,21 @@ export function useScene(): SceneContextValue {
   );
 
   const addStep = useCallback(() => dispatch(sceneActions.addStep()), [dispatch]);
+  const seedScenarioFromPlayText = useCallback(
+    (text: string) => dispatch(sceneActions.seedScenarioFromPlayText({ text })),
+    [dispatch],
+  );
+  const splitStepFromSelection = useCallback(
+    (args: {
+      sourceStepId: number;
+      targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
+      selectedText: string;
+      trimmedSourceText: string;
+    }) => {
+      dispatch(sceneActions.splitStepFromSelection(args));
+    },
+    [dispatch],
+  );
   const deleteStep = useCallback((id: number) => dispatch(sceneActions.deleteStep(id)), [dispatch]);
   const reorderSteps = useCallback(
     (fromIndex: number, toIndex: number) => dispatch(sceneActions.reorderSteps({ fromIndex, toIndex })),
@@ -212,11 +246,16 @@ export function useScene(): SceneContextValue {
     realtimePullDeferredReason,
     clearRealtimePullDeferred,
     addStep,
+    seedScenarioFromPlayText,
+    splitStepFromSelection,
     deleteStep,
     reorderSteps,
     saveStepsForLightPlot,
     pushSceneAfterSoundsSave,
     syncFromServer,
+    downloadProjectorMediaForOffline,
+    syncAndDownloadProjectorMediaForOffline,
+    importDevMediaFolder,
     registerPlaylistPlay,
     handleTrackLinkClick,
     registerSoundToggle,

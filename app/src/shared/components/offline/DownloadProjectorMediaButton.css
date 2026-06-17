@@ -1,0 +1,33 @@
+.download-projector-media {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-projector-media__btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 124, 255, 0.55);
+  background: rgba(74, 124, 255, 0.18);
+  color: var(--color-text-bright, #f5f7fb);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.download-projector-media__btn:hover:not(:disabled) {
+  border-color: #4a7cff;
+  background: rgba(74, 124, 255, 0.28);
+}
+
+.download-projector-media__btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.download-projector-media__hint {
+  font-size: 12px;
+  opacity: 0.8;
+  max-width: 420px;
+}

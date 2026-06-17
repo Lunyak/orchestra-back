@@ -12,14 +12,56 @@ import {
   desktopSaveProjectScene,
 } from "../../../shared/platform/desktop-methods";
 import { createId } from "../../../shared/utils/createId";
+import { stepHasMaterial } from "./scenario-material";
 import { uploadProjectFile } from "../../../sync/api/files";
 import { ensureProject } from "../../../sync/api/projects";
 import type { PlaylistTrack } from "../../../shared/types/playlist";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
+import { saveDesktopProjectMediaFromFile } from "../../../shared/platform/desktop-project-media";
 
 import { DEFAULT_THEATER_LAYOUT } from "../../theater/model/theater-defaults";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { normalizeHoldImages } from "../../projector/model/scene-projector-persist";
+
+type ProjectorMediaWithPath = {
+  id?: number;
+  file?: string;
+  filePath?: string;
+  remoteKey?: string;
+};
+
+function mergeProjectorMediaWithLocalPaths<T extends ProjectorMediaWithPath>(
+  incoming: T[],
+  prev: T[],
+): T[] {
+  if (incoming.length === 0) return prev;
+  if (prev.length === 0) return incoming;
+  const prevById = new Map(
+    prev.filter((item) => item.id != null).map((item) => [Number(item.id), item]),
+  );
+  const prevByKey = new Map(
+    prev
+      .filter((item) => String(item.remoteKey ?? "").trim())
+      .map((item) => [String(item.remoteKey), item]),
+  );
+  const prevByFile = new Map(
+    prev
+      .filter((item) => String(item.file ?? "").trim())
+      .map((item) => [String(item.file), item]),
+  );
+
+  return incoming.map((item) => {
+    if (String(item.filePath ?? "").trim()) return item;
+    const prevItem =
+      (item.id != null ? prevById.get(Number(item.id)) : undefined) ??
+      (String(item.remoteKey ?? "").trim()
+        ? prevByKey.get(String(item.remoteKey))
+        : undefined) ??
+      (String(item.file ?? "").trim() ? prevByFile.get(String(item.file)) : undefined);
+    if (!prevItem?.filePath) return item;
+    return { ...item, filePath: prevItem.filePath };
+  });
+}
 
 function mergeProjectorSceneDataOnHydrate(
   incoming: SceneData | null,
@@ -33,8 +75,14 @@ function mergeProjectorSceneDataOnHydrate(
   const prevVideos = Array.isArray(prev.videos) ? prev.videos : [];
   return {
     ...incoming,
-    videos: incomingVideos.length > 0 ? incoming.videos : prev.videos,
-    holdImages: incomingHolds.length > 0 ? incoming.holdImages : prev.holdImages,
+    videos:
+      incomingVideos.length > 0
+        ? mergeProjectorMediaWithLocalPaths(incomingVideos, prevVideos)
+        : prev.videos,
+    holdImages:
+      incomingHolds.length > 0
+        ? mergeProjectorMediaWithLocalPaths(incomingHolds, prevHolds)
+        : prev.holdImages,
     projector: incoming.projector ?? prev.projector,
   };
 }
@@ -282,9 +330,8 @@ const initialState: SceneState = {
   voiceLinesUpload: { uploading: false, error: null },
 };
 
-function ensureNonEmptySteps(raw: ScriptStep[]): ScriptStep[] {
-  if (raw.length > 0) return raw;
-  return [{ id: 1, title: "Новый шаг", markdown: "" }];
+function normalizeHydratedSteps(raw: ScriptStep[]): ScriptStep[] {
+  return Array.isArray(raw) ? raw : [];
 }
 
 function nextSoundIds(sounds: any[] | undefined, count: number): number[] {
@@ -460,6 +507,7 @@ export const uploadSceneVideosWeb = createAsyncThunk<
   const uploaded: SceneVideo[] = [];
   for (let i = 0; i < files.length; i += 1) {
     const file = files[i];
+    const local = await saveDesktopProjectMediaFromFile(projectSlug, "video", file);
     const { key, url } = await uploadProjectFile(token, {
       projectId,
       type: "video",
@@ -469,7 +517,8 @@ export const uploadSceneVideosWeb = createAsyncThunk<
     uploaded.push({
       id: ids[i],
       title,
-      file: file.name,
+      file: local?.file ?? file.name,
+      filePath: local?.filePath,
       remoteKey: key,
       remoteUrl: url,
     });
@@ -503,6 +552,7 @@ export const uploadSceneHoldImagesWeb = createAsyncThunk<
   const uploaded: SceneHoldImage[] = [];
   for (let i = 0; i < files.length; i += 1) {
     const file = files[i];
+    const local = await saveDesktopProjectMediaFromFile(projectSlug, "image", file);
     const { key, url } = await uploadProjectFile(token, {
       projectId,
       type: "image",
@@ -512,7 +562,8 @@ export const uploadSceneHoldImagesWeb = createAsyncThunk<
     uploaded.push({
       id: ids[i],
       title,
-      file: file.name,
+      file: local?.file ?? file.name,
+      filePath: local?.filePath,
       remoteKey: key,
       remoteUrl: url,
     });
@@ -979,7 +1030,7 @@ export const sceneSlice = createSlice({
         action.payload.sceneData,
         state.sceneData,
       );
-      const nextSteps = ensureNonEmptySteps(action.payload.steps);
+      const nextSteps = normalizeHydratedSteps(action.payload.steps);
       state.steps = nextSteps;
       state.theaterLayout = action.payload.theaterLayout;
 
@@ -1056,7 +1107,7 @@ export const sceneSlice = createSlice({
       state.sceneDataRevision += 1;
     },
     setSteps(state, action: PayloadAction<ScriptStep[]>) {
-      state.steps = ensureNonEmptySteps(action.payload);
+      state.steps = normalizeHydratedSteps(action.payload);
       state.hasLocalEdits = true;
       state.stepsRevision += 1;
     },
@@ -1087,6 +1138,54 @@ export const sceneSlice = createSlice({
     setCurrentPage(state, action: PayloadAction<number>) {
       state.currentPage = action.payload;
     },
+    seedScenarioFromPlayText(state, action: PayloadAction<{ text: string }>) {
+      const text = String(action.payload.text ?? "").trim();
+      if (!text) return;
+      state.hasLocalEdits = true;
+
+      const titleFromText = "Пьеса";
+
+      if (state.steps.length === 0) {
+        state.steps = [
+          {
+            id: 1,
+            title: titleFromText,
+            markdown: "",
+            playMarkdown: text,
+          },
+        ];
+        state.currentPage = 0;
+        state.stepsRevision += 1;
+        return;
+      }
+
+      const emptyIndex = state.steps.findIndex((step) => !stepHasMaterial(step));
+      if (emptyIndex !== -1) {
+        const step = state.steps[emptyIndex];
+        const keepTitle =
+          step.title?.trim() && step.title.trim() !== "Новый шаг"
+            ? step.title.trim()
+            : titleFromText;
+        state.steps[emptyIndex] = {
+          ...step,
+          title: keepTitle,
+          playMarkdown: text,
+        };
+        state.currentPage = emptyIndex;
+        state.stepsRevision += 1;
+        return;
+      }
+
+      const nextId = state.steps.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
+      state.steps.unshift({
+        id: nextId,
+        title: titleFromText,
+        markdown: "",
+        playMarkdown: text,
+      });
+      state.currentPage = 0;
+      state.stepsRevision += 1;
+    },
     addStep(state) {
       state.hasLocalEdits = true;
       const nextId = state.steps.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
@@ -1106,18 +1205,108 @@ export const sceneSlice = createSlice({
       state.currentPage = insertIndex;
       state.stepsRevision += 1;
     },
+    splitStepFromSelection(
+      state,
+      action: PayloadAction<{
+        sourceStepId: number;
+        targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
+        selectedText: string;
+        trimmedSourceText: string;
+      }>,
+    ) {
+      const { sourceStepId, targetField, selectedText, trimmedSourceText } = action.payload;
+      const sourceIdx = state.steps.findIndex((s) => s.id === sourceStepId);
+      if (sourceIdx === -1) return;
+
+      const sourceStep = state.steps[sourceIdx];
+      state.steps[sourceIdx] = { ...sourceStep, [targetField]: trimmedSourceText };
+
+      const nextId = state.steps.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
+      const nextRequisites = sourceStep.requisites
+        ? sourceStep.requisites.map((item) => ({ ...item, checked: false }))
+        : [];
+      const nextItem: ScriptStep = {
+        id: nextId,
+        title: `Шаг ${nextId}`,
+        markdown: "",
+        requisites: nextRequisites,
+      };
+      if (targetField === "markdown") {
+        nextItem.markdown = selectedText;
+      } else if (targetField === "playMarkdown") {
+        nextItem.playMarkdown = selectedText;
+      } else {
+        nextItem.explicationMarkdown = selectedText;
+      }
+
+      state.steps.push(nextItem);
+      state.currentPage = state.steps.length - 1;
+      state.hasLocalEdits = true;
+      state.stepsRevision += 1;
+    },
+    splitStepContentIntoSteps(
+      state,
+      action: PayloadAction<{
+        sourceStepId: number;
+        targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
+        chunks: string[];
+        chunkTitles?: string[];
+      }>,
+    ) {
+      const { sourceStepId, targetField, chunks, chunkTitles } = action.payload;
+      const trimmedChunks = chunks.map((c) => String(c ?? "").trim()).filter(Boolean);
+      if (!trimmedChunks.length) return;
+
+      const sourceIdx = state.steps.findIndex((s) => s.id === sourceStepId);
+      if (sourceIdx === -1) return;
+
+      const sourceStep = state.steps[sourceIdx];
+      let maxId = state.steps.reduce((acc, step) => Math.max(acc, step.id), 0);
+
+      const makeStep = (chunk: string, title: string): ScriptStep => {
+        maxId += 1;
+        const nextRequisites = sourceStep.requisites
+          ? sourceStep.requisites.map((item) => ({ ...item, checked: false }))
+          : [];
+        const nextItem: ScriptStep = {
+          id: maxId,
+          title,
+          markdown: "",
+          requisites: nextRequisites,
+        };
+        nextItem[targetField] = chunk;
+        return nextItem;
+      };
+
+      const [firstChunk, ...restChunks] = trimmedChunks;
+      const firstTitle =
+        chunkTitles?.[0]?.trim() ||
+        sourceStep.title ||
+        `Шаг ${sourceStep.id}`;
+      state.steps[sourceIdx] = {
+        ...sourceStep,
+        title: firstTitle,
+        [targetField]: firstChunk,
+      };
+
+      let insertAt = sourceIdx + 1;
+      restChunks.forEach((chunk, index) => {
+        const title =
+          chunkTitles?.[index + 1]?.trim() || `Шаг ${maxId + 1}`;
+        state.steps.splice(insertAt, 0, makeStep(chunk, title));
+        insertAt += 1;
+      });
+
+      state.currentPage = sourceIdx;
+      state.hasLocalEdits = true;
+      state.stepsRevision += 1;
+    },
     deleteStep(state, action: PayloadAction<number>) {
       state.hasLocalEdits = true;
       const id = action.payload;
       const next = state.steps.filter((s) => s.id !== id);
-      if (next.length === 0) {
-        state.currentPage = 0;
-        state.steps = [{ id: 1, title: "Новый шаг", markdown: "" }];
-        state.stepsRevision += 1;
-        return;
-      }
       state.steps = next;
-      state.currentPage = Math.min(state.currentPage, next.length - 1);
+      state.currentPage = next.length === 0 ? 0 : Math.min(state.currentPage, next.length - 1);
       state.stepsRevision += 1;
     },
     reorderSteps(state, action: PayloadAction<{ fromIndex: number; toIndex: number }>) {
@@ -1258,6 +1447,17 @@ export const sceneSlice = createSlice({
       next[idx] = { ...next[idx], ...action.payload.changes };
       state.sceneData = { ...(state.sceneData ?? {}), holdImages: next };
       state.hasLocalEdits = true;
+      state.sceneDataRevision += 1;
+    },
+    setProjectorMediaLibrary(
+      state,
+      action: PayloadAction<{ videos: SceneVideo[]; holdImages: SceneHoldImage[] }>,
+    ) {
+      state.sceneData = {
+        ...(state.sceneData ?? {}),
+        videos: action.payload.videos,
+        holdImages: action.payload.holdImages,
+      };
       state.sceneDataRevision += 1;
     },
     removeSceneVideo(state, action: PayloadAction<number>) {

@@ -6,6 +6,7 @@ import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { getDesktopApi } from "../../platform/desktop-api";
 import { isOfflineNativePlatform } from "../../platform/media-url";
+import { DownloadProjectorMediaButton } from "./DownloadProjectorMediaButton";
 import "./OfflinePackStatus.css";
 
 export function OfflinePackStatus() {
@@ -63,14 +64,19 @@ export function OfflinePackStatus() {
           : "Офлайн-режим"}
       </span>
       {hasLocalApi ? (
-        <button
-          type="button"
-          className="offline-pack-status__btn"
-          disabled={busy || !online || !projectName}
-          onClick={() => void downloadPack()}
-        >
-          {busy ? "Загрузка…" : "Скачать для спектакля"}
-        </button>
+        <>
+          <button
+            type="button"
+            className="offline-pack-status__btn"
+            disabled={busy || !online || !projectName}
+            onClick={() => void downloadPack()}
+          >
+            {busy ? "Загрузка…" : "Скачать для спектакля"}
+          </button>
+          <DownloadProjectorMediaButton
+            buttonClassName="offline-pack-status__btn offline-pack-status__btn--secondary"
+          />
+        </>
       ) : null}
       {message ? <span className="offline-pack-status__hint">{message}</span> : null}
     </div>

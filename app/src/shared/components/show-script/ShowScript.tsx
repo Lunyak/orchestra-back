@@ -1,7 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useProject } from "../../../features/project";
 import { useScene } from "../../../features/scene";
+import { isScenarioWithoutMaterial } from "../../../features/scene/model/scenario-material";
+import { ScriptEmptyMaterialPrompt } from "../../../features/scene/ui/ScriptEmptyMaterialPrompt";
 import { useScriptUI } from '../../../features/script-ui';
+import { showScriptMarkdownActions } from "../../../features/show-script-markdown/model/show-script-markdown-slice";
+import { useAppDispatch } from "../../store/hooks";
 import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
 import { ScriptRequisite, ScriptStep } from "../../types/script";
 import { RequisitesPanel } from "./components/RequisitesPanel";
@@ -10,6 +14,7 @@ import './style.css';
 
 
 export const ShowScript: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { projectName } = useProject();
   const projectSlug = projectName || "fools";
   const sceneName = "script";
@@ -18,7 +23,7 @@ export const ShowScript: React.FC = () => {
     steps,
     currentPage,
     updateStep: updateSceneStep,
-    addStep,
+    splitStepFromSelection,
     resetAllRequisites,
     handleTrackLinkClick,
     handleSoundLinkClick,
@@ -27,6 +32,7 @@ export const ShowScript: React.FC = () => {
     realtimePullDeferredReason,
     clearRealtimePullDeferred,
     syncFromServer,
+    seedScenarioFromPlayText,
   } = useScene();
 
   const [newRequisite, setNewRequisite] = useState('');
@@ -36,6 +42,26 @@ export const ShowScript: React.FC = () => {
     isEditing,
     setIsEditing,
   } = useScriptUI();
+
+  const showEmptyMaterialPrompt = useMemo(
+    () => isScenarioWithoutMaterial(steps),
+    [steps],
+  );
+
+  const handleImportMaterial = useCallback(
+    (text: string) => {
+      seedScenarioFromPlayText(text);
+      setIsEditing(true);
+      dispatch(
+        showScriptMarkdownActions.setMarkdownMode({
+          projectSlug,
+          sceneName,
+          mode: "play",
+        }),
+      );
+    },
+    [dispatch, projectSlug, sceneName, seedScenarioFromPlayText, setIsEditing],
+  );
 
   const currentStep = steps[currentPage];
   const currentRequisites = currentStep?.requisites ?? [];
@@ -127,12 +153,17 @@ export const ShowScript: React.FC = () => {
 
   const hasCopiedRequisites = requisitesClipboardRef.current != null;
   const createStepFromSelection = (
+    sourceStepId: number,
     selectedText: string,
+    trimmedSourceText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => {
-    const nextStepId = steps.reduce((acc, step) => Math.max(acc, step.id), 0) + 1;
-    addStep();
-    updateSceneStep(nextStepId, { [targetField]: selectedText });
+    splitStepFromSelection({
+      sourceStepId,
+      targetField,
+      selectedText,
+      trimmedSourceText,
+    });
   };
 
   return (
@@ -165,6 +196,9 @@ export const ShowScript: React.FC = () => {
           </div>
         ) : null}
 
+        {showEmptyMaterialPrompt ? (
+          <ScriptEmptyMaterialPrompt onImport={handleImportMaterial} />
+        ) : (
         <ShowScriptMarkdownSection
           projectSlug={projectSlug}
           sceneName={sceneName}
@@ -205,6 +239,7 @@ export const ShowScript: React.FC = () => {
             ) : null
           }
         />
+        )}
       </div>
     </div >
   );

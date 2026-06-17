@@ -1,5 +1,6 @@
 ---
 description: Frontend coding standards — React, CSS, TypeScript, UI tokens
+globs: orchestra-back/**/*.{tsx,ts,css}
 alwaysApply: true
 ---
 
@@ -67,6 +68,13 @@ SHARED UTILITIES:
 - Do not refactor unrelated code
 - Keep responses under 150 lines unless explicitly required
 - Think step-by-step internally but output only the final answer
+
+## Новый UI — обязательный чеклист
+
+1. Есть ли готовый компонент в `app/src/shared/`? (Button, Modal, ListItem, native-text-input…)
+2. Открыл `app/src/shared/styles/variables.css` и `CHEATSHEET.md`?
+3. CSS в отдельном файле, токены `var(--…)`, className через `cn`
+4. Острые углы по умолчанию (см. ниже)
 
 Когда создаёшь новые UI-элементы (кнопки, карточки, инпуты, модальные окна, dropdowns, табы, меню и любые контейнеры):
 

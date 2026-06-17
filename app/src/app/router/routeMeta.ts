@@ -9,7 +9,12 @@ export function isTheaterRouteEnabled() {
 }
 
 function isScriptStateRoute(pathname: string) {
-  return pathname === "/" || pathname === "/light-plot" || isTheaterRoute(pathname);
+  return (
+    pathname === "/" ||
+    pathname === "/light-plot" ||
+    pathname === "/notes-run" ||
+    isTheaterRoute(pathname)
+  );
 }
 
 /** Главная страница сценария (markdown). */

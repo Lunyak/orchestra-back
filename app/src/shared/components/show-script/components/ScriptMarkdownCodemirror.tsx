@@ -116,6 +116,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
     kadrSectionBlocksRef.current = kadrSectionBlocks;
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
+    const suppressOnChangeRef = useRef(false);
     const onClipboardImagePasteRef = useRef(onClipboardImagePaste);
     onClipboardImagePasteRef.current = onClipboardImagePaste;
 
@@ -143,11 +144,16 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
         const view = viewRef.current;
         if (!view) return;
         view.focus();
-        view.dispatch({
-          changes: { from: 0, to: view.state.doc.length, insert: text },
-          selection: EditorSelection.cursor(Math.max(0, Math.min(text.length, cursor))),
-          scrollIntoView: true,
-        });
+        suppressOnChangeRef.current = true;
+        try {
+          view.dispatch({
+            changes: { from: 0, to: view.state.doc.length, insert: text },
+            selection: EditorSelection.cursor(Math.max(0, Math.min(text.length, cursor))),
+            scrollIntoView: true,
+          });
+        } finally {
+          suppressOnChangeRef.current = false;
+        }
       },
     }));
 
@@ -189,7 +195,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
           }),
           scriptMarkdownCodemirrorTheme,
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) {
+            if (update.docChanged && !suppressOnChangeRef.current) {
               onChangeRef.current(update.state.doc.toString());
             }
           }),
@@ -218,11 +224,16 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       const cur = view.state.doc.toString();
       const next = String(value ?? "");
       if (cur === next) return;
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: next },
-        selection: EditorSelection.cursor(0),
-        scrollIntoView: true,
-      });
+      suppressOnChangeRef.current = true;
+      try {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: next },
+          selection: EditorSelection.cursor(0),
+          scrollIntoView: true,
+        });
+      } finally {
+        suppressOnChangeRef.current = false;
+      }
     }, [value]);
 
     useEffect(() => {

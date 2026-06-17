@@ -7,6 +7,7 @@ import {
   resolveProjectorVideoAsset,
   type ProjectorMediaContext,
 } from "../model/projector-media";
+import { isLocalProjectMediaUrl } from "../../../shared/platform/media-url";
 import "./projector-media-preview.css";
 
 export type ProjectorMediaPreviewProps = {
@@ -30,6 +31,9 @@ export async function resolveProjectorPreviewSrc(
   if (mode === "hold") {
     const asset = resolveProjectorHoldAsset(ctx, holdId);
     if (!asset) return { src: null, blob: false };
+    if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
+      return { src: asset.fallbackSrc, blob: false };
+    }
     if (!asset.storageKey && asset.fallbackSrc) {
       return { src: asset.fallbackSrc, blob: false };
     }
@@ -43,6 +47,9 @@ export async function resolveProjectorPreviewSrc(
   if (videoId == null || videoId <= 0) return { src: null, blob: false };
   const asset = resolveProjectorVideoAsset(ctx, videoId);
   if (!asset) return { src: null, blob: false };
+  if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
+    return { src: asset.fallbackSrc, blob: false };
+  }
   if (!asset.storageKey && asset.fallbackSrc) {
     return { src: asset.fallbackSrc, blob: false };
   }

@@ -96,6 +96,16 @@
   background: #08f;
 }
 
+.theater-editor-menubar__option:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.theater-editor-menubar__option:disabled:hover {
+  color: #888;
+  background: transparent;
+}
+
 .theater-editor-menubar__option--active {
   color: #ccc;
   background: rgba(21, 60, 94, 0.85);

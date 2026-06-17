@@ -156,6 +156,7 @@ export function CreateKadrModal({
   const imagePreviewUrlRef = useRef<string | null>(null);
   const wasOpenRef = useRef(false);
   const faderOptionsSyncedKeyRef = useRef("");
+  const skipNextFaderSyncRef = useRef(false);
   const [draft, setDraft] = useState<CreateKadrDraft>(() =>
     buildInitialCreateKadrDraft({
       lightChannelsCount: lightChannels.length,
@@ -170,6 +171,8 @@ export function CreateKadrModal({
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
 
   const projectorCtx = useMemo<ProjectorMediaContext>(
     () => ({
@@ -257,6 +260,7 @@ export function CreateKadrModal({
           });
     setDraft(nextDraft);
     faderOptionsSyncedKeyRef.current = "";
+    skipNextFaderSyncRef.current = true;
     setImageError(null);
     setImagePreviewUrl(null);
     if (imagePreviewUrlRef.current) {
@@ -279,6 +283,11 @@ export function CreateKadrModal({
   useEffect(() => {
     if (!isOpen) return;
     const optionKeys = faderOptions.map((item) => item.key).join("|");
+    if (skipNextFaderSyncRef.current) {
+      skipNextFaderSyncRef.current = false;
+      faderOptionsSyncedKeyRef.current = optionKeys;
+      return;
+    }
     if (optionKeys === faderOptionsSyncedKeyRef.current) return;
     faderOptionsSyncedKeyRef.current = optionKeys;
 
@@ -323,6 +332,9 @@ export function CreateKadrModal({
     const level = Math.min(1, Math.max(0, raw));
     setDraft((prev) => ({
       ...prev,
+      includedFaderKeys: prev.includedFaderKeys.includes(key)
+        ? prev.includedFaderKeys
+        : [...prev.includedFaderKeys, key],
       faderLevels: { ...prev.faderLevels, [key]: level },
     }));
   }, []);
@@ -403,7 +415,7 @@ export function CreateKadrModal({
   };
 
   const handleSubmit = () => {
-    onSubmit(draft);
+    onSubmit(draftRef.current);
   };
 
   const projectorValue = projectorSelectValue(draft.projectorCue);

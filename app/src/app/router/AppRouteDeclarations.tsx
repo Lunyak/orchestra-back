@@ -148,6 +148,7 @@ export function AppRouteDeclarations() {
         }
       />
       <Route path="/light-plot" element={<SpectaclePage />} />
+      <Route path="/notes-run" element={<SpectaclePage />} />
       <Route path="/board" element={<SpectaclePage />} />
       <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />
       <Route

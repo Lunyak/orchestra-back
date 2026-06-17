@@ -2,7 +2,109 @@ import type { ScriptStep, TheaterDoor, TheaterLayout } from "../../../shared/typ
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { normalizeDoors } from "../../theater/model/theater-doors";
 import { mergeTheaterLayoutExtras } from "../../theater/model/theater-layout-extras";
+import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
+import { mapTheaterSpotlightFromApi } from "../../theater/model/theater-light-fader-bindings";
 import { DEFAULT_THEATER_LAYOUT } from "./scene-slice";
+
+export function normalizeRequisiteAssignees(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
+    : [];
+}
+
+/** Единый маппинг шага из sync API (web pull, desktop resync, prefetch). */
+export function normalizeScriptStepFromSyncApi(st: unknown): ScriptStep | null {
+  const row = st as Record<string, unknown> | null;
+  const id = Number(row?.sourceId ?? row?.id ?? 0);
+  if (!Number.isFinite(id) || id <= 0) return null;
+
+  return {
+    id,
+    title: String(row?.title ?? ""),
+    markdown: String(row?.markdown ?? ""),
+    playMarkdown:
+      typeof row?.playMarkdown === "string" ? row.playMarkdown : undefined,
+    explicationMarkdown:
+      typeof row?.explicationMarkdown === "string" ? row.explicationMarkdown : undefined,
+    durationMin:
+      row?.durationMin != null && Number.isFinite(Number(row.durationMin))
+        ? Number(row.durationMin)
+        : undefined,
+    kanbanStatus:
+      typeof row?.kanbanStatus === "string" ? row.kanbanStatus : undefined,
+    kanbanOrder:
+      row?.kanbanOrder != null && Number.isFinite(Number(row.kanbanOrder))
+        ? Math.trunc(Number(row.kanbanOrder))
+        : undefined,
+    requisites: Array.isArray(row?.requisites)
+      ? row.requisites.map((r: unknown) => {
+          const req = r as Record<string, unknown>;
+          return {
+            id: Number(req?.sourceId ?? req?.id ?? 0),
+            label: String(req?.label ?? ""),
+            checked: Boolean(req?.checked),
+            setupAssignees: normalizeRequisiteAssignees(req?.setupAssignees),
+            removeAssignees: normalizeRequisiteAssignees(req?.removeAssignees),
+          };
+        })
+      : [],
+    lightPlot: Array.isArray(row?.lightPlot)
+      ? row.lightPlot.map((f: unknown) => {
+          const fixture = f as Record<string, unknown>;
+          return {
+            id: Number(fixture?.sourceId ?? fixture?.id ?? 0),
+            label: String(fixture?.label ?? ""),
+            channel: String(fixture?.channel ?? ""),
+            x: Number(fixture?.x ?? 0),
+            y: Number(fixture?.y ?? 0),
+            angle:
+              fixture?.angle != null && Number.isFinite(Number(fixture.angle))
+                ? Number(fixture.angle)
+                : undefined,
+            length:
+              fixture?.length != null && Number.isFinite(Number(fixture.length))
+                ? Number(fixture.length)
+                : undefined,
+          };
+        })
+      : [],
+    lightCues: Array.isArray(row?.lightCues)
+      ? row.lightCues.map((cue: unknown) => {
+          const item = cue as Record<string, unknown>;
+          return {
+            id: Number(item?.id ?? 0),
+            tSec: Number(item?.tSec ?? 0),
+            channel: String(item?.channel ?? ""),
+            intensity:
+              typeof item?.intensity === "number" ? item.intensity : undefined,
+            enabled: item?.enabled as boolean | undefined,
+          };
+        })
+      : undefined,
+    lightKadrs:
+      row?.lightKadrs && typeof row.lightKadrs === "object"
+        ? (row.lightKadrs as ScriptStep["lightKadrs"])
+        : undefined,
+    ...resolveStepTheaterFromApi(row),
+    theaterSpotlights: Array.isArray(row?.theaterSpotlights)
+      ? row.theaterSpotlights
+          .map((sp: unknown) => mapTheaterSpotlightFromApi(sp))
+          .filter((sp): sp is NonNullable<typeof sp> => sp != null)
+      : [],
+  };
+}
+
+export function normalizeScriptStepsFromSyncApi(steps: unknown): ScriptStep[] {
+  if (!Array.isArray(steps)) return [];
+  return [...steps]
+    .sort(
+      (a, b) =>
+        Number((a as Record<string, unknown>)?.order ?? 0) -
+        Number((b as Record<string, unknown>)?.order ?? 0),
+    )
+    .map((st) => normalizeScriptStepFromSyncApi(st))
+    .filter((step): step is ScriptStep => step != null);
+}
 
 export function normalizeLightChannelsFromServer(rows: unknown[]): string[] {
   const normalizedRows = Array.isArray(rows) ? rows : [];

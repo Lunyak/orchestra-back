@@ -19,10 +19,23 @@ import {
   resolveInitialTheaterLayout,
 } from "../../theater/model/theater-layout-draft-storage";
 import { prepareSceneLightBindings } from "../../theater/model/theater-light-fader-bindings";
+import { stepHasTheaterSceneContent } from "../../theater/model/copy-step-theater-scene";
 import { sceneActions, DEFAULT_THEATER_LAYOUT } from "./scene-slice";
 import { loadSceneRolesFromStorage, saveSceneRolesToStorage } from "./scene-roles-storage";
 import { normalizeLightChannelsLoose } from "./scene-normalize";
+import { hydrateSceneFromLocalPack } from "./scene-local-hydration";
 import { useSceneOperations } from "./scene-operations";
+import {
+  getProjectMediaFolderInfo,
+  mergeScannedMediaIntoScene,
+  readStoredProjectMediaFolder,
+  scanProjectMediaFolder,
+} from "../../../shared/platform/project-media-folder";
+import { setBrowserPickedMediaProject } from "../../../shared/platform/browser-picked-media";
+import { registerDevProjectMediaRoot } from "../../../shared/platform/local-project-dev";
+import { store } from "../../../shared/store/store";
+import { ensureDesktopProjectorMediaOffline } from "../../../sync/desktopProjectorMediaOffline";
+import { unpackProjectorMedia } from "../../projector/model/scene-projector-persist";
 
 export function useSceneSyncEffects() {
   const dispatch = useAppDispatch();
@@ -59,6 +72,7 @@ export function useSceneSyncEffects() {
   >(null);
   const realtimeConnectHandlerRef = useRef<(() => void) | null>(null);
   const desktopLocalSceneLoadedRef = useRef(false);
+  const desktopTheaterRecoveryRef = useRef<string | null>(null);
   const lastLocalEditAtRef = useRef(0);
 
   useEffect(() => {
@@ -67,20 +81,76 @@ export function useSceneSyncEffects() {
     selectedStepIdRef.current = null;
     restoredProjectRef.current = null;
     desktopLocalSceneLoadedRef.current = false;
+    desktopTheaterRecoveryRef.current = null;
 
     let cancelled = false;
     const loadScene = async () => {
+      setBrowserPickedMediaProject(projectName);
+      const storedFolder = readStoredProjectMediaFolder(projectName);
+      if (storedFolder.path) {
+        void registerDevProjectMediaRoot(projectName, storedFolder.path);
+      }
+      void getProjectMediaFolderInfo(projectName);
+
       const desktopApi = getDesktopApi();
       if (!desktopApi) {
+        const loadedLocal = await hydrateSceneFromLocalPack(projectName, dispatch);
         if (cancelled) return;
+        if (loadedLocal) {
+          desktopLocalSceneLoadedRef.current = true;
+        }
+        if (!getDesktopApi()) {
+          const scanned = await scanProjectMediaFolder(projectName);
+          if (
+            !cancelled &&
+            scanned.ok &&
+            (scanned.videos.length > 0 ||
+              scanned.holdImages.length > 0 ||
+              (scanned.sounds?.length ?? 0) > 0)
+          ) {
+            const prev = store.getState().scene.sceneData;
+            const merged = mergeScannedMediaIntoScene(
+              prev?.videos ?? [],
+              prev?.holdImages ?? [],
+              prev?.playlist ?? [],
+              scanned,
+            );
+            dispatch(
+              sceneActions.setProjectorMediaLibrary({
+                videos: merged.videos,
+                holdImages: merged.holdImages,
+              }),
+            );
+            if (merged.playlist.length !== (prev?.playlist?.length ?? 0)) {
+              dispatch(sceneActions.setPlaylist(merged.playlist));
+            }
+            console.info(
+              `[sync] imported media from ${scanned.mediaRoot ?? scanned.folderName ?? "local"}`,
+            );
+          }
+        }
+        if (loadedLocal) {
+          if (!store.getState().scene.isSceneReady) {
+            dispatch(sceneActions.setSceneReady(true));
+          }
+          return;
+        }
+        const hasImportedMedia =
+          (store.getState().scene.sceneData?.videos?.length ?? 0) > 0 ||
+          (store.getState().scene.sceneData?.holdImages?.length ?? 0) > 0;
+        if (hasImportedMedia) {
+          if (!store.getState().scene.isSceneReady) {
+            dispatch(sceneActions.setSceneReady(true));
+          }
+          return;
+        }
         dispatch(
           sceneActions.hydrateScene({
             sceneData: null,
             theaterLayout: DEFAULT_THEATER_LAYOUT,
             steps: [],
             currentPage: 0,
-            // Web: Р¶РґС‘Рј initial sync (РµСЃР»Рё РµСЃС‚СЊ С‚РѕРєРµРЅ), С‡С‚РѕР±С‹ РЅРµ РјРµР»СЊРєР°Р»Рѕ РїСѓСЃС‚РѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ/С€Р°Рі-Р·Р°РіР»СѓС€РєР°
-            isSceneReady: !accessToken,
+            isSceneReady: true,
           }),
         );
         return;
@@ -126,6 +196,33 @@ export function useSceneSyncEffects() {
           }),
         );
         desktopLocalSceneLoadedRef.current = Array.isArray(prepared.steps) && prepared.steps.length > 0;
+        void (async () => {
+          const pid =
+            typeof window !== "undefined"
+              ? localStorage.getItem(`projectId:${projectName}`)
+              : null;
+          const offline = await ensureDesktopProjectorMediaOffline({
+            projectSlug: projectName,
+            accessToken,
+            projectId: pid,
+          });
+          if (cancelled || !offline?.changed) return;
+          const bag = unpackProjectorMedia((localSceneData as any)?.projectorMedia);
+          const nextSceneData = {
+            ...(localSceneData as object),
+            videos: offline.videos.length > 0 ? offline.videos : bag.videos,
+            holdImages: offline.holdImages.length > 0 ? offline.holdImages : bag.holdImages,
+          };
+          dispatch(
+            sceneActions.hydrateScene({
+              sceneData: nextSceneData,
+              theaterLayout,
+              steps: prepared.steps,
+              currentPage: 0,
+              isSceneReady: true,
+            }),
+          );
+        })();
         if (!isTheaterLayoutDraftDirty(projectName)) {
           commitTheaterLayoutBaseline(projectName, theaterLayout);
         }
@@ -166,11 +263,36 @@ export function useSceneSyncEffects() {
   useEffect(() => {
     if (!accessToken || !projectName) return;
     if (getDesktopApi()) return;
+    if (!isSceneReady) return;
+    if (import.meta.env.DEV && desktopLocalSceneLoadedRef.current) return;
     const key = `${accessToken}:${projectName}`;
     if (lastSyncedKeyRef.current === key) return;
     lastSyncedKeyRef.current = key;
     void syncFromServer(accessToken, projectName);
-  }, [accessToken, projectName, syncFromServer]);
+  }, [accessToken, projectName, syncFromServer, isSceneReady]);
+
+  // Desktop: локальный script.json мог устареть/обнулить 3D — подтягиваем театр с сервера.
+  useEffect(() => {
+    if (!getDesktopApi() || !accessToken || !projectName) return;
+    if (!isSceneReady || steps.length === 0) return;
+    if (hasLocalEdits) return;
+    if (desktopTheaterRecoveryRef.current === projectName) return;
+
+    const lacksTheater = !steps.some((step) => stepHasTheaterSceneContent(step));
+    desktopTheaterRecoveryRef.current = projectName;
+    if (!lacksTheater) return;
+
+    console.warn("[sync] desktop local pack has no 3D theater content, pulling from server");
+    void syncFromServer(accessToken, projectName);
+  }, [
+    accessToken,
+    hasLocalEdits,
+    isSceneReady,
+    projectName,
+    steps,
+    stepsRevision,
+    syncFromServer,
+  ]);
 
   // Realtime: join socket.io room per project and pull on updates.
   useEffect(() => {
@@ -377,7 +499,8 @@ export function useSceneSyncEffects() {
   }, [hasLocalEdits, stepsRevision, sceneDataRevision, theaterLayout, lightChannelsKey]);
 
   useEffect(() => {
-    if (!isSceneReady || steps.length === 0) return;
+    if (!isSceneReady) return;
+    if (steps.length === 0 && !hasLocalEdits) return;
 
     const shadowStepCount = Array.isArray(serverShadow?.steps) ? serverShadow!.steps.length : 0;
     const localBehindServer =

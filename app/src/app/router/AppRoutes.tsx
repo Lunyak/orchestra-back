@@ -2,6 +2,7 @@ import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import {
   AppEditorMenubar,
   AppEditorMenubarProvider,
+  AppEditorScriptFormatPlayMenu,
   AppEditorScriptFormattingMenu,
   AppEditorScriptMarkdownMenu,
   AppEditorScriptModeNav,
@@ -16,10 +17,12 @@ import {
 import { useIsMobile } from "@shared/hooks/useIsMobile";
 import { PlaylistSidebar } from "@shared/components/playlist-sidebar/PlaylistSidebar";
 import { useAppDispatch, useAppSelector } from "@shared/store/hooks";
-import { Suspense, useCallback } from "react";
+import { Suspense, useCallback, useState } from "react";
+import { FormatPlayTextModal } from "../../features/play-format/ui/FormatPlayTextModal";
 import { useLocation } from "react-router-dom";
 import { useProject } from "../../features/project";
 import { useScene } from "../../features/scene";
+import { sceneActions } from "../../features/scene/model/scene-slice";
 import {
   selectActiveStepMarkdownContext,
   selectShowScriptMarkdownUi,
@@ -57,6 +60,7 @@ function AppRoutesContent() {
   } = useScriptUI();
 
   const isMobile = useIsMobile();
+  const [formatPlayModalOpen, setFormatPlayModalOpen] = useState(false);
 
   const { shouldShowScriptState, isSpectacleLayoutRoute } = getRouteMeta(
     location.pathname,
@@ -66,10 +70,10 @@ function AppRoutesContent() {
     (state) => state.scriptUi.spectacleRunTextHidden,
   );
   const showScriptMainChrome = isScriptMarkdownRoute(location.pathname);
-  const { currentStep } = useAppSelector((state) =>
+  const { currentStep, activeMarkdown, activeMarkdownField } = useAppSelector((state) =>
     projectName
       ? selectActiveStepMarkdownContext(state, projectName, SCRIPT_SCENE_NAME)
-      : { currentStep: undefined },
+      : { currentStep: undefined, activeMarkdown: "", activeMarkdownField: "markdown" as const },
   );
   const markdownMode = useAppSelector((state) =>
     projectName
@@ -159,6 +163,13 @@ function AppRoutesContent() {
   const kadrMarkdownModes =
     markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
 
+  const canFormatPlayText =
+    kadrMarkdownModes &&
+    Boolean(currentStep) &&
+    !(markdownMode === "play" && playOriginalMode);
+
+  const formatPlaySourceText = String(activeMarkdown ?? "");
+
   const handleToggleEditorToc = useCallback(() => {
     if (!projectName) return;
     const next = !editorTocEnabled;
@@ -245,6 +256,10 @@ function AppRoutesContent() {
             disabled={!isEditing || !kadrMarkdownModes}
             onTokenizeMatches={handleTokenizeMatches}
           />
+          <AppEditorScriptFormatPlayMenu
+            disabled={!canFormatPlayText}
+            onOpen={() => setFormatPlayModalOpen(true)}
+          />
         </>
       ) : null,
   );
@@ -315,6 +330,29 @@ function AppRoutesContent() {
       ) : null,
   );
 
+  const handleApplyFormattedPlayText = useCallback(
+    (text: string) => {
+      if (!currentStep) return;
+      updateStep(currentStep.id, { [activeMarkdownField]: text });
+    },
+    [activeMarkdownField, currentStep, updateStep],
+  );
+
+  const handleApplyFormattedPlayTextSplit = useCallback(
+    (args: { chunks: string[]; chunkTitles: string[] }) => {
+      if (!currentStep || args.chunks.length === 0) return;
+      dispatch(
+        sceneActions.splitStepContentIntoSteps({
+          sourceStepId: currentStep.id,
+          targetField: activeMarkdownField,
+          chunks: args.chunks,
+          chunkTitles: args.chunkTitles,
+        }),
+      );
+    },
+    [activeMarkdownField, currentStep, dispatch],
+  );
+
   return (
     <>
       <Suspense fallback={suspenseFallback}>
@@ -328,6 +366,13 @@ function AppRoutesContent() {
           onRegisterPlayHandler={registerPlaylistPlay}
         />
       ) : null}
+      <FormatPlayTextModal
+        isOpen={formatPlayModalOpen}
+        sourceText={formatPlaySourceText}
+        onClose={() => setFormatPlayModalOpen(false)}
+        onApply={handleApplyFormattedPlayText}
+        onApplySplit={handleApplyFormattedPlayTextSplit}
+      />
     </>
   );
 }

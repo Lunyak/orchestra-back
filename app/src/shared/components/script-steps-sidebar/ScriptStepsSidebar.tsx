@@ -47,7 +47,7 @@ export const ScriptStepsSidebar = ({
       const prefix = `Удалить шаг ${index + 1}${step.title ? `: "${step.title}"` : ""}?`;
       const suffix =
         steps.length <= 1
-          ? " После удаления будет создан новый пустой шаг."
+          ? " Сценарий станет пустым — можно снова добавить материал."
           : " Это действие нельзя отменить.";
       const message = `${prefix}${suffix}`;
 
@@ -88,6 +88,9 @@ export const ScriptStepsSidebar = ({
     <aside className="script-sidebar">
       <div className="script-sidebar-content">
         <div className="steps-mini-list">
+          {steps.length === 0 ? (
+            <p className="script-sidebar-empty">Добавьте материал в сценарий</p>
+          ) : null}
           {steps.map((step, index) => {
             const isActive = index === currentIndex;
             return (
@@ -132,17 +135,19 @@ export const ScriptStepsSidebar = ({
           <button
             className="script-nav-btn"
             onClick={onPrev}
-            disabled={currentIndex === 0}
+            disabled={currentIndex === 0 || steps.length === 0}
           >
             ←
           </button>
           <span className="page-indicator">
-            Шаг {currentIndex + 1} из {steps.length}
+            {steps.length === 0
+              ? "Нет шагов"
+              : `Шаг ${currentIndex + 1} из ${steps.length}`}
           </span>
           <button
             className="script-nav-btn"
             onClick={onNext}
-            disabled={currentIndex === steps.length - 1}
+            disabled={currentIndex === steps.length - 1 || steps.length === 0}
           >
             →
           </button>

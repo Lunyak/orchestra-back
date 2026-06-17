@@ -43,7 +43,10 @@ export type PlatformAddProjectImageResult = PlatformInvokeResult & {
 
 export interface PlatformApi {
   invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
-  readProjectScene?: (projectName: string, sceneName: string) => Promise<unknown>;
+  readProjectScene: (projectName: string, sceneName: string) => Promise<unknown>;
+  /** Локальная «Запись» — отдельный файл, не участвует в sync. */
+  readNotesRun?: (projectName: string) => Promise<unknown>;
+  saveNotesRun?: (projectName: string, data: unknown) => Promise<PlatformSceneSaveResult>;
   saveProjectScene?: (
     projectName: string,
     sceneName: string,
@@ -67,6 +70,31 @@ export interface PlatformApi {
   deleteProjectAudio?: (projectName: string, file: string) => Promise<PlatformInvokeResult>;
   deleteProjectSound?: (projectName: string, file: string) => Promise<PlatformInvokeResult>;
   pickProjectModel?: (projectName: string) => Promise<PlatformPickModelResult>;
+  pickProjectMediaFolder?: (
+    projectName: string,
+  ) => Promise<
+    PlatformInvokeResult & {
+      path?: string;
+      label?: string;
+      mediaRoot?: string;
+      videos?: Array<{ id: number; title: string; file: string; filePath?: string }>;
+      holdImages?: Array<{ id: number; title: string; file: string; filePath?: string }>;
+      sounds?: Array<{ id: number; title: string; file: string; filePath?: string }>;
+    }
+  >;
+  getProjectMediaFolder?: (
+    projectName: string,
+  ) => Promise<PlatformInvokeResult & { path?: string; label?: string }>;
+  scanProjectMediaFolder?: (
+    projectName: string,
+  ) => Promise<
+    PlatformInvokeResult & {
+      mediaRoot?: string;
+      videos?: Array<{ id: number; title: string; file: string; filePath?: string }>;
+      holdImages?: Array<{ id: number; title: string; file: string; filePath?: string }>;
+      sounds?: Array<{ id: number; title: string; file: string; filePath?: string }>;
+    }
+  >;
   addProjectImage?: (
     projectName: string,
     data: ArrayBuffer | Uint8Array,

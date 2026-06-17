@@ -12,6 +12,7 @@ import {
 import { useSpectacleRunContext } from "../../spectacle-run/model/spectacle-run-context";
 import type { ProjectorMediaContext } from "../model/projector-media";
 import { ProjectorMediaPreview } from "./ProjectorMediaPreview";
+import { DownloadProjectorMediaButton } from "../../../shared/components/offline/DownloadProjectorMediaButton";
 import "./spectacle-run-projector.css";
 
 type RenameTarget = { kind: "video" | "hold"; id: number };
@@ -380,6 +381,10 @@ export function SpectacleRunProjectorPanel() {
             multiple
             hidden
             onChange={(e) => void handleAddHoldImages(e.target.files)}
+          />
+          <DownloadProjectorMediaButton
+            buttonClassName="spectacle-run-projector__btn"
+            onStatus={(message) => run.setLiveStatus(message)}
           />
         </div>
         <span

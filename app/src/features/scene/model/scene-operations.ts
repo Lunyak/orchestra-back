@@ -17,6 +17,15 @@ import type { SyncChange } from "../../../sync/api/types/sync";
 import { cleanupProjectImages } from "../../../sync/api/projects";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { prefetchDesktopOfflineAfterSync } from "../../../sync/desktopPrefetchOffline";
+import { downloadDesktopProjectorMediaOffline } from "../../../sync/desktopProjectorMediaOffline";
+import { downloadPlaylistTracksOffline } from "../../../shared/media/web-media-cache";
+import {
+  mergeScannedMediaIntoScene,
+  pickProjectMediaFolder,
+  scanProjectMediaFolder,
+  type ProjectMediaScan,
+} from "../../../shared/platform/project-media-folder";
+import type { BrowserPickedScan } from "../../../shared/platform/browser-picked-media";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
@@ -25,11 +34,9 @@ import {
   selectShowScriptMarkdownUi,
   showScriptMarkdownActions,
 } from "../../show-script-markdown/model/show-script-markdown-slice";
-import { resolveStepTheaterFromApi } from "../../theater/model/theater-model-serialize";
 import { stepTheaterSyncPayload } from "../../theater/model/theater-step-models";
 import {
   prepareSceneLightBindings,
-  mapTheaterSpotlightFromApi,
   mapTheaterSpotlightToSync,
 } from "../../theater/model/theater-light-fader-bindings";
 import {
@@ -39,22 +46,17 @@ import {
 } from "../../theater/model/theater-layout-draft-storage";
 import { sceneActions, DEFAULT_THEATER_LAYOUT, type SceneData } from "./scene-slice";
 import { loadSceneRolesFromStorage } from "./scene-roles-storage";
-import { hydrateSceneFromLocalPack } from "./scene-local-hydration";
 import {
   extractReferencedRemoteImageKeysFromSteps,
   normalizeLightChannelsFromServer,
+  normalizeRequisiteAssignees,
+  normalizeScriptStepsFromSyncApi,
   normalizeTheaterLayoutFromServer,
 } from "./scene-normalize";
 import {
   resolveLightChannelsForPersist,
 } from "../../../shared/components/light-console/light-channels-mutate";
 import { prepareLightProgramsForPersist, buildCompleteLightFaders } from "../../../shared/components/light-console/light-console-data";
-
-function normalizeRequisiteAssignees(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.map((item) => String(item ?? "").trim()).filter(Boolean)
-    : [];
-}
 
 export function useSceneOperations() {
   const dispatch = useAppDispatch();
@@ -129,58 +131,11 @@ export function useSceneOperations() {
           dispatch(sceneActions.setSceneReady(true));
           return;
         }
-        const normalizedSteps = (Array.isArray(serverSteps) ? serverSteps : [])
-          .filter((st: any) => String(st?.sceneId ?? "") === String(scene.id))
-          .sort((a: any, b: any) => (Number(a?.order ?? 0) - Number(b?.order ?? 0)))
-          .map((st: any) => ({
-            id: Number(st?.sourceId ?? 0),
-            title: String(st?.title ?? ""),
-            markdown: String(st?.markdown ?? ""),
-            playMarkdown: st?.playMarkdown ?? undefined,
-            explicationMarkdown: st?.explicationMarkdown ?? undefined,
-            durationMin: st?.durationMin ?? undefined,
-            kanbanStatus: st?.kanbanStatus ?? undefined,
-            kanbanOrder: st?.kanbanOrder ?? undefined,
-            requisites: Array.isArray(st?.requisites)
-              ? st.requisites.map((r: any) => ({
-                  id: Number(r?.sourceId ?? r?.id ?? 0),
-                  label: String(r?.label ?? ""),
-                  checked: Boolean(r?.checked),
-                  setupAssignees: normalizeRequisiteAssignees(r?.setupAssignees),
-                  removeAssignees: normalizeRequisiteAssignees(r?.removeAssignees),
-                }))
-              : [],
-            lightPlot: Array.isArray(st?.lightPlot)
-              ? st.lightPlot.map((f: any) => ({
-                  id: Number(f?.sourceId ?? f?.id ?? 0),
-                  label: String(f?.label ?? ""),
-                  channel: String(f?.channel ?? ""),
-                  x: Number(f?.x ?? 0),
-                  y: Number(f?.y ?? 0),
-                  angle: f?.angle ?? undefined,
-                  length: f?.length ?? undefined,
-                }))
-              : [],
-            lightCues: Array.isArray((st as any)?.lightCues)
-              ? (st as any).lightCues.map((cue: any) => ({
-                  id: Number(cue?.id ?? 0),
-                  tSec: Number(cue?.tSec ?? 0),
-                  channel: String(cue?.channel ?? ""),
-                  intensity:
-                    typeof cue?.intensity === "number" ? cue.intensity : undefined,
-                  enabled: cue?.enabled ?? undefined,
-                }))
-              : undefined,
-            lightKadrs:
-              (st as any)?.lightKadrs && typeof (st as any).lightKadrs === "object"
-                ? (st as any).lightKadrs
-                : undefined,
-            ...resolveStepTheaterFromApi(st),
-            theaterSpotlights: Array.isArray(st?.theaterSpotlights)
-              ? st.theaterSpotlights.map((sp: any) => mapTheaterSpotlightFromApi(sp))
-              : [],
-          }))
-          .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
+        const normalizedSteps = normalizeScriptStepsFromSyncApi(
+          (Array.isArray(serverSteps) ? serverSteps : []).filter(
+            (st: any) => String(st?.sceneId ?? "") === String(scene.id),
+          ),
+        );
 
         const normalizedPlaylist = (Array.isArray(playlistItems) ? playlistItems : [])
           .filter((pi: any) => String(pi?.sceneId ?? "") === String(scene.id))
@@ -316,6 +271,36 @@ export function useSceneOperations() {
             },
           }),
         );
+        if (!getDesktopApi()) {
+          void scanProjectMediaFolder(effectiveProject).then((scanned) => {
+            if (!scanned.ok) return;
+            const state = store.getState().scene;
+            const merged = mergeScannedMediaIntoScene(
+              state.sceneData?.videos ?? [],
+              state.sceneData?.holdImages ?? [],
+              state.sceneData?.playlist ?? [],
+              scanned,
+            );
+            dispatch(
+              sceneActions.setProjectorMediaLibrary({
+                videos: merged.videos,
+                holdImages: merged.holdImages,
+              }),
+            );
+            if (merged.playlist.length !== (state.sceneData?.playlist?.length ?? 0)) {
+              dispatch(sceneActions.setPlaylist(merged.playlist));
+            }
+          });
+          const playlist = Array.isArray(minimalSceneData.playlist) ? minimalSceneData.playlist : [];
+          if (
+            typeof navigator !== "undefined" &&
+            navigator.onLine &&
+            playlist.length > 0 &&
+            tokenToUse
+          ) {
+            void downloadPlaylistTracksOffline(effectiveProject, playlist, tokenToUse);
+          }
+        }
         if (!isTheaterLayoutDraftDirty(effectiveProject)) {
           commitTheaterLayoutBaseline(effectiveProject, normalizedLayout);
         }
@@ -472,6 +457,7 @@ export function useSceneOperations() {
         images,
         lightChannels: persistedLightChannels,
       };
+      delete payload.lightNotesRun;
 
       const commitSavedBaseline = (payloadForShadow: any, stepsForShadow: ScriptStep[]) => {
         dispatch(
@@ -555,59 +541,7 @@ export function useSceneOperations() {
                 const serverStepsRaw = Array.isArray((pull as any)?.steps)
                   ? (pull as any).steps.filter((st: any) => String(st?.sceneId ?? "") === sceneId)
                   : [];
-                const prevSteps = [...serverStepsRaw]
-                  .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
-                  .map((st: any) => ({
-                    id: Number(st?.sourceId ?? 0),
-                    title: String(st?.title ?? ""),
-                    markdown: String(st?.markdown ?? ""),
-                    playMarkdown: st?.playMarkdown ?? undefined,
-                    explicationMarkdown: st?.explicationMarkdown ?? undefined,
-                    durationMin: st?.durationMin ?? undefined,
-                    kanbanStatus: st?.kanbanStatus ?? undefined,
-                    kanbanOrder: st?.kanbanOrder ?? undefined,
-                    requisites: Array.isArray(st?.requisites)
-                      ? st.requisites.map((r: any) => ({
-                          id: Number(r?.sourceId ?? r?.id ?? 0),
-                          label: String(r?.label ?? ""),
-                          checked: Boolean(r?.checked),
-                          setupAssignees: normalizeRequisiteAssignees(r?.setupAssignees),
-                          removeAssignees: normalizeRequisiteAssignees(r?.removeAssignees),
-                        }))
-                      : [],
-                    lightPlot: Array.isArray(st?.lightPlot)
-                      ? st.lightPlot.map((f: any) => ({
-                          id: Number(f?.sourceId ?? f?.id ?? 0),
-                          label: String(f?.label ?? ""),
-                          channel: String(f?.channel ?? ""),
-                          x: Number(f?.x ?? 0),
-                          y: Number(f?.y ?? 0),
-                          angle: f?.angle ?? undefined,
-                          length: f?.length ?? undefined,
-                        }))
-                      : [],
-                    lightCues: Array.isArray(st?.lightCues)
-                      ? st.lightCues.map((cue: any) => ({
-                          id: Number(cue?.id ?? 0),
-                          tSec: Number(cue?.tSec ?? 0),
-                          channel: String(cue?.channel ?? ""),
-                          intensity:
-                            typeof cue?.intensity === "number"
-                              ? cue.intensity
-                              : undefined,
-                          enabled: cue?.enabled ?? undefined,
-                        }))
-                      : undefined,
-                    lightKadrs:
-                      (st as any)?.lightKadrs && typeof (st as any).lightKadrs === "object"
-                        ? (st as any).lightKadrs
-                        : undefined,
-                    ...resolveStepTheaterFromApi(st),
-                    theaterSpotlights: Array.isArray(st?.theaterSpotlights)
-                      ? st.theaterSpotlights.map((sp: any) => mapTheaterSpotlightFromApi(sp))
-                      : [],
-                  }))
-                  .filter((x: any) => Number.isFinite(x.id) && x.id > 0) as ScriptStep[];
+                const prevSteps = normalizeScriptStepsFromSyncApi(serverStepsRaw);
 
                 const playlistItems = Array.isArray((pull as any)?.playlistItems)
                   ? (pull as any).playlistItems.filter((pi: any) => String(pi?.sceneId ?? "") === sceneId)
@@ -1135,5 +1069,107 @@ export function useSceneOperations() {
     }
   }, [accessToken, projectName, ensureRemoteProject]);
 
-  return { syncFromServer, saveStepsForLightPlot, pushSceneAfterSoundsSave };
+  const downloadProjectorMediaForOffline = useCallback(async (opts?: {
+    onProgress?: (current: number, total: number, label: string) => void;
+  }) => {
+    if (!projectName) {
+      throw new Error("Выберите проект");
+    }
+    if (!getDesktopApi()?.invoke) {
+      throw new Error("Скачивание доступно только в десктоп-приложении");
+    }
+    const tokenToUse =
+      accessToken ??
+      (typeof window !== "undefined" ? localStorage.getItem("accessToken") : null);
+    const projectId =
+      typeof window !== "undefined"
+        ? localStorage.getItem(`projectId:${projectName}`)
+        : null;
+    const result = await downloadDesktopProjectorMediaOffline({
+      projectSlug: projectName,
+      accessToken: tokenToUse,
+      projectId,
+      onProgress: opts?.onProgress,
+    });
+    if (result.changed) {
+      dispatch(
+        sceneActions.setProjectorMediaLibrary({
+          videos: result.videos,
+          holdImages: result.holdImages,
+        }),
+      );
+    }
+    return result;
+  }, [accessToken, dispatch, projectName]);
+
+  const syncAndDownloadProjectorMediaForOffline = useCallback(async (opts?: {
+    onProgress?: (current: number, total: number, label: string) => void;
+  }) => {
+    const tokenToUse =
+      accessToken ??
+      (typeof window !== "undefined" ? localStorage.getItem("accessToken") : null);
+    if (tokenToUse && projectName && typeof navigator !== "undefined" && navigator.onLine) {
+      await syncFromServer(tokenToUse, projectName);
+    }
+    await saveStepsRef.current({ force: true });
+    return downloadProjectorMediaForOffline(opts);
+  }, [accessToken, downloadProjectorMediaForOffline, projectName, syncFromServer]);
+
+  const importDevMediaFolder = useCallback(async (opts?: {
+    force?: boolean;
+    scanned?: ProjectMediaScan | BrowserPickedScan;
+    pickIfMissing?: boolean;
+  }) => {
+    if (!projectName) {
+      throw new Error("Выберите проект");
+    }
+    let scan: ProjectMediaScan | undefined =
+      opts?.scanned && opts.scanned.ok ? (opts.scanned as ProjectMediaScan) : undefined;
+    if (!scan?.ok) {
+      const resolved = await scanProjectMediaFolder(projectName);
+      scan = resolved.ok ? resolved : undefined;
+    }
+    if (!scan?.ok && opts?.pickIfMissing !== false) {
+      const picked = await pickProjectMediaFolder(projectName);
+      if (!picked.ok) {
+        throw new Error(picked.error ?? "Выберите папку с медиа для проекта");
+      }
+      scan = picked;
+    }
+    if (!scan?.ok) {
+      throw new Error(scan?.error ?? "Папка с медиа не выбрана");
+    }
+    const state = store.getState().scene;
+    const merged = mergeScannedMediaIntoScene(
+      state.sceneData?.videos ?? [],
+      state.sceneData?.holdImages ?? [],
+      state.sceneData?.playlist ?? [],
+      scan,
+    );
+    dispatch(
+      sceneActions.setProjectorMediaLibrary({
+        videos: merged.videos,
+        holdImages: merged.holdImages,
+      }),
+    );
+    dispatch(sceneActions.setPlaylist(merged.playlist));
+    const label = scan.mediaRoot ?? scan.folderName ?? "локальная папка";
+    const soundCount = scan.sounds?.length ?? 0;
+    const soundNote = soundCount > 0 ? `, ${soundCount} mp3 в папке` : "";
+    return {
+      message: `Подключено: ${merged.videos.length} видео, ${merged.holdImages.length} заставок${soundNote} (${label})`,
+      videos: merged.videos,
+      holdImages: merged.holdImages,
+      folderLabel: label,
+    };
+  }, [dispatch, projectName]);
+
+  return {
+    syncFromServer,
+    saveStepsForLightPlot,
+    pushSceneAfterSoundsSave,
+    downloadProjectorMediaForOffline,
+    syncAndDownloadProjectorMediaForOffline,
+    importDevMediaFolder,
+  };
 }

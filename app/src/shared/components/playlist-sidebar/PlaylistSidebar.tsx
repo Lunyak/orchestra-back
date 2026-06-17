@@ -22,11 +22,14 @@ import { createAudioFadeController } from "../../media/audio-fade";
 import {
   buildPlaylistCacheKey,
   fetchAndCachePlaylistTrack,
+  getCachedObjectUrl,
   isWebMediaCacheEnabled,
   isWebMediaCached,
   resolveWebPlaylistPlaybackUrl,
+  downloadPlaylistTracksOffline,
 } from "../../media/web-media-cache";
 import { resolveOfflineMediaUrl } from "../../platform/media-url";
+import { resolveBrowserPickedMediaUrl } from "../../platform/browser-picked-media";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
 import { Buttons } from "../buttons/Buttons";
@@ -313,6 +316,19 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
   const resolveTrackPlaybackSrc = useCallback(
     async (track: PlaylistTrack) => {
+      const titleHint = String(track.title ?? "").trim();
+
+      if (isWebMediaCacheEnabled()) {
+        const cacheKey = buildPlaylistCacheKey(projectName, track);
+        const cached = await getCachedObjectUrl(cacheKey);
+        if (cached) return cached;
+      }
+
+      if (!getDesktopApi()) {
+        const picked = resolveBrowserPickedMediaUrl(track.file, titleHint, projectName);
+        if (picked) return picked;
+      }
+
       if (getDesktopApi() || track.filePath) {
         return resolveOfflineMediaUrl({
           projectSlug: projectName,
@@ -320,13 +336,16 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
           fileName: track.file,
           filePath: track.filePath,
           remoteUrl: track.remoteUrl,
+          titleHint,
         });
       }
+
       if (isWebMediaCacheEnabled()) {
         return resolveWebPlaylistPlaybackUrl(projectName, track, accessToken);
       }
+
       const remote = String(track.remoteUrl ?? "").trim();
-      if (remote) return remote;
+      if (/^https?:\/\//i.test(remote)) return remote;
       return track.file;
     },
     [accessToken, projectName],
@@ -779,9 +798,30 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       setIsPlaying(true);
     } catch (error) {
       if (requestId !== playRequestId.current) return;
+      if (isWebMediaCacheEnabled() && accessToken && typeof navigator !== "undefined" && navigator.onLine) {
+        try {
+          await fetchAndCachePlaylistTrack(projectName, track, accessToken);
+          const retrySrc = await getCachedObjectUrl(buildPlaylistCacheKey(projectName, track));
+          if (retrySrc) {
+            inactiveAudio.src = retrySrc;
+            await inactiveAudio.play();
+            if (requestId !== playRequestId.current) {
+              inactiveAudio.pause();
+              return;
+            }
+            setActiveAudioKey(inactiveKey);
+            runFade(inactiveAudio, inactiveKey, 0, fadeTarget, fadeInMs);
+            setIsPlaying(true);
+            return;
+          }
+        } catch {
+          /* fall through */
+        }
+      }
       console.error("Ошибка воспроизведения:", error);
     }
   }, [
+    accessToken,
     activeAudioKey,
     clearFadeTimer,
     crossfadeEnabled,
@@ -810,7 +850,13 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       const byIndex = playlist[Number(trackId) - 1];
       if (byIndex) {
         void playTrack(byIndex, playbackVolume, { continueIfPlaying });
+        return;
       }
+      console.warn("[playlist] track not found", {
+        trackId,
+        playlistIds: playlist.map((track) => track.id),
+        playlistTitles: playlist.map((track) => track.title),
+      });
     },
     [playlist, playTrack, setVolume],
   );
@@ -1066,6 +1112,8 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     : "Добавить аудио (веб)";
   const showPlayer = mode !== "list";
   const showSidebar = mode !== "player";
+  /** Аудио нужно и в list-режиме: прогон/запись вызывают invokePlaylistPlay без UI-плеера. */
+  const mountAudioHost = showPlayer || Boolean(onRegisterPlayHandler);
 
   const sharedActiveTrackId = useSyncExternalStore(
     subscribePlaylistActiveTrack,
@@ -1116,7 +1164,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
 
   return (
     <>
-      {showPlayer ? (
+      {mountAudioHost ? (
         <div className="playlist-audio-host" aria-hidden="true">
           <audio ref={audioRefA} />
           <audio ref={audioRefB} />

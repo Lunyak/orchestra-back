@@ -72,7 +72,9 @@ interface IProps {
   onTrackLinkClick: (trackId: number) => void;
   onSoundLinkClick?: (soundId: number) => void;
   onCreateStepFromSelection?: (
+    sourceStepId: number,
     selectedText: string,
+    trimmedSourceText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => void;
   requisitesPane?: React.ReactNode;
@@ -482,26 +484,27 @@ export function ShowScriptMarkdownSection({
     }
     if (pick.kind === "create-step-from-selection") {
       const ed = markdownRef.current;
-      if (!ed) return;
+      if (!ed || !currentStep) return;
       const selection = ed.getSelection();
       if (!selection) return;
       const selectionFrom = Math.min(selection.from, selection.to);
       const selectionTo = Math.max(selection.from, selection.to);
       if (selectionFrom === selectionTo) return;
-      const selectedText = ed.getDoc().slice(selectionFrom, selectionTo);
-      if (!onCreateStepFromSelection) return;
-      onCreateStepFromSelection?.(
-        selectedText,
-        activeMarkdownField as "markdown" | "playMarkdown" | "explicationMarkdown",
-      );
       const currentValue = ed.getDoc();
-      const { value: nextValue, cursor } = insertAtSelection({
+      const selectedText = currentValue.slice(selectionFrom, selectionTo);
+      if (!selectedText || !onCreateStepFromSelection) return;
+      const { value: trimmedSourceText } = insertAtSelection({
         value: currentValue,
         insert: "",
         selectionStart: selectionFrom,
         selectionEnd: selectionTo,
       });
-      ed.applyDocument(nextValue, cursor);
+      onCreateStepFromSelection(
+        currentStep.id,
+        selectedText,
+        trimmedSourceText,
+        activeMarkdownField as "markdown" | "playMarkdown" | "explicationMarkdown",
+      );
       return;
     }
     void handleInsertImage();

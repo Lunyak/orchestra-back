@@ -3,6 +3,7 @@ import {
   fetchProjectorImageBlobUrl,
   fetchProjectorVideoBlobUrl,
 } from "../model/projector-media";
+import { isLocalProjectMediaUrl } from "../../../shared/platform/media-url";
 import {
   sendProjectorMessage,
   subscribeProjectorMessages,
@@ -44,6 +45,7 @@ export function ProjectorOutputPage() {
   const [holdLoading, setHoldLoading] = useState(false);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
+  const [outputHint, setOutputHint] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeVideoIdRef = useRef<number | null>(null);
@@ -97,9 +99,14 @@ export function ProjectorOutputPage() {
       revokeHoldBlob();
       setHoldSrc(null);
       setHoldLoading(true);
+      setOutputHint(null);
 
       try {
-        if (!storageKey && fallbackSrc) {
+        if (fallbackSrc && isLocalProjectMediaUrl(fallbackSrc)) {
+          setHoldSrc(fallbackSrc);
+          return;
+        }
+        if (fallbackSrc) {
           setHoldSrc(fallbackSrc);
           return;
         }
@@ -112,14 +119,11 @@ export function ProjectorOutputPage() {
             return;
           }
         }
-        if (fallbackSrc) {
-          setHoldSrc(fallbackSrc);
-          return;
-        }
         reportOutputError(
           "hold",
           "файл заставки не найден в хранилище — перезагрузите заставку в панели проектора",
         );
+        setOutputHint("Заставка не найдена — нажмите «Выбрать папку…» в Записи");
       } finally {
         if (loadHoldSeqRef.current === seq) {
           setHoldLoading(false);
@@ -136,9 +140,14 @@ export function ProjectorOutputPage() {
       revokeVideoBlob();
       setVideoSrc(null);
       setVideoLoading(true);
+      setOutputHint(null);
 
       try {
-        if (!storageKey && fallbackSrc) {
+        if (fallbackSrc && isLocalProjectMediaUrl(fallbackSrc)) {
+          setVideoSrc(fallbackSrc);
+          return;
+        }
+        if (fallbackSrc) {
           setVideoSrc(fallbackSrc);
           return;
         }
@@ -151,14 +160,11 @@ export function ProjectorOutputPage() {
             return;
           }
         }
-        if (fallbackSrc) {
-          setVideoSrc(fallbackSrc);
-          return;
-        }
         reportOutputError(
           "video",
           "файл видео не найден в хранилище — перезагрузите видео в панели проектора",
         );
+        setOutputHint("Видео не найдено — нажмите «Выбрать папку…» в Записи");
       } finally {
         if (loadVideoSeqRef.current === seq) {
           setVideoLoading(false);
@@ -412,6 +418,10 @@ export function ProjectorOutputPage() {
           onEnded={handleVideoEnded}
           onError={handleVideoError}
         />
+      ) : null}
+
+      {!holdLoading && !videoLoading && outputHint ? (
+        <p className="projector-output__error">{outputHint}</p>
       ) : null}
     </div>
   );

@@ -18,6 +18,11 @@ const LightPlotPage = React.lazy(() =>
     default: m.LightPlotPage,
   })),
 );
+const NotesRunPageSection = React.lazy(() =>
+  import("../../notes-run/ui/NotesRunPageSection").then((m) => ({
+    default: m.NotesRunPageSection,
+  })),
+);
 const ShowScript = React.lazy(() =>
   import("../../../shared/components/show-script/ShowScript").then((m) => ({
     default: m.ShowScript,
@@ -56,6 +61,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     projectName,
     projects,
     pushSceneAfterSoundsSave,
+    registerPlaylistPlay,
     registerSoundToggle,
     reorderSteps,
     sceneData,
@@ -149,6 +155,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
         projectName={projectDisplay}
         sceneName="script"
         mode="list"
+        onRegisterPlayHandler={registerPlaylistPlay}
       />
     </div>
   ) : null;
@@ -269,6 +276,11 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
               <LightPlotPage />
             </Suspense>
           )}
+          {activeView === "notes-run" && (
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка прогона…" />}>
+              <NotesRunPageSection />
+            </Suspense>
+          )}
           {activeView === "script" && (
             <Suspense
               fallback={
@@ -288,31 +300,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       </div>
       {theaterHostMounted ? theaterOutlinerNode : null}
       {stepsSidebarNode}
-      {!isMobile && !compactMainChrome && activeView !== "light-plot" && (
-        <div className="desktop-panel-buttons" aria-label="Панели">
-          {showStepsSidebar && isStepsCollapsed && (
-            <button
-              type="button"
-              className="desktop-panel-btn"
-              onClick={() => setIsStepsCollapsed(false)}
-              aria-label="Показать шаги"
-            >
-              Шаги
-            </button>
-          )}
-          {!showPlaylistSidebar && (!isTheaterView || theaterRehearsalMode) && (
-            <button
-              type="button"
-              className="desktop-panel-btn"
-              onClick={togglePlaylist}
-              aria-label="Показать плейлист"
-            >
-              Плейлист
-            </button>
-          )}
-        </div>
-      )}
-
       {isMobile &&
         (mobilePlaylistOpen ||
           mobileStepsOpen ||

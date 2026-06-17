@@ -170,11 +170,24 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     setProjectsLoading(true);
     try {
       const desktopApi = getDesktopApi();
-      const listRaw: ProjectSummary[] = desktopApi
+      let listRaw: ProjectSummary[] = desktopApi
         ? (await desktopApi.listProjects()).map(desktopProjectSummary)
         : accessToken
           ? await fetchProjects(accessToken)
           : [];
+      if (listRaw.length === 0 && import.meta.env.DEV) {
+        try {
+          const res = await fetch("/local-project-dev/projects");
+          if (res.ok) {
+            const data = (await res.json()) as { projects?: string[] };
+            listRaw = (Array.isArray(data.projects) ? data.projects : []).map((slug) =>
+              desktopProjectSummary(slug),
+            );
+          }
+        } catch {
+          /* dev local list unavailable */
+        }
+      }
       const items = listRaw.filter((project) => !isDirectorSessionsSlug(project.slug));
       const list = items.map((project) => project.slug);
       setProjectItems(items);

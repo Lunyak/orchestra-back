@@ -1,5 +1,6 @@
 import cn from "classnames";
 import React, { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import "./style.css";
 
 export type ModalProps = {
@@ -48,7 +49,7 @@ export function Modal({
 
   if (!isOpen) return null;
 
-  return (
+  const dialog = (
     <div
       className="modal-backdrop"
       role="presentation"
@@ -69,4 +70,10 @@ export function Modal({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined") {
+    return createPortal(dialog, document.body);
+  }
+
+  return dialog;
 }

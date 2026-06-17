@@ -15,6 +15,8 @@ interface API {
   ) => Promise<any>;
   saveProjectConfig: (projectName: string, config: any) => Promise<any>;
   readProjectScene: (projectName: string, sceneName: string) => Promise<any>;
+  readNotesRun: (projectName: string) => Promise<any>;
+  saveNotesRun: (projectName: string, data: any) => Promise<{ ok?: boolean; error?: string }>;
   pickProjectImage: (projectName: string, projectId?: string) => Promise<any>;
   addProjectImage: (
     projectName: string,
@@ -36,6 +38,9 @@ interface API {
     name: string
   ) => Promise<{ ok: boolean; name?: string; error?: string }>;
   deleteProject: (name: string) => Promise<{ ok: boolean; error?: string }>;
+  pickProjectMediaFolder: (projectName: string) => Promise<any>;
+  getProjectMediaFolder: (projectName: string) => Promise<any>;
+  scanProjectMediaFolder: (projectName: string) => Promise<any>;
 
   ping: () => string;
 }
