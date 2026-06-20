@@ -8,4 +8,5 @@ import "../../../features/rehearsals/api/rehearsals-api";
 import "../../../features/director-sessions/api/director-sessions-api";
 import "../../../features/troupe/api/troupe-api";
 import "../../../features/premises/api/premises-api";
+import "../../../features/project-tasks/api/project-tasks-api";
 import "./sync-api";

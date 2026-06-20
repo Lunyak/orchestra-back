@@ -1,24 +1,41 @@
 .troupe-layout .main-content {
-  padding: 16px;
-  color: var(--color-text-primary);
-  font-family: var(--font-family-script-body);
-  background-color: var(--color-bg-primary);
+  --troupe-bg: #111;
+  --troupe-bg-deep: #0a0a0a;
+  --troupe-panel: #1b1b1b;
+  --troupe-panel-hover: #222;
+  --troupe-border: #222;
+  --troupe-border-strong: #333;
+  --troupe-text: #888;
+  --troupe-text-muted: #666;
+  --troupe-text-strong: #ccc;
+  --troupe-accent: var(--color-active-ascent);
+  --troupe-accent-bg: color-mix(in srgb, var(--color-active-ascent) 16%, transparent);
+  --troupe-focus-ring: color-mix(in srgb, var(--color-active-ascent) 35%, transparent);
+
+  padding: 10px 12px 24px;
+  color: var(--troupe-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--troupe-bg);
+}
+
+.troupe-layout .app-content {
+  background: var(--troupe-bg);
 }
 
 .troupe-view {
-  max-width: 1200px;
+  max-width: var(--width-content-page);
   width: 100%;
   min-width: 0;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .troupe-hint {
   margin: 0 0 10px;
   font-size: 12px;
-  opacity: 0.85;
+  color: var(--troupe-text);
   line-height: 1.45;
   overflow-wrap: anywhere;
   hyphens: auto;
@@ -30,10 +47,13 @@
 }
 
 .troupe-invite-card__title {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   margin-bottom: 8px;
   line-height: 1.25;
+  text-transform: uppercase;
+  color: var(--troupe-text-muted);
 }
 
 .troupe-invite-card__title-mobile {
@@ -49,21 +69,85 @@
   align-items: flex-start;
   justify-content: flex-start;
   gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--troupe-border);
 }
 
 .troupe-header__title {
-  color: var(--color-text-tertiary);
+  margin: 0;
+  color: var(--troupe-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.troupe-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--troupe-border);
+  background: var(--troupe-panel);
+  padding: 4px;
+}
+
+.troupe-tab {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--troupe-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.troupe-tab:hover {
+  background: var(--troupe-panel-hover);
+  color: var(--troupe-text-strong);
+}
+
+.troupe-tab--active,
+.troupe-tab[aria-selected="true"] {
+  background: var(--troupe-accent-bg);
+  color: var(--color-active-ascent);
+}
+
+.troupe-tab__count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--troupe-bg-deep);
+  color: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .troupe-card {
-  border: 1px solid var(--color-border-visible);
-  padding: 12px;
-  background: var(--color-bg-transparent-2);
+  border: 1px solid var(--troupe-border);
+  border-radius: 0;
+  padding: 10px 12px 12px;
+  background: var(--troupe-panel);
+  box-shadow: none;
+}
+
+.troupe-schedule-card--guest {
+  border-color: var(--troupe-border-strong);
+  background: color-mix(in srgb, var(--troupe-panel) 88%, var(--troupe-accent-bg));
 }
 
 .troupe-error {
   margin-top: 8px;
-  color: var(--color-danger-light);
+  color: #f66;
   font-size: 12px;
 }
 
@@ -73,7 +157,7 @@
   flex-wrap: wrap;
   align-items: center;
   font-size: 12px;
-  opacity: 0.9;
+  color: var(--troupe-text);
 }
 
 .troupe-legend-item {
@@ -87,7 +171,7 @@
   height: 10px;
   border-radius: 3px;
   display: inline-block;
-  border: 1px solid var(--color-border-input-soft);
+  border: 1px solid var(--troupe-border-strong);
 }
 
 .troupe-dot.free {
@@ -103,14 +187,14 @@
 }
 
 .troupe-dot.unknown {
-  background: var(--color-border-visible);
+  background: var(--troupe-border-strong);
 }
 
 .troupe-schedule {
   margin-top: 10px;
-  border: 1px solid var(--color-border-visible);
+  border: 1px solid var(--troupe-border);
   overflow: auto;
-  background: var(--color-bg-scrim-faint);
+  background: var(--troupe-bg-deep);
 }
 
 .troupe-grid {
@@ -122,8 +206,8 @@
   --troupe-grid-span: 32;
   --troupe-mark-w: 1px;
   --troupe-mark-overlap: 1px;
-  --troupe-mark-orange: var(--color-accent-orange);
-  --troupe-mark-blue: var(--color-accent-blue-strong);
+  --troupe-mark-orange: var(--troupe-accent);
+  --troupe-mark-blue: var(--troupe-accent);
 
   display: grid;
   grid-template-columns: var(--troupe-label-w, 240px) repeat(var(--troupe-day-count), var(--troupe-day-w, 28px));
@@ -137,20 +221,26 @@
 }
 
 .troupe-card__field-label {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   margin-bottom: 8px;
+  text-transform: uppercase;
+  color: var(--troupe-text-muted);
 }
 
 .troupe-scale-head__title {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   margin-bottom: 4px;
+  text-transform: uppercase;
+  color: var(--troupe-text-muted);
 }
 
 .troupe-scale-head__subtitle {
   font-size: 12px;
-  opacity: 0.75;
+  color: var(--troupe-text);
 }
 
 .troupe-header-cell--day-head {
@@ -159,7 +249,7 @@
 }
 
 .troupe-header-cell--day-head:focus-visible {
-  outline: 2px solid var(--color-blue-border);
+  outline: 2px solid var(--troupe-focus-ring);
   outline-offset: 2px;
 }
 
@@ -181,22 +271,22 @@
 
 .troupe-header-cell.troupe-header-cell--today:not(.troupe-header-cell--col-selected) .troupe-header-day-num,
 .troupe-header-cell.troupe-header-cell--today:not(.troupe-header-cell--col-selected) .troupe-header-day-wd {
-  color: var(--color-text-primary);
+  color: var(--troupe-text-strong);
   opacity: 1;
 }
 
 .troupe-header-cell.troupe-header-cell--col-selected .troupe-header-day-num,
 .troupe-header-cell.troupe-header-cell--col-selected .troupe-header-day-wd {
-  color: var(--color-text-primary);
+  color: var(--color-active-ascent);
   opacity: 1;
 }
 
 .troupe-header-cell.troupe-header-cell--today:not(.troupe-header-cell--col-selected) {
-  background: var(--color-accent-orange-bg);
+  background: var(--troupe-panel-hover);
 }
 
 .troupe-header-cell.troupe-header-cell--col-selected {
-  background: var(--color-accent-blue-bg-medium);
+  background: var(--troupe-accent-bg);
 }
 
 .troupe-header-cell.troupe-header-cell--today::before {
@@ -310,8 +400,8 @@
 
 .troupe-cell {
   box-sizing: border-box;
-  border-right: 1px solid var(--color-border-faint);
-  border-bottom: 1px solid var(--color-border-faint);
+  border-right: 1px solid var(--troupe-border);
+  border-bottom: 1px solid var(--troupe-border);
   /* padding: 4px 6px; */
   min-height: 28px;
   display: flex;
@@ -323,7 +413,7 @@
   position: sticky;
   top: 0;
   z-index: 5;
-  background: var(--color-surface-panel);
+  background: var(--troupe-panel);
   backdrop-filter: blur(6px);
 
   display: flex;
@@ -337,9 +427,9 @@
   left: 0;
   z-index: 6;
   justify-content: flex-start;
-  background: var(--color-surface-panel);
+  background: var(--troupe-panel);
   backdrop-filter: blur(6px);
-  border-right: 1px solid var(--color-border-visible);
+  border-right: 1px solid var(--troupe-border-strong);
 }
 
 .troupe-actor-cell {
@@ -349,8 +439,13 @@
   user-select: none;
 }
 
+.troupe-actor-cell--readonly {
+  cursor: default;
+}
+
 .troupe-actor-cell.selected {
-  background: var(--color-accent-orange-strong);
+  background: var(--troupe-accent-bg);
+  box-shadow: inset 0 0 0 1px var(--troupe-focus-ring);
 }
 
 .troupe-actor-cell.selected .troupe-actor-row {
@@ -360,12 +455,14 @@
 
 .troupe-actor-cell.selected .troupe-actor-name,
 .troupe-actor-cell.selected .troupe-actor-email {
-  color: var(--color-text-primary);
+  color: var(--color-active-ascent);
   opacity: 1;
 }
 
 .troupe-actions {
   margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--troupe-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -373,22 +470,119 @@
   flex-wrap: wrap;
 }
 
+.troupe-project-cast-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.troupe-project-cast-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--troupe-border);
+}
+
+.troupe-project-cast-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.troupe-project-cast-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--troupe-text-muted);
+}
+
+.troupe-project-cast-subtitle {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--troupe-text-strong);
+}
+
+.troupe-project-cast-schedule-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.troupe-project-cast-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.troupe-project-cast-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--troupe-border);
+  background: var(--troupe-bg-deep);
+}
+
+.troupe-project-cast-item:hover {
+  background: var(--troupe-panel-hover);
+}
+
+.troupe-project-cast-meta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--troupe-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.troupe-project-cast-badge {
+  padding: 3px 6px;
+  background: var(--troupe-panel);
+  color: var(--troupe-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.troupe-project-cast-badge--active {
+  color: var(--color-active-ascent);
+  background: var(--troupe-accent-bg);
+}
+
+.troupe-project-cast-empty {
+  padding: 12px 0;
+  color: var(--troupe-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .troupe-actions-left {
   font-size: 12px;
-  opacity: 0.9;
+  color: var(--troupe-text);
   min-width: 0;
 }
 
 .troupe-actions-label {
-  opacity: 0.75;
+  color: var(--troupe-text-muted);
 }
 
 .troupe-actions-selected {
   font-weight: 700;
+  color: var(--troupe-text-strong);
 }
 
 .troupe-actions-selected.muted {
-  opacity: 0.65;
+  color: var(--troupe-text-muted);
   font-weight: 600;
 }
 
@@ -408,7 +602,7 @@
 .troupe-project-field__label {
   font-size: 12px;
   font-weight: 700;
-  opacity: 0.8;
+  color: var(--troupe-text-muted);
 }
 
 .troupe-project-select {
@@ -424,11 +618,12 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: var(--troupe-actor-text-max, 180px);
+  color: var(--troupe-text-strong);
 }
 
 .troupe-actor-email {
   font-size: 11px;
-  opacity: 0.7;
+  color: var(--troupe-text-muted);
   line-height: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -471,9 +666,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-border-input);
-  background: var(--color-border-subtle);
-  color: var(--color-text-high);
+  border: 1px solid var(--troupe-border);
+  border-radius: 0;
+  background: var(--troupe-panel-hover);
+  color: var(--troupe-text-strong);
   font-size: 16px;
   line-height: 1;
   font-weight: 700;
@@ -486,8 +682,9 @@
 }
 
 .troupe-month-nav button:hover {
-  background: var(--color-bg-transparent-5);
-  border-color: var(--color-border-emphasis);
+  background: var(--troupe-accent);
+  border-color: var(--troupe-accent);
+  color: #fff;
 }
 
 .troupe-month-nav button:active {
@@ -496,8 +693,8 @@
 
 .troupe-month-nav button:focus-visible {
   outline: none;
-  border-color: var(--color-accent-orange-border);
-  box-shadow: 0 0 0 2px rgba(231, 139, 78, 0.25);
+  border-color: var(--troupe-accent);
+  box-shadow: 0 0 0 2px var(--troupe-focus-ring);
 }
 
 .troupe-month-nav button:disabled {
@@ -514,18 +711,489 @@
   max-width: 360px;
 }
 
-.troupe-form-row__btn {
-  padding: 8px 14px;
-  border: 1px solid var(--color-border-input);
-  background: var(--color-border-subtle);
-  color: inherit;
+.troupe-view .button {
+  height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--troupe-panel-hover);
+  color: #aaa;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.troupe-view .button:hover:not(:disabled) {
+  background: var(--troupe-accent);
+  color: #fff;
+}
+
+.troupe-view .button.danger:hover:not(:disabled) {
+  background: #f66;
+  color: #111;
+}
+
+.troupe-view .button:disabled {
+  opacity: 0.4;
+}
+
+.troupe-view .inline-text-field {
+  height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background: var(--troupe-panel-hover);
+  color: #aaa;
+  font-size: 12px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.troupe-view .inline-text-field::placeholder {
+  color: var(--troupe-text-muted);
+}
+
+.troupe-view .inline-text-field:focus-visible {
+  border-color: var(--troupe-accent);
+  box-shadow: none;
+}
+
+.troupe-view .custom-select__trigger {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background: var(--troupe-panel-hover);
+  color: #aaa;
+  font-family: inherit;
+  font-size: 12px;
+  box-shadow: none;
+}
+
+.troupe-view .custom-select__trigger:hover,
+.troupe-view .custom-select__trigger:focus-visible {
+  border-color: var(--troupe-accent);
+  box-shadow: none;
+}
+
+.troupe-view .custom-select__dropdown {
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background: var(--troupe-panel);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
+}
+
+.troupe-view .custom-select__option {
+  color: var(--troupe-text-strong);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.troupe-view .custom-select__option:hover {
+  background: var(--troupe-panel-hover);
+  color: var(--troupe-text-strong);
+}
+
+.troupe-view .custom-select__option--selected {
+  background: var(--troupe-accent-bg);
+  color: var(--color-active-ascent);
+}
+
+.troupe-member-kind-field {
+  flex: 0 0 auto;
+}
+
+.troupe-actions-right .troupe-member-kind-select {
+  width: 142px;
+}
+
+.troupe-form-row__btn {
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: var(--troupe-panel-hover);
+  color: #aaa;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
+}
+
+.troupe-form-row__btn:hover:not(:disabled) {
+  background: var(--troupe-accent);
+  color: #fff;
 }
 
 .troupe-form-row__btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.troupe-team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.troupe-team-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.troupe-team-title {
+  color: var(--troupe-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.troupe-team-subtitle {
+  margin-top: 4px;
+  color: var(--troupe-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.troupe-team-form {
+  align-items: flex-start;
+}
+
+.troupe-role-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.troupe-role-chip {
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background: var(--troupe-bg-deep);
+  color: var(--troupe-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.troupe-role-chip:hover:not(:disabled) {
+  border-color: var(--troupe-accent);
+  color: var(--troupe-text-strong);
+}
+
+.troupe-role-chip--active,
+.troupe-role-chip[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  background: var(--troupe-accent-bg);
+  color: var(--color-active-ascent);
+}
+
+.troupe-role-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.troupe-role-chip--locked {
+  opacity: 0.78;
+}
+
+.troupe-role-editor {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.troupe-role-editor--row {
+  grid-column: 1 / -1;
+  padding-top: 10px;
+  border-top: 1px solid var(--troupe-border);
+}
+
+.troupe-role-select {
+  min-width: 190px;
+}
+
+.troupe-role-parent-select {
+  min-width: 210px;
+}
+
+.troupe-role-summary {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.troupe-role-summary--editable {
+  flex: 1 1 auto;
+}
+
+.troupe-role-summary__empty {
+  color: var(--troupe-text-muted);
+  font-size: 12px;
+}
+
+.troupe-role-pill {
+  min-height: 24px;
+  max-width: 170px;
+  padding: 4px 8px;
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background: var(--troupe-panel);
+  color: var(--troupe-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+button.troupe-role-pill {
+  cursor: pointer;
+}
+
+.troupe-role-pill--active {
+  border-color: var(--color-active-ascent);
+  background: var(--troupe-accent-bg);
+  color: var(--color-active-ascent);
+}
+
+.troupe-role-pill--locked,
+.troupe-role-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.troupe-role-pill--more {
+  color: var(--troupe-text-muted);
+}
+
+.troupe-role-pill__remove {
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.troupe-team-empty {
+  padding: 14px;
+  border: 1px dashed var(--troupe-border-strong);
+  color: var(--troupe-text-muted);
+  font-size: 12px;
+}
+
+.troupe-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.troupe-team-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr) auto;
+  column-gap: 8px;
+  row-gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--troupe-border);
+  background: var(--troupe-bg-deep);
+}
+
+.troupe-team-item__roles {
+  min-width: 0;
+}
+
+.troupe-team-item__actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.troupe-team-item--editing {
+  border-color: var(--troupe-border-strong);
+}
+
+.troupe-role-tree-card {
+  gap: 14px;
+}
+
+.troupe-role-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.troupe-role-tree-level {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.troupe-role-tree-level--nested {
+  margin-top: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.troupe-role-node {
+  min-width: 0;
+}
+
+.troupe-role-card {
+  min-height: 150px;
+  padding: 12px;
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, var(--troupe-accent-bg), transparent 42%),
+    var(--troupe-bg-deep);
+  color: var(--troupe-text);
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.troupe-role-card:hover {
+  border-color: var(--color-active-ascent);
+  color: var(--troupe-text-strong);
+}
+
+.troupe-role-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.troupe-role-card__eyebrow {
+  color: var(--troupe-text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.troupe-role-card__title {
+  margin-top: 4px;
+  color: var(--troupe-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.troupe-role-card__count {
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-active-ascent);
+  color: var(--color-active-ascent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.troupe-role-card__description {
+  color: var(--troupe-text);
+  font-size: 12px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.troupe-role-card__assignees {
+  margin-top: auto;
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.troupe-role-card__empty {
+  color: var(--troupe-text-muted);
+  font-size: 11px;
+}
+
+.troupe-role-card__more {
+  color: var(--troupe-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.troupe-role-page {
+  gap: 12px;
+}
+
+.troupe-role-page__back {
+  color: var(--troupe-text);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.troupe-role-page__back:hover {
+  color: var(--troupe-text-strong);
+}
+
+.troupe-role-page-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.troupe-role-page__instruction {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.troupe-role-page__textarea {
+  min-height: 220px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--troupe-border-strong);
+  border-radius: 0;
+  background: var(--troupe-bg-deep);
+  color: var(--troupe-text-strong);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.troupe-role-page__textarea:focus-visible {
+  outline: 2px solid var(--troupe-focus-ring);
+  outline-offset: 2px;
+}
+
+.troupe-role-assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.troupe-role-assignment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--troupe-border);
+  background: var(--troupe-bg-deep);
 }
 
 .troupe-schedule-scroll-hint {
@@ -535,7 +1203,7 @@
 
 .troupe-calendar-hint {
   font-size: 12px;
-  opacity: 0.75;
+  color: var(--troupe-text-muted);
   margin: 10px 0 0;
 }
 
@@ -569,15 +1237,15 @@
 .troupe-day-cell.free.selected {
   background-color: var(--color-status-success-bg-medium);
   background-image: linear-gradient(
-    var(--color-accent-orange-bg-soft),
-    var(--color-accent-orange-bg-soft)
+    var(--troupe-accent-bg),
+    var(--troupe-accent-bg)
   );
 }
 
 .troupe-day-cell.partial.selected {
   background-color: var(--color-status-info-bg-medium);
   background-image:
-    linear-gradient(var(--color-accent-orange-bg-soft), var(--color-accent-orange-bg-soft)),
+    linear-gradient(var(--troupe-accent-bg), var(--troupe-accent-bg)),
     repeating-linear-gradient(
       135deg,
       var(--color-status-info-stripe) 0px,
@@ -590,37 +1258,38 @@
 .troupe-day-cell.busy.selected {
   background-color: var(--color-status-error-bg-medium);
   background-image: linear-gradient(
-    var(--color-accent-orange-bg-soft),
-    var(--color-accent-orange-bg-soft)
+    var(--troupe-accent-bg),
+    var(--troupe-accent-bg)
   );
 }
 
 .troupe-day-cell.unknown.selected {
   background-color: var(--color-bg-transparent-0);
   background-image: linear-gradient(
-    var(--color-accent-orange-bg-soft),
-    var(--color-accent-orange-bg-soft)
+    var(--troupe-accent-bg),
+    var(--troupe-accent-bg)
   );
 }
 
 .troupe-empty {
   justify-content: flex-start;
-  opacity: 0.75;
+  color: var(--troupe-text-muted);
   grid-column: 1 / span var(--troupe-grid-span);
 }
 
 .troupe-mini-btn {
   font-size: 11px;
   padding: 4px 8px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border-input);
-  background: var(--color-border-faint);
-  color: inherit;
+  border-radius: 0;
+  border: 1px solid var(--troupe-border);
+  background: var(--troupe-panel-hover);
+  color: var(--troupe-text);
   cursor: pointer;
 }
 
 .troupe-mini-btn:hover {
-  background: var(--color-border-medium);
+  background: var(--troupe-accent);
+  color: #fff;
 }
 
 .troupe-mini-btn.danger {
@@ -637,7 +1306,7 @@
     order: 10;
     margin-top: 12px;
     padding-top: 12px;
-    border-top: 1px solid var(--color-bg-hover);
+    border-top: 1px solid var(--troupe-border);
   }
 
   .troupe-layout .main-content {
@@ -648,6 +1317,17 @@
 
   .troupe-view {
     gap: 12px;
+  }
+
+  .troupe-tabs {
+    align-items: stretch;
+  }
+
+  .troupe-tab {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 8px 10px;
+    text-align: center;
   }
 
   .troupe-card {
@@ -724,7 +1404,7 @@
     margin: 0 0 8px;
     font-size: 11px;
     line-height: 1.35;
-    opacity: 0.82;
+    color: var(--troupe-text-muted);
   }
 
   .troupe-scale-head {
@@ -753,6 +1433,20 @@
     align-items: stretch;
   }
 
+  .troupe-project-cast-head,
+  .troupe-project-cast-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-project-cast-tools {
+    justify-content: flex-start;
+  }
+
+  .troupe-project-cast-meta {
+    justify-content: space-between;
+  }
+
   .troupe-actions-right {
     flex-direction: column;
     align-items: stretch;
@@ -771,6 +1465,11 @@
     box-sizing: border-box;
   }
 
+  .troupe-actions-right .troupe-member-kind-select {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
   .troupe-form-row {
     flex-direction: column;
     align-items: stretch;
@@ -782,6 +1481,55 @@
     min-width: 0 !important;
     width: 100%;
     box-sizing: border-box;
+  }
+
+  .troupe-role-editor {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-role-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .troupe-role-parent-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .troupe-role-pill {
+    max-width: 100%;
+  }
+
+  .troupe-role-tree-level,
+  .troupe-role-tree-level--nested {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .troupe-role-tree-level--nested {
+    padding-left: 0;
+  }
+
+  .troupe-role-assignment {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-team-head,
+  .troupe-team-item {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .troupe-team-item__roles {
+    gap: 5px;
+  }
+
+  .troupe-team-item .troupe-mini-btn {
+    align-self: flex-start;
   }
 
   .troupe-invite-card {
@@ -873,22 +1621,11 @@
     display: none;
   }
 
-  .troupe-calendar-hint--mobile {
-    display: block;
-  }
+.troupe-premises-panel {
+  margin-top: 10px;
 }
 
-.premises-troupe-link {
-  margin: 4px 0 0;
-}
-
-.premises-troupe-link a {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-}
-
-.premises-troupe-link a:hover {
-  color: var(--color-text-primary);
+.troupe-premises-card .troupe-project-cast-head {
+  margin-bottom: 0;
 }
 

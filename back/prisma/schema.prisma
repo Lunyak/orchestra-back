@@ -27,7 +27,10 @@ model User {
   roleNotes          ProjectRoleNote[]
   rehearsalComments  RehearsalComment[]
   directorSessionComments DirectorSessionComment[]
+  projectTasksCreated ProjectTask[] @relation("ProjectTaskCreator")
   troupeMemberships  TroupeMember[]
+  teamMemberships    TeamMember[]      @relation("TeamMemberUser")
+  teamMembersOwned   TeamMember[]      @relation("TeamOwner")
   troupeOwned        Troupe?
   passwordResetTokens PasswordResetToken[]
   chatMessages       ChatMessage[]
@@ -103,8 +106,60 @@ model Project {
   actorAnnotations ActorAnnotation[]
   directorSessions DirectorSession[]
   roles            ProjectRole[]
+  tasks            ProjectTask[]
 
   @@index([ownerId])
+}
+
+enum ProjectTaskStatus {
+  todo
+  in_progress
+  done
+  blocked
+}
+
+enum ProjectTaskCategory {
+  props
+  costume
+  light
+  sound
+  admin
+  production
+  other
+}
+
+enum ProjectTaskSource {
+  manual
+  requisite
+}
+
+model ProjectTask {
+  id              String              @id @default(cuid())
+  projectId       String
+  title           String
+  description     String?
+  status          ProjectTaskStatus   @default(todo)
+  category        ProjectTaskCategory @default(other)
+  source          ProjectTaskSource   @default(manual)
+  /// Уникальный ключ для импорта (например requisite:12:3:setup:email)
+  sourceKey       String?
+  assigneeEmail   String?
+  dueAt           DateTime?
+  refStepId       Int?
+  refRequisiteId  Int?
+  refAction       String?
+  sortOrder       Int                 @default(0)
+  createdById     String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy       User?               @relation("ProjectTaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, sourceKey])
+  @@index([projectId, status])
+  @@index([projectId, sortOrder])
+  @@index([assigneeEmail])
 }
 
 enum RehearsalParticipantStatus {
@@ -667,6 +722,7 @@ model Troupe {
   updatedAt   DateTime @updatedAt
 
   members            TroupeMember[]
+  roleDefinitions    TeamRoleDefinition[]
   chatConversations  ChatConversation[]
   premises           Premise[]
 
@@ -808,10 +864,71 @@ model TroupeMember {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   /// Email участника труппы. Храним в lower-case.
   email     String
+  kind      TroupeMemberKind @default(regular)
   createdAt DateTime @default(now())
 
   @@unique([troupeId, email])
   @@index([email])
   @@index([troupeId])
   @@index([userId])
+}
+
+enum TroupeMemberKind {
+  regular
+  guest
+}
+
+model TeamMember {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  owner       User     @relation("TeamOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation("TeamMemberUser", fields: [userId], references: [id], onDelete: SetNull)
+  /// Email участника команды. Храним в lower-case.
+  email       String
+  /// Должности/функции в команде: actor, director, accountant, artist, producer, smm, assistant_director, troupe_manager.
+  roles       Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roleAssignments TeamRoleAssignment[]
+
+  @@unique([ownerUserId, email])
+  @@index([email])
+  @@index([ownerUserId])
+  @@index([userId])
+}
+
+model TeamRoleDefinition {
+  id          String   @id @default(cuid())
+  troupeId    String
+  troupe      Troupe   @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  slug        String
+  title       String
+  parentId    String?
+  parent      TeamRoleDefinition?  @relation("TeamRoleTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    TeamRoleDefinition[] @relation("TeamRoleTree")
+  sortOrder   Int      @default(0)
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assignments TeamRoleAssignment[]
+
+  @@unique([troupeId, slug])
+  @@index([troupeId])
+  @@index([parentId])
+}
+
+model TeamRoleAssignment {
+  id           String   @id @default(cuid())
+  roleId       String
+  role         TeamRoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  teamMemberId String
+  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+
+  @@unique([roleId, teamMemberId])
+  @@index([roleId])
+  @@index([teamMemberId])
 }

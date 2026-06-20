@@ -1,15 +1,25 @@
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useInviteProjectMemberMutation } from "../../project/api/project-api";
 import { useProject } from "../../project";
 import { useTeam } from "../../team";
 import { useAuth } from "../../auth/model/auth-context";
 import type { OrchestraQueryError } from "../../../shared/api/rtk/axios-base-query";
 import {
+  useAddTeamMemberMutation,
   useAddTroupeMemberMutation,
   useMyTroupeQuery,
+  useRemoveTeamMemberMutation,
   usePatchTroupeTitleMutation,
   useRemoveTroupeMemberMutation,
+  useUpdateTroupeMemberKindMutation,
+  useUpdateTeamMemberMutation,
+  type ProjectCastMemberItem,
+  type TeamMemberItem,
+  type TeamMemberRole,
+  type TroupeMemberKind,
+  type TroupeMemberItem,
 } from "../api/troupe-api";
 import {
   monthKey,
@@ -34,9 +44,38 @@ function normalizeEmail(email: string | null | undefined): string {
   return String(email ?? "").trim().toLowerCase();
 }
 
+function normalizeTroupeMemberKind(kind: unknown): TroupeMemberKind {
+  return kind === "guest" ? "guest" : "regular";
+}
+
+export type TroupePageTab = "team" | "troupe" | "project" | "premises";
+
+function readInitialTroupeTab(locationState: unknown): TroupePageTab {
+  const tab = (locationState as { tab?: unknown } | null)?.tab;
+  if (tab === "team" || tab === "troupe" || tab === "project" || tab === "premises") {
+    return tab;
+  }
+  return "team";
+}
+
+export const TEAM_MEMBER_ROLE_OPTIONS: Array<{
+  value: TeamMemberRole;
+  label: string;
+}> = [
+  { value: "actor", label: "Актёр" },
+  { value: "director", label: "Режиссёр" },
+  { value: "accountant", label: "Бухгалтер" },
+  { value: "artist", label: "Художник" },
+  { value: "producer", label: "Продюсер" },
+  { value: "smm", label: "SMM" },
+  { value: "assistant_director", label: "Пом. реж." },
+  { value: "troupe_manager", label: "Зав. труппой" },
+];
+
 export type TroupePageViewModel = ReturnType<typeof useTroupePage>;
 
 export function useTroupePage() {
+  const location = useLocation();
   const { accessToken } = useAuth();
   const {
     onProjectChange,
@@ -52,10 +91,21 @@ export function useTroupePage() {
     projectMembers,
     projectMembersLoading,
     projectOwner,
+    refreshMembers,
   } = useTeam();
 
   const [titleDraft, setTitleDraft] = useState("");
   const [email, setEmail] = useState("");
+  const [teamEmail, setTeamEmail] = useState("");
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TroupePageTab>(() =>
+    readInitialTroupeTab(location.state),
+  );
+
+  useEffect(() => {
+    const nextTab = readInitialTroupeTab(location.state);
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
+  }, [location.key, location.state]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<Date>(() =>
@@ -78,13 +128,138 @@ export function useTroupePage() {
     error: fetchError,
     isLoading: loading,
     isFetching,
+    refetch: refetchTroupe,
   } = useMyTroupeQuery(
     { project: projectName, month },
     { skip: skipFetch },
   );
 
   const troupe = data?.troupe ?? null;
-  const members = data?.members ?? [];
+  const troupeMembers = useMemo<TroupeMemberItem[]>(() => {
+    if (data?.troupeMembers) {
+      return data.troupeMembers.map((member) => ({
+        ...member,
+        kind: normalizeTroupeMemberKind(member.kind),
+      }));
+    }
+
+    const uniqueMembers = new Map<string, TroupeMemberItem>();
+    for (const member of data?.members ?? []) {
+      const key = member.troupeMemberId ?? null;
+      if (!key) continue;
+      uniqueMembers.set(key, {
+        ...member,
+        id: key,
+        kind: normalizeTroupeMemberKind(member.kind),
+        troupeMemberId: key,
+      });
+    }
+
+    return Array.from(uniqueMembers.values()).sort((a, b) =>
+      normalizeEmail(a.email).localeCompare(normalizeEmail(b.email)),
+    );
+  }, [data?.members, data?.troupeMembers]);
+  const teamMembers = useMemo<TeamMemberItem[]>(() => {
+    if (data?.teamMembers) return data.teamMembers;
+
+    return troupeMembers.map((member) => ({
+      id: `team-fallback:${member.id}`,
+      ownerUserId: "",
+      userId: null,
+      email: member.email,
+      kind: normalizeTroupeMemberKind(member.kind),
+      roles: ["actor"],
+      createdAt: member.createdAt,
+      updatedAt: member.createdAt,
+      profile: member.profile,
+      troupeMemberId: member.troupeMemberId ?? member.id,
+    }));
+  }, [data?.teamMembers, troupeMembers]);
+  const projectCastMembers = useMemo<ProjectCastMemberItem[]>(() => {
+    if (data?.projectCastMembers) return data.projectCastMembers;
+
+    const legacyMemberByEmail = new Map(
+      (data?.members ?? []).map((member) => [
+        normalizeEmail(member.email),
+        member,
+      ]),
+    );
+    const troupeMemberByEmail = new Map(
+      troupeMembers.map((member) => [
+        normalizeEmail(member.email),
+        member.troupeMemberId ?? member.id,
+      ]),
+    );
+    const makeFallbackMember = (
+      args: {
+        email: string;
+        id: string;
+        role: string;
+        isOwner: boolean;
+        displayName?: string | null;
+      },
+    ): ProjectCastMemberItem | null => {
+      const email = normalizeEmail(args.email);
+      if (!email) return null;
+      const legacyMember = legacyMemberByEmail.get(email);
+      const troupeMemberId = troupeMemberByEmail.get(email) ?? null;
+      return {
+        id: args.id,
+        troupeId: troupe?.id ?? projectName,
+        email,
+        kind: normalizeTroupeMemberKind(legacyMember?.kind),
+        createdAt: "",
+        profile: legacyMember?.profile ?? {
+          email,
+          displayName: args.displayName ?? null,
+        },
+        troupeMemberId,
+        projectMemberId: args.isOwner ? null : args.id,
+        projectRole: args.role,
+        isProjectOwner: args.isOwner,
+        inTroupe: Boolean(troupeMemberId),
+      };
+    };
+    const rows: ProjectCastMemberItem[] = [];
+    const owner = projectOwner
+      ? makeFallbackMember({
+          email: projectOwner.email,
+          id: `powner:${projectName}:${normalizeEmail(projectOwner.email)}`,
+          role: "owner",
+          isOwner: true,
+          displayName: projectOwner.displayName,
+        })
+      : null;
+    if (owner) rows.push(owner);
+    for (const member of projectMembers) {
+      const row = makeFallbackMember({
+        email: member.user.email,
+        id: member.id,
+        role: member.role,
+        isOwner: false,
+        displayName: member.user.displayName,
+      });
+      if (row) rows.push(row);
+    }
+    return rows;
+  }, [
+    data?.members,
+    data?.projectCastMembers,
+    projectMembers,
+    projectName,
+    projectOwner,
+    troupe?.id,
+    troupeMembers,
+  ]);
+  const members = troupeMembers;
+  const regularTroupeMembers = useMemo(
+    () => troupeMembers.filter((member) => member.kind !== "guest"),
+    [troupeMembers],
+  );
+  const guestTroupeMembers = useMemo(
+    () => troupeMembers.filter((member) => member.kind === "guest"),
+    [troupeMembers],
+  );
   const scheduleRefreshing = isFetching && !loading && troupe != null;
   const error = fetchError
     ? queryErrorMessage(fetchError, "Не удалось загрузить труппу")
@@ -92,8 +267,13 @@ export function useTroupePage() {
 
   const [addTroupeMemberMut, { isLoading: adding }] = useAddTroupeMemberMutation();
   const [removeTroupeMemberMut] = useRemoveTroupeMemberMutation();
+  const [updateTroupeMemberKindMut] = useUpdateTroupeMemberKindMutation();
   const [patchTroupeTitleMut, { isLoading: patchingTitle }] =
     usePatchTroupeTitleMutation();
+  const [addTeamMemberMut, { isLoading: addingTeamMember }] =
+    useAddTeamMemberMutation();
+  const [updateTeamMemberMut] = useUpdateTeamMemberMutation();
+  const [removeTeamMemberMut] = useRemoveTeamMemberMutation();
   const [inviteProjectMemberMut] = useInviteProjectMemberMutation();
 
   useEffect(() => {
@@ -127,9 +307,9 @@ export function useTroupePage() {
   const selectedMember = useMemo(
     () =>
       selectedMemberId
-        ? (members.find((m) => m.id === selectedMemberId) ?? null)
+        ? (troupeMembers.find((m) => m.id === selectedMemberId) ?? null)
         : null,
-    [members, selectedMemberId],
+    [selectedMemberId, troupeMembers],
   );
 
   const selectedMemberInProject = useMemo(() => {
@@ -141,10 +321,10 @@ export function useTroupePage() {
 
   useEffect(() => {
     if (!selectedMemberId) return;
-    if (!members.some((m) => m.id === selectedMemberId)) {
+    if (!troupeMembers.some((m) => m.id === selectedMemberId)) {
       setSelectedMemberId(null);
     }
-  }, [members, selectedMemberId]);
+  }, [selectedMemberId, troupeMembers]);
 
   const canManageProjectTroupe = isProjectOwner === true;
 
@@ -179,6 +359,8 @@ export function useTroupePage() {
         email: selectedMember.email,
         role: "viewer",
       }).unwrap();
+      void refetchTroupe();
+      void refreshMembers();
     } catch (e: unknown) {
       setInviteErrorByMemberId((p) => ({
         ...p,
@@ -197,6 +379,8 @@ export function useTroupePage() {
   }, [
     inviteProjectMemberMut,
     projectName,
+    refetchTroupe,
+    refreshMembers,
     selectedMember,
     selectedMemberInProject,
   ]);
@@ -222,6 +406,28 @@ export function useTroupePage() {
     }
   }, [month, projectName, removeTroupeMemberMut, selectedMember?.troupeMemberId]);
 
+  const updateSelectedTroupeMemberKind = useCallback(
+    async (kind: TroupeMemberKind) => {
+      if (!selectedMember?.troupeMemberId || !projectName) return;
+      try {
+        await updateTroupeMemberKindMut({
+          project: projectName,
+          memberId: selectedMember.troupeMemberId,
+          kind,
+          month,
+        }).unwrap();
+      } catch (e: unknown) {
+        alert(queryErrorMessage(e, "Не удалось обновить тип актёра"));
+      }
+    },
+    [
+      month,
+      projectName,
+      selectedMember?.troupeMemberId,
+      updateTroupeMemberKindMut,
+    ],
+  );
+
   const addMemberByEmail = useCallback(async () => {
     const value = email.trim();
     if (!value || !projectName) return;
@@ -234,11 +440,65 @@ export function useTroupePage() {
     }
   }, [addTroupeMemberMut, email, month, projectName]);
 
+  const addTeamMemberByEmail = useCallback(async () => {
+    const value = teamEmail.trim();
+    if (!value) return;
+    setTeamError(null);
+    try {
+      await addTeamMemberMut({ email: value, roles: [] }).unwrap();
+      setTeamEmail("");
+    } catch (e: unknown) {
+      setTeamError(queryErrorMessage(e, "Не удалось добавить участника команды"));
+    }
+  }, [addTeamMemberMut, teamEmail]);
+
+  const toggleTeamMemberRole = useCallback(
+    async (member: TeamMemberItem, role: TeamMemberRole) => {
+      const nextRoles = member.roles.includes(role)
+        ? member.roles.filter((item) => item !== role)
+        : [...member.roles, role];
+      setTeamError(null);
+      try {
+        if (member.id.startsWith("team-fallback:")) {
+          await addTeamMemberMut({
+            email: member.email,
+            roles: nextRoles,
+          }).unwrap();
+          void refetchTroupe();
+          return;
+        }
+        await updateTeamMemberMut({
+          memberId: member.id,
+          roles: nextRoles,
+        }).unwrap();
+      } catch (e: unknown) {
+        setTeamError(queryErrorMessage(e, "Не удалось обновить должности"));
+      }
+    },
+    [addTeamMemberMut, refetchTroupe, updateTeamMemberMut],
+  );
+
+  const removeTeamMemberById = useCallback(
+    async (memberId: string) => {
+      if (memberId.startsWith("team-fallback:")) return;
+      setTeamError(null);
+      try {
+        await removeTeamMemberMut({ memberId }).unwrap();
+      } catch (e: unknown) {
+        setTeamError(queryErrorMessage(e, "Не удалось удалить участника команды"));
+      }
+    },
+    [removeTeamMemberMut],
+  );
+
   return {
     accessToken,
+    activeTab,
+    addingTeamMember,
     adding,
     addError,
     addMemberByEmail,
+    addTeamMemberByEmail,
     canManageProjectTroupe,
     currentMonth,
     days,
@@ -254,10 +514,12 @@ export function useTroupePage() {
     patchingTitle,
     projectName,
     projectItems,
+    projectCastMembers,
     currentProjectDisplayName,
     projects,
     projectsLoading,
     projectMembersLoading,
+    regularTroupeMembers,
     removeSelectedFromTroupe,
     removingIds,
     saveTitle,
@@ -268,11 +530,22 @@ export function useTroupePage() {
     selectedMemberInProject,
     setCurrentMonth,
     setEmail,
+    setActiveTab,
     setSelectedDayIso,
     setSelectedMemberId,
+    setTeamEmail,
     setTitleDraft,
+    teamEmail,
+    teamError,
+    teamMembers,
+    teamRoleOptions: TEAM_MEMBER_ROLE_OPTIONS,
     titleDraft,
+    toggleTeamMemberRole,
     todayIso,
     troupe,
+    troupeMembers,
+    guestTroupeMembers,
+    updateSelectedTroupeMemberKind,
+    removeTeamMemberById,
   };
 }

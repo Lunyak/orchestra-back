@@ -104,10 +104,12 @@ export function useSpectaclePage() {
           ? "notes-run"
           : location.pathname === "/board"
             ? "board"
-            : location.pathname === "/sessions" ||
-                location.pathname.startsWith("/sessions/")
-              ? "sessions"
-              : "script";
+            : location.pathname === "/tasks"
+              ? "tasks"
+              : location.pathname === "/sessions" ||
+                  location.pathname.startsWith("/sessions/")
+                ? "sessions"
+                : "script";
   const isTheaterView = activeView === "theater";
 
   const [theaterOutlinerHost, setTheaterOutlinerHost] =
@@ -158,7 +160,8 @@ export function useSpectaclePage() {
     activeView === "light-plot" ||
     activeView === "notes-run" ||
     activeView === "theater";
-  const compactMainChrome = activeView === "board" || activeView === "sessions";
+  const compactMainChrome =
+    activeView === "board" || activeView === "sessions" || activeView === "tasks";
 
   const kanbanMembers = useMemo(
     () =>

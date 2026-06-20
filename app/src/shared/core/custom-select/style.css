@@ -46,6 +46,7 @@
 }
 
 .custom-select__label {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -54,6 +55,7 @@
 }
 
 .custom-select__chevron {
+  flex-shrink: 0;
   font-size: 12px;
   opacity: 0.85;
   transition: transform 0.16s ease;
@@ -63,18 +65,54 @@
   transform: rotate(180deg);
 }
 
-.custom-select__dropdown {
+.custom-select__dropdown-wrap {
   position: absolute;
   z-index: 40;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  max-height: 220px;
-  overflow-y: auto;
   border: 1px solid var(--field-control-border-hover);
   background: var(--color-bg-primary);
   box-shadow: 0 12px 28px var(--color-shadow-panel);
+}
+
+.custom-select__search-wrap {
+  padding: 4px 4px 0;
+}
+
+.custom-select__search {
+  width: 100%;
+  min-height: var(--field-control-min-height);
+  padding: var(--field-control-padding-y) var(--field-control-padding-x);
+  border: 1px solid var(--field-control-border);
+  background: var(--field-control-bg-hover);
+  box-shadow: var(--field-control-inset);
+  color: var(--field-control-text);
+  font-family: var(--font-family-script-body);
+  font-size: var(--field-control-font-size);
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.custom-select__search:focus {
+  outline: none;
+  border-color: var(--color-active-ascent);
+  box-shadow:
+    var(--field-control-inset),
+    0 0 0 2px var(--field-control-focus-ring);
+}
+
+.custom-select__dropdown {
+  max-height: 220px;
+  overflow-y: auto;
   padding: 4px;
+}
+
+.custom-select__empty {
+  padding: 10px 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.35;
 }
 
 .custom-select__option {
@@ -115,6 +153,28 @@
   align-items: center;
   gap: var(--spacing-4);
   min-width: 0;
+  max-width: 100%;
+  height: 24px;
+  max-height: 24px;
+  overflow: hidden;
+}
+
+.custom-select__label:has(.custom-select__person),
+.custom-select__label:has(.person-select-preview--compact) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.custom-select:has(.custom-select__person) .custom-select__trigger,
+.custom-select:has(.person-select-preview--compact) .custom-select__trigger {
+  height: var(--field-control-min-height);
+  min-height: var(--field-control-min-height);
+  max-height: var(--field-control-min-height);
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .custom-select__person-name {

@@ -3,11 +3,15 @@ import type { ScriptTokenizeMode } from "./script-tokenize-formatting";
 
 export type AppEditorScriptFormattingMenuProps = {
   disabled?: boolean;
+  formatPlayDisabled?: boolean;
+  onOpenFormatPlay: () => void;
   onTokenizeMatches: (query: string, mode: ScriptTokenizeMode) => number;
 };
 
 export function AppEditorScriptFormattingMenu({
   disabled = false,
+  formatPlayDisabled = false,
+  onOpenFormatPlay,
   onTokenizeMatches,
 }: AppEditorScriptFormattingMenuProps) {
   const inputId = useId();
@@ -81,6 +85,23 @@ export function AppEditorScriptFormattingMenu({
               : resultText || "Можно обернуть все сразу или шагать по совпадениям."}
           </div>
         </form>
+        <button
+          type="button"
+          role="menuitem"
+          className="theater-editor-menubar__option"
+          disabled={formatPlayDisabled}
+          title={
+            formatPlayDisabled
+              ? "Откройте шаг на вкладке Текст, Тех. карта или Экспликация"
+              : undefined
+          }
+          onClick={() => {
+            if (formatPlayDisabled) return;
+            onOpenFormatPlay();
+          }}
+        >
+          ФОРМАТ. ПЬЕСЫ
+        </button>
       </div>
     </div>
   );

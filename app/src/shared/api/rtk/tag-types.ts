@@ -14,5 +14,6 @@ export const orchestraApiTagTypes = [
   "PremiseMembers",
   "DirectorSessions",
   "ProjectMaterial",
+  "ProjectTasks",
   "SyncPull",
 ] as const;

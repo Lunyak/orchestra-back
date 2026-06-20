@@ -1,0 +1,84 @@
+.rehearsal-plan-chrome {
+  margin-bottom: 14px;
+}
+
+.rehearsal-plan-chrome__header {
+  margin-bottom: 10px;
+}
+
+.rehearsal-plan-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--stage-brutal-border);
+  background: rgba(41, 42, 45, 0.72);
+  padding: 4px;
+}
+
+.rehearsal-plan-tab {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-lighter);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.rehearsal-plan-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-primary);
+}
+
+.rehearsal-plan-tab--active,
+.rehearsal-plan-tab[aria-selected="true"] {
+  background: rgba(231, 138, 78, 0.12);
+  color: var(--color-active-ascent);
+}
+
+@media (max-width: 640px) {
+  .rehearsal-plan-chrome {
+    margin-bottom: 10px;
+  }
+
+  .rehearsal-plan-chrome__header {
+    margin-bottom: 8px;
+    padding: 0 10px;
+  }
+
+  .rehearsal-plan-tabs {
+    width: 100%;
+    gap: 0;
+    padding: 0;
+    border-left: 0;
+    border-right: 0;
+    background: rgba(27, 27, 27, 0.96);
+  }
+
+  .rehearsal-plan-tab {
+    flex: 1;
+    justify-content: center;
+    min-height: 24px;
+    padding: 3px 4px;
+    font-size: 8px;
+    letter-spacing: 0.04em;
+    border-right: 1px solid var(--stage-brutal-border);
+  }
+
+  .rehearsal-plan-tab:last-child {
+    border-right: 0;
+  }
+
+  .rehearsal-plan-tab--active,
+  .rehearsal-plan-tab[aria-selected="true"] {
+    box-shadow: inset 0 -1px 0 var(--color-active-ascent);
+  }
+}

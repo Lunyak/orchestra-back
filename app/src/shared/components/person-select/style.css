@@ -1,0 +1,50 @@
+.person-select-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.person-select-preview--compact {
+  height: 24px;
+  max-height: 24px;
+  overflow: hidden;
+}
+
+.person-select-preview--compact.person-select-preview--empty {
+  line-height: 24px;
+}
+
+.person-select-preview--compact .person-select-preview__meta {
+  display: block;
+  min-width: 0;
+}
+
+.person-select-preview--empty {
+  color: var(--sessions-text-muted, var(--color-text-muted));
+  font-size: 13px;
+}
+
+.person-select-preview__meta {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.person-select-preview__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.person-select-preview__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  opacity: 0.72;
+}

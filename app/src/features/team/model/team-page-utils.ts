@@ -3,6 +3,7 @@ export function shouldLoadProjectMembers(pathname: string): boolean {
   return (
     pathname === "/settings" ||
     pathname === "/board" ||
+    pathname === "/tasks" ||
     pathname === "/troupe" ||
     pathname === "/sessions" ||
     pathname.startsWith("/sessions/")

@@ -4,7 +4,8 @@ export type SpectacleActiveView =
   | "notes-run"
   | "board"
   | "script"
-  | "sessions";
+  | "sessions"
+  | "tasks";
 
 export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   SpectacleActiveView,
@@ -16,4 +17,5 @@ export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   board: "main-content-kanban",
   script: "show-script",
   sessions: "main-content-sessions",
+  tasks: "main-content-sessions",
 };

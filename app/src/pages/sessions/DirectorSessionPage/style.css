@@ -1,20 +1,32 @@
 .session__step-item {
+  position: relative;
+  display: grid;
   text-align: left;
   cursor: pointer;
   color: inherit;
-  gap: 4px;
+  gap: 2px;
   box-sizing: border-box;
   width: 100%;
   font: inherit;
   color: var(--color-text-primary);
-  border: none;
-  /* Стабильная высота строки списка: три текстовых зоны, даже если часть пустая */
-  grid-template-rows: auto auto minmax(calc(12px * 1.35), auto);
+  border: 1px solid var(--color-border-faint);
+  background: var(--color-bg-transparent-1);
+  padding: 6px 9px 6px 13px;
+  grid-template-rows: auto auto;
   align-content: start;
 }
 
+.session__step-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--color-border-faint);
+}
+
 .session__step-item__title {
-  min-height: calc(12px * 1.25);
   line-height: 1.25;
   display: flex;
   flex-wrap: wrap;
@@ -52,23 +64,17 @@
 }
 
 .session__step-item--booked:not(.session__step-item--selected) {
-  box-shadow: inset 3px 0 0 var(--color-warning-inset);
-}
-
-.session__step-item__status {
-  min-height: calc(12px * 1.35);
-  line-height: 1.35;
+  border-color: var(--color-warning-border);
 }
 
 .session__step-item__missing {
-  min-height: calc(12px * 1.35);
   line-height: 1.35;
   font-size: 12px;
   opacity: 0.85;
 }
 
 .session__step-item__missing--empty {
-  visibility: hidden;
+  display: none;
 }
 
 .director-session-page__preview-pre {
@@ -86,16 +92,21 @@
 }
 
 .session__step-item--selected {
-  background: var(--color-bg-tertiary);
+  border-color: var(--color-active-ascent);
+  background: var(--color-bg-transparent-2);
   color: var(--color-text-primary);
 }
 
-.session__step-item--ok {
-  background: var(--color-status-success-bg);
+.session__step-item--selected::before {
+  background: var(--color-active-ascent);
 }
 
-.session__step-item--bad {
-  background: var(--color-status-error-bg);
+.session__step-item--ok::before {
+  background: var(--color-status-success);
+}
+
+.session__step-item--bad::before {
+  background: var(--color-status-error);
 }
 
 .director-session-page__preview {
@@ -120,4 +131,10 @@
   max-height: 550px;
   overflow: auto;
   padding-right: 4px;
+}
+
+@media (max-width: 640px) {
+  .director-session-page__preview-pre {
+    display: none;
+  }
 }

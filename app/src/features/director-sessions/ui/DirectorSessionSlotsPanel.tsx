@@ -3,7 +3,7 @@ import { ListItem } from "@shared/components/list-item/ListItem";
 import { Button } from "@shared/core/button/Button";
 import { Modal } from "@shared/core/modal/Modal";
 import cn from "classnames";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import type {
   DirectorRehearsalSession,
@@ -20,6 +20,11 @@ type DragStepRefPayload = {
   projectSlug: string;
   stepId: number;
   durationMin?: number;
+};
+
+type DirectorSessionSlotDisplay = {
+  projectLabel: string;
+  materialLabel: string;
 };
 
 function parseDragStepRef(dt: DataTransfer): DragStepRefPayload | null {
@@ -110,6 +115,7 @@ export type DirectorSessionSlotsPanelProps = {
   onRequestCloseSlot: () => void;
   /** Доп. класс на карточке слота (напр. доступность по ролям на странице одной сессии) */
   slotToneClassById?: Map<string, string> | null;
+  slotDisplayById?: Map<string, DirectorSessionSlotDisplay> | null;
 };
 
 export function DirectorSessionSlotsPanel({
@@ -122,10 +128,19 @@ export function DirectorSessionSlotsPanel({
   slotSettings,
   onRequestCloseSlot,
   slotToneClassById,
+  slotDisplayById,
 }: DirectorSessionSlotsPanelProps) {
   const [autoShiftFollowing, setAutoShiftFollowing] = useState(true);
   const [timelineDragOver, setTimelineDragOver] = useState(false);
   const [draggedSlotId, setDraggedSlotId] = useState<string | null>(null);
+  const [touchDragOverSlotId, setTouchDragOverSlotId] = useState<string | null>(
+    null,
+  );
+  const [isTouchDraggingSlot, setIsTouchDraggingSlot] = useState(false);
+  const touchDragPointerIdRef = useRef<number | null>(null);
+  const touchDragOverSlotIdRef = useRef<string | null>(null);
+  const touchDragPreviewRef = useRef<HTMLDivElement | null>(null);
+  const touchDragPointRef = useRef<{ x: number; y: number } | null>(null);
   const [materialDragPayload, setMaterialDragPayload] =
     useState<DragStepRefPayload | null>(null);
 
@@ -214,19 +229,29 @@ export function DirectorSessionSlotsPanel({
     await updateActiveSession({ slots: packSlotsSequentialInOrder(sorted) });
   };
 
-  const moveSlotBefore = async (dragId: string, beforeId: string) => {
-    if (dragId === beforeId) return;
-    const sorted = [...(session.slots ?? [])].sort(
-      (a, b) => a.offsetMin - b.offsetMin,
-    );
-    const fromIndex = sorted.findIndex((s) => s.id === dragId);
-    const toIndex = sorted.findIndex((s) => s.id === beforeId);
-    if (fromIndex === -1 || toIndex === -1) return;
-    const next = [...sorted];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
-    await updateActiveSession({ slots: packSlotsSequentialInOrder(next) });
-  };
+  const moveSlotToTarget = useCallback(
+    async (dragId: string, targetId: string) => {
+      if (dragId === targetId) return;
+      const sorted = [...(session.slots ?? [])].sort(
+        (a, b) => a.offsetMin - b.offsetMin,
+      );
+      const fromIndex = sorted.findIndex((s) => s.id === dragId);
+      const toIndex = sorted.findIndex((s) => s.id === targetId);
+      if (fromIndex === -1 || toIndex === -1) return;
+
+      const insertAfter = fromIndex < toIndex;
+      const next = [...sorted];
+      const [moved] = next.splice(fromIndex, 1);
+      const targetIndexAfterRemoval = next.findIndex((s) => s.id === targetId);
+      if (targetIndexAfterRemoval === -1) return;
+      const insertAt = insertAfter
+        ? targetIndexAfterRemoval + 1
+        : targetIndexAfterRemoval;
+      next.splice(insertAt, 0, moved);
+      await updateActiveSession({ slots: packSlotsSequentialInOrder(next) });
+    },
+    [session.slots, updateActiveSession],
+  );
 
   const attachStepToSlotByDrop = async (
     slotId: string,
@@ -327,6 +352,111 @@ export function DirectorSessionSlotsPanel({
     return sortedSlots.find((s) => s.id === selectedSlotId) ?? null;
   }, [sortedSlots, selectedSlotId]);
 
+  const draggedSlotForTouchPreview = useMemo(() => {
+    if (!isTouchDraggingSlot || !draggedSlotId) return null;
+    return sortedSlots.find((s) => s.id === draggedSlotId) ?? null;
+  }, [draggedSlotId, isTouchDraggingSlot, sortedSlots]);
+
+  const getSlotDisplay = useCallback(
+    (sl: DirectorSessionSlot): DirectorSessionSlotDisplay => {
+      const display = slotDisplayById?.get(sl.id);
+      if (display) return display;
+      if (!sl.ref) {
+        return {
+          projectLabel: "Материал не выбран",
+          materialLabel: "",
+        };
+      }
+      return {
+        projectLabel: String(sl.ref.projectSlug ?? "").trim() || "Проект",
+        materialLabel: "Материал загружается",
+      };
+    },
+    [slotDisplayById],
+  );
+
+  const draggedSlotDisplay = useMemo(
+    () =>
+      draggedSlotForTouchPreview
+        ? getSlotDisplay(draggedSlotForTouchPreview)
+        : null,
+    [draggedSlotForTouchPreview, getSlotDisplay],
+  );
+
+  const updateTouchDragPreview = useCallback((clientX: number, clientY: number) => {
+    touchDragPointRef.current = { x: clientX, y: clientY };
+    const preview = touchDragPreviewRef.current;
+    if (!preview) return;
+    const x = Math.round(clientX + 12);
+    const y = Math.round(clientY + 12);
+    preview.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }, []);
+
+  useEffect(() => {
+    const point = touchDragPointRef.current;
+    if (!draggedSlotForTouchPreview || !point) return;
+    updateTouchDragPreview(point.x, point.y);
+  }, [draggedSlotForTouchPreview, updateTouchDragPreview]);
+
+  useEffect(() => {
+    if (!draggedSlotId || touchDragPointerIdRef.current == null) return;
+
+    const getSlotIdAtPoint = (clientX: number, clientY: number) => {
+      const target = document.elementFromPoint(clientX, clientY);
+      const row = target?.closest<HTMLElement>("[data-session-slot-id]");
+      return row?.dataset.sessionSlotId ?? null;
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerId !== touchDragPointerIdRef.current) return;
+      e.preventDefault();
+      updateTouchDragPreview(e.clientX, e.clientY);
+      const nextSlotId = getSlotIdAtPoint(e.clientX, e.clientY);
+      const nextOverSlotId =
+        nextSlotId && nextSlotId !== draggedSlotId ? nextSlotId : null;
+      touchDragOverSlotIdRef.current = nextOverSlotId;
+      setTouchDragOverSlotId(nextOverSlotId);
+    };
+
+    const handlePointerUp = (e: PointerEvent) => {
+      if (e.pointerId !== touchDragPointerIdRef.current) return;
+      e.preventDefault();
+      const nextSlotId =
+        touchDragOverSlotIdRef.current ?? getSlotIdAtPoint(e.clientX, e.clientY);
+      touchDragPointerIdRef.current = null;
+      touchDragOverSlotIdRef.current = null;
+      touchDragPointRef.current = null;
+      setTouchDragOverSlotId(null);
+      setDraggedSlotId(null);
+      setIsTouchDraggingSlot(false);
+      if (nextSlotId && nextSlotId !== draggedSlotId) {
+        void moveSlotToTarget(draggedSlotId, nextSlotId);
+      }
+    };
+
+    const handlePointerCancel = (e: PointerEvent) => {
+      if (e.pointerId !== touchDragPointerIdRef.current) return;
+      touchDragPointerIdRef.current = null;
+      touchDragOverSlotIdRef.current = null;
+      touchDragPointRef.current = null;
+      setTouchDragOverSlotId(null);
+      setDraggedSlotId(null);
+      setIsTouchDraggingSlot(false);
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, {
+      passive: false,
+    });
+    window.addEventListener("pointerup", handlePointerUp, { passive: false });
+    window.addEventListener("pointercancel", handlePointerCancel);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      window.removeEventListener("pointercancel", handlePointerCancel);
+    };
+  }, [draggedSlotId, moveSlotToTarget, updateTouchDragPreview]);
+
   return (
     <RehearsalsCard fluid title="" className="director-session-slots-panel">
       <div className="director-session-slots-panel__tools">
@@ -374,92 +504,176 @@ export function DirectorSessionSlotsPanel({
             Слотов нет — нажми «+» или перетащи шаг сюда.
           </div>
         )}
-        {sortedSlots.map((sl) => (
-          <div
-            key={sl.id}
-            className={cn(
-              "director-session-slots-panel__row",
-              sl.id === selectedSlotId && "active",
-            )}
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (materialDragPayload) e.dataTransfer.dropEffect = "copy";
-              else e.dataTransfer.dropEffect = "move";
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              const payload =
-                parseDragStepRef(e.dataTransfer) ?? materialDragPayload;
-              if (payload) {
-                setMaterialDragPayload(null);
-                void attachStepToSlotByDrop(sl.id, payload);
-                return;
-              }
-              const dragId = parseDragSlotId(e.dataTransfer) || draggedSlotId;
-              if (!dragId) return;
-              void moveSlotBefore(dragId, sl.id);
-            }}
-          >
-            <ListItem
+        {sortedSlots.map((sl) => {
+          const display = getSlotDisplay(sl);
+          const slotTime = formatSlotTime(session.startsAt, sl.offsetMin);
+          const draggedSlotIndex = draggedSlotId
+            ? sortedSlots.findIndex((slot) => slot.id === draggedSlotId)
+            : -1;
+          const targetSlotIndex = sortedSlots.findIndex((slot) => slot.id === sl.id);
+          const isDropInsertAfter =
+            touchDragOverSlotId === sl.id &&
+            draggedSlotIndex !== -1 &&
+            draggedSlotIndex < targetSlotIndex;
+          const dropHintLabel = isDropInsertAfter
+            ? "Вставить после этого слота"
+            : "Вставить перед этим слотом";
+          return (
+            <div
+              key={sl.id}
+              data-session-slot-id={sl.id}
               className={cn(
-                "session-slot",
+                "director-session-slots-panel__row",
                 sl.id === selectedSlotId && "active",
-                draggedSlotId === sl.id && "dragging",
-                slotToneClassById?.get(sl.id),
+                touchDragOverSlotId === sl.id && "dropTarget",
               )}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (materialDragPayload) e.dataTransfer.dropEffect = "copy";
+                else e.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                const payload =
+                  parseDragStepRef(e.dataTransfer) ?? materialDragPayload;
+                if (payload) {
+                  setMaterialDragPayload(null);
+                  void attachStepToSlotByDrop(sl.id, payload);
+                  return;
+                }
+                const dragId = parseDragSlotId(e.dataTransfer) || draggedSlotId;
+                if (!dragId) return;
+                void moveSlotToTarget(dragId, sl.id);
+              }}
             >
-              <span
-                className="sessions-sessionRow__dragHandle director-session-slots-panel__drag"
-                draggable
-                title="Перетащи, чтобы изменить порядок"
-                role="presentation"
-                onPointerDown={(e) => e.stopPropagation()}
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("text/plain", sl.id);
-                  e.dataTransfer.setData(DND_MIME_SLOT_ID, sl.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  setDraggedSlotId(sl.id);
-                }}
-                onDragEnd={() => setDraggedSlotId(null)}
+              <ListItem
+                className={cn(
+                  "session-slot",
+                  sl.id === selectedSlotId && "active",
+                  draggedSlotId === sl.id && "dragging",
+                  slotToneClassById?.get(sl.id),
+                )}
               >
-                ⋮⋮
-              </span>
-              <Button
-                type="button"
-                className="rehearsals-item director-session-slots-panel__slot-main"
-                onClick={() => onSelectSlot(sl.id)}
-              >
-                <div className="sessions-slot-head">
-                  <div className="sessions-slot-title">
-                    {formatSlotTime(session.startsAt, sl.offsetMin)} · {sl.durationMin} мин
+                <span
+                  className="sessions-sessionRow__dragHandle director-session-slots-panel__drag"
+                  title="Перетащи, чтобы изменить порядок"
+                  role="presentation"
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    touchDragPointerIdRef.current = e.pointerId;
+                    touchDragOverSlotIdRef.current = null;
+                    updateTouchDragPreview(e.clientX, e.clientY);
+                    setDraggedSlotId(sl.id);
+                    setTouchDragOverSlotId(null);
+                    setIsTouchDraggingSlot(true);
+                  }}
+                >
+                  ⋮⋮
+                </span>
+                <Button
+                  type="button"
+                  className="rehearsals-item director-session-slots-panel__slot-main"
+                  onClick={() => onSelectSlot(sl.id)}
+                >
+                  <div className="sessions-slot-head">
+                    <div className="sessions-slot-title" title={slotTime}>
+                      <span
+                        className="director-session-slots-panel__status-dot"
+                        aria-hidden="true"
+                      />
+                      <span className="sessions-slot-title__text">
+                        {slotTime}
+                      </span>
+                    </div>
+                    <Buttons.DeleteButton
+                      type="button"
+                      className="sessions-slot-title__btn-delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void removeSlot(sl.id);
+                      }}
+                    />
                   </div>
-                  <Buttons.DeleteButton
-                    type="button"
-                    className="sessions-slot-title__btn-delete"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void removeSlot(sl.id);
-                    }}
-                  />
-                </div>
-                <div className="sessions-slot-meta">
-                  {sl.ref
-                    ? `${sl.ref.projectSlug} · шаг #${sl.ref.stepId}`
-                    : "Материал не выбран"}
-                </div>
-                {String(sl.notes ?? "").trim() ? (
                   <div
-                    className="sessions-slot-notes"
-                    title={String(sl.notes).trim()}
+                    className="sessions-slot-project"
+                    title={display.projectLabel}
                   >
-                    {String(sl.notes).trim()}
+                    {display.projectLabel}
                   </div>
-                ) : null}
-              </Button>
-            </ListItem>
-          </div>
-        ))}
+                  {display.materialLabel ? (
+                    <div className="sessions-slot-meta" title={display.materialLabel}>
+                      {display.materialLabel}
+                    </div>
+                  ) : null}
+                  {String(sl.notes ?? "").trim() ? (
+                    <div
+                      className="sessions-slot-notes"
+                      title={String(sl.notes).trim()}
+                    >
+                      {String(sl.notes).trim()}
+                    </div>
+                  ) : null}
+                </Button>
+              </ListItem>
+              {touchDragOverSlotId === sl.id ? (
+                <div className="director-session-slots-panel__drop-hint">
+                  {dropHintLabel}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
+      {draggedSlotForTouchPreview ? (
+        <div
+          ref={touchDragPreviewRef}
+          className={cn(
+            "director-session-slots-panel__touch-preview",
+            slotToneClassById?.get(draggedSlotForTouchPreview.id),
+          )}
+          aria-hidden="true"
+        >
+          <span className="sessions-sessionRow__dragHandle director-session-slots-panel__drag">
+            ⋮⋮
+          </span>
+          <div className="director-session-slots-panel__touch-preview-main">
+            <div className="sessions-slot-head">
+              <div
+                className="sessions-slot-title"
+                title={formatSlotTime(
+                  session.startsAt,
+                  draggedSlotForTouchPreview.offsetMin,
+                )}
+              >
+                <span className="director-session-slots-panel__status-dot" />
+                <span className="sessions-slot-title__text">
+                  {formatSlotTime(
+                    session.startsAt,
+                    draggedSlotForTouchPreview.offsetMin,
+                  )}
+                </span>
+              </div>
+            </div>
+            <div
+              className="sessions-slot-project"
+              title={draggedSlotDisplay?.projectLabel}
+            >
+              {draggedSlotDisplay?.projectLabel ?? "Проект"}
+            </div>
+            {draggedSlotDisplay?.materialLabel ? (
+              <div
+                className="sessions-slot-meta"
+                title={draggedSlotDisplay.materialLabel}
+              >
+                {draggedSlotDisplay.materialLabel}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <Buttons.AddButton type="button" onClick={() => void addSlot()} title="Новый слот" />
       {selectedSlotForModal ? (
         <Modal

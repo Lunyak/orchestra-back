@@ -80,7 +80,7 @@
 .settings-view {
     text-align: left;
     color: var(--color-text-lighter);
-    max-width: 920px;
+    max-width: var(--width-content-page);
     width: 100%;
     min-width: 0;
     margin: 0 auto;

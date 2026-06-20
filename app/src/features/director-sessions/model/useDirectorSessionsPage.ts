@@ -7,8 +7,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth";
 import {
-  actorCalendarPresentStrictForDraft,
-  classifyActorSlotAvailability,
   computePlannedEmailsForSession,
   findDirectorSessionParticipant,
   formatSlotTime,
@@ -41,8 +39,12 @@ import { createId } from "../../../shared/utils/createId";
 import type { TeamProfile } from "../../../sync/api/profile";
 import {
   getEmailsPlannedForDirectorSlot,
-  getNormalizedRoleKeysForSlotStep,
 } from "./session-slot-planned";
+import {
+  buildSessionSlotInsights,
+  computeSlotGatherStatus,
+} from "./session-slot-insights";
+import type { DaySessionPreview, SlotGatherStatus } from "./session-page-types";
 import type { SessionsSideCalledStatusTone } from "./session-page-types";
 
 export type DirectorSessionsPageViewModel = ReturnType<typeof useDirectorSessionsPage>;
@@ -57,7 +59,7 @@ export function useDirectorSessionsPage() {
     () => parseEmailFromAccessToken(accessToken),
     [accessToken],
   );
-  const { projects } = useProject();
+  const { projects, projectItems } = useProject();
   const location = useLocation();
   const navigate = useNavigate();
   const { sessionId: paramSessionId, slotId: paramSlotId } = useParams<{
@@ -293,7 +295,7 @@ export function useDirectorSessionsPage() {
     }
     setActiveSlotId((prev) => {
       if (prev && slots.some((sl) => sl.id === prev)) return prev;
-      return slots[0]?.id ?? null;
+      return null;
     });
   }, [activeSessionId, activeSession, slotIdFromUrl]);
 
@@ -304,14 +306,15 @@ export function useDirectorSessionsPage() {
     setCalendarState((prev) => ({ ...prev, selectedDate: dk }));
   }, [activeSessionId, activeSession?.startsAt, calendarState.selectedDate]);
 
+  const calendarSelectedDateRef = useRef(calendarState.selectedDate);
   useEffect(() => {
+    const prevSelectedDate = calendarSelectedDateRef.current;
+    calendarSelectedDateRef.current = calendarState.selectedDate;
+    if (prevSelectedDate === calendarState.selectedDate) return;
+    if (activeSessionId == null) return;
     const daySessions = sessionsByDate.get(calendarState.selectedDate) ?? [];
-    if (daySessions.length === 0) {
-      if (activeSessionId != null) setActiveSessionId(null);
-      return;
-    }
     if (!daySessions.some((s) => s.id === activeSessionId)) {
-      setActiveSessionId(daySessions[0].id);
+      setActiveSessionId(null);
     }
   }, [calendarState.selectedDate, sessionsByDate, activeSessionId]);
 
@@ -328,7 +331,8 @@ export function useDirectorSessionsPage() {
     const ids = new Set(list.map((s) => String(s?.id ?? "")).filter(Boolean));
     setActiveSessionId((prev) => {
       if (sessionIdFromUrl && ids.has(sessionIdFromUrl)) return sessionIdFromUrl;
-      return prev ?? list[0]?.id ?? null;
+      if (prev && ids.has(prev)) return prev;
+      return null;
     });
   }, [sessionsBundle?.sessions, sessionIdFromUrl]);
 
@@ -583,6 +587,17 @@ export function useDirectorSessionsPage() {
     [projects],
   );
 
+  const projectLabelBySlug = useMemo(
+    () =>
+      new Map(
+        projectItems.map((project) => [
+          project.slug,
+          project.name || project.slug,
+        ]),
+      ),
+    [projectItems],
+  );
+
   const loadProjectData = async (slug: string) => {
     if (!accessToken) return;
     if (!slug || dataCache[slug]) return;
@@ -710,6 +725,20 @@ export function useDirectorSessionsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, activeSession?.slots?.length]);
 
+  useEffect(() => {
+    const slugs = new Set<string>();
+    for (const session of sessionsForSelectedDay) {
+      for (const sl of session.slots ?? []) {
+        const slug = sl.ref?.projectSlug;
+        if (slug) slugs.add(slug);
+      }
+    }
+    slugs.forEach((slug) => {
+      if (!dataCache[slug]) void loadProjectData(slug);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionsForSelectedDay]);
+
   const slotById = useMemo(() => {
     const map = new Map<string, DirectorSessionSlot>();
     (activeSession?.slots ?? []).forEach((s) => map.set(s.id, s));
@@ -720,54 +749,8 @@ export function useDirectorSessionsPage() {
 
   const slotInsights = useMemo(() => {
     if (!activeSession) return [];
-    return [...(activeSession.slots ?? [])]
-      .sort((a, b) => a.offsetMin - b.offsetMin)
-      .map((sl) => {
-        const ref = sl.ref;
-        if (!ref) {
-          return {
-            slotId: sl.id,
-            time: formatSlotTime(activeSession.startsAt, sl.offsetMin),
-            title: "Материал не выбран",
-            ready: false,
-            missingRoles: [] as string[],
-            actors: [] as string[],
-          };
-        }
-        const data = dataCache[ref.projectSlug];
-        const step = data?.steps?.find((x) => x.id === ref.stepId) ?? null;
-        const roleKeys = getNormalizedRoleKeysForSlotStep(
-          step ?? null,
-          data?.sceneRoles,
-          ref.stepId,
-        );
-        const missingRoles = roleKeys
-          .filter((key) => !key || !(data?.roleEmailsByKey ?? {})[key]?.length)
-          .map(
-            (key) =>
-              String(data?.roleTitleByKey?.[key ?? ""] ?? key ?? "").trim() ||
-              key,
-          );
-        /** Кто вызван на репетицию в слоте: чекбоксы «кто репетирует», иначе весь состав ролей. */
-        const actors = getEmailsPlannedForDirectorSlot(
-          ref.projectSlug,
-          ref.stepId,
-          data,
-          (sl as DirectorSessionSlot).roleRehearsalPicks,
-        );
-        return {
-          slotId: sl.id,
-          time: formatSlotTime(activeSession.startsAt, sl.offsetMin),
-          title:
-            `${ref.projectSlug} · #${ref.stepId} ${step?.title ?? ""}`.trim(),
-          ready: roleKeys.length === 0 ? true : missingRoles.length === 0,
-          missingRoles,
-          actors: Array.from(
-            new Set(actors.map((x) => String(x ?? "").trim()).filter(Boolean)),
-          ),
-        };
-      });
-  }, [activeSession, dataCache]);
+    return buildSessionSlotInsights(activeSession, dataCache, projectLabelBySlug);
+  }, [activeSession, dataCache, projectLabelBySlug]);
 
   /** Все email, отмеченные в слотах как участники репетиции (для панели без выбранного слота). */
   const sessionPickedActorEmails = useMemo(() => {
@@ -827,8 +810,29 @@ export function useDirectorSessionsPage() {
     [actorEmails],
   );
 
-  const { data: profilesList = [] } = useProfilesBatchQuery(profileEmailsSorted, {
-    skip: !accessToken || !sessionDateKey || profileEmailsSorted.length === 0,
+  const dayPreviewActorEmails = useMemo(() => {
+    const set = new Set<string>();
+    for (const session of sessionsForSelectedDay) {
+      for (const insight of buildSessionSlotInsights(session, dataCache)) {
+        for (const actor of insight.actors) {
+          const normalized = normalizeEmail(String(actor ?? ""));
+          if (normalized) set.add(normalized);
+        }
+      }
+    }
+    return Array.from(set);
+  }, [sessionsForSelectedDay, dataCache]);
+
+  const profilesQueryEmails = useMemo(
+    () =>
+      Array.from(new Set([...profileEmailsSorted, ...dayPreviewActorEmails]))
+        .filter(Boolean)
+        .sort(),
+    [profileEmailsSorted, dayPreviewActorEmails],
+  );
+
+  const { data: profilesList = [] } = useProfilesBatchQuery(profilesQueryEmails, {
+    skip: !accessToken || profilesQueryEmails.length === 0,
   });
 
   const profilesByEmail = useMemo(() => {
@@ -840,83 +844,91 @@ export function useDirectorSessionsPage() {
     return map;
   }, [profilesList]);
 
-  const slotAvailabilityById = useMemo(() => {
-    if (!activeSession || !sessionDateKey)
-      return new Map<
-        string,
-        { free: string[]; busy: string[]; unknown: string[] }
-      >();
-    const base = getSessionStartLocalMinutes(activeSession.startsAt);
-    const slotActorsById = new Map<string, string[]>();
-    for (const s of slotInsights) slotActorsById.set(s.slotId, s.actors ?? []);
+  const slotGatherStatusBySlotId = useMemo(() => {
+    const out = new Map<string, SlotGatherStatus>();
+    if (!activeSession) return out;
+    for (const insight of slotInsights) {
+      const slot = slotById.get(insight.slotId);
+      out.set(
+        insight.slotId,
+        computeSlotGatherStatus(activeSession, insight, slot),
+      );
+    }
+    return out;
+  }, [activeSession, slotInsights, slotById]);
+
+  const daySessionPreviewsById = useMemo(() => {
+    const out = new Map<string, DaySessionPreview>();
+    for (const session of sessionsForSelectedDay) {
+      const insights = buildSessionSlotInsights(session, dataCache, projectLabelBySlug);
+      const slotsById = new Map(
+        (session.slots ?? []).map((slot) => [slot.id, slot]),
+      );
+      const slots = insights.map((insight) => {
+        const slot = slotsById.get(insight.slotId);
+        const gatherStatus = computeSlotGatherStatus(session, insight, slot);
+        return {
+          slotId: insight.slotId,
+          time: insight.time,
+          projectLabel: insight.projectLabel,
+          stepLabel: insight.stepLabel,
+          gatherStatus,
+          durationMin: slot?.durationMin ?? 0,
+        };
+      });
+      const slotsWithMaterial = slots.filter((slot) => slot.gatherStatus !== "none");
+      const slotsOkCount = slotsWithMaterial.filter(
+        (slot) => slot.gatherStatus === "ok",
+      ).length;
+      const commentRaw = String(session.comment ?? "").trim();
+      out.set(session.id, {
+        sessionId: session.id,
+        slots,
+        slotsOkCount,
+        slotsWithMaterialCount: slotsWithMaterial.length,
+        commentPreview:
+          commentRaw.length > 72 ? `${commentRaw.slice(0, 72)}…` : commentRaw,
+      });
+    }
+    return out;
+  }, [sessionsForSelectedDay, dataCache, projectLabelBySlug]);
+
+  const sessionsSideCalledRowsBySlotId = useMemo(() => {
+    const formatShortName = (profile: TeamProfile | undefined, fallback: string) => {
+      const firstName = String(profile?.firstName ?? "").trim();
+      const lastName = String(profile?.lastName ?? "").trim();
+      if (firstName && lastName) return `${firstName} ${lastName[0]}.`;
+      if (firstName) return firstName;
+
+      const displayName = String(profile?.displayName ?? "").trim();
+      const [firstPart, secondPart] = displayName.split(/\s+/).filter(Boolean);
+      if (firstPart && secondPart) return `${firstPart} ${secondPart[0]}.`;
+      return displayName || fallback;
+    };
 
     const out = new Map<
       string,
-      { free: string[]; busy: string[]; unknown: string[] }
+      Array<{
+        key: string;
+        email: string;
+        name: string;
+        avatarUrl: string | null;
+        avatarLabel: string;
+        statusLabel: string;
+        statusTone: SessionsSideCalledStatusTone;
+      }>
     >();
-    for (const sl of activeSession.slots ?? []) {
-      const actors = slotActorsById.get(sl.id) ?? [];
-      if (actors.length === 0) continue;
+    if (!activeSession) return out;
 
-      const startMin = base + Math.max(0, Math.floor(sl.offsetMin || 0));
-      const endMin = startMin + Math.max(1, Math.floor(sl.durationMin || 1));
-
-      const free: string[] = [];
-      const busy: string[] = [];
-      const unknown: string[] = [];
-
-      for (const actorRaw of actors) {
-        const actor = normalizeEmail(actorRaw);
-        if (!actor) continue;
-        const prof = profilesByEmail.get(actor);
-        const st = classifyActorSlotAvailability(
-          prof,
-          sessionDateKey,
-          startMin,
-          endMin,
-        );
-        if (st === "free") free.push(actorRaw);
-        else if (st === "busy") busy.push(actorRaw);
-        else unknown.push(actorRaw);
-      }
-
-      out.set(sl.id, { free, busy, unknown });
-    }
-    return out;
-  }, [
-    activeSessionId,
-    activeSession?.startsAt,
-    activeSession?.slots,
-    profilesByEmail,
-    sessionDateKey,
-    slotInsights,
-  ]);
-
-  const sessionsSideCalledRows = useMemo(() => {
-    if (!activeSession) return [];
-
-    const rowForEmail = (
-      raw: string,
-      opts: {
-        freeSet: Set<string> | null;
-        busySet: Set<string> | null;
-      },
-    ) => {
+    const rowForEmail = (raw: string) => {
       const emailNorm = normalizeEmail(String(raw ?? ""));
       const prof = emailNorm ? profilesByEmail.get(emailNorm) : undefined;
-      const displayName = String((prof as any)?.displayName ?? "").trim();
-      const name = displayName || String(raw ?? "").trim() || emailNorm;
-      const avatarUrl = String((prof as any)?.avatarUrl ?? "").trim() || null;
+      const displayName = String((prof as TeamProfile)?.displayName ?? "").trim();
+      const fallbackName = displayName || String(raw ?? "").trim() || emailNorm;
+      const name = formatShortName(prof as TeamProfile | undefined, fallbackName);
+      const avatarUrl = String((prof as TeamProfile)?.avatarUrl ?? "").trim() || null;
       let statusLabel = "";
       let statusTone: SessionsSideCalledStatusTone = "muted";
-      const cal =
-        sessionDateKey && prof
-          ? (
-              (prof as any)?.availabilityCalendar as
-                | Record<string, string>
-                | undefined
-            )?.[sessionDateKey]
-          : undefined;
 
       const published = isDirectorSessionPublished(activeSession);
       const participants = activeSession.participants ?? [];
@@ -925,10 +937,10 @@ export function useDirectorSessionsPage() {
       if (!sessionDateKey) {
         statusLabel = "Сначала укажи дату сессии";
         statusTone = "warn";
-      } else if (opts.busySet?.has(emailNorm)) {
-        statusLabel = "Занят на это время";
-        statusTone = "bad";
-      } else if (hasCallTable) {
+      } else if (!hasCallTable) {
+        statusLabel = "Ждём публикации";
+        statusTone = "warn";
+      } else {
         const part = findDirectorSessionParticipant(activeSession, emailNorm);
         if (part?.status === "present") {
           statusLabel = "Подтвердил явку";
@@ -939,30 +951,10 @@ export function useDirectorSessionsPage() {
         } else if (part?.status === "late") {
           statusLabel = "Опоздает";
           statusTone = "warn";
-        } else if (part) {
-          statusLabel = "Вызов не подтверждён";
-          statusTone = "warn";
         } else {
           statusLabel = "Вызов не подтверждён";
           statusTone = "warn";
         }
-      } else if (selfEmailNorm && emailNorm === selfEmailNorm) {
-        statusLabel = "Подтвердил явку";
-        statusTone = "confirmed";
-      } else if (opts.freeSet && opts.freeSet.has(emailNorm)) {
-        statusLabel = "Свободен";
-        statusTone = "ok";
-      } else if (!opts.freeSet) {
-        if (cal === "absent") {
-          statusLabel = "Занят (календарь)";
-          statusTone = "bad";
-        } else {
-          statusLabel = "Свободен";
-          statusTone = "ok";
-        }
-      } else {
-        statusLabel = "Занятость не отмечена";
-        statusTone = "warn";
       }
 
       return {
@@ -976,47 +968,25 @@ export function useDirectorSessionsPage() {
       };
     };
 
-    if (!activeSlotId) {
-      const emailSet = new Set<string>();
-      for (const p of activeSession.plannedEmails ?? []) {
-        const n = normalizeEmail(String(p ?? ""));
-        if (n) emailSet.add(n);
+    for (const insight of slotInsights) {
+      const emails = insight.actors ?? [];
+      if (emails.length === 0) {
+        out.set(insight.slotId, []);
+        continue;
       }
-      sessionPickedActorEmails.forEach((n) => emailSet.add(n));
-      const sorted = Array.from(emailSet).sort((a, b) =>
-        a.localeCompare(b, "ru"),
-      );
-      return sorted.map((emailNorm) =>
-        rowForEmail(emailNorm, { freeSet: null, busySet: null }),
+      out.set(
+        insight.slotId,
+        emails.map((raw) => rowForEmail(raw)),
       );
     }
 
-    const insight = slotInsights.find((x) => x.slotId === activeSlotId);
-    if (!insight) return [];
-    const emails = insight.actors ?? [];
-    if (emails.length === 0) return [];
-    const avail = slotAvailabilityById.get(activeSlotId) ?? {
-      free: [] as string[],
-      busy: [] as string[],
-      unknown: [] as string[],
-    };
-    const freeSet = new Set(
-      avail.free.map((x) => normalizeEmail(String(x ?? ""))),
-    );
-    const busySet = new Set(
-      avail.busy.map((x) => normalizeEmail(String(x ?? ""))),
-    );
-    return emails.map((raw) => rowForEmail(raw, { freeSet, busySet }));
-  }, [
-    activeSession,
-    activeSlotId,
-    slotInsights,
-    sessionPickedActorEmails,
-    slotAvailabilityById,
-    profilesByEmail,
-    sessionDateKey,
-    selfEmailNorm,
-  ]);
+    return out;
+  }, [activeSession, slotInsights, profilesByEmail, sessionDateKey]);
+
+  const sessionsSideCalledRows = useMemo(() => {
+    if (!activeSlotId) return [];
+    return sessionsSideCalledRowsBySlotId.get(activeSlotId) ?? [];
+  }, [activeSlotId, sessionsSideCalledRowsBySlotId]);
 
   const sessionMissingAvailabilityEmails = useMemo(() => {
     if (!activeSession || !sessionDateKey) return [] as string[];
@@ -1036,74 +1006,6 @@ export function useDirectorSessionsPage() {
     activeSession?.plannedEmails,
     sessionDateKey,
     sessionPickedActorEmails,
-    profilesByEmail,
-    selfEmailNorm,
-  ]);
-
-  /**
-   * Список сессий: зелёный слот — кастинг готов и у каждого вызванного «явка на вызов»:
-   * после публикации — participants.status === "present"; до публикации — явная отметка дня + «приду» (или JWT для себя).
-   */
-  const slotRowToneClassBySlotId = useMemo(() => {
-    const out = new Map<string, string>();
-    if (!activeSession || !sessionDateKey) return out;
-
-    const published = isDirectorSessionPublished(activeSession);
-    const participants = activeSession.participants ?? [];
-    const hasCallTable = published && participants.length > 0;
-
-    for (const insight of slotInsights) {
-      const sl = slotById.get(insight.slotId);
-      if (!sl?.ref) continue;
-
-      if (!insight.ready) {
-        out.set(
-          insight.slotId,
-          "sessions-slots-readonly__row--tone-roles-not-covered",
-        );
-        continue;
-      }
-
-      const actors = insight.actors ?? [];
-      const normActors = actors
-        .map((a) => normalizeEmail(String(a ?? "")))
-        .filter(Boolean);
-      if (normActors.length === 0) continue;
-
-      let allConfirmedPresent = true;
-      for (const e of normActors) {
-        if (hasCallTable) {
-          const st = findDirectorSessionParticipant(activeSession, e)?.status;
-          if (st !== "present") {
-            allConfirmedPresent = false;
-            break;
-          }
-        } else if (
-          !actorCalendarPresentStrictForDraft(
-            e,
-            sessionDateKey,
-            profilesByEmail,
-            selfEmailNorm,
-          )
-        ) {
-          allConfirmedPresent = false;
-          break;
-        }
-      }
-
-      out.set(
-        insight.slotId,
-        allConfirmedPresent
-          ? "sessions-slots-readonly__row--tone-all-free"
-          : "sessions-slots-readonly__row--tone-roles-not-covered",
-      );
-    }
-    return out;
-  }, [
-    activeSession,
-    sessionDateKey,
-    slotInsights,
-    slotById,
     profilesByEmail,
     selfEmailNorm,
   ]);
@@ -1191,9 +1093,10 @@ export function useDirectorSessionsPage() {
     publishActiveSession,
     moveSessionBefore,
     slotInsights,
-    slotAvailabilityById,
-    slotRowToneClassBySlotId,
+    slotGatherStatusBySlotId,
+    daySessionPreviewsById,
     sessionsSideCalledRows,
+    sessionsSideCalledRowsBySlotId,
     sessionMissingAvailabilityEmails,
     activeSlotInsight,
     sendAvailabilityReminders,
@@ -1201,5 +1104,6 @@ export function useDirectorSessionsPage() {
     getLocalDateTimeParts,
     toDateKey,
     navigate,
+    sessionIdFromUrl,
   };
 }

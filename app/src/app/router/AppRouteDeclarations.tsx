@@ -39,6 +39,12 @@ const TroupePage = lazy(() =>
   })),
 );
 
+const TeamRolePage = lazy(() =>
+  import("../../pages/troupe/TeamRolePage").then((m) => ({
+    default: m.TeamRolePage,
+  })),
+);
+
 const PremisesPage = lazy(() =>
   import("../../pages/premises/PremisesPage").then((m) => ({
     default: m.PremisesPage,
@@ -150,6 +156,7 @@ export function AppRouteDeclarations() {
       <Route path="/light-plot" element={<SpectaclePage />} />
       <Route path="/notes-run" element={<SpectaclePage />} />
       <Route path="/board" element={<SpectaclePage />} />
+      <Route path="/tasks" element={<SpectaclePage />} />
       <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />
       <Route
         path="/rehearsals/:rehearsalId"
@@ -173,6 +180,7 @@ export function AppRouteDeclarations() {
       />
       <Route path="/profile" element={<ProfilePage />} />
       <Route path="/troupe" element={<TroupePage />} />
+      <Route path="/troupe/roles/:roleId" element={<TeamRolePage />} />
       <Route path="/premises" element={<PremisesPage />} />
       <Route path="/premises/:premiseId" element={<PremiseDetailPage />} />
       <Route path="/roles" element={<Navigate to="/board" replace />} />

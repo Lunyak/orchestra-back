@@ -1,5 +1,5 @@
 ﻿.actor-view {
-  max-width: 920px;
+  max-width: var(--width-content-page);
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -321,24 +321,26 @@
   opacity: var(--opacity-medium);
 }
 
-@media (min-width: 721px) {
-  .actor-layout .actor-main:has(.voice-trainer) {
-    flex-direction: column;
-    overflow: hidden;
-  }
+.actor-layout .actor-main:has(.voice-trainer),
+.actor-layout .actor-main:has(.dialogue-trainer) {
+  flex-direction: column;
+  overflow: hidden;
+}
 
-  .actor-layout .actor-view:has(.voice-trainer) {
-    flex: 1;
-    min-height: 0;
-    width: 100%;
-  }
+.actor-layout .actor-view:has(.voice-trainer),
+.actor-layout .actor-view:has(.dialogue-trainer) {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  gap: 0;
+}
 
-  .actor-layout .actor-section:has(.voice-trainer) {
-    flex: 1;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
+.actor-layout .actor-section:has(.voice-trainer),
+.actor-layout .actor-section:has(.dialogue-trainer) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 720px) {

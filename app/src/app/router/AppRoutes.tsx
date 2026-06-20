@@ -2,7 +2,6 @@ import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import {
   AppEditorMenubar,
   AppEditorMenubarProvider,
-  AppEditorScriptFormatPlayMenu,
   AppEditorScriptFormattingMenu,
   AppEditorScriptMarkdownMenu,
   AppEditorScriptModeNav,
@@ -192,12 +191,18 @@ function AppRoutesContent() {
     );
   }, [dispatch, editorTocEnabled, projectName]);
 
-  const isBoardRoute = location.pathname === "/board";
+  const isRehearsalPlanRoute =
+    location.pathname === "/board" ||
+    location.pathname === "/tasks" ||
+    location.pathname === "/sessions" ||
+    location.pathname.startsWith("/sessions/");
 
   const isPlaylistVisible = isMobile ? mobilePlaylistOpen : showPlaylistSidebar;
   const isStepsVisible = isMobile ? mobileStepsOpen : !isStepsCollapsed;
   const isHeaderStepsCollapsed = !isStepsVisible;
-  const fallbackLabel = isBoardRoute ? "Загрузка доски…" : "Загрузка страницы…";
+  const fallbackLabel = isRehearsalPlanRoute
+    ? "Загрузка плана репетиций…"
+    : "Загрузка страницы…";
   const suspenseFallback = isSpectacleLayoutRoute ? (
     <PageLoader
       variant="spectacle"
@@ -254,11 +259,9 @@ function AppRoutesContent() {
           />
           <AppEditorScriptFormattingMenu
             disabled={!isEditing || !kadrMarkdownModes}
+            formatPlayDisabled={!canFormatPlayText}
+            onOpenFormatPlay={() => setFormatPlayModalOpen(true)}
             onTokenizeMatches={handleTokenizeMatches}
-          />
-          <AppEditorScriptFormatPlayMenu
-            disabled={!canFormatPlayText}
-            onOpen={() => setFormatPlayModalOpen(true)}
           />
         </>
       ) : null,

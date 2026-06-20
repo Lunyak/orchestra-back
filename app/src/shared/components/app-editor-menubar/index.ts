@@ -22,8 +22,6 @@ export type {
 } from "./script-tokenize-formatting";
 export { AppEditorScriptFormattingMenu } from "./AppEditorScriptFormattingMenu";
 export type { AppEditorScriptFormattingMenuProps } from "./AppEditorScriptFormattingMenu";
-export { AppEditorScriptFormatPlayMenu } from "./AppEditorScriptFormatPlayMenu";
-export type { AppEditorScriptFormatPlayMenuProps } from "./AppEditorScriptFormatPlayMenu";
 export { AppEditorScriptMarkdownMenu } from "./AppEditorScriptMarkdownMenu";
 export type { AppEditorScriptMarkdownMenuProps } from "./AppEditorScriptMarkdownMenu";
 export { AppEditorScriptPlayOriginalToggle } from "./AppEditorScriptPlayOriginalToggle";

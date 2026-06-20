@@ -25,6 +25,7 @@ import { RehearsalsCard } from "../../../rehearsals-card/RehearsalsCard";
 import type { ScriptStep } from "../../../../shared/types/script";
 import { markdownToPlainText } from "../../../../shared/utils/textPreview";
 import type { TeamProfile } from "../../../../sync/api/profile";
+import { RehearsalPlanSectionChrome } from "../../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
 import "../../../../pages/sessions/style.css";
 import "./style.css";
 import {
@@ -648,6 +649,31 @@ export function DirectorSessionPage() {
     return data?.steps?.find((s) => s.id === id) ?? null;
   }, [dataCache, slot?.ref]);
 
+  const slotDisplayById = useMemo(() => {
+    const map = new Map<
+      string,
+      { projectLabel: string; materialLabel: string }
+    >();
+    for (const sl of session?.slots ?? []) {
+      const ref = sl.ref;
+      if (!ref?.projectSlug || ref.stepId == null) {
+        map.set(sl.id, {
+          projectLabel: "Материал не выбран",
+          materialLabel: "",
+        });
+        continue;
+      }
+      const slug = String(ref.projectSlug).trim();
+      const step = dataCache[slug]?.steps?.find((s) => s.id === ref.stepId);
+      map.set(sl.id, {
+        projectLabel: projectLabelBySlug.get(slug) ?? slug,
+        materialLabel:
+          String(step?.title ?? "").trim() || "Материал загружается",
+      });
+    }
+    return map;
+  }, [dataCache, projectLabelBySlug, session?.slots]);
+
   const slotPlannedInput = useMemo((): DirectorSlotPlannedData | null => {
     if (!slot?.ref) return null;
     const slug = String(slot.ref.projectSlug ?? "").trim();
@@ -691,6 +717,8 @@ export function DirectorSessionPage() {
 
   return (
     <div className="director-session-page">
+      <RehearsalPlanSectionChrome activeTab="sessions" />
+
       <div className="director-session-page__head">
         <Link
           to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
@@ -722,6 +750,7 @@ export function DirectorSessionPage() {
             session={session}
             sessions={sessions}
             slotToneClassById={slotRehearsalToneClassById}
+            slotDisplayById={slotDisplayById}
             selectedSlotId={slId || null}
             onSelectSlot={(id) =>
               navigate(
@@ -746,7 +775,7 @@ export function DirectorSessionPage() {
                     className="director-session-page__preview"
                   >
                     {selectedStep && (
-                      <div className="session__step-item">
+                      <div className="session__selected-step">
                         <PreviewSlot selectedStep={selectedStep} />
 
                         <TroupeSchedulePreview
@@ -945,35 +974,6 @@ export function DirectorSessionPage() {
                                   ) : null}
                                 </span>
                               ) : null}
-                            </div>
-                            <div
-                              className="session__step-item__status"
-                              style={{ fontSize: 12, opacity: 0.72 }}
-                            >
-                              {isReadyStep(s) ? "Готова" : "В работе"}
-                              {s.durationMin != null
-                                ? ` · длит.: ${Math.max(1, Math.floor(Number(s.durationMin) || 1))} мин`
-                                : ""}
-                              {" · "}
-                              {ok ? (
-                                <span
-                                  style={{
-                                    color: "var(--color-status-success-text)",
-                                    fontWeight: 800,
-                                  }}
-                                >
-                                  можно взять
-                                </span>
-                              ) : (
-                                <span
-                                  style={{
-                                    color: "var(--color-status-error-text)",
-                                    fontWeight: 800,
-                                  }}
-                                >
-                                  не собирается
-                                </span>
-                              )}
                             </div>
                             <div
                               className={cn(

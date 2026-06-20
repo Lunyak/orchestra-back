@@ -1,7 +1,9 @@
+import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { calledStatusToGatherMark } from "../director-sessions/model/session-page-utils";
 import {
   type DirectorRehearsalSession,
   type DirectorSessionSlot,
@@ -591,34 +593,38 @@ export function DirectorSessionDetailPanel({
               {calledList.length > 0 ? (
                 <div className="director-session-page__called-scroll">
                   <ul className="director-session-page__called-list">
-                    {calledList.map((row) => (
-                      <li
-                        key={row.key}
-                        className={
-                          row.statusTone === "confirmed"
-                            ? "director-session-page__called-item director-session-page__called-item--confirmed"
-                            : "director-session-page__called-item"
-                        }
-                      >
-                        <MiniAvatar
-                          src={row.avatarUrl}
-                          label={row.avatarLabel}
-                          title={row.email}
-                          size={22}
-                        />
-                        <div className="director-session-page__called-item-main">
+                    {calledList.map((row) => {
+                      const statusParts = [row.statusLabel.trim()];
+                      if (row.respondedShort) statusParts.push(row.respondedShort);
+                      const statusHint = statusParts.filter(Boolean).join(" · ");
+                      const markStatus = calledStatusToGatherMark(row.statusTone);
+
+                      return (
+                        <li
+                          key={row.key}
+                          className="director-session-page__called-item"
+                          title={statusHint || undefined}
+                        >
+                          <MiniAvatar
+                            src={row.avatarUrl}
+                            label={row.avatarLabel}
+                            title={row.email}
+                            size={22}
+                          />
+                          <span
+                            className={cn(
+                              "sessions-slot-gather-mark",
+                              `sessions-slot-gather-mark--${markStatus}`,
+                            )}
+                            title={statusHint || undefined}
+                            aria-label={statusHint || undefined}
+                          />
                           <span className="director-session-page__called-name" title={row.email}>
                             {row.name}
                           </span>
-                          <span
-                            className={`director-session-page__called-status director-session-page__called-status--${row.statusTone}`}
-                          >
-                            {row.statusLabel}
-                            {row.respondedShort ? ` · ${row.respondedShort}` : ""}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ) : (

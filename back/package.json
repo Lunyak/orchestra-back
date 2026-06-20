@@ -38,7 +38,7 @@
     "@nestjs/websockets": "^11.0.1",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
-    "axios": "^1.6.5",
+    "axios": "^1.17.0",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
@@ -84,6 +84,7 @@
     "typescript-eslint": "^8.20.0"
   },
   "overrides": {
+    "axios": "^1.17.0",
     "zeptomatch": "1.2.0",
     "@prisma/dev": {
       "zeptomatch": "1.2.0"

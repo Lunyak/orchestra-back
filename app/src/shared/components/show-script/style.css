@@ -801,8 +801,7 @@
 .markdown-preview.markdown-preview--kadr .markdown-kadr {
   margin: 0;
   padding: 14px 12px 18px;
-  border: 1px solid var(--color-border-faint-muted);
-  border-radius: 10px;
+  border: none;
   background: var(--color-bg-secondary);
   box-sizing: border-box;
 }

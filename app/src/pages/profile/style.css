@@ -20,7 +20,7 @@
   padding: 0;
   margin: 0 auto;
   width: 100%;
-  max-width: 960px;
+  max-width: var(--width-content-page);
   box-sizing: border-box;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }

@@ -57,8 +57,14 @@
     padding: 12px 12px 160px;
   }
 
+  .main-content-theater,
+  .main-content-sessions,
+  .main-content-kanban,
+  .main-content-premises {
+    padding: 0 0 160px;
+  }
+
   .main-content-theater {
-    padding: 0;
     overflow: hidden;
   }
 }
@@ -66,6 +72,13 @@
 @media (max-width: 480px) {
   .main-content {
     padding: 8px 8px 190px;
+  }
+
+  .main-content-theater,
+  .main-content-sessions,
+  .main-content-kanban,
+  .main-content-premises {
+    padding: 0 6px 0;
   }
 
   .main-content-theater {
@@ -76,6 +89,13 @@
 @media (max-width: 320px) {
   .main-content {
     padding: 6px 6px 200px;
+  }
+
+  .main-content-theater,
+  .main-content-sessions,
+  .main-content-kanban,
+  .main-content-premises {
+    padding: 0 0 200px;
   }
 
   .main-content-theater {

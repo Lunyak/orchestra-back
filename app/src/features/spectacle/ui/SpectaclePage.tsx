@@ -36,6 +36,11 @@ const KanbanBoardPage = React.lazy(() =>
     default: m.KanbanBoardPage,
   })),
 );
+const TasksPage = React.lazy(() =>
+  import("../../../pages/tasks/TasksPage").then((m) => ({
+    default: m.TasksPage,
+  })),
+);
 
 export type { SpectaclePageViewModel } from "../model/useSpectaclePage";
 export { useSpectaclePage } from "../model/useSpectaclePage";
@@ -291,8 +296,13 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
             </Suspense>
           )}
           {activeView === "board" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка доски…" />}>
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка плана репетиций…" />}>
               <KanbanBoardPage members={kanbanMembers} />
+            </Suspense>
+          )}
+          {activeView === "tasks" && (
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка плана репетиций…" />}>
+              <TasksPage />
             </Suspense>
           )}
           {activeView === "sessions" && <Outlet />}

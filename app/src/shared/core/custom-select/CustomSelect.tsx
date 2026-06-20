@@ -1,11 +1,14 @@
 import cn from "classnames";
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { filterCustomSelectOptions } from "./custom-select-search";
 import "./style.css";
 
 export type CustomSelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  /** Дополнительный текст для поиска (имя, email, алиасы). */
+  searchText?: string;
 };
 
 type CustomSelectProps = {
@@ -14,6 +17,12 @@ type CustomSelectProps = {
   onChange: (nextValue: string) => void;
   placeholder?: string;
   noOptionsLabel?: string;
+  searchPlaceholder?: string;
+  noSearchResultsLabel?: string;
+  /** Поиск по label, value и searchText. По умолчанию включён. */
+  searchable?: boolean;
+  /** Минимум опций, при котором показывается поле поиска. */
+  minOptionsForSearch?: number;
   className?: string;
   triggerClassName?: string;
   dropdownClassName?: string;
@@ -34,6 +43,10 @@ export function CustomSelect({
   onChange,
   placeholder = "Выбрать",
   noOptionsLabel = "Нет опций",
+  searchPlaceholder = "Поиск…",
+  noSearchResultsLabel = "Ничего не найдено",
+  searchable = true,
+  minOptionsForSearch = 2,
   className,
   triggerClassName,
   dropdownClassName,
@@ -45,11 +58,15 @@ export function CustomSelect({
   renderOption,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const generatedId = useId();
   const listboxId = id ? `${id}-listbox` : `custom-select-${generatedId}-listbox`;
+  const searchInputId = id ? `${id}-search` : `custom-select-${generatedId}-search`;
   const hasOptions = options.length > 0;
   const isDisabled = disabled || !hasOptions;
+  const showSearch = searchable && options.length >= minOptionsForSearch;
 
   const selectedOption = useMemo(
     () => options.find((option) => option.value === value) ?? null,
@@ -59,9 +76,29 @@ export function CustomSelect({
     ? selectedOption?.label || placeholder
     : noOptionsLabel;
 
+  const filteredOptions = useMemo(
+    () => (showSearch ? filterCustomSelectOptions(options, searchQuery) : options),
+    [options, searchQuery, showSearch],
+  );
+
   useEffect(() => {
     if (!hasOptions) setIsOpen(false);
   }, [hasOptions]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery("");
+      return;
+    }
+
+    if (!showSearch) return;
+
+    const frameId = window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isOpen, showSearch]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,6 +122,11 @@ export function CustomSelect({
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [isOpen]);
+
+  const closeDropdown = () => {
+    setIsOpen(false);
+    setSearchQuery("");
+  };
 
   return (
     <div
@@ -120,37 +162,61 @@ export function CustomSelect({
       </button>
       {isOpen && !isDisabled ? (
         <div
-          role="listbox"
-          id={listboxId}
-          className={cn("custom-select__dropdown", dropdownClassName)}
-          aria-label={ariaLabel}
+          className={cn("custom-select__dropdown-wrap", dropdownClassName)}
+          onMouseDown={(event) => event.stopPropagation()}
         >
-          {options.map((option) => {
-            const isSelected = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                disabled={option.disabled}
-                className={cn(
-                  "custom-select__option",
-                  optionClassName,
-                  isSelected && "custom-select__option--selected",
-                )}
-                onClick={() => {
-                  if (option.disabled) return;
-                  onChange(option.value);
-                  setIsOpen(false);
+          {showSearch ? (
+            <div className="custom-select__search-wrap">
+              <input
+                ref={searchInputRef}
+                id={searchInputId}
+                type="search"
+                className="custom-select__search"
+                value={searchQuery}
+                placeholder={searchPlaceholder}
+                aria-label={searchPlaceholder}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.stopPropagation();
+                    closeDropdown();
+                  }
                 }}
-              >
-                {renderOption
-                  ? renderOption(option, { isSelected })
-                  : option.label}
-              </button>
-            );
-          })}
+              />
+            </div>
+          ) : null}
+          <div role="listbox" id={listboxId} className="custom-select__dropdown" aria-label={ariaLabel}>
+            {filteredOptions.length === 0 ? (
+              <div className="custom-select__empty">{noSearchResultsLabel}</div>
+            ) : (
+              filteredOptions.map((option) => {
+                const isSelected = option.value === value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    disabled={option.disabled}
+                    className={cn(
+                      "custom-select__option",
+                      optionClassName,
+                      isSelected && "custom-select__option--selected",
+                    )}
+                    onClick={() => {
+                      if (option.disabled) return;
+                      onChange(option.value);
+                      closeDropdown();
+                    }}
+                  >
+                    {renderOption
+                      ? renderOption(option, { isSelected })
+                      : option.label}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       ) : null}
     </div>

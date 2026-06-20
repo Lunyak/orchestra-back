@@ -23,6 +23,7 @@ function normalizeEmail(v: string): string {
 
 const ACTOR_COL_PX = 200;
 const DAY_COL_PX = 18;
+const ACTOR_COL_VAR = `var(--troupe-schedule-actor-col, ${ACTOR_COL_PX}px)`;
 /** День сессии, пара дней до и календарный месяц после дня сессии */
 const DAYS_BEFORE_SESSION = 2;
 
@@ -55,7 +56,7 @@ export function TroupeSchedulePreview({
 
   const gridTemplateColumns = useMemo(
     () =>
-      `${ACTOR_COL_PX}px repeat(${scheduleDays.length}, ${DAY_COL_PX}px)`,
+      `${ACTOR_COL_VAR} repeat(${scheduleDays.length}, ${DAY_COL_PX}px)`,
     [scheduleDays.length],
   );
 
@@ -86,7 +87,7 @@ export function TroupeSchedulePreview({
     return null;
   }
 
-  const gridMinWidth = ACTOR_COL_PX + scheduleDays.length * DAY_COL_PX;
+  const gridMinWidth = `calc(${ACTOR_COL_VAR} + ${scheduleDays.length * DAY_COL_PX}px)`;
 
   return (
     <div className="rehearsals-section troupe-schedule-preview troupe-schedule-preview--session-window">

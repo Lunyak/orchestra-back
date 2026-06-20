@@ -1,9 +1,13 @@
 ﻿.dialogue-trainer {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   gap: var(--spacing-5);
 }
 
 .dialogue-toolbar {
+  flex-shrink: 0;
   display: flex;
   gap: var(--spacing-5);
   align-items: flex-start;
@@ -66,13 +70,15 @@
 .dialogue-scroll {
   --trainer-line-py: 5px;
   --trainer-line-min-h: 30px;
+  flex: 1;
+  min-height: 0;
   border: 1px solid var(--field-control-border);
   background: color-mix(in srgb, var(--field-control-bg) 72%, var(--color-bg-secondary));
   padding: var(--spacing-5);
-  max-height: 70vh;
   overflow: auto;
   display: grid;
   gap: var(--spacing-1);
+  align-content: start;
 }
 
 .dialogue-line-wrap {
@@ -454,7 +460,6 @@
 
   .dialogue-scroll {
     padding: var(--spacing-4);
-    max-height: calc(100dvh - 260px);
   }
 
   .dialogue-line {

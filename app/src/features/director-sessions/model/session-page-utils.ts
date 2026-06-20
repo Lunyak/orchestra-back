@@ -12,7 +12,9 @@ import type {
   AvailabilityTimeRange,
   DirectorSessionProjectDataCache,
   ProjectDataCache,
+  SessionsSideCalledStatusTone,
   SlotActorAvailability,
+  SlotGatherStatus,
 } from "./session-page-types";
 
 export const SESSION_ROW_LONG_PRESS_MS = 520;
@@ -245,6 +247,16 @@ export function directorSlotRefKey(projectSlug: string, stepId: number): string 
   return `${String(projectSlug ?? "").trim()}:${Math.floor(Number(stepId) || 0)}`;
 }
 
+export function projectDisplayLabel(
+  projectSlug: string,
+  projectLabelBySlug?: ReadonlyMap<string, string> | null,
+): string {
+  const slug = String(projectSlug ?? "").trim();
+  if (!slug) return "";
+  const label = String(projectLabelBySlug?.get(slug) ?? "").trim();
+  return label || slug;
+}
+
 export function isReadyStep(step: ScriptStep): boolean {
   const st = String((step as { kanbanStatus?: string })?.kanbanStatus ?? "")
     .trim()
@@ -314,4 +326,13 @@ export function parseStepsFromPull(
     }))
     .filter((x) => Number.isFinite(x.id) && x.id > 0) as ScriptStep[];
   return { steps, sceneId, sceneRoles };
+}
+
+export function calledStatusToGatherMark(
+  tone: SessionsSideCalledStatusTone,
+): SlotGatherStatus {
+  if (tone === "confirmed" || tone === "ok") return "ok";
+  if (tone === "warn") return "warn";
+  if (tone === "bad") return "bad";
+  return "none";
 }

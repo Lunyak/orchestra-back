@@ -5,22 +5,174 @@ import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import React from "react";
-import { formatTimeHHMM, getSessionStartLocalMinutes } from "../model/session-page-utils";
+import React, { useEffect, useState } from "react";
+import {
+  calledStatusToGatherMark,
+  formatTimeHHMM,
+  getSessionStartLocalMinutes,
+} from "../model/session-page-utils";
 import "../../director-session-detail/director-session-detail.css";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
+import { RehearsalPlanSectionChrome } from "../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
 import "../../../pages/rehearsals/style.css";
 import "../../../pages/sessions/style.css";
 import {
   useDirectorSessionsPage,
   type DirectorSessionsPageViewModel,
 } from "../model/useDirectorSessionsPage";
+import type { SessionsSideCalledStatusTone, SlotGatherStatus } from "../model/session-page-types";
 
 export type { DirectorSessionsPageViewModel } from "../model/useDirectorSessionsPage";
 export { useDirectorSessionsPage } from "../model/useDirectorSessionsPage";
 
 dayjs.locale("ru");
+
+type SessionsBrowseStep = "calendar" | "day" | "session";
+
+type CalledRow = {
+  key: string;
+  email: string;
+  name: string;
+  avatarUrl: string | null;
+  avatarLabel: string;
+  statusLabel: string;
+  statusTone: SessionsSideCalledStatusTone;
+};
+
+const SLOT_GATHER_LABELS: Record<SlotGatherStatus, string> = {
+  ok: "Все явки",
+  warn: "Не все явки",
+  bad: "Не собирается",
+  none: "Нет материала",
+};
+
+function SlotGatherMark({ status }: { status: SlotGatherStatus }) {
+  const label = SLOT_GATHER_LABELS[status];
+  return (
+    <span
+      className={cn("sessions-slot-gather-mark", `sessions-slot-gather-mark--${status}`)}
+      title={label}
+      aria-label={label}
+    />
+  );
+}
+
+function SessionsSlotPreviewRow({
+  time,
+  projectLabel,
+  stepLabel,
+  durationMin,
+  gatherStatus,
+}: {
+  time: string;
+  projectLabel: string;
+  stepLabel: string;
+  durationMin?: number;
+  gatherStatus: SlotGatherStatus;
+}) {
+  const durationSuffix =
+    durationMin != null && durationMin > 0 ? `${durationMin}′` : null;
+  const materialParts: string[] = [];
+  if (projectLabel) materialParts.push(projectLabel);
+  materialParts.push(stepLabel);
+  if (durationSuffix) materialParts.push(durationSuffix);
+  const materialLine = materialParts.join(" · ");
+
+  return (
+    <div className="sessions-slot-row">
+      <span className="sessions-slot-row__time">{time}</span>
+      <span className="sessions-slot-row__label" title={materialLine}>
+        {materialLine}
+      </span>
+      <SlotGatherMark status={gatherStatus} />
+    </div>
+  );
+}
+
+function SessionsStepBack({
+  onClick,
+  children,
+}: {
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button type="button" className="sessions-step-back" onClick={onClick}>
+      {children}
+    </button>
+  );
+}
+
+function SlotCalledActors({
+  rows,
+  emptyMessage,
+  compact = false,
+}: {
+  rows: CalledRow[];
+  emptyMessage: string;
+  compact?: boolean;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rehearsals-muted sessions-slot-called__empty">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  const avatarSize = compact ? 18 : 22;
+
+  return (
+    <div
+      className={cn(
+        "sessions-slot-called",
+        compact && "sessions-slot-called--compact",
+      )}
+    >
+      {!compact ? (
+        <div className="rehearsals-section-title sessions-slot-called__title">
+          Актёры
+        </div>
+      ) : null}
+      <ul className="director-session-page__called-list sessions-slot-called__list">
+        {rows.map((row) => {
+          const statusHint = row.statusLabel.trim();
+          const markStatus = calledStatusToGatherMark(row.statusTone);
+
+          return (
+            <li
+              key={row.key}
+              className="director-session-page__called-item"
+              title={statusHint || undefined}
+            >
+              <MiniAvatar
+                src={row.avatarUrl}
+                label={row.avatarLabel}
+                title={row.email}
+                size={avatarSize}
+              />
+              <span
+                className={cn(
+                  "sessions-slot-gather-mark",
+                  `sessions-slot-gather-mark--${markStatus}`,
+                )}
+                title={statusHint || undefined}
+                aria-label={statusHint || undefined}
+              />
+              <span
+                className="director-session-page__called-name"
+                title={row.email}
+              >
+                {row.name}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
 
 export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewModel }) {
   const {
@@ -46,8 +198,8 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
     setActiveSlotId,
     formatSlotTime,
     slotInsights,
-    slotRowToneClassBySlotId,
-    slotAvailabilityById,
+    slotGatherStatusBySlotId,
+    daySessionPreviewsById,
     publishError,
     sendingAvailabilityReminders,
     availabilityReminderMessage,
@@ -59,85 +211,138 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
     activeSessionPublished,
     sendAvailabilityReminders,
     sessionMissingAvailabilityEmails,
-    sessionsSideCalledRows,
-    activeSlotInsight,
+    sessionsSideCalledRowsBySlotId,
+    sessionIdFromUrl,
     navigate,
   } = vm;
+
+  const [browseStep, setBrowseStep] = useState<SessionsBrowseStep>(() =>
+    sessionIdFromUrl ? "session" : "calendar",
+  );
+
+  useEffect(() => {
+    if (sessionIdFromUrl && activeSessionId) {
+      setBrowseStep("session");
+    }
+  }, [sessionIdFromUrl, activeSessionId]);
+
+  const goCalendar = () => {
+    setActiveSessionId(null);
+    setActiveSlotId(null);
+    setBrowseStep("calendar");
+  };
+
+  const goDay = () => {
+    setActiveSlotId(null);
+    setBrowseStep("day");
+  };
+
+  const openDay = (dateKey: string) => {
+    setCalendarState((prev) => ({ ...prev, selectedDate: dateKey }));
+    setActiveSessionId(null);
+    setActiveSlotId(null);
+    setBrowseStep("day");
+  };
+
+  const openSession = (sessionId: string) => {
+    setActiveSessionId(sessionId);
+    setActiveSlotId(null);
+    setBrowseStep("session");
+  };
+
+  const handleCreateSession = async () => {
+    await createSessionForSelectedDate();
+    setBrowseStep("session");
+  };
+
+  const handleCalendarDoubleClick = async (dateKey: string) => {
+    await createSessionAtDate(dateKey);
+    setBrowseStep("session");
+  };
+
+  const toggleSlot = (slotId: string) => {
+    setActiveSlotId((prev) => (prev === slotId ? null : slotId));
+  };
+
+  const sortedSlots = [...(activeSession?.slots ?? [])].sort(
+    (a, b) => a.offsetMin - b.offsetMin,
+  );
+
   return (
-    <>
-      <div className="rehearsals-page sessions-page">
-        <div className="rehearsals-head">
-          <div className="rehearsals-meta">Сессии</div>
-        </div>
+    <div className="rehearsals-page sessions-page">
+      <RehearsalPlanSectionChrome activeTab="sessions" />
 
-        <div className="sessions-layout">
-          <aside className="sessions-side">
-            <RehearsalsCard className="sessions-calendar-card">
-              <div className="sessions-calendar-toolbar">
-                <Button
-                  type="button"
-                  onClick={() => void createSessionForSelectedDate()}
-                  title={`Создать сессию на ${calendarSelectedDateLabel}, 20:00`}
-                >
-                  + Сессия на день
-                </Button>
-              </div>
+      <div className="sessions-flow">
+        {browseStep === "calendar" ? (
+          <RehearsalsCard className="sessions-calendar-card">
+            <CalendarSection
+              className="sessions-calendar"
+              storageMonthKey="director-sessions-calendar-month"
+              onStateChange={setCalendarState}
+              dotsByDate={dotsByDate}
+              eventsByDate={eventsByDate}
+              onDayClick={openDay}
+              onDayDoubleClick={(date) => void handleCalendarDoubleClick(date)}
+              title="Календарь сессий"
+              subtitle="Клик — день · двойной клик — новая сессия"
+            />
+          </RehearsalsCard>
+        ) : null}
 
-              <CalendarSection
-                className="sessions-calendar"
-                storageMonthKey="director-sessions-calendar-month"
-                onStateChange={setCalendarState}
-                dotsByDate={dotsByDate}
-                eventsByDate={eventsByDate}
-                onDayDoubleClick={(date) => void createSessionAtDate(date)}
-                title="Календарь сессий"
-                subtitle="Клик — выбрать день · двойной клик по дню — новая сессия в 20:00"
-              />
+        {browseStep === "day" ? (
+          <RehearsalsCard className="sessions-day-step">
+            <div className="sessions-step-head">
+              <SessionsStepBack onClick={goCalendar}>← Календарь</SessionsStepBack>
+              <span className="sessions-step-head__title">
+                {calendarSelectedDateLabel}
+              </span>
+            </div>
 
-              <div className="sessions-day-panel">
-                <div className="sessions-day-panel__head">
-                  <span className="sessions-day-panel__title">
-                    {calendarSelectedDateLabel}
-                  </span>
-                  <span className="rehearsals-muted sessions-day-panel__count">
-                    {sessionsForSelectedDay.length
-                      ? `${sessionsForSelectedDay.length} сесс.`
-                      : "нет сессий"}
-                  </span>
+            <div className="sessions-day-toolbar">
+              <Button
+                type="button"
+                onClick={() => void handleCreateSession()}
+                title={`Создать сессию на ${calendarSelectedDateLabel}, 20:00`}
+              >
+                Создать сессию
+              </Button>
+            </div>
+
+            <div className="sessions-day-list">
+              {sessionsForSelectedDay.length === 0 ? (
+                <div className="rehearsals-muted sessions-day-list__empty">
+                  На этот день сессий нет. Создайте сессию или сделайте двойной
+                  клик по дате в календаре.
                 </div>
+              ) : (
+                sessionsForSelectedDay.map((s) => {
+                  const time = formatTimeHHMM(
+                    getSessionStartLocalMinutes(s.startsAt),
+                  );
+                  const published = Boolean(String(s.publishedAt ?? "").trim());
+                  const preview = daySessionPreviewsById.get(s.id);
+                  const gatherSummary = preview?.slotsWithMaterialCount
+                    ? `${preview.slotsOkCount}/${preview.slotsWithMaterialCount}`
+                    : null;
 
-                <div className="sessions-day-list">
-                  {sessionsForSelectedDay.length === 0 ? (
-                    <div className="rehearsals-muted sessions-day-list__empty">
-                      На этот день сессий нет. Нажмите «+ Сессия на день» или
-                      сделайте двойной клик по дате в календаре.
-                    </div>
-                  ) : (
-                    sessionsForSelectedDay.map((s) => {
-                      const time = formatTimeHHMM(
-                        getSessionStartLocalMinutes(s.startsAt),
-                      );
-                      const published = Boolean(
-                        String(s.publishedAt ?? "").trim(),
-                      );
-                      const isActive = s.id === activeSessionId;
-                      return (
-                        <div
-                          key={s.id}
-                          className={cn("sessions-day-item", {
-                            "sessions-day-item--active": isActive,
-                          })}
-                        >
-                          <button
-                            type="button"
-                            className="sessions-day-item__main"
-                            onClick={() => setActiveSessionId(s.id)}
-                            onDoubleClick={() => navigateToSessionPage(s.id)}
-                            title="Клик — выбрать · двойной клик — план и материалы"
-                          >
-                            <span className="sessions-day-item__time">
-                              {time}
-                            </span>
+                  return (
+                    <div key={s.id} className="sessions-day-item">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="sessions-day-item__main"
+                        onClick={() => openSession(s.id)}
+                        onDoubleClick={() => navigateToSessionPage(s.id)}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" && e.key !== " ") return;
+                          e.preventDefault();
+                          openSession(s.id);
+                        }}
+                        title="Клик — сессия · двойной клик — план и материалы"
+                      >
+                        <span className="sessions-day-item__head">
+                          <span className="sessions-day-item__time">{time}</span>
+                          <span className="sessions-day-item__head-body">
                             <span className="sessions-day-item__title">
                               {s.title}
                             </span>
@@ -150,691 +355,289 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                                 черновик
                               </span>
                             )}
-                          </button>
-                          <Buttons.DeleteButton
-                            type="button"
-                            className="sessions-day-item__delete"
-                            onClick={() => void deleteSession(s.id)}
-                            title="Удалить сессию"
-                            aria-label="Удалить сессию"
-                          />
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </RehearsalsCard>
-          </aside>
-
-          <div className="sessions-main">
-            {!activeSession ? (
-              <div className="rehearsals-muted sessions-main-empty">
-                Выберите день в календаре и создайте сессию или выберите существующую
-                в списке под календарём.
-              </div>
-            ) : (
-              <div className="sessions-panels">
-                <RehearsalsCard fluid>
-                  <div className="form-textarea sessions-slots__title">
-                    <input
-                      className="native-text-input"
-                      type="text"
-                      aria-label="Название сессии"
-                      value={activeSession.title}
-                      onChange={(e) =>
-                        void updateActiveSession({ title: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="sessions-row">
-                    <div
-                      className={cn(
-                        "form-textarea",
-                        "form-textarea--with-label",
-                      )}
-                    >
-                      <input
-                        id={sessionDateInputId}
-                        className="native-text-input"
-                        type="date"
-                        value={
-                          getLocalDateTimeParts(activeSession.startsAt).date
-                        }
-                        onChange={(e) => {
-                          const { time } = getLocalDateTimeParts(
-                            activeSession.startsAt,
-                          );
-                          const next = `${e.target.value}T${time || "20:00"}:00`;
-                          const d = new Date(next);
-                          if (Number.isFinite(d.getTime()))
-                            void updateActiveSession({
-                              startsAt: d.toISOString(),
-                            });
-                        }}
-                      />
-                    </div>
-                    <div
-                      className={cn(
-                        "form-textarea",
-                        "form-textarea--with-label",
-                      )}
-                    >
-                      <input
-                        id={sessionTimeInputId}
-                        className="native-text-input"
-                        type="time"
-                        value={
-                          getLocalDateTimeParts(activeSession.startsAt).time
-                        }
-                        onChange={(e) => {
-                          const { date } = getLocalDateTimeParts(
-                            activeSession.startsAt,
-                          );
-                          const next = `${date || toDateKey(new Date())}T${e.target.value}:00`;
-                          const d = new Date(next);
-                          if (Number.isFinite(d.getTime()))
-                            void updateActiveSession({
-                              startsAt: d.toISOString(),
-                            });
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="sessions-slots-readonly">
-                    <div className="sessions-slots-readonly__head">
-                      <span className="rehearsals-muted">Слоты (обзор)</span>
-                    </div>
-                    {(!activeSession.slots ||
-                      activeSession.slots.length === 0) && (
-                      <div className="sessions-slots-empty rehearsals-muted">
-                        Слотов пока нет — задай план на странице сессии (кнопка
-                        выше).
-                      </div>
-                    )}
-                    {[...(activeSession.slots ?? [])]
-                      .sort((a, b) => a.offsetMin - b.offsetMin)
-                      .map((sl) => (
-                        <button
-                          key={sl.id}
-                          type="button"
-                          className={`sessions-slots-readonly__row ${sl.id === activeSlotId ? "active" : ""} ${slotRowToneClassBySlotId.get(sl.id) ?? ""}`.trim()}
-                          onClick={() => setActiveSlotId(sl.id)}
-                        >
-                          <div className="sessions-slots-readonly__time">
-                            {formatSlotTime(
-                              activeSession.startsAt,
-                              sl.offsetMin,
-                            )}{" "}
-                            · {sl.durationMin} мин
-                          </div>
-                          <div className="sessions-slots-readonly__meta">
-                            {slotInsights.find((x) => x.slotId === sl.id)
-                              ?.title ??
-                              (sl.ref
-                                ? `${sl.ref.projectSlug} · шаг #${sl.ref.stepId}`
-                                : "Материал не выбран")}
-                          </div>
-                          {String(sl.notes ?? "").trim() ? (
-                            <div
-                              className="sessions-slots-readonly__notes"
-                              title={String(sl.notes).trim()}
+                          </span>
+                          {gatherSummary ? (
+                            <span
+                              className="sessions-day-item__gather-summary"
+                              title="Слотов с полными явками"
                             >
-                              {String(sl.notes).trim()}
-                            </div>
+                              {gatherSummary}
+                            </span>
                           ) : null}
-                          {(() => {
-                            const av = slotAvailabilityById.get(sl.id);
-                            if (!av) return null;
-                            const total =
-                              av.free.length +
-                              av.busy.length +
-                              av.unknown.length;
-                            if (total === 0) return null;
-                            return (
-                              <div className="rehearsals-muted sessions-slots-readonly__avail">
-                                по доступности: свободны <b>{av.free.length}</b>{" "}
-                                / {total}
-                                {av.unknown.length ? (
-                                  <>
-                                    {" "}
-                                    · не отмечено: <b>{av.unknown.length}</b>
-                                  </>
-                                ) : null}
-                                {av.busy.length ? (
-                                  <>
-                                    {" "}
-                                    · заняты: <b>{av.busy.length}</b>
-                                  </>
-                                ) : null}
-                              </div>
-                            );
-                          })()}
-                          {(() => {
-                            const info = slotInsights.find(
-                              (x) => x.slotId === sl.id,
-                            );
-                            if (!info || !sl.ref) return null;
-                            if (info.ready) {
-                              return (
-                                <div className="rehearsals-muted sessions-slot-ok">
-                                  Собирается
-                                </div>
-                              );
-                            }
-                            if (info.missingRoles.length) {
-                              return (
-                                <div className="rehearsals-error sessions-slot-bad">
-                                  Не собирается: нет назначений для{" "}
-                                  {info.missingRoles.slice(0, 4).join(", ")}
-                                  {info.missingRoles.length > 4
-                                    ? ` +${info.missingRoles.length - 4}`
-                                    : ""}
-                                </div>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </button>
-                      ))}
-                  </div>
-                  {publishError && (
-                    <div className="rehearsals-error">{publishError}</div>
-                  )}
-                  {availabilityReminderMessage ? (
-                    <div className="rehearsals-muted">{availabilityReminderMessage}</div>
-                  ) : null}
-
-                  <FormTextarea
-                    rootClassName="form-textarea--section"
-                    rows={3}
-                    value={sessionCommentDraft}
-                    onChange={(e) => onSessionCommentChange(e.target.value)}
-                    onBlur={onSessionCommentBlur}
-                    placeholder="Комментарий к сессии"
-                  />
-
-                  <div className="sessions-slots__container-btns">
-                    <Button
-                      type="button"
-                      onClick={() => void publishActiveSession()}
-                      disabled={publishing}
-                      title={
-                        activeSessionPublished
-                          ? "Пересобрать список участников по календарю, обновить комментарий; при подключённом боте — обновить или отправить сообщение в Telegram"
-                          : "Помечает сессию опубликованной; при подключённом боте — дублирует вызов в Telegram"
-                      }
-                    >
-                      {publishing
-                        ? "Публикую…"
-                        : activeSessionPublished
-                          ? "Обновить публикацию"
-                          : "Опубликовать"}
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => void sendAvailabilityReminders()}
-                      disabled={
-                        sendingAvailabilityReminders ||
-                        sessionMissingAvailabilityEmails.length === 0
-                      }
-                      title="Отправить в Telegram напоминания актёрам без отметки занятости"
-                    >
-                      {sendingAvailabilityReminders
-                        ? "Отправляю…"
-                        : `Напомнить в Telegram (${sessionMissingAvailabilityEmails.length})`}
-                    </Button>
-
-                    <Button
-                      className="sessions-field__plan"
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          `/sessions/${encodeURIComponent(activeSession.id)}`,
-                        )
-                      }
-                      title="Создавать, наполнять и менять порядок слотов — на странице сессии"
-                    >
-                      План и материалы
-                    </Button>
-                  </div>
-                </RehearsalsCard>
-
-                {activeSession ? (
-                  <div
-                    className="sessions-side-called"
-                    style={{ marginTop: 12 }}
-                  >
-                    <div className="rehearsals-section-title">
-                      {activeSlotId ? "В выбранном слоте" : "Участники сессии"}
-                      {activeSlotInsight ? (
-                        <span
-                          className="rehearsals-muted"
-                          style={{ fontWeight: 600 }}
-                        >
-                          {" "}
-                          · {activeSlotInsight.time}
                         </span>
-                      ) : null}
-                    </div>
-                    {sessionsSideCalledRows.length === 0 ? (
-                      <div
-                        className="rehearsals-muted"
-                        style={{ fontSize: 12 }}
-                      >
-                        {activeSlotId
-                          ? "Нет актёров по ролям (выбери материал в слоте или назначь роли в проекте)."
-                          : "Нет участников: опубликуй сессию или назначь материалы в слотах."}
+
+                        {preview && preview.slots.length > 0 ? (
+                          <ul className="sessions-day-item__slots">
+                            {preview.slots.map((slot) => (
+                              <li key={slot.slotId}>
+                                <SessionsSlotPreviewRow
+                                  time={slot.time}
+                                  projectLabel={slot.projectLabel}
+                                  stepLabel={slot.stepLabel}
+                                  durationMin={slot.durationMin}
+                                  gatherStatus={slot.gatherStatus}
+                                />
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+
+                        {preview?.commentPreview ? (
+                          <p className="sessions-day-item__comment rehearsals-muted">
+                            {preview.commentPreview}
+                          </p>
+                        ) : null}
                       </div>
-                    ) : (
-                      <div className="director-session-page__called-scroll">
-                        <ul className="director-session-page__called-list">
-                          {sessionsSideCalledRows.map((row) => (
-                            <li
-                              key={row.key}
-                              className={cn(
-                                "director-session-page__called-item",
-                                row.statusTone === "confirmed" &&
-                                  "director-session-page__called-item--confirmed",
-                              )}
-                            >
-                              <MiniAvatar
-                                src={row.avatarUrl}
-                                label={row.avatarLabel}
-                                title={row.email}
-                                size={22}
-                              />
-                              <div className="director-session-page__called-item-main">
-                                <span
-                                  className="director-session-page__called-name"
-                                  title={row.email}
-                                >
-                                  {row.name}
-                                </span>
-                                {row.statusLabel ? (
-                                  <span
-                                    className={
-                                      row.statusTone === "confirmed"
-                                        ? "director-session-page__called-status director-session-page__called-status--confirmed"
-                                        : `director-session-page__called-status director-session-page__called-status--${row.statusTone}`
-                                    }
-                                  >
-                                    {row.statusLabel}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-
-                {/* <RehearsalsCard fluid title="Материалы">
-                <div className="sessions-row sessions-material-controls">
-                  <select
-                    className="native-select"
-                    value={projectFilter}
-                    onChange={(e) => setProjectFilter(e.target.value)}
-                  >
-                    {visibleProjects.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="native-text-input"
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="поиск по названию/тексту"
-                  />
-                </div>
-                <div className="sessions-material-subtools">
-                  <label className="sessions-check">
-                    <input
-                      type="checkbox"
-                      checked={onlySelectable}
-                      onChange={(e) => setOnlySelectable(e.target.checked)}
-                    />
-                    <span className="rehearsals-muted">
-                      только сцены, которые можно выбрать (по ролям свободных
-                      актёров)
-                    </span>
-                  </label>
-                  {membersLoading && (
-                    <span className="rehearsals-muted">
-                      загружаю участников…
-                    </span>
-                  )}
-                </div>
-
-                {stepsLoading && (
-                  <div className="rehearsals-muted sessions-help">
-                    Загружаю шаги…
-                  </div>
-                )}
-
-                <div className="sessions-material-list">
-                  {filteredStepsForList.slice(0, 200).map((s) => (
-                    <ListItem
-                      key={`${projectFilter}:${s.id}`}
-                      className="sessions-listItem-row"
-                      draggable
-                      onDragStart={(e) => {
-                        const payload: DragStepRefPayload = {
-                          kind: "stepRef",
-                          projectSlug: projectFilter,
-                          stepId: s.id,
-                          durationMin:
-                            s.durationMin == null
-                              ? undefined
-                              : Math.max(
-                                  1,
-                                  Math.floor(Number(s.durationMin) || 1),
-                                ),
-                        };
-                        e.dataTransfer.setData(
-                          DND_MIME_STEP_REF,
-                          JSON.stringify(payload),
-                        );
-                        e.dataTransfer.effectAllowed = "copy";
-                        setMaterialDragPayload(payload);
-                      }}
-                      onDragEnd={() => setMaterialDragPayload(null)}
-                    >
-                      <button
+                      <Buttons.DeleteButton
                         type="button"
-                        className="rehearsals-item"
-                        title="Открыть текст и выбрать (или перетащи в слот)"
-                        onClick={() => {
-                          setMaterialPreview({
-                            projectSlug: projectFilter,
-                            step: s,
-                          });
-                        }}
-                      >
-                        <div className="rehearsals-item-title">
-                          #{s.id} {s.title}
-                        </div>
-                      </button>
-                    </ListItem>
-                  ))}
-                  {filteredStepsForList.length === 0 && (
-                    <div className="rehearsals-muted">Ничего не найдено.</div>
-                  )}
-                </div>
+                        className="sessions-day-item__delete"
+                        onClick={() => void deleteSession(s.id)}
+                        title="Удалить сессию"
+                        aria-label="Удалить сессию"
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </RehearsalsCard>
+        ) : null}
 
-                {materialPreview && (
-                  <div
-                    className="sessions-modal-backdrop"
-                    role="presentation"
-                    onClick={() => setMaterialPreview(null)}
-                  >
-                    <div
-                      className="sessions-modal"
-                      role="dialog"
-                      aria-modal="true"
-                      aria-label="Материал"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="sessions-modal-head">
-                        <div>
-                          <div className="sessions-modal-title">
-                            {materialPreview.projectSlug} · #
-                            {materialPreview.step.id}{" "}
-                            {materialPreview.step.title}
-                          </div>
-                          <div className="rehearsals-muted">
-                            кликни “Назначить”, чтобы положить в выбранный слот
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setMaterialPreview(null)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                      <div className="sessions-modal-actions">
+        {browseStep === "session" && activeSession ? (
+          <RehearsalsCard className="sessions-session-step">
+            <div className="sessions-step-head">
+              <SessionsStepBack onClick={goDay}>← {calendarSelectedDateLabel}</SessionsStepBack>
+              <span className="sessions-step-head__meta rehearsals-muted">
+                {formatTimeHHMM(
+                  getSessionStartLocalMinutes(activeSession.startsAt),
+                )}
+                {activeSessionPublished ? " · опубликована" : " · черновик"}
+              </span>
+            </div>
+
+            <div className="form-textarea sessions-slots__title">
+              <input
+                className="native-text-input"
+                type="text"
+                aria-label="Название сессии"
+                value={activeSession.title}
+                onChange={(e) =>
+                  void updateActiveSession({ title: e.target.value })
+                }
+              />
+            </div>
+
+            <FormTextarea
+              rootClassName="sessions-session-comment"
+              rows={2}
+              value={sessionCommentDraft}
+              onChange={(e) => onSessionCommentChange(e.target.value)}
+              onBlur={onSessionCommentBlur}
+              placeholder="Комментарий к сессии"
+            />
+
+            <div className="sessions-row">
+              <div className={cn("form-textarea", "form-textarea--with-label")}>
+                <input
+                  id={sessionDateInputId}
+                  className="native-text-input"
+                  type="date"
+                  value={getLocalDateTimeParts(activeSession.startsAt).date}
+                  onChange={(e) => {
+                    const { time } = getLocalDateTimeParts(
+                      activeSession.startsAt,
+                    );
+                    const next = `${e.target.value}T${time || "20:00"}:00`;
+                    const d = new Date(next);
+                    if (Number.isFinite(d.getTime()))
+                      void updateActiveSession({
+                        startsAt: d.toISOString(),
+                      });
+                  }}
+                />
+              </div>
+              <div className={cn("form-textarea", "form-textarea--with-label")}>
+                <input
+                  id={sessionTimeInputId}
+                  className="native-text-input"
+                  type="time"
+                  value={getLocalDateTimeParts(activeSession.startsAt).time}
+                  onChange={(e) => {
+                    const { date } = getLocalDateTimeParts(
+                      activeSession.startsAt,
+                    );
+                    const next = `${date || toDateKey(new Date())}T${e.target.value}:00`;
+                    const d = new Date(next);
+                    if (Number.isFinite(d.getTime()))
+                      void updateActiveSession({
+                        startsAt: d.toISOString(),
+                      });
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="sessions-session-slots">
+              <div className="sessions-session-slots__head">
+                <span className="rehearsals-muted">Слоты</span>
+                <Button
+                  className="sessions-field__plan"
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/sessions/${encodeURIComponent(activeSession.id)}`,
+                    )
+                  }
+                  title="Создавать, наполнять и менять порядок слотов"
+                >
+                  План и материалы
+                </Button>
+              </div>
+
+              {sortedSlots.length === 0 ? (
+                <div className="sessions-slots-empty rehearsals-muted">
+                  Слотов пока нет — задай план на странице сессии.
+                </div>
+              ) : (
+                <div className="sessions-slots director-session-slots-panel__timeline">
+                  {sortedSlots.map((sl) => {
+                    const isActive = sl.id === activeSlotId;
+                    const insight = slotInsights.find((x) => x.slotId === sl.id);
+                    const projectLabel = insight?.projectLabel ?? "";
+                    const stepLabel = insight?.stepLabel ?? "Материал не выбран";
+                    const slotTime = formatSlotTime(
+                      activeSession.startsAt,
+                      sl.offsetMin,
+                    );
+                    const slotProjectLabel = projectLabel || "Материал не выбран";
+                    const slotMeta = projectLabel ? stepLabel : "";
+                    const slotNotes = String(sl.notes ?? "").trim();
+                    const gatherStatus =
+                      slotGatherStatusBySlotId.get(sl.id) ?? "none";
+                    const calledRows =
+                      sessionsSideCalledRowsBySlotId.get(sl.id) ?? [];
+                    const slotEmptyMessage =
+                      "Нет актёров по ролям — выбери материал или назначь роли в проекте.";
+
+                    return (
+                      <div
+                        key={sl.id}
+                        className={cn(
+                          "sessions-session-slot",
+                          "director-session-slots-panel__row",
+                          isActive && "active",
+                        )}
+                      >
                         <Button
                           type="button"
-                          disabled={!activeSlotId}
-                          onClick={() => {
-                            if (!activeSlotId) return;
-                            void attachToSlot(activeSlotId, {
-                              projectSlug: materialPreview.projectSlug,
-                              stepId: materialPreview.step.id,
-                            });
-                            setMaterialPreview(null);
-                          }}
-                        >
-                          Назначить в выбранный слот
-                        </Button>
-                        {!activeSlotId && (
-                          <div className="rehearsals-muted">
-                            Сначала выбери слот слева
-                          </div>
-                        )}
-                      </div>
-                      <pre className="sessions-modal-text">
-                        {markdownToPlainText(
-                          String(
-                            materialPreview.step.playMarkdown ??
-                              materialPreview.step.markdown ??
-                              "",
-                          ),
-                        )}
-                      </pre>
-                    </div>
-                  </div>
-                )}
-
-                <div className="rehearsals-section">
-                  <div className="rehearsals-section-title">
-                    График актёров на {sessionDateKey ?? "—"}
-                  </div>
-                  {!sessionDateKey ? (
-                    <div className="rehearsals-muted">
-                      Сначала выбери дату сессии.
-                    </div>
-                  ) : (
-                    <>
-                      <div
-                        className="rehearsals-muted"
-                        style={{ marginTop: 6 }}
-                      >
-                        Месяц: <b>{troupeScheduleMonthKey}</b> · выбранный день
-                        подсвечен
-                      </div>
-                      <div className="troupe-legend" style={{ marginTop: 8 }}>
-                        <span className="troupe-legend-item">
-                          <span className="troupe-dot free" /> свободен
-                        </span>
-                        <span className="troupe-legend-item">
-                          <span className="troupe-dot partial" /> свободен
-                          (время)
-                        </span>
-                        <span className="troupe-legend-item">
-                          <span className="troupe-dot busy" /> занят
-                        </span>
-                        <span className="troupe-legend-item">
-                          <span className="troupe-dot unknown" /> не отмечено
-                        </span>
-                      </div>
-
-                      <div
-                        className="troupe-schedule"
-                        role="region"
-                        aria-label="График занятости актёров"
-                      >
-                        <div
-                          className="troupe-grid"
-                          style={{
-                            gridTemplateColumns:
-                              troupeScheduleGridTemplateColumns,
-                            minWidth: 240 + troupeScheduleDays.length * 28,
-                          }}
-                        >
-                          <div className="troupe-cell troupe-sticky troupe-header-cell"></div>
-                          {troupeScheduleDays.map((d) => {
-                            const dayKey = toDateKey(d);
-                            const isFocus = dayKey === sessionDateKey;
-                            const n = d.toLocaleDateString("ru-RU", {
-                              day: "numeric",
-                            });
-                            const wd = d.toLocaleDateString("ru-RU", {
-                              weekday: "short",
-                            });
-                            return (
-                              <div
-                                key={dayKey}
-                                className={`troupe-cell troupe-header-cell ${isFocus ? "focus" : ""}`}
-                                title={dayKey}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    lineHeight: "14px",
-                                  }}
-                                >
-                                  {n}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: 10,
-                                    opacity: 0.7,
-                                    lineHeight: "12px",
-                                  }}
-                                >
-                                  {wd}
-                                </div>
-                              </div>
-                            );
-                          })}
-
-                          {troupeScheduleActors.length === 0 ? (
-                            <div
-                              className="troupe-cell troupe-empty"
-                              style={{
-                                gridColumn: `1 / span ${troupeScheduleDays.length + 1}`,
-                              }}
-                            >
-                              Нет данных по участникам проекта (или нет
-                              профилей).
-                            </div>
-                          ) : (
-                            troupeScheduleActors.slice(0, 200).map((a) => {
-                              const label = a.displayName
-                                ? `${a.displayName} (${a.email})`
-                                : a.email;
-                              return (
-                                <React.Fragment key={a.email}>
-                                  <div
-                                    className="troupe-cell troupe-sticky troupe-actor-cell"
-                                    title={label}
-                                  >
-                                    <div
-                                      style={{
-                                        minWidth: 0,
-                                        display: "flex",
-                                        gap: 10,
-                                        alignItems: "center",
-                                      }}
-                                    >
-                                      <MiniAvatar
-                                        src={
-                                          String(a.avatarUrl ?? "").trim() ||
-                                          null
-                                        }
-                                        label={label}
-                                        size={22}
-                                      />
-                                      <div
-                                        style={{
-                                          display: "flex",
-                                          flexDirection: "column",
-                                          gap: 2,
-                                          justifyContent: "center",
-                                          minWidth: 0,
-                                        }}
-                                      >
-                                        <div
-                                          className="troupe-actor-name"
-                                          title={label}
-                                        >
-                                          {a.displayName
-                                            ? a.displayName
-                                            : a.email}
-                                        </div>
-                                        <div
-                                          className="troupe-actor-email"
-                                          title={a.email}
-                                        >
-                                          {a.email}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  {troupeScheduleDays.map((d) => {
-                                    const dayKey = toDateKey(d);
-                                    const cal = a.availabilityCalendar ?? {};
-                                    const ranges =
-                                      (a.availabilityTimeRanges ?? {})[
-                                        dayKey
-                                      ] ?? [];
-                                    const st =
-                                      cal?.[dayKey] === "present"
-                                        ? "present"
-                                        : cal?.[dayKey] === "absent"
-                                          ? "absent"
-                                          : "unknown";
-                                    const cls =
-                                      st === "absent"
-                                        ? "busy"
-                                        : ranges.length > 0
-                                          ? "partial"
-                                          : st === "present"
-                                            ? "free"
-                                            : "unknown";
-                                    const tooltip =
-                                      st === "absent"
-                                        ? "Занят"
-                                        : ranges.length > 0
-                                          ? `Свободен: ${ranges.map((r) => `${r.from}–${r.to}`).join(", ")}`
-                                          : st === "present"
-                                            ? "Свободен"
-                                            : "Не отмечено";
-                                    const isFocus = dayKey === sessionDateKey;
-                                    return (
-                                      <div
-                                        key={`${a.email}:${dayKey}`}
-                                        className={`troupe-cell troupe-day-cell ${cls} ${isFocus ? "focus" : ""}`}
-                                        title={`${dayKey} • ${tooltip}`}
-                                      />
-                                    );
-                                  })}
-                                </React.Fragment>
-                              );
-                            })
+                          className={cn(
+                            "rehearsals-item",
+                            "sessions-session-slot__main",
+                            "director-session-slots-panel__slot-main",
+                            isActive && "active",
                           )}
-                        </div>
+                          onClick={() => toggleSlot(sl.id)}
+                          aria-expanded={isActive}
+                        >
+                          <div className="sessions-slot-head">
+                            <div className="sessions-slot-title" title={slotTime}>
+                              <span className="sessions-slot-title__text">
+                                {slotTime}
+                              </span>
+                            </div>
+                            <div className="sessions-session-slot__marks">
+                              <SlotGatherMark status={gatherStatus} />
+                            </div>
+                          </div>
+                          <div
+                            className="sessions-slot-project"
+                            title={slotProjectLabel}
+                          >
+                            {slotProjectLabel}
+                          </div>
+                          {slotMeta ? (
+                            <div className="sessions-slot-meta" title={slotMeta}>
+                              {slotMeta}
+                            </div>
+                          ) : null}
+                          {slotNotes ? (
+                            <div
+                              className="sessions-slot-notes"
+                              title={slotNotes}
+                            >
+                              {slotNotes}
+                            </div>
+                          ) : null}
+                        </Button>
+
+                        {isActive ? (
+                          <SlotCalledActors
+                            rows={calledRows}
+                            emptyMessage={slotEmptyMessage}
+                          />
+                        ) : null}
                       </div>
-                    </>
-                  )}
+                    );
+                  })}
                 </div>
-              </RehearsalsCard> */}
+              )}
+            </div>
+
+            <div className="sessions-session-footer">
+              {publishError ? (
+                <div className="rehearsals-error">{publishError}</div>
+              ) : null}
+              {availabilityReminderMessage ? (
+                <div className="rehearsals-muted">
+                  {availabilityReminderMessage}
+                </div>
+              ) : null}
+
+              <div className="sessions-slots__container-btns sessions-session-footer__btns">
+                <Button
+                  type="button"
+                  onClick={() => void publishActiveSession()}
+                  disabled={publishing}
+                  title={
+                    activeSessionPublished
+                      ? "Пересобрать список участников по календарю, обновить комментарий; при подключённом боте — обновить или отправить сообщение в Telegram"
+                      : "Помечает сессию опубликованной; при подключённом боте — дублирует вызов в Telegram"
+                  }
+                >
+                  {publishing
+                    ? "Публикую…"
+                    : activeSessionPublished
+                      ? "Обновить публикацию"
+                      : "Опубликовать"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void sendAvailabilityReminders()}
+                  disabled={
+                    sendingAvailabilityReminders ||
+                    sessionMissingAvailabilityEmails.length === 0
+                  }
+                  title="Отправить в Telegram напоминания актёрам без отметки занятости"
+                >
+                  {sendingAvailabilityReminders
+                    ? "Отправляю…"
+                    : `Напомнить в Telegram (${sessionMissingAvailabilityEmails.length})`}
+                </Button>
               </div>
-            )}
+            </div>
+          </RehearsalsCard>
+        ) : null}
+
+        {browseStep === "session" && !activeSession ? (
+          <div className="rehearsals-muted sessions-main-empty">
+            Сессия не найдена.{" "}
+            <button type="button" className="sessions-step-back" onClick={goDay}>
+              Вернуться к списку
+            </button>
           </div>
-        </div>
+        ) : null}
       </div>
-    </>
+    </div>
   );
 }
 

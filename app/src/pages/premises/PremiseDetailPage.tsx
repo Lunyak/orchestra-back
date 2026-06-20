@@ -181,7 +181,9 @@ export function PremiseDetailPage() {
   if (!accessToken) {
     return (
       <div className="rehearsals-page sessions-page">
-        <div className="rehearsals-muted">Нужно войти.</div>
+        <div className="premises-view">
+          <div className="rehearsals-muted">Нужно войти.</div>
+        </div>
       </div>
     );
   }
@@ -192,7 +194,9 @@ export function PremiseDetailPage() {
         <div className="app-content">
           <main className="main-content main-content-premises">
             <div className="rehearsals-page sessions-page">
-              <div className="rehearsals-muted">Загрузка…</div>
+              <div className="premises-view">
+                <div className="rehearsals-muted">Загрузка…</div>
+              </div>
             </div>
           </main>
         </div>
@@ -206,12 +210,14 @@ export function PremiseDetailPage() {
         <div className="app-content">
           <main className="main-content main-content-premises">
             <div className="rehearsals-page sessions-page">
-              <div className="rehearsals-error">
-                Помещение не найдено или нет доступа
+              <div className="premises-view">
+                <div className="rehearsals-error">
+                  Помещение не найдено или нет доступа
+                </div>
+                <Link to="/troupe" state={{ tab: "premises" }} className="director-session-page__back">
+                  ← Все помещения
+                </Link>
               </div>
-              <Link to="/premises" className="director-session-page__back">
-                ← Все помещения
-              </Link>
             </div>
           </main>
         </div>
@@ -310,6 +316,7 @@ export function PremiseDetailPage() {
       <div className="app-content">
         <main className="main-content main-content-premises">
           <div className="rehearsals-page sessions-page">
+            <div className="premises-view">
             <div className="rehearsals-head premises-page__head">
               <div className="premises-page__head-main">
                 <div className="premises-page__title-row">
@@ -332,7 +339,7 @@ export function PremiseDetailPage() {
                 )}
               </div>
               <div className="premises-page__head-actions">
-                <Link to="/premises" className="director-session-page__back">
+                <Link to="/troupe" state={{ tab: "premises" }} className="director-session-page__back">
                   ← Все помещения
                 </Link>
               </div>
@@ -597,6 +604,7 @@ export function PremiseDetailPage() {
                   </RehearsalsCard>
                 ) : null}
               </div>
+            </div>
             </div>
           </div>
         </main>

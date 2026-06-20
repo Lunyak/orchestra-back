@@ -64,24 +64,13 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
   },
   {
     path: "/board",
-    label: "Доска",
+    label: "План репетиций",
     navClass: "header-nav-btn--board",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="4" width="6" height="16" rx="1" />
         <rect x="10" y="4" width="6" height="16" rx="1" />
         <rect x="17" y="4" width="4" height="16" rx="1" />
-      </svg>
-    ),
-  },
-  {
-    path: "/sessions",
-    label: "Сессии",
-    navClass: "header-nav-btn--sessions",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle cx="12" cy="12" r="10" />
-        <polyline points="12 6 12 12 16 14" />
       </svg>
     ),
   },
@@ -101,7 +90,7 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
   },
   {
     path: "/troupe",
-    label: "Труппа",
+    label: "Команда",
     navClass: "header-nav-btn--troupe",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -137,6 +126,21 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
 ];
 
 export function isHeaderNavItemActive(path: string, currentPath: string) {
+  if (path === "/troupe") {
+    return (
+      currentPath === path ||
+      currentPath.startsWith("/troupe/") ||
+      currentPath.startsWith("/premises")
+    );
+  }
+  if (path === "/board") {
+    return (
+      currentPath === "/board" ||
+      currentPath === "/tasks" ||
+      currentPath === "/sessions" ||
+      currentPath.startsWith("/sessions/")
+    );
+  }
   return currentPath === path || (path !== "/" && currentPath.startsWith(path));
 }
 

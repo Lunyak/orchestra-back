@@ -22,12 +22,24 @@ export function isScriptMarkdownRoute(pathname: string) {
   return pathname === "/";
 }
 
+function isBoardRoute(pathname: string) {
+  return pathname === "/board";
+}
+
 function isSessionsRoute(pathname: string) {
   return pathname === "/sessions" || pathname.startsWith("/sessions/");
 }
 
+function isTasksRoute(pathname: string) {
+  return pathname === "/tasks";
+}
+
+function isRehearsalPlanRoute(pathname: string) {
+  return isBoardRoute(pathname) || isSessionsRoute(pathname) || isTasksRoute(pathname);
+}
+
 export function isSpectacleRoute(pathname: string) {
-  return isScriptStateRoute(pathname) || isSessionsRoute(pathname);
+  return isScriptStateRoute(pathname) || isRehearsalPlanRoute(pathname);
 }
 
 export function getRouteMeta(pathname: string) {

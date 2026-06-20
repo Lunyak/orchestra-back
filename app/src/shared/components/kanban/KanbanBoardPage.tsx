@@ -22,6 +22,7 @@ import "./style.css";
 import { Button } from "@shared/core/button/Button";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { OptionalFilterSelect } from "@shared/core/optional-filter-select/OptionalFilterSelect";
+import { RehearsalPlanSectionChrome } from "../rehearsal-plan/RehearsalPlanSectionChrome";
 import { STATUSES, statusOf, type KanbanStatus } from "./kanban-constants";
 
 function orderOf(step: ScriptStep, fallback: number): number {
@@ -527,9 +528,7 @@ export function KanbanBoardPage({
 
   return (
     <div className="kanban-page">
-      <div className="kanban-header">
-        <h2 className="kanban-title">Доска готовности</h2>
-      </div>
+      <RehearsalPlanSectionChrome activeTab="board" />
 
       {rolesError && (
         <div className="kanban-muted" style={{ marginBottom: 12 }}>

@@ -22,6 +22,7 @@ import { RolesModule } from './roles/roles.module';
 import { SiteAnalyticsModule } from './site-analytics/site-analytics.module';
 import { ChatModule } from './chat/chat.module';
 import { PremisesModule } from './premises/premises.module';
+import { ProjectTasksModule } from './project-tasks/project-tasks.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PremisesModule } from './premises/premises.module';
     SiteAnalyticsModule,
     ChatModule,
     PremisesModule,
+    ProjectTasksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
