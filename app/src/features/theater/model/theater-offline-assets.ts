@@ -1,6 +1,6 @@
-import type { ScriptStep, TheaterModel } from "../../../shared/types/script";
+import type { ScriptScene, TheaterModel } from "../../../shared/types/script";
 import { decodeOrchestraModelKey } from "../../../shared/project-assets/orchestraModelRef";
-import { readStepTheaterModels } from "./theater-step-models";
+import { readSceneTheaterModels } from "./theater-scene-models";
 import {
   getDecorTextureFilePath,
   isDecorTexturePreset,
@@ -94,12 +94,12 @@ function collectFromModel(
   });
 }
 
-export function collectTheaterOfflineAssets(steps: ScriptStep[]): TheaterOfflineManifest {
+export function collectTheaterOfflineAssets(scenes: ScriptScene[]): TheaterOfflineManifest {
   const assets: TheaterOfflineAsset[] = [];
   const seen = new Set<string>();
 
-  for (const step of steps) {
-    for (const model of readStepTheaterModels(step)) {
+  for (const scene of scenes) {
+    for (const model of readSceneTheaterModels(scene)) {
       collectFromModel(model, assets, seen);
     }
   }

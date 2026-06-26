@@ -111,7 +111,7 @@
   box-sizing: border-box;
 }
 
-.app-editor-menubar__step-title.script-step-title {
+.app-editor-menubar__scene-title.script-scene-title {
   min-width: 0;
   max-width: 100%;
   margin: 0;
@@ -126,7 +126,7 @@
   color: var(--color-script-accent, #aaa);
 }
 
-.app-editor-menubar__step-title-input.script-step-title {
+.app-editor-menubar__scene-title-input.script-scene-title {
   width: 100%;
   height: 28px;
   margin: 4px 0;
@@ -142,12 +142,12 @@
   outline: none;
 }
 
-.app-editor-menubar__step-title-input.script-step-title:focus-visible {
+.app-editor-menubar__scene-title-input.script-scene-title:focus-visible {
   border-color: var(--color-active-ascent);
   box-shadow: 0 0 0 1px rgba(231, 138, 78, 0.18);
 }
 
-.app-editor-menubar__step-title-input.script-step-title::placeholder {
+.app-editor-menubar__scene-title-input.script-scene-title::placeholder {
   color: var(--color-text-muted);
   font-weight: 500;
 }
@@ -349,10 +349,40 @@
   text-transform: none;
 }
 
+.app-editor-menubar__center .app-editor-menubar__project-select {
+  width: min(42vw, 320px);
+  min-width: 0;
+}
+
+.app-editor-menubar__project-select-trigger {
+  min-height: 28px;
+  padding: 0 10px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #aaa;
+}
+
+.app-editor-menubar__project-select-trigger:hover {
+  border-color: var(--color-border-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-editor-menubar__project-select .custom-select__label {
+  text-align: center;
+}
+
+.app-editor-menubar__project-select-dropdown {
+  z-index: 1300;
+  min-width: min(92vw, 320px);
+}
+
 .app-editor-menubar__project-badge {
-  margin-left: 0;
+  margin: 0;
   padding: 0 14px;
-  border-left: 1px solid #222;
   color: #666;
   font-size: 11px;
   font-weight: 600;
@@ -367,10 +397,6 @@
 .app-editor-menubar__track:has(.app-editor-menubar__actions) .theater-editor-menubar__menus {
   flex: 0 0 auto;
   min-width: 0;
-}
-
-.app-editor-menubar__actions + .app-editor-menubar__project-badge {
-  flex: 0 0 auto;
 }
 
 .app-editor-menubar__project-badge strong {
@@ -481,7 +507,7 @@
     display: none;
   }
 
-  .app-editor-menubar__project-badge {
+  .app-editor-menubar__project-select {
     display: none;
   }
 }

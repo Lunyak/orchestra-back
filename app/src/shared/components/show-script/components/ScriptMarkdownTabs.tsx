@@ -29,7 +29,7 @@ export function ScriptMarkdownTabs({
   activeTabClassName,
 }: ScriptMarkdownTabsProps) {
   return (
-    <div className={tabsClassName} role="tablist" aria-label="Режим шага">
+    <div className={tabsClassName} role="tablist" aria-label="Режим сцены">
       {SCRIPT_MARKDOWN_TAB_ITEMS.map(({ mode, label }) => {
         const isActive = markdownMode === mode;
         return (

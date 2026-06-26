@@ -3,7 +3,7 @@ import type { SyncPullResponse } from "../../../sync/api/types/sync";
 
 export type SyncPullArgs = {
   projectSlug: string;
-  include?: { steps?: boolean };
+  include?: { scenes?: boolean };
 };
 
 export const syncApi = orchestraApi.injectEndpoints({

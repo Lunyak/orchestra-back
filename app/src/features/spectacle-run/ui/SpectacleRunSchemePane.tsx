@@ -1,14 +1,14 @@
 import { useMemo, useState } from "react";
 import type {
-  SceneLightChannelRolesV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../../features/scene/model/scene-slice";
-import type { ScriptStep } from "../../../shared/types/script";
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../../features/playbook/model/playbook-slice";
+import type { ScriptScene } from "../../../shared/types/script";
 import {
   fadersForKadrDisplay,
   findKadrById,
-  readStepLightKadrsFromMarkdown,
+  readSceneLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import { buildLightSchemeLookModel } from "../../../shared/components/light-console/light-scheme-preview";
@@ -23,13 +23,13 @@ import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../../../shared/components/show
 import { SpectacleRunProjectorPanel } from "../../projector/ui/SpectacleRunProjectorPanel";
 
 export type SpectacleRunSchemePaneProps = {
-  step: ScriptStep | null;
+  scene: ScriptScene | null;
   tapeItem: SpectacleTapeItem | null;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1 | null;
-  lightPrograms: SceneLightProgramsDataV1 | null;
-  lightChannelRoles: SceneLightChannelRolesV1 | null;
-  onLightChannelRolesChange: (next: SceneLightChannelRolesV1) => void;
+  lightFaders: PlaybookLightFadersDataV1 | null;
+  lightPrograms: PlaybookLightProgramsDataV1 | null;
+  lightChannelRoles: PlaybookLightChannelRolesV1 | null;
+  onLightChannelRolesChange: (next: PlaybookLightChannelRolesV1) => void;
   selectedLightSlot: number;
   liveConsole: ReturnType<typeof useLightConsoleState>;
   liveStatus: string | null;
@@ -38,7 +38,7 @@ export type SpectacleRunSchemePaneProps = {
 };
 
 export function SpectacleRunSchemePane({
-  step,
+  scene,
   tapeItem,
   lightChannels,
   lightFaders,
@@ -52,14 +52,14 @@ export function SpectacleRunSchemePane({
   onOpenConsoleSettings,
 }: SpectacleRunSchemePaneProps) {
   const [highlightedChannel, setHighlightedChannel] = useState<number | null>(null);
-  const lightPlot = step?.lightPlot ?? [];
+  const lightPlot = scene?.lightPlot ?? [];
   const plotEmpty = lightPlot.length === 0;
   const gridCols = 12;
   const gridRows = 20;
 
   const kadrs = useMemo(
-    () => readStepLightKadrsFromMarkdown(step),
-    [step?.markdown, step?.lightKadrs, step?.id],
+    () => readSceneLightKadrsFromMarkdown(scene),
+    [scene?.markdown, scene?.lightKadrs, scene?.id],
   );
   const activeKadr = useMemo(() => {
     if (!tapeItem?.kadrId) return kadrs.kadrs.find((k) => k.kadrNo === tapeItem?.kadrNo);
@@ -100,8 +100,8 @@ export function SpectacleRunSchemePane({
     return (
       <div className="spectacle-run-scheme spectacle-run-scheme--empty">
         <p>
-          В шаге «{tapeItem.stepTitle}» пока нет картин. Добавьте первую — появится в ленте репетиции
-          и в тексте шага (<code>### Картина 1</code>).
+          В сцене «{tapeItem.sceneTitle}» пока нет картин. Добавьте первую — появится в ленте репетиции
+          и в тексте сцены (<code>### Картина 1</code>).
         </p>
       </div>
     );
@@ -111,8 +111,8 @@ export function SpectacleRunSchemePane({
     <div className="spectacle-run-scheme">
       {plotEmpty ? (
         <div className="spectacle-run-scheme__plot-setup" role="note">
-          <p>
-            <strong>План софитов пуст</strong> — на схеме нечего подсвечивать. Картины и текст — в{" "}
+          <p className="spectacle-run-scheme__plot-setup-text">
+            <strong className="spectacle-run-scheme__plot-setup-title">План софитов пуст</strong> — на схеме нечего подсвечивать. Картины и текст — в{" "}
             <strong>{SCRIPT_MARKDOWN_NOTES_TAB_LABEL}</strong>, позиции софитов — в 3D-театре ниже.
           </p>
         </div>
@@ -154,7 +154,7 @@ export function SpectacleRunSchemePane({
           activeKadr={activeKadr}
           lightFaders={displayFaders}
           boardFaders={baseFaders}
-          spotlights={step?.theaterSpotlights ?? []}
+          spotlights={scene?.theaterSpotlights ?? []}
           onHighlightChannel={setHighlightedChannel}
         />
       </div>
@@ -167,7 +167,7 @@ export function SpectacleRunSchemePane({
         selectedLightSlot={liveConsole.selectedLightSlot}
         faders={liveConsole.faders}
         programs={liveConsole.programs}
-        spotlights={step?.theaterSpotlights ?? []}
+        spotlights={scene?.theaterSpotlights ?? []}
         consoleChannel={liveConsole.selectedLightSlot}
         onSelectChannel={liveConsole.selectChannel}
         onSelectProgram={liveConsole.selectProgram}

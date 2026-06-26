@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type {
-  ScriptStep,
+  ScriptScene,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
@@ -47,12 +47,12 @@ export type TheaterHistorySlice = {
 export type TheaterDocumentSlice = {
   projectName: string;
   currentPage: number;
-  currentStep: ScriptStep | undefined;
-  stepCount: number;
+  currentScene: ScriptScene | undefined;
+  sceneCount: number;
   layout: TheaterLayout;
   updateLayout: (patch: Partial<TheaterLayout>) => void;
   previewLayout: (patch: Partial<TheaterLayout>) => void;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
 };
 
 export type TheaterSelectionSlice = {

@@ -2,7 +2,7 @@ import { combineSlices, configureStore } from "@reduxjs/toolkit";
 import { setupListeners } from "@reduxjs/toolkit/query";
 import { orchestraApi } from "../api/rtk/orchestra-api";
 import "../api/rtk/register-api";
-import { sceneSlice } from "../../features/scene/model/scene-slice";
+import { playbookSlice } from "../../features/playbook/model/playbook-slice";
 import { authSlice } from "../../features/auth/model/auth-slice";
 import { showScriptSlice } from "../../features/show-script/model/show-script-slice";
 import { showScriptMarkdownSlice } from "../../features/show-script-markdown/model/show-script-markdown-slice";
@@ -17,7 +17,7 @@ import { roleWorkbookSlice } from "../../features/role-workbook/model/roleWorkbo
 import { scriptUiSlice } from "../../features/script-ui/model/script-ui-slice";
 
 export const rootReducer = combineSlices(
-  sceneSlice,
+  playbookSlice,
   authSlice,
   showScriptSlice,
   showScriptMarkdownSlice,

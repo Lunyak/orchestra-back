@@ -49,7 +49,7 @@ export function TheaterBtn({
   return (
     <Button
       type="button"
-      className={cn("theater-btn", active ? "is-active" : "secondary", className)}
+      className={cn("theater-btn", active ? "button--active" : "secondary", className)}
       onClick={onClick}
       disabled={disabled}
       title={title}

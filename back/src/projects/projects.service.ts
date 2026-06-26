@@ -87,9 +87,9 @@ export class ProjectsService {
     const project = await this.assertUserHasProjectAccess(userId, slug);
     const projectId = project.id;
 
-    // Find all referenced orchestra-image keys inside steps markdown/playMarkdown/explicationMarkdown.
-    const rows = await this.prisma.step.findMany({
-      where: { scene: { projectId }, deletedAt: null },
+    // Find all referenced orchestra-image keys inside scene markdown/playMarkdown/explicationMarkdown.
+    const rows = await this.prisma.scene.findMany({
+      where: { playbook: { projectId }, deletedAt: null },
       select: { markdown: true, playMarkdown: true, explicationMarkdown: true },
       take: 20000,
     });
@@ -105,7 +105,7 @@ export class ProjectsService {
 
     // Also keep images referenced from sounds icons (they are uploaded as type "image" too).
     const soundRows = await this.prisma.sound.findMany({
-      where: { scene: { projectId } },
+      where: { playbook: { projectId } },
       select: { iconRemoteKey: true },
       take: 20000,
     });
@@ -137,13 +137,13 @@ export class ProjectsService {
       );
     }
 
-    const sceneRows = await this.prisma.scene.findMany({
+    const playbookRows = await this.prisma.playbook.findMany({
       where: { projectId },
       select: { projectorMedia: true },
       take: 500,
     });
-    for (const scene of sceneRows) {
-      extractReferencedImageKeysFromProjectorMedia(scene.projectorMedia).forEach(
+    for (const playbook of playbookRows) {
+      extractReferencedImageKeysFromProjectorMedia(playbook.projectorMedia).forEach(
         (k) => {
           if (k.startsWith(prefix)) referenced.add(k);
         },
@@ -285,11 +285,11 @@ export class ProjectsService {
         ],
       },
       include: {
-        scenes: {
+        playbooks: {
           include: {
             playlist: true,
             sounds: true,
-            steps: {
+            scenes: {
               include: {
                 requisites: true,
                 lightPlot: true,

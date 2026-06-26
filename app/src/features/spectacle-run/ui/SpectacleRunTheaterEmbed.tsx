@@ -3,7 +3,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { PageLoader } from "../../../shared/components/page-loader/PageLoader";
 import { useProject } from "../../project/model/project-context";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
 
 const TheaterScene = lazy(() =>
@@ -40,10 +40,10 @@ function TheaterFullscreenIcon({ expanded }: { expanded: boolean }) {
 
 export function SpectacleRunTheaterEmbed() {
   const { projectName } = useProject();
-  const { theaterLayout, setTheaterLayout } = useScene();
+  const { theaterLayout, setTheaterLayout } = usePlaybook();
   const run = useSpectacleRunContext();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const showEmptySceneHint = run.currentStepTheaterEmpty && run.canCopyTheaterFromPreviousStep;
+  const showEmptySceneHint = run.currentSceneTheaterEmpty && run.canCopyTheaterFromPreviousScene;
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen((value) => !value);
@@ -86,14 +86,14 @@ export function SpectacleRunTheaterEmbed() {
       )}
     >
       <div className="spectacle-run-theater-embed__toolbar">
-        {run.canCopyTheaterFromPreviousStep ? (
+        {run.canCopyTheaterFromPreviousScene ? (
           <button
             type="button"
             className="spectacle-run-theater-embed__copy-scene-btn"
-            title="Скопировать мебель, декор, софиты и реквизит с предыдущего шага"
-            onClick={run.copyTheaterFromPreviousStep}
+            title="Скопировать мебель, декор, софиты и реквизит с предыдущей сцены"
+            onClick={run.copyTheaterFromPreviousScene}
           >
-            Сцена ← шаг
+            ← пред. сцена
           </button>
         ) : null}
         <button
@@ -112,8 +112,8 @@ export function SpectacleRunTheaterEmbed() {
       </div>
       {showEmptySceneHint ? (
         <p className="spectacle-run-theater-embed__empty-hint" role="status">
-          Сцена в этом шаге пуста. Нажмите «Сцена ← шаг» или создайте картину — предложим скопировать
-          расстановку с предыдущего шага.
+          Расстановка в этой сцене пуста. Нажмите «← пред. сцена» или создайте картину — предложим скопировать
+          расстановку с предыдущей сцены.
         </p>
       ) : null}
       <Suspense fallback={<PageLoader variant="view" label="Загрузка 3D…" />}>

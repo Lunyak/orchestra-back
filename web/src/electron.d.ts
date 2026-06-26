@@ -8,13 +8,13 @@ interface API {
   off: (channel: string, listener: (...args: any[]) => void) => void;
 
   saveScene: (name: string, data: any) => Promise<any>;
-  saveProjectScene: (
+  saveProjectPlaybook: (
     projectName: string,
     sceneName: string,
     data: any
   ) => Promise<any>;
   saveProjectConfig: (projectName: string, config: any) => Promise<any>;
-  readProjectScene: (projectName: string, sceneName: string) => Promise<any>;
+  readProjectPlaybook: (projectName: string, sceneName: string) => Promise<any>;
   readNotesRun: (projectName: string) => Promise<any>;
   saveNotesRun: (projectName: string, data: any) => Promise<{ ok?: boolean; error?: string }>;
   pickProjectImage: (projectName: string, projectId?: string) => Promise<any>;

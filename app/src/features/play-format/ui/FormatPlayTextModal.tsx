@@ -19,7 +19,7 @@ import {
   type RoleMarkerEntry,
 } from "../model/role-marker-entries";
 import {
-  deriveStepTitleFromChunk,
+  deriveSceneTitleFromChunk,
   splitPlayTextIntoChunks,
 } from "../model/splitPlayTextIntoChunks";
 import "./format-play-text-modal.css";
@@ -56,7 +56,7 @@ export function FormatPlayTextModal({
   const [protectTitlePage, setProtectTitlePage] = useState(true);
   const [useRoleMarkers, setUseRoleMarkers] = useState(true);
   const [useRoleAliases, setUseRoleAliases] = useState(false);
-  const [splitIntoSteps, setSplitIntoSteps] = useState(false);
+  const [splitIntoScenes, setSplitIntoScenes] = useState(false);
   const [roleEntries, setRoleEntries] = useState<RoleMarkerEntry[]>([]);
   const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
   const [customRoleDraft, setCustomRoleDraft] = useState("");
@@ -81,7 +81,7 @@ export function FormatPlayTextModal({
     setProtectTitlePage(true);
     setUseRoleMarkers(true);
     setUseRoleAliases(false);
-    setSplitIntoSteps(false);
+    setSplitIntoScenes(false);
     setAliasDrafts({});
     aliasPendingRef.current = {};
     if (aliasDebounceRef.current) {
@@ -159,9 +159,9 @@ export function FormatPlayTextModal({
     [displayPreviewText],
   );
 
-  const stepChunks = useMemo(
-    () => (splitIntoSteps ? splitPlayTextIntoChunks(displayPreviewText) : []),
-    [displayPreviewText, splitIntoSteps],
+  const sceneChunks = useMemo(
+    () => (splitIntoScenes ? splitPlayTextIntoChunks(displayPreviewText) : []),
+    [displayPreviewText, splitIntoScenes],
   );
 
   const refreshDetectedRoles = useCallback(() => {
@@ -305,7 +305,7 @@ export function FormatPlayTextModal({
     useRoleMarkers &&
     preview.stats.unmatchedMarkers.length > 0 &&
     preview.stats.inlineSplits === 0;
-  const splitBlocked = splitIntoSteps && stepChunks.length <= 1;
+  const splitBlocked = splitIntoScenes && sceneChunks.length <= 1;
   const previewWarningLines = useMemo(
     () => new Set(displayWarnings.map((warning) => warning.line)),
     [displayWarnings],
@@ -324,7 +324,7 @@ export function FormatPlayTextModal({
   );
   const canApply =
     hasSourceText &&
-    (!previewUnchanged || preview.stats.inlineSplits > 0 || splitIntoSteps || Object.keys(lineEdits).length > 0) &&
+    (!previewUnchanged || preview.stats.inlineSplits > 0 || splitIntoScenes || Object.keys(lineEdits).length > 0) &&
     !hasUnmatchedMarkers &&
     !splitBlocked;
 
@@ -581,15 +581,15 @@ export function FormatPlayTextModal({
         <label className="format-play-text-modal__option format-play-text-modal__option--compact">
           <input
             type="checkbox"
-            checked={splitIntoSteps}
-            onChange={(event) => setSplitIntoSteps(event.target.checked)}
+            checked={splitIntoScenes}
+            onChange={(event) => setSplitIntoScenes(event.target.checked)}
           />
-          Разбить на шаги по актам, сценам и картинам
+          Разбить на сцены по актам, сценам и картинам
         </label>
-        {splitIntoSteps ? (
+        {splitIntoScenes ? (
           <p className="format-play-text-modal__split-hint">
-            {stepChunks.length > 1
-              ? `Получится шагов: ${stepChunks.length}. Границы — строки «Акт», «Сцена», «Картина», «Действие».`
+            {sceneChunks.length > 1
+              ? `Получится сцен: ${sceneChunks.length}. Границы — строки «Акт», «Сцена», «Картина», «Действие».`
               : "В тексте нет таких заголовков — добавь «Акт I», «Сцена 1», «Картина 2» и т.п."}
           </p>
         ) : null}
@@ -727,8 +727,8 @@ export function FormatPlayTextModal({
           `Выбрано ролей: ${enabledRoleCount}. Смотри колонку «Станет».`
         ) : splitBlocked ? (
           "Для нарезки нужны заголовки «Акт», «Сцена» или «Картина» в тексте."
-        ) : splitIntoSteps && stepChunks.length > 1 ? (
-          `Будет создано шагов: ${stepChunks.length}.`
+        ) : splitIntoScenes && sceneChunks.length > 1 ? (
+          `Будет создано сцен: ${sceneChunks.length}.`
         ) : previewUnchanged ? (
           "Изменений нет."
         ) : (
@@ -764,11 +764,11 @@ export function FormatPlayTextModal({
               roleMarkerSpecs: useRoleMarkers ? applySpecs : [],
             }).text;
             const textToApply = applyPreviewLineEdits(formattedText, lineEdits);
-            if (splitIntoSteps && onApplySplit) {
+            if (splitIntoScenes && onApplySplit) {
               const applyChunks = splitPlayTextIntoChunks(textToApply);
               if (applyChunks.length > 1) {
                 const chunkTitles = applyChunks.map((chunk, index) =>
-                  deriveStepTitleFromChunk(chunk, `Шаг ${index + 1}`),
+                  deriveSceneTitleFromChunk(chunk, `Сцена ${index + 1}`),
                 );
                 onApplySplit({ chunks: applyChunks, chunkTitles });
               } else {

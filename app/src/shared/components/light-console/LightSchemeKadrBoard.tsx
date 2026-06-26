@@ -1,15 +1,15 @@
 import { useMemo, useState } from "react";
 import type {
-  SceneLightChannelRolesV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../../features/scene/model/scene-slice";
-import type { LightFixture, ScriptStep } from "../../types/script";
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../../features/playbook/model/playbook-slice";
+import type { LightFixture, ScriptScene } from "../../types/script";
 import { parseLightChannel, resolveLightColor } from "../show-script/utils/lightTokens";
 import {
   fadersForKadrDisplay,
   findKadrById,
-  readStepLightKadrs,
+  readSceneLightKadrs,
   scanMarkdownKadrSections,
 } from "../../../features/theater/model/light-kadrs";
 import {
@@ -23,15 +23,15 @@ import { LightSchemeStageMap } from "./LightSchemeStageMap";
 import { LightSchemeLookCard } from "./LightSchemeLookCard";
 
 export type LightSchemeKadrBoardProps = {
-  step: ScriptStep | null | undefined;
+  scene: ScriptScene | null | undefined;
   markdown: string;
   activeKadrId: string | null;
   onActiveKadrIdChange?: (id: string | null) => void;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1 | null;
-  lightPrograms: SceneLightProgramsDataV1 | null;
-  lightChannelRoles: SceneLightChannelRolesV1 | null;
-  onLightChannelRolesChange: (next: SceneLightChannelRolesV1) => void;
+  lightFaders: PlaybookLightFadersDataV1 | null;
+  lightPrograms: PlaybookLightProgramsDataV1 | null;
+  lightChannelRoles: PlaybookLightChannelRolesV1 | null;
+  onLightChannelRolesChange: (next: PlaybookLightChannelRolesV1) => void;
   lightPlot: LightFixture[];
   gridCols: number;
   gridRows: number;
@@ -54,7 +54,7 @@ function kadrProgramColor(
 }
 
 export function LightSchemeKadrBoard({
-  step,
+  scene,
   markdown,
   activeKadrId,
   onActiveKadrIdChange,
@@ -75,7 +75,7 @@ export function LightSchemeKadrBoard({
   const [highlightedChannel, setHighlightedChannel] = useState<number | null>(null);
 
   const sections = useMemo(() => scanMarkdownKadrSections(markdown), [markdown]);
-  const kadrs = useMemo(() => readStepLightKadrs(step), [step?.lightKadrs, step?.id]);
+  const kadrs = useMemo(() => readSceneLightKadrs(scene), [scene?.lightKadrs, scene?.id]);
   const baseFaders = useMemo(
     () => resolveLightFaders(lightFaders ?? undefined),
     [lightFaders],
@@ -129,7 +129,7 @@ export function LightSchemeKadrBoard({
         <div>
           <div className="light-scheme-board__title">Свет картины</div>
           <div className="light-scheme-board__hint">
-            Превью look · запись пульта — кнопка ниже или вкладка «Свет» в сценарии шага
+            Превью look · запись пульта — кнопка ниже или вкладка «Свет» в сценарии сцены
           </div>
         </div>
         {onRecordKadr ? (
@@ -214,7 +214,7 @@ export function LightSchemeKadrBoard({
         </div>
       ) : (
         <p className="light-scheme-board__empty">
-          В тексте шага нет «### Картина N» — добавьте картину в сценарии.
+          В тексте сцены нет «### Картина N» — добавьте картину в сценарии.
         </p>
       )}
 
@@ -235,7 +235,7 @@ export function LightSchemeKadrBoard({
           activeKadr={activeKadr}
           lightFaders={displayFaders}
           boardFaders={baseFaders}
-          spotlights={step?.theaterSpotlights ?? []}
+          spotlights={scene?.theaterSpotlights ?? []}
           onHighlightChannel={setHighlightedChannel}
         />
       </div>

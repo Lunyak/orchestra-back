@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { useMemo, useState } from "react";
 import {
   countSceneOutlinerItems,
@@ -176,25 +177,21 @@ export function TheaterSceneOutliner({
                       return (
                         <div
                           key={`${item.kind}-${item.id}`}
-                          className={[
+                          className={cn(
                             "theater-editor-outliner-row",
-                            pulsing ? "theater-editor-outliner-row--pulse" : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
+                            pulsing && "theater-editor-outliner-row--pulse",
+                          )}
                         >
                           <button
                             type="button"
                             role="option"
                             aria-selected={active}
-                            className={[
+                            className={cn(
                               "theater-editor-outliner-option",
-                              active ? "theater-editor-outliner-option--active" : "",
-                              item.muted ? "theater-editor-outliner-option--muted" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                            style={{ paddingLeft: "22px" }}
+                              "theater-editor-outliner-option--child",
+                              active && "theater-editor-outliner-option--active",
+                              item.muted && "theater-editor-outliner-option--muted",
+                            )}
                             disabled={disabled}
                             title={
                               item.meta ? `${item.label} · ${item.meta}` : item.label
@@ -204,7 +201,7 @@ export function TheaterSceneOutliner({
                           >
                             <span className="theater-editor-outliner-spacer" aria-hidden />
                             <span
-                              className={`theater-editor-outliner-type ${typeClass}`}
+                              className={cn("theater-editor-outliner-type", typeClass)}
                               aria-hidden
                             />
                             <span className="theater-editor-outliner-name">

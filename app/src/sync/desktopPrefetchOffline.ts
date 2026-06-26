@@ -1,14 +1,15 @@
-import type { ScriptStep, TheaterLayout } from "../shared/types/script";
-import type { SceneLightFadersDataV1 } from "../features/scene/model/scene-slice";
+import type { ScriptScene, TheaterLayout } from "../shared/types/script";
+import type { PlaybookLightFadersDataV1 } from "../features/playbook/model/playbook-slice";
 import { prepareSceneLightBindings } from "../features/theater/model/theater-light-fader-bindings";
 import { collectTheaterOfflineAssets } from "../features/theater/model/theater-offline-assets";
 import { decodeOrchestraModelKey } from "../shared/project-assets/orchestraModelRef";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import {
-  desktopReadProjectScene,
-  desktopSaveProjectScene,
+  desktopReadProjectPlaybook,
+  desktopSaveProjectPlaybook,
 } from "../shared/platform/desktop-methods";
-import { DEFAULT_THEATER_LAYOUT } from "../features/scene/model/scene-slice";
+import { DEFAULT_THEATER_LAYOUT } from "../features/playbook/model/playbook-slice";
+import { readPlaybookScenes } from "../features/playbook/model/playbook-normalize";
 import { normalizePersistedTheaterLayout } from "../features/theater/model/theater-metrics";
 import {
   collectMarkdownImagePrefetchTargets,
@@ -21,7 +22,7 @@ import {
   normalizeHoldImages,
   packProjectorMedia,
   unpackProjectorMedia,
-} from "../features/projector/model/scene-projector-persist";
+} from "../features/projector/model/playbook-projector-persist";
 import {
   isDirectObjectStorageUrl,
 } from "../features/projector/model/projector-storage-key";
@@ -37,7 +38,7 @@ function normalizeLightChannelsLoose(raw: unknown): string[] {
 
 /**
  * После sync/pull с сервера: скачивает в папку проекта треки плейлиста и звуки по remoteUrl,
- * иконки звуков, а также все картинки из маркдауна шагов: `images` в script.json,
+ * иконки звуков, а также все картинки из маркдауна сцен: `images` в script.json,
  * `orchestra-image:…`, относительные `./images/…` и прямые `https://…` в `![…](…)`.
  * Затем перезаписывает script.json и возвращает payload для hydrate.
  */
@@ -45,7 +46,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
   accessToken: string;
   projectSlug: string;
   projectId: string | null;
-  minimalSceneData: {
+  minimalPlaybookData: {
     name?: string;
     playlist?: any[];
     sounds?: any[];
@@ -57,7 +58,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     holdImages?: unknown;
     projector?: unknown;
   };
-  normalizedSteps: ScriptStep[];
+  normalizedScenes: ScriptScene[];
   normalizedLayout: TheaterLayout;
   normalizedLightChannels: string[];
 }): Promise<{
@@ -109,10 +110,10 @@ export async function prefetchDesktopOfflineAfterSync(args: {
 
   try {
     const base =
-      (await desktop.readProjectScene?.(args.projectSlug, "script")) ?? {};
+      (await desktop.readProjectPlaybook?.(args.projectSlug, "script")) ?? {};
 
-    const playlist = Array.isArray(args.minimalSceneData.playlist)
-      ? args.minimalSceneData.playlist.map((t: any) => ({ ...t }))
+    const playlist = Array.isArray(args.minimalPlaybookData.playlist)
+      ? args.minimalPlaybookData.playlist.map((t: any) => ({ ...t }))
       : [];
     for (let i = 0; i < playlist.length; i += 1) {
       const t = playlist[i];
@@ -125,8 +126,8 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       }
     }
 
-    const sounds = Array.isArray(args.minimalSceneData.sounds)
-      ? args.minimalSceneData.sounds.map((s: any) => ({ ...s }))
+    const sounds = Array.isArray(args.minimalPlaybookData.sounds)
+      ? args.minimalPlaybookData.sounds.map((s: any) => ({ ...s }))
       : [];
     for (let i = 0; i < sounds.length; i += 1) {
       let s = sounds[i];
@@ -154,10 +155,10 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       base && typeof base === "object" && (base as any).images && typeof (base as any).images === "object"
         ? { ...(base as any).images }
         : {};
-    const pruned = pruneSceneImages(baseImages, args.normalizedSteps) ?? {};
+    const pruned = pruneSceneImages(baseImages, args.normalizedScenes) ?? {};
     const images: Record<string, { remoteKey?: string; remoteUrl?: string }> = { ...pruned };
 
-    const imgTargets = collectMarkdownImagePrefetchTargets(args.normalizedSteps);
+    const imgTargets = collectMarkdownImagePrefetchTargets(args.normalizedScenes);
     for (const t of imgTargets) {
       if (t.kind === "orchestra") {
         const bn = storageKeyToImageBasename(t.key);
@@ -185,7 +186,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       await downloadOne({ kind: "image", fileName: name, url: urlStr });
     }
 
-    const theaterOffline = collectTheaterOfflineAssets(args.normalizedSteps);
+    const theaterOffline = collectTheaterOfflineAssets(args.normalizedScenes);
     for (const asset of theaterOffline.assets) {
       if (asset.kind === "model") {
         const orchestraKey = decodeOrchestraModelKey(asset.relativePath);
@@ -215,27 +216,27 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     }
 
     const offlineBindings = prepareSceneLightBindings(
-      args.normalizedSteps,
-      args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
+      args.normalizedScenes,
+      args.minimalPlaybookData.lightFaders as PlaybookLightFadersDataV1 | null | undefined,
     );
-    const stepsForOffline = offlineBindings.steps;
+    const scenesForOffline = offlineBindings.scenes;
     const offlineLightFaders =
       offlineBindings.lightFaders ??
-      (args.minimalSceneData.lightFaders as SceneLightFadersDataV1 | null | undefined);
+      (args.minimalPlaybookData.lightFaders as PlaybookLightFadersDataV1 | null | undefined);
 
     const baseBag = unpackProjectorMedia((base as any)?.projectorMedia);
     const videosRaw =
-      Array.isArray((args.minimalSceneData as any)?.videos) &&
-      (args.minimalSceneData as any).videos.length > 0
-        ? (args.minimalSceneData as any).videos
+      Array.isArray((args.minimalPlaybookData as any)?.videos) &&
+      (args.minimalPlaybookData as any).videos.length > 0
+        ? (args.minimalPlaybookData as any).videos
         : Array.isArray((base as any)?.videos)
           ? (base as any).videos
           : baseBag.videos;
     const videos = Array.isArray(videosRaw) ? videosRaw.map((v: any) => ({ ...v })) : [];
     const holdImagesRaw =
-      Array.isArray((args.minimalSceneData as any)?.holdImages) &&
-      (args.minimalSceneData as any).holdImages.length > 0
-        ? (args.minimalSceneData as any).holdImages
+      Array.isArray((args.minimalPlaybookData as any)?.holdImages) &&
+      (args.minimalPlaybookData as any).holdImages.length > 0
+        ? (args.minimalPlaybookData as any).holdImages
         : Array.isArray((base as any)?.holdImages)
           ? (base as any).holdImages
           : baseBag.holdImages;
@@ -243,7 +244,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       ? holdImagesRaw.map((h: any) => ({ ...h }))
       : [];
     const projector =
-      (args.minimalSceneData as any)?.projector ??
+      (args.minimalPlaybookData as any)?.projector ??
       (base as any)?.projector ??
       baseBag.projector;
     const projectorMedia = packProjectorMedia({
@@ -296,17 +297,17 @@ export async function prefetchDesktopOfflineAfterSync(args: {
 
     const payload: Record<string, unknown> = {
       ...base,
-      name: args.minimalSceneData.name ?? (base as any)?.name ?? "script",
-      steps: stepsForOffline,
+      name: args.minimalPlaybookData.name ?? (base as any)?.name ?? "script",
+      scenes: scenesForOffline,
       theaterLayout: args.normalizedLayout,
       lightChannels: args.normalizedLightChannels,
       playlist,
       sounds,
-      sceneRoles: args.minimalSceneData.sceneRoles ?? (base as any)?.sceneRoles,
+      sceneRoles: args.minimalPlaybookData.sceneRoles ?? (base as any)?.sceneRoles,
       lightFaders: offlineLightFaders ?? (base as any)?.lightFaders,
-      lightPrograms: args.minimalSceneData.lightPrograms ?? (base as any)?.lightPrograms,
+      lightPrograms: args.minimalPlaybookData.lightPrograms ?? (base as any)?.lightPrograms,
       lightChannelRoles:
-        args.minimalSceneData.lightChannelRoles ?? (base as any)?.lightChannelRoles,
+        args.minimalPlaybookData.lightChannelRoles ?? (base as any)?.lightChannelRoles,
       videos,
       holdImages,
       projector,
@@ -325,16 +326,17 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       },
     };
     delete payload.lightNotesRun;
+    delete payload.steps;
 
-    const saveRes = await desktopSaveProjectScene(desktop, args.projectSlug, "script", payload, {
+    const saveRes = await desktopSaveProjectPlaybook(desktop, args.projectSlug, "script", payload, {
       skipOutbox: true,
     });
     if (!saveRes?.ok) {
-      errors.push(`saveProjectScene: ${saveRes?.error ?? "failed"}`);
+      errors.push(`saveProjectPlaybook: ${saveRes?.error ?? "failed"}`);
       return { downloaded, skipped, errors, rehydratePayload: null };
     }
 
-    const fresh = await desktopReadProjectScene(desktop, args.projectSlug, "script");
+    const fresh = await desktopReadProjectPlaybook(desktop, args.projectSlug, "script");
     if (!fresh || typeof fresh !== "object") {
       return { downloaded, skipped, errors, rehydratePayload: null };
     }
@@ -349,7 +351,7 @@ export async function prefetchDesktopOfflineAfterSync(args: {
       : args.normalizedLightChannels;
 
     const projectorBag = unpackProjectorMedia(f.projectorMedia);
-    const sceneData = {
+    const playbookData = {
       name: f.name,
       playlist: Array.isArray(f.playlist) ? f.playlist : [],
       sounds: Array.isArray(f.sounds) ? f.sounds : [],
@@ -374,20 +376,20 @@ export async function prefetchDesktopOfflineAfterSync(args: {
     };
 
     const prepared = prepareSceneLightBindings(
-      Array.isArray(f.steps) && f.steps.length ? (f.steps as ScriptStep[]) : stepsForOffline,
-      sceneData.lightFaders as SceneLightFadersDataV1 | null | undefined,
+      readPlaybookScenes(f).length ? readPlaybookScenes(f) : scenesForOffline,
+      playbookData.lightFaders as PlaybookLightFadersDataV1 | null | undefined,
     );
-    sceneData.lightFaders = prepared.lightFaders ?? sceneData.lightFaders;
-    const stepsOut = prepared.steps;
+    playbookData.lightFaders = prepared.lightFaders ?? playbookData.lightFaders;
+    const scenesOut = prepared.scenes;
 
     const rehydratePayload: Record<string, unknown> = {
-      sceneData,
-      steps: stepsOut,
+      playbookData,
+      scenes: scenesOut,
       theaterLayout,
-      isSceneReady: true,
+      isPlaybookReady: true,
       serverShadow: {
-        sceneData,
-        steps: stepsOut,
+        playbookData,
+        scenes: scenesOut,
         theaterLayout,
         lightChannels: lc,
       },

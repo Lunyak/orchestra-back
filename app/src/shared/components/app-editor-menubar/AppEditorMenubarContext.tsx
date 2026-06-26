@@ -50,11 +50,6 @@ export function useAppEditorViewMenuRender(
   });
 }
 
-/** @deprecated Prefer useAppEditorViewMenuRender for live-updating menus. */
-export function useAppEditorViewMenu(content: ReactNode | null) {
-  useAppEditorViewMenuRender("legacy-view-menu", 0, () => content);
-}
-
 export function useAppEditorMenubarViewMenu() {
   useSyncExternalStore(
     appEditorViewMenuSlot.subscribe,

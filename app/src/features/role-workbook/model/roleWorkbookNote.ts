@@ -6,8 +6,8 @@ export const ROLE_DIRECTOR_REFS_MARKER = "[[ROLE_DIRECTOR_REFS_V1]]";
 
 export type RoleDirectorQuestion = {
   text: string;
-  stepId?: number;
-  stepTitle?: string;
+  sceneId?: number;
+  sceneTitle?: string;
 };
 
 export type RoleRelationshipEntry = {
@@ -16,8 +16,8 @@ export type RoleRelationshipEntry = {
 };
 
 export type RoleSceneArc = {
-  stepId?: number;
-  stepTitle?: string;
+  sceneId?: number;
+  sceneTitle?: string;
   /** Что происходит с персонажем в сцене. */
   text: string;
 };
@@ -44,15 +44,15 @@ export function sceneArcHasContent(arc: Partial<RoleSceneArc> | null | undefined
 }
 
 export function normalizeSceneArc(raw: Partial<RoleSceneArc> | null | undefined): RoleSceneArc | null {
-  const stepIdNum = raw?.stepId == null ? undefined : Number(raw.stepId);
-  const stepId =
-    stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0 ? Math.floor(stepIdNum) : undefined;
-  const stepTitle = typeof raw?.stepTitle === "string" ? raw.stepTitle : undefined;
+  const sceneIdNum = raw?.sceneId == null ? undefined : Number(raw.sceneId);
+  const sceneId =
+    sceneIdNum != null && Number.isFinite(sceneIdNum) && sceneIdNum > 0 ? Math.floor(sceneIdNum) : undefined;
+  const sceneTitle = typeof raw?.sceneTitle === "string" ? raw.sceneTitle : undefined;
   const text = sceneArcDisplayText(raw as any);
 
-  if (!text && stepId == null) return null;
+  if (!text && sceneId == null) return null;
 
-  return { stepId, stepTitle, text };
+  return { sceneId, sceneTitle, text };
 }
 
 export type RoleWorkbookDataV1 = {
@@ -105,11 +105,11 @@ export function normalizeDirectorQuestion(
 ): RoleDirectorQuestion | null {
   const text = String(raw?.text ?? "").trim();
   if (!text) return null;
-  const stepIdNum = raw?.stepId == null ? undefined : Number(raw.stepId);
-  const stepId =
-    stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0 ? Math.floor(stepIdNum) : undefined;
-  const stepTitle = typeof raw?.stepTitle === "string" ? raw.stepTitle : undefined;
-  return { text, stepId, stepTitle };
+  const sceneIdNum = raw?.sceneId == null ? undefined : Number(raw.sceneId);
+  const sceneId =
+    sceneIdNum != null && Number.isFinite(sceneIdNum) && sceneIdNum > 0 ? Math.floor(sceneIdNum) : undefined;
+  const sceneTitle = typeof raw?.sceneTitle === "string" ? raw.sceneTitle : undefined;
+  return { text, sceneId, sceneTitle };
 }
 
 export type RoleWorkbookSnapshot = {

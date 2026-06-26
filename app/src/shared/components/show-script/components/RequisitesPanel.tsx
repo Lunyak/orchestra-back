@@ -90,7 +90,7 @@ export function RequisitesPanel({
             className="requisites-action-btn"
             onClick={onResetAll}
             disabled={requisites.length === 0}
-            title="Сбросить отметки на всех шагах"
+            title="Сбросить отметки на всех сценах"
           >
             D
           </button>

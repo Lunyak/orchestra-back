@@ -1,5 +1,5 @@
 import type { ImportRequisiteTaskPayload } from "../../../sync/api/project-tasks";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 
 function normalizeEmail(value: unknown): string {
   return String(value ?? "")
@@ -18,13 +18,13 @@ function parseAssigneeList(values: string[] | undefined): string[] {
   );
 }
 
-export function buildRequisiteTaskImports(steps: ScriptStep[]): ImportRequisiteTaskPayload[] {
+export function buildRequisiteTaskImports(scenes: ScriptScene[]): ImportRequisiteTaskPayload[] {
   const result: ImportRequisiteTaskPayload[] = [];
 
-  for (const step of steps) {
-    const stepId = step.id;
-    const stepTitle = String(step.title ?? "").trim() || `Шаг #${stepId}`;
-    const requisites = Array.isArray(step.requisites) ? step.requisites : [];
+  for (const scene of scenes) {
+    const sceneId = scene.id;
+    const sceneTitle = String(scene.title ?? "").trim() || `Сцена #${sceneId}`;
+    const requisites = Array.isArray(scene.requisites) ? scene.requisites : [];
 
     for (const requisite of requisites) {
       const requisiteId = requisite.id;
@@ -34,10 +34,10 @@ export function buildRequisiteTaskImports(steps: ScriptStep[]): ImportRequisiteT
 
       for (const assigneeEmail of setupAssignees) {
         result.push({
-          title: `Выставить «${label}» · ${stepTitle}`,
-          sourceKey: `requisite:${stepId}:${requisiteId}:setup:${assigneeEmail}`,
+          title: `Выставить «${label}» · ${sceneTitle}`,
+          sourceKey: `requisite:${sceneId}:${requisiteId}:setup:${assigneeEmail}`,
           assigneeEmail,
-          refStepId: stepId,
+          refSceneId: sceneId,
           refRequisiteId: requisiteId,
           refAction: "setup",
         });
@@ -45,10 +45,10 @@ export function buildRequisiteTaskImports(steps: ScriptStep[]): ImportRequisiteT
 
       for (const assigneeEmail of removeAssignees) {
         result.push({
-          title: `Убрать «${label}» · ${stepTitle}`,
-          sourceKey: `requisite:${stepId}:${requisiteId}:remove:${assigneeEmail}`,
+          title: `Убрать «${label}» · ${sceneTitle}`,
+          sourceKey: `requisite:${sceneId}:${requisiteId}:remove:${assigneeEmail}`,
           assigneeEmail,
-          refStepId: stepId,
+          refSceneId: sceneId,
           refRequisiteId: requisiteId,
           refAction: "remove",
         });
@@ -59,6 +59,6 @@ export function buildRequisiteTaskImports(steps: ScriptStep[]): ImportRequisiteT
   return result;
 }
 
-export function countRequisiteTaskImports(steps: ScriptStep[]): number {
-  return buildRequisiteTaskImports(steps).length;
+export function countRequisiteTaskImports(scenes: ScriptScene[]): number {
+  return buildRequisiteTaskImports(scenes).length;
 }

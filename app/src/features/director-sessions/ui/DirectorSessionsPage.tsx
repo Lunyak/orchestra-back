@@ -15,8 +15,8 @@ import "../../director-session-detail/director-session-detail.css";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { RehearsalPlanSectionChrome } from "../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
-import "../../../pages/rehearsals/style.css";
-import "../../../pages/sessions/style.css";
+import "../../rehearsals/ui/rehearsals.css";
+import "./director-sessions.css";
 import {
   useDirectorSessionsPage,
   type DirectorSessionsPageViewModel,
@@ -28,7 +28,7 @@ export { useDirectorSessionsPage } from "../model/useDirectorSessionsPage";
 
 dayjs.locale("ru");
 
-type SessionsBrowseStep = "calendar" | "day" | "session";
+type SessionsBrowseStage = "calendar" | "day" | "session";
 
 type CalledRow = {
   key: string;
@@ -61,13 +61,13 @@ function SlotGatherMark({ status }: { status: SlotGatherStatus }) {
 function SessionsSlotPreviewRow({
   time,
   projectLabel,
-  stepLabel,
+  sceneLabel,
   durationMin,
   gatherStatus,
 }: {
   time: string;
   projectLabel: string;
-  stepLabel: string;
+  sceneLabel: string;
   durationMin?: number;
   gatherStatus: SlotGatherStatus;
 }) {
@@ -75,7 +75,7 @@ function SessionsSlotPreviewRow({
     durationMin != null && durationMin > 0 ? `${durationMin}′` : null;
   const materialParts: string[] = [];
   if (projectLabel) materialParts.push(projectLabel);
-  materialParts.push(stepLabel);
+  materialParts.push(sceneLabel);
   if (durationSuffix) materialParts.push(durationSuffix);
   const materialLine = materialParts.join(" · ");
 
@@ -90,7 +90,7 @@ function SessionsSlotPreviewRow({
   );
 }
 
-function SessionsStepBack({
+function SessionsNavBack({
   onClick,
   children,
 }: {
@@ -98,7 +98,7 @@ function SessionsStepBack({
   children: React.ReactNode;
 }) {
   return (
-    <button type="button" className="sessions-step-back" onClick={onClick}>
+    <button type="button" className="sessions-nav-back" onClick={onClick}>
       {children}
     </button>
   );
@@ -216,48 +216,48 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
     navigate,
   } = vm;
 
-  const [browseStep, setBrowseStep] = useState<SessionsBrowseStep>(() =>
+  const [browseStage, setBrowseStage] = useState<SessionsBrowseStage>(() =>
     sessionIdFromUrl ? "session" : "calendar",
   );
 
   useEffect(() => {
     if (sessionIdFromUrl && activeSessionId) {
-      setBrowseStep("session");
+      setBrowseStage("session");
     }
   }, [sessionIdFromUrl, activeSessionId]);
 
   const goCalendar = () => {
     setActiveSessionId(null);
     setActiveSlotId(null);
-    setBrowseStep("calendar");
+    setBrowseStage("calendar");
   };
 
   const goDay = () => {
     setActiveSlotId(null);
-    setBrowseStep("day");
+    setBrowseStage("day");
   };
 
   const openDay = (dateKey: string) => {
     setCalendarState((prev) => ({ ...prev, selectedDate: dateKey }));
     setActiveSessionId(null);
     setActiveSlotId(null);
-    setBrowseStep("day");
+    setBrowseStage("day");
   };
 
   const openSession = (sessionId: string) => {
     setActiveSessionId(sessionId);
     setActiveSlotId(null);
-    setBrowseStep("session");
+    setBrowseStage("session");
   };
 
   const handleCreateSession = async () => {
     await createSessionForSelectedDate();
-    setBrowseStep("session");
+    setBrowseStage("session");
   };
 
   const handleCalendarDoubleClick = async (dateKey: string) => {
     await createSessionAtDate(dateKey);
-    setBrowseStep("session");
+    setBrowseStage("session");
   };
 
   const toggleSlot = (slotId: string) => {
@@ -273,7 +273,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
       <RehearsalPlanSectionChrome activeTab="sessions" />
 
       <div className="sessions-flow">
-        {browseStep === "calendar" ? (
+        {browseStage === "calendar" ? (
           <RehearsalsCard className="sessions-calendar-card">
             <CalendarSection
               className="sessions-calendar"
@@ -289,11 +289,11 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
           </RehearsalsCard>
         ) : null}
 
-        {browseStep === "day" ? (
-          <RehearsalsCard className="sessions-day-step">
-            <div className="sessions-step-head">
-              <SessionsStepBack onClick={goCalendar}>← Календарь</SessionsStepBack>
-              <span className="sessions-step-head__title">
+        {browseStage === "day" ? (
+          <RehearsalsCard className="sessions-day-stage">
+            <div className="sessions-nav-head">
+              <SessionsNavBack onClick={goCalendar}>← Календарь</SessionsNavBack>
+              <span className="sessions-nav-head__title">
                 {calendarSelectedDateLabel}
               </span>
             </div>
@@ -340,9 +340,9 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                         }}
                         title="Клик — сессия · двойной клик — план и материалы"
                       >
-                        <span className="sessions-day-item__head">
+                        <span className="sessions-day-item__header">
                           <span className="sessions-day-item__time">{time}</span>
-                          <span className="sessions-day-item__head-body">
+                          <span className="sessions-day-item__header-body">
                             <span className="sessions-day-item__title">
                               {s.title}
                             </span>
@@ -373,7 +373,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                                 <SessionsSlotPreviewRow
                                   time={slot.time}
                                   projectLabel={slot.projectLabel}
-                                  stepLabel={slot.stepLabel}
+                                  sceneLabel={slot.sceneLabel}
                                   durationMin={slot.durationMin}
                                   gatherStatus={slot.gatherStatus}
                                 />
@@ -403,11 +403,11 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
           </RehearsalsCard>
         ) : null}
 
-        {browseStep === "session" && activeSession ? (
-          <RehearsalsCard className="sessions-session-step">
-            <div className="sessions-step-head">
-              <SessionsStepBack onClick={goDay}>← {calendarSelectedDateLabel}</SessionsStepBack>
-              <span className="sessions-step-head__meta rehearsals-muted">
+        {browseStage === "session" && activeSession ? (
+          <RehearsalsCard className="sessions-session-stage">
+            <div className="sessions-nav-head">
+              <SessionsNavBack onClick={goDay}>← {calendarSelectedDateLabel}</SessionsNavBack>
+              <span className="sessions-nav-head__meta rehearsals-muted">
                 {formatTimeHHMM(
                   getSessionStartLocalMinutes(activeSession.startsAt),
                 )}
@@ -478,7 +478,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
             </div>
 
             <div className="sessions-session-slots">
-              <div className="sessions-session-slots__head">
+              <div className="sessions-session-slots__header">
                 <span className="rehearsals-muted">Слоты</span>
                 <Button
                   className="sessions-field__plan"
@@ -504,13 +504,13 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                     const isActive = sl.id === activeSlotId;
                     const insight = slotInsights.find((x) => x.slotId === sl.id);
                     const projectLabel = insight?.projectLabel ?? "";
-                    const stepLabel = insight?.stepLabel ?? "Материал не выбран";
+                    const sceneLabel = insight?.sceneLabel ?? "Материал не выбран";
                     const slotTime = formatSlotTime(
                       activeSession.startsAt,
                       sl.offsetMin,
                     );
                     const slotProjectLabel = projectLabel || "Материал не выбран";
-                    const slotMeta = projectLabel ? stepLabel : "";
+                    const slotMeta = projectLabel ? sceneLabel : "";
                     const slotNotes = String(sl.notes ?? "").trim();
                     const gatherStatus =
                       slotGatherStatusBySlotId.get(sl.id) ?? "none";
@@ -525,7 +525,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                         className={cn(
                           "sessions-session-slot",
                           "director-session-slots-panel__row",
-                          isActive && "active",
+                          isActive && "sessions-session-slot--active",
                         )}
                       >
                         <Button
@@ -534,7 +534,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                             "rehearsals-item",
                             "sessions-session-slot__main",
                             "director-session-slots-panel__slot-main",
-                            isActive && "active",
+                            isActive && "sessions-session-slot__main--active",
                           )}
                           onClick={() => toggleSlot(sl.id)}
                           aria-expanded={isActive}
@@ -628,10 +628,10 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
           </RehearsalsCard>
         ) : null}
 
-        {browseStep === "session" && !activeSession ? (
+        {browseStage === "session" && !activeSession ? (
           <div className="rehearsals-muted sessions-main-empty">
             Сессия не найдена.{" "}
-            <button type="button" className="sessions-step-back" onClick={goDay}>
+            <button type="button" className="sessions-nav-back" onClick={goDay}>
               Вернуться к списку
             </button>
           </div>

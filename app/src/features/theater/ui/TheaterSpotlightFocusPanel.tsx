@@ -1,3 +1,4 @@
+import cn from "classnames";
 import type { TheaterSpotlight } from "../../../shared/types/script";
 import { useEffect, useState } from "react";
 import {
@@ -121,18 +122,22 @@ export function TheaterSpotlightFocusPanel({
       <div className="theater-model-context-menu__row">
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            spotlightAimMode === "point" ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            spotlightAimMode === "point" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickAimMode("point")}
         >
           Точка
         </button>
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            spotlightAimMode === "cell" ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            spotlightAimMode === "cell" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickAimMode("cell")}
         >
           Ячейка
@@ -159,18 +164,22 @@ export function TheaterSpotlightFocusPanel({
       <div className="theater-model-context-menu__row">
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            enabled ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            enabled && "theater-model-context-menu__item--active",
+          )}
           onClick={onToggleEnabled}
         >
           {enabled ? "Вкл" : "Выкл"}
         </button>
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            !hidden ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            !hidden && "theater-model-context-menu__item--active",
+          )}
           onClick={onToggleHidden}
         >
           {hidden ? "3D скрыт" : "3D виден"}
@@ -187,18 +196,22 @@ export function TheaterSpotlightFocusPanel({
       <div className="theater-model-context-menu__row">
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            dragMode === "source" ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            dragMode === "source" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickDragMode("source")}
         >
           Источник
         </button>
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            dragMode === "target" ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            dragMode === "target" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickDragMode("target")}
         >
           Цель

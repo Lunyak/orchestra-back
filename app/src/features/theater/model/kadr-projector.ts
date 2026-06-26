@@ -5,7 +5,6 @@ const SOUND_KADR_LINE_RE = /^-\s*\*\*Звук\*\*:\s*([^\n]*)/im;
 
 export const VIDEO_LINE_PREFIX = "- **Видео**:";
 
-/** @deprecated Старые кадры; новые записываем как «Видео». */
 export const PROJECTOR_LINE_PREFIX = "- **Проектор**:";
 
 export const VIDEO_KADR_LINE_RE = /^-\s*\*\*(?:Видео|Проектор)\*\*:\s*([^\n]*)/im;

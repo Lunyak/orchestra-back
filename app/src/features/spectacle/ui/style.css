@@ -1,3 +1,5 @@
+@import "../../../shared/components/mobile-drawer/mobile-drawer.css";
+
 /* Spectacle page: empty state, mobile overlay, desktop panel toggles, theater host */
 
 .empty-project {
@@ -128,65 +130,12 @@
     -1px 0 0 rgba(0, 0, 0, 0.72) inset;
 }
 
-.mobile-panel-close {
-  position: fixed;
-  top: 12px;
-  z-index: 1001;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: var(--color-overlay-strong);
-  color: var(--color-text-primary);
-  font-size: 24px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease;
-}
-
-.mobile-panel-close:hover {
-  background: var(--color-shadow-overlay);
-}
-
-.mobile-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--color-overlay-medium);
-  z-index: 999;
-  backdrop-filter: blur(2px);
-  animation: spectacle-fade-in 0.2s ease;
-}
-
-@keyframes spectacle-fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@media (max-width: 480px) {
-  .mobile-panel-close {
-    width: 32px;
-    height: 32px;
-    font-size: 20px;
-  }
-}
-
 @media (max-width: 1024px), (pointer: coarse) {
   .main-content-theater {
     padding: 0;
   }
 
-  .theater-settings-sidebar--right.mobile {
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile {
     position: fixed;
     top: 0;
     right: 0;
@@ -201,36 +150,26 @@
     pointer-events: none;
   }
 
-  .theater-settings-sidebar--right.mobile.open {
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile.theater-settings-sidebar--open {
     transform: translateX(0);
     pointer-events: auto;
   }
 
-  .theater-settings-sidebar--right.mobile .mobile-panel-close {
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile .mobile-drawer__close {
     left: 12px;
     right: auto;
     transform: translateX(calc(-100% - 12px));
   }
 
-  .theater-settings-sidebar--right.mobile:not(.open) .mobile-panel-close {
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile:not(.theater-settings-sidebar--open) .mobile-drawer__close {
     display: none;
   }
 
-  .theater-settings-sidebar--right.mobile .theater-controls-panel,
-  .theater-settings-sidebar--right.mobile .theater-controls--editor-sidebar,
-  .theater-settings-sidebar--right.mobile .theater-right-sidebar {
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile .theater-controls-panel,
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile .theater-controls--editor-sidebar,
+  .theater-settings-sidebar--right.theater-settings-sidebar--mobile .theater-right-sidebar {
     display: flex !important;
     height: 100%;
     min-height: 0;
-  }
-}
-
-@media (max-width: 320px) {
-  .mobile-panel-close {
-    width: 28px;
-    height: 28px;
-    font-size: 18px;
-    top: 8px;
-    right: 8px;
   }
 }

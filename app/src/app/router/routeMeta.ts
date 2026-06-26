@@ -1,5 +1,8 @@
 import { ENABLE_3D_THEATER } from "../../shared/build-features";
 
+export const SUFER_ROUTE_PATH = "/sufer";
+export const PROJECT_MEDIA_ROUTE_PATH = "/media";
+
 function isTheaterRoute(pathname: string) {
   return ENABLE_3D_THEATER && pathname === "/theater";
 }
@@ -12,6 +15,8 @@ function isScriptStateRoute(pathname: string) {
   return (
     pathname === "/" ||
     pathname === "/light-plot" ||
+    pathname === SUFER_ROUTE_PATH ||
+    pathname === PROJECT_MEDIA_ROUTE_PATH ||
     pathname === "/notes-run" ||
     isTheaterRoute(pathname)
   );

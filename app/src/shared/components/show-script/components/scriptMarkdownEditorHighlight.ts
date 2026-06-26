@@ -1,7 +1,7 @@
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 
-const body = "var(--color-text-primary)";
+const body = "var(--script-play-text-color, var(--color-text-primary))";
 
 /**
  * Подсветка Markdown в редакторе сценария — те же оттенки, что у `.markdown-preview`

@@ -3,12 +3,14 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "../../auth";
 import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { useProject } from "../../project";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useScriptUI } from "../../script-ui";
 import { useTeam } from "../../team";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { useIsMobile } from "../../../shared/hooks/useIsMobile";
 import { patchTheaterViewPrefs, readTheaterViewPrefs } from "../../theater/model/theater-view-prefs-storage";
+import { writeRehearsalPlanTab } from "../../../shared/settings/rehearsalPlanTab";
+import { PROJECT_MEDIA_ROUTE_PATH, SUFER_ROUTE_PATH } from "../../../app/router/routeMeta";
 import type { SpectacleActiveView } from "./spectacle-page-types";
 
 export type SpectaclePageViewModel = ReturnType<typeof useSpectaclePage>;
@@ -25,31 +27,31 @@ export function useSpectaclePage() {
   } = useProject();
   const { projectMembers, projectOwner } = useTeam();
   const {
-    sceneData,
-    steps,
+    playbookData,
+    scenes,
     currentPage,
     setCurrentPage,
     theaterLayout,
     setTheaterLayout,
-    isSceneReady,
-    addStep,
-    deleteStep,
-    reorderSteps,
+    isPlaybookReady,
+    addScene,
+    deleteScene,
+    reorderScenes,
     registerPlaylistPlay,
     registerSoundToggle,
-    saveStepsForLightPlot,
-    pushSceneAfterSoundsSave,
-  } = useScene();
+    saveScenesForLightPlot,
+    pushPlaybookAfterSoundsSave,
+  } = usePlaybook();
   const {
     showPlaylistSidebar,
     togglePlaylist,
     showHeaderSounds,
-    isStepsCollapsed,
-    setIsStepsCollapsed,
+    isScenesCollapsed,
+    setIsScenesCollapsed,
     mobilePlaylistOpen,
     setMobilePlaylistOpen,
-    mobileStepsOpen,
-    setMobileStepsOpen,
+    mobileScenesOpen,
+    setMobileScenesOpen,
     closeMobilePanels,
     isEditing,
     setIsEditing,
@@ -85,9 +87,9 @@ export function useSpectaclePage() {
     const prev = prevIsEditingRef.current;
     prevIsEditingRef.current = isEditing;
     if (prev && !isEditing) {
-      void saveStepsForLightPlot();
+      void saveScenesForLightPlot();
     }
-  }, [isEditing, saveStepsForLightPlot]);
+  }, [isEditing, saveScenesForLightPlot]);
 
   const { data: myProfile } = useMyProfileQuery(undefined, {
     skip: !accessToken,
@@ -100,9 +102,11 @@ export function useSpectaclePage() {
       ? "theater"
       : location.pathname === "/light-plot"
         ? "light-plot"
-        : location.pathname === "/notes-run"
-          ? "notes-run"
-          : location.pathname === "/board"
+        : location.pathname === SUFER_ROUTE_PATH || location.pathname === "/notes-run"
+          ? "sufer"
+          : location.pathname === PROJECT_MEDIA_ROUTE_PATH
+            ? "media"
+            : location.pathname === "/board"
             ? "board"
             : location.pathname === "/tasks"
               ? "tasks"
@@ -122,7 +126,7 @@ export function useSpectaclePage() {
   useEffect(() => {
     if (
       isMobile &&
-      (mobilePlaylistOpen || mobileStepsOpen || (isTheaterView && showTheaterControls))
+      (mobilePlaylistOpen || mobileScenesOpen || (isTheaterView && showTheaterControls))
     ) {
       document.body.style.overflow = "hidden";
     } else {
@@ -135,7 +139,7 @@ export function useSpectaclePage() {
     isMobile,
     isTheaterView,
     mobilePlaylistOpen,
-    mobileStepsOpen,
+    mobileScenesOpen,
     showTheaterControls,
   ]);
 
@@ -155,13 +159,26 @@ export function useSpectaclePage() {
     localStorage.setItem("activeView", activeView);
   }, [activeView]);
 
-  const shouldShowStepsSidebar =
+  useEffect(() => {
+    if (
+      activeView === "board" ||
+      activeView === "sessions" ||
+      activeView === "tasks"
+    ) {
+      writeRehearsalPlanTab(activeView);
+    }
+  }, [activeView]);
+
+  const shouldShowScenesSidebar =
     activeView === "script" ||
     activeView === "light-plot" ||
-    activeView === "notes-run" ||
+    activeView === "sufer" ||
     activeView === "theater";
   const compactMainChrome =
-    activeView === "board" || activeView === "sessions" || activeView === "tasks";
+    activeView === "board" ||
+    activeView === "sessions" ||
+    activeView === "tasks" ||
+    activeView === "media";
 
   const kanbanMembers = useMemo(
     () =>
@@ -193,42 +210,42 @@ export function useSpectaclePage() {
   return {
     accessToken,
     activeView,
-    addStep,
+    addScene,
     closeMobilePanels,
     compactMainChrome,
     currentPage,
-    deleteStep,
+    deleteScene,
     isEditing,
     isMobile,
     isProjectsLoaded,
-    isSceneReady,
-    isStepsCollapsed,
+    isPlaybookReady,
+    isScenesCollapsed,
     isTheaterView,
     kanbanMembers,
     mobilePlaylistOpen,
-    mobileStepsOpen,
+    mobileScenesOpen,
     onProjectChange,
     projectName,
     projects,
     projectsLoading,
-    pushSceneAfterSoundsSave,
+    pushPlaybookAfterSoundsSave,
     registerPlaylistPlay,
     registerSoundToggle,
-    reorderSteps,
-    sceneData,
+    reorderScenes,
+    playbookData,
     setCurrentPage,
     setIsEditing,
-    setIsStepsCollapsed,
+    setIsScenesCollapsed,
     setMobilePlaylistOpen,
-    setMobileStepsOpen,
+    setMobileScenesOpen,
     setTheaterOutlinerHostRef,
     setTheaterLayout,
-    shouldShowStepsSidebar,
+    shouldShowScenesSidebar,
     shouldSwapPanels,
     showHeaderSounds,
     showPlaylistSidebar,
     showTheaterControls,
-    steps,
+    scenes,
     theaterOutlinerHost,
     theaterLayout,
     togglePanels: togglePanelsWithPersist,

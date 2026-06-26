@@ -3,7 +3,7 @@
  * Путь хранится per-project; на диске Electron — также в media-source.json.
  */
 
-import type { PlaylistTrack } from "../../features/scene/model/scene-slice";
+import type { PlaylistTrack } from "../types/playlist";
 import { getDesktopApi } from "./desktop-api";
 import {
   isBrowserFolderPickerSupported,
@@ -13,10 +13,12 @@ import {
 } from "./browser-picked-media";
 import {
   fetchDevScannedMedia,
+  fetchDevMediaRootProjectJson,
   mergeDevScannedProjectorMedia,
   registerDevProjectMediaRoot,
   type DevScannedMedia,
 } from "./local-project-dev";
+import { readBrowserPickedProjectJson } from "./browser-picked-media";
 
 export type ProjectMediaFolderInfo = {
   path: string | null;
@@ -75,6 +77,31 @@ function basename(value: string): string {
   return parts[parts.length - 1] ?? normalized;
 }
 
+/** JSON из выбранной папки: notes-run.json, script.json (корень или scenesModules/). */
+export async function readProjectFolderJson(
+  projectSlug: string,
+  kind: "script" | "notes-run",
+): Promise<Record<string, unknown> | null> {
+  if (!projectSlug) return null;
+
+  const fromBrowser = readBrowserPickedProjectJson(projectSlug, kind);
+  if (fromBrowser) return fromBrowser;
+
+  const stored = readStoredProjectMediaFolder(projectSlug);
+  if (stored.path && looksLikeFilesystemPath(stored.path)) {
+    const fromMediaRoot = await fetchDevMediaRootProjectJson(projectSlug, kind, stored.path);
+    if (fromMediaRoot) return fromMediaRoot;
+  }
+
+  return null;
+}
+
+function looksLikeFilesystemPath(value: string): boolean {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return false;
+  return /^([a-zA-Z]:[\\/]|\\\\|\/)/.test(trimmed);
+}
+
 export async function getProjectMediaFolderInfo(
   projectSlug: string,
 ): Promise<ProjectMediaFolderInfo> {
@@ -109,7 +136,12 @@ function toScanResult(
     ok: Boolean(data.ok),
     source,
     mediaRoot: data.mediaRoot,
-    folderName: data.folderName ?? (data.mediaRoot ? basename(data.mediaRoot) : undefined),
+    folderName:
+      "folderName" in data && data.folderName
+        ? data.folderName
+        : data.mediaRoot
+          ? basename(data.mediaRoot)
+          : undefined,
     videos: Array.isArray(data.videos) ? data.videos : [],
     holdImages: Array.isArray(data.holdImages) ? data.holdImages : [],
     sounds: Array.isArray((data as DevScannedMedia).sounds)

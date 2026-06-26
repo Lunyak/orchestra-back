@@ -2,7 +2,7 @@ import { api } from "./client";
 
 export type DirectorSessionParticipantStatus = "unknown" | "present" | "absent" | "late";
 
-export type DirectorSessionSlotRef = { projectSlug: string; stepId: number };
+export type DirectorSessionSlotRef = { projectSlug: string; sceneId: number };
 
 export type DirectorSlotRoleRehearsalPick = {
   roleKey: string;

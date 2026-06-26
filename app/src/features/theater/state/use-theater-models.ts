@@ -14,7 +14,7 @@ import { encodeOrchestraModelRef } from "../../../shared/project-assets/orchestr
 import { ensureProject } from "../../../sync/api/projects";
 import { uploadProjectFile } from "../../../sync/api/files";
 import type {
-  ScriptStep,
+  ScriptScene,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
@@ -46,13 +46,13 @@ import {
   type ActiveAlignGuide,
 } from "../model/theater-align-guides";
 import {
-  readStepTheaterModels,
-  writeStepTheaterModels,
-} from "../model/theater-step-models";
+  readSceneTheaterModels,
+  writeSceneTheaterModels,
+} from "../model/theater-scene-models";
 import {
-  buildCopyStepTheaterScenePatch,
-  buildCopyStepTheaterScenePatchFromStep,
-} from "../model/copy-step-theater-scene";
+  buildCopySceneTheaterLayoutPatch,
+  buildCopySceneTheaterLayoutPatchFromScene,
+} from "../model/copy-scene-theater-layout";
 import { cloneTheaterSpotlights } from "./use-theater-spotlights";
 import type { TheaterEditMode } from "./use-theater-selection";
 import { resolveTheaterModelFileUrlSync } from "../model/theater-model-asset-url";
@@ -91,10 +91,10 @@ export function cloneTheaterModels(source: TheaterModel[]): TheaterModel[] {
 export type UseTheaterModelsArgs = {
   projectName: string;
   currentPage: number;
-  currentStep: ScriptStep | undefined;
-  steps: ScriptStep[];
-  updateStep: (stepId: number, patch: Partial<ScriptStep>) => void;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  currentScene: ScriptScene | undefined;
+  scenes: ScriptScene[];
+  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   recordTheaterHistory: () => void;
   beginTheaterHistoryTransaction: () => void;
   endTheaterHistoryTransaction: () => void;
@@ -119,10 +119,10 @@ export type UseTheaterModelsArgs = {
 export function useTheaterModels({
   projectName,
   currentPage,
-  currentStep,
-  steps,
-  updateStep,
-  updateCurrentStep,
+  currentScene,
+  scenes,
+  updateScene,
+  updateCurrentScene,
   recordTheaterHistory,
   beginTheaterHistoryTransaction,
   endTheaterHistoryTransaction,
@@ -179,7 +179,7 @@ export function useTheaterModels({
     null,
   );
 
-  const models = readStepTheaterModels(currentStep);
+  const models = readSceneTheaterModels(currentScene);
   const visibleModels = useMemo(
     () => models.filter((model) => !model.hidden),
     [models],
@@ -288,9 +288,9 @@ export function useTheaterModels({
     const updateModels = useCallback(
       (next: TheaterModel[]) => {
         recordTheaterHistory();
-        updateCurrentStep(writeStepTheaterModels(normalizeModels(next)));
+        updateCurrentScene(writeSceneTheaterModels(normalizeModels(next)));
       },
-      [normalizeModels, recordTheaterHistory, updateCurrentStep]
+      [normalizeModels, recordTheaterHistory, updateCurrentScene]
     );
 
     const updateModel = useCallback(
@@ -307,40 +307,40 @@ export function useTheaterModels({
       [projectName],
     );
 
-    const copyModelsFromPreviousStep = () => {
-      if (!currentStep || currentPage <= 0) return;
-      const previous = steps[currentPage - 1];
-      const source = readStepTheaterModels(previous);
+    const copyModelsFromPreviousScene = () => {
+      if (!currentScene || currentPage <= 0) return;
+      const previous = scenes[currentPage - 1];
+      const source = readSceneTheaterModels(previous);
       const cloned = cloneTheaterModels(source);
       updateModels(cloned);
       if (cloned.length > 0) {
-        updateCurrentStep({ theaterActiveModelId: cloned[0].id });
+        updateCurrentScene({ theaterActiveModelId: cloned[0].id });
       }
     };
 
-    const copyTheaterFromPreviousStep = useCallback(() => {
-      if (!currentStep || currentPage <= 0) return;
-      const previous = steps[currentPage - 1];
+    const copyTheaterFromPreviousScene = useCallback(() => {
+      if (!currentScene || currentPage <= 0) return;
+      const previous = scenes[currentPage - 1];
       if (!previous) return;
-      updateCurrentStep(buildCopyStepTheaterScenePatchFromStep(previous));
-      setDecorActionMessage("Сцена скопирована с предыдущего шага");
-    }, [currentPage, currentStep, steps, updateCurrentStep]);
+      updateCurrentScene(buildCopySceneTheaterLayoutPatchFromScene(previous));
+      setDecorActionMessage("Сцена скопирована с предыдущей сцены");
+    }, [currentPage, currentScene, scenes, updateCurrentScene]);
 
-    const copyTheaterToNextStep = useCallback(() => {
-      if (!currentStep || currentPage >= steps.length - 1) return;
-      const nextStep = steps[currentPage + 1];
-      if (!nextStep) return;
-      updateStep(
-        nextStep.id,
-        buildCopyStepTheaterScenePatch({
+    const copyTheaterToNextScene = useCallback(() => {
+      if (!currentScene || currentPage >= scenes.length - 1) return;
+      const nextScene = scenes[currentPage + 1];
+      if (!nextScene) return;
+      updateScene(
+        nextScene.id,
+        buildCopySceneTheaterLayoutPatch({
           spotlights: displaySpotlights,
           models,
-          lightPlot: currentStep.lightPlot,
-          requisites: currentStep.requisites,
+          lightPlot: currentScene.lightPlot,
+          requisites: currentScene.requisites,
         }),
       );
-      setDecorActionMessage(`Сцена скопирована на шаг «${nextStep.title}»`);
-    }, [currentPage, currentStep, displaySpotlights, models, steps, updateStep]);
+      setDecorActionMessage(`Расстановка скопирована на сцену «${nextScene.title}»`);
+    }, [currentPage, currentScene, displaySpotlights, models, scenes, updateScene]);
 
 
 
@@ -359,15 +359,15 @@ export function useTheaterModels({
           scale: [1, 1, 1],
         };
         updateModels([...models, nextItem]);
-        updateCurrentStep({ theaterActiveModelId: nextId });
+        updateCurrentScene({ theaterActiveModelId: nextId });
         setPendingSnapModelId(nextId);
         setEditMode("models");
       },
-      [models, updateCurrentStep, updateModels],
+      [models, updateCurrentScene, updateModels],
     );
 
     const addModelFromWebUpload = useCallback(() => {
-      if (!currentStep) return;
+      if (!currentScene) return;
       const token = readAccessToken();
       if (!token) {
         setDecorActionMessage("Войдите в аккаунт, чтобы загрузить модель");
@@ -405,10 +405,10 @@ export function useTheaterModels({
         })();
       };
       input.click();
-    }, [appendFileModel, currentStep, projectName, setDecorActionMessage]);
+    }, [appendFileModel, currentScene, projectName, setDecorActionMessage]);
 
     const addModel = async () => {
-      if (!currentStep) return;
+      if (!currentScene) return;
       const desktopApi = getDesktopApi();
       if (desktopApi?.pickProjectModel) {
         try {
@@ -476,7 +476,7 @@ export function useTheaterModels({
           : {}),
       };
       updateModels([...models, nextItem]);
-      updateCurrentStep({ theaterActiveModelId: nextId });
+      updateCurrentScene({ theaterActiveModelId: nextId });
       setPendingSnapModelId(nextId);
       setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
     };
@@ -484,7 +484,7 @@ export function useTheaterModels({
 
     const mirrorModel = useCallback(
       (id: number, axis: "x" | "z") => {
-        if (!currentStep) return;
+        if (!currentScene) return;
         const source = models.find((item) => item.id === id);
         if (!source) return;
         const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
@@ -505,10 +505,10 @@ export function useTheaterModels({
           rotation,
         };
         updateModels([...models, nextItem]);
-        updateCurrentStep({ theaterActiveModelId: nextId });
+        updateCurrentScene({ theaterActiveModelId: nextId });
         setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
       },
-      [currentStep, models, updateCurrentStep, updateModels],
+      [currentScene, models, updateCurrentScene, updateModels],
     );
 
     const alignModelsByActive = useCallback(
@@ -557,17 +557,17 @@ export function useTheaterModels({
     );
 
     const removeSelectedModels = useCallback(() => {
-      if (multiSelectedModelIds.length === 0 || !currentStep) return;
+      if (multiSelectedModelIds.length === 0 || !currentScene) return;
       const selected = new Set(multiSelectedModelIds);
       const next = models.filter((item) => !selected.has(item.id));
       updateModels(next);
-      updateCurrentStep({ theaterActiveModelId: next[0]?.id });
+      updateCurrentScene({ theaterActiveModelId: next[0]?.id });
       setMultiSelectedModelIds(next[0] ? [next[0].id] : []);
       setDecorActionMessage(`Удалено объектов: ${selected.size}`);
-    }, [currentStep, models, multiSelectedModelIds, updateCurrentStep, updateModels]);
+    }, [currentScene, models, multiSelectedModelIds, updateCurrentScene, updateModels]);
 
     const cloneSelectedModels = useCallback(() => {
-      if (multiSelectedModelIds.length === 0 || !currentStep) return;
+      if (multiSelectedModelIds.length === 0 || !currentScene) return;
       let nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0);
       const copies: TheaterModel[] = [];
       multiSelectedModelIds.forEach((sourceId, index) => {
@@ -591,22 +591,22 @@ export function useTheaterModels({
       updateModels([...models, ...copies]);
       const copyIds = copies.map((item) => item.id);
       setMultiSelectedModelIds(copyIds);
-      updateCurrentStep({ theaterActiveModelId: copyIds[0] });
+      updateCurrentScene({ theaterActiveModelId: copyIds[0] });
       setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
       setDecorActionMessage(`Скопировано объектов: ${copies.length}`);
-    }, [currentStep, models, multiSelectedModelIds, updateCurrentStep, updateModels]);
+    }, [currentScene, models, multiSelectedModelIds, updateCurrentScene, updateModels]);
 
     const removeModel = (id: number) => {
-      if (!currentStep) return;
+      if (!currentScene) return;
       const next = models.filter((item) => item.id !== id);
       updateModels(next);
       if (activeModelId === id) {
-        updateCurrentStep({ theaterActiveModelId: next[0]?.id });
+        updateCurrentScene({ theaterActiveModelId: next[0]?.id });
       }
     };
 
     const cloneModel = (id: number) => {
-      if (!currentStep) return;
+      if (!currentScene) return;
       const source = models.find((item) => item.id === id);
       if (!source) return;
       const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
@@ -619,13 +619,13 @@ export function useTheaterModels({
         position: [source.position[0] + offsetX, source.position[1], source.position[2] + offsetZ],
       };
       updateModels([...models, nextItem]);
-      updateCurrentStep({ theaterActiveModelId: nextId });
+      updateCurrentScene({ theaterActiveModelId: nextId });
       setPendingSnapModelId(nextId);
       setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
     };
 
     const seatActiveHumanOnFurniture = useCallback(() => {
-      if (!currentStep || !activeModelId) return;
+      if (!currentScene || !activeModelId) return;
       const human = models.find((item) => item.id === activeModelId);
       if (!human) return;
       const furniture = findSeatingTargetForHuman(
@@ -648,7 +648,7 @@ export function useTheaterModels({
       setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
     }, [
       activeModelId,
-      currentStep,
+      currentScene,
       models,
       multiSelectedModelIds,
       setDecorActionMessage,
@@ -984,9 +984,9 @@ export function useTheaterModels({
 
     const previewModel = useCallback(
       (id: number, patch: Partial<TheaterModel>) => {
-        if (!currentStep) return;
-        updateCurrentStep(
-          writeStepTheaterModels(
+        if (!currentScene) return;
+        updateCurrentScene(
+          writeSceneTheaterModels(
             normalizeModels(
               models.map((item) =>
                 item.id === id ? { ...item, ...patch } : item,
@@ -995,7 +995,7 @@ export function useTheaterModels({
           ),
         );
       },
-      [currentStep, models, normalizeModels, updateCurrentStep],
+      [currentScene, models, normalizeModels, updateCurrentScene],
     );
 
     const placeActiveModel = useCallback(
@@ -1118,9 +1118,9 @@ export function useTheaterModels({
     updateModels,
     updateModel,
     resolveModelSrc,
-    copyModelsFromPreviousStep,
-    copyTheaterFromPreviousStep,
-    copyTheaterToNextStep,
+    copyModelsFromPreviousScene,
+    copyTheaterFromPreviousScene,
+    copyTheaterToNextScene,
     addModel,
     addBuiltinModel,
     mirrorModel,

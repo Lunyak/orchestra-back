@@ -46,54 +46,56 @@ export function ProfileRoleWorkTab() {
 
   return (
     <div className="profile-tab-page">
-      <div className="profile-tab-head">
-        <div className="profile-tab-title">Рисунок роли</div>
-      </div>
-
-      <p className="profile-hint profile-tab-lead">
-        Роли, назначенные на ваш email. Для каждой — тетрадь: обстоятельства, биография, сверхзадача, работа по
-        сценам. Назначения — в карточке сцены на доске готовности.
-      </p>
-
-      <div className="profile-toolbar">
-        <Button className="secondary" type="button" onClick={() => navigate("/board")}>
-          Открыть доску
-        </Button>
-      </div>
-
-      {rolesError ? <div className="settings-invite-error">{rolesError}</div> : null}
-      {rolesLoading ? <div className="profile-save-hint">Загрузка ролей…</div> : null}
-
-      <div className="profile-panel profile-role-work-panel">
-        <div className="profile-role-work-grid">
-          {myAssignedRoles.length === 0 && !rolesLoading ? (
-            <p className="profile-hint">
-              Роли не назначены на ваш email (или профиль ещё не загружен). Назначения делаются в карточке сцены на
-              доске.
-            </p>
-          ) : null}
-
-          {myAssignedRoles.map((r) => (
-            <div
-              key={String(r.id)}
-              className="profile-role-work-card"
-              title="Открыть рисунок роли"
-            >
-              <RolePlayingCard
-                role={r}
-                accessToken={accessToken}
-                size="md"
-                onClick={() => navigate(`/role-workbook/${encodeURIComponent(String(r.id))}`)}
-              />
-            </div>
-          ))}
+      <div className="profile-tab-main">
+        <div className="profile-tab-head">
+          <div className="profile-tab-title">Рисунок роли</div>
         </div>
-      </div>
 
-      <p className="profile-hint profile-tab-footer">
-        Проект: <strong>{projectName || "—"}</strong> · Пользователь:{" "}
-        <strong>{profile?.email ?? "—"}</strong>
-      </p>
+        <p className="profile-hint profile-tab-lead">
+          Роли, назначенные на ваш email. Для каждой — тетрадь: обстоятельства, биография, сверхзадача, работа по
+          сценам. Назначения — в карточке сцены на доске готовности.
+        </p>
+
+        <div className="profile-toolbar">
+          <Button className="secondary" type="button" onClick={() => navigate("/board")}>
+            Открыть доску
+          </Button>
+        </div>
+
+        {rolesError ? <div className="settings-invite-error">{rolesError}</div> : null}
+        {rolesLoading ? <div className="profile-save-hint">Загрузка ролей…</div> : null}
+
+        <div className="profile-panel profile-role-work-panel">
+          <div className="profile-role-work-grid">
+            {myAssignedRoles.length === 0 && !rolesLoading ? (
+              <p className="profile-hint">
+                Роли не назначены на ваш email (или профиль ещё не загружен). Назначения делаются в карточке сцены на
+                доске.
+              </p>
+            ) : null}
+
+            {myAssignedRoles.map((r) => (
+              <div
+                key={String(r.id)}
+                className="profile-role-work-card"
+                title="Открыть рисунок роли"
+              >
+                <RolePlayingCard
+                  role={r}
+                  accessToken={accessToken}
+                  size="md"
+                  onClick={() => navigate(`/role-workbook/${encodeURIComponent(String(r.id))}`)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="profile-hint profile-tab-footer">
+          Проект: <strong>{projectName || "—"}</strong> · Пользователь:{" "}
+          <strong>{profile?.email ?? "—"}</strong>
+        </p>
+      </div>
     </div>
   );
 }

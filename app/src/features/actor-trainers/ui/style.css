@@ -178,7 +178,7 @@
   transition: var(--transition-colors);
 }
 
-.actor-trainer-source-tab.is-active {
+.actor-trainer-source-tab--active {
   border-color: var(--color-blue-border);
   background: var(--color-blue-highlight-bg);
 }

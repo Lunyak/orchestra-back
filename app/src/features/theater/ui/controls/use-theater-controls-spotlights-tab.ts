@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { countStepLightChannelLinks } from "../../model/theater-light-channel-link";
+import { countSceneLightChannelLinks } from "../../model/theater-light-channel-link";
 import { bindSpotlightOnFaderBoard, detachSpotlightFromFaderBoard } from "../../model/theater-light-fader-bindings";
 import {
   buildCompleteLightFaders,
@@ -9,11 +9,11 @@ import {
 } from "../../../../shared/components/light-console/light-console-data";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 import { useTheaterControlsLightChannels } from "./use-theater-controls-light-channels";
-import { useScene } from "../../../scene";
+import { usePlaybook } from "../../../playbook";
 
 export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
   const { lightChannels, selectedLightSlot } = useTheaterControlsLightChannels();
-  const { sceneData, setSceneData, saveStepsForLightPlot } = useScene();
+  const { playbookData, setPlaybookData, saveScenesForLightPlot } = usePlaybook();
   const [spotlightBatchCount, setSpotlightBatchCount] = useState(6);
   const [rgbBatchCount, setRgbBatchCount] = useState(4);
   const [spotlightLayoutRows, setSpotlightLayoutRows] = useState(2);
@@ -32,8 +32,8 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
       const regular = vm.displaySpotlights.filter((item) => !item.isRgb);
       const rgb = vm.displaySpotlights.filter((item) => item.isRgb);
       const total = regular.length + rgb.length;
-      const plot = vm.currentStep?.lightPlot ?? [];
-      const stats = countStepLightChannelLinks(plot, vm.displaySpotlights);
+      const plot = vm.currentScene?.lightPlot ?? [];
+      const stats = countSceneLightChannelLinks(plot, vm.displaySpotlights);
       const linkBadge = `схема ${stats.fixtures} · 3D ${stats.spotlights}`;
       const countBadge =
         total > 0 ? `${total} (${regular.length} + ${rgb.length} RGB)` : "нет";
@@ -51,21 +51,21 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
         spotlightSourceHeightLabel:
           total > 0 ? `${averageSourceHeight.toFixed(1)} м` : "нет",
       };
-    }, [vm.currentStep?.lightPlot, vm.displaySpotlights]);
+    }, [vm.currentScene?.lightPlot, vm.displaySpotlights]);
 
   const saveSpotlightFaderBinding = useCallback(() => {
     if (bindingSaveTimerRef.current != null) {
       window.clearTimeout(bindingSaveTimerRef.current);
     }
     bindingSaveTimerRef.current = window.setTimeout(() => {
-      void saveStepsForLightPlot({ force: true });
+      void saveScenesForLightPlot({ force: true });
       bindingSaveTimerRef.current = null;
     }, 900);
-  }, [saveStepsForLightPlot]);
+  }, [saveScenesForLightPlot]);
 
   const bindSpotlightToFader = useCallback(
     (faderId: number, spotlightId: number, channel: number) => {
-      setSceneData((prev) => {
+      setPlaybookData((prev) => {
         const current = prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [];
         const ch = Math.max(1, Math.trunc(channel) || 1);
         const nextFaderRows = bindSpotlightOnFaderBoard(current, faderId, spotlightId, ch);
@@ -86,12 +86,12 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
       });
       saveSpotlightFaderBinding();
     },
-    [lightChannels.length, saveSpotlightFaderBinding, setSceneData],
+    [lightChannels.length, saveSpotlightFaderBinding, setPlaybookData],
   );
 
   const unbindSpotlightFromFader = useCallback(
     (spotlightId: number) => {
-      setSceneData((prev) => {
+      setPlaybookData((prev) => {
         const current = prev?.lightFaders?.v === 1 ? prev.lightFaders.faders : [];
         return {
           ...(prev ?? {}),
@@ -103,14 +103,14 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
       });
       saveSpotlightFaderBinding();
     },
-    [saveSpotlightFaderBinding, setSceneData],
+    [saveSpotlightFaderBinding, setPlaybookData],
   );
 
   return {
     lightChannels,
     lightFaders:
-      sceneData?.lightFaders && sceneData.lightFaders.v === 1
-        ? sceneData.lightFaders.faders
+      playbookData?.lightFaders && playbookData.lightFaders.v === 1
+        ? playbookData.lightFaders.faders
         : [],
     selectedLightSlot,
     spotlightBatchCount,

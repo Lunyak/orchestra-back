@@ -72,7 +72,7 @@
   box-sizing: border-box;
 }
 
-.premises-page__head.rehearsals-head {
+.premises-page__header.rehearsals-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -95,7 +95,7 @@
   margin-top: 8px;
 }
 
-.premises-page__head-main {
+.premises-page__header-main {
   min-width: 0;
 }
 
@@ -128,7 +128,7 @@
   max-width: 52rem;
 }
 
-.premises-page__head-actions {
+.premises-page__header-actions {
   flex-shrink: 0;
 }
 
@@ -148,7 +148,7 @@
   color: #fff;
 }
 
-.premises-slot-modal-panel.modal-panel {
+.premises-slot-modal.modal-panel {
   max-width: min(560px, calc(100vw - 24px));
   border-radius: 0;
   border: 1px solid #222;
@@ -157,7 +157,7 @@
   box-shadow: 0 18px 36px rgba(0, 0, 0, 0.55);
 }
 
-.premises-slot-modal-panel .premises-slot-modal__inner h3 {
+.premises-slot-modal .premises-slot-modal__inner h3 {
   margin: 0 0 4px;
   font-size: 13px;
   font-weight: 600;
@@ -166,16 +166,16 @@
   color: #ccc;
 }
 
-.premises-slot-modal-panel .premises-slot-modal__inner {
+.premises-slot-modal .premises-slot-modal__inner {
   display: flex;
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px 16px;
 }
 
-.premises-slot-modal-panel .native-text-input,
-.premises-slot-modal-panel .native-select,
-.premises-slot-modal-panel .premises-field input[type="datetime-local"] {
+.premises-slot-modal .native-text-input,
+.premises-slot-modal .native-select,
+.premises-slot-modal .premises-field input[type="datetime-local"] {
   background: #222;
   border: 1px solid #333;
   border-radius: 0;
@@ -183,21 +183,21 @@
   font-size: 12px;
 }
 
-.premises-slot-modal-panel .native-text-input:focus,
-.premises-slot-modal-panel .native-select:focus,
-.premises-slot-modal-panel .premises-field input[type="datetime-local"]:focus {
+.premises-slot-modal .native-text-input:focus,
+.premises-slot-modal .native-select:focus,
+.premises-slot-modal .premises-field input[type="datetime-local"]:focus {
   border-color: #08f;
   outline: none;
 }
 
-.premises-slot-modal-panel .form-textarea textarea {
+.premises-slot-modal .form-textarea textarea {
   background: #222;
   border-color: #333;
   border-radius: 0;
   color: #aaa;
 }
 
-.premises-slot-modal-panel .button {
+.premises-slot-modal .button {
   background: #222;
   color: #aaa;
   font-size: 11px;
@@ -209,23 +209,23 @@
   border-radius: 0;
 }
 
-.premises-slot-modal-panel .button:hover:not(:disabled) {
+.premises-slot-modal .button:hover:not(:disabled) {
   background: #08f;
   color: #fff;
 }
 
-.premises-slot-modal-panel .premises-error {
+.premises-slot-modal .premises-error {
   color: #f66;
 }
 
-.premises-slot-modal-panel .premises-slot-modal__actions {
+.premises-slot-modal .premises-slot-modal__actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
   margin-top: 4px;
 }
 
-.premises-slot-modal-panel .premises-field {
+.premises-slot-modal .premises-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -233,7 +233,7 @@
   min-width: 0;
 }
 
-.premises-slot-modal-panel .premises-checkbox {
+.premises-slot-modal .premises-checkbox {
   display: inline-flex;
   align-items: center;
   gap: 6px;

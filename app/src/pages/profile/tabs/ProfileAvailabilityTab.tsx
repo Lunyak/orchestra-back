@@ -1,3 +1,4 @@
+import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -41,6 +42,23 @@ function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
 
+const MAX_AVAILABILITY_RANGE_DAYS = 366;
+
+function countIsoDatesInRange(fromIso: string, toIso: string): number {
+  const from = fromIso.trim();
+  const to = toIso.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return 0;
+  if (from > to) return 0;
+
+  const start = dayjs(from, "YYYY-MM-DD", true);
+  const end = dayjs(to, "YYYY-MM-DD", true);
+  if (!start.isValid() || !end.isValid()) return 0;
+
+  const dayCount = end.diff(start, "day") + 1;
+  if (dayCount <= 0 || dayCount > MAX_AVAILABILITY_RANGE_DAYS) return 0;
+  return dayCount;
+}
+
 export function ProfileAvailabilityTab() {
   const { accessToken } = useAuth();
   const dispatch = useAppDispatch();
@@ -58,6 +76,14 @@ export function ProfileAvailabilityTab() {
   const selectedDate = calendarState.selectedDate;
   const [dayModalOpen, setDayModalOpen] = useState(false);
   const [sessionDetailModalId, setSessionDetailModalId] = useState<string | null>(null);
+  const [rangeFromDate, setRangeFromDate] = useState(selectedDate);
+  const [rangeToDate, setRangeToDate] = useState(selectedDate);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRangeFromDate(selectedDate);
+    setRangeToDate(selectedDate);
+  }, [selectedDate]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -187,6 +213,32 @@ export function ProfileAvailabilityTab() {
     setDayModalOpen(true);
   }, []);
 
+  const rangeDayCount = useMemo(
+    () => countIsoDatesInRange(rangeFromDate, rangeToDate),
+    [rangeFromDate, rangeToDate],
+  );
+
+  const rangeIsValid = rangeDayCount > 0;
+
+  const applyRangeStatus = useCallback(
+    (status: AvailabilityStatus | null) => {
+      if (!rangeIsValid) {
+        setRangeError("Укажите корректный диапазон: дата «С» не позже «По», не больше года.");
+        return;
+      }
+
+      setRangeError(null);
+      dispatch(
+        profileDataActions.setAvailabilityRangeStatus({
+          fromDate: rangeFromDate,
+          toDate: rangeToDate,
+          status,
+        }),
+      );
+    },
+    [dispatch, rangeFromDate, rangeIsValid, rangeToDate],
+  );
+
   if (!accessToken) {
     return <div className="profile-tab-page profile-hint">Нужно войти, чтобы управлять занятостью.</div>;
   }
@@ -198,7 +250,7 @@ export function ProfileAvailabilityTab() {
         {profileFlags.saving ? (
           <div className="profile-save-hint">Автосохранение…</div>
         ) : profileFlags.error ? (
-          <div className="settings-invite-error" style={{ margin: 0 }}>
+          <div className="settings-invite-error settings-invite-error--flush">
             {profileFlags.error}
           </div>
         ) : profileFlags.ok ? (
@@ -206,35 +258,75 @@ export function ProfileAvailabilityTab() {
         ) : null}
       </div>
 
-      <div className="profile-intro profile-availability-intro">
-        <strong>Как отметить занятость</strong>
-        <ol>
-          <li>Нажмите день в календаре — откроется окно настройки.</li>
-          <li>Выберите «Занят», «Свободен» или «Не отмечено».</li>
-          <li>
-            При «Свободен» можно задать <strong>часы</strong> кнопкой «+ Добавить диапазон».
-          </li>
-        </ol>
-        <div className="profile-availability-legend">
-          <span className="profile-availability-legend-item">
-            <span className="profile-availability-legend-swatch profile-availability-legend-swatch--present" />
-            свободен
-          </span>
-          <span className="profile-availability-legend-item">
-            <span className="profile-availability-legend-swatch profile-availability-legend-swatch--absent" />
-            занят
-          </span>
-          <span className="profile-availability-legend-item">
-            <span className="profile-availability-legend-swatch profile-availability-legend-swatch--session" />
-            сессия
-          </span>
-        </div>
-      </div>
-
       {flags.error ? (
         <div className="settings-invite-error profile-availability-load-error">{flags.error}</div>
       ) : null}
       {flags.loading ? <div className="profile-save-hint">Загрузка сессий…</div> : null}
+
+      <section className="profile-availability-range">
+        <div className="profile-availability-section-label">Диапазон дней</div>
+        <div className="profile-availability-range__fields">
+          <label className="profile-field profile-availability-range__field">
+          
+            <InlineTextField
+              className="profile-availability-date-input"
+              type="date"
+              value={rangeFromDate}
+              onChange={(e) => {
+                setRangeFromDate(e.target.value);
+                setRangeError(null);
+              }}
+            />
+          </label>
+          <span className="profile-availability-range__sep">—</span>
+          <label className="profile-field profile-availability-range__field">
+          
+            <InlineTextField
+              className="profile-availability-date-input"
+              type="date"
+              value={rangeToDate}
+              onChange={(e) => {
+                setRangeToDate(e.target.value);
+                setRangeError(null);
+              }}
+            />
+          </label>
+        </div>
+        {rangeIsValid ? (
+          <div className="profile-availability-hint profile-availability-range__hint">
+            Будет затронуто {rangeDayCount}{" "}
+            {rangeDayCount === 1 ? "день" : rangeDayCount < 5 ? "дня" : "дней"}.
+          </div>
+        ) : null}
+        {rangeError ? (
+          <div className="settings-invite-error profile-availability-range__error">{rangeError}</div>
+        ) : null}
+        <div className="profile-availability-status-row profile-availability-range__actions">
+          <Button
+            className="secondary"
+            type="button"
+            disabled={!rangeIsValid}
+            onClick={() => applyRangeStatus(null)}
+          >
+            Сбросить
+          </Button>
+          <Button
+            type="button"
+            disabled={!rangeIsValid}
+            onClick={() => applyRangeStatus("present")}
+          >
+            Свободен
+          </Button>
+          <Button
+            className="danger"
+            type="button"
+            disabled={!rangeIsValid}
+            onClick={() => applyRangeStatus("absent")}
+          >
+            Занят
+          </Button>
+        </div>
+      </section>
 
       <div className="profile-availability-calendar-wrap">
         <CalendarSection
@@ -258,7 +350,7 @@ export function ProfileAvailabilityTab() {
         panelClassName="profile-availability-day-modal"
         ariaLabelledBy="profile-availability-day-modal-title"
       >
-        <div className="profile-availability-day-modal__head">
+        <div className="profile-availability-day-modal__header">
           <h3 id="profile-availability-day-modal-title" className="profile-availability-day-modal__title">
             {calendarSelectedDateLabel}
           </h3>
@@ -276,7 +368,7 @@ export function ProfileAvailabilityTab() {
           <div className="profile-availability-section-label">Статус дня</div>
           <div className="profile-availability-status-row">
             <Button
-              className={selectedStatus == null ? "is-active" : "secondary"}
+              className={cn(selectedStatus == null ? "button--active" : "secondary")}
               type="button"
               onClick={() =>
                 dispatch(
@@ -287,7 +379,7 @@ export function ProfileAvailabilityTab() {
               Не отмечено
             </Button>
             <Button
-              className={selectedStatus === "present" ? "is-active" : "secondary"}
+              className={cn(selectedStatus === "present" ? "button--active" : "secondary")}
               type="button"
               onClick={() =>
                 dispatch(
@@ -298,7 +390,10 @@ export function ProfileAvailabilityTab() {
               Свободен
             </Button>
             <Button
-              className={selectedStatus === "absent" ? "danger is-active" : "secondary"}
+              className={cn(
+                selectedStatus === "absent" && "danger",
+                selectedStatus === "absent" ? "button--active" : "secondary",
+              )}
               type="button"
               onClick={() =>
                 dispatch(

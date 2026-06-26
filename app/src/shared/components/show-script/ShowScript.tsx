@@ -1,13 +1,13 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useProject } from "../../../features/project";
-import { useScene } from "../../../features/scene";
-import { isScenarioWithoutMaterial } from "../../../features/scene/model/scenario-material";
-import { ScriptEmptyMaterialPrompt } from "../../../features/scene/ui/ScriptEmptyMaterialPrompt";
+import { usePlaybook } from "../../../features/playbook";
+import { isScenarioWithoutMaterial } from "../../../features/playbook/model/scenario-material";
+import { ScriptEmptyMaterialPrompt } from "../../../features/playbook/ui/ScriptEmptyMaterialPrompt";
 import { useScriptUI } from '../../../features/script-ui';
 import { showScriptMarkdownActions } from "../../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useAppDispatch } from "../../store/hooks";
 import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
-import { ScriptRequisite, ScriptStep } from "../../types/script";
+import { ScriptRequisite, ScriptScene } from "../../types/script";
 import { RequisitesPanel } from "./components/RequisitesPanel";
 import { ShowScriptMarkdownSection } from "./components/ShowScriptMarkdownSection";
 import './style.css';
@@ -20,10 +20,10 @@ export const ShowScript: React.FC = () => {
   const sceneName = "script";
 
   const {
-    steps,
+    scenes,
     currentPage,
-    updateStep: updateSceneStep,
-    splitStepFromSelection,
+    updateScene,
+    splitSceneFromSelection,
     resetAllRequisites,
     handleTrackLinkClick,
     handleSoundLinkClick,
@@ -33,7 +33,7 @@ export const ShowScript: React.FC = () => {
     clearRealtimePullDeferred,
     syncFromServer,
     seedScenarioFromPlayText,
-  } = useScene();
+  } = usePlaybook();
 
   const [newRequisite, setNewRequisite] = useState('');
   const requisitesClipboardRef = useRef<ScriptRequisite[] | null>(null);
@@ -44,8 +44,8 @@ export const ShowScript: React.FC = () => {
   } = useScriptUI();
 
   const showEmptyMaterialPrompt = useMemo(
-    () => isScenarioWithoutMaterial(steps),
-    [steps],
+    () => isScenarioWithoutMaterial(scenes),
+    [scenes],
   );
 
   const handleImportMaterial = useCallback(
@@ -63,8 +63,8 @@ export const ShowScript: React.FC = () => {
     [dispatch, projectSlug, sceneName, seedScenarioFromPlayText, setIsEditing],
   );
 
-  const currentStep = steps[currentPage];
-  const currentRequisites = currentStep?.requisites ?? [];
+  const currentScene = scenes[currentPage];
+  const currentRequisites = currentScene?.requisites ?? [];
   const { data: troupeData } = useMyTroupeQuery(
     { project: projectSlug },
     { skip: !projectSlug },
@@ -85,26 +85,26 @@ export const ShowScript: React.FC = () => {
         .filter((item): item is { value: string; label: string } => Boolean(item)),
     [troupeData?.members],
   );
-  const updateStepField = <K extends keyof ScriptStep>(
+  const updateSceneField = <K extends keyof ScriptScene>(
     id: number,
     field: K,
-    value: ScriptStep[K],
+    value: ScriptScene[K],
   ) => {
-    updateSceneStep(id, { [field]: value } as Partial<ScriptStep>);
+    updateScene(id, { [field]: value } as Partial<ScriptScene>);
   };
 
   const toggleRequisite = (requisiteId: number) => {
-    if (!currentStep) return;
+    if (!currentScene) return;
     const nextRequisites = currentRequisites.map((item) =>
       item.id === requisiteId ? { ...item, checked: !item.checked } : item
     );
-    updateStepField(currentStep.id, 'requisites', nextRequisites);
+    updateSceneField(currentScene.id, 'requisites', nextRequisites);
   };
 
   const removeRequisite = (requisiteId: number) => {
-    if (!currentStep) return;
+    if (!currentScene) return;
     const nextRequisites = currentRequisites.filter((item) => item.id !== requisiteId);
-    updateStepField(currentStep.id, 'requisites', nextRequisites);
+    updateSceneField(currentScene.id, 'requisites', nextRequisites);
   };
 
   const updateRequisiteAssignees = (
@@ -112,15 +112,15 @@ export const ShowScript: React.FC = () => {
     field: "setupAssignees" | "removeAssignees",
     assignees: string[],
   ) => {
-    if (!currentStep) return;
+    if (!currentScene) return;
     const nextRequisites = currentRequisites.map((item) =>
       item.id === requisiteId ? { ...item, [field]: assignees } : item
     );
-    updateStepField(currentStep.id, 'requisites', nextRequisites);
+    updateSceneField(currentScene.id, 'requisites', nextRequisites);
   };
 
   const addRequisite = () => {
-    if (!currentStep) return;
+    if (!currentScene) return;
     const label = newRequisite.trim();
     if (!label) return;
     const nextId =
@@ -132,12 +132,12 @@ export const ShowScript: React.FC = () => {
       setupAssignees: [],
       removeAssignees: [],
     };
-    updateStepField(currentStep.id, 'requisites', [...currentRequisites, nextItem]);
+    updateSceneField(currentScene.id, 'requisites', [...currentRequisites, nextItem]);
     setNewRequisite('');
   };
 
   const copyRequisites = () => {
-    if (!currentStep) return;
+    if (!currentScene) return;
     requisitesClipboardRef.current = currentRequisites.map((item) => ({ ...item }));
   };
 
@@ -146,20 +146,20 @@ export const ShowScript: React.FC = () => {
   };
 
   const pasteRequisites = () => {
-    if (!currentStep || !requisitesClipboardRef.current) return;
+    if (!currentScene || !requisitesClipboardRef.current) return;
     const cloned = requisitesClipboardRef.current.map((item) => ({ ...item }));
-    updateStepField(currentStep.id, 'requisites', cloned);
+    updateSceneField(currentScene.id, 'requisites', cloned);
   };
 
   const hasCopiedRequisites = requisitesClipboardRef.current != null;
-  const createStepFromSelection = (
-    sourceStepId: number,
+  const createSceneFromSelection = (
+    sourceSceneId: number,
     selectedText: string,
     trimmedSourceText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => {
-    splitStepFromSelection({
-      sourceStepId,
+    splitSceneFromSelection({
+      sourceSceneId,
       targetField,
       selectedText,
       trimmedSourceText,
@@ -203,12 +203,12 @@ export const ShowScript: React.FC = () => {
           projectSlug={projectSlug}
           sceneName={sceneName}
           inlineMarkdownTabs={false}
-          updateStepField={updateStepField}
+          updateSceneField={updateSceneField}
           onTrackLinkClick={handleTrackLinkClick}
           onSoundLinkClick={handleSoundLinkClick}
-          onCreateStepFromSelection={createStepFromSelection}
+          onCreateSceneFromSelection={createSceneFromSelection}
           requisitesPane={
-            currentStep ? (
+            currentScene ? (
               <RequisitesPanel
                 show
                 isEditing={isEditing}
@@ -228,10 +228,10 @@ export const ShowScript: React.FC = () => {
             ) : null
           }
           renderBody={({ markdownPane }) =>
-            currentStep ? (
-              <div className="script-step-editor">
-                <div className="script-step-body">
-                  <div className="script-step-main">
+            currentScene ? (
+              <div className="script-scene-editor">
+                <div className="script-scene-body">
+                  <div className="script-scene-main">
                     {markdownPane}
                   </div>
                 </div>

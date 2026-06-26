@@ -3,6 +3,7 @@
 .profile-layout .main-content-profile {
   padding: 10px 12px 24px;
   background: #111;
+  justify-content: center;
 }
 
 .profile-view {
@@ -66,10 +67,10 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
-.profile-tab-btn.active {
-  border-bottom-color: var(--profile-chrome-accent);
-  background: var(--profile-chrome-accent-bg);
-  color: var(--profile-chrome-text-strong);
+.profile-tab-btn--active {
+  border-bottom-color: var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 12%, transparent);
+  color: var(--color-active-ascent);
 }
 
 .profile-tab-btn:disabled {
@@ -103,6 +104,7 @@
   gap: 10px;
   width: 100%;
   max-width: 640px;
+  margin: 0 auto;
 }
 
 .profile-tab-head {
@@ -246,7 +248,7 @@
   cursor: not-allowed;
 }
 
-.profile-trainer-card__head {
+.profile-trainer-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -351,7 +353,7 @@
   color: #aaa;
 }
 
-.profile-view .button.is-active {
+.profile-view .button--active {
   border: 0;
   box-shadow: 0 0 0 1px var(--profile-chrome-focus-ring);
   background: var(--profile-chrome-accent-bg);
@@ -382,7 +384,9 @@
 
 /* Вкладка «Занятость» */
 .profile-availability-page {
-  max-width: none;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
 .profile-availability-load-error {
@@ -428,6 +432,51 @@
   border: 1px solid var(--profile-chrome-border);
   background: var(--profile-chrome-panel);
   padding: 10px 10px 12px;
+}
+
+.profile-availability-range {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--profile-chrome-border);
+  background: var(--profile-chrome-panel);
+}
+
+.profile-availability-range__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.profile-availability-range__field {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.profile-availability-range__sep {
+  align-self: center;
+  color: var(--profile-chrome-text-muted);
+  font-size: 12px;
+  line-height: 1;
+  padding-bottom: 8px;
+}
+
+.profile-availability-range__hint {
+  margin: 0;
+}
+
+.profile-availability-range__error {
+  margin: 0;
+}
+
+.profile-availability-range__actions {
+  margin: 0;
+}
+
+.profile-availability-date-input {
+  width: 100%;
+  min-width: 0;
 }
 
 .profile-availability-page .profile-availability-calendar .month-cal {
@@ -564,7 +613,7 @@
   color: var(--profile-chrome-text-strong, #ccc);
 }
 
-.profile-availability-day-modal__head {
+.profile-availability-day-modal__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -649,7 +698,7 @@
   color: #aaa;
 }
 
-.profile-availability-day-modal .button.is-active {
+.profile-availability-day-modal .button--active {
   border-color: var(--profile-chrome-accent, #08f);
   background: var(--profile-chrome-accent-bg, rgba(0, 136, 255, 0.12));
   color: var(--profile-chrome-text-strong, #ccc);

@@ -26,7 +26,7 @@
   opacity: 0.92;
 }
 
-.light-console__head {
+.light-console__header {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -748,11 +748,6 @@
   line-height: 1.45;
 }
 
-.light-scheme-call__head {
-  display: grid;
-  gap: 2px;
-}
-
 .light-scheme-call__kadr {
   font-size: 10px;
   font-weight: 800;
@@ -990,7 +985,7 @@
   background: rgba(0, 0, 0, 0.16);
 }
 
-.light-split-panel__head {
+.light-split-panel__header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;

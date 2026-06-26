@@ -11,12 +11,12 @@ export function AppEditorScriptMarkdownMenu({
   onSetMarkdownMode,
 }: AppEditorScriptMarkdownMenuProps) {
   const activeLabel =
-    SCRIPT_MARKDOWN_TAB_ITEMS.find((item) => item.mode === markdownMode)?.label ?? "Шаг";
+    SCRIPT_MARKDOWN_TAB_ITEMS.find((item) => item.mode === markdownMode)?.label ?? "Сцена";
 
   return (
     <div className="theater-editor-menubar__menu">
       <span className="theater-editor-menubar__menu-title">{activeLabel}</span>
-      <div className="theater-editor-menubar__options" role="menu" aria-label="Режим шага">
+      <div className="theater-editor-menubar__options" role="menu" aria-label="Режим сцены">
         {SCRIPT_MARKDOWN_TAB_ITEMS.map(({ mode, label }) => {
           const isActive = markdownMode === mode;
           return (

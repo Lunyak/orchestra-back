@@ -13,7 +13,7 @@ function AddButton({ className, children = "+", type = "button", ...rest }: Icon
 }
 
 export type DeleteButtonProps = IconActionButtonProps & {
-  variant?: "playlist" | "step";
+  variant?: "playlist" | "scene";
 };
 
 function DeleteButton({ className, variant = "playlist", type = "button", children = "×", ...rest }: DeleteButtonProps) {

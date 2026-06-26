@@ -21,7 +21,7 @@ export type { LightConsoleSettingsModalProps } from "./LightConsoleSettingsModal
 export { useLightConsoleLayoutSettings } from "./useLightConsoleLayoutSettings";
 export {
   appendLightChannel,
-  applyLightConsoleLayoutToSceneData,
+  applyLightConsoleLayoutToPlaybookData,
   buildLightConsoleLayoutCounts,
   removeLastLightChannel,
   resizeLightChannels,

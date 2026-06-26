@@ -1,4 +1,5 @@
-import type { RefObject } from "react";
+import cn from "classnames";
+import type { Ref } from "react";
 import type { TheaterModel, TheaterSpotlight } from "../../../../shared/types/script";
 import { worldToPlanPoint } from "../../model/theater-floor-plan-geometry";
 import {
@@ -15,7 +16,7 @@ import type { TheaterFloorPlanGeometry } from "./use-theater-floor-plan-geometry
 import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
 
 export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
-  svgRef: RefObject<SVGSVGElement | null>;
+  svgRef: Ref<SVGSVGElement>;
   planContentTransform: string | undefined;
   doorHover: DoorPlanHit | null;
   recessHover: RecessPlanHit | null;
@@ -410,7 +411,7 @@ export function TheaterFloorPlanSvg({
             return (
               <g
                 key={`spot-${item.id}`}
-                className={isSelectedSpot ? "is-active" : undefined}
+                className={cn(isSelectedSpot && "theater-floor-plan-spot--active")}
               >
                 {showSpotlightGuideLines && isSelectedSpot ? (
                   <line
@@ -497,15 +498,13 @@ export function TheaterFloorPlanSvg({
               width={w}
               height={h}
               transform={`rotate(${deg} ${sx} ${sy})`}
-              className={[
+              className={cn(
                 "theater-floor-plan-object",
-                item.kind === "decor" ? "theater-floor-plan-object--decor" : "",
-                item.outOfBounds ? "theater-floor-plan-object--oob" : "",
-                active ? "is-active" : "",
-                hovered ? "is-hovered" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
+                item.kind === "decor" && "theater-floor-plan-object--decor",
+                item.outOfBounds && "theater-floor-plan-object--oob",
+                active && "theater-floor-plan-object--active",
+                hovered && "theater-floor-plan-object--hovered",
+              )}
               style={item.color ? { fill: item.color } : undefined}
               onContextMenu={(event) => {
                 event.preventDefault();

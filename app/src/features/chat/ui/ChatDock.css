@@ -332,6 +332,10 @@
   flex-wrap: wrap;
 }
 
+.chat-dock-msg__body {
+  white-space: pre-wrap;
+}
+
 .chat-dock-foot {
   padding: 8px 10px 10px;
   border-top: 1px solid var(--color-border-subtle);

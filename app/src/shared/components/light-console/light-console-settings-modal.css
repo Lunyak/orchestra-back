@@ -4,7 +4,7 @@
   max-width: min(420px, calc(100vw - 24px));
 }
 
-.light-console-settings-modal__head {
+.light-console-settings-modal__header {
   display: flex;
   align-items: center;
   justify-content: space-between;

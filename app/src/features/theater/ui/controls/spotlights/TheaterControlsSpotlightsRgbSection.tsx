@@ -60,7 +60,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                     item.id === vm.activeSpotlightId ||
                     vm.multiSelectedSpotlightIds.includes(item.id)
                   }
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   placeholder={`RGB ${item.id}`}
                   onSelect={(shiftKey) => vm.selectTheaterSpotlight(item.id, shiftKey)}
                   onLabelCommit={(label) => vm.updateSpotlight(item.id, { label })}
@@ -78,7 +78,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                         spot.bindSpotlightToFader(faderId, item.id, nextChannel);
                       }
                     }}
-                    disabled={!vm.currentStep}
+                    disabled={!vm.currentScene}
                     className="native-text-input theater-channel-input theater-channel-input--channel"
                   />
                 </label>
@@ -90,7 +90,7 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                         ? String(readSpotlightFaderId(item))
                         : ""
                     }
-                    disabled={!vm.currentStep}
+                    disabled={!vm.currentScene}
                     onChange={(event) => {
                       const raw = event.target.value.trim();
                       if (!raw) {
@@ -127,14 +127,14 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                       enabled: !(item.enabled ?? true),
                     })
                   }
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   title={item.enabled === false ? "Включить" : "Выключить"}
                 >
                   <span className="theater-spotlight-power-dot" />
                 </TheaterBtn>
                 <TheaterBtn
                   className="theater-btn--danger"
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   title="Удалить RGB"
                   onClick={() => vm.removeSpotlight(item.id)}
                 >
@@ -147,18 +147,18 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
             )}
             </div>
             <div className="theater-btn-row">
-              <TheaterBtn onClick={vm.addRgbSpotlight} disabled={!vm.currentStep}>
+              <TheaterBtn onClick={vm.addRgbSpotlight} disabled={!vm.currentScene}>
                 + RGB
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.enableSpotlightsByType(true)}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               >
                 Вкл все
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.disableSpotlightsByType(true)}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               >
                 Выкл все
               </TheaterBtn>
@@ -175,17 +175,17 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                   onChange={(event) =>
                     setRgbBatchCount(Math.max(1, Math.min(64, Number(event.target.value) || 1)))
                   }
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                 />
               </TheaterField>
               <TheaterBtn
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 onClick={() => vm.addSpotlightsBatch(rgbBatchCount, 3, { isRgb: true })}
               >
                 +{rgbBatchCount}×3
               </TheaterBtn>
               <TheaterBtn
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 onClick={() => vm.addSpotlightsBatch(rgbBatchCount, 4, { isRgb: true })}
               >
                 +{rgbBatchCount}×4
@@ -195,28 +195,28 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
             <div className="theater-btn-row theater-btn-row--3">
               <TheaterBtn
                 onClick={() => vm.applyRgbColorToAll(tc("--color-success-accent"))}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="Зеленый"
               >
                 Зеленый
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.applyRgbColorToAll(tc("--color-primary-light"))}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="Синий"
               >
                 Синий
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.applyRgbColorToAll(tc("--color-light-pink"))}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="Розовый"
               >
                 Розовый
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.applyRgbColorToAll(tc("--color-warning-bright"))}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="Желтый"
               >
                 Желтый
@@ -229,12 +229,12 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
                 className="theater-color-input"
                 value={vm.rgbBatchColor}
                 onChange={(event) => vm.setRgbBatchColor(event.target.value)}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               />
             </label>
             <TheaterBtn
               onClick={() => vm.applyRgbColorToAll(vm.rgbBatchColor)}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Применить выбранный цвет ко всем RGB"
             >
               Применить цвет

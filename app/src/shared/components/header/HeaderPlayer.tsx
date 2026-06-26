@@ -1,21 +1,24 @@
+import cn from "classnames";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   pickSceneSoundsDesktop,
-  sceneActions,
+  playbookActions,
   setSoundIcon,
   uploadSceneSoundsWeb,
-} from "../../../features/scene/model/scene-slice";
+} from "../../../features/playbook/model/playbook-slice";
 import { ensureProject } from "../../../sync/api/projects";
 import { getDesktopApi } from "../../platform/desktop-api";
 import {
   desktopDeleteProjectSound,
-  desktopReadProjectScene,
-  desktopSaveProjectScene,
+  desktopReadProjectPlaybook,
+  desktopSaveProjectPlaybook,
 } from "../../platform/desktop-methods";
 import { createAudioFadeController } from "../../media/audio-fade";
 import { resolveOfflineMediaUrl } from "../../platform/media-url";
-import { registerSoundPlayHandler } from "../../../features/scene/model/scene-playback-bridge";
+import { registerSoundPlayHandler } from "../../../features/playbook/model/playbook-playback-bridge";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { soundTrackHasIcon } from "../../platform/resolve-sound-icon-url";
+import { SoundTrackIcon } from "./SoundTrackIcon";
 import "./style.css";
 
 export interface HeaderSound {
@@ -47,6 +50,7 @@ interface LoadedTrack {
   icon?: string;
   iconRemoteKey?: string;
   iconRemoteUrl?: string;
+  iconPreviewUrl?: string;
   volume: number;
   fadeMs: number;
   loop: boolean;
@@ -75,7 +79,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   onRegisterToggleHandler,
 }) => {
   const dispatch = useAppDispatch();
-  const soundsUpload = useAppSelector((s) => s.scene.soundsUpload);
+  const soundsUpload = useAppSelector((s) => s.playbook.soundsUpload);
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
       id: sound.id,
@@ -118,16 +122,6 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     requestAnimationFrame(() => renameInputRef.current?.focus());
   }, [editingId]);
 
-  const getLocalProjectId = () => {
-    const key = `projectId:${projectName}`;
-    if (typeof window === "undefined") return null;
-    try {
-      return window.localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  };
-
   const showMessage = (message: string) => {
     setUiMessage(message);
     if (messageTimerRef.current !== null) {
@@ -153,9 +147,10 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           name: sound.title,
           url: sound.remoteUrl ?? sound.file,
           file: sound.file,
-          icon: sound.icon,
-          iconRemoteKey: sound.iconRemoteKey,
-          iconRemoteUrl: sound.iconRemoteUrl,
+          icon: sound.icon ?? existing?.icon,
+          iconRemoteKey: sound.iconRemoteKey ?? existing?.iconRemoteKey,
+          iconRemoteUrl: sound.iconRemoteUrl ?? existing?.iconRemoteUrl,
+          iconPreviewUrl: existing?.iconPreviewUrl,
           // Preserve previous values if backend payload doesn't include them yet.
           volume: sound.volume ?? existing?.volume ?? 0.8,
           fadeMs: sound.fadeMs ?? existing?.fadeMs ?? 500,
@@ -269,7 +264,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       return;
     }
     try {
-      const current = await desktopReadProjectScene(desktopApi, projectName, sceneName);
+      const current = await desktopReadProjectPlaybook(desktopApi, projectName, sceneName);
       const payload = {
         ...(current && typeof current === "object" ? current : {}),
         sounds: nextTracks.map((track) => {
@@ -293,7 +288,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           };
         }),
       };
-      const result = await desktopSaveProjectScene(
+      const result = await desktopSaveProjectPlaybook(
         desktopApi,
         projectName,
         sceneName,
@@ -329,7 +324,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       t.id === trackId ? { ...t, name: nextTitle } : t,
     );
     setTracks(nextTracks);
-    dispatch(sceneActions.updateSound({ id: trackId, changes: { title: nextTitle } as any }));
+    dispatch(playbookActions.updateSound({ id: trackId, changes: { title: nextTitle } as any }));
     setEditingId(null);
     setEditingName("");
 
@@ -385,7 +380,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     }
     const nextTracks = tracks.filter((item) => item.id !== track.id);
     setTracks(nextTracks);
-    dispatch(sceneActions.removeSound(track.id));
+    dispatch(playbookActions.removeSound(track.id));
   };
 
   const clearFadeTimer = (trackId: number) => {
@@ -490,7 +485,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         item.id === track.id ? { ...item, volume: value } : item,
       ),
     );
-    dispatch(sceneActions.updateSound({ id: track.id, changes: { volume: value } }));
+    dispatch(playbookActions.updateSound({ id: track.id, changes: { volume: value } }));
   };
 
   const handleFadeChange = (track: LoadedTrack, value: number) => {
@@ -499,7 +494,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         item.id === track.id ? { ...item, fadeMs: value } : item,
       ),
     );
-    dispatch(sceneActions.updateSound({ id: track.id, changes: { fadeMs: value } }));
+    dispatch(playbookActions.updateSound({ id: track.id, changes: { fadeMs: value } }));
   };
 
   const handleLoopChange = async (track: LoadedTrack, value: boolean) => {
@@ -512,7 +507,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         item.id === track.id ? { ...item, loop: value } : item,
       ),
     );
-    dispatch(sceneActions.updateSound({ id: track.id, changes: { loop: value } }));
+    dispatch(playbookActions.updateSound({ id: track.id, changes: { loop: value } }));
   };
 
   const handleRestartOnStopChange = (track: LoadedTrack, value: boolean) => {
@@ -521,24 +516,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         item.id === track.id ? { ...item, restartOnStop: value } : item,
       ),
     );
-    dispatch(sceneActions.updateSound({ id: track.id, changes: { restartOnStop: value } }));
-  };
-
-  const resolveIconSrc = (file: string) => {
-    const projectId = getLocalProjectId();
-    const url = new URL(`project-sound-icons://${encodeURIComponent(projectName)}/`);
-    const encodedFile = encodeURIComponent(file);
-    url.pathname = projectId
-      ? `/${encodeURIComponent(projectId)}/${encodedFile}`
-      : `/${encodedFile}`;
-    return url.toString();
-  };
-
-  /** URL для отображения иконки: remoteUrl на вебе, иначе project-sound-icons на десктопе. */
-  const getIconSrc = (track: LoadedTrack) => {
-    if (track.iconRemoteUrl && /^https?:\/\//i.test(track.iconRemoteUrl)) return track.iconRemoteUrl;
-    if (track.icon) return resolveIconSrc(track.icon);
-    return "";
+    dispatch(playbookActions.updateSound({ id: track.id, changes: { restartOnStop: value } }));
   };
 
   const addIcon = async (track: LoadedTrack) => {
@@ -577,7 +555,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         type="file"
         accept="audio/*"
         multiple
-        style={{ display: "none" }}
+        className="native-file-input--hidden"
         onChange={(event) => {
           const list = event.target.files ? Array.from(event.target.files) : [];
           event.target.value = "";
@@ -589,7 +567,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
         ref={iconInputRef}
         type="file"
         accept="image/*"
-        style={{ display: "none" }}
+        className="native-file-input--hidden"
         onChange={(event) => {
           const file = event.target.files?.[0] ?? null;
           event.target.value = "";
@@ -598,6 +576,12 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           if (!file || soundId == null) return;
 
           void (async () => {
+            const previewUrl = URL.createObjectURL(file);
+            setTracks((prev) =>
+              prev.map((t) =>
+                t.id === soundId ? { ...t, iconPreviewUrl: previewUrl } : t,
+              ),
+            );
             try {
               const res = await dispatch(
                 setSoundIcon({ projectSlug: projectName, soundId, file }),
@@ -605,11 +589,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
 
               if (!res?.changes || Object.keys(res.changes).length === 0) return;
               setTracks((prev) =>
-                prev.map((t) => (t.id === soundId ? { ...t, ...res.changes } : t)),
+                prev.map((t) =>
+                  t.id === soundId ? { ...t, ...res.changes, iconPreviewUrl: previewUrl } : t,
+                ),
               );
+              onSoundsSaved?.();
             } catch (err) {
               console.error("[sounds] web icon upload failed", err);
               showMessage("Не удалось загрузить иконку. Проверьте консоль.");
+              setTracks((prev) =>
+                prev.map((t) =>
+                  t.id === soundId ? { ...t, iconPreviewUrl: undefined } : t,
+                ),
+              );
+              URL.revokeObjectURL(previewUrl);
             }
           })();
         }}
@@ -641,7 +634,12 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           return (
             <div
               key={track.id}
-              className={`header-player-track-row ${track.isPlaying ? "playing" : ""} ${showSettings ? "settings-open" : ""} ${isRenaming ? "is-renaming" : ""}`}
+              className={cn(
+                "header-player-track-row",
+                track.isPlaying && "header-player-track-row--playing",
+                showSettings && "header-player-track-row--settings-open",
+                isRenaming && "header-player-track-row--renaming",
+              )}
               onClick={() => {
                 if (isRenaming) return;
                 toggleTrack(track);
@@ -729,12 +727,11 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                   onBlur={() => void applyRename(track.id)}
                   aria-label="Переименовать звук"
                 />
-              ) : track.icon || track.iconRemoteUrl ? (
-                <img
+              ) : soundTrackHasIcon(track) ? (
+                <SoundTrackIcon
+                  projectName={projectName}
+                  track={track}
                   className="header-player-track-icon"
-                  src={getIconSrc(track)}
-                  alt={track.name}
-                  title={track.name}
                 />
               ) : (
                 <div className="header-player-track-name" title={track.name}>

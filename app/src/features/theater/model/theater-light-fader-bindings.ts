@@ -1,9 +1,9 @@
 import type {
-  SceneLightFaderV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../scene/model/scene-slice";
-import type { StepLightKadrFaderStateV1 } from "../../../shared/types/script";
+  PlaybookLightFaderV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../playbook/model/playbook-slice";
+import type { SceneLightKadrFaderStateV1 } from "../../../shared/types/script";
 import {
   applyProgramFaderStatesToBoard,
   buildCompleteLightFaders,
@@ -12,7 +12,7 @@ import {
   resolveLightPrograms,
 } from "../../../shared/components/light-console/light-console-data";
 import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";
-import type { ScriptStep, TheaterSpotlight } from "../../../shared/types/script";
+import type { ScriptScene, TheaterSpotlight } from "../../../shared/types/script";
 import {
   formatChannelShort,
   formatFaderShort,
@@ -57,7 +57,7 @@ export function readSpotlightChannel(spotlight: TheaterSpotlight): number | unde
 
 /** Канал фейдера для конкретного софита (из link или поля channel). */
 export function readFaderChannelForSpotlight(
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   spotlightId?: number,
 ): number | undefined {
   if (spotlightId != null) {
@@ -85,7 +85,7 @@ export type FaderMatchOptions = {
 /** Софит подчиняется фейдеру при совпадении faderId и канала (канал пульта или привязки link). */
 export function spotlightMatchesFader(
   spotlight: TheaterSpotlight,
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   options?: FaderMatchOptions,
 ): boolean {
   if (readSpotlightFaderId(spotlight) !== fader.id) return false;
@@ -108,7 +108,7 @@ export function spotlightMatchesFader(
 /** Привязка софита к фейдеру (опционально с учётом активного K на пульте). */
 export function spotlightAssignedToFader(
   spotlight: TheaterSpotlight,
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   options?: FaderMatchOptions,
 ): boolean {
   return spotlightMatchesFader(spotlight, fader, options);
@@ -116,7 +116,7 @@ export function spotlightAssignedToFader(
 
 /** Уровень фейдера 0…1 (не яркость софита). Выключен или ≤0 → 0. */
 export function readFaderLevel(
-  fader: Pick<SceneLightFaderV1, "intensity" | "enabled"> | null | undefined,
+  fader: Pick<PlaybookLightFaderV1, "intensity" | "enabled"> | null | undefined,
 ): number {
   if (!fader || fader.enabled === false) return 0;
   const raw =
@@ -129,9 +129,9 @@ export function readFaderLevel(
 
 export function resolveFaderForSpotlight(
   spotlight: TheaterSpotlight,
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
   options?: FaderMatchOptions,
-): SceneLightFaderV1 | undefined {
+): PlaybookLightFaderV1 | undefined {
   const faderId = readSpotlightFaderId(spotlight);
   if (faderId == null || !lightFaders || lightFaders.v !== 1) return undefined;
   const fader = lightFaders.faders.find((item) => item.id === faderId);
@@ -148,7 +148,7 @@ export function readSpotlightBaseUiIntensity(spotlight: TheaterSpotlight): numbe
 /** Итоговая яркость для отрисовки: свет софита × коэффициент фейдера. */
 export function effectiveSpotlightUiIntensity(
   spotlight: TheaterSpotlight,
-  fader?: Pick<SceneLightFaderV1, "intensity" | "enabled"> | null,
+  fader?: Pick<PlaybookLightFaderV1, "intensity" | "enabled"> | null,
 ): number {
   const level = fader != null ? readFaderLevel(fader) : 1;
   if (level <= 0) return 0;
@@ -156,10 +156,10 @@ export function effectiveSpotlightUiIntensity(
   return base * level;
 }
 
-/** Копия софита с учётом фейдера только для 3D/превью (не меняет сохранённые данные шага). */
+/** Копия софита с учётом фейдера только для 3D/превью (не меняет сохранённые данные сцены). */
 export function applyFaderToSpotlightForDisplay(
   spotlight: TheaterSpotlight,
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
   options?: FaderMatchOptions,
 ): TheaterSpotlight {
   const faderId = readSpotlightFaderId(spotlight);
@@ -187,7 +187,7 @@ export function applyFaderToSpotlightForDisplay(
 
 export function applyFadersToSpotlightsForDisplay(
   spotlights: TheaterSpotlight[],
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
   options?: FaderMatchOptions,
 ): TheaterSpotlight[] {
   if (!lightFaders || lightFaders.v !== 1) return spotlights;
@@ -202,8 +202,8 @@ export function applyFadersToSpotlightsForDisplay(
  */
 export function applyFadersToSpotlightsPerChannelDisplay(
   spotlights: TheaterSpotlight[],
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined,
   liveConsoleChannel?: number,
 ): TheaterSpotlight[] {
   if (!lightFaders || lightFaders.v !== 1) return spotlights;
@@ -296,14 +296,14 @@ export function mapTheaterSpotlightToSync(spotlight: TheaterSpotlight) {
 
 export function spotlightBelongsToFader(
   spotlight: TheaterSpotlight,
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   options?: FaderMatchOptions,
 ): boolean {
   return spotlightMatchesFader(spotlight, fader, options);
 }
 
 export function getSpotlightsBoundToFader(
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   spotlights: TheaterSpotlight[],
   options?: FaderMatchOptions,
 ): TheaterSpotlight[] {
@@ -315,7 +315,7 @@ export function getSpotlightsBoundToFader(
 /** Софит привязан к F на K: в софите выбран F, на доске есть link (как после bindSpotlightToFader). */
 export function isSpotlightEquipmentBindingActive(
   spotlight: TheaterSpotlight,
-  lightFaders?: SceneLightFadersDataV1 | null,
+  lightFaders?: PlaybookLightFadersDataV1 | null,
 ): boolean {
   if (spotlight.hidden) return false;
   const faderId = readSpotlightFaderId(spotlight);
@@ -347,7 +347,7 @@ export function collectActiveEquipmentBindings(
   options?: {
     channels?: number[];
     lightChannelsCount?: number;
-    lightFaders?: SceneLightFadersDataV1 | null;
+    lightFaders?: PlaybookLightFadersDataV1 | null;
   },
 ): ActiveEquipmentBinding[] {
   const allow =
@@ -382,7 +382,7 @@ export function collectActiveEquipmentBindings(
 export function equipmentFaderIdsOnChannel(
   channel: number,
   spotlights: TheaterSpotlight[],
-  lightFaders?: SceneLightFadersDataV1 | null,
+  lightFaders?: PlaybookLightFadersDataV1 | null,
 ): number[] {
   const ch = Math.max(1, Math.trunc(channel) || 1);
   return collectActiveEquipmentBindings(spotlights, { lightFaders })
@@ -395,7 +395,7 @@ export function isFaderEquipmentOnChannel(
   channel: number,
   faderId: number,
   spotlights: TheaterSpotlight[],
-  lightFaders?: SceneLightFadersDataV1 | null,
+  lightFaders?: PlaybookLightFadersDataV1 | null,
 ): boolean {
   const ch = Math.max(1, Math.trunc(channel) || 1);
   const id = Math.max(1, Math.trunc(faderId) || 1);
@@ -406,21 +406,21 @@ export function isFaderEquipmentOnChannel(
 
 /** На канале K к фейдеру F привязан хотя бы один софит или RGB в 3D. */
 export function faderHasEquipmentOnChannel(
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   channel: number,
   spotlights: TheaterSpotlight[],
-  lightFaders?: SceneLightFadersDataV1 | null,
+  lightFaders?: PlaybookLightFadersDataV1 | null,
 ): boolean {
   return isFaderEquipmentOnChannel(channel, fader.id, spotlights, lightFaders);
 }
 
-export function readFaderBoardChannel(fader: SceneLightFaderV1): number {
+export function readFaderBoardChannel(fader: PlaybookLightFaderV1): number {
   return fader.channel ?? fader.links?.[0]?.channel ?? fader.id;
 }
 
 /** Фейдер относится к выбранному каналу K (привязка или софиты на этом K). */
 export function faderBelongsToConsoleChannel(
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   channel: number,
   spotlights: TheaterSpotlight[],
 ): boolean {
@@ -431,8 +431,8 @@ export function faderBelongsToConsoleChannel(
 }
 
 export function resolveKadrFaderChannel(
-  state: Pick<StepLightKadrFaderStateV1, "faderId" | "channel">,
-  fader?: SceneLightFaderV1 | null,
+  state: Pick<SceneLightKadrFaderStateV1, "faderId" | "channel">,
+  fader?: PlaybookLightFaderV1 | null,
 ): number {
   const fromState = state.channel;
   if (fromState != null && Number.isFinite(fromState) && fromState > 0) {
@@ -447,20 +447,20 @@ export function resolveKadrFaderChannel(
  * Для активного K — живая доска; для остальных — память программы K.
  */
 export function buildKadrFaderSnapshotFromSofitChannels(args: {
-  baseFaders: SceneLightFadersDataV1;
-  programs: SceneLightProgramsDataV1;
+  baseFaders: PlaybookLightFadersDataV1;
+  programs: PlaybookLightProgramsDataV1;
   sofitChannels: number[];
   liveChannel: number;
-  liveFaders: SceneLightFadersDataV1;
+  liveFaders: PlaybookLightFadersDataV1;
   lightChannelsCount?: number;
   spotlights?: TheaterSpotlight[];
-}): StepLightKadrFaderStateV1[] {
+}): SceneLightKadrFaderStateV1[] {
   const liveCh = Math.max(1, Math.trunc(args.liveChannel) || 1);
   const selected = normalizeSelectedRecordChannels(
     args.sofitChannels,
     args.lightChannelsCount ?? 64,
   );
-  const byKey = new Map<string, StepLightKadrFaderStateV1>();
+  const byKey = new Map<string, SceneLightKadrFaderStateV1>();
   const spotlights = args.spotlights ?? [];
 
   for (const channel of selected) {
@@ -492,12 +492,11 @@ export function buildKadrFaderSnapshotFromSofitChannels(args: {
   );
 }
 
-/** @deprecated Используйте buildKadrFaderSnapshotFromSofitChannels — иначе F8 → K8. */
-export function buildKadrFaderSnapshotForStep(
-  faders: SceneLightFadersDataV1,
+export function buildKadrFaderSnapshotForScene(
+  faders: PlaybookLightFadersDataV1,
   spotlights: TheaterSpotlight[] = [],
   liveChannel?: number,
-): StepLightKadrFaderStateV1[] {
+): SceneLightKadrFaderStateV1[] {
   const ch =
     liveChannel != null && Number.isFinite(liveChannel) && liveChannel > 0
       ? Math.trunc(liveChannel)
@@ -531,10 +530,10 @@ export function buildKadrFaderSnapshotForStep(
 }
 
 export function mergeFaderSpotlightLink(
-  fader: SceneLightFaderV1,
+  fader: PlaybookLightFaderV1,
   spotlightId: number,
   channel: number,
-): SceneLightFaderV1 {
+): PlaybookLightFaderV1 {
   const prevLinks = Array.isArray(fader.links) ? fader.links : [];
   const withoutSpotlight = prevLinks.filter((link) => link.spotlightId !== spotlightId);
   const { channel: _channel, spotlightId: _spotlightId, ...rest } = fader;
@@ -545,10 +544,10 @@ export function mergeFaderSpotlightLink(
 }
 
 export function detachSpotlightFromOtherFaders(
-  faders: SceneLightFaderV1[],
+  faders: PlaybookLightFaderV1[],
   targetFaderId: number,
   spotlightId: number,
-): SceneLightFaderV1[] {
+): PlaybookLightFaderV1[] {
   return faders.map((fader) => {
     if (fader.id === targetFaderId) return fader;
     const links = (fader.links ?? []).filter((link) => link.spotlightId !== spotlightId);
@@ -565,9 +564,9 @@ export function detachSpotlightFromOtherFaders(
 
 /** Снять софит со всех фейдеров (когда в UI выбран «—» у F). */
 export function detachSpotlightFromFaderBoard(
-  faders: SceneLightFaderV1[],
+  faders: PlaybookLightFaderV1[],
   spotlightId: number,
-): SceneLightFaderV1[] {
+): PlaybookLightFaderV1[] {
   return faders.map((fader) => {
     const links = (fader.links ?? []).filter((link) => link.spotlightId !== spotlightId);
     const spotlightIdField =
@@ -581,11 +580,11 @@ export function detachSpotlightFromFaderBoard(
   });
 }
 
-/** Синхронизирует links на доске пульта с spotlight.faderId (источник истины — шаг). */
+/** Синхронизирует links на доске пульта с spotlight.faderId (источник истины — сцена). */
 export function repairLightFaderLinksFromSpotlights(
-  steps: ScriptStep[],
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
-): SceneLightFadersDataV1 | null | undefined {
+  scenes: ScriptScene[],
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
+): PlaybookLightFadersDataV1 | null | undefined {
   if (!lightFaders || lightFaders.v !== 1 || !Array.isArray(lightFaders.faders)) {
     return lightFaders;
   }
@@ -593,9 +592,9 @@ export function repairLightFaderLinksFromSpotlights(
   let faderRows = lightFaders.faders;
   let changed = false;
 
-  for (const step of steps) {
-    if (!Array.isArray(step.theaterSpotlights)) continue;
-    for (const spotlight of step.theaterSpotlights) {
+  for (const scene of scenes) {
+    if (!Array.isArray(scene.theaterSpotlights)) continue;
+    for (const spotlight of scene.theaterSpotlights) {
       const faderId = readSpotlightFaderId(spotlight);
       const channel = readSpotlightChannel(spotlight);
       if (faderId == null || channel == null) continue;
@@ -619,11 +618,11 @@ export function repairLightFaderLinksFromSpotlights(
 
 /** Восстанавливает spotlight.faderId из scene.lightFaders после pull/локальной загрузки. */
 export function applySceneFaderBindingsToSpotlights(
-  steps: ScriptStep[],
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
-): ScriptStep[] {
+  scenes: ScriptScene[],
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
+): ScriptScene[] {
   if (!lightFaders || lightFaders.v !== 1 || !Array.isArray(lightFaders.faders)) {
-    return steps;
+    return scenes;
   }
 
   const bindingBySpotlightId = new Map<number, { faderId: number; channel: number }>();
@@ -646,15 +645,15 @@ export function applySceneFaderBindingsToSpotlights(
       }
     }
   }
-  if (bindingBySpotlightId.size === 0) return steps;
+  if (bindingBySpotlightId.size === 0) return scenes;
 
   let changed = false;
-  const nextSteps = steps.map((step) => {
-    if (!Array.isArray(step.theaterSpotlights) || step.theaterSpotlights.length === 0) {
-      return step;
+  const nextScenes = scenes.map((scene) => {
+    if (!Array.isArray(scene.theaterSpotlights) || scene.theaterSpotlights.length === 0) {
+      return scene;
     }
-    let stepChanged = false;
-    const nextSpotlights = step.theaterSpotlights.map((spotlight) => {
+    let sceneChanged = false;
+    const nextSpotlights = scene.theaterSpotlights.map((spotlight) => {
       const spotChannel = readSpotlightChannel(spotlight);
       if (hasSpotlightFaderId(spotlight)) {
         return spotlight;
@@ -669,34 +668,34 @@ export function applySceneFaderBindingsToSpotlights(
       ) {
         return spotlight;
       }
-      stepChanged = true;
+      sceneChanged = true;
       return { ...spotlight, faderId: binding.faderId };
     });
-    if (!stepChanged) return step;
+    if (!sceneChanged) return scene;
     changed = true;
-    return { ...step, theaterSpotlights: nextSpotlights };
+    return { ...scene, theaterSpotlights: nextSpotlights };
   });
 
-  return changed ? nextSteps : steps;
+  return changed ? nextScenes : scenes;
 }
 
-/** Согласует шаги и lightFaders после load/save. */
+/** Согласует сцены и lightFaders после load/save. */
 export function prepareSceneLightBindings(
-  steps: ScriptStep[],
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
-): { steps: ScriptStep[]; lightFaders: SceneLightFadersDataV1 | null | undefined } {
-  const repairedFaders = repairLightFaderLinksFromSpotlights(steps, lightFaders);
-  const nextSteps = applySceneFaderBindingsToSpotlights(steps, repairedFaders);
-  const syncedFaders = repairLightFaderLinksFromSpotlights(nextSteps, repairedFaders);
-  return { steps: nextSteps, lightFaders: syncedFaders };
+  scenes: ScriptScene[],
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
+): { scenes: ScriptScene[]; lightFaders: PlaybookLightFadersDataV1 | null | undefined } {
+  const repairedFaders = repairLightFaderLinksFromSpotlights(scenes, lightFaders);
+  const nextScenes = applySceneFaderBindingsToSpotlights(scenes, repairedFaders);
+  const syncedFaders = repairLightFaderLinksFromSpotlights(nextScenes, repairedFaders);
+  return { scenes: nextScenes, lightFaders: syncedFaders };
 }
 
 export function bindSpotlightOnFaderBoard(
-  faders: SceneLightFaderV1[],
+  faders: PlaybookLightFaderV1[],
   faderId: number,
   spotlightId: number,
   channel: number,
-): SceneLightFaderV1[] {
+): PlaybookLightFaderV1[] {
   const exists = faders.some((item) => item.id === faderId);
   const detached = detachSpotlightFromOtherFaders(faders, faderId, spotlightId);
   const base = exists

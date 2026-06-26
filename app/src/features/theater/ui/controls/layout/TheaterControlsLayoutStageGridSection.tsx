@@ -25,7 +25,7 @@ export function TheaterControlsLayoutStageGridSection({ vm }: LayoutSectionProps
                   min={1}
                   max={12}
                   value={vm.stageGrid.cols}
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onChange={(event) =>
                     vm.updateLayoutZoneGrid({
                       cols: Math.max(1, Math.min(12, Number(event.target.value) || 1)),
@@ -40,7 +40,7 @@ export function TheaterControlsLayoutStageGridSection({ vm }: LayoutSectionProps
                   min={1}
                   max={8}
                   value={vm.stageGrid.rows}
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onChange={(event) =>
                     vm.updateLayoutZoneGrid({
                       rows: Math.max(1, Math.min(8, Number(event.target.value) || 1)),

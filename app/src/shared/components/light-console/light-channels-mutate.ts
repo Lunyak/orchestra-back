@@ -1,9 +1,9 @@
 import type {
-  SceneData,
-  SceneLightChannelRolesV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../../features/scene/model/scene-slice";
+  PlaybookData,
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../../features/playbook/model/playbook-slice";
 import { resolveLightChannelRoles } from "./light-channel-roles";
 import {
   buildCompleteLightFaders,
@@ -41,13 +41,6 @@ export function mergeLightChannelsAtCount(primary: string[], secondary: string[]
     if (p.trim() && s.trim() && p.trim() !== s.trim()) return p;
     return p.trim() ? p : s;
   });
-}
-
-/** @deprecated используйте mergeLightChannelsAtCount / resolveLightChannelsForPersist */
-export function mergeLightChannelsPreferLonger(prev: string[], loaded: string[]): string[] {
-  const longer = prev.length >= loaded.length ? prev : loaded;
-  const shorter = prev.length >= loaded.length ? loaded : prev;
-  return mergeLightChannelsAtCount(longer, shorter);
 }
 
 /** Для сохранения: Redux-пульт задаёт число K. */
@@ -93,9 +86,9 @@ export function resizeLightChannels(channels: string[], count: number): string[]
 }
 
 export function resizeLightFaders(
-  faders: SceneLightFadersDataV1 | null | undefined,
+  faders: PlaybookLightFadersDataV1 | null | undefined,
   count: number,
-): SceneLightFadersDataV1 {
+): PlaybookLightFadersDataV1 {
   const nextCount = clampConsoleSlotCount(count);
   const resolved = resolveLightFaders(faders);
   return buildCompleteLightFaders(
@@ -110,8 +103,8 @@ export function resizeLightFaders(
 
 export function buildLightConsoleLayoutCounts(args: {
   lightChannels: string[];
-  lightFaders?: SceneLightFadersDataV1 | null;
-  lightPrograms?: SceneLightProgramsDataV1 | null;
+  lightFaders?: PlaybookLightFadersDataV1 | null;
+  lightPrograms?: PlaybookLightProgramsDataV1 | null;
 }): LightConsoleLayoutCounts {
   const faders = resolveLightFaders(args.lightFaders);
   const programSlotCount = readLightProgramSlotCount(args.lightPrograms ?? null);
@@ -124,38 +117,29 @@ export function buildLightConsoleLayoutCounts(args: {
 }
 
 /** Только роли софитов при изменении числа K (без P и F). */
-export function patchSceneDataForLightChannelsChange(
-  prev: SceneData | null | undefined,
+export function patchPlaybookDataForLightChannelsChange(
+  prev: PlaybookData | null | undefined,
   nextChannels: string[],
-): Pick<SceneData, "lightChannelRoles"> {
+): Pick<PlaybookData, "lightChannelRoles"> {
   const nextLen = nextChannels.length;
   const roles = resolveLightChannelRoles(prev?.lightChannelRoles, nextLen);
   const sofitChannels = roles.sofitChannels.filter((ch) => ch <= nextLen);
-  const lightChannelRoles: SceneLightChannelRolesV1 = { v: 1, sofitChannels };
+  const lightChannelRoles: PlaybookLightChannelRolesV1 = { v: 1, sofitChannels };
   return { lightChannelRoles };
 }
 
-/** @deprecated используйте patchSceneDataForLightChannelsChange */
-export function patchSceneDataForLightChannelCount(
-  prev: SceneData | null | undefined,
-  nextChannels: string[],
-  _prevChannelCount?: number,
-): Pick<SceneData, "lightChannelRoles"> {
-  return patchSceneDataForLightChannelsChange(prev, nextChannels);
-}
-
-export function applyLightConsoleLayoutToSceneData(
-  prev: SceneData | null | undefined,
+export function applyLightConsoleLayoutToPlaybookData(
+  prev: PlaybookData | null | undefined,
   args: {
     lightChannels: string[];
     layout: LightConsoleLayoutCounts;
   },
-): Pick<SceneData, "lightChannels" | "lightFaders" | "lightPrograms" | "lightChannelRoles"> {
+): Pick<PlaybookData, "lightChannels" | "lightFaders" | "lightPrograms" | "lightChannelRoles"> {
   const nextChannels = resizeLightChannels(args.lightChannels, args.layout.channelCount);
   return {
     lightChannels: nextChannels,
     lightFaders: resizeLightFaders(prev?.lightFaders, args.layout.faderCount),
     lightPrograms: resizeLightPrograms(prev?.lightPrograms, args.layout.programCount),
-    ...patchSceneDataForLightChannelsChange(prev, nextChannels),
+    ...patchPlaybookDataForLightChannelsChange(prev, nextChannels),
   };
 }

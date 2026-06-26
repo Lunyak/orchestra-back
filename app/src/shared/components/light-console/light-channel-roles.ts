@@ -1,5 +1,5 @@
-import type { SceneLightChannelRolesV1 } from "../../../features/scene/model/scene-slice";
-import type { StepLightKadrV1 } from "../../types/script";
+import type { PlaybookLightChannelRolesV1 } from "../../../features/playbook/model/playbook-slice";
+import type { SceneLightKadrV1 } from "../../types/script";
 
 export const DEFAULT_SOFIT_CHANNELS = [1, 2];
 
@@ -28,17 +28,17 @@ export function normalizeSofitChannels(
 }
 
 export function resolveLightChannelRoles(
-  raw: SceneLightChannelRolesV1 | null | undefined,
+  raw: PlaybookLightChannelRolesV1 | null | undefined,
   lightChannelsCount: number,
-): SceneLightChannelRolesV1 {
+): PlaybookLightChannelRolesV1 {
   const sofitChannels = normalizeSelectedRecordChannels(raw?.sofitChannels, lightChannelsCount);
   return { v: 1, sofitChannels };
 }
 
 /** K для карточки картины: toggles сцены → снимок картины → каналы из faders. */
 export function resolveSofitChannelsForKadrDisplay(args: {
-  lightChannelRoles?: SceneLightChannelRolesV1 | null;
-  kadr?: StepLightKadrV1 | null;
+  lightChannelRoles?: PlaybookLightChannelRolesV1 | null;
+  kadr?: SceneLightKadrV1 | null;
   lightChannelsCount: number;
 }): number[] {
   const fromRoles = normalizeSelectedRecordChannels(
@@ -67,10 +67,10 @@ export function resolveSofitChannelsForKadrDisplay(args: {
 }
 
 export function toggleSofitChannel(
-  roles: SceneLightChannelRolesV1,
+  roles: PlaybookLightChannelRolesV1,
   channel: number,
   lightChannelsCount: number,
-): SceneLightChannelRolesV1 {
+): PlaybookLightChannelRolesV1 {
   const normalized = normalizeSelectedRecordChannels(roles.sofitChannels, lightChannelsCount);
   const next = normalized.includes(channel)
     ? normalized.filter((n) => n !== channel)

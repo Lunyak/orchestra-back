@@ -95,7 +95,7 @@ export class ImportRequisiteTaskItemDto {
   assigneeEmail?: string;
 
   @IsInt()
-  refStepId: number;
+  refSceneId: number;
 
   @IsInt()
   refRequisiteId: number;

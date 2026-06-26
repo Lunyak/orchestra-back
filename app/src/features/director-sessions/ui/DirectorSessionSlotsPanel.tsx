@@ -10,15 +10,16 @@ import type {
   DirectorSessionSlot,
 } from "../directorSessionsSync";
 import { createId } from "../../../shared/utils/createId";
-import "../../../pages/sessions/style.css";
+import "./director-sessions.css";
 
 const DND_MIME_SLOT_ID = "application/x-orchestra-director-session-slot";
-const DND_MIME_STEP_REF = "application/x-orchestra-director-session-step-ref";
+const DND_MIME_SCENE_REF = "application/x-orchestra-director-session-scene-ref";
+const LEGACY_DND_MIME_STEP_REF = "application/x-orchestra-director-session-step-ref";
 
-type DragStepRefPayload = {
-  kind: "stepRef";
+type DragSceneRefPayload = {
+  kind: "sceneRef";
   projectSlug: string;
-  stepId: number;
+  sceneId: number;
   durationMin?: number;
 };
 
@@ -27,21 +28,22 @@ type DirectorSessionSlotDisplay = {
   materialLabel: string;
 };
 
-function parseDragStepRef(dt: DataTransfer): DragStepRefPayload | null {
-  const raw = dt.getData(DND_MIME_STEP_REF);
+function parseDragSceneRef(dt: DataTransfer): DragSceneRefPayload | null {
+  const raw =
+    dt.getData(DND_MIME_SCENE_REF) || dt.getData(LEGACY_DND_MIME_STEP_REF);
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as Partial<DragStepRefPayload> | null;
-    if (!v || v.kind !== "stepRef") return null;
+    const v = JSON.parse(raw) as Partial<DragSceneRefPayload & { kind?: string }> | null;
+    if (!v || (v.kind !== "sceneRef" && v.kind !== "stepRef")) return null;
     const projectSlug = String(v.projectSlug ?? "").trim();
-    const stepId = Number(v.stepId);
+    const sceneId = Number(v.sceneId);
     const durationMin =
       v.durationMin == null
         ? undefined
         : Math.max(1, Math.floor(Number(v.durationMin)));
     if (!projectSlug) return null;
-    if (!Number.isFinite(stepId) || stepId <= 0) return null;
-    return { kind: "stepRef", projectSlug, stepId, durationMin };
+    if (!Number.isFinite(sceneId) || sceneId <= 0) return null;
+    return { kind: "sceneRef", projectSlug, sceneId, durationMin };
   } catch (_) {
     return null;
   }
@@ -54,7 +56,7 @@ function parseDragSlotId(dt: DataTransfer): string | null {
   return id || null;
 }
 
-function guessDurationMin(payload: DragStepRefPayload): number {
+function guessDurationMin(payload: DragSceneRefPayload): number {
   const d = Number(payload.durationMin);
   if (Number.isFinite(d) && d > 0) return Math.max(1, Math.floor(d));
   return 30;
@@ -110,7 +112,7 @@ export type DirectorSessionSlotsPanelProps = {
   /** Если удалили последний выбранный слот и слотов не осталось */
   onNoSlotsLeft?: () => void;
   persistSessions: (next: DirectorRehearsalSession[]) => Promise<void>;
-  /** Блок настроек слота (проект, шаг, превью, заметки) — в модалке по выбранному слоту */
+  /** Блок настроек слота (проект, сцена, превью, заметки) — в модалке по выбранному слоту */
   slotSettings?: React.ReactNode;
   onRequestCloseSlot: () => void;
   /** Доп. класс на карточке слота (напр. доступность по ролям на странице одной сессии) */
@@ -142,7 +144,7 @@ export function DirectorSessionSlotsPanel({
   const touchDragPreviewRef = useRef<HTMLDivElement | null>(null);
   const touchDragPointRef = useRef<{ x: number; y: number } | null>(null);
   const [materialDragPayload, setMaterialDragPayload] =
-    useState<DragStepRefPayload | null>(null);
+    useState<DragSceneRefPayload | null>(null);
 
   const [slotDraft, setSlotDraft] = useState<
     Record<string, { time: string; duration: string }>
@@ -253,9 +255,9 @@ export function DirectorSessionSlotsPanel({
     [session.slots, updateActiveSession],
   );
 
-  const attachStepToSlotByDrop = async (
+  const attachSceneToSlotByDrop = async (
     slotId: string,
-    payload: DragStepRefPayload,
+    payload: DragSceneRefPayload,
   ) => {
     const slots = [...(session.slots ?? [])];
     const current = slots.find((s) => s.id === slotId) ?? null;
@@ -266,7 +268,7 @@ export function DirectorSessionSlotsPanel({
     await updateSlot(
       slotId,
       {
-        ref: { projectSlug: payload.projectSlug, stepId: payload.stepId },
+        ref: { projectSlug: payload.projectSlug, sceneId: payload.sceneId },
         durationMin: nextDur,
       },
       { shiftFollowing: autoShiftFollowing, deltaMin: delta },
@@ -284,7 +286,7 @@ export function DirectorSessionSlotsPanel({
     }));
   };
 
-  const addSlotFromDroppedStep = async (payload: DragStepRefPayload) => {
+  const addSlotFromDroppedScene = async (payload: DragSceneRefPayload) => {
     const sorted = [...(session.slots ?? [])].sort(
       (a, b) => a.offsetMin - b.offsetMin,
     );
@@ -297,7 +299,7 @@ export function DirectorSessionSlotsPanel({
       id: createId(),
       offsetMin,
       durationMin,
-      ref: { projectSlug: payload.projectSlug, stepId: payload.stepId },
+      ref: { projectSlug: payload.projectSlug, sceneId: payload.sceneId },
     };
     await updateActiveSession({
       slots: [...(session.slots ?? []), slot],
@@ -477,7 +479,7 @@ export function DirectorSessionSlotsPanel({
         className={cn(
           "sessions-slots",
           "director-session-slots-panel__timeline",
-          timelineDragOver && "dropActive",
+          timelineDragOver && "sessions-slots--drop-active",
         )}
         onDragEnter={() => {
           if (materialDragPayload) setTimelineDragOver(true);
@@ -490,18 +492,18 @@ export function DirectorSessionSlotsPanel({
         }}
         onDrop={(e) => {
           const payload =
-            parseDragStepRef(e.dataTransfer) ?? materialDragPayload;
+            parseDragSceneRef(e.dataTransfer) ?? materialDragPayload;
           setTimelineDragOver(false);
           setMaterialDragPayload(null);
           if (!payload) return;
           e.preventDefault();
-          void addSlotFromDroppedStep(payload);
+          void addSlotFromDroppedScene(payload);
         }}
-        title="Сюда можно перетащить шаг сценария — появится новый слот с материалом"
+        title="Сюда можно перетащить сцену сценария — появится новый слот с материалом"
       >
         {sortedSlots.length === 0 && (
           <div className="sessions-slots-empty rehearsals-muted">
-            Слотов нет — нажми «+» или перетащи шаг сюда.
+            Слотов нет — нажми «+» или перетащи сцену сюда.
           </div>
         )}
         {sortedSlots.map((sl) => {
@@ -524,8 +526,8 @@ export function DirectorSessionSlotsPanel({
               data-session-slot-id={sl.id}
               className={cn(
                 "director-session-slots-panel__row",
-                sl.id === selectedSlotId && "active",
-                touchDragOverSlotId === sl.id && "dropTarget",
+                sl.id === selectedSlotId && "director-session-slots-panel__row--active",
+                touchDragOverSlotId === sl.id && "director-session-slots-panel__row--drop-target",
               )}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -535,10 +537,10 @@ export function DirectorSessionSlotsPanel({
               onDrop={(e) => {
                 e.preventDefault();
                 const payload =
-                  parseDragStepRef(e.dataTransfer) ?? materialDragPayload;
+                  parseDragSceneRef(e.dataTransfer) ?? materialDragPayload;
                 if (payload) {
                   setMaterialDragPayload(null);
-                  void attachStepToSlotByDrop(sl.id, payload);
+                  void attachSceneToSlotByDrop(sl.id, payload);
                   return;
                 }
                 const dragId = parseDragSlotId(e.dataTransfer) || draggedSlotId;
@@ -549,13 +551,13 @@ export function DirectorSessionSlotsPanel({
               <ListItem
                 className={cn(
                   "session-slot",
-                  sl.id === selectedSlotId && "active",
-                  draggedSlotId === sl.id && "dragging",
+                  sl.id === selectedSlotId && "session-slot--active",
+                  draggedSlotId === sl.id && "session-slot--dragging",
                   slotToneClassById?.get(sl.id),
                 )}
               >
                 <span
-                  className="sessions-sessionRow__dragHandle director-session-slots-panel__drag"
+                  className="director-session-slots-panel__drag"
                   title="Перетащи, чтобы изменить порядок"
                   role="presentation"
                   onPointerDown={(e) => {
@@ -636,7 +638,7 @@ export function DirectorSessionSlotsPanel({
           )}
           aria-hidden="true"
         >
-          <span className="sessions-sessionRow__dragHandle director-session-slots-panel__drag">
+          <span className="director-session-slots-panel__drag">
             ⋮⋮
           </span>
           <div className="director-session-slots-panel__touch-preview-main">
@@ -679,7 +681,7 @@ export function DirectorSessionSlotsPanel({
         <Modal
           isOpen
           onClose={onRequestCloseSlot}
-          panelClassName="director-session-slot-modal-panel"
+          panelClassName="director-session-slot-modal"
           ariaLabel="Параметры слота"
         >
           <Buttons.CloseButton
@@ -723,7 +725,7 @@ export function DirectorSessionSlotsPanel({
                 }
                 onBlur={() => void commitSlotDraft(selectedSlotForModal.id)}
               />
-              <span className="director-session-slot-modal__duration-wrap">
+              <span className="director-session-slot-modal__duration-container">
                 <input
                   type="number"
                   min={1}

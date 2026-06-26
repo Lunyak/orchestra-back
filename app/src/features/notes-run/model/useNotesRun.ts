@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useScene } from "../../scene";
-import { invokePlaylistPause, invokePlaylistPlay, invokeSoundPlay } from "../../scene/model/scene-playback-bridge";
+import { usePlaybook } from "../../playbook";
+import { invokePlaylistPause, invokePlaylistPlay, invokeSoundPlay } from "../../playbook/model/playbook-playback-bridge";
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
-import { normalizeHoldImages } from "../../projector/model/scene-projector-persist";
+import { normalizeHoldImages } from "../../projector/model/playbook-projector-persist";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
 import {
   closeProjectorWindow,
@@ -19,13 +19,17 @@ import { resolveKadrProjectorVideoOptions } from "../../theater/model/kadr-proje
 import {
   applyNotesRunDraft,
   buildEmptyNotesRunDraft,
-  buildNotesRunCardsFromSteps,
+  buildNotesRunCardsFromScenes,
   buildNotesRunDraftFromCard,
   loadNotesRun,
   renumberNotesRunCards,
   saveNotesRun,
 } from "./notes-run-storage";
 import type { NotesRunCardDraft, NotesRunCardV1, NotesRunDataV1 } from "./notes-run-types";
+import {
+  getProjectMediaFolderInfo,
+  scanProjectMediaFolder,
+} from "../../../shared/platform/project-media-folder";
 
 function isKeyboardTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -42,7 +46,7 @@ function resolvePlaylistTrack(
 }
 
 export function useNotesRun(projectName: string) {
-  const { sceneData, steps, isSceneReady } = useScene();
+  const { playbookData, scenes, isPlaybookReady } = usePlaybook();
   const [notesRun, setNotesRun] = useState<NotesRunDataV1>({ v: 1, cards: [] });
   const [notesLoaded, setNotesLoaded] = useState(false);
   const [cardIndex, setCardIndex] = useState(0);
@@ -73,15 +77,34 @@ export function useNotesRun(projectName: string) {
     setNotesLoaded(false);
     setRunActive(false);
     setPaused(false);
-    void loadNotesRun(projectName).then((data) => {
+    const loadInitial = async () => {
+      let data = await loadNotesRun(projectName);
+      if (cancelled) return;
+      if (data.cards.length === 0 && projectName) {
+        const folderInfo = await getProjectMediaFolderInfo(projectName);
+        if (folderInfo.path) {
+          await scanProjectMediaFolder(projectName);
+          if (cancelled) return;
+          data = await loadNotesRun(projectName);
+        }
+      }
       if (cancelled) return;
       setNotesRun(data);
       setCardIndex(0);
       setNotesLoaded(true);
-    });
+    };
+    void loadInitial();
     return () => {
       cancelled = true;
     };
+  }, [projectName]);
+
+  const reloadFromFolder = useCallback(async () => {
+    const data = await loadNotesRun(projectName);
+    setNotesRun(data);
+    setCardIndex(0);
+    setNotesLoaded(true);
+    return data;
   }, [projectName]);
 
   const cards = notesRun.cards;
@@ -91,11 +114,11 @@ export function useNotesRun(projectName: string) {
   const projectorMediaCtx = useMemo<ProjectorMediaContext>(
     () => ({
       projectSlug: projectName,
-      videos: sceneData?.videos ?? [],
-      holdImages: normalizeHoldImages(sceneData?.holdImages, sceneData?.projector ?? undefined),
-      projector: sceneData?.projector ?? null,
+      videos: playbookData?.videos ?? [],
+      holdImages: normalizeHoldImages(playbookData?.holdImages, playbookData?.projector ?? undefined),
+      projector: playbookData?.projector ?? null,
     }),
-    [projectName, sceneData?.holdImages, sceneData?.projector, sceneData?.videos],
+    [projectName, playbookData?.holdImages, playbookData?.projector, playbookData?.videos],
   );
 
   const persistCards = useCallback(
@@ -131,7 +154,7 @@ export function useNotesRun(projectName: string) {
     [projectorVideoMuted, projectorVideoVolume],
   );
 
-  const playlist = sceneData?.playlist ?? [];
+  const playlist = playbookData?.playlist ?? [];
 
   const applyCardPlayback = useCallback(
     async (card: NotesRunCardV1 | null) => {
@@ -173,12 +196,12 @@ export function useNotesRun(projectName: string) {
 
   useEffect(() => {
     if (!runActive || paused) return;
-    if (!notesLoaded || !isSceneReady || applyingRef.current) return;
+    if (!notesLoaded || !isPlaybookReady || applyingRef.current) return;
     if (currentCard?.playTrackId && playlist.length === 0) return;
     void applyCardPlayback(currentCard);
   }, [
     runActive,
-    isSceneReady,
+    isPlaybookReady,
     notesLoaded,
     playlist.length,
     clampedIndex,
@@ -274,14 +297,14 @@ export function useNotesRun(projectName: string) {
 
   useEffect(() => {
     if (!runActive || !isProjectorWindowOpen()) return;
-    const videoCount = sceneData?.videos?.length ?? 0;
-    const holdCount = sceneData?.holdImages?.length ?? 0;
+    const videoCount = playbookData?.videos?.length ?? 0;
+    const holdCount = playbookData?.holdImages?.length ?? 0;
     if (videoCount === 0 && holdCount === 0) return;
     showProjectorHold(projectorMediaCtx);
   }, [
     runActive,
-    sceneData?.holdImages?.length,
-    sceneData?.videos?.length,
+    playbookData?.holdImages?.length,
+    playbookData?.videos?.length,
     projectorMediaCtx,
   ]);
 
@@ -345,33 +368,33 @@ export function useNotesRun(projectName: string) {
     setLiveStatus("Карточка удалена");
   }, [cards, clampedIndex, persistCards]);
 
-  const initFromSteps = useCallback(() => {
-    if (steps.length === 0) {
-      setLiveStatus("В сценарии нет шагов");
+  const initFromScenes = useCallback(() => {
+    if (scenes.length === 0) {
+      setLiveStatus("В сценарии нет сцен");
       return;
     }
     if (
       cards.length > 0 &&
-      !window.confirm("Заменить текущие карточки списком из шагов сценария?")
+      !window.confirm("Заменить текущие карточки списком из сцен сценария?")
     ) {
       return;
     }
-    const next = buildNotesRunCardsFromSteps(steps);
+    const next = buildNotesRunCardsFromScenes(scenes);
     void persistCards(next.cards);
     setCardIndex(0);
-    setLiveStatus(`Создано ${next.cards.length} карточек по шагам`);
-  }, [cards.length, persistCards, steps]);
+    setLiveStatus(`Создано ${next.cards.length} карточек по сценам`);
+  }, [cards.length, persistCards, scenes]);
 
   const modalDraft = useMemo(() => {
     if (modalMode === "edit" && editCardId) {
       const card = cards.find((c) => c.id === editCardId);
       if (card) return buildNotesRunDraftFromCard(card);
     }
-    const step = steps[0];
+    const firstScene = scenes[0];
     const draft = buildEmptyNotesRunDraft();
-    if (step?.title) draft.stepLabel = step.title;
+    if (firstScene?.title) draft.sceneLabel = firstScene.title;
     return draft;
-  }, [cards, editCardId, modalMode, steps]);
+  }, [cards, editCardId, modalMode, scenes]);
 
   useEffect(() => {
     if (cards.length === 0 || modalOpen) return;
@@ -402,9 +425,9 @@ export function useNotesRun(projectName: string) {
     modalMode,
     modalDraft,
     projectorMediaCtx,
-    playlist: (sceneData?.playlist ?? []).map((t) => ({ id: t.id, title: t.title ?? "" })),
-    sounds: (sceneData?.sounds ?? []).map((s) => ({ id: s.id, title: s.title ?? "" })),
-    videos: sceneData?.videos ?? [],
+    playlist: (playbookData?.playlist ?? []).map((t) => ({ id: t.id, title: t.title ?? "" })),
+    sounds: (playbookData?.sounds ?? []).map((s) => ({ id: s.id, title: s.title ?? "" })),
+    videos: playbookData?.videos ?? [],
     holdImages: projectorMediaCtx.holdImages ?? [],
     goToIndex,
     goPrev,
@@ -418,7 +441,8 @@ export function useNotesRun(projectName: string) {
     closeModal,
     submitModal,
     deleteCurrentCard,
-    initFromSteps,
+    initFromScenes,
+    reloadFromFolder,
     canGoPrev: clampedIndex > 0,
     canGoNext: clampedIndex < cards.length - 1,
   };

@@ -35,7 +35,7 @@ export function TheaterEditorMenubarTheaterFields({ vm }: { vm: TheaterSceneView
       <button
         type="button"
         className="theater-editor-menubar__field-action"
-        disabled={!vm.currentStep || (vm.currentStep.lightCues?.length ?? 0) === 0}
+        disabled={!vm.currentScene || (vm.currentScene.lightCues?.length ?? 0) === 0}
         title="Скопировать таймлайн light cue в буфер"
         onClick={() => void vm.copyLightCuesToClipboard(lightChannels)}
       >

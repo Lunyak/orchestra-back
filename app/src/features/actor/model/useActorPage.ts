@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth";
 import {
-  extractRolePhrasesFromSteps,
+  extractRolePhrasesFromScenes,
   type RolePhraseSource,
 } from "../../actor-trainers/model/rolePhrases";
 import { buildDialogueLines, normalizeRoleKey } from "../../actor-trainers/model/dialogue";
@@ -17,7 +17,7 @@ import {
   useProjectRolesQuery,
 } from "../../project/api/project-api";
 import { useProject } from "../../project";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { normalizeActorKey, normalizeRoleKeyForStorage } from "./actor-page-helpers";
 
@@ -32,7 +32,7 @@ export function useActorPage() {
     currentProjectDisplayName,
     onProjectChange,
   } = useProject();
-  const { steps, syncFromServer, isSceneReady } = useScene();
+  const { scenes, syncFromServer, isPlaybookReady } = usePlaybook();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
 
@@ -101,7 +101,7 @@ export function useActorPage() {
 
   const roleKeysMentionedInScript = useMemo(() => {
     const set = new Set<string>();
-    const lines = buildDialogueLines({ steps, preferField: "playMarkdown" });
+    const lines = buildDialogueLines({ scenes, preferField: "playMarkdown" });
     for (const l of lines) {
       if (l.kind !== "utterance") continue;
       if (!l.role) continue;
@@ -109,7 +109,7 @@ export function useActorPage() {
       if (k) set.add(k);
     }
     return set;
-  }, [steps]);
+  }, [scenes]);
 
   const rolesForActor = useMemo(() => {
     const me = normalizeActorKey(myEmail);
@@ -201,40 +201,40 @@ export function useActorPage() {
 
   const phrases: RolePhraseSource[] = useMemo(() => {
     if (!effectiveRoleInfo) return [];
-    return extractRolePhrasesFromSteps({
-      steps,
+    return extractRolePhrasesFromScenes({
+      scenes,
       role: effectiveRoleTitle || effectiveRoleInfo.key || "",
       roleKeys: effectiveRoleKeys,
       preferField: "playMarkdown",
     });
-  }, [effectiveRoleInfo, effectiveRoleKeys, effectiveRoleTitle, steps]);
+  }, [effectiveRoleInfo, effectiveRoleKeys, effectiveRoleTitle, scenes]);
 
-  const phraseSteps = useMemo(() => {
-    const map = new Map<number, { stepId: number; stepTitle: string; count: number }>();
+  const phraseScenes = useMemo(() => {
+    const map = new Map<number, { sceneId: number; sceneTitle: string; count: number }>();
     for (const p of phrases) {
-      const prev = map.get(p.stepId);
-      if (prev) map.set(p.stepId, { ...prev, count: prev.count + 1 });
-      else map.set(p.stepId, { stepId: p.stepId, stepTitle: p.stepTitle, count: 1 });
+      const prev = map.get(p.sceneId);
+      if (prev) map.set(p.sceneId, { ...prev, count: prev.count + 1 });
+      else map.set(p.sceneId, { sceneId: p.sceneId, sceneTitle: p.sceneTitle, count: 1 });
     }
-    return Array.from(map.values()).sort((a, b) => a.stepId - b.stepId);
+    return Array.from(map.values()).sort((a, b) => a.sceneId - b.sceneId);
   }, [phrases]);
 
   useEffect(() => {
     if (!accessToken || !projectName) return;
-    if (steps.length > 0) return;
+    if (scenes.length > 0) return;
     void syncFromServer(accessToken, projectName);
-  }, [accessToken, projectName, steps.length, syncFromServer]);
+  }, [accessToken, projectName, scenes.length, syncFromServer]);
 
-  const phraseStepsEmptyHint = useMemo(() => {
-    if (phraseSteps.length > 0) return null;
+  const phraseScenesEmptyHint = useMemo(() => {
+    if (phraseScenes.length > 0) return null;
     if (!effectiveRoleInfo) {
       return myEmail
         ? "Выберите роль или проверьте назначение роли в карточке готовности."
         : "Дождитесь загрузки профиля.";
     }
-    if (steps.length === 0) {
-      return isSceneReady
-        ? "В проекте нет шагов сценария или поле «Текст» пустое."
+    if (scenes.length === 0) {
+      return isPlaybookReady
+        ? "В проекте нет сцен сценария или поле «Текст» пустое."
         : "Загрузка сценария… Если список не появится, откройте проект на главной странице.";
     }
 
@@ -245,8 +245,8 @@ export function useActorPage() {
           normalizeRoleKey(String(r.title ?? "")),
           ...((r.aliases ?? []) as string[]).map((a) => normalizeRoleKey(String(a ?? ""))),
         ].filter(Boolean);
-        const count = extractRolePhrasesFromSteps({
-          steps,
+        const count = extractRolePhrasesFromScenes({
+          scenes,
           role: String(r.title ?? r.key ?? ""),
           roleKeys: keys,
           preferField: "playMarkdown",
@@ -261,52 +261,52 @@ export function useActorPage() {
         .join(", ")} — выберите другую роль выше.`;
     }
 
-    return `Для роли «${effectiveRoleTitle}» реплики не найдены. Проверьте разметку [[РОЛЬ]] или РОЛЬ: … в поле «Текст» шагов.`;
+    return `Для роли «${effectiveRoleTitle}» реплики не найдены. Проверьте разметку [[РОЛЬ]] или РОЛЬ: … в поле «Текст» сцен.`;
   }, [
     effectiveRoleInfo,
     effectiveRoleTitle,
-    isSceneReady,
+    isPlaybookReady,
     myEmail,
-    phraseSteps.length,
+    phraseScenes.length,
     rolesForActor,
-    steps,
+    scenes,
   ]);
 
-  const phrasesByStep = useMemo(() => {
+  const phrasesByScene = useMemo(() => {
     const map = new Map<number, RolePhraseSource[]>();
     for (const p of phrases) {
-      const arr = map.get(p.stepId);
+      const arr = map.get(p.sceneId);
       if (arr) arr.push(p);
-      else map.set(p.stepId, [p]);
+      else map.set(p.sceneId, [p]);
     }
     return map;
   }, [phrases]);
 
-  const [selectedStepIds, setSelectedStepIds] = useState<number[] | "all">("all");
+  const [selectedPlaybookIds, setSelectedSceneIds] = useState<number[] | "all">("all");
 
-  const phraseStepIdSet = useMemo(
-    () => new Set(phraseSteps.map((s) => s.stepId)),
-    [phraseSteps],
+  const phraseSceneIdSet = useMemo(
+    () => new Set(phraseScenes.map((s) => s.sceneId)),
+    [phraseScenes],
   );
 
-  const normalizedSelectedStepIds = useMemo(() => {
-    if (selectedStepIds === "all") return "all" as const;
-    const uniq = Array.from(new Set(selectedStepIds)).filter((id) =>
-      phraseStepIdSet.has(id),
+  const normalizedSelectedSceneIds = useMemo(() => {
+    if (selectedPlaybookIds === "all") return "all" as const;
+    const uniq = Array.from(new Set(selectedPlaybookIds)).filter((id) =>
+      phraseSceneIdSet.has(id),
     );
     return uniq;
-  }, [phraseStepIdSet, selectedStepIds]);
+  }, [phraseSceneIdSet, selectedPlaybookIds]);
 
   const filteredPhrases = useMemo(() => {
-    if (normalizedSelectedStepIds === "all") return phrases;
-    if (normalizedSelectedStepIds.length === 0) return [];
-    const allowed = new Set(normalizedSelectedStepIds);
-    return phrases.filter((p) => allowed.has(p.stepId));
-  }, [phrases, normalizedSelectedStepIds]);
+    if (normalizedSelectedSceneIds === "all") return phrases;
+    if (normalizedSelectedSceneIds.length === 0) return [];
+    const allowed = new Set(normalizedSelectedSceneIds);
+    return phrases.filter((p) => allowed.has(p.sceneId));
+  }, [phrases, normalizedSelectedSceneIds]);
 
-  const totalInAllSteps = useMemo(
-    () => phraseSteps.reduce((acc, s) => acc + s.count, 0),
-    [phraseSteps],
+  const totalInAllScenes = useMemo(
+    () => phraseScenes.reduce((acc, s) => acc + s.count, 0),
+    [phraseScenes],
   );
 
   const trainerStorageKey = useMemo(() => {
@@ -352,7 +352,7 @@ export function useActorPage() {
   }, [effectiveRoleInfo?.key, myEmail, projectName]);
 
   useEffect(() => {
-    setSelectedStepIds("all");
+    setSelectedSceneIds("all");
   }, [effectiveRoleInfo?.id, projectName]);
 
   const actorUiKey = useMemo(() => {
@@ -391,23 +391,23 @@ export function useActorPage() {
     dispatch(actorTrainerUiActions.setTrainerMode({ uiKey: actorUiKey, value: mode }));
   };
 
-  const selectedStepIdsForTraining = useMemo(() => {
-    if (normalizedSelectedStepIds === "all") {
-      return phraseSteps.map((s) => s.stepId);
+  const selectedPlaybookIdsForTraining = useMemo(() => {
+    if (normalizedSelectedSceneIds === "all") {
+      return phraseScenes.map((s) => s.sceneId);
     }
-    return normalizedSelectedStepIds;
-  }, [normalizedSelectedStepIds, phraseSteps]);
+    return normalizedSelectedSceneIds;
+  }, [normalizedSelectedSceneIds, phraseScenes]);
 
   const scenesLabel = useMemo(() => {
     if (!effectiveRoleInfo) return "—";
-    if (normalizedSelectedStepIds === "all") return `все (${phraseSteps.length})`;
-    return `${normalizedSelectedStepIds.length} / ${phraseSteps.length}`;
-  }, [effectiveRoleInfo, normalizedSelectedStepIds, phraseSteps.length]);
+    if (normalizedSelectedSceneIds === "all") return `все (${phraseScenes.length})`;
+    return `${normalizedSelectedSceneIds.length} / ${phraseScenes.length}`;
+  }, [effectiveRoleInfo, normalizedSelectedSceneIds, phraseScenes.length]);
 
-  const openStepInScript = useCallback(
-    (stepId: number) => {
+  const openSceneInScript = useCallback(
+    (sceneId: number) => {
       if (!projectName) return;
-      localStorage.setItem(`selectedStepId:${projectName}`, String(stepId));
+      localStorage.setItem(`selectedSceneId:${projectName}`, String(sceneId));
       navigate("/");
     },
     [navigate, projectName],
@@ -419,7 +419,7 @@ export function useActorPage() {
     projectName,
     currentProjectDisplayName,
     onProjectChange,
-    steps,
+    scenes,
     settingsHidden,
     setSettingsHidden,
     profileLoading,
@@ -433,20 +433,20 @@ export function useActorPage() {
     effectiveRoleInfo,
     effectiveRoleTitle,
     effectiveRoleKeys,
-    phraseSteps,
-    phraseStepsEmptyHint,
-    phrasesByStep,
-    normalizedSelectedStepIds,
-    setSelectedStepIds,
-    totalInAllSteps,
+    phraseScenes,
+    phraseScenesEmptyHint,
+    phrasesByScene,
+    normalizedSelectedSceneIds,
+    setSelectedSceneIds,
+    totalInAllScenes,
     filteredPhrases,
     trainerMode,
     setTrainerMode,
-    selectedStepIdsForTraining,
+    selectedPlaybookIdsForTraining,
     scenesLabel,
     trainerStorageKey,
     dialogueStorageKey,
     voiceStorageKey,
-    openStepInScript,
+    openSceneInScript,
   };
 }

@@ -91,10 +91,10 @@ function getDecorCatalogEntryByBuiltin(
 
 export function formatDecorInventoryPlain(
   models: TheaterModel[],
-  stepTitle?: string,
+  sceneTitle?: string,
 ): string {
   const lines = collectDecorInventoryLines(models);
-  const header = stepTitle ? `Реквизит сцены: ${stepTitle}` : "Реквизит сцены";
+  const header = sceneTitle ? `Реквизит сцены: ${sceneTitle}` : "Реквизит сцены";
   if (lines.length === 0) return `${header}\n\n(нет декора на сцене)`;
 
   const body = lines.map((line) => {
@@ -113,10 +113,10 @@ export function formatDecorInventoryPlain(
 
 export function formatDecorInventoryMarkdown(
   models: TheaterModel[],
-  stepTitle?: string,
+  sceneTitle?: string,
 ): string {
   const lines = collectDecorInventoryLines(models);
-  const header = stepTitle ? `## Реквизит: ${stepTitle}` : "## Реквизит сцены";
+  const header = sceneTitle ? `## Реквизит: ${sceneTitle}` : "## Реквизит сцены";
   if (lines.length === 0) return `${header}\n\n_Нет декора на сцене._`;
 
   const body = lines.map((line) => {
@@ -172,7 +172,7 @@ function escapeCsvCell(value: string): string {
 
 export function formatDecorInventoryCsv(
   models: TheaterModel[],
-  stepTitle?: string,
+  sceneTitle?: string,
 ): string {
   const lines = collectDecorInventoryLines(models);
   const rows: string[][] = [
@@ -188,18 +188,18 @@ export function formatDecorInventoryCsv(
     ]);
   }
   const body = rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
-  if (stepTitle?.trim()) {
-    return `# ${stepTitle.trim()}\n${body}`;
+  if (sceneTitle?.trim()) {
+    return `# ${sceneTitle.trim()}\n${body}`;
   }
   return body;
 }
 
 export function downloadDecorInventoryCsv(
   models: TheaterModel[],
-  stepTitle?: string,
+  sceneTitle?: string,
   filename = "decor-inventory.csv",
 ) {
-  const csv = formatDecorInventoryCsv(models, stepTitle);
+  const csv = formatDecorInventoryCsv(models, sceneTitle);
   const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");

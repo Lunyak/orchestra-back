@@ -10,12 +10,12 @@ import {
   resolveLightProgramMinCount,
   resolveLightPrograms,
 } from "../../../shared/components/light-console/light-console-data";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useScriptUI } from "../../script-ui";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import type {
-  ScriptStep,
+  ScriptScene,
   TheaterLayout,
   TheaterSpotlight,
 } from "../../../shared/types/script";
@@ -55,11 +55,11 @@ export function useTheaterScene({
   theaterLayout,
   onTheaterLayoutChange,
 }: UseTheaterSceneArgs) {
-  const { steps, currentPage, updateStep, sceneData } = useScene();
+  const { scenes, currentPage, updateScene, playbookData } = usePlaybook();
   const { selectedLightSlot, lightChannels } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName || "", "script"),
   );
-  const currentStep = steps[currentPage];
+  const currentScene = scenes[currentPage];
   const layout = theaterLayout ?? DEFAULT_THEATER_LAYOUT;
   const {
     swapTheaterPanels,
@@ -107,10 +107,10 @@ export function useTheaterScene({
   const history = useTheaterHistory({
     projectName,
     currentPage,
-    currentStep,
+    currentScene,
     layout,
     onTheaterLayoutChange,
-    updateStep,
+    updateScene,
   });
   const {
     applyingHistoryRef,
@@ -154,17 +154,17 @@ export function useTheaterScene({
     seedStageOutlineFromCurrentShape,
   } = layoutEditing;
 
-  const updateCurrentStep = useCallback(
-    (patch: Partial<ScriptStep>) => {
-      if (!currentStep) return;
-      updateStep(currentStep.id, patch);
+  const updateCurrentScene = useCallback(
+    (patch: Partial<ScriptScene>) => {
+      if (!currentScene) return;
+      updateScene(currentScene.id, patch);
     },
-    [currentStep, updateStep],
+    [currentScene, updateScene],
   );
 
   const selection = useTheaterSelection({
-    currentStep,
-    updateCurrentStep,
+    currentScene,
+    updateCurrentScene,
     setActiveTab,
   });
   const {
@@ -203,15 +203,15 @@ export function useTheaterScene({
   const resolvedLightPrograms = useMemo(
     () =>
       resolveLightPrograms(
-        sceneData?.lightPrograms,
-        resolveLightProgramMinCount(lightChannels.length, sceneData?.lightPrograms),
+        playbookData?.lightPrograms,
+        resolveLightProgramMinCount(lightChannels.length, playbookData?.lightPrograms),
       ),
-    [lightChannels.length, sceneData?.lightPrograms],
+    [lightChannels.length, playbookData?.lightPrograms],
   );
 
   const spotlightsApi = useTheaterSpotlights({
-    currentStep,
-    updateCurrentStep,
+    currentScene,
+    updateCurrentScene,
     recordTheaterHistory,
     layout,
     gridStep,
@@ -222,7 +222,7 @@ export function useTheaterScene({
     setEditMode,
     setDecorActionMessage,
     rehearsalSpotlights,
-    lightFaders: sceneData?.lightFaders,
+    lightFaders: playbookData?.lightFaders,
     lightPrograms: resolvedLightPrograms,
     consoleChannel: selectedLightSlot > 0 ? selectedLightSlot : undefined,
   });
@@ -288,10 +288,10 @@ export function useTheaterScene({
   const modelsApi = useTheaterModels({
     projectName,
     currentPage,
-    currentStep,
-    steps,
-    updateStep,
-    updateCurrentStep,
+    currentScene,
+    scenes,
+    updateScene,
+    updateCurrentScene,
     recordTheaterHistory,
     beginTheaterHistoryTransaction,
     endTheaterHistoryTransaction,
@@ -316,10 +316,10 @@ export function useTheaterScene({
   const decorApi = useTheaterDecor({
     projectName,
     currentPage,
-    currentStep,
-    steps,
-    updateStep,
-    updateCurrentStep,
+    currentScene,
+    scenes,
+    updateScene,
+    updateCurrentScene,
     layout,
     gridStep,
     snapToGrid,
@@ -349,9 +349,9 @@ export function useTheaterScene({
     updateModel,
     updateModels,
     resolveModelSrc,
-    copyModelsFromPreviousStep,
-    copyTheaterFromPreviousStep,
-    copyTheaterToNextStep,
+    copyModelsFromPreviousScene,
+    copyTheaterFromPreviousScene,
+    copyTheaterToNextScene,
     addModel,
     addBuiltinModel,
     mirrorModel,
@@ -405,7 +405,7 @@ export function useTheaterScene({
     applyDecorTexturePreset,
     clearDecorTexture,
     copyDecorInventoryToClipboard,
-    copyDecorToNextStep,
+    copyDecorToNextScene,
     exportDecorInventoryCsv,
     syncDecorInventoryToRequisites,
     importDecorTemplateFromJson,
@@ -442,7 +442,7 @@ export function useTheaterScene({
 
   const floorPlanApi = useTheaterFloorPlan({
     projectName,
-    currentStep,
+    currentScene,
     layout,
     visibleModels,
     visibleSpotlights,
@@ -483,7 +483,7 @@ export function useTheaterScene({
     updateSpotlight,
     updateModels,
     updateModel,
-    updateCurrentStep,
+    updateCurrentScene,
     setDecorActionMessage,
     activeTab,
     editMode,
@@ -507,30 +507,30 @@ export function useTheaterScene({
     setActiveAlignGuides,
   });
 
-  const { stepRehearsalMode, setStepRehearsalMode } = useTheaterRehearsal({
+  const { sceneRehearsalMode, setSceneRehearsalMode } = useTheaterRehearsal({
     currentPage,
-    currentStep,
+    currentScene,
     displaySpotlights,
     setRehearsalSpotlights,
     setSpectaclePreviewMode,
   });
 
-  const copyFromPreviousStep = () => {
-    if (!currentStep || currentPage <= 0) return;
-    const previous = steps[currentPage - 1];
+  const copyFromPreviousScene = () => {
+    if (!currentScene || currentPage <= 0) return;
+    const previous = scenes[currentPage - 1];
     const source = previous?.theaterSpotlights ?? [];
     const cloned = cloneTheaterSpotlights(source);
     updateSpotlights(cloned);
     if (cloned.length > 0) {
-      updateCurrentStep({ theaterActiveSpotlightId: cloned[0].id });
+      updateCurrentScene({ theaterActiveSpotlightId: cloned[0].id });
     }
   };
 
   const copyLightCuesToClipboard = useCallback(
     async (lightChannels?: string[]) => {
-      const text = formatLightCuesMarkdown(currentStep?.lightCues ?? [], {
-        stepTitle: currentStep?.title?.trim() || undefined,
-        durationMin: currentStep?.durationMin,
+      const text = formatLightCuesMarkdown(currentScene?.lightCues ?? [], {
+        sceneTitle: currentScene?.title?.trim() || undefined,
+        durationMin: currentScene?.durationMin,
         lightChannels,
       });
       try {
@@ -540,7 +540,7 @@ export function useTheaterScene({
         setDecorActionMessage("Не удалось скопировать cue");
       }
     },
-    [currentStep?.durationMin, currentStep?.lightCues, currentStep?.title],
+    [currentScene?.durationMin, currentScene?.lightCues, currentScene?.title],
   );
 
   useTheaterKeyboardBindings({
@@ -593,12 +593,12 @@ export function useTheaterScene({
     document: {
       projectName,
       currentPage,
-      currentStep,
-      stepCount: steps.length,
+      currentScene,
+      sceneCount: scenes.length,
       layout,
       updateLayout,
       previewLayout,
-      updateCurrentStep,
+      updateCurrentScene,
     },
     selection: {
       activeTab,
@@ -635,10 +635,10 @@ export function useTheaterScene({
     slices,
     projectName,
     currentPage,
-    currentStep,
-    stepCount: steps.length,
+    currentScene,
+    sceneCount: scenes.length,
     layout,
-    updateCurrentStep,
+    updateCurrentScene,
     showControls,
     setShowControls,
     setSwapTheaterPanels,
@@ -646,7 +646,7 @@ export function useTheaterScene({
     setShowHiddenInOutliner,
     hallTemplates: THEATER_HALL_TEMPLATES,
     decorActionMessage,
-    copyFromPreviousStep,
+    copyFromPreviousScene,
     copyLightCuesToClipboard,
     ...prefs,
     undoTheater,
@@ -687,7 +687,7 @@ export function useTheaterScene({
     toggleSceneOutlinerVisibility,
     setSceneOutlinerGroupVisibility,
     toggleActiveSceneVisibility,
-    stepRehearsalMode,
-    setStepRehearsalMode,
+    sceneRehearsalMode,
+    setSceneRehearsalMode,
   };
 }

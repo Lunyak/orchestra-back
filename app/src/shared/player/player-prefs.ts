@@ -1,24 +1,48 @@
 export const PLAYER_PREFS_STORAGE_KEY = "orchestra:player-prefs";
-/** @deprecated migrated into {@link PLAYER_PREFS_STORAGE_KEY} */
-export const PLAYER_DOCK_HIDDEN_LEGACY_KEY = "orchestra:player-dock-hidden";
+const PLAYER_DOCK_HIDDEN_LEGACY_KEY = "orchestra:player-dock-hidden";
 
 export const PLAYER_DOCK_VISIBILITY_EVENT = "orchestra:player-dock-visibility";
 export const PLAYER_VOLUME_CHANGE_EVENT = "orchestra:player-volume-change";
+export const PLAYER_DOCK_OFFSET_CHANGE_EVENT = "orchestra:player-dock-offset-change";
+
+export type PlayerDockOffset = {
+  x: number;
+  y: number;
+};
 
 export type PlayerPrefs = {
   dockHidden: boolean;
   volume: number;
+  dockOffset?: PlayerDockOffset;
 };
+
+const DEFAULT_DOCK_OFFSET: PlayerDockOffset = { x: 0, y: 0 };
 
 const DEFAULT_PREFS: PlayerPrefs = {
   dockHidden: false,
   volume: 0.8,
+  dockOffset: DEFAULT_DOCK_OFFSET,
 };
 
 function clampVolume(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
   if (!Number.isFinite(parsed)) return DEFAULT_PREFS.volume;
   return Math.min(1, Math.max(0, parsed));
+}
+
+function clampDockAxis(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
+  if (!Number.isFinite(parsed)) return 0;
+  return parsed;
+}
+
+function parseDockOffset(raw: Partial<PlayerPrefs>): PlayerDockOffset {
+  const offset = raw.dockOffset;
+  if (!offset || typeof offset !== "object") return { ...DEFAULT_DOCK_OFFSET };
+  return {
+    x: clampDockAxis(offset.x),
+    y: clampDockAxis(offset.y),
+  };
 }
 
 function parsePrefs(raw: string | null): PlayerPrefs | null {
@@ -28,6 +52,7 @@ function parsePrefs(raw: string | null): PlayerPrefs | null {
     return {
       dockHidden: parsed.dockHidden === true,
       volume: clampVolume(parsed.volume),
+      dockOffset: parseDockOffset(parsed),
     };
   } catch {
     return null;
@@ -48,6 +73,7 @@ export function readPlayerPrefs(): PlayerPrefs {
       dockHidden: legacyHidden,
     };
     persistPlayerPrefs(migrated);
+    localStorage.removeItem(PLAYER_DOCK_HIDDEN_LEGACY_KEY);
     return migrated;
   } catch {
     return { ...DEFAULT_PREFS };
@@ -69,6 +95,27 @@ export function readPlayerDockHidden(): boolean {
 
 export function readPlayerVolume(): number {
   return readPlayerPrefs().volume;
+}
+
+export function readPlayerDockOffset(): PlayerDockOffset {
+  return readPlayerPrefs().dockOffset ?? { ...DEFAULT_DOCK_OFFSET };
+}
+
+export function setPlayerDockOffset(offset: PlayerDockOffset) {
+  const prefs = readPlayerPrefs();
+  const nextOffset = {
+    x: clampDockAxis(offset.x),
+    y: clampDockAxis(offset.y),
+  };
+  const next = { ...prefs, dockOffset: nextOffset };
+  persistPlayerPrefs(next);
+  window.dispatchEvent(
+    new CustomEvent(PLAYER_DOCK_OFFSET_CHANGE_EVENT, { detail: { offset: nextOffset } }),
+  );
+}
+
+export function resetPlayerDockOffset() {
+  setPlayerDockOffset(DEFAULT_DOCK_OFFSET);
 }
 
 export function setPlayerDockHidden(hidden: boolean) {

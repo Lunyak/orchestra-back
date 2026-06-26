@@ -33,7 +33,7 @@ const modelsHeader = `import {
 import * as THREE from "three";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import type {
-  ScriptStep,
+  ScriptScene,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
@@ -59,9 +59,9 @@ import {
   type ActiveAlignGuide,
 } from "../model/theater-align-guides";
 import {
-  readStepTheaterModels,
-  writeStepTheaterModels,
-} from "../model/theater-step-models";
+  readSceneTheaterModels,
+  writeSceneTheaterModels,
+} from "../model/theater-scene-models";
 import { cloneTheaterSpotlights } from "./use-theater-spotlights";
 import type { TheaterEditMode } from "./use-theater-selection";
 
@@ -82,10 +82,10 @@ export function cloneTheaterModels(source: TheaterModel[]): TheaterModel[] {
 export type UseTheaterModelsArgs = {
   projectName: string;
   currentPage: number;
-  currentStep: ScriptStep | undefined;
-  steps: ScriptStep[];
-  updateStep: (stepId: number, patch: Partial<ScriptStep>) => void;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  currentScene: ScriptScene | undefined;
+  scenes: ScriptScene[];
+  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   recordTheaterHistory: () => void;
   beginTheaterHistoryTransaction: () => void;
   endTheaterHistoryTransaction: () => void;
@@ -110,10 +110,10 @@ export type UseTheaterModelsArgs = {
 export function useTheaterModels({
   projectName,
   currentPage,
-  currentStep,
+  currentScene,
   steps,
-  updateStep,
-  updateCurrentStep,
+  updateScene,
+  updateCurrentScene,
   recordTheaterHistory,
   beginTheaterHistoryTransaction,
   endTheaterHistoryTransaction,
@@ -170,7 +170,7 @@ export function useTheaterModels({
     null,
   );
 
-  const models = readStepTheaterModels(currentStep);
+  const models = readSceneTheaterModels(currentScene);
   const visibleModels = useMemo(
     () => models.filter((model) => !model.hidden),
     [models],
@@ -288,7 +288,7 @@ const decorHeader = `import {
 } from "react";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopAddProjectImage } from "../../../shared/platform/desktop-methods";
-import type { ScriptStep, TheaterLayout, TheaterModel } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterModel } from "../../../shared/types/script";
 import {
   getDecorCatalogEntry,
   isTheaterDecorModel,
@@ -325,19 +325,19 @@ import {
 } from "../model/theater-decor-textures";
 import { buildDecorGridPositions } from "../model/theater-decor-grid";
 import {
-  readStepTheaterModels,
-  writeStepTheaterModels,
-} from "../model/theater-step-models";
+  readSceneTheaterModels,
+  writeSceneTheaterModels,
+} from "../model/theater-scene-models";
 import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterDecorArgs = {
   projectName: string;
   currentPage: number;
-  currentStep: ScriptStep | undefined;
-  steps: ScriptStep[];
-  updateStep: (stepId: number, patch: Partial<ScriptStep>) => void;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  currentScene: ScriptScene | undefined;
+  scenes: ScriptScene[];
+  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   layout: TheaterLayout;
   gridStep: number;
   snapToGrid: boolean;
@@ -353,10 +353,10 @@ export type UseTheaterDecorArgs = {
 export function useTheaterDecor({
   projectName,
   currentPage,
-  currentStep,
+  currentScene,
   steps,
-  updateStep,
-  updateCurrentStep,
+  updateScene,
+  updateCurrentScene,
   layout,
   gridStep,
   snapToGrid,
@@ -458,8 +458,8 @@ decorText = decorText.replace(
 );
 // Fix addDecorAt deps - remove decorActionMessage
 decorText = decorText.replace(
-  /(\[)\s*\n\s*currentStep,\s*\n\s*decorActionMessage,\s*\n\s*decorCatalogKey,/,
-  "$1\n      currentStep,\n      decorCatalogKey,",
+  /(\[)\s*\n\s*currentScene,\s*\n\s*decorActionMessage,\s*\n\s*decorCatalogKey,/,
+  "$1\n      currentScene,\n      decorCatalogKey,",
 );
 
 fs.writeFileSync(

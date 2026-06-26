@@ -325,16 +325,6 @@ function hitTestSingleDoorOnPlan(
   return null;
 }
 
-/** @deprecated use hitTestDoorsOnPlan */
-export function hitTestDoorOnPlan(
-  worldX: number,
-  worldZ: number,
-  layout: TheaterLayout,
-): DoorPlanHit["part"] | null {
-  const hit = hitTestDoorsOnPlan(worldX, worldZ, layout);
-  return hit?.part ?? null;
-}
-
 export function doorUsesAxisZ(wall: TheaterDoorWall): boolean {
   return wall === "left" || wall === "right";
 }

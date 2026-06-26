@@ -1,7 +1,9 @@
 import { createId } from "../../../shared/utils/createId";
+import { readLegacySceneLabel } from "../../../shared/playbook/legacy-scene-json";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { fetchDevLocalProjectJson } from "../../../shared/platform/local-project-dev";
-import type { ScriptStep } from "../../../shared/types/script";
+import { readProjectFolderJson } from "../../../shared/platform/project-media-folder";
+import type { ScriptScene } from "../../../shared/types/script";
 import type { NotesRunCardDraft, NotesRunCardV1, NotesRunDataV1 } from "./notes-run-types";
 
 export function normalizeNotesRunData(raw: unknown): NotesRunDataV1 {
@@ -31,7 +33,7 @@ function normalizeNotesRunCard(raw: Partial<NotesRunCardV1>, fallbackNo: number)
     id,
     cardNo,
     title: String(raw?.title ?? "").trim(),
-    stepLabel: String(raw?.stepLabel ?? "").trim(),
+    sceneLabel: readLegacySceneLabel(raw as Record<string, unknown>),
     lightLines,
     lightNotes: String(raw?.lightNotes ?? "").trim(),
     playTrackId:
@@ -79,7 +81,7 @@ function readNotesRunLocalBackup(projectSlug: string): NotesRunDataV1 | null {
   }
 }
 
-/** Загрузка «Записи» — только локально, sync не участвует. */
+/** Загрузка суфлёра — только локально, sync не участвует. */
 export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1> {
   if (!projectSlug) return { v: 1, cards: [] };
 
@@ -97,9 +99,9 @@ export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1>
     }
 
     // Одноразовая миграция из старого script.json (если было)
-    if (api.readProjectScene) {
+    if (api.readProjectPlaybook) {
       try {
-        const script = await api.readProjectScene(projectSlug, "script");
+        const script = await api.readProjectPlaybook(projectSlug, "script");
         const legacy = normalizeNotesRunData((script as { lightNotesRun?: unknown })?.lightNotesRun);
         if (legacy.cards.length > 0) {
           await saveNotesRun(projectSlug, legacy);
@@ -109,6 +111,19 @@ export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1>
         /* ignore */
       }
     }
+  }
+
+  try {
+    const folderRaw = await readProjectFolderJson(projectSlug, "notes-run");
+    if (folderRaw) {
+      const fromFolder = normalizeNotesRunData(folderRaw);
+      if (fromFolder.cards.length > 0) {
+        saveNotesRunLocalBackup(projectSlug, fromFolder);
+        return fromFolder;
+      }
+    }
+  } catch {
+    /* folder notes-run missing */
   }
 
   try {
@@ -127,7 +142,7 @@ export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1>
   return readNotesRunLocalBackup(projectSlug) ?? { v: 1, cards: [] };
 }
 
-/** Сохранение «Записи» — отдельный файл + localStorage, без script.json и сервера. */
+/** Сохранение суфлёра — отдельный файл + localStorage, без script.json и сервера. */
 export async function saveNotesRun(projectSlug: string, data: NotesRunDataV1): Promise<void> {
   const normalized = normalizeNotesRunData(data);
   saveNotesRunLocalBackup(projectSlug, normalized);
@@ -137,14 +152,14 @@ export async function saveNotesRun(projectSlug: string, data: NotesRunDataV1): P
 
   const result = await api.saveNotesRun(projectSlug, normalized);
   if (!result?.ok) {
-    throw new Error(result?.error ?? "Не удалось сохранить «Запись»");
+    throw new Error(result?.error ?? "Не удалось сохранить суфлёр");
   }
 }
 
 export function buildEmptyNotesRunDraft(): NotesRunCardDraft {
   return {
     title: "",
-    stepLabel: "",
+    sceneLabel: "",
     lightLines: [{ label: "", value: "" }],
     lightNotes: "",
     playTrackId: null,
@@ -158,7 +173,7 @@ export function buildEmptyNotesRunDraft(): NotesRunCardDraft {
 export function buildNotesRunDraftFromCard(card: NotesRunCardV1): NotesRunCardDraft {
   return {
     title: card.title,
-    stepLabel: card.stepLabel,
+    sceneLabel: card.sceneLabel,
     lightLines:
       card.lightLines.length > 0
         ? card.lightLines.map((row) => ({ ...row }))
@@ -189,7 +204,7 @@ export function applyNotesRunDraft(
     id: cardId ?? createId(),
     cardNo: cardId ? cards.find((c) => c.id === cardId)?.cardNo ?? cards.length + 1 : cards.length + 1,
     title: draft.title.trim(),
-    stepLabel: draft.stepLabel.trim(),
+    sceneLabel: draft.sceneLabel.trim(),
     lightLines,
     lightNotes: draft.lightNotes.trim(),
     playTrackId: draft.playTrackId != null && draft.playTrackId > 0 ? draft.playTrackId : null,
@@ -212,12 +227,12 @@ export function applyNotesRunDraft(
   return normalizeNotesRunData({ v: 1, cards: renumberNotesRunCards(nextCards) });
 }
 
-export function buildNotesRunCardsFromSteps(steps: ScriptStep[]): NotesRunDataV1 {
-  const cards: NotesRunCardV1[] = steps.map((step, index) => ({
+export function buildNotesRunCardsFromScenes(scenes: ScriptScene[]): NotesRunDataV1 {
+  const cards: NotesRunCardV1[] = scenes.map((scene, index) => ({
     id: createId(),
     cardNo: index + 1,
     title: "",
-    stepLabel: String(step.title ?? "").trim() || `Шаг ${index + 1}`,
+    sceneLabel: String(scene.title ?? "").trim() || `Сцена ${index + 1}`,
     lightLines: [],
     lightNotes: "",
     playTrackId: null,

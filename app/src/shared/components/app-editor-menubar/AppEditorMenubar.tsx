@@ -4,6 +4,7 @@ import { AppEditorChatToggle } from "./AppEditorChatToggle";
 import { AppEditorPlaylistEditToggle } from "./AppEditorPlaylistEditToggle";
 import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
 import { AppEditorNavigationMenu } from "./AppEditorNavigationMenu";
+import { AppEditorMenubarProjectSelect } from "./AppEditorMenubarProjectSelect";
 import { AppEditorProjectMenu } from "./AppEditorProjectMenu";
 import { useAppEditorMenubarCenter, useAppEditorMenubarToolbarActions, useAppEditorMenubarViewMenu } from "./AppEditorMenubarContext";
 import "./style.css";
@@ -12,7 +13,7 @@ export function AppEditorMenubar() {
   const viewMenu = useAppEditorMenubarViewMenu();
   const centerContent = useAppEditorMenubarCenter();
   const toolbarActions = useAppEditorMenubarToolbarActions();
-  const { projectName, currentProjectDisplayName } = useProject();
+  const { projectName } = useProject();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const handleMenusClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -62,8 +63,11 @@ export function AppEditorMenubar() {
             {viewMenu}
           </div>
         </div>
-        {centerContent ? (
-          <div className="app-editor-menubar__center">{centerContent}</div>
+        {projectName || centerContent ? (
+          <div className="app-editor-menubar__center">
+            {centerContent}
+            {projectName ? <AppEditorMenubarProjectSelect /> : null}
+          </div>
         ) : null}
         <div className="app-editor-menubar__end">
           <div className="app-editor-menubar__actions">
@@ -72,11 +76,6 @@ export function AppEditorMenubar() {
             <AppEditorPlaylistEditToggle />
             <AppEditorChatToggle />
           </div>
-          {projectName ? (
-            <div className="app-editor-menubar__project-badge" title={projectName}>
-              <strong>{currentProjectDisplayName}</strong>
-            </div>
-          ) : null}
         </div>
       </div>
     </header>

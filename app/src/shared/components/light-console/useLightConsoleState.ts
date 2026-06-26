@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useScene, type SceneLightFadersDataV1, type SceneLightProgramsDataV1 } from "../../../features/scene";
+import { usePlaybook, type PlaybookLightFadersDataV1, type PlaybookLightProgramsDataV1 } from "../../../features/playbook";
 import {
   selectShowScriptMarkdownUi,
   showScriptMarkdownActions,
@@ -24,12 +24,12 @@ type UseLightConsoleStateArgs = {
   projectName: string;
   spotlights?: TheaterSpotlight[];
   /** Override faders (kadr snapshot preview). */
-  fadersOverride?: SceneLightFadersDataV1 | null;
+  fadersOverride?: PlaybookLightFadersDataV1 | null;
   /** Override active program id (kadr preview). */
   activeProgramIdOverride?: number | null;
   readOnly?: boolean;
-  onFadersChange?: (next: SceneLightFadersDataV1) => void;
-  onProgramsChange?: (next: SceneLightProgramsDataV1) => void;
+  onFadersChange?: (next: PlaybookLightFadersDataV1) => void;
+  onProgramsChange?: (next: PlaybookLightProgramsDataV1) => void;
 };
 
 export function useLightConsoleState({
@@ -42,7 +42,7 @@ export function useLightConsoleState({
   onProgramsChange,
 }: UseLightConsoleStateArgs) {
   const dispatch = useAppDispatch();
-  const { sceneData, setSceneData } = useScene();
+  const { playbookData, setPlaybookData } = usePlaybook();
   const programSaveTimerRef = useRef<number | null>(null);
   const channelSaveTimerRef = useRef<number | null>(null);
   const activeProgramIdRef = useRef<number | null>(null);
@@ -55,20 +55,20 @@ export function useLightConsoleState({
   const persistedFaders = useMemo(
     () =>
       buildCompleteLightFaders(
-        sceneData?.lightFaders && sceneData.lightFaders.v === 1
-          ? sceneData.lightFaders
+        playbookData?.lightFaders && playbookData.lightFaders.v === 1
+          ? playbookData.lightFaders
           : createDefaultLightFaders(),
       ),
-    [sceneData?.lightFaders],
+    [playbookData?.lightFaders],
   );
   const faders = fadersOverride ?? persistedFaders;
   const programs = useMemo(
     () =>
       resolveLightPrograms(
-        sceneData?.lightPrograms,
-        resolveLightProgramMinCount(lightChannels.length, sceneData?.lightPrograms),
+        playbookData?.lightPrograms,
+        resolveLightProgramMinCount(lightChannels.length, playbookData?.lightPrograms),
       ),
-    [lightChannels.length, sceneData?.lightPrograms],
+    [lightChannels.length, playbookData?.lightPrograms],
   );
   const displayPrograms =
     activeProgramIdOverride != null
@@ -92,7 +92,7 @@ export function useLightConsoleState({
   );
 
   const persistFaders = useCallback(
-    (next: SceneLightFadersDataV1, syncChannelSnapshot = false) => {
+    (next: PlaybookLightFadersDataV1, syncChannelSnapshot = false) => {
       if (readOnly || fadersOverride) {
         onFadersChange?.(next);
         return;
@@ -102,13 +102,13 @@ export function useLightConsoleState({
         return;
       }
       if (!syncChannelSnapshot) {
-        setSceneData((prev) => ({
+        setPlaybookData((prev) => ({
           ...(prev ?? {}),
           lightFaders: next,
         }));
         return;
       }
-      setSceneData((prev) => {
+      setPlaybookData((prev) => {
         const channel = Math.max(1, editingChannelRef.current || selectedLightSlot || 1);
         const prevPrograms =
           prev?.lightPrograms && prev.lightPrograms.v === 1 ? prev.lightPrograms : programs;
@@ -130,40 +130,40 @@ export function useLightConsoleState({
       programs,
       readOnly,
       selectedLightSlot,
-      setSceneData,
+      setPlaybookData,
     ],
   );
 
   const persistPrograms = useCallback(
-    (next: SceneLightProgramsDataV1) => {
+    (next: PlaybookLightProgramsDataV1) => {
       if (readOnly) return;
       const normalized = resolveLightPrograms(next);
       if (onProgramsChange) {
         onProgramsChange(normalized);
         return;
       }
-      setSceneData((prev) => ({
+      setPlaybookData((prev) => ({
         ...(prev ?? {}),
         lightPrograms: normalized,
       }));
     },
-    [onProgramsChange, readOnly, setSceneData],
+    [onProgramsChange, readOnly, setPlaybookData],
   );
 
   useEffect(() => {
     if (readOnly || fadersOverride || programsBootstrappedRef.current) return;
-    const raw = sceneData?.lightPrograms;
+    const raw = playbookData?.lightPrograms;
     if (!lightProgramsNeedNormalization(raw)) {
       programsBootstrappedRef.current = true;
       return;
     }
     programsBootstrappedRef.current = true;
     persistPrograms(resolveLightPrograms(raw));
-  }, [fadersOverride, persistPrograms, readOnly, sceneData?.lightPrograms]);
+  }, [fadersOverride, persistPrograms, readOnly, playbookData?.lightPrograms]);
 
   const patchFader = (
     faderId: number,
-    patch: Partial<SceneLightFadersDataV1["faders"][number]>,
+    patch: Partial<PlaybookLightFadersDataV1["faders"][number]>,
   ) => {
     const nextFaders = faders.faders.map((item) =>
       item.id === faderId ? { ...item, ...patch } : item,
@@ -335,7 +335,7 @@ export function useLightConsoleState({
       return;
     }
 
-    setSceneData((prev) => ({
+    setPlaybookData((prev) => ({
       ...(prev ?? {}),
       lightPrograms: resolveLightPrograms({
         ...(prev?.lightPrograms && prev.lightPrograms.v === 1 ? prev.lightPrograms : programs),

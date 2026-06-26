@@ -2,7 +2,7 @@ export type ScriptEditorInsertMenuContext = {
   playlistOptions: { id: number; title: string }[];
   soundsOptions: { id: number; title: string }[];
   lightChannels: string[];
-  /** Текущий markdown шага — для нумерации «Картина N». */
+  /** Текущий markdown сцены — для нумерации «Картина N». */
   activeMarkdown: string;
   /** Есть ли токен для загрузки картинки. */
   canInsertImage: boolean;
@@ -17,7 +17,7 @@ export type ScriptEditorInsertMenuPick =
   | { kind: "insert-image" }
   | { kind: "copy-selection" }
   | { kind: "paste-clipboard" }
-  | { kind: "create-step-from-selection" };
+  | { kind: "create-scene-from-selection" };
 
 export type ScriptEditorInsertSubmenuChild = {
   id: string;

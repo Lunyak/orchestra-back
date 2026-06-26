@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { ScriptStep, TheaterSpotlight } from "../../../shared/types/script";
+import type { ScriptScene, TheaterSpotlight } from "../../../shared/types/script";
 import {
   normalizeLightCues,
   resolveSpotlightsAtLightCueTime,
@@ -8,7 +8,7 @@ import {
 
 export type UseTheaterRehearsalArgs = {
   currentPage: number;
-  currentStep: ScriptStep | undefined;
+  currentScene: ScriptScene | undefined;
   displaySpotlights: TheaterSpotlight[];
   setRehearsalSpotlights: Dispatch<SetStateAction<TheaterSpotlight[] | null>>;
   setSpectaclePreviewMode: (value: boolean) => void;
@@ -16,29 +16,29 @@ export type UseTheaterRehearsalArgs = {
 
 export function useTheaterRehearsal({
   currentPage,
-  currentStep,
+  currentScene,
   displaySpotlights,
   setRehearsalSpotlights,
   setSpectaclePreviewMode,
 }: UseTheaterRehearsalArgs) {
-  const [stepRehearsalMode, setStepRehearsalMode] = useState(false);
+  const [sceneRehearsalMode, setSceneRehearsalMode] = useState(false);
 
   useEffect(() => {
-    setStepRehearsalMode(false);
+    setSceneRehearsalMode(false);
   }, [currentPage]);
 
   useEffect(() => {
-    if (!stepRehearsalMode || !currentStep) {
+    if (!sceneRehearsalMode || !currentScene) {
       setRehearsalSpotlights(null);
       return undefined;
     }
     setSpectaclePreviewMode(true);
-    const cues = normalizeLightCues(currentStep.lightCues ?? []);
+    const cues = normalizeLightCues(currentScene.lightCues ?? []);
     if (cues.length === 0) {
       setRehearsalSpotlights(null);
       return undefined;
     }
-    const duration = Math.max(1, stepDurationSec(currentStep.durationMin));
+    const duration = Math.max(1, stepDurationSec(currentScene.durationMin));
     const started = performance.now();
     let frame = 0;
     const tick = () => {
@@ -54,17 +54,17 @@ export function useTheaterRehearsal({
       setRehearsalSpotlights(null);
     };
   }, [
-    currentStep,
-    currentStep?.durationMin,
-    currentStep?.id,
-    currentStep?.lightCues,
+    currentScene,
+    currentScene?.durationMin,
+    currentScene?.id,
+    currentScene?.lightCues,
     displaySpotlights,
     setSpectaclePreviewMode,
-    stepRehearsalMode,
+    sceneRehearsalMode,
   ]);
 
   return {
-    stepRehearsalMode,
-    setStepRehearsalMode,
+    sceneRehearsalMode,
+    setSceneRehearsalMode,
   };
 }

@@ -1,4 +1,6 @@
-.playlist-sidebar-wrapper {
+@import "../mobile-drawer/mobile-drawer.css";
+
+.playlist-sidebar-container {
   position: relative;
   background-color: var(--color-bg-secondary);
   width: 100%;
@@ -13,15 +15,15 @@
   pointer-events: none;
 }
 
-.playlist-sidebar-wrapper.hidden:not(.mobile) {
+.playlist-sidebar-container--hidden:not(.playlist-sidebar-container--mobile) {
   display: none;
 }
 
-.playlist-sidebar-wrapper.mobile.hidden {
+.playlist-sidebar-container--mobile.playlist-sidebar-container--hidden {
   transform: translateX(-100%);
 }
 
-.playlist-sidebar-wrapper.mobile {
+.playlist-sidebar-container--mobile {
   position: fixed;
   top: 0;
   bottom: 0;
@@ -36,39 +38,39 @@
   overflow-x: hidden;
 }
 
-.playlist-sidebar-wrapper.mobile:not(.open) {
+.playlist-sidebar-container--mobile:not(.playlist-sidebar-container--open) {
   pointer-events: none;
 }
 
-.playlist-sidebar-wrapper.mobile.open {
+.playlist-sidebar-container--mobile.playlist-sidebar-container--open {
   transform: translateX(0);
 }
 
-.playlist-sidebar-wrapper.mobile .mobile-panel-close {
+.playlist-sidebar-container--mobile .mobile-drawer__close {
   right: 12px;
   left: auto;
   transform: translateX(53px);
 }
 
-.playlist-sidebar-wrapper.mobile:not(.open) .mobile-panel-close {
+.playlist-sidebar-container--mobile:not(.playlist-sidebar-container--open) .mobile-drawer__close {
   display: none;
 }
 
 @media (max-width: 979px) {
-  .playlist-sidebar-wrapper:not(.mobile) {
+  .playlist-sidebar-container:not(.playlist-sidebar-container--mobile) {
     display: none;
   }
 }
 
 @media (max-width: 480px) {
-  .playlist-sidebar-wrapper.mobile {
+  .playlist-sidebar-container--mobile {
     max-width: 250px;
     width: 90vw;
   }
 }
 
 @media (max-width: 320px) {
-  .playlist-sidebar-wrapper.mobile {
+  .playlist-sidebar-container--mobile {
     max-width: 200px;
     width: 100%;
   }
@@ -90,13 +92,13 @@
   box-sizing: border-box;
 }
 
-.playlist-sidebar-wrapper.mobile .playlist-sidebar {
+.playlist-sidebar-container--mobile .playlist-sidebar {
   width: 100%;
   max-width: 100%;
   min-width: 0;
 }
 
-.playlist-sidebar.drag-over {
+.playlist-sidebar--drag-over {
   outline: 2px dashed var(--color-accent-blue);
   outline-offset: -8px;
 }
@@ -122,12 +124,6 @@
 .playlist-hint {
   color: var(--color-text-subtle);
   font-size: 12px;
-}
-
-.playlist-player {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .playlist-controls {
@@ -521,11 +517,32 @@
 .playlist-bottom-player {
   position: fixed;
   left: 50%;
-  bottom: 36px;
+  bottom: 136px;
   z-index: 1600;
   width: min(780px, calc(100vw - 32px));
-  transform: translateX(-50%);
+  transform: translate(
+    calc(-50% + var(--playlist-bottom-player-offset-x, 0px)),
+    var(--playlist-bottom-player-offset-y, 0px)
+  );
   pointer-events: none;
+}
+
+.playlist-bottom-player--dragging {
+  user-select: none;
+}
+
+.playlist-bottom-player__inner--draggable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.playlist-bottom-player--dragging .playlist-bottom-player__inner--draggable {
+  cursor: grabbing;
+}
+
+body.playlist-bottom-player-drag-active {
+  user-select: none;
+  cursor: grabbing;
 }
 
 .playlist-bottom-player__inner {
@@ -545,7 +562,6 @@
     inset 0 1px 0 var(--color-border-faint-top);
   backdrop-filter: blur(14px);
   pointer-events: auto;
-  transform: translateY(-100px);
 }
 
 .playlist-bottom-player__transport {
@@ -853,6 +869,7 @@
   .playlist-bottom-player {
     bottom: 12px;
     width: calc(100vw - 16px);
+    transform: translateX(-50%);
   }
 
   .playlist-bottom-player__inner {
@@ -1004,7 +1021,7 @@
   position: relative;
 }
 
-.playlist-track-row.drag-over {
+.playlist-track-row--drag-over {
   outline: 2px dashed var(--color-sky-outline);
   outline-offset: 2px;
 }
@@ -1030,7 +1047,7 @@
   gap: 10px;
 }
 
-.playlist-track-row.active .playlist-track-btn {
+.playlist-track-row--active .playlist-track-btn {
   background: transparent;
 }
 
@@ -1043,14 +1060,14 @@
   font-size: 13px;
 }
 
-.playlist-track-row.active .playlist-track-btn,
-.playlist-track-row.active .playlist-track-actions,
-.playlist-track-row.active .playlist-track-fade,
-.playlist-track-row.active .playlist-track-loop {
+.playlist-track-row--active .playlist-track-btn,
+.playlist-track-row--active .playlist-track-actions,
+.playlist-track-row--active .playlist-track-fade,
+.playlist-track-row--active .playlist-track-loop {
   color: var(--color-surface-1);
 }
 
-.playlist-track-title.editable {
+.playlist-track-title--editable {
   text-decoration: underline;
   text-decoration-style: dotted;
   text-underline-offset: 2px;

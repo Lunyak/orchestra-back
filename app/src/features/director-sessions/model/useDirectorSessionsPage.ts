@@ -1,4 +1,4 @@
-﻿import type { CalendarSectionState } from "@shared/components/calendar/CalendarSection";
+import type { CalendarSectionState } from "@shared/components/calendar/CalendarSection";
 import type { MonthCalendarEvent } from "@shared/components/calendar/MonthCalendar";
 import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import dayjs from "dayjs";
@@ -577,7 +577,7 @@ export function useDirectorSessionsPage() {
     }
   });
   const [dataCache, setDataCache] = useState<ProjectDataCache>({});
-  const [stepsLoading, setStepsLoading] = useState(false);
+  const [scenesLoading, setScenesLoading] = useState(false);
 
   const visibleProjects = useMemo(
     () =>
@@ -601,7 +601,7 @@ export function useDirectorSessionsPage() {
   const loadProjectData = async (slug: string) => {
     if (!accessToken) return;
     if (!slug || dataCache[slug]) return;
-    setStepsLoading(true);
+    setScenesLoading(true);
     try {
       const data = await fetchProjectMaterial(slug).unwrap();
       setDataCache((p) => ({ ...p, [slug]: data }));
@@ -610,14 +610,14 @@ export function useDirectorSessionsPage() {
       setDataCache((p) => ({
         ...p,
         [slug]: {
-          steps: [],
+          scenes: [],
           roleEmailsByKey: {},
           roleTitleByKey: {},
           sceneRoles: null,
         },
       }));
     } finally {
-      setStepsLoading(false);
+      setScenesLoading(false);
     }
   };
 
@@ -633,7 +633,7 @@ export function useDirectorSessionsPage() {
   useEffect(() => {
     if (!accessToken) return;
     if ((sessions ?? []).length === 0) return;
-    if (stepsLoading) return;
+    if (scenesLoading) return;
 
     let cancelled = false;
 
@@ -684,7 +684,7 @@ export function useDirectorSessionsPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persist меняется каждый рендер; достаточно dataCache/sessions
-  }, [accessToken, dataCache, sessions, stepsLoading]);
+  }, [accessToken, dataCache, sessions, scenesLoading]);
 
   useEffect(() => {
     const first =
@@ -758,12 +758,12 @@ export function useDirectorSessionsPage() {
     const set = new Set<string>();
     for (const sl of activeSession.slots ?? []) {
       const ref = sl.ref;
-      if (!ref?.projectSlug || ref.stepId == null) continue;
+      if (!ref?.projectSlug || ref.sceneId == null) continue;
       const data = dataCache[ref.projectSlug];
       if (!data) continue;
       for (const e of getEmailsPlannedForDirectorSlot(
         ref.projectSlug,
-        ref.stepId,
+        ref.sceneId,
         data,
         (sl as DirectorSessionSlot).roleRehearsalPicks,
       )) {
@@ -871,7 +871,7 @@ export function useDirectorSessionsPage() {
           slotId: insight.slotId,
           time: insight.time,
           projectLabel: insight.projectLabel,
-          stepLabel: insight.stepLabel,
+          sceneLabel: insight.sceneLabel,
           gatherStatus,
           durationMin: slot?.durationMin ?? 0,
         };

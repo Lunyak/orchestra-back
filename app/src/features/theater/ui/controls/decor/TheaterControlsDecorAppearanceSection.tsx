@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { tc } from "../../../../../shared/styles/theme-color";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { DECOR_CATALOG } from "../../../model/theater-decor-catalog";
@@ -177,11 +178,10 @@ export function TheaterControlsDecorAppearanceSection({ vm, decor }: DecorSectio
                   <button
                     key={preset.id}
                     type="button"
-                    className={`theater-decor-texture-swatch${
-                      activeDecorTexturePresetId === preset.id
-                        ? " theater-decor-texture-swatch--active"
-                        : ""
-                    }`}
+                    className={cn(
+                      "theater-decor-texture-swatch",
+                      activeDecorTexturePresetId === preset.id && "theater-decor-texture-swatch--active",
+                    )}
                     title={preset.label}
                     style={{ backgroundColor: preset.tint }}
                     onClick={() => vm.applyDecorTexturePreset(preset.id)}
@@ -191,7 +191,7 @@ export function TheaterControlsDecorAppearanceSection({ vm, decor }: DecorSectio
               <div className="theater-spotlight-grid">
                 <TheaterBtn
                   onClick={() => decorTextureInputRef.current?.click()}
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                 >
                   Загрузить PNG/JPG
                 </TheaterBtn>

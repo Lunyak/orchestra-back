@@ -3,10 +3,12 @@ import type { RootState } from "../../../shared/store/store";
 
 export type LightPlotMode = "rehearsal" | "prog-run";
 
+const SCENES_COLLAPSED_KEY = "isScenesCollapsed";
+
 export type ScriptUiState = {
   showPlaylistSidebar: boolean;
   showHeaderSounds: boolean;
-  isStepsCollapsed: boolean;
+  isScenesCollapsed: boolean;
 
   /**
    * Мобильные оверлеи панелей (НЕ persist'им).
@@ -14,7 +16,7 @@ export type ScriptUiState = {
    * не ломая сохранённые desktop-настройки.
    */
   mobilePlaylistOpen: boolean;
-  mobileStepsOpen: boolean;
+  mobileScenesOpen: boolean;
 
   /** Режим редактирования сценария (persist в localStorage). */
   isEditing: boolean;
@@ -26,9 +28,9 @@ export type ScriptUiState = {
   swapTheaterPanels: boolean;
   /** Правая панель настроек 3D-театра (persist per-project в theater-view-prefs). */
   showTheaterControls: boolean;
-  /** Скрыть текст шага на странице «Репетиция» (/light-plot). */
+  /** Скрыть текст сцены на странице «Репетиция» (/light-plot). */
   spectacleRunTextHidden: boolean;
-  /** Режим страницы /light-plot: пошаговая репетиция или прогон. */
+  /** Режим страницы /light-plot: посценовая репетиция или прогон. */
   lightPlotMode: LightPlotMode;
 };
 
@@ -45,12 +47,16 @@ function storedBool(key: string, defaultValue: boolean): boolean {
   }
 }
 
+function readScenesCollapsed(defaultValue: boolean): boolean {
+  return storedBool(SCENES_COLLAPSED_KEY, defaultValue);
+}
+
 function persistBooleans(state: ScriptUiState) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem("showPlaylistSidebar", String(state.showPlaylistSidebar));
     localStorage.setItem("showHeaderSounds", String(state.showHeaderSounds));
-    localStorage.setItem("isStepsCollapsed", String(state.isStepsCollapsed));
+    localStorage.setItem(SCENES_COLLAPSED_KEY, String(state.isScenesCollapsed));
     localStorage.setItem("isEditing", String(state.isEditing));
     localStorage.setItem(
       "playlistCrossfadeEnabled",
@@ -65,9 +71,9 @@ function defaultState(): ScriptUiState {
   return {
     showPlaylistSidebar: true,
     showHeaderSounds: true,
-    isStepsCollapsed: false,
+    isScenesCollapsed: false,
     mobilePlaylistOpen: false,
-    mobileStepsOpen: false,
+    mobileScenesOpen: false,
     isEditing: false,
     playlistEditMode: false,
     playlistCrossfadeEnabled: false,
@@ -112,7 +118,7 @@ function initialStateFromStorage(): ScriptUiState {
     ...base,
     showPlaylistSidebar: storedBool("showPlaylistSidebar", base.showPlaylistSidebar),
     showHeaderSounds: storedBool("showHeaderSounds", base.showHeaderSounds),
-    isStepsCollapsed: storedBool("isStepsCollapsed", base.isStepsCollapsed),
+    isScenesCollapsed: readScenesCollapsed(base.isScenesCollapsed),
     isEditing: storedBool("isEditing", base.isEditing),
     playlistCrossfadeEnabled: storedBool(
       "playlistCrossfadeEnabled",
@@ -138,7 +144,7 @@ export const scriptUiSlice = createSlice({
       const base = defaultState();
       state.showPlaylistSidebar = storedBool("showPlaylistSidebar", base.showPlaylistSidebar);
       state.showHeaderSounds = storedBool("showHeaderSounds", base.showHeaderSounds);
-      state.isStepsCollapsed = storedBool("isStepsCollapsed", base.isStepsCollapsed);
+      state.isScenesCollapsed = readScenesCollapsed(base.isScenesCollapsed);
       state.isEditing = storedBool("isEditing", base.isEditing);
       state.playlistCrossfadeEnabled = storedBool(
         "playlistCrossfadeEnabled",
@@ -155,7 +161,7 @@ export const scriptUiSlice = createSlice({
       }
       // Эфемерные поля — сброс при init; theater-панели восстанавливаются в useSpectaclePage.
       state.mobilePlaylistOpen = false;
-      state.mobileStepsOpen = false;
+      state.mobileScenesOpen = false;
       state.playlistEditMode = false;
       persistBooleans(state);
     },
@@ -178,12 +184,12 @@ export const scriptUiSlice = createSlice({
       persistBooleans(state);
     },
 
-    setIsStepsCollapsed(state, action: PayloadAction<{ value: boolean }>) {
-      state.isStepsCollapsed = Boolean(action.payload.value);
+    setIsScenesCollapsed(state, action: PayloadAction<{ value: boolean }>) {
+      state.isScenesCollapsed = Boolean(action.payload.value);
       persistBooleans(state);
     },
-    toggleStepsCollapsed(state) {
-      state.isStepsCollapsed = !state.isStepsCollapsed;
+    toggleScenesCollapsed(state) {
+      state.isScenesCollapsed = !state.isScenesCollapsed;
       persistBooleans(state);
     },
 
@@ -194,16 +200,16 @@ export const scriptUiSlice = createSlice({
       state.mobilePlaylistOpen = !state.mobilePlaylistOpen;
     },
 
-    setMobileStepsOpen(state, action: PayloadAction<{ value: boolean }>) {
-      state.mobileStepsOpen = Boolean(action.payload.value);
+    setMobileScenesOpen(state, action: PayloadAction<{ value: boolean }>) {
+      state.mobileScenesOpen = Boolean(action.payload.value);
     },
-    toggleMobileSteps(state) {
-      state.mobileStepsOpen = !state.mobileStepsOpen;
+    toggleMobileScenes(state) {
+      state.mobileScenesOpen = !state.mobileScenesOpen;
     },
 
     closeMobilePanels(state) {
       state.mobilePlaylistOpen = false;
-      state.mobileStepsOpen = false;
+      state.mobileScenesOpen = false;
     },
 
     setIsEditing(state, action: PayloadAction<{ value: boolean }>) {

@@ -1,0 +1,61 @@
+{
+  "name": "Сценарий спектакля",
+  "playlist": [
+    {
+      "id": 3,
+      "title": "01 - Начало",
+      "file": "01-1768855046523.mp3",
+      "fadeMs": 2900,
+      "loop": false
+    }
+  ],
+  "sounds": [],
+  "scenes": [
+    {
+      "id": 1,
+      "title": " Зачин",
+      "markdown": "СВЕТ — канал  {{ blackout }}\n\n[Начало спектакля](track:1)\n\nСВЕТ — канал {{light:2}}\n\nРАБОТАЕТ ДЫМ МАШИНА\n\nСнецкий под одеялом Просыпается. Ловит ШМЕЛЯ.\n\nХЛОПОК! СМЕНА СВЕТА канал {{light:3}}\n\nВыбегаю люди начинается хаос.\n\nЗвучит МОЛНИЯ СВЕТ — {{light:2}}\n\nЛюди замирают. \n\nУхает сова СНЕЦКИЙ прячется под одеяло\n\nСВЕТ — {{blackout}}\n\nЖдем пока уйдут жители деревни и включаем свет.\n\nСВЕТ — канал {{light:3}}\n\nЛошадь сидит за Снецким. Снецкий прячется под одеялом \n\n{{blackout}} Ждем 5 секунд\n\nСВЕТ — канал {{light:3}}\n\nЛошадь стоит около СНЕЦКОГО, поднимает руку под звук шкатулки БЬЕТ ПО ГОЛОВЕ!\n\n{{ blackout }} Пока не уйдут со сцены\n\nМузыка играет дальше до выхода Леона\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "requisites": [
+        {
+          "id": 1,
+          "label": "Одеяло",
+          "checked": false
+        }
+      ],
+      "lightPlot": [],
+      "playMarkdown": "..."
+    }
+  ],
+  "lightChannels": [
+    "1| green",
+    "2 | blue",
+    "3 | red",
+    "4 | pink",
+    "5 | white",
+    "6 | yellow",
+    "7 | pink",
+    "",
+    "0 | black"
+  ],
+  "lightPlot": [],
+  "theaterLayout": {
+    "hallWidth": 20,
+    "hallDepth": 31,
+    "wallHeight": 6,
+    "stageWidth": 6,
+    "stageDepth": 3,
+    "stageHeight": 1,
+    "stageZ": 4,
+    "audienceStartZ": 3,
+    "seatRows": 12,
+    "seatsPerRow": 10,
+    "seatSpacing": 1.1,
+    "rowSpacing": 0.8,
+    "aisleWidth": 3.2,
+    "aisleCenterX": 0.4,
+    "doorWidth": 1.2,
+    "doorHeight": 2.2,
+    "doorZ": -13.5,
+    "rowRise": 0.3
+  }
+}

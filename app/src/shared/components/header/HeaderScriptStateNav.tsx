@@ -3,6 +3,6 @@ export interface HeaderScriptStateProps {
   onTogglePlaylist: () => void;
   showHeaderSounds: boolean;
   onToggleHeaderSounds: () => void;
-  isStepsCollapsed: boolean;
-  onToggleStepsCollapsed: () => void;
+  isScenesCollapsed: boolean;
+  onToggleScenesCollapsed: () => void;
 }

@@ -1,6 +1,7 @@
+import cn from "classnames";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Buttons } from "../../../shared/components/buttons/Buttons";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
 import {
   shuffle,
@@ -44,8 +45,8 @@ function persistDoneSet(storageKey: string | undefined, next: Set<string>) {
 type Exercise = {
   id: string;
   lineId: string;
-  stepId: number;
-  stepTitle: string;
+  sceneId: number;
+  sceneTitle: string;
   role: string;
   text: string;
   target: WordToken[];
@@ -245,7 +246,7 @@ function RoleLinePuzzle({
           <button
             key={t.id}
             type="button"
-            className={`dialogue-token dialogue-token--${t.kind}`}
+            className={cn("dialogue-token", t.kind === "punct" && "dialogue-token--punct")}
             onClick={() => pick(t)}
           >
             {t.text}
@@ -263,22 +264,22 @@ function RoleLinePuzzle({
 }
 
 export function DialogueSceneTrainer({
-  steps,
+  scenes,
   role,
   roleKeys,
-  selectedStepIds,
+  selectedPlaybookIds,
   storageKey,
 }: {
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
   role: string;
   roleKeys?: string[];
-  selectedStepIds: number[];
+  selectedPlaybookIds: number[];
   storageKey?: string;
 }) {
   const allLines = useMemo(() => {
-    const selected = steps.filter((s) => selectedStepIds.includes(s.id));
-    return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
-  }, [selectedStepIds, steps]);
+    const selected = scenes.filter((s) => selectedPlaybookIds.includes(s.id));
+    return buildDialogueLines({ scenes: selected, preferField: "playMarkdown" });
+  }, [selectedPlaybookIds, scenes]);
 
   const desiredRoleKeySet = useMemo(() => {
     const keys = (roleKeys && roleKeys.length ? roleKeys : [role])
@@ -297,13 +298,13 @@ export function DialogueSceneTrainer({
         tokenizeText(line.text, { includePunctuation: true }),
       );
       if (tokens.length < 1) continue;
-      const seed = Number(String(line.stepId ?? 0)) + line.text.length * 17;
+      const seed = Number(String(line.sceneId ?? 0)) + line.text.length * 17;
       out.push({
         // Use stable line id so progress survives text edits/cleanup.
         id: line.id,
         lineId: line.id,
-        stepId: line.stepId,
-        stepTitle: line.stepTitle,
+        sceneId: line.sceneId,
+        sceneTitle: line.sceneTitle,
         role: line.role,
         text: line.text,
         target: tokens,
@@ -430,7 +431,12 @@ export function DialogueSceneTrainer({
 
     return (
       <div
-        className={`dialogue-line dialogue-line--mine ${done ? "dialogue-line--done" : ""} ${isActive ? "dialogue-line--active" : ""}`}
+        className={cn(
+          "dialogue-line",
+          "dialogue-line--mine",
+          done && "dialogue-line--done",
+          isActive && "dialogue-line--active",
+        )}
       >
         <RoleLinePuzzle
           ex={ex}
@@ -510,17 +516,17 @@ export function DialogueSceneTrainer({
         ) : null}
         {allLines.length === 0 ? (
           <div className="dialogue-empty">
-            {selectedStepIds.length === 0
-              ? "Выберите шаги для тренировки в настройках выше."
-              : "Нет текста в выбранных шагах (проверьте поле «Текст» в шагах)."}
+            {selectedPlaybookIds.length === 0
+              ? "Выберите сцены для тренировки в настройках выше."
+              : "Нет текста в выбранных сценах (проверьте поле «Текст» в сценах)."}
           </div>
         ) : (
           allLines.map((line) => (
             <div
               key={line.id}
               ref={(el) => setLineRef(line.id, el)}
-              className="dialogue-line-wrap"
-              data-step-id={String(line.stepId)}
+              className="dialogue-trainer__line"
+              data-scene-id={String(line.sceneId)}
             >
               {renderLine(line)}
             </div>

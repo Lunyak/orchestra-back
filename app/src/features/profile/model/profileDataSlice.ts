@@ -54,6 +54,34 @@ function minutesToHHMM(min: number): string {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+function isValidIsoDate(iso: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso);
+}
+
+const MAX_AVAILABILITY_RANGE_DAYS = 366;
+
+function listIsoDatesInRange(fromIso: string, toIso: string): string[] {
+  const from = String(fromIso ?? "").trim();
+  const to = String(toIso ?? "").trim();
+  if (!isValidIsoDate(from) || !isValidIsoDate(to)) return [];
+  if (from > to) return [];
+
+  const out: string[] = [];
+  const cur = new Date(`${from}T12:00:00`);
+  const end = new Date(`${to}T12:00:00`);
+  if (!Number.isFinite(cur.getTime()) || !Number.isFinite(end.getTime())) return [];
+
+  while (cur <= end && out.length < MAX_AVAILABILITY_RANGE_DAYS) {
+    const yyyy = cur.getFullYear();
+    const mm = String(cur.getMonth() + 1).padStart(2, "0");
+    const dd = String(cur.getDate()).padStart(2, "0");
+    out.push(`${yyyy}-${mm}-${dd}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  return out;
+}
+
 function normalizePatchFromForm(form: Partial<MyProfile>): Partial<MyProfile> {
   const t = (v: unknown) => String(v ?? "").trim();
 
@@ -249,6 +277,35 @@ export const profileDataSlice = createSlice({
 
       // Ranges only make sense when day is explicitly "present"
       if (status !== "present") delete nextRanges[date];
+
+      (state.form as any).availabilityCalendar = nextCal;
+      (state.form as any).availabilityTimeRanges = nextRanges;
+    },
+    setAvailabilityRangeStatus(
+      state,
+      action: PayloadAction<{ fromDate: string; toDate: string; status: AvailabilityStatus | null }>,
+    ) {
+      const dates = listIsoDatesInRange(action.payload.fromDate, action.payload.toDate);
+      if (dates.length === 0) return;
+
+      const status = action.payload.status;
+      const availabilityCalendar =
+        (((state.form as any).availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>) ?? {};
+      const availabilityTimeRanges =
+        (((state.form as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>) ?? {};
+
+      const nextCal = { ...availabilityCalendar };
+      const nextRanges = { ...availabilityTimeRanges };
+
+      for (const date of dates) {
+        if (status === "present" || status === "absent") {
+          nextCal[date] = status;
+          if (status !== "present") delete nextRanges[date];
+        } else {
+          delete nextCal[date];
+          delete nextRanges[date];
+        }
+      }
 
       (state.form as any).availabilityCalendar = nextCal;
       (state.form as any).availabilityTimeRanges = nextRanges;

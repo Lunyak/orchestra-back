@@ -3,7 +3,7 @@ import { useAuth } from "../../auth";
 import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { useProject } from "../../project";
 import { useProjectMembersQuery } from "../../project/api/project-api";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useMyTroupeQuery } from "../../troupe/api/troupe-api";
 import { memberLabel } from "../../troupe/model/troupe-page-utils";
 import {
@@ -37,7 +37,7 @@ export function useProjectTasksPage() {
     skip: !accessToken,
   });
   const { projectName } = useProject();
-  const { steps } = useScene();
+  const { scenes } = usePlaybook();
   const [filter, setFilter] = useState<ProjectTaskFilter>("open");
   const [newTitle, setNewTitle] = useState("");
   const [newAssigneeEmail, setNewAssigneeEmail] = useState("");
@@ -107,8 +107,8 @@ export function useProjectTasksPage() {
   );
 
   const requisiteImportCount = useMemo(
-    () => countRequisiteTaskImports(steps),
-    [steps],
+    () => countRequisiteTaskImports(scenes),
+    [scenes],
   );
 
   const tasks = data?.tasks ?? [];
@@ -204,7 +204,7 @@ export function useProjectTasksPage() {
 
   const handleImportRequisites = async () => {
     if (!projectSlug) return;
-    const imports = buildRequisiteTaskImports(steps);
+    const imports = buildRequisiteTaskImports(scenes);
     if (!imports.length) return;
     setActionError(null);
     try {

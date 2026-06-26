@@ -2,7 +2,7 @@ import type { HeaderScriptStateProps } from "../header/HeaderScriptStateNav";
 import { MenubarPanelIcon } from "./MenubarPanelIcon";
 
 const icons = {
-  steps: (
+  scenes: (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <line x1="8" y1="6" x2="21" y2="6" />
       <line x1="8" y1="12" x2="21" y2="12" />
@@ -48,13 +48,13 @@ export function AppEditorScriptPanelsNav({
   onTogglePlaylist,
   showHeaderSounds,
   onToggleHeaderSounds,
-  isStepsCollapsed,
-  onToggleStepsCollapsed,
+  isScenesCollapsed,
+  onToggleScenesCollapsed,
   showSpectacleRunTextToggle = false,
   spectacleRunTextHidden = false,
   onToggleSpectacleRunText,
 }: AppEditorScriptPanelsNavProps) {
-  const stepsActive = !isStepsCollapsed;
+  const scenesActive = !isScenesCollapsed;
   const runTextVisible = !spectacleRunTextHidden;
   const navLabel = showSpectacleRunTextToggle ? "Панели репетиции" : "Панели сценария";
 
@@ -64,16 +64,16 @@ export function AppEditorScriptPanelsNav({
         type="button"
         className={[
           "app-editor-menubar__panel-btn",
-          stepsActive ? "app-editor-menubar__panel-btn--active" : "app-editor-menubar__panel-btn--muted",
+          scenesActive ? "app-editor-menubar__panel-btn--active" : "app-editor-menubar__panel-btn--muted",
         ]
           .filter(Boolean)
           .join(" ")}
-        onClick={onToggleStepsCollapsed}
-        title={isStepsCollapsed ? "Показать шаги" : "Скрыть шаги"}
-        aria-label={isStepsCollapsed ? "Показать шаги" : "Скрыть шаги"}
-        aria-pressed={stepsActive}
+        onClick={onToggleScenesCollapsed}
+        title={isScenesCollapsed ? "Показать сцены" : "Скрыть сцены"}
+        aria-label={isScenesCollapsed ? "Показать сцены" : "Скрыть сцены"}
+        aria-pressed={scenesActive}
       >
-        <MenubarPanelIcon active={stepsActive}>{icons.steps}</MenubarPanelIcon>
+        <MenubarPanelIcon active={scenesActive}>{icons.scenes}</MenubarPanelIcon>
       </button>
       <button
         type="button"
@@ -119,7 +119,7 @@ export function AppEditorScriptPanelsNav({
             .join(" ")}
           onClick={onToggleSpectacleRunText}
           title={spectacleRunTextHidden ? "Показать текст" : "Скрыть текст"}
-          aria-label={spectacleRunTextHidden ? "Показать текст шага" : "Скрыть текст шага"}
+          aria-label={spectacleRunTextHidden ? "Показать текст сцены" : "Скрыть текст сцены"}
           aria-pressed={runTextVisible}
         >
           <MenubarPanelIcon active={runTextVisible}>{icons.runText}</MenubarPanelIcon>

@@ -349,7 +349,7 @@
   outline-offset: 2px;
 }
 
-.rolewb-actor-avatar-btn.is-active {
+.rolewb-actor-avatar-btn--active {
   border-color: var(--color-active-ascent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-active-ascent) 28%, transparent);
 }
@@ -371,7 +371,7 @@
   background: var(--color-text-muted);
 }
 
-.rolewb-actor-avatar-btn.has-save .rolewb-actor-avatar-status {
+.rolewb-actor-avatar-btn--has-save .rolewb-actor-avatar-status {
   background: var(--color-active-ascent);
 }
 
@@ -405,6 +405,77 @@
   color: var(--color-text-muted);
   line-height: 1.45;
   margin: 0;
+}
+
+.rolewb-row--between {
+  justify-content: space-between;
+}
+
+.rolewb-textarea,
+.rolewb-field-full {
+  max-width: unset;
+  width: 100%;
+}
+
+.rolewb-hint--flush {
+  margin-top: 0;
+}
+
+.rolewb-hint--tight {
+  margin-top: 6px;
+}
+
+.rolewb-hint--spaced {
+  margin-top: 8px;
+}
+
+.rolewb-saved-status {
+  font-size: 12px;
+  color: var(--color-status-success-bright);
+}
+
+.rolewb-meta {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.rolewb-meta--soft {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.rolewb-meta--muted {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.rolewb-dropzone--spaced {
+  margin-top: 6px;
+}
+
+.rolewb-img-placeholder {
+  height: 140px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.rolewb-scene-arcs-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.rolewb-scene-id {
+  opacity: 0.75;
+}
+
+.rolewb-timestamp-muted {
+  opacity: 0.75;
+}
+
+.rolewb-reference-gallery--spaced {
+  margin-top: 8px;
 }
 
 .rolewb-scene-block {

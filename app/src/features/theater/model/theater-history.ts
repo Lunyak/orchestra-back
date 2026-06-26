@@ -1,12 +1,12 @@
 import type {
-  ScriptStep,
+  ScriptScene,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
 } from "../../../shared/types/script";
 
 export type TheaterHistorySnapshot = {
-  stepId: number;
+  sceneId: number;
   layout: TheaterLayout;
   theaterSpotlights: TheaterSpotlight[];
   theaterModels: TheaterModel[];
@@ -55,19 +55,19 @@ export function cloneTheaterModels(items: TheaterModel[]): TheaterModel[] {
 }
 
 export function createTheaterHistorySnapshot(args: {
-  step: ScriptStep | undefined;
+  scene: ScriptScene | undefined;
   layout: TheaterLayout;
   spotlights: TheaterSpotlight[];
   models: TheaterModel[];
 }): TheaterHistorySnapshot | null {
-  if (!args.step) return null;
+  if (!args.scene) return null;
   return {
-    stepId: args.step.id,
+    sceneId: args.scene.id,
     layout: cloneTheaterLayout(args.layout),
     theaterSpotlights: cloneTheaterSpotlights(args.spotlights),
     theaterModels: cloneTheaterModels(args.models),
-    theaterActiveSpotlightId: args.step.theaterActiveSpotlightId,
-    theaterActiveModelId: args.step.theaterActiveModelId,
+    theaterActiveSpotlightId: args.scene.theaterActiveSpotlightId,
+    theaterActiveModelId: args.scene.theaterActiveModelId,
   };
 }
 

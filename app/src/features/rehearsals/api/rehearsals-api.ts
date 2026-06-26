@@ -1,7 +1,7 @@
 import { orchestraApi } from "../../../shared/api/rtk/orchestra-api";
 import type {
   Rehearsal,
-  RehearsalSelectedStep,
+  RehearsalSelectedScene,
 } from "../../../sync/api/rehearsals";
 
 export type RehearsalListArgs = {
@@ -15,11 +15,11 @@ export type RehearsalListResponse = {
   rehearsals: Rehearsal[];
 };
 
-export type RehearsalStepsResponse = {
+export type RehearsalScenesResponse = {
   rehearsal: { id: string; title: string; startsAt: string };
-  selectedSceneIds: string[];
-  selectedSteps: RehearsalSelectedStep[];
-  scenes: Array<{ id: string; name: string; steps: Array<{ id: number; title: string }> }>;
+  selectedPlaybookIds: string[];
+  selectedScenes: RehearsalSelectedScene[];
+  playbooks: Array<{ id: string; name: string; scenes: Array<{ id: number; title: string }> }>;
 };
 
 export type RehearsalPlanResponse = {
@@ -56,11 +56,11 @@ export const rehearsalsApi = orchestraApi.injectEndpoints({
       providesTags: (_r, _e, id) => [{ type: "Rehearsal", id }],
     }),
 
-    rehearsalSteps: build.query<RehearsalStepsResponse, string>({
+    rehearsalScenes: build.query<RehearsalScenesResponse, string>({
       query: (rehearsalId) => ({
-        url: `/rehearsals/${encodeURIComponent(rehearsalId)}/steps`,
+        url: `/rehearsals/${encodeURIComponent(rehearsalId)}/scenes`,
       }),
-      providesTags: (_r, _e, id) => [{ type: "RehearsalSteps", id }],
+      providesTags: (_r, _e, id) => [{ type: "RehearsalScenes", id }],
     }),
 
     rehearsalPlan: build.query<RehearsalPlanResponse, string>({
@@ -96,8 +96,8 @@ export const rehearsalsApi = orchestraApi.injectEndpoints({
             | "startsAt"
             | "durationMin"
             | "notes"
-            | "selectedSceneIds"
-            | "selectedSteps"
+            | "selectedPlaybookIds"
+            | "selectedScenes"
           >
         >;
         projectSlug?: string;
@@ -112,8 +112,8 @@ export const rehearsalsApi = orchestraApi.injectEndpoints({
         { type: "Rehearsal", id: rehearsalId },
         { type: "RehearsalPlan", id: rehearsalId },
         { type: "RehearsalList" },
-        ...(patch.selectedSteps != null
-          ? [{ type: "RehearsalSteps" as const, id: rehearsalId }]
+        ...(patch.selectedScenes != null
+          ? [{ type: "RehearsalScenes" as const, id: rehearsalId }]
           : []),
       ],
     }),
@@ -132,7 +132,7 @@ export const {
   useListRehearsalsQuery,
   useGetRehearsalQuery,
   useLazyGetRehearsalQuery,
-  useRehearsalStepsQuery,
+  useRehearsalScenesQuery,
   useRehearsalPlanQuery,
   useCreateRehearsalMutation,
   useUpdateRehearsalMutation,

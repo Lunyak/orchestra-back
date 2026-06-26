@@ -23,6 +23,10 @@ type BlobCache = {
 };
 
 const blobCaches = new Map<string, BlobCache>();
+const jsonCaches = new Map<
+  string,
+  { script?: Record<string, unknown>; notesRun?: Record<string, unknown> }
+>();
 let activeProjectSlug: string | null = null;
 
 function extOf(name: string): string {
@@ -37,6 +41,60 @@ function revokeBlobCache(projectSlug: string): void {
     URL.revokeObjectURL(url);
   }
   blobCaches.delete(projectSlug);
+  jsonCaches.delete(projectSlug);
+}
+
+async function readJsonFileHandle(
+  handle: FileSystemFileHandle,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const file = await handle.getFile();
+    const parsed = JSON.parse(await file.text()) as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function readJsonFromDir(
+  handle: FileSystemDirectoryHandle,
+  fileName: string,
+): Promise<Record<string, unknown> | null> {
+  try {
+    const fileHandle = await handle.getFileHandle(fileName);
+    return readJsonFileHandle(fileHandle);
+  } catch {
+    return null;
+  }
+}
+
+async function readScriptJsonFromDir(
+  handle: FileSystemDirectoryHandle,
+): Promise<Record<string, unknown> | null> {
+  const direct = await readJsonFromDir(handle, "script.json");
+  if (direct) return direct;
+  try {
+    const modules = await handle.getDirectoryHandle("scenesModules");
+    const fromModules = await readJsonFromDir(modules, "script.json");
+    if (fromModules) return fromModules;
+  } catch {
+    /* no scenesModules */
+  }
+  try {
+    const legacy = await handle.getDirectoryHandle("scenes");
+    return readJsonFromDir(legacy, "script.json");
+  } catch {
+    return null;
+  }
+}
+
+export function readBrowserPickedProjectJson(
+  projectSlug: string,
+  kind: "script" | "notes-run",
+): Record<string, unknown> | null {
+  const entry = jsonCaches.get(projectSlug);
+  if (!entry) return null;
+  return kind === "script" ? (entry.script ?? null) : (entry.notesRun ?? null);
 }
 
 export function setBrowserPickedMediaProject(projectSlug: string | null): void {
@@ -107,6 +165,24 @@ async function idbSet(key: string, value: unknown): Promise<void> {
   });
 }
 
+async function walkDirectoryFiles(
+  handle: FileSystemDirectoryHandle,
+  depth: number,
+  maxDepth: number,
+  onFile: (file: File) => void,
+): Promise<void> {
+  for await (const entry of handle.values()) {
+    if (entry.kind === "file") {
+      const fileHandle = entry as FileSystemFileHandle;
+      onFile(await fileHandle.getFile());
+      continue;
+    }
+    if (entry.kind === "directory" && depth < maxDepth) {
+      await walkDirectoryFiles(entry as FileSystemDirectoryHandle, depth + 1, maxDepth, onFile);
+    }
+  }
+}
+
 async function scanDirectoryHandle(
   projectSlug: string,
   handle: FileSystemDirectoryHandle,
@@ -122,9 +198,7 @@ async function scanDirectoryHandle(
   let holdId = 1;
   let soundId = 1;
 
-  for await (const entry of handle.values()) {
-    if (entry.kind !== "file") continue;
-    const file = await entry.getFile();
+  await walkDirectoryFiles(handle, 0, 4, (file) => {
     const ext = extOf(file.name);
     const title = file.name.replace(/\.[^.]+$/, "") || file.name;
     const blobUrl = URL.createObjectURL(file);
@@ -139,13 +213,20 @@ async function scanDirectoryHandle(
     } else if (AUDIO_EXT.has(ext)) {
       sounds.push({ id: soundId++, title, file: file.name });
     }
-  }
+  });
 
   videos.sort((a, b) => a.title.localeCompare(b.title, "ru"));
   holdImages.sort((a, b) => a.title.localeCompare(b.title, "ru"));
   sounds.sort((a, b) => a.title.localeCompare(b.title, "ru"));
 
-  if (videos.length === 0 && holdImages.length === 0 && sounds.length === 0) {
+  const notesRun = await readJsonFromDir(handle, "notes-run.json");
+  const script = await readScriptJsonFromDir(handle);
+  jsonCaches.set(projectSlug, {
+    notesRun: notesRun ?? undefined,
+    script: script ?? undefined,
+  });
+
+  if (videos.length === 0 && holdImages.length === 0 && sounds.length === 0 && !notesRun && !script) {
     return {
       ok: false,
       folderName: handle.name,
@@ -153,7 +234,7 @@ async function scanDirectoryHandle(
       videos: [],
       holdImages: [],
       sounds: [],
-      error: "В папке нет mp4, jpg или mp3",
+      error: "В папке нет mp4, jpg, mp3, script.json или notes-run.json",
     };
   }
 
@@ -180,7 +261,16 @@ export async function pickBrowserMediaFolder(projectSlug: string): Promise<Brows
     };
   }
   try {
-    const handle = await window.showDirectoryPicker({ mode: "read" });
+    const picker = window.showDirectoryPicker;
+    if (!picker) {
+      return {
+        ok: false,
+        videos: [],
+        holdImages: [],
+        error: "Ваш браузер не поддерживает выбор папки (нужен Chrome или Edge)",
+      };
+    }
+    const handle = await picker({ mode: "read" });
     const permission = await handle.requestPermission({ mode: "read" });
     if (permission !== "granted") {
       return { ok: false, videos: [], holdImages: [], error: "Нет доступа к папке" };
@@ -224,22 +314,4 @@ export async function restoreBrowserMediaFolder(projectSlug: string): Promise<Br
       error: String((err as Error)?.message ?? err),
     };
   }
-}
-
-/** @deprecated Используйте scanProjectMediaFolder из project-media-folder.ts */
-export async function resolveLocalMediaScan(projectSlug?: string): Promise<
-  BrowserPickedScan & { source: "vite" | "browser" | "none" }
-> {
-  const { scanProjectMediaFolder } = await import("./project-media-folder");
-  const scanned = await scanProjectMediaFolder(projectSlug ?? activeProjectSlug ?? "");
-  return {
-    ok: scanned.ok,
-    source: scanned.source === "desktop" ? "vite" : scanned.source,
-    mediaRoot: scanned.mediaRoot,
-    folderName: scanned.folderName,
-    videos: scanned.videos,
-    holdImages: scanned.holdImages,
-    sounds: scanned.sounds,
-    error: scanned.error,
-  };
 }

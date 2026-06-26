@@ -1,12 +1,12 @@
 import type {
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../scene/model/scene-slice";
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../playbook/model/playbook-slice";
 import {
   fadersForKadrDisplay,
   findKadrById,
   type MarkdownKadrSection,
-  readStepLightKadrsFromMarkdown,
+  readSceneLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
 import {
   findProjectorLineInSection,
@@ -17,7 +17,7 @@ import { findSoundLineInSection, parseSoundLineInSection } from "../../theater/m
 import { formatFaderShort } from "../../../shared/components/light-console/light-console-labels";
 import { buildLightConsoleSplitModel } from "../../../shared/components/light-console/light-console-split";
 import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
-import type { ScriptStep, StepLightKadrV1 } from "../../../shared/types/script";
+import type { ScriptScene, SceneLightKadrV1 } from "../../../shared/types/script";
 import { parseKadrTitleFromHeading } from "./create-kadr-from-draft";
 import { parseKadrLabelsInSection, type KadrRunLabel } from "./kadr-section-labels";
 import { parseKadrCommentRawInSection } from "./kadr-section-comment";
@@ -94,10 +94,10 @@ function findFieldBody(
 
 function resolveKadrForItem(
   item: SpectacleTapeItem,
-  step: ScriptStep | undefined,
-): StepLightKadrV1 | undefined {
-  if (!step || item.isPlaceholder || !item.section) return undefined;
-  const kadrs = readStepLightKadrsFromMarkdown(step);
+  scene: ScriptScene | undefined,
+): SceneLightKadrV1 | undefined {
+  if (!scene || item.isPlaceholder || !item.section) return undefined;
+  const kadrs = readSceneLightKadrsFromMarkdown(scene);
   return (
     (item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined) ??
     kadrs.kadrs.find((k) => k.kadrNo === item.kadrNo)
@@ -107,7 +107,7 @@ function resolveKadrForItem(
 function programLabel(
   programId: number,
   lightChannels: string[],
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined,
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined,
 ): string {
   if (programId <= 0) return "блекаут";
   const program = lightPrograms?.programs.find((p) => p.id === programId);
@@ -121,10 +121,10 @@ function programLabel(
 }
 
 function formatLightSummary(
-  kadr: StepLightKadrV1,
+  kadr: SceneLightKadrV1,
   lightChannels: string[],
-  lightFaders: SceneLightFadersDataV1,
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1,
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined,
 ): string {
   if (kadr.blackout || kadr.programId <= 0) return "Блекаут";
 
@@ -140,7 +140,7 @@ function formatLightSummary(
   return `П${kadr.programId} · ${split.programLabel}`;
 }
 
-function formatFaderSummary(kadr: StepLightKadrV1): string | null {
+function formatFaderSummary(kadr: SceneLightKadrV1): string | null {
   const activeFaders = kadr.faders
     .filter((row) => row.enabled !== false && (row.intensity ?? 0) > 0.02)
     .map((row) => {
@@ -258,24 +258,24 @@ function pushTextField(
 
 export function buildKadrStripTechSummary(args: {
   item: SpectacleTapeItem;
-  step: ScriptStep | undefined;
+  scene: ScriptScene | undefined;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms?: SceneLightProgramsDataV1 | null;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms?: PlaybookLightProgramsDataV1 | null;
   media?: MediaLookup;
 }): KadrStripTechSummary {
-  const { item, step } = args;
+  const { item, scene } = args;
   const headingTitle = item.isPlaceholder
     ? "Без картин"
     : parseKadrTitleFromHeading(item.headingTitle ?? "", item.kadrNo);
 
-  if (item.isPlaceholder || !item.section || !step) {
+  if (item.isPlaceholder || !item.section || !scene) {
     return { headingTitle, rows: [], blackout: false, cornerLabels: [] };
   }
 
-  const markdown = String(step.markdown ?? "");
+  const markdown = String(scene.markdown ?? "");
   const section = item.section;
-  const kadr = resolveKadrForItem(item, step);
+  const kadr = resolveKadrForItem(item, scene);
   const rows: KadrStripTechRow[] = [];
   const media = args.media ?? {};
 

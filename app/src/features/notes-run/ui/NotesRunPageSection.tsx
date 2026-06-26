@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { useProject } from "../../project/model/project-context";
 import { useNotesRun } from "../model/useNotesRun";
 import { NotesRunProvider, useNotesRunContext } from "../model/notes-run-context";
@@ -23,16 +24,16 @@ function NotesRunToolbar() {
           {run.paused ? "Продолжить" : "Пауза"}
         </button>
         <button type="button" className="notes-run__btn" onClick={run.openCreateModal}>
-          + После текущей
+          Добавить
         </button>
         <button type="button" className="notes-run__btn" onClick={run.openEditModal} disabled={!run.currentCard}>
           Редактировать
         </button>
-        <button type="button" className="notes-run__btn" onClick={run.deleteCurrentCard} disabled={!run.currentCard}>
+        <button type="button" className="notes-run__btn notes-run__btn--danger" onClick={run.deleteCurrentCard} disabled={!run.currentCard}>
           Удалить
         </button>
-        <button type="button" className="notes-run__btn" onClick={run.initFromSteps}>
-          Из шагов сценария
+        <button type="button" className="notes-run__btn" onClick={run.initFromScenes}>
+          Из сцен сценария
         </button>
       </div>
       <div className="notes-run__toolbar-group">
@@ -45,7 +46,7 @@ function NotesRunToolbar() {
             Проектор
           </button>
         )}
-        <span className="notes-run__counter" aria-live="polite">
+        <span className="notes-run__toolbar-counter" aria-live="polite">
           {run.cards.length === 0
             ? "0 карточек"
             : `${run.cardIndex + 1} / ${run.cards.length}`}
@@ -89,9 +90,11 @@ function NotesRunNav() {
 }
 
 function cnNavForward(canGoNext: boolean) {
-  return canGoNext
-    ? "notes-run__nav-btn notes-run__nav-btn--forward notes-run__nav-btn--primary"
-    : "notes-run__nav-btn notes-run__nav-btn--forward";
+  return cn(
+    "notes-run__nav-btn",
+    "notes-run__nav-btn--forward",
+    canGoNext && "notes-run__nav-btn--primary",
+  );
 }
 
 function NotesRunBody() {

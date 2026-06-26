@@ -34,36 +34,36 @@ export function TheaterControlsDecorInventorySection({ vm, decor }: DecorSection
 <TheaterCollapsibleSection
             sectionId="decor-inventory"
             title="Реквизит"
-            summary="Список и шаги"
+            summary="Список и сцены"
           >
           <div className="theater-btn-row theater-btn-row--3">
             <TheaterBtn
               onClick={() => void vm.copyDecorInventoryToClipboard()}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Скопировать список декора в буфер (Markdown)"
             >
               Копировать список
             </TheaterBtn>
             <TheaterBtn
               onClick={vm.exportDecorInventoryCsv}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Сохранить список декора в CSV"
             >
               CSV реквизита
             </TheaterBtn>
             <TheaterBtn
               onClick={vm.syncDecorInventoryToRequisites}
-              disabled={!vm.currentStep}
-              title="Добавить позиции декора в реквизит шага"
+              disabled={!vm.currentScene}
+              title="Добавить позиции декора в реквизит сцены"
             >
-              В реквизит шага
+              В реквизит сцены
             </TheaterBtn>
             <TheaterBtn
-              onClick={vm.copyDecorToNextStep}
-              disabled={!vm.currentStep || vm.currentPage >= vm.stepCount - 1}
-              title="Скопировать декор текущего шага на следующий"
+              onClick={vm.copyDecorToNextScene}
+              disabled={!vm.currentScene || vm.currentPage >= vm.sceneCount - 1}
+              title="Скопировать декор текущей сцены на следующую"
             >
-              На след. шаг
+              На след. сцену
             </TheaterBtn>
           </div>
           {vm.decorActionMessage ? (

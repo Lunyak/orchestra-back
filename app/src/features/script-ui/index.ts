@@ -1,1 +1,3 @@
-export { ScriptUIProvider, useScriptUI } from "./model/script-ui-context";
+export { ScriptUiBootstrap } from "./model/ScriptUiBootstrap";
+export { useScriptUI } from "./model/useScriptUI";
+export type { ScriptUIContextValue } from "./model/useScriptUI";

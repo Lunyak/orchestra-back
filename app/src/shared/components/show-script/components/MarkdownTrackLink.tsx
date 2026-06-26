@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import {
   getPlaylistVisualSnapshot,
   subscribePlaylistActiveTrack,
-} from "../../../../features/scene/model/scene-playback-bridge";
+} from "../../../../features/playbook/model/playbook-playback-bridge";
 
 type MarkdownTrackLinkProps = {
   trackId?: number;

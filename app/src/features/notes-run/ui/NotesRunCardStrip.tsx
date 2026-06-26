@@ -1,5 +1,5 @@
 import cn from "classnames";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
 import type { NotesRunCardV1 } from "../model/notes-run-types";
@@ -53,6 +53,26 @@ export function NotesRunCardStrip({
   onSelectIndex: (index: number) => void;
 }) {
   const active = cards[cardIndex] ?? null;
+  const stripRef = useRef<HTMLDivElement>(null);
+  const activeChipRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const chip = activeChipRef.current;
+    const track = stripRef.current;
+    if (!chip || !track) return;
+
+    const chipLeft = chip.offsetLeft;
+    const chipRight = chipLeft + chip.offsetWidth;
+    const viewLeft = track.scrollLeft;
+    const viewRight = viewLeft + track.clientWidth;
+    const edgePadding = 8;
+    const chipOutsideView =
+      chipLeft < viewLeft + edgePadding || chipRight > viewRight - edgePadding;
+
+    if (chipOutsideView) {
+      chip.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
+    }
+  }, [cardIndex]);
 
   const activePreview = useMemo(() => {
     if (!active?.projectorCue) return null;
@@ -80,31 +100,33 @@ export function NotesRunCardStrip({
   if (cards.length === 0) {
     return (
       <div className="notes-run__empty">
-        <p>Карточек пока нет. Создайте вручную или «Из шагов сценария».</p>
+        <p>Карточек пока нет. Создайте вручную или «Из сцен сценария».</p>
       </div>
     );
   }
 
   return (
-    <div className="notes-run__strip-wrap">
-      <div className="notes-run__strip" role="tablist" aria-label="Карточки прогона">
+    <div className="notes-run__strip-container">
+      <div ref={stripRef} className="notes-run__strip" role="tablist" aria-label="Карточки суфлёра">
         {cards.map((card, index) => {
           const activeChip = index === cardIndex;
+          const chipRef = activeChip ? activeChipRef : undefined;
           const soundLine = formatSoundLine(card, media);
           const videoLine = formatVideoLine(card, media);
           return (
             <button
               key={card.id}
+              ref={chipRef}
               type="button"
               role="tab"
               aria-selected={activeChip}
               className={cn("notes-run__chip", activeChip && "notes-run__chip--active")}
               onClick={() => onSelectIndex(index)}
             >
-              <header className="notes-run__chip-head">
-                <span className="notes-run__chip-no">#{card.cardNo}</span>
-                {card.stepLabel ? (
-                  <span className="notes-run__chip-step">{card.stepLabel}</span>
+              <header className="notes-run__chip-header">
+                <span className="notes-run__chip-number">#{card.cardNo}</span>
+                {card.sceneLabel ? (
+                  <span className="notes-run__chip-scene">{card.sceneLabel}</span>
                 ) : null}
               </header>
               <h3 className="notes-run__chip-title">

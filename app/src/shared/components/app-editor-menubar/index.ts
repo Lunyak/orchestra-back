@@ -7,7 +7,6 @@ export {
   useAppEditorMenubarActionsRender,
   useAppEditorMenubarCenter,
   useAppEditorMenubarCenterRender,
-  useAppEditorViewMenu,
   useAppEditorViewMenuRender,
 } from "./AppEditorMenubarContext";
 export {
@@ -26,8 +25,8 @@ export { AppEditorScriptMarkdownMenu } from "./AppEditorScriptMarkdownMenu";
 export type { AppEditorScriptMarkdownMenuProps } from "./AppEditorScriptMarkdownMenu";
 export { AppEditorScriptPlayOriginalToggle } from "./AppEditorScriptPlayOriginalToggle";
 export { AppEditorScriptTocToggle } from "./AppEditorScriptTocToggle";
-export { AppEditorScriptStepTitle } from "./AppEditorScriptStepTitle";
-export type { AppEditorScriptStepTitleProps } from "./AppEditorScriptStepTitle";
+export { AppEditorScriptSceneTitle } from "./AppEditorScriptSceneTitle";
+export type { AppEditorScriptSceneTitleProps } from "./AppEditorScriptSceneTitle";
 export { AppEditorScriptModeNav } from "./AppEditorScriptModeNav";
 export type { AppEditorScriptModeNavProps } from "./AppEditorScriptModeNav";
 export { AppEditorScriptPanelsNav } from "./AppEditorScriptPanelsNav";

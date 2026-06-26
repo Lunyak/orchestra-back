@@ -11,6 +11,10 @@ services:
       - ./back/src:/app/src
       - ./back/prisma:/app/prisma
       - ./back/test:/app/test
+      - ./back/tsconfig.json:/app/tsconfig.json
+      - ./back/tsconfig.build.json:/app/tsconfig.build.json
+      - ./back/nest-cli.json:/app/nest-cli.json
+      - ./back/prisma.config.ts:/app/prisma.config.ts
       # Синхронизация манифеста с хостом + npm install при старте — иначе анонимный том
       # /app/node_modules залипает на старых пакетах после добавления зависимостей (без ручного docker volume rm).
       - ./back/package.json:/app/package.json
@@ -35,6 +39,7 @@ services:
       - ./web/public:/workspace/web/public
       - ./web/index.html:/workspace/web/index.html
       - ./web/vite.config.ts:/workspace/web/vite.config.ts
+      - ./web/vite-local-projects-plugin.ts:/workspace/web/vite-local-projects-plugin.ts
       - ./web/tsconfig.json:/workspace/web/tsconfig.json
       - ./web/tsconfig.node.json:/workspace/web/tsconfig.node.json
       - ./web/package.json:/workspace/web/package.json

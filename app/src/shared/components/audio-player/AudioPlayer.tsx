@@ -50,7 +50,7 @@ export const AudioPlayer: React.FC = () => {
           type="file"
           accept="audio/*"
           multiple
-          style={{ display: "none" }}
+          className="native-file-input--hidden"
           onChange={handleFileChange}
         />
         <button className="btn btn-primary" onClick={handleFileLoad}>

@@ -13,13 +13,13 @@ import "./style.css";
 
 export function ActorPageView() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [stepPickerOpen, setStepPickerOpen] = useState(false);
-  const [expandedStepIds, setExpandedStepIds] = useState<Set<number>>(() => new Set());
+  const [scenePickerOpen, setScenePickerOpen] = useState(false);
+  const [expandedSceneIds, setExpandedSceneIds] = useState<Set<number>>(() => new Set());
   const {
     projects,
     projectName,
     onProjectChange,
-    steps,
+    scenes,
     profileLoading,
     myEmail,
     canPickAnyRole,
@@ -30,16 +30,16 @@ export function ActorPageView() {
     effectiveRoleInfo,
     effectiveRoleTitle,
     effectiveRoleKeys,
-    phraseSteps,
-    phraseStepsEmptyHint,
-    phrasesByStep,
-    normalizedSelectedStepIds,
-    setSelectedStepIds,
-    totalInAllSteps,
+    phraseScenes,
+    phraseScenesEmptyHint,
+    phrasesByScene,
+    normalizedSelectedSceneIds,
+    setSelectedSceneIds,
+    totalInAllScenes,
     filteredPhrases,
     trainerMode,
     setTrainerMode,
-    selectedStepIdsForTraining,
+    selectedPlaybookIdsForTraining,
     trainerStorageKey,
     dialogueStorageKey,
     voiceStorageKey,
@@ -70,31 +70,31 @@ export function ActorPageView() {
       ? "Нет ролей для вашего пользователя"
       : "Профиль не загружен";
 
-  const stepPickerDisabled = !effectiveRoleInfo || phraseSteps.length === 0;
-  const selectedStepsText = normalizedSelectedStepIds === "all" ? "все" : String(normalizedSelectedStepIds.length);
+  const scenePickerDisabled = !effectiveRoleInfo || phraseScenes.length === 0;
+  const selectedScenesText = normalizedSelectedSceneIds === "all" ? "все" : String(normalizedSelectedSceneIds.length);
   const selectedScenesButtonText =
-    normalizedSelectedStepIds === "all"
-      ? `Выбрать сцены: все (${phraseSteps.length})`
-      : `Выбрать сцены: ${normalizedSelectedStepIds.length} из ${phraseSteps.length}`;
+    normalizedSelectedSceneIds === "all"
+      ? `Выбрать сцены: все (${phraseScenes.length})`
+      : `Выбрать сцены: ${normalizedSelectedSceneIds.length} из ${phraseScenes.length}`;
 
-  const toggleStepSelection = (stepId: number, nextChecked: boolean) => {
-    setSelectedStepIds((prev) => {
+  const toggleSceneSelection = (sceneId: number, nextChecked: boolean) => {
+    setSelectedSceneIds((prev) => {
       if (prev === "all") {
         if (nextChecked) return "all";
-        return phraseSteps.map((x) => x.stepId).filter((id) => id !== stepId);
+        return phraseScenes.map((x) => x.sceneId).filter((id) => id !== sceneId);
       }
       const set = new Set(prev);
-      if (nextChecked) set.add(stepId);
-      else set.delete(stepId);
+      if (nextChecked) set.add(sceneId);
+      else set.delete(sceneId);
       return Array.from(set.values()).sort((a, b) => a - b);
     });
   };
 
-  const toggleStepExpanded = (stepId: number) => {
-    setExpandedStepIds((prev) => {
+  const toggleSceneExpanded = (sceneId: number) => {
+    setExpandedSceneIds((prev) => {
       const next = new Set(prev);
-      if (next.has(stepId)) next.delete(stepId);
-      else next.add(stepId);
+      if (next.has(sceneId)) next.delete(sceneId);
+      else next.add(sceneId);
       return next;
     });
   };
@@ -131,7 +131,7 @@ export function ActorPageView() {
               panelClassName="actor-settings-modal"
               ariaLabel="Настройки актёра"
             >
-              <div className="actor-settings-modal__head">
+              <div className="actor-settings-modal__header">
                 <div>
                   <div className="actor-label">Настройки</div>
                   <div className="actor-settings-modal__title">Актёрский тренажёр</div>
@@ -179,21 +179,21 @@ export function ActorPageView() {
                 </label>
 
                 <div className="actor-field">
-                  <div className="actor-label">Сцены (шаги) для тренировки</div>
-                  <div className="actor-step-picker">
-                    <div className="actor-step-picker-actions">
+                  <div className="actor-label">Сцены для тренировки</div>
+                  <div className="actor-scene-picker">
+                    <div className="actor-scene-picker-actions">
                       <Button
-                        className="actor-step-btn secondary"
+                        className="actor-scene-btn secondary"
                         type="button"
-                        onClick={() => setStepPickerOpen(true)}
+                        onClick={() => setScenePickerOpen(true)}
                         disabled={!effectiveRoleInfo}
                       >
                         {selectedScenesButtonText}
                       </Button>
                     </div>
-                    {phraseSteps.length === 0 ? (
+                    {phraseScenes.length === 0 ? (
                       <div className="actor-hint">
-                        {phraseStepsEmptyHint ?? "Нет шагов с репликами выбранной роли."}
+                        {phraseScenesEmptyHint ?? "Нет сцен с репликами выбранной роли."}
                       </div>
                     ) : null}
                   </div>
@@ -202,92 +202,92 @@ export function ActorPageView() {
             </Modal>
 
             <Modal
-              isOpen={stepPickerOpen}
+              isOpen={scenePickerOpen}
               onClose={() => {
-                setStepPickerOpen(false);
+                setScenePickerOpen(false);
               }}
-              panelClassName="actor-step-picker-modal"
+              panelClassName="actor-scene-picker-modal"
               ariaLabel="Выбор сцен для тренировки"
             >
-              <div className="actor-step-picker-modal__head">
+              <div className="actor-scene-picker-modal__header">
                 <div>
-                  <div className="actor-label">Сцены (шаги) для тренировки</div>
-                  <div className="actor-step-picker-meta">
-                    Выбрано: <b>{selectedStepsText}</b>
+                  <div className="actor-label">Сцены для тренировки</div>
+                  <div className="actor-scene-picker-meta">
+                    Выбрано: <b>{selectedScenesText}</b>
                   </div>
                 </div>
                 <Button
-                  className="actor-step-btn secondary"
+                  className="actor-scene-btn secondary"
                   type="button"
                   onClick={() => {
-                    setStepPickerOpen(false);
+                    setScenePickerOpen(false);
                   }}
                 >
                   Закрыть
                 </Button>
               </div>
 
-              <div className="actor-step-picker-modal__toolbar">
+              <div className="actor-scene-picker-modal__toolbar">
                 <Button
-                  className="actor-step-btn secondary"
+                  className="actor-scene-btn secondary"
                   type="button"
-                  onClick={() => setSelectedStepIds("all")}
-                  disabled={stepPickerDisabled}
+                  onClick={() => setSelectedSceneIds("all")}
+                  disabled={scenePickerDisabled}
                 >
-                  Все ({totalInAllSteps})
+                  Все ({totalInAllScenes})
                 </Button>
                 <Button
-                  className="actor-step-btn secondary"
+                  className="actor-scene-btn secondary"
                   type="button"
-                  onClick={() => setSelectedStepIds([])}
-                  disabled={stepPickerDisabled}
+                  onClick={() => setSelectedSceneIds([])}
+                  disabled={scenePickerDisabled}
                 >
                   Очистить
                 </Button>
               </div>
 
-              <div className="actor-step-picker-list actor-step-picker-modal__list" aria-label="Список шагов">
-                {phraseSteps.length === 0 ? (
+              <div className="actor-scene-picker-list actor-scene-picker-modal__list" aria-label="Список сцен">
+                {phraseScenes.length === 0 ? (
                   <div className="actor-hint">
-                    {phraseStepsEmptyHint ?? "Нет шагов с репликами выбранной роли."}
+                    {phraseScenesEmptyHint ?? "Нет сцен с репликами выбранной роли."}
                   </div>
                 ) : (
-                  phraseSteps.map((s) => {
+                  phraseScenes.map((s) => {
                     const checked =
-                      normalizedSelectedStepIds === "all" ? true : normalizedSelectedStepIds.includes(s.stepId);
-                    const examples = (phrasesByStep.get(s.stepId) ?? []).slice(0, 2);
-                    const stepSource = steps.find((step) => Number(step.id) === s.stepId) ?? null;
-                    const stepText = String(stepSource?.playMarkdown || stepSource?.markdown || "").trim();
-                    const expanded = expandedStepIds.has(s.stepId);
+                      normalizedSelectedSceneIds === "all" ? true : normalizedSelectedSceneIds.includes(s.sceneId);
+                    const examples = (phrasesByScene.get(s.sceneId) ?? []).slice(0, 2);
+                    const sceneSource = scenes.find((scene) => Number(scene.id) === s.sceneId) ?? null;
+                    const sceneText = String(sceneSource?.playMarkdown || sceneSource?.markdown || "").trim();
+                    const expanded = expandedSceneIds.has(s.sceneId);
 
                     return (
                       <div
-                        key={s.stepId}
-                        className={cn("actor-step-item", checked && "actor-step-item--selected")}
+                        key={s.sceneId}
+                        className={cn("actor-scene-item", checked && "actor-scene-item--selected")}
                         role="checkbox"
                         aria-checked={checked}
                         tabIndex={0}
-                        onClick={() => toggleStepSelection(s.stepId, !checked)}
+                        onClick={() => toggleSceneSelection(s.sceneId, !checked)}
                         onKeyDown={(e) => {
                           if (e.key !== "Enter" && e.key !== " ") return;
                           e.preventDefault();
-                          toggleStepSelection(s.stepId, !checked);
+                          toggleSceneSelection(s.sceneId, !checked);
                         }}
                       >
                         <input
-                          className="actor-step-hidden-checkbox"
+                          className="actor-scene-hidden-checkbox"
                           type="checkbox"
                           checked={checked}
-                          onChange={(e) => toggleStepSelection(s.stepId, e.target.checked)}
+                          onChange={(e) => toggleSceneSelection(s.sceneId, e.target.checked)}
                           tabIndex={-1}
                         />
-                        <span className="actor-step-id actor-step-id--corner">#{s.stepId}</span>
-                        <span className="actor-step-main">
-                          <span className="actor-step-title">{s.stepTitle}</span>
+                        <span className="actor-scene-id actor-scene-id--corner">#{s.sceneId}</span>
+                        <span className="actor-scene-main">
+                          <span className="actor-scene-title">{s.sceneTitle}</span>
                           {examples.length > 0 ? (
-                            <span className="actor-step-examples">
+                            <span className="actor-scene-examples">
                               {examples.map((ex, idx) => (
-                                <span key={`${s.stepId}-ex-${idx}`} className="actor-step-example">
+                                <span key={`${s.sceneId}-ex-${idx}`} className="actor-scene-example">
                                   “{String(ex.text).slice(0, 90)}
                                   {ex.text.length > 90 ? "…" : ""}”
                                 </span>
@@ -295,23 +295,23 @@ export function ActorPageView() {
                             </span>
                           ) : null}
                         </span>
-                        {stepText ? (
+                        {sceneText ? (
                           <button
-                            className="actor-step-disclosure"
+                            className="actor-scene-disclosure"
                             type="button"
                             aria-expanded={expanded}
                             onClick={(e) => {
                               e.stopPropagation();
-                              toggleStepExpanded(s.stepId);
+                              toggleSceneExpanded(s.sceneId);
                             }}
                             onKeyDown={(e) => e.stopPropagation()}
                           >
                             {expanded ? "Скрыть текст сцены" : "Показать текст сцены"}
                           </button>
                         ) : null}
-                        {expanded && stepText ? (
-                          <div className="actor-step-full-text" onClick={(e) => e.stopPropagation()}>
-                            {stepText}
+                        {expanded && sceneText ? (
+                          <div className="actor-scene-full-text" onClick={(e) => e.stopPropagation()}>
+                            {sceneText}
                           </div>
                         ) : null}
                       </div>
@@ -324,28 +324,28 @@ export function ActorPageView() {
             <div className="actor-section">
               {trainerMode === "dialogue" ? (
                 <DialogueSceneTrainer
-                  steps={steps}
+                  scenes={scenes}
                   role={effectiveRoleTitle}
                   roleKeys={effectiveRoleKeys}
-                  selectedStepIds={selectedStepIdsForTraining}
+                  selectedPlaybookIds={selectedPlaybookIdsForTraining}
                   storageKey={dialogueStorageKey || undefined}
                 />
               ) : trainerMode === "voice" ? (
                 <VoiceDialogueTrainer
-                  steps={steps}
+                  scenes={scenes}
                   role={effectiveRoleTitle}
                   roleKeys={effectiveRoleKeys}
-                  selectedStepIds={selectedStepIdsForTraining}
+                  selectedPlaybookIds={selectedPlaybookIdsForTraining}
                   storageKey={voiceStorageKey || undefined}
                   performerId={myEmail}
                   performerLabel={myEmail || undefined}
                 />
               ) : (
                 <PhraseWriteTrainer
-                  steps={steps}
+                  scenes={scenes}
                   role={effectiveRoleTitle}
                   roleKeys={effectiveRoleKeys}
-                  selectedStepIds={selectedStepIdsForTraining}
+                  selectedPlaybookIds={selectedPlaybookIdsForTraining}
                   storageKey={trainerStorageKey || undefined}
                 />
               )}

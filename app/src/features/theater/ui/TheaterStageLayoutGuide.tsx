@@ -1,3 +1,4 @@
+import cn from "classnames";
 import type { TheaterLayout } from "../../../shared/types/script";
 import {
   resolveProsceniumEnabled,
@@ -62,7 +63,7 @@ export function TheaterStageLayoutGuide({ layout, compact = false }: TheaterStag
   const sameWidth = Math.abs(geom.stageBackWidth - geom.prosceniumWidth) < 0.05;
 
   return (
-    <div className={`theater-stage-layout-guide${compact ? " theater-stage-layout-guide--compact" : ""}`}>
+    <div className={cn("theater-stage-layout-guide", compact && "theater-stage-layout-guide--compact")}>
       <div className="theater-stage-layout-guide-preview">
         <ShapePreview shape={shape} />
         <div className="theater-stage-layout-guide-caption">

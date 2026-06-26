@@ -8,11 +8,11 @@ import {
   fetchVideoStreamBlobUrl,
 } from "../../../sync/api/files";
 import type {
-  SceneHoldImage,
+  PlaybookHoldImage,
   SceneProjectorSettingsV1,
-  SceneVideo,
-} from "../../scene/model/scene-slice";
-import { normalizeHoldImages } from "./scene-projector-persist";
+  PlaybookVideo,
+} from "../../playbook/model/playbook-slice";
+import { normalizeHoldImages } from "./playbook-projector-persist";
 import {
   enrichProjectorMediaRemoteKey,
   isDirectObjectStorageUrl,
@@ -21,8 +21,8 @@ import {
 
 export type ProjectorMediaContext = {
   projectSlug: string;
-  videos?: SceneVideo[];
-  holdImages?: SceneHoldImage[];
+  videos?: PlaybookVideo[];
+  holdImages?: PlaybookHoldImage[];
   projector?: SceneProjectorSettingsV1 | null;
 };
 
@@ -36,7 +36,7 @@ function readAccessToken(): string | null {
   return localStorage.getItem("accessToken");
 }
 
-function listHoldImages(ctx: ProjectorMediaContext): SceneHoldImage[] {
+function listHoldImages(ctx: ProjectorMediaContext): PlaybookHoldImage[] {
   return normalizeHoldImages(ctx.holdImages, ctx.projector ?? undefined);
 }
 
@@ -181,32 +181,4 @@ export async function fetchProjectorImageBlobUrl(storageKey: string): Promise<st
 
 export async function fetchProjectorVideoBlobUrl(storageKey: string): Promise<string | null> {
   return fetchVideoStreamBlobUrl(readAccessToken(), storageKey);
-}
-
-/** @deprecated Используйте resolveProjectorHoldAsset + загрузку в окне проектора */
-export async function resolveProjectorHoldPlaySrc(
-  ctx: ProjectorMediaContext,
-  holdId?: number | null,
-): Promise<string | null> {
-  const asset = resolveProjectorHoldAsset(ctx, holdId);
-  if (!asset) return null;
-  if (asset.storageKey) {
-    const blobUrl = await fetchProjectorImageBlobUrl(asset.storageKey);
-    if (blobUrl) return blobUrl;
-  }
-  return asset.fallbackSrc;
-}
-
-/** @deprecated Используйте resolveProjectorVideoAsset + загрузку в окне проектора */
-export async function resolveProjectorVideoPlaySrc(
-  ctx: ProjectorMediaContext,
-  videoId: number,
-): Promise<string | null> {
-  const asset = resolveProjectorVideoAsset(ctx, videoId);
-  if (!asset) return null;
-  if (asset.storageKey) {
-    const blobUrl = await fetchProjectorVideoBlobUrl(asset.storageKey);
-    if (blobUrl) return blobUrl;
-  }
-  return asset.fallbackSrc;
 }

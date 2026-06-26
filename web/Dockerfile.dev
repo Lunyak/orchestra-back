@@ -9,7 +9,7 @@ COPY app/package.json app/package-lock.json ./app/
 # Не вызываем npm ci здесь: при сборке часто падает по сети (ECONNRESET), а lock на старте
 # подтягивается с хоста через compose. Зависимости ставятся в CMD при запуске контейнера.
 
-COPY web/vite.config.ts web/tsconfig.json web/tsconfig.node.json web/index.html ./web/
+COPY web/vite.config.ts web/vite-local-projects-plugin.ts web/tsconfig.json web/tsconfig.node.json web/index.html ./web/
 
 WORKDIR /workspace/web
 

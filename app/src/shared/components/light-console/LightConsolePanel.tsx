@@ -1,4 +1,4 @@
-import type { SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
+import type { PlaybookLightFadersDataV1 } from "../../../features/playbook/model/playbook-slice";
 import type { TheaterSpotlight } from "../../types/script";
 import { LightConsoleSettingsModal } from "./LightConsoleSettingsModal";
 import { LightConsoleView } from "./LightConsoleView";
@@ -10,13 +10,13 @@ export type LightConsolePanelProps = {
   spotlights?: TheaterSpotlight[];
   mode?: "live" | "kadr" | "compact";
   readOnly?: boolean;
-  fadersOverride?: SceneLightFadersDataV1 | null;
+  fadersOverride?: PlaybookLightFadersDataV1 | null;
   activeProgramIdOverride?: number | null;
   className?: string;
-  onFadersChange?: (next: SceneLightFadersDataV1) => void;
+  onFadersChange?: (next: PlaybookLightFadersDataV1) => void;
   onPatchFader?: (
     faderId: number,
-    patch: Partial<SceneLightFadersDataV1["faders"][number]>,
+    patch: Partial<PlaybookLightFadersDataV1["faders"][number]>,
     selectedLightSlot: number,
   ) => void;
 };

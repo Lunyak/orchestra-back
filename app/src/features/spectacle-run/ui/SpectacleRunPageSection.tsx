@@ -6,7 +6,7 @@ import {
   scriptUiActions,
   type LightPlotMode,
 } from "../../script-ui/model/script-ui-slice";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { LightPlotModeTabs } from "../../../shared/components/light-plot/LightPlotModeTabs";
 import { useSpectacleRun } from "../model/useSpectacleRun";
 import { SpectacleRunProvider } from "../model/spectacle-run-context";
@@ -23,7 +23,7 @@ import "../../../shared/components/light-console/light-console.css";
 import "./style.css";
 
 export type SpectacleRunPageSectionProps = {
-  onOpenTechCard?: (stepIndex?: number) => void;
+  onOpenTechCard?: (sceneIndex?: number) => void;
 };
 
 export function SpectacleRunPageSection({
@@ -31,7 +31,7 @@ export function SpectacleRunPageSection({
 }: SpectacleRunPageSectionProps) {
   const dispatch = useAppDispatch();
   const { projectName } = useProject();
-  const { steps } = useScene();
+  const { scenes } = usePlaybook();
   const lightPlotMode = useAppSelector((state) => state.scriptUi.lightPlotMode);
   const { lightChannels } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
@@ -46,7 +46,7 @@ export function SpectacleRunPageSection({
 
   const run = useSpectacleRun({
     projectName: projectName ?? "",
-    steps,
+    scenes,
     lightChannels,
   });
 

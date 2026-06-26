@@ -66,11 +66,11 @@ export function resolveOfflineMediaUrl(opts: {
 
 export function isOfflineNativePlatform(): boolean {
   const api = getDesktopApi();
-  return Capacitor.isNativePlatform() || Boolean(api?.readProjectScene ?? api?.invoke);
+  return Capacitor.isNativePlatform() || Boolean(api?.readProjectPlaybook ?? api?.invoke);
 }
 
 export function isDesktopApp(): boolean {
-  return Boolean(getDesktopApi()?.readProjectScene);
+  return Boolean(getDesktopApi()?.readProjectPlaybook);
 }
 
 /** Браузер на npm run dev — медиа с локального диска. */

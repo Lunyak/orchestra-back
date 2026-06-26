@@ -34,7 +34,9 @@
     "src/**/*.d.ts",
     "../app/src/shared/types/**/*.ts",
     "../app/src/shared/types/**/*.d.ts",
-    "../app/src/shared/platform/capacitor-shims.d.ts"
+    "../app/src/shared/platform/capacitor-shims.d.ts",
+    "../app/src/shared/platform/file-system-access.d.ts",
+    "../app/src/vite-env.d.ts"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

@@ -38,7 +38,7 @@ const taskSelect = {
   sourceKey: true,
   assigneeEmail: true,
   dueAt: true,
-  refStepId: true,
+  refSceneId: true,
   refRequisiteId: true,
   refAction: true,
   sortOrder: true,
@@ -265,7 +265,7 @@ export class ProjectTasksService {
           assigneeEmail: item.assigneeEmail
             ? normEmail(item.assigneeEmail)
             : null,
-          refStepId: item.refStepId,
+          refSceneId: item.refSceneId,
           refRequisiteId: item.refRequisiteId,
           refAction: item.refAction,
           sortOrder,

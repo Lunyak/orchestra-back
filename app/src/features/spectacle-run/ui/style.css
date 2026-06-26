@@ -120,33 +120,10 @@
   max-width: 280px;
 }
 
-.spectacle-run__prog-run-nav-step {
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-muted);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .spectacle-run__prog-run-nav-kadr {
   font-size: 15px;
   font-weight: 800;
   color: var(--color-text-bright);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.spectacle-run__prog-run-nav-transition {
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1.25;
-  color: var(--color-active-ascent);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -185,7 +162,7 @@
   text-align: center;
 }
 
-.spectacle-run__meta-step {
+.spectacle-run__meta-scene {
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -193,7 +170,7 @@
   color: var(--color-text-muted);
 }
 
-.spectacle-run__meta-step,
+.spectacle-run__meta-scene,
 .spectacle-run__meta-kadr {
   max-width: 100%;
   overflow: hidden;
@@ -327,14 +304,13 @@
   color: var(--color-text-muted-bright);
 }
 
-.spectacle-run-scheme__plot-setup p {
-  margin: 0 0 10px;
+.spectacle-run-scheme__plot-setup-text {
+  margin: 0;
 }
 
-.spectacle-run-scheme__plot-setup-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.spectacle-run-scheme__plot-setup-title {
+  font-weight: 700;
+  color: inherit;
 }
 
 .light-plot-empty--actionable {
@@ -409,7 +385,7 @@
   overflow: auto;
 }
 
-.spectacle-run-text__step-title {
+.spectacle-run-text__scene-title {
   margin: 0 0 10px;
   font-size: var(--script-font-size-heading);
   color: var(--color-text-bright);
@@ -423,11 +399,17 @@
 
 .spectacle-run-text__body {
   font-size: var(--script-font-size-body);
-  line-height: 1.5;
+  line-height: var(--script-play-line-height, 1.5);
+  color: var(--script-play-text-color, inherit);
+  font-family: var(--script-play-font-family, inherit);
 }
 
 .spectacle-run-text__body.markdown-preview p {
   font-size: inherit;
+}
+
+.spectacle-run-text__body.markdown-preview p + p {
+  margin-top: var(--script-play-paragraph-gap, var(--script-markdown-paragraph-gap));
 }
 
 .spectacle-run-scheme {
@@ -566,14 +548,6 @@
   height: 100%;
 }
 
-.spectacle-run-theater-embed__hint {
-  margin: 0;
-  padding: 4px 10px 8px;
-  font-size: 10px;
-  color: var(--color-text-muted);
-  line-height: 1.35;
-}
-
 .spectacle-run-theater-embed__fallback {
   margin: 0;
   padding: 12px;
@@ -621,7 +595,7 @@
   scroll-snap-type: none;
 }
 
-.spectacle-run-kadr-strip__step {
+.spectacle-run-kadr-strip__scene {
   position: relative;
   display: flex;
   flex-direction: row;
@@ -635,13 +609,13 @@
   scroll-snap-align: start;
 }
 
-.spectacle-run-kadr-strip__step:last-child {
+.spectacle-run-kadr-strip__scene:last-child {
   border-right: none;
   margin-right: 0;
   padding-right: 0;
 }
 
-.spectacle-run-kadr-strip__step::before {
+.spectacle-run-kadr-strip__scene::before {
   content: "";
   position: absolute;
   top: 0;
@@ -653,7 +627,7 @@
   z-index: 1;
 }
 
-.spectacle-run-kadr-strip__step-no {
+.spectacle-run-kadr-strip__scene-number {
   position: absolute;
   top: 4px;
   left: 4px;
@@ -670,7 +644,7 @@
   pointer-events: none;
 }
 
-.spectacle-run-kadr-strip__step-title {
+.spectacle-run-kadr-strip__scene-title {
   position: absolute;
   top: 6px;
   left: 32px;
@@ -778,7 +752,7 @@
   overflow-y: visible;
 }
 
-.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__step {
+.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__scene {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
@@ -791,17 +765,17 @@
   margin-right: 14px;
 }
 
-.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__step::before {
+.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__scene::before {
   display: none;
 }
 
-.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__step-no {
+.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__scene-number {
   position: static;
   grid-row: 1;
   grid-column: 1;
 }
 
-.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__step-title {
+.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__scene-title {
   position: static;
   grid-row: 1;
   grid-column: 2;
@@ -829,7 +803,7 @@
   box-sizing: border-box;
 }
 
-.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__chip[data-active="true"] .spectacle-run-kadr-strip__chip-no {
+.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__chip[data-active="true"] .spectacle-run-kadr-strip__chip-number {
   color: var(--color-active-ascent);
   border-color: var(--color-active-ascent);
 }
@@ -918,7 +892,7 @@
   background: rgba(0, 0, 0, 0.78);
 }
 
-.spectacle-run-kadr-strip__chip-head {
+.spectacle-run-kadr-strip__chip-header {
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
@@ -931,7 +905,7 @@
   position: relative;
 }
 
-.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__chip-head {
+.spectacle-run-kadr-strip--prog-run .spectacle-run-kadr-strip__chip-header {
   position: absolute;
   top: 0;
   left: 0;
@@ -948,7 +922,7 @@
   z-index: 4;
 }
 
-.spectacle-run-kadr-strip__chip-no {
+.spectacle-run-kadr-strip__chip-number {
   flex: 0 0 auto;
   flex-shrink: 0;
   min-width: 24px;

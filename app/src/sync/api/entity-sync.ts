@@ -48,7 +48,7 @@ export async function syncPullScene(
   include?: SyncPullRequest["include"],
 ): Promise<{
   scene: { id: string; projectId: string; name: string; updatedAt: string };
-  steps?: any[];
+  scenes?: any[];
   playlistItems?: any[];
   sounds?: any[];
   lightChannels?: any[];

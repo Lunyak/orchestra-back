@@ -42,8 +42,8 @@ import type {
   PremiseSlotItem,
   PremiseSlotStatus,
 } from "../../sync/api/premises";
-import "../../pages/rehearsals/style.css";
-import "../../pages/sessions/style.css";
+import "../../features/rehearsals/ui/rehearsals.css";
+import "../../features/director-sessions/ui/director-sessions.css";
 import "./style.css";
 
 dayjs.locale("ru");
@@ -317,8 +317,8 @@ export function PremiseDetailPage() {
         <main className="main-content main-content-premises">
           <div className="rehearsals-page sessions-page">
             <div className="premises-view">
-            <div className="rehearsals-head premises-page__head">
-              <div className="premises-page__head-main">
+            <div className="rehearsals-head premises-page__header">
+              <div className="premises-page__header-main">
                 <div className="premises-page__title-row">
                   <div className="rehearsals-meta">{premise.name}</div>
                   <span
@@ -338,7 +338,7 @@ export function PremiseDetailPage() {
                   </p>
                 )}
               </div>
-              <div className="premises-page__head-actions">
+              <div className="premises-page__header-actions">
                 <Link to="/troupe" state={{ tab: "premises" }} className="director-session-page__back">
                   ← Все помещения
                 </Link>
@@ -380,7 +380,7 @@ export function PremiseDetailPage() {
                   ) : null}
 
                   <div className="sessions-day-panel">
-                    <div className="sessions-day-panel__head">
+                    <div className="sessions-day-panel__header">
                       <span className="sessions-day-panel__title">
                         {calendarSelectedDateLabel}
                       </span>
@@ -442,7 +442,7 @@ export function PremiseDetailPage() {
               <div className="sessions-main">
                 <RehearsalsCard fluid>
                   <div className="sessions-slots-readonly">
-                    <div className="sessions-slots-readonly__head">
+                    <div className="sessions-slots-readonly__header">
                       <span className="rehearsals-section-title">
                         Слоты на {calendarSelectedDateLabel}
                       </span>
@@ -614,7 +614,7 @@ export function PremiseDetailPage() {
         isOpen={slotModalOpen}
         onClose={() => setSlotModalOpen(false)}
         ariaLabel={editingSlot ? "Редактирование слота" : "Новый слот"}
-        panelClassName="premises-slot-modal-panel"
+        panelClassName="premises-slot-modal"
       >
         <div className="premises-slot-modal__inner">
           <h3 id="premise-slot-modal-title">

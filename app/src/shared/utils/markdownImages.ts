@@ -1,4 +1,4 @@
-import type { ScriptStep } from "../types/script";
+import type { ScriptScene } from "../types/script";
 
 /**
  * Картинки в маркдауне: при сохранении сцены оставляем в images только те, на которые есть ссылки.
@@ -55,14 +55,14 @@ export function httpUrlToImageFileName(url: string): string {
   return `remote-${(h >>> 0).toString(16)}.bin`;
 }
 
-/** Собирает имена файлов картинок, на которые есть ссылки в маркдауне шагов (![alt](path) с path вида ./images/xxx или images/xxx). */
-export function getReferencedImageFilenames(steps: ScriptStep[]): Set<string> {
+/** Собирает имена файлов картинок, на которые есть ссылки в маркдауне сцен (![alt](path) с path вида ./images/xxx или images/xxx). */
+export function getReferencedImageFilenames(scenes: ScriptScene[]): Set<string> {
   const names = new Set<string>();
   // Ссылки на картинки: ![alt](url) — учитываем только относительные пути к images/
   const re = /!\[[^\]]*\]\s*\(\s*([^)\s]+)\s*\)/g;
-  for (const step of steps) {
+  for (const scene of scenes) {
     const text = stripMarkdownCodeFences(
-      [step.markdown, step.playMarkdown, step.explicationMarkdown].filter(Boolean).join("\n"),
+      [scene.markdown, scene.playMarkdown, scene.explicationMarkdown].filter(Boolean).join("\n"),
     );
     let m: RegExpExecArray | null;
     re.lastIndex = 0;
@@ -98,13 +98,13 @@ export function getReferencedImageFilenames(steps: ScriptStep[]): Set<string> {
 
 export type SceneImagesMap = Record<string, { remoteKey?: string; remoteUrl?: string }>;
 
-/** Оставляет в images только те картинки, которые реально упоминаются в шагах. Остальные можно удалить с хранилища при пуше. */
+/** Оставляет в images только те картинки, которые реально упоминаются в сценах. Остальные можно удалить с хранилища при пуше. */
 export function pruneSceneImages(
   images: SceneImagesMap | undefined | null,
-  steps: ScriptStep[],
+  scenes: ScriptScene[],
 ): SceneImagesMap | undefined {
   if (!images || typeof images !== "object") return undefined;
-  const referenced = getReferencedImageFilenames(steps);
+  const referenced = getReferencedImageFilenames(scenes);
   const pruned: SceneImagesMap = {};
   for (const name of referenced) {
     if (images[name]) pruned[name] = images[name];
@@ -126,17 +126,17 @@ export function findFirstMarkdownImageHref(text: string): string | null {
 }
 
 /**
- * Все картинки из markdown шагов: orchestra-image:, http(s):, относительные images/…
+ * Все картинки из markdown сцен: orchestra-image:, http(s):, относительные images/…
  * (для десктопного офлайн-кэша).
  */
-export function collectMarkdownImagePrefetchTargets(steps: ScriptStep[]): MarkdownImagePrefetchTarget[] {
+export function collectMarkdownImagePrefetchTargets(scenes: ScriptScene[]): MarkdownImagePrefetchTarget[] {
   const orchestra = new Map<string, true>();
   const http = new Map<string, true>();
   const relative = new Map<string, true>();
 
-  for (const step of steps) {
+  for (const scene of scenes) {
     const text = stripMarkdownCodeFences(
-      [step.markdown, step.playMarkdown, step.explicationMarkdown].filter(Boolean).join("\n"),
+      [scene.markdown, scene.playMarkdown, scene.explicationMarkdown].filter(Boolean).join("\n"),
     );
     let m: RegExpExecArray | null;
     MARKDOWN_IMG_RE.lastIndex = 0;

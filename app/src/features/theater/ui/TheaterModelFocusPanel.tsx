@@ -1,3 +1,4 @@
+import cn from "classnames";
 import type { ModelPlacementPreset } from "../model/theater-model-placement";
 
 export type TheaterModelTransformMode = "translate" | "rotate" | "scale";
@@ -47,9 +48,10 @@ export function TheaterModelFocusPanel({
       {onToggleHidden ? (
         <button
           type="button"
-          className={`theater-model-context-menu__item${
-            !hidden ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            !hidden && "theater-model-context-menu__item--active",
+          )}
           onClick={onToggleHidden}
         >
           {hidden ? "Показать в 3D" : "Скрыть в 3D"}
@@ -58,29 +60,33 @@ export function TheaterModelFocusPanel({
       <div className="theater-model-context-menu__row">
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            transformMode === "translate"
-              ? " theater-model-context-menu__item--active"
-              : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            transformMode === "translate" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickTransform("translate")}
         >
           Двигать
         </button>
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            transformMode === "rotate" ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            transformMode === "rotate" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickTransform("rotate")}
         >
           Крутить
         </button>
         <button
           type="button"
-          className={`theater-model-context-menu__item theater-model-context-menu__item--compact${
-            transformMode === "scale" ? " theater-model-context-menu__item--active" : ""
-          }`}
+          className={cn(
+            "theater-model-context-menu__item",
+            "theater-model-context-menu__item--compact",
+            transformMode === "scale" && "theater-model-context-menu__item--active",
+          )}
           onClick={() => onPickTransform("scale")}
         >
           Масштаб

@@ -3,12 +3,13 @@ import { getDesktopApi } from "../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "./desktopOutbox";
 import {
   normalizeLightChannelsFromServer,
-  normalizeScriptStepsFromSyncApi,
+  normalizeScriptScenesFromSyncApi,
   normalizeTheaterLayoutFromServer,
-} from "../features/scene/model/scene-normalize";
+  readPlaybookScenes,
+} from "../features/playbook/model/playbook-normalize";
+import { pullPlaybooksFromSync, pullScriptScenesFromSync, syncPullIncludeForPlaybook, syncRowMatchesPlaybook } from "./sync-pull-normalize";
 
-// rawJson больше не приходит с сервера; resync делаем только по шагам.
-const HEAVY_KEYS = ["steps"] as const;
+const HEAVY_KEYS = ["scenes"] as const;
 
 function stableStringify(value: any): string {
   if (value === null) return "null";
@@ -36,6 +37,7 @@ function pickMeta(obj: any): Record<string, any> {
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(obj)) {
     if ((HEAVY_KEYS as readonly string[]).includes(k)) continue;
+    if (k === "steps") continue;
     out[k] = v;
   }
   return out;
@@ -57,7 +59,7 @@ function mergeSoundsPreservingLocalFilePath(localSounds: any, serverSounds: any)
 }
 
 function buildServerSceneRawFromPull(args: {
-  steps?: unknown;
+  scenes?: unknown;
   theaterLayout?: unknown;
   lightChannels?: unknown;
   scene?: Record<string, unknown> | null;
@@ -67,9 +69,10 @@ function buildServerSceneRawFromPull(args: {
   const normalizedLightChannels = Array.isArray(args.lightChannels)
     ? normalizeLightChannelsFromServer(args.lightChannels)
     : undefined;
+  const scriptScenesRaw = args.scenes;
 
   return {
-    steps: normalizeScriptStepsFromSyncApi(args.steps),
+    scenes: normalizeScriptScenesFromSyncApi(scriptScenesRaw),
     ...(normalizedLayout ? { theaterLayout: normalizedLayout } : {}),
     ...(normalizedLightChannels ? { lightChannels: normalizedLightChannels } : {}),
     ...(scene?.lightFaders ? { lightFaders: scene.lightFaders } : {}),
@@ -88,7 +91,7 @@ export async function resyncDesktopProject(
   totalScenes: number;
 }> {
   const api = getDesktopApi();
-  if (!api?.readProjectScene || !api?.saveProjectScene) {
+  if (!api?.readProjectPlaybook || !api?.saveProjectPlaybook) {
     throw new Error("Desktop API недоступен");
   }
 
@@ -111,17 +114,17 @@ export async function resyncDesktopProject(
     for (const sceneName of sceneNamesToSync) {
       totalScenes += 1;
       const pull = await syncPullScene(accessToken, projectSlug, sceneName, {
-        steps: true,
+        scenes: true,
         theaterLayout: true,
         lightChannels: true,
       });
       const serverRaw = buildServerSceneRawFromPull({
-        steps: pull.steps,
+        scenes: pullScriptScenesFromSync(pull),
         theaterLayout: pull.theaterLayout,
         lightChannels: pull.lightChannels,
         scene: pull.scene as Record<string, unknown> | null,
       });
-      const localRaw = (await api.readProjectScene(projectSlug, sceneName)) ?? {};
+      const localRaw = (await api.readProjectPlaybook(projectSlug, sceneName)) ?? {};
 
       const next: any = { ...(isPlainObject(localRaw) ? localRaw : {}) };
 
@@ -137,17 +140,18 @@ export async function resyncDesktopProject(
 
       let changed = !deepEqualByStableStringify(metaLocal, metaServer);
 
-      for (const key of HEAVY_KEYS) {
-        const localV = (localRaw as any)?.[key];
-        const serverV = (serverRaw as any)?.[key];
-        if (!deepEqualByStableStringify(localV ?? null, serverV ?? null)) {
-          next[key] = serverV ?? null;
-          changed = true;
-        }
+      const localScenes = readPlaybookScenes(isPlainObject(localRaw) ? localRaw : null);
+      const serverScenes = Array.isArray((serverRaw as any)?.scenes)
+        ? (serverRaw as any).scenes
+        : [];
+      if (!deepEqualByStableStringify(localScenes, serverScenes)) {
+        next.scenes = serverScenes;
+        delete next.steps;
+        changed = true;
       }
 
       if (changed) {
-        await api.saveProjectScene(projectSlug, sceneName, next, {
+        await api.saveProjectPlaybook(projectSlug, sceneName, next, {
           skipOutbox: true,
         });
         updatedScenes += 1;
@@ -157,13 +161,9 @@ export async function resyncDesktopProject(
     return { updatedScenes, totalScenes };
   } catch (err) {
     console.warn("[resync] pull-scene failed, fallback to syncPull", err);
-    const pull = await syncPull(accessToken, null, projectSlug, {
-      steps: true,
-      theaterLayout: true,
-      lightChannels: true,
-    });
-    const serverScenes = Array.isArray(pull?.scenes) ? pull.scenes : [];
-    const related = serverScenes.filter((s: any) => String(s?.projectId ?? "").trim());
+    const pull = await syncPull(accessToken, null, projectSlug, syncPullIncludeForPlaybook());
+    const serverPlaybooks = pullPlaybooksFromSync(pull);
+    const related = serverPlaybooks.filter((s: any) => String(s?.projectId ?? "").trim());
 
     totalScenes = related.length;
     for (const s of related) {
@@ -171,25 +171,25 @@ export async function resyncDesktopProject(
       const parts = sceneId.split(":");
       const sceneName = parts.length >= 2 ? parts.slice(1).join(":") : "";
       if (!sceneName) continue;
-      const serverSteps = Array.isArray((pull as any)?.steps)
-        ? (pull as any).steps.filter((st: any) => String(st?.sceneId ?? "") === sceneId)
-        : [];
+      const pulledScriptScenes = pullScriptScenesFromSync(pull).filter((st) =>
+        syncRowMatchesPlaybook(st, sceneId),
+      );
       const theaterLayoutRow = (Array.isArray((pull as any)?.theaterLayouts)
         ? (pull as any).theaterLayouts
         : []
-      ).find((row: any) => String(row?.sceneId ?? "") === sceneId);
+      ).find((row: unknown) => syncRowMatchesPlaybook(row, sceneId));
       const lightChannelRows = (Array.isArray((pull as any)?.lightChannels)
         ? (pull as any).lightChannels
         : []
-      ).filter((row: any) => String(row?.sceneId ?? "") === sceneId);
+      ).filter((row: unknown) => syncRowMatchesPlaybook(row, sceneId));
 
       const serverRaw = buildServerSceneRawFromPull({
-        steps: serverSteps,
+        scenes: pulledScriptScenes,
         theaterLayout: theaterLayoutRow,
         lightChannels: lightChannelRows,
         scene: s as Record<string, unknown>,
       });
-      const localRaw = (await api.readProjectScene(projectSlug, sceneName)) ?? {};
+      const localRaw = (await api.readProjectPlaybook(projectSlug, sceneName)) ?? {};
       const next: any = { ...(isPlainObject(localRaw) ? localRaw : {}) };
 
       const metaLocal = pickMeta(localRaw);
@@ -203,17 +203,18 @@ export async function resyncDesktopProject(
       Object.assign(next, metaLocal, metaServer);
       let changed = !deepEqualByStableStringify(metaLocal, metaServer);
 
-      for (const key of HEAVY_KEYS) {
-        const localV = (localRaw as any)?.[key];
-        const serverV = (serverRaw as any)?.[key];
-        if (!deepEqualByStableStringify(localV ?? null, serverV ?? null)) {
-          next[key] = serverV ?? null;
-          changed = true;
-        }
+      const localScenes = readPlaybookScenes(isPlainObject(localRaw) ? localRaw : null);
+      const serverScenes = Array.isArray((serverRaw as any)?.scenes)
+        ? (serverRaw as any).scenes
+        : [];
+      if (!deepEqualByStableStringify(localScenes, serverScenes)) {
+        next.scenes = serverScenes;
+        delete next.steps;
+        changed = true;
       }
 
       if (changed) {
-        await api.saveProjectScene(projectSlug, sceneName, next, {
+        await api.saveProjectPlaybook(projectSlug, sceneName, next, {
           skipOutbox: true,
         });
         updatedScenes += 1;

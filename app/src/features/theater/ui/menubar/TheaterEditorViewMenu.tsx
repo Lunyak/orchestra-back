@@ -63,10 +63,10 @@ export function TheaterEditorViewMenu({ vm }: TheaterEditorViewMenuProps) {
               Просмотр
             </TheaterEditorMenubarToggle>
             <TheaterEditorMenubarToggle
-              checked={vm.stepRehearsalMode}
-              onChange={vm.setStepRehearsalMode}
+              checked={vm.sceneRehearsalMode}
+              onChange={vm.setSceneRehearsalMode}
             >
-              Репетиция шага
+              Репетиция сцены
             </TheaterEditorMenubarToggle>
             <TheaterEditorMenubarTheaterFields vm={vm} />
           </div>

@@ -288,7 +288,7 @@
 }
 
 /* In settings mode, do not show hover sliders */
-.header-player-track-row.settings-open .header-player-hover-slider {
+.header-player-track-row--settings-open .header-player-hover-slider {
   opacity: 0 !important;
   pointer-events: none !important;
   transform: translateY(-50%) scale(0.96) !important;
@@ -339,7 +339,7 @@
   z-index: 3;
 }
 
-.header-player-track-row.settings-open .header-player-mixer {
+.header-player-track-row--settings-open .header-player-mixer {
   opacity: 0;
   pointer-events: none;
 }
@@ -393,7 +393,7 @@
   box-shadow: 0 0 0 3px var(--color-playlist-accent-glow);
 }
 
-.header-player-track-row.playing {
+.header-player-track-row--playing {
   background: var(--color-surface-3);
 }
 
@@ -538,7 +538,7 @@
   transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
 }
 
-.header-player-track-row.settings-open .header-player-remove {
+.header-player-track-row--settings-open .header-player-remove {
   opacity: 0.9;
   pointer-events: auto;
   transform: scale(1);

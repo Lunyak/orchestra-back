@@ -48,7 +48,7 @@ export function ProfileTrainersTab() {
                     navigate(item.path);
                   }}
                 >
-                  <div className="profile-trainer-card__head">
+                  <div className="profile-trainer-card__header">
                     <h3 className="profile-trainer-card__title">{item.title}</h3>
                     {inDev ? <span className="profile-trainer-card__badge">В разработке</span> : null}
                   </div>

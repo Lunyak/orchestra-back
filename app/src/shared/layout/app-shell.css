@@ -60,6 +60,7 @@
   .main-content-theater,
   .main-content-sessions,
   .main-content-kanban,
+  .main-content-project-media,
   .main-content-premises {
     padding: 0 0 160px;
   }
@@ -77,6 +78,7 @@
   .main-content-theater,
   .main-content-sessions,
   .main-content-kanban,
+  .main-content-project-media,
   .main-content-premises {
     padding: 0 6px 0;
   }
@@ -94,6 +96,7 @@
   .main-content-theater,
   .main-content-sessions,
   .main-content-kanban,
+  .main-content-project-media,
   .main-content-premises {
     padding: 0 0 200px;
   }

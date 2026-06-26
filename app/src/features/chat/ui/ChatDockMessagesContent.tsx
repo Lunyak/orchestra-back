@@ -1,3 +1,4 @@
+import cn from "classnames";
 import dayjs from "dayjs";
 import { memo, useEffect, useRef, useState } from "react";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
@@ -81,7 +82,7 @@ export const ChatDockMessagesContent = memo(function ChatDockMessagesContent({
         return (
           <article
             key={m.id}
-            className={`chat-dock-msg ${mine ? "chat-dock-msg--mine" : ""}`}
+            className={cn("chat-dock-msg", mine && "chat-dock-msg--mine")}
           >
             <div className="chat-dock-msg-row">
               <MiniAvatar
@@ -95,7 +96,7 @@ export const ChatDockMessagesContent = memo(function ChatDockMessagesContent({
                   <span title={m.authorEmail}>{label}</span>
                   <span>{dayjs(m.createdAt).format("DD.MM HH:mm")}</span>
                 </div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{m.body}</div>
+                <div className="chat-dock-msg__body">{m.body}</div>
               </div>
             </div>
           </article>

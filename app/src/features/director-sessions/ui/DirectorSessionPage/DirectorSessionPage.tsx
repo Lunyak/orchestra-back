@@ -22,18 +22,18 @@ import { projectApi, useProjectMembersQuery, useProjectRolesQuery } from "../../
 import { useAppDispatch } from "../../../../shared/store/hooks";
 import { useProject } from "../../../project";
 import { RehearsalsCard } from "../../../rehearsals-card/RehearsalsCard";
-import type { ScriptStep } from "../../../../shared/types/script";
+import type { ScriptScene } from "../../../../shared/types/script";
 import { markdownToPlainText } from "../../../../shared/utils/textPreview";
 import type { TeamProfile } from "../../../../sync/api/profile";
 import { RehearsalPlanSectionChrome } from "../../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
-import "../../../../pages/sessions/style.css";
+import "../director-sessions.css";
 import "./style.css";
 import {
   classifyActorSlotAvailability,
   directorSlotRefKey,
   formatSlotTime,
   getSessionStartLocalMinutes,
-  isReadyStep,
+  isReadyScene,
   looksLikeEmail,
   memberEmailsFromProjectMembers,
   normalizeEmail,
@@ -43,7 +43,7 @@ import {
 import type { DirectorSessionProjectDataCache } from "../../model/session-page-types";
 import {
   getAllAssigneeEmailsForDirectorSlotChart,
-  getNormalizedRoleKeysForSlotStep,
+  getNormalizedRoleKeysForSlotScene,
   getRolePlannedEmailsForDirectorSlot,
   type DirectorSlotPlannedData,
 } from "../../model/session-slot-planned";
@@ -80,8 +80,8 @@ export function DirectorSessionPage() {
   const [fetchProjectMaterial] = useLazyProjectMaterialQuery();
 
   const [dataCache, setDataCache] = useState<DirectorSessionProjectDataCache>({});
-  const [stepsLoading, setStepsLoading] = useState(false);
-  const [stepsError, setStepsError] = useState<string | null>(null);
+  const [scenesLoading, setScenesLoading] = useState(false);
+  const [scenesError, setScenesError] = useState<string | null>(null);
   /** Роли по slug проекта — для расчёта тонов всех слотов (разные проекты в одной сессии). */
   const [roleEmailsByProjectSlug, setRoleEmailsByProjectSlug] = useState<
     Record<string, Record<string, string[]>>
@@ -325,8 +325,8 @@ export function DirectorSessionPage() {
     if (!accessToken) return;
     if (!slug) return;
     if (dataCache[slug]) return;
-    setStepsLoading(true);
-    setStepsError(null);
+    setScenesLoading(true);
+    setScenesError(null);
     try {
       const data = await fetchProjectMaterial(slug).unwrap();
       setDataCache((p) => ({
@@ -335,15 +335,15 @@ export function DirectorSessionPage() {
       }));
     } catch (e: unknown) {
       const err = e as { message?: string; data?: { message?: string } };
-      setStepsError(
-        err?.data?.message ?? err?.message ?? "Не удалось загрузить шаги",
+      setScenesError(
+        err?.data?.message ?? err?.message ?? "Не удалось загрузить сцены",
       );
       setDataCache((p) => ({
         ...p,
-        [slug]: { steps: [], sceneId: null, sceneRoles: null },
+        [slug]: { scenes: [], sceneId: null, sceneRoles: null },
       }));
     } finally {
-      setStepsLoading(false);
+      setScenesLoading(false);
     }
   };
 
@@ -406,19 +406,19 @@ export function DirectorSessionPage() {
     const set = new Set<string>();
     for (const sl of session.slots ?? []) {
       const ref = sl.ref;
-      if (!ref?.projectSlug || ref.stepId == null) continue;
+      if (!ref?.projectSlug || ref.sceneId == null) continue;
       const slug = String(ref.projectSlug).trim();
       const cached = dataCache[slug];
       const rem = roleEmailsByProjectSlug[slug];
-      if (!cached?.steps?.length || !rem) continue;
+      if (!cached?.scenes?.length || !rem) continue;
       const plannedData: DirectorSlotPlannedData = {
-        steps: cached.steps,
+        scenes: cached.scenes,
         sceneRoles: cached.sceneRoles ?? null,
         roleEmailsByKey: rem,
       };
       const byRole = getRolePlannedEmailsForDirectorSlot(
         slug,
-        ref.stepId,
+        ref.sceneId,
         plannedData,
         null,
       );
@@ -458,21 +458,21 @@ export function DirectorSessionPage() {
 
     for (const sl of session.slots ?? []) {
       const ref = sl.ref;
-      if (!ref?.projectSlug || ref.stepId == null) continue;
+      if (!ref?.projectSlug || ref.sceneId == null) continue;
       const slug = String(ref.projectSlug).trim();
       const cached = dataCache[slug];
       const rem = roleEmailsByProjectSlug[slug];
-      if (!cached?.steps?.length || !rem) continue;
+      if (!cached?.scenes?.length || !rem) continue;
 
       const plannedData: DirectorSlotPlannedData = {
-        steps: cached.steps,
+        scenes: cached.scenes,
         sceneRoles: cached.sceneRoles ?? null,
         roleEmailsByKey: rem,
       };
 
       const byRole = getRolePlannedEmailsForDirectorSlot(
         slug,
-        ref.stepId,
+        ref.sceneId,
         plannedData,
         null,
       );
@@ -569,9 +569,9 @@ export function DirectorSessionPage() {
     return `${formatSlotTime(session.startsAt, slot.offsetMin)} · ${slot.durationMin} мин`;
   }, [session, slot]);
 
-  const steps = useMemo(() => {
-    const src = projectFilter ? (dataCache[projectFilter]?.steps ?? []) : [];
-    const base = src.filter((s) => !isReadyStep(s));
+  const filteredScenes = useMemo(() => {
+    const src = projectFilter ? (dataCache[projectFilter]?.scenes ?? []) : [];
+    const base = src.filter((s) => !isReadyScene(s));
     const q = query.trim().toLowerCase();
     if (!q) return base;
     return base.filter((s) => {
@@ -587,20 +587,20 @@ export function DirectorSessionPage() {
     });
   }, [dataCache, projectFilter, query]);
 
-  const selectableSteps = useMemo(() => {
+  const selectableScenes = useMemo(() => {
     const out: Array<{
-      step: ScriptStep;
+      scene: ScriptScene;
       ok: boolean;
       missing: string[];
       roles: string[];
     }> = [];
-    const list = steps;
+    const list = filteredScenes;
     const freeSet = freeRolesNormSet;
     const pack = projectFilter ? dataCache[projectFilter] : null;
     const sceneRoles = pack?.sceneRoles ?? null;
 
     for (const s of list) {
-      const roleKeysNorm = getNormalizedRoleKeysForSlotStep(
+      const roleKeysNorm = getNormalizedRoleKeysForSlotScene(
         s,
         sceneRoles,
         s.id,
@@ -614,26 +614,26 @@ export function DirectorSessionPage() {
           missing.push(roleTitleByKey[normKey] ?? normKey);
         }
       }
-      out.push({ step: s, ok: missing.length === 0, missing, roles });
+      out.push({ scene: s, ok: missing.length === 0, missing, roles });
     }
     return out;
-  }, [freeRolesNormSet, steps, dataCache, projectFilter, roleTitleByKey]);
+  }, [freeRolesNormSet, filteredScenes, dataCache, projectFilter, roleTitleByKey]);
 
-  const stepsForList = useMemo(() => {
-    if (!onlySelectable) return selectableSteps;
-    return selectableSteps.filter((x) => x.ok);
-  }, [onlySelectable, selectableSteps]);
+  const scenesForList = useMemo(() => {
+    if (!onlySelectable) return selectableScenes;
+    return selectableScenes.filter((x) => x.ok);
+  }, [onlySelectable, selectableScenes]);
 
-  /** Шаги (project + stepId), которые уже привязаны к какому-либо слоту этой сессии */
-  const slotsByStepRefInSession = useMemo(() => {
+  /** Сцены (project + sceneId), которые уже привязаны к какому-либо слоту этой сессии */
+  const slotsBySceneRefInSession = useMemo(() => {
     const map = new Map<string, DirectorSessionSlot[]>();
     if (!session?.slots?.length) return map;
     for (const sl of session.slots) {
       const r = sl.ref;
       if (!r?.projectSlug) continue;
-      const stepId = Math.floor(Number(r.stepId) || 0);
-      if (!Number.isFinite(stepId) || stepId <= 0) continue;
-      const k = directorSlotRefKey(r.projectSlug, stepId);
+      const sceneId = Math.floor(Number(r.sceneId) || 0);
+      if (!Number.isFinite(sceneId) || sceneId <= 0) continue;
+      const k = directorSlotRefKey(r.projectSlug, sceneId);
       const arr = map.get(k) ?? [];
       arr.push(sl);
       map.set(k, arr);
@@ -641,12 +641,12 @@ export function DirectorSessionPage() {
     return map;
   }, [session?.id, session?.slots]);
 
-  const selectedStep = useMemo(() => {
+  const selectedScene = useMemo(() => {
     if (!slot?.ref) return null;
     const slug = slot.ref.projectSlug;
-    const id = slot.ref.stepId;
+    const id = slot.ref.sceneId;
     const data = dataCache[slug];
-    return data?.steps?.find((s) => s.id === id) ?? null;
+    return data?.scenes?.find((s) => s.id === id) ?? null;
   }, [dataCache, slot?.ref]);
 
   const slotDisplayById = useMemo(() => {
@@ -656,7 +656,7 @@ export function DirectorSessionPage() {
     >();
     for (const sl of session?.slots ?? []) {
       const ref = sl.ref;
-      if (!ref?.projectSlug || ref.stepId == null) {
+      if (!ref?.projectSlug || ref.sceneId == null) {
         map.set(sl.id, {
           projectLabel: "Материал не выбран",
           materialLabel: "",
@@ -664,11 +664,11 @@ export function DirectorSessionPage() {
         continue;
       }
       const slug = String(ref.projectSlug).trim();
-      const step = dataCache[slug]?.steps?.find((s) => s.id === ref.stepId);
+      const scene = dataCache[slug]?.scenes?.find((s) => s.id === ref.sceneId);
       map.set(sl.id, {
         projectLabel: projectLabelBySlug.get(slug) ?? slug,
         materialLabel:
-          String(step?.title ?? "").trim() || "Материал загружается",
+          String(scene?.title ?? "").trim() || "Материал загружается",
       });
     }
     return map;
@@ -679,7 +679,7 @@ export function DirectorSessionPage() {
     const slug = String(slot.ref.projectSlug ?? "").trim();
     const cached = dataCache[slug];
     return {
-      steps: cached?.steps ?? [],
+      scenes: cached?.scenes ?? [],
       sceneRoles: cached?.sceneRoles ?? null,
       roleEmailsByKey,
     };
@@ -687,12 +687,12 @@ export function DirectorSessionPage() {
 
   const slotRoleKeysForPicker = useMemo(() => {
     if (!slot?.ref || !slotPlannedInput) return [];
-    const stepId = slot.ref.stepId;
-    const step = slotPlannedInput.steps.find((s) => s.id === stepId) ?? null;
-    return getNormalizedRoleKeysForSlotStep(
-      step,
+    const sceneId = slot.ref.sceneId;
+    const scene = slotPlannedInput.scenes.find((s) => s.id === sceneId) ?? null;
+    return getNormalizedRoleKeysForSlotScene(
+      scene,
       slotPlannedInput.sceneRoles,
-      stepId,
+      sceneId,
     );
   }, [slot?.ref, slotPlannedInput]);
 
@@ -701,25 +701,30 @@ export function DirectorSessionPage() {
     const slug = String(slot.ref.projectSlug ?? "").trim();
     const list = getAllAssigneeEmailsForDirectorSlotChart(
       slug,
-      slot.ref.stepId,
+      slot.ref.sceneId,
       slotPlannedInput,
     );
     return new Set(list);
   }, [slot?.ref, slotPlannedInput]);
 
-  if (!accessToken)
+  if (!accessToken) {
     return (
-      <div style={{ padding: 12 }}>
+      <div className="director-session-page__message">
         Нужно войти, чтобы открыть страницу сессии.
       </div>
     );
-  if (!sid) return <div style={{ padding: 12 }}>Некорректный адрес.</div>;
+  }
+  if (!sid) {
+    return (
+      <div className="director-session-page__message">Некорректный адрес.</div>
+    );
+  }
 
   return (
     <div className="director-session-page">
       <RehearsalPlanSectionChrome activeTab="sessions" />
 
-      <div className="director-session-page__head">
+      <div className="director-session-page__header">
         <Link
           to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
           className="director-session-page__back"
@@ -729,10 +734,10 @@ export function DirectorSessionPage() {
       </div>
 
       {loading ? (
-        <div style={{ marginTop: 10, opacity: 0.75 }}>Загрузка…</div>
+        <div className="director-session-page__loading">Загрузка…</div>
       ) : null}
       {error ? (
-        <div className="settings-invite-error" style={{ marginTop: 10 }}>
+        <div className="settings-invite-error director-session-page__error">
           {error}
         </div>
       ) : null}
@@ -774,9 +779,9 @@ export function DirectorSessionPage() {
                     title=""
                     className="director-session-page__preview"
                   >
-                    {selectedStep && (
-                      <div className="session__selected-step">
-                        <PreviewSlot selectedStep={selectedStep} />
+                    {selectedScene && (
+                      <div className="session__selected-scene">
+                        <PreviewSlot selectedScene={selectedScene} />
 
                         <TroupeSchedulePreview
                           sessionDateKey={sessionDateKey}
@@ -807,47 +812,32 @@ export function DirectorSessionPage() {
                       rows={4}
                     />
 
-                    <div
-                      style={{
-                        marginTop: 12,
-                        display: "flex",
-                        gap: 10,
-                        flexWrap: "wrap",
-                      }}
-                    ></div>
                   </RehearsalsCard>
 
                   <RehearsalsCard fluid title="">
-                    <div style={{ marginTop: 10 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 10,
-                          flexWrap: "wrap",
-                          alignItems: "center",
-                        }}
+                    <div className="session__scenes-filters">
+                      <select
+                        className="native-select"
+                        value={projectFilter}
+                        onChange={(e) => setProjectFilter(e.target.value)}
                       >
-                        <select
-                          className="native-select"
-                          value={projectFilter}
-                          onChange={(e) => setProjectFilter(e.target.value)}
-                        >
-                          {visibleProjects.map((p) => (
-                            <option key={p} value={p}>
-                              {projectLabelBySlug.get(p) ?? p}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          className="native-text-input"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder="поиск по названию/тексту"
-                          style={{ flex: 1, minWidth: 240 }}
-                        />
-                      </div>
+                        {visibleProjects.map((p) => (
+                          <option key={p} value={p}>
+                            {projectLabelBySlug.get(p) ?? p}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className={cn(
+                          "native-text-input",
+                          "session__scenes-search-input",
+                        )}
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="поиск по названию/тексту"
+                      />
                     </div>
-                    <div className="session__steps-checkbox">
+                    <div className="session__scenes-checkbox">
                       <LabeledCheckbox
                         checked={onlySelectable}
                         onChange={(e) => setOnlySelectable(e)}
@@ -856,38 +846,32 @@ export function DirectorSessionPage() {
                       </LabeledCheckbox>
                     </div>
 
-                    {stepsLoading ? (
-                      <div className="session__steps-list">Загружаю шаги…</div>
+                    {scenesLoading ? (
+                      <div className="session__scenes-list">Загружаю сцены…</div>
                     ) : null}
-                    {stepsError ? (
-                      <div
-                        className="settings-invite-error"
-                        style={{ marginTop: 10 }}
-                      >
-                        {stepsError}
+                    {scenesError ? (
+                      <div className="settings-invite-error director-session-page__error">
+                        {scenesError}
                       </div>
                     ) : null}
                     {availabilityError ? (
-                      <div
-                        className="settings-invite-error"
-                        style={{ marginTop: 10 }}
-                      >
+                      <div className="settings-invite-error director-session-page__error">
                         {availabilityError}
                       </div>
                     ) : null}
 
-                    <div className="session__steps-list">
-                      {stepsForList.slice(0, 250).map((stepData) => {
-                        const s = stepData.step;
+                    <div className="session__scenes-list">
+                      {scenesForList.slice(0, 250).map((sceneData) => {
+                        const s = sceneData.scene;
                         const isSelected = Boolean(
                           slot.ref &&
                           slot.ref.projectSlug === projectFilter &&
-                          slot.ref.stepId === s.id,
+                          slot.ref.sceneId === s.id,
                         );
-                        const ok = stepData.ok;
+                        const ok = sceneData.ok;
                         const refKey = directorSlotRefKey(projectFilter, s.id);
                         const slotsWithSameRef =
-                          slotsByStepRefInSession.get(refKey) ?? [];
+                          slotsBySceneRefInSession.get(refKey) ?? [];
                         const otherSlotsWithRef = slotsWithSameRef.filter(
                           (sl) => sl.id !== slot.id,
                         );
@@ -926,11 +910,11 @@ export function DirectorSessionPage() {
                             : "Назначить в этот слот";
                         return (
                           <button
-                            className={cn("session__step-item", {
-                              "session__step-item--selected": isSelected,
-                              "session__step-item--ok": !isSelected && ok,
-                              "session__step-item--bad": !isSelected && !ok,
-                              "session__step-item--booked":
+                            className={cn("session__scene-item", {
+                              "session__scene-item--selected": isSelected,
+                              "session__scene-item--ok": !isSelected && ok,
+                              "session__scene-item--bad": !isSelected && !ok,
+                              "session__scene-item--booked":
                                 bookedInOtherSlots && !isSelected,
                             })}
                             key={`${projectFilter}:${s.id}`}
@@ -939,7 +923,7 @@ export function DirectorSessionPage() {
                               void updateSlot({
                                 ref: {
                                   projectSlug: projectFilter,
-                                  stepId: s.id,
+                                  sceneId: s.id,
                                 },
                                 durationMin:
                                   s.durationMin == null
@@ -953,21 +937,18 @@ export function DirectorSessionPage() {
                             }
                             title={assignTitle}
                           >
-                            <div
-                              className="session__step-item__title"
-                              style={{ fontWeight: 900, fontSize: 12 }}
-                            >
-                              <span className="session__step-item__title-text">
+                            <div className="session__scene-item__title">
+                              <span className="session__scene-item__title-text">
                                 #{s.id} {s.title || "\u00a0"}
                               </span>
                               {bookedInOtherSlots ? (
                                 <span
-                                  className="session__step-item__badge session__step-item__badge--in-session"
+                                  className="session__scene-item__badge session__scene-item__badge--in-session"
                                   aria-hidden
                                 >
                                   в сессии
                                   {otherSlotsTimesLabel ? (
-                                    <span className="session__step-item__badge-detail">
+                                    <span className="session__scene-item__badge-detail">
                                       {" "}
                                       · {otherSlotsTimesLabel}
                                     </span>
@@ -977,19 +958,19 @@ export function DirectorSessionPage() {
                             </div>
                             <div
                               className={cn(
-                                "session__step-item__missing",
-                                !(!ok && stepData.missing.length > 0) &&
-                                  "session__step-item__missing--empty",
+                                "session__scene-item__missing",
+                                !(!ok && sceneData.missing.length > 0) &&
+                                  "session__scene-item__missing--empty",
                               )}
                             >
-                              {!ok && stepData.missing.length > 0 ? (
+                              {!ok && sceneData.missing.length > 0 ? (
                                 <>
                                   не хватает:{" "}
                                   <b>
-                                    {stepData.missing.slice(0, 6).join(", ")}
+                                    {sceneData.missing.slice(0, 6).join(", ")}
                                   </b>
-                                  {stepData.missing.length > 6
-                                    ? ` +${stepData.missing.length - 6}`
+                                  {sceneData.missing.length > 6
+                                    ? ` +${sceneData.missing.length - 6}`
                                     : ""}
                                 </>
                               ) : (
@@ -999,9 +980,9 @@ export function DirectorSessionPage() {
                           </button>
                         );
                       })}
-                      {stepsForList.length === 0 && !stepsLoading && (
-                        <div style={{ fontSize: 12, opacity: 0.75 }}>
-                          Нет шагов (или сцена не найдена).
+                      {scenesForList.length === 0 && !scenesLoading && (
+                        <div className="session__scenes-list__empty">
+                          Нет сцен (или сценарий не найден).
                         </div>
                       )}
                     </div>
@@ -1016,13 +997,13 @@ export function DirectorSessionPage() {
   );
 }
 
-const PreviewSlot = ({ selectedStep }: { selectedStep: any }) => {
+const PreviewSlot = ({ selectedScene }: { selectedScene: any }) => {
   return (
     <pre className="director-session-page__preview-pre">
       {(() => {
         const text = String(
-          (selectedStep as any).playMarkdown ??
-            (selectedStep as any).markdown ??
+          (selectedScene as any).playMarkdown ??
+            (selectedScene as any).markdown ??
             "",
         );
         const plain = markdownToPlainText(text);

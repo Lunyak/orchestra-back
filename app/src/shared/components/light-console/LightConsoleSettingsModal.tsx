@@ -73,7 +73,7 @@ export function LightConsoleSettingsModal({
       panelClassName="light-console-settings-modal"
       ariaLabelledBy="light-console-settings-title"
     >
-      <header className="light-console-settings-modal__head">
+      <header className="light-console-settings-modal__header">
         <h2 id="light-console-settings-title" className="light-console-settings-modal__title">
           Настройка пульта
         </h2>

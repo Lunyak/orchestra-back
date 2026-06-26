@@ -6,7 +6,7 @@ import {
   normalizeEmail,
   projectDisplayLabel,
 } from "./session-page-utils";
-import { getEmailsPlannedForDirectorSlot, getNormalizedRoleKeysForSlotStep } from "./session-slot-planned";
+import { getEmailsPlannedForDirectorSlot, getNormalizedRoleKeysForSlotScene } from "./session-slot-planned";
 import type { ProjectDataCache, SlotGatherStatus, SlotInsight } from "./session-page-types";
 
 export function buildSessionSlotInsights(
@@ -23,7 +23,7 @@ export function buildSessionSlotInsights(
           slotId: sl.id,
           time: formatSlotTime(session.startsAt, sl.offsetMin),
           projectLabel: "",
-          stepLabel: "Материал не выбран",
+          sceneLabel: "Материал не выбран",
           title: "Материал не выбран",
           ready: false,
           missingRoles: [] as string[],
@@ -32,12 +32,12 @@ export function buildSessionSlotInsights(
       }
 
       const data = dataCache[ref.projectSlug];
-      const step = data?.steps?.find((x) => x.id === ref.stepId) ?? null;
-      const stepLabel = String(step?.title ?? "").trim() || `Шаг #${ref.stepId}`;
-      const roleKeys = getNormalizedRoleKeysForSlotStep(
-        step ?? null,
+      const scene = data?.scenes?.find((x) => x.id === ref.sceneId) ?? null;
+      const sceneLabel = String(scene?.title ?? "").trim() || `Сцена #${ref.sceneId}`;
+      const roleKeys = getNormalizedRoleKeysForSlotScene(
+        scene ?? null,
         data?.sceneRoles,
-        ref.stepId,
+        ref.sceneId,
       );
       const missingRoles = roleKeys
         .filter((key) => !key || !(data?.roleEmailsByKey ?? {})[key]?.length)
@@ -47,7 +47,7 @@ export function buildSessionSlotInsights(
         );
       const actors = getEmailsPlannedForDirectorSlot(
         ref.projectSlug,
-        ref.stepId,
+        ref.sceneId,
         data,
         (sl as DirectorSessionSlot).roleRehearsalPicks,
       );
@@ -57,8 +57,8 @@ export function buildSessionSlotInsights(
         slotId: sl.id,
         time: formatSlotTime(session.startsAt, sl.offsetMin),
         projectLabel,
-        stepLabel,
-        title: `${projectLabel} · #${ref.stepId} ${stepLabel}`.trim(),
+        sceneLabel,
+        title: `${projectLabel} · #${ref.sceneId} ${sceneLabel}`.trim(),
         ready: roleKeys.length === 0 ? true : missingRoles.length === 0,
         missingRoles,
         actors: Array.from(

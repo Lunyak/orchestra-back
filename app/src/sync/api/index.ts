@@ -67,7 +67,7 @@ export {
   createRehearsal,
   getMyRehearsalComment,
   getRehearsal,
-  getRehearsalSteps,
+  getRehearsalScenes,
   listRehearsals,
   planRehearsal,
   publishRehearsal,
@@ -78,7 +78,7 @@ export {
   type RehearsalMyComment,
   type RehearsalParticipant,
   type RehearsalParticipantStatus,
-  type RehearsalSelectedStep,
+  type RehearsalSelectedScene,
 } from "./rehearsals";
 
 export {
@@ -111,14 +111,14 @@ export {
 export {
   createActorAnnotation,
   deleteActorAnnotation,
-  deleteActorStepNote,
-  getActorStepNote,
+  deleteActorSceneNote,
+  getActorSceneNote,
   listActorAnnotations,
   updateActorAnnotation,
-  upsertActorStepNote,
+  upsertActorSceneNote,
   type ActorAnnotation,
   type ActorAnnotationField,
-  type ActorStepNote,
+  type ActorSceneNote,
 } from "./actor-notes";
 
 export {

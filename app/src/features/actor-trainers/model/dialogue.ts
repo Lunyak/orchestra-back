@@ -1,11 +1,11 @@
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import { stripLeadingPunctuation } from "./wordTokens";
 
 export type DialogueLine = {
   id: string;
-  stepId: number;
-  stepTitle: string;
+  sceneId: number;
+  sceneTitle: string;
   kind: "utterance" | "stage";
   role?: string;
   text: string;
@@ -70,18 +70,18 @@ function parseLineSpeaker(line: string): { role: string; rest: string } | null {
 }
 
 export function buildDialogueLines(opts: {
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
   preferField?: "playMarkdown" | "markdown";
 }): DialogueLine[] {
   const out: DialogueLine[] = [];
 
-  for (const step of opts.steps ?? []) {
+  for (const scene of opts.scenes ?? []) {
     // Важно: диалоговый тренажёр строится только из "Текста" (playMarkdown),
     // без fallback на "Схему" (markdown), если явно не выбрано иначе.
     const rawText =
       (opts.preferField === "markdown"
-        ? step.markdown ?? ""
-        : step.playMarkdown ?? "") ?? "";
+        ? scene.markdown ?? ""
+        : scene.playMarkdown ?? "") ?? "";
     const text = String(rawText ?? "");
     if (!text.trim()) continue;
 
@@ -98,9 +98,9 @@ export function buildDialogueLines(opts: {
         const rest = cleanText(parsed.rest);
         if (!rest) continue;
         out.push({
-          id: `${step.id}:u:${i}`,
-          stepId: step.id,
-          stepTitle: step.title ?? `Шаг ${step.id}`,
+          id: `${scene.id}:u:${i}`,
+          sceneId: scene.id,
+          sceneTitle: scene.title ?? `Сцена ${scene.id}`,
           kind: "utterance",
           role: currentRole,
           text: rest,
@@ -112,9 +112,9 @@ export function buildDialogueLines(opts: {
         const st = cleanText(trimmed);
         if (!st) continue;
         out.push({
-          id: `${step.id}:s:${i}`,
-          stepId: step.id,
-          stepTitle: step.title ?? `Шаг ${step.id}`,
+          id: `${scene.id}:s:${i}`,
+          sceneId: scene.id,
+          sceneTitle: scene.title ?? `Сцена ${scene.id}`,
           kind: "stage",
           text: st,
         });
@@ -126,18 +126,18 @@ export function buildDialogueLines(opts: {
       if (!cleaned) continue;
       if (currentRole) {
         out.push({
-          id: `${step.id}:u:${i}`,
-          stepId: step.id,
-          stepTitle: step.title ?? `Шаг ${step.id}`,
+          id: `${scene.id}:u:${i}`,
+          sceneId: scene.id,
+          sceneTitle: scene.title ?? `Сцена ${scene.id}`,
           kind: "utterance",
           role: currentRole,
           text: cleaned,
         });
       } else {
         out.push({
-          id: `${step.id}:s:${i}`,
-          stepId: step.id,
-          stepTitle: step.title ?? `Шаг ${step.id}`,
+          id: `${scene.id}:s:${i}`,
+          sceneId: scene.id,
+          sceneTitle: scene.title ?? `Сцена ${scene.id}`,
           kind: "stage",
           text: cleaned,
         });

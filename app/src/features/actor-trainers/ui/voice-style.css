@@ -24,7 +24,7 @@
   user-select: none;
 }
 
-.voice-title .voice-step {
+.voice-title .voice-scene {
   margin: 0;
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
@@ -87,7 +87,7 @@
   background: var(--color-bg-modal);
 }
 
-.voice-settings-modal__head {
+.voice-settings-modal__header {
   flex-shrink: 0;
   display: flex;
   gap: var(--spacing-5);
@@ -750,7 +750,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.voice-line-sheet__head {
+.voice-line-sheet__header {
   position: relative;
   flex-shrink: 0;
   min-height: var(--voice-line-sheet-head);
@@ -762,16 +762,16 @@
   background: color-mix(in srgb, var(--field-control-bg) 72%, transparent);
 }
 
-.voice-line-sheet__panel--collapsed .voice-line-sheet__head {
+.voice-line-sheet__panel--collapsed .voice-line-sheet__header {
   border-bottom: 0;
   background: transparent;
 }
 
-.voice-line-sheet__head:active {
+.voice-line-sheet__header:active {
   cursor: grabbing;
 }
 
-.voice-line-sheet__head::before {
+.voice-line-sheet__header::before {
   content: "";
   position: absolute;
   top: 8px;

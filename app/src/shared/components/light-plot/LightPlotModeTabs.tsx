@@ -5,7 +5,7 @@ import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../show-script/script-markdown-
 export type LightPlotModeTabsProps = {
   mode: LightPlotMode;
   onModeChange: (mode: LightPlotMode) => void;
-  onOpenTechCard?: (stepIndex?: number) => void;
+  onOpenTechCard?: (sceneIndex?: number) => void;
   center?: ReactNode;
   trailing?: ReactNode;
 };
@@ -53,7 +53,7 @@ export function LightPlotModeTabs({
             type="button"
             className="light-plot-mode-tab light-plot-mode-tab--link"
             onClick={() => onOpenTechCard()}
-            title={`Открыть ${SCRIPT_MARKDOWN_NOTES_TAB_LABEL} текущего шага в сценарии`}
+            title={`Открыть ${SCRIPT_MARKDOWN_NOTES_TAB_LABEL} текущей сцены в сценарии`}
           >
             {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}
           </button>

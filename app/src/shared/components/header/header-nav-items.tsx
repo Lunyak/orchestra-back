@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SUFER_ROUTE_PATH } from "../../../app/router/routeMeta";
 import { ENABLE_3D_THEATER } from "../../build-features";
 
 export type HeaderNavItem = {
@@ -7,6 +8,9 @@ export type HeaderNavItem = {
   navClass: string;
   icon: ReactNode;
 };
+
+/** Идентификатор пункта «План репетиций»; фактический URL — resolveRehearsalPlanEntryPath(). */
+export const REHEARSAL_PLAN_NAV_PATH = "/board";
 
 export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
   {
@@ -24,9 +28,9 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
     ),
   },
   {
-    path: "/notes-run",
-    label: "Запись",
-    navClass: "header-nav-btn--notes-run",
+    path: SUFER_ROUTE_PATH,
+    label: "Суфлёр",
+    navClass: "header-nav-btn--sufer",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -63,7 +67,7 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
     ),
   },
   {
-    path: "/board",
+    path: REHEARSAL_PLAN_NAV_PATH,
     label: "План репетиций",
     navClass: "header-nav-btn--board",
     icon: (
@@ -133,7 +137,7 @@ export function isHeaderNavItemActive(path: string, currentPath: string) {
       currentPath.startsWith("/premises")
     );
   }
-  if (path === "/board") {
+  if (path === REHEARSAL_PLAN_NAV_PATH) {
     return (
       currentPath === "/board" ||
       currentPath === "/tasks" ||

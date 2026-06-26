@@ -11,9 +11,9 @@ export function SpectacleRunMeta() {
 
   return (
     <div className="spectacle-run__meta" aria-live="polite">
-      <span className="spectacle-run__meta-step">
-        Шаг {currentItem?.stepOrdinal ?? "—"}
-        {currentItem?.stepTitle ? ` · ${currentItem.stepTitle}` : ""}
+      <span className="spectacle-run__meta-scene">
+        Сцена {currentItem?.sceneOrdinal ?? "—"}
+        {currentItem?.sceneTitle ? ` · ${currentItem.sceneTitle}` : ""}
       </span>
       <span className="spectacle-run__meta-kadr">
         {currentItem?.isPlaceholder
@@ -26,14 +26,11 @@ export function SpectacleRunMeta() {
 
 export function SpectacleRunProgRunNav() {
   const run = useSpectacleRunContext();
-  const { tape, tapeIndex, currentItem, currentStep, canGoPrev, canGoNext, nextLabel } = run;
+  const { tape, tapeIndex, currentItem, currentScene, canGoPrev, canGoNext, nextLabel } = run;
   const tapeLen = tape.length;
 
   if (tapeLen === 0) return null;
 
-  const stepOrdinal = currentItem?.stepOrdinal ?? "—";
-  const stepTitle = currentItem?.stepTitle?.trim() ?? "";
-  const stepLine = stepTitle ? `Шаг ${stepOrdinal} · ${stepTitle}` : `Шаг ${stepOrdinal}`;
   const kadrNo = currentItem?.kadrNo;
   const kadrTitle =
     currentItem && !currentItem.isPlaceholder && kadrNo != null
@@ -45,14 +42,14 @@ export function SpectacleRunProgRunNav() {
       ? `К${kadrNo} · ${kadrTitle}`
       : `К${kadrNo ?? "—"}`;
   const transitionLine =
-    currentItem?.section && currentStep && !currentItem.isPlaceholder
+    currentItem?.section && currentScene && !currentItem.isPlaceholder
       ? formatKadrTransitionForDisplay(
-          parseKadrTransitionRawInSection(String(currentStep.markdown ?? ""), currentItem.section),
+          parseKadrTransitionRawInSection(String(currentScene.markdown ?? ""), currentItem.section),
         )
       : "";
 
   return (
-    <div className="spectacle-run__prog-run-nav" aria-label="Навигация по шагам">
+    <div className="spectacle-run__prog-run-nav" aria-label="Навигация по сценам">
       <button
         type="button"
         className="spectacle-run__prog-run-nav-btn"
@@ -166,14 +163,14 @@ export function SpectacleRunToolbarActions() {
         {tapeIndex + 1} / {tapeLen}
       </span>
 
-      {run.canCopyTheaterFromPreviousStep ? (
+      {run.canCopyTheaterFromPreviousScene ? (
         <button
           type="button"
-          className="spectacle-run__add-kadr-btn spectacle-run__copy-scene-btn"
-          title="Скопировать мебель, декор, софиты и реквизит с предыдущего шага"
-          onClick={run.copyTheaterFromPreviousStep}
+          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--copy-scene"
+          title="Скопировать мебель, декор, софиты и реквизит с предыдущей сцены"
+          onClick={run.copyTheaterFromPreviousScene}
         >
-          Сцена ← шаг
+          ← пред. сцена
         </button>
       ) : null}
 
@@ -183,10 +180,10 @@ export function SpectacleRunToolbarActions() {
           className="spectacle-run__add-kadr-btn"
           title={
             run.currentItem?.isPlaceholder
-              ? "Добавить первую картину в шаг"
+              ? "Добавить первую картину в сцену"
               : `Вставить картину ${run.nextKadrNo} после текущей`
           }
-          onClick={run.addKadrToCurrentStep}
+          onClick={run.addKadrToCurrentScene}
         >
           + Картина {run.nextKadrNo}
         </button>
@@ -208,7 +205,7 @@ export function SpectacleRunToolbarActions() {
         <button
           type="button"
           className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--danger"
-          title="Удалить текущую картину и перенумеровать остальные в шаге"
+          title="Удалить текущую картину и перенумеровать остальные в сцене"
           onClick={run.deleteCurrentKadr}
         >
           Удалить картину

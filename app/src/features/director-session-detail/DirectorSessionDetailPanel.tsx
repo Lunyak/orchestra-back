@@ -1,56 +1,26 @@
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { calledStatusToGatherMark } from "../director-sessions/model/session-page-utils";
 import {
-  type DirectorRehearsalSession,
   type DirectorSessionSlot,
 } from "../director-sessions/directorSessionsSync";
 import {
-  confirmMyDirectorSessionAttendance,
-  declineMyDirectorSessionAttendance,
-  getDirectorSession,
   type DirectorSessionParticipant,
   type DirectorSessionParticipantStatus,
 } from "../../sync/api/director-sessions";
-import { syncPull } from "../../sync/api/entity-sync";
-import type { SyncPullResponse } from "../../sync/api/types/sync";
-import { getMyProfile, getProfilesBatch, type TeamProfile } from "../../sync/api/profile";
-import type { ScriptStep } from "../../shared/types/script";
+import type { TeamProfile } from "../../sync/api/profile";
 import { MiniAvatar } from "../../shared/core/mini-avatar/MiniAvatar";
 import { Button } from "@shared/core/button/Button";
+import { normalizeEmail } from "../director-sessions/model/session-page-utils";
+import { useDirectorSessionDetail } from "./useDirectorSessionDetail";
 
-import "../../pages/rehearsals/style.css";
+import "../rehearsals/ui/rehearsals.css";
 import "./director-session-detail.css";
 
 dayjs.locale("ru");
-
-function parseStepsFromPull(
-  pull: SyncPullResponse,
-  projectSlug: string,
-): { steps: ScriptStep[]; sceneId: string | null } {
-  const proj = (pull.projects ?? []).find((p: any) => p.slug === projectSlug);
-  const scene =
-    proj ? (pull.scenes ?? []).find((s: any) => String(s?.id ?? "") === `${proj.id}:script`) : null;
-  const sceneId = String(scene?.id ?? "") || null;
-  const steps = (Array.isArray((pull as any)?.steps) ? (pull as any).steps : [])
-    .filter((st: any) => (sceneId ? String(st?.sceneId ?? "") === sceneId : true))
-    .sort((a: any, b: any) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
-    .map((st: any) => ({
-      id: Number(st?.sourceId ?? 0),
-      title: String(st?.title ?? ""),
-      markdown: String(st?.markdown ?? ""),
-      playMarkdown: st?.playMarkdown ?? undefined,
-      explicationMarkdown: st?.explicationMarkdown ?? undefined,
-      durationMin: st?.durationMin ?? undefined,
-      kanbanStatus: st?.kanbanStatus ?? undefined,
-      kanbanOrder: st?.kanbanOrder ?? undefined,
-    }))
-    .filter((x: any) => Number.isFinite(x.id) && x.id > 0);
-  return { steps, sceneId };
-}
 
 function getSessionStartLocalMinutes(startsAtIso: string): number {
   const d = new Date(startsAtIso);
@@ -68,10 +38,6 @@ function formatTimeHHMM(totalMin: number): string {
 function formatSlotTime(startsAtIso: string, offsetMin: number): string {
   const base = getSessionStartLocalMinutes(startsAtIso);
   return formatTimeHHMM(base + Math.max(0, Math.floor(offsetMin)));
-}
-
-function normalizeEmail(v: string): string {
-  return String(v ?? "").trim().toLowerCase();
 }
 
 type CallRowStatus = {
@@ -146,152 +112,19 @@ export function DirectorSessionDetailPanel({
 }: DirectorSessionDetailPanelProps) {
   const id = String(sessionId ?? "").trim();
 
-  const [session, setSession] = useState<DirectorRehearsalSession | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [stepTitleBySlugAndId, setStepTitleBySlugAndId] = useState<
-    Record<string, Record<number, string>>
-  >({});
-  const [resolvedProfiles, setResolvedProfiles] = useState<TeamProfile[]>([]);
-  const [myEmail, setMyEmail] = useState<string | null>(null);
-  const [attendanceBusy, setAttendanceBusy] = useState(false);
-  const [attendanceErr, setAttendanceErr] = useState<string | null>(null);
-  const [attendanceOk, setAttendanceOk] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!accessToken) {
-      setMyEmail(null);
-      return;
-    }
-    let cancelled = false;
-    getMyProfile(accessToken)
-      .then((p) => {
-        if (!cancelled) setMyEmail(normalizeEmail(String(p?.email ?? "")));
-      })
-      .catch(() => {
-        if (!cancelled) setMyEmail(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken]);
-
-  const slotRefsKey = useMemo(() => {
-    const parts =
-      session?.slots
-        ?.map((s) => (s.ref ? `${s.ref.projectSlug}:${s.ref.stepId}` : ""))
-        .filter(Boolean)
-        .sort() ?? [];
-    return parts.join("|");
-  }, [session?.slots]);
-
-  useEffect(() => {
-    setAttendanceErr(null);
-    setAttendanceOk(null);
-  }, [id]);
-
-  useEffect(() => {
-    if (!accessToken || !id) return;
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    getDirectorSession(accessToken, id)
-      .then((data) => {
-        if (cancelled) return;
-        setSession(data as DirectorRehearsalSession);
-      })
-      .catch((e: any) => {
-        if (cancelled) return;
-        const status = e?.response?.status;
-        setError(
-          status === 404
-            ? "Сессия не найдена"
-            : (e?.response?.data?.message ?? e?.message ?? "Не удалось загрузить сессию"),
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, id]);
-
-  const sessionEmailsKey = useMemo(() => {
-    const u = new Set<string>();
-    for (const e of session?.plannedEmails ?? []) {
-      const v = normalizeEmail(String(e));
-      if (v) u.add(v);
-    }
-    for (const p of session?.participants ?? []) {
-      const v = normalizeEmail(String(p.email));
-      if (v) u.add(v);
-    }
-    return Array.from(u).sort().join("|");
-  }, [session?.plannedEmails, session?.participants]);
-
-  useEffect(() => {
-    if (!accessToken || !sessionEmailsKey) {
-      setResolvedProfiles([]);
-      return;
-    }
-    const emails = sessionEmailsKey.split("|").filter(Boolean);
-    let cancelled = false;
-    getProfilesBatch(accessToken, emails)
-      .then((list) => {
-        if (!cancelled) setResolvedProfiles(list ?? []);
-      })
-      .catch(() => {
-        if (!cancelled) setResolvedProfiles([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, sessionEmailsKey]);
-
-  useEffect(() => {
-    if (!accessToken || !slotRefsKey) {
-      setStepTitleBySlugAndId({});
-      return;
-    }
-    const slugs = Array.from(
-      new Set(
-        slotRefsKey
-          .split("|")
-          .map((seg) => String(seg.split(":")[0] ?? "").trim())
-          .filter(Boolean),
-      ),
-    );
-    if (slugs.length === 0) {
-      setStepTitleBySlugAndId({});
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      const merged: Record<string, Record<number, string>> = {};
-      await Promise.all(
-        slugs.map(async (slug) => {
-          try {
-            const pull = await syncPull(accessToken, null, slug, { steps: true });
-            if (cancelled) return;
-            const { steps } = parseStepsFromPull(pull, slug);
-            const byId: Record<number, string> = {};
-            for (const st of steps) {
-              const t = String(st.title ?? "").trim();
-              if (t) byId[st.id] = t;
-            }
-            merged[slug] = byId;
-          } catch {
-            if (!cancelled) merged[slug] = {};
-          }
-        }),
-      );
-      if (!cancelled) setStepTitleBySlugAndId(merged);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, slotRefsKey]);
+  const {
+    session,
+    loading,
+    error,
+    sceneTitleBySlugAndId,
+    resolvedProfiles,
+    myEmail,
+    attendanceBusy,
+    attendanceErr,
+    attendanceOk,
+    onConfirmAttendance,
+    onDeclineAttendance,
+  } = useDirectorSessionDetail(accessToken, id);
 
   const headerTimeLabel = useMemo(() => {
     if (!session?.startsAt) return "";
@@ -372,7 +205,7 @@ export function DirectorSessionDetailPanel({
 
   const inPlannedOnly = useMemo(() => {
     if (!myEmail || !session?.plannedEmails?.length) return false;
-    const planned = (session.plannedEmails ?? []).map((e) => normalizeEmail(String(e)));
+    const planned = (session.plannedEmails ?? []).map((email: string) => normalizeEmail(String(email)));
     if (!planned.includes(myEmail)) return false;
     return !myParticipant;
   }, [myEmail, session?.plannedEmails, myParticipant]);
@@ -386,50 +219,6 @@ export function DirectorSessionDetailPanel({
   const rootClass = onClose
     ? "director-session-detail-root--modal rehearsals-page"
     : "rehearsals-page sessions-page";
-
-  const onConfirmAttendance = async () => {
-    if (!accessToken || !id) return;
-    setAttendanceBusy(true);
-    setAttendanceErr(null);
-    setAttendanceOk(null);
-    try {
-      const res = await confirmMyDirectorSessionAttendance(accessToken, id);
-      if (res?.session) setSession(res.session as DirectorRehearsalSession);
-      setAttendanceOk("Вызов подтверждён");
-    } catch (e: any) {
-      const msg =
-        e?.response?.data?.message ??
-        e?.message ??
-        "Не удалось подтвердить вызов";
-      setAttendanceErr(String(msg));
-    } finally {
-      setAttendanceBusy(false);
-    }
-  };
-
-  const onDeclineAttendance = async () => {
-    if (!accessToken || !id) return;
-    const ok = window.confirm(
-      "Отметить «не приду»? Режиссёр увидит, что вы не сможете прийти на эту сессию.",
-    );
-    if (!ok) return;
-    setAttendanceBusy(true);
-    setAttendanceErr(null);
-    setAttendanceOk(null);
-    try {
-      const res = await declineMyDirectorSessionAttendance(accessToken, id);
-      if (res?.session) setSession(res.session as DirectorRehearsalSession);
-      setAttendanceOk("Ответ сохранён: не приду");
-    } catch (e: any) {
-      const msg =
-        e?.response?.data?.message ??
-        e?.message ??
-        "Не удалось сохранить ответ";
-      setAttendanceErr(String(msg));
-    } finally {
-      setAttendanceBusy(false);
-    }
-  };
 
   return (
     <div className={rootClass}>
@@ -450,12 +239,12 @@ export function DirectorSessionDetailPanel({
       </div>
 
       {loading ? (
-        <div className="rehearsals-muted" style={{ marginTop: 10 }}>
+        <div className="rehearsals-muted rehearsals-muted--top">
           Загрузка…
         </div>
       ) : null}
       {error ? (
-        <div className="settings-invite-error" style={{ marginTop: 10 }}>
+        <div className="settings-invite-error rehearsals-muted--top">
           {error}
         </div>
       ) : null}
@@ -476,12 +265,12 @@ export function DirectorSessionDetailPanel({
                       ) : (
                         <>
                           {attendanceErr ? (
-                            <div className="settings-invite-error" style={{ margin: 0 }}>
+                            <div className="settings-invite-error settings-invite-error--flush">
                               {attendanceErr}
                             </div>
                           ) : null}
                           {attendanceOk ? (
-                            <p className="director-session-page__attendance-note" style={{ color: "var(--color-status-success-bright)" }}>
+                            <p className="director-session-page__attendance-note director-session-page__attendance-note--success">
                               {attendanceOk}
                             </p>
                           ) : null}
@@ -636,7 +425,7 @@ export function DirectorSessionDetailPanel({
             </div>
 
             {(slotsSorted ?? []).length === 0 ? (
-              <div className="rehearsals-muted" style={{ marginTop: 6 }}>
+              <div className="rehearsals-muted rehearsals-muted--tight-top">
                 В этой сессии пока нет слотов.
               </div>
             ) : (
@@ -646,9 +435,9 @@ export function DirectorSessionDetailPanel({
                     ? (() => {
                         const slug = sl.ref.projectSlug;
                         const title =
-                          stepTitleBySlugAndId[slug]?.[sl.ref.stepId]?.trim() ?? "";
-                        const stepLabel = title || `шаг #${sl.ref.stepId}`;
-                        return `${slug} - ${stepLabel}`;
+                          sceneTitleBySlugAndId[slug]?.[sl.ref.sceneId]?.trim() ?? "";
+                        const sceneLabel = title || `сцена #${sl.ref.sceneId}`;
+                        return `${slug} - ${sceneLabel}`;
                       })()
                     : "Материал не выбран";
                   return (

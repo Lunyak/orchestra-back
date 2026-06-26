@@ -12,14 +12,14 @@
     text-transform: uppercase;
 }
 
-.button.is-active {
+.button--active {
     border: 1px solid var(--color-active-ascent);
     background: var(--color-active-ascent);
     color: var(--color-text-secondary);
     outline: none;
 }
 
-.button.is-active:hover {
+.button--active:hover {
     background: var(--color-active-ascent);
     filter: brightness(1.06);
 }
@@ -78,13 +78,13 @@
     background: var(--color-button-danger-active, var(--color-button-danger));
 }
 
-.button.danger.is-active {
+.button.danger.button--active {
     border-color: var(--color-danger);
     background: var(--color-button-danger);
     color: var(--color-text-primary);
 }
 
-.button.danger.is-active:hover {
+.button.danger.button--active:hover {
     background: var(--color-button-danger-hover, var(--color-button-danger));
     filter: none;
 }

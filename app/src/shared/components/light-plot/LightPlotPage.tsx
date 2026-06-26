@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useScene } from "../../../features/scene";
+import { usePlaybook } from "../../../features/playbook";
 import { useProject } from "../../../features/project/model/project-context";
 import { useAppDispatch } from "../../../shared/store/hooks";
 import { showScriptMarkdownActions } from "../../../features/show-script-markdown/model/show-script-markdown-slice";
@@ -15,13 +15,13 @@ export const LightPlotPage = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { projectName } = useProject();
-  const { steps, setCurrentPage } = useScene();
+  const { scenes, setCurrentPage } = usePlaybook();
 
   const openTechCard = useCallback(
-    (stepIndex?: number) => {
+    (sceneIndex?: number) => {
       if (!projectName) return;
-      if (stepIndex != null && stepIndex >= 0 && stepIndex < steps.length) {
-        setCurrentPage(stepIndex);
+      if (sceneIndex != null && sceneIndex >= 0 && sceneIndex < scenes.length) {
+        setCurrentPage(sceneIndex);
       }
       try {
         if (typeof window !== "undefined") {
@@ -42,7 +42,7 @@ export const LightPlotPage = () => {
       );
       navigate("/");
     },
-    [dispatch, navigate, projectName, setCurrentPage, steps.length],
+    [dispatch, navigate, projectName, setCurrentPage, scenes.length],
   );
 
   return (

@@ -1,4 +1,4 @@
-import type { SceneLightFadersDataV1, SceneLightProgramsDataV1 } from "../../../features/scene/model/scene-slice";
+import type { PlaybookLightFadersDataV1, PlaybookLightProgramsDataV1 } from "../../../features/playbook/model/playbook-slice";
 import { LIGHT_CHANNEL_SLOT_COUNT } from "../../../features/theater/model/theater-light-channel-link";
 import type { TheaterSpotlight } from "../../types/script";
 import {
@@ -16,7 +16,7 @@ export function coerceProgramId(value: unknown): number | null {
   return id;
 }
 
-export function createDefaultLightFaders(): SceneLightFadersDataV1 {
+export function createDefaultLightFaders(): PlaybookLightFadersDataV1 {
   return {
     v: 1,
     count: 8,
@@ -33,7 +33,7 @@ export function createDefaultLightFaders(): SceneLightFadersDataV1 {
 
 export function createDefaultLightPrograms(
   count = DEFAULT_LIGHT_PROGRAM_COUNT,
-): SceneLightProgramsDataV1 {
+): PlaybookLightProgramsDataV1 {
   const n = Math.max(1, Math.trunc(count) || DEFAULT_LIGHT_PROGRAM_COUNT);
   return {
     v: 1,
@@ -47,9 +47,9 @@ export function createDefaultLightPrograms(
 }
 
 export function buildCompleteLightFaders(
-  persisted: SceneLightFadersDataV1 | undefined,
+  persisted: PlaybookLightFadersDataV1 | undefined,
   minFaderCount = 1,
-): SceneLightFadersDataV1 {
+): PlaybookLightFadersDataV1 {
   const storedCount = Math.trunc(Number(persisted?.count) || 0);
   const baseCount = storedCount > 0 ? storedCount : 8;
   const countHint = Math.max(minFaderCount, baseCount);
@@ -58,7 +58,7 @@ export function buildCompleteLightFaders(
     0,
   );
   const maxFaderId = Math.max(countHint, maxIdInList);
-  const byId = new Map<number, SceneLightFadersDataV1["faders"][number]>();
+  const byId = new Map<number, PlaybookLightFadersDataV1["faders"][number]>();
   for (let id = 1; id <= maxFaderId; id += 1) {
     byId.set(id, {
       id,
@@ -87,7 +87,7 @@ export function buildCompleteLightFaders(
 }
 
 export function readLightProgramSlotCount(
-  raw: SceneLightProgramsDataV1 | null | undefined,
+  raw: PlaybookLightProgramsDataV1 | null | undefined,
 ): number {
   const explicit = Math.trunc(Number(raw?.count) || 0);
   const storedLen = Array.isArray(raw?.programs) ? raw.programs.length : 0;
@@ -96,9 +96,9 @@ export function readLightProgramSlotCount(
 }
 
 export function resolveLightPrograms(
-  raw: SceneLightProgramsDataV1 | null | undefined,
+  raw: PlaybookLightProgramsDataV1 | null | undefined,
   minCount?: number,
-): SceneLightProgramsDataV1 {
+): PlaybookLightProgramsDataV1 {
   const slotCount = readLightProgramSlotCount(raw);
   const effectiveMin = minCount ?? (slotCount > 0 ? slotCount : DEFAULT_LIGHT_PROGRAM_COUNT);
   if (!raw || raw.v !== 1 || !Array.isArray(raw.programs) || raw.programs.length === 0) {
@@ -106,7 +106,7 @@ export function resolveLightPrograms(
   }
 
   const maxId = Math.max(effectiveMin, slotCount);
-  const byId = new Map<number, SceneLightProgramsDataV1["programs"][number]>();
+  const byId = new Map<number, PlaybookLightProgramsDataV1["programs"][number]>();
   for (const program of raw.programs) {
     const id = coerceProgramId(program.id);
     if (id == null || id > maxId) continue;
@@ -133,11 +133,11 @@ export function resolveLightPrograms(
 }
 
 export function resizeLightPrograms(
-  raw: SceneLightProgramsDataV1 | null | undefined,
+  raw: PlaybookLightProgramsDataV1 | null | undefined,
   count: number,
-): SceneLightProgramsDataV1 {
+): PlaybookLightProgramsDataV1 {
   const nextCount = Math.max(1, Math.min(64, Math.trunc(Number(count)) || 1));
-  const byId = new Map<number, SceneLightProgramsDataV1["programs"][number]>();
+  const byId = new Map<number, PlaybookLightProgramsDataV1["programs"][number]>();
   for (const program of raw?.programs ?? []) {
     const id = coerceProgramId(program.id);
     if (id == null || id > nextCount) continue;
@@ -161,7 +161,7 @@ export function resizeLightPrograms(
 }
 
 export function lightProgramsNeedNormalization(
-  raw: SceneLightProgramsDataV1 | null | undefined,
+  raw: PlaybookLightProgramsDataV1 | null | undefined,
 ): boolean {
   if (!raw || raw.v !== 1 || !Array.isArray(raw.programs)) return true;
   const slotCount = readLightProgramSlotCount(raw);
@@ -174,15 +174,15 @@ export function lightProgramsNeedNormalization(
 }
 
 export function resolveLightFaders(
-  raw: SceneLightFadersDataV1 | null | undefined,
-): SceneLightFadersDataV1 {
+  raw: PlaybookLightFadersDataV1 | null | undefined,
+): PlaybookLightFadersDataV1 {
   if (raw && raw.v === 1) return buildCompleteLightFaders(raw);
   return createDefaultLightFaders();
 }
 
 export function snapshotFadersForProgram(
-  faders: SceneLightFadersDataV1,
-): SceneLightProgramsDataV1["programs"][number]["faders"] {
+  faders: PlaybookLightFadersDataV1,
+): PlaybookLightProgramsDataV1["programs"][number]["faders"] {
   return faders.faders.map((item) => ({
     faderId: item.id,
     intensity: item.intensity ?? 1,
@@ -192,7 +192,7 @@ export function snapshotFadersForProgram(
 }
 
 function readFaderLevelForSnapshot(
-  fader: SceneLightFadersDataV1["faders"][number],
+  fader: PlaybookLightFadersDataV1["faders"][number],
 ): number {
   if (fader.enabled === false) return 0;
   const raw =
@@ -205,15 +205,15 @@ function readFaderLevelForSnapshot(
 
 /** Память П: все ненулевые F со всех K (память programs[1…N] + текущая доска). */
 export function snapshotFadersForProgramFromAllChannels(
-  programs: SceneLightProgramsDataV1,
-  baseFaders: SceneLightFadersDataV1,
+  programs: PlaybookLightProgramsDataV1,
+  baseFaders: PlaybookLightFadersDataV1,
   channelCount: number,
-  currentBoard: SceneLightFadersDataV1,
-): SceneLightProgramsDataV1["programs"][number]["faders"] {
+  currentBoard: PlaybookLightFadersDataV1,
+): PlaybookLightProgramsDataV1["programs"][number]["faders"] {
   const maxCh = Math.max(1, Math.trunc(channelCount) || 1);
   const byFader = new Map<
     number,
-    SceneLightProgramsDataV1["programs"][number]["faders"][number]
+    PlaybookLightProgramsDataV1["programs"][number]["faders"][number]
   >();
 
   for (let channel = 1; channel <= maxCh; channel += 1) {
@@ -244,9 +244,9 @@ export function snapshotFadersForProgramFromAllChannels(
 }
 
 export function applyProgramFaderStatesToBoard(
-  faders: SceneLightFadersDataV1,
-  states: SceneLightProgramsDataV1["programs"][number]["faders"],
-): SceneLightFadersDataV1 {
+  faders: PlaybookLightFadersDataV1,
+  states: PlaybookLightProgramsDataV1["programs"][number]["faders"],
+): PlaybookLightFadersDataV1 {
   const stateByFader = new Map(states.map((state) => [state.faderId, state]));
   return {
     ...faders,
@@ -271,10 +271,10 @@ export function applyProgramFaderStatesToBoard(
 
 /** Снимок уровней всех F для канала K (хранится в program[id].faders). */
 export function upsertProgramChannelSnapshot(
-  programs: SceneLightProgramsDataV1,
+  programs: PlaybookLightProgramsDataV1,
   channelId: number,
-  faders: SceneLightFadersDataV1,
-): SceneLightProgramsDataV1 {
+  faders: PlaybookLightFadersDataV1,
+): PlaybookLightProgramsDataV1 {
   const id = coerceProgramId(channelId);
   if (id == null) return programs;
   const snapshot = snapshotFadersForProgram(faders);
@@ -287,12 +287,12 @@ export function upsertProgramChannelSnapshot(
 }
 
 export function upsertActiveProgramSnapshotFromAllChannels(
-  programs: SceneLightProgramsDataV1,
+  programs: PlaybookLightProgramsDataV1,
   activeProgramId: number,
-  baseFaders: SceneLightFadersDataV1,
+  baseFaders: PlaybookLightFadersDataV1,
   channelCount: number,
-  currentBoard: SceneLightFadersDataV1,
-): SceneLightProgramsDataV1 {
+  currentBoard: PlaybookLightFadersDataV1,
+): PlaybookLightProgramsDataV1 {
   const id = coerceProgramId(activeProgramId);
   if (id == null) return programs;
   const snapshot = snapshotFadersForProgramFromAllChannels(
@@ -310,9 +310,9 @@ export function upsertActiveProgramSnapshotFromAllChannels(
 }
 
 export function readProgramChannelFaderStates(
-  programs: SceneLightProgramsDataV1,
+  programs: PlaybookLightProgramsDataV1,
   channelId: number,
-): SceneLightProgramsDataV1["programs"][number]["faders"] {
+): PlaybookLightProgramsDataV1["programs"][number]["faders"] {
   const id = coerceProgramId(channelId);
   if (id == null) return [];
   return programs.programs.find((program) => program.id === id)?.faders ?? [];
@@ -320,7 +320,7 @@ export function readProgramChannelFaderStates(
 
 export function resolveLightProgramMinCount(
   lightChannelsCount: number,
-  programs?: SceneLightProgramsDataV1 | null,
+  programs?: PlaybookLightProgramsDataV1 | null,
   minChannel = 0,
 ): number {
   const channelCount = Math.max(
@@ -333,8 +333,8 @@ export function resolveLightProgramMinCount(
 }
 
 function zeroFaderBoardStates(
-  faders: SceneLightFadersDataV1,
-): SceneLightProgramsDataV1["programs"][number]["faders"] {
+  faders: PlaybookLightFadersDataV1,
+): PlaybookLightProgramsDataV1["programs"][number]["faders"] {
   return faders.faders.map((fader) => ({
     faderId: fader.id,
     intensity: 0,
@@ -345,11 +345,11 @@ function zeroFaderBoardStates(
 
 /** Перед save: снимок активного K из live-доски → program[K] (3D читает program, не lightFaders). */
 export function prepareLightProgramsForPersist(args: {
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   lightChannelsCount: number;
   activeChannel: number;
-}): SceneLightProgramsDataV1 {
+}): PlaybookLightProgramsDataV1 {
   const channelCount = Math.max(1, Math.trunc(args.lightChannelsCount) || 1);
   const activeChannel = Math.max(0, Math.trunc(args.activeChannel) || 0);
   let programs = resolveLightPrograms(
@@ -364,11 +364,11 @@ export function prepareLightProgramsForPersist(args: {
 
 /** Доска F для канала K: живая доска, память program[K] или нули — не чужой K. */
 export function buildFaderBoardForConsoleChannel(
-  liveFaders: SceneLightFadersDataV1,
-  programs: SceneLightProgramsDataV1,
+  liveFaders: PlaybookLightFadersDataV1,
+  programs: PlaybookLightProgramsDataV1,
   channel: number,
   options?: { useLiveBoard?: boolean },
-): SceneLightFadersDataV1 {
+): PlaybookLightFadersDataV1 {
   if (options?.useLiveBoard) return liveFaders;
   const channelStates = readProgramChannelFaderStates(programs, channel);
   if (channelStates.length > 0) {
@@ -384,15 +384,15 @@ export type LightConsoleViewProps = {
   readOnly?: boolean;
   lightChannels: string[];
   selectedLightSlot: number;
-  faders: SceneLightFadersDataV1;
-  programs: SceneLightProgramsDataV1;
+  faders: PlaybookLightFadersDataV1;
+  programs: PlaybookLightProgramsDataV1;
   spotlights?: TheaterSpotlight[];
   consoleChannel?: number;
   onSelectChannel?: (slot: number) => void;
   onSelectProgram?: (programId: number) => void;
   onPatchFader?: (
     faderId: number,
-    patch: Partial<SceneLightFadersDataV1["faders"][number]>,
+    patch: Partial<PlaybookLightFadersDataV1["faders"][number]>,
   ) => void;
   onSaveActiveProgram?: () => void;
   onOpenSettings?: () => void;

@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useScene } from "../../../features/scene";
+import { usePlaybook } from "../../../features/playbook";
 import {
   selectShowScriptMarkdownUi,
   showScriptMarkdownActions,
 } from "../../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
-  applyLightConsoleLayoutToSceneData,
+  applyLightConsoleLayoutToPlaybookData,
   buildLightConsoleLayoutCounts,
   type LightConsoleLayoutCounts,
 } from "./light-channels-mutate";
 
 export function useLightConsoleLayoutSettings(projectName: string) {
   const dispatch = useAppDispatch();
-  const { sceneData, setSceneData, saveStepsForLightPlot } = useScene();
+  const { playbookData, setPlaybookData, saveScenesForLightPlot } = usePlaybook();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { lightChannels, selectedLightSlot } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName || "fools", "script"),
@@ -23,15 +23,15 @@ export function useLightConsoleLayoutSettings(projectName: string) {
     () =>
       buildLightConsoleLayoutCounts({
         lightChannels,
-        lightFaders: sceneData?.lightFaders,
-        lightPrograms: sceneData?.lightPrograms,
+        lightFaders: playbookData?.lightFaders,
+        lightPrograms: playbookData?.lightPrograms,
       }),
-    [lightChannels, sceneData?.lightFaders, sceneData?.lightPrograms],
+    [lightChannels, playbookData?.lightFaders, playbookData?.lightPrograms],
   );
 
   const applyLayout = useCallback(
     (next: LightConsoleLayoutCounts) => {
-      const patched = applyLightConsoleLayoutToSceneData(sceneData, {
+      const patched = applyLightConsoleLayoutToPlaybookData(playbookData, {
         lightChannels,
         layout: next,
       });
@@ -53,21 +53,21 @@ export function useLightConsoleLayoutSettings(projectName: string) {
           }),
         );
       }
-      setSceneData((prev) => ({
+      setPlaybookData((prev) => ({
         ...(prev ?? {}),
         ...patched,
       }));
-      void saveStepsForLightPlot({ force: true });
+      void saveScenesForLightPlot({ force: true });
       setSettingsOpen(false);
     },
     [
       dispatch,
       lightChannels,
       projectName,
-      sceneData,
+      playbookData,
       selectedLightSlot,
-      saveStepsForLightPlot,
-      setSceneData,
+      saveScenesForLightPlot,
+      setPlaybookData,
     ],
   );
 

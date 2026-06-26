@@ -2,13 +2,13 @@ import cn from "classnames";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "../../../shared/core/modal/Modal";
 import type {
-  SceneHoldImage,
-  SceneLightChannelRolesV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
+  PlaybookHoldImage,
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
   SceneProjectorSettingsV1,
-  SceneVideo,
-} from "../../scene/model/scene-slice";
+  PlaybookVideo,
+} from "../../playbook/model/playbook-slice";
 import type { TheaterSpotlight } from "../../../shared/types/script";
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
@@ -27,7 +27,7 @@ import {
   type CreateKadrDraft,
   type KadrModalMode,
 } from "../model/create-kadr-from-draft";
-import "./create-kadr-modal.css";
+import "@shared/components/create-kadr-modal/create-kadr-modal.css";
 
 export type CreateKadrModalProps = {
   isOpen: boolean;
@@ -37,15 +37,15 @@ export type CreateKadrModalProps = {
   initialDraft?: CreateKadrDraft | null;
   projectName: string;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1 | null;
-  lightPrograms: SceneLightProgramsDataV1 | null;
-  lightChannelRoles: SceneLightChannelRolesV1 | null;
+  lightFaders: PlaybookLightFadersDataV1 | null;
+  lightPrograms: PlaybookLightProgramsDataV1 | null;
+  lightChannelRoles: PlaybookLightChannelRolesV1 | null;
   spotlights: TheaterSpotlight[];
   liveConsole: ReturnType<typeof useLightConsoleState>;
   playlist: Array<{ id: number; title: string }>;
   sounds: Array<{ id: number; title: string }>;
-  videos: SceneVideo[];
-  holdImages: SceneHoldImage[];
+  videos: PlaybookVideo[];
+  holdImages: PlaybookHoldImage[];
   projector?: SceneProjectorSettingsV1 | null;
   onClose: () => void;
   onSubmit: (draft: CreateKadrDraft) => void;
@@ -445,7 +445,7 @@ export function CreateKadrModal({
       panelClassName="create-kadr-modal"
       ariaLabel={modalTitle}
     >
-      <header className="create-kadr-modal__head">
+      <header className="create-kadr-modal__header">
         <h2 className="create-kadr-modal__title" id="create-kadr-modal-title">
           {modalTitle}
         </h2>
@@ -676,7 +676,7 @@ export function CreateKadrModal({
                             !item.enabled && "create-kadr-modal__fader--dim",
                           )}
                         >
-                          <label className="create-kadr-modal__fader-head">
+                          <label className="create-kadr-modal__fader-header">
                             <input
                               type="checkbox"
                               checked={checked}

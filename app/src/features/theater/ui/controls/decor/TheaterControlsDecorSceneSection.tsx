@@ -46,9 +46,9 @@ export function TheaterControlsDecorSceneSection({ vm, decor }: DecorSectionProp
                 if (!Number.isFinite(nextId)) return;
                 vm.exitDecorPlaceMode();
                 vm.setEditMode("decor");
-                vm.updateCurrentStep({ theaterActiveModelId: nextId });
+                vm.updateCurrentScene({ theaterActiveModelId: nextId });
               }}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               placeholder="Выберите объект"
               noOptionsLabel="Объектов нет"
             />

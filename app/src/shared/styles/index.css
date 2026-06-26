@@ -1,5 +1,5 @@
 /* Главный файл стилей - импортируйте его в App или index.css */
-@import url("https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=IBM+Plex+Mono:wght@400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=IBM+Plex+Mono:wght@400&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;700&family=Roboto:wght@400;700&family=Literata:wght@400;700&family=PT+Serif:wght@400;700&family=Merriweather:wght@400;700&display=swap");
 @import './variables.css';
 @import './global.css';
 @import './themes/light.css';

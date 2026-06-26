@@ -1,11 +1,11 @@
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { stripLeadingPunctuation } from "./wordTokens";
 
 export type RolePhraseSource = {
   lineId: string;
-  stepId: number;
-  stepTitle: string;
+  sceneId: number;
+  sceneTitle: string;
   role: string;
   text: string;
 };
@@ -102,10 +102,10 @@ export function normalizeCastActors(value: unknown): string[] {
 
 /**
  * Объединяет "истину" по ролям из:
- * - `sceneData.roleAssignments` (глобально)
+ * - `playbookData.roleAssignments` (глобально)
  */
 export function buildRoleAssignmentsIndex(opts: {
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
   roleAssignments?: Record<string, string[]>;
 }): Map<string, { role: string; actors: string[] }> {
   const map = new Map<string, { role: string; actors: string[] }>();
@@ -132,8 +132,8 @@ export function buildRoleAssignmentsIndex(opts: {
   return map;
 }
 
-export function extractRolePhrasesFromSteps(opts: {
-  steps: ScriptStep[];
+export function extractRolePhrasesFromScenes(opts: {
+  scenes: ScriptScene[];
   role: string;
   /** Дополнительные ключи роли (key/aliases), чтобы находить реплики при алиасах в тексте. */
   roleKeys?: string[];
@@ -151,13 +151,13 @@ export function extractRolePhrasesFromSteps(opts: {
 
   const out: RolePhraseSource[] = [];
 
-  for (const step of opts.steps ?? []) {
+  for (const scene of opts.scenes ?? []) {
     // Важно: для актёрского тренажёра берём ТОЛЬКО "Текст" (playMarkdown),
     // без подмешивания "Схемы" (markdown), если явно не выбрано иначе.
     const rawText =
       (opts.preferField === "markdown"
-        ? step.markdown ?? ""
-        : step.playMarkdown ?? "") ?? "";
+        ? scene.markdown ?? ""
+        : scene.playMarkdown ?? "") ?? "";
     const text = String(rawText ?? "");
     if (!text.trim()) continue;
 
@@ -174,9 +174,9 @@ export function extractRolePhrasesFromSteps(opts: {
         if (!rest) continue;
         if (desiredSet.has(normalizeRoleKey(currentRole))) {
           out.push({
-            lineId: `${step.id}:u:${i}`,
-            stepId: step.id,
-            stepTitle: step.title ?? `Шаг ${step.id}`,
+            lineId: `${scene.id}:u:${i}`,
+            sceneId: scene.id,
+            sceneTitle: scene.title ?? `Сцена ${scene.id}`,
             role: currentRole,
             text: rest,
           });
@@ -190,9 +190,9 @@ export function extractRolePhrasesFromSteps(opts: {
       if (!cleaned) continue;
       if (desiredSet.has(normalizeRoleKey(currentRole))) {
         out.push({
-          lineId: `${step.id}:u:${i}`,
-          stepId: step.id,
-          stepTitle: step.title ?? `Шаг ${step.id}`,
+          lineId: `${scene.id}:u:${i}`,
+          sceneId: scene.id,
+          sceneTitle: scene.title ?? `Сцена ${scene.id}`,
           role: currentRole,
           text: cleaned,
         });

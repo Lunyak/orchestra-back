@@ -65,7 +65,7 @@
   border-radius: 10px;
 }
 
-.script-step-title {
+.script-scene-title {
   width: 100%;
   box-sizing: border-box;
   margin-bottom: 12px;
@@ -164,12 +164,12 @@
     }
   }
 
-  .script-step-title {
+  .script-scene-title {
     color: var(--color-script-accent);
   }
 }
 
-.script-step-editor {
+.script-scene-editor {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -177,7 +177,7 @@
   gap: 12px;
 }
 
-.script-step-body {
+.script-scene-body {
   display: flex;
   gap: 12px;
   flex: 1;
@@ -185,7 +185,7 @@
   position: relative;
 }
 
-.script-step-main {
+.script-scene-main {
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -273,7 +273,7 @@
     --script-markdown-content-padding-bottom: 170px;
   }
 
-  .script-step-body {
+  .script-scene-body {
     flex-direction: column;
   }
 }
@@ -708,10 +708,18 @@
 /* Вкладка «Текст» (play): ширина колонки лейбла по строке, без выравнивания по max всех реплик. */
 .markdown-preview.markdown-preview--play-inline-labels {
   font-size: var(--script-font-size-body);
+  color: var(--script-play-text-color, var(--color-text-primary));
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
 }
 
 .markdown-preview.markdown-preview--play-inline-labels p {
   font-size: inherit;
+  line-height: inherit;
+}
+
+.markdown-preview.markdown-preview--play-inline-labels p + p {
+  margin-top: var(--script-play-paragraph-gap, var(--script-markdown-paragraph-gap));
 }
 
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-label {
@@ -728,6 +736,7 @@
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-dialog-label {
   display: inline-flex;
   vertical-align: baseline;
+  margin-right: var(--script-play-label-text-gap, 4px);
 }
 
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-dialog-text {
@@ -735,8 +744,11 @@
   vertical-align: baseline;
 }
 
-.markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-speaker-label {
+.markdown-preview.markdown-preview--play-inline-labels .markdown-speaker-label,
+.script-markdown-editor-main--play .markdown-speaker-label,
+.markdown-speaker-label--play {
   display: inline-flex;
+  align-items: center;
   white-space: nowrap;
   overflow: visible;
   max-height: none;
@@ -746,9 +758,21 @@
   -webkit-line-clamp: unset;
   line-clamp: unset;
   -webkit-box-orient: unset;
-  font-weight: 100;
-  font-size: var(--script-font-size-label);
-  text-transform: capitalize !important;
+  padding: 0 6px;
+  letter-spacing: 0.25px;
+  vertical-align: baseline;
+  cursor: pointer;
+  font-weight: var(--script-play-label-font-weight, 100);
+  font-size: var(--script-play-label-font-size, var(--script-font-size-label));
+  font-family: var(--script-play-label-font-family, inherit);
+  color: var(--script-play-label-color, var(--script-play-text-color, var(--color-text-primary)));
+  background: var(--script-play-label-bg, var(--color-blue-bg));
+  text-transform: var(--script-play-label-text-transform, capitalize);
+}
+
+.script-markdown-editor-main--play .script-markdown-cm .markdown-speaker-label,
+.markdown-speaker-label--play {
+  margin-right: var(--script-play-label-text-gap, 4px);
 }
 
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--no-label {
@@ -842,9 +866,7 @@
   margin: 0 0 8px;
 }
 
-.markdown-kadr__heading-row h1,
-.markdown-kadr__heading-row h2,
-.markdown-kadr__heading-row h3 {
+.markdown-kadr__heading-row-title {
   margin: 0;
 }
 
@@ -943,7 +965,6 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   margin-top: 2px;
 }
 
@@ -1561,7 +1582,7 @@
   width: 100%;
 }
 
-.script-step-comment-pane {
+.script-scene-comment-pane {
   flex: 1;
   width: 100%;
   max-width: var(--width-content-page);
@@ -1579,7 +1600,7 @@
   box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.18);
 }
 
-.script-step-comment-pane__label {
+.script-scene-comment-pane__label {
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -1587,7 +1608,7 @@
   color: var(--color-text-primary);
 }
 
-.script-step-comment-pane__input {
+.script-scene-comment-pane__input {
   flex: 1;
   width: 100%;
   min-height: 220px;
@@ -1602,19 +1623,19 @@
   outline: none;
 }
 
-.script-step-comment-pane__input:focus-visible {
+.script-scene-comment-pane__input:focus-visible {
   border-color: var(--color-active-ascent);
   box-shadow: 0 0 0 1px rgba(231, 138, 78, 0.18);
 }
 
-.script-step-comment-pane__hint {
+.script-scene-comment-pane__hint {
   min-height: 14px;
   font-size: 11px;
   color: var(--color-text-muted);
 }
 
-.script-step-requisites-pane,
-.script-step-light-pane {
+.script-scene-requisites-pane,
+.script-scene-light-pane {
   flex: 1;
   width: 100%;
   max-width: var(--width-content-page);
@@ -1638,8 +1659,78 @@
   padding-top: 4px;
 }
 
+.script-markdown-cm--with-scene-title .cm-scroller {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.script-markdown-cm--with-scene-title .script-markdown-cm__scene-title-mount {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  box-sizing: border-box;
+}
+
+.script-markdown-cm--with-scene-title .cm-content {
+  flex: 1 0 auto;
+  width: 100%;
+  min-width: 0;
+}
+
+.script-markdown-cm--with-scene-title .script-markdown-cm__scene-title-mount .app-editor-menubar__scene-title.script-scene-title {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 12px;
+  padding: 0;
+  line-height: 1.35;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--color-script-accent, var(--color-text-primary));
+}
+
+.script-markdown-cm--with-scene-title .script-markdown-cm__scene-title-mount .app-editor-menubar__scene-title-input.script-scene-title {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  margin: 0 0 12px;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout.script-markdown-cm--with-scene-title .script-markdown-cm__scene-title-mount {
+  padding:
+    var(--script-markdown-content-padding-top)
+    var(--script-markdown-content-padding-x)
+    0;
+  box-sizing: border-box;
+}
+
+.script-markdown-cm--with-scene-title:not(.script-markdown-cm--kadr-layout) .script-markdown-cm__scene-title-mount {
+  padding: 12px 12px 0;
+  box-sizing: border-box;
+}
+
+.script-markdown-cm.script-markdown-cm--kadr-layout.script-markdown-cm--with-scene-title .cm-content {
+  padding-top: 0;
+}
+
 .script-markdown-cm .cm-line.cm-line-para-gap {
   padding-top: var(--script-markdown-paragraph-gap);
+}
+
+.script-markdown-editor-main--play .script-markdown-cm .cm-line.cm-line-para-gap {
+  padding-top: var(--script-play-paragraph-gap, var(--script-markdown-paragraph-gap));
 }
 
 /*
@@ -1910,8 +2001,33 @@
 }
 
 /* Как .markdown-kadr h1/h2 — белый; ### как h3 в сценарии — оранжевый */
+.script-markdown-editor-main--play .script-markdown-cm .cm-editor {
+  color: var(--script-play-text-color, var(--color-text-primary));
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  caret-color: var(--script-play-text-color, var(--color-text-primary));
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
+}
+
 .script-markdown-editor-main--play .script-markdown-cm .cm-scroller {
   font-size: var(--script-font-size-body);
+  color: var(--script-play-text-color, var(--color-text-primary));
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
+}
+
+.script-markdown-editor-main--play .script-markdown-cm .cm-content {
+  color: var(--script-play-text-color, var(--color-text-primary));
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  caret-color: var(--script-play-text-color, var(--color-text-primary));
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
+}
+
+.script-markdown-editor-main--play .script-markdown-cm .cm-line {
+  line-height: inherit;
+}
+
+.script-markdown-editor-main--play .script-markdown-cm .cm-md-parenthetical-remark {
+  color: inherit;
 }
 
 .script-markdown-cm .cm-md-heading-body--1 {
@@ -2410,9 +2526,9 @@
 
 .main-content.show-script .show-script,
 .main-content.show-script .script-content,
-.main-content.show-script .script-step-editor,
-.main-content.show-script .script-step-body,
-.main-content.show-script .script-step-main,
+.main-content.show-script .script-scene-editor,
+.main-content.show-script .script-scene-body,
+.main-content.show-script .script-scene-main,
 .main-content.show-script .script-markdown-pane,
 .main-content.show-script .form-group {
   width: 100%;

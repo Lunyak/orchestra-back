@@ -33,8 +33,8 @@ import type {
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import { PremisesIndexPanel } from "../premises/PremisesIndexPanel";
 import "../premises/style.css";
-import "../../pages/rehearsals/style.css";
-import "../../pages/sessions/style.css";
+import "../../features/rehearsals/ui/rehearsals.css";
+import "../../features/director-sessions/ui/director-sessions.css";
 import "./style.css";
 
 dayjs.locale("ru");

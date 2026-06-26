@@ -6,33 +6,12 @@ import {
 } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 import { mergeLightChannelsAtCount } from "../../../shared/components/light-console/light-channels-mutate";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
-import { desktopReadProjectScene } from "../../../shared/platform/desktop-methods";
-import {
-  createActorAnnotation,
-  deleteActorAnnotation,
-  listActorAnnotations,
-  updateActorAnnotation,
-  type ActorAnnotation,
-  type ActorAnnotationField,
-} from "../../../sync/api/actor-notes";
+import { desktopReadProjectPlaybook } from "../../../shared/platform/desktop-methods";
+import type { ActorAnnotationField } from "../../../sync/api/actor-notes";
 
-type CacheKey = string;
 type SceneKey = string;
-
-function getAccessToken(getState: () => RootState): string | null {
-  const fromState = getState().auth?.accessToken ?? null;
-  if (fromState) return fromState;
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("accessToken");
-}
-
-type AnnotationsEntry = {
-  items: ActorAnnotation[];
-  loading: boolean;
-  error: string | null;
-};
 
 export type ShowScriptMarkdownMode = "notes" | "play" | "explication" | "comments" | "requisites" | "light";
 
@@ -51,12 +30,10 @@ type SceneUiState = {
 };
 
 export interface ShowScriptMarkdownState {
-  annotationsByKey: Record<CacheKey, AnnotationsEntry | undefined>;
   uiBySceneKey: Record<SceneKey, SceneUiState | undefined>;
 }
 
 const initialState: ShowScriptMarkdownState = {
-  annotationsByKey: {},
   uiBySceneKey: {},
 };
 
@@ -94,15 +71,6 @@ function getDefaultUiForSceneKey(sceneKey: SceneKey): SceneUiState {
   if (existing) return existing;
   const created = defaultSceneUi();
   defaultUiBySceneKeyCache.set(sceneKey, created);
-  return created;
-}
-
-const defaultAnnotationsByCacheKey = new Map<CacheKey, AnnotationsEntry>();
-function getDefaultAnnotationsForCacheKey(cacheKey: CacheKey): AnnotationsEntry {
-  const existing = defaultAnnotationsByCacheKey.get(cacheKey);
-  if (existing) return existing;
-  const created: AnnotationsEntry = { items: [], loading: false, error: null };
-  defaultAnnotationsByCacheKey.set(cacheKey, created);
   return created;
 }
 
@@ -188,19 +156,19 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
   const sceneKey = getSceneKey(args.projectSlug, args.sceneName);
   const getFromStore = () => {
     const state = thunkApi.getState() as RootState;
-    const sceneData = (state as any)?.scene?.sceneData ?? null;
-    const serverShadow = (state as any)?.scene?.serverShadow ?? null;
+    const playbookData = state.playbook.playbookData ?? null;
+    const serverShadow = state.playbook.serverShadow ?? null;
     const playlistRaw =
-      sceneData && String(sceneData?.name ?? "") === String(args.sceneName ?? "")
-        ? (sceneData as any)?.playlist
-        : (sceneData as any)?.playlist;
+      playbookData && String(playbookData?.name ?? "") === String(args.sceneName ?? "")
+        ? (playbookData as any)?.playlist
+        : (playbookData as any)?.playlist;
     const soundsRaw =
-      sceneData && String(sceneData?.name ?? "") === String(args.sceneName ?? "")
-        ? (sceneData as any)?.sounds
-        : (sceneData as any)?.sounds;
+      playbookData && String(playbookData?.name ?? "") === String(args.sceneName ?? "")
+        ? (playbookData as any)?.sounds
+        : (playbookData as any)?.sounds;
     const fromShadow = normalizeLightChannels(serverShadow?.lightChannels);
-    const fromScene = normalizeLightChannels((sceneData as any)?.lightChannels);
-    const sceneChannelsRaw = (sceneData as any)?.lightChannels;
+    const fromScene = normalizeLightChannels((playbookData as any)?.lightChannels);
+    const sceneChannelsRaw = (playbookData as any)?.lightChannels;
     const sceneHasChannels = Array.isArray(sceneChannelsRaw) && sceneChannelsRaw.length > 0;
     const primary = sceneHasChannels
       ? fromScene
@@ -218,7 +186,7 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
 
   if (api) {
     try {
-      const scene = await desktopReadProjectScene(api, args.projectSlug, args.sceneName);
+      const scene = await desktopReadProjectPlaybook(api, args.projectSlug, args.sceneName);
       const fromFile = {
         playlistOptions: normalizePlaylistOptions((scene as any)?.playlist),
         soundsOptions: normalizeSoundsOptions((scene as any)?.sounds),
@@ -252,82 +220,6 @@ export const loadSceneScriptMarkdownMeta = createAsyncThunk<
 
   return { sceneKey, ...getFromStore() };
 });
-
-export const loadActorAnnotations = createAsyncThunk<
-  { cacheKey: CacheKey; annotations: ActorAnnotation[] },
-  { cacheKey: CacheKey; projectSlug: string; sceneName: string; stepId: number; field: ActorAnnotationField }
->("showScriptMarkdown/loadActorAnnotations", async (args, api) => {
-  const token = getAccessToken(api.getState as () => RootState);
-  if (!token) return { cacheKey: args.cacheKey, annotations: [] };
-  const res = await listActorAnnotations(token, {
-    projectSlug: args.projectSlug,
-    sceneName: args.sceneName,
-    stepId: args.stepId,
-    field: args.field,
-  });
-  return { cacheKey: args.cacheKey, annotations: res.annotations ?? [] };
-});
-
-export const createAnnotation = createAsyncThunk<
-  { cacheKey: CacheKey; annotation: ActorAnnotation },
-  {
-    cacheKey: CacheKey;
-    projectSlug: string;
-    sceneName: string;
-    stepId: number;
-    field: ActorAnnotationField;
-    startOffset: number;
-    endOffset: number;
-    selectedText?: string;
-    noteText: string;
-  }
->("showScriptMarkdown/createAnnotation", async (args, api) => {
-  const token = getAccessToken(api.getState as () => RootState);
-  if (!token) {
-    throw new Error("No access token");
-  }
-  const res = await createActorAnnotation(token, {
-    projectSlug: args.projectSlug,
-    sceneName: args.sceneName,
-    stepId: args.stepId,
-    field: args.field,
-    startOffset: args.startOffset,
-    endOffset: args.endOffset,
-    selectedText: args.selectedText,
-    noteText: args.noteText,
-  });
-  return { cacheKey: args.cacheKey, annotation: res.annotation };
-});
-
-export const updateAnnotation = createAsyncThunk<
-  { cacheKey: CacheKey; annotation: ActorAnnotation },
-  { cacheKey: CacheKey; id: string; noteText: string }
->("showScriptMarkdown/updateAnnotation", async (args, api) => {
-  const token = getAccessToken(api.getState as () => RootState);
-  if (!token) {
-    throw new Error("No access token");
-  }
-  const res = await updateActorAnnotation(token, args.id, { noteText: args.noteText });
-  return { cacheKey: args.cacheKey, annotation: res.annotation };
-});
-
-export const deleteAnnotation = createAsyncThunk<
-  { cacheKey: CacheKey; id: string },
-  { cacheKey: CacheKey; id: string }
->("showScriptMarkdown/deleteAnnotation", async (args, api) => {
-  const token = getAccessToken(api.getState as () => RootState);
-  if (!token) {
-    throw new Error("No access token");
-  }
-  await deleteActorAnnotation(token, args.id);
-  return { cacheKey: args.cacheKey, id: args.id };
-});
-
-function sortAnnotations(items: ActorAnnotation[]): ActorAnnotation[] {
-  return items
-    .slice()
-    .sort((a, b) => a.startOffset - b.startOffset || a.endOffset - b.endOffset);
-}
 
 export const showScriptMarkdownSlice = createSlice({
   name: "showScriptMarkdown",
@@ -442,87 +334,6 @@ export const showScriptMarkdownSlice = createSlice({
       }
       state.uiBySceneKey[action.payload.sceneKey] = next;
     });
-
-    builder.addCase(loadActorAnnotations.pending, (state, action) => {
-      const { cacheKey } = action.meta.arg;
-      const prev = state.annotationsByKey[cacheKey];
-      state.annotationsByKey[cacheKey] = {
-        items: prev?.items ?? [],
-        loading: true,
-        error: null,
-      };
-    });
-    builder.addCase(loadActorAnnotations.fulfilled, (state, action) => {
-      state.annotationsByKey[action.payload.cacheKey] = {
-        items: sortAnnotations(action.payload.annotations ?? []),
-        loading: false,
-        error: null,
-      };
-    });
-    builder.addCase(loadActorAnnotations.rejected, (state, action) => {
-      const { cacheKey } = action.meta.arg;
-      const prev = state.annotationsByKey[cacheKey];
-      state.annotationsByKey[cacheKey] = {
-        items: prev?.items ?? [],
-        loading: false,
-        error: "Не удалось загрузить метки",
-      };
-    });
-
-    builder.addCase(createAnnotation.fulfilled, (state, action) => {
-      const entry = state.annotationsByKey[action.payload.cacheKey] ?? {
-        items: [],
-        loading: false,
-        error: null,
-      };
-      entry.items = sortAnnotations([...entry.items, action.payload.annotation]);
-      entry.error = null;
-      state.annotationsByKey[action.payload.cacheKey] = entry;
-    });
-    builder.addCase(createAnnotation.rejected, (state, action) => {
-      const { cacheKey } = action.meta.arg;
-      const prev = state.annotationsByKey[cacheKey];
-      state.annotationsByKey[cacheKey] = {
-        items: prev?.items ?? [],
-        loading: false,
-        error: "Не удалось создать пометку",
-      };
-    });
-
-    builder.addCase(updateAnnotation.fulfilled, (state, action) => {
-      const entry = state.annotationsByKey[action.payload.cacheKey];
-      if (!entry) return;
-      entry.items = entry.items.map((a) =>
-        a.id === action.payload.annotation.id ? action.payload.annotation : a,
-      );
-      entry.items = sortAnnotations(entry.items);
-      entry.error = null;
-    });
-    builder.addCase(updateAnnotation.rejected, (state, action) => {
-      const { cacheKey } = action.meta.arg;
-      const prev = state.annotationsByKey[cacheKey];
-      state.annotationsByKey[cacheKey] = {
-        items: prev?.items ?? [],
-        loading: false,
-        error: "Не удалось сохранить",
-      };
-    });
-
-    builder.addCase(deleteAnnotation.fulfilled, (state, action) => {
-      const entry = state.annotationsByKey[action.payload.cacheKey];
-      if (!entry) return;
-      entry.items = entry.items.filter((a) => a.id !== action.payload.id);
-      entry.error = null;
-    });
-    builder.addCase(deleteAnnotation.rejected, (state, action) => {
-      const { cacheKey } = action.meta.arg;
-      const prev = state.annotationsByKey[cacheKey];
-      state.annotationsByKey[cacheKey] = {
-        items: prev?.items ?? [],
-        loading: false,
-        error: "Не удалось удалить",
-      };
-    });
   },
 });
 
@@ -539,24 +350,24 @@ export const selectShowScriptMarkdownUi = createSelector(
     uiBySceneKey[sceneKey] ?? getDefaultUiForSceneKey(sceneKey),
 );
 
-export const selectActiveStepMarkdownContext = createSelector(
+export const selectActiveSceneMarkdownContext = createSelector(
   [
     (state: RootState, projectSlug: string, sceneName: string) =>
       selectShowScriptMarkdownUi(state, projectSlug, sceneName),
-    (state: RootState) => state.scene.steps,
-    (state: RootState) => state.scene.currentPage,
+    (state: RootState) => state.playbook.scenes,
+    (state: RootState) => state.playbook.currentPage,
   ],
   (
     ui,
-    steps,
+    scenes,
     currentPage,
   ): {
-    currentStep: ScriptStep | undefined;
+    currentScene: ScriptScene | undefined;
     activeMarkdownField: "markdown" | "playMarkdown" | "explicationMarkdown";
     activeMarkdown: string;
     activeField: ActorAnnotationField;
   } => {
-    const currentStep = steps[currentPage];
+    const currentScene = scenes[currentPage];
     const activeMarkdownField: "markdown" | "playMarkdown" | "explicationMarkdown" =
       ui.markdownMode === "play"
         ? ui.playOriginalMode
@@ -566,21 +377,11 @@ export const selectActiveStepMarkdownContext = createSelector(
           ? "explicationMarkdown"
           : "markdown";
 
-    const activeMarkdown = String(currentStep?.[activeMarkdownField] ?? "");
+    const activeMarkdown = String(currentScene?.[activeMarkdownField] ?? "");
 
     const activeField = activeMarkdownField as ActorAnnotationField;
 
-    return { currentStep, activeMarkdownField, activeMarkdown, activeField };
+    return { currentScene, activeMarkdownField, activeMarkdown, activeField };
   },
-);
-
-export const selectAnnotations = createSelector(
-  [
-    (state: RootState, cacheKey: CacheKey) =>
-      state.showScriptMarkdown.annotationsByKey[cacheKey],
-    (_state: RootState, cacheKey: CacheKey) => cacheKey,
-  ],
-  (entry, cacheKey): AnnotationsEntry =>
-    entry ?? getDefaultAnnotationsForCacheKey(cacheKey),
 );
 

@@ -97,7 +97,7 @@ model Project {
   ownerId     String
   owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
 
-  scenes      Scene[]
+  playbooks   Playbook[]
   members     ProjectMember[]
   telegramBotPreferences ProjectTelegramBotPreference[]
   modelFiles  ProjectModelFile[]
@@ -145,7 +145,7 @@ model ProjectTask {
   sourceKey       String?
   assigneeEmail   String?
   dueAt           DateTime?
-  refStepId       Int?
+  refSceneId      Int?
   refRequisiteId  Int?
   refAction       String?
   sortOrder       Int                 @default(0)
@@ -177,10 +177,10 @@ model Rehearsal {
   durationMin   Int?
   notes         String?
   place         String?  // Место проведения репетиции
-  /// Выбранные сцены на эту репетицию (массив id сцен). Если null/пусто — значит "не выбрано".
-  selectedSceneIds Json?
-  /// Выбранные "сцены" (шаги) на эту репетицию: [{ sceneId, stepId }]
-  selectedSteps Json?
+  /// Выбранные playbook-модули на репетицию (массив id). Если null/пусто — «не выбрано».
+  selectedPlaybookIds Json?
+  /// Выбранные сцены спектакля: [{ playbookId, sceneId }]
+  selectedScenes Json?
   telegramChatId       String?  // ID группы в Telegram
   telegramMessageId    String?  // ID сообщения опроса в Telegram
   telegramThreadId     String?  // ID топика в группе
@@ -267,11 +267,11 @@ model ProjectTelegramBotPreference {
   @@index([botIntegrationId])
 }
 
-model Scene {
+model Playbook {
   id        String   @id @default(cuid())
   projectId String
   name      String
-  /// Метаданные сцены (в т.ч. привязки ролей к шагам: sceneRoles v1)
+  /// Привязки ролей к сценам спектакля (sceneRoles v1)
   sceneRoles Json?
   /// Настройка пульта света: фейдеры, количество фейдеров и привязки
   lightFaders Json?
@@ -289,7 +289,7 @@ model Scene {
 
   playlist       PlaylistItem[]
   sounds         Sound[]
-  steps          Step[]
+  scenes         Scene[]
   lightChannels  GlobalLightChannel[]
   lightPlot      GlobalLightPlot[]
   theaterLayout  TheaterLayout?
@@ -405,7 +405,7 @@ model ProjectRoleNote {
 
 model PlaylistItem {
   id        String @id @default(cuid())
-  sceneId   String
+  playbookId String
   order     Int
   sourceId  Int
   title     String
@@ -415,12 +415,12 @@ model PlaylistItem {
   fadeMs    Int
   loop      Boolean
 
-  scene     Scene  @relation(fields: [sceneId], references: [id])
+  playbook  Playbook  @relation(fields: [playbookId], references: [id])
 }
 
 model Sound {
   id        String @id @default(cuid())
-  sceneId   String
+  playbookId String
   sourceId  Int
   title     String
   file      String
@@ -433,12 +433,12 @@ model Sound {
   fadeMs    Int
   loop      Boolean
 
-  scene     Scene  @relation(fields: [sceneId], references: [id])
+  playbook  Playbook  @relation(fields: [playbookId], references: [id])
 }
 
-model Step {
+model Scene {
   id           String   @id @default(cuid())
-  sceneId      String
+  playbookId   String
   sourceId     Int
   title        String
   markdown     String?
@@ -455,27 +455,27 @@ model Step {
   updatedAt    DateTime @updatedAt
   deletedAt    DateTime?
 
-  scene        Scene    @relation(fields: [sceneId], references: [id])
+  playbook     Playbook @relation(fields: [playbookId], references: [id])
 
-  requisites        StepRequisite[]
-  lightPlot         StepLightPlot[]
+  requisites        SceneRequisite[]
+  lightPlot         SceneLightPlot[]
   theaterModels     TheaterModel[]
   theaterSpotlights TheaterSpotlight[]
 }
 
-model StepRequisite {
+model SceneRequisite {
   id       String @id @default(cuid())
-  stepId   String
+  sceneId  String
   sourceId Int
   label    String
   checked  Boolean @default(false)
 
-  step     Step   @relation(fields: [stepId], references: [id])
+  scene    Scene  @relation(fields: [sceneId], references: [id])
 }
 
-model StepLightPlot {
+model SceneLightPlot {
   id       String @id @default(cuid())
-  stepId   String
+  sceneId  String
   sourceId Int
   label    String
   channel  String?
@@ -484,12 +484,12 @@ model StepLightPlot {
   angle    Int
   length   Int
 
-  step     Step   @relation(fields: [stepId], references: [id])
+  scene    Scene  @relation(fields: [sceneId], references: [id])
 }
 
 model TheaterModel {
   id              String   @id @default(cuid())
-  stepId          String
+  sceneId         String
   sourceId        Int
   name            String
   type            String
@@ -507,12 +507,12 @@ model TheaterModel {
   decorTextureMode   String?
   decorTextureFaces  Json?
 
-  step            Step    @relation(fields: [stepId], references: [id])
+  scene           Scene   @relation(fields: [sceneId], references: [id])
 }
 
 model TheaterSpotlight {
   id        String  @id @default(cuid())
-  stepId    String
+  sceneId   String
   sourceId  Int
   label     String
   position  Json
@@ -529,35 +529,35 @@ model TheaterSpotlight {
   gridCol   Int?
   gridRow   Int?
 
-  step      Step    @relation(fields: [stepId], references: [id])
+  scene     Scene   @relation(fields: [sceneId], references: [id])
 }
 
 model GlobalLightChannel {
-  id      String  @id @default(cuid())
-  sceneId String
-  raw     String
-  index   Int
+  id         String  @id @default(cuid())
+  playbookId String
+  raw        String
+  index      Int
 
-  scene   Scene   @relation(fields: [sceneId], references: [id])
+  playbook   Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model GlobalLightPlot {
-  id       String @id @default(cuid())
-  sceneId  String
-  sourceId Int
-  label    String
-  channel  String
-  x        Int
-  y        Int
-  angle    Int
-  length   Int
+  id         String @id @default(cuid())
+  playbookId String
+  sourceId   Int
+  label      String
+  channel    String
+  x          Int
+  y          Int
+  angle      Int
+  length     Int
 
-  scene    Scene  @relation(fields: [sceneId], references: [id])
+  playbook   Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model TheaterLayout {
   id             String @id @default(cuid())
-  sceneId        String @unique
+  playbookId     String @unique
   hallWidth      Float
   hallDepth      Float
   wallHeight     Float
@@ -579,7 +579,7 @@ model TheaterLayout {
   doors          Json?
   extras         Json?
 
-  scene          Scene  @relation(fields: [sceneId], references: [id])
+  playbook       Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model ProjectModelFile {
@@ -666,23 +666,23 @@ model BotVariable {
 }
 
 model ActorNote {
-  id           String   @id @default(cuid())
-  userId       String
-  projectId    String
-  sceneId      String?
-  stepSourceId Int?
-  text         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  userId        String
+  projectId     String
+  playbookId    String?
+  sceneSourceId Int?
+  text          String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  scene   Scene?  @relation(fields: [sceneId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  playbook Playbook? @relation(fields: [playbookId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, sceneId, stepSourceId])
+  @@unique([userId, playbookId, sceneSourceId])
   @@index([projectId])
   @@index([userId])
-  @@index([sceneId])
+  @@index([playbookId])
 }
 
 enum ActorAnnotationField {
@@ -692,24 +692,24 @@ enum ActorAnnotationField {
 }
 
 model ActorAnnotation {
-  id           String               @id @default(cuid())
-  userId       String
-  projectId    String
-  sceneId      String
-  stepSourceId Int
-  field        ActorAnnotationField
-  startOffset  Int
-  endOffset    Int
-  selectedText String?
-  noteText     String
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id            String               @id @default(cuid())
+  userId        String
+  projectId     String
+  playbookId    String
+  sceneSourceId Int
+  field         ActorAnnotationField
+  startOffset   Int
+  endOffset     Int
+  selectedText  String?
+  noteText      String
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  scene   Scene   @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  playbook Playbook @relation(fields: [playbookId], references: [id], onDelete: Cascade)
 
-  @@index([userId, sceneId, stepSourceId, field])
+  @@index([userId, playbookId, sceneSourceId, field])
   @@index([projectId])
 }
 

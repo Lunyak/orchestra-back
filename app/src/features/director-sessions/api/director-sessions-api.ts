@@ -19,6 +19,11 @@ export type DirectorSessionsBundle = {
   sessions: DirectorRehearsalSession[];
 };
 
+export type DirectorSessionAttendanceResponse = {
+  ok: boolean;
+  session: DirectorSession;
+};
+
 export const directorSessionsApi = orchestraApi.injectEndpoints({
   endpoints: (build) => ({
     directorSessionsBundle: build.query<DirectorSessionsBundle, void>({
@@ -91,7 +96,7 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
           return { error: { status: 401, message: "Нет токена авторизации" } };
         }
         try {
-          const pull = await syncPull(token, null, projectSlug, { steps: true });
+          const pull = await syncPull(token, null, projectSlug, { scenes: true });
           const rolesRes = await api
             .dispatch(projectApi.endpoints.projectRoles.initiate(projectSlug))
             .unwrap()
@@ -110,14 +115,52 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
       },
       providesTags: (_r, _e, slug) => [{ type: "ProjectMaterial", id: slug }],
     }),
+
+    directorSession: build.query<DirectorRehearsalSession, string>({
+      query: (sessionId) => ({
+        url: `/director-sessions/${encodeURIComponent(sessionId)}`,
+      }),
+      providesTags: (_r, _e, sessionId) => [{ type: "DirectorSessions", id: sessionId }],
+    }),
+
+    confirmDirectorSessionAttendance: build.mutation<
+      DirectorSessionAttendanceResponse,
+      string
+    >({
+      query: (sessionId) => ({
+        url: `/director-sessions/${encodeURIComponent(sessionId)}/confirm-attendance`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, sessionId) => [
+        { type: "DirectorSessions", id: sessionId },
+        { type: "DirectorSessions", id: "BUNDLE" },
+      ],
+    }),
+
+    declineDirectorSessionAttendance: build.mutation<
+      DirectorSessionAttendanceResponse,
+      string
+    >({
+      query: (sessionId) => ({
+        url: `/director-sessions/${encodeURIComponent(sessionId)}/decline-attendance`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, sessionId) => [
+        { type: "DirectorSessions", id: sessionId },
+        { type: "DirectorSessions", id: "BUNDLE" },
+      ],
+    }),
   }),
 });
 
 export const {
   useDirectorSessionsBundleQuery,
+  useDirectorSessionQuery,
   useReplaceDirectorSessionsMutation,
   usePublishDirectorSessionMutation,
   useRemindDirectorSessionMissingAvailabilityMutation,
   useProjectMaterialQuery,
   useLazyProjectMaterialQuery,
+  useConfirmDirectorSessionAttendanceMutation,
+  useDeclineDirectorSessionAttendanceMutation,
 } = directorSessionsApi;

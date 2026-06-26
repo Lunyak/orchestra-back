@@ -41,7 +41,7 @@ export function TheaterControlsDecorTemplatesSection({ vm, decor }: DecorSection
               <div key={template.id} className="theater-decor-template-row">
                 <TheaterBtn
                   onClick={() => vm.applyDecorTemplateByListId(template.id)}
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   title={
                     template.description
                       ? `${template.description} — добавить`
@@ -55,7 +55,7 @@ export function TheaterControlsDecorTemplatesSection({ vm, decor }: DecorSection
                 {template.source === "builtin" ? (
                   <TheaterBtn
                     onClick={() => vm.applyDecorTemplateByListId(template.id, true)}
-                    disabled={!vm.currentStep}
+                    disabled={!vm.currentScene}
                     title="Заменить весь декор шаблоном"
                   >
                     ↺
@@ -85,21 +85,21 @@ export function TheaterControlsDecorTemplatesSection({ vm, decor }: DecorSection
             />
             <TheaterBtn
               onClick={() => decorTemplateInputRef.current?.click()}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Загрузить JSON-шаблон из файла"
             >
               Импорт JSON
             </TheaterBtn>
             <TheaterBtn
               onClick={vm.exportCurrentDecorAsJsonTemplate}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Сохранить текущий декор как JSON-шаблон"
             >
               Экспорт JSON
             </TheaterBtn>
             <TheaterBtn
               onClick={() => void vm.saveDecorTemplatesToProject()}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Записать импортированные шаблоны в файл проекта (desktop)"
             >
               В проект

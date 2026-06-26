@@ -17,7 +17,7 @@ export type { RehearsalsPageViewModel } from "./model/useRehearsalsPage";
 export {
   rehearsalsApi,
   useListRehearsalsQuery,
-  useRehearsalStepsQuery,
+  useRehearsalScenesQuery,
   useCreateRehearsalMutation,
   useUpdateRehearsalMutation,
 } from "./api/rehearsals-api";

@@ -1,4 +1,4 @@
-import type { SceneLightFadersDataV1 } from "../../scene/model/scene-slice";
+import type { PlaybookLightFadersDataV1 } from "../../playbook/model/playbook-slice";
 import { buildCompleteLightFaders } from "../../../shared/components/light-console/light-console-data";
 import type { TheaterSpotlight } from "../../../shared/types/script";
 import {
@@ -7,10 +7,10 @@ import {
 } from "./theater-light-fader-bindings";
 
 export function patchSceneFaderLevel(
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
   faderId: number,
   level: number,
-): SceneLightFadersDataV1 {
+): PlaybookLightFadersDataV1 {
   const base = buildCompleteLightFaders(lightFaders ?? undefined);
   const clamped = Math.min(1, Math.max(0, level));
   return {
@@ -25,10 +25,10 @@ export function patchSceneFaderLevel(
 
 /** Яркость софита в 3D → уровень привязанного F на общей доске пульта. */
 export function patchSceneFaderFromSpotlightIntensity(
-  lightFaders: SceneLightFadersDataV1 | null | undefined,
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined,
   spotlight: TheaterSpotlight,
   uiIntensity: number,
-): SceneLightFadersDataV1 | null {
+): PlaybookLightFadersDataV1 | null {
   const faderId = readSpotlightFaderId(spotlight);
   if (faderId == null) return null;
   const level = sceneFaderLevelFromSpotlightUiIntensity(uiIntensity);

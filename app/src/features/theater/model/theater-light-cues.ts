@@ -65,14 +65,14 @@ function formatCueTime(tSec: number): string {
 export function formatLightCuesPlain(
   cues: LightCue[],
   options?: {
-    stepTitle?: string;
+    sceneTitle?: string;
     lightChannels?: string[];
     durationMin?: number | null;
   },
 ): string {
   const normalized = normalizeLightCues(cues);
-  const header = options?.stepTitle
-    ? `Световой таймлайн: ${options.stepTitle}`
+  const header = options?.sceneTitle
+    ? `Световой таймлайн: ${options.sceneTitle}`
     : "Световой таймлайн";
   const duration = stepDurationSec(options?.durationMin);
   if (normalized.length === 0) {
@@ -90,20 +90,20 @@ export function formatLightCuesPlain(
     return `• ${formatCueTime(cue.tSec)} — канал ${cue.channel}${channelLabel !== cue.channel ? ` (${channelLabel})` : ""} — ${state}`;
   });
 
-  return [`${header}`, `Длительность шага: ~${duration} с`, "", ...lines].join("\n");
+  return [`${header}`, `Длительность сцены: ~${duration} с`, "", ...lines].join("\n");
 }
 
 export function formatLightCuesMarkdown(
   cues: LightCue[],
   options?: {
-    stepTitle?: string;
+    sceneTitle?: string;
     lightChannels?: string[];
     durationMin?: number | null;
   },
 ): string {
   const normalized = normalizeLightCues(cues);
-  const header = options?.stepTitle
-    ? `## Свет: ${options.stepTitle}`
+  const header = options?.sceneTitle
+    ? `## Свет: ${options.sceneTitle}`
     : "## Световой таймлайн";
   const duration = stepDurationSec(options?.durationMin);
   if (normalized.length === 0) {

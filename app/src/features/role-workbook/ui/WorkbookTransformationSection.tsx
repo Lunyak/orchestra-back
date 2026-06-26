@@ -1,3 +1,5 @@
+import cn from "classnames";
+
 export type WorkbookTransformationSectionProps = {
   sectionNum: number;
   start: string;
@@ -34,36 +36,33 @@ export function WorkbookTransformationSection(props: WorkbookTransformationSecti
         <label className="rolewb-scene-field">
           <span className="rolewb-scene-field-label">В начале пьесы</span>
           <textarea
-            className="settings-invite-input"
+            className={cn("settings-invite-input", "rolewb-textarea")}
             rows={3}
             value={start}
             disabled={!canEdit}
             onChange={(e) => onChangeStart(e.target.value)}
-            style={{ maxWidth: "unset", width: "100%" }}
             placeholder="Кем я был? Как себя ощущал? Что считал нормой?"
           />
         </label>
         <label className="rolewb-scene-field">
           <span className="rolewb-scene-field-label">К финалу</span>
           <textarea
-            className="settings-invite-input"
+            className={cn("settings-invite-input", "rolewb-textarea")}
             rows={3}
             value={end}
             disabled={!canEdit}
             onChange={(e) => onChangeEnd(e.target.value)}
-            style={{ maxWidth: "unset", width: "100%" }}
             placeholder="Кем стал? Что больше не могу / не хочу? Что понял?"
           />
         </label>
         <label className="rolewb-scene-field rolewb-transform-full">
           <span className="rolewb-scene-field-label">Главный перелом</span>
           <textarea
-            className="settings-invite-input"
+            className={cn("settings-invite-input", "rolewb-textarea")}
             rows={3}
             value={turningPoint}
             disabled={!canEdit}
             onChange={(e) => onChangeTurningPoint(e.target.value)}
-            style={{ maxWidth: "unset", width: "100%" }}
             placeholder="Сцена или событие, после которого всё по-другому. Почему именно оно?"
           />
         </label>

@@ -46,7 +46,7 @@ features/<name>/
 | Тип | Где |
 |-----|-----|
 | Списки, профили, роли, участники проекта | RTK Query (`orchestraApi`) |
-| Сцена, черновики шагов, UI панелей | Redux slices + локальный `useState` |
+| Playbook, черновики сцен, UI панелей | Redux slices + локальный `useState` |
 | Auth token | auth slice + `getAccessToken()` в `axiosBaseQuery` |
 
 Подробнее: `app/src/shared/api/rtk/README.md`.
@@ -57,7 +57,7 @@ features/<name>/
 |---------|------------|
 | `auth` | Вход, токен |
 | `project` | Текущий проект, RTK: roles, members |
-| `scene` | Сцена, шаги, sync runner, thunks |
+| `playbook` | Сценарий, сцены, sync runner, thunks |
 | `script-ui` | Плейлист, панели, edit mode |
 | `team` | `useTeam()` — участники на settings/board/troupe/sessions |
 | `spectacle` | Оболочка главной страницы (вкладки script/theater/board/…) |
@@ -82,7 +82,7 @@ features/<name>/
 ## Маршрутизация
 
 1. `web/src/main.tsx` → `App` из `app/src/app/App.tsx`.
-2. `App` — провайдеры (`StoreProvider`, Auth, Project, Scene, …) + `AppRoutes`.
+2. `App` — провайдеры (`StoreProvider`, Auth, Project, PlaybookSyncRunner, …) + `AppRoutes`.
 3. `app/src/app/router/AppRouteDeclarations.tsx` — lazy-импорты из `pages/*`.
 
 ## Новая страница
@@ -99,4 +99,4 @@ features/<name>/
 - вызовов вне React (thunks, desktop, prefetch);
 - постепенной миграции UI на RTK по мере касания экрана.
 
-3D театр и тяжёлый scene sync не трогаем без отдельной задачи.
+3D театр и тяжёлый playbook sync не трогаем без отдельной задачи.

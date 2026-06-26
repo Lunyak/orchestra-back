@@ -23,6 +23,7 @@ export type { DirectorSessionsPageViewModel } from "./model/useDirectorSessionsP
 export {
   directorSessionsApi,
   useDirectorSessionsBundleQuery,
+  useDirectorSessionQuery,
   useLazyProjectMaterialQuery,
   useProjectMaterialQuery,
   useReplaceDirectorSessionsMutation,

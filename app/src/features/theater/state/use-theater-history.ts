@@ -7,7 +7,7 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react";
-import type { ScriptStep, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
 import { DEFAULT_SPOTLIGHTS } from "../model/theater-defaults";
 import {
   createTheaterHistorySnapshot,
@@ -15,17 +15,17 @@ import {
   type TheaterHistorySnapshot,
 } from "../model/theater-history";
 import {
-  readStepTheaterModels,
-  writeStepTheaterModels,
-} from "../model/theater-step-models";
+  readSceneTheaterModels,
+  writeSceneTheaterModels,
+} from "../model/theater-scene-models";
 
 export type UseTheaterHistoryArgs = {
   projectName: string;
   currentPage: number;
-  currentStep: ScriptStep | undefined;
+  currentScene: ScriptScene | undefined;
   layout: TheaterLayout;
   onTheaterLayoutChange?: Dispatch<SetStateAction<TheaterLayout>>;
-  updateStep: (stepId: number, patch: Partial<ScriptStep>) => void;
+  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
 };
 
 export type TheaterHistoryController = {
@@ -43,15 +43,15 @@ export type TheaterHistoryController = {
 };
 
 /**
- * Undo/redo stack for theater step + layout. Refs are shared with drag/transform handlers.
+ * Undo/redo stack for theater scene + layout. Refs are shared with drag/transform handlers.
  */
 export function useTheaterHistory({
   projectName,
   currentPage,
-  currentStep,
+  currentScene,
   layout,
   onTheaterLayoutChange,
-  updateStep,
+  updateScene,
 }: UseTheaterHistoryArgs): TheaterHistoryController {
   const historyStackRef = useRef(createTheaterUndoStack());
   const historyTransactionRef = useRef(false);
@@ -60,27 +60,27 @@ export function useTheaterHistory({
   const bumpHistory = useCallback(() => setHistoryRevision((v) => v + 1), []);
 
   const captureTheaterHistory = useCallback((): TheaterHistorySnapshot | null => {
-    if (!currentStep) return null;
+    if (!currentScene) return null;
     const spotlightsForHistory: TheaterSpotlight[] | undefined =
-      currentStep.theaterSpotlights === undefined
+      currentScene.theaterSpotlights === undefined
         ? DEFAULT_SPOTLIGHTS
-        : currentStep.theaterSpotlights;
+        : currentScene.theaterSpotlights;
     return createTheaterHistorySnapshot({
-      step: currentStep,
+      scene: currentScene,
       layout,
       spotlights: spotlightsForHistory,
-      models: readStepTheaterModels(currentStep),
+      models: readSceneTheaterModels(currentScene),
     });
-  }, [currentStep, layout]);
+  }, [currentScene, layout]);
 
   const applyTheaterHistory = useCallback(
     (snapshot: TheaterHistorySnapshot) => {
       applyingHistoryRef.current = true;
       try {
         onTheaterLayoutChange?.(snapshot.layout);
-        updateStep(snapshot.stepId, {
+        updateScene(snapshot.sceneId, {
           theaterSpotlights: snapshot.theaterSpotlights,
-          ...writeStepTheaterModels(snapshot.theaterModels),
+          ...writeSceneTheaterModels(snapshot.theaterModels),
           theaterActiveSpotlightId: snapshot.theaterActiveSpotlightId,
           theaterActiveModelId: snapshot.theaterActiveModelId,
         });
@@ -88,7 +88,7 @@ export function useTheaterHistory({
         applyingHistoryRef.current = false;
       }
     },
-    [onTheaterLayoutChange, updateStep],
+    [onTheaterLayoutChange, updateScene],
   );
 
   const recordTheaterHistory = useCallback(() => {

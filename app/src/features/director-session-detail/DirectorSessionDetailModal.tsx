@@ -25,7 +25,7 @@ export function DirectorSessionDetailModal({
     <Modal
       isOpen
       onClose={onClose}
-      panelClassName="director-session-detail-modal-panel"
+      panelClassName="director-session-detail-modal"
       ariaLabel="Сессия"
     >
       <Buttons.CloseButton

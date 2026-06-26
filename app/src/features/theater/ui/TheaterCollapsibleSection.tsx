@@ -58,7 +58,7 @@ export function TheaterCollapsibleSection({
     >
       <button
         type="button"
-        className="theater-panel-section__head"
+        className="theater-panel-section__header"
         onClick={toggle}
         aria-expanded={open}
       >

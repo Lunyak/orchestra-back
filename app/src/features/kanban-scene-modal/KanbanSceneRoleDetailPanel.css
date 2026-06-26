@@ -1,0 +1,196 @@
+.kanban-role-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kanban-role-detail__error {
+  font-size: 12px;
+  color: var(--color-danger-light, #ffb4b4);
+}
+
+.kanban-role-detail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kanban-role-detail__top {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.kanban-role-detail__section--card {
+  align-items: center;
+}
+
+.kanban-role-detail__section--description {
+  min-width: 0;
+}
+
+.kanban-role-detail__section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-ui);
+}
+
+.kanban-role-detail__description {
+  width: 100%;
+  min-height: 224px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.kanban-role-detail__hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.kanban-role-detail__assignments {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+  max-height: min(340px, 42vh);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.kanban-role-detail__actor-tile {
+  display: grid;
+  justify-items: center;
+  gap: 0;
+  grid-template-rows: 98px auto auto;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--stage-brutal-border);
+  border-top: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 20%, transparent 20% 100%),
+    var(--color-bg-transparent-1);
+  color: var(--color-text-ui);
+  cursor: pointer;
+  position: relative;
+  text-align: center;
+  box-shadow: var(--stage-brutal-shadow-hard);
+  transition:
+    background-color 0.14s ease,
+    border-color 0.14s ease,
+    filter 0.14s ease,
+    transform 0.14s ease;
+}
+
+.kanban-role-detail__actor-tile:hover:not(:disabled) {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0 20%, transparent 20% 100%),
+    var(--color-bg-hover);
+  border-top-color: var(--color-active-ascent);
+  transform: translateY(-1px);
+}
+
+.kanban-role-detail__actor-tile--selected {
+  background:
+    linear-gradient(135deg, rgba(255, 125, 52, 0.16) 0 22%, transparent 22% 100%),
+    var(--color-bg-active);
+  border-color: var(--color-active-ascent);
+  border-top-color: var(--color-active-ascent);
+  filter: none;
+}
+
+.kanban-role-detail__actor-tile--selected::before {
+  content: "✓";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 100%;
+  height: 98px;
+  display: grid;
+  place-items: center;
+  color: var(--color-active-ascent);
+  font-size: 58px;
+  font-weight: 900;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.42);
+  -webkit-text-stroke: 1px var(--color-active-ascent);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.35),
+    3px 3px 0 rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+}
+
+.kanban-role-detail__actor-tile:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.kanban-role-detail__actor-tile .mini-avatar {
+  width: 100% !important;
+  height: 98px !important;
+  border: 0;
+  border-radius: 0;
+  font-size: 24px;
+  filter: saturate(0.9) contrast(1.08);
+}
+
+.kanban-role-detail__actor-name {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: grid;
+  gap: 1px;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+  padding: 7px 7px 2px;
+}
+
+.kanban-role-detail__actor-name span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kanban-role-detail__actor-state {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+  line-height: 1.2;
+  padding: 0 7px 8px;
+}
+
+.kanban-role-detail__actor-tile--selected .kanban-role-detail__actor-state {
+  color: var(--color-active-ascent);
+}
+
+.kanban-role-detail__muted {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.kanban-role-detail__footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-default);
+}
+
+@media (max-width: 720px) {
+  .kanban-role-detail__top {
+    grid-template-columns: 1fr;
+  }
+
+  .kanban-role-detail__description {
+    min-height: 150px;
+  }
+}

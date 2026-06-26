@@ -81,7 +81,7 @@
   align-content: start;
 }
 
-.dialogue-line-wrap {
+.dialogue-trainer__line {
   display: grid;
 }
 

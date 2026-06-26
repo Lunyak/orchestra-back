@@ -12,7 +12,7 @@ export interface RehearsalParticipant {
   respondedAt?: string | null;
 }
 
-export type RehearsalSelectedStep = { sceneId: string; stepId: number };
+export type RehearsalSelectedScene = { playbookId: string; sceneId: number };
 
 export interface Rehearsal {
   id: string;
@@ -21,8 +21,8 @@ export interface Rehearsal {
   durationMin?: number | null;
   notes?: string | null;
   place?: string | null;
-  selectedSceneIds?: string[] | null;
-  selectedSteps?: RehearsalSelectedStep[] | null;
+  selectedPlaybookIds?: string[] | null;
+  selectedScenes?: RehearsalSelectedScene[] | null;
   telegramChatId?: string | null;
   telegramMessageId?: string | null;
   telegramThreadId?: string | null;
@@ -43,7 +43,7 @@ export async function updateRehearsal(
   patch: Partial<
     Pick<
       Rehearsal,
-      "title" | "startsAt" | "durationMin" | "notes" | "selectedSceneIds" | "selectedSteps"
+      "title" | "startsAt" | "durationMin" | "notes" | "selectedPlaybookIds" | "selectedScenes"
     >
   >,
 ): Promise<Rehearsal> {
@@ -55,17 +55,17 @@ export async function updateRehearsal(
   return data;
 }
 
-export async function getRehearsalSteps(
+export async function getRehearsalScenes(
   accessToken: string,
   rehearsalId: string,
 ): Promise<{
   rehearsal: { id: string; title: string; startsAt: string };
-  selectedSceneIds: string[];
-  selectedSteps: RehearsalSelectedStep[];
-  scenes: Array<{ id: string; name: string; steps: Array<{ id: number; title: string }> }>;
+  selectedPlaybookIds: string[];
+  selectedScenes: RehearsalSelectedScene[];
+  playbooks: Array<{ id: string; name: string; scenes: Array<{ id: number; title: string }> }>;
 }> {
   const { data } = await api.get(
-    `/rehearsals/${encodeURIComponent(rehearsalId)}/steps`,
+    `/rehearsals/${encodeURIComponent(rehearsalId)}/scenes`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;

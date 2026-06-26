@@ -11,13 +11,31 @@ export function stripParentheses(text: string): string {
   return s;
 }
 
-function normalizeForCheck(text: string): string {
+export function normalizeForCheck(text: string): string {
   return stripParentheses(text)
     .toLowerCase()
     .replace(/ё/g, "е")
     .replace(/[^\p{L}\p{N}\s'-]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function splitIntoSentences(text: string): string[] {
+  const s = stripParentheses(text);
+  if (!s.trim()) return [];
+  const parts = s
+    .split(/(?<=[.!?])\s+/g)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : [s.trim()];
+}
+
+export function ttsPartnerLine(text: string): string {
+  const s = String(text ?? "").trim();
+  if (!s) return "";
+  if (s.length <= 500) return s;
+  const parts = splitIntoSentences(s);
+  return String(parts[parts.length - 1] ?? s).trim();
 }
 
 const STOP_WORDS = new Set<string>([
@@ -308,7 +326,7 @@ function normalizeTokenForScore(token: string): string {
   return softStemRu(t);
 }
 
-function tokensForScore(text: string): string[] {
+export function tokensForScore(text: string): string[] {
   const base = tokenizeWords(normalizeForCheck(text)).map((t) => t.norm);
   const withNums = normalizeNumberSequences(base);
   const filtered = withNums.filter((w) => w && !STOP_WORDS.has(w));
@@ -412,7 +430,7 @@ function buildMatchTokens(text: string): MatchToken[] {
   return out;
 }
 
-function matchStats(expected: string[], spoken: string[]): { matched: number; ratio: number } {
+export function matchStats(expected: string[], spoken: string[]): { matched: number; ratio: number } {
   if (expected.length === 0) return { matched: 0, ratio: 0 };
   if (spoken.length === 0) return { matched: 0, ratio: 0 };
 

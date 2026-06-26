@@ -1,3 +1,4 @@
+import cn from "classnames";
 import "./login.css";
 import { isAxiosError } from "axios";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
@@ -73,7 +74,7 @@ export function LoginForm({
       style={loginLayoutBackgroundStyle}
     >
       <form className="login-form" onSubmit={handleSubmit}>
-        <h1>
+        <h1 className="login-form__title">
           {isResetMode
             ? "Сброс пароля"
             : isRegisterMode
@@ -94,7 +95,7 @@ export function LoginForm({
         <label className="login-form__label">
           Email
           <input
-            className="login-form__input "
+            className="login-form__input"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -103,13 +104,14 @@ export function LoginForm({
         </label>
         {isResetMode ? (
           <>
-            <p className="login-form-subtitle" style={{ marginTop: 8 }}>
+            <p className={cn("login-form-subtitle", "login-form-subtitle--tight-top")}>
               Мы отправим письмо со ссылкой для смены пароля (если такой аккаунт
               есть).
             </p>
             <div>
               <button
                 type="button"
+                className="login-form__btn login-form__btn--secondary"
                 disabled={!email.trim() || resetLoading}
                 onClick={async () => {
                   setError(null);
@@ -139,6 +141,7 @@ export function LoginForm({
               </button>
               <button
                 type="button"
+                className="login-form__btn login-form__btn--secondary"
                 onClick={() => {
                   setIsResetMode(false);
                   setError(null);
@@ -154,7 +157,7 @@ export function LoginForm({
             <label className="login-form__label">
               Пароль
               <input
-                className="login-form__input "
+                className="login-form__input"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -169,22 +172,27 @@ export function LoginForm({
               >
                 <span>
                   Я принимаю{" "}
-                  <a href="/terms" target="_blank" rel="noreferrer">
+                  <a className="login-form__link" href="/terms" target="_blank" rel="noreferrer">
                     Пользовательское соглашение
                   </a>{" "}
                   и ознакомлен(а) с{" "}
-                  <a href="/privacy" target="_blank" rel="noreferrer">
+                  <a className="login-form__link" href="/privacy" target="_blank" rel="noreferrer">
                     Политикой обработки персональных данных
                   </a>
                   .
                 </span>
               </LabeledCheckbox>
             ) : null}
-            <button type="submit" disabled={isRegisterMode && !acceptLegal}>
+            <button
+              type="submit"
+              className="login-form__btn login-form__btn--submit"
+              disabled={isRegisterMode && !acceptLegal}
+            >
               {isRegisterMode ? "Создать аккаунт" : "Войти"}
             </button>
             <button
               type="button"
+              className="login-form__btn login-form__btn--secondary"
               onClick={() => {
                 setError(null);
                 setMessage(null);
@@ -199,6 +207,7 @@ export function LoginForm({
             {!isRegisterMode ? (
               <button
                 type="button"
+                className="login-form__btn login-form__btn--secondary"
                 onClick={() => {
                   setError(null);
                   setMessage(null);

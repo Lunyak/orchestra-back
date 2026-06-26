@@ -79,7 +79,7 @@ export function RoleAvatarEditor({
   return (
     <div className="role-avatar-editor" onPaste={onPaste}>
       {canEdit ? (
-        <div className="role-avatar-editor__card-wrap">
+        <div className="role-avatar-editor__card-container">
           <input
             ref={inputRef}
             type="file"

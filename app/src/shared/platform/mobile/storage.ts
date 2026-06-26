@@ -49,7 +49,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-export async function readProjectScene(
+export async function readProjectPlaybook(
   projectSlug: string,
   sceneName: string,
 ): Promise<Record<string, unknown> | null> {
@@ -67,7 +67,7 @@ export async function readProjectScene(
   }
 }
 
-export async function saveProjectScene(
+export async function saveProjectPlaybook(
   projectSlug: string,
   sceneName: string,
   payload: Record<string, unknown>,

@@ -1,0 +1,14 @@
+{
+  "name": "Проект test",
+  "scenes": [
+    {
+      "id": 1,
+      "title": "Сцена 1",
+      "markdown": "",
+      "requisites": []
+    }
+  ],
+  "playlist": [],
+  "sounds": [],
+  "lightChannels": ["", "", "", "", "", "", "", "", ""]
+}

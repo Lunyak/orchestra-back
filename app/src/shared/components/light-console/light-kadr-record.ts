@@ -1,9 +1,9 @@
 import type {
-  SceneLightChannelRolesV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../../features/scene/model/scene-slice";
-import type { StepLightKadrsDataV1, TheaterSpotlight } from "../../types/script";
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../../features/playbook/model/playbook-slice";
+import type { SceneLightKadrsDataV1, TheaterSpotlight } from "../../types/script";
 import { resolveLightChannelRoles } from "./light-channel-roles";
 import {
   buildKadrFromConsole,
@@ -11,7 +11,7 @@ import {
   findKadrById,
   type MarkdownKadrSection,
   recordKadrToMarkdown,
-  upsertKadrInStep,
+  upsertKadrInScene,
 } from "../../../features/theater/model/light-kadrs";
 import { resolveLightFaders, resolveLightPrograms } from "./light-console-data";
 
@@ -19,22 +19,22 @@ export type RecordLightKadrInput = {
   markdown: string;
   section: MarkdownKadrSection;
   existingKadrId?: string | null;
-  kadrs: StepLightKadrsDataV1;
+  kadrs: SceneLightKadrsDataV1;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1 | null | undefined;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightFaders: PlaybookLightFadersDataV1 | null | undefined;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   /** Активная программа на пульте (кнопка П1–П8). */
   programId: number;
-  /** Софиты шага — для записи F, привязанных к K3, K4 и т.д. */
+  /** Софиты сцены — для записи F, привязанных к K3, K4 и т.д. */
   spotlights?: TheaterSpotlight[];
   /** Активный K на пульте при записи. */
   liveConsoleChannel?: number;
-  lightChannelRoles?: SceneLightChannelRolesV1 | null;
+  lightChannelRoles?: PlaybookLightChannelRolesV1 | null;
 };
 
 export type RecordLightKadrResult = {
   kadrId: string;
-  nextKadrs: StepLightKadrsDataV1;
+  nextKadrs: SceneLightKadrsDataV1;
   nextMarkdown: string;
   summary: string;
 };
@@ -69,7 +69,7 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
     lightChannelsCount: input.lightChannels.length,
   });
 
-  const nextKadrs = upsertKadrInStep({ kadrs: input.kadrs, kadr });
+  const nextKadrs = upsertKadrInScene({ kadrs: input.kadrs, kadr });
   const nextMarkdown = recordKadrToMarkdown({
     markdown: input.markdown,
     section: { ...input.section, id: kadrId },
@@ -103,7 +103,7 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
 }
 
 export function resolveActiveProgramId(
-  programs: SceneLightProgramsDataV1 | null | undefined,
+  programs: PlaybookLightProgramsDataV1 | null | undefined,
 ): number {
   const resolved = resolveLightPrograms(programs);
   return resolved.activeProgramId ?? 1;

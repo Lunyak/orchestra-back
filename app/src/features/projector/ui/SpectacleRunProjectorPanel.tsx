@@ -1,19 +1,19 @@
 import cn from "classnames";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useAppDispatch } from "../../../shared/store/hooks";
 import {
-  sceneActions,
-  uploadSceneHoldImagesWeb,
-  uploadSceneVideosWeb,
-  type SceneHoldImage,
-  type SceneVideo,
-} from "../../scene/model/scene-slice";
+  playbookActions,
+  uploadPlaybookHoldImagesWeb,
+  uploadPlaybookVideosWeb,
+  type PlaybookHoldImage,
+  type PlaybookVideo,
+} from "../../playbook/model/playbook-slice";
 import { useSpectacleRunContext } from "../../spectacle-run/model/spectacle-run-context";
 import type { ProjectorMediaContext } from "../model/projector-media";
 import { ProjectorMediaPreview } from "./ProjectorMediaPreview";
 import { DownloadProjectorMediaButton } from "../../../shared/components/offline/DownloadProjectorMediaButton";
-import "./spectacle-run-projector.css";
+import "@shared/components/media-projector/media-projector.css";
 
 type RenameTarget = { kind: "video" | "hold"; id: number };
 
@@ -61,7 +61,7 @@ function ProjectorMediaTitle({
     return (
       <input
         ref={renameInputRef}
-        className="spectacle-run-projector__rename-input"
+        className="media-projector__rename-input"
         value={editingName}
         onChange={(e) => onEditingNameChange(e.target.value)}
         onKeyDown={(e) => {
@@ -82,7 +82,7 @@ function ProjectorMediaTitle({
 
   return (
     <span
-      className="spectacle-run-projector__card-title"
+      className="media-projector__card-title"
       title={`${display} — двойной клик, чтобы переименовать`}
       onDoubleClick={() => onStartRename(target, display)}
     >
@@ -130,33 +130,33 @@ function ProjectorTapeCard({
 
   return (
     <article
-      className={cn("spectacle-run-projector__card")}
+      className={cn("media-projector__card")}
       data-active={isActive || undefined}
       data-kind={kind}
     >
-      <div className="spectacle-run-projector__card-preview">
+      <div className="media-projector__card-preview">
         <ProjectorMediaPreview
           ctx={projectorCtx}
           mode={kind === "hold" ? "hold" : "video"}
           videoId={kind === "video" ? id : null}
           holdId={kind === "hold" ? id : null}
           title={title}
-          className="spectacle-run-projector__card-media"
+          className="media-projector__card-media"
         />
       </div>
-      <div className="spectacle-run-projector__card-body">
+      <div className="media-projector__card-body">
         <ProjectorMediaTitle
           {...titleProps}
           label={title}
           fallback={kind === "hold" ? `Заставка ${id}` : `Видео ${id}`}
           target={renameTarget}
         />
-        <div className="spectacle-run-projector__card-actions">
-          <div className="spectacle-run-projector__card-actions-row">
+        <div className="media-projector__card-actions">
+          <div className="media-projector__card-actions-row">
             {showMuteControl ? (
               <button
                 type="button"
-                className="spectacle-run-projector__btn spectacle-run-projector__btn--mute"
+                className="media-projector__btn media-projector__btn--mute"
                 data-active={isMuted || undefined}
                 onClick={onToggleMute}
                 aria-label={isMuted ? "Включить звук" : "Выключить звук"}
@@ -167,7 +167,7 @@ function ProjectorTapeCard({
             ) : null}
             <button
               type="button"
-              className="spectacle-run-projector__btn"
+              className="media-projector__btn"
               data-active={isActive || isPaused || undefined}
               onClick={onPrimary}
             >
@@ -176,7 +176,7 @@ function ProjectorTapeCard({
           </div>
           <button
             type="button"
-            className="spectacle-run-projector__btn spectacle-run-projector__btn--danger"
+            className="media-projector__btn media-projector__btn--danger"
             onClick={onDelete}
             aria-label={`Удалить ${title}`}
           >
@@ -190,7 +190,7 @@ function ProjectorTapeCard({
 
 export function SpectacleRunProjectorPanel() {
   const run = useSpectacleRunContext();
-  const { saveStepsForLightPlot, sceneData } = useScene();
+  const { saveScenesForLightPlot, playbookData } = usePlaybook();
   const dispatch = useAppDispatch();
 
   const projectorCtx = useMemo<ProjectorMediaContext>(
@@ -198,9 +198,9 @@ export function SpectacleRunProjectorPanel() {
       projectSlug: run.projectName,
       videos: run.videos,
       holdImages: run.holdImages,
-      projector: sceneData?.projector ?? null,
+      projector: playbookData?.projector ?? null,
     }),
-    [run.holdImages, run.projectName, run.videos, sceneData?.projector],
+    [run.holdImages, run.projectName, run.videos, playbookData?.projector],
   );
 
   const [editingTarget, setEditingTarget] = useState<RenameTarget | null>(null);
@@ -227,7 +227,7 @@ export function SpectacleRunProjectorPanel() {
 
   const persistProjectorMedia = async () => {
     try {
-      await saveStepsForLightPlot({ force: true });
+      await saveScenesForLightPlot({ force: true });
     } catch (err) {
       run.setLiveStatus(String((err as Error)?.message ?? "Не удалось сохранить медиа в сцену"));
     }
@@ -262,9 +262,9 @@ export function SpectacleRunProjectorPanel() {
     }
 
     if (target.kind === "video") {
-      dispatch(sceneActions.updateSceneVideo({ id: target.id, changes: { title: nextTitle } }));
+      dispatch(playbookActions.updatePlaybookVideo({ id: target.id, changes: { title: nextTitle } }));
     } else {
-      dispatch(sceneActions.updateSceneHoldImage({ id: target.id, changes: { title: nextTitle } }));
+      dispatch(playbookActions.updatePlaybookHoldImage({ id: target.id, changes: { title: nextTitle } }));
     }
     cancelRename();
     await persistProjectorMedia();
@@ -275,7 +275,7 @@ export function SpectacleRunProjectorPanel() {
     if (!files?.length || !run.projectName) return;
     try {
       await dispatch(
-        uploadSceneVideosWeb({ projectSlug: run.projectName, files: [...files] }),
+        uploadPlaybookVideosWeb({ projectSlug: run.projectName, files: [...files] }),
       ).unwrap();
       await persistProjectorMedia();
       run.setLiveStatus(`Добавлено видео: ${files.length}`);
@@ -289,7 +289,7 @@ export function SpectacleRunProjectorPanel() {
     if (!files?.length || !run.projectName) return;
     try {
       await dispatch(
-        uploadSceneHoldImagesWeb({ projectSlug: run.projectName, files: [...files] }),
+        uploadPlaybookHoldImagesWeb({ projectSlug: run.projectName, files: [...files] }),
       ).unwrap();
       await persistProjectorMedia();
       run.setLiveStatus(`Добавлено заставок: ${files.length}`);
@@ -299,7 +299,7 @@ export function SpectacleRunProjectorPanel() {
     if (holdInputRef.current) holdInputRef.current.value = "";
   };
 
-  const handleRemoveVideo = async (video: SceneVideo) => {
+  const handleRemoveVideo = async (video: PlaybookVideo) => {
     const label = video.title?.trim() || `Видео ${video.id}`;
     if (!window.confirm(`Удалить ролик «${label}» из библиотеки проектора?`)) return;
     run.removeProjectorVideo(video.id);
@@ -307,7 +307,7 @@ export function SpectacleRunProjectorPanel() {
     run.setLiveStatus(`Удалено: ${label}`);
   };
 
-  const handleRemoveHold = async (hold: SceneHoldImage) => {
+  const handleRemoveHold = async (hold: PlaybookHoldImage) => {
     const label = hold.title?.trim() || `Заставка ${hold.id}`;
     if (!window.confirm(`Удалить заставку «${label}»?`)) return;
     run.removeProjectorHold(hold.id);
@@ -339,13 +339,13 @@ export function SpectacleRunProjectorPanel() {
   };
 
   return (
-    <section className="spectacle-run-projector" aria-label="Проектор">
-      <div className="spectacle-run-projector__head">
-        <span className="spectacle-run-projector__title">Проектор</span>
-        <div className="spectacle-run-projector__toolbar">
+    <section className="media-projector" aria-label="Проектор">
+      <div className="media-projector__header">
+        <span className="media-projector__title">Проектор</span>
+        <div className="media-projector__toolbar">
           <button
             type="button"
-            className="spectacle-run-projector__btn"
+            className="media-projector__btn"
             data-active={run.isProjectorOpen || undefined}
             onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
           >
@@ -353,7 +353,7 @@ export function SpectacleRunProjectorPanel() {
           </button>
           <button
             type="button"
-            className="spectacle-run-projector__btn"
+            className="media-projector__btn"
             onClick={() => videoInputRef.current?.click()}
           >
             + Видео
@@ -368,7 +368,7 @@ export function SpectacleRunProjectorPanel() {
           />
           <button
             type="button"
-            className="spectacle-run-projector__btn"
+            className="media-projector__btn"
             onClick={() => holdInputRef.current?.click()}
             title="Картинки между роликами и после конца видео"
           >
@@ -383,26 +383,26 @@ export function SpectacleRunProjectorPanel() {
             onChange={(e) => void handleAddHoldImages(e.target.files)}
           />
           <DownloadProjectorMediaButton
-            buttonClassName="spectacle-run-projector__btn"
+            buttonClassName="media-projector__btn"
             onStatus={(message) => run.setLiveStatus(message)}
           />
         </div>
         <span
           className={cn(
-            "spectacle-run-projector__status",
-            run.isProjectorOpen && "spectacle-run-projector__status--on",
+            "media-projector__status",
+            run.isProjectorOpen && "media-projector__status--on",
           )}
         >
           {run.isProjectorOpen ? "выход открыт" : "выход закрыт"}
         </span>
       </div>
 
-      <div className="spectacle-run-projector__tape-wrap">
-        <div className="spectacle-run-projector__tape" role="list" aria-label="Медиа проектора">
+      <div className="media-projector__tape-container">
+        <div className="media-projector__tape" role="list" aria-label="Медиа проектора">
           {!hasMedia ? (
-            <p className="spectacle-run-projector__tape-empty">Добавьте видео или заставку</p>
+            <p className="media-projector__tape-empty">Добавьте видео или заставку</p>
           ) : null}
-          {holdImages.map((hold: SceneHoldImage) => {
+          {holdImages.map((hold: PlaybookHoldImage) => {
             const isActive =
               playback.mode === "hold" &&
               playback.holdId === hold.id &&
@@ -424,7 +424,7 @@ export function SpectacleRunProjectorPanel() {
               />
             );
           })}
-          {videos.map((video: SceneVideo) => {
+          {videos.map((video: PlaybookVideo) => {
             const isActive =
               playback.videoId === video.id && playback.playing && run.isProjectorOpen;
             const isPausedSame =
@@ -457,16 +457,16 @@ export function SpectacleRunProjectorPanel() {
         </div>
       </div>
 
-      <div className="spectacle-run-projector__transport">
-        <label className="spectacle-run-projector__slider-field">
-          <span className="spectacle-run-projector__slider-label">
+      <div className="media-projector__transport">
+        <label className="media-projector__slider-field">
+          <span className="media-projector__slider-label">
             Прогресс
-            <span className="spectacle-run-projector__slider-value">
+            <span className="media-projector__slider-value">
               {formatPlaybackTime(currentTime)} / {formatPlaybackTime(duration)}
             </span>
           </span>
           <input
-            className="spectacle-run-projector__slider"
+            className="media-projector__slider"
             type="range"
             min={0}
             max={duration > 0 ? duration : 1}
@@ -477,13 +477,13 @@ export function SpectacleRunProjectorPanel() {
             aria-label="Прогресс видео"
           />
         </label>
-        <label className="spectacle-run-projector__slider-field">
-          <span className="spectacle-run-projector__slider-label">
+        <label className="media-projector__slider-field">
+          <span className="media-projector__slider-label">
             Громкость
-            <span className="spectacle-run-projector__slider-value">{volumePercent}%</span>
+            <span className="media-projector__slider-value">{volumePercent}%</span>
           </span>
           <input
-            className="spectacle-run-projector__slider"
+            className="media-projector__slider"
             type="range"
             min={0}
             max={100}

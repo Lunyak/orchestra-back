@@ -65,7 +65,7 @@
   transform: rotate(180deg);
 }
 
-.custom-select__dropdown-wrap {
+.custom-select__dropdown-container {
   position: absolute;
   z-index: 40;
   top: calc(100% + 4px);
@@ -76,7 +76,7 @@
   box-shadow: 0 12px 28px var(--color-shadow-panel);
 }
 
-.custom-select__search-wrap {
+.custom-select__search-container {
   padding: 4px 4px 0;
 }
 

@@ -17,12 +17,12 @@ type TheaterModelPayload = {
   decorTextureFaces?: unknown;
 };
 
-export function flattenClientTheaterModels(step: {
+export function flattenClientTheaterModels(scene: {
   theaterModels?: TheaterModelPayload[];
   theaterDecor?: TheaterModelPayload[];
 }): TheaterModelPayload[] {
-  const props = (step.theaterModels ?? []).map((m) => ({ ...m, kind: m.kind ?? 'prop' }));
-  const decor = (step.theaterDecor ?? []).map((m) => ({ ...m, kind: 'decor' }));
+  const props = (scene.theaterModels ?? []).map((m) => ({ ...m, kind: m.kind ?? 'prop' }));
+  const decor = (scene.theaterDecor ?? []).map((m) => ({ ...m, kind: 'decor' }));
   return [...props, ...decor];
 }
 
@@ -61,7 +61,7 @@ export function prismaTheaterModelRowToClient(row: Record<string, unknown>) {
 }
 
 export function clientTheaterModelToPrisma(
-  stepId: string,
+  sceneId: string,
   m: TheaterModelPayload,
   normalizeVec3: (v: unknown, fallback: [number, number, number]) => [number, number, number],
   normalizeInt: (v: unknown, fallback: number) => number,
@@ -71,7 +71,7 @@ export function clientTheaterModelToPrisma(
   const sourceId = normalizeInt(m?.id, -1);
   if (sourceId <= 0) return null;
   return {
-    stepId,
+    sceneId,
     sourceId,
     name: normalizeString(m?.name, `Model ${sourceId}`),
     type: normalizeString(m?.type, 'builtin'),

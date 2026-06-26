@@ -1,7 +1,7 @@
 import {
   invokePlaylistPlay,
   invokeSoundPlay,
-} from "../../scene/model/scene-playback-bridge";
+} from "../../playbook/model/playbook-playback-bridge";
 import type { KadrSoundCue } from "../../theater/model/kadr-sound";
 
 export function applyKadrSound(cue: KadrSoundCue | null | undefined) {

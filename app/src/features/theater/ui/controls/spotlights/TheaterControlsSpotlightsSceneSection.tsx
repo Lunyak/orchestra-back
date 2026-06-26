@@ -30,30 +30,30 @@ export function TheaterControlsSpotlightsSceneSection({ vm, spot }: SpotlightsSe
 <>
 <TheaterCollapsibleSection
             sectionId="spotlights-scene"
-            title="Сцена и шаги"
+            title="Сцена"
             summary="Копирование, блекаут"
             badge={spotlightCountBadge}
           >
             <div className="theater-btn-row">
               <TheaterBtn
-                onClick={vm.copyFromPreviousStep}
-                disabled={!vm.currentStep || vm.currentPage === 0}
+                onClick={vm.copyFromPreviousScene}
+                disabled={!vm.currentScene || vm.currentPage === 0}
               >
-                Софиты ← шаг
+                Софиты ← сцена
               </TheaterBtn>
               <TheaterBtn
-                onClick={vm.copyTheaterFromPreviousStep}
-                disabled={!vm.currentStep || vm.currentPage === 0}
+                onClick={vm.copyTheaterFromPreviousScene}
+                disabled={!vm.currentScene || vm.currentPage === 0}
               >
-                Сцена ← шаг
+                Расстановка ← сцена
               </TheaterBtn>
             </div>
             <div className="theater-btn-row">
               <TheaterBtn
-                onClick={vm.copyTheaterToNextStep}
-                disabled={!vm.currentStep || vm.currentPage >= vm.stepCount - 1}
+                onClick={vm.copyTheaterToNextScene}
+                disabled={!vm.currentScene || vm.currentPage >= vm.sceneCount - 1}
               >
-                Сцена → шаг
+                Расстановка → сцена
               </TheaterBtn>
               <TheaterBtn
                 active={vm.dutyLightEnabled}
@@ -66,10 +66,10 @@ export function TheaterControlsSpotlightsSceneSection({ vm, spot }: SpotlightsSe
               >
                 Дежурка
               </TheaterBtn>
-              <TheaterBtn onClick={vm.fullLightAllSpotlights} disabled={!vm.currentStep}>
+              <TheaterBtn onClick={vm.fullLightAllSpotlights} disabled={!vm.currentScene}>
                 Полный свет
               </TheaterBtn>
-              <TheaterBtn onClick={vm.blackoutAllSpotlights} disabled={!vm.currentStep}>
+              <TheaterBtn onClick={vm.blackoutAllSpotlights} disabled={!vm.currentScene}>
                 Блекаут
               </TheaterBtn>
             </div>

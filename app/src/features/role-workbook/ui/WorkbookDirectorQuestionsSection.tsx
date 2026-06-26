@@ -1,9 +1,10 @@
 import { Button } from "@shared/core/button/Button";
+import cn from "classnames";
 import type { RoleDirectorQuestion } from "../model/roleWorkbookNote";
 
 export type WorkbookSceneOption = {
-  stepId?: number;
-  stepTitle?: string;
+  sceneId?: number;
+  sceneTitle?: string;
 };
 
 export type WorkbookDirectorQuestionsSectionProps = {
@@ -29,8 +30,8 @@ export function WorkbookDirectorQuestionsSection({
       ...questions,
       {
         text: "",
-        stepId: firstScene?.stepId,
-        stepTitle: firstScene?.stepTitle,
+        sceneId: firstScene?.sceneId,
+        sceneTitle: firstScene?.sceneTitle,
       },
     ]);
   };
@@ -69,39 +70,37 @@ export function WorkbookDirectorQuestionsSection({
             <div key={`dir-q-${idx}`} className="rolewb-director-q-row">
               {sceneOptions.length > 0 ? (
                 <select
-                  className="settings-invite-input"
-                  value={q.stepId != null ? String(q.stepId) : ""}
+                  className={cn("settings-invite-input", "rolewb-field-full")}
+                  value={q.sceneId != null ? String(q.sceneId) : ""}
                   disabled={!canEdit}
                   onChange={(e) => {
                     const v = e.target.value;
                     if (!v) {
-                      updateQuestion(idx, { stepId: undefined, stepTitle: undefined });
+                      updateQuestion(idx, { sceneId: undefined, sceneTitle: undefined });
                       return;
                     }
                     const id = Number(v);
-                    const scene = sceneOptions.find((s) => s.stepId === id);
+                    const scene = sceneOptions.find((s) => s.sceneId === id);
                     updateQuestion(idx, {
-                      stepId: id,
-                      stepTitle: scene?.stepTitle,
+                      sceneId: id,
+                      sceneTitle: scene?.sceneTitle,
                     });
                   }}
-                  style={{ maxWidth: "unset", width: "100%" }}
                 >
                   <option value="">Вся роль / без привязки к сцене</option>
                   {sceneOptions.map((s) => (
-                    <option key={`q-scene-${s.stepId}`} value={String(s.stepId ?? "")}>
-                      {s.stepTitle ?? `Сцена #${s.stepId}`}
+                    <option key={`q-scene-${s.sceneId}`} value={String(s.sceneId ?? "")}>
+                      {s.sceneTitle ?? `Сцена #${s.sceneId}`}
                     </option>
                   ))}
                 </select>
               ) : null}
               <textarea
-                className="settings-invite-input"
+                className={cn("settings-invite-input", "rolewb-textarea")}
                 rows={2}
                 value={q.text}
                 disabled={!canEdit}
                 onChange={(e) => updateQuestion(idx, { text: e.target.value })}
-                style={{ maxWidth: "unset", width: "100%" }}
                 placeholder="Что неясно? Например: зачем герой молчит в этой сцене?"
               />
               {canEdit ? (

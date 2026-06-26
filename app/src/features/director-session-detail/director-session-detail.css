@@ -1,6 +1,6 @@
-/* Локальные стили; типографика блока — pages/rehearsals/style.css (подключает панель). */
+/* Локальные стили; типографика блока — features/rehearsals/ui/rehearsals.css (подключает панель). */
 
-.director-session-detail-modal-panel {
+.director-session-detail-modal {
   position: relative;
   max-width: min(520px, calc(100vw - 20px));
   max-height: min(88vh, 820px);
@@ -195,6 +195,10 @@
   font-size: 12px;
   line-height: 1.4;
   opacity: 0.78;
+}
+
+.director-session-page__attendance-note--success {
+  color: var(--color-status-success-bright);
 }
 
 .director-session-page__attendance-actions {

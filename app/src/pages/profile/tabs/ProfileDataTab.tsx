@@ -28,7 +28,6 @@ export function ProfileDataTab() {
   const mainFormSignature = useMemo(
     () =>
       JSON.stringify({
-        displayName: String((form as any).displayName ?? ""),
         firstName: String((form as any).firstName ?? ""),
         lastName: String((form as any).lastName ?? ""),
         telegramUsername: String((form as any).telegramUsername ?? ""),
@@ -68,7 +67,6 @@ export function ProfileDataTab() {
       const res = await dispatch(saveMyProfileThunk({ accessToken }));
       if (saveMyProfileThunk.fulfilled.match(res)) {
         autoSaveBaselineRef.current = JSON.stringify({
-          displayName: String((res.payload as any)?.displayName ?? ""),
           firstName: String((res.payload as any)?.firstName ?? ""),
           lastName: String((res.payload as any)?.lastName ?? ""),
           telegramUsername: String((res.payload as any)?.telegramUsername ?? ""),
@@ -86,8 +84,6 @@ export function ProfileDataTab() {
 
   const avatarUrl = String((form as any).avatarUrl ?? "").trim();
   const avatarLabel = useMemo(() => {
-    const display = String((form as any).displayName ?? "").trim();
-    if (display) return display;
     const full = [String((form as any).firstName ?? "").trim(), String((form as any).lastName ?? "").trim()]
       .filter(Boolean)
       .join(" ");
@@ -168,26 +164,6 @@ export function ProfileDataTab() {
 
         <div className="profile-data-sections profile-form">
           <section className="profile-data-section">
-            <h3 className="profile-data-section__title">Как вас видят</h3>
-            <label className="profile-field">
-              <span className="profile-field__label">Отображаемое имя</span>
-              <InlineTextField
-                value={String((form as any).displayName ?? "")}
-                onChange={(e) =>
-                  dispatch(
-                    profileDataActions.setProfileFormField({
-                      key: "displayName",
-                      value: e.target.value,
-                    }),
-                  )
-                }
-                placeholder="например: Сергей"
-              />
-            </label>
-          </section>
-
-          <section className="profile-data-section">
-            <h3 className="profile-data-section__title">Имя и фамилия</h3>
             <div className="profile-form-row">
               <label className="profile-field">
                 <span className="profile-field__label">Имя</span>

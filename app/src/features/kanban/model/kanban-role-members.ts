@@ -1,4 +1,4 @@
-import type { KanbanStepRolesAdminMember } from "../../kanban-step-modal/KanbanStepRolesAdminPanel";
+import type { KanbanSceneRolesAdminMember } from "../../kanban-scene-modal/KanbanSceneRolesAdminPanel";
 import type { ProjectMembersResponse } from "../../project/api/project-api";
 import type { MyTroupeResponse } from "../../troupe/api/troupe-api";
 
@@ -9,7 +9,7 @@ export function normalizeEmail(v: string): string {
 export function mergeKanbanRoleAssignmentMembers(
   troupeRes: MyTroupeResponse | undefined,
   projectMembersRes: ProjectMembersResponse | undefined,
-): KanbanStepRolesAdminMember[] {
+): KanbanSceneRolesAdminMember[] {
   const membersFromTroupe = (troupeRes?.members ?? [])
     .map((m) => ({
       email: normalizeEmail(String(m?.email ?? "")),
@@ -17,7 +17,7 @@ export function mergeKanbanRoleAssignmentMembers(
     }))
     .filter((m) => Boolean(m.email));
 
-  const membersFromProject: KanbanStepRolesAdminMember[] = [];
+  const membersFromProject: KanbanSceneRolesAdminMember[] = [];
   const ownerEmail = normalizeEmail(String(projectMembersRes?.owner?.email ?? ""));
   if (ownerEmail) {
     membersFromProject.push({
@@ -36,7 +36,7 @@ export function mergeKanbanRoleAssignmentMembers(
     });
   }
 
-  const uniq = new Map<string, KanbanStepRolesAdminMember>();
+  const uniq = new Map<string, KanbanSceneRolesAdminMember>();
   for (const m of [...membersFromTroupe, ...membersFromProject]) {
     if (!m.email) continue;
     const prev = uniq.get(m.email);

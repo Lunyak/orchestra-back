@@ -1,6 +1,6 @@
 import { tc } from "../../../shared/styles/theme-color";
 import { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
-import type { ScriptStep, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
 import { DEFAULT_SPOTLIGHTS } from "../model/theater-defaults";
 import {
   THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
@@ -51,15 +51,15 @@ import {
   formatGridCellLabel,
 } from "../model/theater-zone-grid";
 import type {
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../scene/model/scene-slice";
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../playbook/model/playbook-slice";
 import { applyFadersToSpotlightsPerChannelDisplay } from "../model/theater-light-fader-bindings";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterSpotlightsArgs = {
-  currentStep: ScriptStep | undefined;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  currentScene: ScriptScene | undefined;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   recordTheaterHistory: () => void;
   layout: TheaterLayout;
   gridStep: number;
@@ -70,8 +70,8 @@ export type UseTheaterSpotlightsArgs = {
   setEditMode: (mode: TheaterEditMode) => void;
   setDecorActionMessage: (message: string | null) => void;
   rehearsalSpotlights: TheaterSpotlight[] | null;
-  lightFaders?: SceneLightFadersDataV1 | null;
-  lightPrograms?: SceneLightProgramsDataV1 | null;
+  lightFaders?: PlaybookLightFadersDataV1 | null;
+  lightPrograms?: PlaybookLightProgramsDataV1 | null;
   /** Активный канал на пульте — живая доска только для этого K. */
   consoleChannel?: number;
 };
@@ -103,8 +103,8 @@ export function cloneTheaterSpotlights(source: TheaterSpotlight[]): TheaterSpotl
 }
 
 export function useTheaterSpotlights({
-  currentStep,
-  updateCurrentStep,
+  currentScene,
+  updateCurrentScene,
   recordTheaterHistory,
   layout,
   gridStep,
@@ -119,7 +119,7 @@ export function useTheaterSpotlights({
   consoleChannel,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
-  const spotlightsRaw = currentStep?.theaterSpotlights;
+  const spotlightsRaw = currentScene?.theaterSpotlights;
   const spotlights = spotlightsRaw ?? [];
   const displaySpotlights =
     spotlightsRaw === undefined ? DEFAULT_SPOTLIGHTS : spotlightsRaw;
@@ -187,9 +187,9 @@ export function useTheaterSpotlights({
   const updateSpotlights = useCallback(
     (next: TheaterSpotlight[]) => {
       recordTheaterHistory();
-      updateCurrentStep({ theaterSpotlights: normalizeSpotlights(next) });
+      updateCurrentScene({ theaterSpotlights: normalizeSpotlights(next) });
     },
-    [normalizeSpotlights, recordTheaterHistory, updateCurrentStep],
+    [normalizeSpotlights, recordTheaterHistory, updateCurrentScene],
   );
 
   const cloneSpotlights = useCallback(
@@ -286,10 +286,10 @@ export function useTheaterSpotlights({
       const next = base.filter((item) => item.id !== id);
       updateSpotlights(next);
       if (activeSpotlightId === id) {
-        updateCurrentStep({ theaterActiveSpotlightId: next[0]?.id });
+        updateCurrentScene({ theaterActiveSpotlightId: next[0]?.id });
       }
     },
-    [activeSpotlightId, spotlightsRaw, updateCurrentStep, updateSpotlights],
+    [activeSpotlightId, spotlightsRaw, updateCurrentScene, updateSpotlights],
   );
 
   const cloneSpotlight = useCallback(
@@ -310,10 +310,10 @@ export function useTheaterSpotlights({
         ],
       };
       updateSpotlights([...base, nextItem]);
-      updateCurrentStep({ theaterActiveSpotlightId: nextId });
+      updateCurrentScene({ theaterActiveSpotlightId: nextId });
       setEditMode("spotlights");
     },
-    [ensureSpotlights, setEditMode, updateCurrentStep, updateSpotlights],
+    [ensureSpotlights, setEditMode, updateCurrentScene, updateSpotlights],
   );
 
   const aimSpotlightAtStage = useCallback(
@@ -339,8 +339,8 @@ export function useTheaterSpotlights({
       isRgb: false,
     };
     updateSpotlights([...base, nextItem]);
-    updateCurrentStep({ theaterActiveSpotlightId: nextId });
-  }, [ensureSpotlights, updateCurrentStep, updateSpotlights]);
+    updateCurrentScene({ theaterActiveSpotlightId: nextId });
+  }, [ensureSpotlights, updateCurrentScene, updateSpotlights]);
 
   const addRgbSpotlight = useCallback(() => {
     const base = ensureSpotlights();
@@ -360,8 +360,8 @@ export function useTheaterSpotlights({
       isRgb: true,
     };
     updateSpotlights([...base, nextItem]);
-    updateCurrentStep({ theaterActiveSpotlightId: nextId });
-  }, [ensureSpotlights, updateCurrentStep, updateSpotlights]);
+    updateCurrentScene({ theaterActiveSpotlightId: nextId });
+  }, [ensureSpotlights, updateCurrentScene, updateSpotlights]);
 
   const patchSpotlightsInScope = useCallback(
     (
@@ -408,10 +408,10 @@ export function useTheaterSpotlights({
 
       updateSpotlights([...base, ...created]);
       if (created.length > 0) {
-        updateCurrentStep({ theaterActiveSpotlightId: created[0].id });
+        updateCurrentScene({ theaterActiveSpotlightId: created[0].id });
       }
     },
-    [ensureSpotlights, layout.hallWidth, updateCurrentStep, updateSpotlights],
+    [ensureSpotlights, layout.hallWidth, updateCurrentScene, updateSpotlights],
   );
 
   const layoutSpotlightsInHallGrid = useCallback(
@@ -477,7 +477,7 @@ export function useTheaterSpotlights({
       }));
       updateSpotlights([...base, ...created]);
       if (created[0]) {
-        updateCurrentStep({ theaterActiveSpotlightId: created[0].id });
+        updateCurrentScene({ theaterActiveSpotlightId: created[0].id });
       }
       const label = SPOTLIGHT_LAYOUT_PRESETS.find((item) => item.id === presetId)?.label;
       setDecorActionMessage(
@@ -486,7 +486,7 @@ export function useTheaterSpotlights({
           : `Добавлено ${created.length} софитов`,
       );
     },
-    [ensureSpotlights, layout, setDecorActionMessage, updateCurrentStep, updateSpotlights],
+    [ensureSpotlights, layout, setDecorActionMessage, updateCurrentScene, updateSpotlights],
   );
 
   const aimSpotlightsAtStage = useCallback(
@@ -613,7 +613,7 @@ export function useTheaterSpotlights({
 
   const syncSpotlightsFromLightPlot = useCallback(
     (lightChannels: string[]) => {
-      const fixtures = currentStep?.lightPlot ?? [];
+      const fixtures = currentScene?.lightPlot ?? [];
       if (fixtures.length === 0) {
         setDecorActionMessage("Схема света пуста");
         return;
@@ -622,22 +622,22 @@ export function useTheaterSpotlights({
       const merged = mergeSpotlightsFromLightPlot(fixtures, base, layout, lightChannels);
       updateSpotlights(merged);
       if (merged.length > 0) {
-        updateCurrentStep({ theaterActiveSpotlightId: merged[0].id });
+        updateCurrentScene({ theaterActiveSpotlightId: merged[0].id });
       }
       setDecorActionMessage(`3D-сцена обновлена из схемы (${fixtures.length} поз.)`);
     },
     [
-      currentStep?.lightPlot,
+      currentScene?.lightPlot,
       ensureSpotlights,
       layout,
       setDecorActionMessage,
-      updateCurrentStep,
+      updateCurrentScene,
       updateSpotlights,
     ],
   );
 
   const applyLightPlotChannelLabels = useCallback(() => {
-    const fixtures = currentStep?.lightPlot;
+    const fixtures = currentScene?.lightPlot;
     if (!fixtures?.length) {
       setDecorActionMessage("Схема света пуста");
       return;
@@ -645,18 +645,18 @@ export function useTheaterSpotlights({
     const base = ensureSpotlights();
     updateSpotlights(applyLightPlotChannelsToSpotlights(base, fixtures));
     setDecorActionMessage("Каналы 3D-софитов приведены к схеме");
-  }, [currentStep?.lightPlot, ensureSpotlights, setDecorActionMessage, updateSpotlights]);
+  }, [currentScene?.lightPlot, ensureSpotlights, setDecorActionMessage, updateSpotlights]);
 
   const syncLightPlotFromSpotlights = useCallback(() => {
     const base = ensureSpotlights();
     if (base.length === 0) {
-      setDecorActionMessage("На шаге нет 3D-софитов");
+      setDecorActionMessage("В сцене нет 3D-софитов");
       return;
     }
-    const merged = mergeLightPlotFromSpotlights(base, currentStep?.lightPlot ?? [], layout);
-    updateCurrentStep({ lightPlot: merged });
+    const merged = mergeLightPlotFromSpotlights(base, currentScene?.lightPlot ?? [], layout);
+    updateCurrentScene({ lightPlot: merged });
     setDecorActionMessage(`Схема света обновлена из 3D (${base.length} софитов)`);
-  }, [currentStep?.lightPlot, ensureSpotlights, layout, setDecorActionMessage, updateCurrentStep]);
+  }, [currentScene?.lightPlot, ensureSpotlights, layout, setDecorActionMessage, updateCurrentScene]);
 
   const setSelectedSpotlightsVisibility = useCallback(
     (hidden: boolean) => {
@@ -680,21 +680,21 @@ export function useTheaterSpotlights({
   }, [ensureSpotlights, multiSelectedSpotlightIds, setDecorActionMessage, updateSpotlights]);
 
   const removeSelectedSpotlights = useCallback(() => {
-    if (multiSelectedSpotlightIds.length === 0 || !currentStep) return;
+    if (multiSelectedSpotlightIds.length === 0 || !currentScene) return;
     const selected = new Set(multiSelectedSpotlightIds);
     const base = spotlightsRaw === undefined ? DEFAULT_SPOTLIGHTS : spotlightsRaw;
     const next = base.filter((item) => !selected.has(item.id));
     updateSpotlights(next);
     setMultiSelectedSpotlightIds(next.length > 0 ? [next[0].id] : []);
-    updateCurrentStep({ theaterActiveSpotlightId: next[0]?.id });
+    updateCurrentScene({ theaterActiveSpotlightId: next[0]?.id });
     setDecorActionMessage(`Удалено софитов: ${selected.size}`);
   }, [
-    currentStep,
+    currentScene,
     multiSelectedSpotlightIds,
     setMultiSelectedSpotlightIds,
     spotlightsRaw,
     setDecorActionMessage,
-    updateCurrentStep,
+    updateCurrentScene,
     updateSpotlights,
   ]);
 
@@ -705,14 +705,14 @@ export function useTheaterSpotlights({
     if (createdIds.length === 0) return;
     updateSpotlights(next);
     setMultiSelectedSpotlightIds(createdIds);
-    updateCurrentStep({ theaterActiveSpotlightId: createdIds[0] });
+    updateCurrentScene({ theaterActiveSpotlightId: createdIds[0] });
     setDecorActionMessage(`Скопировано софитов: ${createdIds.length}`);
   }, [
     ensureSpotlights,
     multiSelectedSpotlightIds,
     setMultiSelectedSpotlightIds,
     setDecorActionMessage,
-    updateCurrentStep,
+    updateCurrentScene,
     updateSpotlights,
   ]);
 

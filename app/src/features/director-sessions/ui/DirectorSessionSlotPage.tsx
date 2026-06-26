@@ -1,5 +1,6 @@
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
+import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -23,7 +24,7 @@ import {
 import { useProject } from "../../project";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import { extractRolesSmart } from "../../rehearsals/model/rehearsals-page-utils";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import type { TeamProfile } from "../../../sync/api/profile";
 import {
@@ -31,7 +32,7 @@ import {
   formatTimeHHMM,
   getRangesForDateMinutes,
   getSessionStartLocalMinutes,
-  isReadyStep,
+  isReadyScene,
   isSlotInsideRanges,
   looksLikeEmail,
   memberEmailsFromProjectMembers,
@@ -43,12 +44,13 @@ import {
 import type { DirectorSessionProjectDataCache } from "../model/session-page-types";
 import {
   getAllAssigneeEmailsForDirectorSlotChart,
-  getNormalizedRoleKeysForSlotStep,
+  getNormalizedRoleKeysForSlotScene,
   type DirectorSlotPlannedData,
 } from "../model/session-slot-planned";
 import { SlotRoleRehearsalPicker } from "./SlotRoleRehearsalPicker";
 import { TroupeSchedulePreview } from "./TroupeSchedulePreview";
-import "../../../pages/sessions/style.css";
+import "./director-sessions.css";
+import "./DirectorSessionSlotPage.css";
 
 dayjs.locale("ru");
 
@@ -77,8 +79,8 @@ export function DirectorSessionSlotPage() {
   const [fetchProjectMaterial] = useLazyProjectMaterialQuery();
 
   const [dataCache, setDataCache] = useState<DirectorSessionProjectDataCache>({});
-  const [stepsLoading, setStepsLoading] = useState(false);
-  const [stepsError, setStepsError] = useState<string | null>(null);
+  const [scenesLoading, setScenesLoading] = useState(false);
+  const [scenesError, setScenesError] = useState<string | null>(null);
 
   const visibleProjects = useMemo(
     () =>
@@ -252,8 +254,8 @@ export function DirectorSessionSlotPage() {
     if (!accessToken) return;
     if (!slug) return;
     if (dataCache[slug]) return;
-    setStepsLoading(true);
-    setStepsError(null);
+    setScenesLoading(true);
+    setScenesError(null);
     try {
       const data = await fetchProjectMaterial(slug).unwrap();
       setDataCache((p) => ({
@@ -262,15 +264,15 @@ export function DirectorSessionSlotPage() {
       }));
     } catch (e: unknown) {
       const err = e as { message?: string; data?: { message?: string } };
-      setStepsError(
-        err?.data?.message ?? err?.message ?? "Не удалось загрузить шаги",
+      setScenesError(
+        err?.data?.message ?? err?.message ?? "Не удалось загрузить сцены",
       );
       setDataCache((p) => ({
         ...p,
-        [slug]: { steps: [], sceneId: null, sceneRoles: null },
+        [slug]: { scenes: [], sceneId: null, sceneRoles: null },
       }));
     } finally {
-      setStepsLoading(false);
+      setScenesLoading(false);
     }
   };
 
@@ -377,9 +379,9 @@ export function DirectorSessionSlotPage() {
     return `${formatSlotTime(session.startsAt, slot.offsetMin)} · ${slot.durationMin} мин`;
   }, [session, slot]);
 
-  const steps = useMemo(() => {
-    const src = projectFilter ? (dataCache[projectFilter]?.steps ?? []) : [];
-    const base = src.filter((s) => !isReadyStep(s));
+  const filteredScenes = useMemo(() => {
+    const src = projectFilter ? (dataCache[projectFilter]?.scenes ?? []) : [];
+    const base = src.filter((s) => !isReadyScene(s));
     const q = query.trim().toLowerCase();
     if (!q) return base;
     return base.filter((s) => {
@@ -395,14 +397,14 @@ export function DirectorSessionSlotPage() {
     });
   }, [dataCache, projectFilter, query]);
 
-  const selectableSteps = useMemo(() => {
+  const selectableScenes = useMemo(() => {
     const out: Array<{
-      step: ScriptStep;
+      scene: ScriptScene;
       ok: boolean;
       missing: string[];
       roles: string[];
     }> = [];
-    const list = steps;
+    const list = filteredScenes;
     const freeSet = freeRolesNormSet;
     for (const s of list) {
       const text = String((s as any).playMarkdown ?? (s as any).markdown ?? "");
@@ -412,22 +414,22 @@ export function DirectorSessionSlotPage() {
         const norm = normalizeRoleKey(r);
         if (norm && !freeSet.has(norm)) missing.push(r);
       }
-      out.push({ step: s, ok: missing.length === 0, missing, roles });
+      out.push({ scene: s, ok: missing.length === 0, missing, roles });
     }
     return out;
-  }, [freeRolesNormSet, steps]);
+  }, [freeRolesNormSet, filteredScenes]);
 
-  const stepsForList = useMemo(() => {
-    if (!onlySelectable) return selectableSteps;
-    return selectableSteps.filter((x) => x.ok);
-  }, [onlySelectable, selectableSteps]);
+  const scenesForList = useMemo(() => {
+    if (!onlySelectable) return selectableScenes;
+    return selectableScenes.filter((x) => x.ok);
+  }, [onlySelectable, selectableScenes]);
 
-  const selectedStep = useMemo(() => {
+  const selectedScene = useMemo(() => {
     if (!slot?.ref) return null;
     const slug = slot.ref.projectSlug;
-    const id = slot.ref.stepId;
+    const id = slot.ref.sceneId;
     const data = dataCache[slug];
-    return data?.steps?.find((s) => s.id === id) ?? null;
+    return data?.scenes?.find((s) => s.id === id) ?? null;
   }, [dataCache, slot?.ref]);
 
   const slotPlannedInput = useMemo((): DirectorSlotPlannedData | null => {
@@ -435,7 +437,7 @@ export function DirectorSessionSlotPage() {
     const slug = String(slot.ref.projectSlug ?? "").trim();
     const cached = dataCache[slug];
     return {
-      steps: cached?.steps ?? [],
+      scenes: cached?.scenes ?? [],
       sceneRoles: cached?.sceneRoles ?? null,
       roleEmailsByKey,
     };
@@ -443,13 +445,13 @@ export function DirectorSessionSlotPage() {
 
   const slotRoleKeysForPicker = useMemo(() => {
     if (!slot?.ref || !slotPlannedInput) return [];
-    const stepId = slot.ref.stepId;
-    const step =
-      slotPlannedInput.steps.find((s) => s.id === stepId) ?? null;
-    return getNormalizedRoleKeysForSlotStep(
-      step,
+    const sceneId = slot.ref.sceneId;
+    const scene =
+      slotPlannedInput.scenes.find((s) => s.id === sceneId) ?? null;
+    return getNormalizedRoleKeysForSlotScene(
+      scene,
       slotPlannedInput.sceneRoles,
-      stepId,
+      sceneId,
     );
   }, [slot?.ref, slotPlannedInput]);
 
@@ -458,61 +460,54 @@ export function DirectorSessionSlotPage() {
     const slug = String(slot.ref.projectSlug ?? "").trim();
     const list = getAllAssigneeEmailsForDirectorSlotChart(
       slug,
-      slot.ref.stepId,
+      slot.ref.sceneId,
       slotPlannedInput,
     );
     return new Set(list);
   }, [slot?.ref, slotPlannedInput]);
 
-  if (!accessToken)
-    return <div style={{ padding: 12 }}>Нужно войти, чтобы открыть слот.</div>;
-  if (!sid || !slId)
-    return <div style={{ padding: 12 }}>Некорректный URL слота.</div>;
+  if (!accessToken) {
+    return (
+      <div className="director-session-slot-page__message">
+        Нужно войти, чтобы открыть слот.
+      </div>
+    );
+  }
+  if (!sid || !slId) {
+    return (
+      <div className="director-session-slot-page__message">
+        Некорректный URL слота.
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{ padding: "12px 12px 40px", maxWidth: 1100, margin: "0 auto" }}
-    >
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
+    <div className="director-session-slot-page">
+      <div className="director-session-slot-page__header">
         <Link
           to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
-          style={{ textDecoration: "none", color: "inherit", opacity: 0.85 }}
+          className="director-session-slot-page__back-link"
         >
           ← К сессии
         </Link>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Слот</div>
-        <div style={{ fontSize: 12, opacity: 0.75 }}>{headerTimeLabel}</div>
-        <div style={{ fontSize: 12, opacity: 0.75 }}>{slotTimeLabel}</div>
+        <div className="director-session-slot-page__title">Слот</div>
+        <div className="director-session-slot-page__meta">{headerTimeLabel}</div>
+        <div className="director-session-slot-page__meta">{slotTimeLabel}</div>
       </div>
 
       {loading ? (
-        <div style={{ marginTop: 10, opacity: 0.75 }}>Загрузка…</div>
+        <div className="director-session-slot-page__loading">Загрузка…</div>
       ) : null}
       {error ? (
-        <div className="settings-invite-error" style={{ marginTop: 10 }}>
+        <div className="settings-invite-error director-session-slot-page__error">
           {error}
         </div>
       ) : null}
 
       {session && slot && !loading && !error && (
-        <div
-          style={{
-            marginTop: 12,
-            display: "grid",
-            gap: 12,
-            gridTemplateColumns: "1fr 1.2fr",
-            alignItems: "start",
-          }}
-        >
+        <div className="director-session-slot-page__grid">
           <RehearsalsCard fluid title="Текущий выбор">
-            <div style={{ marginTop: 8, fontSize: 12, opacity: 0.85 }}>
+            <div className="director-session-slot-page__selection-summary">
               {slot.ref ? (
                 <>
                   <div>
@@ -523,7 +518,7 @@ export function DirectorSessionSlotPage() {
                     </b>
                   </div>
                   <div>
-                    Шаг: <b>#{slot.ref.stepId}</b>
+                    Сцена: <b>#{slot.ref.sceneId}</b>
                   </div>
                 </>
               ) : (
@@ -531,30 +526,17 @@ export function DirectorSessionSlotPage() {
               )}
             </div>
 
-            {selectedStep && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 900 }}>Превью</div>
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
-                  {selectedStep.title ? selectedStep.title : "—"}
+            {selectedScene && (
+              <div className="director-session-slot-page__preview">
+                <div className="director-session-slot-page__preview-title">Превью</div>
+                <div className="director-session-slot-page__preview-scene-title">
+                  {selectedScene.title ? selectedScene.title : "—"}
                 </div>
-                <pre
-                  style={{
-                    marginTop: 8,
-                    whiteSpace: "pre-wrap",
-                    maxHeight: 260,
-                    overflow: "auto",
-                    padding: 10,
-                    borderRadius: 10,
-                    border: "1px solid var(--color-border-medium)",
-                    background: "var(--color-bg-scrim)",
-                    fontSize: 12,
-                    lineHeight: 1.35,
-                  }}
-                >
+                <pre className="director-session-slot-page__preview-text">
                   {(() => {
                     const text = String(
-                      (selectedStep as any).playMarkdown ??
-                        (selectedStep as any).markdown ??
+                      (selectedScene as any).playMarkdown ??
+                        (selectedScene as any).markdown ??
                         "",
                     );
                     const plain = markdownToPlainText(text);
@@ -593,68 +575,33 @@ export function DirectorSessionSlotPage() {
               rows={4}
             />
 
-            <div
-              style={{
-                marginTop: 12,
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
+            <div className="director-session-slot-page__actions">
               <button
                 type="button"
+                className="director-session-slot-page__action-btn"
                 onClick={() =>
                   void updateSlot({
                     ref: undefined,
                     roleRehearsalPicks: undefined,
                   })
                 }
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border-strong)",
-                  background: "var(--color-bg-transparent-3)",
-                  color: "inherit",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 12,
-                }}
               >
                 Снять материал
               </button>
               <button
                 type="button"
+                className="director-session-slot-page__action-btn"
                 onClick={() =>
                   navigate(`/sessions?sessionId=${encodeURIComponent(sid)}`)
                 }
-                style={{
-                  height: 34,
-                  padding: "0 12px",
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border-strong)",
-                  background: "var(--color-bg-transparent-3)",
-                  color: "inherit",
-                  cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 12,
-                }}
               >
                 Готово
               </button>
             </div>
           </RehearsalsCard>
 
-          <RehearsalsCard fluid title="Выбор сцены/шага">
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 10,
-                flexWrap: "wrap",
-                alignItems: "center",
-              }}
-            >
+          <RehearsalsCard fluid title="Выбор сцены">
+            <div className="director-session-slot-page__filters">
               <select
                 className="native-select"
                 value={projectFilter}
@@ -667,99 +614,82 @@ export function DirectorSessionSlotPage() {
                 ))}
               </select>
               <input
-                className="native-text-input"
+                className={cn(
+                  "native-text-input",
+                  "director-session-slot-page__search-input",
+                )}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="поиск по названию/тексту"
-                style={{ flex: 1, minWidth: 240 }}
               />
             </div>
 
-            <div
-              style={{
-                marginTop: 10,
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <label
-                style={{
-                  display: "inline-flex",
-                  gap: 8,
-                  alignItems: "center",
-                  userSelect: "none",
-                }}
-              >
+            <div className="director-session-slot-page__availability-bar">
+              <label className="director-session-slot-page__availability-label">
                 <input
                   type="checkbox"
                   checked={onlySelectable}
                   onChange={(e) => setOnlySelectable(e.target.checked)}
                 />
-                <span style={{ fontSize: 12, opacity: 0.85 }}>
+                <span className="director-session-slot-page__availability-label-text">
                   по доступности актёров
                 </span>
               </label>
               {(membersLoading || rolesLoading) && (
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
+                <span className="director-session-slot-page__availability-hint">
                   подгружаю роли/участников…
                 </span>
               )}
               {sessionDateKey && slotWindow ? (
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
+                <span className="director-session-slot-page__availability-hint">
                   окно слота: <b>{sessionDateKey}</b> ·{" "}
                   {formatTimeHHMM(slotWindow.startMin)}–
                   {formatTimeHHMM(slotWindow.endMin)}
                 </span>
               ) : (
-                <span style={{ fontSize: 12, opacity: 0.75 }}>
+                <span className="director-session-slot-page__availability-hint">
                   нет даты/времени для расчёта доступности
                 </span>
               )}
             </div>
 
-            {stepsLoading ? (
-              <div style={{ marginTop: 10, opacity: 0.75, fontSize: 12 }}>
-                Загружаю шаги…
+            {scenesLoading ? (
+              <div className="director-session-slot-page__loading">
+                Загружаю сцены…
               </div>
             ) : null}
-            {stepsError ? (
-              <div className="settings-invite-error" style={{ marginTop: 10 }}>
-                {stepsError}
+            {scenesError ? (
+              <div className="settings-invite-error director-session-slot-page__error">
+                {scenesError}
               </div>
             ) : null}
             {availabilityError ? (
-              <div className="settings-invite-error" style={{ marginTop: 10 }}>
+              <div className="settings-invite-error director-session-slot-page__error">
                 {availabilityError}
               </div>
             ) : null}
 
-            <div
-              style={{
-                marginTop: 10,
-                display: "grid",
-                gap: 8,
-                maxHeight: 620,
-                overflow: "auto",
-                paddingRight: 4,
-              }}
-            >
-              {stepsForList.slice(0, 250).map((x) => {
-                const s = x.step;
+            <div className="director-session-slot-page__scene-list">
+              {scenesForList.slice(0, 250).map((x) => {
+                const s = x.scene;
                 const isSelected = Boolean(
                   slot.ref &&
                   slot.ref.projectSlug === projectFilter &&
-                  slot.ref.stepId === s.id,
+                  slot.ref.sceneId === s.id,
                 );
                 const ok = x.ok;
                 return (
                   <button
                     key={`${projectFilter}:${s.id}`}
                     type="button"
+                    className={cn(
+                      "director-session-slot-page__scene-item",
+                      ok && "director-session-slot-page__scene-item--ok",
+                      isSelected && "director-session-slot-page__scene-item--selected",
+                    )}
                     onClick={() =>
                       void updateSlot({
-                        ref: { projectSlug: projectFilter, stepId: s.id },
+                        ref: { projectSlug: projectFilter, sceneId: s.id },
                         durationMin:
                           s.durationMin == null
                             ? slot.durationMin
@@ -770,58 +700,29 @@ export function DirectorSessionSlotPage() {
                         roleRehearsalPicks: undefined,
                       })
                     }
-                    style={{
-                      textAlign: "left",
-                      borderRadius: 12,
-                      border: isSelected
-                        ? "1px solid var(--color-blue-border-hover)"
-                        : ok
-                          ? "1px solid var(--color-success-border-soft)"
-                          : "1px solid var(--color-status-error-bg-medium)",
-                      background: isSelected
-                        ? "var(--color-status-info-bg-light)"
-                        : ok
-                          ? "var(--color-status-success-bg)"
-                          : "var(--color-status-error-bg)",
-                      padding: "10px 10px",
-                      cursor: "pointer",
-                      color: "inherit",
-                      display: "grid",
-                      gap: 4,
-                    }}
                     title="Назначить в этот слот"
                   >
-                    <div style={{ fontWeight: 900, fontSize: 12 }}>
+                    <div className="director-session-slot-page__scene-item-title">
                       #{s.id} {s.title}
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.72 }}>
-                      {isReadyStep(s) ? "Готова" : "В работе"}
+                    <div className="director-session-slot-page__scene-item-meta">
+                      {isReadyScene(s) ? "Готова" : "В работе"}
                       {s.durationMin != null
                         ? ` · длит.: ${Math.max(1, Math.floor(Number(s.durationMin) || 1))} мин`
                         : ""}
                       {" · "}
                       {ok ? (
-                        <span
-                          style={{
-                            color: "var(--color-status-success-text)",
-                            fontWeight: 800,
-                          }}
-                        >
+                        <span className="director-session-slot-page__scene-item-status--ok">
                           можно взять
                         </span>
                       ) : (
-                        <span
-                          style={{
-                            color: "var(--color-status-error-text)",
-                            fontWeight: 800,
-                          }}
-                        >
+                        <span className="director-session-slot-page__scene-item-status--bad">
                           не собирается
                         </span>
                       )}
                     </div>
                     {!ok && x.missing.length > 0 && (
-                      <div style={{ fontSize: 12, opacity: 0.85 }}>
+                      <div className="director-session-slot-page__scene-item-missing">
                         не хватает: <b>{x.missing.slice(0, 6).join(", ")}</b>
                         {x.missing.length > 6
                           ? ` +${x.missing.length - 6}`
@@ -831,9 +732,9 @@ export function DirectorSessionSlotPage() {
                   </button>
                 );
               })}
-              {stepsForList.length === 0 && !stepsLoading && (
-                <div style={{ fontSize: 12, opacity: 0.75 }}>
-                  Нет шагов (или сцена не найдена).
+              {scenesForList.length === 0 && !scenesLoading && (
+                <div className="director-session-slot-page__empty">
+                  Нет сцен (или сценарий не найден).
                 </div>
               )}
             </div>

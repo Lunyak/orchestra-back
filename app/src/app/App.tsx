@@ -1,11 +1,12 @@
 import "../index.css";
-import { applyScriptPlayFontSizePx } from "../shared/settings/scriptPlayFontSize";
+import { applyScriptPlayTextAppearance } from "../shared/settings/scriptPlayFontSize";
 import { bootstrapTheme } from "../shared/styles/theme/apply-theme";
 import { ThemeProvider } from "../shared/styles/theme/ThemeProvider";
 import { useAuth, useAuthBootstrap } from "../features/auth";
 import { ProjectProvider } from "../features/project";
-import { SceneSyncRunner } from "../features/scene";
-import { ScriptUIProvider } from "../features/script-ui";
+import { PlaybookSyncRunner } from "../features/playbook";
+import { migratePlaybookLegacyBrowserStorage } from "../features/playbook/model/playbook-legacy-migration";
+import { ScriptUiBootstrap } from "../features/script-ui";
 import { LoginPage } from "../pages/login/LoginPage";
 import { ResetPasswordPage } from "../pages/login/ResetPasswordPage";
 import { PrivacyPage } from "../pages/legal/PrivacyPage";
@@ -19,7 +20,8 @@ import { ChatDock } from "../features/chat";
 import { isProjectorOutputWindow } from "../features/projector/model/projector-playback-bridge";
 
 bootstrapTheme();
-applyScriptPlayFontSizePx();
+applyScriptPlayTextAppearance();
+migratePlaybookLegacyBrowserStorage();
 
 export interface AppProps {
   /** После логина/регистрации (только desktop — выгрузка локальных данных). */
@@ -51,14 +53,13 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
 
   return (
     <ProjectProvider>
-      <SceneSyncRunner>
-        <ScriptUIProvider>
-          <>
-            <AppRoutes />
-            {!isProjectorOutput ? <ChatDock /> : null}
-          </>
-        </ScriptUIProvider>
-      </SceneSyncRunner>
+      <PlaybookSyncRunner>
+        <>
+          <ScriptUiBootstrap />
+          <AppRoutes />
+          {!isProjectorOutput ? <ChatDock /> : null}
+        </>
+      </PlaybookSyncRunner>
     </ProjectProvider>
   );
 }

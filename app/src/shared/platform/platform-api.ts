@@ -2,7 +2,7 @@
 
 export type PlatformInvokeResult = { ok?: boolean; error?: string; canceled?: boolean };
 
-export type PlatformSceneSaveResult = { ok?: boolean; error?: string };
+export type PlatformPlaybookSaveResult = { ok?: boolean; error?: string };
 
 export type PlatformAudioTrack = {
   title?: string;
@@ -43,16 +43,16 @@ export type PlatformAddProjectImageResult = PlatformInvokeResult & {
 
 export interface PlatformApi {
   invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
-  readProjectScene: (projectName: string, sceneName: string) => Promise<unknown>;
-  /** Локальная «Запись» — отдельный файл, не участвует в sync. */
+  readProjectPlaybook: (projectName: string, sceneName: string) => Promise<unknown>;
+  /** Локальный суфлёр — отдельный файл, не участвует в sync. */
   readNotesRun?: (projectName: string) => Promise<unknown>;
-  saveNotesRun?: (projectName: string, data: unknown) => Promise<PlatformSceneSaveResult>;
-  saveProjectScene?: (
+  saveNotesRun?: (projectName: string, data: unknown) => Promise<PlatformPlaybookSaveResult>;
+  saveProjectPlaybook?: (
     projectName: string,
     sceneName: string,
     data: unknown,
     options?: unknown,
-  ) => Promise<PlatformSceneSaveResult>;
+  ) => Promise<PlatformPlaybookSaveResult>;
   outboxList?: (projectName: string, limit?: number) => Promise<PlatformOutboxListResult>;
   listProjects?: () => Promise<string[]>;
   createProject?: (name: string) => Promise<{ ok: boolean; name?: string; error?: string }>;

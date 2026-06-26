@@ -1,4 +1,4 @@
-import type { ScriptStep, TheaterModel } from "../../../shared/types/script";
+import type { ScriptScene, TheaterModel } from "../../../shared/types/script";
 
 export function mapTheaterModelFromApi(raw: unknown): TheaterModel | null {
   if (!raw || typeof raw !== "object") return null;
@@ -48,11 +48,11 @@ export function mapTheaterModelFromApi(raw: unknown): TheaterModel | null {
   };
 }
 
-export function mapTheaterModelsFromApiStep(step: unknown): {
+export function mapTheaterModelsFromApiScene(scene: unknown): {
   theaterModels: TheaterModel[];
   theaterDecor?: TheaterModel[];
 } {
-  const st = step as Record<string, unknown> | null;
+  const st = scene as Record<string, unknown> | null;
   const theaterModels = (Array.isArray(st?.theaterModels) ? st.theaterModels : [])
     .map(mapTheaterModelFromApi)
     .filter((item): item is TheaterModel => item != null);
@@ -99,13 +99,13 @@ export function mapTheaterModelToApiPayload(model: TheaterModel, kind: "prop" | 
   };
 }
 
-export function resolveStepTheaterFromApi(step: unknown): {
+export function resolveSceneTheaterFromApi(scene: unknown): {
   theaterModels: TheaterModel[];
   theaterDecor?: TheaterModel[];
 } {
-  const st = step as Record<string, unknown> | null;
+  const st = scene as Record<string, unknown> | null;
   if (Array.isArray(st?.theaterDecor) && (st.theaterDecor as unknown[]).length > 0) {
-    return mapTheaterModelsFromApiStep(step);
+    return mapTheaterModelsFromApiScene(scene);
   }
   const theaterModels: TheaterModel[] = [];
   const theaterDecor: TheaterModel[] = [];
@@ -122,7 +122,7 @@ export function resolveStepTheaterFromApi(step: unknown): {
   };
 }
 
-export function writeStepTheaterModelsToApi(
+export function writeSceneTheaterModelsToApi(
   models: TheaterModel[],
   decor?: TheaterModel[],
 ): {

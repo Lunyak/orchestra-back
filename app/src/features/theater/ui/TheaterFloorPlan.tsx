@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { TheaterStageLayoutGuide } from "./TheaterStageLayoutGuide";
 import { TheaterFloorPlanSvg } from "./floor-plan/TheaterFloorPlanSvg";
 import type { TheaterFloorPlanProps } from "./floor-plan/theater-floor-plan-types";
@@ -39,7 +40,7 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
 
   return (
     <div
-      className={`theater-floor-plan${expanded ? " theater-floor-plan--expanded" : ""}`}
+      className={cn("theater-floor-plan", expanded && "theater-floor-plan--expanded")}
     >
       <div className="theater-floor-plan-header">
         <span>План{isLayoutEdit ? ` · ${shapeLabel}` : " сверху"}</span>

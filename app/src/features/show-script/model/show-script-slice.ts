@@ -1,8 +1,8 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
 import {
-  getActorStepNote,
-  upsertActorStepNote,
+  getActorSceneNote,
+  upsertActorSceneNote,
 } from "../../../sync/api/actor-notes";
 
 type CacheKey = string;
@@ -29,30 +29,30 @@ const initialState: ShowScriptState = {
   actorNotesByKey: {},
 };
 
-export const loadActorStepNote = createAsyncThunk<
+export const loadActorSceneNote = createAsyncThunk<
   { cacheKey: CacheKey; text: string },
-  { cacheKey: CacheKey; projectSlug: string; sceneName: string; stepId: number }
->("showScript/loadActorStepNote", async (args, api) => {
+  { cacheKey: CacheKey; projectSlug: string; sceneName: string; sceneId: number }
+>("showScript/loadActorSceneNote", async (args, api) => {
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) return { cacheKey: args.cacheKey, text: "" };
-  const res = await getActorStepNote(token, {
+  const res = await getActorSceneNote(token, {
     projectSlug: args.projectSlug,
     sceneName: args.sceneName,
-    stepId: args.stepId,
+    sceneId: args.sceneId,
   });
   return { cacheKey: args.cacheKey, text: String(res?.note?.text ?? "") };
 });
 
-export const saveActorStepNote = createAsyncThunk<
+export const saveActorSceneNote = createAsyncThunk<
   { cacheKey: CacheKey; text: string },
-  { cacheKey: CacheKey; projectSlug: string; sceneName: string; stepId: number; text: string }
->("showScript/saveActorStepNote", async (args, api) => {
+  { cacheKey: CacheKey; projectSlug: string; sceneName: string; sceneId: number; text: string }
+>("showScript/saveActorSceneNote", async (args, api) => {
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) return { cacheKey: args.cacheKey, text: args.text };
-  const res = await upsertActorStepNote(token, {
+  const res = await upsertActorSceneNote(token, {
     projectSlug: args.projectSlug,
     sceneName: args.sceneName,
-    stepId: args.stepId,
+    sceneId: args.sceneId,
     text: args.text,
   });
   return { cacheKey: args.cacheKey, text: String(res?.note?.text ?? "") };
@@ -63,7 +63,7 @@ export const showScriptSlice = createSlice({
   initialState,
   reducers: {},
   extraReducers: (builder) => {
-    builder.addCase(loadActorStepNote.pending, (state, action) => {
+    builder.addCase(loadActorSceneNote.pending, (state, action) => {
       const { cacheKey } = action.meta.arg;
       const prev = state.actorNotesByKey[cacheKey];
       state.actorNotesByKey[cacheKey] = {
@@ -73,7 +73,7 @@ export const showScriptSlice = createSlice({
         error: null,
       };
     });
-    builder.addCase(loadActorStepNote.fulfilled, (state, action) => {
+    builder.addCase(loadActorSceneNote.fulfilled, (state, action) => {
       state.actorNotesByKey[action.payload.cacheKey] = {
         text: action.payload.text,
         loading: false,
@@ -81,7 +81,7 @@ export const showScriptSlice = createSlice({
         error: null,
       };
     });
-    builder.addCase(loadActorStepNote.rejected, (state, action) => {
+    builder.addCase(loadActorSceneNote.rejected, (state, action) => {
       const { cacheKey } = action.meta.arg;
       const prev = state.actorNotesByKey[cacheKey];
       state.actorNotesByKey[cacheKey] = {
@@ -92,7 +92,7 @@ export const showScriptSlice = createSlice({
       };
     });
 
-    builder.addCase(saveActorStepNote.pending, (state, action) => {
+    builder.addCase(saveActorSceneNote.pending, (state, action) => {
       const { cacheKey } = action.meta.arg;
       const prev = state.actorNotesByKey[cacheKey];
       state.actorNotesByKey[cacheKey] = {
@@ -102,7 +102,7 @@ export const showScriptSlice = createSlice({
         error: null,
       };
     });
-    builder.addCase(saveActorStepNote.fulfilled, (state, action) => {
+    builder.addCase(saveActorSceneNote.fulfilled, (state, action) => {
       state.actorNotesByKey[action.payload.cacheKey] = {
         text: action.payload.text,
         loading: false,
@@ -110,7 +110,7 @@ export const showScriptSlice = createSlice({
         error: null,
       };
     });
-    builder.addCase(saveActorStepNote.rejected, (state, action) => {
+    builder.addCase(saveActorSceneNote.rejected, (state, action) => {
       const { cacheKey } = action.meta.arg;
       const prev = state.actorNotesByKey[cacheKey];
       state.actorNotesByKey[cacheKey] = {

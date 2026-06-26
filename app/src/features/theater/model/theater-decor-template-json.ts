@@ -329,9 +329,9 @@ export async function loadProjectDecorTemplateManifest(
   projectName: string,
 ): Promise<DecorTemplateJson[]> {
   const api = typeof window !== "undefined" ? window.api : undefined;
-  if (!api?.readProjectScene) return [];
+  if (!api?.readProjectPlaybook) return [];
   try {
-    const raw = await api.readProjectScene(projectName, "decor-templates");
+    const raw = await api.readProjectPlaybook(projectName, "decor-templates");
     if (Array.isArray(raw)) {
       return raw
         .map((item) => parseDecorTemplateJson(item))
@@ -353,9 +353,9 @@ export async function saveProjectDecorTemplates(
   templates: DecorTemplateJson[],
 ): Promise<boolean> {
   const api = typeof window !== "undefined" ? window.api : undefined;
-  if (!api?.saveProjectScene) return false;
+  if (!api?.saveProjectPlaybook) return false;
   try {
-    await api.saveProjectScene(projectName, "decor-templates", { templates });
+    await api.saveProjectPlaybook(projectName, "decor-templates", { templates });
     return true;
   } catch {
     return false;

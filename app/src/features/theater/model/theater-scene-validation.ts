@@ -7,7 +7,7 @@ import type {
 } from "../../../shared/types/script";
 import { isTheaterDecorModel } from "./theater-decor-catalog";
 import { resolveLayoutDoors } from "./theater-doors";
-import { countStepLightChannelLinks } from "./theater-light-channel-link";
+import { countSceneLightChannelLinks } from "./theater-light-channel-link";
 
 export type SceneValidationIssue = {
   id: string;
@@ -47,7 +47,7 @@ export function validateTheaterScene(args: {
     issues.push({
       id: "no-spotlights",
       level: "warn",
-      message: "На шаге нет 3D-софитов",
+      message: "В сцене нет 3D-софитов",
     });
   }
 
@@ -104,7 +104,7 @@ export function validateTheaterScene(args: {
     }
   }
 
-  const linkStats = countStepLightChannelLinks(args.lightPlot, spotlights);
+  const linkStats = countSceneLightChannelLinks(args.lightPlot, spotlights);
   if ((args.lightPlot?.length ?? 0) > 0 && linkStats.linkedSlots === 0) {
     issues.push({
       id: "light-plot-unlinked",

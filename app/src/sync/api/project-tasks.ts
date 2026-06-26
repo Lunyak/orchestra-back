@@ -22,7 +22,7 @@ export type ProjectTaskItem = {
   sourceKey: string | null;
   assigneeEmail: string | null;
   dueAt: string | null;
-  refStepId: number | null;
+  refSceneId: number | null;
   refRequisiteId: number | null;
   refAction: string | null;
   sortOrder: number;
@@ -61,7 +61,7 @@ export type ImportRequisiteTaskPayload = {
   title: string;
   sourceKey: string;
   assigneeEmail?: string;
-  refStepId: number;
+  refSceneId: number;
   refRequisiteId: number;
   refAction: "setup" | "remove";
 };

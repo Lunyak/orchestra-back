@@ -13,6 +13,7 @@ import {
   updateTelegramBot,
   upsertBotVariable,
 } from "../../sync/api/telegram-bots";
+import "./SettingsPage/style.css";
 
 function looksLikeTelegramBotToken(token: string): boolean {
   const t = String(token ?? "").trim();
@@ -269,9 +270,9 @@ export function SettingsBotPage() {
   };
 
   return (
-    <div className="app-layout">
+    <div className="app-layout settings-layout">
       <div className="app-content">
-        <main className="main-content settings-main">
+        <main className="main-content main-content-settings">
           <div className="settings-view">
             <div className="settings-bot-topbar">
               <button type="button" onClick={() => navigate("/settings")}>

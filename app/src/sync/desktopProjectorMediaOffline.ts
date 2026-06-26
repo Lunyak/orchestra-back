@@ -1,17 +1,17 @@
-import type { SceneHoldImage, SceneVideo } from "../features/scene/model/scene-slice";
+import type { PlaybookHoldImage, PlaybookVideo } from "../features/playbook/model/playbook-slice";
 import {
   normalizeHoldImages,
   packProjectorMedia,
   unpackProjectorMedia,
-} from "../features/projector/model/scene-projector-persist";
+} from "../features/projector/model/playbook-projector-persist";
 import {
   isDirectObjectStorageUrl,
   resolveProjectorStorageKey,
 } from "../features/projector/model/projector-storage-key";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import {
-  desktopReadProjectScene,
-  desktopSaveProjectScene,
+  desktopReadProjectPlaybook,
+  desktopSaveProjectPlaybook,
 } from "../shared/platform/desktop-methods";
 import { storageKeyToImageBasename } from "../shared/utils/markdownImages";
 import { getPlayUrl } from "./api/files";
@@ -38,14 +38,14 @@ async function resolveRemoteDownloadUrl(
   return url;
 }
 
-function holdFileName(hold: SceneHoldImage): string {
+function holdFileName(hold: PlaybookHoldImage): string {
   const key = String(hold?.remoteKey ?? resolveProjectorStorageKey(hold) ?? "").trim();
   return String(hold?.file ?? (key ? storageKeyToImageBasename(key) : ""))
     .trim()
     .replace(/^.*[/\\]/, "");
 }
 
-function videoFileName(video: SceneVideo): string {
+function videoFileName(video: PlaybookVideo): string {
   const key = String(video?.remoteKey ?? resolveProjectorStorageKey(video) ?? "").trim();
   return String(video?.file ?? (key ? key.replace(/\\/g, "/").split("/").filter(Boolean).pop() : ""))
     .trim()
@@ -55,8 +55,8 @@ function videoFileName(video: SceneVideo): string {
 export type ProjectorMediaOfflineDownloadResult = {
   ok: boolean;
   changed: boolean;
-  videos: SceneVideo[];
-  holdImages: SceneHoldImage[];
+  videos: PlaybookVideo[];
+  holdImages: PlaybookHoldImage[];
   downloaded: number;
   localFound: number;
   alreadyLocal: number;
@@ -111,10 +111,10 @@ export async function downloadDesktopProjectorMediaOffline(args: {
     payload: Record<string, unknown>,
   ) => Promise<any>;
 
-  const base = (await desktopReadProjectScene(desktop, args.projectSlug, "script")) ?? {};
+  const base = (await desktopReadProjectPlaybook(desktop, args.projectSlug, "script")) ?? {};
   const bag = unpackProjectorMedia((base as any)?.projectorMedia);
   const videos = Array.isArray((base as any)?.videos)
-    ? ((base as any).videos as SceneVideo[]).map((v) => ({ ...v }))
+    ? ((base as any).videos as PlaybookVideo[]).map((v) => ({ ...v }))
     : bag.videos.map((v) => ({ ...v }));
   const holdImages = normalizeHoldImages(
     Array.isArray((base as any)?.holdImages) ? (base as any).holdImages : bag.holdImages,
@@ -267,7 +267,7 @@ export async function downloadDesktopProjectorMediaOffline(args: {
       projector,
       projectorMedia: packProjectorMedia({ videos, holdImages, projector }),
     };
-    await desktopSaveProjectScene(desktop, args.projectSlug, "script", payload, {
+    await desktopSaveProjectPlaybook(desktop, args.projectSlug, "script", payload, {
       skipOutbox: true,
     });
   }
@@ -283,20 +283,5 @@ export async function downloadDesktopProjectorMediaOffline(args: {
     ok: stats.failed.length === 0 || stats.downloaded + stats.localFound + stats.alreadyLocal > 0,
     ...resultBody,
     message: buildResultMessage(resultBody),
-  };
-}
-
-/** @deprecated используйте downloadDesktopProjectorMediaOffline */
-export async function ensureDesktopProjectorMediaOffline(args: {
-  projectSlug: string;
-  accessToken: string | null;
-  projectId: string | null;
-}): Promise<{ changed: boolean; videos: SceneVideo[]; holdImages: SceneHoldImage[] } | null> {
-  const result = await downloadDesktopProjectorMediaOffline(args);
-  if (!getDesktopApi()?.invoke) return null;
-  return {
-    changed: result.changed,
-    videos: result.videos,
-    holdImages: result.holdImages,
   };
 }

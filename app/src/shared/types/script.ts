@@ -1,18 +1,18 @@
-export interface ScriptStep {
+export interface ScriptScene {
   id: number;
   title: string;
   markdown: string;
   playMarkdown?: string;
-  /** Режиссёрская экспликация для шага (markdown). */
+  /** Режиссёрская экспликация для сцены (markdown). */
   explicationMarkdown?: string;
-  /** Длительность шага в минутах (для планирования сессий / слотов). */
+  /** Длительность сцены в минутах (для планирования сессий / слотов). */
   durationMin?: number;
   requisites?: ScriptRequisite[];
   lightPlot?: LightFixture[];
-  /** Таймлайн световых cue для шага */
+  /** Таймлайн световых cue для сцены */
   lightCues?: LightCue[];
   /** Световые картины (look на границе ### Картина N) */
-  lightKadrs?: StepLightKadrsDataV1;
+  lightKadrs?: SceneLightKadrsDataV1;
   theaterSpotlights?: TheaterSpotlight[];
   theaterActiveSpotlightId?: number;
   theaterModels?: TheaterModel[];
@@ -20,11 +20,11 @@ export interface ScriptStep {
   theaterDecor?: TheaterModel[];
   theaterActiveModelId?: number;
   /**
-   * Канбан-статус готовности "сцены" (шаг сценария).
-   * Хранится в Step и синкается как часть шага.
+   * Канбан-статус готовности сцены сценария.
+   * Хранится в ScriptScene и синкается как часть сцены.
    */
   kanbanStatus?: "raw" | "text-learned" | "almost-ready" | "ready";
-  /** Порядок карточки в колонке канбана (не влияет на порядок шагов в сценарии). */
+  /** Порядок карточки в колонке канбана (не влияет на порядок сцен в сценарии). */
   kanbanOrder?: number;
 }
 
@@ -32,9 +32,9 @@ export interface ScriptRequisite {
   id: number;
   label: string;
   checked: boolean;
-  /** Кто выставляет/подготавливает реквизит для шага. */
+  /** Кто выставляет/подготавливает реквизит для сцены. */
   setupAssignees?: string[];
-  /** Кто уносит/убирает реквизит после шага. */
+  /** Кто уносит/убирает реквизит после сцены. */
   removeAssignees?: string[];
 }
 
@@ -49,12 +49,12 @@ export interface LightFixture {
 }
 
 /** Снимок света для картины (### Картина N + <!-- lk:id -->). */
-export interface StepLightKadrV1 {
+export interface SceneLightKadrV1 {
   id: string;
   kadrNo: number;
   title?: string;
   programId: number;
-  faders: StepLightKadrFaderStateV1[];
+  faders: SceneLightKadrFaderStateV1[];
   /** K, отмеченные в toggles при «Записать свет». */
   recordChannels?: number[];
   nextProgramId?: number;
@@ -63,7 +63,7 @@ export interface StepLightKadrV1 {
   updatedAt?: string;
 }
 
-export type StepLightKadrFaderStateV1 = {
+export type SceneLightKadrFaderStateV1 = {
   faderId: number;
   /** K на пульте при записи (не путать с faderId: F8 на K1 → channel 1). */
   channel?: number;
@@ -71,15 +71,15 @@ export type StepLightKadrFaderStateV1 = {
   enabled?: boolean;
 };
 
-export type StepLightKadrsDataV1 = {
+export type SceneLightKadrsDataV1 = {
   v: 1;
-  kadrs: StepLightKadrV1[];
+  kadrs: SceneLightKadrV1[];
 };
 
-/** Ключевой кадр света на таймлайне шага (секунды от начала). */
+/** Ключевой кадр света на таймлайне сцены (секунды от начала). */
 export interface LightCue {
   id: number;
-  /** Секунды от начала шага */
+  /** Секунды от начала сцены */
   tSec: number;
   /** Номер светового канала (строка, как в lightPlot) */
   channel: string;

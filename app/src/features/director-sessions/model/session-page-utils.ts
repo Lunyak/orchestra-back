@@ -5,8 +5,9 @@ import type {
   DirectorRehearsalSession,
   DirectorSessionSlot,
 } from "../directorSessionsSync";
-import type { ScriptStep } from "../../../shared/types/script";
-import type { SceneRolesDataV1 } from "../../scene";
+import type { ScriptScene } from "../../../shared/types/script";
+import { pullPlaybooksFromSync, pullScriptScenesFromSync, syncRowMatchesPlaybook } from "../../../sync/sync-pull-normalize";
+import type { PlaybookRolesDataV1 } from "../../playbook";
 import type { SyncPullResponse } from "../../../sync/api/types/sync";
 import type {
   AvailabilityTimeRange,
@@ -212,8 +213,8 @@ export function computePlannedEmailsForSession(
   for (const sl of slots) {
     const ref = (sl as DirectorSessionSlot).ref;
     const slug = String(ref?.projectSlug ?? "").trim();
-    const stepId = typeof ref?.stepId === "number" ? ref.stepId : null;
-    if (!slug || stepId == null) continue;
+    const sceneId = typeof ref?.sceneId === "number" ? ref.sceneId : null;
+    if (!slug || sceneId == null) continue;
     const data = dataCache[slug];
     if (!data) {
       complete = false;
@@ -221,7 +222,7 @@ export function computePlannedEmailsForSession(
     }
     const slotEmails = getEmailsPlannedForDirectorSlot(
       slug,
-      stepId,
+      sceneId,
       data,
       sl.roleRehearsalPicks,
     );
@@ -243,8 +244,8 @@ export function getLocalDateTimeParts(iso: string): { date: string; time: string
   return { date, time: `${hh}:${mm}` };
 }
 
-export function directorSlotRefKey(projectSlug: string, stepId: number): string {
-  return `${String(projectSlug ?? "").trim()}:${Math.floor(Number(stepId) || 0)}`;
+export function directorSlotRefKey(projectSlug: string, sceneId: number): string {
+  return `${String(projectSlug ?? "").trim()}:${Math.floor(Number(sceneId) || 0)}`;
 }
 
 export function projectDisplayLabel(
@@ -257,8 +258,8 @@ export function projectDisplayLabel(
   return label || slug;
 }
 
-export function isReadyStep(step: ScriptStep): boolean {
-  const st = String((step as { kanbanStatus?: string })?.kanbanStatus ?? "")
+export function isReadyScene(scene: ScriptScene): boolean {
+  const st = String((scene as { kanbanStatus?: string })?.kanbanStatus ?? "")
     .trim()
     .toLowerCase();
   return st === "ready" || st === "готова";
@@ -300,19 +301,20 @@ export function memberEmailsFromProjectMembers(
   return Array.from(new Set(emails));
 }
 
-export function parseStepsFromPull(
+export function parseScenesFromPull(
   pull: SyncPullResponse,
   projectSlug: string,
 ): DirectorSessionProjectDataCache[string] {
   const proj = (pull.projects ?? []).find((p) => p.slug === projectSlug);
   const scene = proj
-    ? (pull.scenes ?? []).find((s) => String(s?.id ?? "") === `${proj.id}:script`)
+    ? (pullPlaybooksFromSync(pull)).find((s) => String(s?.id ?? "") === `${proj.id}:script`)
     : null;
   const sceneId = String(scene?.id ?? "") || null;
-  const sceneRoles = ((scene as { sceneRoles?: SceneRolesDataV1 } | null)?.sceneRoles ??
-    null) as SceneRolesDataV1 | null;
-  const steps = (Array.isArray(pull.steps) ? pull.steps : [])
-    .filter((st) => (sceneId ? String(st?.sceneId ?? "") === sceneId : true))
+  const sceneRoles = ((scene as { sceneRoles?: PlaybookRolesDataV1 } | null)?.sceneRoles ??
+    null) as PlaybookRolesDataV1 | null;
+  const scriptScenesRaw = pullScriptScenesFromSync(pull);
+  const scenes = (Array.isArray(scriptScenesRaw) ? scriptScenesRaw : [])
+    .filter((st) => (sceneId ? syncRowMatchesPlaybook(st, sceneId) : true))
     .sort((a, b) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
     .map((st) => ({
       id: Number(st?.sourceId ?? 0),
@@ -324,8 +326,8 @@ export function parseStepsFromPull(
       kanbanStatus: st?.kanbanStatus ?? undefined,
       kanbanOrder: st?.kanbanOrder ?? undefined,
     }))
-    .filter((x) => Number.isFinite(x.id) && x.id > 0) as ScriptStep[];
-  return { steps, sceneId, sceneRoles };
+    .filter((x) => Number.isFinite(x.id) && x.id > 0) as ScriptScene[];
+  return { scenes, sceneId, sceneRoles };
 }
 
 export function calledStatusToGatherMark(

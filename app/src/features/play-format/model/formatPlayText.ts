@@ -13,7 +13,6 @@ import {
 export type FormatPlayTextOptions = {
   mergeBrokenLines?: boolean;
   wrapRoleLabels?: boolean;
-  /** @deprecated Используй roleMarkerSpecs */
   roleMarkerLines?: string[];
   /** Роли с псевдонимами для сопоставления в тексте. */
   roleMarkerSpecs?: RoleMarkerSpec[];

@@ -1,12 +1,12 @@
 import type {
-  SceneLightChannelRolesV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../scene/model/scene-slice";
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../playbook/model/playbook-slice";
 import type {
-  ScriptStep,
-  StepLightKadrV1,
-  StepLightKadrsDataV1,
+  ScriptScene,
+  SceneLightKadrV1,
+  SceneLightKadrsDataV1,
   TheaterSpotlight,
 } from "../../../shared/types/script";
 import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";
@@ -17,10 +17,10 @@ import {
   buildKadrFromConsole,
   findKadrById,
   type MarkdownKadrSection,
-  readStepLightKadrsFromMarkdown,
+  readSceneLightKadrsFromMarkdown,
   recordKadrToMarkdown,
   scanMarkdownKadrSections,
-  upsertKadrInStep,
+  upsertKadrInScene,
 } from "../../theater/model/light-kadrs";
 import {
   formatProjectorKadrLine,
@@ -54,11 +54,11 @@ import {
   upsertKadrTransitionInSection,
 } from "./kadr-section-transition";
 import {
-  insertKadrAfterInStep,
+  insertKadrAfterInScene,
   type InsertKadrAfterTarget,
   type SpectacleTapeItem,
 } from "./spectacle-kadr-tape";
-import { getPlaylistPlaybackSnapshot } from "../../scene/model/scene-playback-bridge";
+import { getPlaylistPlaybackSnapshot } from "../../playbook/model/playbook-playback-bridge";
 import { readPlayerVolume } from "../../../shared/player/player-prefs";
 
 export type CreateKadrFaderOption = {
@@ -132,10 +132,10 @@ export function syncDraftFaderOptions(
 }
 
 function applyDraftFaderStates(
-  kadr: StepLightKadrV1,
+  kadr: SceneLightKadrV1,
   draft: CreateKadrDraft,
   liveConsoleChannel: number,
-): StepLightKadrV1 {
+): SceneLightKadrV1 {
   if (draft.blackout) {
     return { ...kadr, programId: 0, blackout: true, faders: [] };
   }
@@ -178,9 +178,9 @@ function applyDraftFaderStates(
 export function listCreateKadrFaderOptions(args: {
   recordChannels: number[];
   liveConsoleChannel: number;
-  liveFaders: SceneLightFadersDataV1;
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  liveFaders: PlaybookLightFadersDataV1;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   spotlights: TheaterSpotlight[];
   lightChannelsCount: number;
 }): CreateKadrFaderOption[] {
@@ -221,11 +221,11 @@ export function listCreateKadrFaderOptions(args: {
 
 export function buildInitialCreateKadrDraft(args: {
   lightChannelsCount: number;
-  lightChannelRoles: SceneLightChannelRolesV1 | null;
+  lightChannelRoles: PlaybookLightChannelRolesV1 | null;
   liveConsoleChannel: number;
-  liveFaders: SceneLightFadersDataV1;
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  liveFaders: PlaybookLightFadersDataV1;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   spotlights: TheaterSpotlight[];
 }): CreateKadrDraft {
   const recordChannels = normalizeSelectedRecordChannels(
@@ -290,14 +290,14 @@ type ApplyKadrDraftArgs = {
   kadrId: string;
   kadrNo: number;
   markdown: string;
-  kadrs: StepLightKadrsDataV1;
+  kadrs: SceneLightKadrsDataV1;
   section: MarkdownKadrSection;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   spotlights: TheaterSpotlight[];
   liveConsoleChannel: number;
-  liveFaders: SceneLightFadersDataV1;
+  liveFaders: PlaybookLightFadersDataV1;
   playlist: Array<{ id: number; title: string }>;
   sounds: Array<{ id: number; title: string }>;
   videos: Array<{ id: number; title: string }>;
@@ -308,7 +308,7 @@ type ApplyKadrDraftArgs = {
 
 function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
   nextMarkdown: string;
-  nextKadrs: StepLightKadrsDataV1;
+  nextKadrs: SceneLightKadrsDataV1;
   kadrId: string;
   kadrNo: number;
   summary: string;
@@ -331,7 +331,7 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
   );
   const isBlackout = draft.blackout;
 
-  let kadr: StepLightKadrV1 = buildKadrFromConsole({
+  let kadr: SceneLightKadrV1 = buildKadrFromConsole({
     id: kadrId,
     kadrNo,
     title: draft.title.trim() || section.headingTitle,
@@ -347,7 +347,7 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
 
   kadr = applyDraftFaderStates(kadr, draft, args.liveConsoleChannel);
 
-  kadrs = upsertKadrInStep({ kadrs, kadr });
+  kadrs = upsertKadrInScene({ kadrs, kadr });
   markdown = recordKadrToMarkdown({
     markdown,
     section: { ...section, id: kadrId },
@@ -421,7 +421,7 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
     markdown = upsertKadrLabelsInSection(markdown, section, runLabels);
   }
 
-  kadrs = upsertKadrInStep({
+  kadrs = upsertKadrInScene({
     kadrs,
     kadr: { ...kadr, title: draft.title.trim() || kadr.title },
   });
@@ -446,16 +446,16 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
 }
 
 export function buildEditKadrDraftFromTapeItem(args: {
-  step: ScriptStep;
+  scene: ScriptScene;
   item: SpectacleTapeItem;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
 }): CreateKadrDraft | null {
-  const { step, item } = args;
+  const { scene, item } = args;
   if (item.isPlaceholder || !item.section) return null;
 
-  const markdown = String(step.markdown ?? "");
+  const markdown = String(scene.markdown ?? "");
   const section = item.section;
-  const kadrs = readStepLightKadrsFromMarkdown(step);
+  const kadrs = readSceneLightKadrsFromMarkdown(scene);
   const kadrId = item.kadrId ?? section.id;
   const kadr =
     (kadrId ? findKadrById(kadrs, kadrId) : undefined) ??
@@ -506,34 +506,34 @@ export function buildEditKadrDraftFromTapeItem(args: {
 }
 
 export function updateKadrFromDraft(args: {
-  step: ScriptStep;
+  scene: ScriptScene;
   item: SpectacleTapeItem;
   draft: CreateKadrDraft;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   spotlights: TheaterSpotlight[];
   liveConsoleChannel: number;
-  liveFaders: SceneLightFadersDataV1;
+  liveFaders: PlaybookLightFadersDataV1;
   playlist: Array<{ id: number; title: string }>;
   sounds: Array<{ id: number; title: string }>;
   videos: Array<{ id: number; title: string }>;
   holdImages: Array<{ id: number; title: string }>;
 }): {
   nextMarkdown: string;
-  nextKadrs: StepLightKadrsDataV1;
+  nextKadrs: SceneLightKadrsDataV1;
   kadrId: string;
   kadrNo: number;
   summary: string;
 } | null {
-  const { step, item, draft } = args;
+  const { scene, item, draft } = args;
   if (item.isPlaceholder || !item.section) return null;
 
   const kadrId = item.kadrId ?? item.section.id;
   if (!kadrId) return null;
 
-  const markdown = String(step.markdown ?? "");
-  const kadrs = readStepLightKadrsFromMarkdown(step);
+  const markdown = String(scene.markdown ?? "");
+  const kadrs = readSceneLightKadrsFromMarkdown(scene);
   const section = findSectionByKadrId(markdown, kadrId) ?? item.section;
   if (!section) return null;
 
@@ -560,28 +560,28 @@ export function updateKadrFromDraft(args: {
 }
 
 export function createKadrFromDraft(args: {
-  step: ScriptStep;
+  scene: ScriptScene;
   draft: CreateKadrDraft;
   insertAfter?: InsertKadrAfterTarget | null;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null | undefined;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   spotlights: TheaterSpotlight[];
   liveConsoleChannel: number;
-  liveFaders: SceneLightFadersDataV1;
+  liveFaders: PlaybookLightFadersDataV1;
   playlist: Array<{ id: number; title: string }>;
   sounds: Array<{ id: number; title: string }>;
   videos: Array<{ id: number; title: string }>;
   holdImages: Array<{ id: number; title: string }>;
 }): {
   nextMarkdown: string;
-  nextKadrs: StepLightKadrsDataV1;
+  nextKadrs: SceneLightKadrsDataV1;
   kadrId: string;
   kadrNo: number;
   summary: string;
 } | null {
-  const { step, draft } = args;
-  const base = insertKadrAfterInStep({ step, after: args.insertAfter ?? null });
+  const { scene, draft } = args;
+  const base = insertKadrAfterInScene({ scene, after: args.insertAfter ?? null });
   const section = findSectionByKadrId(base.nextMarkdown, base.kadrId);
   if (!section) return null;
 

@@ -66,16 +66,6 @@ function extractRolesSmart(text?: string): string[] {
   return uniq([...a, ...b]);
 }
 
-type RawStepLike = {
-  id?: number;
-  title?: string;
-  markdown?: string;
-  playMarkdown?: string;
-  kanbanStatus?: string;
-  kanbanOrder?: number;
-  cast?: Record<string, string | string[]>;
-};
-
 @Injectable()
 export class BotService {
   constructor(private readonly prisma: PrismaService) {}
@@ -230,7 +220,7 @@ export class BotService {
         id: true,
         slug: true,
         name: true,
-        scenes: {
+        playbooks: {
           where: { deletedAt: null },
           select: { id: true, name: true, updatedAt: true },
         },
@@ -240,13 +230,13 @@ export class BotService {
       throw new NotFoundException('Project not found');
     }
 
-    const stepRows = await this.prisma.step.findMany({
+    const sceneRows = await this.prisma.scene.findMany({
       where: {
-        sceneId: { in: project.scenes.map((s) => s.id) },
+        playbookId: { in: project.playbooks.map((s) => s.id) },
         deletedAt: null,
       },
       select: {
-        sceneId: true,
+        playbookId: true,
         sourceId: true,
         title: true,
         markdown: true,
@@ -255,21 +245,21 @@ export class BotService {
         kanbanOrder: true,
         order: true,
       },
-      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+      orderBy: [{ playbookId: 'asc' }, { order: 'asc' }],
     });
-    const stepsBySceneId = new Map<string, typeof stepRows>();
-    for (const st of stepRows) {
-      const list = stepsBySceneId.get(st.sceneId) ?? [];
+    const scenesByPlaybookId = new Map<string, typeof sceneRows>();
+    for (const st of sceneRows) {
+      const list = scenesByPlaybookId.get(st.playbookId) ?? [];
       list.push(st);
-      stepsBySceneId.set(st.sceneId, list);
+      scenesByPlaybookId.set(st.playbookId, list);
     }
 
     const items: Array<{
       projectSlug: string;
-      sceneId: string;
-      sceneName: string;
-      stepId: number | null;
-      stepTitle: string;
+      playbookId: string;
+      playbookName: string;
+      sceneId: number | null;
+      sceneTitle: string;
       requiredRoles: string[];
       missingRoles: string[];
       ready: boolean;
@@ -277,27 +267,26 @@ export class BotService {
       kanbanOrder?: number;
     }> = [];
 
-    for (const scene of project.scenes) {
-      const steps = stepsBySceneId.get(scene.id) ?? [];
-      for (const step of steps) {
-        const text = step.playMarkdown ?? step.markdown ?? '';
+    for (const playbook of project.playbooks) {
+      const scenes = scenesByPlaybookId.get(playbook.id) ?? [];
+      for (const scene of scenes) {
+        const text = scene.playMarkdown ?? scene.markdown ?? '';
         const requiredRoles = extractRolesSmart(text);
 
-        // Если ролей нет — такую "сцену" можно репетировать всегда (техничка/ремарки).
         if (requiredRoles.length === 0) {
           items.push({
             projectSlug: project.slug,
-            sceneId: scene.id,
-            sceneName: scene.name,
-            stepId: typeof step.sourceId === 'number' ? step.sourceId : null,
-            stepTitle:
-              (step.title ?? '').trim() ||
-              `Step ${String(step.sourceId ?? '')}`.trim(),
+            playbookId: playbook.id,
+            playbookName: playbook.name,
+            sceneId: typeof scene.sourceId === 'number' ? scene.sourceId : null,
+            sceneTitle:
+              (scene.title ?? '').trim() ||
+              `Scene ${String(scene.sourceId ?? '')}`.trim(),
             requiredRoles: [],
             missingRoles: [],
             ready: true,
-            kanbanStatus: step.kanbanStatus ?? undefined,
-            kanbanOrder: step.kanbanOrder ?? undefined,
+            kanbanStatus: scene.kanbanStatus ?? undefined,
+            kanbanOrder: scene.kanbanOrder ?? undefined,
           });
           continue;
         }
@@ -318,17 +307,17 @@ export class BotService {
 
         items.push({
           projectSlug: project.slug,
-          sceneId: scene.id,
-          sceneName: scene.name,
-          stepId: typeof step.sourceId === 'number' ? step.sourceId : null,
-          stepTitle:
-            (step.title ?? '').trim() ||
-            `Step ${String(step.sourceId ?? '')}`.trim(),
+          playbookId: playbook.id,
+          playbookName: playbook.name,
+          sceneId: typeof scene.sourceId === 'number' ? scene.sourceId : null,
+          sceneTitle:
+            (scene.title ?? '').trim() ||
+            `Scene ${String(scene.sourceId ?? '')}`.trim(),
           requiredRoles: requiredRoles.sort((a, b) => a.localeCompare(b, 'ru')),
           missingRoles,
           ready: missingRoles.length === 0,
-          kanbanStatus: step.kanbanStatus ?? undefined,
-          kanbanOrder: step.kanbanOrder ?? undefined,
+          kanbanStatus: scene.kanbanStatus ?? undefined,
+          kanbanOrder: scene.kanbanOrder ?? undefined,
         });
       }
     }
@@ -339,8 +328,8 @@ export class BotService {
       if (a.missingRoles.length !== b.missingRoles.length) {
         return a.missingRoles.length - b.missingRoles.length;
       }
-      const aa = `${a.sceneName} ${a.stepTitle}`;
-      const bb = `${b.sceneName} ${b.stepTitle}`;
+      const aa = `${a.playbookName} ${a.sceneTitle}`;
+      const bb = `${b.playbookName} ${b.sceneTitle}`;
       return aa.localeCompare(bb, 'ru');
     });
 

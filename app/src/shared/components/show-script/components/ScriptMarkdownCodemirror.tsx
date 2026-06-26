@@ -9,17 +9,22 @@ import {
   keymap,
   placeholder as cmPlaceholder,
 } from "@codemirror/view";
+import cn from "classnames";
 import {
   forwardRef,
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
+import { createPortal } from "react-dom";
+import { AppEditorScriptSceneTitle } from "../../app-editor-menubar";
 import { markdownHeadingSectionBlocks } from "./markdownHeadingSectionBlocks";
 import { markdownHideKadrAnchors } from "./markdownHideKadrAnchors";
 import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
 import { orchestraEditorRichTokens } from "./orchestraEditorRichTokens";
 import { scriptMarkdownEditorSyntaxHighlighting } from "./scriptMarkdownEditorHighlight";
+import { scriptMarkdownCodemirrorTheme } from "./scriptMarkdownCodemirrorTheme";
 
 export type ScriptMarkdownEditorHandle = {
   focus: () => void;
@@ -45,42 +50,13 @@ type Props = {
   onTrackLinkClick?: (trackId: number) => void;
   /** Карточки секций по `###` (режим notes / play / explication). */
   kadrSectionBlocks?: boolean;
+  /** Вкладка «Текст»: лейблы [[РОЛЬ]] с настройками из settings. */
+  playTextMode?: boolean;
+  /** Название сцены — дублирует menubar внутри области прокрутки редактора. */
+  sceneTitle?: string;
+  sceneTitleEditing?: boolean;
+  onSceneTitleChange?: (title: string) => void;
 };
-
-/** Тема редактора: токены приложения, без gutter, active line без фона (чипы / inline-превью). */
-const scriptMarkdownCodemirrorTheme = EditorView.theme(
-  {
-    "&": {
-      height: "100%",
-      backgroundColor: "var(--color-bg-primary)",
-      color: "var(--color-text-primary)",
-    },
-    ".cm-scroller": {
-      fontFamily: "var(--font-family-script-body)",
-      fontSize: "14px",
-      lineHeight: "1.5",
-      minHeight: "280px",
-    },
-    ".cm-content": {
-      caretColor: "var(--color-text-primary)",
-      whiteSpace: "pre-wrap",
-      wordBreak: "break-word",
-      overflowWrap: "break-word",
-    },
-    ".cm-line": {
-      padding: 0,
-    },
-    ".cm-cursor, .cm-dropCursor": {
-      borderLeftColor: "var(--color-text-primary)",
-    },
-    ".cm-activeLine": {
-      backgroundColor: "inherit",
-    },
-    ".cm-gutters": { display: "none" },
-    ".cm-placeholder": { color: "rgba(148,163,184,0.75)" },
-  },
-  { dark: true },
-);
 
 export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, Props>(
   function ScriptMarkdownCodemirror(
@@ -96,11 +72,16 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       lightChannels,
       onTrackLinkClick,
       kadrSectionBlocks = false,
+      playTextMode = false,
+      sceneTitle,
+      sceneTitleEditing = false,
+      onSceneTitleChange,
     },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
+    const [sceneTitleMount, setSceneTitleMount] = useState<HTMLDivElement | null>(null);
     const lightChannelsRef = useRef(lightChannels);
     lightChannelsRef.current = lightChannels;
     const onTrackLinkClickRef = useRef(onTrackLinkClick);
@@ -114,6 +95,8 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
     const imageCtxKey = `${imageCtxRef.current.projectSlug}\0${imageCtxRef.current.accessToken ?? ""}`;
     const kadrSectionBlocksRef = useRef(kadrSectionBlocks);
     kadrSectionBlocksRef.current = kadrSectionBlocks;
+    const playTextModeRef = useRef(playTextMode);
+    playTextModeRef.current = playTextMode;
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
     const suppressOnChangeRef = useRef(false);
@@ -180,6 +163,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
             () => lightChannelsRef.current,
             () => onTrackLinkClickRef.current,
             () => imageCtxRef.current,
+            () => playTextModeRef.current,
           ),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           ph ? cmPlaceholder(ph) : [],
@@ -205,18 +189,25 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       const view = new EditorView({ state, parent: host });
       viewRef.current = view;
 
+      const sceneTitleEl = document.createElement("div");
+      sceneTitleEl.className = "script-markdown-cm__scene-title-mount";
+      view.scrollDOM.insertBefore(sceneTitleEl, view.contentDOM);
+      setSceneTitleMount(sceneTitleEl);
+
       return () => {
+        sceneTitleEl.remove();
+        setSceneTitleMount(null);
         view.destroy();
         viewRef.current = null;
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once; parent remounts via key on step/field
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once; parent remounts via key on scene/field
     }, []);
 
     useEffect(() => {
       const view = viewRef.current;
       if (!view) return;
       view.dispatch({});
-    }, [kadrSectionBlocks]);
+    }, [kadrSectionBlocks, playTextMode]);
 
     useEffect(() => {
       const view = viewRef.current;
@@ -250,12 +241,30 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       view.dispatch({ selection: sel });
     }, [imageCtxKey]);
 
+    const showSceneTitle = sceneTitleEditing || Boolean(String(sceneTitle ?? "").trim());
+
     return (
-      <div
-        ref={hostRef}
-        id={id}
-        className={["script-markdown-cm", className].filter(Boolean).join(" ")}
-      />
+      <>
+        <div
+          ref={hostRef}
+          id={id}
+          className={cn(
+            "script-markdown-cm",
+            className,
+            showSceneTitle && "script-markdown-cm--with-scene-title",
+          )}
+        />
+        {sceneTitleMount && showSceneTitle
+          ? createPortal(
+              <AppEditorScriptSceneTitle
+                title={String(sceneTitle ?? "")}
+                isEditing={sceneTitleEditing}
+                onTitleChange={onSceneTitleChange ?? (() => {})}
+              />,
+              sceneTitleMount,
+            )
+          : null}
+      </>
     );
   },
 );

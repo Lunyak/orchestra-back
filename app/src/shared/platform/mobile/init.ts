@@ -2,9 +2,9 @@ import { Capacitor } from "@capacitor/core";
 import {
   downloadRemoteAsset,
   mobileInvoke,
-  readProjectScene,
+  readProjectPlaybook,
   resolveFileSrc,
-  saveProjectScene,
+  saveProjectPlaybook,
 } from "./storage";
 
 let initialized = false;
@@ -16,8 +16,8 @@ export async function initCapacitorPlatform(): Promise<void> {
 
   const api = {
     invoke: mobileInvoke,
-    readProjectScene,
-    saveProjectScene,
+    readProjectPlaybook,
+    saveProjectPlaybook,
     resolveFileSrc,
     downloadRemoteAsset,
     isCapacitor: true as const,

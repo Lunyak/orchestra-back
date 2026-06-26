@@ -1,6 +1,6 @@
 import cn from "classnames";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
 import { tokenizeWords } from "../model/wordTokens";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
@@ -23,7 +23,7 @@ import {
   uploadVoiceLineTakeWeb,
   type SceneVoiceLineEntry,
   type SceneVoiceLineTake,
-} from "../../scene/model/scene-slice";
+} from "../../playbook/model/playbook-slice";
 import { Modal } from "../../../shared/core/modal/Modal";
 import { useAppEditorMenubarActionsRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
 import { useIsMobile } from "@shared/hooks/useIsMobile";
@@ -34,8 +34,8 @@ import "./voice-style.css";
 type VoiceExercise = {
   id: string;
   lineId: string;
-  stepId: number;
-  stepTitle: string;
+  sceneId: number;
+  sceneTitle: string;
   role: string;
   textRaw: string;
   textForCheck: string;
@@ -814,7 +814,7 @@ function VoiceLineSheet({
         style={panelStyle}
       >
         <div
-          className="voice-line-sheet__head"
+          className="voice-line-sheet__header"
           aria-expanded={expanded}
           aria-label={expanded ? "Свернуть панель — потяните вниз" : "Развернуть панель — потяните вверх"}
           onPointerDown={onHeadPointerDown}
@@ -1101,18 +1101,18 @@ function VoiceLineControlsPanel({
 }
 
 export function VoiceDialogueTrainer({
-  steps,
+  scenes,
   role,
   roleKeys,
-  selectedStepIds,
+  selectedPlaybookIds,
   storageKey,
   performerId,
   performerLabel,
 }: {
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
   role: string;
   roleKeys?: string[];
-  selectedStepIds: number[];
+  selectedPlaybookIds: number[];
   storageKey?: string;
   performerId: string;
   performerLabel?: string;
@@ -1137,16 +1137,16 @@ export function VoiceDialogueTrainer({
   const projectRoles = useMemo(() => rolesRes?.roles ?? [], [rolesRes?.roles]);
   const uiKey = storageKey || `voiceTrainer:${projectName || "project"}:${primaryRoleKey || "role"}`;
   const ui = useAppSelector((s) => selectVoiceTrainerUi(s, uiKey));
-  const voiceLines = useAppSelector((s) => s.scene.sceneData?.voiceLines);
-  const voiceUpload = useAppSelector((s) => s.scene.voiceLinesUpload);
+  const voiceLines = useAppSelector((s) => s.playbook.playbookData?.voiceLines);
+  const voiceUpload = useAppSelector((s) => s.playbook.voiceLinesUpload);
 
   useEffect(() => {
     dispatch(voiceTrainerUiActions.initVoiceTrainerUi({ uiKey }));
   }, [dispatch, uiKey]);
   const allLines = useMemo(() => {
-    const selected = steps.filter((s) => selectedStepIds.includes(s.id));
-    return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
-  }, [selectedStepIds, steps]);
+    const selected = scenes.filter((s) => selectedPlaybookIds.includes(s.id));
+    return buildDialogueLines({ scenes: selected, preferField: "playMarkdown" });
+  }, [selectedPlaybookIds, scenes]);
 
   const exercises = useMemo(() => {
     const out: VoiceExercise[] = [];
@@ -1174,11 +1174,11 @@ export function VoiceDialogueTrainer({
       const textForCheck = normalizeForCheck(line.text);
       if (!textForCheck) continue;
       out.push({
-        // Use stable line id (stepId + line index) so progress survives text edits/cleanup.
+        // Use stable line id (sceneId + line index) so progress survives text edits/cleanup.
         id: line.id,
         lineId: line.id,
-        stepId: line.stepId,
-        stepTitle: line.stepTitle,
+        sceneId: line.sceneId,
+        sceneTitle: line.sceneTitle,
         role: line.role,
         textRaw: line.text,
         textForCheck,
@@ -2491,12 +2491,12 @@ export function VoiceDialogueTrainer({
       <div className="voice-head">
         <div className="voice-title">
           <b>{role || "—"}</b>
-          {current?.stepTitle ? (
+          {current?.sceneTitle ? (
             <>
               <span className="voice-title__sep" aria-hidden="true">
                 |
               </span>
-              <span className="voice-step">{current.stepTitle}</span>
+              <span className="voice-scene">{current.sceneTitle}</span>
             </>
           ) : null}
         </div>
@@ -2624,7 +2624,7 @@ export function VoiceDialogueTrainer({
       panelClassName="voice-settings-modal"
       ariaLabel="Настройки голосового тренажёра"
     >
-      <div className="voice-settings-modal__head">
+      <div className="voice-settings-modal__header">
         <div>
           <div className="voice-settings-modal__label">Настройки</div>
           <div className="voice-settings-modal__title">Голосовой тренажёр</div>

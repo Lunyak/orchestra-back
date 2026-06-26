@@ -1,7 +1,10 @@
+import cn from "classnames";
+import { useRef } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
 import { setPlayerDockHidden } from "../../player/player-prefs";
 import { usePlayerDockHidden } from "../../player/usePlayerDockHidden";
+import { usePlaylistBottomPlayerDrag } from "../../player/usePlaylistBottomPlayerDrag";
 import type { PlaylistTrack } from "../../types/playlist";
 
 type PlaylistBottomControlsProps = {
@@ -40,13 +43,40 @@ export function PlaylistBottomControls({
   formatTime,
 }: PlaylistBottomControlsProps) {
   const { playerDockHidden } = usePlayerDockHidden();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const {
+    canDrag,
+    isDragging,
+    containerStyle,
+    onDragPointerDown,
+    onDragDoubleClick,
+  } = usePlaylistBottomPlayerDrag(containerRef, innerRef);
 
   if (typeof document === "undefined") return null;
   if (playerDockHidden) return null;
 
+  const dragPanelTitle = canDrag
+    ? "Перетащите панель или дважды нажмите для сброса позиции"
+    : undefined;
+
   return createPortal(
-    <div className="playlist-bottom-player" aria-label="Управление проигрывателем">
-      <div className="playlist-bottom-player__inner">
+    <div
+      ref={containerRef}
+      className={cn("playlist-bottom-player", isDragging && "playlist-bottom-player--dragging")}
+      style={containerStyle}
+      aria-label="Управление проигрывателем"
+    >
+      <div
+        ref={innerRef}
+        className={cn(
+          "playlist-bottom-player__inner",
+          canDrag && "playlist-bottom-player__inner--draggable",
+        )}
+        onPointerDown={canDrag ? onDragPointerDown : undefined}
+        onDoubleClick={canDrag ? onDragDoubleClick : undefined}
+        title={dragPanelTitle}
+      >
         <div className="playlist-bottom-player__transport">
           <button
             type="button"

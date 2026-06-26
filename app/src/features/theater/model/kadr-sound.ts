@@ -10,7 +10,6 @@ export type KadrSoundCue = {
   soundIds: number[];
   /** Громкость плеера 0…1 (в тексте «80%»). */
   volume?: number;
-  /** @deprecated Старые строки; в новых кадрах не записываем. */
   fadeMs?: number;
 };
 

@@ -19,16 +19,26 @@ type OutboxPayload =
       projectSlug: string;
       sceneName: string;
       sceneTitle?: string;
-      rawJsonDelta: any; // legacy name: contains scene-level deltas (no longer pushed as rawJson)
+      rawJsonDelta: any;
     }
   | {
-      kind: "stepUpsert";
+      kind: "sceneUpsert" | "stepUpsert";
       projectSlug: string;
       sceneName: string;
-      step: any;
+      scene?: any;
+      step?: any;
       order: number;
     }
-  | { kind: "stepDelete"; projectSlug: string; sceneName: string; stepId: number };
+  | {
+      kind: "sceneDelete" | "stepDelete";
+      projectSlug: string;
+      sceneName: string;
+      scriptSceneId: number;
+    };
+
+function outboxSceneRecord(payload: { scene?: any; step?: any }): any {
+  return payload.scene ?? payload.step;
+}
 
 function mergeSceneDelta(target: any, delta: any) {
   if (!delta || typeof delta !== "object") return;
@@ -68,13 +78,13 @@ export async function flushDesktopOutbox(
     string,
     { name: string; delta: any; outboxIds: string[] }
   >();
-  const stepUpserts: Array<{
+  const sceneUpserts: Array<{
     outboxId: string;
-    sceneId: string;
-    step: any;
+    playbookId: string;
+    scene: any;
     order: number;
   }> = [];
-  const stepDeletes: Array<{ outboxId: string; sceneId: string; stepId: number }> = [];
+  const sceneDeletes: Array<{ outboxId: string; playbookId: string; scriptSceneId: number }> = [];
 
   for (const item of res.items) {
     const outboxId = String(item?.id ?? "");
@@ -96,18 +106,18 @@ export async function flushDesktopOutbox(
       continue;
     }
 
-    if (payload.kind === "stepDelete") {
-      const sceneId = `${projectId}:${payload.sceneName}`;
-      stepDeletes.push({ outboxId, sceneId, stepId: payload.stepId });
+    if (payload.kind === "sceneDelete" || payload.kind === "stepDelete") {
+      const playbookId = `${projectId}:${payload.sceneName}`;
+      sceneDeletes.push({ outboxId, playbookId, scriptSceneId: payload.scriptSceneId });
       continue;
     }
 
-    if (payload.kind === "stepUpsert") {
-      const sceneId = `${projectId}:${payload.sceneName}`;
-      stepUpserts.push({
+    if (payload.kind === "sceneUpsert" || payload.kind === "stepUpsert") {
+      const playbookId = `${projectId}:${payload.sceneName}`;
+      sceneUpserts.push({
         outboxId,
-        sceneId,
-        step: payload.step,
+        playbookId,
+        scene: outboxSceneRecord(payload),
         order: payload.order,
       });
     }
@@ -130,7 +140,7 @@ export async function flushDesktopOutbox(
 
     changes.push({
       id: createId(),
-      entityType: "Scene",
+      entityType: "Playbook",
       entityId: sceneId,
       operation: "update",
       payload: scenePayload,
@@ -216,56 +226,57 @@ export async function flushDesktopOutbox(
     }
   }
 
-  for (const del of stepDeletes) {
-    const stepIdNum = Number(del.stepId);
-    if (!Number.isFinite(stepIdNum)) continue;
-    const stepId = Math.trunc(stepIdNum);
+  for (const del of sceneDeletes) {
+    const sceneIdNum = Number(del.scriptSceneId);
+    if (!Number.isFinite(sceneIdNum)) continue;
+    const scriptSceneId = Math.trunc(sceneIdNum);
     changes.push({
       id: createId(),
-      entityType: "Step",
-      entityId: `${del.sceneId}:${stepId}`,
+      entityType: "Scene",
+      entityId: `${del.playbookId}:${scriptSceneId}`,
       operation: "delete",
-      payload: { id: `${del.sceneId}:${stepId}`, updatedAt: nowIso },
+      payload: { id: `${del.playbookId}:${scriptSceneId}`, updatedAt: nowIso },
       createdAt: nowIso,
     });
   }
 
-  for (const up of stepUpserts) {
-    const stepIdNum = Number((up.step as { id?: unknown } | null | undefined)?.id);
-    if (!Number.isFinite(stepIdNum)) continue;
-    const stepId = Math.trunc(stepIdNum);
-    const stepKey = `${up.sceneId}:${stepId}`;
+  for (const up of sceneUpserts) {
+    const sceneIdNum = Number((up.scene as { id?: unknown } | null | undefined)?.id);
+    if (!Number.isFinite(sceneIdNum)) continue;
+    const sourceSceneId = Math.trunc(sceneIdNum);
+    const sceneEntityKey = `${up.playbookId}:${sourceSceneId}`;
+    const scene = up.scene;
     changes.push({
       id: createId(),
-      entityType: "Step",
-      entityId: stepKey,
+      entityType: "Scene",
+      entityId: sceneEntityKey,
       operation: "update",
       payload: {
-        id: stepKey,
-        sceneId: up.sceneId,
-        sourceId: stepId,
-        title: String(up.step?.title ?? "").trim() || `Step ${stepId}`,
-        markdown: typeof up.step?.markdown === "string" ? up.step.markdown : "",
+        id: sceneEntityKey,
+        playbookId: up.playbookId,
+        sourceId: sourceSceneId,
+        title: String(scene?.title ?? "").trim() || `Сцена ${sourceSceneId}`,
+        markdown: typeof scene?.markdown === "string" ? scene.markdown : "",
         playMarkdown:
-          typeof up.step?.playMarkdown === "string" ? up.step.playMarkdown : null,
+          typeof scene?.playMarkdown === "string" ? scene.playMarkdown : null,
         explicationMarkdown:
-          typeof up.step?.explicationMarkdown === "string"
-            ? up.step.explicationMarkdown
+          typeof scene?.explicationMarkdown === "string"
+            ? scene.explicationMarkdown
             : null,
         durationMin:
-          typeof up.step?.durationMin === "number" ? up.step.durationMin : null,
+          typeof scene?.durationMin === "number" ? scene.durationMin : null,
         kanbanStatus:
-          typeof up.step?.kanbanStatus === "string" ? up.step.kanbanStatus : null,
+          typeof scene?.kanbanStatus === "string" ? scene.kanbanStatus : null,
         kanbanOrder:
-          typeof up.step?.kanbanOrder === "number" ? up.step.kanbanOrder : null,
+          typeof scene?.kanbanOrder === "number" ? scene.kanbanOrder : null,
         order: up.order,
-        requisites: Array.isArray(up.step?.requisites) ? up.step.requisites : [],
-        lightPlot: Array.isArray(up.step?.lightPlot) ? up.step.lightPlot : [],
-        lightCues: Array.isArray(up.step?.lightCues) ? up.step.lightCues : [],
-        lightKadrs: up.step?.lightKadrs ?? null,
-        theaterModels: Array.isArray(up.step?.theaterModels) ? up.step.theaterModels : [],
-        theaterSpotlights: Array.isArray(up.step?.theaterSpotlights)
-          ? up.step.theaterSpotlights.map((sp: TheaterSpotlight) =>
+        requisites: Array.isArray(scene?.requisites) ? scene.requisites : [],
+        lightPlot: Array.isArray(scene?.lightPlot) ? scene.lightPlot : [],
+        lightCues: Array.isArray(scene?.lightCues) ? scene.lightCues : [],
+        lightKadrs: scene?.lightKadrs ?? null,
+        theaterModels: Array.isArray(scene?.theaterModels) ? scene.theaterModels : [],
+        theaterSpotlights: Array.isArray(scene?.theaterSpotlights)
+          ? scene.theaterSpotlights.map((sp: TheaterSpotlight) =>
               mapTheaterSpotlightToSync(sp),
             )
           : [],
@@ -290,8 +301,8 @@ export async function flushDesktopOutbox(
   const ackIds = Array.from(
     new Set([
       ...Array.from(sceneDeltaBySceneId.values()).flatMap((x) => x.outboxIds),
-      ...stepUpserts.map((x) => x.outboxId),
-      ...stepDeletes.map((x) => x.outboxId),
+      ...sceneUpserts.map((x) => x.outboxId),
+      ...sceneDeletes.map((x) => x.outboxId),
     ]),
   );
   await api.outboxAck(ackIds);

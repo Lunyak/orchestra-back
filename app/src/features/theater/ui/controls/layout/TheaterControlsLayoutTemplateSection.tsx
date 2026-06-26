@@ -22,27 +22,27 @@ export function TheaterControlsLayoutTemplateSection({ vm, layout }: LayoutSecti
                 vm.applyHallTemplate(nextValue);
                 setHallTemplatePick("");
               }}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               placeholder="Применить шаблон…"
             />
             <div className="theater-btn-row theater-btn-row--3">
               <TheaterBtn
                 onClick={vm.exportFloorPlanSvg}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="SVG"
               >
                 SVG
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => void vm.exportFloorPlanPng()}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="PNG"
               >
                 PNG
               </TheaterBtn>
               <TheaterBtn
                 onClick={vm.exportFloorPlanPdf}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="Печать / PDF"
               >
                 PDF
@@ -50,7 +50,7 @@ export function TheaterControlsLayoutTemplateSection({ vm, layout }: LayoutSecti
             </div>
             <TheaterBtn
               onClick={() => void vm.copyFloorPlanToClipboard()}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Скопировать план в буфер обмена как PNG"
             >
               План в буфер

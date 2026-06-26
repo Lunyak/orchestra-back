@@ -8,9 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { RolesService } from '../roles/roles.service';
+import { extractRoleKeysFromSceneRoles } from '../playbook/scene-roles-data';
 import { UpsertMyDirectorSessionCommentDto } from './dto/upsert-my-director-session-comment.dto';
 
-type DirectorSlotRef = { projectSlug: string; stepId: number };
+type DirectorSlotRef = { projectSlug: string; sceneId: number };
 type DirectorSlotRoleRehearsalPick = {
   roleKey: string;
   email: string;
@@ -55,28 +56,11 @@ type DirectorRehearsalSession = {
   publishedAt?: string | null;
 };
 
-type RawStepLike = {
+type RawSceneLike = {
   id?: number;
   title?: string;
   markdown?: string;
   playMarkdown?: string;
-};
-
-type SceneRoleLinkV1 = {
-  roleId: string;
-  roleKey?: string;
-  roleTitle?: string;
-  note?: string;
-  createdAtIso?: string;
-  updatedAtIso?: string;
-};
-
-type SceneRolesDataV1 = {
-  v: 1;
-  byStepId: Record<
-    string,
-    Record<string, SceneRoleLinkV1 | undefined> | undefined
-  >;
 };
 
 const DEFAULT_TZ = 'Europe/Moscow';
@@ -279,30 +263,6 @@ function normalizeRoleAssignmentsIndex(
     if (actors.length) map.set(key, Array.from(new Set(actors)));
   }
   return map;
-}
-
-function extractRoleKeysFromSceneRoles(
-  sceneRoles: any,
-  stepId: number,
-): string[] {
-  const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
-  if (!sr || typeof sr !== 'object' || (sr as any).v !== 1) return [];
-  const byStepId = (sr as any).byStepId;
-  if (!byStepId || typeof byStepId !== 'object') return [];
-  const stepMap = byStepId[String(stepId)];
-  if (!stepMap || typeof stepMap !== 'object') return [];
-  const out: string[] = [];
-  for (const it of Object.values(stepMap as Record<string, any>)) {
-    if (!it || typeof it !== 'object') continue;
-    const key =
-      typeof it.roleKey === 'string' && it.roleKey.trim()
-        ? normalizeRoleKey(it.roleKey)
-        : typeof it.roleTitle === 'string' && it.roleTitle.trim()
-          ? normalizeRoleKey(it.roleTitle)
-          : null;
-    if (key) out.push(key);
-  }
-  return Array.from(new Set(out)).filter(Boolean);
 }
 
 @Injectable()
@@ -715,19 +675,19 @@ export class DirectorSessionsService {
   }
 
   private async loadProjectScriptData(projectId: string) {
-    const sceneId = `${projectId}:script`;
-    const scene =
-      (await this.prisma.scene.findUnique({
-        where: { id: sceneId },
+    const playbookId = `${projectId}:script`;
+    const playbook =
+      (await this.prisma.playbook.findUnique({
+        where: { id: playbookId },
         select: { id: true, sceneRoles: true },
       })) ??
-      (await this.prisma.scene.findFirst({
+      (await this.prisma.playbook.findFirst({
         where: { projectId, deletedAt: null },
         select: { id: true, sceneRoles: true },
       }));
 
-    const stepRows = await this.prisma.step.findMany({
-      where: { sceneId: scene?.id ?? sceneId, deletedAt: null },
+    const sceneRows = await this.prisma.scene.findMany({
+      where: { playbookId: playbook?.id ?? playbookId, deletedAt: null },
       select: {
         sourceId: true,
         title: true,
@@ -737,14 +697,14 @@ export class DirectorSessionsService {
       },
       orderBy: { order: 'asc' },
     });
-    const steps: RawStepLike[] = stepRows.map((st) => ({
+    const scenes: RawSceneLike[] = sceneRows.map((st) => ({
       id: st.sourceId,
       title: st.title,
       markdown: st.markdown ?? undefined,
       playMarkdown: st.playMarkdown ?? undefined,
     }));
 
-    return { steps, sceneRoles: (scene as any)?.sceneRoles ?? null };
+    return { scenes, sceneRoles: (playbook as any)?.sceneRoles ?? null };
   }
 
   /**
@@ -903,24 +863,25 @@ export class DirectorSessionsService {
 
     for (const slug of slugs) {
       const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
-      const { steps, sceneRoles } = await this.loadProjectScriptData(project.id);
-      const stepById = new Map<number, RawStepLike>();
-      steps.forEach((st) => {
-        if (typeof st?.id === 'number') stepById.set(st.id, st);
+      const { scenes, sceneRoles } = await this.loadProjectScriptData(project.id);
+      const sceneById = new Map<number, RawSceneLike>();
+      scenes.forEach((st) => {
+        if (typeof st?.id === 'number') sceneById.set(st.id, st);
       });
 
       const slotRefs = refs.filter((r) => r.projectSlug === slug);
       for (const ref of slotRefs) {
-        const step = stepById.get(ref.stepId);
+        const scene = sceneById.get(ref.sceneId);
         const attachedKeys = extractRoleKeysFromSceneRoles(
           sceneRoles,
-          ref.stepId,
+          ref.sceneId,
+          normalizeRoleKey,
         );
         const roleKeys =
           attachedKeys.length > 0
             ? attachedKeys
             : extractRolesSmart(
-                String(step?.playMarkdown ?? step?.markdown ?? ''),
+                String(scene?.playMarkdown ?? scene?.markdown ?? ''),
               )
                 .map((r) => normalizeRoleKey(r))
                 .filter(Boolean);
@@ -1202,7 +1163,7 @@ export class DirectorSessionsService {
       Boolean,
     );
     const projectBySlug = new Map<string, { id: string; slug: string }>();
-    const stepsBySlug = new Map<string, Map<number, RawStepLike>>();
+    const scenesBySlug = new Map<string, Map<number, RawSceneLike>>();
 
     for (const slug of slugs) {
       const project = await this.prisma.project.findFirst({
@@ -1211,12 +1172,12 @@ export class DirectorSessionsService {
       });
       if (!project) continue;
       projectBySlug.set(slug, project);
-      const { steps } = await this.loadProjectScriptData(project.id);
-      const map = new Map<number, RawStepLike>();
-      steps.forEach((st) => {
+      const { scenes } = await this.loadProjectScriptData(project.id);
+      const map = new Map<number, RawSceneLike>();
+      scenes.forEach((st) => {
         if (typeof st?.id === 'number') map.set(st.id, st);
       });
-      stepsBySlug.set(slug, map);
+      scenesBySlug.set(slug, map);
     }
 
     // local time labels (HH:MM) based on session.startsAt + offsetMin
@@ -1244,17 +1205,17 @@ export class DirectorSessionsService {
           timeStart,
           timeEnd,
           projectSlug: null,
-          stepId: null,
-          stepTitle: null,
+          sceneId: null,
+          sceneTitle: null,
         };
-      const step = stepsBySlug.get(ref.projectSlug)?.get(ref.stepId);
+      const scene = scenesBySlug.get(ref.projectSlug)?.get(ref.sceneId);
       return {
         ...sl,
         timeStart,
         timeEnd,
         projectSlug: ref.projectSlug,
-        stepId: ref.stepId,
-        stepTitle: step?.title ?? null,
+        sceneId: ref.sceneId,
+        sceneTitle: scene?.title ?? null,
       };
     });
 

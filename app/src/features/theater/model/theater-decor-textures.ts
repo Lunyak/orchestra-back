@@ -288,13 +288,3 @@ export function resolveDecorTextureMapping(
     clamp: true,
   };
 }
-
-/** @deprecated используйте resolveDecorTextureMapping */
-export function resolveDecorTextureRepeat(
-  model: { decorTextureRepeat?: number; decorSize?: [number, number, number] },
-  surfaceWidth: number,
-  surfaceHeight: number,
-): [number, number] {
-  const mapping = resolveDecorTextureMapping(model, surfaceWidth, surfaceHeight, 1);
-  return [mapping.repeatU, mapping.repeatV];
-}

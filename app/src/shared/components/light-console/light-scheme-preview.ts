@@ -1,10 +1,10 @@
 import type {
-  SceneLightChannelRolesV1,
-  SceneLightFaderV1,
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../../features/scene/model/scene-slice";
-import type { LightFixture, StepLightKadrV1 } from "../../types/script";
+  PlaybookLightChannelRolesV1,
+  PlaybookLightFaderV1,
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../../features/playbook/model/playbook-slice";
+import type { LightFixture, SceneLightKadrV1 } from "../../types/script";
 import { parseLightChannel, resolveLightColor } from "../show-script/utils/lightTokens";
 import { parseLightChannelSlot } from "../../../features/theater/model/theater-light-channel-link";
 import { buildLightConsoleSplitModel, type LightFaderBoardRow } from "./light-console-split";
@@ -42,13 +42,13 @@ export type LightSchemeLookModel = {
   fixtureStates: Map<number, FixtureLookState>;
 };
 
-function readFaderChannel(fader: SceneLightFaderV1): number {
+function readFaderChannel(fader: PlaybookLightFaderV1): number {
   return fader.channel ?? fader.links?.[0]?.channel ?? fader.id;
 }
 
 function readFaderLevel(
-  fader: SceneLightFaderV1,
-  kadrStates: StepLightKadrV1["faders"] | undefined,
+  fader: PlaybookLightFaderV1,
+  kadrStates: SceneLightKadrV1["faders"] | undefined,
 ): number {
   const state = kadrStates?.find((item) => item.faderId === fader.id);
   const intensity =
@@ -62,15 +62,15 @@ function readFaderLevel(
   return Math.min(1, Math.max(0, intensity));
 }
 
-function faderLinkedToFixture(fader: SceneLightFaderV1, fixtureId: number): boolean {
+function faderLinkedToFixture(fader: PlaybookLightFaderV1, fixtureId: number): boolean {
   if (fader.spotlightId === fixtureId) return true;
   return (fader.links ?? []).some((link) => link.spotlightId === fixtureId);
 }
 
 function resolveFixtureFader(
   fixture: LightFixture,
-  faders: SceneLightFaderV1[],
-): SceneLightFaderV1 | null {
+  faders: PlaybookLightFaderV1[],
+): PlaybookLightFaderV1 | null {
   const direct = faders.find((fader) => faderLinkedToFixture(fader, fixture.id));
   if (direct) return direct;
 
@@ -90,13 +90,13 @@ function channelLabel(lightChannels: string[], channel: number): string {
 }
 
 export function buildLightSchemeLookModel(args: {
-  kadr: StepLightKadrV1;
+  kadr: SceneLightKadrV1;
   sectionTitle?: string;
   lightPlot: LightFixture[];
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1;
-  lightPrograms: SceneLightProgramsDataV1 | null;
-  lightChannelRoles: SceneLightChannelRolesV1 | null;
+  lightFaders: PlaybookLightFadersDataV1;
+  lightPrograms: PlaybookLightProgramsDataV1 | null;
+  lightChannelRoles: PlaybookLightChannelRolesV1 | null;
 }): LightSchemeLookModel {
   const roles = resolveLightChannelRoles(args.lightChannelRoles, args.lightChannels.length);
   const sofitChannels = resolveSofitChannelsForKadrDisplay({

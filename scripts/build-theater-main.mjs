@@ -32,7 +32,7 @@ import * as THREE from "three";
 import { useScene } from "../../scene";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import {
-  ScriptStep,
+  ScriptScene,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,

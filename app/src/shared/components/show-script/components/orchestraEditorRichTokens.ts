@@ -16,6 +16,7 @@ import {
 } from "@codemirror/view";
 import { getPlayUrl, fetchImageStreamBlobUrl } from "../../../../sync/api/files";
 import { decodeOrchestraImageStorageKey } from "../../../utils/markdownImages";
+import { SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE } from "../../../settings/scriptPlayFontSize";
 import {
   formatSpeakerLabelDisplay,
   getReadableTextColor,
@@ -201,6 +202,7 @@ function resolveChip(
   full: string,
   m: RegExpExecArray,
   lightChannels: string[],
+  playTextMode: boolean,
 ): ChipSpec | null {
   if (m[7]) {
     const altM = /!\[([^\]]*)\]\(\s*orchestra-image:/.exec(full);
@@ -218,8 +220,11 @@ function resolveChip(
     const text = formatSpeakerLabelDisplay(normalized);
     return {
       label: text,
-      classNames: "markdown-speaker-label",
+      classNames: playTextMode
+        ? "markdown-speaker-label markdown-speaker-label--play"
+        : "markdown-speaker-label",
       title: normalized,
+      style: playTextMode ? SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE : undefined,
     };
   }
 
@@ -550,8 +555,10 @@ function buildRichDecorations(
   lightChannels: string[],
   getOnTrackLinkClick: () => ((trackId: number) => void) | undefined,
   getImageCtx: () => EditorImageCtx,
+  getPlayTextMode: () => boolean,
   view: EditorView,
 ): { decorations: DecorationSet; hiddenAtomic: DecorationSet } {
+  const playTextMode = getPlayTextMode();
   const sel = state.selection.main;
   const b = new RangeSetBuilder<Decoration>();
   const hiddenB = new RangeSetBuilder<Decoration>();
@@ -603,7 +610,7 @@ function buildRichDecorations(
           continue;
         }
       }
-      const spec = resolveChip(m[0], m, lightChannels);
+      const spec = resolveChip(m[0], m, lightChannels, playTextMode);
       if (!spec) continue;
       if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
       pushHidden(from, to);
@@ -715,6 +722,7 @@ export function orchestraEditorRichTokens(
   getLightChannels: () => string[],
   getOnTrackLinkClick: () => ((trackId: number) => void) | undefined,
   getImageCtx: () => EditorImageCtx,
+  getPlayTextMode: () => boolean,
 ): Extension {
   const plugin = ViewPlugin.fromClass(
     class {
@@ -722,6 +730,7 @@ export function orchestraEditorRichTokens(
       hiddenAtomic: DecorationSet = Decoration.none;
       lastChannelStamp = "";
       lastImageCtxStamp = "";
+      lastPlayTextMode = getPlayTextMode();
       constructor(readonly view: EditorView) {
         const ch = getLightChannels();
         this.lastChannelStamp = ch.join("\n");
@@ -734,6 +743,7 @@ export function orchestraEditorRichTokens(
           ch,
           getOnTrackLinkClick,
           getImageCtx,
+          getPlayTextMode,
           this.view,
         );
         this.decorations = built.decorations;
@@ -743,15 +753,18 @@ export function orchestraEditorRichTokens(
         const ch = getLightChannels();
         const stamp = ch.join("\n");
         const iStamp = editorImageCtxStamp(getImageCtx());
+        const playTextMode = getPlayTextMode();
         if (
           u.docChanged ||
           u.selectionSet ||
           u.viewportChanged ||
           stamp !== this.lastChannelStamp ||
-          iStamp !== this.lastImageCtxStamp
+          iStamp !== this.lastImageCtxStamp ||
+          playTextMode !== this.lastPlayTextMode
         ) {
           this.lastChannelStamp = stamp;
           this.lastImageCtxStamp = iStamp;
+          this.lastPlayTextMode = playTextMode;
           this.applyBuild(u.state, ch);
         }
         if (

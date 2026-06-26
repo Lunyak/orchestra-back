@@ -29,4 +29,4 @@ export { useTheaterHallLayout } from "./state/use-theater-hall-layout";
 export { useTheaterFloorPlan } from "./state/use-theater-floor-plan";
 export { useTheaterCameraBookmarks } from "./state/use-theater-camera-bookmarks";
 export { useTheaterKeyboardBindings } from "./state/use-theater-keyboard-bindings";
-export { useStageGridHighlight } from "./scene/use-stage-grid-highlight";
+export { useStageGridHighlight } from "./playbook-stage/use-stage-grid-highlight";

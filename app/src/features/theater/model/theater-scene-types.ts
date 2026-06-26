@@ -7,10 +7,6 @@ export type TheaterSceneProps = {
   onTheaterLayoutChange?: Dispatch<SetStateAction<TheaterLayout>>;
   isPanelsSwapped?: boolean;
   onTogglePanels?: () => void;
-  /** @deprecated настройки в верхней панели и правом сайдбаре */
-  controlsHost?: HTMLElement | null;
-  /** @deprecated use outlinerHost */
-  mainControlsHost?: HTMLElement | null;
   /** Правый сайдбар: outliner + свойства */
   outlinerHost?: HTMLElement | null;
   controlsInPanel?: boolean;

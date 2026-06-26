@@ -8,7 +8,7 @@ import {
 } from "react";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopAddProjectImage } from "../../../shared/platform/desktop-methods";
-import type { ScriptStep, TheaterLayout, TheaterModel } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterModel } from "../../../shared/types/script";
 import {
   getDecorCatalogEntry,
   isTheaterDecorModel,
@@ -45,19 +45,19 @@ import {
 } from "../model/theater-decor-textures";
 import { buildDecorGridPositions } from "../model/theater-decor-grid";
 import {
-  readStepTheaterModels,
-  writeStepTheaterModels,
-} from "../model/theater-step-models";
+  readSceneTheaterModels,
+  writeSceneTheaterModels,
+} from "../model/theater-scene-models";
 import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterDecorArgs = {
   projectName: string;
   currentPage: number;
-  currentStep: ScriptStep | undefined;
-  steps: ScriptStep[];
-  updateStep: (stepId: number, patch: Partial<ScriptStep>) => void;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  currentScene: ScriptScene | undefined;
+  scenes: ScriptScene[];
+  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   layout: TheaterLayout;
   gridStep: number;
   snapToGrid: boolean;
@@ -75,10 +75,10 @@ export type UseTheaterDecorArgs = {
 export function useTheaterDecor({
   projectName,
   currentPage,
-  currentStep,
-  steps,
-  updateStep,
-  updateCurrentStep,
+  currentScene,
+  scenes,
+  updateScene,
+  updateCurrentScene,
   layout,
   gridStep,
   snapToGrid,
@@ -123,7 +123,7 @@ export function useTheaterDecor({
 
     const addDecorAt = useCallback(
       (position: [number, number, number]) => {
-        if (!currentStep) return;
+        if (!currentScene) return;
         const preset = getDecorCatalogEntry(decorCatalogKey);
         const size = resolveDecorDraftSize();
         const gridPositions = buildDecorGridPositions(position, {
@@ -159,7 +159,7 @@ export function useTheaterDecor({
         setEditMode("decor");
       },
       [
-      currentStep,
+      currentScene,
       decorCatalogKey,
         decorDraftTexture,
         decorDraftTextureMode,
@@ -178,9 +178,9 @@ export function useTheaterDecor({
 
     const enterDecorPlaceMode = useCallback(() => {
       setDecorPlaceMode(true);
-      updateCurrentStep({ theaterActiveModelId: undefined });
+      updateCurrentScene({ theaterActiveModelId: undefined });
       setEditMode("decor");
-    }, [updateCurrentStep]);
+    }, [updateCurrentScene]);
 
     const exitDecorPlaceMode = useCallback(() => {
       setDecorPlaceMode(false);
@@ -307,32 +307,32 @@ export function useTheaterDecor({
 
     const applyDecorSceneTemplate = useCallback(
       (templateId: DecorSceneTemplateId) => {
-        if (!currentStep) return;
+        if (!currentScene) return;
         const startId = models.reduce((acc, item) => Math.max(acc, item.id), 0);
         const sketch = buildDecorSceneTemplate(templateId, layout, startId);
         if (sketch.length === 0) return;
         updateModels([...models, ...sketch]);
         const lastId = sketch[sketch.length - 1]?.id;
         if (lastId != null) {
-          updateCurrentStep({ theaterActiveModelId: lastId });
+          updateCurrentScene({ theaterActiveModelId: lastId });
         }
         setDecorPlaceMode(false);
         setEditMode("decor");
         setActiveTab("decor");
       },
-      [currentStep, layout, models, updateCurrentStep, updateModels],
+      [currentScene, layout, models, updateCurrentScene, updateModels],
     );
 
     const replaceDecorSceneTemplate = useCallback(
       (templateId: DecorSceneTemplateId) => {
-        if (!currentStep) return;
+        if (!currentScene) return;
         const kept = models.filter((item) => !isTheaterDecorModel(item));
         const startId = kept.reduce((acc, item) => Math.max(acc, item.id), 0);
         const sketch = buildDecorSceneTemplate(templateId, layout, startId);
         updateModels([...kept, ...sketch]);
         const lastId = sketch[sketch.length - 1]?.id;
         if (lastId != null) {
-          updateCurrentStep({ theaterActiveModelId: lastId });
+          updateCurrentScene({ theaterActiveModelId: lastId });
         }
         const label =
           DECOR_SCENE_TEMPLATES.find((item) => item.id === templateId)?.label ??
@@ -342,31 +342,31 @@ export function useTheaterDecor({
         setActiveTab("decor");
         setDecorActionMessage(`Декор заменён шаблоном «${label}»`);
       },
-      [currentStep, layout, models, updateCurrentStep, updateModels],
+      [currentScene, layout, models, updateCurrentScene, updateModels],
     );
 
     const applyDecorTemplateJson = useCallback(
       (template: DecorTemplateJson) => {
-        if (!currentStep) return;
+        if (!currentScene) return;
         const startId = models.reduce((acc, item) => Math.max(acc, item.id), 0);
         const sketch = buildModelsFromDecorTemplateJson(template, layout, startId);
         if (sketch.length === 0) return;
         updateModels([...models, ...sketch]);
         const lastId = sketch[sketch.length - 1]?.id;
         if (lastId != null) {
-          updateCurrentStep({ theaterActiveModelId: lastId });
+          updateCurrentScene({ theaterActiveModelId: lastId });
         }
         setDecorPlaceMode(false);
         setEditMode("decor");
         setActiveTab("decor");
       },
-      [currentStep, layout, models, updateCurrentStep, updateModels],
+      [currentScene, layout, models, updateCurrentScene, updateModels],
     );
 
     const copyDecorInventoryToClipboard = useCallback(async () => {
       const text = formatDecorInventoryMarkdown(
         models,
-        currentStep?.title?.trim() || undefined,
+        currentScene?.title?.trim() || undefined,
       );
       try {
         await navigator.clipboard.writeText(text);
@@ -374,28 +374,28 @@ export function useTheaterDecor({
       } catch {
         setDecorActionMessage("Не удалось скопировать в буфер");
       }
-    }, [currentStep?.title, models]);
+    }, [currentScene?.title, models]);
 
     const exportDecorInventoryCsv = useCallback(() => {
-      const title = currentStep?.title?.trim() || "decor-inventory";
+      const title = currentScene?.title?.trim() || "decor-inventory";
       downloadDecorInventoryCsv(models, title, `${title}.csv`);
       setDecorActionMessage("CSV реквизита сохранён");
-    }, [currentStep?.title, models]);
+    }, [currentScene?.title, models]);
 
     const syncDecorInventoryToRequisites = useCallback(() => {
-      if (!currentStep) return;
+      if (!currentScene) return;
       const labels = decorInventoryToRequisiteLabels(models);
       if (labels.length === 0) {
         setDecorActionMessage("На сцене нет декора");
         return;
       }
-      const next = mergeDecorIntoRequisites(currentStep.requisites ?? [], labels);
-      updateStep(currentStep.id, { requisites: next });
-      const added = next.length - (currentStep.requisites?.length ?? 0);
+      const next = mergeDecorIntoRequisites(currentScene.requisites ?? [], labels);
+      updateScene(currentScene.id, { requisites: next });
+      const added = next.length - (currentScene.requisites?.length ?? 0);
       setDecorActionMessage(
         added > 0 ? `Добавлено в реквизит: ${added}` : "Новых позиций нет",
       );
-    }, [currentStep, models, updateStep]);
+    }, [currentScene, models, updateScene]);
 
     const importDecorTemplateFromJson = useCallback(
       (raw: unknown, persist = true) => {
@@ -416,16 +416,16 @@ export function useTheaterDecor({
     );
 
     const exportCurrentDecorAsJsonTemplate = useCallback(() => {
-      const stepTitle = currentStep?.title?.trim() || "step";
-      const slug = stepTitle
+      const sceneTitle = currentScene?.title?.trim() || "Сцена";
+      const slug = sceneTitle
         .toLowerCase()
         .replace(/[^a-z0-9а-яё]+/gi, "-")
         .replace(/^-+|-+$/g, "")
         .slice(0, 40);
       const template = exportDecorModelsToTemplateJson(models, layout, {
         id: slug || "decor-scene",
-        label: stepTitle,
-        description: "Экспорт текущего декора шага",
+        label: sceneTitle,
+        description: "Экспорт текущего декора сцены",
       });
       if (template.items.length === 0) {
         setDecorActionMessage("На сцене нет декора для экспорта");
@@ -433,7 +433,7 @@ export function useTheaterDecor({
       }
       downloadDecorTemplateJson(template);
       setDecorActionMessage("JSON шаблон сохранён");
-    }, [currentStep?.title, layout, models]);
+    }, [currentScene?.title, layout, models]);
 
     const decorTemplateList = useMemo((): DecorTemplateListItem[] => {
       const builtin: DecorTemplateListItem[] = DECOR_SCENE_TEMPLATES.map(
@@ -518,16 +518,16 @@ export function useTheaterDecor({
       applyDecorSceneTemplate("basic");
     }, [applyDecorSceneTemplate]);
 
-    const copyDecorToNextStep = useCallback(() => {
-      if (!currentStep || currentPage >= steps.length - 1) return;
-      const nextStep = steps[currentPage + 1];
-      if (!nextStep) return;
+    const copyDecorToNextScene = useCallback(() => {
+      if (!currentScene || currentPage >= scenes.length - 1) return;
+      const nextScene = scenes[currentPage + 1];
+      if (!nextScene) return;
       const decorItems = models.filter(isTheaterDecorModel);
       if (decorItems.length === 0) {
         setDecorActionMessage("Нет декора для копирования");
         return;
       }
-      const existing = readStepTheaterModels(nextStep);
+      const existing = readSceneTheaterModels(nextScene);
       let nextId = existing.reduce((acc, item) => Math.max(acc, item.id), 0);
       const copies = decorItems.map((item) => {
         nextId += 1;
@@ -542,11 +542,11 @@ export function useTheaterDecor({
           ] as [number, number, number],
         };
       });
-      updateStep(nextStep.id, writeStepTheaterModels([...existing, ...copies]));
+      updateScene(nextScene.id, writeSceneTheaterModels([...existing, ...copies]));
       setDecorActionMessage(
-        `Декор скопирован на шаг «${nextStep.title}» (${copies.length})`,
+        `Декор скопирован на сцену «${nextScene.title}» (${copies.length})`,
       );
-    }, [currentPage, currentStep, models, steps, updateStep]);
+    }, [currentPage, currentScene, models, scenes, updateScene]);
 
     const saveDecorTemplatesToProject = useCallback(async () => {
       const result = await persistStoredDecorTemplatesToProject(projectName);
@@ -598,7 +598,7 @@ export function useTheaterDecor({
     decorTemplateList,
     applyDecorTemplateByListId,
     applyDecorSketchTemplate,
-    copyDecorToNextStep,
+    copyDecorToNextScene,
     saveDecorTemplatesToProject,
     setDecorDraftTextureRepeat,
   };

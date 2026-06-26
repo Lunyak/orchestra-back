@@ -61,7 +61,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                     item.id === vm.activeSpotlightId ||
                     vm.multiSelectedSpotlightIds.includes(item.id)
                   }
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   placeholder={`Софит ${item.id}`}
                   onSelect={(shiftKey) => vm.selectTheaterSpotlight(item.id, shiftKey)}
                   onLabelCommit={(label) => vm.updateSpotlight(item.id, { label })}
@@ -79,7 +79,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                         spot.bindSpotlightToFader(faderId, item.id, nextChannel);
                       }
                     }}
-                    disabled={!vm.currentStep}
+                    disabled={!vm.currentScene}
                     className="native-text-input theater-channel-input theater-channel-input--channel"
                   />
                 </label>
@@ -91,7 +91,7 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                         ? String(readSpotlightFaderId(item))
                         : ""
                     }
-                    disabled={!vm.currentStep}
+                    disabled={!vm.currentScene}
                     onChange={(event) => {
                       const raw = event.target.value.trim();
                       if (!raw) {
@@ -128,14 +128,14 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                       enabled: !(item.enabled ?? true),
                     })
                   }
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   title={item.enabled === false ? "Включить" : "Выключить"}
                 >
                   <span className="theater-spotlight-power-dot" />
                 </TheaterBtn>
                 <TheaterBtn
                   className="theater-btn--danger"
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   title="Удалить софит"
                   onClick={() => vm.removeSpotlight(item.id)}
                 >
@@ -148,18 +148,18 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
             )}
             </div>
             <div className="theater-btn-row">
-              <TheaterBtn onClick={vm.addSpotlight} disabled={!vm.currentStep}>
+              <TheaterBtn onClick={vm.addSpotlight} disabled={!vm.currentScene}>
                 + Софит
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.enableSpotlightsByType(false)}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               >
                 Вкл все
               </TheaterBtn>
               <TheaterBtn
                 onClick={() => vm.disableSpotlightsByType(false)}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               >
                 Выкл все
               </TheaterBtn>
@@ -178,17 +178,17 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
                       Math.max(1, Math.min(64, Number(event.target.value) || 1)),
                     )
                   }
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                 />
               </TheaterField>
               <TheaterBtn
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 onClick={() => vm.addSpotlightsBatch(spotlightBatchCount, 3)}
               >
                 +{spotlightBatchCount}×3
               </TheaterBtn>
               <TheaterBtn
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 onClick={() => vm.addSpotlightsBatch(spotlightBatchCount, 4)}
               >
                 +{spotlightBatchCount}×4

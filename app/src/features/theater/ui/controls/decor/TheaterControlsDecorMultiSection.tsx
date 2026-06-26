@@ -40,40 +40,40 @@ export function TheaterControlsDecorMultiSection({ vm, decor }: DecorSectionProp
               defaultOpen
             >
               <div className="theater-btn-row theater-btn-row--3">
-                <TheaterBtn disabled={!vm.currentStep} onClick={() => vm.alignSelectedModels("z")}>
+                <TheaterBtn disabled={!vm.currentScene} onClick={() => vm.alignSelectedModels("z")}>
                   Выровнять Z
                 </TheaterBtn>
-                <TheaterBtn disabled={!vm.currentStep} onClick={() => vm.alignSelectedModels("x")}>
+                <TheaterBtn disabled={!vm.currentScene} onClick={() => vm.alignSelectedModels("x")}>
                   Выровнять X
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep || vm.multiSelectedModelIds.length < 3}
+                  disabled={!vm.currentScene || vm.multiSelectedModelIds.length < 3}
                   onClick={() => vm.distributeSelectedModels("z")}
                 >
                   Разнести Z
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep || vm.multiSelectedModelIds.length < 3}
+                  disabled={!vm.currentScene || vm.multiSelectedModelIds.length < 3}
                   onClick={() => vm.distributeSelectedModels("x")}
                 >
                   Разнести X
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={() => vm.setSelectedModelsVisibility(true)}
                 >
                   Скрыть выбранные
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={() => vm.setSelectedModelsVisibility(false)}
                 >
                   Показать выбранные
                 </TheaterBtn>
-                <TheaterBtn disabled={!vm.currentStep} onClick={vm.removeSelectedModels}>
+                <TheaterBtn disabled={!vm.currentScene} onClick={vm.removeSelectedModels}>
                   Удалить выбранные
                 </TheaterBtn>
-                <TheaterBtn disabled={!vm.currentStep} onClick={vm.cloneSelectedModels}>
+                <TheaterBtn disabled={!vm.currentScene} onClick={vm.cloneSelectedModels}>
                   Клон
                 </TheaterBtn>
               </div>

@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth";
 import { useProject } from "../../project";
@@ -437,7 +438,7 @@ export function ChatDock() {
 
       {open ? (
         <section
-          className={`chat-dock-panel${expanded ? " chat-dock-panel--expanded" : ""}`}
+          className={cn("chat-dock-panel", expanded && "chat-dock-panel--expanded")}
           aria-label="Чат"
         >
           <header className="chat-dock-head">

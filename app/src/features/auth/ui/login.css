@@ -58,7 +58,7 @@
   pointer-events: none;
 }
 
-.login-form h1 {
+.login-form__title {
   position: relative;
   z-index: 1;
   margin: 0 0 6px;
@@ -78,6 +78,10 @@
   line-height: 1.45;
   color: var(--color-text-muted);
   max-width: 36ch;
+}
+
+.login-form-subtitle--tight-top {
+  margin-top: 8px;
 }
 
 .login-api-hint {
@@ -115,8 +119,7 @@
   padding: 2px 6px;
 }
 
-.login-form__label,
-.login-form label {
+.login-form__label {
   position: relative;
   z-index: 1;
   display: block;
@@ -128,8 +131,7 @@
   color: var(--color-text-muted);
 }
 
-.login-form__input,
-.login-form label input:not([type="checkbox"]) {
+.login-form__input {
   display: block;
   width: 100%;
   margin-top: 6px;
@@ -147,13 +149,11 @@
     box-shadow 0.12s ease;
 }
 
-.login-form__input::placeholder,
-.login-form label input:not([type="checkbox"])::placeholder {
+.login-form__input::placeholder {
   color: var(--color-text-dim);
 }
 
-.login-form__input:focus,
-.login-form label input:not([type="checkbox"]):focus {
+.login-form__input:focus {
   border-color: var(--login-accent);
   box-shadow:
     3px 3px 0 rgba(0, 0, 0, 0.26),
@@ -175,7 +175,7 @@
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.22);
 }
 
-.login-form button {
+.login-form__btn {
   position: relative;
   z-index: 1;
   width: 100%;
@@ -196,24 +196,24 @@
     color 0.12s ease;
 }
 
-.login-form button[type="submit"] {
+.login-form__btn--submit {
   border-left: 3px solid var(--login-accent);
   background: color-mix(in srgb, var(--login-accent) 88%, #0b0c10);
   color: var(--color-text-secondary);
 }
 
-.login-form button[type="submit"]:hover:not(:disabled) {
+.login-form__btn--submit:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.26);
   filter: brightness(1.05);
 }
 
-.login-form button[type="submit"]:active:not(:disabled) {
+.login-form__btn--submit:active:not(:disabled) {
   transform: translateY(1px);
   box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.24);
 }
 
-.login-form button[type="button"] {
+.login-form__btn--secondary {
   background: rgba(0, 0, 0, 0.16);
   color: var(--color-text-lighter);
   border-style: dashed;
@@ -223,14 +223,14 @@
   font-weight: 700;
 }
 
-.login-form button[type="button"]:hover:not(:disabled) {
+.login-form__btn--secondary:hover:not(:disabled) {
   border-color: var(--login-accent);
   border-style: solid;
   background: rgba(0, 0, 0, 0.28);
   color: var(--color-text-almost-white);
 }
 
-.login-form button:disabled {
+.login-form__btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
@@ -251,14 +251,14 @@
   font-size: 11px;
 }
 
-.login-form a {
+.login-form__link {
   color: var(--color-script-accent);
   font-weight: 700;
   text-decoration: none;
   border-bottom: 1px solid color-mix(in srgb, var(--color-script-accent) 45%, transparent);
 }
 
-.login-form a:hover {
+.login-form__link:hover {
   color: var(--color-text-lighter);
   border-bottom-color: var(--color-script-accent);
 }
@@ -287,7 +287,7 @@
     padding: 22px 18px 18px;
   }
 
-  .login-form h1 {
+  .login-form__title {
     font-size: 19px;
   }
 

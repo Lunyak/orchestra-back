@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { useScene } from "../../../features/scene";
+import { usePlaybook } from "../../../features/playbook";
 import type {
-  SceneLightFadersDataV1,
-  SceneLightProgramsDataV1,
-} from "../../../features/scene/model/scene-slice";
-import type { ScriptStep } from "../../types/script";
+  PlaybookLightFadersDataV1,
+  PlaybookLightProgramsDataV1,
+} from "../../../features/playbook/model/playbook-slice";
+import type { ScriptScene } from "../../types/script";
 import { parseLightChannel, resolveLightColor } from "../show-script/utils/lightTokens";
 import {
   applyKadrToFaders,
-  deleteKadrFromStepMarkdown,
+  deleteKadrFromSceneMarkdown,
   findKadrById,
   formatDeleteKadrConfirmMessage,
-  readStepLightKadrs,
+  readSceneLightKadrs,
   recordKadrToMarkdown,
   scanMarkdownKadrSections,
 } from "../../../features/theater/model/light-kadrs";
@@ -24,15 +24,15 @@ import { useLightConsoleState } from "./useLightConsoleState";
 
 export type LightKadrPanelProps = {
   projectName: string;
-  step: ScriptStep | null | undefined;
+  scene: ScriptScene | null | undefined;
   markdown: string;
   activeKadrId: string | null;
   onActiveKadrIdChange?: (id: string | null) => void;
   lightChannels: string[];
-  lightFaders: SceneLightFadersDataV1 | null;
-  lightPrograms: SceneLightProgramsDataV1 | null;
-  spotlights?: ScriptStep["theaterSpotlights"];
-  onUpdateStep: (changes: Partial<ScriptStep>) => void;
+  lightFaders: PlaybookLightFadersDataV1 | null;
+  lightPrograms: PlaybookLightProgramsDataV1 | null;
+  spotlights?: ScriptScene["theaterSpotlights"];
+  onUpdateScene: (changes: Partial<ScriptScene>) => void;
   onUpdateMarkdown: (nextMarkdown: string) => void;
 };
 
@@ -49,7 +49,7 @@ function kadrProgramColor(
 
 export function LightKadrPanel({
   projectName,
-  step,
+  scene,
   markdown,
   activeKadrId,
   onActiveKadrIdChange,
@@ -57,14 +57,14 @@ export function LightKadrPanel({
   lightFaders,
   lightPrograms,
   spotlights,
-  onUpdateStep,
+  onUpdateScene,
   onUpdateMarkdown,
 }: LightKadrPanelProps) {
   const [recordMessage, setRecordMessage] = useState<string | null>(null);
   const [programSaveMessage, setProgramSaveMessage] = useState<string | null>(null);
   const [selectedKadrNo, setSelectedKadrNo] = useState<number | null>(null);
   const sections = useMemo(() => scanMarkdownKadrSections(markdown), [markdown]);
-  const kadrs = useMemo(() => readStepLightKadrs(step), [step?.lightKadrs, step?.id]);
+  const kadrs = useMemo(() => readSceneLightKadrs(scene), [scene?.lightKadrs, scene?.id]);
 
   useEffect(() => {
     if (sections.length === 0) {
@@ -105,7 +105,7 @@ export function LightKadrPanel({
     return kadrs.kadrs.find((k) => k.kadrNo === activeSection.kadrNo);
   }, [activeSection, kadrs.kadrs]);
 
-  const { sceneData } = useScene();
+  const { playbookData } = usePlaybook();
   const liveConsole = useLightConsoleState({
     projectName,
     spotlights: spotlights ?? [],
@@ -113,7 +113,7 @@ export function LightKadrPanel({
   const layoutSettings = useLightConsoleLayoutSettings(projectName);
 
   const recordActiveKadr = () => {
-    if (!step || !activeSection) return;
+    if (!scene || !activeSection) return;
     const result = recordLightKadrForSection({
       markdown,
       section: activeSection,
@@ -126,12 +126,12 @@ export function LightKadrPanel({
       spotlights: spotlights ?? [],
       liveConsoleChannel: liveConsole.selectedLightSlot,
       lightChannelRoles:
-        sceneData?.lightChannelRoles && sceneData.lightChannelRoles.v === 1
-          ? sceneData.lightChannelRoles
+        playbookData?.lightChannelRoles && playbookData.lightChannelRoles.v === 1
+          ? playbookData.lightChannelRoles
           : null,
     });
     if (!result) return;
-    onUpdateStep({ lightKadrs: result.nextKadrs });
+    onUpdateScene({ lightKadrs: result.nextKadrs });
     onUpdateMarkdown(result.nextMarkdown);
     onActiveKadrIdChange?.(result.kadrId);
     setRecordMessage(result.summary);
@@ -152,7 +152,7 @@ export function LightKadrPanel({
   };
 
   const syncMarkdownLine = () => {
-    if (!step || !activeKadr || !activeSection) return;
+    if (!scene || !activeKadr || !activeSection) return;
     onUpdateMarkdown(
       recordKadrToMarkdown({
         markdown,
@@ -166,7 +166,7 @@ export function LightKadrPanel({
   };
 
   const deleteActiveKadr = () => {
-    if (!step || !activeSection) return;
+    if (!scene || !activeSection) return;
     const confirmMessage = formatDeleteKadrConfirmMessage(activeSection.headingTitle);
     if (!window.confirm(confirmMessage)) return;
 
@@ -175,13 +175,13 @@ export function LightKadrPanel({
         section.headingStart === activeSection.headingStart &&
         section.kadrNo === activeSection.kadrNo,
     );
-    const { markdown: nextMarkdown, lightKadrs: nextKadrs } = deleteKadrFromStepMarkdown(step, {
+    const { markdown: nextMarkdown, lightKadrs: nextKadrs } = deleteKadrFromSceneMarkdown(scene, {
       id: activeSection.id,
       kadrNo: activeSection.kadrNo,
     });
 
     onUpdateMarkdown(nextMarkdown);
-    onUpdateStep({ lightKadrs: nextKadrs });
+    onUpdateScene({ lightKadrs: nextKadrs });
 
     const remaining = scanMarkdownKadrSections(nextMarkdown);
     const nextIndex =
@@ -202,7 +202,7 @@ export function LightKadrPanel({
     <div className="light-kadr-panel">
       <div className="light-kadr-panel__header">
         <div>
-          <div className="light-kadr-panel__title">Картины шага</div>
+          <div className="light-kadr-panel__title">Картины сцены</div>
           <div className="light-kadr-panel__hint">
             П1–П8 = заливка · фейдеры = софиты · одна кнопка сохраняет всё в картину
           </div>
@@ -212,7 +212,7 @@ export function LightKadrPanel({
             type="button"
             className="light-kadr-panel__action"
             data-primary="true"
-            disabled={!step || !activeSection}
+            disabled={!scene || !activeSection}
             onClick={recordActiveKadr}
             title={
               activeSection
@@ -243,7 +243,7 @@ export function LightKadrPanel({
           <button
             type="button"
             className="light-kadr-panel__action light-kadr-panel__action--danger"
-            disabled={!step || !activeSection}
+            disabled={!scene || !activeSection}
             onClick={deleteActiveKadr}
             title={
               activeSection
@@ -273,7 +273,7 @@ export function LightKadrPanel({
               </span>
             )}
           </div>
-          <div className="light-kadr-panel__strip" role="tablist" aria-label="Картины шага">
+          <div className="light-kadr-panel__strip" role="tablist" aria-label="Картины сцены">
             {sections.map((section) => {
               const kadr =
                 section.id != null
@@ -312,7 +312,7 @@ export function LightKadrPanel({
         </>
       ) : (
         <p className="light-kadr-panel__empty">
-          Нет <code>### Картина N</code> в тексте шага — добавьте на вкладке «
+          Нет <code>### Картина N</code> в тексте сцены — добавьте на вкладке «
           {SCRIPT_MARKDOWN_NOTES_TAB_LABEL}» / «Текст».
         </p>
       )}

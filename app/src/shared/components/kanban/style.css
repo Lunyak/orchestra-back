@@ -230,7 +230,7 @@
     0 0 0 1px rgba(0, 0, 0, 0.58) inset;
 }
 
-.kanban-card.dragging {
+.kanban-card--dragging {
   opacity: 0.55;
   transform: rotate(-1deg);
 }
@@ -402,12 +402,12 @@
   max-width: 200px;
 }
 
-.kanban-field-label {
+.kanban-field__label {
   font-size: 12px;
   opacity: 0.8;
 }
 
-.kanban-section-title {
+.kanban-section__title {
   font-weight: 700;
   font-size: 13px;
   margin-bottom: 8px;
@@ -416,6 +416,10 @@
 .kanban-muted {
   font-size: 12px;
   opacity: 0.75;
+}
+
+.kanban-muted--bottom {
+  margin-bottom: 12px;
 }
 
 .kanban-roles-grid {

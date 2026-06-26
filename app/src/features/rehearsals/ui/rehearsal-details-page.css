@@ -1,0 +1,150 @@
+.rehearsal-details-page__message {
+  padding: 12px;
+}
+
+.rehearsal-details-page {
+  padding: 12px 12px 40px;
+}
+
+.rehearsal-details-page__header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.rehearsal-details-page__back-link {
+  text-decoration: none;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.rehearsal-details-page__title {
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.rehearsal-details-page__meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.rehearsal-details-page__loading {
+  margin-top: 10px;
+  opacity: 0.75;
+}
+
+.rehearsal-details-page__error {
+  margin-top: 10px;
+}
+
+.rehearsal-details-page__content {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.rehearsal-details-page__card {
+  border: 1px solid var(--color-border-visible);
+  padding: 12px;
+  background: var(--color-bg-transparent-2);
+}
+
+.rehearsal-details-page__card-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.rehearsal-details-page__card-title--section {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.rehearsal-details-page__id-line {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.rehearsal-details-page__id-value {
+  opacity: 0.9;
+}
+
+.rehearsal-details-page__place-line {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.rehearsal-details-page__place-value {
+  opacity: 1;
+}
+
+.rehearsal-details-page__notes {
+  margin-top: 8px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  opacity: 0.9;
+}
+
+.rehearsal-details-page__comment-status {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.rehearsal-details-page__status-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.rehearsal-details-page__status-success {
+  font-size: 12px;
+  color: var(--color-status-success-bright);
+}
+
+.rehearsal-details-page__comment-error {
+  margin: 0;
+}
+
+.rehearsal-details-page__comment-input {
+  width: 100%;
+  margin-top: 8px;
+  resize: vertical;
+}
+
+.rehearsal-details-page__comment-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.rehearsal-details-page__participants-empty {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.rehearsal-details-page__participants-list {
+  display: grid;
+  gap: 6px;
+}
+
+.rehearsal-details-page__participant-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border-medium);
+  background: var(--color-bg-scrim-subtle);
+  font-size: 12px;
+}
+
+.rehearsal-details-page__participant-name {
+  opacity: 0.95;
+}
+
+.rehearsal-details-page__participant-status {
+  opacity: 0.7;
+}

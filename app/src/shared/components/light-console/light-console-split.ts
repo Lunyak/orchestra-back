@@ -1,5 +1,5 @@
-import type { SceneLightFaderV1, SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
-import type { StepLightKadrFaderStateV1 } from "../../types/script";
+import type { PlaybookLightFaderV1, PlaybookLightFadersDataV1 } from "../../../features/playbook/model/playbook-slice";
+import type { SceneLightKadrFaderStateV1 } from "../../types/script";
 import {
   collectActiveEquipmentBindings,
   resolveKadrFaderChannel,
@@ -39,14 +39,14 @@ export type LightConsoleSplitModel = {
   washFaders: LightFaderBoardRow[];
 };
 
-function readFaderChannel(fader: SceneLightFaderV1): number {
+function readFaderChannel(fader: PlaybookLightFaderV1): number {
   return fader.channel ?? fader.links?.[0]?.channel ?? fader.id;
 }
 
 function readKadrFaderState(
   faderId: number,
-  kadrStates: StepLightKadrFaderStateV1[] | undefined,
-  fallback: SceneLightFaderV1,
+  kadrStates: SceneLightKadrFaderStateV1[] | undefined,
+  fallback: PlaybookLightFaderV1,
 ): { intensity: number; enabled: boolean } {
   const state = kadrStates?.find((item) => item.faderId === faderId);
   const intensity =
@@ -60,8 +60,8 @@ function readKadrFaderState(
 }
 
 function toBoardRow(
-  fader: SceneLightFaderV1,
-  kadrStates: StepLightKadrFaderStateV1[] | undefined,
+  fader: PlaybookLightFaderV1,
+  kadrStates: SceneLightKadrFaderStateV1[] | undefined,
 ): LightFaderBoardRow {
   const channel = readFaderChannel(fader);
   const { intensity, enabled } = readKadrFaderState(fader.id, kadrStates, fader);
@@ -77,8 +77,8 @@ function toBoardRow(
 }
 
 function toBoardRowFromKadrState(
-  fader: SceneLightFaderV1,
-  state: StepLightKadrFaderStateV1,
+  fader: PlaybookLightFaderV1,
+  state: SceneLightKadrFaderStateV1,
   channel: number,
 ): LightFaderBoardRow {
   const raw =
@@ -99,10 +99,10 @@ function toBoardRowFromKadrState(
 
 /** Строки для техкарты: только K+F с активной привязкой в 3D (как в списке софитов). */
 export function buildKadrRecordFaderRows(args: {
-  kadrFaderStates: StepLightKadrFaderStateV1[];
-  faders: SceneLightFadersDataV1;
+  kadrFaderStates: SceneLightKadrFaderStateV1[];
+  faders: PlaybookLightFadersDataV1;
   /** Доска с links для проверки привязок; если не задана — используется faders. */
-  boardFaders?: SceneLightFadersDataV1;
+  boardFaders?: PlaybookLightFadersDataV1;
   selectedChannels: number[];
   lightChannelsCount?: number;
   spotlights?: TheaterSpotlight[];
@@ -115,7 +115,7 @@ export function buildKadrRecordFaderRows(args: {
     lightFaders: board,
   });
 
-  const stateByKey = new Map<string, StepLightKadrFaderStateV1>();
+  const stateByKey = new Map<string, SceneLightKadrFaderStateV1>();
   for (const state of args.kadrFaderStates) {
     const def = args.faders.faders.find((fader) => fader.id === state.faderId);
     if (!def) continue;
@@ -156,28 +156,11 @@ export function buildKadrRecordFaderRows(args: {
   });
 }
 
-/** @deprecated Используйте buildKadrRecordFaderRows */
-export function buildKadrSofitFaderRowsForDisplay(args: {
-  kadrFaderStates: StepLightKadrFaderStateV1[];
-  faders: SceneLightFadersDataV1;
-  sofitChannels: number[];
-  lightChannelsCount?: number;
-  /** Уровни заливки (K активной П) показываются в блоке «Заливка», не здесь. */
-  washProgramId?: number;
-}): LightFaderBoardRow[] {
-  return buildKadrRecordFaderRows({
-    kadrFaderStates: args.kadrFaderStates,
-    faders: args.faders,
-    selectedChannels: args.sofitChannels,
-    lightChannelsCount: args.lightChannelsCount,
-  });
-}
-
 /** Заливка в карточке картины: без дубля софитов на том же K. */
 export function buildKadrWashFaderRowsForCard(args: {
   programId: number;
-  kadrFaderStates: StepLightKadrFaderStateV1[];
-  faders: SceneLightFadersDataV1;
+  kadrFaderStates: SceneLightKadrFaderStateV1[];
+  faders: PlaybookLightFadersDataV1;
   sofitRows: LightFaderBoardRow[];
   sofitChannels: number[];
   lightChannelsCount?: number;
@@ -219,8 +202,8 @@ export function buildKadrWashFaderRowsForCard(args: {
 export function buildLightConsoleSplitModel(args: {
   programId: number;
   lightChannels: string[];
-  faders: SceneLightFadersDataV1;
-  kadrFaderStates?: StepLightKadrFaderStateV1[];
+  faders: PlaybookLightFadersDataV1;
+  kadrFaderStates?: SceneLightKadrFaderStateV1[];
   sofitChannels?: number[];
   programLabel?: string;
 }): LightConsoleSplitModel {

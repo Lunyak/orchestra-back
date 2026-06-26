@@ -23,7 +23,7 @@
 }
 
 .modal-backdrop:has(.actor-settings-modal),
-.modal-backdrop:has(.actor-step-picker-modal) {
+.modal-backdrop:has(.actor-scene-picker-modal) {
   z-index: 1300;
 }
 
@@ -34,7 +34,7 @@
   background: var(--color-bg-modal);
 }
 
-.actor-settings-modal__head {
+.actor-settings-modal__header {
   flex-shrink: 0;
   display: flex;
   gap: var(--spacing-5);
@@ -107,7 +107,7 @@
   opacity: var(--opacity-muted);
 }
 
-.actor-step-picker {
+.actor-scene-picker {
   border: 0;
   padding: 0;
   background: transparent;
@@ -115,49 +115,49 @@
   gap: var(--spacing-2);
 }
 
-.actor-step-picker-actions {
+.actor-scene-picker-actions {
   display: flex;
   gap: var(--spacing-4);
   align-items: center;
   flex-wrap: wrap;
 }
 
-.actor-step-btn.button {
+.actor-scene-btn.button {
   text-transform: none;
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
 }
 
-.actor-controls--modal .actor-step-btn.button {
+.actor-controls--modal .actor-scene-btn.button {
   width: 100%;
   min-height: 30px;
   padding: 5px 10px;
   font-size: 12px;
 }
 
-.actor-step-btn.button.secondary {
+.actor-scene-btn.button.secondary {
   border: 1px solid var(--color-border-strong);
   background: var(--color-bg-transparent-2);
   color: var(--color-text-lighter);
 }
 
-.actor-step-btn.button.secondary:hover {
+.actor-scene-btn.button.secondary:hover {
   background: var(--color-bg-hover);
 }
 
-.actor-step-picker-meta {
+.actor-scene-picker-meta {
   font-size: var(--font-size-base);
   opacity: var(--opacity-medium);
 }
 
-.actor-step-picker-modal {
+.actor-scene-picker-modal {
   width: min(720px, calc(100vw - 20px));
   max-height: min(88vh, 820px);
   border: 1px solid var(--color-border-visible);
   background: var(--color-bg-modal);
 }
 
-.actor-step-picker-modal__head {
+.actor-scene-picker-modal__header {
   flex-shrink: 0;
   display: flex;
   gap: var(--spacing-5);
@@ -167,7 +167,7 @@
   border-bottom: 1px solid var(--color-border-visible);
 }
 
-.actor-step-picker-modal__toolbar {
+.actor-scene-picker-modal__toolbar {
   flex-shrink: 0;
   display: flex;
   gap: var(--spacing-4);
@@ -178,7 +178,7 @@
   background: var(--color-bg-transparent-1);
 }
 
-.actor-step-picker-list {
+.actor-scene-picker-list {
   max-height: 220px;
   overflow: auto;
   display: grid;
@@ -186,7 +186,7 @@
   padding: var(--spacing-1);
 }
 
-.actor-step-picker-modal__list {
+.actor-scene-picker-modal__list {
   flex: 1;
   min-height: 0;
   max-height: none;
@@ -194,7 +194,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.actor-step-item {
+.actor-scene-item {
   position: relative;
   display: grid;
   grid-template-columns: 1fr;
@@ -209,25 +209,25 @@
     border-color 0.14s ease;
 }
 
-.actor-step-item:hover,
-.actor-step-item:focus-visible {
+.actor-scene-item:hover,
+.actor-scene-item:focus-visible {
   border-color: var(--color-active-ascent);
   background: var(--color-bg-transparent-2);
   outline: none;
 }
 
-.actor-step-item--selected {
+.actor-scene-item--selected {
   border-color: var(--color-active-ascent);
   background: color-mix(in srgb, var(--color-active-ascent) 34%, var(--color-bg-transparent-1));
   color: var(--color-text-lighter);
 }
 
-.actor-step-item--selected:hover,
-.actor-step-item--selected:focus-visible {
+.actor-scene-item--selected:hover,
+.actor-scene-item--selected:focus-visible {
   background: color-mix(in srgb, var(--color-active-ascent) 42%, var(--color-bg-transparent-1));
 }
 
-.actor-step-hidden-checkbox {
+.actor-scene-hidden-checkbox {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -235,40 +235,40 @@
   pointer-events: none;
 }
 
-.actor-step-main {
+.actor-scene-main {
   display: grid;
   gap: var(--spacing-2);
 }
 
-.actor-step-title {
+.actor-scene-title {
   font-size: var(--font-size-md);
 }
 
-.actor-step-id {
+.actor-scene-id {
   font-size: var(--font-size-base);
   opacity: var(--opacity-muted);
   margin-left: var(--spacing-3);
 }
 
-.actor-step-id--corner {
+.actor-scene-id--corner {
   position: absolute;
   top: var(--spacing-4);
   right: var(--spacing-5);
   margin-left: 0;
 }
 
-.actor-step-examples {
+.actor-scene-examples {
   display: grid;
   gap: var(--spacing-2);
 }
 
-.actor-step-example {
+.actor-scene-example {
   font-size: var(--font-size-base);
   opacity: var(--opacity-subtle);
   line-height: var(--line-height-normal);
 }
 
-.actor-step-disclosure {
+.actor-scene-disclosure {
   justify-self: start;
   margin: 0;
   padding: 0;
@@ -282,11 +282,11 @@
   cursor: pointer;
 }
 
-.actor-step-disclosure:hover {
+.actor-scene-disclosure:hover {
   color: var(--color-active-ascent);
 }
 
-.actor-step-full-text {
+.actor-scene-full-text {
   max-height: 220px;
   overflow: auto;
   padding: var(--spacing-4) var(--spacing-5);
@@ -352,32 +352,32 @@
     padding: var(--spacing-5);
   }
 
-  .actor-step-picker-list {
+  .actor-scene-picker-list {
     max-height: 180px;
   }
 
-  .actor-step-picker-modal {
+  .actor-scene-picker-modal {
     width: calc(100vw - 12px);
     max-height: calc(100dvh - 12px);
   }
 
-  .actor-step-picker-modal__head {
+  .actor-scene-picker-modal__header {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .actor-step-picker-modal__head .button,
-  .actor-step-picker-modal__toolbar .button,
-  .actor-step-picker-actions .button {
+  .actor-scene-picker-modal__header .button,
+  .actor-scene-picker-modal__toolbar .button,
+  .actor-scene-picker-actions .button {
     width: 100%;
   }
 
-  .actor-step-picker-modal__list {
+  .actor-scene-picker-modal__list {
     max-height: none;
     padding: var(--spacing-4);
   }
 
-  .actor-step-item {
+  .actor-scene-item {
     grid-template-columns: 1fr;
     gap: var(--spacing-4);
   }
@@ -387,7 +387,7 @@
     max-height: calc(100dvh - 12px);
   }
 
-  .actor-settings-modal__head {
+  .actor-settings-modal__header {
     align-items: stretch;
     flex-direction: column;
   }

@@ -1,6 +1,6 @@
-import type { ScriptStep } from "../../types/script";
+import type { ScriptScene } from "../../types/script";
 
-export type KanbanStatus = NonNullable<ScriptStep["kanbanStatus"]>;
+export type KanbanStatus = NonNullable<ScriptScene["kanbanStatus"]>;
 
 export type KanbanStatusConfig = {
   id: KanbanStatus;
@@ -17,6 +17,6 @@ export const STATUSES: KanbanStatusConfig[] = [
   { id: "ready", label: "Готова", hint: "", headerBg: "var(--kanban-col-ready)" },
 ];
 
-export function statusOf(step: ScriptStep): KanbanStatus {
-  return (step.kanbanStatus ?? "raw") as KanbanStatus;
+export function statusOf(scene: ScriptScene): KanbanStatus {
+  return (scene.kanbanStatus ?? "raw") as KanbanStatus;
 }

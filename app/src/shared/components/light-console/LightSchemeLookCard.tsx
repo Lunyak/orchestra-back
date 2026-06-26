@@ -4,17 +4,17 @@ import {
   buildKadrRecordFaderRows,
   type LightFaderBoardRow,
 } from "./light-console-split";
-import type { SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
-import type { StepLightKadrV1, TheaterSpotlight } from "../../types/script";
+import type { PlaybookLightFadersDataV1 } from "../../../features/playbook/model/playbook-slice";
+import type { SceneLightKadrV1, TheaterSpotlight } from "../../types/script";
 import { formatSofitChannelsLabel } from "./light-channel-roles";
 
 export type LightSchemeLookCardProps = {
   lookModel: LightSchemeLookModel | null;
   lightChannels: string[];
-  activeKadr?: StepLightKadrV1 | null;
-  lightFaders?: SceneLightFadersDataV1 | null;
+  activeKadr?: SceneLightKadrV1 | null;
+  lightFaders?: PlaybookLightFadersDataV1 | null;
   /** Сцена с links — для фильтра «есть оборудование» (не kadr-display). */
-  boardFaders?: SceneLightFadersDataV1 | null;
+  boardFaders?: PlaybookLightFadersDataV1 | null;
   spotlights?: TheaterSpotlight[];
   programLabelOverride?: string;
   onHighlightChannel?: (channel: number | null) => void;

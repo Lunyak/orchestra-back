@@ -71,7 +71,7 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
-.theater-tabs--editor-menubar > .theater-btn.button.is-active,
+.theater-tabs--editor-menubar > .theater-btn.button--active,
 .theater-tabs--editor-menubar > .theater-btn.button:not(.secondary) {
   color: #ccc;
   background: #111;
@@ -500,6 +500,14 @@
 .theater-editor-outliner-option--active {
   background: rgba(21, 60, 94, 1);
   color: #ccc;
+}
+
+.theater-editor-outliner-option--scene {
+  padding-left: 4px;
+}
+
+.theater-editor-outliner-option--child {
+  padding-left: 22px;
 }
 
 .theater-editor-outliner-option--muted {

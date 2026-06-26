@@ -44,7 +44,7 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
 };
 
 /**
- * Editor view preferences: persisted per project, independent of ScriptStep.
+ * Editor view preferences: persisted per project, independent of ScriptScene.
  */
 export function useTheaterViewPrefs(
   projectName: string,

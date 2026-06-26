@@ -27,12 +27,13 @@
 - ✅ `features/team` — `useTeam()` на `useProjectMembersQuery` (settings, board, troupe, sessions)
 - ✅ `features/troupe` — `myTroupe`, участники; Kanban — роли + труппа + members
 - ✅ `features/project` — CRUD ролей и назначений (`createProjectRole`, `deleteProjectRole`, `setProjectRoleAssignments`)
-- ✅ `features/actor` — страница актёра на RTK (профиль, роли, участники)
+- ✅ `features/actor` — страница актёра на RTK; аннотации сценария (`actor-notes-api`)
 - ✅ `roleWorkbook` thunk — роли/труппа/участники/профили через кэш RTK (`initiate`)
-- ✅ сценарий (`StepRolesPanel`, `ScriptMarkdownPreview`) и профиль — роли через `useProjectRolesQuery`
+- ✅ `playbook-slice` / `sync.service` — распил на types, thunks, helpers, applier
+- ✅ сценарий (`SceneRolesPanel`, `ScriptMarkdownPreview`) и профиль — роли через `useProjectRolesQuery`
 - ✅ `ChatDock` — `useMyProfileQuery`
 - 🗑️ удалены неиспользуемые `troupe-slice` и `profileRolesSlice` из store
-- ⏳ остальные `sync/api/*` (чат, аннотации, sync pull/push, profileData mutations) по мере необходимости
+- ⏳ остальные `sync/api/*` (чат, scene notes, sync pull/push, profileData mutations) по мере необходимости
 
 `setupListeners` включён в `shared/store/store.ts` — refetch при фокусе вкладки для подписанных query.
 

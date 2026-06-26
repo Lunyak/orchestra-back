@@ -1,4 +1,4 @@
-/** Строка-граница шага: «Акт 1», «Сцена II», «Картина 3», «### Картина 2» и т.п. */
+/** Строка-граница сцены: «Акт 1», «Сцена II», «Картина 3», «### Картина 2» и т.п. */
 const STRUCTURAL_SPLIT_RE =
   /^(?:#{1,3}\s+)?(?:\*\*)?(?:ДЕЙСТВИЕ|АКТ|СЦЕНА|КАРТИН[АУЕЙ]|МИЗАНСЦЕНА)(?:\s|[:.)\]]|$)/iu;
 
@@ -32,7 +32,7 @@ export function splitPlayTextIntoChunks(text: string): string[] {
   return chunks.length > 0 ? chunks : [normalized];
 }
 
-export function deriveStepTitleFromChunk(chunk: string, fallback: string): string {
+export function deriveSceneTitleFromChunk(chunk: string, fallback: string): string {
   const firstLine =
     chunk
       .split("\n")

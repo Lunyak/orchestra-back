@@ -2,14 +2,14 @@ import { useMemo } from "react";
 import { useProject } from "../../project/model/project-context";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
 import { SpectacleRunKadrStrip } from "./SpectacleRunKadrStrip";
 import { SpectacleRunProgRunNav } from "./SpectacleRunToolbar";
 
 export function SpectacleRunProgRunContent() {
   const { projectName } = useProject();
-  const { steps, sceneData } = useScene();
+  const { scenes, playbookData } = usePlaybook();
   const { lightChannels } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
   );
@@ -18,25 +18,25 @@ export function SpectacleRunProgRunContent() {
 
   const playlist = useMemo(
     () =>
-      (sceneData?.playlist ?? []).map((track) => ({
+      (playbookData?.playlist ?? []).map((track) => ({
         id: track.id,
         title: track.title ?? "",
       })),
-    [sceneData?.playlist],
+    [playbookData?.playlist],
   );
   const sounds = useMemo(
     () =>
-      (sceneData?.sounds ?? []).map((sound) => ({
+      (playbookData?.sounds ?? []).map((sound) => ({
         id: sound.id,
         title: sound.title ?? "",
       })),
-    [sceneData?.sounds],
+    [playbookData?.sounds],
   );
 
   if (tape.length === 0) {
     return (
       <div className="spectacle-run spectacle-run--empty spectacle-run--prog-run-only">
-        <p>Нет шагов в спектакле. Добавьте шаги в сценарии.</p>
+        <p>Нет сцен в спектакле. Добавьте сцены в сценарии.</p>
       </div>
     );
   }
@@ -49,7 +49,7 @@ export function SpectacleRunProgRunContent() {
           projectName={projectName ?? ""}
           tape={tape}
           tapeIndex={tapeIndex}
-          steps={steps}
+          scenes={scenes}
           lightChannels={lightChannels}
           lightFaders={run.lightFaders}
           lightPrograms={run.lightPrograms}

@@ -15,7 +15,7 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
         activeDoorId={vm.activeDoorId}
         layoutFocused={vm.layoutOutlineFocused}
         pulseTarget={vm.pulseTarget}
-        disabled={!vm.currentStep}
+        disabled={!vm.currentScene}
         onFocusItem={vm.focusSceneOutlinerItem}
         onToggleVisibility={vm.toggleSceneOutlinerVisibility}
         onToggleGroupVisibility={vm.setSceneOutlinerGroupVisibility}
@@ -34,11 +34,11 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
               value={bookmarkLabel}
               placeholder="Вид со зрителей"
               onChange={(event) => setBookmarkLabel(event.target.value)}
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
             />
           </TheaterField>
           <TheaterBtn
-            disabled={!vm.currentStep}
+            disabled={!vm.currentScene}
             onClick={() => void vm.saveCameraBookmark(bookmarkLabel)}
             title="Сохранить текущий ракурс 3D"
           >
@@ -52,13 +52,13 @@ export function TheaterControlsOutlinerSection({ vm }: TheaterControlsTabProps) 
                 <span title={bookmark.label}>{bookmark.label}</span>
                 <TheaterBtn
                   onClick={() => vm.applyCameraBookmark(bookmark)}
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                 >
                   Перейти
                 </TheaterBtn>
                 <TheaterBtn
                   onClick={() => vm.deleteCameraBookmark(bookmark.id)}
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                 >
                   ×
                 </TheaterBtn>

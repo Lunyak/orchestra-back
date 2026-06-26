@@ -510,14 +510,30 @@ function resolveKadrIdFromHeading(
   return id ?? undefined;
 }
 
+function headingWithRowTitleClass(heading: HastNode): HastNode {
+  if (!heading || heading.type !== "element") return heading;
+  const props = { ...((heading as { properties?: Record<string, unknown> }).properties ?? {}) };
+  const existing = props.className;
+  const titleClass = "markdown-kadr__heading-row-title";
+  if (Array.isArray(existing)) {
+    props.className = [...existing, titleClass];
+  } else if (typeof existing === "string" && existing.trim()) {
+    props.className = `${existing} ${titleClass}`;
+  } else {
+    props.className = titleClass;
+  }
+  return { ...heading, properties: props } as HastNode;
+}
+
 function wrapKadrHeading(
   heading: HastNode,
   lkId: string | undefined,
   blackoutIds: Set<string>,
 ): HastNode {
-  if (!lkId || !blackoutIds.has(lkId)) return heading;
+  const titledHeading = headingWithRowTitleClass(heading);
+  if (!lkId || !blackoutIds.has(lkId)) return titledHeading;
   return makeEl("div", ["markdown-kadr__heading-row"], {}, [
-    heading,
+    titledHeading,
     makeEl("span", ["markdown-kadr-blackout-badge"], {}, [
       { type: "text", value: "Блекаут" } as HastNode,
     ]),

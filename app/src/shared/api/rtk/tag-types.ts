@@ -2,7 +2,7 @@
 export const orchestraApiTagTypes = [
   "Rehearsal",
   "RehearsalList",
-  "RehearsalSteps",
+  "RehearsalScenes",
   "RehearsalPlan",
   "Profile",
   "ProfileBatch",
@@ -16,4 +16,5 @@ export const orchestraApiTagTypes = [
   "ProjectMaterial",
   "ProjectTasks",
   "SyncPull",
+  "ActorAnnotations",
 ] as const;

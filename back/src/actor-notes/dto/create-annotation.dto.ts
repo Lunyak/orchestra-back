@@ -20,7 +20,7 @@ export class CreateAnnotationDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  stepId: number;
+  sceneId: number;
 
   @IsIn(['markdown', 'playMarkdown', 'explicationMarkdown'])
   field: 'markdown' | 'playMarkdown' | 'explicationMarkdown';

@@ -8,7 +8,7 @@ import type {
 import {
   createKadrTemplateSnippet,
   createLightKadrId,
-  nextKadrNumberForStep,
+  nextKadrNumberForScene,
 } from "../../../features/theater/model/light-kadrs";
 
 export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinition[] = [
@@ -38,14 +38,14 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
     },
   },
   {
-    id: "selection-to-step",
-    label: "Выделение в новый шаг",
+    id: "selection-to-scene",
+    label: "Выделение в новую сцену",
     group: "Буфер",
     resolve: (ctx): ScriptEditorInsertResolveResult => {
       if (!ctx.canCopySelection) {
         return { state: "disabled", reason: "Выдели текст в редакторе" };
       }
-      return { state: "ok", pick: { kind: "create-step-from-selection" } };
+      return { state: "ok", pick: { kind: "create-scene-from-selection" } };
     },
   },
   {
@@ -121,7 +121,7 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
     label: "Картина (шаблон)",
     group: "Структура",
     resolve: (ctx) => {
-      const nextN = nextKadrNumberForStep({ markdown: ctx.activeMarkdown });
+      const nextN = nextKadrNumberForScene({ markdown: ctx.activeMarkdown });
       const kadrId = createLightKadrId();
       return {
         state: "ok",

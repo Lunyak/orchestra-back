@@ -1,4 +1,5 @@
-import type { SceneRolesDataV1 } from "../../scene";
+import { pullPlaybooksFromSync, pullScriptScenesFromSync, syncRowMatchesPlaybook } from "../../../sync/sync-pull-normalize";
+import type { PlaybookRolesDataV1 } from "../../playbook";
 import type { SyncPullResponse } from "../../../sync/api/types/sync";
 import { normalizeEmail, normalizeRoleKey } from "./session-page-utils";
 import type {
@@ -25,11 +26,12 @@ export function buildProjectDataCacheFromPull(
 
   const proj = (pull.projects ?? []).find((p) => p.slug === slug);
   const scene = proj
-    ? (pull.scenes ?? []).find((s) => String(s?.id ?? "") === `${proj.id}:script`)
+    ? (pullPlaybooksFromSync(pull)).find((s) => String(s?.id ?? "") === `${proj.id}:script`)
     : null;
   const sceneId = String(scene?.id ?? "");
-  const steps = (Array.isArray(pull.steps) ? pull.steps : [])
-    .filter((st) => String(st?.sceneId ?? "") === sceneId)
+  const scriptScenesRaw = pullScriptScenesFromSync(pull);
+  const scenes = (Array.isArray(scriptScenesRaw) ? scriptScenesRaw : [])
+    .filter((st) => syncRowMatchesPlaybook(st, sceneId))
     .sort((a, b) => Number(a?.order ?? 0) - Number(b?.order ?? 0))
     .map((st) => ({
       id: Number(st?.sourceId ?? 0),
@@ -43,10 +45,10 @@ export function buildProjectDataCacheFromPull(
     }))
     .filter((x) => Number.isFinite(x.id) && x.id > 0);
 
-  const sceneRoles = ((scene as { sceneRoles?: SceneRolesDataV1 } | null)?.sceneRoles ??
-    null) as SceneRolesDataV1 | null;
+  const sceneRoles = ((scene as { sceneRoles?: PlaybookRolesDataV1 } | null)?.sceneRoles ??
+    null) as PlaybookRolesDataV1 | null;
 
-  return { steps, roleEmailsByKey, roleTitleByKey, sceneRoles };
+  return { scenes, roleEmailsByKey, roleTitleByKey, sceneRoles };
 }
 
 /** Материалы из RTK projectMaterial → кэш детальной страницы сессии. */
@@ -54,7 +56,7 @@ export function projectMaterialToDirectorSessionCache(
   data: ProjectDataCache[string],
 ): DirectorSessionProjectDataCache[string] {
   return {
-    steps: data.steps,
+    scenes: data.scenes,
     sceneId: null,
     sceneRoles: data.sceneRoles ?? null,
   };

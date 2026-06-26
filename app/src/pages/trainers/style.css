@@ -33,7 +33,7 @@
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-.trainers-index__head {
+.trainers-index__header {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -146,7 +146,7 @@
   cursor: not-allowed;
 }
 
-.trainer-index-card__head {
+.trainer-index-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -194,7 +194,7 @@
   color: var(--trainers-chrome-text-muted);
 }
 
-.trainer-card__head {
+.trainer-card__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -499,7 +499,7 @@
     gap: 8px;
   }
 
-  .trainers-index__head {
+  .trainers-index__header {
     padding-bottom: 8px;
   }
 
@@ -507,7 +507,7 @@
     padding: 12px 14px;
   }
 
-  .trainer-index-card__head {
+  .trainer-index-card__header {
     align-items: flex-start;
   }
 

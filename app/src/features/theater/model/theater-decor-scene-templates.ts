@@ -255,11 +255,3 @@ export function buildDecorSceneTemplate(
       return buildBasicScene(layout, startId);
   }
 }
-
-/** @deprecated используйте buildDecorSceneTemplate("basic", ...) */
-export function buildBasicDecorSketch(
-  layout: TheaterLayout,
-  startId: number,
-): TheaterModel[] {
-  return buildDecorSceneTemplate("basic", layout, startId);
-}

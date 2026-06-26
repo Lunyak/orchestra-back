@@ -1,4 +1,5 @@
 import { Button } from "@shared/core/button/Button";
+import cn from "classnames";
 import { useMemo } from "react";
 import type { ProjectRoleInfo } from "../../../sync/api/projects";
 import { RolePlayingCard } from "../../role-card/RolePlayingCard";
@@ -87,11 +88,10 @@ export function WorkbookRelationshipsSection({
               />
               <div className="rolewb-rel-fields">
                 <select
-                  className="settings-invite-input"
+                  className={cn("settings-invite-input", "rolewb-field-full")}
                   value={entry.targetRoleId}
                   disabled={!canEdit}
                   onChange={(e) => updateEntry(idx, { targetRoleId: e.target.value })}
-                  style={{ maxWidth: "unset", width: "100%" }}
                 >
                   {otherRoles.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -100,12 +100,11 @@ export function WorkbookRelationshipsSection({
                   ))}
                 </select>
                 <textarea
-                  className="settings-invite-input"
+                  className={cn("settings-invite-input", "rolewb-textarea")}
                   rows={3}
                   value={entry.text}
                   disabled={!canEdit}
                   onChange={(e) => updateEntry(idx, { text: e.target.value })}
-                  style={{ maxWidth: "unset", width: "100%" }}
                   placeholder="Как связаны? Что хочешь от него/неё? Что скрываешь?"
                 />
                 {canEdit ? (
@@ -125,16 +124,15 @@ export function WorkbookRelationshipsSection({
         </Button>
       ) : null}
 
-      <div className="rolewb-hint" style={{ marginTop: 8 }}>
+      <div className="rolewb-hint rolewb-hint--spaced">
         Общие заметки (если нужно — без привязки к одному персонажу):
       </div>
       <textarea
-        className="settings-invite-input"
+        className={cn("settings-invite-input", "rolewb-textarea")}
         rows={3}
         value={legacyNotes}
         disabled={!canEdit}
         onChange={(e) => onChangeLegacyNotes(e.target.value)}
-        style={{ maxWidth: "unset", width: "100%" }}
         placeholder="Прочие связи, группы, прошлое с несколькими героями…"
       />
     </div>

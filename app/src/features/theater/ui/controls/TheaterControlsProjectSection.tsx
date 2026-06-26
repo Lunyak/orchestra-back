@@ -1,8 +1,9 @@
-import { useScene } from "../../../scene/model/scene-context";
+import cn from "classnames";
+import { usePlaybook } from "../../../playbook/model/playbook-context";
 import type { TheaterControlsTabProps } from "./types";
 
 export function TheaterControlsProjectSection({ vm }: TheaterControlsTabProps) {
-  const { steps, currentPage, setCurrentPage } = useScene();
+  const { scenes, currentPage, setCurrentPage } = usePlaybook();
 
   return (
     <div className="theater-editor-project">
@@ -14,46 +15,44 @@ export function TheaterControlsProjectSection({ vm }: TheaterControlsTabProps) {
           </span>
         </div>
         <div className="theater-editor-panel-row">
-          <span className="theater-editor-panel-label">Шаг</span>
+          <span className="theater-editor-panel-label">Сцена</span>
           <span className="theater-editor-panel-value">
-            {vm.currentStep
-              ? `${currentPage + 1} / ${vm.stepCount}`
-              : `— / ${vm.stepCount}`}
+            {vm.currentScene
+              ? `${currentPage + 1} / ${vm.sceneCount}`
+              : `— / ${vm.sceneCount}`}
           </span>
         </div>
-        {vm.currentStep?.title ? (
+        {vm.currentScene?.title ? (
           <div className="theater-editor-panel-row theater-editor-panel-row--stack">
             <span className="theater-editor-panel-label">Название</span>
-            <span className="theater-editor-panel-value">{vm.currentStep.title}</span>
+            <span className="theater-editor-panel-value">{vm.currentScene.title}</span>
           </div>
         ) : null}
       </div>
 
-      <div className="theater-editor-panel-heading">Шаги сценария</div>
-      <div className="theater-editor-project-steps" role="listbox" aria-label="Шаги сценария">
-        {steps.length === 0 ? (
-          <p className="theater-editor-outliner-empty">Нет шагов</p>
+      <div className="theater-editor-panel-heading">Сцены сценария</div>
+      <div className="theater-editor-project-scenes" role="listbox" aria-label="Сцены сценария">
+        {scenes.length === 0 ? (
+          <p className="theater-editor-outliner-empty">Нет сцен</p>
         ) : (
-          steps.map((step, index) => {
+          scenes.map((scene, index) => {
             const active = index === currentPage;
-            const label = step.title?.trim() || `Шаг ${index + 1}`;
+            const label = scene.title?.trim() || `Сцена ${index + 1}`;
             const meta =
-              step.durationMin != null && Number.isFinite(step.durationMin)
-                ? `${step.durationMin} мин`
+              scene.durationMin != null && Number.isFinite(scene.durationMin)
+                ? `${scene.durationMin} мин`
                 : undefined;
             return (
               <button
-                key={step.id}
+                key={scene.id}
                 type="button"
                 role="option"
                 aria-selected={active}
-                className={[
+                className={cn(
                   "theater-editor-outliner-option",
-                  active ? "theater-editor-outliner-option--active" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                style={{ paddingLeft: "4px" }}
+                  "theater-editor-outliner-option--scene",
+                  active && "theater-editor-outliner-option--active",
+                )}
                 title={label}
                 onClick={() => setCurrentPage(index)}
               >

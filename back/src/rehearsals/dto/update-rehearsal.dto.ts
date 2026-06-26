@@ -10,12 +10,12 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class SelectedStepDto {
+class SelectedSceneDto {
   @IsString()
-  sceneId!: string;
+  playbookId!: string;
 
   @IsInt()
-  stepId!: number;
+  sceneId!: number;
 }
 
 export class UpdateRehearsalDto {
@@ -40,11 +40,11 @@ export class UpdateRehearsalDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  selectedSceneIds?: string[];
+  selectedPlaybookIds?: string[];
 
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => SelectedStepDto)
-  selectedSteps?: SelectedStepDto[];
+  @Type(() => SelectedSceneDto)
+  selectedScenes?: SelectedSceneDto[];
 }

@@ -1,5 +1,7 @@
 /** Dev-сервер (npm run dev): чтение проектов и медиа с локального диска без Electron. */
 
+import { normalizePlaybookJsonPayload, playbookSceneCount } from "../../features/playbook/model/playbook-normalize";
+
 export function isDevLocalProjectsEnabled(): boolean {
   return Boolean(import.meta.env.DEV);
 }
@@ -30,19 +32,64 @@ export function localProjectMediaDevUrl(
   return url;
 }
 
+export function localProjectSoundIconDevUrl(
+  projectSlug: string,
+  fileName: string,
+): string | null {
+  if (!isDevLocalProjectsEnabled() || !projectSlug) return null;
+  const clean = String(fileName ?? "")
+    .trim()
+    .replace(/^.*[/\\]/, "");
+  if (!clean) return null;
+  return `/local-project-media/${encodeURIComponent(projectSlug)}/sounds/icons/${encodeURIComponent(clean)}`;
+}
+
 export async function fetchDevLocalProjectJson(
   projectSlug: string,
   kind: "script" | "notes-run",
 ): Promise<Record<string, unknown> | null> {
   if (!isDevLocalProjectsEnabled() || !projectSlug) return null;
+  const file = kind === "notes-run" ? "notes-run.json" : "script.json";
+  const paths = [
+    `/local-project-scenesModules/${encodeURIComponent(projectSlug)}/${file}`,
+    `/local-project-scenes/${encodeURIComponent(projectSlug)}/${file}`,
+  ];
+  let best: Record<string, unknown> | null = null;
+  let bestCount = -1;
+  for (const url of paths) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = (await res.json()) as Record<string, unknown>;
+      if (!data || typeof data !== "object") continue;
+      const normalized = kind === "script" ? normalizePlaybookJsonPayload(data) : data;
+      const count = kind === "script" ? playbookSceneCount(normalized) : 1;
+      if (count > bestCount) {
+        best = normalized;
+        bestCount = count;
+      }
+    } catch {
+      /* try next path */
+    }
+  }
+  return best;
+}
+
+export async function fetchDevMediaRootProjectJson(
+  projectSlug: string,
+  kind: "script" | "notes-run",
+  mediaRootPath?: string | null,
+): Promise<Record<string, unknown> | null> {
+  if (!isDevLocalProjectsEnabled() || !projectSlug) return null;
+  const query = new URLSearchParams({ project: projectSlug, kind });
+  const root = String(mediaRootPath ?? "").trim();
+  if (root) query.set("root", root);
   try {
-    const file = kind === "notes-run" ? "notes-run.json" : "script.json";
-    const res = await fetch(
-      `/local-project-scenes/${encodeURIComponent(projectSlug)}/${file}`,
-    );
+    const res = await fetch(`/local-project-dev/project-file?${query}`);
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
-    return data && typeof data === "object" ? data : null;
+    if (!data || typeof data !== "object") return null;
+    return kind === "script" ? normalizePlaybookJsonPayload(data) : data;
   } catch {
     return null;
   }
@@ -149,18 +196,22 @@ export function mergeDevScannedProjectorMedia<
   };
 
   return {
-    videos: mergeList(prevVideos, scanned.videos, (item, id) => ({
-      id,
-      title: item.title,
-      file: item.file,
-      filePath: item.filePath,
-    })) as TV[],
-    holdImages: mergeList(prevHolds, scanned.holdImages, (item, id) => ({
-      id,
-      title: item.title,
-      file: item.file,
-      filePath: item.filePath,
-    })) as TH[],
+    videos: mergeList(prevVideos, scanned.videos, (item, id) =>
+      ({
+        id,
+        title: item.title,
+        file: item.file,
+        filePath: item.filePath,
+      }) as TV,
+    ),
+    holdImages: mergeList(prevHolds, scanned.holdImages, (item, id) =>
+      ({
+        id,
+        title: item.title,
+        file: item.file,
+        filePath: item.filePath,
+      }) as TH,
+    ),
   };
 }
 

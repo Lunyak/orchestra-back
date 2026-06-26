@@ -49,9 +49,9 @@ export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
               const nextId = Number(nextValue);
               if (!Number.isFinite(nextId)) return;
               vm.setEditMode("models");
-              vm.updateCurrentStep({ theaterActiveModelId: nextId });
+              vm.updateCurrentScene({ theaterActiveModelId: nextId });
             }}
-            disabled={!vm.currentStep}
+            disabled={!vm.currentScene}
             placeholder="Выберите модель"
             noOptionsLabel="Моделей нет"
           />
@@ -65,10 +65,10 @@ export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
             if (nextKey) vm.setBuiltinModelKey(nextKey);
           }}
         />
-        <TheaterBtn onClick={vm.addBuiltinModel} disabled={!vm.currentStep}>
+        <TheaterBtn onClick={vm.addBuiltinModel} disabled={!vm.currentScene}>
           + Шаблон
         </TheaterBtn>
-        <TheaterBtn onClick={vm.addModel} disabled={!vm.currentStep}>
+        <TheaterBtn onClick={vm.addModel} disabled={!vm.currentScene}>
           + Файл модели
         </TheaterBtn>
         <TheaterBtn
@@ -84,14 +84,14 @@ export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
           Клонировать модель
         </TheaterBtn>
         <TheaterBtn
-          onClick={() => vm.updateCurrentStep({ theaterActiveModelId: undefined })}
+          onClick={() => vm.updateCurrentScene({ theaterActiveModelId: undefined })}
           disabled={!vm.activeModelId}
           title="Снять выделение"
         >
           Снять выделение
         </TheaterBtn>
         <TheaterBtn
-          disabled={!vm.currentStep}
+          disabled={!vm.currentScene}
           title="Ctrl+A — выбрать все видимые модели"
           onClick={vm.selectAllVisibleInEditMode}
         >
@@ -192,9 +192,9 @@ export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
           </div>
         ) : null}
         <TheaterBtn
-          onClick={vm.copyModelsFromPreviousStep}
-          disabled={!vm.currentStep || vm.currentPage === 0}
-          title="Скопировать модели из предыдущего шага"
+          onClick={vm.copyModelsFromPreviousScene}
+          disabled={!vm.currentScene || vm.currentPage === 0}
+          title="Скопировать модели из предыдущей сцены"
         >
           Скопировать модели
         </TheaterBtn>
@@ -206,47 +206,47 @@ export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
           </div>
           <div className="theater-spotlight-grid">
             <TheaterBtn
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Выровнять Z всех выбранных по первому"
               onClick={() => vm.alignSelectedModels("z")}
             >
               Выровнять Z
             </TheaterBtn>
             <TheaterBtn
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               title="Выровнять X всех выбранных по первому"
               onClick={() => vm.alignSelectedModels("x")}
             >
               Выровнять X
             </TheaterBtn>
             <TheaterBtn
-              disabled={!vm.currentStep || vm.multiSelectedModelIds.length < 3}
+              disabled={!vm.currentScene || vm.multiSelectedModelIds.length < 3}
               onClick={() => vm.distributeSelectedModels("z")}
             >
               Разнести Z
             </TheaterBtn>
             <TheaterBtn
-              disabled={!vm.currentStep || vm.multiSelectedModelIds.length < 3}
+              disabled={!vm.currentScene || vm.multiSelectedModelIds.length < 3}
               onClick={() => vm.distributeSelectedModels("x")}
             >
               Разнести X
             </TheaterBtn>
             <TheaterBtn
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               onClick={() => vm.setSelectedModelsVisibility(true)}
             >
               Скрыть выбранные
             </TheaterBtn>
             <TheaterBtn
-              disabled={!vm.currentStep}
+              disabled={!vm.currentScene}
               onClick={() => vm.setSelectedModelsVisibility(false)}
             >
               Показать выбранные
             </TheaterBtn>
-            <TheaterBtn disabled={!vm.currentStep} onClick={vm.removeSelectedModels}>
+            <TheaterBtn disabled={!vm.currentScene} onClick={vm.removeSelectedModels}>
               Удалить выбранные
             </TheaterBtn>
-            <TheaterBtn disabled={!vm.currentStep} onClick={vm.cloneSelectedModels}>
+            <TheaterBtn disabled={!vm.currentScene} onClick={vm.cloneSelectedModels}>
               Клонировать выбранные
             </TheaterBtn>
           </div>

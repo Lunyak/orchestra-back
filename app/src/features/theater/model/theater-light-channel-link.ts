@@ -157,7 +157,7 @@ export function fixtureMatchesChannelSlot(fixture: LightFixture, slot: number): 
   return parseLightChannelSlot(fixture.channel) === slot;
 }
 
-export function countStepLightChannelLinks(
+export function countSceneLightChannelLinks(
   lightPlot: LightFixture[] | undefined,
   spotlights: TheaterSpotlight[] | undefined,
 ): { fixtures: number; spotlights: number; linkedSlots: number } {

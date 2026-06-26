@@ -1,28 +1,29 @@
-import type { SceneRolesDataV1 } from "../../scene";
-import type { ScriptStep } from "../../../shared/types/script";
+import { readPlaybookRolesBySceneId } from "../../playbook/model/playbook-roles-storage";
+import type { PlaybookRolesDataV1 } from "../../playbook";
+import type { ScriptScene } from "../../../shared/types/script";
 import type { DirectorSlotRoleRehearsalPick } from "../directorSessionsSync";
 import { looksLikeEmail, normalizeEmail, normalizeRoleKey } from "./session-page-utils";
 
 export type { DirectorSlotRoleRehearsalPick };
 
 export type DirectorSlotPlannedData = {
-  steps: ScriptStep[];
-  sceneRoles?: SceneRolesDataV1 | null;
+  scenes: ScriptScene[];
+  sceneRoles?: PlaybookRolesDataV1 | null;
   roleEmailsByKey: Record<string, string[]>;
 };
 
 function extractRoleKeysFromSceneRoles(
-  sceneRoles: SceneRolesDataV1 | null | undefined,
-  stepId: number,
+  sceneRoles: PlaybookRolesDataV1 | null | undefined,
+  sceneId: number,
 ): string[] {
   const sr = sceneRoles;
   if (!sr || typeof sr !== "object" || sr.v !== 1) return [];
-  const byStepId = sr.byStepId;
-  if (!byStepId || typeof byStepId !== "object") return [];
-  const stepMap = byStepId[String(stepId)];
-  if (!stepMap || typeof stepMap !== "object") return [];
+  const bySceneId = readPlaybookRolesBySceneId(sr);
+  if (!bySceneId || typeof bySceneId !== "object") return [];
+  const sceneMap = bySceneId[String(sceneId)];
+  if (!sceneMap || typeof sceneMap !== "object") return [];
   const out: string[] = [];
-  for (const it of Object.values(stepMap)) {
+  for (const it of Object.values(sceneMap)) {
     if (!it || typeof it !== "object") continue;
     const key =
       typeof it.roleKey === "string" && it.roleKey.trim()
@@ -79,14 +80,14 @@ function extractRolesSmart(text?: string): string[] {
   );
 }
 
-export function getNormalizedRoleKeysForSlotStep(
-  step: ScriptStep | null | undefined,
-  sceneRoles: SceneRolesDataV1 | null | undefined,
-  stepId: number,
+export function getNormalizedRoleKeysForSlotScene(
+  scene: ScriptScene | null | undefined,
+  sceneRoles: PlaybookRolesDataV1 | null | undefined,
+  sceneId: number,
 ): string[] {
-  if (!step) return [];
-  const text = String(step.playMarkdown ?? step.markdown ?? "");
-  const attachedKeys = extractRoleKeysFromSceneRoles(sceneRoles, stepId);
+  if (!scene) return [];
+  const text = String(scene.playMarkdown ?? scene.markdown ?? "");
+  const attachedKeys = extractRoleKeysFromSceneRoles(sceneRoles, sceneId);
   const roleKeys =
     attachedKeys.length > 0
       ? attachedKeys
@@ -99,13 +100,13 @@ export function getNormalizedRoleKeysForSlotStep(
 /** Все назначенные на роли слота — для графика занятости (без учёта roleRehearsalPicks). */
 export function getAllAssigneeEmailsForDirectorSlotChart(
   projectSlug: string,
-  stepId: number,
+  sceneId: number,
   data: DirectorSlotPlannedData | null | undefined,
 ): string[] {
   const slug = String(projectSlug ?? "").trim();
   if (!slug || !data) return [];
-  const step = (data.steps ?? []).find((x) => x.id === stepId) ?? null;
-  const roleKeys = getNormalizedRoleKeysForSlotStep(step, data.sceneRoles, stepId);
+  const scene = (data.scenes ?? []).find((x) => x.id === sceneId) ?? null;
+  const roleKeys = getNormalizedRoleKeysForSlotScene(scene, data.sceneRoles, sceneId);
   const out = new Set<string>();
   const roleEmails = data.roleEmailsByKey ?? {};
   for (const key of roleKeys) {
@@ -123,17 +124,17 @@ export function getAllAssigneeEmailsForDirectorSlotChart(
 
 export type RolePlannedEmails = { roleKey: string; emails: string[] };
 
-/** План по ролям шага (для проверки «в каждой роли есть свободный актёр»). */
+/** План по ролям сцены (для проверки «в каждой роли есть свободный актёр»). */
 export function getRolePlannedEmailsForDirectorSlot(
   projectSlug: string,
-  stepId: number,
+  sceneId: number,
   data: DirectorSlotPlannedData | null | undefined,
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[] | null,
 ): RolePlannedEmails[] {
   const slug = String(projectSlug ?? "").trim();
   if (!slug || !data) return [];
-  const step = (data.steps ?? []).find((x) => x.id === stepId) ?? null;
-  const roleKeys = getNormalizedRoleKeysForSlotStep(step, data.sceneRoles, stepId);
+  const scene = (data.scenes ?? []).find((x) => x.id === sceneId) ?? null;
+  const roleKeys = getNormalizedRoleKeysForSlotScene(scene, data.sceneRoles, sceneId);
   const picks = roleRehearsalPicks ?? null;
   const roleEmails = data.roleEmailsByKey ?? {};
   const out: RolePlannedEmails[] = [];
@@ -165,14 +166,14 @@ export function getRolePlannedEmailsForDirectorSlot(
 
 export function getEmailsPlannedForDirectorSlot(
   projectSlug: string,
-  stepId: number,
+  sceneId: number,
   data: DirectorSlotPlannedData | null | undefined,
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[] | null,
 ): string[] {
   const slug = String(projectSlug ?? "").trim();
   if (!slug || !data) return [];
-  const step = (data.steps ?? []).find((x) => x.id === stepId) ?? null;
-  const roleKeys = getNormalizedRoleKeysForSlotStep(step, data.sceneRoles, stepId);
+  const scene = (data.scenes ?? []).find((x) => x.id === sceneId) ?? null;
+  const roleKeys = getNormalizedRoleKeysForSlotScene(scene, data.sceneRoles, sceneId);
   const picks = roleRehearsalPicks ?? null;
   const out = new Set<string>();
   const roleEmails = data.roleEmailsByKey ?? {};

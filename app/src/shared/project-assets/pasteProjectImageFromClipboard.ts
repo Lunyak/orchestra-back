@@ -1,8 +1,8 @@
 import { getDesktopApi } from "../platform/desktop-api";
 import {
   desktopAddProjectImage,
-  desktopReadProjectScene,
-  desktopSaveProjectScene,
+  desktopReadProjectPlaybook,
+  desktopSaveProjectPlaybook,
 } from "../platform/desktop-methods";
 import { ensureProject } from "../../sync/api/projects";
 
@@ -143,7 +143,7 @@ export async function pasteProjectImageFromClipboard(
               (options.persistRemoteToScene ?? true) && !!options.sceneName;
 
             if (shouldPersist && options.sceneName) {
-              const current = await desktopReadProjectScene(
+              const current = await desktopReadProjectPlaybook(
                 desktopApi,
                 options.projectSlug,
                 options.sceneName,
@@ -160,7 +160,7 @@ export async function pasteProjectImageFromClipboard(
                 [filename]: { remoteKey, remoteUrl },
               };
 
-              await desktopSaveProjectScene(
+              await desktopSaveProjectPlaybook(
                 desktopApi,
                 options.projectSlug,
                 options.sceneName,

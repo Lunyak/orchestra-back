@@ -308,23 +308,23 @@ export class RolesService {
   }
 
   /**
-   * One-time seed: if project has no roles yet, create roles from Step text.
+   * One-time seed: if project has no roles yet, create roles from Scene text.
    * Safe to call repeatedly.
    */
-  async seedFromStepCastIfEmpty(projectId: string) {
+  async seedFromSceneCastIfEmpty(projectId: string) {
     const existingCount = await this.prisma.projectRole.count({
       where: { projectId },
     });
     if (existingCount > 0) return { ok: true, seeded: false };
 
-    const steps = await this.prisma.step.findMany({
-      where: { scene: { projectId }, deletedAt: null },
+    const scenes = await this.prisma.scene.findMany({
+      where: { playbook: { projectId }, deletedAt: null },
       select: { markdown: true, playMarkdown: true },
       take: 5000,
     });
 
     const keyToTitle = new Map<string, string>();
-    for (const st of steps) {
+    for (const st of scenes) {
       const text = (st as any)?.playMarkdown ?? (st as any)?.markdown ?? '';
       for (const roleTitleRaw of extractRolesFromText(text)) {
         const roleTitle = String(roleTitleRaw ?? '').trim();
@@ -354,7 +354,7 @@ export class RolesService {
     if (keys.length === 0) return new Map<string, string[]>();
 
     // Seed if empty (для проектов без заведённых ролей).
-    await this.seedFromStepCastIfEmpty(projectId);
+    await this.seedFromSceneCastIfEmpty(projectId);
 
     const roles = await this.prisma.projectRole.findMany({
       where: { projectId, key: { in: Array.from(new Set(keys)) } },

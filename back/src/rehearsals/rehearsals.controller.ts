@@ -61,9 +61,9 @@ export class RehearsalsController {
     );
   }
 
-  @Get(':id/steps')
-  steps(@Req() req: any, @Param('id') id: string) {
-    return this.rehearsals.getStepsForRehearsal(req.user.userId, id);
+  @Get(':id/scenes')
+  scenes(@Req() req: any, @Param('id') id: string) {
+    return this.rehearsals.getScenesForRehearsal(req.user.userId, id);
   }
 
   @Patch(':id')

@@ -1,3 +1,4 @@
+import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -5,9 +6,10 @@ import { CalendarSection } from "../../../shared/components/calendar/CalendarSec
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import { formatMemberLabel, RehearsalPlanBlock } from "..";
+import { isoDate, normalizeEmail } from "../model/rehearsals-page-utils";
 import type { RehearsalsPageViewModel } from "../model/useRehearsalsPage";
 import { useRehearsalsPage } from "../model/useRehearsalsPage";
-import "../../../pages/rehearsals/style.css";
+import "./rehearsals.css";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");
@@ -62,11 +64,11 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
     rolesError,
     rolesLoading,
     saveMeta,
-    saveSelectedSteps,
-    saveStepsError,
-    savingSteps,
-    scriptStepById,
-    selectedSteps,
+    saveSelectedScenes,
+    saveScenesError,
+    savingScenes,
+    scriptSceneById,
+    selectedScenes,
     setActiveRehearsalId,
     setCalendarError,
     setCalendarState,
@@ -79,17 +81,16 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
     setMetaTitle,
     setPublishError,
     setPublishing,
-    setSaveStepsError,
-    setSavingSteps,
-    setSelectedSteps,
-    stepAvailabilityByKey,
-    steps,
-    stepsError,
-    stepsLoading,
-    stepsOptions,
+    setSaveScenesError,
+    setSavingScenes,
+    setSelectedScenes,
+    sceneAvailabilityByKey,
+    scenesError,
+    scenesLoading,
+    sceneOptions,
     teamProfileByEmail,
     teamProfiles,
-    toggleStep,
+    toggleScene,
   } = vm;
 
   return (
@@ -121,12 +122,12 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                   subtitle="Клик по дню: выбрать дату. Репетиции на дате показываются точками."
                 />
                 {calendarError && (
-                  <div className="rehearsals-error" style={{ marginTop: 10 }}>
+                  <div className="rehearsals-error rehearsals-error--spaced">
                     {calendarError}
                   </div>
                 )}
 
-                <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+                <div className="rehearsals-day-list-label">
                   Репетиции на {calendarState.selectedDate}:
                 </div>
                 <div className="rehearsals-list">
@@ -147,10 +148,13 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                         <button
                           key={r.id}
                           type="button"
-                          className={`rehearsals-item ${activeRehearsal?.id === r.id ? "active" : ""} ${isBad ? "bad" : ""
-                            }`}
+                          className={cn(
+                            "rehearsals-item",
+                            activeRehearsal?.id === r.id && "rehearsals-item--active",
+                            isBad && "rehearsals-item--bad",
+                          )}
                           onClick={() => setActiveRehearsalId(r.id)}
-                          title={isBad ? `Не собирается шагов: ${notReady}` : undefined}
+                          title={isBad ? `Не собирается сцен: ${notReady}` : undefined}
                         >
                           <div className="rehearsals-item-title">
                             {hh}:{mm}
@@ -173,7 +177,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                     {freeActorsForSelectedDate.length === 0 ? (
                       <div className="rehearsals-muted">Никто не отметил «свободен» на эту дату.</div>
                     ) : (
-                      <div className="rehearsals-table-wrap">
+                      <div className="rehearsals-table-container">
                         <table className="rehearsals-table">
                           <thead>
                             <tr>
@@ -185,7 +189,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                             {freeActorsForSelectedDate.map((a) => (
                               <tr key={a.email}>
                                 <td>
-                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                  <span className="rehearsals-actor-cell">
                                     <MiniAvatar src={String(a.avatarUrl ?? "").trim() || null} label={formatMemberLabel(a)} size={20} />
                                     <span>{formatMemberLabel(a)}</span>
                                   </span>
@@ -207,28 +211,28 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                     </div>
                     {!activeRehearsal ? (
                       <div className="rehearsals-muted">Выбери (или создай) репетицию, чтобы загрузить список сцен.</div>
-                    ) : stepsLoading ? (
+                    ) : scenesLoading ? (
                       <div className="rehearsals-muted">Загрузка сцен…</div>
-                    ) : stepsError ? (
-                      <div className="rehearsals-error">{stepsError}</div>
-                    ) : stepsOptions.length === 0 ? (
+                    ) : scenesError ? (
+                      <div className="rehearsals-error">{scenesError}</div>
+                    ) : sceneOptions.length === 0 ? (
                       <div className="rehearsals-muted">Сцен пока нет.</div>
                     ) : (
-                      <div className="rehearsals-table-wrap">
+                      <div className="rehearsals-table-container">
                         <table className="rehearsals-table">
                           <thead>
                             <tr>
                               <th>Сцена</th>
-                              <th>Шаг</th>
+                              <th>Сцена</th>
                               <th>Статус</th>
                               <th>Не хватает ролей</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {stepsOptions.flatMap((sc) =>
-                              sc.steps.map((st) => {
+                            {sceneOptions.flatMap((sc) =>
+                              sc.scenes.map((st) => {
                                 const key = `${sc.id}:${st.id}`;
-                                const info = stepAvailabilityByKey.get(key);
+                                const info = sceneAvailabilityByKey.get(key);
                                 const unknown = info?.unknown ?? false;
                                 const ok = info?.ok ?? true;
                                 const missing = info?.missingRoles ?? [];
@@ -283,9 +287,9 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                   >
                     <div className="rehearsals-section">
                       <div className="rehearsals-section-title">Параметры</div>
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <label style={{ display: "grid", gap: 6 }}>
-                          <span className="rehearsals-muted" style={{ fontSize: 12 }}>
+                      <div className="rehearsals-form-grid">
+                        <label className="rehearsals-form-field">
+                          <span className="rehearsals-muted rehearsals-muted--sm">
                             Название
                           </span>
                           <input
@@ -294,8 +298,8 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                             placeholder="Репетиция"
                           />
                         </label>
-                        <label style={{ display: "grid", gap: 6 }}>
-                          <span className="rehearsals-muted" style={{ fontSize: 12 }}>
+                        <label className="rehearsals-form-field">
+                          <span className="rehearsals-muted rehearsals-muted--sm">
                             Дата и время начала
                           </span>
                           <input
@@ -304,8 +308,8 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                             onChange={(e) => onChangeStart(e.target.value)}
                           />
                         </label>
-                        <label style={{ display: "grid", gap: 6 }}>
-                          <span className="rehearsals-muted" style={{ fontSize: 12 }}>
+                        <label className="rehearsals-form-field">
+                          <span className="rehearsals-muted rehearsals-muted--sm">
                             Дата и время окончания
                           </span>
                           <input
@@ -314,11 +318,11 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                             onChange={(e) => onChangeEnd(e.target.value)}
                           />
                         </label>
-                        <div className="rehearsals-muted" style={{ fontSize: 12 }}>
+                        <div className="rehearsals-muted rehearsals-muted--sm">
                           Длительность: {computedDurationLabel}
                         </div>
 
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <div className="rehearsals-form-actions">
                           <button type="button" onClick={() => applyPresetDuration(90)} disabled={metaSaving}>
                             90 мин
                           </button>
@@ -338,9 +342,9 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
 
                     <div className="rehearsals-section">
                       <div className="rehearsals-section-title">Публикация в чат</div>
-                      <div style={{ display: "grid", gap: 8 }}>
-                        <div className="rehearsals-muted" style={{ fontSize: 12 }}>
-                          Сначала выбери сцены (шаги) для репетиции. В опрос попадут только те актёры, которые нужны по выбранным сценам и отметили «свободен» в профиле.
+                      <div className="rehearsals-form-grid">
+                        <div className="rehearsals-muted rehearsals-muted--sm">
+                          Сначала выбери сцены для репетиции. В опрос попадут только те актёры, которые нужны по выбранным сценам и отметили «свободен» в профиле.
                         </div>
                         <button
                           type="button"
@@ -348,13 +352,13 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                           disabled={
                             publishing ||
                             !!activeRehearsal.telegramMessageId ||
-                            !(activeRehearsal.selectedSteps?.length ?? 0)
+                            !(activeRehearsal.selectedScenes?.length ?? 0)
                           }
                           title={
                             activeRehearsal.telegramMessageId
                               ? "Уже опубликовано"
-                              : !(activeRehearsal.selectedSteps?.length ?? 0)
-                                ? "Сначала выберите и сохраните сцены (шаги)"
+                              : !(activeRehearsal.selectedScenes?.length ?? 0)
+                                ? "Сначала выберите и сохраните сцены"
                                 : "Опубликовать репетицию в Telegram-чате"
                           }
                         >
@@ -375,46 +379,46 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
 
                     <div className="rehearsals-section">
                       <div className="rehearsals-section-title">Сцены на репетицию</div>
-                      {stepsLoading ? (
+                      {scenesLoading ? (
                         <div className="rehearsals-muted">Загрузка…</div>
-                      ) : stepsError ? (
-                        <div className="rehearsals-error">{stepsError}</div>
-                      ) : stepsOptions.length === 0 ? (
+                      ) : scenesError ? (
+                        <div className="rehearsals-error">{scenesError}</div>
+                      ) : sceneOptions.length === 0 ? (
                         <div className="rehearsals-muted">Сцен пока нет.</div>
                       ) : (
-                        <div style={{ display: "grid", gap: 10 }}>
-                          <div className="rehearsals-muted" style={{ fontSize: 12 }}>
-                            Выбрано: {selectedSteps.length}
+                        <div className="rehearsals-scene-pick-grid">
+                          <div className="rehearsals-muted rehearsals-muted--sm">
+                            Выбрано: {selectedScenes.length}
                           </div>
-                          <div style={{ maxHeight: 220, overflow: "auto", paddingRight: 6 }}>
-                            {stepsOptions.slice(0, 10).map((sc) => (
-                              <div key={sc.id} style={{ marginBottom: 10 }}>
-                                <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+                          <div className="rehearsals-scene-pick-scroll">
+                            {sceneOptions.slice(0, 10).map((sc) => (
+                              <div key={sc.id} className="rehearsals-scene-group">
+                                <div className="rehearsals-scene-group-title">
                                   {sc.name}
                                 </div>
-                                <div style={{ display: "grid", gap: 6 }}>
-                                  {sc.steps.slice(0, 200).map((st) => {
+                                <div className="rehearsals-scene-options">
+                                  {sc.scenes.slice(0, 200).map((st) => {
                                     const key = `${sc.id}:${st.id}`;
-                                    const avail = stepAvailabilityByKey.get(key);
+                                    const avail = sceneAvailabilityByKey.get(key);
                                     const unknown = avail?.unknown ?? false;
                                     const ok = avail?.ok ?? true;
                                     const missing = avail?.missingRoles ?? [];
-                                    const checked = selectedSteps.some(
-                                      (x) => x.sceneId === sc.id && x.stepId === st.id,
+                                    const checked = selectedScenes.some(
+                                      (x) => x.playbookId === sc.id && x.sceneId === st.id,
                                     );
                                     return (
                                       <label
                                         key={`${sc.id}:${st.id}`}
-                                        style={{ display: "flex", gap: 8, alignItems: "flex-start" }}
+                                        className="rehearsals-scene-option"
                                       >
                                         <input
                                           type="checkbox"
                                           checked={checked}
                                           disabled={!unknown && !ok}
-                                          onChange={() => toggleStep(sc.id, st.id)}
+                                          onChange={() => toggleScene(sc.id, st.id)}
                                           title={
                                             unknown
-                                              ? "Нет данных о ролях/назначениях для этого шага"
+                                              ? "Нет данных о ролях/назначениях для этой сцены"
                                               : ok
                                                 ? "Можно выбрать"
                                                 : missing.length
@@ -422,16 +426,16 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                                                   : "Не хватает ролей (по свободным актёрам)"
                                           }
                                         />
-                                        <span style={{ fontSize: 12, lineHeight: 1.2 }}>
+                                        <span className="rehearsals-scene-option-text">
                                           {st.id}. {st.title}
                                           {!unknown && !ok && missing.length > 0 && (
-                                            <span className="rehearsals-muted" style={{ display: "block", marginTop: 2 }}>
+                                            <span className="rehearsals-muted rehearsals-scene-option-note">
                                               не хватает: {missing.slice(0, 4).join(", ")}
                                               {missing.length > 4 ? ` +${missing.length - 4}` : ""}
                                             </span>
                                           )}
                                           {unknown && (
-                                            <span className="rehearsals-muted" style={{ display: "block", marginTop: 2 }}>
+                                            <span className="rehearsals-muted rehearsals-scene-option-note">
                                               роли: нет данных
                                             </span>
                                           )}
@@ -443,10 +447,10 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                               </div>
                             ))}
                           </div>
-                          <button type="button" onClick={saveSelectedSteps} disabled={savingSteps}>
-                            {savingSteps ? "Сохраняю…" : "Сохранить сцены"}
+                          <button type="button" onClick={saveSelectedScenes} disabled={savingScenes}>
+                            {savingScenes ? "Сохраняю…" : "Сохранить сцены"}
                           </button>
-                          {saveStepsError && <div className="rehearsals-error">{saveStepsError}</div>}
+                          {saveScenesError && <div className="rehearsals-error">{saveScenesError}</div>}
                         </div>
                       )}
                     </div>
@@ -469,7 +473,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                           return (
                             <div key={m.email} className="rehearsals-person">
                               <div className="rehearsals-person-label">
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                                <span className="rehearsals-actor-cell">
                                   <MiniAvatar
                                     src={String((prof as any)?.avatarUrl ?? "").trim() || null}
                                     label={formatMemberLabel(m)}
@@ -478,7 +482,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                                   <span>{formatMemberLabel(m)}</span>
                                 </span>
                               </div>
-                              <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                              <div className="rehearsals-muted rehearsals-muted--xs">
                                 по календарю:{" "}
                                 {availability === "present"
                                   ? "свободен"
@@ -487,17 +491,17 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                                     : "не отмечено"}
                               </div>
                               {meta?.respondedAt && (
-                                <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                                <div className="rehearsals-muted rehearsals-muted--xs">
                                   ответил: {dayjs(meta.respondedAt).format("DD.MM HH:mm")}
                                 </div>
                               )}
                               {meta?.status === "late" && meta?.lateTime && (
-                                <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                                <div className="rehearsals-muted rehearsals-muted--xs">
                                   будет к: {meta.lateTime}
                                 </div>
                               )}
                               {meta?.status && meta.status !== "unknown" && (
-                                <div className="rehearsals-muted" style={{ fontSize: 11 }}>
+                                <div className="rehearsals-muted rehearsals-muted--xs">
                                   по вызову:{" "}
                                   {meta.status === "present"
                                     ? "подтвердил"
@@ -532,5 +536,5 @@ export function RehearsalsPage() {
   if (vm.needsAuth) {
     return <div className="rehearsals-muted">Нужно войти.</div>;
   }
-  return <RehearsalsPageView vm={vm} />;
+  return <RehearsalsPageView {...vm} />;
 }

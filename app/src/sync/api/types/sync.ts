@@ -4,8 +4,8 @@ export type SyncOperation = "create" | "update" | "delete";
 
 export type SyncEntityType =
   | "Project"
+  | "Playbook"
   | "Scene"
-  | "Step"
   | "PlaylistItem"
   | "Sound"
   | "GlobalLightChannel"
@@ -34,7 +34,7 @@ export interface SyncPullRequest {
   lastSyncAt: string | null;
   projectSlug?: string;
   include?: {
-    steps?: boolean;
+    scenes?: boolean;
     playlist?: boolean;
     sounds?: boolean;
     lightChannels?: boolean;
@@ -45,8 +45,8 @@ export interface SyncPullRequest {
 export interface SyncPullResponse {
   now: string;
   projects: ProjectSummary[];
-  scenes: any[];
-  steps?: any[];
+  playbooks?: any[];
+  scenes?: any[];
   playlistItems?: any[];
   sounds?: any[];
   lightChannels?: any[];

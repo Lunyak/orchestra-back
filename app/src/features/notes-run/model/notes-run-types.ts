@@ -10,8 +10,8 @@ export type NotesRunCardV1 = {
   id: string;
   cardNo: number;
   title: string;
-  /** Произвольная метка шага сценария (текст, не id). */
-  stepLabel: string;
+  /** Произвольная метка сцены сценария (текст, не id). */
+  sceneLabel: string;
   lightLines: NotesRunLightLineV1[];
   /** Доп. текст по свету — если не хватает таблицы строк. */
   lightNotes: string;
@@ -29,7 +29,7 @@ export type NotesRunDataV1 = {
 
 export type NotesRunCardDraft = {
   title: string;
-  stepLabel: string;
+  sceneLabel: string;
   lightLines: NotesRunLightLineV1[];
   lightNotes: string;
   playTrackId: number | null;

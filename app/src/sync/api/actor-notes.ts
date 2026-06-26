@@ -1,6 +1,6 @@
 import { api } from "./client";
 
-export interface ActorStepNote {
+export interface ActorSceneNote {
   id: string;
   text: string;
   createdAt: string;
@@ -19,12 +19,12 @@ export interface ActorAnnotation {
   updatedAt: string;
 }
 
-export async function getActorStepNote(
+export async function getActorSceneNote(
   accessToken: string,
-  params: { projectSlug: string; sceneName: string; stepId: number },
-): Promise<{ note: ActorStepNote | null }> {
-  const { data } = await api.get<{ note: ActorStepNote | null }>(
-    "/actor-notes/step",
+  params: { projectSlug: string; sceneName: string; sceneId: number },
+): Promise<{ note: ActorSceneNote | null }> {
+  const { data } = await api.get<{ note: ActorSceneNote | null }>(
+    "/actor-notes/scene",
     {
       params,
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -33,12 +33,12 @@ export async function getActorStepNote(
   return data;
 }
 
-export async function upsertActorStepNote(
+export async function upsertActorSceneNote(
   accessToken: string,
-  body: { projectSlug: string; sceneName: string; stepId: number; text?: string },
-): Promise<{ note: ActorStepNote | null }> {
-  const { data } = await api.put<{ note: ActorStepNote | null }>(
-    "/actor-notes/step",
+  body: { projectSlug: string; sceneName: string; sceneId: number; text?: string },
+): Promise<{ note: ActorSceneNote | null }> {
+  const { data } = await api.put<{ note: ActorSceneNote | null }>(
+    "/actor-notes/scene",
     body,
     {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -47,11 +47,11 @@ export async function upsertActorStepNote(
   return data;
 }
 
-export async function deleteActorStepNote(
+export async function deleteActorSceneNote(
   accessToken: string,
-  params: { projectSlug: string; sceneName: string; stepId: number },
+  params: { projectSlug: string; sceneName: string; sceneId: number },
 ): Promise<{ ok: boolean }> {
-  const { data } = await api.delete<{ ok: boolean }>("/actor-notes/step", {
+  const { data } = await api.delete<{ ok: boolean }>("/actor-notes/scene", {
     params,
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -63,7 +63,7 @@ export async function listActorAnnotations(
   params: {
     projectSlug: string;
     sceneName: string;
-    stepId: number;
+    sceneId: number;
     field: ActorAnnotationField;
   },
 ): Promise<{ annotations: ActorAnnotation[] }> {
@@ -82,7 +82,7 @@ export async function createActorAnnotation(
   body: {
     projectSlug: string;
     sceneName: string;
-    stepId: number;
+    sceneId: number;
     field: ActorAnnotationField;
     startOffset: number;
     endOffset: number;

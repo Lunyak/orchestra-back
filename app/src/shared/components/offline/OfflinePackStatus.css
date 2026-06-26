@@ -18,11 +18,11 @@
   flex-shrink: 0;
 }
 
-.offline-pack-status__dot.online {
+.offline-pack-status__dot--online {
   background: #3dd68c;
 }
 
-.offline-pack-status__dot.offline {
+.offline-pack-status__dot--offline {
   background: #f5a623;
 }
 

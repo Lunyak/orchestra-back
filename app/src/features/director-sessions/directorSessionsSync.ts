@@ -8,7 +8,7 @@ import { getMyProfile, type MyProfile } from "../../sync/api/profile";
 
 export type DirectorSlotRef = {
   projectSlug: string;
-  stepId: number;
+  sceneId: number;
 };
 
 export type DirectorSlotRoleRehearsalPick = {

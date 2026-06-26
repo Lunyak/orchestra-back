@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { ScriptStep, TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import {
   copyFloorPlanToClipboard,
   downloadFloorPlanPdf,
@@ -9,7 +9,7 @@ import {
 
 export type UseTheaterFloorPlanArgs = {
   projectName: string;
-  currentStep: ScriptStep | undefined;
+  currentScene: ScriptScene | undefined;
   layout: TheaterLayout;
   visibleModels: TheaterModel[];
   visibleSpotlights: TheaterSpotlight[];
@@ -22,7 +22,7 @@ export type UseTheaterFloorPlanArgs = {
 
 export function useTheaterFloorPlan({
   projectName,
-  currentStep,
+  currentScene,
   layout,
   visibleModels,
   visibleSpotlights,
@@ -41,11 +41,11 @@ export function useTheaterFloorPlan({
       showSpotlights,
       showGrid,
       gridStep,
-      title: currentStep?.title ?? projectName,
+      title: currentScene?.title ?? projectName,
     });
     setDecorActionMessage("План зала сохранён (SVG)");
   }, [
-    currentStep?.title,
+    currentScene?.title,
     gridStep,
     layout,
     projectName,
@@ -68,11 +68,11 @@ export function useTheaterFloorPlan({
       gridStep,
       width: 840,
       height: 680,
-      title: currentStep?.title ?? projectName,
+      title: currentScene?.title ?? projectName,
     });
     setDecorActionMessage("План зала сохранён (PNG)");
   }, [
-    currentStep?.title,
+    currentScene?.title,
     gridStep,
     layout,
     projectName,
@@ -93,11 +93,11 @@ export function useTheaterFloorPlan({
       showSpotlights,
       showGrid,
       gridStep,
-      title: currentStep?.title ?? projectName,
+      title: currentScene?.title ?? projectName,
     });
     setDecorActionMessage("Открыт диалог печати (PDF)");
   }, [
-    currentStep?.title,
+    currentScene?.title,
     gridStep,
     layout,
     projectName,
@@ -120,13 +120,13 @@ export function useTheaterFloorPlan({
       gridStep,
       width: 840,
       height: 680,
-      title: currentStep?.title ?? projectName,
+      title: currentScene?.title ?? projectName,
     });
     setDecorActionMessage(
       ok ? "План скопирован в буфер" : "Буфер обмена недоступен",
     );
   }, [
-    currentStep?.title,
+    currentScene?.title,
     gridStep,
     layout,
     projectName,

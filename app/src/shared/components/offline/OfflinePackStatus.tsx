@@ -1,7 +1,8 @@
+import cn from "classnames";
 import { Capacitor } from "@capacitor/core";
 import { Network } from "@capacitor/network";
 import React, { useCallback, useEffect, useState } from "react";
-import { useScene } from "../../../features/scene";
+import { usePlaybook } from "../../../features/playbook";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { getDesktopApi } from "../../platform/desktop-api";
@@ -12,7 +13,7 @@ import "./OfflinePackStatus.css";
 export function OfflinePackStatus() {
   const { projectName } = useProject();
   const { accessToken } = useAuth();
-  const { syncFromServer } = useScene();
+  const { syncFromServer } = usePlaybook();
   const [online, setOnline] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -51,11 +52,11 @@ export function OfflinePackStatus() {
 
   if (!isOfflineNativePlatform()) return null;
 
-  const hasLocalApi = Boolean(getDesktopApi()?.readProjectScene);
+  const hasLocalApi = Boolean(getDesktopApi()?.readProjectPlaybook);
 
   return (
     <div className="offline-pack-status" role="status">
-      <span className={`offline-pack-status__dot ${online ? "online" : "offline"}`} />
+      <span className={cn("offline-pack-status__dot", online ? "offline-pack-status__dot--online" : "offline-pack-status__dot--offline")} />
       <span className="offline-pack-status__text">
         {Capacitor.isNativePlatform()
           ? online
@@ -71,7 +72,7 @@ export function OfflinePackStatus() {
             disabled={busy || !online || !projectName}
             onClick={() => void downloadPack()}
           >
-            {busy ? "Загрузка…" : "Скачать для спектакля"}
+            {busy ? "Загрузка…" : "Скачать для суфлёра"}
           </button>
           <DownloadProjectorMediaButton
             buttonClassName="offline-pack-status__btn offline-pack-status__btn--secondary"

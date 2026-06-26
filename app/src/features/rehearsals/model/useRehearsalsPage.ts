@@ -1,19 +1,20 @@
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
-import { useQueries } from "@reduxjs/toolkit/query/react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { useLocation } from "react-router-dom";
 import { useMyProfileQuery, useProfilesBatchQuery } from "../../profile/api/profile-api";
 import { useProjectRolesQuery } from "../../project/api/project-api";
 import { useAuth } from "../../auth";
 import {
   rehearsalsApi,
+  type RehearsalPlanResponse,
   useCreateRehearsalMutation,
   useLazyGetRehearsalQuery,
   useListRehearsalsQuery,
   usePublishRehearsalMutation,
-  useRehearsalStepsQuery,
+  useRehearsalScenesQuery,
   useUpdateRehearsalMutation,
 } from "../api/rehearsals-api";
 import {
@@ -24,11 +25,11 @@ import {
   normalizeRoleName,
 } from "./rehearsals-page-utils";
 import { useProject } from "../../project";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import { useTeam } from "../../team";
 import type { CalendarSectionState } from "../../../shared/components/calendar/CalendarSection";
 import type { TeamProfile } from "../../../sync/api/profile";
-import type { Rehearsal, RehearsalSelectedStep } from "../../../sync/api/rehearsals";
+import type { Rehearsal, RehearsalSelectedScene } from "../../../sync/api/rehearsals";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");
@@ -39,7 +40,7 @@ export function useRehearsalsPage() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
   const { projectMembers, projectOwner } = useTeam();
-  const { steps: scriptSteps } = useScene();
+  const { scenes: scriptScenes } = usePlaybook();
   const location = useLocation();
 
   const projectSlug = projectName || "fools";
@@ -124,38 +125,38 @@ export function useRehearsalsPage() {
 
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const [selectedSteps, setSelectedSteps] = useState<RehearsalSelectedStep[]>([]);
-  const lastStepsRehearsalIdRef = useRef<string | null>(null);
+  const [selectedScenes, setSelectedScenes] = useState<RehearsalSelectedScene[]>([]);
+  const lastScenesRehearsalIdRef = useRef<string | null>(null);
 
   const {
-    data: stepsData,
-    isLoading: stepsLoading,
-    isError: stepsIsError,
-  } = useRehearsalStepsQuery(activeRehearsal?.id ?? "", {
+    data: scenesData,
+    isLoading: scenesLoading,
+    isError: scenesIsError,
+  } = useRehearsalScenesQuery(activeRehearsal?.id ?? "", {
     skip: !accessToken || !activeRehearsal?.id,
   });
-  const stepsOptions = stepsData?.scenes ?? [];
-  const stepsError = stepsIsError ? "Не удалось загрузить список сцен" : null;
+  const sceneOptions = scenesData?.playbooks ?? [];
+  const scenesError = scenesIsError ? "Не удалось загрузить список сцен" : null;
 
   useEffect(() => {
     const rid = activeRehearsal?.id ?? null;
     if (!rid) {
-      setSelectedSteps([]);
-      lastStepsRehearsalIdRef.current = null;
+      setSelectedScenes([]);
+      lastScenesRehearsalIdRef.current = null;
       return;
     }
-    if (lastStepsRehearsalIdRef.current !== rid && stepsData?.selectedSteps) {
-      setSelectedSteps(stepsData.selectedSteps);
-      lastStepsRehearsalIdRef.current = rid;
+    if (lastScenesRehearsalIdRef.current !== rid && scenesData?.selectedScenes) {
+      setSelectedScenes(scenesData.selectedScenes);
+      lastScenesRehearsalIdRef.current = rid;
     }
-  }, [activeRehearsal?.id, stepsData?.selectedSteps]);
+  }, [activeRehearsal?.id, scenesData?.selectedScenes]);
 
   const [createRehearsalMut] = useCreateRehearsalMutation();
   const [updateRehearsalMut] = useUpdateRehearsalMutation();
   const [publishRehearsalMut] = usePublishRehearsalMutation();
   const [fetchRehearsal] = useLazyGetRehearsalQuery();
-  const [savingSteps, setSavingSteps] = useState(false);
-  const [saveStepsError, setSaveStepsError] = useState<string | null>(null);
+  const [savingScenes, setSavingScenes] = useState(false);
+  const [saveScenesError, setSaveScenesError] = useState<string | null>(null);
 
   const [metaTitle, setMetaTitle] = useState("");
   const [metaStartsAtLocal, setMetaStartsAtLocal] = useState("");
@@ -327,14 +328,14 @@ export function useRehearsalsPage() {
     return Array.from(map.values());
   }, [members, myMember]);
 
-  const scriptStepById = useMemo(() => {
-    const map = new Map<number, (typeof scriptSteps)[number]>();
-    for (const st of scriptSteps ?? []) {
-      if (typeof st?.id !== "number") continue;
-      map.set(st.id, st);
+  const scriptSceneById = useMemo(() => {
+    const map = new Map<number, (typeof scriptScenes)[number]>();
+    for (const scene of scriptScenes ?? []) {
+      if (typeof scene?.id !== "number") continue;
+      map.set(scene.id, scene);
     }
     return map;
-  }, [scriptSteps]);
+  }, [scriptScenes]);
 
   const profileEmails = useMemo(
     () => membersWithMe.map((m) => normalizeEmail(m.email)).filter(Boolean).sort(),
@@ -455,26 +456,32 @@ export function useRehearsalsPage() {
     return out;
   }, [calendarState.selectedDate, membersWithMe, projectRoles, teamProfileByEmail]);
 
+  const dispatch = useAppDispatch();
   const planIds = useMemo(() => rehearsals.slice(0, 20).map((r) => r.id), [rehearsals]);
-  const planQueries = useQueries({
-    queries: planIds.map((id) => ({
-      ...rehearsalsApi.endpoints.rehearsalPlan.getOptions(id),
-      skip: !accessToken,
-    })),
-  });
 
-  const planCache = useMemo(() => {
+  useEffect(() => {
+    if (!accessToken) return;
+    const subs = planIds.map((id) => dispatch(rehearsalsApi.endpoints.rehearsalPlan.initiate(id)));
+    return () => {
+      for (const sub of subs) sub.unsubscribe();
+    };
+  }, [accessToken, dispatch, planIds]);
+
+  const planCache = useAppSelector((state) => {
     const out: Record<string, { notReady: number }> = {};
-    planIds.forEach((id, index) => {
-      const data = planQueries[index]?.data;
-      if (!data) return;
+    for (const id of planIds) {
+      const data = rehearsalsApi.endpoints.rehearsalPlan.select(id)(state).data as
+        | RehearsalPlanResponse
+        | undefined;
+      if (!data) continue;
+      const items = data.items ?? [];
       const notReady = data.selectionRequired
         ? 1
-        : (data.items ?? []).filter((x) => !x.ready).length;
+        : items.filter((item) => !item.ready).length;
       out[id] = { notReady };
-    });
+    }
     return out;
-  }, [planIds, planQueries]);
+  });
 
   const createForSelectedDate = async () => {
     if (!accessToken) return;
@@ -507,33 +514,33 @@ export function useRehearsalsPage() {
     }
   };
 
-  const toggleStep = (sceneId: string, stepId: number) => {
-    setSelectedSteps((prev) => {
-      const key = `${sceneId}:${stepId}`;
-      const has = prev.some((x) => `${x.sceneId}:${x.stepId}` === key);
-      if (has) return prev.filter((x) => `${x.sceneId}:${x.stepId}` !== key);
-      return [...prev, { sceneId, stepId }];
+  const toggleScene = (playbookId: string, sceneId: number) => {
+    setSelectedScenes((prev) => {
+      const key = `${playbookId}:${sceneId}`;
+      const has = prev.some((x) => `${x.playbookId}:${x.sceneId}` === key);
+      if (has) return prev.filter((x) => `${x.playbookId}:${x.sceneId}` !== key);
+      return [...prev, { playbookId, sceneId }];
     });
   };
 
-  const saveSelectedSteps = async () => {
+  const saveSelectedScenes = async () => {
     if (!accessToken || !activeRehearsal) return;
-    setSavingSteps(true);
-    setSaveStepsError(null);
+    setSavingScenes(true);
+    setSaveScenesError(null);
     try {
       await updateRehearsalMut({
         rehearsalId: activeRehearsal.id,
         projectSlug,
-        patch: { selectedSteps },
+        patch: { selectedScenes },
       }).unwrap();
     } catch {
-      setSaveStepsError("Не удалось сохранить выбранные сцены");
+      setSaveScenesError("Не удалось сохранить выбранные сцены");
     } finally {
-      setSavingSteps(false);
+      setSavingScenes(false);
     }
   };
 
-  const stepAvailabilityByKey = useMemo(() => {
+  const sceneAvailabilityByKey = useMemo(() => {
     const out = new Map<
       string,
       {
@@ -545,10 +552,10 @@ export function useRehearsalsPage() {
       }
     >();
 
-    for (const sc of stepsOptions ?? []) {
-      for (const st of sc.steps ?? []) {
+    for (const sc of sceneOptions ?? []) {
+      for (const st of sc.scenes ?? []) {
         const key = `${sc.id}:${st.id}`;
-        const full = scriptStepById.get(st.id);
+        const full = scriptSceneById.get(st.id);
         const unknown = !full || rolesLoading;
         const text = (full?.playMarkdown ?? full?.markdown ?? "") as string;
         const requiredRolesRaw = extractRolesSmart(text);
@@ -593,7 +600,7 @@ export function useRehearsalsPage() {
     }
 
     return out;
-  }, [availableEmailSetForSelectedDate, roleByNorm, rolesLoading, scriptStepById, stepsOptions]);
+  }, [availableEmailSetForSelectedDate, roleByNorm, rolesLoading, scriptSceneById, sceneOptions]);
 
   return {
     accessToken,
@@ -641,11 +648,11 @@ export function useRehearsalsPage() {
     rolesError,
     rolesLoading,
     saveMeta,
-    saveSelectedSteps,
-    saveStepsError,
-    savingSteps,
-    scriptStepById,
-    selectedSteps,
+    saveSelectedScenes,
+    saveScenesError,
+    savingScenes,
+    scriptSceneById,
+    selectedScenes,
     setActiveRehearsalId,
     setCalendarError,
     setCalendarState,
@@ -658,17 +665,16 @@ export function useRehearsalsPage() {
     setMetaTitle,
     setPublishError,
     setPublishing,
-    setSaveStepsError,
-    setSavingSteps,
-    setSelectedSteps,
-    stepAvailabilityByKey,
-    steps,
-    stepsError,
-    stepsLoading,
-    stepsOptions,
+    setSaveScenesError,
+    setSavingScenes,
+    setSelectedScenes,
+    sceneAvailabilityByKey,
+    scenesError,
+    scenesLoading,
+    sceneOptions,
     teamProfileByEmail,
     teamProfiles,
-    toggleStep,
+    toggleScene,
     needsAuth: !accessToken,
   };
 }

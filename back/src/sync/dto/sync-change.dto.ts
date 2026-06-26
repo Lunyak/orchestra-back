@@ -12,8 +12,8 @@ export type SyncOperation = 'create' | 'update' | 'delete';
 
 export type SyncEntityType =
   | 'Project'
+  | 'Playbook'
   | 'Scene'
-  | 'Step'
   | 'PlaylistItem'
   | 'Sound'
   | 'GlobalLightChannel'
@@ -25,6 +25,7 @@ export class SyncChangeDto {
 
   @IsIn([
     'Project',
+    'Playbook',
     'Scene',
     'Step',
     'PlaylistItem',
@@ -32,7 +33,7 @@ export class SyncChangeDto {
     'GlobalLightChannel',
     'TheaterLayout',
   ])
-  entityType: SyncEntityType;
+  entityType: SyncEntityType | 'Step';
 
   @IsString()
   entityId: string;
@@ -76,12 +77,12 @@ export class SyncPullDto {
 
   /**
    * Управляет тем, какие "тяжелые" или legacy данные включать в ответ.
-   * По умолчанию (если не передано) возвращаем только projects/scenes и без тяжелых таблиц.
+   * По умолчанию (если не передано) возвращаем только projects/playbooks и без тяжелых таблиц.
    */
   @IsOptional()
   @IsObject()
   include?: {
-    steps?: boolean;
+    scenes?: boolean;
     playlist?: boolean;
     sounds?: boolean;
     lightChannels?: boolean;
@@ -99,7 +100,7 @@ export class SyncPullSceneDto {
   @IsOptional()
   @IsObject()
   include?: {
-    steps?: boolean;
+    scenes?: boolean;
     playlist?: boolean;
     sounds?: boolean;
     lightChannels?: boolean;

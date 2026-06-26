@@ -162,11 +162,11 @@ export function CustomSelect({
       </button>
       {isOpen && !isDisabled ? (
         <div
-          className={cn("custom-select__dropdown-wrap", dropdownClassName)}
+          className={cn("custom-select__dropdown-container", dropdownClassName)}
           onMouseDown={(event) => event.stopPropagation()}
         >
           {showSearch ? (
-            <div className="custom-select__search-wrap">
+            <div className="custom-select__search-container">
               <input
                 ref={searchInputRef}
                 id={searchInputId}

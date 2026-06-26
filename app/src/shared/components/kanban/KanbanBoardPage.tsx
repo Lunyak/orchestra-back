@@ -1,20 +1,21 @@
+import cn from "classnames";
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../features/auth";
 import { mergeKanbanRoleAssignmentMembers } from "../../../features/kanban/model/kanban-role-members";
-import { KanbanStepDetailModal } from "../../../features/kanban-step-modal/KanbanStepDetailModal";
-import type { KanbanStepRolesAdminMember } from "../../../features/kanban-step-modal/KanbanStepRolesAdminPanel";
+import { KanbanSceneDetailModal } from "../../../features/kanban-scene-modal/KanbanSceneDetailModal";
+import type { KanbanSceneRolesAdminMember } from "../../../features/kanban-scene-modal/KanbanSceneRolesAdminPanel";
 import {
   useProjectMembersQuery,
   useProjectRolesQuery,
 } from "../../../features/project/api/project-api";
 import { useProject } from "../../../features/project";
-import { useScene } from "../../../features/scene";
+import { usePlaybook } from "../../../features/playbook";
 import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
-import type { ScriptStep } from "../../types/script";
+import type { ScriptScene } from "../../types/script";
 import type { ProjectRoleInfo } from "../../../sync/api/projects";
 import type { TroupeMemberItem } from "../../../sync/api/troupe";
 import {
-  loadActorStepNote,
+  loadActorSceneNote,
   selectActorNote,
 } from "../../../features/show-script/model/show-script-slice";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -25,8 +26,8 @@ import { OptionalFilterSelect } from "@shared/core/optional-filter-select/Option
 import { RehearsalPlanSectionChrome } from "../rehearsal-plan/RehearsalPlanSectionChrome";
 import { STATUSES, statusOf, type KanbanStatus } from "./kanban-constants";
 
-function orderOf(step: ScriptStep, fallback: number): number {
-  const v = step.kanbanOrder;
+function orderOf(scene: ScriptScene, fallback: number): number {
+  const v = scene.kanbanOrder;
   return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
@@ -103,47 +104,47 @@ function formatMemberLabel(m: MemberInfo): string {
   return `${name} (${m.email})`;
 }
 
-function normalizeMissingOrders(steps: ScriptStep[]): ScriptStep[] {
+function normalizeMissingOrders(scenes: ScriptScene[]): ScriptScene[] {
   let changed = false;
-  const next = steps.map((s, idx) => {
+  const next = scenes.map((s, idx) => {
     if (typeof s.kanbanOrder === "number" && Number.isFinite(s.kanbanOrder)) return s;
     changed = true;
     return { ...s, kanbanOrder: idx + 1 };
   });
-  return changed ? next : steps;
+  return changed ? next : scenes;
 }
 
 function reorderColumn(
-  steps: ScriptStep[],
+  scenes: ScriptScene[],
   status: KanbanStatus,
   idsInDesiredOrder: string[],
-  mutateDragged?: (s: ScriptStep) => ScriptStep
-): ScriptStep[] {
+  mutateDragged?: (s: ScriptScene) => ScriptScene
+): ScriptScene[] {
   const orderMap = new Map<string, number>();
   idsInDesiredOrder.forEach((id, idx) => orderMap.set(id, idx + 1));
-  return steps.map((s) => {
+  return scenes.map((s) => {
     if (statusOf(s) !== status) return s;
     const desired = orderMap.get(String(s.id));
     if (desired == null) return s;
-    const next: ScriptStep = { ...s, kanbanOrder: desired };
+    const next: ScriptScene = { ...s, kanbanOrder: desired };
     return mutateDragged ? mutateDragged(next) : next;
   });
 }
 
 function applyMove(
-  steps: ScriptStep[],
+  scenes: ScriptScene[],
   draggedId: number,
   toStatus: KanbanStatus,
   beforeId?: number
-): ScriptStep[] {
-  const dragged = steps.find((s) => s.id === draggedId);
-  if (!dragged) return steps;
+): ScriptScene[] {
+  const dragged = scenes.find((s) => s.id === draggedId);
+  if (!dragged) return scenes;
 
   const fromStatus = statusOf(dragged);
   const draggedKey = String(draggedId);
 
   const sortedKeysForStatus = (status: KanbanStatus) =>
-    steps
+    scenes
       .map((s, idx) => ({
         key: String(s.id),
         id: s.id,
@@ -162,7 +163,7 @@ function applyMove(
   const nextToKeys = [...toKeys];
   nextToKeys.splice(insertAt < 0 ? nextToKeys.length : insertAt, 0, draggedKey);
 
-  let next = steps;
+  let next = scenes;
   if (fromStatus === toStatus) {
     const current = [draggedKey, ...toKeys];
     const fromIndex = current.indexOf(draggedKey);
@@ -193,11 +194,11 @@ export function KanbanBoardPage({
   const dispatch = useAppDispatch();
   const { accessToken } = useAuth();
   const { projectName } = useProject();
-  const { sceneData, steps, setSteps } = useScene();
-  const actorNoteSceneName = String(sceneData?.name ?? "script").trim() || "script";
+  const { playbookData, scenes, setScenes } = usePlaybook();
+  const actorNoteSceneName = String(playbookData?.name ?? "script").trim() || "script";
   const [draggedId, setDraggedId] = useState<number | null>(null);
-  const [openedStepId, setOpenedStepId] = useState<number | null>(null);
-  const [expandedCommentStepIds, setExpandedCommentStepIds] = useState<Set<number>>(
+  const [openedSceneId, setOpenedSceneId] = useState<number | null>(null);
+  const [expandedCommentSceneIds, setExpandedCommentSceneIds] = useState<Set<number>>(
     () => new Set(),
   );
   const [query, setQuery] = useState("");
@@ -221,13 +222,13 @@ export function KanbanBoardPage({
     );
   }, [members]);
 
-  const normalizedSteps = useMemo(() => normalizeMissingOrders(steps), [steps]);
+  const normalizedScenes = useMemo(() => normalizeMissingOrders(scenes), [scenes]);
 
   useEffect(() => {
-    if (normalizedSteps !== steps) setSteps(normalizedSteps);
-  }, [normalizedSteps, setSteps, steps]);
+    if (normalizedScenes !== scenes) setScenes(normalizedScenes);
+  }, [normalizedScenes, setScenes, scenes]);
 
-  const effectiveRoleAssignmentsFallback = (sceneData?.roleAssignments ?? {}) as Record<
+  const effectiveRoleAssignmentsFallback = (playbookData?.roleAssignments ?? {}) as Record<
     string,
     string[]
   >;
@@ -338,7 +339,7 @@ export function KanbanBoardPage({
     return [];
   };
 
-  const getRoleActors = (step: ScriptStep, roleRaw: string): string[] => {
+  const getRoleActors = (scene: ScriptScene, roleRaw: string): string[] => {
     const info = resolveRoleInfo(roleRaw);
     const emails = Array.isArray((info as any)?.emails) ? (info as any).emails : [];
     const cleaned = emails.map((x: any) => String(x ?? "").trim()).filter(Boolean);
@@ -366,7 +367,7 @@ export function KanbanBoardPage({
 
   const allRoleKeys = useMemo(() => {
     const set = new Set<string>();
-    for (const s of normalizedSteps) {
+    for (const s of normalizedScenes) {
       const text = s.playMarkdown ?? s.markdown;
       extractRolesSmart(text)
         .map((r) => normalizeRoleKey(r))
@@ -374,7 +375,7 @@ export function KanbanBoardPage({
         .forEach((k) => set.add(k));
     }
     return Array.from(set);
-  }, [normalizedSteps]);
+  }, [normalizedScenes]);
 
   const roleFilterOptions = useMemo(() => {
     return allRoleKeys
@@ -388,7 +389,7 @@ export function KanbanBoardPage({
 
   const allActors = useMemo(() => {
     const set = new Set<string>();
-    for (const s of normalizedSteps) {
+    for (const s of normalizedScenes) {
       const text = s.playMarkdown ?? s.markdown;
       const roles = extractRolesSmart(text);
       for (const r of roles) {
@@ -399,12 +400,12 @@ export function KanbanBoardPage({
       }
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, "ru"));
-  }, [normalizedSteps, projectRoles, troupeMembers, sceneData]);
+  }, [normalizedScenes, projectRoles, troupeMembers, playbookData]);
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  const filteredSteps = useMemo(() => {
-    const matchesQuery = (s: ScriptStep, roles: string[]) => {
+  const filteredScenes = useMemo(() => {
+    const matchesQuery = (s: ScriptScene, roles: string[]) => {
       if (!normalizedQuery) return true;
       const inTitle = (s.title ?? "").toLowerCase().includes(normalizedQuery);
       const inRoles = roles.some((r) =>
@@ -418,7 +419,7 @@ export function KanbanBoardPage({
       return inTitle || inRoles || inActors;
     };
 
-    return normalizedSteps.filter((s) => {
+    return normalizedScenes.filter((s) => {
       const text = s.playMarkdown ?? s.markdown;
       const roles = extractRolesSmart(text);
       if (!matchesQuery(s, roles)) return false;
@@ -439,14 +440,14 @@ export function KanbanBoardPage({
       }
       return true;
     });
-  }, [actorFilter, normalizedQuery, normalizedSteps, onlyUnassigned, roleFilter, projectRoles, troupeMembers, sceneData]);
+  }, [actorFilter, normalizedQuery, normalizedScenes, onlyUnassigned, roleFilter, projectRoles, troupeMembers, playbookData]);
 
   const actorNotesByKey = useAppSelector((s) => s.showScript.actorNotesByKey);
 
   const columns = useMemo(() => {
-    const byStatus = new Map<KanbanStatus, ScriptStep[]>();
+    const byStatus = new Map<KanbanStatus, ScriptScene[]>();
     STATUSES.forEach((s) => byStatus.set(s.id, []));
-    filteredSteps.forEach((s) => {
+    filteredScenes.forEach((s) => {
       const st = statusOf(s);
       const col = byStatus.get(st) ?? [];
       col.push(s);
@@ -457,31 +458,31 @@ export function KanbanBoardPage({
       byStatus.set(st, col);
     }
     return byStatus;
-  }, [filteredSteps]);
+  }, [filteredScenes]);
 
-  const openedStep = useMemo(
-    () => (openedStepId != null ? normalizedSteps.find((s) => s.id === openedStepId) ?? null : null),
-    [openedStepId, normalizedSteps]
+  const openedScene = useMemo(
+    () => (openedSceneId != null ? normalizedScenes.find((s) => s.id === openedSceneId) ?? null : null),
+    [openedSceneId, normalizedScenes]
   );
 
   const openedRoles = useMemo(() => {
-    if (!openedStep) return [];
-    const text = openedStep.playMarkdown ?? openedStep.markdown;
+    if (!openedScene) return [];
+    const text = openedScene.playMarkdown ?? openedScene.markdown;
     return extractRolesSmart(text);
-  }, [openedStep]);
+  }, [openedScene]);
 
   useEffect(() => {
     if (!accessToken || !projectName) return;
-    filteredSteps.forEach((step) => {
-      const cacheKey = `${projectName}:${actorNoteSceneName}:${step.id}`;
+    filteredScenes.forEach((scene) => {
+      const cacheKey = `${projectName}:${actorNoteSceneName}:${scene.id}`;
       const entry = actorNotesByKey[cacheKey];
       if (entry) return;
       void dispatch(
-        loadActorStepNote({
+        loadActorSceneNote({
           cacheKey,
           projectSlug: projectName,
           sceneName: actorNoteSceneName,
-          stepId: step.id,
+          sceneId: scene.id,
         }),
       );
     });
@@ -490,7 +491,7 @@ export function KanbanBoardPage({
     actorNoteSceneName,
     actorNotesByKey,
     dispatch,
-    filteredSteps,
+    filteredScenes,
     projectName,
   ]);
 
@@ -504,7 +505,7 @@ export function KanbanBoardPage({
     ev.preventDefault();
     const id = Number(ev.dataTransfer.getData("text/plain"));
     if (!Number.isFinite(id)) return;
-    setSteps(applyMove(normalizedSteps, id, toStatus));
+    setScenes(applyMove(normalizedScenes, id, toStatus));
     setDraggedId(null);
   };
 
@@ -512,16 +513,16 @@ export function KanbanBoardPage({
     ev.preventDefault();
     const id = Number(ev.dataTransfer.getData("text/plain"));
     if (!Number.isFinite(id)) return;
-    setSteps(applyMove(normalizedSteps, id, toStatus, beforeId));
+    setScenes(applyMove(normalizedScenes, id, toStatus, beforeId));
     setDraggedId(null);
   };
 
-  const setStepStatus = (id: number, st: KanbanStatus) => {
-    setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, kanbanStatus: st } : s)));
+  const setSceneStatus = (id: number, st: KanbanStatus) => {
+    setScenes((prev) => prev.map((s) => (s.id === id ? { ...s, kanbanStatus: st } : s)));
   };
 
-  const setStepDurationMin = (id: number, durationMin: number | undefined) => {
-    setSteps((prev) =>
+  const setSceneDurationMin = (id: number, durationMin: number | undefined) => {
+    setScenes((prev) =>
       prev.map((s) => (s.id === id ? { ...s, durationMin } : s))
     );
   };
@@ -531,7 +532,7 @@ export function KanbanBoardPage({
       <RehearsalPlanSectionChrome activeTab="board" />
 
       {rolesError && (
-        <div className="kanban-muted" style={{ marginBottom: 12 }}>
+        <div className="kanban-muted kanban-muted--bottom">
           {rolesError}
         </div>
       )}
@@ -628,11 +629,11 @@ export function KanbanBoardPage({
                   const isDragging = draggedId === s.id;
                   const noteCacheKey = `${projectName ?? ""}:${actorNoteSceneName}:${s.id}`;
                   const noteText = String(actorNotesByKey[noteCacheKey]?.text ?? "").trim();
-                  const isCommentExpanded = expandedCommentStepIds.has(s.id);
+                  const isCommentExpanded = expandedCommentSceneIds.has(s.id);
                   return (
                     <div
                       key={s.id}
-                      className={`kanban-card ${isDragging ? "dragging" : ""}`}
+                      className={cn("kanban-card", isDragging && "kanban-card--dragging")}
                       style={
                         {
                           "--kanban-card-accent": st.headerBg,
@@ -643,11 +644,11 @@ export function KanbanBoardPage({
                       onDragEnd={() => setDraggedId(null)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => onDropBeforeCard(e, st.id, s.id)}
-                      onClick={() => setOpenedStepId(s.id)}
+                      onClick={() => setOpenedSceneId(s.id)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") setOpenedStepId(s.id);
+                        if (e.key === "Enter" || e.key === " ") setOpenedSceneId(s.id);
                       }}
                       aria-label={`Сцена: ${s.title}`}
                     >
@@ -693,7 +694,7 @@ export function KanbanBoardPage({
                           aria-expanded={isCommentExpanded}
                           onClick={(e) => {
                             e.stopPropagation();
-                            setExpandedCommentStepIds((prev) => {
+                            setExpandedCommentSceneIds((prev) => {
                               const next = new Set(prev);
                               if (next.has(s.id)) {
                                 next.delete(s.id);
@@ -717,12 +718,12 @@ export function KanbanBoardPage({
         })}
       </div>
 
-      {openedStep && (
-        <KanbanStepDetailModal
-          step={openedStep}
-          onClose={() => setOpenedStepId(null)}
-          setStepStatus={setStepStatus}
-          setStepDurationMin={setStepDurationMin}
+      {openedScene && (
+        <KanbanSceneDetailModal
+          scene={openedScene}
+          onClose={() => setOpenedSceneId(null)}
+          setSceneStatus={setSceneStatus}
+          setSceneDurationMin={setSceneDurationMin}
           rolesLoading={rolesLoading}
           openedRoles={openedRoles}
           getRoleActors={getRoleActors}

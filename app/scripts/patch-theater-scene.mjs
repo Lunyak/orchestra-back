@@ -195,7 +195,7 @@ const unusedImportPatterns = [
   /import \{[^}]*resolveModelPlacementPosition[^}]*\} from "\.\/theater-model-placement";\n/,
   /import \{ snapModelZToAudienceLine \}[^\n]+\n/,
   /import \{[^}]*applyAlignGuideSnap[^}]*\} from "\.\/theater-align-guides";\n/,
-  /import \{[^}]*readStepTheaterModels[^}]*\} from "\.\/theater-step-models";\n/,
+  /import \{[^}]*readSceneTheaterModels[^}]*\} from "\.\/theater-scene-models";\n/,
 ];
 for (const pat of unusedImportPatterns) {
   text = text.replace(pat, "");

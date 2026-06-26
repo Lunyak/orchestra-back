@@ -12,8 +12,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { GetStepNoteDto } from './dto/get-step-note.dto';
-import { UpsertStepNoteDto } from './dto/upsert-step-note.dto';
+import { GetSceneNoteDto } from './dto/get-scene-note.dto';
+import { UpsertSceneNoteDto } from './dto/upsert-scene-note.dto';
 import { ListAnnotationsDto } from './dto/list-annotations.dto';
 import { CreateAnnotationDto } from './dto/create-annotation.dto';
 import { UpdateAnnotationDto } from './dto/update-annotation.dto';
@@ -25,34 +25,34 @@ import type { ActorAnnotationField } from '@prisma/client';
 export class ActorNotesController {
   constructor(private readonly actorNotes: ActorNotesService) {}
 
-  @Get('step')
-  getStep(@Req() req: any, @Query() query: GetStepNoteDto) {
-    return this.actorNotes.getStepNote(
+  @Get('scene')
+  getScene(@Req() req: any, @Query() query: GetSceneNoteDto) {
+    return this.actorNotes.getSceneNote(
       req.user.userId,
       query.projectSlug,
       query.sceneName,
-      query.stepId,
+      query.sceneId,
     );
   }
 
-  @Put('step')
-  upsertStep(@Req() req: any, @Body() body: UpsertStepNoteDto) {
-    return this.actorNotes.upsertStepNote(
+  @Put('scene')
+  upsertScene(@Req() req: any, @Body() body: UpsertSceneNoteDto) {
+    return this.actorNotes.upsertSceneNote(
       req.user.userId,
       body.projectSlug,
       body.sceneName,
-      body.stepId,
+      body.sceneId,
       body.text,
     );
   }
 
-  @Delete('step')
-  deleteStep(@Req() req: any, @Query() query: GetStepNoteDto) {
-    return this.actorNotes.deleteStepNote(
+  @Delete('scene')
+  deleteScene(@Req() req: any, @Query() query: GetSceneNoteDto) {
+    return this.actorNotes.deleteSceneNote(
       req.user.userId,
       query.projectSlug,
       query.sceneName,
-      query.stepId,
+      query.sceneId,
     );
   }
 
@@ -62,7 +62,7 @@ export class ActorNotesController {
       req.user.userId,
       query.projectSlug,
       query.sceneName,
-      query.stepId,
+      query.sceneId,
       query.field as ActorAnnotationField,
     );
   }
@@ -73,7 +73,7 @@ export class ActorNotesController {
       req.user.userId,
       body.projectSlug,
       body.sceneName,
-      body.stepId,
+      body.sceneId,
       body.field as ActorAnnotationField,
       body.startOffset,
       body.endOffset,

@@ -1,14 +1,14 @@
-import type { ScriptStep } from "../../../shared/types/script";
-import type { SceneRolesDataV1 } from "../../scene";
+import type { ScriptScene } from "../../../shared/types/script";
+import type { PlaybookRolesDataV1 } from "../../playbook";
 import type { DirectorSessionParticipant } from "../../../sync/api/director-sessions";
 
 export type ProjectDataCache = Record<
   string,
   {
-    steps: ScriptStep[];
+    scenes: ScriptScene[];
     roleEmailsByKey: Record<string, string[]>;
     roleTitleByKey: Record<string, string>;
-    sceneRoles?: SceneRolesDataV1 | null;
+    sceneRoles?: PlaybookRolesDataV1 | null;
   }
 >;
 
@@ -27,7 +27,7 @@ export type SlotInsight = {
   slotId: string;
   time: string;
   projectLabel: string;
-  stepLabel: string;
+  sceneLabel: string;
   title: string;
   ready: boolean;
   missingRoles: string[];
@@ -41,7 +41,7 @@ export type DaySessionSlotPreview = {
   slotId: string;
   time: string;
   projectLabel: string;
-  stepLabel: string;
+  sceneLabel: string;
   gatherStatus: SlotGatherStatus;
   durationMin: number;
 };
@@ -56,12 +56,12 @@ export type DaySessionPreview = {
 
 export type { DirectorSessionParticipant };
 
-/** Кэш шагов сцены на странице детальной сессии (отличается от ProjectDataCache списка сессий). */
+/** Кэш сцен сценария на странице детальной сессии (отличается от ProjectDataCache списка сессий). */
 export type DirectorSessionProjectDataCache = Record<
   string,
   {
-    steps: ScriptStep[];
+    scenes: ScriptScene[];
     sceneId: string | null;
-    sceneRoles: SceneRolesDataV1 | null;
+    sceneRoles: PlaybookRolesDataV1 | null;
   }
 >;

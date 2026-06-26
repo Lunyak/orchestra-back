@@ -1,5 +1,6 @@
+import cn from "classnames";
 import { Button } from "@shared/core/button/Button";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
@@ -11,213 +12,29 @@ import { WorkbookInboundMentionsSection } from "../../features/role-workbook/ui/
 import { WorkbookRehearsalChecklistSection } from "../../features/role-workbook/ui/WorkbookRehearsalChecklistSection";
 import { WorkbookRelationshipsSection } from "../../features/role-workbook/ui/WorkbookRelationshipsSection";
 import { WorkbookTransformationSection } from "../../features/role-workbook/ui/WorkbookTransformationSection";
-import { useScene } from "../../features/scene";
+import { WorkbookTextSection, type WorkbookTextFieldKey } from "../../features/role-workbook/ui/WorkbookTextSection";
+import { usePlaybook } from "../../features/playbook";
 import { useAppDispatch, useAppSelector } from "../../shared/store/hooks";
 import {
   roleWorkbookActions,
   selectRoleWorkbook,
   loadRoleWorkbookThunk,
-  saveRoleWorkbookThunk,
-  saveDirectorRefsThunk,
 } from "../../features/role-workbook/model/roleWorkbookSlice";
 import {
   actorLabel,
   pickLatestWorkbookSnapshotForActor,
   type RoleSceneArc,
-  type RoleWorkbookDataV1,
 } from "../../features/role-workbook/model/roleWorkbookNote";
-import { extractRolePhrasesFromSteps } from "../../features/actor-trainers/model/rolePhrases";
-import { getPlayUrl, uploadProjectFile } from "../../sync/api/files";
+import { extractRolePhrasesFromScenes } from "../../features/actor-trainers/model/rolePhrases";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
+import {
+  WORKBOOK_SECTIONS,
+  type WorkbookSectionId,
+} from "../../features/role-workbook/model/role-workbook-sections";
+import { normalizeWorkbookEmail } from "../../features/role-workbook/model/role-workbook-utils";
+import { useRoleWorkbookAutosave } from "../../features/role-workbook/model/useRoleWorkbookAutosave";
+import { useRoleWorkbookReferenceImages } from "../../features/role-workbook/model/useRoleWorkbookReferenceImages";
 import "./style.css";
-
-function normalizeEmail(v: unknown): string {
-  return String(v ?? "").trim().toLowerCase();
-}
-
-function clipboardImageFile(data: DataTransfer | null | undefined): File | null {
-  const directFile = Array.from(data?.files ?? []).find((file) =>
-    String(file?.type ?? "").startsWith("image/"),
-  );
-  if (directFile) return directFile;
-  const imageItem =
-    Array.from(data?.items ?? []).find((item) =>
-      String(item?.type ?? "").startsWith("image/"),
-    ) ?? null;
-  return imageItem?.getAsFile() ?? null;
-}
-
-function imageFilesFromTransfer(data: DataTransfer | null | undefined): File[] {
-  const byFiles = Array.from(data?.files ?? []).filter((file) =>
-    String(file?.type ?? "").startsWith("image/"),
-  );
-  if (byFiles.length > 0) return byFiles;
-  return Array.from(data?.items ?? [])
-    .filter((item) => String(item?.type ?? "").startsWith("image/"))
-    .map((item) => item.getAsFile())
-    .filter((file): file is File => Boolean(file));
-}
-
-type WorkbookTextFieldKey = keyof Omit<
-  RoleWorkbookDataV1,
-  | "v"
-  | "actorEmail"
-  | "referenceImages"
-  | "referenceLinksLegacy"
-  | "sceneArcs"
-  | "relationshipEntries"
-  | "directorQuestions"
-  | "savedAtIso"
->;
-
-function WorkbookTextSection(props: {
-  sectionNum: number;
-  title: string;
-  hint?: ReactNode;
-  fieldKey: WorkbookTextFieldKey;
-  rows: number;
-  placeholder: string;
-  value: string;
-  canEdit: boolean;
-  onFieldChange: (key: WorkbookTextFieldKey, value: string) => void;
-}) {
-  const { sectionNum, title, hint, fieldKey, rows, placeholder, value, canEdit, onFieldChange } = props;
-  return (
-    <div className="rolewb-card rolewb-section" id={`rolewb-section-${fieldKey}`}>
-      <div className="rolewb-section-head">
-        <span className="rolewb-section-num">{sectionNum}</span>
-        <div className="rolewb-card-title">{title}</div>
-      </div>
-      {hint ? <div className="rolewb-hint">{hint}</div> : null}
-      <textarea
-        className="settings-invite-input"
-        rows={rows}
-        value={value}
-        onChange={(e) => onFieldChange(fieldKey, e.target.value)}
-        disabled={!canEdit}
-        style={{ maxWidth: "unset", width: "100%" }}
-        placeholder={placeholder}
-      />
-    </div>
-  );
-}
-
-const ACTOR_WORKBOOK_AUTOSAVE_DELAY_MS = 1200;
-
-type WorkbookSectionId =
-  | "givenCircumstances"
-  | "biography"
-  | "socialPortrait"
-  | "relationships"
-  | "inbound"
-  | "superObjective"
-  | "obstacles"
-  | "eventSeries"
-  | "transformation"
-  | "appearance"
-  | "referenceImages"
-  | "sceneArcs"
-  | "directorQuestions"
-  | "rehearsalChecklist"
-  | "preparation";
-
-const WORKBOOK_SECTIONS: Array<{
-  id: WorkbookSectionId;
-  title: string;
-  hint: string;
-}> = [
-  {
-    id: "givenCircumstances",
-    title: "Обстоятельства",
-    hint: "Мир пьесы, время, место и правила, которые давят на героя.",
-  },
-  {
-    id: "biography",
-    title: "Биография",
-    hint: "Прошлое героя и то, что сформировало его характер.",
-  },
-  {
-    id: "socialPortrait",
-    title: "Социальный портрет",
-    hint: "Возраст, статус, профессия, речь, привычки и среда.",
-  },
-  {
-    id: "relationships",
-    title: "Отношения",
-    hint: "Связи с другими персонажами, конфликты, близость и цели.",
-  },
-  {
-    id: "inbound",
-    title: "Обо мне",
-    hint: "Что другие персонажи уже написали о вашей роли.",
-  },
-  {
-    id: "superObjective",
-    title: "Сверхзадача",
-    hint: "Главная цель героя и сквозное действие.",
-  },
-  {
-    id: "obstacles",
-    title: "Препятствия",
-    hint: "Что мешает герою достичь цели.",
-  },
-  {
-    id: "eventSeries",
-    title: "Событийный ряд",
-    hint: "Ключевые события жизни героя в пьесе.",
-  },
-  {
-    id: "transformation",
-    title: "Трансформация",
-    hint: "Кем герой был, кем стал и где случился перелом.",
-  },
-  {
-    id: "appearance",
-    title: "Внешность",
-    hint: "Осанка, пластика, голос, темп и внешний образ.",
-  },
-  {
-    id: "referenceImages",
-    title: "Референсы",
-    hint: "Картинки, фактуры, костюм, пластика и настроение.",
-  },
-  {
-    id: "sceneArcs",
-    title: "По сценам",
-    hint: "Что меняется с персонажем в каждой сцене.",
-  },
-  {
-    id: "directorQuestions",
-    title: "Неясно",
-    hint: "Вопросы режиссёру по роли, тексту и сценам.",
-  },
-  {
-    id: "rehearsalChecklist",
-    title: "Чеклист",
-    hint: "Что уже отработано и что впереди.",
-  },
-  {
-    id: "preparation",
-    title: "Подготовка",
-    hint: "План самостоятельной подготовки к роли.",
-  },
-];
-
-function referenceColumnCount(total: number): number {
-  if (total <= 4) return 1;
-  if (total <= 8) return 2;
-  if (total <= 12) return 3;
-  return 4;
-}
-
-function distributeIntoColumns<T>(items: T[], columnCount: number): T[][] {
-  const safeColumnCount = Math.max(1, Math.min(columnCount, items.length || 1));
-  const columns = Array.from({ length: safeColumnCount }, () => [] as T[]);
-  items.forEach((item, idx) => {
-    columns[idx % safeColumnCount].push(item);
-  });
-  return columns;
-}
 
 export function RoleWorkbookPage() {
   const { accessToken } = useAuth();
@@ -226,18 +43,10 @@ export function RoleWorkbookPage() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const s = useAppSelector(selectRoleWorkbook);
-  const { steps } = useScene();
+  const { scenes } = usePlaybook();
   const { data: rolesRes } = useProjectRolesQuery(projectSlug!, { skip: !projectSlug });
   const projectRoles = rolesRes?.roles ?? [];
   const [updateProjectRole, { isLoading: updatingRoleAvatar }] = useUpdateProjectRoleMutation();
-  const [actorDraftDirtyRevision, setActorDraftDirtyRevision] = useState(0);
-  const actorDraftDirtyRevisionRef = useRef(0);
-  const actorDraftSavedRevisionRef = useRef(0);
-  const actorDraftAutosaveTimerRef = useRef<number | null>(null);
-  const [directorRefsDirtyRevision, setDirectorRefsDirtyRevision] = useState(0);
-  const directorRefsDirtyRevisionRef = useRef(0);
-  const directorRefsSavedRevisionRef = useRef(0);
-  const directorRefsAutosaveTimerRef = useRef<number | null>(null);
   const [isActorWorkbookOpen, setIsActorWorkbookOpen] = useState(false);
   const [activeWorkbookSection, setActiveWorkbookSection] = useState<WorkbookSectionId | null>(null);
 
@@ -254,8 +63,8 @@ export function RoleWorkbookPage() {
 
   const visibleActorTiles = useMemo(() => {
     if (s.isProjectOwner) return assigned;
-    const me = normalizeEmail(s.myEmail);
-    return assigned.filter((em) => normalizeEmail(em) === me);
+    const me = normalizeWorkbookEmail(s.myEmail);
+    return assigned.filter((em) => normalizeWorkbookEmail(em) === me);
   }, [assigned, s.isProjectOwner, s.myEmail]);
 
   const snapshotsByActorEmail = useMemo(() => {
@@ -271,117 +80,26 @@ export function RoleWorkbookPage() {
     return out;
   }, [assigned, s.isProjectOwner, s.notes]);
 
-  const selectedActor = normalizeEmail(s.selectedActorEmail);
-  const myEmail = normalizeEmail(s.myEmail);
+  const selectedActor = normalizeWorkbookEmail(s.selectedActorEmail);
+  const myEmail = normalizeWorkbookEmail(s.myEmail);
   const canEdit = Boolean(myEmail && selectedActor && myEmail === selectedActor);
   const canEditDirectorRefs = Boolean(s.isProjectOwner);
   const canViewActorWorkbook = Boolean((s as any).canViewActorWorkbook);
 
-  const clearActorAutosaveTimer = useCallback(() => {
-    const timer = actorDraftAutosaveTimerRef.current;
-    if (timer == null) return;
-    window.clearTimeout(timer);
-    actorDraftAutosaveTimerRef.current = null;
-  }, []);
-
-  const clearDirectorRefsAutosaveTimer = useCallback(() => {
-    const timer = directorRefsAutosaveTimerRef.current;
-    if (timer == null) return;
-    window.clearTimeout(timer);
-    directorRefsAutosaveTimerRef.current = null;
-  }, []);
-
-  const markActorDraftDirty = useCallback(() => {
-    if (!canEdit) return;
-    const nextRevision = actorDraftDirtyRevisionRef.current + 1;
-    actorDraftDirtyRevisionRef.current = nextRevision;
-    setActorDraftDirtyRevision(nextRevision);
-  }, [canEdit]);
-
-  const markDirectorRefsDirty = useCallback(() => {
-    if (!canEditDirectorRefs) return;
-    const nextRevision = directorRefsDirtyRevisionRef.current + 1;
-    directorRefsDirtyRevisionRef.current = nextRevision;
-    setDirectorRefsDirtyRevision(nextRevision);
-  }, [canEditDirectorRefs]);
-
-  const saveActorDraftNow = useCallback(async () => {
-    if (!canEdit || !accessToken || !projectSlug || !effectiveRoleId) return;
-    const targetRevision = actorDraftDirtyRevisionRef.current;
-    if (targetRevision <= actorDraftSavedRevisionRef.current) return;
-    clearActorAutosaveTimer();
-    await dispatch(saveRoleWorkbookThunk({ accessToken, projectSlug, roleId: effectiveRoleId }));
-    actorDraftSavedRevisionRef.current = targetRevision;
-  }, [
-    accessToken,
-    canEdit,
-    clearActorAutosaveTimer,
-    dispatch,
-    effectiveRoleId,
-    projectSlug,
-  ]);
-
-  const saveDirectorRefsNow = useCallback(async () => {
-    if (!canEditDirectorRefs || !accessToken || !projectSlug || !effectiveRoleId) return;
-    const targetRevision = directorRefsDirtyRevisionRef.current;
-    if (targetRevision <= directorRefsSavedRevisionRef.current) return;
-    clearDirectorRefsAutosaveTimer();
-    await dispatch(saveDirectorRefsThunk({ accessToken, projectSlug, roleId: effectiveRoleId }));
-    directorRefsSavedRevisionRef.current = targetRevision;
-  }, [
-    accessToken,
-    canEditDirectorRefs,
-    clearDirectorRefsAutosaveTimer,
-    dispatch,
-    effectiveRoleId,
-    projectSlug,
-  ]);
-
-  useEffect(() => {
-    clearActorAutosaveTimer();
-    actorDraftDirtyRevisionRef.current = 0;
-    actorDraftSavedRevisionRef.current = 0;
-    setActorDraftDirtyRevision(0);
-  }, [clearActorAutosaveTimer, effectiveRoleId, selectedActor]);
-
-  useEffect(() => {
-    clearDirectorRefsAutosaveTimer();
-    directorRefsDirtyRevisionRef.current = 0;
-    directorRefsSavedRevisionRef.current = 0;
-    setDirectorRefsDirtyRevision(0);
-  }, [clearDirectorRefsAutosaveTimer, effectiveRoleId]);
-
-  useEffect(() => {
-    if (!canEdit) return;
-    if (actorDraftDirtyRevision <= actorDraftSavedRevisionRef.current) return;
-    clearActorAutosaveTimer();
-    actorDraftAutosaveTimerRef.current = window.setTimeout(() => {
-      void saveActorDraftNow();
-    }, ACTOR_WORKBOOK_AUTOSAVE_DELAY_MS);
-    return clearActorAutosaveTimer;
-  }, [actorDraftDirtyRevision, canEdit, clearActorAutosaveTimer, saveActorDraftNow]);
-
-  useEffect(() => {
-    if (!canEditDirectorRefs) return;
-    if (directorRefsDirtyRevision <= directorRefsSavedRevisionRef.current) return;
-    clearDirectorRefsAutosaveTimer();
-    directorRefsAutosaveTimerRef.current = window.setTimeout(() => {
-      void saveDirectorRefsNow();
-    }, ACTOR_WORKBOOK_AUTOSAVE_DELAY_MS);
-    return clearDirectorRefsAutosaveTimer;
-  }, [
-    canEditDirectorRefs,
-    clearDirectorRefsAutosaveTimer,
-    directorRefsDirtyRevision,
+  const {
+    markActorDraftDirty,
+    markDirectorRefsDirty,
+    saveActorDraftNow,
     saveDirectorRefsNow,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      clearActorAutosaveTimer();
-      clearDirectorRefsAutosaveTimer();
-    };
-  }, [clearActorAutosaveTimer, clearDirectorRefsAutosaveTimer]);
+  } = useRoleWorkbookAutosave({
+    dispatch,
+    accessToken,
+    projectSlug,
+    effectiveRoleId,
+    selectedActor,
+    canEdit,
+    canEditDirectorRefs,
+  });
 
   const setSelectedActor = useCallback(
     (email: string) => dispatch(roleWorkbookActions.setSelectedActorEmail({ value: email })),
@@ -471,41 +189,41 @@ export function RoleWorkbookPage() {
     );
   }, [roleLabel, s.roleInfo?.key, s.roleInfo?.title]);
 
-  const roleStepIdSet = useMemo(() => {
-    const phrases = extractRolePhrasesFromSteps({
-      steps: Array.isArray(steps) ? steps : [],
+  const roleSceneIdSet = useMemo(() => {
+    const phrases = extractRolePhrasesFromScenes({
+      scenes: Array.isArray(scenes) ? scenes : [],
       role: roleLabel,
       roleKeys: roleKeyCandidates,
       preferField: "playMarkdown",
     });
-    return new Set<number>(phrases.map((p) => p.stepId));
-  }, [roleKeyCandidates, roleLabel, steps]);
+    return new Set<number>(phrases.map((p) => p.sceneId));
+  }, [roleKeyCandidates, roleLabel, scenes]);
 
   const desiredSceneArcs = useMemo(() => {
-    const src = Array.isArray(steps) ? steps : [];
-    const byStepId = new Map<number, RoleSceneArc>();
+    const src = Array.isArray(scenes) ? scenes : [];
+    const bySceneId = new Map<number, RoleSceneArc>();
     for (const a of sceneArcs ?? []) {
-      const id = typeof a?.stepId === "number" ? a.stepId : Number(a?.stepId ?? NaN);
+      const id = typeof a?.sceneId === "number" ? a.sceneId : Number(a?.sceneId ?? NaN);
       if (!Number.isFinite(id)) continue;
-      byStepId.set(id, a);
+      bySceneId.set(id, a);
     }
     return src
-      .filter((st) => st && Number.isFinite(Number((st as any).id)) && roleStepIdSet.has(Number((st as any).id)))
-      .map((st) => {
-        const id = Number((st as any).id);
-        const prev = byStepId.get(id);
+      .filter((scene) => scene && Number.isFinite(Number((scene as any).id)) && roleSceneIdSet.has(Number((scene as any).id)))
+      .map((scene) => {
+        const id = Number((scene as any).id);
+        const prev = bySceneId.get(id);
         return {
-          stepId: id,
-          stepTitle: String((st as any).title ?? "").trim() || undefined,
+          sceneId: id,
+          sceneTitle: String((scene as any).title ?? "").trim() || undefined,
           text: String(prev?.text ?? ""),
         };
       });
-  }, [roleStepIdSet, sceneArcs, steps]);
+  }, [roleSceneIdSet, sceneArcs, scenes]);
 
-  const sceneArcTextByStepId = useMemo(() => {
+  const sceneArcTextBySceneId = useMemo(() => {
     const map = new Map<number, string>();
     for (const a of sceneArcs ?? []) {
-      const id = typeof a?.stepId === "number" ? a.stepId : Number(a?.stepId ?? NaN);
+      const id = typeof a?.sceneId === "number" ? a.sceneId : Number(a?.sceneId ?? NaN);
       if (!Number.isFinite(id)) continue;
       map.set(Number(id), String(a?.text ?? ""));
     }
@@ -516,135 +234,40 @@ export function RoleWorkbookPage() {
     return (desiredSceneArcs ?? []).map((a) => ({
       ...a,
       text:
-        a.stepId != null && sceneArcTextByStepId.has(Number(a.stepId))
-          ? String(sceneArcTextByStepId.get(Number(a.stepId)) ?? "")
+        a.sceneId != null && sceneArcTextBySceneId.has(Number(a.sceneId))
+          ? String(sceneArcTextBySceneId.get(Number(a.sceneId)) ?? "")
           : String(a.text ?? ""),
     }));
-  }, [desiredSceneArcs, sceneArcTextByStepId]);
+  }, [desiredSceneArcs, sceneArcTextBySceneId]);
 
   const sceneOptionsForQuestions = useMemo(() => {
     return (sceneArcsForView ?? [])
-      .filter((a) => a.stepId != null)
-      .map((a) => ({ stepId: a.stepId, stepTitle: a.stepTitle }));
+      .filter((a) => a.sceneId != null)
+      .map((a) => ({ sceneId: a.sceneId, sceneTitle: a.sceneTitle }));
   }, [sceneArcsForView]);
 
   const desiredSceneArcsSignature = useMemo(() => {
     return (desiredSceneArcs ?? [])
-      .map((a) => `${String((a as any)?.stepId ?? "")}:${String((a as any)?.stepTitle ?? "")}`)
+      .map((a) => `${String((a as any)?.sceneId ?? "")}:${String((a as any)?.sceneTitle ?? "")}`)
       .join("|");
   }, [desiredSceneArcs]);
 
   const sceneArcsSignature = useMemo(() => {
     return (sceneArcs ?? [])
-      .map((a) => `${String((a as any)?.stepId ?? "")}:${String((a as any)?.stepTitle ?? "")}`)
+      .map((a) => `${String((a as any)?.sceneId ?? "")}:${String((a as any)?.sceneTitle ?? "")}`)
       .join("|");
   }, [sceneArcs]);
 
   useEffect(() => {
     if (!canEdit) return;
-    // Автосписок сцен: только те шаги, где роль присутствует в "Тексте" (playMarkdown).
-    // Важно: подписи/тексты арок сохраняем по stepId.
-    if (!Array.isArray(steps) || steps.length === 0) return;
+    // Автосписок сцен: только те сцены, где роль присутствует в "Тексте" (playMarkdown).
+    // Важно: подписи/тексты арок сохраняем по sceneId.
+    if (!Array.isArray(scenes) || scenes.length === 0) return;
     if (desiredSceneArcsSignature === sceneArcsSignature) return;
     dispatch(roleWorkbookActions.setDraftSceneArcs({ value: desiredSceneArcs as any }));
-  }, [canEdit, desiredSceneArcs, desiredSceneArcsSignature, dispatch, sceneArcsSignature, steps]);
+  }, [canEdit, desiredSceneArcs, desiredSceneArcsSignature, dispatch, sceneArcsSignature, scenes]);
 
-  // --- Director image references ---
   const directorImages = useMemo(() => s.directorRefsDraft?.images ?? [], [s.directorRefsDraft?.images]);
-  const [uploading, setUploading] = useState(false);
-  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
-  const directorFileInputRef = useRef<HTMLInputElement | null>(null);
-  const directorRefsSectionRef = useRef<HTMLDivElement | null>(null);
-
-  const urlCacheRef = useRef<Map<string, string>>(new Map());
-  const [urlTick, setUrlTick] = useState(0);
-  const ensureImageUrl = useCallback(
-    async (key: string) => {
-      const k = String(key ?? "").trim();
-      if (!k) return null;
-      const cached = urlCacheRef.current.get(k);
-      if (cached) return cached;
-      if (!accessToken) return null;
-      try {
-        const { url } = await getPlayUrl(accessToken, k);
-        if (url) {
-          urlCacheRef.current.set(k, url);
-          setUrlTick((x) => x + 1);
-        }
-        return url ?? null;
-      } catch {
-        return null;
-      }
-    },
-    [accessToken],
-  );
-
-  const uploadDirectorClipboardImage = useCallback(
-    async (file: File | null) => {
-      if (!canEditDirectorRefs || !file) return;
-      if (!accessToken || !projectSlug) return;
-      const projectId = await ensureRemoteProject(accessToken);
-      if (!projectId) return;
-
-      setUploading(true);
-      try {
-        const { key, url } = await uploadProjectFile(accessToken, { projectId, type: "image", file });
-        if (!key) return;
-        dispatch(roleWorkbookActions.addDirectorRefImages({ images: [{ key, url }] as any }));
-        markDirectorRefsDirty();
-      } finally {
-        setUploading(false);
-      }
-    },
-    [
-      accessToken,
-      canEditDirectorRefs,
-      dispatch,
-      ensureRemoteProject,
-      markDirectorRefsDirty,
-      projectSlug,
-    ],
-  );
-
-  const onDirectorRefsPaste = useCallback(
-    async (e: React.ClipboardEvent<HTMLDivElement>) => {
-      if (!canEditDirectorRefs) return;
-      const file = clipboardImageFile(e.clipboardData);
-      if (!file) return;
-      e.preventDefault();
-      e.stopPropagation();
-      await uploadDirectorClipboardImage(file);
-    },
-    [canEditDirectorRefs, uploadDirectorClipboardImage],
-  );
-
-  useEffect(() => {
-    if (!canEditDirectorRefs) return;
-    const onPaste = (e: ClipboardEvent) => {
-      const file = clipboardImageFile(e.clipboardData);
-      if (!file) return;
-
-      const section = directorRefsSectionRef.current;
-      const target = e.target;
-      const targetNode = target instanceof Node ? target : null;
-      const pastedInsideRefs = Boolean(section && targetNode && section.contains(targetNode));
-      const active = document.activeElement;
-      const pastedWithoutFocusedField =
-        active === document.body || active == null || active === document.documentElement;
-      if (!pastedInsideRefs && !pastedWithoutFocusedField) return;
-
-      e.preventDefault();
-      void uploadDirectorClipboardImage(file);
-    };
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
-  }, [canEditDirectorRefs, uploadDirectorClipboardImage]);
-
-  // --- Actor image references ---
-  const actorImages = useMemo(() => draft?.referenceImages ?? [], [draft?.referenceImages]);
-  const [actorUploading, setActorUploading] = useState(false);
-  const [actorLightboxIdx, setActorLightboxIdx] = useState<number | null>(null);
-  const actorFileInputRef = useRef<HTMLInputElement | null>(null);
   const [remoteProjectId, setRemoteProjectId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -658,222 +281,46 @@ export function RoleWorkbookPage() {
     };
   }, [accessToken, ensureRemoteProject, projectSlug]);
 
-  const uploadActorImages = useCallback(
-    async (files: File[] | FileList | null) => {
-      if (!canEdit) return;
-      if (!files || files.length === 0) return;
-      if (!accessToken || !projectSlug) return;
-      const selected = Array.from(files).slice(0, 20);
-      if (selected.length === 0) return;
-      const projectId = await ensureRemoteProject(accessToken);
-      if (!projectId) return;
-      setActorUploading(true);
-      try {
-        const uploaded: Array<{ key: string; url?: string }> = [];
-        for (const f of selected) {
-          const { key, url } = await uploadProjectFile(accessToken, { projectId, type: "image", file: f });
-          if (key) {
-            if (url) urlCacheRef.current.set(key, url);
-            uploaded.push({ key, url });
-          }
-        }
-        if (uploaded.length > 0) {
-          setUrlTick((x) => x + 1);
-          dispatch(roleWorkbookActions.addActorRefImages({ images: uploaded as any }));
-          markActorDraftDirty();
-          // Persist immediately so refs don't disappear after refresh.
-          if (effectiveRoleId) {
-            await dispatch(
-              saveRoleWorkbookThunk({ accessToken, projectSlug, roleId: effectiveRoleId }),
-            );
-          }
-        }
-      } finally {
-        setActorUploading(false);
-      }
-    },
-    [accessToken, canEdit, dispatch, ensureRemoteProject, markActorDraftDirty, projectSlug, effectiveRoleId],
-  );
-
-  const canAddReferenceImages = Boolean(canEdit || canEditDirectorRefs);
-  const referenceUploading = Boolean(actorUploading || uploading);
-
-  const referenceAuthorLabel = canEdit
-    ? `актёра ${actorLabel(s.profilesByEmail?.[selectedActor] ?? null, selectedActor)}`
-    : "режиссёра";
-
-  const combinedReferenceImages = useMemo(() => {
-    const actorName = actorLabel(s.profilesByEmail?.[selectedActor] ?? null, selectedActor);
-    return [
-      ...actorImages.map((img, idx) => ({
-        source: "actor" as const,
-        sourceLabel: `от актёра ${actorName}`,
-        img,
-        idx,
-      })),
-      ...directorImages.map((img, idx) => ({
-        source: "director" as const,
-        sourceLabel: "от режиссёра",
-        img,
-        idx,
-      })),
-    ];
-  }, [actorImages, directorImages, s.profilesByEmail, selectedActor]);
-
-  const referenceColumns = useMemo(() => {
-    return distributeIntoColumns(
-      combinedReferenceImages,
-      referenceColumnCount(combinedReferenceImages.length),
-    );
-  }, [combinedReferenceImages]);
-
-  const onActorRefsPaste = useCallback(
-    async (e: React.ClipboardEvent<HTMLDivElement>) => {
-      if (!canEdit) return;
-      e.stopPropagation();
-      const cd = e.clipboardData;
-      if (!cd) return;
-      const items = Array.from(cd.items ?? []);
-      const imageItem = items.find((it) => String(it.type ?? "").startsWith("image/")) ?? null;
-      if (!imageItem) return;
-      e.preventDefault();
-      if (!accessToken || !projectSlug) return;
-      const projectId = await ensureRemoteProject(accessToken);
-      if (!projectId) return;
-      setActorUploading(true);
-      try {
-        const file = imageItem.getAsFile();
-        if (!file) return;
-        const { key, url } = await uploadProjectFile(accessToken, { projectId, type: "image", file });
-        if (!key) return;
-        if (url) {
-          urlCacheRef.current.set(key, url);
-          setUrlTick((x) => x + 1);
-        }
-        {
-          dispatch(roleWorkbookActions.addActorRefImages({ images: [{ key, url }] as any }));
-          markActorDraftDirty();
-          // Persist immediately so refs don't disappear after refresh.
-          if (effectiveRoleId) {
-            await dispatch(
-              saveRoleWorkbookThunk({ accessToken, projectSlug, roleId: effectiveRoleId }),
-            );
-          }
-        }
-      } finally {
-        setActorUploading(false);
-      }
-    },
-    [accessToken, canEdit, dispatch, ensureRemoteProject, markActorDraftDirty, projectSlug, effectiveRoleId],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const list = actorImages.slice(0, 200);
-      for (const img of list) {
-        if (cancelled) return;
-        if (!img?.key) continue;
-        if (!urlCacheRef.current.get(img.key)) await ensureImageUrl(img.key);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [actorImages, ensureImageUrl]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      // Preload all (bounded) so the gallery is fully visible.
-      const list = directorImages.slice(0, 200);
-      for (const img of list) {
-        if (cancelled) return;
-        if (!img?.key) continue;
-        if (!urlCacheRef.current.get(img.key)) await ensureImageUrl(img.key);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [directorImages, ensureImageUrl]);
-
-  const uploadDirectorImages = useCallback(async (files: File[] | FileList | null) => {
-    const selected = Array.from(files ?? [])
-      .filter((file) => String(file?.type ?? "").startsWith("image/"))
-      .slice(0, 20);
-    if (selected.length === 0) return;
-    if (!accessToken || !projectSlug) return;
-    if (!effectiveRoleId) return;
-    const projectId = await ensureRemoteProject(accessToken);
-    if (!projectId) return;
-    setUploading(true);
-    try {
-      const uploaded: Array<{ key: string; url?: string }> = [];
-      for (const f of selected) {
-        const { key, url } = await uploadProjectFile(accessToken, { projectId, type: "image", file: f });
-        if (key) {
-          if (url) urlCacheRef.current.set(key, url);
-          uploaded.push({ key, url });
-        }
-      }
-      if (uploaded.length > 0) {
-        setUrlTick((x) => x + 1);
-        dispatch(roleWorkbookActions.addDirectorRefImages({ images: uploaded as any }));
-        markDirectorRefsDirty();
-        await saveDirectorRefsNow();
-      }
-    } finally {
-      setUploading(false);
-    }
-  }, [accessToken, dispatch, ensureRemoteProject, markDirectorRefsDirty, projectSlug, saveDirectorRefsNow]);
-
-  const onDropDirectorImages = useCallback(
-    async (files: File[]) => {
-      if (files.length === 0) return;
-      await uploadDirectorImages(files);
-    },
-    [uploadDirectorImages],
-  );
-
-  const uploadReferenceImages = useCallback(
-    async (files: File[] | FileList | null) => {
-      if (canEdit) {
-        await uploadActorImages(files);
-        return;
-      }
-      if (canEditDirectorRefs) {
-        await uploadDirectorImages(files);
-      }
-    },
-    [canEdit, canEditDirectorRefs, uploadActorImages, uploadDirectorImages],
-  );
-
-  const onReferenceRefsPaste = useCallback(
-    async (e: React.ClipboardEvent<HTMLDivElement>) => {
-      if (!canAddReferenceImages) return;
-      const file = clipboardImageFile(e.clipboardData);
-      if (!file) return;
-      e.preventDefault();
-      e.stopPropagation();
-      await uploadReferenceImages([file]);
-    },
-    [canAddReferenceImages, uploadReferenceImages],
-  );
-
-  useEffect(() => {
-    if (lightboxIdx == null) return;
-    const img = directorImages[lightboxIdx];
-    if (!img?.key) return;
-    if (!urlCacheRef.current.get(img.key)) void ensureImageUrl(img.key);
-  }, [directorImages, ensureImageUrl, lightboxIdx]);
-
-  useEffect(() => {
-    if (actorLightboxIdx == null) return;
-    const img = actorImages[actorLightboxIdx];
-    if (!img?.key) return;
-    if (!urlCacheRef.current.get(img.key)) void ensureImageUrl(img.key);
-  }, [actorImages, actorLightboxIdx, ensureImageUrl]);
+  const {
+    actorImages,
+    actorFileInputRef,
+    directorFileInputRef,
+    directorRefsSectionRef,
+    uploadActorImages,
+    uploadDirectorImages,
+    uploadReferenceImages,
+    onReferenceRefsPaste,
+    canAddReferenceImages,
+    referenceUploading,
+    referenceAuthorLabel,
+    combinedReferenceImages,
+    referenceColumns,
+    directorRefsError,
+    urlCacheRef,
+    ensureImageUrl,
+    lightboxIdx,
+    setLightboxIdx,
+    actorLightboxIdx,
+    setActorLightboxIdx,
+    imageFilesFromTransfer,
+    urlTick,
+  } = useRoleWorkbookReferenceImages({
+    dispatch,
+    accessToken,
+    projectSlug,
+    effectiveRoleId,
+    canEdit,
+    canEditDirectorRefs,
+    selectedActor,
+    draftReferenceImages: draft?.referenceImages,
+    directorImages,
+    profilesByEmail: s.profilesByEmail,
+    directorRefsError: s.directorRefsError,
+    ensureRemoteProject,
+    markActorDraftDirty,
+    markDirectorRefsDirty,
+    saveDirectorRefsNow,
+  });
 
   if (!accessToken) return <div>Нужно войти, чтобы открыть страницу роли.</div>;
   if (!projectSlug) return <div>Не выбран проект.</div>;
@@ -966,7 +413,7 @@ export function RoleWorkbookPage() {
 
                       {canViewActorWorkbook && visibleActorTiles.length > 0 ? (
                         <div className="rolewb-actor-quick-view">
-                          <div className="rolewb-hint" style={{ marginTop: 0 }}>
+                          <div className="rolewb-hint rolewb-hint--flush">
                             Актёры:
                           </div>
                           <div className="rolewb-actor-avatar-list">
@@ -981,7 +428,7 @@ export function RoleWorkbookPage() {
                                 <button
                                   key={`actor-snap-${em}`}
                                   type="button"
-                                  className={`rolewb-actor-avatar-btn${updatedAtIso ? " has-save" : ""}`}
+                                  className={cn("rolewb-actor-avatar-btn", updatedAtIso && "rolewb-actor-avatar-btn--has-save")}
                                   onClick={() => openActorWorkbook(em)}
                                   title={title}
                                   aria-label={`Открыть тетрадку актёра: ${label}`}
@@ -1010,7 +457,7 @@ export function RoleWorkbookPage() {
                 <>
                   {!activeWorkbookSection ? (
                   <div className="rolewb-card rolewb-intro">
-                    <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
+                    <div className="rolewb-row rolewb-row--between">
                       <div className="rolewb-card-title">Актёрская тетрадь · рисунок роли</div>
                     </div>
                     <div className="rolewb-hint">
@@ -1042,7 +489,7 @@ export function RoleWorkbookPage() {
                         )}
                       </div>
                       {s.lastSavedAtIso ? (
-                        <div style={{ fontSize: 12, color: "var(--color-status-success-bright)" }}>
+                        <div className="rolewb-saved-status">
                           Сохранено: {new Date(s.lastSavedAtIso).toLocaleString("ru-RU")}
                         </div>
                       ) : null}
@@ -1240,7 +687,7 @@ export function RoleWorkbookPage() {
                         }}
                       />
                       <div
-                        className="rolewb-dropzone"
+                        className="rolewb-dropzone rolewb-dropzone--spaced"
                         tabIndex={0}
                         onPaste={onReferenceRefsPaste}
                         onDragOver={(e) => {
@@ -1261,7 +708,6 @@ export function RoleWorkbookPage() {
                           if (canEdit) actorFileInputRef.current?.click();
                           else directorFileInputRef.current?.click();
                         }}
-                        style={{ marginTop: 6 }}
                         title="Кликни сюда и нажми Ctrl+V, либо перетащи файлы"
                       >
                         {referenceUploading
@@ -1271,20 +717,20 @@ export function RoleWorkbookPage() {
                             : "Только просмотр."}
                       </div>
 
-                      {s.directorRefsError ? <div className="settings-invite-error">{s.directorRefsError}</div> : null}
+                      {directorRefsError ? <div className="settings-invite-error">{directorRefsError}</div> : null}
                       {combinedReferenceImages.length === 0 ? (
                         <div className="rolewb-hint">Пока нет картинок.</div>
                       ) : (
                         <div
                           className={
                             combinedReferenceImages.length <= 4
-                              ? "rolewb-gallery rolewb-reference-gallery rolewb-reference-gallery_row"
+                              ? "rolewb-gallery rolewb-reference-gallery rolewb-reference-gallery_row rolewb-reference-gallery--spaced"
                               : "rolewb-reference-columns"
                           }
                           style={
                             combinedReferenceImages.length > 4
                               ? ({ "--rolewb-ref-cols": referenceColumns.length } as CSSProperties)
-                              : { marginTop: 8 }
+                              : undefined
                           }
                         >
                           {combinedReferenceImages.length <= 4
@@ -1313,13 +759,7 @@ export function RoleWorkbookPage() {
                                       />
                                     ) : (
                                       <div
-                                        style={{
-                                          height: 140,
-                                          display: "grid",
-                                          placeItems: "center",
-                                          fontSize: 12,
-                                          opacity: 0.7,
-                                        }}
+                                        className="rolewb-img-placeholder"
                                         onClick={() => {
                                           void ensureImageUrl(img.key);
                                           if (item.source === "actor") setActorLightboxIdx(item.idx);
@@ -1378,13 +818,7 @@ export function RoleWorkbookPage() {
                                           />
                                         ) : (
                                           <div
-                                            style={{
-                                              height: 140,
-                                              display: "grid",
-                                              placeItems: "center",
-                                              fontSize: 12,
-                                              opacity: 0.7,
-                                            }}
+                                            className="rolewb-img-placeholder"
                                             onClick={() => {
                                               void ensureImageUrl(img.key);
                                               if (item.source === "actor") setActorLightboxIdx(item.idx);
@@ -1430,8 +864,8 @@ export function RoleWorkbookPage() {
                         onClick={() => setActorLightboxIdx(null)}
                       >
                         <div className="rolewb-lightbox-inner" onClick={(e) => e.stopPropagation()}>
-                          <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
-                            <div style={{ fontSize: 12, opacity: 0.85 }}>
+                          <div className="rolewb-row rolewb-row--between">
+                            <div className="rolewb-meta">
                               {actorImages[actorLightboxIdx]?.caption || `Кадр ${actorLightboxIdx + 1}`}
                             </div>
                             <Button className="secondary" type="button" onClick={() => setActorLightboxIdx(null)}>
@@ -1453,7 +887,7 @@ export function RoleWorkbookPage() {
                         }}
                       />
 
-                      <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
+                      <div className="rolewb-row rolewb-row--between">
                         <Button
                           className="secondary"
                           type="button"
@@ -1463,7 +897,7 @@ export function RoleWorkbookPage() {
                         >
                           ←
                         </Button>
-                        <div style={{ fontSize: 12, opacity: 0.75 }}>
+                        <div className="rolewb-meta rolewb-meta--muted">
                           {actorLightboxIdx + 1} / {actorImages.length}
                         </div>
                         <Button
@@ -1487,8 +921,8 @@ export function RoleWorkbookPage() {
                         onClick={() => setLightboxIdx(null)}
                       >
                         <div className="rolewb-lightbox-inner" onClick={(e) => e.stopPropagation()}>
-                          <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
-                            <div style={{ fontSize: 12, opacity: 0.85 }}>
+                          <div className="rolewb-row rolewb-row--between">
+                            <div className="rolewb-meta">
                               {directorImages[lightboxIdx]?.caption || `Кадр ${lightboxIdx + 1}`}
                             </div>
                             <Button className="secondary" type="button" onClick={() => setLightboxIdx(null)}>
@@ -1510,7 +944,7 @@ export function RoleWorkbookPage() {
                             }}
                           />
 
-                          <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
+                          <div className="rolewb-row rolewb-row--between">
                             <Button
                               className="secondary"
                               type="button"
@@ -1522,7 +956,7 @@ export function RoleWorkbookPage() {
                             >
                               ←
                             </Button>
-                            <div style={{ fontSize: 12, opacity: 0.75 }}>
+                            <div className="rolewb-meta rolewb-meta--muted">
                               {lightboxIdx + 1} / {directorImages.length}
                             </div>
                             <Button
@@ -1553,13 +987,13 @@ export function RoleWorkbookPage() {
                         Для каждой сцены опиши, что происходит с персонажем: чего хочет, что делает, что получает, в чём
                         поворот.
                       </div>
-                      <div className="rolewb-hint" style={{ marginTop: 6 }}>
-                        Список сцен формируется автоматически из сценария: берём только те шаги, где роль{" "}
+                      <div className="rolewb-hint rolewb-hint--tight">
+                        Список сцен формируется автоматически из сценария: берём только те сцены, где роль{" "}
                         <b>{s.roleInfo?.title ?? s.roleInfo?.key ?? effectiveRoleId}</b> встречается в “Тексте” (формат{" "}
                         <code>РОЛЬ: ...</code> или <code>[[РОЛЬ]] ...</code>). Найдено сцен:{" "}
                         <b>{Array.isArray(desiredSceneArcs) ? desiredSceneArcs.length : 0}</b>
                       </div>
-                      <div style={{ display: "grid", gap: 8 }}>
+                      <div className="rolewb-scene-arcs-grid">
                         {sceneArcsForView.length === 0 ? (
                           <div className="rolewb-hint">
                             Пока нет сцен с этой ролью в тексте сценария.
@@ -1567,12 +1001,12 @@ export function RoleWorkbookPage() {
                         ) : null}
                         {sceneArcsForView.map((a, idx) => (
                           <div key={`arc-${idx}`} className="rolewb-scene-block">
-                            <div className="rolewb-row" style={{ justifyContent: "space-between" }}>
-                              <div style={{ fontSize: 12, opacity: 0.8 }}>
-                                {a.stepTitle ? (
+                            <div className="rolewb-row rolewb-row--between">
+                              <div className="rolewb-meta rolewb-meta--soft">
+                                {a.sceneTitle ? (
                                   <>
-                                    <b>{a.stepTitle}</b>{" "}
-                                    {a.stepId ? <span style={{ opacity: 0.75 }}>· #{a.stepId}</span> : null}
+                                    <b>{a.sceneTitle}</b>{" "}
+                                    {a.sceneId ? <span className="rolewb-scene-id">· #{a.sceneId}</span> : null}
                                   </>
                                 ) : (
                                   <b>Сцена #{idx + 1}</b>
@@ -1580,7 +1014,7 @@ export function RoleWorkbookPage() {
                               </div>
                             </div>
                             <textarea
-                              className="settings-invite-input"
+                              className={cn("settings-invite-input", "rolewb-textarea")}
                               rows={3}
                               value={String(a.text ?? "")}
                               disabled={!canEdit}
@@ -1591,7 +1025,6 @@ export function RoleWorkbookPage() {
                                 dispatch(roleWorkbookActions.setDraftSceneArcs({ value: next }));
                                 markActorDraftDirty();
                               }}
-                              style={{ maxWidth: "unset", width: "100%" }}
                               placeholder="Что происходит с персонажем в этой сцене? В чём поворот?"
                             />
                           </div>
@@ -1619,11 +1052,11 @@ export function RoleWorkbookPage() {
                       sectionNum={13}
                       done={String(draft?.rehearsalDone ?? "")}
                       todo={String(draft?.rehearsalTodo ?? "")}
-                      nextStep={String(draft?.rehearsalNextStep ?? "")}
+                      rehearsalFocus={String(draft?.rehearsalNextStep ?? "")}
                       canEdit={canEdit}
                       onChangeDone={(v) => onDraftFieldChange("rehearsalDone", v)}
                       onChangeTodo={(v) => onDraftFieldChange("rehearsalTodo", v)}
-                      onChangeNextStep={(v) => onDraftFieldChange("rehearsalNextStep", v)}
+                      onChangeRehearsalFocus={(v) => onDraftFieldChange("rehearsalNextStep", v)}
                     />
                   </div>
 

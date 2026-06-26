@@ -1,14 +1,14 @@
 import { createContext } from "react";
 import type {
-  SceneHoldImage,
+  PlaybookHoldImage,
   SceneProjectorSettingsV1,
-  SceneVideo,
-} from "../../../../features/scene/model/scene-slice";
+  PlaybookVideo,
+} from "../../../../features/playbook/model/playbook-slice";
 
 export type MarkdownKadrMediaLookup = {
   projectSlug: string;
-  videos: SceneVideo[];
-  holdImages: SceneHoldImage[];
+  videos: PlaybookVideo[];
+  holdImages: PlaybookHoldImage[];
   projector?: SceneProjectorSettingsV1 | null;
 };
 

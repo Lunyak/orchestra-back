@@ -41,21 +41,21 @@ export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: Spotligh
             <div className="theater-btn-row theater-btn-row--3">
               <TheaterBtn
                 onClick={() => vm.syncSpotlightsFromLightPlot(lightChannels)}
-                disabled={!vm.currentStep || linkStats.fixtures === 0}
+                disabled={!vm.currentScene || linkStats.fixtures === 0}
                 title="Схема → 3D"
               >
                 Из схемы
               </TheaterBtn>
               <TheaterBtn
                 onClick={vm.syncLightPlotFromSpotlights}
-                disabled={!vm.currentStep || totalSpotlights === 0}
+                disabled={!vm.currentScene || totalSpotlights === 0}
                 title="3D → схема"
               >
                 В схему
               </TheaterBtn>
               <TheaterBtn
                 onClick={vm.applyLightPlotChannelLabels}
-                disabled={!vm.currentStep || linkStats.fixtures === 0}
+                disabled={!vm.currentScene || linkStats.fixtures === 0}
                 title="Подписи каналов"
               >
                 Каналы
@@ -63,14 +63,14 @@ export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: Spotligh
             </div>
             <div className="theater-btn-row">
               <TheaterBtn
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
                 title="Ctrl+A"
                 onClick={vm.selectAllVisibleInEditMode}
               >
                 Выбрать все
               </TheaterBtn>
               <TheaterBtn
-                disabled={!vm.currentStep || (!vm.activeSpotlightId && vm.multiSelectedSpotlightIds.length === 0)}
+                disabled={!vm.currentScene || (!vm.activeSpotlightId && vm.multiSelectedSpotlightIds.length === 0)}
                 title="Esc"
                 onClick={vm.clearSceneSelection}
               >
@@ -97,14 +97,14 @@ export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: Spotligh
               <TheaterBtn
                 active={vm.spotlightAimMode === "point"}
                 onClick={() => vm.setSpotlightAimMode("point")}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               >
                 Точка
               </TheaterBtn>
               <TheaterBtn
                 active={vm.spotlightAimMode === "cell"}
                 onClick={() => vm.setSpotlightAimMode("cell")}
-                disabled={!vm.currentStep}
+                disabled={!vm.currentScene}
               >
                 Ячейка
               </TheaterBtn>

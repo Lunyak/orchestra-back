@@ -6,9 +6,7 @@ import {
   AppEditorScriptMarkdownMenu,
   AppEditorScriptModeNav,
   AppEditorScriptPanelsNav,
-  AppEditorScriptStepTitle,
   useAppEditorMenubarActionsRender,
-  useAppEditorMenubarCenterRender,
   useAppEditorViewMenuRender,
   requestScriptTokenizeMatches,
   type ScriptTokenizeMode,
@@ -20,10 +18,10 @@ import { Suspense, useCallback, useState } from "react";
 import { FormatPlayTextModal } from "../../features/play-format/ui/FormatPlayTextModal";
 import { useLocation } from "react-router-dom";
 import { useProject } from "../../features/project";
-import { useScene } from "../../features/scene";
-import { sceneActions } from "../../features/scene/model/scene-slice";
+import { usePlaybook } from "../../features/playbook";
+import { playbookActions } from "../../features/playbook/model/playbook-slice";
 import {
-  selectActiveStepMarkdownContext,
+  selectActiveSceneMarkdownContext,
   selectShowScriptMarkdownUi,
   showScriptMarkdownActions,
 } from "../../features/show-script-markdown/model/show-script-markdown-slice";
@@ -39,21 +37,21 @@ function AppRoutesContent() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { projectName } = useProject();
-  const { registerPlaylistPlay, updateStep } = useScene();
+  const { registerPlaylistPlay, updateScene } = usePlaybook();
   const {
     showPlaylistSidebar,
     togglePlaylist,
     showHeaderSounds,
     toggleHeaderSounds,
-    isStepsCollapsed,
-    setIsStepsCollapsed,
-    toggleStepsCollapsed,
+    isScenesCollapsed,
+    setIsScenesCollapsed,
+    toggleScenesCollapsed,
     mobilePlaylistOpen,
     setMobilePlaylistOpen,
     toggleMobilePlaylist,
-    mobileStepsOpen,
-    setMobileStepsOpen,
-    toggleMobileSteps,
+    mobileScenesOpen,
+    setMobileScenesOpen,
+    toggleMobileScenes,
     isEditing,
     toggleEditing,
   } = useScriptUI();
@@ -69,10 +67,10 @@ function AppRoutesContent() {
     (state) => state.scriptUi.spectacleRunTextHidden,
   );
   const showScriptMainChrome = isScriptMarkdownRoute(location.pathname);
-  const { currentStep, activeMarkdown, activeMarkdownField } = useAppSelector((state) =>
+  const { currentScene, activeMarkdown, activeMarkdownField } = useAppSelector((state) =>
     projectName
-      ? selectActiveStepMarkdownContext(state, projectName, SCRIPT_SCENE_NAME)
-      : { currentStep: undefined, activeMarkdown: "", activeMarkdownField: "markdown" as const },
+      ? selectActiveSceneMarkdownContext(state, projectName, SCRIPT_SCENE_NAME)
+      : { currentScene: undefined, activeMarkdown: "", activeMarkdownField: "markdown" as const },
   );
   const markdownMode = useAppSelector((state) =>
     projectName
@@ -164,7 +162,7 @@ function AppRoutesContent() {
 
   const canFormatPlayText =
     kadrMarkdownModes &&
-    Boolean(currentStep) &&
+    Boolean(currentScene) &&
     !(markdownMode === "play" && playOriginalMode);
 
   const formatPlaySourceText = String(activeMarkdown ?? "");
@@ -198,8 +196,8 @@ function AppRoutesContent() {
     location.pathname.startsWith("/sessions/");
 
   const isPlaylistVisible = isMobile ? mobilePlaylistOpen : showPlaylistSidebar;
-  const isStepsVisible = isMobile ? mobileStepsOpen : !isStepsCollapsed;
-  const isHeaderStepsCollapsed = !isStepsVisible;
+  const isScenesVisible = isMobile ? mobileScenesOpen : !isScenesCollapsed;
+  const isHeaderScenesCollapsed = !isScenesVisible;
   const fallbackLabel = isRehearsalPlanRoute
     ? "Загрузка плана репетиций…"
     : "Загрузка страницы…";
@@ -207,7 +205,7 @@ function AppRoutesContent() {
     <PageLoader
       variant="spectacle"
       showLeftSidebar={isPlaylistVisible}
-      showRightSidebar={isStepsVisible}
+      showRightSidebar={isScenesVisible}
       showTopBar={showHeaderSounds}
       label="Загрузка страницы…"
     />
@@ -220,38 +218,38 @@ function AppRoutesContent() {
       togglePlaylist();
       return;
     }
-    setMobileStepsOpen(false);
+    setMobileScenesOpen(false);
     toggleMobilePlaylist();
-  }, [isMobile, togglePlaylist, setMobileStepsOpen, toggleMobilePlaylist]);
+  }, [isMobile, togglePlaylist, setMobileScenesOpen, toggleMobilePlaylist]);
 
   const handleToggleSpectacleRunText = useCallback(() => {
     dispatch(scriptUiActions.toggleSpectacleRunTextHidden());
   }, [dispatch]);
 
-  const handleToggleSteps = useCallback(() => {
+  const handleToggleScenes = useCallback(() => {
     if (!isMobile) {
-      toggleStepsCollapsed();
+      toggleScenesCollapsed();
       return;
     }
     setMobilePlaylistOpen(false);
-    if (!mobileStepsOpen) {
-      setIsStepsCollapsed(false);
+    if (!mobileScenesOpen) {
+      setIsScenesCollapsed(false);
     }
-    toggleMobileSteps();
+    toggleMobileScenes();
   }, [
     isMobile,
-    mobileStepsOpen,
-    setIsStepsCollapsed,
-    toggleStepsCollapsed,
+    mobileScenesOpen,
+    setIsScenesCollapsed,
+    toggleScenesCollapsed,
     setMobilePlaylistOpen,
-    toggleMobileSteps,
+    toggleMobileScenes,
   ]);
 
   useAppEditorViewMenuRender(
     "script-markdown-menu",
     0,
     () =>
-      showScriptMainChrome && currentStep ? (
+      showScriptMainChrome && currentScene ? (
         <>
           <AppEditorScriptMarkdownMenu
             markdownMode={markdownMode}
@@ -264,27 +262,6 @@ function AppRoutesContent() {
             onTokenizeMatches={handleTokenizeMatches}
           />
         </>
-      ) : null,
-  );
-
-  const handleStepTitleChange = useCallback(
-    (title: string) => {
-      if (!currentStep) return;
-      updateStep(currentStep.id, { title });
-    },
-    [currentStep, updateStep],
-  );
-
-  useAppEditorMenubarCenterRender(
-    "script-step-title",
-    0,
-    () =>
-      showScriptMainChrome && currentStep ? (
-        <AppEditorScriptStepTitle
-          title={currentStep.title ?? ""}
-          isEditing={isEditing}
-          onTitleChange={handleStepTitleChange}
-        />
       ) : null,
   );
 
@@ -322,8 +299,8 @@ function AppRoutesContent() {
           onTogglePlaylist={handleTogglePlaylist}
           showHeaderSounds={showHeaderSounds}
           onToggleHeaderSounds={toggleHeaderSounds}
-          isStepsCollapsed={isHeaderStepsCollapsed}
-          onToggleStepsCollapsed={handleToggleSteps}
+          isScenesCollapsed={isHeaderScenesCollapsed}
+          onToggleScenesCollapsed={handleToggleScenes}
           showSpectacleRunTextToggle={isLightPlotRoute}
           spectacleRunTextHidden={spectacleRunTextHidden}
           onToggleSpectacleRunText={
@@ -335,25 +312,25 @@ function AppRoutesContent() {
 
   const handleApplyFormattedPlayText = useCallback(
     (text: string) => {
-      if (!currentStep) return;
-      updateStep(currentStep.id, { [activeMarkdownField]: text });
+      if (!currentScene) return;
+      updateScene(currentScene.id, { [activeMarkdownField]: text });
     },
-    [activeMarkdownField, currentStep, updateStep],
+    [activeMarkdownField, currentScene, updateScene],
   );
 
   const handleApplyFormattedPlayTextSplit = useCallback(
     (args: { chunks: string[]; chunkTitles: string[] }) => {
-      if (!currentStep || args.chunks.length === 0) return;
+      if (!currentScene || args.chunks.length === 0) return;
       dispatch(
-        sceneActions.splitStepContentIntoSteps({
-          sourceStepId: currentStep.id,
+        playbookActions.splitSceneContentIntoScenes({
+          sourceSceneId: currentScene.id,
           targetField: activeMarkdownField,
           chunks: args.chunks,
           chunkTitles: args.chunkTitles,
         }),
       );
     },
-    [activeMarkdownField, currentStep, dispatch],
+    [activeMarkdownField, currentScene, dispatch],
   );
 
   return (

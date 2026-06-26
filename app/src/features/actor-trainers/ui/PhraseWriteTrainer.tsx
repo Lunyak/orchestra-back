@@ -1,6 +1,7 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import cn from "classnames";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Buttons } from "../../../shared/components/buttons/Buttons";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
 import {
   DEFAULT_PHRASE_PASS_RATIO_PERCENT,
@@ -17,8 +18,8 @@ import "./dialogue-style.css";
 type Exercise = {
   id: string;
   lineId: string;
-  stepId: number;
-  stepTitle: string;
+  sceneId: number;
+  sceneTitle: string;
   role: string;
   text: string;
   textForCheck: string;
@@ -161,7 +162,11 @@ function RoleLineWrite({
       </div>
 
       <textarea
-        className={`dialogue-write-input${checked?.ok === true ? " dialogue-write-input--ok" : checked?.ok === false ? " dialogue-write-input--bad" : ""}`}
+        className={cn(
+          "dialogue-write-input",
+          checked?.ok === true && "dialogue-write-input--ok",
+          checked?.ok === false && "dialogue-write-input--bad",
+        )}
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
@@ -185,7 +190,7 @@ function RoleLineWrite({
       </div>
 
       {checked ? (
-        <div className={`dialogue-write-result${checked.ok ? " dialogue-write-result--ok" : ""}`}>
+        <div className={cn("dialogue-write-result", checked.ok && "dialogue-write-result--ok")}>
           {checked.ok ? "Верно." : `Пока не так (нужно ≥${passRatioPercent}%).`} Точность:{" "}
           <b>{Math.round(checked.ratio * 100)}%</b>
           {!checked.ok && checked.issues.length > 0 ? (
@@ -202,22 +207,22 @@ function RoleLineWrite({
 }
 
 export function PhraseWriteTrainer({
-  steps,
+  scenes,
   role,
   roleKeys,
-  selectedStepIds,
+  selectedPlaybookIds,
   storageKey,
 }: {
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
   role: string;
   roleKeys?: string[];
-  selectedStepIds: number[];
+  selectedPlaybookIds: number[];
   storageKey?: string;
 }) {
   const allLines = useMemo(() => {
-    const selected = steps.filter((s) => selectedStepIds.includes(s.id));
-    return buildDialogueLines({ steps: selected, preferField: "playMarkdown" });
-  }, [selectedStepIds, steps]);
+    const selected = scenes.filter((s) => selectedPlaybookIds.includes(s.id));
+    return buildDialogueLines({ scenes: selected, preferField: "playMarkdown" });
+  }, [selectedPlaybookIds, scenes]);
 
   const desiredRoleKeySet = useMemo(() => {
     const keys = (roleKeys && roleKeys.length ? roleKeys : [role])
@@ -237,8 +242,8 @@ export function PhraseWriteTrainer({
       out.push({
         id: line.id,
         lineId: line.id,
-        stepId: line.stepId,
-        stepTitle: line.stepTitle,
+        sceneId: line.sceneId,
+        sceneTitle: line.sceneTitle,
         role: line.role,
         text: line.text,
         textForCheck,
@@ -377,7 +382,12 @@ export function PhraseWriteTrainer({
 
     return (
       <div
-        className={`dialogue-line dialogue-line--mine ${done ? "dialogue-line--done" : ""} ${isActive ? "dialogue-line--active" : ""}`}
+        className={cn(
+          "dialogue-line",
+          "dialogue-line--mine",
+          done && "dialogue-line--done",
+          isActive && "dialogue-line--active",
+        )}
       >
         <RoleLineWrite
           ex={ex}
@@ -475,17 +485,17 @@ export function PhraseWriteTrainer({
         ) : null}
         {allLines.length === 0 ? (
           <div className="dialogue-empty">
-            {selectedStepIds.length === 0
-              ? "Выберите шаги для тренировки в настройках выше."
-              : "Нет текста в выбранных шагах (проверьте поле «Текст» в шагах)."}
+            {selectedPlaybookIds.length === 0
+              ? "Выберите сцены для тренировки в настройках выше."
+              : "Нет текста в выбранных сценах (проверьте поле «Текст» в сценах)."}
           </div>
         ) : (
           allLines.map((line) => (
             <div
               key={line.id}
               ref={(el) => setLineRef(line.id, el)}
-              className="dialogue-line-wrap"
-              data-step-id={String(line.stepId)}
+              className="dialogue-trainer__line"
+              data-scene-id={String(line.sceneId)}
             >
               {renderLine(line)}
             </div>

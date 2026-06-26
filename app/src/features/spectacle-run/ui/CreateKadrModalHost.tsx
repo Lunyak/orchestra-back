@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import {
   buildEditKadrDraftFromTapeItem,
   type CreateKadrDraft,
@@ -9,26 +9,26 @@ import { CreateKadrModal } from "./CreateKadrModal";
 
 export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[] }) {
   const run = useSpectacleRunContext();
-  const { sceneData } = useScene();
-  const step = run.currentStep;
+  const { playbookData } = usePlaybook();
+  const scene = run.currentScene;
   const currentItem = run.currentItem;
 
   const editDraft = useMemo((): CreateKadrDraft | null => {
-    if (run.kadrModalMode !== "edit" || !step || !currentItem) return null;
+    if (run.kadrModalMode !== "edit" || !scene || !currentItem) return null;
     return buildEditKadrDraftFromTapeItem({
-      step,
+      scene,
       item: currentItem,
       lightPrograms: run.lightPrograms,
     });
-  }, [currentItem, run.kadrModalMode, run.lightPrograms, step]);
+  }, [currentItem, run.kadrModalMode, run.lightPrograms, scene]);
 
-  if (!step) return null;
+  if (!scene) return null;
 
-  const playlist = (sceneData?.playlist ?? []).map((track) => ({
+  const playlist = (playbookData?.playlist ?? []).map((track) => ({
     id: track.id,
     title: track.title ?? "",
   }));
-  const sounds = (sceneData?.sounds ?? []).map((sound) => ({
+  const sounds = (playbookData?.sounds ?? []).map((sound) => ({
     id: sound.id,
     title: sound.title ?? "",
   }));
@@ -47,13 +47,13 @@ export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[]
       lightFaders={run.lightFaders}
       lightPrograms={run.lightPrograms}
       lightChannelRoles={run.lightChannelRoles}
-      spotlights={step.theaterSpotlights ?? []}
+      spotlights={scene.theaterSpotlights ?? []}
       liveConsole={run.liveConsole}
       playlist={playlist}
       sounds={sounds}
       videos={run.videos}
       holdImages={run.holdImages}
-      projector={sceneData?.projector ?? null}
+      projector={playbookData?.projector ?? null}
       onClose={run.closeKadrModal}
       onSubmit={run.submitKadrModal}
     />

@@ -16,9 +16,15 @@ function safeSegment(value: string): string {
 
 function resolveProjectsRoots(webDir: string): string[] {
   const explicit = String(process.env.ORCHESTRA_PROJECTS_ROOT ?? "").trim();
+  const roaming = process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming");
+  const localAppData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local");
   const roots = [
     explicit,
+    path.join(roaming, "orchestra-services", "projects"),
+    path.join(roaming, "Orchestra", "projects"),
+    path.join(localAppData, "Orchestra", "projects"),
     path.join(os.homedir(), "Library", "Application Support", "orchestra-services", "projects"),
+    path.join(os.homedir(), "Library", "Application Support", "Orchestra", "projects"),
     path.join(webDir, "src", "data", "projects"),
   ].filter(Boolean);
   return [...new Set(roots)];
@@ -43,6 +49,72 @@ function resolveProjectFile(roots: string[], projectSlug: string, parts: string[
     if (fs.existsSync(target) && fs.statSync(target).isFile()) return target;
   }
   return null;
+}
+
+function playbookSceneCountFromFile(filePath: string): number {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf-8")) as Record<string, unknown>;
+    const fromScenes = Array.isArray(parsed.scenes) ? parsed.scenes : [];
+    const fromLegacy = Array.isArray(parsed.steps) ? parsed.steps : [];
+    const raw = fromScenes.length > 0 ? fromScenes : fromLegacy;
+    return raw.length;
+  } catch {
+    return 0;
+  }
+}
+
+function resolveProjectScriptFile(roots: string[], projectSlug: string): string | null {
+  const modulesPath = resolveProjectFile(roots, projectSlug, ["scenesModules", "script.json"]);
+  const legacyPath = resolveProjectFile(roots, projectSlug, ["scenes", "script.json"]);
+  if (modulesPath && legacyPath) {
+    const modulesCount = playbookSceneCountFromFile(modulesPath);
+    const legacyCount = playbookSceneCountFromFile(legacyPath);
+    return legacyCount > modulesCount ? legacyPath : modulesPath;
+  }
+  return modulesPath ?? legacyPath;
+}
+
+function resolveScriptFileInDir(baseDir: string): string | null {
+  const base = path.resolve(baseDir);
+  if (!fs.existsSync(base)) return null;
+  const rootScript = path.join(base, "script.json");
+  const modulesPath = path.join(base, "scenesModules", "script.json");
+  const legacyPath = path.join(base, "scenes", "script.json");
+  const candidates: string[] = [];
+  if (fs.existsSync(rootScript) && fs.statSync(rootScript).isFile()) candidates.push(rootScript);
+  if (fs.existsSync(modulesPath) && fs.statSync(modulesPath).isFile()) candidates.push(modulesPath);
+  if (fs.existsSync(legacyPath) && fs.statSync(legacyPath).isFile()) candidates.push(legacyPath);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]!;
+  let best = candidates[0]!;
+  let bestCount = playbookSceneCountFromFile(best);
+  for (const candidate of candidates.slice(1)) {
+    const count = playbookSceneCountFromFile(candidate);
+    if (count > bestCount) {
+      best = candidate;
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
+function resolveMediaRootProjectFile(
+  projectMediaRoots: Map<string, string>,
+  projectSlug: string,
+  kind: "script" | "notes-run",
+  rootOverride?: string | null,
+): string | null {
+  const root =
+    (rootOverride && fs.existsSync(rootOverride) ? path.resolve(rootOverride) : null) ??
+    projectMediaRoots.get(projectSlug) ??
+    projectMediaRoots.get(decodeURIComponent(projectSlug)) ??
+    null;
+  if (!root) return null;
+  if (kind === "notes-run") {
+    const filePath = path.join(root, "notes-run.json");
+    return fs.existsSync(filePath) && fs.statSync(filePath).isFile() ? filePath : null;
+  }
+  return resolveScriptFileInDir(root);
 }
 
 function resolveFlatMediaFile(
@@ -243,14 +315,42 @@ export function viteLocalProjectsPlugin(webDir: string): Plugin {
             return;
           }
 
-          const sceneMatch = /^\/local-project-scenes\/([^/]+)\/(script|notes-run)\.json$/.exec(
-            url,
-          );
+          if (url === "/local-project-dev/project-file") {
+            const params = new URL(rawUrl, "http://local").searchParams;
+            const projectSlug = safeSegment(String(params.get("project") ?? ""));
+            const kind = String(params.get("kind") ?? "").trim() === "notes-run" ? "notes-run" : "script";
+            const rootParam = String(params.get("root") ?? "").trim() || null;
+            if (!projectSlug) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: "project required" }));
+              return;
+            }
+            const filePath = resolveMediaRootProjectFile(
+              projectMediaRoots,
+              projectSlug,
+              kind,
+              rootParam,
+            );
+            if (!filePath) {
+              res.statusCode = 404;
+              res.end(JSON.stringify({ ok: false, error: "Not found" }));
+              return;
+            }
+            const body = await fsPromises.readFile(filePath, "utf-8");
+            res.setHeader("Content-Type", "application/json");
+            res.end(body);
+            return;
+          }
+
+          const sceneMatch =
+            /^\/local-project-scenesModules\/([^/]+)\/(script|notes-run)\.json$/.exec(url) ??
+            /^\/local-project-scenes\/([^/]+)\/(script|notes-run)\.json$/.exec(url);
           if (sceneMatch) {
             const [, projectSlug, kind] = sceneMatch;
-            const rel =
-              kind === "notes-run" ? ["notes-run.json"] : ["scenes", "script.json"];
-            const filePath = resolveProjectFile(roots, decodeURIComponent(projectSlug), rel);
+            const filePath =
+              kind === "notes-run"
+                ? resolveProjectFile(roots, decodeURIComponent(projectSlug), ["notes-run.json"])
+                : resolveProjectScriptFile(roots, decodeURIComponent(projectSlug));
             if (!filePath) {
               res.statusCode = 404;
               res.end("Not found");

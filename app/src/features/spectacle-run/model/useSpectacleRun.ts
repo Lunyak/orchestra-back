@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { showScriptMarkdownActions } from "../../show-script-markdown/model/show-script-markdown-slice";
-import { useScene } from "../../scene";
-import { sceneActions, type SceneLightChannelRolesV1 } from "../../scene/model/scene-slice";
+import { usePlaybook } from "../../playbook";
+import { playbookActions, type PlaybookLightChannelRolesV1 } from "../../playbook/model/playbook-slice";
 import {
   applyKadrToFaders,
-  deleteKadrFromStepMarkdown,
+  deleteKadrFromSceneMarkdown,
   findKadrById,
   formatDeleteKadrConfirmMessage,
-  readStepLightKadrs,
+  readSceneLightKadrs,
   resolveKadrSectionForTapeItem,
 } from "../../theater/model/light-kadrs";
-import { invokePlaylistPause } from "../../scene/model/scene-playback-bridge";
+import { invokePlaylistPause } from "../../playbook/model/playbook-playback-bridge";
 import { parseSoundLineInSection } from "../../theater/model/kadr-sound";
 import { parseProjectorLineInSection, resolveKadrProjectorVideoOptions, type KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { applyKadrSound } from "./apply-kadr-sound";
@@ -32,7 +32,7 @@ import {
   subscribeProjectorPlayback,
 } from "../../projector/model/projector-playback-bridge";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
-import { normalizeHoldImages } from "../../projector/model/scene-projector-persist";
+import { normalizeHoldImages } from "../../projector/model/playbook-projector-persist";
 import { recordLightKadrForSection } from "../../../shared/components/light-console/light-kadr-record";
 import {
   resolveLightFaders,
@@ -41,11 +41,11 @@ import {
 } from "../../../shared/components/light-console/light-console-data";
 import { useLightConsoleLayoutSettings } from "../../../shared/components/light-console/useLightConsoleLayoutSettings";
 import { useLightConsoleState } from "../../../shared/components/light-console/useLightConsoleState";
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 import {
   buildSpectacleKadrTape,
-  findTapeIndexForStepKadr,
-  isLastTapeItemInStep,
+  findTapeIndexForSceneKadr,
+  isLastTapeItemInScene,
   type SpectacleTapeItem,
 } from "./spectacle-kadr-tape";
 import {
@@ -56,9 +56,9 @@ import {
 } from "./create-kadr-from-draft";
 import { persistProgRunPaused, readProgRunPaused } from "./prog-run-prefs-storage";
 import {
-  buildCopyStepTheaterScenePatchFromStep,
-  stepHasTheaterSceneContent,
-} from "../../theater/model/copy-step-theater-scene";
+  buildCopySceneTheaterLayoutPatchFromScene,
+  sceneHasTheaterLayoutContent,
+} from "../../theater/model/copy-scene-theater-layout";
 
 function isKeyboardTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -67,15 +67,15 @@ function isKeyboardTypingTarget(target: EventTarget | null): boolean {
 
 export type UseSpectacleRunArgs = {
   projectName: string;
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
   lightChannels: string[];
 };
 
-export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpectacleRunArgs) {
+export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpectacleRunArgs) {
   const dispatch = useAppDispatch();
-  const { sceneData, setSceneData, updateStep, setCurrentPage, currentPage, saveStepsForLightPlot } =
-    useScene();
-  const tape = useMemo(() => buildSpectacleKadrTape(steps), [steps]);
+  const { playbookData, setPlaybookData, updateScene, setCurrentPage, currentPage, saveScenesForLightPlot } =
+    usePlaybook();
+  const tape = useMemo(() => buildSpectacleKadrTape(scenes), [scenes]);
   const [tapeIndex, setTapeIndex] = useState(0);
   const [kadrModalOpen, setKadrModalOpen] = useState(false);
   const kadrModalOpenRef = useRef(false);
@@ -119,29 +119,29 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const pendingTapeIndexAfterDeleteRef = useRef<number | null>(null);
   const skipTapeApplyEffectRef = useRef(false);
   const skipKadrFadersOnceRef = useRef(false);
-  const stepsRef = useRef(steps);
+  const scenesRef = useRef(scenes);
   const tapeRef = useRef(tape);
-  stepsRef.current = steps;
+  scenesRef.current = scenes;
   tapeRef.current = tape;
 
   const lightFaders = useMemo(
-    () => resolveLightFaders(sceneData?.lightFaders ?? undefined),
-    [sceneData?.lightFaders],
+    () => resolveLightFaders(playbookData?.lightFaders ?? undefined),
+    [playbookData?.lightFaders],
   );
   const lightPrograms = useMemo(
     () =>
       resolveLightPrograms(
-        sceneData?.lightPrograms,
-        resolveLightProgramMinCount(lightChannels.length, sceneData?.lightPrograms),
+        playbookData?.lightPrograms,
+        resolveLightProgramMinCount(lightChannels.length, playbookData?.lightPrograms),
       ),
-    [lightChannels.length, sceneData?.lightPrograms],
+    [lightChannels.length, playbookData?.lightPrograms],
   );
 
   const clampedIndex = tape.length === 0 ? 0 : Math.min(tapeIndex, tape.length - 1);
   const currentItem = tape[clampedIndex] ?? null;
-  const currentStep = currentItem ? steps[currentItem.stepIndex] : null;
+  const currentScene = currentItem ? scenes[currentItem.sceneIndex] : null;
   const nextKadrNo =
-    !currentStep || !currentItem || currentItem.isPlaceholder ? 1 : currentItem.kadrNo + 1;
+    !currentScene || !currentItem || currentItem.isPlaceholder ? 1 : currentItem.kadrNo + 1;
 
   tapeIndexRef.current = clampedIndex;
 
@@ -158,7 +158,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   const liveConsole = useLightConsoleState({
     projectName,
-    spotlights: currentStep?.theaterSpotlights ?? [],
+    spotlights: currentScene?.theaterSpotlights ?? [],
   });
   const consoleLayoutSettings = useLightConsoleLayoutSettings(projectName);
 
@@ -173,10 +173,10 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       if (kadrModalOpenRef.current) return;
 
       const item = tapeRef.current[index];
-      const step = item ? stepsRef.current[item.stepIndex] : null;
-      if (!item || !step || item.isPlaceholder) return;
+      const scene = item ? scenesRef.current[item.sceneIndex] : null;
+      if (!item || !scene || item.isPlaceholder) return;
 
-      const markdown = String(step.markdown ?? "");
+      const markdown = String(scene.markdown ?? "");
       const section = resolveKadrSectionForTapeItem(markdown, item);
       if (!section) {
         setLiveStatus(
@@ -195,20 +195,20 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       );
 
       const roles =
-        sceneData?.lightChannelRoles && sceneData.lightChannelRoles.v === 1
-          ? sceneData.lightChannelRoles
+        playbookData?.lightChannelRoles && playbookData.lightChannelRoles.v === 1
+          ? playbookData.lightChannelRoles
           : null;
 
       const result = recordLightKadrForSection({
         markdown,
         section,
         existingKadrId: kadrId,
-        kadrs: readStepLightKadrs(step),
+        kadrs: readSceneLightKadrs(scene),
         lightChannels,
         lightFaders: faders,
         lightPrograms: programs,
         programId,
-        spotlights: step.theaterSpotlights ?? [],
+        spotlights: scene.theaterSpotlights ?? [],
         liveConsoleChannel: liveConsole.selectedLightSlot,
         lightChannelRoles: roles,
       });
@@ -217,21 +217,21 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         return;
       }
 
-      updateStep(step.id, {
+      updateScene(scene.id, {
         lightKadrs: result.nextKadrs,
         markdown: result.nextMarkdown,
-      } as Partial<ScriptStep>);
+      } as Partial<ScriptScene>);
       setLiveStatus(result.summary);
-      void saveStepsForLightPlot({ force: true });
+      void saveScenesForLightPlot({ force: true });
     },
     [
       lightChannels,
       liveConsole.faders,
       liveConsole.programs,
       liveConsole.selectedLightSlot,
-      sceneData?.lightChannelRoles,
-      saveStepsForLightPlot,
-      updateStep,
+      playbookData?.lightChannelRoles,
+      saveScenesForLightPlot,
+      updateScene,
     ],
   );
 
@@ -244,8 +244,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     if (kadrModalOpenRef.current) return;
     const item = tapeRef.current[tapeIndexRef.current];
     if (!item || item.isPlaceholder) return;
-    const step = stepsRef.current[item.stepIndex];
-    if (!step || !resolveKadrSectionForTapeItem(String(step.markdown ?? ""), item)) {
+    const scene = scenesRef.current[item.sceneIndex];
+    if (!scene || !resolveKadrSectionForTapeItem(String(scene.markdown ?? ""), item)) {
       return;
     }
     if (liveSaveTimerRef.current != null) {
@@ -260,21 +260,21 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const projectorMediaCtx = useMemo<ProjectorMediaContext>(
     () => ({
       projectSlug: projectName,
-      videos: sceneData?.videos ?? [],
-      holdImages: sceneData?.holdImages ?? [],
-      projector: sceneData?.projector ?? null,
+      videos: playbookData?.videos ?? [],
+      holdImages: playbookData?.holdImages ?? [],
+      projector: playbookData?.projector ?? null,
     }),
-    [projectName, sceneData?.holdImages, sceneData?.projector, sceneData?.videos],
+    [projectName, playbookData?.holdImages, playbookData?.projector, playbookData?.videos],
   );
 
   const videos = projectorMediaCtx.videos ?? [];
   const holdImages = useMemo(
     () =>
       normalizeHoldImages(
-        sceneData?.holdImages,
-        sceneData?.projector ?? undefined,
+        playbookData?.holdImages,
+        playbookData?.projector ?? undefined,
       ),
-    [sceneData?.holdImages, sceneData?.projector],
+    [playbookData?.holdImages, playbookData?.projector],
   );
 
   useEffect(() => {
@@ -520,7 +520,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   const removeProjectorVideo = useCallback(
     (videoId: number) => {
-      dispatch(sceneActions.removeSceneVideo(videoId));
+      dispatch(playbookActions.removePlaybookVideo(videoId));
       resetProjectorDraftAfterRemoval({ kind: "video", id: videoId });
     },
     [dispatch, resetProjectorDraftAfterRemoval],
@@ -528,7 +528,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
   const removeProjectorHold = useCallback(
     (holdId: number) => {
-      dispatch(sceneActions.removeSceneHoldImage(holdId));
+      dispatch(playbookActions.removePlaybookHoldImage(holdId));
       resetProjectorDraftAfterRemoval({ kind: "hold", id: holdId });
     },
     [dispatch, resetProjectorDraftAfterRemoval],
@@ -537,15 +537,15 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const applyTapeItem = useCallback(
     (item: SpectacleTapeItem, options?: { applyFaders?: boolean; applyPlayback?: boolean }) => {
       applyingTapeRef.current = true;
-      setCurrentPage(item.stepIndex);
+      setCurrentPage(item.sceneIndex);
 
-      const step = stepsRef.current[item.stepIndex];
-      if (!step || item.isPlaceholder) {
+      const scene = scenesRef.current[item.sceneIndex];
+      if (!scene || item.isPlaceholder) {
         applyingTapeRef.current = false;
         return;
       }
 
-      const markdown = String(step.markdown ?? "");
+      const markdown = String(scene.markdown ?? "");
       const section = resolveKadrSectionForTapeItem(markdown, item);
       const applyPlayback =
         options?.applyPlayback ??
@@ -574,7 +574,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
         }
       }
 
-      const kadrs = readStepLightKadrs(step);
+      const kadrs = readSceneLightKadrs(scene);
       const kadrId = item.kadrId ?? section?.id ?? null;
       const kadr = kadrId ? findKadrById(kadrs, kadrId) : undefined;
 
@@ -633,8 +633,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   useEffect(() => {
     if (tape.length === 0 || tapeInitRef.current) return;
     tapeInitRef.current = true;
-    const onStep = tape.findIndex((item) => item.stepIndex === currentPage);
-    if (onStep >= 0) setTapeIndex(onStep);
+    const tapeIndexForCurrentScene = tape.findIndex((item) => item.sceneIndex === currentPage);
+    if (tapeIndexForCurrentScene >= 0) setTapeIndex(tapeIndexForCurrentScene);
   }, [currentPage, tape]);
 
   useEffect(() => {
@@ -701,11 +701,11 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   useEffect(() => {
     const onPageHide = () => {
       flushPendingLiveSave();
-      void saveStepsForLightPlot({ force: true });
+      void saveScenesForLightPlot({ force: true });
     };
     window.addEventListener("pagehide", onPageHide);
     return () => window.removeEventListener("pagehide", onPageHide);
-  }, [flushPendingLiveSave, saveStepsForLightPlot]);
+  }, [flushPendingLiveSave, saveScenesForLightPlot]);
 
   useEffect(() => {
     if (tape.length === 0) return;
@@ -714,35 +714,35 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     }
   }, [tape.length, tapeIndex]);
 
-  const previousStep =
-    currentItem && currentItem.stepIndex > 0 ? steps[currentItem.stepIndex - 1] : null;
-  const currentStepTheaterEmpty = currentStep ? !stepHasTheaterSceneContent(currentStep) : false;
-  const canCopyTheaterFromPreviousStep = Boolean(
-    previousStep && stepHasTheaterSceneContent(previousStep),
+  const previousScene =
+    currentItem && currentItem.sceneIndex > 0 ? scenes[currentItem.sceneIndex - 1] : null;
+  const currentSceneTheaterEmpty = currentScene ? !sceneHasTheaterLayoutContent(currentScene) : false;
+  const canCopyTheaterFromPreviousScene = Boolean(
+    previousScene && sceneHasTheaterLayoutContent(previousScene),
   );
 
-  const copyTheaterFromPreviousStep = useCallback(() => {
-    if (!currentStep || !previousStep) return;
-    if (!stepHasTheaterSceneContent(previousStep)) {
-      setLiveStatus("На предыдущем шаге нет сцены для копирования");
+  const copyTheaterFromPreviousScene = useCallback(() => {
+    if (!currentScene || !previousScene) return;
+    if (!sceneHasTheaterLayoutContent(previousScene)) {
+      setLiveStatus("На предыдущей сцене нет расстановки для копирования");
       return;
     }
-    updateStep(currentStep.id, buildCopyStepTheaterScenePatchFromStep(previousStep));
-    setLiveStatus(`Сцена скопирована с шага «${previousStep.title}»`);
-    void saveStepsForLightPlot({ force: true });
-  }, [currentStep, previousStep, saveStepsForLightPlot, updateStep]);
+    updateScene(currentScene.id, buildCopySceneTheaterLayoutPatchFromScene(previousScene));
+    setLiveStatus(`Расстановка скопирована со сцены «${previousScene.title}»`);
+    void saveScenesForLightPlot({ force: true });
+  }, [currentScene, previousScene, saveScenesForLightPlot, updateScene]);
 
-  const addKadrToCurrentStep = useCallback(() => {
-    if (!currentStep) return;
+  const addKadrToCurrentScene = useCallback(() => {
+    if (!currentScene) return;
 
-    if (currentStepTheaterEmpty && previousStep && stepHasTheaterSceneContent(previousStep)) {
+    if (currentSceneTheaterEmpty && previousScene && sceneHasTheaterLayoutContent(previousScene)) {
       const shouldCopy = window.confirm(
-        `Сцена в шаге «${currentStep.title}» пуста.\n\nСкопировать расстановку (мебель, декор, софиты, реквизит) с шага «${previousStep.title}»?`,
+        `Расстановка в сцене «${currentScene.title}» пуста.\n\nСкопировать расстановку (мебель, декор, софиты, реквизит) со сцены «${previousScene.title}»?`,
       );
       if (shouldCopy) {
-        updateStep(currentStep.id, buildCopyStepTheaterScenePatchFromStep(previousStep));
-        void saveStepsForLightPlot({ force: true });
-        setLiveStatus(`Сцена скопирована с шага «${previousStep.title}»`);
+        updateScene(currentScene.id, buildCopySceneTheaterLayoutPatchFromScene(previousScene));
+        void saveScenesForLightPlot({ force: true });
+        setLiveStatus(`Расстановка скопирована со сцены «${previousScene.title}»`);
       }
     }
 
@@ -750,21 +750,21 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     cancelPendingLiveSave();
     setKadrModalOpen(true);
   }, [
-    currentStep,
-    currentStepTheaterEmpty,
-    previousStep,
+    currentScene,
+    currentSceneTheaterEmpty,
+    previousScene,
     cancelPendingLiveSave,
-    saveStepsForLightPlot,
-    updateStep,
+    saveScenesForLightPlot,
+    updateScene,
   ]);
 
   const editCurrentKadr = useCallback(() => {
     const item = tape[clampedIndex];
-    if (!item || item.isPlaceholder || !currentStep) return;
+    if (!item || item.isPlaceholder || !currentScene) return;
     cancelPendingLiveSave();
     setKadrModalMode("edit");
     setKadrModalOpen(true);
-  }, [cancelPendingLiveSave, clampedIndex, currentStep, tape]);
+  }, [cancelPendingLiveSave, clampedIndex, currentScene, tape]);
 
   const closeKadrModal = useCallback(() => {
     setKadrModalOpen(false);
@@ -776,21 +776,21 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       const item = tape[clampedIndex];
       if (!item) return;
-      const step = steps[item.stepIndex];
-      if (!step) return;
+      const scene = scenes[item.sceneIndex];
+      if (!scene) return;
 
       const mediaArgs = {
         lightChannels,
         lightFaders: liveConsole.faders,
         lightPrograms: liveConsole.programs,
-        spotlights: step.theaterSpotlights ?? [],
+        spotlights: scene.theaterSpotlights ?? [],
         liveConsoleChannel: liveConsole.selectedLightSlot,
         liveFaders: liveConsole.faders,
-        playlist: (sceneData?.playlist ?? []).map((track) => ({
+        playlist: (playbookData?.playlist ?? []).map((track) => ({
           id: track.id,
           title: track.title ?? "",
         })),
-        sounds: (sceneData?.sounds ?? []).map((sound) => ({
+        sounds: (playbookData?.sounds ?? []).map((sound) => ({
           id: sound.id,
           title: sound.title ?? "",
         })),
@@ -805,8 +805,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       const result =
         kadrModalMode === "edit"
-          ? updateKadrFromDraft({ step, item, draft, ...mediaArgs })
-          : createKadrFromDraft({ step, draft, insertAfter, ...mediaArgs });
+          ? updateKadrFromDraft({ scene, item, draft, ...mediaArgs })
+          : createKadrFromDraft({ scene, draft, insertAfter, ...mediaArgs });
 
       if (!result) {
         setLiveStatus(
@@ -818,10 +818,10 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       if (kadrModalMode === "create") {
         pendingTapeKadrIdRef.current = result.kadrId;
       }
-      updateStep(step.id, {
+      updateScene(scene.id, {
         markdown: result.nextMarkdown,
         lightKadrs: result.nextKadrs,
-      } as Partial<ScriptStep>);
+      } as Partial<ScriptScene>);
 
       const savedKadr = findKadrById(result.nextKadrs, result.kadrId);
       if (savedKadr && !savedKadr.blackout && savedKadr.programId > 0) {
@@ -839,7 +839,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
 
       setKadrModalOpen(false);
       setLiveStatus(result.summary);
-      void saveStepsForLightPlot({ force: true });
+      void saveScenesForLightPlot({ force: true });
     },
     [
       clampedIndex,
@@ -850,12 +850,12 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       liveConsole.faders,
       liveConsole.programs,
       liveConsole.selectedLightSlot,
-      saveStepsForLightPlot,
-      sceneData?.playlist,
-      sceneData?.sounds,
-      steps,
+      saveScenesForLightPlot,
+      playbookData?.playlist,
+      playbookData?.sounds,
+      scenes,
       tape,
-      updateStep,
+      updateScene,
       videos,
     ],
   );
@@ -863,8 +863,8 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   const deleteCurrentKadr = useCallback(() => {
     const item = tape[clampedIndex];
     if (!item || item.isPlaceholder) return;
-    const step = steps[item.stepIndex];
-    if (!step) return;
+    const scene = scenes[item.sceneIndex];
+    if (!scene) return;
 
     const confirmMessage = formatDeleteKadrConfirmMessage(item.headingTitle);
     if (!window.confirm(confirmMessage)) return;
@@ -874,17 +874,17 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
       liveSaveTimerRef.current = null;
     }
 
-    const { markdown, lightKadrs } = deleteKadrFromStepMarkdown(step, {
+    const { markdown, lightKadrs } = deleteKadrFromSceneMarkdown(scene, {
       id: item.kadrId ?? item.section?.id,
       kadrNo: item.kadrNo,
       headingStart: item.section?.headingStart,
     });
 
     pendingTapeIndexAfterDeleteRef.current = clampedIndex;
-    updateStep(step.id, { markdown, lightKadrs } as Partial<ScriptStep>);
-    void saveStepsForLightPlot({ force: true });
+    updateScene(scene.id, { markdown, lightKadrs } as Partial<ScriptScene>);
+    void saveScenesForLightPlot({ force: true });
     setLiveStatus(`«${item.headingTitle}» удалена`);
-  }, [clampedIndex, saveStepsForLightPlot, steps, tape, updateStep]);
+  }, [clampedIndex, saveScenesForLightPlot, scenes, tape, updateScene]);
 
   const goToTapeIndex = useCallback(
     (nextIndex: number) => {
@@ -936,11 +936,11 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   useEffect(() => {
     const pendingId = pendingTapeKadrIdRef.current;
     if (!pendingId || tape.length === 0) return;
-    const idx = findTapeIndexForStepKadr(tape, -1, pendingId);
+    const idx = findTapeIndexForSceneKadr(tape, -1, pendingId);
     if (idx < 0) return;
     pendingTapeKadrIdRef.current = null;
     goToTapeIndex(idx);
-  }, [tape, steps, goToTapeIndex]);
+  }, [tape, scenes, goToTapeIndex]);
 
   useEffect(() => {
     const pendingIndex = pendingTapeIndexAfterDeleteRef.current;
@@ -948,7 +948,7 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     pendingTapeIndexAfterDeleteRef.current = null;
     const nextIndex = Math.min(pendingIndex, tape.length - 1);
     goToTapeIndex(Math.max(0, nextIndex));
-  }, [tape, steps, goToTapeIndex]);
+  }, [tape, scenes, goToTapeIndex]);
 
   const goPrev = useCallback(() => goToTapeIndex(clampedIndex - 1), [clampedIndex, goToTapeIndex]);
   const goNext = useCallback(() => goToTapeIndex(clampedIndex + 1), [clampedIndex, goToTapeIndex]);
@@ -973,10 +973,10 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [goToTapeIndex, isProgRun, kadrModalOpen, tape.length]);
 
-  const goNextStep = useCallback(() => {
+  const goNextScene = useCallback(() => {
     if (!currentItem) return;
     const nextInTape = tape.findIndex(
-      (item, index) => index > clampedIndex && item.stepIndex > currentItem.stepIndex,
+      (item, index) => index > clampedIndex && item.sceneIndex > currentItem.sceneIndex,
     );
     if (nextInTape >= 0) goToTapeIndex(nextInTape);
   }, [clampedIndex, currentItem, goToTapeIndex, tape]);
@@ -1001,15 +1001,15 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
   }, [applyTapeItem, goToTapeIndex, projectName, tape]);
 
   const isLastInSpectacle = clampedIndex >= tape.length - 1;
-  const isLastInStep = isLastTapeItemInStep(tape, clampedIndex);
+  const isLastInScene = isLastTapeItemInScene(tape, clampedIndex);
   const canGoNext = !isLastInSpectacle;
-  const nextLabel = isLastInStep ? "Следующий шаг" : "Далее";
+  const nextLabel = isLastInScene ? "Следующая сцена" : "Далее";
 
   return {
     tape,
     tapeIndex: clampedIndex,
     currentItem,
-    currentStep,
+    currentScene,
     textHidden,
     liveStatus,
     setLiveStatus,
@@ -1017,15 +1017,15 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     lightFaders,
     lightPrograms,
     lightChannelRoles:
-      sceneData?.lightChannelRoles && sceneData.lightChannelRoles.v === 1
-        ? sceneData.lightChannelRoles
+      playbookData?.lightChannelRoles && playbookData.lightChannelRoles.v === 1
+        ? playbookData.lightChannelRoles
         : null,
-    setLightChannelRoles: (next: SceneLightChannelRolesV1) => {
-      setSceneData((prev) => ({ ...(prev ?? {}), lightChannelRoles: next }));
+    setLightChannelRoles: (next: PlaybookLightChannelRolesV1) => {
+      setPlaybookData((prev) => ({ ...(prev ?? {}), lightChannelRoles: next }));
     },
     goPrev,
     goNext,
-    goNextStep,
+    goNextScene,
     goToTapeIndex,
     startProgRun,
     progRunPaused,
@@ -1033,20 +1033,20 @@ export function useSpectacleRun({ projectName, steps, lightChannels }: UseSpecta
     toggleProgRunPause,
     canGoPrev: clampedIndex > 0,
     canGoNext,
-    isLastInStep,
+    isLastInScene,
     isLastInSpectacle,
     nextLabel,
     flushLiveSave,
-    addKadrToCurrentStep,
+    addKadrToCurrentScene,
     editCurrentKadr,
     deleteCurrentKadr,
-    canEditKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentStep),
-    canDeleteKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentStep),
+    canEditKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentScene),
+    canDeleteKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentScene),
     nextKadrNo,
-    canAddKadr: Boolean(currentStep),
-    canCopyTheaterFromPreviousStep,
-    currentStepTheaterEmpty,
-    copyTheaterFromPreviousStep,
+    canAddKadr: Boolean(currentScene),
+    canCopyTheaterFromPreviousScene,
+    currentSceneTheaterEmpty,
+    copyTheaterFromPreviousScene,
     kadrModalOpen,
     kadrModalMode,
     closeKadrModal,

@@ -192,3 +192,7 @@ input.native-text-input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
   opacity: 0.85;
 }
+
+.native-file-input--hidden {
+  display: none;
+}

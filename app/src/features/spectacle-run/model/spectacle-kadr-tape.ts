@@ -2,38 +2,38 @@ import {
   createKadrTemplateSnippet,
   createLightKadrId,
   type MarkdownKadrSection,
-  readStepLightKadrs,
-  readStepLightKadrsFromMarkdown,
+  readSceneLightKadrs,
+  readSceneLightKadrsFromMarkdown,
   renumberKadrSectionsInMarkdown,
   scanMarkdownKadrSections,
   syncLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
-import type { ScriptStep, StepLightKadrsDataV1 } from "../../../shared/types/script";
+import type { ScriptScene, SceneLightKadrsDataV1 } from "../../../shared/types/script";
 
 export type SpectacleTapeItem = {
-  /** Индекс в steps[] */
-  stepIndex: number;
-  stepId: number;
-  stepTitle: string;
-  /** Порядковый номер шага в спектакле (1-based) */
-  stepOrdinal: number;
+  /** Индекс в scenes[] */
+  sceneIndex: number;
+  sceneId: number;
+  sceneTitle: string;
+  /** Порядковый номер сцены в спектакле (1-based) */
+  sceneOrdinal: number;
   kadrNo: number;
   kadrId: string | null;
   headingTitle: string;
   section: MarkdownKadrSection | null;
-  /** Шаг без ### Картина — placeholder в ленте */
+  /** Сцена без ### Картина — placeholder в ленте */
   isPlaceholder?: boolean;
 };
 
-export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[] {
+export function buildSpectacleKadrTape(scenes: ScriptScene[]): SpectacleTapeItem[] {
   const items: SpectacleTapeItem[] = [];
 
-  steps.forEach((step, stepIndex) => {
-    const stepOrdinal = stepIndex + 1;
-    const stepTitle = String(step.title ?? "").trim() || `Шаг ${stepOrdinal}`;
-    const markdown = String(step.markdown ?? "");
+  scenes.forEach((scene, sceneIndex) => {
+    const sceneOrdinal = sceneIndex + 1;
+    const sceneTitle = String(scene.title ?? "").trim() || `Сцена ${sceneOrdinal}`;
+    const markdown = String(scene.markdown ?? "");
     const sections = scanMarkdownKadrSections(markdown);
-    const kadrs = readStepLightKadrsFromMarkdown(step);
+    const kadrs = readSceneLightKadrsFromMarkdown(scene);
 
     if (sections.length > 0) {
       for (const section of sections) {
@@ -44,10 +44,10 @@ export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[]
             ? kadrs.kadrs.find((k) => k.kadrNo === section.kadrNo)
             : undefined);
         items.push({
-          stepIndex,
-          stepId: step.id,
-          stepTitle,
-          stepOrdinal,
+          sceneIndex,
+          sceneId: scene.id,
+          sceneTitle,
+          sceneOrdinal,
           kadrNo: section.kadrNo,
           kadrId: section.id ?? linked?.id ?? null,
           headingTitle: section.headingTitle,
@@ -58,10 +58,10 @@ export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[]
     }
 
     items.push({
-      stepIndex,
-      stepId: step.id,
-      stepTitle,
-      stepOrdinal,
+      sceneIndex,
+      sceneId: scene.id,
+      sceneTitle,
+      sceneOrdinal,
       kadrNo: 0,
       kadrId: null,
       headingTitle: "Без картин",
@@ -73,28 +73,28 @@ export function buildSpectacleKadrTape(steps: ScriptStep[]): SpectacleTapeItem[]
   return items;
 }
 
-export type SpectacleTapeStepGroup = {
-  stepIndex: number;
-  stepId: number;
-  stepOrdinal: number;
-  stepTitle: string;
+export type SpectacleTapeSceneGroup = {
+  sceneIndex: number;
+  sceneId: number;
+  sceneOrdinal: number;
+  sceneTitle: string;
   items: Array<{ tapeIndex: number; item: SpectacleTapeItem }>;
 };
 
-/** Группы ленты по шагам сценария — для нижней полосы кадров. */
-export function buildSpectacleTapeStepGroups(
+/** Группы ленты по сценам сценария — для нижней полосы кадров. */
+export function buildSpectacleTapeSceneGroups(
   tape: SpectacleTapeItem[],
-): SpectacleTapeStepGroup[] {
-  const groups: SpectacleTapeStepGroup[] = [];
-  let group: SpectacleTapeStepGroup | null = null;
+): SpectacleTapeSceneGroup[] {
+  const groups: SpectacleTapeSceneGroup[] = [];
+  let group: SpectacleTapeSceneGroup | null = null;
 
   tape.forEach((item, tapeIndex) => {
-    if (!group || group.stepId !== item.stepId) {
+    if (!group || group.sceneId !== item.sceneId) {
       group = {
-        stepIndex: item.stepIndex,
-        stepId: item.stepId,
-        stepOrdinal: item.stepOrdinal,
-        stepTitle: item.stepTitle,
+        sceneIndex: item.sceneIndex,
+        sceneId: item.sceneId,
+        sceneOrdinal: item.sceneOrdinal,
+        sceneTitle: item.sceneTitle,
         items: [],
       };
       groups.push(group);
@@ -105,30 +105,30 @@ export function buildSpectacleTapeStepGroups(
   return groups;
 }
 
-export function isLastTapeItemInStep(
+export function isLastTapeItemInScene(
   tape: SpectacleTapeItem[],
   index: number,
 ): boolean {
   const item = tape[index];
   if (!item) return true;
   const next = tape[index + 1];
-  return !next || next.stepId !== item.stepId;
+  return !next || next.sceneId !== item.sceneId;
 }
 
-export { nextKadrNumberForStep } from "../../theater/model/light-kadrs";
+export { nextKadrNumberForScene } from "../../theater/model/light-kadrs";
 
 export type InsertKadrAfterTarget = {
   id?: string | null;
   kadrNo?: number;
 };
 
-/** Вставить картину после указанной (или в конец шага) и перенумеровать 1…N. */
-export function insertKadrAfterInStep(args: {
-  step: ScriptStep;
+/** Вставить картину после указанной (или в конец сцены) и перенумеровать 1…N. */
+export function insertKadrAfterInScene(args: {
+  scene: ScriptScene;
   after?: InsertKadrAfterTarget | null;
   kadrId?: string;
-}): { nextMarkdown: string; nextKadrs: StepLightKadrsDataV1; kadrId: string; kadrNo: number } {
-  const markdown = String(args.step.markdown ?? "");
+}): { nextMarkdown: string; nextKadrs: SceneLightKadrsDataV1; kadrId: string; kadrNo: number } {
+  const markdown = String(args.scene.markdown ?? "");
   const kadrId = args.kadrId ?? createLightKadrId();
   const sections = scanMarkdownKadrSections(markdown);
 
@@ -151,7 +151,7 @@ export function insertKadrAfterInStep(args: {
   const prefix = markdown.slice(insertAt, insertAt + 1) === "\n" || insertAt === 0 ? "" : "\n";
   const insertedMarkdown = `${markdown.slice(0, insertAt)}${prefix}${snippet}${markdown.slice(insertAt)}`;
   const nextMarkdown = renumberKadrSectionsInMarkdown(insertedMarkdown);
-  const prevKadrs = readStepLightKadrs(args.step);
+  const prevKadrs = readSceneLightKadrs(args.scene);
   const nextKadrs = syncLightKadrsFromMarkdown({ markdown: nextMarkdown, kadrs: prevKadrs });
   const createdSection =
     scanMarkdownKadrSections(nextMarkdown).find((section) => section.id === kadrId) ?? null;
@@ -160,18 +160,18 @@ export function insertKadrAfterInStep(args: {
   return { nextMarkdown, nextKadrs, kadrId, kadrNo };
 }
 
-/** Добавить в конец markdown шага блок ### Картина N. */
-export function appendKadrToStep(args: {
-  step: ScriptStep;
+/** Добавить в конец markdown сцены блок ### Картина N. */
+export function appendKadrToScene(args: {
+  scene: ScriptScene;
   kadrNo?: number;
   kadrId?: string;
-}): { nextMarkdown: string; nextKadrs: StepLightKadrsDataV1; kadrId: string; kadrNo: number } {
-  return insertKadrAfterInStep({ step: args.step, after: null, kadrId: args.kadrId });
+}): { nextMarkdown: string; nextKadrs: SceneLightKadrsDataV1; kadrId: string; kadrNo: number } {
+  return insertKadrAfterInScene({ scene: args.scene, after: null, kadrId: args.kadrId });
 }
 
-export function findTapeIndexForStepKadr(
+export function findTapeIndexForSceneKadr(
   tape: SpectacleTapeItem[],
-  stepIndex: number,
+  sceneIndex: number,
   kadrId: string | null,
   kadrNo?: number,
 ): number {
@@ -179,14 +179,14 @@ export function findTapeIndexForStepKadr(
     const byId = tape.findIndex((item) => item.kadrId === kadrId);
     if (byId >= 0) return byId;
   }
-  if (stepIndex >= 0 && kadrNo != null && kadrNo > 0) {
+  if (sceneIndex >= 0 && kadrNo != null && kadrNo > 0) {
     const byNo = tape.findIndex(
-      (item) => item.stepIndex === stepIndex && item.kadrNo === kadrNo,
+      (item) => item.sceneIndex === sceneIndex && item.kadrNo === kadrNo,
     );
     if (byNo >= 0) return byNo;
   }
-  if (stepIndex >= 0) {
-    return tape.findIndex((item) => item.stepIndex === stepIndex);
+  if (sceneIndex >= 0) {
+    return tape.findIndex((item) => item.sceneIndex === sceneIndex);
   }
   return -1;
 }

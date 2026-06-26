@@ -50,7 +50,7 @@ export function WorkbookInboundMentionsSection({
                     <span>
                       Актёр: <b>{actor}</b>
                     </span>
-                    {when ? <span style={{ opacity: 0.75 }}>Обновлено: {when}</span> : null}
+                    {when ? <span className="rolewb-timestamp-muted">Обновлено: {when}</span> : null}
                   </div>
                   <div className="rolewb-inbound-quote">{m.text}</div>
                 </div>

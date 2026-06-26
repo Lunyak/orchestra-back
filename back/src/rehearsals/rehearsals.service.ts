@@ -7,6 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RolesService } from '../roles/roles.service';
+import { extractRoleKeysFromSceneRoles } from '../playbook/scene-roles-data';
+import { parseSelectedScenesJson } from '../playbook/selected-scenes-json';
 import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
 import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
@@ -63,7 +65,7 @@ function parseIsoDate(v: string): Date {
   return d.toDate();
 }
 
-type RawStepLike = {
+type RawSceneLike = {
   id?: number;
   title?: string;
   markdown?: string;
@@ -71,23 +73,6 @@ type RawStepLike = {
   durationMin?: number;
   kanbanStatus?: string;
   kanbanOrder?: number;
-};
-
-type SceneRoleLinkV1 = {
-  roleId: string;
-  roleKey?: string;
-  roleTitle?: string;
-  note?: string;
-  createdAtIso?: string;
-  updatedAtIso?: string;
-};
-
-type SceneRolesDataV1 = {
-  v: 1;
-  byStepId: Record<
-    string,
-    Record<string, SceneRoleLinkV1 | undefined> | undefined
-  >;
 };
 
 function uniq<T>(arr: T[]): T[] {
@@ -158,47 +143,24 @@ function extractRolesSmart(text?: string): string[] {
   ]);
 }
 
-function extractRoleKeysFromSceneRoles(
-  sceneRoles: any,
-  stepId: number,
-): string[] {
-  const sr = sceneRoles as SceneRolesDataV1 | null | undefined;
-  if (!sr || typeof sr !== 'object' || (sr as any).v !== 1) return [];
-  const byStepId = (sr as any).byStepId;
-  if (!byStepId || typeof byStepId !== 'object') return [];
-  const stepMap = byStepId[String(stepId)];
-  if (!stepMap || typeof stepMap !== 'object') return [];
-  const out: string[] = [];
-  for (const it of Object.values(stepMap as Record<string, any>)) {
-    if (!it || typeof it !== 'object') continue;
-    const key =
-      typeof it.roleKey === 'string' && it.roleKey.trim()
-        ? normalizeRoleKey(it.roleKey)
-        : typeof it.roleTitle === 'string' && it.roleTitle.trim()
-          ? normalizeRoleKey(it.roleTitle)
-          : null;
-    if (key) out.push(key);
-  }
-  return uniq(out).filter(Boolean);
-}
-
-function getRoleTokensForStep(
-  scene: { sceneRoles?: any } | null,
-  step: {
+function getRoleTokensForScene(
+  playbook: { sceneRoles?: any } | null,
+  scene: {
     sourceId?: number;
     markdown?: string | null;
     playMarkdown?: string | null;
   },
 ): string[] {
-  const stepId = typeof step.sourceId === 'number' ? step.sourceId : null;
-  if (stepId != null) {
+  const sceneSourceId = typeof scene.sourceId === 'number' ? scene.sourceId : null;
+  if (sceneSourceId != null) {
     const attached = extractRoleKeysFromSceneRoles(
-      (scene as any)?.sceneRoles,
-      stepId,
+      (playbook as any)?.sceneRoles,
+      sceneSourceId,
+      normalizeRoleKey,
     );
     if (attached.length > 0) return attached;
   }
-  const text = step.playMarkdown ?? step.markdown ?? '';
+  const text = scene.playMarkdown ?? scene.markdown ?? '';
   return extractRolesSmart(text);
 }
 
@@ -232,29 +194,6 @@ function parseStringArrayJson(value: unknown): string[] {
   }
   // Prisma JSONB может прийти как объект/строка — но нам нужен только массив
   return [];
-}
-
-type SelectedStepRef = { sceneId: string; stepId: number };
-
-function parseSelectedStepsJson(value: unknown): SelectedStepRef[] {
-  if (!value || !Array.isArray(value)) return [];
-  const out: SelectedStepRef[] = [];
-  for (const item of value) {
-    if (!item || typeof item !== 'object') continue;
-    const sceneId = String(item.sceneId ?? '').trim();
-    const stepIdRaw = item.stepId;
-    const stepId =
-      typeof stepIdRaw === 'number'
-        ? Math.trunc(stepIdRaw)
-        : parseInt(String(stepIdRaw ?? ''), 10);
-    if (!sceneId) continue;
-    if (!Number.isFinite(stepId) || stepId <= 0) continue;
-    out.push({ sceneId, stepId });
-  }
-  // uniq by sceneId+stepId
-  const map = new Map<string, SelectedStepRef>();
-  for (const x of out) map.set(`${x.sceneId}:${x.stepId}`, x);
-  return Array.from(map.values());
 }
 
 @Injectable()
@@ -424,22 +363,22 @@ export class RehearsalsService {
         startsAt: dto.startsAt != null ? parseIsoDate(dto.startsAt) : undefined,
         durationMin: dto.durationMin != null ? dto.durationMin : undefined,
         notes: dto.notes != null ? dto.notes.trim() || null : undefined,
-        selectedSceneIds:
-          dto.selectedSceneIds != null
-            ? dto.selectedSceneIds
+        selectedPlaybookIds:
+          dto.selectedPlaybookIds != null
+            ? dto.selectedPlaybookIds
                 .map((x) => String(x ?? '').trim())
                 .filter(Boolean)
             : undefined,
-        selectedSteps:
-          dto.selectedSteps != null
-            ? parseSelectedStepsJson(dto.selectedSteps as any)
+        selectedScenes:
+          dto.selectedScenes != null
+            ? parseSelectedScenesJson(dto.selectedScenes as any)
             : undefined,
       },
       include: { participants: true },
     });
   }
 
-  async getStepsForRehearsal(userId: string, rehearsalId: string) {
+  async getScenesForRehearsal(userId: string, rehearsalId: string) {
     const reh = await this.prisma.rehearsal.findUnique({
       where: { id: rehearsalId },
       include: { project: { select: { id: true, slug: true, name: true } } },
@@ -447,47 +386,44 @@ export class RehearsalsService {
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, false);
 
-    const scenes = await this.prisma.scene.findMany({
-      where: { projectId: reh.projectId, deletedAt: null },
+    const playbooks = await this.prisma.playbook.findMany({ where: { projectId: reh.projectId, deletedAt: null },
       select: { id: true, name: true },
       orderBy: { createdAt: 'asc' },
     });
 
-    const steps = await this.prisma.step.findMany({
-      where: {
-        sceneId: { in: scenes.map((s) => s.id) },
+    const scenes = await this.prisma.scene.findMany({ where: { playbookId: { in: playbooks.map((s) => s.id) },
         deletedAt: null,
       },
-      select: { sceneId: true, sourceId: true, title: true, order: true },
-      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+      select: { playbookId: true, sourceId: true, title: true, order: true },
+      orderBy: [{ playbookId: 'asc' }, { order: 'asc' }],
     });
-    const stepsBySceneId = new Map<
+    const scenesByPlaybookId = new Map<
       string,
       Array<{ id: number; title: string }>
     >();
-    for (const st of steps) {
-      const list = stepsBySceneId.get(st.sceneId) ?? [];
+    for (const st of scenes) {
+      const list = scenesByPlaybookId.get(st.playbookId) ?? [];
       list.push({
         id: st.sourceId,
-        title: String(st.title ?? '').trim() || `Step ${st.sourceId}`,
+        title: String(st.title ?? '').trim() || `Scene ${st.sourceId}`,
       });
-      stepsBySceneId.set(st.sceneId, list);
+      scenesByPlaybookId.set(st.playbookId, list);
     }
 
-    const selectedSceneIds = parseStringArrayJson(
-      (reh as any)?.selectedSceneIds,
+    const selectedPlaybookIds = parseStringArrayJson(
+      (reh as any)?.selectedPlaybookIds,
     );
-    const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
+    const selectedScenes = parseSelectedScenesJson((reh as any)?.selectedScenes);
 
     return {
       rehearsal: { id: reh.id, title: reh.title, startsAt: reh.startsAt },
-      selectedSceneIds,
-      selectedSteps,
-      scenes: scenes.map((s) => {
+      selectedPlaybookIds,
+      selectedScenes,
+      playbooks: playbooks.map((s) => {
         return {
           id: s.id,
           name: s.name,
-          steps: (stepsBySceneId.get(s.id) ?? []).slice(0, 200),
+          scenes: (scenesByPlaybookId.get(s.id) ?? []).slice(0, 200),
         };
       }),
     };
@@ -570,27 +506,27 @@ export class RehearsalsService {
       availableFromByEmail.set(email, Math.max(rehearsalStartMin, mins));
     }
 
-    const selectedSceneIds = parseStringArrayJson(
-      (reh as any)?.selectedSceneIds,
+    const selectedPlaybookIds = parseStringArrayJson(
+      (reh as any)?.selectedPlaybookIds,
     );
-    const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
-    const allowedStepsBySceneId = new Map<string, Set<number>>();
-    for (const x of selectedSteps) {
-      const set = allowedStepsBySceneId.get(x.sceneId) ?? new Set<number>();
-      set.add(x.stepId);
-      allowedStepsBySceneId.set(x.sceneId, set);
+    const selectedScenes = parseSelectedScenesJson((reh as any)?.selectedScenes);
+    const allowedScenesByPlaybookId = new Map<string, Set<number>>();
+    for (const x of selectedScenes) {
+      const set = allowedScenesByPlaybookId.get(x.playbookId) ?? new Set<number>();
+      set.add(x.sceneId);
+      allowedScenesByPlaybookId.set(x.playbookId, set);
     }
-    const allowedSceneIdsFromSteps = new Set<string>(
-      selectedSteps.map((x) => x.sceneId),
+    const allowedPlaybookIdsFromScenes = new Set<string>(
+      selectedScenes.map((x) => x.playbookId),
     );
-    const effectiveSceneIds =
-      selectedSceneIds.length > 0
-        ? selectedSceneIds
-        : selectedSteps.length > 0
-          ? Array.from(allowedSceneIdsFromSteps)
+    const effectivePlaybookIds =
+      selectedPlaybookIds.length > 0
+        ? selectedPlaybookIds
+        : selectedScenes.length > 0
+          ? Array.from(allowedPlaybookIdsFromScenes)
           : [];
 
-    if (selectedSteps.length === 0) {
+    if (selectedScenes.length === 0) {
       return {
         rehearsal: {
           id: reh.id,
@@ -606,26 +542,24 @@ export class RehearsalsService {
           rehearsalEndTime: minutesToHHMM(rehearsalEndMin),
           durationMin: rehearsalDurationMin,
           scheduledMin: 0,
-          steps: [] as any[],
+          scenes: [] as any[],
         },
       };
     }
-    const scenes = await this.prisma.scene.findMany({
+    const playbooks = await this.prisma.playbook.findMany({
       where: {
         projectId: reh.projectId,
         deletedAt: null,
-        ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
+        ...(effectivePlaybookIds.length ? { id: { in: effectivePlaybookIds } } : {}),
       },
       select: { id: true, name: true, sceneRoles: true },
     });
 
-    const stepRows = await this.prisma.step.findMany({
-      where: {
-        sceneId: { in: scenes.map((s) => s.id) },
+    const sceneRows = await this.prisma.scene.findMany({ where: { playbookId: { in: playbooks.map((s) => s.id) },
         deletedAt: null,
       },
       select: {
-        sceneId: true,
+        playbookId: true,
         sourceId: true,
         title: true,
         markdown: true,
@@ -633,29 +567,29 @@ export class RehearsalsService {
         durationMin: true,
         order: true,
       },
-      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+      orderBy: [{ playbookId: 'asc' }, { order: 'asc' }],
     });
-    const stepsBySceneId = new Map<string, typeof stepRows>();
-    for (const st of stepRows) {
-      const list = stepsBySceneId.get(st.sceneId) ?? [];
+    const scenesByPlaybookId = new Map<string, typeof sceneRows>();
+    for (const st of sceneRows) {
+      const list = scenesByPlaybookId.get(st.playbookId) ?? [];
       list.push(st);
-      stepsBySceneId.set(st.sceneId, list);
+      scenesByPlaybookId.set(st.playbookId, list);
     }
 
     // 1) Собираем все роли, которые реально нужны в выбранных шагах.
     const requiredRoleKeysSet = new Set<string>();
-    for (const scene of scenes) {
-      const steps = stepsBySceneId.get(scene.id) ?? [];
-      for (const step of steps) {
-        const allowed = allowedStepsBySceneId.get(scene.id);
+    for (const playbook of playbooks) {
+      const scenes = scenesByPlaybookId.get(playbook.id) ?? [];
+      for (const scene of scenes) {
+        const allowed = allowedScenesByPlaybookId.get(playbook.id);
         if (
           allowed &&
-          typeof step.sourceId === 'number' &&
-          !allowed.has(step.sourceId)
+          typeof scene.sourceId === 'number' &&
+          !allowed.has(scene.sourceId)
         )
           continue;
-        if (allowed && typeof step.sourceId !== 'number') continue;
-        const roles = getRoleTokensForStep(scene as any, step as any);
+        if (allowed && typeof scene.sourceId !== 'number') continue;
+        const roles = getRoleTokensForScene(playbook as any, scene as any);
         roles
           .map((r) => normalizeRoleKey(r))
           .filter(Boolean)
@@ -682,18 +616,18 @@ export class RehearsalsService {
 
     // 2) Собираем нужные email-ы для доступности.
     const neededEmails = new Set<string>();
-    for (const scene of scenes) {
-      const steps = stepsBySceneId.get(scene.id) ?? [];
-      for (const step of steps) {
-        const allowed = allowedStepsBySceneId.get(scene.id);
+    for (const playbook of playbooks) {
+      const scenes = scenesByPlaybookId.get(playbook.id) ?? [];
+      for (const scene of scenes) {
+        const allowed = allowedScenesByPlaybookId.get(playbook.id);
         if (
           allowed &&
-          typeof step.sourceId === 'number' &&
-          !allowed.has(step.sourceId)
+          typeof scene.sourceId === 'number' &&
+          !allowed.has(scene.sourceId)
         )
           continue;
-        if (allowed && typeof step.sourceId !== 'number') continue;
-        const roles = getRoleTokensForStep(scene as any, step as any);
+        if (allowed && typeof scene.sourceId !== 'number') continue;
+        const roles = getRoleTokensForScene(playbook as any, scene as any);
         for (const role of roles) {
           getAssignedEmailsForRole(role).forEach((e) =>
             neededEmails.add(normEmail(e)),
@@ -732,10 +666,10 @@ export class RehearsalsService {
     }
 
     const items: Array<{
-      sceneId: string;
-      sceneName: string;
-      stepId: number | null;
-      stepTitle: string;
+      playbookId: string;
+      playbookName: string;
+      sceneId: number | null;
+      sceneTitle: string;
       requiredRoles: string[];
       missing: string[];
       ready: boolean;
@@ -749,20 +683,20 @@ export class RehearsalsService {
       durationMin: number | null;
     }> = [];
 
-    for (const scene of scenes) {
-      const steps = stepsBySceneId.get(scene.id) ?? [];
-      for (const step of steps) {
-        const allowed = allowedStepsBySceneId.get(scene.id);
+    for (const playbook of playbooks) {
+      const scenes = scenesByPlaybookId.get(playbook.id) ?? [];
+      for (const scene of scenes) {
+        const allowed = allowedScenesByPlaybookId.get(playbook.id);
         if (
           allowed &&
-          typeof step.sourceId === 'number' &&
-          !allowed.has(step.sourceId)
+          typeof scene.sourceId === 'number' &&
+          !allowed.has(scene.sourceId)
         )
           continue;
-        if (allowed && typeof step.sourceId !== 'number') continue;
-        const roles = getRoleTokensForStep(scene as any, step as any);
+        if (allowed && typeof scene.sourceId !== 'number') continue;
+        const roles = getRoleTokensForScene(playbook as any, scene as any);
         const rawDuration =
-          typeof step.durationMin === 'number' ? step.durationMin : null;
+          typeof scene.durationMin === 'number' ? scene.durationMin : null;
         const durationMin =
           rawDuration != null && Number.isFinite(rawDuration) && rawDuration > 0
             ? Math.max(1, Math.min(480, Math.trunc(rawDuration)))
@@ -805,12 +739,12 @@ export class RehearsalsService {
         }
 
         items.push({
-          sceneId: scene.id,
-          sceneName: scene.name,
-          stepId: typeof step.sourceId === 'number' ? step.sourceId : null,
-          stepTitle:
-            (step.title ?? '').trim() ||
-            `Step ${String(step.sourceId ?? '')}`.trim(),
+          playbookId: playbook.id,
+          playbookName: playbook.name,
+          sceneId: typeof scene.sourceId === 'number' ? scene.sourceId : null,
+          sceneTitle:
+            (scene.title ?? '').trim() ||
+            `Scene ${String(scene.sourceId ?? '')}`.trim(),
           requiredRoles: roles,
           missing,
           ready: missing.length === 0,
@@ -830,8 +764,8 @@ export class RehearsalsService {
       }
       if (a.missing.length !== b.missing.length)
         return a.missing.length - b.missing.length;
-      return `${a.sceneName} ${a.stepTitle}`.localeCompare(
-        `${b.sceneName} ${b.stepTitle}`,
+      return `${a.playbookName} ${a.sceneTitle}`.localeCompare(
+        `${b.playbookName} ${b.sceneTitle}`,
         'ru',
       );
     });
@@ -843,18 +777,18 @@ export class RehearsalsService {
       .sort((a, b) => {
         if (a.availableFromMin !== b.availableFromMin)
           return a.availableFromMin - b.availableFromMin;
-        return `${a.sceneName} ${a.stepTitle}`.localeCompare(
-          `${b.sceneName} ${b.stepTitle}`,
+        return `${a.playbookName} ${a.sceneTitle}`.localeCompare(
+          `${b.playbookName} ${b.sceneTitle}`,
           'ru',
         );
       });
 
     let cursorMin = rehearsalStartMin;
     const timeline: Array<{
-      sceneId: string;
-      sceneName: string;
-      stepId: number | null;
-      stepTitle: string;
+      playbookId: string;
+      playbookName: string;
+      sceneId: number | null;
+      sceneTitle: string;
       startTime: string;
       endTime: string;
       startMin: number;
@@ -868,10 +802,10 @@ export class RehearsalsService {
       const endMin = startMin + (x.durationMin ?? 0);
       if (endMin > rehearsalEndMin) break;
       timeline.push({
+        playbookId: x.playbookId,
+        playbookName: x.playbookName,
         sceneId: x.sceneId,
-        sceneName: x.sceneName,
-        stepId: x.stepId,
-        stepTitle: x.stepTitle,
+        sceneTitle: x.sceneTitle,
         startTime: minutesToHHMM(startMin),
         endTime: minutesToHHMM(endMin),
         startMin,
@@ -898,7 +832,7 @@ export class RehearsalsService {
         rehearsalEndTime: minutesToHHMM(rehearsalEndMin),
         durationMin: rehearsalDurationMin,
         scheduledMin: Math.max(0, cursorMin - rehearsalStartMin),
-        steps: timeline,
+        scenes: timeline,
       },
     };
   }
@@ -924,64 +858,62 @@ export class RehearsalsService {
     // Те, кто отметил absent или не отметил ничего — в опрос не попадают.
     const rehearsalDateKey = getDateKey(reh.startsAt);
 
-    const selectedSceneIds = parseStringArrayJson(
-      (reh as any)?.selectedSceneIds,
+    const selectedPlaybookIds = parseStringArrayJson(
+      (reh as any)?.selectedPlaybookIds,
     );
-    const selectedSteps = parseSelectedStepsJson((reh as any)?.selectedSteps);
-    const allowedStepsBySceneId = new Map<string, Set<number>>();
-    for (const x of selectedSteps) {
-      const set = allowedStepsBySceneId.get(x.sceneId) ?? new Set<number>();
-      set.add(x.stepId);
-      allowedStepsBySceneId.set(x.sceneId, set);
+    const selectedScenes = parseSelectedScenesJson((reh as any)?.selectedScenes);
+    const allowedScenesByPlaybookId = new Map<string, Set<number>>();
+    for (const x of selectedScenes) {
+      const set = allowedScenesByPlaybookId.get(x.playbookId) ?? new Set<number>();
+      set.add(x.sceneId);
+      allowedScenesByPlaybookId.set(x.playbookId, set);
     }
-    const allowedSceneIdsFromSteps = new Set<string>(
-      selectedSteps.map((x) => x.sceneId),
+    const allowedPlaybookIdsFromScenes = new Set<string>(
+      selectedScenes.map((x) => x.playbookId),
     );
-    const effectiveSceneIds =
-      selectedSceneIds.length > 0
-        ? selectedSceneIds
-        : selectedSteps.length > 0
-          ? Array.from(allowedSceneIdsFromSteps)
+    const effectivePlaybookIds =
+      selectedPlaybookIds.length > 0
+        ? selectedPlaybookIds
+        : selectedScenes.length > 0
+          ? Array.from(allowedPlaybookIdsFromScenes)
           : [];
-    const scenes = await this.prisma.scene.findMany({
+    const playbooks = await this.prisma.playbook.findMany({
       where: {
         projectId: reh.projectId,
         deletedAt: null,
-        ...(effectiveSceneIds.length ? { id: { in: effectiveSceneIds } } : {}),
+        ...(effectivePlaybookIds.length ? { id: { in: effectivePlaybookIds } } : {}),
       },
       select: { id: true, name: true, sceneRoles: true },
     });
 
-    const stepRows2 = await this.prisma.step.findMany({
-      where: {
-        sceneId: { in: scenes.map((s) => s.id) },
+    const sceneRows2 = await this.prisma.scene.findMany({ where: { playbookId: { in: playbooks.map((s) => s.id) },
         deletedAt: null,
       },
       select: {
-        sceneId: true,
+        playbookId: true,
         sourceId: true,
         title: true,
         markdown: true,
         playMarkdown: true,
         order: true,
       },
-      orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+      orderBy: [{ playbookId: 'asc' }, { order: 'asc' }],
     });
-    const stepsBySceneId2 = new Map<string, typeof stepRows2>();
-    for (const st of stepRows2) {
-      const list = stepsBySceneId2.get(st.sceneId) ?? [];
+    const scenesByPlaybookId2 = new Map<string, typeof sceneRows2>();
+    for (const st of sceneRows2) {
+      const list = scenesByPlaybookId2.get(st.playbookId) ?? [];
       list.push(st);
-      stepsBySceneId2.set(st.sceneId, list);
+      scenesByPlaybookId2.set(st.playbookId, list);
     }
-    if (effectiveSceneIds.length && scenes.length === 0) {
+    if (effectivePlaybookIds.length && playbooks.length === 0) {
       throw new BadRequestException('Выбранные сцены не найдены');
     }
-    if (scenes.length === 0) {
+    if (playbooks.length === 0) {
       throw new BadRequestException(
         'Перед публикацией выберите сцены для репетиции',
       );
     }
-    if (selectedSteps.length === 0) {
+    if (selectedScenes.length === 0) {
       throw new BadRequestException(
         'Перед публикацией выберите сцены (шаги) для репетиции',
       );
@@ -989,18 +921,18 @@ export class RehearsalsService {
 
     // Нужные участники для публикации берём из назначений ролей (Role assignments).
     const requiredRoleKeysSet = new Set<string>();
-    for (const scene of scenes) {
-      const steps = stepsBySceneId2.get(scene.id) ?? [];
-      for (const step of steps) {
-        const allowed = allowedStepsBySceneId.get(scene.id);
+    for (const playbook of playbooks) {
+      const scenes = scenesByPlaybookId2.get(playbook.id) ?? [];
+      for (const scene of scenes) {
+        const allowed = allowedScenesByPlaybookId.get(playbook.id);
         if (
           allowed &&
-          typeof step.sourceId === 'number' &&
-          !allowed.has(step.sourceId)
+          typeof scene.sourceId === 'number' &&
+          !allowed.has(scene.sourceId)
         )
           continue;
-        if (allowed && typeof step.sourceId !== 'number') continue;
-        const roles = getRoleTokensForStep(scene as any, step as any);
+        if (allowed && typeof scene.sourceId !== 'number') continue;
+        const roles = getRoleTokensForScene(playbook as any, scene as any);
         roles
           .map((r) => normalizeRoleKey(r))
           .filter(Boolean)
@@ -1027,18 +959,18 @@ export class RehearsalsService {
 
     const neededEmails = new Set<string>();
     const missingRoles = new Set<string>();
-    for (const scene of scenes) {
-      const steps = stepsBySceneId2.get(scene.id) ?? [];
-      for (const step of steps) {
-        const allowed = allowedStepsBySceneId.get(scene.id);
+    for (const playbook of playbooks) {
+      const scenes = scenesByPlaybookId2.get(playbook.id) ?? [];
+      for (const scene of scenes) {
+        const allowed = allowedScenesByPlaybookId.get(playbook.id);
         if (
           allowed &&
-          typeof step.sourceId === 'number' &&
-          !allowed.has(step.sourceId)
+          typeof scene.sourceId === 'number' &&
+          !allowed.has(scene.sourceId)
         )
           continue;
-        if (allowed && typeof step.sourceId !== 'number') continue;
-        const roles = getRoleTokensForStep(scene as any, step as any);
+        if (allowed && typeof scene.sourceId !== 'number') continue;
+        const roles = getRoleTokensForScene(playbook as any, scene as any);
         for (const role of roles) {
           const emails = getAssignedEmailsForRole(role);
           if (emails.length === 0) missingRoles.add(role);

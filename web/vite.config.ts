@@ -8,13 +8,16 @@ import { viteLocalProjectsPlugin } from "./vite-local-projects-plugin";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function isDockerEnv() {
+  return existsSync("/.dockerenv");
+}
+
 /** Vite dev server (proxy) runs in Node; inside Docker it must reach API by compose service name, not LAN IP. */
 function resolveApiProxyTarget(rawBase: string): string {
   const explicit = String(process.env.DEV_PROXY_API ?? "").trim();
   if (explicit) return explicit;
 
-  const inDocker = existsSync("/.dockerenv");
-  if (inDocker) return "http://back:3000";
+  if (isDockerEnv()) return "http://back:3000";
 
   if (rawBase.startsWith("http://") || rawBase.startsWith("https://")) return rawBase;
   return "http://localhost:3000";
@@ -27,6 +30,8 @@ export default defineConfig(async ({ mode, command }) => {
   const basePath = isDesktopBuild ? "./" : String(env.VITE_BASE_PATH || "/");
   // DEV_PROXY_API — явный URL для прокси (compose: http://back:3000). Иначе в Docker — back:3000, на хосте — rawBase или localhost.
   const proxyTarget = resolveApiProxyTarget(rawBase);
+  const inDocker = isDockerEnv();
+  const isDevServer = command === "serve";
   const isMobileBuild = mode === "mobile" || env.VITE_CAPACITOR === "1";
   const electronEntry = path.resolve(__dirname, "../desktop/electron/main.ts");
   const preloadEntry = path.resolve(__dirname, "../desktop/electron/preload.mjs");
@@ -117,6 +122,15 @@ export default defineConfig(async ({ mode, command }) => {
           changeOrigin: true,
         },
       },
+      // Bind mount на Windows/macOS не шлёт inotify в Linux-контейнер — polling для HMR.
+      ...(inDocker && isDevServer
+        ? {
+            watch: {
+              usePolling: true,
+              interval: 1000,
+            },
+          }
+        : {}),
     },
     plugins: [
       react(),

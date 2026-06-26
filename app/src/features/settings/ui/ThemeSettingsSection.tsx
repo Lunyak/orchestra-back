@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { Button } from "@shared/core/button/Button";
 import { readCurrentThemeTokenValues } from "../../../shared/styles/theme/apply-theme";
 import { useTheme } from "../../../shared/styles/theme/ThemeProvider";
@@ -31,7 +32,7 @@ function ThemeEditor({
 
   return (
     <div className="theme-editor">
-      <div className="theme-editor__head">
+      <div className="theme-editor__header">
         <input
           className="theme-editor__name"
           value={name}
@@ -122,7 +123,7 @@ export function ThemeSettingsSection() {
           <button
             key={theme.id}
             type="button"
-            className={`theme-card${activeThemeId === theme.id ? " is-active" : ""}`}
+            className={cn("theme-card", activeThemeId === theme.id && "theme-card--active")}
             onClick={() => setTheme(theme.id)}
           >
             <div className="theme-card__swatches">
@@ -147,7 +148,7 @@ export function ThemeSettingsSection() {
                 <div className="theme-custom-row__actions">
                   <Button
                     type="button"
-                    className={activeThemeId === themeId ? "is-active" : "secondary"}
+                    className={cn(activeThemeId === themeId ? "button--active" : "secondary")}
                     onClick={() => setTheme(themeId)}
                   >
                     {activeThemeId === themeId ? "Активна" : "Применить"}

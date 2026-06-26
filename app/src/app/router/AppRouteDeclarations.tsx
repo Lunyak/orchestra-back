@@ -5,26 +5,28 @@ import {
   ENABLE_ACTOR_PAGE,
   ENABLE_ROLE_WORKBOOK_PAGE,
 } from "../../shared/build-features";
-import { isTheaterRouteEnabled } from "./routeMeta";
+import { isTheaterRouteEnabled, PROJECT_MEDIA_ROUTE_PATH, SUFER_ROUTE_PATH } from "./routeMeta";
 
 const SpectaclePage = lazy(() =>
-  import("../../pages/spectacle/SpectaclePage").then((m) => ({
+  import("../../features/spectacle").then((m) => ({
     default: m.SpectaclePage,
   })),
 );
 
 const DirectorSessionsPage = lazy(() =>
-  import("../../pages/sessions/DirectorSessionsPage").then((m) => ({
-    default: m.DirectorSessionsPage,
-  })),
+  import("../../features/director-sessions/ui/DirectorSessionsPage").then(
+    (m) => ({
+      default: m.DirectorSessionsPage,
+    }),
+  ),
 );
 
 const DirectorSessionPage = lazy(() =>
-  import("../../pages/sessions/DirectorSessionPage/DirectorSessionPage").then(
-    (m) => ({
-      default: m.DirectorSessionPage,
-    }),
-  ),
+  import(
+    "../../features/director-sessions/ui/DirectorSessionPage/DirectorSessionPage"
+  ).then((m) => ({
+    default: m.DirectorSessionPage,
+  })),
 );
 
 const ProfilePage = lazy(() =>
@@ -70,7 +72,7 @@ const SettingsBotPage = lazy(() =>
 );
 
 const ActorPage = lazy(() =>
-  import("../../pages/actor/ActorPage").then((m) => ({
+  import("../../features/actor").then((m) => ({
     default: m.ActorPage,
   })),
 );
@@ -154,7 +156,9 @@ export function AppRouteDeclarations() {
         }
       />
       <Route path="/light-plot" element={<SpectaclePage />} />
-      <Route path="/notes-run" element={<SpectaclePage />} />
+      <Route path="/notes-run" element={<Navigate to={SUFER_ROUTE_PATH} replace />} />
+      <Route path={SUFER_ROUTE_PATH} element={<SpectaclePage />} />
+      <Route path={PROJECT_MEDIA_ROUTE_PATH} element={<SpectaclePage />} />
       <Route path="/board" element={<SpectaclePage />} />
       <Route path="/tasks" element={<SpectaclePage />} />
       <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />

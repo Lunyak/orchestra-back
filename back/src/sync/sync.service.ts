@@ -1,120 +1,44 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { FileStorageService } from '../files/file-storage.service';
-import { LocalFileStorageService } from '../files/local-file-storage.service';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { SyncChangeDto } from './dto/sync-change.dto';
+import { SyncChangeApplierService } from './sync-change-applier.service';
 import {
   clientTheaterModelToPrisma,
   flattenClientTheaterModels,
 } from './theater-model-sync';
+import {
+  syncMapTheaterSpotlightRow,
+  syncNormalizeBool,
+  syncNormalizeFloat,
+  syncNormalizeInt,
+  syncNormalizeOptionalInt,
+  syncNormalizeString,
+  syncNormalizeVec3,
+  syncProjectIdFromCompoundId,
+} from './sync-value-normalize';
 
 @Injectable()
 export class SyncService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsGateway,
-    private readonly config: ConfigService,
-    private readonly fileStorage: FileStorageService,
-    private readonly localFileStorage: LocalFileStorageService,
+    private readonly changeApplier: SyncChangeApplierService,
   ) {}
 
-  private normalizeBool(v: any, fallback = false): boolean {
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'number') return v !== 0;
-    if (typeof v === 'string') {
-      const s = v.trim().toLowerCase();
-      if (s === 'true' || s === '1' || s === 'yes') return true;
-      if (s === 'false' || s === '0' || s === 'no') return false;
-    }
-    return fallback;
-  }
-
-  private normalizeInt(v: any, fallback: number): number {
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n)) return fallback;
-    return Math.trunc(n);
-  }
-
-  private normalizeFloat(v: any, fallback: number): number {
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n)) return fallback;
-    return n;
-  }
-
-  private normalizeString(v: any, fallback = ''): string {
-    const s = typeof v === 'string' ? v : String(v ?? '');
-    const t = s.trim();
-    return t || fallback;
-  }
-
-  private normalizeVec3(
-    v: any,
-    fallback: [number, number, number],
-  ): [number, number, number] {
-    if (!Array.isArray(v) || v.length !== 3) return fallback;
-    const x = this.normalizeFloat(v[0], fallback[0]);
-    const y = this.normalizeFloat(v[1], fallback[1]);
-    const z = this.normalizeFloat(v[2], fallback[2]);
-    return [x, y, z];
-  }
-
-  private normalizeOptionalInt(v: any): number | null {
-    if (v === null || v === undefined || v === '') return null;
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n)) return null;
-    return Math.trunc(n);
-  }
-
-  private mapTheaterSpotlightRow(stepId: string, sp: any) {
-    const sourceId = this.normalizeInt(sp?.id, -1);
-    if (sourceId <= 0) return null;
-    const label = this.normalizeString(sp?.label, `Spotlight ${sourceId}`);
-    return {
-      stepId,
-      sourceId,
-      label,
-      position: this.normalizeVec3(sp?.position, [0, 6, 6]),
-      target: this.normalizeVec3(sp?.target, [0, 1, 2]),
-      angleDeg: this.normalizeInt(sp?.angleDeg, 20),
-      intensity: this.normalizeFloat(sp?.intensity, 0.7),
-      color: this.normalizeString(sp?.color, '#ffffff'),
-      enabled: this.normalizeBool(sp?.enabled, true),
-      channel: this.normalizeInt(sp?.channel, sourceId),
-      isRgb: this.normalizeBool(sp?.isRgb, false),
-      faderId: this.normalizeOptionalInt(sp?.faderId),
-      hidden: this.normalizeBool(sp?.hidden, false),
-      gridCol: this.normalizeOptionalInt(sp?.gridCol),
-      gridRow: this.normalizeOptionalInt(sp?.gridRow),
-    };
-  }
-
-  private projectIdFromCompoundId(
-    value: string | null | undefined,
-  ): string | null {
-    const id = typeof value === 'string' ? value.trim() : '';
-    if (!id) return null;
-    const idx = id.indexOf(':');
-    if (idx <= 0) return null;
-    return id.slice(0, idx);
-  }
-
-  private async syncStepsFromLegacySceneSnapshot(
-    sceneId: string,
-    legacySceneSnapshot: any,
+  private async syncScenesFromLegacyPlaybookSnapshot(
+    playbookId: string,
+    legacyPlaybookSnapshot: any,
   ) {
-    const stepsValue = legacySceneSnapshot?.steps;
-    if (!Array.isArray(stepsValue)) return;
-
-    const steps = stepsValue;
-    const parsed = steps
+    const scenesValue = legacyPlaybookSnapshot?.scenes ?? legacyPlaybookSnapshot?.steps;
+    if (!Array.isArray(scenesValue)) return;
+    const parsed = scenesValue
       .map((st: any, idx: number) => {
-        const sourceId = this.normalizeInt(st?.id, -1);
+        const sourceId = syncNormalizeInt(st?.id, -1);
         if (sourceId <= 0) return null;
-        const id = `${sceneId}:${sourceId}`;
+        const id = `${playbookId}:${sourceId}`;
         const rawDuration =
           typeof st?.durationMin === 'number' ? st.durationMin : null;
         const durationMin =
@@ -133,9 +57,9 @@ export class SyncService {
             : null;
         return {
           id,
-          sceneId,
+          playbookId,
           sourceId,
-          title: this.normalizeString(st?.title, `Step ${sourceId}`),
+          title: syncNormalizeString(st?.title, `Scene ${sourceId}`),
           markdown: typeof st?.markdown === 'string' ? st.markdown : null,
           playMarkdown:
             typeof st?.playMarkdown === 'string' ? st.playMarkdown : null,
@@ -163,7 +87,7 @@ export class SyncService {
       })
       .filter(Boolean) as Array<{
       id: string;
-      sceneId: string;
+      playbookId: string;
       sourceId: number;
       title: string;
       markdown: string | null;
@@ -181,25 +105,25 @@ export class SyncService {
 
     if (parsed.length === 0) return;
 
-    const stepIds = parsed.map((x) => x.id);
+    const sceneIds = parsed.map((x) => x.id);
 
     const requisitesData = parsed.flatMap((st) =>
       (st.requisites ?? [])
         .map((r: any) => {
-          const sourceId = this.normalizeInt(r?.id, -1);
+          const sourceId = syncNormalizeInt(r?.id, -1);
           if (sourceId <= 0) return null;
-          const label = this.normalizeString(r?.label, '');
+          const label = syncNormalizeString(r?.label, '');
           if (!label) return null;
           return {
-            stepId: st.id,
+            sceneId: st.id,
             sourceId,
             label,
-            checked: this.normalizeBool(r?.checked, false),
+            checked: syncNormalizeBool(r?.checked, false),
           };
         })
         .filter(Boolean),
     ) as Array<{
-      stepId: string;
+      sceneId: string;
       sourceId: number;
       label: string;
       checked: boolean;
@@ -208,27 +132,27 @@ export class SyncService {
     const lightPlotData = parsed.flatMap((st) =>
       (st.lightPlot ?? [])
         .map((f: any) => {
-          const sourceId = this.normalizeInt(f?.id, -1);
+          const sourceId = syncNormalizeInt(f?.id, -1);
           if (sourceId <= 0) return null;
-          const label = this.normalizeString(f?.label, '');
+          const label = syncNormalizeString(f?.label, '');
           if (!label) return null;
           return {
-            stepId: st.id,
+            sceneId: st.id,
             sourceId,
             label,
             channel:
               typeof f?.channel === 'string' && f.channel.trim()
                 ? f.channel.trim()
                 : null,
-            x: this.normalizeInt(f?.x, 0),
-            y: this.normalizeInt(f?.y, 0),
-            angle: this.normalizeInt(f?.angle, 0),
-            length: this.normalizeInt(f?.length, 0),
+            x: syncNormalizeInt(f?.x, 0),
+            y: syncNormalizeInt(f?.y, 0),
+            angle: syncNormalizeInt(f?.angle, 0),
+            length: syncNormalizeInt(f?.length, 0),
           };
         })
         .filter(Boolean),
     ) as Array<{
-      stepId: string;
+      sceneId: string;
       sourceId: number;
       label: string;
       channel: string | null;
@@ -244,15 +168,15 @@ export class SyncService {
           clientTheaterModelToPrisma(
             st.id,
             m,
-            (v, fb) => this.normalizeVec3(v, fb),
-            (v, fb) => this.normalizeInt(v, fb),
-            (v, fb) => this.normalizeString(v, fb),
-            (v, fb) => this.normalizeBool(v, fb),
+            (v, fb) => syncNormalizeVec3(v, fb),
+            (v, fb) => syncNormalizeInt(v, fb),
+            (v, fb) => syncNormalizeString(v, fb),
+            (v, fb) => syncNormalizeBool(v, fb),
           ),
         )
         .filter(Boolean),
     ) as Array<{
-      stepId: string;
+      sceneId: string;
       sourceId: number;
       name: string;
       type: string;
@@ -273,60 +197,60 @@ export class SyncService {
 
     const theaterSpotlightsData = parsed.flatMap((st) =>
       (st.theaterSpotlights ?? [])
-        .map((sp: any) => this.mapTheaterSpotlightRow(st.id, sp))
+        .map((sp: any) => syncMapTheaterSpotlightRow(st.id, sp))
         .filter(Boolean),
     ) as Prisma.TheaterSpotlightCreateManyInput[];
 
-    // Upsert steps + overwrite nested свет/3D данные из legacy-снапшота сцены.
-    const stepUpserts = parsed.map((st) =>
-      this.prisma.step.upsert({
-        where: { id: st.id },
+    // Upsert scenes + overwrite nested свет/3D данные из legacy-снапшота сцены.
+    const sceneUpserts = parsed.map((scene) =>
+      this.prisma.scene.upsert({
+        where: { id: scene.id },
         update: {
-          title: st.title,
-          markdown: st.markdown,
-          playMarkdown: st.playMarkdown,
-          explicationMarkdown: st.explicationMarkdown,
-          durationMin: st.durationMin,
-          kanbanStatus: st.kanbanStatus,
-          kanbanOrder: st.kanbanOrder,
-          order: st.order,
+          title: scene.title,
+          markdown: scene.markdown,
+          playMarkdown: scene.playMarkdown,
+          explicationMarkdown: scene.explicationMarkdown,
+          durationMin: scene.durationMin,
+          kanbanStatus: scene.kanbanStatus,
+          kanbanOrder: scene.kanbanOrder,
+          order: scene.order,
           deletedAt: null,
         },
         create: {
-          id: st.id,
-          sceneId: st.sceneId,
-          sourceId: st.sourceId,
-          title: st.title,
-          markdown: st.markdown,
-          playMarkdown: st.playMarkdown,
-          explicationMarkdown: st.explicationMarkdown,
-          durationMin: st.durationMin,
-          kanbanStatus: st.kanbanStatus,
-          kanbanOrder: st.kanbanOrder,
-          order: st.order,
+          id: scene.id,
+          playbookId: scene.playbookId,
+          sourceId: scene.sourceId,
+          title: scene.title,
+          markdown: scene.markdown,
+          playMarkdown: scene.playMarkdown,
+          explicationMarkdown: scene.explicationMarkdown,
+          durationMin: scene.durationMin,
+          kanbanStatus: scene.kanbanStatus,
+          kanbanOrder: scene.kanbanOrder,
+          order: scene.order,
         },
       }),
     );
 
     await this.prisma.$transaction([
-      ...stepUpserts,
-      this.prisma.stepRequisite.deleteMany({
-        where: { stepId: { in: stepIds } },
+      ...sceneUpserts,
+      this.prisma.sceneRequisite.deleteMany({
+        where: { sceneId: { in: sceneIds } },
       }),
-      this.prisma.stepLightPlot.deleteMany({
-        where: { stepId: { in: stepIds } },
+      this.prisma.sceneLightPlot.deleteMany({
+        where: { sceneId: { in: sceneIds } },
       }),
       this.prisma.theaterModel.deleteMany({
-        where: { stepId: { in: stepIds } },
+        where: { sceneId: { in: sceneIds } },
       }),
       this.prisma.theaterSpotlight.deleteMany({
-        where: { stepId: { in: stepIds } },
+        where: { sceneId: { in: sceneIds } },
       }),
       ...(requisitesData.length
-        ? [this.prisma.stepRequisite.createMany({ data: requisitesData })]
+        ? [this.prisma.sceneRequisite.createMany({ data: requisitesData })]
         : []),
       ...(lightPlotData.length
-        ? [this.prisma.stepLightPlot.createMany({ data: lightPlotData })]
+        ? [this.prisma.sceneLightPlot.createMany({ data: lightPlotData })]
         : []),
       ...(theaterModelsData.length
         ? [
@@ -345,7 +269,7 @@ export class SyncService {
     ]);
   }
 
-  private sceneIdFromEntityId(entityId?: string | null): string | null {
+  private playbookIdFromEntityId(entityId?: string | null): string | null {
     const raw = String(entityId ?? '').trim();
     if (!raw) return null;
     const scriptIdx = raw.indexOf(':script');
@@ -378,7 +302,7 @@ export class SyncService {
     );
   }
 
-  private scenePayloadWouldNullWipe(
+  private playbookPayloadWouldNullWipe(
     payload: any,
     existing: {
       sceneRoles: unknown;
@@ -406,28 +330,25 @@ export class SyncService {
     changes: SyncChangeDto[],
   ): Promise<Set<SyncChangeDto>> {
     const destructive = new Set<SyncChangeDto>();
-    const sceneIds = new Set<string>();
+    const playbookIds = new Set<string>();
 
     for (const change of changes) {
       if (change.entityType === 'Project' && change.operation === 'delete') {
         destructive.add(change);
       }
-      const sceneId =
-        String(change.payload?.sceneId ?? '').trim() ||
-        this.sceneIdFromEntityId(change.entityId);
-      if (sceneId) sceneIds.add(sceneId);
+      const playbookId =
+        String(change.payload?.playbookId ?? change.payload?.sceneId ?? '').trim() ||
+        this.playbookIdFromEntityId(change.entityId);
+      if (playbookId) playbookIds.add(playbookId);
     }
 
-    for (const sceneId of sceneIds) {
-      const [activeSteps, activePlaylist, activeSounds, existingScene] =
+    for (const playbookId of playbookIds) {
+      const [activeScenes, activePlaylist, activeSounds, existingPlaybook] =
         await Promise.all([
-          this.prisma.step.count({ where: { sceneId, deletedAt: null } }),
-          this.prisma.playlistItem.count({ where: { sceneId } }),
-          this.prisma.sound.count({ where: { sceneId } }),
-          this.prisma.scene.findUnique({
-            where: { id: sceneId },
-            select: {
-              sceneRoles: true,
+          this.prisma.scene.count({ where: { playbookId, deletedAt: null } }),
+          this.prisma.playlistItem.count({ where: { playbookId } }),
+          this.prisma.sound.count({ where: { playbookId } }),
+          this.prisma.playbook.findUnique({ where: { id: playbookId }, select: { sceneRoles: true,
               lightFaders: true,
               lightPrograms: true,
               lightChannelRoles: true,
@@ -436,22 +357,22 @@ export class SyncService {
           }),
         ]);
 
-      const stepDeletes = changes.filter(
+      const sceneDeletes = changes.filter(
         (c) =>
-          c.entityType === 'Step' &&
+          c.entityType === 'Scene' &&
           c.operation === 'delete' &&
-          this.sceneIdFromEntityId(c.entityId) === sceneId,
+          this.playbookIdFromEntityId(c.entityId) === playbookId,
       );
-      const stepDeleteThreshold = Math.max(2, Math.ceil(activeSteps * 0.4));
-      if (activeSteps > 0 && stepDeletes.length >= stepDeleteThreshold) {
-        stepDeletes.forEach((c) => destructive.add(c));
+      const sceneDeleteThreshold = Math.max(2, Math.ceil(activeScenes * 0.4));
+      if (activeScenes > 0 && sceneDeletes.length >= sceneDeleteThreshold) {
+        sceneDeletes.forEach((c) => destructive.add(c));
       }
 
       const playlistDeletes = changes.filter(
         (c) =>
           c.entityType === 'PlaylistItem' &&
           c.operation === 'delete' &&
-          String(c.payload?.sceneId ?? '') === sceneId,
+          String(c.payload?.playbookId ?? c.payload?.sceneId ?? '') === playbookId,
       );
       const playlistDeleteThreshold = Math.max(3, Math.ceil(activePlaylist * 0.4));
       if (activePlaylist > 0 && playlistDeletes.length >= playlistDeleteThreshold) {
@@ -462,7 +383,7 @@ export class SyncService {
         (c) =>
           c.entityType === 'Sound' &&
           c.operation === 'delete' &&
-          String(c.payload?.sceneId ?? '') === sceneId,
+          String(c.payload?.playbookId ?? c.payload?.sceneId ?? '') === playbookId,
       );
       const soundDeleteThreshold = Math.max(2, Math.ceil(activeSounds * 0.4));
       if (activeSounds > 0 && soundDeletes.length >= soundDeleteThreshold) {
@@ -471,10 +392,10 @@ export class SyncService {
 
       for (const change of changes) {
         if (
-          change.entityType === 'Scene' &&
+          change.entityType === 'Playbook' &&
           change.operation !== 'delete' &&
-          String(change.payload?.id ?? '') === sceneId &&
-          this.scenePayloadWouldNullWipe(change.payload, existingScene)
+          String(change.payload?.id ?? '') === playbookId &&
+          this.playbookPayloadWouldNullWipe(change.payload, existingPlaybook)
         ) {
           destructive.add(change);
         }
@@ -576,7 +497,9 @@ export class SyncService {
     });
 
     for (const change of allowed) {
-      const { entityType, operation, payload } = change;
+      const entityType =
+        change.entityType === 'Step' ? 'Scene' : change.entityType;
+      const { operation, payload } = change;
 
       console.log('[sync] processing change', {
         entityType,
@@ -593,12 +516,12 @@ export class SyncService {
 
       try {
         if (entityType === 'Project') {
-          await this.applyProjectChange(userId, operation, payload);
+          await this.changeApplier.applyProjectChange(userId, operation, payload);
         }
-        if (entityType === 'Scene') {
+        if (entityType === 'Playbook') {
           const allowNullWipe =
             !!projectId && confirmedProjectIds.has(projectId);
-          await this.applySceneChange(
+          await this.changeApplier.applyPlaybookChange(
             userId,
             operation,
             payload,
@@ -606,20 +529,45 @@ export class SyncService {
             allowNullWipe,
           );
         }
-        if (entityType === 'Step') {
-          await this.applyStepChange(userId, operation, payload, sourceClientId);
+        if (entityType === 'Scene') {
+          const sourceId = syncNormalizeInt(payload?.sourceId, -1);
+          const isPlaybookMeta =
+            sourceId <= 0 &&
+            payload?.projectId &&
+            typeof payload?.name === 'string';
+          if (isPlaybookMeta) {
+            await this.changeApplier.applyPlaybookChange(
+              userId,
+              operation,
+              payload,
+              sourceClientId,
+              !!projectId && confirmedProjectIds.has(projectId),
+            );
+          } else {
+            await this.changeApplier.applySceneChange(
+              userId,
+              operation,
+              {
+                ...payload,
+                playbookId: String(
+                  payload?.playbookId ?? payload?.sceneId ?? '',
+                ).trim(),
+              },
+              sourceClientId,
+            );
+          }
         }
         if (entityType === 'PlaylistItem') {
-          await this.applyPlaylistItemChange(operation, payload, sourceClientId);
+          await this.changeApplier.applyPlaylistItemChange(operation, payload, sourceClientId);
         }
         if (entityType === 'Sound') {
-          await this.applySoundChange(operation, payload, sourceClientId);
+          await this.changeApplier.applySoundChange(operation, payload, sourceClientId);
         }
         if (entityType === 'GlobalLightChannel') {
-          await this.applyGlobalLightChannelChange(operation, payload, sourceClientId);
+          await this.changeApplier.applyGlobalLightChannelChange(operation, payload, sourceClientId);
         }
         if (entityType === 'TheaterLayout') {
-          await this.applyTheaterLayoutChange(operation, payload, sourceClientId);
+          await this.changeApplier.applyTheaterLayoutChange(operation, payload, sourceClientId);
         }
       } catch (error) {
         // Временно логируем ошибки синка, чтобы понимать, почему данные не попадают в БД
@@ -631,7 +579,7 @@ export class SyncService {
           payloadSummary: {
             id: payload?.id,
             projectId: payload?.projectId,
-            sceneId: payload?.sceneId,
+            playbookId: payload?.playbookId,
           },
           error: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
@@ -642,749 +590,6 @@ export class SyncService {
     return { ok: true };
   }
 
-  private async applyProjectChange(
-    userId: string,
-    operation: string,
-    payload: any,
-  ) {
-    if (operation === 'delete') {
-      await this.prisma.project.updateMany({
-        where: { id: payload.id, ownerId: userId },
-        data: { deletedAt: new Date(payload.updatedAt) },
-      });
-      return;
-    }
-
-    await this.prisma.project.upsert({
-      where: { id: payload.id },
-      update: {
-        name: payload.name,
-        slug: payload.slug,
-        description: payload.description ?? null,
-      },
-      create: {
-        id: payload.id,
-        ownerId: userId,
-        slug: payload.slug,
-        name: payload.name,
-        description: payload.description ?? null,
-      },
-    });
-  }
-
-  private useLocalStorage(): boolean {
-    return this.config.get<string>('STORAGE_TYPE') === 'local';
-  }
-
-  private getFileStorage(): FileStorageService | LocalFileStorageService {
-    return this.useLocalStorage() ? this.localFileStorage : this.fileStorage;
-  }
-
-  /** Из значения (URL или ключ) извлечь ключ хранилища для удаления. */
-  private fileValueToStorageKey(
-    value: string,
-    projectId: string,
-  ): string | null {
-    if (!value || typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      // Паттерн для /files/play/... (backend API)
-      const playMatch = trimmed.match(/\/files\/play\/([^/?#]+)/);
-      if (playMatch) {
-        try {
-          return decodeURIComponent(playMatch[1]);
-        } catch {
-          return null;
-        }
-      }
-      // Паттерн для прямых ссылок MinIO: /orchestra-media/projectId/type/filename
-      const minioMatch = trimmed.match(
-        /\/orchestra-media\/([^/?#]+\/[^/?#]+\/[^/?#]+)/,
-      );
-      if (minioMatch) {
-        try {
-          return decodeURIComponent(minioMatch[1]);
-        } catch {
-          return null;
-        }
-      }
-      return null;
-    }
-    if (trimmed.startsWith(projectId + '/')) return trimmed;
-    return null;
-  }
-
-  private async applySceneChange(
-    userId: string,
-    operation: string,
-    payload: any,
-    sourceClientId?: string | null,
-    allowNullWipe = false,
-  ) {
-    if (operation === 'delete') {
-      await this.prisma.scene.updateMany({
-        where: {
-          id: payload.id,
-          project: { ownerId: userId },
-        },
-        data: { deletedAt: new Date(payload.updatedAt) },
-      });
-      return;
-    }
-
-    console.log('[sync] applying Scene change', {
-      operation,
-      id: payload.id,
-      projectId: payload.projectId,
-      name: payload.name,
-    });
-
-    const hasSceneRoles = Object.prototype.hasOwnProperty.call(
-      payload ?? {},
-      'sceneRoles',
-    );
-    const nextSceneRoles = hasSceneRoles
-      ? (payload?.sceneRoles ?? null)
-      : undefined;
-    const hasLightFaders = Object.prototype.hasOwnProperty.call(
-      payload ?? {},
-      'lightFaders',
-    );
-    const nextLightFaders = hasLightFaders
-      ? (payload?.lightFaders ?? null)
-      : undefined;
-    const hasLightPrograms = Object.prototype.hasOwnProperty.call(
-      payload ?? {},
-      'lightPrograms',
-    );
-    const nextLightPrograms = hasLightPrograms
-      ? (payload?.lightPrograms ?? null)
-      : undefined;
-    const hasLightChannelRoles = Object.prototype.hasOwnProperty.call(
-      payload ?? {},
-      'lightChannelRoles',
-    );
-    const nextLightChannelRoles = hasLightChannelRoles
-      ? (payload?.lightChannelRoles ?? null)
-      : undefined;
-    const hasProjectorMedia = Object.prototype.hasOwnProperty.call(
-      payload ?? {},
-      'projectorMedia',
-    );
-    const nextProjectorMedia = hasProjectorMedia
-      ? (payload?.projectorMedia ?? null)
-      : undefined;
-
-    const existing = await this.prisma.scene.findUnique({
-      where: { id: payload.id },
-      select: {
-        sceneRoles: true,
-        lightFaders: true,
-        lightPrograms: true,
-        lightChannelRoles: true,
-        projectorMedia: true,
-      },
-    });
-
-    const keepExistingJson = (
-      hasField: boolean,
-      nextValue: unknown,
-      currentValue: unknown,
-      fieldName: string,
-    ): boolean => {
-      if (!hasField) return false;
-      if (nextValue != null) return true;
-      if (!this.hasJsonValue(currentValue)) return true;
-      if (allowNullWipe) return true;
-      console.warn('[sync] blocked null overwrite of Scene field', {
-        sceneId: payload.id,
-        fieldName,
-      });
-      return false;
-    };
-
-    const applySceneRoles = keepExistingJson(
-      hasSceneRoles,
-      nextSceneRoles,
-      existing?.sceneRoles,
-      'sceneRoles',
-    );
-    const applyLightFaders = keepExistingJson(
-      hasLightFaders,
-      nextLightFaders,
-      existing?.lightFaders,
-      'lightFaders',
-    );
-    const applyLightPrograms = keepExistingJson(
-      hasLightPrograms,
-      nextLightPrograms,
-      existing?.lightPrograms,
-      'lightPrograms',
-    );
-    const applyLightChannelRoles = keepExistingJson(
-      hasLightChannelRoles,
-      nextLightChannelRoles,
-      existing?.lightChannelRoles,
-      'lightChannelRoles',
-    );
-    const applyProjectorMedia = keepExistingJson(
-      hasProjectorMedia,
-      nextProjectorMedia,
-      existing?.projectorMedia,
-      'projectorMedia',
-    );
-
-    const result = await this.prisma.scene.upsert({
-      where: { id: payload.id },
-      update: {
-        name: payload.name,
-        ...(applySceneRoles ? { sceneRoles: nextSceneRoles } : {}),
-        ...(applyLightFaders ? { lightFaders: nextLightFaders } : {}),
-        ...(applyLightPrograms ? { lightPrograms: nextLightPrograms } : {}),
-        ...(applyLightChannelRoles
-          ? { lightChannelRoles: nextLightChannelRoles }
-          : {}),
-        ...(applyProjectorMedia ? { projectorMedia: nextProjectorMedia } : {}),
-      },
-      create: {
-        id: payload.id,
-        name: payload.name,
-        projectId: payload.projectId,
-        sceneRoles: hasSceneRoles ? nextSceneRoles : null,
-        lightFaders: hasLightFaders ? nextLightFaders : null,
-        lightPrograms: hasLightPrograms ? nextLightPrograms : null,
-        lightChannelRoles: hasLightChannelRoles ? nextLightChannelRoles : null,
-        projectorMedia: hasProjectorMedia ? nextProjectorMedia : null,
-      },
-    });
-
-    console.log('[sync] Scene upsert result', {
-      id: result.id,
-      name: result.name,
-    });
-
-    if (payload.projectId) {
-      this.notifications.notifySceneUpdated(payload.projectId, sourceClientId);
-    }
-  }
-
-  private async applyPlaylistItemChange(
-    operation: string,
-    payload: any,
-    sourceClientId?: string | null,
-  ) {
-    const sceneId = String(payload?.sceneId ?? '').trim();
-    const sourceId = this.normalizeInt(payload?.sourceId, -1);
-    if (!sceneId || sourceId <= 0) return;
-    const projectId = this.projectIdFromCompoundId(sceneId);
-
-    if (operation === 'delete') {
-      await this.prisma.playlistItem.deleteMany({
-        where: { sceneId, sourceId },
-      });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-
-    const order = this.normalizeInt(payload?.order, 0);
-    const title = this.normalizeString(payload?.title, `Track ${sourceId}`);
-    const file = this.normalizeString(payload?.file, '');
-
-    const fadeMs = this.normalizeInt(payload?.fadeMs, 0);
-    const loop = this.normalizeBool(payload?.loop, false);
-    const remoteUrl =
-      typeof payload?.remoteUrl === 'string' && payload.remoteUrl.trim()
-        ? payload.remoteUrl.trim()
-        : null;
-    const remoteKey =
-      typeof payload?.remoteKey === 'string' && payload.remoteKey.trim()
-        ? payload.remoteKey.trim()
-        : null;
-
-    const existing = await this.prisma.playlistItem.findFirst({
-      where: { sceneId, sourceId },
-      select: { id: true },
-    });
-    if (existing?.id) {
-      await this.prisma.playlistItem.update({
-        where: { id: existing.id },
-        data: { order, title, file, fadeMs, loop, remoteUrl, remoteKey },
-      });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-    await this.prisma.playlistItem.create({
-      data: {
-        sceneId,
-        sourceId,
-        order,
-        title,
-        file,
-        fadeMs,
-        loop,
-        remoteUrl,
-        remoteKey,
-      },
-    });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-  }
-
-  private async applySoundChange(
-    operation: string,
-    payload: any,
-    sourceClientId?: string | null,
-  ) {
-    const sceneId = String(payload?.sceneId ?? '').trim();
-    const sourceId = this.normalizeInt(payload?.sourceId, -1);
-    if (!sceneId || sourceId <= 0) return;
-    const projectId = this.projectIdFromCompoundId(sceneId);
-
-    if (operation === 'delete') {
-      await this.prisma.sound.deleteMany({
-        where: { sceneId, sourceId },
-      });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-
-    const title = this.normalizeString(payload?.title, `Sound ${sourceId}`);
-    const file = this.normalizeString(payload?.file, '');
-    const icon =
-      typeof payload?.icon === 'string' && payload.icon.trim()
-        ? payload.icon.trim()
-        : null;
-    const volume =
-      payload?.volume != null && Number.isFinite(Number(payload.volume))
-        ? Number(payload.volume)
-        : 1;
-    const fadeMs = this.normalizeInt(payload?.fadeMs, 0);
-    const loop = this.normalizeBool(payload?.loop, false);
-    const remoteUrl =
-      typeof payload?.remoteUrl === 'string' && payload.remoteUrl.trim()
-        ? payload.remoteUrl.trim()
-        : null;
-    const remoteKey =
-      typeof payload?.remoteKey === 'string' && payload.remoteKey.trim()
-        ? payload.remoteKey.trim()
-        : null;
-    const iconRemoteUrl =
-      typeof payload?.iconRemoteUrl === 'string' && payload.iconRemoteUrl.trim()
-        ? payload.iconRemoteUrl.trim()
-        : null;
-    const iconRemoteKey =
-      typeof payload?.iconRemoteKey === 'string' && payload.iconRemoteKey.trim()
-        ? payload.iconRemoteKey.trim()
-        : null;
-
-    const existing = await this.prisma.sound.findFirst({
-      where: { sceneId, sourceId },
-      select: { id: true },
-    });
-    if (existing?.id) {
-      await this.prisma.sound.update({
-        where: { id: existing.id },
-        data: {
-          title,
-          file,
-          icon,
-          remoteUrl,
-          remoteKey,
-          iconRemoteUrl,
-          iconRemoteKey,
-          volume,
-          fadeMs,
-          loop,
-        },
-      });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-    await this.prisma.sound.create({
-      data: {
-        sceneId,
-        sourceId,
-        title,
-        file,
-        icon,
-        remoteUrl,
-        remoteKey,
-        iconRemoteUrl,
-        iconRemoteKey,
-        volume,
-        fadeMs,
-        loop,
-      },
-    });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-  }
-
-  private async applyGlobalLightChannelChange(
-    operation: string,
-    payload: any,
-    sourceClientId?: string | null,
-  ) {
-    const sceneId = String(payload?.sceneId ?? '').trim();
-    const index = this.normalizeInt(payload?.index, -1);
-    if (!sceneId || index < 0) return;
-    const projectId = this.projectIdFromCompoundId(sceneId);
-
-    if (operation === 'delete') {
-      await this.prisma.globalLightChannel.deleteMany({
-        where: { sceneId, index },
-      });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-
-    const raw = this.normalizeString(payload?.raw, '');
-    const updated = await this.prisma.globalLightChannel.updateMany({
-      where: { sceneId, index },
-      data: { raw, index },
-    });
-    if (updated.count > 0) return;
-    await this.prisma.globalLightChannel.create({
-      data: { sceneId, index, raw },
-    });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-  }
-
-  private buildTheaterLayoutExtras(payload: any): Prisma.InputJsonValue | undefined {
-    const keys = [
-      'stageShape',
-      'stageFrontZ',
-      'stageBackWidth',
-      'prosceniumWidth',
-      'prosceniumHeight',
-      'prosceniumEnabled',
-      'tJunctionZ',
-      'wallRecesses',
-      'stageOutline',
-      'stageOutlineOpenEdges',
-      'zones',
-      'zoneGrid',
-      'stageFloorMaterial',
-      'hallFloorMaterial',
-      'backWallMaterial',
-      'sideWallsMaterial',
-      'portalMaterial',
-    ];
-    const extras: Record<string, unknown> = {};
-    for (const key of keys) {
-      if (payload?.[key] !== undefined) extras[key] = payload[key];
-    }
-    return Object.keys(extras).length > 0
-      ? (extras as Prisma.InputJsonObject)
-      : undefined;
-  }
-
-  private async applyTheaterLayoutChange(
-    operation: string,
-    payload: any,
-    sourceClientId?: string | null,
-  ) {
-    const sceneId = String(payload?.sceneId ?? '').trim();
-    if (!sceneId) return;
-    const projectId = this.projectIdFromCompoundId(sceneId);
-    if (operation === 'delete') {
-      await this.prisma.theaterLayout.deleteMany({ where: { sceneId } });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-    const num = (v: any, fallback: number) =>
-      v != null && Number.isFinite(Number(v)) ? Number(v) : fallback;
-    const extras = this.buildTheaterLayoutExtras(payload);
-    await this.prisma.theaterLayout.upsert({
-      where: { sceneId },
-      update: {
-        hallWidth: num(payload?.hallWidth, 0),
-        hallDepth: num(payload?.hallDepth, 0),
-        wallHeight: num(payload?.wallHeight, 0),
-        stageWidth: num(payload?.stageWidth, 0),
-        stageDepth: num(payload?.stageDepth, 0),
-        stageHeight: num(payload?.stageHeight, 0),
-        stageZ: num(payload?.stageZ, 0),
-        audienceStartZ: num(payload?.audienceStartZ, 0),
-        seatRows: this.normalizeInt(payload?.seatRows, 0),
-        seatsPerRow: this.normalizeInt(payload?.seatsPerRow, 0),
-        seatSpacing: num(payload?.seatSpacing, 0),
-        rowSpacing: num(payload?.rowSpacing, 0),
-        rowRise: num(payload?.rowRise, 0),
-        aisleWidth: num(payload?.aisleWidth, 0),
-        aisleCenterX: num(payload?.aisleCenterX, 0),
-        doorWidth: num(payload?.doorWidth, 0),
-        doorHeight: num(payload?.doorHeight, 0),
-        doorZ: num(payload?.doorZ, 0),
-        doors: Array.isArray(payload?.doors) ? payload.doors : undefined,
-        extras,
-      },
-      create: {
-        sceneId,
-        hallWidth: num(payload?.hallWidth, 0),
-        hallDepth: num(payload?.hallDepth, 0),
-        wallHeight: num(payload?.wallHeight, 0),
-        stageWidth: num(payload?.stageWidth, 0),
-        stageDepth: num(payload?.stageDepth, 0),
-        stageHeight: num(payload?.stageHeight, 0),
-        stageZ: num(payload?.stageZ, 0),
-        audienceStartZ: num(payload?.audienceStartZ, 0),
-        seatRows: this.normalizeInt(payload?.seatRows, 0),
-        seatsPerRow: this.normalizeInt(payload?.seatsPerRow, 0),
-        seatSpacing: num(payload?.seatSpacing, 0),
-        rowSpacing: num(payload?.rowSpacing, 0),
-        rowRise: num(payload?.rowRise, 0),
-        aisleWidth: num(payload?.aisleWidth, 0),
-        aisleCenterX: num(payload?.aisleCenterX, 0),
-        doorWidth: num(payload?.doorWidth, 0),
-        doorHeight: num(payload?.doorHeight, 0),
-        doorZ: num(payload?.doorZ, 0),
-        doors: Array.isArray(payload?.doors) ? payload.doors : undefined,
-        extras,
-      },
-    });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-  }
-
-  private async applyStepChange(
-    userId: string,
-    operation: string,
-    payload: any,
-    sourceClientId?: string | null,
-  ) {
-    if (operation === 'delete') {
-      await this.prisma.step.updateMany({
-        where: {
-          id: payload.id,
-          scene: {
-            project: { ownerId: userId },
-          },
-        },
-        data: { deletedAt: new Date(payload.updatedAt) },
-      });
-      const projectId = this.projectIdFromCompoundId(payload?.id);
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-      return;
-    }
-
-    console.log('[sync] applying Step change', {
-      operation,
-      id: payload.id,
-      sceneId: payload.sceneId,
-      sourceId: payload.sourceId,
-      title: payload.title,
-    });
-
-    // Проверяем, существует ли Scene перед созданием Step
-    const sceneExists = await this.prisma.scene.findUnique({
-      where: { id: payload.sceneId },
-    });
-
-    if (!sceneExists) {
-      console.warn('[sync] Scene does not exist for Step', {
-        stepId: payload.id,
-        sceneId: payload.sceneId,
-      });
-    }
-
-    const hasLightKadrs = Object.prototype.hasOwnProperty.call(
-      payload ?? {},
-      'lightKadrs',
-    );
-    const nextLightKadrs = hasLightKadrs
-      ? (payload?.lightKadrs ?? null)
-      : undefined;
-
-    const result = await this.prisma.step.upsert({
-      where: { id: payload.id },
-      update: {
-        title: payload.title,
-        markdown: payload.markdown ?? null,
-        playMarkdown: payload.playMarkdown ?? null,
-        explicationMarkdown: payload.explicationMarkdown ?? null,
-        // Если шаг ранее "удалили" (soft delete), любая upsert/update должна возвращать его в активное состояние.
-        deletedAt: null,
-        durationMin:
-          payload.durationMin != null &&
-          Number.isFinite(Number(payload.durationMin))
-            ? Math.trunc(Number(payload.durationMin))
-            : undefined,
-        kanbanStatus:
-          typeof payload.kanbanStatus === 'string' &&
-          payload.kanbanStatus.trim()
-            ? payload.kanbanStatus.trim()
-            : undefined,
-        kanbanOrder:
-          payload.kanbanOrder != null &&
-          Number.isFinite(Number(payload.kanbanOrder))
-            ? Math.trunc(Number(payload.kanbanOrder))
-            : undefined,
-        order: payload.order,
-        ...(hasLightKadrs ? { lightKadrs: nextLightKadrs } : {}),
-      },
-      create: {
-        id: payload.id,
-        sceneId: payload.sceneId,
-        sourceId: payload.sourceId,
-        title: payload.title,
-        markdown: payload.markdown ?? null,
-        playMarkdown: payload.playMarkdown ?? null,
-        explicationMarkdown: payload.explicationMarkdown ?? null,
-        deletedAt: null,
-        durationMin:
-          payload.durationMin != null &&
-          Number.isFinite(Number(payload.durationMin))
-            ? Math.trunc(Number(payload.durationMin))
-            : null,
-        kanbanStatus:
-          typeof payload.kanbanStatus === 'string' &&
-          payload.kanbanStatus.trim()
-            ? payload.kanbanStatus.trim()
-            : null,
-        kanbanOrder:
-          payload.kanbanOrder != null &&
-          Number.isFinite(Number(payload.kanbanOrder))
-            ? Math.trunc(Number(payload.kanbanOrder))
-            : null,
-        order: payload.order,
-        lightKadrs: hasLightKadrs ? nextLightKadrs : null,
-      },
-    });
-
-    console.log('[sync] Step upsert result', {
-      id: result.id,
-      title: result.title,
-    });
-
-    const projectId = this.projectIdFromCompoundId(payload?.sceneId);
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
-
-    // Optional: normalize nested step data if provided in payload (requisites/light/theater).
-    try {
-      const stepId = payload.id as string;
-      if (typeof stepId !== 'string' || !stepId) return;
-
-      const requisitesValue = payload.requisites;
-      const lightPlotValue = payload.lightPlot;
-      const theaterModelsValue = payload.theaterModels;
-      const theaterDecorValue = payload.theaterDecor;
-      const theaterSpotlightsValue = payload.theaterSpotlights;
-
-      const tx: any[] = [];
-
-      if (Array.isArray(requisitesValue)) {
-        const data = requisitesValue
-          .map((r: any) => {
-            const sourceId = this.normalizeInt(r?.id, -1);
-            if (sourceId <= 0) return null;
-            const label = this.normalizeString(r?.label, '');
-            if (!label) return null;
-            return {
-              stepId,
-              sourceId,
-              label,
-              checked: this.normalizeBool(r?.checked, false),
-            };
-          })
-          .filter(
-            (
-              x,
-            ): x is {
-              stepId: string;
-              sourceId: number;
-              label: string;
-              checked: boolean;
-            } => x !== null,
-          );
-        tx.push(this.prisma.stepRequisite.deleteMany({ where: { stepId } }));
-        if (data.length)
-          tx.push(this.prisma.stepRequisite.createMany({ data }));
-      }
-
-      if (Array.isArray(lightPlotValue)) {
-        const data = lightPlotValue
-          .map((f: any) => {
-            const sourceId = this.normalizeInt(f?.id, -1);
-            if (sourceId <= 0) return null;
-            const label = this.normalizeString(f?.label, '');
-            if (!label) return null;
-            return {
-              stepId,
-              sourceId,
-              label,
-              channel:
-                typeof f?.channel === 'string' && f.channel.trim()
-                  ? f.channel.trim()
-                  : null,
-              x: this.normalizeInt(f?.x, 0),
-              y: this.normalizeInt(f?.y, 0),
-              angle: this.normalizeInt(f?.angle, 0),
-              length: this.normalizeInt(f?.length, 0),
-            };
-          })
-          .filter(
-            (
-              x,
-            ): x is {
-              stepId: string;
-              sourceId: number;
-              label: string;
-              channel: string | null;
-              x: number;
-              y: number;
-              angle: number;
-              length: number;
-            } => x !== null,
-          );
-        tx.push(this.prisma.stepLightPlot.deleteMany({ where: { stepId } }));
-        if (data.length)
-          tx.push(this.prisma.stepLightPlot.createMany({ data }));
-      }
-
-      if (Array.isArray(theaterModelsValue) || Array.isArray(theaterDecorValue)) {
-        const flat = flattenClientTheaterModels({
-          theaterModels: Array.isArray(theaterModelsValue) ? theaterModelsValue : [],
-          theaterDecor: Array.isArray(theaterDecorValue) ? theaterDecorValue : [],
-        });
-        const data = flat
-          .map((m: any) =>
-            clientTheaterModelToPrisma(
-              stepId,
-              m,
-              (v, fb) => this.normalizeVec3(v, fb),
-              (v, fb) => this.normalizeInt(v, fb),
-              (v, fb) => this.normalizeString(v, fb),
-              (v, fb) => this.normalizeBool(v, fb),
-            ),
-          )
-          .filter((x): x is NonNullable<typeof x> => x !== null);
-        tx.push(this.prisma.theaterModel.deleteMany({ where: { stepId } }));
-        if (data.length)
-          tx.push(
-            this.prisma.theaterModel.createMany({
-              data: data as Prisma.TheaterModelCreateManyInput[],
-            }),
-          );
-      }
-
-      if (Array.isArray(theaterSpotlightsValue)) {
-        const data = theaterSpotlightsValue
-          .map((sp: any) => this.mapTheaterSpotlightRow(stepId, sp))
-          .filter(Boolean) as Prisma.TheaterSpotlightCreateManyInput[];
-        tx.push(this.prisma.theaterSpotlight.deleteMany({ where: { stepId } }));
-        if (data.length)
-          tx.push(this.prisma.theaterSpotlight.createMany({ data }));
-      }
-
-      if (tx.length) {
-        await this.prisma.$transaction(tx);
-      }
-    } catch (err) {
-      console.error('[sync] failed to sync nested Step payload', {
-        stepId: payload?.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
 
   /** Проверка: пользователь — владелец или участник с ролью editor. */
   private async canUserWriteToProject(
@@ -1410,30 +615,35 @@ export class SyncService {
     payload: any,
   ): Promise<string | null> {
     if (entityType === 'Project' && payload?.id) return payload.id;
-    if (entityType === 'Scene' && payload?.projectId) return payload.projectId;
+    if (entityType === 'Playbook' && payload?.projectId) return payload.projectId;
     if (
-      (entityType === 'Step' ||
+      (entityType === 'Scene' ||
         entityType === 'PlaylistItem' ||
         entityType === 'Sound' ||
         entityType === 'GlobalLightChannel' ||
         entityType === 'TheaterLayout') &&
-      payload?.sceneId
+      (payload?.playbookId ?? payload?.sceneId)
     ) {
-      const scene = await this.prisma.scene.findUnique({
-        where: { id: payload.sceneId },
+      const playbookId = String(
+        payload?.playbookId ?? payload?.sceneId ?? '',
+      ).trim();
+      if (!playbookId) return null;
+      const playbook = await this.prisma.playbook.findUnique({
+        where: { id: playbookId },
         select: { projectId: true },
       });
-      return scene?.projectId ?? null;
+      return playbook?.projectId ?? null;
     }
     return null;
   }
 
-  /** Возвращает снимок проектов, сцен и шагов. Если передан projectSlug — только по этому проекту. */
+  /** Возвращает снимок проектов, playbooks и scenes. Если передан projectSlug — только по этому проекту. */
   async getChangesSince(
     userId: string,
     _lastSyncAt: string | null,
     projectSlug?: string,
     include?: {
+      scenes?: boolean;
       steps?: boolean;
       playlist?: boolean;
       sounds?: boolean;
@@ -1455,97 +665,96 @@ export class SyncService {
 
     if (projects.length === 0) {
       const now = new Date().toISOString();
-      return { now, projects: [], scenes: [], steps: [] };
+      return { now, projects: [], playbooks: [], scenes: [] };
     }
 
     const projectIds = projects.map((p) => p.id);
 
-    const scenes = await this.prisma.scene.findMany({
-      where: { projectId: { in: projectIds } },
+    const playbooks = await this.prisma.playbook.findMany({ where: { projectId: { in: projectIds } },
     });
 
-    const sceneIds = scenes.map((s) => s.id);
+    const playbookIds = playbooks.map((s) => s.id);
 
-    const wantSteps = Boolean(include?.steps);
+    const wantScenes = Boolean(include?.scenes ?? include?.steps);
     const wantPlaylist = Boolean(include?.playlist);
     const wantSounds = Boolean(include?.sounds);
     const wantLightChannels = Boolean(include?.lightChannels);
     const wantTheaterLayout = Boolean(include?.theaterLayout);
 
-    const stepsRaw = wantSteps
-      ? await this.prisma.step.findMany({
-          where: { sceneId: { in: sceneIds }, deletedAt: null },
+    const scenesRaw = wantScenes
+      ? await this.prisma.scene.findMany({
+          where: { playbookId: { in: playbookIds }, deletedAt: null },
           include: {
             requisites: true,
             lightPlot: true,
             theaterModels: true,
             theaterSpotlights: true,
           },
-          orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+          orderBy: [{ playbookId: 'asc' }, { order: 'asc' }],
         })
       : [];
 
-    // Дедуп шагов по (sceneId, sourceId).
-    // Причина: ранее могли приехать Step с неконсистентным id (другая "префиксная" часть),
+    // Дедуп сцен по (playbookId, sourceId).
+    // Причина: ранее могли приехать Scene с неконсистентным id (другая "префиксная" часть),
     // что приводило к двум строкам с одинаковым sourceId в одной сцене.
-    const stepsByComposite = new Map<string, (typeof stepsRaw)[number]>();
-    for (const st of stepsRaw) {
-      const k = `${st.sceneId}:${st.sourceId}`;
-      const prev = stepsByComposite.get(k);
+    const scenesByComposite = new Map<string, (typeof scenesRaw)[number]>();
+    for (const st of scenesRaw) {
+      const k = `${st.playbookId}:${st.sourceId}`;
+      const prev = scenesByComposite.get(k);
       if (!prev) {
-        stepsByComposite.set(k, st);
+        scenesByComposite.set(k, st);
         continue;
       }
       // Берём "самый свежий" как источник истины
-      if (st.updatedAt > prev.updatedAt) stepsByComposite.set(k, st);
+      if (st.updatedAt > prev.updatedAt) scenesByComposite.set(k, st);
     }
-    const steps = Array.from(stepsByComposite.values()).sort((a, b) => {
-      if (a.sceneId !== b.sceneId) return a.sceneId < b.sceneId ? -1 : 1;
+    const scenes = Array.from(scenesByComposite.values()).sort((a, b) => {
+      if (a.playbookId !== b.playbookId) return a.playbookId < b.playbookId ? -1 : 1;
       return a.order - b.order;
     });
 
-    const stepsBySceneId = new Map<string, typeof steps>();
-    for (const st of steps) {
-      const list = stepsBySceneId.get(st.sceneId) ?? [];
+    const scenesByPlaybookId = new Map<string, typeof scenes>();
+    for (const st of scenes) {
+      const list = scenesByPlaybookId.get(st.playbookId) ?? [];
       list.push(st);
-      stepsBySceneId.set(st.sceneId, list);
+      scenesByPlaybookId.set(st.playbookId, list);
     }
 
     const playlistItems = wantPlaylist
       ? await this.prisma.playlistItem.findMany({
-          where: { sceneId: { in: sceneIds } },
-          orderBy: [{ sceneId: 'asc' }, { order: 'asc' }],
+          where: { playbookId: { in: playbookIds } },
+          orderBy: [{ playbookId: 'asc' }, { order: 'asc' }],
         })
       : [];
 
     const sounds = wantSounds
       ? await this.prisma.sound.findMany({
-          where: { sceneId: { in: sceneIds } },
-          orderBy: [{ sceneId: 'asc' }, { sourceId: 'asc' }],
+          where: { playbookId: { in: playbookIds } },
+          orderBy: [{ playbookId: 'asc' }, { sourceId: 'asc' }],
         })
       : [];
 
     const lightChannels = wantLightChannels
       ? await this.prisma.globalLightChannel.findMany({
-          where: { sceneId: { in: sceneIds } },
-          orderBy: [{ sceneId: 'asc' }, { index: 'asc' }],
+          where: { playbookId: { in: playbookIds } },
+          orderBy: [{ playbookId: 'asc' }, { index: 'asc' }],
         })
       : [];
 
     const theaterLayouts = wantTheaterLayout
       ? await this.prisma.theaterLayout.findMany({
-          where: { sceneId: { in: sceneIds } },
+          where: { playbookId: { in: playbookIds } },
         })
       : [];
 
     const now = new Date().toISOString();
-    const scenesForClient = scenes;
+    const playbooksForClient = playbooks;
 
     return {
       now,
       projects,
-      scenes: scenesForClient,
-      ...(wantSteps ? { steps } : {}),
+      playbooks: playbooksForClient,
+      ...(wantScenes ? { scenes } : {}),
       ...(wantPlaylist ? { playlistItems } : {}),
       ...(wantSounds ? { sounds } : {}),
       ...(wantLightChannels ? { lightChannels } : {}),
@@ -1558,6 +767,7 @@ export class SyncService {
     projectSlug: string,
     sceneName: string,
     include?: {
+      scenes?: boolean;
       steps?: boolean;
       playlist?: boolean;
       sounds?: boolean;
@@ -1568,7 +778,7 @@ export class SyncService {
     const slug = String(projectSlug ?? '').trim();
     const name = String(sceneName ?? '').trim();
     if (!slug) throw new NotFoundException('Project not found');
-    if (!name) throw new NotFoundException('Scene not found');
+    if (!name) throw new NotFoundException('Playbook not found');
 
     const project = await this.prisma.project.findFirst({
       where: {
@@ -1580,21 +790,20 @@ export class SyncService {
     });
     if (!project) throw new NotFoundException('Project not found');
 
-    const sceneId = `${project.id}:${name}`;
-    const scene = await this.prisma.scene.findUnique({
-      where: { id: sceneId },
+    const playbookId = `${project.id}:${name}`;
+    const playbook = await this.prisma.playbook.findUnique({ where: { id: playbookId },
     });
-    if (!scene) throw new NotFoundException('Scene not found');
+    if (!playbook) throw new NotFoundException('Playbook not found');
 
-    const wantSteps = Boolean(include?.steps);
+    const wantScenes = Boolean(include?.scenes ?? include?.steps);
     const wantPlaylist = Boolean(include?.playlist);
     const wantSounds = Boolean(include?.sounds);
     const wantLightChannels = Boolean(include?.lightChannels);
     const wantTheaterLayout = Boolean(include?.theaterLayout);
 
-    const stepsRaw = wantSteps
-      ? await this.prisma.step.findMany({
-          where: { sceneId, deletedAt: null },
+    const scenesRaw = wantScenes
+      ? await this.prisma.scene.findMany({
+          where: { playbookId, deletedAt: null },
           include: {
             requisites: true,
             lightPlot: true,
@@ -1604,53 +813,53 @@ export class SyncService {
           orderBy: { order: 'asc' },
         })
       : [];
-    const stepsBySourceId = new Map<number, (typeof stepsRaw)[number]>();
-    for (const st of stepsRaw) {
-      const prev = stepsBySourceId.get(st.sourceId);
+    const scenesBySourceId = new Map<number, (typeof scenesRaw)[number]>();
+    for (const st of scenesRaw) {
+      const prev = scenesBySourceId.get(st.sourceId);
       if (!prev || st.updatedAt > prev.updatedAt)
-        stepsBySourceId.set(st.sourceId, st);
+        scenesBySourceId.set(st.sourceId, st);
     }
-    const steps = Array.from(stepsBySourceId.values()).sort(
+    const scenes = Array.from(scenesBySourceId.values()).sort(
       (a, b) => a.order - b.order,
     );
 
     const playlistItems = wantPlaylist
       ? await this.prisma.playlistItem.findMany({
-          where: { sceneId },
+          where: { playbookId },
           orderBy: { order: 'asc' },
         })
       : [];
     const sounds = wantSounds
       ? await this.prisma.sound.findMany({
-          where: { sceneId },
+          where: { playbookId },
           orderBy: { sourceId: 'asc' },
         })
       : [];
     const lightChannels = wantLightChannels
       ? await this.prisma.globalLightChannel.findMany({
-          where: { sceneId },
+          where: { playbookId },
           orderBy: { index: 'asc' },
         })
       : [];
     const theaterLayout = wantTheaterLayout
       ? await this.prisma.theaterLayout.findUnique({
-          where: { sceneId },
+          where: { playbookId },
         })
       : null;
 
     return {
-      scene: {
-        id: scene.id,
-        projectId: scene.projectId,
-        name: scene.name,
-        sceneRoles: scene.sceneRoles,
-        lightFaders: scene.lightFaders,
-        lightPrograms: scene.lightPrograms,
-        lightChannelRoles: scene.lightChannelRoles,
-        projectorMedia: scene.projectorMedia,
-        updatedAt: scene.updatedAt,
+      playbook: {
+        id: playbook.id,
+        projectId: playbook.projectId,
+        name: playbook.name,
+        sceneRoles: playbook.sceneRoles,
+        lightFaders: playbook.lightFaders,
+        lightPrograms: playbook.lightPrograms,
+        lightChannelRoles: playbook.lightChannelRoles,
+        projectorMedia: playbook.projectorMedia,
+        updatedAt: playbook.updatedAt,
       },
-      ...(wantSteps ? { steps } : {}),
+      ...(wantScenes ? { scenes } : {}),
       ...(wantPlaylist ? { playlistItems } : {}),
       ...(wantSounds ? { sounds } : {}),
       ...(wantLightChannels ? { lightChannels } : {}),
@@ -1658,10 +867,10 @@ export class SyncService {
     };
   }
 
-  // Временный метод для полной проверки содержимого таблиц Scene/Step без фильтров
+  // Временный метод для полной проверки содержимого таблиц Playbook/Scene без фильтров
   async debugAll() {
+    const playbooks = await this.prisma.playbook.findMany();
     const scenes = await this.prisma.scene.findMany();
-    const steps = await this.prisma.step.findMany();
-    return { scenes, steps };
+    return { playbooks, scenes };
   }
 }

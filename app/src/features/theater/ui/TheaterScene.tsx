@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useAppEditorViewMenuRender } from "@shared/components/app-editor-menubar";
-import { useScene } from "../../scene";
+import { usePlaybook } from "../../playbook";
 import {
   patchSceneFaderFromSpotlightIntensity,
   patchSceneFaderLevel,
@@ -21,7 +21,7 @@ import {
 } from "../model/theater-scene-lighting";
 import { useTheaterScene, type TheaterSceneViewModel } from "../model/use-theater-scene";
 import type { TheaterSceneProps } from "../model/theater-scene-types";
-import { useStageGridHighlight } from "../scene/use-stage-grid-highlight";
+import { useStageGridHighlight } from "../playbook-stage/use-stage-grid-highlight";
 import {
   DEFAULT_THEATER_CAMERA,
   readTheaterCamera,
@@ -62,7 +62,7 @@ export const TheaterScene = ({
     theaterLayout,
     onTheaterLayoutChange,
   });
-  const { sceneData, setSceneData, saveStepsForLightPlot } = useScene();
+  const { playbookData, setPlaybookData, saveScenesForLightPlot } = usePlaybook();
 
   useEffect(() => {
     if (!embeddedLightRehearsal) return;
@@ -225,15 +225,15 @@ export const TheaterScene = ({
           const faderId = readSpotlightFaderId(activeSpotlight);
           const channel = readSpotlightChannel(activeSpotlight);
           if (faderId != null && channel != null) {
-            setSceneData((prev) => {
+            setPlaybookData((prev) => {
               const nextFaders = patchSceneFaderLevel(
-                prev?.lightFaders ?? sceneData?.lightFaders ?? null,
+                prev?.lightFaders ?? playbookData?.lightFaders ?? null,
                 faderId,
                 nextEnabled ? 1 : 0,
               );
               const programs = resolveLightPrograms(
-                prev?.lightPrograms ?? sceneData?.lightPrograms,
-                resolveLightProgramMinCount(channel, prev?.lightPrograms ?? sceneData?.lightPrograms, channel),
+                prev?.lightPrograms ?? playbookData?.lightPrograms,
+                resolveLightProgramMinCount(channel, prev?.lightPrograms ?? playbookData?.lightPrograms, channel),
               );
               return {
                 ...(prev ?? {}),
@@ -243,7 +243,7 @@ export const TheaterScene = ({
             });
           }
           window.setTimeout(() => {
-            void saveStepsForLightPlot({ force: true });
+            void saveScenesForLightPlot({ force: true });
           }, 0);
         },
         onToggleHidden: () =>
@@ -257,12 +257,12 @@ export const TheaterScene = ({
         onIntensityChange: (intensity: number) => {
           vm.updateSpotlight(activeSpotlight.id, { intensity });
           const nextFaders = patchSceneFaderFromSpotlightIntensity(
-            sceneData?.lightFaders ?? null,
+            playbookData?.lightFaders ?? null,
             activeSpotlight,
             intensity,
           );
           if (nextFaders) {
-            setSceneData((prev) => ({ ...(prev ?? {}), lightFaders: nextFaders }));
+            setPlaybookData((prev) => ({ ...(prev ?? {}), lightFaders: nextFaders }));
           }
         },
         onColorChange: (color: string) =>
@@ -345,11 +345,11 @@ export const TheaterScene = ({
             onClick={onTogglePanels}
             title={
               isPanelsSwapped
-                ? "Плейлист слева и шаги справа, сцена на весь экран"
+                ? "Плейлист слева и сцены справа, сцена на весь экран"
                 : "Слева — вкладки (включая «Обзор»), справа — содержимое"
             }
           >
-            {isPanelsSwapped ? "Музыка и шаги" : "Настройки сцены"}
+            {isPanelsSwapped ? "Музыка и сцены" : "Настройки сцены"}
           </TheaterBtn>
         </div>
       )}
@@ -424,7 +424,7 @@ export const TheaterScene = ({
           <button
             type="button"
             className="theater-canvas-history-btn"
-            disabled={!vm.currentStep || !vm.canUndoTheater}
+            disabled={!vm.currentScene || !vm.canUndoTheater}
             onClick={vm.undoTheater}
             title="Отменить (Ctrl+Z)"
           >
@@ -433,7 +433,7 @@ export const TheaterScene = ({
           <button
             type="button"
             className="theater-canvas-history-btn"
-            disabled={!vm.currentStep || !vm.canRedoTheater}
+            disabled={!vm.currentScene || !vm.canRedoTheater}
             onClick={vm.redoTheater}
             title="Повторить (Ctrl+Y)"
           >
@@ -597,10 +597,10 @@ function buildTheaterMobileSnapshot(vm: TheaterSceneViewModel) {
     version: 1,
     savedAt: new Date().toISOString(),
     projectName: vm.projectName,
-    step: vm.currentStep
+    scene: vm.currentScene
       ? {
-          id: vm.currentStep.id,
-          title: vm.currentStep.title,
+          id: vm.currentScene.id,
+          title: vm.currentScene.title,
           page: vm.currentPage,
         }
       : null,
@@ -634,7 +634,7 @@ function downloadTheaterMobileSnapshot(vm: TheaterSceneViewModel) {
   const blob = new Blob([text], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
-  const title = vm.currentStep?.title?.trim() || vm.projectName;
+  const title = vm.currentScene?.title?.trim() || vm.projectName;
   anchor.href = url;
   anchor.download = `${slugifyTheaterFilename(title)}-theater.json`;
   anchor.click();
@@ -652,8 +652,8 @@ function TheaterMobileActionBar({
   const selectedTitle = useMemo(() => {
     if (vm.activeModel) return vm.activeModel.name;
     if (vm.activeSpotlight) return vm.activeSpotlight.label;
-    return vm.currentStep?.title || "Театр";
-  }, [vm.activeModel, vm.activeSpotlight, vm.currentStep?.title]);
+    return vm.currentScene?.title || "Театр";
+  }, [vm.activeModel, vm.activeSpotlight, vm.currentScene?.title]);
 
   const openSheet = (next: TheaterMobileSheet) => {
     setSheet((current) => (current === next ? null : next));
@@ -820,7 +820,7 @@ function TheaterMobileActionBar({
           {sheet === "save" ? (
             <div className="theater-mobile-sheet__stack">
               <p>
-                Основные правки уже попадают в текущий шаг. Здесь можно сделать отдельный снимок
+                Основные правки уже попадают в текущую сцену. Здесь можно сделать отдельный снимок
                 3D-театра для телефона или экспорта.
               </p>
               <MobileActionButton onClick={saveLocalSnapshot}>Сохранить на устройстве</MobileActionButton>

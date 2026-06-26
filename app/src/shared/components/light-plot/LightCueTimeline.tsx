@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { LightCue, ScriptStep, TheaterSpotlight } from "../../types/script";
+import type { LightCue, ScriptScene, TheaterSpotlight } from "../../types/script";
 
 import { LightChannelSelect } from "../../../features/theater/ui/LightChannelSelect";
 
@@ -216,7 +216,7 @@ export function LightCueTimeline({
 
           {typeof durationMin === "number" && durationMin > 0
 
-            ? ` (шаг ${durationMin} мин)`
+            ? ` (сцена ${durationMin} мин)`
 
             : ""}
 
@@ -440,9 +440,9 @@ export function LightCueTimeline({
 
 
 
-export function readStepLightCues(step: Pick<ScriptStep, "lightCues"> | undefined): LightCue[] {
+export function readSceneLightCues(scene: Pick<ScriptScene, "lightCues"> | undefined): LightCue[] {
 
-  return normalizeLightCues(step?.lightCues ?? []);
+  return normalizeLightCues(scene?.lightCues ?? []);
 
 }
 

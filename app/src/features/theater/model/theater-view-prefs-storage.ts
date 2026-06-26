@@ -16,7 +16,7 @@ export type TheaterViewPrefs = {
   /** Пульт света внизу сцены (вкладка «Пульт» слева только переключает это). */
   lightConsoleExpanded: boolean;
   outlineDrawMode: boolean;
-  /** Режим «Настройки сцены» (панели слева/справа вместо «Музыка и шаги»). */
+  /** Режим «Настройки сцены» (панели слева/справа вместо «Музыка и сцены»). */
   swapTheaterPanels: boolean;
   showTheaterControls: boolean;
   /** Точечная цель софита или привязка кликом по ячейке сетки */

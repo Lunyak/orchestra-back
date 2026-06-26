@@ -4,7 +4,7 @@ import {
   type KadrSoundCue,
   upsertSoundLineInSection,
 } from "../../theater/model/kadr-sound";
-import { getPlaylistPlaybackSnapshot } from "../../scene/model/scene-playback-bridge";
+import { getPlaylistPlaybackSnapshot } from "../../playbook/model/playbook-playback-bridge";
 import { readPlayerVolume } from "../../../shared/player/player-prefs";
 
 export type RecordSoundKadrInput = {

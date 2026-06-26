@@ -1,5 +1,5 @@
 import { parseLightChannel } from "../show-script/utils/lightTokens";
-import type { SceneLightFadersDataV1 } from "../../../features/scene/model/scene-slice";
+import type { PlaybookLightFadersDataV1 } from "../../../features/playbook/model/playbook-slice";
 import {
   effectiveSpotlightUiIntensity,
   getSpotlightsBoundToFader,
@@ -38,7 +38,7 @@ export function LightConsoleView({
   const compact = mode === "compact";
   const disabled = readOnly || !onPatchFader;
 
-  const getSpotlightsForFader = (fader: SceneLightFadersDataV1["faders"][number]) =>
+  const getSpotlightsForFader = (fader: PlaybookLightFadersDataV1["faders"][number]) =>
     getSpotlightsBoundToFader(fader, spotlights, faderMatchOptions);
 
   return (
@@ -49,7 +49,7 @@ export function LightConsoleView({
       aria-label="Пульт света"
     >
       <div className="light-console__body">
-        <div className="light-console__head">
+        <div className="light-console__header">
         <div className="light-console__program-bar">
           {programs.programs.map((program) => {
             const channelRaw = lightChannels[program.id - 1] ?? "";

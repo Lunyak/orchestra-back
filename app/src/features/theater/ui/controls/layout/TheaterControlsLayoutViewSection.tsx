@@ -61,10 +61,10 @@ export function TheaterControlsLayoutViewSection({ vm, layout }: LayoutSectionPr
             Просмотр
           </LabeledCheckbox>
           <LabeledCheckbox
-            checked={vm.stepRehearsalMode}
-            onChange={vm.setStepRehearsalMode}
+            checked={vm.sceneRehearsalMode}
+            onChange={vm.setSceneRehearsalMode}
           >
-            Репетиция шага
+            Репетиция сцены
           </LabeledCheckbox>
         </div>
         <TheaterField label={labelM("Шаг сетки")}>
@@ -88,7 +88,7 @@ export function TheaterControlsLayoutViewSection({ vm, layout }: LayoutSectionPr
           />
         </TheaterField>
         <TheaterBtn
-          disabled={!vm.currentStep || (vm.currentStep.lightCues?.length ?? 0) === 0}
+          disabled={!vm.currentScene || (vm.currentScene.lightCues?.length ?? 0) === 0}
           title="Скопировать таймлайн light cue в буфер"
           onClick={() => void vm.copyLightCuesToClipboard(lightChannels)}
         >

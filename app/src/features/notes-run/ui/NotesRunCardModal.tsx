@@ -1,12 +1,12 @@
 import cn from "classnames";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "../../../shared/core/modal/Modal";
-import type { SceneHoldImage, SceneVideo } from "../../scene/model/scene-slice";
+import type { PlaybookHoldImage, PlaybookVideo } from "../../playbook/model/playbook-slice";
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
 import type { NotesRunCardDraft } from "../model/notes-run-types";
-import "../../spectacle-run/ui/create-kadr-modal.css";
+import "@shared/components/create-kadr-modal/create-kadr-modal.css";
 import "./notes-run.css";
 
 function parseProjectorSelectValue(value: string): KadrProjectorCue | null {
@@ -47,8 +47,8 @@ export function NotesRunCardModal({
   cardNo: number;
   playlist: Array<{ id: number; title: string }>;
   sounds: Array<{ id: number; title: string }>;
-  videos: SceneVideo[];
-  holdImages: SceneHoldImage[];
+  videos: PlaybookVideo[];
+  holdImages: PlaybookHoldImage[];
   projectorCtx: ProjectorMediaContext;
   onClose: () => void;
   onSubmit: (draft: NotesRunCardDraft) => void;
@@ -112,8 +112,8 @@ export function NotesRunCardModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} panelClassName="create-kadr-modal notes-run-modal" ariaLabel={title}>
-      <header className="create-kadr-modal__head">
+    <Modal isOpen={isOpen} onClose={onClose} panelClassName="create-kadr-modal" ariaLabel={title}>
+      <header className="create-kadr-modal__header">
         <h2 className="create-kadr-modal__title">{title}</h2>
         <button type="button" className="create-kadr-modal__close" onClick={onClose}>
           ×
@@ -121,7 +121,7 @@ export function NotesRunCardModal({
       </header>
 
       <div className="create-kadr-modal__body">
-        <p className="notes-run-modal__hint">
+        <p className="notes-run__modal-hint">
           Свет записывается свободно — любые названия софитов/каналов и значения. Без привязки к 3D и пульту.
         </p>
 
@@ -137,21 +137,21 @@ export function NotesRunCardModal({
         </label>
 
         <label className="create-kadr-modal__field">
-          <span className="create-kadr-modal__label">Шаг / сцена (метка)</span>
+          <span className="create-kadr-modal__label">Сцена (метка)</span>
           <input
             type="text"
             className="create-kadr-modal__input"
-            value={draft.stepLabel}
-            placeholder="Например: Шаг 3 · Кухня"
-            onChange={(e) => setDraft((prev) => ({ ...prev, stepLabel: e.target.value }))}
+            value={draft.sceneLabel}
+            placeholder="Например: Сцена 3 · Кухня"
+            onChange={(e) => setDraft((prev) => ({ ...prev, sceneLabel: e.target.value }))}
           />
         </label>
 
         <section className="create-kadr-modal__section">
           <h3 className="create-kadr-modal__section-title">Свет</h3>
-          <div className="notes-run-modal__light-grid">
+          <div className="notes-run__modal-light-grid">
             {draft.lightLines.map((row, index) => (
-              <div key={`line-${index}`} className="notes-run-modal__light-row">
+              <div key={`line-${index}`} className="notes-run__modal-light-row">
                 <input
                   type="text"
                   className="create-kadr-modal__input"
@@ -168,7 +168,7 @@ export function NotesRunCardModal({
                 />
                 <button
                   type="button"
-                  className="notes-run-modal__line-remove"
+                  className="notes-run__modal-light-row-remove"
                   onClick={() => removeLightLine(index)}
                   aria-label="Удалить строку"
                 >
@@ -177,7 +177,7 @@ export function NotesRunCardModal({
               </div>
             ))}
           </div>
-          <button type="button" className="notes-run-modal__add-line" onClick={addLightLine}>
+          <button type="button" className="notes-run__modal-light-add" onClick={addLightLine}>
             + строка света
           </button>
           <label className="create-kadr-modal__field">

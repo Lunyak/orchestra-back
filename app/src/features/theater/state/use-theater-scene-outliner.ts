@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { ScriptStep, TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import { isTheaterDecorModel } from "../model/theater-decor-catalog";
 import {
   buildSceneOutlinerGroups,
@@ -27,7 +27,7 @@ export type UseTheaterSceneOutlinerArgs = {
   updateSpotlight: (id: number, patch: Partial<TheaterSpotlight>) => void;
   updateModels: (next: TheaterModel[]) => void;
   updateModel: (id: number, patch: Partial<TheaterModel>) => void;
-  updateCurrentStep: (patch: Partial<ScriptStep>) => void;
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   setDecorActionMessage: (message: string | null) => void;
   activeTab: TheaterViewPrefs["activeTab"];
   editMode: TheaterEditMode;
@@ -63,7 +63,7 @@ export function useTheaterSceneOutliner({
   updateSpotlight,
   updateModels,
   updateModel,
-  updateCurrentStep,
+  updateCurrentScene,
   setDecorActionMessage,
   activeTab,
   editMode,
@@ -114,7 +114,7 @@ export function useTheaterSceneOutliner({
       const ids = visibleSpotlights.map((item) => item.id);
       if (ids.length === 0) return;
       setMultiSelectedSpotlightIds(ids);
-      updateCurrentStep({ theaterActiveSpotlightId: ids[0] });
+      updateCurrentScene({ theaterActiveSpotlightId: ids[0] });
       setDecorActionMessage(`Выбрано софитов: ${ids.length}`);
       return;
     }
@@ -124,7 +124,7 @@ export function useTheaterSceneOutliner({
         .map((item) => item.id);
       if (ids.length === 0) return;
       setMultiSelectedModelIds(ids);
-      updateCurrentStep({ theaterActiveModelId: ids[0] });
+      updateCurrentScene({ theaterActiveModelId: ids[0] });
       setEditMode("models");
       setDecorActionMessage(`Выбрано объектов: ${ids.length}`);
       return;
@@ -135,7 +135,7 @@ export function useTheaterSceneOutliner({
         .map((item) => item.id);
       if (ids.length === 0) return;
       setMultiSelectedModelIds(ids);
-      updateCurrentStep({ theaterActiveModelId: ids[0] });
+      updateCurrentScene({ theaterActiveModelId: ids[0] });
       setEditMode("decor");
       setDecorActionMessage(`Выбрано объектов: ${ids.length}`);
     }
@@ -146,7 +146,7 @@ export function useTheaterSceneOutliner({
     setDecorActionMessage,
     setMultiSelectedModelIds,
     setMultiSelectedSpotlightIds,
-    updateCurrentStep,
+    updateCurrentScene,
     visibleModels,
     visibleSpotlights,
   ]);
@@ -289,12 +289,12 @@ export function useTheaterSceneOutliner({
 
     if (activeSpotlightId != null || multiSelectedSpotlightIds.length > 0) {
       setMultiSelectedSpotlightIds([]);
-      updateCurrentStep({ theaterActiveSpotlightId: undefined });
+      updateCurrentScene({ theaterActiveSpotlightId: undefined });
     }
 
     if (activeModelId != null || multiSelectedModelIds.length > 0) {
       setMultiSelectedModelIds([]);
-      updateCurrentStep({ theaterActiveModelId: undefined });
+      updateCurrentScene({ theaterActiveModelId: undefined });
     }
 
     if (decorPlaceMode) setDecorPlaceMode(false);
@@ -312,7 +312,7 @@ export function useTheaterSceneOutliner({
     setLayoutOutlineFocused,
     setMultiSelectedModelIds,
     setMultiSelectedSpotlightIds,
-    updateCurrentStep,
+    updateCurrentScene,
   ]);
 
   const toggleSceneOutlinerVisibility = useCallback(

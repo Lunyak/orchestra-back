@@ -84,8 +84,8 @@
   background: var(--color-danger-bg-hover-strong);
 }
 
-/* Script step row */
-.icon-action-delete--step {
+/* Script scene row */
+.icon-action-delete--scene {
   position: absolute;
   right: 4px;
   top: 50%;
@@ -101,7 +101,7 @@
   transition: opacity 0.15s ease;
 }
 
-.icon-action-delete--step:hover {
+.icon-action-delete--scene:hover {
   background: var(--color-danger-hover);
 }
 

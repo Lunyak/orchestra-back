@@ -122,7 +122,7 @@ export function LightConsoleSplitView({
 
       <div className="light-console-split__panels">
         <section className="light-split-panel" aria-label="Софиты">
-          <header className="light-split-panel__head">
+          <header className="light-split-panel__header">
             <span className="light-split-panel__title">Софиты</span>
             <span className="light-split-panel__hint">
               {sofitHint ? sofitHint : `K${model.sofitChannels.join(", K")}`}
@@ -152,7 +152,7 @@ export function LightConsoleSplitView({
         </section>
 
         <section className="light-split-panel" aria-label="Заливка RGB">
-          <header className="light-split-panel__head">
+          <header className="light-split-panel__header">
             <span className="light-split-panel__title">Заливка</span>
             <span className="light-split-panel__hint">K{model.washChannel} · RGB</span>
           </header>

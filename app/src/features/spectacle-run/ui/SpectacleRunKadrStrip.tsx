@@ -4,11 +4,11 @@ import cn from "classnames";
 
 import type {
 
-  SceneLightFadersDataV1,
+  PlaybookLightFadersDataV1,
 
-  SceneLightProgramsDataV1,
+  PlaybookLightProgramsDataV1,
 
-} from "../../scene/model/scene-slice";
+} from "../../playbook/model/playbook-slice";
 
 import {
 
@@ -16,7 +16,7 @@ import {
 
   findKadrById,
 
-  readStepLightKadrsFromMarkdown,
+  readSceneLightKadrsFromMarkdown,
 
 } from "../../theater/model/light-kadrs";
 
@@ -26,11 +26,11 @@ import { resolveLightFaders } from "../../../shared/components/light-console/lig
 
 import { resolveLightColor } from "../../../shared/components/show-script/utils/lightTokens";
 
-import type { ScriptStep } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 
 import {
 
-  buildSpectacleTapeStepGroups,
+  buildSpectacleTapeSceneGroups,
 
   type SpectacleTapeItem,
 
@@ -81,13 +81,13 @@ export type SpectacleRunKadrStripProps = {
 
   tapeIndex: number;
 
-  steps: ScriptStep[];
+  scenes: ScriptScene[];
 
   lightChannels: string[];
 
-  lightFaders: SceneLightFadersDataV1 | null;
+  lightFaders: PlaybookLightFadersDataV1 | null;
 
-  lightPrograms: SceneLightProgramsDataV1 | null;
+  lightPrograms: PlaybookLightProgramsDataV1 | null;
 
   playlist?: Array<{ id: number; title: string }>;
 
@@ -109,7 +109,7 @@ function kadrProgramColor(
 
   item: SpectacleTapeItem,
 
-  step: ScriptStep | undefined,
+  scene: ScriptScene | undefined,
 
   lightChannels: string[],
 
@@ -117,9 +117,9 @@ function kadrProgramColor(
 
 ): string | null {
 
-  if (item.isPlaceholder || !step) return null;
+  if (item.isPlaceholder || !scene) return null;
 
-  const kadrs = readStepLightKadrsFromMarkdown(step);
+  const kadrs = readSceneLightKadrsFromMarkdown(scene);
 
   const kadr =
 
@@ -449,9 +449,9 @@ function SpectacleRunKadrStripProgRunChip({
 
       <span className="spectacle-run-kadr-strip__chip-layout spectacle-run-kadr-strip__chip-layout--stack">
 
-        <span className="spectacle-run-kadr-strip__chip-head">
+        <span className="spectacle-run-kadr-strip__chip-header">
 
-          <span className="spectacle-run-kadr-strip__chip-no">{chipNo}</span>
+          <span className="spectacle-run-kadr-strip__chip-number">{chipNo}</span>
 
           {summary.headingTitle ? (
 
@@ -557,7 +557,7 @@ function SpectacleRunKadrStripProgRunChip({
 
           ) : item.isPlaceholder ? (
 
-            <span className="spectacle-run-kadr-strip__chip-empty">нет картин в шаге</span>
+            <span className="spectacle-run-kadr-strip__chip-empty">нет картин в сцене</span>
 
           ) : null}
 
@@ -583,7 +583,7 @@ export function SpectacleRunKadrStrip({
 
   tapeIndex,
 
-  steps,
+  scenes,
 
   lightChannels,
 
@@ -607,7 +607,7 @@ export function SpectacleRunKadrStrip({
 
   const isProgRun = variant === "prog-run";
 
-  const groups = useMemo(() => buildSpectacleTapeStepGroups(tape), [tape]);
+  const groups = useMemo(() => buildSpectacleTapeSceneGroups(tape), [tape]);
 
   const baseFaders = useMemo(
 
@@ -637,12 +637,12 @@ export function SpectacleRunKadrStrip({
     () =>
       tape
         .map((item) => {
-          const step = steps[item.stepIndex];
-          const markdownLen = String(step?.markdown ?? "").length;
+          const scene = scenes[item.sceneIndex];
+          const markdownLen = String(scene?.markdown ?? "").length;
           return `${item.kadrId ?? "ph"}:${item.kadrNo}:${markdownLen}`;
         })
         .join("|"),
-    [steps, tape],
+    [scenes, tape],
   );
 
   useProgRunKadrChipHeight(isProgRun, stripRef, chipHeightKey);
@@ -684,7 +684,7 @@ export function SpectacleRunKadrStrip({
     <footer
       ref={stripRef}
       className={cn("spectacle-run-kadr-strip", isProgRun && "spectacle-run-kadr-strip--prog-run")}
-      aria-label="Лента картин по шагам"
+      aria-label="Лента картин по сценам"
     >
 
       <div ref={trackRef} className="spectacle-run-kadr-strip__track">
@@ -693,19 +693,19 @@ export function SpectacleRunKadrStrip({
 
           <section
 
-            key={group.stepId}
+            key={group.sceneId}
 
-            className="spectacle-run-kadr-strip__step"
+            className="spectacle-run-kadr-strip__scene"
 
-            aria-label={`Шаг ${group.stepOrdinal}: ${group.stepTitle}`}
+            aria-label={`Сцена ${group.sceneOrdinal}: ${group.sceneTitle}`}
 
           >
 
-            <span className="spectacle-run-kadr-strip__step-no">{group.stepOrdinal}</span>
+            <span className="spectacle-run-kadr-strip__scene-number">{group.sceneOrdinal}</span>
 
-            <span className="spectacle-run-kadr-strip__step-title" title={group.stepTitle}>
+            <span className="spectacle-run-kadr-strip__scene-title" title={group.sceneTitle}>
 
-              {group.stepTitle}
+              {group.sceneTitle}
 
             </span>
 
@@ -715,13 +715,13 @@ export function SpectacleRunKadrStrip({
 
                 const active = index === tapeIndex;
 
-                const step = steps[item.stepIndex];
+                const scene = scenes[item.sceneIndex];
 
                 const programColor = kadrProgramColor(
 
                   item,
 
-                  step,
+                  scene,
 
                   lightChannels,
 
@@ -736,12 +736,12 @@ export function SpectacleRunKadrStrip({
                   : parseKadrTitleFromHeading(item.headingTitle ?? "", item.kadrNo);
 
                 const title = item.isPlaceholder
-                  ? `${item.stepTitle}: нет картин`
+                  ? `${item.sceneTitle}: нет картин`
                   : displayKadrTitle
                     ? `${chipLabel} · ${displayKadrTitle}`
                     : chipLabel;
 
-                const markdown = String(step?.markdown ?? "");
+                const markdown = String(scene?.markdown ?? "");
 
                 const imageHref = item.isPlaceholder
 
@@ -749,7 +749,7 @@ export function SpectacleRunKadrStrip({
 
                   : findFirstKadrSectionImageHref(markdown, item.section);
 
-                const chipKey = `${item.stepId}-${item.kadrId ?? "ph"}-${item.kadrNo}-${index}`;
+                const chipKey = `${item.sceneId}-${item.kadrId ?? "ph"}-${item.kadrNo}-${index}`;
 
                 const chipRef = active ? activeChipRef : undefined;
 
@@ -801,7 +801,7 @@ export function SpectacleRunKadrStrip({
 
                   item,
 
-                  step,
+                  scene,
 
                   lightChannels,
 

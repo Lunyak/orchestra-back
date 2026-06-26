@@ -29,7 +29,7 @@ export function TrainersPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="trainers-view trainers-index">
-            <header className="trainers-index__head">
+            <header className="trainers-index__header">
               <h1 className="trainers-page-title">Тренажёры</h1>
               <p className="trainers-lead">
                 Короткие упражнения для ежедневной практики. «Речь» и «Дикция» пока в разработке.
@@ -56,7 +56,7 @@ export function TrainersPage() {
                         navigate(item.path);
                       }}
                     >
-                      <div className="trainer-index-card__head">
+                      <div className="trainer-index-card__header">
                         <h2 className="trainer-index-card__title">{item.title}</h2>
                         {inDev ? (
                           <span className="trainer-index-card__badge">В разработке</span>

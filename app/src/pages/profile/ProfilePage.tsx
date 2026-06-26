@@ -68,7 +68,7 @@ export function ProfilePage() {
             <div className="profile-tabs" role="tablist" aria-label="Разделы профиля">
               <button
                 type="button"
-                className={cn("profile-tab-btn", activeTab === "profile" && "active")}
+                className={cn("profile-tab-btn", activeTab === "profile" && "profile-tab-btn--active")}
                 onClick={() => setTab("profile")}
                 role="tab"
                 aria-selected={activeTab === "profile"}
@@ -78,7 +78,7 @@ export function ProfilePage() {
               </button>
               <button
                 type="button"
-                className={cn("profile-tab-btn", activeTab === "availability" && "active")}
+                className={cn("profile-tab-btn", activeTab === "availability" && "profile-tab-btn--active")}
                 onClick={() => setTab("availability")}
                 role="tab"
                 aria-selected={activeTab === "availability"}
@@ -88,7 +88,7 @@ export function ProfilePage() {
               </button>
               <button
                 type="button"
-                className={cn("profile-tab-btn", activeTab === "trainers" && "active")}
+                className={cn("profile-tab-btn", activeTab === "trainers" && "profile-tab-btn--active")}
                 onClick={() => setTab("trainers")}
                 role="tab"
                 aria-selected={activeTab === "trainers"}
@@ -98,7 +98,7 @@ export function ProfilePage() {
               </button>
               <button
                 type="button"
-                className={cn("profile-tab-btn", activeTab === "roleWork" && "active")}
+                className={cn("profile-tab-btn", activeTab === "roleWork" && "profile-tab-btn--active")}
                 onClick={() => setTab("roleWork")}
                 role="tab"
                 aria-selected={activeTab === "roleWork"}

@@ -7,7 +7,7 @@ export interface PageLoaderProps {
   variant?: PageLoaderVariant;
   /** Показывать левый сайдбар-заглушку (плейлист). */
   showLeftSidebar?: boolean;
-  /** Показывать правый сайдбар-заглушку (шаги). */
+  /** Показывать правый сайдбар-заглушку (сцены). */
   showRightSidebar?: boolean;
   /** Заглушка верхней панели (sounds-bar). */
   showTopBar?: boolean;

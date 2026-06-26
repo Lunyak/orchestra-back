@@ -5,7 +5,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import "./style.css";
 import { HeaderPlayer } from "../../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/PlaylistSidebar";
-import { ScriptStepsSidebar } from "../../../shared/components/script-steps-sidebar/ScriptStepsSidebar";
+import { ScriptScenesSidebar } from "../../../shared/components/script-scenes-sidebar/ScriptScenesSidebar";
 import { OfflinePackStatus } from "../../../shared/components/offline/OfflinePackStatus";
 import { MAIN_CONTENT_VIEW_MODIFIERS } from "../model/spectacle-page-types";
 import {
@@ -23,6 +23,11 @@ const NotesRunPageSection = React.lazy(() =>
     default: m.NotesRunPageSection,
   })),
 );
+const ProjectMediaPageSection = React.lazy(() =>
+  import("../../project-media/ui/ProjectMediaPageSection").then((m) => ({
+    default: m.ProjectMediaPageSection,
+  })),
+);
 const ShowScript = React.lazy(() =>
   import("../../../shared/components/show-script/ShowScript").then((m) => ({
     default: m.ShowScript,
@@ -37,7 +42,7 @@ const KanbanBoardPage = React.lazy(() =>
   })),
 );
 const TasksPage = React.lazy(() =>
-  import("../../../pages/tasks/TasksPage").then((m) => ({
+  import("../../project-tasks/ui/TasksPage").then((m) => ({
     default: m.TasksPage,
   })),
 );
@@ -49,41 +54,41 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   const navigate = useNavigate();
   const {
     activeView,
-    addStep,
+    addScene,
     closeMobilePanels,
     compactMainChrome,
     currentPage,
-    deleteStep,
+    deleteScene,
     isEditing,
     isMobile,
     isProjectsLoaded,
-    isSceneReady,
-    isStepsCollapsed,
+    isPlaybookReady,
+    isScenesCollapsed,
     isTheaterView,
     kanbanMembers,
     mobilePlaylistOpen,
-    mobileStepsOpen,
+    mobileScenesOpen,
     projectName,
     projects,
-    pushSceneAfterSoundsSave,
+    pushPlaybookAfterSoundsSave,
     registerPlaylistPlay,
     registerSoundToggle,
-    reorderSteps,
-    sceneData,
+    reorderScenes,
+    playbookData,
     setCurrentPage,
     setIsEditing,
-    setIsStepsCollapsed,
+    setIsScenesCollapsed,
     setMobilePlaylistOpen,
-    setMobileStepsOpen,
+    setMobileScenesOpen,
     setShowTheaterControls,
     setTheaterOutlinerHostRef,
     setTheaterLayout,
-    shouldShowStepsSidebar,
+    shouldShowScenesSidebar,
     shouldSwapPanels,
     showHeaderSounds,
     showPlaylistSidebar,
     showTheaterControls,
-    steps,
+    scenes,
     theaterOutlinerHost,
     theaterLayout,
     togglePanels,
@@ -130,12 +135,12 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
 
   const projectDisplay = projectName;
 
-  if (!isSceneReady) {
+  if (!isPlaybookReady) {
     return (
       <PageLoader
         variant="spectacle"
         showLeftSidebar={isMobile ? mobilePlaylistOpen : showPlaylistSidebar}
-        showRightSidebar={isMobile ? mobileStepsOpen : !isStepsCollapsed}
+        showRightSidebar={isMobile ? mobileScenesOpen : !isScenesCollapsed}
         showTopBar={showHeaderSounds}
         label="Загрузка сцены…"
       />
@@ -143,13 +148,22 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   }
 
   const forceHidePlaylistPanel = isTheaterView && shouldSwapPanels;
+  const playlistPanelHidden =
+    forceHidePlaylistPanel ||
+    (!isMobile && !showPlaylistSidebar) ||
+    (isMobile && !mobilePlaylistOpen);
   const playlistNode = !compactMainChrome ? (
     <div
-      className={`playlist-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobilePlaylistOpen ? "open" : ""} ${forceHidePlaylistPanel || (!isMobile && !showPlaylistSidebar) || (isMobile && !mobilePlaylistOpen) ? "hidden" : ""}`}
+      className={cn(
+        "playlist-sidebar-container",
+        isMobile && "playlist-sidebar-container--mobile",
+        mobilePlaylistOpen && "playlist-sidebar-container--open",
+        playlistPanelHidden && "playlist-sidebar-container--hidden",
+      )}
     >
       {isMobile && (
         <button
-          className="mobile-panel-close"
+          className="mobile-drawer__close"
           onClick={() => setMobilePlaylistOpen(false)}
           aria-label="Закрыть плейлист"
         >
@@ -174,8 +188,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       ref={setTheaterOutlinerHostRef}
       className={cn(
         "theater-settings-sidebar theater-settings-sidebar--right theater-outliner-sidebar",
-        isMobile && "mobile",
-        isMobile && showTheaterControls && "open",
+        isMobile && "theater-settings-sidebar--mobile",
+        isMobile && showTheaterControls && "theater-settings-sidebar--open",
       )}
       aria-label="Настройки 3D-сцены"
       aria-hidden={isMobile ? !showTheaterControls : undefined}
@@ -183,7 +197,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       {isMobile && showTheaterControls ? (
         <button
           type="button"
-          className="mobile-panel-close"
+          className="mobile-drawer__close"
           onClick={() => setShowTheaterControls(false)}
           aria-label="Закрыть панель настроек"
         >
@@ -193,41 +207,45 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     </aside>
   ) : null;
 
-  /** Шаги на 3D-театре — только в режиме «Музыка и шаги». */
+  /** Сцены на 3D-театре — только в режиме «Музыка и сцены». */
   const theaterRehearsalMode = isTheaterView && !shouldSwapPanels;
-  const showStepsSidebar =
-    shouldShowStepsSidebar && (!isTheaterView || theaterRehearsalMode);
+  const showScenesSidebar =
+    shouldShowScenesSidebar && (!isTheaterView || theaterRehearsalMode);
 
   const stepsSidebarVisible =
-    showStepsSidebar &&
-    ((isMobile && mobileStepsOpen) || (!isMobile && !isStepsCollapsed));
+    showScenesSidebar &&
+    ((isMobile && mobileScenesOpen) || (!isMobile && !isScenesCollapsed));
 
   const stepsSidebarNode = stepsSidebarVisible ? (
       <div
-        className={`steps-sidebar-wrapper ${isMobile ? "mobile" : ""} ${mobileStepsOpen ? "open" : ""}`}
+        className={cn(
+          "scenes-sidebar-container",
+          isMobile && "scenes-sidebar-container--mobile",
+          mobileScenesOpen && "scenes-sidebar-container--open",
+        )}
       >
         {isMobile && (
           <button
-            className="mobile-panel-close"
-            onClick={() => setMobileStepsOpen(false)}
-            aria-label="Закрыть шаги"
+            className="mobile-drawer__close"
+            onClick={() => setMobileScenesOpen(false)}
+            aria-label="Закрыть сцены"
           >
             ×
           </button>
         )}
-        <ScriptStepsSidebar
-          steps={steps}
+        <ScriptScenesSidebar
+          scenes={scenes}
           currentIndex={currentPage}
           onSelect={setCurrentPage}
           onPrev={() => setCurrentPage((p: number) => Math.max(0, p - 1))}
           onNext={() =>
-            setCurrentPage((p: number) => Math.min(steps.length - 1, p + 1))
+            setCurrentPage((p: number) => Math.min(scenes.length - 1, p + 1))
           }
-          onDelete={deleteStep}
-          onReorder={reorderSteps}
+          onDelete={deleteScene}
+          onReorder={reorderScenes}
           isEditing={isEditing}
           onToggleEditing={() => setIsEditing((p: boolean) => !p)}
-          onAddStep={addStep}
+          onAddScene={addScene}
         />
       </div>
     ) : null;
@@ -248,8 +266,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
             <HeaderPlayer
               projectName={projectDisplay}
               sceneName="script"
-              sounds={sceneData?.sounds || []}
-              onSoundsSaved={pushSceneAfterSoundsSave}
+              sounds={playbookData?.sounds || []}
+              onSoundsSaved={pushPlaybookAfterSoundsSave}
               onRegisterToggleHandler={registerSoundToggle}
             />
           </div>
@@ -281,9 +299,14 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
               <LightPlotPage />
             </Suspense>
           )}
-          {activeView === "notes-run" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка прогона…" />}>
+          {activeView === "sufer" && (
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка суфлёра…" />}>
               <NotesRunPageSection />
+            </Suspense>
+          )}
+          {activeView === "media" && (
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка медиа…" />}>
+              <ProjectMediaPageSection />
             </Suspense>
           )}
           {activeView === "script" && (
@@ -312,10 +335,10 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       {stepsSidebarNode}
       {isMobile &&
         (mobilePlaylistOpen ||
-          mobileStepsOpen ||
+          mobileScenesOpen ||
           (showTheaterSettingsHost && showTheaterControls)) && (
         <div
-          className="mobile-overlay"
+          className="mobile-drawer__overlay"
           onClick={() => {
             closeMobilePanels();
             if (showTheaterSettingsHost && showTheaterControls) {

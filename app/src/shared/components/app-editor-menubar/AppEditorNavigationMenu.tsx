@@ -3,7 +3,9 @@ import {
   filterHeaderNavItems,
   HEADER_NAV_ITEMS,
   isHeaderNavItemActive,
+  REHEARSAL_PLAN_NAV_PATH,
 } from "../header/header-nav-items";
+import { resolveRehearsalPlanEntryPath } from "../../settings/rehearsalPlanTab";
 
 export function AppEditorNavigationMenu() {
   const navigate = useNavigate();
@@ -33,7 +35,13 @@ export function AppEditorNavigationMenu() {
               ]
                 .filter(Boolean)
                 .join(" ")}
-              onClick={() => navigate(path)}
+              onClick={() => {
+                const targetPath =
+                  path === REHEARSAL_PLAN_NAV_PATH
+                    ? resolveRehearsalPlanEntryPath()
+                    : path;
+                navigate(targetPath);
+              }}
             >
               <span className="app-editor-menubar__nav-icon" aria-hidden>
                 {icon}

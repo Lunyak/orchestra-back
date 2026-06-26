@@ -25,7 +25,7 @@ function normSlug(v: unknown): string {
   return safeToString(v).trim();
 }
 
-function normSceneName(v: unknown): string {
+function normPlaybookName(v: unknown): string {
   return safeToString(v).trim();
 }
 
@@ -65,85 +65,88 @@ export class ActorNotesService {
     return project.id;
   }
 
-  private async ensureScene(projectId: string, sceneName: string) {
-    const name = normSceneName(sceneName);
+  private async ensurePlaybook(projectId: string, sceneName: string) {
+    const name = normPlaybookName(sceneName);
     if (!name) throw new BadRequestException('sceneName is required');
-    const sceneId = `${projectId}:${name}`;
-    // Если сцена ещё не синкнулась — создаём "пустую" запись, чтобы можно было привязать заметку.
-    return this.prisma.scene.upsert({
-      where: { id: sceneId },
+    const playbookId = `${projectId}:${name}`;
+    return this.prisma.playbook.upsert({
+      where: { id: playbookId },
       update: { name },
-      create: { id: sceneId, projectId, name },
+      create: { id: playbookId, projectId, name },
       select: { id: true },
     });
   }
 
-  async getStepNote(
+  async getSceneNote(
     userId: string,
     projectSlug: string,
     sceneName: string,
-    stepId: number,
+    sceneId: number,
   ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
-    const scene = await this.ensureScene(projectId, sceneName);
+    const playbook = await this.ensurePlaybook(projectId, sceneName);
 
-    const sourceId = Math.trunc(Number(stepId));
+    const sourceId = Math.trunc(Number(sceneId));
     if (!Number.isFinite(sourceId) || sourceId <= 0) {
-      throw new BadRequestException('stepId must be a positive integer');
+      throw new BadRequestException('sceneId must be a positive integer');
     }
 
     const note = await this.prisma.actorNote.findFirst({
       where: {
         userId,
         projectId,
-        sceneId: scene.id,
-        stepSourceId: sourceId,
+        playbookId: playbook.id,
+        sceneSourceId: sourceId,
       },
       select: { id: true, text: true, createdAt: true, updatedAt: true },
     });
     return { note };
   }
 
-  async upsertStepNote(
+  async upsertSceneNote(
     userId: string,
     projectSlug: string,
     sceneName: string,
-    stepId: number,
+    sceneId: number,
     text: unknown,
   ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
-    const scene = await this.ensureScene(projectId, sceneName);
+    const playbook = await this.ensurePlaybook(projectId, sceneName);
 
-    const sourceId = Math.trunc(Number(stepId));
+    const sourceId = Math.trunc(Number(sceneId));
     if (!Number.isFinite(sourceId) || sourceId <= 0) {
-      throw new BadRequestException('stepId must be a positive integer');
+      throw new BadRequestException('sceneId must be a positive integer');
     }
 
     const cleaned = normText(text);
     if (!cleaned) {
-      // Пустая строка = удаление заметки
       await this.prisma.actorNote.deleteMany({
-        where: { userId, projectId, sceneId: scene.id, stepSourceId: sourceId },
+        where: {
+          userId,
+          projectId,
+          playbookId: playbook.id,
+          sceneSourceId: sourceId,
+        },
       });
       return { note: null };
     }
 
     const note = await this.prisma.actorNote.upsert({
       where: {
-        userId_sceneId_stepSourceId: {
+        userId_playbookId_sceneSourceId: {
           userId,
-          sceneId: scene.id,
-          stepSourceId: sourceId,
+          playbookId: playbook.id,
+          sceneSourceId: sourceId,
         },
       },
       update: { text: cleaned },
       create: {
         userId,
         projectId,
-        sceneId: scene.id,
-        stepSourceId: sourceId,
+        playbookId: playbook.id,
+        sceneSourceId: sourceId,
         text: cleaned,
       },
       select: { id: true, text: true, createdAt: true, updatedAt: true },
@@ -152,23 +155,28 @@ export class ActorNotesService {
     return { note };
   }
 
-  async deleteStepNote(
+  async deleteSceneNote(
     userId: string,
     projectSlug: string,
     sceneName: string,
-    stepId: number,
+    sceneId: number,
   ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
-    const scene = await this.ensureScene(projectId, sceneName);
+    const playbook = await this.ensurePlaybook(projectId, sceneName);
 
-    const sourceId = Math.trunc(Number(stepId));
+    const sourceId = Math.trunc(Number(sceneId));
     if (!Number.isFinite(sourceId) || sourceId <= 0) {
-      throw new BadRequestException('stepId must be a positive integer');
+      throw new BadRequestException('sceneId must be a positive integer');
     }
 
     await this.prisma.actorNote.deleteMany({
-      where: { userId, projectId, sceneId: scene.id, stepSourceId: sourceId },
+      where: {
+        userId,
+        projectId,
+        playbookId: playbook.id,
+        sceneSourceId: sourceId,
+      },
     });
     return { ok: true };
   }
@@ -177,24 +185,24 @@ export class ActorNotesService {
     userId: string,
     projectSlug: string,
     sceneName: string,
-    stepId: number,
+    sceneId: number,
     field: ActorAnnotationField,
   ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
-    const scene = await this.ensureScene(projectId, sceneName);
+    const playbook = await this.ensurePlaybook(projectId, sceneName);
 
-    const sourceId = Math.trunc(Number(stepId));
+    const sourceId = Math.trunc(Number(sceneId));
     if (!Number.isFinite(sourceId) || sourceId <= 0) {
-      throw new BadRequestException('stepId must be a positive integer');
+      throw new BadRequestException('sceneId must be a positive integer');
     }
 
     const items = await this.prisma.actorAnnotation.findMany({
       where: {
         userId,
         projectId,
-        sceneId: scene.id,
-        stepSourceId: sourceId,
+        playbookId: playbook.id,
+        sceneSourceId: sourceId,
         field,
       },
       orderBy: [{ startOffset: 'asc' }, { createdAt: 'asc' }],
@@ -216,7 +224,7 @@ export class ActorNotesService {
     userId: string,
     projectSlug: string,
     sceneName: string,
-    stepId: number,
+    sceneId: number,
     field: ActorAnnotationField,
     startOffset: number,
     endOffset: number,
@@ -225,11 +233,11 @@ export class ActorNotesService {
   ) {
     const projectId = await this.resolveProjectId(userId, projectSlug);
     await this.assertUserHasProjectAccess(userId, projectId);
-    const scene = await this.ensureScene(projectId, sceneName);
+    const playbook = await this.ensurePlaybook(projectId, sceneName);
 
-    const sourceId = Math.trunc(Number(stepId));
+    const sourceId = Math.trunc(Number(sceneId));
     if (!Number.isFinite(sourceId) || sourceId <= 0) {
-      throw new BadRequestException('stepId must be a positive integer');
+      throw new BadRequestException('sceneId must be a positive integer');
     }
 
     const start = Math.trunc(Number(startOffset));
@@ -257,8 +265,8 @@ export class ActorNotesService {
       data: {
         userId,
         projectId,
-        sceneId: scene.id,
-        stepSourceId: sourceId,
+        playbookId: playbook.id,
+        sceneSourceId: sourceId,
         field,
         startOffset: start,
         endOffset: end,

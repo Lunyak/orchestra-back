@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import type * as THREE from "three";
 import type { TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../../shared/types/script";
 import type { ActiveAlignGuide } from "../../model/theater-align-guides";
-import type { StageGridCell } from "../../scene/use-stage-grid-highlight";
+import type { StageGridCell } from "../../playbook-stage/use-stage-grid-highlight";
 import { TheaterStage } from "../three/TheaterStage";
 import { DecorFloorPlacer } from "../three/DecorFloorPlacer";
 import { AudienceSeatsHandle } from "../three/AudienceSeatsHandle";

@@ -569,15 +569,15 @@ export const roleWorkbookSlice = createSlice({
       const raw = Array.isArray(action.payload.value) ? action.payload.value : [];
       state.draft.directorQuestions = raw
         .map((x) => {
-          const stepIdNum = x?.stepId == null ? undefined : Number(x.stepId);
-          const stepId =
-            stepIdNum != null && Number.isFinite(stepIdNum) && stepIdNum > 0
-              ? Math.floor(stepIdNum)
+          const sceneIdNum = x?.sceneId == null ? undefined : Number(x.sceneId);
+          const sceneId =
+            sceneIdNum != null && Number.isFinite(sceneIdNum) && sceneIdNum > 0
+              ? Math.floor(sceneIdNum)
               : undefined;
           return {
             text: String(x?.text ?? ""),
-            stepId,
-            stepTitle: typeof x?.stepTitle === "string" ? x.stepTitle : undefined,
+            sceneId,
+            sceneTitle: typeof x?.sceneTitle === "string" ? x.sceneTitle : undefined,
           };
         })
         .slice(0, 80);

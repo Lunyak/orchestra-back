@@ -4,7 +4,7 @@ import type {
   PlatformPickAudioResult,
   PlatformPickSoundIconResult,
   PlatformPickSoundResult,
-  PlatformSceneSaveResult,
+  PlatformPlaybookSaveResult,
   PlatformAddProjectImageResult,
   PlatformPickModelResult,
 } from "./platform-api";
@@ -22,22 +22,22 @@ function fn<T extends (...args: never[]) => unknown>(
   return f;
 }
 
-export function desktopReadProjectScene(
+export function desktopReadProjectPlaybook(
   api: PlatformApi,
   projectName: string,
   sceneName: string,
 ): Promise<unknown> {
-  return fn(api, (a) => a.readProjectScene, "readProjectScene")(projectName, sceneName);
+  return fn(api, (a) => a.readProjectPlaybook, "readProjectPlaybook")(projectName, sceneName);
 }
 
-export function desktopSaveProjectScene(
+export function desktopSaveProjectPlaybook(
   api: PlatformApi,
   projectName: string,
   sceneName: string,
   data: unknown,
   options?: unknown,
-): Promise<PlatformSceneSaveResult> {
-  return fn(api, (a) => a.saveProjectScene, "saveProjectScene")(
+): Promise<PlatformPlaybookSaveResult> {
+  return fn(api, (a) => a.saveProjectPlaybook, "saveProjectPlaybook")(
     projectName,
     sceneName,
     data,
@@ -75,11 +75,11 @@ export function desktopDeleteProjectAudio(
   return fn(api, (a) => a.deleteProjectAudio, "deleteProjectAudio")(projectName, file);
 }
 
-export async function desktopReadProjectSceneRequired(
+export async function desktopReadProjectPlaybookRequired(
   projectName: string,
   sceneName: string,
 ): Promise<unknown> {
-  return desktopReadProjectScene(requireDesktopApi(), projectName, sceneName);
+  return desktopReadProjectPlaybook(requireDesktopApi(), projectName, sceneName);
 }
 
 export function desktopPickProjectSoundIcon(
@@ -125,11 +125,11 @@ export function desktopAddProjectImage(
   );
 }
 
-export async function desktopSaveProjectSceneRequired(
+export async function desktopSaveProjectPlaybookRequired(
   projectName: string,
   sceneName: string,
   data: unknown,
   options?: unknown,
-): Promise<PlatformSceneSaveResult> {
-  return desktopSaveProjectScene(requireDesktopApi(), projectName, sceneName, data, options);
+): Promise<PlatformPlaybookSaveResult> {
+  return desktopSaveProjectPlaybook(requireDesktopApi(), projectName, sceneName, data, options);
 }

@@ -38,36 +38,36 @@ export function TheaterControlsSpotlightsMultiSection({ vm, spot }: SpotlightsSe
             >
               <div className="theater-btn-row theater-btn-row--3">
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={() => vm.aimSelectedSpotlightsAtStage()}
                 >
                   Цель
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={() => vm.assignSelectedSpotlightChannelsSequential()}
                 >
                   Каналы
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={vm.cloneSelectedSpotlights}
                 >
                   Клон
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={() => vm.setSelectedSpotlightsVisibility(true)}
                 >
                   Скрыть
                 </TheaterBtn>
                 <TheaterBtn
-                  disabled={!vm.currentStep}
+                  disabled={!vm.currentScene}
                   onClick={() => vm.setSelectedSpotlightsVisibility(false)}
                 >
                   Показать
                 </TheaterBtn>
-                <TheaterBtn disabled={!vm.currentStep} onClick={vm.removeSelectedSpotlights}>
+                <TheaterBtn disabled={!vm.currentScene} onClick={vm.removeSelectedSpotlights}>
                   Удалить
                 </TheaterBtn>
               </div>

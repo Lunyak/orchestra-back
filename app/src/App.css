@@ -4,7 +4,7 @@
  * - features/auth/ui/login.css — экран входа
  * - features/spectacle/ui/style.css — chrome страницы спектакля
  * - shared/components/playlist-sidebar/style.css — обёртка плейлиста
- * - shared/components/script-steps-sidebar/style.css — обёртка шагов
+ * - shared/components/script-scenes-sidebar/style.css — обёртка сцен
  *
  * Глобальные стили подключаются через index.css → shared/styles/index.css
  */
