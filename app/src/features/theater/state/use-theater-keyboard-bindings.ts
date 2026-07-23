@@ -1,5 +1,15 @@
 import { useEffect } from "react";
-import type { TheaterLayout } from "../../../shared/types/script";
+import type {
+  TheaterLayout,
+  TheaterModel,
+  TheaterSpotlight,
+} from "../../../shared/types/script";
+import {
+  focusCameraForLayout,
+  focusCameraForModel,
+  focusCameraForSpotlight,
+  requestTheaterCameraFocus,
+} from "../model/theater-camera-focus";
 import { patchTheaterViewPrefs } from "../model/theater-view-prefs-storage";
 import {
   isTheaterPageActive,
@@ -14,6 +24,8 @@ import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
 export type UseTheaterKeyboardBindingsArgs = {
   projectName: string;
   layout: TheaterLayout;
+  models: TheaterModel[];
+  spotlights: TheaterSpotlight[];
   activeTab: TheaterViewPrefs["activeTab"];
   editMode: TheaterEditMode;
   activeModelId: number | undefined;
@@ -49,6 +61,8 @@ export function useTheaterKeyboardBindings(args: UseTheaterKeyboardBindingsArgs)
   const {
     projectName,
     layout,
+    models,
+    spotlights,
     activeTab,
     editMode,
     activeModelId,
@@ -323,4 +337,35 @@ export function useTheaterKeyboardBindings(args: UseTheaterKeyboardBindingsArgs)
     window.addEventListener("keydown", handleClear, true);
     return () => window.removeEventListener("keydown", handleClear, true);
   }, [clearSceneSelection]);
+
+  useEffect(() => {
+    const handleFrameSelection = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!isTheaterPhysicalKey(event, "KeyF", "f")) return;
+      if (isTheaterEditableTarget(event.target)) return;
+      if (!isTheaterPageActive()) return;
+
+      if (activeModelId != null) {
+        const model = models.find((entry) => entry.id === activeModelId);
+        if (!model) return;
+        event.preventDefault();
+        requestTheaterCameraFocus(focusCameraForModel(model, layout));
+        return;
+      }
+
+      if (activeSpotlightId != null) {
+        const spotlight = spotlights.find((entry) => entry.id === activeSpotlightId);
+        if (!spotlight) return;
+        event.preventDefault();
+        requestTheaterCameraFocus(focusCameraForSpotlight(spotlight, layout));
+        return;
+      }
+
+      event.preventDefault();
+      requestTheaterCameraFocus(focusCameraForLayout(layout));
+    };
+
+    window.addEventListener("keydown", handleFrameSelection, true);
+    return () => window.removeEventListener("keydown", handleFrameSelection, true);
+  }, [activeModelId, activeSpotlightId, layout, models, spotlights]);
 }

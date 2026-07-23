@@ -42,6 +42,7 @@ import type {
   PremiseSlotItem,
   PremiseSlotStatus,
 } from "../../sync/api/premises";
+import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "../../features/director-sessions/ui/director-sessions.css";
 import "./style.css";
@@ -180,9 +181,15 @@ export function PremiseDetailPage() {
 
   if (!accessToken) {
     return (
-      <div className="rehearsals-page sessions-page">
-        <div className="premises-view">
-          <div className="rehearsals-muted">Нужно войти.</div>
+      <div className="app-layout premises-layout">
+        <div className="app-content">
+          <main className="main-content main-content-premises">
+            <div className="premises-view">
+              <AdminSectionChrome activeSection="premises">
+                <div className="rehearsals-muted">Нужно войти.</div>
+              </AdminSectionChrome>
+            </div>
+          </main>
         </div>
       </div>
     );
@@ -193,10 +200,10 @@ export function PremiseDetailPage() {
       <div className="app-layout premises-layout">
         <div className="app-content">
           <main className="main-content main-content-premises">
-            <div className="rehearsals-page sessions-page">
-              <div className="premises-view">
+            <div className="premises-view">
+              <AdminSectionChrome activeSection="premises">
                 <div className="rehearsals-muted">Загрузка…</div>
-              </div>
+              </AdminSectionChrome>
             </div>
           </main>
         </div>
@@ -209,15 +216,15 @@ export function PremiseDetailPage() {
       <div className="app-layout premises-layout">
         <div className="app-content">
           <main className="main-content main-content-premises">
-            <div className="rehearsals-page sessions-page">
-              <div className="premises-view">
+            <div className="premises-view">
+              <AdminSectionChrome activeSection="premises">
                 <div className="rehearsals-error">
                   Помещение не найдено или нет доступа
                 </div>
-                <Link to="/troupe" state={{ tab: "premises" }} className="director-session-page__back">
+                <Link to="/premises" className="director-session-page__back">
                   ← Все помещения
                 </Link>
-              </div>
+              </AdminSectionChrome>
             </div>
           </main>
         </div>
@@ -315,8 +322,9 @@ export function PremiseDetailPage() {
     <div className="app-layout premises-layout">
       <div className="app-content">
         <main className="main-content main-content-premises">
-          <div className="rehearsals-page sessions-page">
-            <div className="premises-view">
+          <div className="premises-view">
+            <AdminSectionChrome activeSection="premises">
+            <div className="rehearsals-page sessions-page">
             <div className="rehearsals-head premises-page__header">
               <div className="premises-page__header-main">
                 <div className="premises-page__title-row">
@@ -339,7 +347,7 @@ export function PremiseDetailPage() {
                 )}
               </div>
               <div className="premises-page__header-actions">
-                <Link to="/troupe" state={{ tab: "premises" }} className="director-session-page__back">
+                <Link to="/premises" className="director-session-page__back">
                   ← Все помещения
                 </Link>
               </div>
@@ -606,6 +614,7 @@ export function PremiseDetailPage() {
               </div>
             </div>
             </div>
+            </AdminSectionChrome>
           </div>
         </main>
       </div>

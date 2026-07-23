@@ -23,6 +23,8 @@ import { SiteAnalyticsModule } from './site-analytics/site-analytics.module';
 import { ChatModule } from './chat/chat.module';
 import { PremisesModule } from './premises/premises.module';
 import { ProjectTasksModule } from './project-tasks/project-tasks.module';
+import { AccountingModule } from './accounting/accounting.module';
+import { StudioModule } from './studio/studio.module';
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { ProjectTasksModule } from './project-tasks/project-tasks.module';
     ChatModule,
     PremisesModule,
     ProjectTasksModule,
+    AccountingModule,
+    StudioModule,
   ],
   controllers: [AppController],
   providers: [AppService],

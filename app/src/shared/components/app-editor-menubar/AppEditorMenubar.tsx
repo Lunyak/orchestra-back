@@ -3,9 +3,8 @@ import { useProject } from "../../../features/project";
 import { AppEditorChatToggle } from "./AppEditorChatToggle";
 import { AppEditorPlaylistEditToggle } from "./AppEditorPlaylistEditToggle";
 import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
-import { AppEditorNavigationMenu } from "./AppEditorNavigationMenu";
+import { AppEditorHomeLink } from "./AppEditorHomeLink";
 import { AppEditorMenubarProjectSelect } from "./AppEditorMenubarProjectSelect";
-import { AppEditorProjectMenu } from "./AppEditorProjectMenu";
 import { useAppEditorMenubarCenter, useAppEditorMenubarToolbarActions, useAppEditorMenubarViewMenu } from "./AppEditorMenubarContext";
 import "./style.css";
 
@@ -25,7 +24,7 @@ export function AppEditorMenubar() {
       menu?.classList.toggle("app-editor-menubar__menu--mobile-expanded");
       return;
     }
-    if (target?.closest("button")) {
+    if (target?.closest("button") || target?.closest("a")) {
       setMobileMenuOpen(false);
     }
   };
@@ -58,8 +57,7 @@ export function AppEditorMenubar() {
             className="theater-editor-menubar__menus"
             onClick={handleMenusClick}
           >
-            <AppEditorNavigationMenu />
-            <AppEditorProjectMenu />
+            <AppEditorHomeLink />
             {viewMenu}
           </div>
         </div>

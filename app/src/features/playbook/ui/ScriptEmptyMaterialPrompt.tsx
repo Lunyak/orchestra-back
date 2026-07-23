@@ -86,7 +86,7 @@ export function ScriptEmptyMaterialPrompt({ onImport }: ScriptEmptyMaterialPromp
           <input
             ref={fileInputRef}
             type="file"
-            className="script-empty-material__file-input"
+            className="native-file-input--hidden"
             accept=".txt,.docx,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             onChange={(event) => void handleFile(event.target.files?.[0])}
           />

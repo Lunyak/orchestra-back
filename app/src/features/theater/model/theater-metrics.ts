@@ -137,6 +137,12 @@ export function normalizeTheaterLayout(
   const hallWidth = roundM(clamp(layout.hallWidth, 4, 80));
   const hallDepth = roundM(clamp(layout.hallDepth, 4, 80));
   const wallHeight = roundM(clamp(layout.wallHeight, 2.5, 20));
+  const hallOffsetX = roundM(
+    Number.isFinite(layout.hallOffsetX) ? (layout.hallOffsetX as number) : 0,
+  );
+  const hallOffsetZ = roundM(
+    Number.isFinite(layout.hallOffsetZ) ? (layout.hallOffsetZ as number) : 0,
+  );
   const halfW = hallWidth / 2;
   const halfD = hallDepth / 2;
 
@@ -269,6 +275,8 @@ export function normalizeTheaterLayout(
     hallWidth,
     hallDepth,
     wallHeight,
+    hallOffsetX,
+    hallOffsetZ,
     audienceStartZ,
     stageFrontZ,
     seatRows,

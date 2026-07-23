@@ -396,7 +396,7 @@ const EventPage: FC = () => {
 
         <header className="event-page__header">
           <div className="event-page__hero">
-            <GlitchHero as="h1" text={title} />
+            <GlitchHero as="h1" text={title} className="home-page__glitch-hero--page" />
           </div>
           {subtitle && <p className="event-page__subtitle">{subtitle}</p>}
 

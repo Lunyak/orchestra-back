@@ -81,7 +81,7 @@ function readNotesRunLocalBackup(projectSlug: string): NotesRunDataV1 | null {
   }
 }
 
-/** Загрузка суфлёра — только локально, sync не участвует. */
+/** Загрузка прогона — только локально, sync не участвует. */
 export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1> {
   if (!projectSlug) return { v: 1, cards: [] };
 
@@ -142,7 +142,7 @@ export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1>
   return readNotesRunLocalBackup(projectSlug) ?? { v: 1, cards: [] };
 }
 
-/** Сохранение суфлёра — отдельный файл + localStorage, без script.json и сервера. */
+/** Сохранение прогона — отдельный файл + localStorage, без script.json и сервера. */
 export async function saveNotesRun(projectSlug: string, data: NotesRunDataV1): Promise<void> {
   const normalized = normalizeNotesRunData(data);
   saveNotesRunLocalBackup(projectSlug, normalized);
@@ -152,7 +152,7 @@ export async function saveNotesRun(projectSlug: string, data: NotesRunDataV1): P
 
   const result = await api.saveNotesRun(projectSlug, normalized);
   if (!result?.ok) {
-    throw new Error(result?.error ?? "Не удалось сохранить суфлёр");
+    throw new Error(result?.error ?? "Не удалось сохранить прогон");
   }
 }
 

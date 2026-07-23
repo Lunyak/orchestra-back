@@ -1,6 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useAppEditorViewMenuRender } from "@shared/components/app-editor-menubar";
+import cn from "classnames";
+import {
+  useAppEditorMenubarActionsRender,
+  useAppEditorViewMenuRender,
+} from "@shared/components/app-editor-menubar";
 import { usePlaybook } from "../../playbook";
 import {
   patchSceneFaderFromSpotlightIntensity,
@@ -26,15 +30,23 @@ import {
   DEFAULT_THEATER_CAMERA,
   readTheaterCamera,
 } from "../model/theater-camera-storage";
-import { countMatchingBuiltin } from "../model/theater-model-align";
 import { splitModelsForFurnitureInstancing } from "../model/theater-furniture-instancing";
 import type { ModelPlacementPreset } from "../model/theater-model-placement";
 import {
   focusCameraForModel,
   requestTheaterCameraFocus,
 } from "../model/theater-camera-focus";
+import {
+  shiftTheaterModels,
+  shiftTheaterSpotlights,
+  type HallExpandResult,
+} from "../model/theater-hall-expand";
+import { buildTheaterModelSizePatch, type TheaterModelWorldSize } from "../model/theater-model-world-size";
+import { writeSceneTheaterModels } from "../model/theater-scene-models";
+import type { TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import { TheaterControls } from "./TheaterControls";
 import { TheaterEditorViewMenu } from "./menubar/TheaterEditorViewMenu";
+import { TheaterEditorLightConsoleMenu } from "./menubar/TheaterEditorLightConsoleMenu";
 import { TheaterBtn } from "./theater-controls-ui";
 import { TheaterFloorPlan } from "./TheaterFloorPlan";
 import { TheaterModelFocusPanel } from "./TheaterModelFocusPanel";
@@ -42,6 +54,7 @@ import { TheaterSpotlightFocusPanel } from "./TheaterSpotlightFocusPanel";
 import { TheaterLightConsolePanel } from "./TheaterLightConsolePanel";
 import { TheaterCanvasShell } from "./canvas/TheaterCanvasShell";
 import { TheaterCanvasContent } from "./canvas/TheaterCanvasContent";
+import { TheaterControlsLayoutTab } from "./controls/TheaterControlsLayoutTab";
 import "./style.css";
 import "./theater-editor-sidebar.css";
 
@@ -87,12 +100,44 @@ export const TheaterScene = ({
   useAppEditorViewMenuRender(
     "theater-view-menu",
     10,
-    () => (embeddedLightRehearsal ? null : <TheaterEditorViewMenu vm={vm} />),
+    () =>
+      embeddedLightRehearsal ? null : (
+        <>
+          <TheaterEditorViewMenu vm={vm} />
+          <TheaterEditorLightConsoleMenu vm={vm} />
+        </>
+      ),
   );
 
-  const toolbarRender = showEditorChrome ? (
-    <TheaterControls vm={vm} controlsInPanel panel="toolbar" />
-  ) : null;
+  const sceneSettingsActive = !isPanelsSwapped;
+  const panelsToggleLabel = isPanelsSwapped ? "Музыка и сцены" : "Настройки сцены";
+  const panelsToggleTitle = isPanelsSwapped
+    ? "Плейлист слева и сцены справа, сцена на весь экран"
+    : "Слева — вкладки (включая «Обзор»), справа — содержимое";
+
+  useAppEditorMenubarActionsRender(
+    "theater-panels-toggle",
+    15,
+    () =>
+      onTogglePanels && !embeddedLightRehearsal ? (
+        <button
+          type="button"
+          className={cn(
+            "app-editor-menubar__panel-btn",
+            "theater-panels-menubar-btn",
+            sceneSettingsActive
+              ? "app-editor-menubar__panel-btn--active"
+              : "app-editor-menubar__panel-btn--muted",
+          )}
+          onClick={onTogglePanels}
+          title={panelsToggleTitle}
+          aria-label={panelsToggleLabel}
+          aria-pressed={sceneSettingsActive}
+        >
+          {panelsToggleLabel}
+        </button>
+      ) : null,
+  );
 
   const sidebarRender =
     controlsInSidebar && outlinerHost
@@ -153,35 +198,88 @@ export const TheaterScene = ({
     ((vm.activeTab === "models" && vm.editMode === "models") ||
       (vm.activeTab === "decor" && vm.editMode === "decor"));
 
-  const modelFocusMatchingCount = vm.activeModel
-    ? countMatchingBuiltin(vm.models, vm.activeModel.id)
-    : 0;
+  const hallExpandStartRef = useRef<{
+    models: TheaterModel[];
+    spotlights: TheaterSpotlight[];
+  } | null>(null);
+
+  const applyHallExpandResult = useCallback(
+    (result: HallExpandResult, mode: "preview" | "commit") => {
+      if (Object.keys(result.patch).length === 0) return;
+      if (mode === "preview") vm.previewLayout(result.patch);
+      else vm.updateLayout(result.patch);
+
+      if (!vm.hallResizeKeepObjects) return;
+      const start = hallExpandStartRef.current;
+      const [sx, sy, sz] = result.objectShift;
+      if (!start || (sx === 0 && sy === 0 && sz === 0)) return;
+      vm.updateCurrentScene({
+        ...writeSceneTheaterModels(shiftTheaterModels(start.models, result.objectShift)),
+        theaterSpotlights: shiftTheaterSpotlights(start.spotlights, result.objectShift),
+      });
+    },
+    [vm],
+  );
+
+  const handleHallExpandDragStart = useCallback(() => {
+    hallExpandStartRef.current = {
+      models: vm.models,
+      spotlights: vm.displaySpotlights,
+    };
+    vm.beginTheaterHistoryTransaction();
+  }, [vm]);
+
+  const handleHallExpandDragEnd = useCallback(() => {
+    hallExpandStartRef.current = null;
+    vm.endTheaterHistoryTransaction();
+  }, [vm]);
 
   const selectSpotlight = useCallback(
     (id: number, additive = false) => {
+      vm.setLayoutOutlineFocused(false);
+      vm.setAudienceSeatsFocused(false);
+      vm.setStageGridFocused(false);
       vm.selectTheaterSpotlight(id, additive);
       vm.setEditMode("spotlights");
     },
-    [vm.selectTheaterSpotlight, vm.setEditMode],
+    [
+      vm.selectTheaterSpotlight,
+      vm.setAudienceSeatsFocused,
+      vm.setEditMode,
+      vm.setLayoutOutlineFocused,
+      vm.setStageGridFocused,
+    ],
   );
 
   const selectModel = useCallback(
     (id: number, additive = false) => {
-      if (vm.activeTab === "decor") {
-        vm.exitDecorPlaceMode();
-        vm.setEditMode("decor");
-      } else {
-        vm.setActiveTab("models");
+      vm.setLayoutOutlineFocused(false);
+      vm.setAudienceSeatsFocused(false);
+      vm.setStageGridFocused(false);
+      const selectingLightTruss =
+        vm.activeTab === "spotlights" &&
+        vm.models.some(
+          (model) => model.id === id && model.builtin === "lightTruss6m",
+        );
+      if (selectingLightTruss) {
         vm.setEditMode("models");
+      } else {
+        vm.exitDecorPlaceMode();
+        vm.setActiveTab("decor");
+        vm.setEditMode("decor");
       }
       vm.selectTheaterModel(id, additive);
     },
     [
       vm.activeTab,
       vm.exitDecorPlaceMode,
+      vm.models,
       vm.selectTheaterModel,
       vm.setActiveTab,
+      vm.setAudienceSeatsFocused,
       vm.setEditMode,
+      vm.setLayoutOutlineFocused,
+      vm.setStageGridFocused,
     ],
   );
 
@@ -278,6 +376,16 @@ export const TheaterScene = ({
         gridCol: highlightGridCell?.col ?? activeSpotlight.gridCol,
         gridRow: highlightGridCell?.row ?? activeSpotlight.gridRow,
         onClearGridBinding: () => vm.clearSpotlightGridBinding(activeSpotlight.id),
+        trusses: vm.models.filter((model) => model.builtin === "lightTruss6m"),
+        spotlights: vm.spotlights,
+        onAttachToTruss: (mountModelId: number, mountPointId: string) =>
+          vm.attachSpotlightToTrussMount(
+            activeSpotlight.id,
+            mountModelId,
+            mountPointId,
+          ),
+        onDetachFromTruss: () =>
+          vm.detachSpotlightFromTruss(activeSpotlight.id),
       }
     : null;
 
@@ -287,8 +395,16 @@ export const TheaterScene = ({
     const modelId = activeModel.id;
     return {
       modelName: activeModel.name,
+      size: vm.activeModelWorldSize,
+      onSizeCommit: (next: Partial<TheaterModelWorldSize>) => {
+        const current = vm.activeModelWorldSize;
+        if (!current) return;
+        const patch = buildTheaterModelSizePatch(activeModel, current, next);
+        if (!patch) return;
+        vm.updateModel(modelId, patch);
+        vm.setPendingSnapModelId(modelId);
+      },
       transformMode: vm.modelTransformMode,
-      matchingBuiltinCount: modelFocusMatchingCount,
       showDecorActions: isDecorTab,
       hidden: activeModel.hidden === true,
       onToggleHidden: () =>
@@ -301,15 +417,20 @@ export const TheaterScene = ({
         vm.setModelTransformMode(mode);
       },
       onRotateQuarter: (direction: "cw" | "ccw") => vm.rotateActiveModel(direction),
+      placementGrid: isDecorTab ? vm.stageGrid : undefined,
       onPlace: isDecorTab
         ? (preset: ModelPlacementPreset) => vm.placeActiveModel(preset)
         : undefined,
-      onAlign: isDecorTab ? (axis: "x" | "z") => vm.alignModelsByActive(axis) : undefined,
-      onDistribute: isDecorTab
-        ? (axis: "x" | "z") => vm.distributeModelsByActive(axis)
-        : undefined,
+      onResetTransform: () => {
+        const resetY = activeModel.builtin === "lightTruss6m" ? 6 : 0;
+        vm.updateModel(modelId, {
+          position: [0, resetY, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1],
+        });
+        vm.setPendingSnapModelId(modelId);
+      },
       onClone: () => vm.cloneModel(modelId),
-      onMirror: isDecorTab ? (axis: "x" | "z") => vm.mirrorModel(modelId, axis) : undefined,
       onDelete: () => vm.removeModel(modelId),
     };
   })();
@@ -328,31 +449,8 @@ export const TheaterScene = ({
         .join(" ")}
     >
       {sidebarRender}
-      <div
-        className={[
-          "theater-scene-main",
-          showEditorChrome ? "theater-scene-main--with-rail" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-      >
-        {toolbarRender}
+      <div className="theater-scene-main">
         <div className="theater-scene-body">
-      {onTogglePanels && !embedLight && (
-        <div className="theater-panels-toggle">
-          <TheaterBtn
-            active={!isPanelsSwapped}
-            onClick={onTogglePanels}
-            title={
-              isPanelsSwapped
-                ? "Плейлист слева и сцены справа, сцена на весь экран"
-                : "Слева — вкладки (включая «Обзор»), справа — содержимое"
-            }
-          >
-            {isPanelsSwapped ? "Музыка и сцены" : "Настройки сцены"}
-          </TheaterBtn>
-        </div>
-      )}
       {mobileTheaterLayout && controlsInSidebar && !vm.showControls ? (
         <div className="theater-mobile-open-panel">
           <TheaterBtn active={false} onClick={() => vm.setShowControls(true)}>
@@ -373,8 +471,8 @@ export const TheaterScene = ({
           spotlights={vm.visibleSpotlights}
           showSeats={vm.showSeats}
           showSpotlights={vm.showSpotlights}
-          expanded={vm.floorPlanExpanded}
-          onToggleExpanded={() => vm.setFloorPlanExpanded((value) => !value)}
+          maxSide={vm.floorPlanMaxSide}
+          onChangeMaxSide={(value) => vm.setFloorPlanMaxSide(value)}
           activeTab={vm.activeTab}
           editMode={vm.editMode}
           decorPlaceMode={vm.decorPlaceMode}
@@ -488,6 +586,7 @@ export const TheaterScene = ({
           highlightGridCell={highlightGridCell}
           spotlightAimMode={vm.spotlightAimMode}
           onPickGridCell={(col, row) => vm.aimActiveSpotlightToGridCell(col, row)}
+          spotlights={vm.spotlights}
           visibleSpotlights={vm.visibleSpotlights}
           activeSpotlightId={vm.activeSpotlightId}
           multiSelectedSpotlightIds={vm.multiSelectedSpotlightIds}
@@ -512,18 +611,84 @@ export const TheaterScene = ({
             selectModel(id);
             vm.setModelTransformMode("translate");
             const model = vm.models.find((item) => item.id === id);
-            if (model) requestTheaterCameraFocus(focusCameraForModel(model));
+            if (model) requestTheaterCameraFocus(focusCameraForModel(model, vm.layout));
           }}
           activeModelObject={vm.activeModelObject}
           activeModelObjectId={vm.activeModelObjectId ?? undefined}
           modelTransformMode={vm.modelTransformMode}
           onModelTransformStart={vm.handleModelTransformStart}
+          onTrussMountPointClick={(
+            modelId,
+            mountPointId,
+            occupiedSpotlightId,
+          ) => {
+            if (occupiedSpotlightId != null) {
+              selectSpotlight(occupiedSpotlightId);
+              return;
+            }
+            vm.installSpotlightOnTrussMount(
+              modelId,
+              mountPointId,
+              vm.trussMountFixtureType,
+            );
+          }}
           onModelTransformEnd={vm.handleModelTransformEnd}
           onModelTransformChange={vm.handleModelTransformChange}
+          activeModel={vm.activeModel}
+          onModelFloorMovePreview={(position) => {
+            const active = vm.activeModel;
+            if (!active) return;
+            const dx = position[0] - active.position[0];
+            const dz = position[2] - active.position[2];
+            const selectedIds =
+              vm.multiSelectedModelIds.length > 1
+                ? vm.multiSelectedModelIds
+                : [active.id];
+            for (const id of selectedIds) {
+              const model = vm.models.find((item) => item.id === id);
+              if (!model) continue;
+              const nextPosition: [number, number, number] =
+                id === active.id
+                  ? position
+                  : [
+                      model.position[0] + dx,
+                      model.position[1],
+                      model.position[2] + dz,
+                    ];
+              vm.previewModel(id, { position: nextPosition });
+            }
+          }}
+          onModelFloorMoveCommit={(position) => {
+            const active = vm.activeModel;
+            if (!active) return;
+            const selectedIds =
+              vm.multiSelectedModelIds.length > 1
+                ? vm.multiSelectedModelIds
+                : [active.id];
+            if (selectedIds.length <= 1) {
+              vm.updateModel(active.id, { position });
+              vm.setPendingSnapModelId(active.id);
+              return;
+            }
+            const selected = new Set(selectedIds);
+            vm.updateModels(
+              vm.models.map((model) => {
+                if (!selected.has(model.id)) return model;
+                if (model.id === active.id) return { ...model, position };
+                return model;
+              }),
+            );
+            vm.setPendingSnapModelId(active.id);
+          }}
+          onModelFloorMoveDragStart={vm.beginTheaterHistoryTransaction}
+          onModelFloorMoveDragEnd={vm.endTheaterHistoryTransaction}
           onActiveObjectChange={vm.handleActiveObjectChange}
           onObjectReady={vm.handleObjectReady}
           onDecorPlace={vm.addDecorAt}
+          onBuiltinTemplateDrop={vm.addBuiltinModelAt}
           audienceSeatsHighlight={vm.audienceSeatsHighlight}
+          audienceSeatsFocused={vm.audienceSeatsFocused}
+          onSelectAudienceSeats={vm.focusAudienceSeats}
           onAudienceStartZPreview={(audienceStartZ) =>
             vm.previewLayout({ audienceStartZ })
           }
@@ -532,6 +697,22 @@ export const TheaterScene = ({
           }
           onAudienceDragStart={vm.beginTheaterHistoryTransaction}
           onAudienceDragEnd={vm.endTheaterHistoryTransaction}
+          layoutOutlineFocused={vm.layoutOutlineFocused}
+          onSelectLayout={vm.focusLayoutHall}
+          onLayoutSizePreview={(result: HallExpandResult) =>
+            applyHallExpandResult(result, "preview")
+          }
+          onLayoutSizeCommit={(result: HallExpandResult) =>
+            applyHallExpandResult(result, "commit")
+          }
+          onLayoutSizeDragStart={handleHallExpandDragStart}
+          onLayoutSizeDragEnd={handleHallExpandDragEnd}
+          stageGridFocused={vm.stageGridFocused}
+          onSelectStageGrid={vm.focusStageGrid}
+          onStageGridPreview={(patch) => vm.previewLayout(patch)}
+          onStageGridCommit={(patch) => vm.updateLayout(patch)}
+          onStageGridDragStart={vm.beginTheaterHistoryTransaction}
+          onStageGridDragEnd={vm.endTheaterHistoryTransaction}
         />
       </TheaterCanvasShell>
         </div>
@@ -617,7 +798,7 @@ function buildTheaterMobileSnapshot(vm: TheaterSceneViewModel) {
       showStageGrid: vm.showStageGrid,
       showSeats: vm.showSeats,
       showFloorPlan: vm.showFloorPlan,
-      floorPlanExpanded: vm.floorPlanExpanded,
+      floorPlanMaxSide: vm.floorPlanMaxSide,
       wallsHidden: vm.wallsHidden,
       wallsOpaque: vm.wallsOpaque,
       spectaclePreviewMode: vm.spectaclePreviewMode,
@@ -696,7 +877,15 @@ function TheaterMobileActionBar({
         <strong>{saveMessage}</strong>
       </div>
       {sheet ? (
-        <section className="theater-mobile-sheet" aria-label="Быстрые действия">
+        <section
+          className={cn(
+            "theater-mobile-sheet",
+            sheet === "scene" &&
+              vm.activeTab === "layout" &&
+              "theater-mobile-sheet--layout",
+          )}
+          aria-label="Быстрые действия"
+        >
           <header className="theater-mobile-sheet__header">
             <strong>
               {sheet === "view"
@@ -789,33 +978,40 @@ function TheaterMobileActionBar({
             </div>
           ) : null}
           {sheet === "scene" ? (
-            <div className="theater-mobile-sheet__grid">
-              <MobileActionButton
-                active={vm.activeTab === "layout"}
-                onClick={() => vm.setActiveTab("layout")}
-              >
-                План зала
-              </MobileActionButton>
-              <MobileActionButton
-                active={vm.lightConsoleExpanded}
-                onClick={() => vm.setLightConsoleExpanded((open) => !open)}
-              >
-                Пульт света
-              </MobileActionButton>
-              <MobileActionButton
-                active={vm.snapToGrid}
-                onClick={() => vm.setSnapToGrid(!vm.snapToGrid)}
-              >
-                Привязка
-              </MobileActionButton>
-              <MobileActionButton
-                active={!isPanelsSwapped}
-                onClick={() => onTogglePanels?.()}
-                disabled={!onTogglePanels}
-              >
-                Настройки
-              </MobileActionButton>
-            </div>
+            <>
+              <div className="theater-mobile-sheet__grid">
+                <MobileActionButton
+                  active={vm.activeTab === "layout"}
+                  onClick={() => vm.setActiveTab("layout")}
+                >
+                  План зала
+                </MobileActionButton>
+                <MobileActionButton
+                  active={vm.lightConsoleExpanded}
+                  onClick={() => vm.setLightConsoleExpanded((open) => !open)}
+                >
+                  Пульт света
+                </MobileActionButton>
+                <MobileActionButton
+                  active={vm.snapToGrid}
+                  onClick={() => vm.setSnapToGrid(!vm.snapToGrid)}
+                >
+                  Привязка
+                </MobileActionButton>
+                <MobileActionButton
+                  active={!isPanelsSwapped}
+                  onClick={() => onTogglePanels?.()}
+                  disabled={!onTogglePanels}
+                >
+                  Настройки
+                </MobileActionButton>
+              </div>
+              {vm.activeTab === "layout" ? (
+                <div className="theater-mobile-layout-settings">
+                  <TheaterControlsLayoutTab vm={vm} />
+                </div>
+              ) : null}
+            </>
           ) : null}
           {sheet === "save" ? (
             <div className="theater-mobile-sheet__stack">

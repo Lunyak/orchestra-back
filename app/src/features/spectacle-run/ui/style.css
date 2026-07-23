@@ -61,8 +61,8 @@
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px 16px;
   align-items: stretch;
   padding: 28px 16px 16px;
   border-top: 1px solid var(--stage-brutal-border, var(--color-border-default));
@@ -70,10 +70,34 @@
   overflow: visible;
 }
 
+.spectacle-run__prog-run-nav-transport {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.spectacle-run__prog-run-nav-transport .spectacle-run__prog-run-start-btn,
+.spectacle-run__prog-run-nav-transport .spectacle-run__prog-run-pause-btn {
+  min-height: 64px;
+  min-width: 108px;
+  padding: 0 18px;
+  font-size: 15px;
+}
+
+.spectacle-run__prog-run-nav-scene {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
 .spectacle-run__prog-run-nav-btn {
   min-height: 64px;
   padding: 0 20px;
-  max-width: 200px;
+  max-width: 220px;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   background: rgba(0, 0, 0, 0.35);
   color: var(--color-text-ui);
@@ -82,7 +106,6 @@
   line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
-  width: 100%;
 }
 
 .spectacle-run__prog-run-nav-btn--forward {
@@ -116,7 +139,7 @@
 }
 
 .spectacle-run__prog-run-nav-meta {
-  min-width: 160px;
+  min-width: 0;
   max-width: 280px;
 }
 
@@ -131,16 +154,11 @@
 }
 
 .spectacle-run__prog-run-nav-counter {
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1;
-  font-size: 11px;
+  display: block;
+  font-size: 13px;
   font-weight: 800;
   color: var(--color-text-muted);
   white-space: nowrap;
-  pointer-events: none;
 }
 
 .spectacle-run__toolbar-actions {
@@ -1071,6 +1089,14 @@
     min-height: 48px;
     padding: 0 14px;
     font-size: 14px;
+  }
+
+  .spectacle-run__prog-run-nav-transport .spectacle-run__prog-run-start-btn,
+  .spectacle-run__prog-run-nav-transport .spectacle-run__prog-run-pause-btn {
+    min-height: 48px;
+    min-width: 96px;
+    padding: 0 14px;
+    font-size: 13px;
   }
 }
 

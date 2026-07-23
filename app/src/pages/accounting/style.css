@@ -1,0 +1,270 @@
+.accounting-layout .main-content {
+  padding: 10px 12px 24px;
+}
+
+.accounting-page__hint {
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #888);
+}
+
+.accounting-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.troupe-accounting-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.troupe-accounting-bar__text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--troupe-text);
+  line-height: 1.45;
+}
+
+.accounting-page {
+  max-width: var(--width-content-page);
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.accounting-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.accounting-page__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.accounting-page__subtitle {
+  margin: 6px 0 0;
+  color: var(--color-text-muted, #888);
+  font-size: 0.9rem;
+}
+
+.accounting-page__back {
+  color: var(--color-text-muted, #888);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.accounting-page__back:hover {
+  color: var(--color-active-ascent);
+}
+
+.accounting-page__error {
+  margin: 0 0 16px;
+  color: var(--color-danger, #c44);
+}
+
+.accounting-progress {
+  height: 6px;
+  background: var(--color-border, #333);
+  margin-top: 8px;
+}
+
+.accounting-progress__fill {
+  height: 100%;
+  width: var(--accounting-progress, 0%);
+  background: var(--color-active-ascent);
+}
+
+.accounting-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.accounting-list-item {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border, #333);
+  text-decoration: none;
+  color: inherit;
+}
+
+.accounting-list-item:hover {
+  border-color: var(--color-active-ascent);
+}
+
+.accounting-list-item__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accounting-list-item__title {
+  font-weight: 600;
+}
+
+.accounting-list-item__meta {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #888);
+}
+
+.accounting-list-item__amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.accounting-status {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.accounting-status--active {
+  color: var(--color-active-ascent);
+}
+
+.accounting-status--closed {
+  color: var(--color-text-muted, #888);
+}
+
+.accounting-form-section {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border, #333);
+}
+
+.accounting-form-section__title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.accounting-form-row {
+  margin-bottom: 12px;
+}
+
+.accounting-tariff-list,
+.accounting-participant-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.accounting-tariff-item,
+.accounting-participant-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.accounting-participant-item__label {
+  flex: 1;
+  min-width: 140px;
+}
+
+.accounting-table-wrap {
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.accounting-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.accounting-table th,
+.accounting-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border, #333);
+  text-align: left;
+}
+
+.accounting-table th {
+  font-weight: 600;
+  color: var(--color-text-muted, #888);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.accounting-table__paid {
+  color: var(--color-active-ascent);
+}
+
+.accounting-table__debt {
+  color: var(--color-danger, #c44);
+}
+
+.accounting-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+  margin: 16px 0 24px;
+}
+
+.accounting-detail-summary__value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.accounting-detail-summary__label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #888);
+  margin-top: 2px;
+}
+
+.accounting-contributions {
+  margin-top: 32px;
+}
+
+.accounting-contributions__title {
+  margin: 0 0 12px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.accounting-contribution-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border, #333);
+  font-size: 0.9rem;
+}
+
+.accounting-my-status {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border, #333);
+}
+
+.accounting-my-status--paid {
+  border-color: var(--color-active-ascent);
+}
+
+.accounting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}

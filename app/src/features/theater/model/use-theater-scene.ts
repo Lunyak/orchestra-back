@@ -38,6 +38,7 @@ import { buildTheaterViewModelSlices } from "../state/build-theater-view-model-s
 import { DEFAULT_THEATER_LAYOUT } from "./theater-defaults";
 import { formatLightCuesMarkdown } from "./theater-light-cues";
 import type { ActiveAlignGuide } from "./theater-align-guides";
+import { syncMountedSpotlights } from "./theater-truss-mounts";
 
 export type UseTheaterSceneArgs = {
   projectName: string;
@@ -87,8 +88,8 @@ export function useTheaterScene({
     setWallsHideFromCamera,
     showFloorPlan,
     setShowFloorPlan,
-    floorPlanExpanded,
-    setFloorPlanExpanded,
+    floorPlanMaxSide,
+    setFloorPlanMaxSide,
     spectaclePreviewMode,
     setSpectaclePreviewMode,
     alignGuidesEnabled,
@@ -138,6 +139,10 @@ export function useTheaterScene({
     setActiveRecessId,
     layoutOutlineFocused,
     setLayoutOutlineFocused,
+    audienceSeatsFocused,
+    setAudienceSeatsFocused,
+    stageGridFocused,
+    setStageGridFocused,
     activeOutlineVertexIndex,
     setActiveOutlineVertexIndex,
     updateLayout,
@@ -310,7 +315,6 @@ export function useTheaterScene({
     setIsDragging,
     setDecorActionMessage,
     displaySpotlights,
-    updateSpotlights,
   });
 
   const decorApi = useTheaterDecor({
@@ -338,6 +342,8 @@ export function useTheaterScene({
     models,
     visibleModels,
     activeModel,
+    activeModelWorldSize,
+    activeModelSizeLabel,
     activeModelObject,
     activeModelObjectId,
     modelTransformMode,
@@ -354,7 +360,7 @@ export function useTheaterScene({
     copyTheaterToNextScene,
     addModel,
     addBuiltinModel,
-    mirrorModel,
+    addBuiltinModelAt,
     alignModelsByActive,
     distributeModelsByActive,
     alignSelectedModels,
@@ -376,6 +382,16 @@ export function useTheaterScene({
     rotateActiveModelFine,
     nudgeActiveModel,
   } = modelsApi;
+
+  useEffect(() => {
+    if (isDragging) return;
+    const syncedSpotlights = syncMountedSpotlights(spotlights, models);
+    const hasChanges = syncedSpotlights.some(
+      (spotlight, index) => spotlight !== spotlights[index],
+    );
+    if (!hasChanges) return;
+    updateCurrentScene({ theaterSpotlights: syncedSpotlights });
+  }, [isDragging, models, spotlights, updateCurrentScene]);
 
   const {
     decorCatalogKey,
@@ -425,7 +441,7 @@ export function useTheaterScene({
   } = spotlightsApi;
   const {
     updateModels: _updateModels,
-    setPendingSnapModelId: _setPendingSnapModelId,
+    setPendingSnapModelId,
     ...modelsVm
   } = modelsApi;
 
@@ -467,6 +483,9 @@ export function useTheaterScene({
     revealAllHiddenInScene,
     isolateSceneSelection,
     focusSceneOutlinerItem,
+    focusLayoutHall,
+    focusAudienceSeats,
+    focusStageGrid,
     clearSceneSelection,
     toggleSceneOutlinerVisibility,
     setSceneOutlinerGroupVisibility,
@@ -500,6 +519,10 @@ export function useTheaterScene({
     setActiveDoorId,
     setLayoutOutlineFocused,
     layoutOutlineFocused,
+    setAudienceSeatsFocused,
+    audienceSeatsFocused,
+    setStageGridFocused,
+    stageGridFocused,
     decorPlaceMode,
     setDecorPlaceMode,
     exitDecorPlaceMode,
@@ -546,6 +569,8 @@ export function useTheaterScene({
   useTheaterKeyboardBindings({
     projectName,
     layout,
+    models,
+    spotlights,
     activeTab,
     editMode,
     activeModelId,
@@ -667,6 +692,7 @@ export function useTheaterScene({
     setActiveAlignGuides,
     ...spotlightsVm,
     ...modelsVm,
+    setPendingSnapModelId,
     ...decorApi,
     ...floorPlanApi,
     applyHallTemplate,
@@ -683,6 +709,9 @@ export function useTheaterScene({
     revealAllHiddenInScene,
     isolateSceneSelection,
     focusSceneOutlinerItem,
+    focusLayoutHall,
+    focusAudienceSeats,
+    focusStageGrid,
     clearSceneSelection,
     toggleSceneOutlinerVisibility,
     setSceneOutlinerGroupVisibility,

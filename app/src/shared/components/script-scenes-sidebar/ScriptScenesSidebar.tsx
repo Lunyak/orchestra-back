@@ -99,6 +99,7 @@ export const ScriptScenesSidebar = ({
                 key={`${scene.id}:${index}`}
                 className={cn(
                   "scene-mini-item",
+                  isActive && "list-item--active",
                   isActive && "scene-mini-item--active",
                   dragOverIndex === index && "scene-mini-item--drag-over",
                   dragIndex === index && "scene-mini-item--dragging",

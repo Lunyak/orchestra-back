@@ -308,7 +308,11 @@ export function LightCueTimeline({
 
               className="light-cue-marker"
 
-              style={{ left: `${Math.min(100, Math.max(0, left))}%` }}
+              style={
+                {
+                  "--light-cue-marker-left": `${Math.min(100, Math.max(0, left))}%`,
+                } as React.CSSProperties
+              }
 
               title={`${cue.tSec}с · канал ${cue.channel}`}
 

@@ -1,4 +1,4 @@
-import { syncPush } from "./api/entity-sync";
+import { dispatchSyncPush } from "../shared/api/rtk/sync-dispatch";
 import type { SyncChange } from "./api/types/sync";
 import { mapTheaterSpotlightToSync } from "../features/theater/model/theater-light-fader-bindings";
 import { ensureProject } from "./api/projects";
@@ -295,7 +295,7 @@ export async function flushDesktopOutbox(
     };
   }
 
-  await syncPush(accessToken, changes);
+  await dispatchSyncPush({ changes });
 
   // Ack only after successful push
   const ackIds = Array.from(

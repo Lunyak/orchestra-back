@@ -328,7 +328,7 @@ export function ShowScriptMarkdownSection({
               className="script-kadr-light-banner__btn script-kadr-light-banner__btn--primary"
               onClick={() => navigate("/light-plot")}
             >
-              Репетиция спектакля
+              Спектакль
             </button>
             <button
               type="button"

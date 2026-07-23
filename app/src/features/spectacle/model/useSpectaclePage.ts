@@ -108,7 +108,8 @@ export function useSpectaclePage() {
             ? "media"
             : location.pathname === "/board"
             ? "board"
-            : location.pathname === "/tasks"
+            : location.pathname === "/tasks" ||
+                location.pathname.startsWith("/tasks/")
               ? "tasks"
               : location.pathname === "/sessions" ||
                   location.pathname.startsWith("/sessions/")

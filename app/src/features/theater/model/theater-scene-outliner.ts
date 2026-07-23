@@ -10,6 +10,7 @@ import {
 } from "./theater-decor-catalog";
 import { THEATER_DOOR_WALL_LABELS } from "./theater-doors";
 import { formatLightChannelSlot } from "./theater-light-channel-link";
+import { resolveZoneGrid } from "./theater-zone-grid";
 
 export type SceneOutlinerKind = "spotlight" | "model" | "decor" | "door" | "layout";
 
@@ -81,8 +82,29 @@ export function buildSceneOutlinerGroups(args: {
       {
         id: 0,
         kind: "layout",
-        label: "Зал и кресла",
-        meta: `${args.layout.hallWidth}×${args.layout.hallDepth} м · ${args.layout.seatRows}×${args.layout.seatsPerRow} мест`,
+        label: "Зал",
+        meta: `${args.layout.hallWidth}×${args.layout.hallDepth} м`,
+        canHide: false,
+      },
+      ...(args.layout.seatRows > 0
+        ? [
+            {
+              id: 1,
+              kind: "layout" as const,
+              label: "Кресла",
+              meta: `${args.layout.seatRows}×${args.layout.seatsPerRow} мест`,
+              canHide: false,
+            },
+          ]
+        : []),
+      {
+        id: 2,
+        kind: "layout",
+        label: "Сетка сцены",
+        meta: (() => {
+          const grid = resolveZoneGrid(args.layout);
+          return `${grid.cols}×${grid.rows}`;
+        })(),
         canHide: false,
       },
     ],
@@ -212,6 +234,8 @@ export function isSceneOutlinerItemActive(
     modelId?: number;
     doorId?: number;
     layoutFocused?: boolean;
+    audienceSeatsFocused?: boolean;
+    stageGridFocused?: boolean;
   },
 ): boolean {
   switch (item.kind) {
@@ -223,6 +247,8 @@ export function isSceneOutlinerItemActive(
     case "door":
       return active.doorId === item.id;
     case "layout":
+      if (item.id === 1) return active.audienceSeatsFocused === true;
+      if (item.id === 2) return active.stageGridFocused === true;
       return active.layoutFocused === true;
     default:
       return false;

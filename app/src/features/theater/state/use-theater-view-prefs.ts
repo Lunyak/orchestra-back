@@ -27,7 +27,7 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
   setWallsHidden: (value: boolean) => void;
   setWallsHideFromCamera: (value: boolean) => void;
   setShowFloorPlan: (value: boolean) => void;
-  setFloorPlanExpanded: Dispatch<SetStateAction<boolean>>;
+  setFloorPlanMaxSide: Dispatch<SetStateAction<number>>;
   setSpectaclePreviewMode: (value: boolean) => void;
   setAlignGuidesEnabled: (value: boolean) => void;
   setActiveTab: (tab: TheaterViewPrefs["activeTab"]) => void;
@@ -37,6 +37,7 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
   setSceneBackgroundColor: (value: string) => void;
   setShowSpotlightGuideLines: (value: boolean) => void;
   setLightConsoleExpanded: Dispatch<SetStateAction<boolean>>;
+  setHallResizeKeepObjects: (value: boolean) => void;
   showSpotlights: boolean;
   setShowSpotlights: (value: boolean) => void;
   showOnlyActiveSpotlight: boolean;
@@ -80,8 +81,8 @@ export function useTheaterViewPrefs(
   const [showFloorPlan, setShowFloorPlan] = useState(
     () => readTheaterViewPrefs(projectName).showFloorPlan,
   );
-  const [floorPlanExpanded, setFloorPlanExpanded] = useState(
-    () => readTheaterViewPrefs(projectName).floorPlanExpanded,
+  const [floorPlanMaxSide, setFloorPlanMaxSide] = useState(
+    () => readTheaterViewPrefs(projectName).floorPlanMaxSide,
   );
   const [spectaclePreviewMode, setSpectaclePreviewMode] = useState(
     () => readTheaterViewPrefs(projectName).spectaclePreviewMode,
@@ -110,6 +111,9 @@ export function useTheaterViewPrefs(
   const [lightConsoleExpanded, setLightConsoleExpanded] = useState(
     () => readTheaterViewPrefs(projectName).lightConsoleExpanded,
   );
+  const [hallResizeKeepObjects, setHallResizeKeepObjects] = useState(
+    () => readTheaterViewPrefs(projectName).hallResizeKeepObjects,
+  );
   const [showSpotlights, setShowSpotlights] = useState(true);
   const [showOnlyActiveSpotlight, setShowOnlyActiveSpotlight] = useState(false);
 
@@ -124,7 +128,7 @@ export function useTheaterViewPrefs(
     setWallsHidden(prefs.wallsHidden);
     setWallsHideFromCamera(prefs.wallsHideFromCamera);
     setShowFloorPlan(prefs.showFloorPlan);
-    setFloorPlanExpanded(prefs.floorPlanExpanded);
+    setFloorPlanMaxSide(prefs.floorPlanMaxSide);
     setSpectaclePreviewMode(prefs.spectaclePreviewMode);
     setAlignGuidesEnabled(prefs.alignGuidesEnabled);
     setActiveTab(prefs.activeTab);
@@ -134,6 +138,7 @@ export function useTheaterViewPrefs(
     setSceneBackgroundColor(prefs.sceneBackgroundColor);
     setShowSpotlightGuideLines(prefs.showSpotlightGuideLines);
     setLightConsoleExpanded(prefs.lightConsoleExpanded);
+    setHallResizeKeepObjects(prefs.hallResizeKeepObjects);
     skipPersistRef.current = true;
   }, [projectName]);
 
@@ -156,7 +161,7 @@ export function useTheaterViewPrefs(
       wallsHidden,
       wallsHideFromCamera,
       showFloorPlan,
-      floorPlanExpanded,
+      floorPlanMaxSide,
       spectaclePreviewMode,
       alignGuidesEnabled,
       activeTab,
@@ -168,6 +173,7 @@ export function useTheaterViewPrefs(
       sceneBackgroundColor,
       showSpotlightGuideLines,
       lightConsoleExpanded,
+      hallResizeKeepObjects,
     });
   }, [
     projectName,
@@ -180,7 +186,7 @@ export function useTheaterViewPrefs(
     wallsHidden,
     wallsHideFromCamera,
     showFloorPlan,
-    floorPlanExpanded,
+    floorPlanMaxSide,
     spectaclePreviewMode,
     alignGuidesEnabled,
     activeTab,
@@ -192,6 +198,7 @@ export function useTheaterViewPrefs(
     sceneBackgroundColor,
     showSpotlightGuideLines,
     lightConsoleExpanded,
+    hallResizeKeepObjects,
   ]);
 
   return {
@@ -204,7 +211,7 @@ export function useTheaterViewPrefs(
     wallsHidden,
     wallsHideFromCamera,
     showFloorPlan,
-    floorPlanExpanded,
+    floorPlanMaxSide,
     spectaclePreviewMode,
     alignGuidesEnabled,
     activeTab,
@@ -216,6 +223,7 @@ export function useTheaterViewPrefs(
     sceneBackgroundColor,
     showSpotlightGuideLines,
     lightConsoleExpanded,
+    hallResizeKeepObjects,
     setShowGrid,
     setShowStageGrid,
     setSnapToGrid,
@@ -225,7 +233,7 @@ export function useTheaterViewPrefs(
     setWallsHidden,
     setWallsHideFromCamera,
     setShowFloorPlan,
-    setFloorPlanExpanded,
+    setFloorPlanMaxSide,
     setSpectaclePreviewMode,
     setAlignGuidesEnabled,
     setActiveTab,
@@ -235,6 +243,7 @@ export function useTheaterViewPrefs(
     setSceneBackgroundColor,
     setShowSpotlightGuideLines,
     setLightConsoleExpanded,
+    setHallResizeKeepObjects,
     showSpotlights,
     setShowSpotlights,
     showOnlyActiveSpotlight,

@@ -40,7 +40,7 @@ export type ProjectorPlaybackState = {
   volume?: number;
 };
 
-/** Ошибка загрузки/воспроизведения — только для экрана репетиции, не для зала. */
+/** Ошибка загрузки/воспроизведения — только для экрана спектакля, не для зала. */
 export type ProjectorOutputError = {
   type: "output-error";
   scope: "hold" | "video";

@@ -10,4 +10,7 @@ import "../../../features/troupe/api/troupe-api";
 import "../../../features/premises/api/premises-api";
 import "../../../features/project-tasks/api/project-tasks-api";
 import "../../../features/actor/api/actor-notes-api";
+import "../../../features/chat/api/chat-api";
+import "../../../features/accounting/api/accounting-api";
+import "../../../features/studio/api/studio-api";
 import "./sync-api";

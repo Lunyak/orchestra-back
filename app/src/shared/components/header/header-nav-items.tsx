@@ -1,50 +1,127 @@
 import type { ReactNode } from "react";
-import { SUFER_ROUTE_PATH } from "../../../app/router/routeMeta";
-import { ENABLE_3D_THEATER } from "../../build-features";
+import {
+  isSpectacleCreativePath,
+  isTheaterRouteEnabled,
+  SPECTACLE_HUB_ROUTE_PATH,
+  SUFER_ROUTE_PATH,
+} from "../../../app/router/routeMeta";
+import {
+  isAdminAccountingPath,
+  isAdminPlanPath,
+  isAdminPremisesPath,
+  isAdminTasksPath,
+  isAdminTeamPath,
+  resolveAdminPlanEntryPath,
+} from "../../settings/adminSection";
+
+export type HeaderNavSubItem = {
+  id: string;
+  path: string;
+  label: string;
+  resolvePath?: () => string;
+  isActive: (pathname: string) => boolean;
+};
 
 export type HeaderNavItem = {
   path: string;
   label: string;
   navClass: string;
   icon: ReactNode;
+  children?: HeaderNavSubItem[];
 };
 
-/** Идентификатор пункта «План репетиций»; фактический URL — resolveRehearsalPlanEntryPath(). */
-export const REHEARSAL_PLAN_NAV_PATH = "/board";
+/** Идентификатор пункта «Администрирование»; фактический URL — resolveAdminEntryPath(). */
+export const ADMIN_NAV_PATH = "/admin";
+
+/** @deprecated Используйте ADMIN_NAV_PATH */
+export const REHEARSAL_PLAN_NAV_PATH = ADMIN_NAV_PATH;
+
+export const ADMIN_NAV_CHILDREN: HeaderNavSubItem[] = [
+  {
+    id: "plan",
+    path: "/sessions",
+    label: "Репетиции",
+    resolvePath: resolveAdminPlanEntryPath,
+    isActive: isAdminPlanPath,
+  },
+  {
+    id: "team",
+    path: "/troupe",
+    label: "Команда",
+    isActive: isAdminTeamPath,
+  },
+  {
+    id: "tasks",
+    path: "/tasks",
+    label: "Задачи",
+    isActive: isAdminTasksPath,
+  },
+  {
+    id: "accounting",
+    path: "/accounting",
+    label: "Бухгалтерия",
+    isActive: isAdminAccountingPath,
+  },
+  {
+    id: "premises",
+    path: "/premises",
+    label: "Помещения",
+    isActive: isAdminPremisesPath,
+  },
+];
+
+export function isStudioPath(pathname: string) {
+  return pathname === "/studio" || pathname.startsWith("/studio/");
+}
+
+export function isSpectacleScriptPath(pathname: string) {
+  return pathname === "/";
+}
+
+export function isSpectacleLightPlotPath(pathname: string) {
+  return pathname === "/light-plot";
+}
+
+export function isSpectacleSuferPath(pathname: string) {
+  return pathname === SUFER_ROUTE_PATH;
+}
+
+export function isSpectacleTheaterPath(pathname: string) {
+  return isTheaterRouteEnabled() && pathname === "/theater";
+}
+
+export const SPECTACLE_NAV_CHILDREN: HeaderNavSubItem[] = [
+  {
+    id: "script",
+    path: "/",
+    label: "Сценарий",
+    isActive: isSpectacleScriptPath,
+  },
+  {
+    id: "light-plot",
+    path: "/light-plot",
+    label: "Техчасть",
+    isActive: isSpectacleLightPlotPath,
+  },
+  {
+    id: "sufer",
+    path: SUFER_ROUTE_PATH,
+    label: "Прогон",
+    isActive: isSpectacleSuferPath,
+  },
+  {
+    id: "theater",
+    path: "/theater",
+    label: "3D театр",
+    isActive: isSpectacleTheaterPath,
+  },
+];
 
 export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
   {
-    path: "/",
-    label: "Сценарий",
-    navClass: "header-nav-btn--script",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="16" y1="13" x2="8" y2="13" />
-        <line x1="16" y1="17" x2="8" y2="17" />
-        <polyline points="10 9 9 9 8 9" />
-      </svg>
-    ),
-  },
-  {
-    path: SUFER_ROUTE_PATH,
-    label: "Суфлёр",
-    navClass: "header-nav-btn--sufer",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="4" width="18" height="16" rx="2" />
-        <path d="M7 8h10" />
-        <path d="M7 12h6" />
-        <path d="M7 16h8" />
-        <circle cx="17" cy="16" r="2" />
-      </svg>
-    ),
-  },
-  {
-    path: "/light-plot",
-    label: "Репетиция",
-    navClass: "header-nav-btn--light-plot",
+    path: SPECTACLE_HUB_ROUTE_PATH,
+    label: "Спектакль",
+    navClass: "header-nav-btn--spectacle",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -53,30 +130,21 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
         <circle cx="15" cy="15" r="2" />
       </svg>
     ),
+    children: SPECTACLE_NAV_CHILDREN,
   },
   {
-    path: "/theater",
-    label: "3D театр",
-    navClass: "header-nav-btn--theater",
+    path: ADMIN_NAV_PATH,
+    label: "Администрирование",
+    navClass: "header-nav-btn--admin",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-        <line x1="12" y1="22.08" x2="12" y2="12" />
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
       </svg>
     ),
-  },
-  {
-    path: REHEARSAL_PLAN_NAV_PATH,
-    label: "План репетиций",
-    navClass: "header-nav-btn--board",
-    icon: (
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="4" width="6" height="16" rx="1" />
-        <rect x="10" y="4" width="6" height="16" rx="1" />
-        <rect x="17" y="4" width="4" height="16" rx="1" />
-      </svg>
-    ),
+    children: ADMIN_NAV_CHILDREN,
   },
   {
     path: "/trainers",
@@ -93,15 +161,17 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
     ),
   },
   {
-    path: "/troupe",
-    label: "Команда",
-    navClass: "header-nav-btn--troupe",
+    path: "/studio",
+    label: "Студия",
+    navClass: "header-nav-btn--studio",
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5V2z" />
+        <path d="M8 7h8" />
+        <path d="M8 11h5" />
+        <circle cx="16" cy="17" r="2" />
+        <path d="M8 17h4" />
       </svg>
     ),
   },
@@ -130,24 +200,35 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
 ];
 
 export function isHeaderNavItemActive(path: string, currentPath: string) {
-  if (path === "/troupe") {
+  if (path === SPECTACLE_HUB_ROUTE_PATH) {
+    return isSpectacleCreativePath(currentPath);
+  }
+  if (path === ADMIN_NAV_PATH) {
     return (
-      currentPath === path ||
-      currentPath.startsWith("/troupe/") ||
-      currentPath.startsWith("/premises")
+      currentPath === "/admin" ||
+      isAdminPlanPath(currentPath) ||
+      isAdminTasksPath(currentPath) ||
+      isAdminTeamPath(currentPath) ||
+      isAdminAccountingPath(currentPath) ||
+      isAdminPremisesPath(currentPath)
     );
   }
-  if (path === REHEARSAL_PLAN_NAV_PATH) {
-    return (
-      currentPath === "/board" ||
-      currentPath === "/tasks" ||
-      currentPath === "/sessions" ||
-      currentPath.startsWith("/sessions/")
-    );
+  if (path === "/studio") {
+    return isStudioPath(currentPath);
   }
   return currentPath === path || (path !== "/" && currentPath.startsWith(path));
 }
 
 export function filterHeaderNavItems(items: HeaderNavItem[]) {
-  return items.filter((item) => ENABLE_3D_THEATER || item.path !== "/theater");
+  const theaterEnabled = isTheaterRouteEnabled();
+  return items.map((item) => {
+    if (item.path !== SPECTACLE_HUB_ROUTE_PATH || !item.children?.length) {
+      return item;
+    }
+    if (theaterEnabled) return item;
+    return {
+      ...item,
+      children: item.children.filter((child) => child.id !== "theater"),
+    };
+  });
 }

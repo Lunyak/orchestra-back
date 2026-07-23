@@ -151,7 +151,7 @@ export function SettingsScriptTextSection() {
     <section className="settings-card settings-script-text-card">
       <header className="settings-script-text-head">
         <h3 className="settings-card__title">Текст пьесы</h3>
-        <p className="settings-script-text-head__hint">Вкладка «Текст» в сценарии и на репетиции</p>
+        <p className="settings-script-text-head__hint">Вкладка «Текст» в сценарии и в спектакле</p>
       </header>
 
       <div className="settings-script-text-preview" aria-live="polite">

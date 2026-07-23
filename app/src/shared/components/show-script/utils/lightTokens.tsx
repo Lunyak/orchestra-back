@@ -83,17 +83,30 @@ export function isColorOverrideToken(raw?: string | null): boolean {
   return resolveLightColor("x", null, v) != null;
 }
 
-function renderLightChip(label: string, color: string | null, key: string) {
+function themedLightChipStyle(color: string | null) {
+  if (!color) return undefined;
   const textColor = getReadableTextColor(color);
+  return {
+    "--markdown-light-chip-bg": color,
+    ...(textColor ? { "--markdown-light-chip-fg": textColor } : {}),
+  };
+}
+
+function themedLightChipHast(classNames: string[], color: string | null) {
+  if (!color) return { className: classNames };
+  return {
+    className: [...classNames, "markdown-light-chip--themed"],
+    properties: { style: themedLightChipStyle(color) },
+  };
+}
+
+function renderLightChip(label: string, color: string | null, key: string) {
+  const themed = Boolean(color);
   return (
     <span
       key={key}
-      className="markdown-light-chip"
-      style={{
-        backgroundColor: color || undefined,
-        color: textColor || undefined,
-        borderColor: color ? "transparent" : undefined,
-      }}
+      className={themed ? "markdown-light-chip markdown-light-chip--themed" : "markdown-light-chip"}
+      style={themed ? (themedLightChipStyle(color) as React.CSSProperties) : undefined}
     >
       {label}
     </span>
@@ -388,16 +401,8 @@ export function createRehypeScriptTokens(
           } else if (rawType?.toLowerCase() === "blackout") {
             const label = "Блекаут";
             const color = resolveLightColor(label, "var(--color-text-black)000", rawColor) ?? "var(--color-text-black)000";
-            const textColor = getReadableTextColor(color);
-            out.push(
-              hastSpan(["markdown-light-chip"], [hastText(label)], {
-                style: {
-                  backgroundColor: color || undefined,
-                  color: textColor || undefined,
-                  borderColor: color ? "transparent" : undefined,
-                },
-              }),
-            );
+            const chip = themedLightChipHast(["markdown-light-chip"], color);
+            out.push(hastSpan(chip.className, [hastText(label)], chip.properties));
           } else if (rawType?.toLowerCase() === "program") {
             const programId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
             const labelOverride = String(rawColor ?? "").trim();
@@ -405,16 +410,8 @@ export function createRehypeScriptTokens(
             const parsed = parseLightChannel(channelValue);
             const label = labelOverride || parsed.label || `П${programId}`;
             const color = resolveLightColor(label, parsed.color) ?? "var(--color-active-ascent)";
-            const textColor = getReadableTextColor(color);
-            out.push(
-              hastSpan(["markdown-light-chip"], [hastText(label)], {
-                style: {
-                  backgroundColor: color || undefined,
-                  color: textColor || undefined,
-                  borderColor: color ? "transparent" : undefined,
-                },
-              }),
-            );
+            const chip = themedLightChipHast(["markdown-light-chip"], color);
+            out.push(hastSpan(chip.className, [hastText(label)], chip.properties));
           } else if (rawType?.toLowerCase() === "fader") {
             const faderId = Math.max(1, Math.trunc(Number(String(rawIndex ?? "")) || 1));
             const label = formatFaderChipDisplay(faderId, rawColor);
@@ -437,16 +434,8 @@ export function createRehypeScriptTokens(
 
               const label = labelOverride || (parsed.label ? parsed.label : String(index));
               const color = resolveLightColor(label, parsed.color, colorOverride || undefined);
-              const textColor = getReadableTextColor(color);
-              out.push(
-                hastSpan(["markdown-light-chip"], [hastText(label)], {
-                  style: {
-                    backgroundColor: color || undefined,
-                    color: textColor || undefined,
-                    borderColor: color ? "transparent" : undefined,
-                  },
-                }),
-              );
+              const chip = themedLightChipHast(["markdown-light-chip"], color);
+              out.push(hastSpan(chip.className, [hastText(label)], chip.properties));
             } else {
               out.push(hastText(raw));
             }

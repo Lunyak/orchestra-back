@@ -1,5 +1,4 @@
 import cn from "classnames";
-import { parseKadrTitleFromHeading } from "../model/create-kadr-from-draft";
 import { formatKadrTransitionForDisplay, parseKadrTransitionRawInSection } from "../model/kadr-section-transition";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
 
@@ -26,21 +25,20 @@ export function SpectacleRunMeta() {
 
 export function SpectacleRunProgRunNav() {
   const run = useSpectacleRunContext();
-  const { tape, tapeIndex, currentItem, currentScene, canGoPrev, canGoNext, nextLabel } = run;
+  const {
+    tape,
+    tapeIndex,
+    currentItem,
+    currentScene,
+    canGoPrev,
+    canGoNext,
+    nextLabel,
+    progRunPaused,
+  } = run;
   const tapeLen = tape.length;
 
   if (tapeLen === 0) return null;
 
-  const kadrNo = currentItem?.kadrNo;
-  const kadrTitle =
-    currentItem && !currentItem.isPlaceholder && kadrNo != null
-      ? parseKadrTitleFromHeading(currentItem.headingTitle ?? "", kadrNo)
-      : "";
-  const kadrLine = currentItem?.isPlaceholder
-    ? "Нет картин"
-    : kadrTitle
-      ? `К${kadrNo} · ${kadrTitle}`
-      : `К${kadrNo ?? "—"}`;
   const transitionLine =
     currentItem?.section && currentScene && !currentItem.isPlaceholder
       ? formatKadrTransitionForDisplay(
@@ -50,14 +48,24 @@ export function SpectacleRunProgRunNav() {
 
   return (
     <div className="spectacle-run__prog-run-nav" aria-label="Навигация по сценам">
-      <button
-        type="button"
-        className="spectacle-run__prog-run-nav-btn"
-        disabled={!canGoPrev}
-        onClick={run.goPrev}
-      >
-        ◀ Назад
-      </button>
+      <div className="spectacle-run__prog-run-nav-transport">
+        <button
+          type="button"
+          className="spectacle-run__prog-run-start-btn"
+          onClick={run.startProgRun}
+        >
+          Старт
+        </button>
+        <button
+          type="button"
+          className="spectacle-run__prog-run-pause-btn"
+          data-paused={progRunPaused ? "true" : undefined}
+          aria-pressed={progRunPaused}
+          onClick={run.toggleProgRunPause}
+        >
+          {progRunPaused ? "Продолжить" : "Пауза"}
+        </button>
+      </div>
       <div className="spectacle-run__prog-run-nav-center" aria-live="polite">
         {transitionLine ? (
           <span className="spectacle-run__prog-run-nav-kadr" title={transitionLine}>
@@ -70,61 +78,49 @@ export function SpectacleRunProgRunNav() {
           </span>
         </div>
       </div>
-      <button
-        type="button"
-        className={cn(
-          "spectacle-run__prog-run-nav-btn",
-          "spectacle-run__prog-run-nav-btn--forward",
-          canGoNext && "spectacle-run__prog-run-nav-btn--primary",
-        )}
-        disabled={!canGoNext}
-        onClick={run.goNext}
-      >
-        {nextLabel} ▶
-      </button>
+      <div className="spectacle-run__prog-run-nav-scene">
+        <button
+          type="button"
+          className="spectacle-run__prog-run-nav-btn"
+          disabled={!canGoPrev}
+          onClick={run.goPrev}
+        >
+          ◀ Назад
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "spectacle-run__prog-run-nav-btn",
+            "spectacle-run__prog-run-nav-btn--forward",
+            canGoNext && "spectacle-run__prog-run-nav-btn--primary",
+          )}
+          disabled={!canGoNext}
+          onClick={run.goNext}
+        >
+          {nextLabel} ▶
+        </button>
+      </div>
     </div>
   );
 }
 
 export function SpectacleRunProgRunToolbar() {
   const run = useSpectacleRunContext();
-  const { tape, tapeIndex, progRunPaused } = run;
-  const tapeLen = tape.length;
+  const { tape } = run;
 
-  if (tapeLen === 0) return null;
+  if (tape.length === 0 || !run.canEditKadr) return null;
 
   return (
     <div className="spectacle-run__toolbar-actions" aria-label="Управление прогоном">
       <button
         type="button"
-        className="spectacle-run__prog-run-start-btn"
-        onClick={run.startProgRun}
+        className="spectacle-run__add-kadr-btn"
+        data-primary="true"
+        title="Редактировать выбранную картину"
+        onClick={run.editCurrentKadr}
       >
-        Старт
+        Редактировать
       </button>
-      <button
-        type="button"
-        className="spectacle-run__prog-run-pause-btn"
-        data-paused={progRunPaused ? "true" : undefined}
-        aria-pressed={progRunPaused}
-        onClick={run.toggleProgRunPause}
-      >
-        {progRunPaused ? "Продолжить" : "Пауза"}
-      </button>
-      {run.canEditKadr ? (
-        <button
-          type="button"
-          className="spectacle-run__add-kadr-btn"
-          data-primary="true"
-          title="Редактировать выбранную картину"
-          onClick={run.editCurrentKadr}
-        >
-          Редактировать
-        </button>
-      ) : null}
-      <span className="spectacle-run__tape-counter" aria-live="polite">
-        {tapeIndex + 1} / {tapeLen}
-      </span>
     </div>
   );
 }
@@ -137,7 +133,7 @@ export function SpectacleRunToolbarActions() {
   if (tapeLen === 0) return null;
 
   return (
-    <div className="spectacle-run__toolbar-actions" aria-label="Навигация репетиции">
+    <div className="spectacle-run__toolbar-actions" aria-label="Навигация спектакля">
       <div className="spectacle-run__nav">
         <button
           type="button"

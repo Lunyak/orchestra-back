@@ -1,63 +1,45 @@
-import { getClientInstanceId } from "../../realtime/clientInstanceId";
-import { api } from "./client";
 import type {
   SyncChange,
   SyncPullRequest,
   SyncPullResponse,
   SyncPushOptions,
-  SyncPushRequest,
 } from "./types/sync";
+import {
+  dispatchSyncPull,
+  dispatchSyncPullScene,
+  dispatchSyncPush,
+} from "../../shared/api/rtk/sync-dispatch";
+import type { SyncPullSceneResponse } from "../../shared/api/rtk/sync-api";
 
+/** @deprecated Prefer `dispatchSyncPush` from `shared/api/rtk/sync-dispatch`. */
 export async function syncPush(
-  accessToken: string,
+  _accessToken: string,
   changes: SyncChange[],
   options?: SyncPushOptions,
-) {
+): Promise<void> {
   if (!changes.length) return;
-  const body: SyncPushRequest = { changes };
-  if (options?.destructiveConfirm?.trim()) {
-    body.destructiveConfirm = options.destructiveConfirm.trim();
-  }
-  await api.post<unknown>("/sync/push", body, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "x-orchestra-client-id": getClientInstanceId(),
-    },
+  await dispatchSyncPush({
+    changes,
+    destructiveConfirm: options?.destructiveConfirm,
   });
 }
 
+/** @deprecated Prefer `dispatchSyncPull` from `shared/api/rtk/sync-dispatch`. */
 export async function syncPull(
-  accessToken: string,
+  _accessToken: string,
   lastSyncAt: string | null,
   projectSlug?: string,
   include?: SyncPullRequest["include"],
 ): Promise<SyncPullResponse> {
-  const body: SyncPullRequest = { lastSyncAt };
-  if (projectSlug) body.projectSlug = projectSlug;
-  if (include) body.include = include;
-  const { data } = await api.post<SyncPullResponse>("/sync/pull", body, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return data;
+  return dispatchSyncPull({ projectSlug, lastSyncAt, include });
 }
 
+/** @deprecated Prefer `dispatchSyncPullScene` from `shared/api/rtk/sync-dispatch`. */
 export async function syncPullScene(
-  accessToken: string,
+  _accessToken: string,
   projectSlug: string,
   sceneName: string,
   include?: SyncPullRequest["include"],
-): Promise<{
-  scene: { id: string; projectId: string; name: string; updatedAt: string };
-  scenes?: any[];
-  playlistItems?: any[];
-  sounds?: any[];
-  lightChannels?: any[];
-  theaterLayout?: any;
-}> {
-  const { data } = await api.post(
-    "/sync/pull-scene",
-    { projectSlug, sceneName, include },
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
-  return data as any;
+): Promise<SyncPullSceneResponse> {
+  return dispatchSyncPullScene({ projectSlug, sceneName, include });
 }

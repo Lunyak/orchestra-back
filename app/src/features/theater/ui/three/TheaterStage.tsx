@@ -22,6 +22,7 @@ import { TheaterStageFloor } from "./TheaterStageFloor";
 import { TheaterStageGridOverlay } from "./TheaterStageGridOverlay";
 import { TheaterStageGridPicker } from "./TheaterStageGridPicker";
 import { TheaterSurfaceMaterial } from "./TheaterSurfaceMaterial";
+import { resolveHallOffsetX, resolveHallOffsetZ } from "../../model/theater-hall-expand";
 
 const WALL_OPACITY = 0.38;
 
@@ -198,10 +199,16 @@ function StageWalls({
   const [, bumpRender] = useState(0);
 
   useFrame(() => {
+    const offsetX = resolveHallOffsetX(layout);
+    const offsetZ = resolveHallOffsetZ(layout);
     const nextHidden = wallsHideFromCamera
       ? findStageWallChainHiddenFromCamera(
           layout,
-          [camera.position.x, camera.position.y, camera.position.z],
+          [
+            camera.position.x - offsetX,
+            camera.position.y,
+            camera.position.z - offsetZ,
+          ],
           [viewTarget.x, viewTarget.y, viewTarget.z],
         )
       : null;

@@ -14,6 +14,7 @@ import {
   THEATER_SPOTLIGHT_DECAY,
   THEATER_SPOTLIGHT_PENUMBRA,
 } from "../../model/theater-scene-lighting";
+import { StageSpotlightModel } from "./StageSpotlightModel";
 
 export const SpotlightItem = ({
   config,
@@ -124,6 +125,10 @@ export const SpotlightItem = ({
   const headLabelFontSize =
     isActive ? 0.34 : isHighlighted ? 0.28 : headLabel.length > 3 ? 0.2 : 0.17;
   const isRgb = config.isRgb ?? false;
+  const fixtureVariant = isRgb ? "rgb" : "fresnel";
+  const fixtureScale = isRgb ? 0.52 : 0.46;
+  const sourceIsMounted = config.mountModelId != null && Boolean(config.mountPointId);
+  const transformEnabled = dragMode === "target" || !sourceIsMounted;
   const uiIntensity = config.intensity ?? THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY;
   const lightIntensity = theaterSpotlightLightIntensity(uiIntensity, isRgb);
   const beamLineGeometry = useMemo(() => {
@@ -148,9 +153,6 @@ export const SpotlightItem = ({
     highlightFocus,
     isHighlighted,
   ]);
-  const sourceColor = isHighlighted
-    ? highlightFocus
-    : config.color || tc("--color-warning");
   const headLabelVisible = showSpotlightLabels || showHelpers || isHighlighted;
   const helperVisible = showHelpers || isHighlighted;
 
@@ -229,6 +231,7 @@ export const SpotlightItem = ({
       ) : null}
       {showHelpers &&
         isActive &&
+        transformEnabled &&
         ((dragMode === "target" && targetRef.current) ||
           (dragMode === "source" && sourceRef.current)) && (
           <TransformControls
@@ -264,7 +267,7 @@ export const SpotlightItem = ({
                 }
                 const applyPositionSnap = (x: number, y: number, z: number) => {
                   let nx = x;
-                  let ny = y;
+                  const ny = y;
                   let nz = z;
                   if (snapEnabled && snapStep > 0) {
                     [nx, nz] = snapTheaterHallPoint(
@@ -331,38 +334,41 @@ export const SpotlightItem = ({
         }}
       >
         <sphereGeometry args={[isHighlighted ? 0.22 : 0.18, 16, 16]} />
-        <meshStandardMaterial
-          color={sourceColor}
-          emissive={isHighlighted ? sourceColor : tc("--color-text-secondary")}
-          emissiveIntensity={isHighlighted ? (isActive ? 1.4 : 1) : 0}
-          toneMapped={false}
+        <meshBasicMaterial
+          transparent
+          opacity={0}
+          depthWrite={false}
+          colorWrite={false}
         />
       </mesh>
       <group ref={fixtureRef} visible={helperVisible}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.28, 0.24, isRgb ? 0.24 : 0.6, 20]} />
-          <meshStandardMaterial
-            color={isEnabled ? tc("--color-border-default") : tc("--color-border-lighter")}
-            emissive={isHighlighted ? highlightFocus : tc("--color-text-secondary")}
-            emissiveIntensity={isHighlighted ? 0.35 : 0}
-          />
-        </mesh>
-        <mesh
-          position={[0, 0, isRgb ? -0.2 : -0.45]}
-          rotation={[Math.PI / 2, 0, 0]}
+        <group
+          scale={fixtureScale}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            if (event.button !== 0) return;
+            onSelect?.(
+              config.id,
+              event.shiftKey,
+              event.nativeEvent.clientX,
+              event.nativeEvent.clientY,
+            );
+          }}
+          onContextMenu={(event) => {
+            event.stopPropagation();
+            event.nativeEvent.preventDefault();
+            onContextMenu?.(
+              config.id,
+              event.nativeEvent.clientX,
+              event.nativeEvent.clientY,
+            );
+          }}
         >
-          <coneGeometry args={[0.32, isRgb ? 0.18 : 0.35, 20]} />
-          <meshStandardMaterial
-            color={isEnabled ? tc("--color-surface-1") : tc("--color-slate-600")}
-            emissive={isHighlighted ? highlightFocus : tc("--color-text-secondary")}
-            emissiveIntensity={isHighlighted ? 0.25 : 0}
+          <StageSpotlightModel
+            lowDetail={config.modelLowDetail ?? false}
+            variant={fixtureVariant}
           />
-        </mesh>
-        <mesh position={[0, -0.2, 0]}>
-          <boxGeometry args={[0.35, 0.08, 0.2]} />
-          <meshStandardMaterial color={isEnabled ? tc("--color-slate-600") : tc("--color-text-dimmer")} />
-        </mesh>
-        {isRgb && null}
+        </group>
       </group>
       <Billboard
         position={[config.position[0], config.position[1] + 0.7, config.position[2]]}

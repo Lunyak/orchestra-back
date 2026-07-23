@@ -3,6 +3,7 @@ import type {
   CreateProjectTaskPayload,
   ImportRequisiteTasksPayload,
   ImportRequisiteTasksResponse,
+  ProjectTaskDetailResponse,
   ProjectTaskItem,
   ProjectTasksListResponse,
   UpdateProjectTaskPayload,
@@ -13,6 +14,11 @@ const projectTasksTag = (projectSlug: string) => ({
   id: projectSlug,
 });
 
+const projectTaskTag = (id: string) => ({
+  type: "ProjectTasks" as const,
+  id: `task:${id}`,
+});
+
 export const projectTasksApi = orchestraApi.injectEndpoints({
   endpoints: (build) => ({
     listProjectTasks: build.query<ProjectTasksListResponse, string>({
@@ -21,6 +27,13 @@ export const projectTasksApi = orchestraApi.injectEndpoints({
         params: { projectSlug },
       }),
       providesTags: (_r, _e, projectSlug) => [projectTasksTag(projectSlug)],
+    }),
+
+    getProjectTask: build.query<ProjectTaskDetailResponse, string>({
+      query: (id) => ({
+        url: `/project-tasks/${encodeURIComponent(id)}`,
+      }),
+      providesTags: (_r, _e, id) => [projectTaskTag(id)],
     }),
 
     createProjectTask: build.mutation<ProjectTaskItem, CreateProjectTaskPayload>({
@@ -41,7 +54,10 @@ export const projectTasksApi = orchestraApi.injectEndpoints({
         method: "PATCH",
         data: body,
       }),
-      invalidatesTags: (_r, _e, { projectSlug }) => [projectTasksTag(projectSlug)],
+      invalidatesTags: (_r, _e, { id, projectSlug }) => [
+        projectTasksTag(projectSlug),
+        projectTaskTag(id),
+      ],
     }),
 
     deleteProjectTask: build.mutation<
@@ -52,7 +68,10 @@ export const projectTasksApi = orchestraApi.injectEndpoints({
         url: `/project-tasks/${encodeURIComponent(id)}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_r, _e, { projectSlug }) => [projectTasksTag(projectSlug)],
+      invalidatesTags: (_r, _e, { id, projectSlug }) => [
+        projectTasksTag(projectSlug),
+        projectTaskTag(id),
+      ],
     }),
 
     importRequisiteProjectTasks: build.mutation<
@@ -71,6 +90,7 @@ export const projectTasksApi = orchestraApi.injectEndpoints({
 
 export const {
   useListProjectTasksQuery,
+  useGetProjectTaskQuery,
   useCreateProjectTaskMutation,
   useUpdateProjectTaskMutation,
   useDeleteProjectTaskMutation,

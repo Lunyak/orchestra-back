@@ -62,7 +62,7 @@ const EventsPage: FC = () => {
 
         <header className="events-page__header">
           <div className="events-page__hero">
-            <GlitchHero as="h1" text="Спектакли" />
+            <GlitchHero as="h1" text="Спектакли" className="home-page__glitch-hero--page" />
           </div>
           <p className="events-page__subtitle">Афиша и даты</p>
         </header>

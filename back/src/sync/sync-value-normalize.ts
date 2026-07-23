@@ -62,6 +62,12 @@ export function syncMapTheaterSpotlightRow(sceneId: string, sp: unknown) {
     enabled: syncNormalizeBool(row?.enabled, true),
     channel: syncNormalizeInt(row?.channel, sourceId),
     isRgb: syncNormalizeBool(row?.isRgb, false),
+    modelLowDetail: syncNormalizeBool(row?.modelLowDetail, false),
+    mountModelId: syncNormalizeOptionalInt(row?.mountModelId),
+    mountPointId:
+      typeof row?.mountPointId === 'string' && row.mountPointId.trim()
+        ? row.mountPointId.trim()
+        : null,
     faderId: syncNormalizeOptionalInt(row?.faderId),
     hidden: syncNormalizeBool(row?.hidden, false),
     gridCol: syncNormalizeOptionalInt(row?.gridCol),

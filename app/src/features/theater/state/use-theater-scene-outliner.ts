@@ -44,6 +44,10 @@ export type UseTheaterSceneOutlinerArgs = {
   setActiveDoorId: (id: number | undefined) => void;
   setLayoutOutlineFocused: (value: boolean) => void;
   layoutOutlineFocused: boolean;
+  setAudienceSeatsFocused: (value: boolean) => void;
+  audienceSeatsFocused: boolean;
+  setStageGridFocused: (value: boolean) => void;
+  stageGridFocused: boolean;
   decorPlaceMode: boolean;
   setDecorPlaceMode: (value: boolean) => void;
   exitDecorPlaceMode: () => void;
@@ -80,6 +84,10 @@ export function useTheaterSceneOutliner({
   setActiveDoorId,
   setLayoutOutlineFocused,
   layoutOutlineFocused,
+  setAudienceSeatsFocused,
+  audienceSeatsFocused,
+  setStageGridFocused,
+  stageGridFocused,
   decorPlaceMode,
   setDecorPlaceMode,
   exitDecorPlaceMode,
@@ -215,6 +223,84 @@ export function useTheaterSceneOutliner({
     updateSpotlights,
   ]);
 
+  const focusLayoutHall = useCallback(() => {
+    setMultiSelectedSpotlightIds([]);
+    setMultiSelectedModelIds([]);
+    updateCurrentScene({
+      theaterActiveSpotlightId: undefined,
+      theaterActiveModelId: undefined,
+    });
+    if (decorPlaceMode) setDecorPlaceMode(false);
+    setActiveDoorId(undefined);
+    setAudienceSeatsFocused(false);
+    setStageGridFocused(false);
+    setLayoutOutlineFocused(true);
+    setActiveTab("layout");
+  }, [
+    decorPlaceMode,
+    setActiveDoorId,
+    setActiveTab,
+    setAudienceSeatsFocused,
+    setDecorPlaceMode,
+    setLayoutOutlineFocused,
+    setMultiSelectedModelIds,
+    setMultiSelectedSpotlightIds,
+    setStageGridFocused,
+    updateCurrentScene,
+  ]);
+
+  const focusAudienceSeats = useCallback(() => {
+    setMultiSelectedSpotlightIds([]);
+    setMultiSelectedModelIds([]);
+    updateCurrentScene({
+      theaterActiveSpotlightId: undefined,
+      theaterActiveModelId: undefined,
+    });
+    if (decorPlaceMode) setDecorPlaceMode(false);
+    setActiveDoorId(undefined);
+    setLayoutOutlineFocused(false);
+    setStageGridFocused(false);
+    setAudienceSeatsFocused(true);
+    setActiveTab("layout");
+  }, [
+    decorPlaceMode,
+    setActiveDoorId,
+    setActiveTab,
+    setAudienceSeatsFocused,
+    setDecorPlaceMode,
+    setLayoutOutlineFocused,
+    setMultiSelectedModelIds,
+    setMultiSelectedSpotlightIds,
+    setStageGridFocused,
+    updateCurrentScene,
+  ]);
+
+  const focusStageGrid = useCallback(() => {
+    setMultiSelectedSpotlightIds([]);
+    setMultiSelectedModelIds([]);
+    updateCurrentScene({
+      theaterActiveSpotlightId: undefined,
+      theaterActiveModelId: undefined,
+    });
+    if (decorPlaceMode) setDecorPlaceMode(false);
+    setActiveDoorId(undefined);
+    setLayoutOutlineFocused(false);
+    setAudienceSeatsFocused(false);
+    setStageGridFocused(true);
+    setActiveTab("layout");
+  }, [
+    decorPlaceMode,
+    setActiveDoorId,
+    setActiveTab,
+    setAudienceSeatsFocused,
+    setDecorPlaceMode,
+    setLayoutOutlineFocused,
+    setMultiSelectedModelIds,
+    setMultiSelectedSpotlightIds,
+    setStageGridFocused,
+    updateCurrentScene,
+  ]);
+
   const focusSceneOutlinerItem = useCallback(
     (item: SceneOutlinerItem, additive = false) => {
       const cameraFocus = resolveOutlinerCameraFocus(item, {
@@ -239,16 +325,22 @@ export function useTheaterSceneOutliner({
       switch (item.kind) {
         case "spotlight":
           setLayoutOutlineFocused(false);
+          setAudienceSeatsFocused(false);
+          setStageGridFocused(false);
           selectTheaterSpotlight(item.id, additive);
           return;
         case "model":
           setLayoutOutlineFocused(false);
+          setAudienceSeatsFocused(false);
+          setStageGridFocused(false);
           setActiveTab("models");
           setEditMode("models");
           selectTheaterModel(item.id, additive);
           return;
         case "decor":
           setLayoutOutlineFocused(false);
+          setAudienceSeatsFocused(false);
+          setStageGridFocused(false);
           setActiveTab("decor");
           setEditMode("decor");
           exitDecorPlaceMode();
@@ -256,13 +348,15 @@ export function useTheaterSceneOutliner({
           return;
         case "door":
           setLayoutOutlineFocused(false);
+          setAudienceSeatsFocused(false);
+          setStageGridFocused(false);
           setActiveTab("layout");
           setActiveDoorId(item.id);
           return;
         case "layout":
-          setLayoutOutlineFocused(true);
-          setActiveTab("layout");
-          setActiveDoorId(undefined);
+          if (item.id === 1) focusAudienceSeats();
+          else if (item.id === 2) focusStageGrid();
+          else focusLayoutHall();
           return;
         default:
           return;
@@ -271,6 +365,9 @@ export function useTheaterSceneOutliner({
     [
       displaySpotlights,
       exitDecorPlaceMode,
+      focusAudienceSeats,
+      focusLayoutHall,
+      focusStageGrid,
       layout,
       layoutDoors,
       models,
@@ -278,8 +375,10 @@ export function useTheaterSceneOutliner({
       selectTheaterSpotlight,
       setActiveDoorId,
       setActiveTab,
+      setAudienceSeatsFocused,
       setEditMode,
       setLayoutOutlineFocused,
+      setStageGridFocused,
     ],
   );
 
@@ -299,19 +398,25 @@ export function useTheaterSceneOutliner({
 
     if (decorPlaceMode) setDecorPlaceMode(false);
     if (layoutOutlineFocused) setLayoutOutlineFocused(false);
+    if (audienceSeatsFocused) setAudienceSeatsFocused(false);
+    if (stageGridFocused) setStageGridFocused(false);
   }, [
     activeModelId,
     activeSpotlightId,
+    audienceSeatsFocused,
     decorPlaceMode,
     layoutOutlineFocused,
     multiSelectedModelIds.length,
     multiSelectedSpotlightIds.length,
     setActiveAlignGuides,
+    setAudienceSeatsFocused,
     setDecorPlaceMode,
     setIsDragging,
     setLayoutOutlineFocused,
     setMultiSelectedModelIds,
     setMultiSelectedSpotlightIds,
+    setStageGridFocused,
+    stageGridFocused,
     updateCurrentScene,
   ]);
 
@@ -431,6 +536,9 @@ export function useTheaterSceneOutliner({
     revealAllHiddenInScene,
     isolateSceneSelection,
     focusSceneOutlinerItem,
+    focusLayoutHall,
+    focusAudienceSeats,
+    focusStageGrid,
     clearSceneSelection,
     toggleSceneOutlinerVisibility,
     setSceneOutlinerGroupVisibility,

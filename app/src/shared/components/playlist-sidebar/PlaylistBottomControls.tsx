@@ -1,10 +1,7 @@
 import cn from "classnames";
-import { useRef } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties } from "react";
-import { setPlayerDockHidden } from "../../player/player-prefs";
 import { usePlayerDockHidden } from "../../player/usePlayerDockHidden";
-import { usePlaylistBottomPlayerDrag } from "../../player/usePlaylistBottomPlayerDrag";
 import type { PlaylistTrack } from "../../types/playlist";
 
 type PlaylistBottomControlsProps = {
@@ -43,40 +40,16 @@ export function PlaylistBottomControls({
   formatTime,
 }: PlaylistBottomControlsProps) {
   const { playerDockHidden } = usePlayerDockHidden();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
-  const {
-    canDrag,
-    isDragging,
-    containerStyle,
-    onDragPointerDown,
-    onDragDoubleClick,
-  } = usePlaylistBottomPlayerDrag(containerRef, innerRef);
 
   if (typeof document === "undefined") return null;
   if (playerDockHidden) return null;
 
-  const dragPanelTitle = canDrag
-    ? "Перетащите панель или дважды нажмите для сброса позиции"
-    : undefined;
-
   return createPortal(
     <div
-      ref={containerRef}
-      className={cn("playlist-bottom-player", isDragging && "playlist-bottom-player--dragging")}
-      style={containerStyle}
+      className="playlist-bottom-player"
       aria-label="Управление проигрывателем"
     >
-      <div
-        ref={innerRef}
-        className={cn(
-          "playlist-bottom-player__inner",
-          canDrag && "playlist-bottom-player__inner--draggable",
-        )}
-        onPointerDown={canDrag ? onDragPointerDown : undefined}
-        onDoubleClick={canDrag ? onDragDoubleClick : undefined}
-        title={dragPanelTitle}
-      >
+      <div className="playlist-bottom-player__inner">
         <div className="playlist-bottom-player__transport">
           <button
             type="button"
@@ -147,9 +120,33 @@ export function PlaylistBottomControls({
             <span className="playlist-bottom-player__time">
               {formatTime(progress)} / {formatTime(duration)}
             </span>
+            <label className="playlist-bottom-player__volume">
+              <span className="playlist-bottom-player__volume-label">Громкость</span>
+              <input
+                className={cn(
+                  "playlist-bottom-player__range",
+                  "playlist-bottom-player__range--volume",
+                )}
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={volume}
+                style={
+                  {
+                    ["--range-fill" as unknown as string]: `${volumePercent}%`,
+                  } as CSSProperties
+                }
+                onChange={(event) => onVolumeChange(Number(event.target.value))}
+                aria-label="Громкость"
+              />
+            </label>
           </div>
           <input
-            className="playlist-bottom-player__range playlist-bottom-player__range--progress"
+            className={cn(
+              "playlist-bottom-player__range",
+              "playlist-bottom-player__range--progress",
+            )}
             type="range"
             min={0}
             max={duration || 0}
@@ -165,46 +162,6 @@ export function PlaylistBottomControls({
             aria-label="Позиция трека"
           />
         </div>
-
-        <label className="playlist-bottom-player__volume">
-          <span>Громкость</span>
-          <input
-            className="playlist-bottom-player__range playlist-bottom-player__range--volume"
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={volume}
-            style={
-              {
-                ["--range-fill" as unknown as string]: `${volumePercent}%`,
-              } as CSSProperties
-            }
-            onChange={(event) => onVolumeChange(Number(event.target.value))}
-          />
-        </label>
-
-        <button
-          type="button"
-          className="playlist-bottom-player__hide"
-          onClick={() => setPlayerDockHidden(true)}
-          aria-label="Скрыть проигрыватель"
-          title="Скрыть проигрыватель"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </button>
       </div>
     </div>,
     document.body,

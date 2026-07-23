@@ -157,7 +157,7 @@ export function SettingsGeneralTab() {
   return (
     <div className="settings-tab-page">
       <section className="settings-card settings-sync-live">
-        <h3 className="settings-card__title">Синхронизация с сервером в суфлёре</h3>
+        <h3 className="settings-card__title">Синхронизация с сервером в прогоне</h3>
         <p className="settings-sync-hint">
           По событию с сервера сцена подтягивается без перезагрузки страницы. Полная перезагрузка
           вкладки при обычной работе чаще связана с истечением сессии или сбоем обновления токена.

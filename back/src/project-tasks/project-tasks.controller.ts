@@ -28,6 +28,11 @@ export class ProjectTasksController {
     return this.tasks.list(req.user.userId, req.user.email, projectSlug);
   }
 
+  @Get(':id')
+  getOne(@Req() req: any, @Param('id') id: string) {
+    return this.tasks.getOne(req.user.userId, req.user.email, id);
+  }
+
   @Post()
   create(@Req() req: any, @Body() body: CreateProjectTaskDto) {
     return this.tasks.create(req.user.userId, req.user.email, body);

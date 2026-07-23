@@ -11,6 +11,7 @@ import {
   resolveDecorTextureFaces,
   supportsDecorTextureFaces,
 } from "../../model/theater-decor-faces";
+import { isTheaterAssetLibraryBuiltin } from "../../model/theater-asset-library";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 
 export function useTheaterControlsDecorTab(vm: TheaterSceneViewModel) {
@@ -26,9 +27,11 @@ export function useTheaterControlsDecorTab(vm: TheaterSceneViewModel) {
     vm.activeModel && isParametricDecorBuiltin(vm.activeModel.builtin)
       ? resolveDecorSize(vm.activeModel)
       : null;
-  const showDecorTextures =
-    vm.activeDecorPreset.parametric ||
-    Boolean(vm.activeModel && isParametricDecorBuiltin(vm.activeModel.builtin));
+  const showDecorTextures = Boolean(
+    vm.activeModel &&
+      (isParametricDecorBuiltin(vm.activeModel.builtin) ||
+        isTheaterAssetLibraryBuiltin(vm.activeModel.builtin)),
+  );
   const activeDecorTexture =
     vm.activeModel?.decorTexture ?? vm.decorDraftTexture ?? undefined;
   const activeDecorTexturePresetId = getDecorTexturePresetId(activeDecorTexture);

@@ -38,7 +38,6 @@ export function useTheaterFloorPlanInteraction(
     layout,
     models,
     spotlights,
-    expanded,
     activeTab,
     editMode,
     decorPlaceMode,
@@ -72,6 +71,7 @@ export function useTheaterFloorPlanInteraction(
     footprints,
     canEditOutline,
     canEditDoor,
+    planNavigationEnabled,
   } = geometry;
 
   const svgRef = useRef<SVGSVGElement>(null);
@@ -92,11 +92,11 @@ export function useTheaterFloorPlanInteraction(
   const [outlineVertexHover, setOutlineVertexHover] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!expanded) {
+    if (!planNavigationEnabled) {
       setPlanZoom(1);
       setPlanPan({ x: 0, y: 0 });
     }
-  }, [expanded]);
+  }, [planNavigationEnabled]);
 
   const clientToWorld = useCallback(
     (clientX: number, clientY: number): [number, number] | null => {
@@ -105,7 +105,7 @@ export function useTheaterFloorPlanInteraction(
       const rect = svg.getBoundingClientRect();
       let svgX = ((clientX - rect.left) / rect.width) * size.width;
       let svgY = ((clientY - rect.top) / rect.height) * size.height;
-      if (expanded) {
+      if (planNavigationEnabled) {
         const cx = size.width / 2;
         const cy = size.height / 2;
         svgX = (svgX - cx - planPan.x) / planZoom + cx;
@@ -115,7 +115,7 @@ export function useTheaterFloorPlanInteraction(
         unbounded: canEditOutline,
       });
     },
-    [canEditOutline, expanded, layout, planPan.x, planPan.y, planZoom, size.width, size.height, viewport],
+    [canEditOutline, planNavigationEnabled, layout, planPan.x, planPan.y, planZoom, size.width, size.height, viewport],
   );
 
   const updatePlanLayoutHover = useCallback(
@@ -161,18 +161,18 @@ export function useTheaterFloorPlanInteraction(
     ],
   );
 
-  const planContentTransform = expanded
+  const planContentTransform = planNavigationEnabled
     ? `translate(${size.width / 2 + planPan.x} ${size.height / 2 + planPan.y}) scale(${planZoom}) translate(${-size.width / 2} ${-size.height / 2})`
     : undefined;
 
   const handleWheel = useCallback(
     (event: React.WheelEvent<SVGSVGElement>) => {
-      if (!expanded) return;
+      if (!planNavigationEnabled) return;
       event.preventDefault();
       const factor = event.deltaY > 0 ? 0.9 : 1.1;
       setPlanZoom((prev) => Math.min(4, Math.max(0.5, prev * factor)));
     },
-    [expanded],
+    [planNavigationEnabled],
   );
 
   const applySnap = useCallback(
@@ -182,7 +182,7 @@ export function useTheaterFloorPlanInteraction(
   );
 
   const handlePointerDown = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (expanded && (event.button === 1 || (event.button === 0 && event.altKey))) {
+    if (planNavigationEnabled && (event.button === 1 || (event.button === 0 && event.altKey))) {
       event.preventDefault();
       panGestureRef.current = {
         startX: event.clientX,

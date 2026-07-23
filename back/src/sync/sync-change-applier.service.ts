@@ -423,36 +423,44 @@ export class SyncChangeApplierService {
     }
     const num = (v: any, fallback: number) =>
       v != null && Number.isFinite(Number(v)) ? Number(v) : fallback;
+    const optionalNum = (v: any) =>
+      v != null && Number.isFinite(Number(v)) ? Number(v) : undefined;
+    const optionalPositiveNum = (v: any) => {
+      const value = optionalNum(v);
+      return value != null && value > 0 ? value : undefined;
+    };
+    const optionalInt = (v: any) =>
+      v != null && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : undefined;
     const extras = this.buildTheaterLayoutExtras(payload);
     await this.prisma.theaterLayout.upsert({
       where: { playbookId },
       update: {
-        hallWidth: num(payload?.hallWidth, 0),
-        hallDepth: num(payload?.hallDepth, 0),
-        wallHeight: num(payload?.wallHeight, 0),
-        stageWidth: num(payload?.stageWidth, 0),
-        stageDepth: num(payload?.stageDepth, 0),
-        stageHeight: num(payload?.stageHeight, 0),
-        stageZ: num(payload?.stageZ, 0),
-        audienceStartZ: num(payload?.audienceStartZ, 0),
-        seatRows: syncNormalizeInt(payload?.seatRows, 0),
-        seatsPerRow: syncNormalizeInt(payload?.seatsPerRow, 0),
-        seatSpacing: num(payload?.seatSpacing, 0),
-        rowSpacing: num(payload?.rowSpacing, 0),
-        rowRise: num(payload?.rowRise, 0),
-        aisleWidth: num(payload?.aisleWidth, 0),
-        aisleCenterX: num(payload?.aisleCenterX, 0),
-        doorWidth: num(payload?.doorWidth, 0),
-        doorHeight: num(payload?.doorHeight, 0),
-        doorZ: num(payload?.doorZ, 0),
+        hallWidth: optionalPositiveNum(payload?.hallWidth),
+        hallDepth: optionalPositiveNum(payload?.hallDepth),
+        wallHeight: optionalPositiveNum(payload?.wallHeight),
+        stageWidth: optionalNum(payload?.stageWidth),
+        stageDepth: optionalNum(payload?.stageDepth),
+        stageHeight: optionalNum(payload?.stageHeight),
+        stageZ: optionalNum(payload?.stageZ),
+        audienceStartZ: optionalNum(payload?.audienceStartZ),
+        seatRows: optionalInt(payload?.seatRows),
+        seatsPerRow: optionalInt(payload?.seatsPerRow),
+        seatSpacing: optionalNum(payload?.seatSpacing),
+        rowSpacing: optionalNum(payload?.rowSpacing),
+        rowRise: optionalNum(payload?.rowRise),
+        aisleWidth: optionalNum(payload?.aisleWidth),
+        aisleCenterX: optionalNum(payload?.aisleCenterX),
+        doorWidth: optionalNum(payload?.doorWidth),
+        doorHeight: optionalNum(payload?.doorHeight),
+        doorZ: optionalNum(payload?.doorZ),
         doors: Array.isArray(payload?.doors) ? payload.doors : undefined,
         extras,
       },
       create: {
         playbookId,
-        hallWidth: num(payload?.hallWidth, 0),
-        hallDepth: num(payload?.hallDepth, 0),
-        wallHeight: num(payload?.wallHeight, 0),
+        hallWidth: optionalPositiveNum(payload?.hallWidth) ?? 12,
+        hallDepth: optionalPositiveNum(payload?.hallDepth) ?? 10,
+        wallHeight: optionalPositiveNum(payload?.wallHeight) ?? 4,
         stageWidth: num(payload?.stageWidth, 0),
         stageDepth: num(payload?.stageDepth, 0),
         stageHeight: num(payload?.stageHeight, 0),

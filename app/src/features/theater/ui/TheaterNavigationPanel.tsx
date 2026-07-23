@@ -1,9 +1,11 @@
 import { useState } from "react";
+import cn from "classnames";
 import type { TheaterSceneViewModel } from "../model/use-theater-scene";
 import { TheaterControlsOutlinerSection } from "./controls/TheaterControlsOutlinerSection";
 import { TheaterControlsProjectSection } from "./controls/TheaterControlsProjectSection";
+import { TheaterKeyboardShortcuts } from "./TheaterKeyboardShortcuts";
 
-type NavigationPanelTab = "scene" | "project";
+type NavigationPanelTab = "scene" | "project" | "help";
 
 export type TheaterNavigationPanelProps = {
   vm: TheaterSceneViewModel;
@@ -14,15 +16,15 @@ export type TheaterNavigationPanelProps = {
 /** Outliner, проект и закладки камеры — отдельно от настроек инструментов. */
 export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelProps) {
   const [tab, setTab] = useState<NavigationPanelTab>("scene");
+  const activePanelLabel =
+    tab === "scene" ? "Сцена" : tab === "project" ? "Проект" : "Справка";
 
   return (
     <div
-      className={[
+      className={cn(
         "theater-navigation-panel",
-        embedded ? "theater-navigation-panel--embedded" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        embedded && "theater-navigation-panel--embedded",
+      )}
       aria-label="Навигация по сцене"
     >
       <div
@@ -34,12 +36,10 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
           type="button"
           role="tab"
           aria-selected={tab === "scene"}
-          className={[
+          className={cn(
             "theater-navigation-panel-tab",
-            tab === "scene" ? "theater-navigation-panel-tab--selected" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+            tab === "scene" && "theater-navigation-panel-tab--selected",
+          )}
           onClick={() => setTab("scene")}
         >
           Сцена
@@ -48,27 +48,35 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
           type="button"
           role="tab"
           aria-selected={tab === "project"}
-          className={[
+          className={cn(
             "theater-navigation-panel-tab",
-            tab === "project" ? "theater-navigation-panel-tab--selected" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+            tab === "project" && "theater-navigation-panel-tab--selected",
+          )}
           onClick={() => setTab("project")}
         >
           Проект
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "help"}
+          className={cn(
+            "theater-navigation-panel-tab",
+            tab === "help" && "theater-navigation-panel-tab--selected",
+          )}
+          onClick={() => setTab("help")}
+        >
+          Справка
         </button>
       </div>
       <div
         className="theater-navigation-panel-body"
         role="tabpanel"
-        aria-label={tab === "scene" ? "Сцена" : "Проект"}
+        aria-label={activePanelLabel}
       >
-        {tab === "scene" ? (
-          <TheaterControlsOutlinerSection vm={vm} />
-        ) : (
-          <TheaterControlsProjectSection vm={vm} />
-        )}
+        {tab === "scene" ? <TheaterControlsOutlinerSection vm={vm} /> : null}
+        {tab === "project" ? <TheaterControlsProjectSection vm={vm} /> : null}
+        {tab === "help" ? <TheaterKeyboardShortcuts /> : null}
       </div>
     </div>
   );

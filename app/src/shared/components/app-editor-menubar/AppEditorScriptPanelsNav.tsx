@@ -56,7 +56,7 @@ export function AppEditorScriptPanelsNav({
 }: AppEditorScriptPanelsNavProps) {
   const scenesActive = !isScenesCollapsed;
   const runTextVisible = !spectacleRunTextHidden;
-  const navLabel = showSpectacleRunTextToggle ? "Панели репетиции" : "Панели сценария";
+  const navLabel = showSpectacleRunTextToggle ? "Панели спектакля" : "Панели сценария";
 
   return (
     <nav className="app-editor-menubar__panels-nav" aria-label={navLabel}>

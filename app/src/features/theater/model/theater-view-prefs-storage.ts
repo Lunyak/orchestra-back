@@ -9,11 +9,12 @@ export type TheaterViewPrefs = {
   wallsHidden: boolean;
   wallsHideFromCamera: boolean;
   showFloorPlan: boolean;
-  floorPlanExpanded: boolean;
+  /** Длинная сторона области 2D-плана (px). */
+  floorPlanMaxSide: number;
   spectaclePreviewMode: boolean;
   alignGuidesEnabled: boolean;
   activeTab: "navigate" | "spotlights" | "models" | "view" | "layout" | "decor";
-  /** Пульт света внизу сцены (вкладка «Пульт» слева только переключает это). */
+  /** Пульт света внизу сцены (переключатель в меню «Вид», не вкладка). */
   lightConsoleExpanded: boolean;
   outlineDrawMode: boolean;
   /** Режим «Настройки сцены» (панели слева/справа вместо «Музыка и сцены»). */
@@ -27,6 +28,11 @@ export type TheaterViewPrefs = {
   sceneBackgroundColor: string;
   /** Направляющие линии от источника софита к цели в 3D и на плане. */
   showSpotlightGuideLines: boolean;
+  /**
+   * При растягивании зала ручками объекты (декор, софиты) остаются на месте.
+   * Выключи — поедут вместе со стенами.
+   */
+  hallResizeKeepObjects: boolean;
 };
 
 export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
@@ -39,7 +45,7 @@ export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
   wallsHidden: false,
   wallsHideFromCamera: true,
   showFloorPlan: true,
-  floorPlanExpanded: false,
+  floorPlanMaxSide: 196,
   spectaclePreviewMode: false,
   alignGuidesEnabled: true,
   activeTab: "spotlights",
@@ -51,6 +57,7 @@ export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
   sceneBackgroundColor: "#6b7280",
   showSpotlightGuideLines: true,
   lightConsoleExpanded: false,
+  hallResizeKeepObjects: true,
 };
 
 export function theaterViewPrefsStorageKey(projectName: string) {
@@ -108,9 +115,15 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
         DEFAULT_THEATER_VIEW_PREFS.wallsHideFromCamera,
       ),
       showFloorPlan: readBool(parsed.showFloorPlan, DEFAULT_THEATER_VIEW_PREFS.showFloorPlan),
-      floorPlanExpanded: readBool(
-        parsed.floorPlanExpanded,
-        DEFAULT_THEATER_VIEW_PREFS.floorPlanExpanded,
+      floorPlanMaxSide: Math.min(
+        720,
+        readNumber(
+          parsed.floorPlanMaxSide,
+          parsed.floorPlanExpanded === true
+            ? 420
+            : DEFAULT_THEATER_VIEW_PREFS.floorPlanMaxSide,
+          140,
+        ),
       ),
       spectaclePreviewMode: readBool(
         parsed.spectaclePreviewMode,
@@ -149,6 +162,10 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
         parsed.activeTab === "console"
           ? true
           : DEFAULT_THEATER_VIEW_PREFS.lightConsoleExpanded,
+      ),
+      hallResizeKeepObjects: readBool(
+        parsed.hallResizeKeepObjects,
+        DEFAULT_THEATER_VIEW_PREFS.hallResizeKeepObjects,
       ),
     };
   } catch {

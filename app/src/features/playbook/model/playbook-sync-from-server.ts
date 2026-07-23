@@ -5,7 +5,7 @@ import {
 import type { ScriptScene } from "../../../shared/types/script";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { stableStringify } from "../../../shared/utils/stableStringify";
-import { syncPull } from "../../../sync/api/entity-sync";
+import { dispatchSyncPull } from "../../../shared/api/rtk/sync-dispatch";
 import { prefetchDesktopOfflineAfterSync } from "../../../sync/desktopPrefetchOffline";
 import { downloadPlaylistTracksOffline } from "../../../shared/media/web-media-cache";
 import { mergeScannedMediaIntoScene, scanProjectMediaFolder } from "../../../shared/platform/project-media-folder";
@@ -83,12 +83,11 @@ export async function syncPlaybookFromServer(
     localStorage.getItem(perProjectKey) ?? localStorage.getItem("lastSyncAt") ?? null;
 
   try {
-    const pull = await syncPull(
-      tokenToUse,
-      effectiveLastSyncAt,
-      effectiveProject,
-      syncPullIncludeForPlaybook(),
-    );
+    const pull = await dispatchSyncPull({
+      projectSlug: effectiveProject,
+      lastSyncAt: effectiveLastSyncAt,
+      include: syncPullIncludeForPlaybook(),
+    });
     const { now, projects, playlistItems, sounds, lightChannels, theaterLayouts } = pull;
     const playbooks = pullPlaybooksFromSync(pull);
     const scriptScenesRaw = pullScriptScenesFromSync(pull);

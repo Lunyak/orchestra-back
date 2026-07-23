@@ -1,3 +1,4 @@
+import cn from "classnames";
 import type { LightFixture } from "../../types/script";
 import { fixtureLookState, type LightSchemeLookModel } from "./light-scheme-preview";
 import { fixtureMatchesChannelSlot } from "../../../features/theater/model/theater-light-channel-link";
@@ -11,7 +12,7 @@ export type LightSchemeStageMapProps = {
   highlightedChannel?: number | null;
   editable?: boolean;
   onAimChange?: (fixtureId: number, angle: number, length: number) => void;
-  /** Текст, если на плане нет софитов (режим репетиции и т.п.). */
+  /** Текст, если на плане нет софитов (режим спектакля и т.п.). */
   emptyPlotHint?: string;
   emptyPlotActionLabel?: string;
   onEmptyPlotAction?: () => void;
@@ -32,6 +33,7 @@ export function LightSchemeStageMap({
 }: LightSchemeStageMapProps) {
   const washColor = lookModel?.programColor ?? null;
   const washOpacity = lookModel?.washIntensity ?? 0;
+  const washDisplayOpacity = Math.min(0.55, 0.12 + washOpacity * 0.43);
 
   const handleAim = (
     fixtureId: number,
@@ -69,10 +71,12 @@ export function LightSchemeStageMap({
         {washColor && washOpacity > 0 ? (
           <div
             className="light-scheme-stage__wash"
-            style={{
-              backgroundColor: washColor,
-              opacity: Math.min(0.55, 0.12 + washOpacity * 0.43),
-            }}
+            style={
+              {
+                "--light-stage-wash-color": washColor,
+                "--light-stage-wash-opacity": String(washDisplayOpacity),
+              } as React.CSSProperties
+            }
             aria-hidden
           />
         ) : null}
@@ -113,28 +117,23 @@ export function LightSchemeStageMap({
             return (
               <div
                 key={fixture.id}
-                className={[
+                className={cn(
                   "light-plot-dot",
                   "light-scheme-stage__dot",
-                  slotActive ? "light-plot-dot--slot-active" : "",
+                  slotActive && "light-plot-dot--slot-active",
                   lit ? "light-scheme-stage__dot--lit" : "light-scheme-stage__dot--dim",
-                  channelHighlight ? "light-scheme-stage__dot--channel-focus" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                style={{
-                  gridColumn: fixture.x,
-                  gridRow: fixture.y,
-                  ["--angle" as string]: `${fixture.angle ?? 0}deg`,
-                  ["--length" as string]: `${fixture.length ?? 54}px`,
-                  ["--look-intensity" as string]: String(intensity),
-                  ...(look?.color && lit
-                    ? {
-                        ["--look-color" as string]: look.color,
-                        borderColor: look.color,
-                      }
-                    : {}),
-                }}
+                  channelHighlight && "light-scheme-stage__dot--channel-focus",
+                )}
+                style={
+                  {
+                    gridColumn: fixture.x,
+                    gridRow: fixture.y,
+                    ["--angle" as string]: `${fixture.angle ?? 0}deg`,
+                    ["--length" as string]: `${fixture.length ?? 54}px`,
+                    ["--look-intensity" as string]: String(intensity),
+                    ...(look?.color && lit ? { ["--look-color" as string]: look.color } : {}),
+                  } as React.CSSProperties
+                }
                 title={
                   look
                     ? `${fixture.label} · ${look.faderLabel ?? "—"} · ${pct}% · K${look.channelSlot ?? "?"}`

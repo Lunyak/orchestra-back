@@ -101,7 +101,9 @@ export class ProjectTasksService {
         ...taskSelect,
         project: {
           select: {
+            id: true,
             slug: true,
+            name: true,
             ownerId: true,
             members: { where: { userId }, select: { id: true } },
           },
@@ -126,6 +128,20 @@ export class ProjectTasksService {
     return {
       project: { id: project.id, slug: project.slug, name: project.name },
       tasks: rows.map((row) => serializeTask(row, viewer)),
+    };
+  }
+
+  async getOne(userId: string, email: string, taskId: string) {
+    const task = await this.getTaskForUser(userId, taskId);
+    const viewer = { userId, email };
+    const { project, ...row } = task;
+    return {
+      project: {
+        id: project.id,
+        slug: project.slug,
+        name: project.name,
+      },
+      task: serializeTask(row, viewer),
     };
   }
 

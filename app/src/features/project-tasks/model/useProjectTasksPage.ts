@@ -40,6 +40,7 @@ export function useProjectTasksPage() {
   const { scenes } = usePlaybook();
   const [filter, setFilter] = useState<ProjectTaskFilter>("open");
   const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [newAssigneeEmail, setNewAssigneeEmail] = useState("");
   const [newCategory, setNewCategory] = useState<ProjectTaskCategory>("other");
   const [newDueDate, setNewDueDate] = useState("");
@@ -143,16 +144,19 @@ export function useProjectTasksPage() {
   const handleCreateTask = async () => {
     const title = newTitle.trim();
     if (!projectSlug || !title) return;
+    const description = newDescription.trim();
     setActionError(null);
     try {
       await createTask({
         projectSlug,
         title,
+        description: description || undefined,
         category: newCategory,
         assigneeEmail: newAssigneeEmail.trim() || undefined,
         dueAt: newDueDate ? new Date(newDueDate).toISOString() : undefined,
       }).unwrap();
       setNewTitle("");
+      setNewDescription("");
       setNewDueDate("");
     } catch (error: unknown) {
       const err = error as { data?: { message?: string }; message?: string };
@@ -185,6 +189,29 @@ export function useProjectTasksPage() {
         isForbidden
           ? "Статус может менять только исполнитель или создатель задачи"
           : err?.data?.message ?? err?.message ?? "Не удалось обновить задачу",
+      );
+    }
+  };
+
+  const handleUpdateTaskAssignee = async (
+    task: ProjectTaskItem,
+    assigneeEmail: string,
+  ) => {
+    if (!projectSlug) return;
+    const nextEmail = assigneeEmail.trim() || null;
+    const currentEmail = task.assigneeEmail?.trim() || null;
+    if (nextEmail === currentEmail) return;
+    setActionError(null);
+    try {
+      await updateTask({
+        id: task.id,
+        projectSlug,
+        body: { assigneeEmail: nextEmail },
+      }).unwrap();
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string }; message?: string };
+      setActionError(
+        err?.data?.message ?? err?.message ?? "Не удалось назначить исполнителя",
       );
     }
   };
@@ -229,6 +256,8 @@ export function useProjectTasksPage() {
     setFilter,
     newTitle,
     setNewTitle,
+    newDescription,
+    setNewDescription,
     newAssigneeEmail,
     setNewAssigneeEmail,
     newCategory,
@@ -249,6 +278,7 @@ export function useProjectTasksPage() {
     error: actionError ?? listError,
     handleCreateTask,
     handleUpdateTaskStatus,
+    handleUpdateTaskAssignee,
     handleDeleteTask,
     handleImportRequisites,
   };

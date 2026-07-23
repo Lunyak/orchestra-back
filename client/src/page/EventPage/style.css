@@ -3,11 +3,11 @@
   --event-bg-url: none;
   --event-glass-blur: 16px;
   --event-glass-sat: 155%;
-  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 28px 24px 72px;
+  padding: clamp(16px, 2.5dvh, 28px) 24px clamp(28px, 5dvh, 72px);
   background:
     radial-gradient(900px 520px at 20% 10%, color-mix(in oklab, var(--event-accent) 28%, transparent), transparent 60%),
     radial-gradient(820px 520px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
@@ -17,7 +17,6 @@
   background-size: auto, auto, auto, cover, auto;
   background-position: center, center, center, center, center;
   background-repeat: no-repeat;
-  overflow: hidden;
 }
 
 .event-page__particles {
@@ -550,7 +549,7 @@
 
 .event-carousel__main {
   width: 100%;
-  height: clamp(360px, 60vh, 640px);
+  height: clamp(260px, 48dvh, 640px);
   /* Swiper defaults are blue; override locally */
   --swiper-theme-color: rgba(255, 255, 255, 0.78);
   --swiper-navigation-color: rgba(255, 255, 255, 0.78);
@@ -754,7 +753,7 @@
   }
 
   .event-carousel__main {
-    height: clamp(260px, 46vh, 440px);
+    height: clamp(240px, 42dvh, 440px);
   }
 
   .event-carousel__main .swiper-button-prev,

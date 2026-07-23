@@ -175,7 +175,7 @@ export function ProjectMediaSourceBar({
   return (
     <section className="project-media-source" aria-label="Источники медиа">
       <p className="project-media-source__lead">
-        Все файлы проекта хранятся здесь. Суфлёр, сценарий и проектор берут медиа из этой
+        Все файлы проекта хранятся здесь. Прогон, сценарий и проектор берут медиа из этой
         библиотеки — отдельно по проекту ничего качать не нужно.
       </p>
 

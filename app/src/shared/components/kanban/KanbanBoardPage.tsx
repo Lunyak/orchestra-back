@@ -529,8 +529,7 @@ export function KanbanBoardPage({
 
   return (
     <div className="kanban-page">
-      <RehearsalPlanSectionChrome activeTab="board" />
-
+      <RehearsalPlanSectionChrome activeTab="board">
       {rolesError && (
         <div className="kanban-muted kanban-muted--bottom">
           {rolesError}
@@ -734,6 +733,7 @@ export function KanbanBoardPage({
           roleAssignmentMembers={roleAssignmentMembers}
         />
       )}
+      </RehearsalPlanSectionChrome>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 export { AppEditorChatToggle } from "./AppEditorChatToggle";
-export { AppEditorNavigationMenu } from "./AppEditorNavigationMenu";
+export { AppEditorHomeLink } from "./AppEditorHomeLink";
 export { AppEditorMenubar } from "./AppEditorMenubar";
 export {
   AppEditorMenubarProvider,

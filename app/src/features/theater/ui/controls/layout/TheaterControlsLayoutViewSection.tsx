@@ -1,20 +1,18 @@
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import { labelM } from "../../../model/theater-metrics";
-import { TheaterBtn, TheaterField } from "../../theater-controls-ui";
-import { useTheaterControlsLightChannels } from "../use-theater-controls-light-channels";
+import { TheaterField } from "../../theater-controls-ui";
 import type { LayoutSectionProps } from "./types";
 
 export function TheaterControlsLayoutViewSection({ vm, layout }: LayoutSectionProps) {
   const { layoutHallBadge } = layout;
-  const { lightChannels } = useTheaterControlsLightChannels();
 
   return (
     <>
       <TheaterCollapsibleSection
         sectionId="layout-view"
-        title="Вид и план"
-        summary="Сетка, кресла, режимы просмотра"
+        title="Вид и привязка"
+        summary="Что показывать и как перемещать"
         badge={layoutHallBadge}
         defaultOpen
       >
@@ -46,14 +44,6 @@ export function TheaterControlsLayoutViewSection({ vm, layout }: LayoutSectionPr
           <LabeledCheckbox checked={vm.showFloorPlan} onChange={vm.setShowFloorPlan}>
             План сверху
           </LabeledCheckbox>
-          {vm.showFloorPlan ? (
-            <LabeledCheckbox
-              checked={vm.floorPlanExpanded}
-              onChange={vm.setFloorPlanExpanded}
-            >
-              План развёрнут
-            </LabeledCheckbox>
-          ) : null}
           <LabeledCheckbox
             checked={vm.spectaclePreviewMode}
             onChange={vm.setSpectaclePreviewMode}
@@ -87,16 +77,9 @@ export function TheaterControlsLayoutViewSection({ vm, layout }: LayoutSectionPr
             onChange={(event) => vm.setSceneBackgroundColor(event.target.value)}
           />
         </TheaterField>
-        <TheaterBtn
-          disabled={!vm.currentScene || (vm.currentScene.lightCues?.length ?? 0) === 0}
-          title="Скопировать таймлайн light cue в буфер"
-          onClick={() => void vm.copyLightCuesToClipboard(lightChannels)}
-        >
-          Cue → буфер
-        </TheaterBtn>
-        {vm.floorPlanExpanded ? (
+        {vm.showFloorPlan ? (
           <p className="theater-layout-hint">
-            Колёсико — масштаб, Alt+перетаскивание — сдвиг плана.
+            Угол плана — размер. Колёсико — масштаб, Alt+перетаскивание — сдвиг.
           </p>
         ) : null}
       </TheaterCollapsibleSection>

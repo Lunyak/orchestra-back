@@ -72,7 +72,7 @@ export function OfflinePackStatus() {
             disabled={busy || !online || !projectName}
             onClick={() => void downloadPack()}
           >
-            {busy ? "Загрузка…" : "Скачать для суфлёра"}
+            {busy ? "Загрузка…" : "Скачать для прогона"}
           </button>
           <DownloadProjectorMediaButton
             buttonClassName="offline-pack-status__btn offline-pack-status__btn--secondary"

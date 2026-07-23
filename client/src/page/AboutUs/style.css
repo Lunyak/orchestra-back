@@ -1,15 +1,14 @@
 .aboutus-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 28px 24px 72px;
+  padding: clamp(16px, 2.5dvh, 28px) 24px clamp(28px, 5dvh, 72px);
   background:
     radial-gradient(900px 500px at 20% 10%, rgba(184, 53, 74, 0.18), transparent 60%),
     radial-gradient(800px 500px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
     radial-gradient(900px 650px at 50% 95%, rgba(0, 0, 0, 0.55), transparent 65%),
     var(--color-bg);
-  overflow: hidden;
 }
 
 .aboutus-page__content {
@@ -67,7 +66,7 @@
 
 .aboutus-card {
   position: relative;
-  height: 420px;
+  height: clamp(280px, 42dvh, 420px);
   border-radius: 1rem;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.03);
@@ -143,7 +142,7 @@
   }
 
   .aboutus-card {
-    height: 380px;
+    height: clamp(260px, 40dvh, 380px);
   }
 }
 
@@ -157,7 +156,7 @@
   }
 
   .aboutus-card {
-    height: 320px;
+    height: clamp(240px, 48dvh, 320px);
   }
 }
 

@@ -116,6 +116,8 @@ export function TheaterFloorPlanSvg({
       ]
         .filter(Boolean)
         .join(" ")}
+      width={size.width}
+      height={size.height}
       viewBox={`0 0 ${size.width} ${size.height}`}
       role="img"
       aria-label="План сцены сверху"

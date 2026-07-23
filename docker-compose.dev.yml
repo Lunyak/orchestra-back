@@ -83,3 +83,31 @@ services:
       - "5174:5173"
     depends_on:
       - back
+
+  site:
+    build:
+      context: .
+      dockerfile: client/Dockerfile.dev
+    volumes:
+      - ./client/src:/workspace/client/src
+      - ./client/public:/workspace/client/public
+      - ./client/package.json:/workspace/client/package.json
+      - ./client/package-lock.json:/workspace/client/package-lock.json
+      - ./client/tsconfig.json:/workspace/client/tsconfig.json
+      - /workspace/client/node_modules
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      BROWSER: none
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      # Браузер ходит на host:8082, HMR-сокет тоже через этот порт
+      WDS_SOCKET_PORT: "8082"
+      REACT_APP_API_BASE_URL: /api
+      DEV_PROXY_API: http://back:3000
+      DEV_PROXY_MINIO: http://minio:9000
+    ports: !override
+      - "8082:3000"
+    depends_on:
+      - back
+      - minio

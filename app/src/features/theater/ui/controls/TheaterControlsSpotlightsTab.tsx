@@ -6,12 +6,14 @@ import { TheaterControlsSpotlightsRegularSection } from "./spotlights/TheaterCon
 import { TheaterControlsSpotlightsRgbSection } from "./spotlights/TheaterControlsSpotlightsRgbSection";
 import { TheaterControlsSpotlightsSceneSection } from "./spotlights/TheaterControlsSpotlightsSceneSection";
 import { TheaterControlsSpotlightsLayoutSection } from "./spotlights/TheaterControlsSpotlightsLayoutSection";
+import { TheaterControlsSpotlightsTrussSection } from "./spotlights/TheaterControlsSpotlightsTrussSection";
 
 export function TheaterControlsSpotlightsTab({ vm }: TheaterControlsTabProps) {
   const spot = useTheaterControlsSpotlightsTab(vm);
   return (
     <div className="theater-layout-panel">
       <TheaterControlsSpotlightsLightplotSection vm={vm} spot={spot} />
+      <TheaterControlsSpotlightsTrussSection vm={vm} spot={spot} />
       <TheaterControlsSpotlightsMultiSection vm={vm} spot={spot} />
       <TheaterControlsSpotlightsRegularSection vm={vm} spot={spot} />
       <TheaterControlsSpotlightsRgbSection vm={vm} spot={spot} />

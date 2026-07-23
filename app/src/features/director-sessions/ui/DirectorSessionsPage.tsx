@@ -270,8 +270,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
 
   return (
     <div className="rehearsals-page sessions-page">
-      <RehearsalPlanSectionChrome activeTab="sessions" />
-
+      <RehearsalPlanSectionChrome activeTab="sessions">
       <div className="sessions-flow">
         {browseStage === "calendar" ? (
           <RehearsalsCard className="sessions-calendar-card">
@@ -637,6 +636,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
           </div>
         ) : null}
       </div>
+      </RehearsalPlanSectionChrome>
     </div>
   );
 }

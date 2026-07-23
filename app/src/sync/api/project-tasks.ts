@@ -37,6 +37,11 @@ export type ProjectTasksListResponse = {
   tasks: ProjectTaskItem[];
 };
 
+export type ProjectTaskDetailResponse = {
+  project: { id: string; slug: string; name: string };
+  task: ProjectTaskItem;
+};
+
 export type CreateProjectTaskPayload = {
   projectSlug: string;
   title: string;

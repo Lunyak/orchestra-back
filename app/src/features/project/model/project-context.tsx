@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
-import { syncPush } from "../../../sync/api/entity-sync";
 import { ensureProject, fetchProjects, updateProject } from "../../../sync/api/projects";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
+import { syncApi } from "../../../shared/api/rtk/sync-api";
+import { store } from "../../../shared/store/store";
 import { createId } from "../../../shared/utils/createId";
 import type { ProjectSummary } from "../../../sync/api/types/project";
 import { useAuth } from "../../auth/model/auth-context";
@@ -359,20 +360,23 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       if (accessToken && projectId) {
         try {
           const nowIso = new Date().toISOString();
-          await syncPush(
-            accessToken,
-            [
-              {
-                id: createId(),
-                entityType: "Project",
-                entityId: projectId,
-                operation: "delete",
-                payload: { id: projectId, updatedAt: nowIso },
-                createdAt: nowIso,
-              },
-            ],
-            { destructiveConfirm: typed.trim() },
-          );
+          await store
+            .dispatch(
+              syncApi.endpoints.syncPush.initiate({
+                changes: [
+                  {
+                    id: createId(),
+                    entityType: "Project",
+                    entityId: projectId,
+                    operation: "delete",
+                    payload: { id: projectId, updatedAt: nowIso },
+                    createdAt: nowIso,
+                  },
+                ],
+                destructiveConfirm: typed.trim(),
+              }),
+            )
+            .unwrap();
         } catch (err) {
           console.error("deleteProject sync failed:", err);
         }

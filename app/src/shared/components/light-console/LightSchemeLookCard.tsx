@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import cn from "classnames";
 import type { LightSchemeLookModel } from "./light-scheme-preview";
 import {
   buildKadrRecordFaderRows,
@@ -34,11 +35,12 @@ function FaderRow({
   equipmentLabel?: string;
 }) {
   const via = equipmentLabel ? ` · ${equipmentLabel}` : "";
+  const fillPct = off ? "0%" : `${pct}%`;
+  const fillColor = color ?? "var(--color-active-ascent)";
+
   return (
     <div
-      className={["light-scheme-call__fader", off ? "light-scheme-call__fader--off" : ""]
-        .filter(Boolean)
-        .join(" ")}
+      className={cn("light-scheme-call__fader", off && "light-scheme-call__fader--off")}
       title={
         off
           ? `${label}${via} · выключен в картине`
@@ -49,10 +51,12 @@ function FaderRow({
       <div className="light-scheme-call__fader-bar">
         <div
           className="light-scheme-call__fader-fill"
-          style={{
-            width: off ? "0%" : `${pct}%`,
-            backgroundColor: color ?? "var(--color-active-ascent)",
-          }}
+          style={
+            {
+              "--light-fader-fill-pct": fillPct,
+              "--light-fader-fill-color": fillColor,
+            } as React.CSSProperties
+          }
         />
       </div>
       <span className="light-scheme-call__fader-pct">{off ? "выкл" : `${pct}%`}</span>

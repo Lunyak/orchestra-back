@@ -1233,12 +1233,12 @@
 /* Страница одной сессии (план слотов + материал) — layout; chrome см. блок выше */
 .director-session-page {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   flex-direction: column;
   justify-content: flex-start;
 }
 
-.director-session-page > .rehearsal-plan-chrome {
+.director-session-page > .admin-chrome-layout {
   width: 100%;
   align-self: stretch;
 }

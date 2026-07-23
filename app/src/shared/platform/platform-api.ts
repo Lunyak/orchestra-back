@@ -44,7 +44,7 @@ export type PlatformAddProjectImageResult = PlatformInvokeResult & {
 export interface PlatformApi {
   invoke?: (channel: string, ...args: unknown[]) => Promise<unknown>;
   readProjectPlaybook: (projectName: string, sceneName: string) => Promise<unknown>;
-  /** Локальный суфлёр — отдельный файл, не участвует в sync. */
+  /** Локальный прогон — отдельный файл, не участвует в sync. */
   readNotesRun?: (projectName: string) => Promise<unknown>;
   saveNotesRun?: (projectName: string, data: unknown) => Promise<PlatformPlaybookSaveResult>;
   saveProjectPlaybook?: (

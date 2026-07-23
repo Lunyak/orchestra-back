@@ -15,19 +15,11 @@ import { SpotlightListNameInput } from "./SpotlightListNameInput";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSectionProps) {
+  const activeRgbSpotlight = vm.activeSpotlight?.isRgb ? vm.activeSpotlight : null;
   const {
-    spotlightBatchCount,
-    setSpotlightBatchCount,
     rgbBatchCount,
     setRgbBatchCount,
-    spotlightLayoutRows,
-    setSpotlightLayoutRows,
-    regularSpotlights,
     rgbSpotlights,
-    totalSpotlights,
-    linkStats,
-    spotlightLinkBadge,
-    spotlightCountBadge,
     lightChannels,
     lightFaders,
     selectedLightSlot,
@@ -146,6 +138,16 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
               <span className="theater-spotlight-empty">RGB нет</span>
             )}
             </div>
+            <LabeledCheckbox
+              checked={activeRgbSpotlight?.modelLowDetail ?? false}
+              onChange={(modelLowDetail) => {
+                if (!activeRgbSpotlight) return;
+                vm.updateSpotlight(activeRgbSpotlight.id, { modelLowDetail });
+              }}
+              disabled={!activeRgbSpotlight}
+            >
+              Упрощённая 3D-модель
+            </LabeledCheckbox>
             <div className="theater-btn-row">
               <TheaterBtn onClick={vm.addRgbSpotlight} disabled={!vm.currentScene}>
                 + RGB

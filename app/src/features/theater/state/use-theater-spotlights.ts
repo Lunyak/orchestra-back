@@ -1,5 +1,11 @@
 import { tc } from "../../../shared/styles/theme-color";
-import { useCallback, useMemo, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useMemo,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { ScriptScene, TheaterLayout, TheaterSpotlight } from "../../../shared/types/script";
 import { DEFAULT_SPOTLIGHTS } from "../model/theater-defaults";
 import {
@@ -55,6 +61,12 @@ import type {
   PlaybookLightProgramsDataV1,
 } from "../../playbook/model/playbook-slice";
 import { applyFadersToSpotlightsPerChannelDisplay } from "../model/theater-light-fader-bindings";
+import { readSceneTheaterModels } from "../model/theater-scene-models";
+import {
+  getOccupiedTrussMountPointIds,
+  isLightTrussModel,
+  resolveLightTrussMountWorldPosition,
+} from "../model/theater-truss-mounts";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterSpotlightsArgs = {
@@ -75,6 +87,8 @@ export type UseTheaterSpotlightsArgs = {
   /** Активный канал на пульте — живая доска только для этого K. */
   consoleChannel?: number;
 };
+
+export type TrussMountFixtureType = "regular" | "rgb";
 
 const batchSpotlightColors = [
   tc("--color-warning"),
@@ -119,6 +133,8 @@ export function useTheaterSpotlights({
   consoleChannel,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
+  const [trussMountFixtureType, setTrussMountFixtureType] =
+    useState<TrussMountFixtureType>("regular");
   const spotlightsRaw = currentScene?.theaterSpotlights;
   const spotlights = spotlightsRaw ?? [];
   const displaySpotlights =
@@ -172,6 +188,13 @@ export function useTheaterSpotlights({
             ? { faderId: Math.max(1, Math.trunc(item.faderId!)) }
             : {}),
           isRgb: item.isRgb ?? false,
+          modelLowDetail: item.modelLowDetail ?? false,
+          ...(Number.isFinite(item.mountModelId)
+            ? { mountModelId: Math.max(1, Math.trunc(item.mountModelId!)) }
+            : {}),
+          ...(item.mountPointId?.trim()
+            ? { mountPointId: item.mountPointId.trim() }
+            : {}),
           ...(item.hidden ? { hidden: true } : {}),
           ...(Number.isFinite(item.gridCol)
             ? { gridCol: Math.max(0, Math.trunc(item.gridCol!)) }
@@ -223,6 +246,14 @@ export function useTheaterSpotlights({
           if ("faderId" in patch && patch.faderId == null) {
             delete next.faderId;
           }
+          if (
+            patch.position &&
+            patch.mountModelId === undefined &&
+            patch.mountPointId === undefined
+          ) {
+            delete next.mountModelId;
+            delete next.mountPointId;
+          }
           return next;
         }),
       );
@@ -273,6 +304,145 @@ export function useTheaterSpotlights({
     [ensureSpotlights, updateSpotlights],
   );
 
+  const attachSpotlightToTrussMount = useCallback(
+    (spotlightId: number, mountModelId: number, mountPointId: string) => {
+      const base = ensureSpotlights();
+      const spotlight = base.find((item) => item.id === spotlightId);
+      const truss = readSceneTheaterModels(currentScene).find(
+        (model) => model.id === mountModelId,
+      );
+      if (!spotlight || !isLightTrussModel(truss)) {
+        setDecorActionMessage("Не удалось найти софит или световую ферму");
+        return;
+      }
+
+      const occupiedMounts = getOccupiedTrussMountPointIds(
+        base,
+        mountModelId,
+        spotlightId,
+      );
+      if (occupiedMounts.has(mountPointId)) {
+        setDecorActionMessage("Эта точка фермы уже занята");
+        return;
+      }
+
+      const position = resolveLightTrussMountWorldPosition(truss, mountPointId);
+      if (!position) {
+        setDecorActionMessage("Точка крепления не найдена");
+        return;
+      }
+
+      updateSpotlights(
+        base.map((item) =>
+          item.id === spotlightId
+            ? { ...item, position, mountModelId, mountPointId }
+            : item,
+        ),
+      );
+      setDecorActionMessage(`«${spotlight.label}» закреплён на «${truss.name}»`);
+    },
+    [
+      currentScene,
+      ensureSpotlights,
+      setDecorActionMessage,
+      updateSpotlights,
+    ],
+  );
+
+  const detachSpotlightFromTruss = useCallback(
+    (spotlightId: number) => {
+      const base = ensureSpotlights();
+      updateSpotlights(
+        base.map((item) =>
+          item.id === spotlightId
+            ? { ...item, mountModelId: undefined, mountPointId: undefined }
+            : item,
+        ),
+      );
+      setDecorActionMessage("Софит снят с фермы");
+    },
+    [ensureSpotlights, setDecorActionMessage, updateSpotlights],
+  );
+
+  const installSpotlightOnTrussMount = useCallback(
+    (
+      mountModelId: number,
+      mountPointId: string,
+      fixtureType: TrussMountFixtureType = trussMountFixtureType,
+    ) => {
+      const base = ensureSpotlights();
+      const truss = readSceneTheaterModels(currentScene).find(
+        (model) => model.id === mountModelId,
+      );
+      if (!isLightTrussModel(truss)) {
+        setDecorActionMessage("Световая ферма не найдена");
+        return;
+      }
+      const occupiedMounts = getOccupiedTrussMountPointIds(base, mountModelId);
+      if (occupiedMounts.has(mountPointId)) {
+        const mountedSpotlight = base.find(
+          (item) =>
+            item.mountModelId === mountModelId &&
+            item.mountPointId === mountPointId,
+        );
+        if (mountedSpotlight) {
+          setMultiSelectedSpotlightIds([mountedSpotlight.id]);
+          updateCurrentScene({
+            theaterActiveSpotlightId: mountedSpotlight.id,
+          });
+          setEditMode("spotlights");
+        }
+        return;
+      }
+
+      const position = resolveLightTrussMountWorldPosition(truss, mountPointId);
+      if (!position) {
+        setDecorActionMessage("Точка крепления не найдена");
+        return;
+      }
+
+      const nextId = base.reduce(
+        (largestId, item) => Math.max(largestId, item.id),
+        0,
+      ) + 1;
+      const isRgb = fixtureType === "rgb";
+      const nextSpotlight: TheaterSpotlight = {
+        id: nextId,
+        label: isRgb ? `RGB ${nextId}` : `Софит ${nextId}`,
+        position,
+        target: [...STAGE_AIM_TARGET],
+        angleDeg: isRgb ? 26 : 20,
+        intensity: isRgb
+          ? THEATER_SPOTLIGHT_RGB_DEFAULT_UI_INTENSITY
+          : THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
+        color: isRgb ? tc("--color-text-white") : tc("--color-warning"),
+        enabled: true,
+        channel: nextId,
+        isRgb,
+        modelLowDetail: false,
+        mountModelId,
+        mountPointId,
+      };
+      updateSpotlights([...base, nextSpotlight]);
+      setMultiSelectedSpotlightIds([nextId]);
+      updateCurrentScene({ theaterActiveSpotlightId: nextId });
+      setEditMode("spotlights");
+      setDecorActionMessage(
+        `${isRgb ? "RGB-софит" : "Софит"} установлен на «${truss.name}»`,
+      );
+    },
+    [
+      currentScene,
+      ensureSpotlights,
+      setDecorActionMessage,
+      setEditMode,
+      setMultiSelectedSpotlightIds,
+      trussMountFixtureType,
+      updateCurrentScene,
+      updateSpotlights,
+    ],
+  );
+
   const updateLayoutZoneGrid = useCallback(
     (patch: Partial<{ cols: number; rows: number }>) => {
       updateLayout(patchLayoutZoneGrid(layout, patch));
@@ -308,6 +478,8 @@ export function useTheaterSpotlights({
           source.position[1],
           source.position[2] + 0.35,
         ],
+        mountModelId: undefined,
+        mountPointId: undefined,
       };
       updateSpotlights([...base, nextItem]);
       updateCurrentScene({ theaterActiveSpotlightId: nextId });
@@ -743,6 +915,11 @@ export function useTheaterSpotlights({
     aimSpotlightToGridCell,
     aimActiveSpotlightToGridCell,
     clearSpotlightGridBinding,
+    attachSpotlightToTrussMount,
+    detachSpotlightFromTruss,
+    installSpotlightOnTrussMount,
+    trussMountFixtureType,
+    setTrussMountFixtureType,
     updateLayoutZoneGrid,
     removeSpotlight,
     cloneSpotlight,

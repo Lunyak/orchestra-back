@@ -10,16 +10,12 @@ import {
 } from "react";
 import * as THREE from "three";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
-import { encodeOrchestraModelRef } from "../../../shared/project-assets/orchestraModelRef";
-import { ensureProject } from "../../../sync/api/projects";
-import { uploadProjectFile } from "../../../sync/api/files";
 import type {
   ScriptScene,
   TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
 } from "../../../shared/types/script";
-import { normalizeDecorTextureFaces } from "../model/theater-decor-faces";
 import {
   alignModelsByActiveBuiltin,
   alignModelsBySelection,
@@ -27,24 +23,27 @@ import {
   distributeModelsBySelection,
   setModelsVisibilityBySelection,
 } from "../model/theater-model-align";
-import { snapTheaterHallPoint } from "../model/theater-hall-grid";
 import {
   resolveModelPlacementPosition,
-  resolveModelHalfDepth,
   rotateModelByQuarterTurn,
   type ModelPlacementPreset,
 } from "../model/theater-model-placement";
 import {
-  canIgnoreSeatedHumanCollision,
   findSeatingTargetForHuman,
-  isSittingHumanTheaterModel,
   seatHumanOnFurniture,
 } from "../model/theater-model-seating";
-import { snapModelZToAudienceLine } from "../model/theater-audience-snap";
+import type { ActiveAlignGuide } from "../model/theater-align-guides";
 import {
-  applyAlignGuideSnap,
-  type ActiveAlignGuide,
-} from "../model/theater-align-guides";
+  applyActiveModelTransform as computeActiveModelTransform,
+  liftModelObjectAboveFloor,
+  nudgeModelPosition,
+  type TheaterModelTransformPatch,
+} from "../model/theater-model-transform";
+import {
+  formatTheaterModelWorldSize,
+  resolveTheaterModelWorldSize,
+  type TheaterModelWorldSize,
+} from "../model/theater-model-world-size";
 import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
@@ -56,25 +55,19 @@ import {
 import { cloneTheaterSpotlights } from "./use-theater-spotlights";
 import type { TheaterEditMode } from "./use-theater-selection";
 import { resolveTheaterModelFileUrlSync } from "../model/theater-model-asset-url";
-
-const MODEL_TRANSFORM_HISTORY_GRACE_MS = 400;
-
-const THEATER_MODEL_FILE_ACCEPT =
-  ".glb,.gltf,model/gltf-binary,model/gltf+json";
-
-function readAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem("accessToken");
-  } catch {
-    return null;
-  }
-}
-
-function modelDisplayNameFromFileName(fileName: string): string {
-  const base = fileName.replace(/^.*[/\\]/, "").trim();
-  return base.replace(/\.[^.]+$/, "") || base || "Модель";
-}
+import {
+  createBuiltinTheaterModel,
+  isTheaterBuiltinTemplateKey,
+} from "../model/theater-model-builtin";
+import {
+  MODEL_TRANSFORM_HISTORY_GRACE_MS,
+} from "../model/theater-model-helpers";
+import { openTheaterModelWebUploadPicker } from "../model/theater-model-import";
+import { normalizeTheaterModels } from "../model/theater-model-normalize";
+import {
+  isLightTrussModel,
+  syncMountedSpotlights,
+} from "../model/theater-truss-mounts";
 
 export function cloneTheaterModels(source: TheaterModel[]): TheaterModel[] {
   return source.map((item) => ({
@@ -113,7 +106,6 @@ export type UseTheaterModelsArgs = {
   setIsDragging: Dispatch<SetStateAction<boolean>>;
   setDecorActionMessage: (message: string | null) => void;
   displaySpotlights: TheaterSpotlight[];
-  updateSpotlights: (next: TheaterSpotlight[]) => void;
 };
 
 export function useTheaterModels({
@@ -141,7 +133,6 @@ export function useTheaterModels({
   setIsDragging,
   setDecorActionMessage,
   displaySpotlights,
-  updateSpotlights,
 }: UseTheaterModelsArgs) {
   const modelTransformEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -178,6 +169,7 @@ export function useTheaterModels({
   const [activeModelObjectId, setActiveModelObjectId] = useState<number | null>(
     null,
   );
+  const [activeModelSizeTick, setActiveModelSizeTick] = useState(0);
 
   const models = readSceneTheaterModels(currentScene);
   const visibleModels = useMemo(
@@ -187,6 +179,16 @@ export function useTheaterModels({
   const activeModel = activeModelId
     ? models.find((item) => item.id === activeModelId)
     : undefined;
+
+  const activeModelWorldSize = useMemo((): TheaterModelWorldSize | null => {
+    if (!activeModel) return null;
+    void activeModelSizeTick;
+    return resolveTheaterModelWorldSize(activeModel, activeModelObject);
+  }, [activeModel, activeModelObject, activeModelSizeTick]);
+
+  const activeModelSizeLabel = useMemo(() => {
+    return activeModelWorldSize ? formatTheaterModelWorldSize(activeModelWorldSize) : null;
+  }, [activeModelWorldSize]);
 
   const clearModelTransformEndTimer = useCallback(() => {
     if (modelTransformEndTimerRef.current == null) return;
@@ -226,80 +228,69 @@ export function useTheaterModels({
   }, [setIsDragging]);
 
     const normalizeModels = useCallback(
-      (items: TheaterModel[]) =>
-        items.map((item, index) => {
-          const nextId = Number(item.id) || index + 1;
-          return {
-            id: nextId,
-            name: item.name?.trim() || `Модель ${nextId}`,
-            file: item.file,
-            type: item.type ?? (item.file ? "file" : "builtin"),
-            builtin: item.builtin,
-            allowOutOfBounds: item.allowOutOfBounds ?? false,
-            ignoreCollisions: item.ignoreCollisions ?? false,
-            position: item.position ?? [0, 0, 0],
-            rotation: item.rotation ?? [0, 0, 0],
-            scale: item.scale ?? [1, 1, 1],
-            decorSize: item.decorSize
-              ? ([...item.decorSize] as [number, number, number])
-              : undefined,
-            decorColor: item.decorColor,
-            decorTexture: item.decorTexture,
-            decorTextureRepeat:
-              typeof item.decorTextureRepeat === "number"
-                ? item.decorTextureRepeat
-                : undefined,
-            decorTextureMode:
-              item.decorTextureMode === "repeat" ||
-              item.decorTextureMode === "cover" ||
-              item.decorTextureMode === "contain" ||
-              item.decorTextureMode === "once"
-                ? item.decorTextureMode
-                : undefined,
-            decorTextureFaces: normalizeDecorTextureFaces(item.decorTextureFaces),
-            decorOneSided: item.decorOneSided ?? false,
-            decorOpacity:
-              typeof item.decorOpacity === "number" ? item.decorOpacity : undefined,
-            decorRoughness:
-              typeof item.decorRoughness === "number" ? item.decorRoughness : undefined,
-            decorMetalness:
-              typeof item.decorMetalness === "number" ? item.decorMetalness : undefined,
-            decorEmissiveColor: item.decorEmissiveColor,
-            decorEmissiveIntensity:
-              typeof item.decorEmissiveIntensity === "number"
-                ? item.decorEmissiveIntensity
-                : undefined,
-            decorMaterialSide:
-              item.decorMaterialSide === "front" ||
-              item.decorMaterialSide === "back" ||
-              item.decorMaterialSide === "double"
-                ? item.decorMaterialSide
-                : undefined,
-            humanSkinColor: item.humanSkinColor,
-            humanTopColor: item.humanTopColor,
-            humanBottomColor: item.humanBottomColor,
-            humanShoeColor: item.humanShoeColor,
-            ...(item.hidden ? { hidden: true } : {}),
-          };
-        }),
-      []
+      (items: TheaterModel[]) => normalizeTheaterModels(items),
+      [],
     );
 
     const updateModels = useCallback(
       (next: TheaterModel[]) => {
         recordTheaterHistory();
-        updateCurrentScene(writeSceneTheaterModels(normalizeModels(next)));
+        const normalizedModels = normalizeModels(next);
+        const sourceSpotlights =
+          currentScene?.theaterSpotlights ?? displaySpotlights;
+        const nextSpotlights = syncMountedSpotlights(
+          sourceSpotlights,
+          normalizedModels,
+        );
+        const spotlightsChanged = nextSpotlights.some(
+          (spotlight, index) => spotlight !== sourceSpotlights[index],
+        );
+        updateCurrentScene({
+          ...writeSceneTheaterModels(normalizedModels),
+          ...(spotlightsChanged
+            ? { theaterSpotlights: nextSpotlights }
+            : {}),
+        });
       },
-      [normalizeModels, recordTheaterHistory, updateCurrentScene]
+      [
+        currentScene?.theaterSpotlights,
+        displaySpotlights,
+        normalizeModels,
+        recordTheaterHistory,
+        updateCurrentScene,
+      ],
+    );
+
+    const syncSpotlightsForModels = useCallback(
+      (nextModels: TheaterModel[], mountModelId?: number) => {
+        const sourceSpotlights =
+          currentScene?.theaterSpotlights ?? displaySpotlights;
+        const nextSpotlights = syncMountedSpotlights(
+          sourceSpotlights,
+          nextModels,
+          mountModelId,
+        );
+        const hasChanges = nextSpotlights.some(
+          (spotlight, index) => spotlight !== sourceSpotlights[index],
+        );
+        if (!hasChanges) return;
+        updateCurrentScene({ theaterSpotlights: nextSpotlights });
+      },
+      [
+        currentScene?.theaterSpotlights,
+        displaySpotlights,
+        updateCurrentScene,
+      ],
     );
 
     const updateModel = useCallback(
       (id: number, patch: Partial<TheaterModel>) => {
-        updateModels(
-          models.map((item) => (item.id === id ? { ...item, ...patch } : item))
+        const nextModels = models.map((item) =>
+          item.id === id ? { ...item, ...patch } : item,
         );
+        updateModels(nextModels);
       },
-      [models, updateModels]
+      [models, updateModels],
     );
 
     const resolveModelSrc = useCallback(
@@ -368,43 +359,19 @@ export function useTheaterModels({
 
     const addModelFromWebUpload = useCallback(() => {
       if (!currentScene) return;
-      const token = readAccessToken();
-      if (!token) {
-        setDecorActionMessage("Войдите в аккаунт, чтобы загрузить модель");
-        return;
-      }
-
-      const input = document.createElement("input");
-      input.type = "file";
-      input.accept = THEATER_MODEL_FILE_ACCEPT;
-      input.multiple = false;
-      input.onchange = () => {
-        const file = input.files?.[0] ?? null;
-        if (!file) return;
-        void (async () => {
-          try {
-            const project = await ensureProject(
-              token,
-              projectName,
-              `Проект ${projectName}`,
-            );
-            const { key } = await uploadProjectFile(token, {
-              projectId: project.id,
-              type: "model",
-              file,
-            });
-            appendFileModel(
-              encodeOrchestraModelRef(key),
-              modelDisplayNameFromFileName(file.name),
-            );
-            setDecorActionMessage(null);
-          } catch (err) {
-            console.error("Failed to upload model:", err);
-            setDecorActionMessage("Не удалось загрузить модель");
-          }
-        })();
-      };
-      input.click();
+      openTheaterModelWebUploadPicker({
+        projectName,
+        onAuthRequired: () => {
+          setDecorActionMessage("Войдите в аккаунт, чтобы загрузить модель");
+        },
+        onError: () => {
+          setDecorActionMessage("Не удалось загрузить модель");
+        },
+        onUploaded: (fileRef, displayName) => {
+          appendFileModel(fileRef, displayName);
+          setDecorActionMessage(null);
+        },
+      });
     }, [appendFileModel, currentScene, projectName, setDecorActionMessage]);
 
     const addModel = async () => {
@@ -432,84 +399,30 @@ export function useTheaterModels({
     };
 
     const addBuiltinModel = () => {
+      addBuiltinModelAt(builtinModelKey);
+    };
+
+    const addBuiltinModelAt = (
+      key: TheaterModel["builtin"] = builtinModelKey,
+      position?: [number, number, number],
+    ) => {
+      if (!key) return;
       const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
-      const builtinNames: Record<string, string> = {
-        table: "Стол",
-        roundTable: "Круглый стол",
-        chair: "Стул",
-        sofa: "Диван",
-        bench: "Скамейка",
-        cabinet: "Тумба",
-        blackCube: "Черный куб",
-        strawGrid: "Сетка + солома",
-        actor: "Актер",
-        hangingFabric: "Висящая ткань",
-        humanStanding: "Человек — стоит",
-        humanSitting: "Человек — сидит",
-        humanSmoothStanding: "Человек сглаженный — стоит",
-        humanSmoothSitting: "Человек сглаженный — сидит",
-        fence: "Забор",
-        dancer: "Танцор",
-      };
-      const isHumanModel =
-        builtinModelKey === "humanStanding" ||
-        builtinModelKey === "humanSitting" ||
-        builtinModelKey === "humanSmoothStanding" ||
-        builtinModelKey === "humanSmoothSitting";
-      const nextItem: TheaterModel = {
-        id: nextId,
-        name: builtinNames[builtinModelKey ?? "table"] || `Модель ${nextId}`,
-        type: "builtin",
-        builtin: builtinModelKey,
-        allowOutOfBounds: false,
-        ignoreCollisions: false,
-        position: [0, isHumanModel ? 0.02 : 0, 0],
-        rotation: [0, 0, 0],
-        scale: isHumanModel ? [0.9, 0.9, 0.9] : [1, 1, 1],
-        ...(isHumanModel
-          ? {
-              humanSkinColor: "#d7a77f",
-              humanTopColor: "#334155",
-              humanBottomColor: "#1e293b",
-              humanShoeColor: "#111827",
-            }
-          : {}),
-      };
+      const nextItem = createBuiltinTheaterModel(nextId, key);
+      if (position) {
+        nextItem.position = [
+          position[0],
+          nextItem.position[1],
+          position[2],
+        ];
+      }
       updateModels([...models, nextItem]);
       updateCurrentScene({ theaterActiveModelId: nextId });
       setPendingSnapModelId(nextId);
+      if (isTheaterBuiltinTemplateKey(key)) setBuiltinModelKey(key);
       setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
     };
 
-
-    const mirrorModel = useCallback(
-      (id: number, axis: "x" | "z") => {
-        if (!currentScene) return;
-        const source = models.find((item) => item.id === id);
-        if (!source) return;
-        const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
-        const position: [number, number, number] = [...source.position];
-        const rotation: [number, number, number] = [...source.rotation];
-        if (axis === "x") {
-          position[0] = -position[0];
-          rotation[1] = -rotation[1];
-        } else {
-          position[2] = -position[2];
-          rotation[1] = Math.PI - rotation[1];
-        }
-        const nextItem: TheaterModel = {
-          ...source,
-          id: nextId,
-          name: `${source.name} (зеркало ${axis.toUpperCase()})`,
-          position,
-          rotation,
-        };
-        updateModels([...models, nextItem]);
-        updateCurrentScene({ theaterActiveModelId: nextId });
-        setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
-      },
-      [currentScene, models, updateCurrentScene, updateModels],
-    );
 
     const alignModelsByActive = useCallback(
       (axis: "x" | "z") => {
@@ -564,7 +477,13 @@ export function useTheaterModels({
       updateCurrentScene({ theaterActiveModelId: next[0]?.id });
       setMultiSelectedModelIds(next[0] ? [next[0].id] : []);
       setDecorActionMessage(`Удалено объектов: ${selected.size}`);
-    }, [currentScene, models, multiSelectedModelIds, updateCurrentScene, updateModels]);
+    }, [
+      currentScene,
+      models,
+      multiSelectedModelIds,
+      updateCurrentScene,
+      updateModels,
+    ]);
 
     const cloneSelectedModels = useCallback(() => {
       if (multiSelectedModelIds.length === 0 || !currentScene) return;
@@ -655,139 +574,31 @@ export function useTheaterModels({
       updateModels,
     ]);
 
-    type ActiveModelPatch = Pick<TheaterModel, "position" | "rotation" | "scale">;
-
-    const applyActiveModelTransform = useCallback((): ActiveModelPatch | null => {
+    const applyActiveModelTransform = useCallback((): TheaterModelTransformPatch | null => {
       if (!activeModelObject || !activeModelId) return null;
-      if (activeModelObjectId !== activeModelId) return null;
-      const obj = activeModelObject;
-      const prevModel = models.find((item) => item.id === activeModelId);
-      const box = new THREE.Box3().setFromObject(obj);
-      const allowBelowFloorAnchor = prevModel ? isSittingHumanTheaterModel(prevModel) : false;
-      const lift = !allowBelowFloorAnchor && box.min.y < 0 ? -box.min.y : 0;
-      let nextX = obj.position.x;
-      let nextZ = obj.position.z;
-      const allowOut = activeModel?.allowOutOfBounds ?? false;
-      if (!allowOut) {
-        const halfW = layout.hallWidth / 2;
-        const halfD = layout.hallDepth / 2;
-        if (box.min.x < -halfW) {
-          nextX += -halfW - box.min.x;
-        }
-        if (box.max.x > halfW) {
-          nextX -= box.max.x - halfW;
-        }
-        if (box.min.z < -halfD) {
-          nextZ += -halfD - box.min.z;
-        }
-        if (box.max.z > halfD) {
-          nextZ -= box.max.z - halfD;
-        }
-      }
-      const clampedY = obj.position.y + lift;
-      obj.position.set(nextX, clampedY, nextZ);
 
-      if (
-        snapToGrid &&
-        gridStep > 0 &&
-        modelTransformMode === "translate"
-      ) {
-        [nextX, nextZ] = snapTheaterHallPoint(
-          nextX,
-          nextZ,
-          layout.hallWidth,
-          layout.hallDepth,
-          gridStep,
-          true,
-        );
-        obj.position.set(nextX, clampedY, nextZ);
-      }
+      const result = computeActiveModelTransform({
+        obj: activeModelObject,
+        activeModelId,
+        activeModelObjectId,
+        models,
+        activeModel,
+        layout,
+        snapToGrid,
+        gridStep,
+        modelTransformMode,
+        alignGuidesEnabled,
+        isDragging,
+        modelObjectMap: modelObjectMapRef.current,
+        historyTransactionActive: historyTransactionRef.current,
+        dragLastValid: modelDragLastValidRef.current,
+      });
 
-      if (modelTransformMode === "translate" && alignGuidesEnabled) {
-        const aligned = applyAlignGuideSnap(nextX, nextZ, layout, true);
-        nextX = aligned.x;
-        nextZ = aligned.z;
-        setActiveAlignGuides(aligned.guides);
-        obj.position.set(nextX, clampedY, nextZ);
-      } else if (!isDragging) {
-        setActiveAlignGuides([]);
+      if (result.alignGuides !== null) {
+        setActiveAlignGuides(result.alignGuides);
       }
-
-      if (prevModel && modelTransformMode === "translate") {
-        nextZ = snapModelZToAudienceLine(
-          nextZ,
-          resolveModelHalfDepth(prevModel),
-          layout.audienceStartZ,
-        );
-        obj.position.set(nextX, clampedY, nextZ);
-      }
-
-      const patch: ActiveModelPatch = {
-        position: [nextX, clampedY, nextZ],
-        rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-        scale: [obj.scale.x, obj.scale.y, obj.scale.z],
-      };
-
-      if (prevModel) {
-        if (prevModel.ignoreCollisions) {
-          if (historyTransactionRef.current) {
-            modelDragLastValidRef.current = patch;
-          }
-          return patch;
-        }
-        if (prevModel.type === "builtin" && prevModel.builtin === "strawGrid") {
-          if (historyTransactionRef.current) {
-            modelDragLastValidRef.current = patch;
-          }
-          return patch;
-        }
-        const activeBox = new THREE.Box3().setFromObject(obj);
-        const collision = models.some((item) => {
-          if (item.id === activeModelId) return false;
-          if (item.type === "builtin" && item.builtin === "strawGrid") return false;
-          if (item.ignoreCollisions) return false;
-          if (canIgnoreSeatedHumanCollision(prevModel, item)) return false;
-          const otherObject = modelObjectMapRef.current.get(item.id);
-          if (otherObject) {
-            const otherBox = new THREE.Box3().setFromObject(otherObject);
-            return activeBox.intersectsBox(otherBox);
-          }
-          const pos = new THREE.Vector3(...item.position);
-          const size = new THREE.Vector3(
-            Math.max(0.2, Math.abs(item.scale[0]) * 0.8),
-            Math.max(0.2, Math.abs(item.scale[1]) * 0.6),
-            Math.max(0.2, Math.abs(item.scale[2]) * 0.8),
-          );
-          const otherBox = new THREE.Box3().setFromCenterAndSize(pos, size);
-          return activeBox.intersectsBox(otherBox);
-        });
-        if (collision) {
-          const fallback =
-            historyTransactionRef.current && modelDragLastValidRef.current
-              ? modelDragLastValidRef.current
-              : prevModel
-                ? {
-                    position: [...prevModel.position] as [number, number, number],
-                    rotation: [...prevModel.rotation] as [number, number, number],
-                    scale: [...prevModel.scale] as [number, number, number],
-                  }
-                : null;
-          if (fallback) {
-            obj.position.set(...fallback.position);
-            obj.rotation.set(
-              fallback.rotation[0],
-              fallback.rotation[1],
-              fallback.rotation[2],
-            );
-            obj.scale.set(fallback.scale[0], fallback.scale[1], fallback.scale[2]);
-            return fallback;
-          }
-        }
-      }
-      if (historyTransactionRef.current) {
-        modelDragLastValidRef.current = patch;
-      }
-      return patch;
+      modelDragLastValidRef.current = result.dragLastValid;
+      return result.patch;
     }, [
       activeModel,
       activeModelId,
@@ -796,12 +607,11 @@ export function useTheaterModels({
       alignGuidesEnabled,
       isDragging,
       layout,
-      layout.hallDepth,
-      layout.hallWidth,
       gridStep,
       modelTransformMode,
       models,
       snapToGrid,
+      setActiveAlignGuides,
     ]);
 
     const persistActiveModel = useCallback(() => {
@@ -819,8 +629,7 @@ export function useTheaterModels({
         const dx = patch.position[0] - origin[0];
         const dy = patch.position[1] - origin[1];
         const dz = patch.position[2] - origin[2];
-        updateModels(
-          models.map((model) => {
+        const nextModels = models.map((model) => {
             const base = baseline.get(model.id);
             if (!base) return model;
             if (model.id === activeModelId) {
@@ -834,8 +643,8 @@ export function useTheaterModels({
                 base.position[2] + dz,
               ] as [number, number, number],
             };
-          }),
-        );
+          });
+        updateModels(nextModels);
         return;
       }
 
@@ -863,12 +672,21 @@ export function useTheaterModels({
           };
         }
       }
-      applyActiveModelTransform();
+      const patch = applyActiveModelTransform();
+      const activeModel = models.find((item) => item.id === activeModelId);
+      if (patch && activeModelId && isLightTrussModel(activeModel)) {
+        const nextModels = models.map((item) =>
+          item.id === activeModelId ? { ...item, ...patch } : item,
+        );
+        syncSpotlightsForModels(nextModels, activeModelId);
+      }
+      setActiveModelSizeTick((tick) => tick + 1);
     }, [
       activeModelId,
       applyActiveModelTransform,
       beginTheaterHistoryTransaction,
       models,
+      syncSpotlightsForModels,
     ]);
 
     const handleModelTransformEnd = useCallback(() => {
@@ -925,7 +743,7 @@ export function useTheaterModels({
         multiSelectedModelIds.length > 1 &&
         multiSelectedModelIds.includes(activeModelId)
       ) {
-        const baseline = new Map<number, ActiveModelPatch>();
+        const baseline = new Map<number, TheaterModelTransformPatch>();
         multiSelectedModelIds.forEach((id) => {
           const model = models.find((item) => item.id === id);
           if (!model) return;
@@ -962,11 +780,9 @@ export function useTheaterModels({
       const snapId = pendingSnapModelId;
       setPendingSnapModelId(null);
 
-      const box = new THREE.Box3().setFromObject(activeModelObject);
-      const lift = box.min.y < 0 ? -box.min.y : 0;
-      if (lift <= 1e-6) return;
+      const lifted = liftModelObjectAboveFloor(activeModelObject);
+      if (lifted <= 0) return;
 
-      activeModelObject.position.y += lift;
       updateModel(snapId, {
         position: [
           activeModelObject.position.x,
@@ -1008,13 +824,11 @@ export function useTheaterModels({
             preset,
             model,
             layout,
-            snapToGrid,
-            gridStep,
           ),
         });
         setPendingSnapModelId(activeModelId);
       },
-      [activeModelId, gridStep, layout, models, snapToGrid, updateModel],
+      [activeModelId, layout, models, updateModel],
     );
 
     const rotateActiveModel = useCallback(
@@ -1056,38 +870,26 @@ export function useTheaterModels({
         if (targetIds.length === 0) return;
 
         const selected = new Set(targetIds);
+        let nextAlignGuides: ActiveAlignGuide[] = [];
         updateModels(
           models.map((model) => {
             if (!selected.has(model.id)) return model;
-            let nextX = model.position[0] + deltaX;
-            let nextZ = model.position[2] + deltaZ;
-            if (snapToGrid && gridStep > 0) {
-              [nextX, nextZ] = snapTheaterHallPoint(
-                nextX,
-                nextZ,
-                layout.hallWidth,
-                layout.hallDepth,
-                gridStep,
-                true,
-              );
-            }
-            if (alignGuidesEnabled) {
-              const aligned = applyAlignGuideSnap(nextX, nextZ, layout, true);
-              nextX = aligned.x;
-              nextZ = aligned.z;
-              setActiveAlignGuides(aligned.guides);
-            }
-            nextZ = snapModelZToAudienceLine(
-              nextZ,
-              resolveModelHalfDepth(model),
-              layout.audienceStartZ,
-            );
-            return {
-              ...model,
-              position: [nextX, model.position[1], nextZ] as [number, number, number],
-            };
+            const nudged = nudgeModelPosition({
+              model,
+              deltaX,
+              deltaZ,
+              layout,
+              snapToGrid,
+              gridStep,
+              alignGuidesEnabled,
+            });
+            nextAlignGuides = nudged.alignGuides;
+            return { ...model, position: nudged.position };
           }),
         );
+        if (alignGuidesEnabled) {
+          setActiveAlignGuides(nextAlignGuides);
+        }
       },
       [
         activeModelId,
@@ -1104,6 +906,8 @@ export function useTheaterModels({
     models,
     visibleModels,
     activeModel,
+    activeModelWorldSize,
+    activeModelSizeLabel,
     activeModelObject,
     activeModelObjectId,
     modelTransformMode,
@@ -1123,7 +927,7 @@ export function useTheaterModels({
     copyTheaterToNextScene,
     addModel,
     addBuiltinModel,
-    mirrorModel,
+    addBuiltinModelAt,
     alignModelsByActive,
     distributeModelsByActive,
     alignSelectedModels,

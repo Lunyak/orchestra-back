@@ -44,7 +44,7 @@
 
 .settings-view-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
@@ -191,6 +191,12 @@
   align-items: flex-start;
   margin: 8px 0 0;
   line-height: 1.35;
+}
+
+label.labeled-checkbox.settings-sync-live-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
 }
 
 .settings-sync-live-row input {

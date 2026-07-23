@@ -63,6 +63,8 @@ export function cloneSpotlightsByIds(
       ] as [number, number, number],
       target: [...source.target] as [number, number, number],
       hidden: false,
+      mountModelId: undefined,
+      mountPointId: undefined,
     };
   });
   return {

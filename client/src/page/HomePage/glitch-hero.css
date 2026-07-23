@@ -125,7 +125,21 @@
 }
 
 .home-page__glitch-hero--home .home-glitch__text {
-  margin: 60px auto 80px;
+  margin: clamp(12px, 4dvh, 60px) auto clamp(16px, 5dvh, 80px);
+  font-size: clamp(40px, 8dvh, 140px);
+}
+
+@supports (font-size: 1cqw) {
+  .home-page__glitch-hero--home .home-glitch__text {
+    font-size: clamp(40px, min(8dvh, 14cqw), 140px);
+  }
+}
+
+/* Внутренние страницы: компактный заголовок под ноутбуки (~Air) */
+.home-page__glitch-hero--page .home-glitch__text {
+  margin: clamp(6px, 1.5dvh, 24px) auto clamp(10px, 2dvh, 32px);
+  font-size: clamp(36px, min(7.5dvh, 11cqw), 88px);
+  letter-spacing: clamp(2px, 0.7cqw, 8px);
 }
 
 .home-glitch__text::before,

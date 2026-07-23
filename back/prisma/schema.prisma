@@ -35,6 +35,12 @@ model User {
   passwordResetTokens PasswordResetToken[]
   chatMessages       ChatMessage[]
   chatReadStates     ChatConversationReadState[]
+  studiosOwned       Studio[]          @relation("StudioOwner")
+  studioMemberships  StudioMember[]
+  studioInvitesCreated StudioInvite[]  @relation("StudioInviteCreator")
+  studioAssignmentsCreated StudioAssignment[] @relation("StudioAssignmentCreator")
+  studioSubmissionsGraded StudioSubmission[] @relation("StudioSubmissionGrader")
+  studioLessonProgressReviewed StudioLessonProgress[] @relation("StudioLessonProgressReviewer")
 }
 
 model PasswordResetToken {
@@ -497,6 +503,8 @@ model TheaterModel {
   file            String?
   kind            String   @default("prop")
   allowOutOfBounds Boolean @default(false)
+  ignoreCollisions Boolean @default(false)
+  modelLowDetail   Boolean @default(false)
   position        Json
   rotation        Json
   scale           Json
@@ -523,6 +531,9 @@ model TheaterSpotlight {
   enabled   Boolean
   channel   Int
   isRgb     Boolean
+  modelLowDetail Boolean @default(false)
+  mountModelId Int?
+  mountPointId String?
   /// Номер фейдера пульта, к которому привязан софит.
   faderId   Int?
   hidden    Boolean @default(false)
@@ -725,8 +736,89 @@ model Troupe {
   roleDefinitions    TeamRoleDefinition[]
   chatConversations  ChatConversation[]
   premises           Premise[]
+  collections        TroupeCollection[]
 
   @@index([ownerUserId])
+}
+
+enum TroupeCollectionStatus {
+  draft
+  active
+  closed
+}
+
+/// Сбор средств труппы (аренда, членский взнос и т.п.).
+model TroupeCollection {
+  id             String                 @id @default(cuid())
+  troupeId       String
+  title          String
+  description    String?
+  status         TroupeCollectionStatus @default(active)
+  dueAt          DateTime?
+  premiseId      String?
+  createdByEmail String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  troupe        Troupe                        @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  premise       Premise?                      @relation(fields: [premiseId], references: [id], onDelete: SetNull)
+  tariffs       TroupeCollectionTariff[]
+  participants  TroupeCollectionParticipant[]
+  contributions TroupeContribution[]
+
+  @@index([troupeId])
+  @@index([premiseId])
+}
+
+/// Тариф взноса внутри сбора (например «полный» / «льготный»).
+model TroupeCollectionTariff {
+  id            String   @id @default(cuid())
+  collectionId  String
+  title         String
+  /// Сумма в копейках (₽ × 100).
+  amountKopecks Int
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  collection   TroupeCollection              @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  participants TroupeCollectionParticipant[]
+
+  @@index([collectionId])
+}
+
+/// Участник сбора с назначенным тарифом.
+model TroupeCollectionParticipant {
+  id           String   @id @default(cuid())
+  collectionId String
+  email        String
+  tariffId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  collection TroupeCollection       @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tariff     TroupeCollectionTariff @relation(fields: [tariffId], references: [id], onDelete: Restrict)
+
+  @@unique([collectionId, email])
+  @@index([collectionId])
+  @@index([email])
+}
+
+/// Зафиксированный взнос участника.
+model TroupeContribution {
+  id              String   @id @default(cuid())
+  collectionId    String
+  email           String
+  amountKopecks   Int
+  paidAt          DateTime @default(now())
+  recordedByEmail String
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  collection TroupeCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, email])
 }
 
 enum PremiseKind {
@@ -759,9 +851,10 @@ model Premise {
   createdAt DateTime    @default(now())
   updatedAt DateTime    @updatedAt
 
-  troupe  Troupe          @relation(fields: [troupeId], references: [id], onDelete: Cascade)
-  members PremiseMember[]
-  slots   PremiseSlot[]
+  troupe      Troupe             @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  members     PremiseMember[]
+  slots       PremiseSlot[]
+  collections TroupeCollection[]
 
   @@index([troupeId])
 }
@@ -931,4 +1024,237 @@ model TeamRoleAssignment {
   @@unique([roleId, teamMemberId])
   @@index([roleId])
   @@index([teamMemberId])
+}
+
+enum StudioMemberRole {
+  owner
+  teacher
+  student
+}
+
+/// Учебная студия (независима от труппы). Владелец может создать несколько.
+model Studio {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  title       String
+  description String?
+  /// Логотип / обложка (URL после загрузки в files).
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner      User                   @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members    StudioMember[]
+  invites    StudioInvite[]
+  modules    StudioProgramModule[]
+  assignments StudioAssignment[]
+  videos     StudioVideo[]
+
+  @@index([ownerUserId])
+}
+
+model StudioMember {
+  id        String           @id @default(cuid())
+  studioId  String
+  email     String
+  userId    String?
+  role      StudioMemberRole @default(student)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([studioId, email])
+  @@index([email])
+  @@index([studioId])
+  @@index([userId])
+}
+
+/// Ссылка-приглашение в студию (token хранится как SHA-256).
+model StudioInvite {
+  id              String           @id @default(cuid())
+  studioId        String
+  tokenHash       String           @unique
+  role            StudioMemberRole @default(student)
+  /// Если задан — принять может только этот email.
+  email           String?
+  createdByUserId String
+  expiresAt       DateTime?
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime         @default(now())
+
+  studio    Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("StudioInviteCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([studioId])
+  @@index([email])
+}
+
+model StudioProgramModule {
+  id          String   @id @default(cuid())
+  studioId    String
+  title       String
+  description String?
+  /// Обложка программы.
+  imageUrl    String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  studio  Studio                 @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  lessons StudioProgramLesson[]
+
+  @@index([studioId, sortOrder])
+}
+
+enum StudioLessonTaskType {
+  complete
+  video
+}
+
+enum StudioLessonProgressStatus {
+  pending
+  submitted
+  completed
+  rejected
+}
+
+model StudioProgramLesson {
+  id          String               @id @default(cuid())
+  moduleId    String
+  title       String
+  body        String?
+  /// Тип задания: отметить выполненным или сдать видео.
+  taskType    StudioLessonTaskType @default(complete)
+  /// Текст задания для студийца (дополнительно к body).
+  taskPrompt  String?
+  sortOrder   Int                  @default(0)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  module      StudioProgramModule    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  assignments StudioAssignment[]
+  progress    StudioLessonProgress[]
+
+  @@index([moduleId, sortOrder])
+}
+
+/// Прогресс студийца по уроку.
+model StudioLessonProgress {
+  id               String                     @id @default(cuid())
+  lessonId         String
+  email            String
+  status           StudioLessonProgressStatus @default(pending)
+  videoUrl         String?
+  note             String?
+  submittedAt      DateTime?
+  completedAt      DateTime?
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  reviewComment    String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  lesson     StudioProgramLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  reviewedBy User?               @relation("StudioLessonProgressReviewer", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([lessonId, email])
+  @@index([email])
+  @@index([lessonId, status])
+  @@index([reviewedByUserId])
+}
+
+model StudioAssignment {
+  id              String    @id @default(cuid())
+  studioId        String
+  title           String
+  description     String?
+  createdByUserId String
+  lessonId        String?
+  dueAt           DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  studio    Studio                    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  createdBy User                      @relation("StudioAssignmentCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  lesson    StudioProgramLesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  targets   StudioAssignmentTarget[]
+  submissions StudioSubmission[]
+  videos    StudioVideo[]
+
+  @@index([studioId])
+  @@index([createdByUserId])
+  @@index([lessonId])
+}
+
+model StudioAssignmentTarget {
+  id           String   @id @default(cuid())
+  assignmentId String
+  email        String
+  createdAt    DateTime @default(now())
+
+  assignment StudioAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, email])
+  @@index([email])
+}
+
+model StudioSubmission {
+  id             String    @id @default(cuid())
+  assignmentId   String
+  email          String
+  body           String?
+  videoUrl       String?
+  submittedAt    DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  /// Оценка 1–5.
+  grade          Int?
+  gradeComment   String?
+  gradedAt       DateTime?
+  gradedByUserId String?
+
+  assignment StudioAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  gradedBy   User?            @relation("StudioSubmissionGrader", fields: [gradedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([assignmentId, email])
+  @@index([email])
+  @@index([gradedByUserId])
+}
+
+model StudioVideo {
+  id              String   @id @default(cuid())
+  studioId        String
+  title           String
+  url             String
+  description     String?
+  uploadedByEmail String
+  assignmentId    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  studio     Studio              @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  assignment StudioAssignment?   @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  markers    StudioVideoMarker[]
+
+  @@index([studioId])
+  @@index([assignmentId])
+  @@index([uploadedByEmail])
+}
+
+model StudioVideoMarker {
+  id          String   @id @default(cuid())
+  videoId     String
+  /// Секунда от начала ролика.
+  timeSec     Int
+  body        String
+  authorEmail String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  video StudioVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId, timeSec])
+  @@index([authorEmail])
 }

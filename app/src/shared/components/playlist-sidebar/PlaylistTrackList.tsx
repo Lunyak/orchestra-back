@@ -81,6 +81,7 @@ export function PlaylistTrackList({
               key={track.id}
               className={cn(
                 "playlist-track-row",
+                trackIsHighlighted && "list-item--active",
                 trackIsHighlighted && "playlist-track-row--active",
                 isEditMode && "playlist-track-row--edit-mode",
                 trackIsDragOver && "playlist-track-row--drag-over",

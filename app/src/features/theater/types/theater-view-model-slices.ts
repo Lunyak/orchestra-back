@@ -19,7 +19,7 @@ export type TheaterPrefsSlice = TheaterViewPrefs & {
   setWallsHidden: (value: boolean) => void;
   setWallsHideFromCamera: (value: boolean) => void;
   setShowFloorPlan: (value: boolean) => void;
-  setFloorPlanExpanded: Dispatch<SetStateAction<boolean>>;
+  setFloorPlanMaxSide: Dispatch<SetStateAction<number>>;
   setSpectaclePreviewMode: (value: boolean) => void;
   setAlignGuidesEnabled: (value: boolean) => void;
   setActiveTab: (tab: TheaterViewPrefs["activeTab"]) => void;
@@ -29,6 +29,7 @@ export type TheaterPrefsSlice = TheaterViewPrefs & {
   setSceneBackgroundColor: (value: string) => void;
   setShowSpotlightGuideLines: (value: boolean) => void;
   setLightConsoleExpanded: Dispatch<SetStateAction<boolean>>;
+  setHallResizeKeepObjects: (value: boolean) => void;
   showSpotlights: boolean;
   setShowSpotlights: (value: boolean) => void;
   showOnlyActiveSpotlight: boolean;

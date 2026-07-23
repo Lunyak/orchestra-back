@@ -6,18 +6,24 @@ import {
   isSeatableBuiltin,
   isHumanTheaterBuiltin,
 } from "../../model/theater-furniture-metrics";
+import { getTheaterAssetLibraryItem } from "../../model/theater-asset-library";
 import { BuiltinModel } from "./BuiltinModel";
 
-const FURNITURE_SELECTION_BUILTINS = new Set<NonNullable<TheaterModel["builtin"]>>([
-  "table",
-  "roundTable",
-  "cabinet",
-  "blackCube",
-]);
+const FURNITURE_SELECTION_BUILTINS = new Set<
+  NonNullable<TheaterModel["builtin"]>
+>(["table", "roundTable", "cabinet", "blackCube"]);
 
 function getBuiltinSelectionBox(
   model: TheaterModel,
 ): { size: [number, number, number]; center: [number, number, number] } | null {
+  const libraryItem = getTheaterAssetLibraryItem(model.builtin);
+  if (libraryItem) {
+    return {
+      size: libraryItem.size,
+      center: [0, libraryItem.size[1] / 2, 0],
+    };
+  }
+
   if (model.builtin && isSeatableBuiltin(model.builtin)) {
     const [width, height, depth] = getFurnitureBounds(model.builtin);
     return {
@@ -34,9 +40,32 @@ function getBuiltinSelectionBox(
     };
   }
 
+  if (model.builtin === "actor") {
+    if (model.actorPose === "lie") {
+      return { size: [0.85, 0.45, 1.9], center: [0, 0.2, 0] };
+    }
+    if (model.actorPose === "sit") {
+      return { size: [0.75, 1.45, 0.9], center: [0, 0.7, 0.08] };
+    }
+    return { size: [0.75, 1.8, 0.7], center: [0, 0.9, 0] };
+  }
+
+  if (model.builtin === "stageActor") {
+    return { size: [0.75, 1.8, 0.7], center: [0, 0.9, 0] };
+  }
+
+  if (model.builtin === "stageSpotlight") {
+    return { size: [1.5, 1.5, 1.5], center: [0, 0, 0] };
+  }
+
+  if (model.builtin === "lightTruss6m") {
+    return { size: [6.2, 0.9, 0.4], center: [0, 0, 0] };
+  }
+
   if (isHumanTheaterBuiltin(model.builtin)) {
     const seated =
-      model.builtin === "humanSitting" || model.builtin === "humanSmoothSitting";
+      model.builtin === "humanSitting" ||
+      model.builtin === "humanSmoothSitting";
     return {
       size: seated ? [0.7, 1.25, 0.85] : [0.7, 1.8, 0.7],
       center: seated ? [0, 0.62, 0.08] : [0, 0.9, 0],
@@ -59,6 +88,7 @@ export const BuiltinModelInstance = ({
   isHovered,
   onHoverChange,
   passThroughPointerEvents,
+  selectionBoxEnabled = true,
 }: {
   projectName: string;
   model: TheaterModel;
@@ -72,6 +102,7 @@ export const BuiltinModelInstance = ({
   isHovered?: boolean;
   onHoverChange?: (next: boolean) => void;
   passThroughPointerEvents?: boolean;
+  selectionBoxEnabled?: boolean;
 }) => {
   const groupRef = useRef<THREE.Group | null>(null);
   const selectionBox = getBuiltinSelectionBox(model);
@@ -142,9 +173,10 @@ export const BuiltinModelInstance = ({
         isSelected={isSelected}
         isHovered={isHovered}
       />
-      {selectionBox ? (
+      {selectionBox && selectionBoxEnabled ? (
         <mesh
           position={selectionBox.center}
+          userData={{ theaterHelper: true }}
           onPointerDown={handlePointerDown}
           onContextMenu={handleContextMenu}
           onDoubleClick={handleDoubleClick}
@@ -163,4 +195,3 @@ export const BuiltinModelInstance = ({
     </group>
   );
 };
-

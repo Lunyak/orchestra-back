@@ -14,6 +14,7 @@ import {
 } from "../../features/troupe/api/troupe-api";
 import { memberLabel } from "../../features/troupe";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
+import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
 import "./style.css";
 
 export function TeamRolePage() {
@@ -131,6 +132,7 @@ export function TeamRolePage() {
       <div className="app-content">
         <main className="main-content">
           <div className="troupe-view troupe-role-page">
+            <AdminSectionChrome activeSection="team">
             <Link className="troupe-role-page__back" to="/troupe">
               ← Команда
             </Link>
@@ -256,6 +258,7 @@ export function TeamRolePage() {
                 </div>
               )}
             </div>
+            </AdminSectionChrome>
           </div>
         </main>
       </div>

@@ -35,6 +35,8 @@ export interface SyncPullRequest {
   projectSlug?: string;
   include?: {
     scenes?: boolean;
+    /** @deprecated use `scenes` */
+    steps?: boolean;
     playlist?: boolean;
     sounds?: boolean;
     lightChannels?: boolean;

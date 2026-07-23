@@ -31,6 +31,8 @@ export function mapTheaterModelFromApi(raw: unknown): TheaterModel | null {
     decorEmissiveIntensity:
       typeof m.decorEmissiveIntensity === "number" ? m.decorEmissiveIntensity : undefined,
     decorMaterialSide: m.decorMaterialSide as TheaterModel["decorMaterialSide"],
+    actorPose: m.actorPose as TheaterModel["actorPose"],
+    modelLowDetail: Boolean(m.modelLowDetail),
     humanSkinColor:
       typeof m.humanSkinColor === "string" ? m.humanSkinColor : undefined,
     humanTopColor:
@@ -92,6 +94,8 @@ export function mapTheaterModelToApiPayload(model: TheaterModel, kind: "prop" | 
     decorEmissiveColor: model.decorEmissiveColor ?? null,
     decorEmissiveIntensity: model.decorEmissiveIntensity ?? null,
     decorMaterialSide: model.decorMaterialSide ?? null,
+    actorPose: model.actorPose ?? null,
+    modelLowDetail: model.modelLowDetail ?? false,
     humanSkinColor: model.humanSkinColor ?? null,
     humanTopColor: model.humanTopColor ?? null,
     humanBottomColor: model.humanBottomColor ?? null,

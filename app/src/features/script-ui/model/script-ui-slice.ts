@@ -28,9 +28,9 @@ export type ScriptUiState = {
   swapTheaterPanels: boolean;
   /** Правая панель настроек 3D-театра (persist per-project в theater-view-prefs). */
   showTheaterControls: boolean;
-  /** Скрыть текст сцены на странице «Репетиция» (/light-plot). */
+  /** Скрыть текст сцены на странице «Спектакль» (/light-plot). */
   spectacleRunTextHidden: boolean;
-  /** Режим страницы /light-plot: посценовая репетиция или прогон. */
+  /** Режим страницы /light-plot: посценовый спектакль или прогон. */
   lightPlotMode: LightPlotMode;
 };
 

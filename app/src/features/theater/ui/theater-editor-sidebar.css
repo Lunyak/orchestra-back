@@ -1,44 +1,28 @@
-/* Left tool rail + right sidebar — three.js editor–inspired layout */
-/* menubar-base is loaded via AppEditorMenubar/style.css — do not re-import here */
+/* Right sidebar tabs — horizontal section switcher */
 
 .theater-controls.theater-controls--toolbar {
-  position: relative;
-  z-index: 4;
-  flex: 0 0 auto;
-  display: flex;
-  align-items: stretch;
-  width: 52px;
-  min-width: 52px;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  gap: 0;
-  border: none;
-  border-right: 1px solid #222;
-  border-radius: 0;
-  background: #111;
-  color: #888;
-  box-shadow: none;
+  display: none;
 }
 
 .theater-tabs--editor-menubar {
   display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
+  flex: 0 0 auto;
+  flex-direction: row;
   flex-wrap: nowrap;
   align-items: stretch;
   gap: 0;
   width: 100%;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 0;
   border: 0;
+  border-bottom: 1px solid #222;
   background: #1b1b1b;
 }
 
 .theater-tabs--editor-menubar::-webkit-scrollbar {
-  width: 5px;
+  height: 5px;
 }
 
 .theater-tabs--editor-menubar::-webkit-scrollbar-thumb {
@@ -46,24 +30,30 @@
 }
 
 .theater-tabs--editor-menubar > .theater-btn.button {
-  flex: 0 0 auto;
+  flex: 1 1 0;
   margin: 0;
-  padding: 10px 6px;
+  padding: 8px 4px;
   border: 0;
-  border-bottom: 1px solid #222;
+  border-right: 1px solid #222;
   border-radius: 0;
   background: transparent;
   color: #555;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
-  line-height: 1.15;
-  letter-spacing: 0.04em;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  writing-mode: vertical-rl;
+  writing-mode: horizontal-tb;
   text-orientation: mixed;
-  transform: rotate(180deg);
+  transform: none;
   box-shadow: none;
-  min-height: 52px;
+  min-height: 32px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.theater-tabs--editor-menubar > .theater-btn.button:last-child {
+  border-right: 0;
 }
 
 .theater-tabs--editor-menubar > .theater-btn.button:hover:not(:disabled) {
@@ -73,10 +63,10 @@
 
 .theater-tabs--editor-menubar > .theater-btn.button--active,
 .theater-tabs--editor-menubar > .theater-btn.button:not(.secondary) {
-  color: #ccc;
+  color: var(--color-active-ascent, #ccc);
   background: #111;
   border-color: #222;
-  box-shadow: inset 2px 0 0 #08f;
+  box-shadow: inset 0 -2px 0 var(--color-active-ascent, #08f);
 }
 
 .theater-keyboard-hints--editor {
@@ -120,7 +110,7 @@
 }
 
 .theater-navigation-panel-tab {
-  flex: 1 1 50%;
+  flex: 1 1 0;
   margin: 0;
   padding: 10px 9px;
   border: 0;
@@ -144,8 +134,12 @@
 }
 
 .theater-navigation-panel-tab--selected {
-  color: #888;
+  color: var(--color-active-ascent);
   background: #111;
+}
+
+.theater-navigation-panel .theater-keyboard-hints--help {
+  margin: 12px;
 }
 
 .theater-navigation-panel-body {

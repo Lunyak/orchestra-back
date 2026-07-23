@@ -28,7 +28,7 @@ export function TheaterCanvasShell({
       }}
       onWheel={(event) => event.preventDefault()}
       onContextMenu={(event) => event.preventDefault()}
-      style={{ touchAction: "none", backgroundColor }}
+      style={{ "--theater-canvas-bg": backgroundColor } as React.CSSProperties}
       dpr={[1, 1.5]}
     >
       <color attach="background" args={[backgroundColor]} />

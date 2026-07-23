@@ -53,7 +53,12 @@ export function ActorAnnotationsPopover({
         popoverRef.current = el;
       }}
       className="actor-annotations-popover"
-      style={{ top: position.top, left: position.left }}
+      style={
+        {
+          "--actor-annotations-popover-top": `${position.top}px`,
+          "--actor-annotations-popover-left": `${position.left}px`,
+        } as React.CSSProperties
+      }
       onMouseDown={(e) => e.stopPropagation()}
     >
       {newAnnotation ? (

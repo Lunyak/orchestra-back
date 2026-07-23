@@ -52,7 +52,7 @@ export type FloorPlanFootprint = {
 export function createFloorPlanViewport(
   width: number,
   height: number,
-  padding = 12,
+  padding = 6,
 ): FloorPlanViewport {
   return { padding, width, height };
 }

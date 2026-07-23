@@ -1,0 +1,248 @@
+import { tc } from "../../../../shared/styles/theme-color";
+import { Billboard, Text } from "@react-three/drei";
+import { useThree, type ThreeEvent } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+import type { TheaterLayout, TheaterModel } from "../../../../shared/types/script";
+import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
+import { roundM } from "../../model/theater-metrics";
+import {
+  resolveTheaterModelWorldSize,
+  type TheaterModelWorldSize,
+} from "../../model/theater-model-world-size";
+
+type MoveSide = "east" | "west" | "south" | "north" | "center";
+
+const HANDLE_SIZE = 0.28;
+const HANDLE_DEPTH = 0.1;
+const PAD_Y = 0.06;
+
+type ModelFloorMoveHandlesProps = {
+  model: TheaterModel;
+  object: THREE.Object3D | null;
+  layout: TheaterLayout;
+  snapEnabled: boolean;
+  snapStep: number;
+  onPreview: (position: [number, number, number]) => void;
+  onCommit: (position: [number, number, number]) => void;
+  onDraggingChange: (dragging: boolean) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+};
+
+function resolveFootprint(
+  model: TheaterModel,
+  object: THREE.Object3D | null,
+): TheaterModelWorldSize {
+  const measured = resolveTheaterModelWorldSize(model, object);
+  if (measured) return measured;
+  return {
+    width: Math.max(0.4, Math.abs(model.scale[0])),
+    height: Math.max(0.4, Math.abs(model.scale[1])),
+    depth: Math.max(0.4, Math.abs(model.scale[2])),
+  };
+}
+
+export function ModelFloorMoveHandles({
+  model,
+  object,
+  layout,
+  snapEnabled,
+  snapStep,
+  onPreview,
+  onCommit,
+  onDraggingChange,
+  onDragStart,
+  onDragEnd,
+}: ModelFloorMoveHandlesProps) {
+  const { gl } = useThree();
+  const dragRef = useRef<{
+    side: MoveSide;
+    startPosition: [number, number, number];
+    startHit: THREE.Vector3;
+    plane: THREE.Plane;
+    lastPosition: [number, number, number];
+  } | null>(null);
+  const [draggingSide, setDraggingSide] = useState<MoveSide | null>(null);
+  const raycaster = useMemo(() => new THREE.Raycaster(), []);
+  const pointerNdc = useMemo(() => new THREE.Vector2(), []);
+  const hitPoint = useMemo(() => new THREE.Vector3(), []);
+
+  const footprint = resolveFootprint(model, object);
+  const halfW = Math.max(0.25, footprint.width / 2);
+  const halfD = Math.max(0.25, footprint.depth / 2);
+  const accent = tc("--color-active-ascent");
+  const position = model.position;
+
+  useEffect(() => {
+    if (!draggingSide) return;
+    const previous = gl.domElement.style.cursor;
+    gl.domElement.style.cursor = "grabbing";
+    return () => {
+      gl.domElement.style.cursor = previous;
+    };
+  }, [draggingSide, gl.domElement]);
+
+  const snapPosition = (x: number, z: number): [number, number, number] => {
+    const [nextX, nextZ] = snapTheaterHallPoint(
+      x,
+      z,
+      layout.hallWidth,
+      layout.hallDepth,
+      snapStep,
+      snapEnabled,
+    );
+    return [roundM(nextX), position[1], roundM(nextZ)];
+  };
+
+  const applyDrag = (clientX: number, clientY: number, camera: THREE.Camera) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const rect = gl.domElement.getBoundingClientRect();
+    pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(pointerNdc, camera);
+    if (!raycaster.ray.intersectPlane(drag.plane, hitPoint)) return;
+
+    const deltaX = hitPoint.x - drag.startHit.x;
+    const deltaZ = hitPoint.z - drag.startHit.z;
+    let nextX = drag.startPosition[0];
+    let nextZ = drag.startPosition[2];
+
+    if (drag.side === "center") {
+      nextX = drag.startPosition[0] + deltaX;
+      nextZ = drag.startPosition[2] + deltaZ;
+    } else if (drag.side === "east" || drag.side === "west") {
+      nextX = drag.startPosition[0] + deltaX;
+    } else {
+      nextZ = drag.startPosition[2] + deltaZ;
+    }
+
+    const next = snapPosition(nextX, nextZ);
+    drag.lastPosition = next;
+    onPreview(next);
+  };
+
+  const beginDrag = (side: MoveSide, event: ThreeEvent<PointerEvent>) => {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(event.point.x, PAD_Y, event.point.z),
+    );
+    const startPosition: [number, number, number] = [
+      position[0],
+      position[1],
+      position[2],
+    ];
+    dragRef.current = {
+      side,
+      startPosition,
+      startHit: event.point.clone(),
+      plane,
+      lastPosition: startPosition,
+    };
+    setDraggingSide(side);
+    onDraggingChange(true);
+    onDragStart();
+
+    const onMove = (native: PointerEvent) => {
+      applyDrag(native.clientX, native.clientY, event.camera);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      const dragState = dragRef.current;
+      dragRef.current = null;
+      setDraggingSide(null);
+      if (dragState) onCommit(dragState.lastPosition);
+      onDraggingChange(false);
+      onDragEnd();
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  const runners: Array<{
+    side: MoveSide;
+    position: [number, number, number];
+    scale: [number, number, number];
+  }> = [
+    {
+      side: "east",
+      position: [halfW + 0.18, PAD_Y, 0],
+      scale: [HANDLE_DEPTH, HANDLE_SIZE, Math.min(1.6, footprint.depth * 0.45)],
+    },
+    {
+      side: "west",
+      position: [-(halfW + 0.18), PAD_Y, 0],
+      scale: [HANDLE_DEPTH, HANDLE_SIZE, Math.min(1.6, footprint.depth * 0.45)],
+    },
+    {
+      side: "south",
+      position: [0, PAD_Y, halfD + 0.18],
+      scale: [Math.min(1.6, footprint.width * 0.45), HANDLE_SIZE, HANDLE_DEPTH],
+    },
+    {
+      side: "north",
+      position: [0, PAD_Y, -(halfD + 0.18)],
+      scale: [Math.min(1.6, footprint.width * 0.45), HANDLE_SIZE, HANDLE_DEPTH],
+    },
+  ];
+
+  const padSize: [number, number, number] = [
+    Math.max(0.45, footprint.width * 0.55),
+    0.04,
+    Math.max(0.45, footprint.depth * 0.55),
+  ];
+
+  return (
+    <group position={[position[0], 0, position[2]]}>
+      <mesh
+        position={[0, PAD_Y, 0]}
+        onPointerDown={(event) => beginDrag("center", event)}
+      >
+        <boxGeometry args={padSize} />
+        <meshStandardMaterial
+          color={accent}
+          transparent
+          opacity={draggingSide === "center" ? 0.55 : 0.28}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {runners.map((runner) => {
+        const isDragging = draggingSide === runner.side;
+        return (
+          <group key={runner.side} position={runner.position}>
+            <mesh onPointerDown={(event) => beginDrag(runner.side, event)}>
+              <boxGeometry args={runner.scale} />
+              <meshStandardMaterial
+                color={accent}
+                emissive={accent}
+                emissiveIntensity={isDragging ? 0.55 : 0.2}
+                transparent
+                opacity={isDragging ? 1 : 0.9}
+              />
+            </mesh>
+          </group>
+        );
+      })}
+
+      <Billboard position={[0, 0.35, 0]} follow>
+        <Text
+          fontSize={0.18}
+          color={accent}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.012}
+          outlineColor="#111"
+        >
+          {`${position[0].toFixed(2)} · ${position[2].toFixed(2)} м`}
+        </Text>
+      </Billboard>
+    </group>
+  );
+}

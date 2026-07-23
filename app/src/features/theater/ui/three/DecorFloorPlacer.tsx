@@ -11,6 +11,8 @@ type DecorFloorPlacerProps = {
   enabled: boolean;
   hallWidth: number;
   hallDepth: number;
+  hallOffsetX?: number;
+  hallOffsetZ?: number;
   snapEnabled: boolean;
   snapStep: number;
   onPlace: (position: [number, number, number]) => void;
@@ -20,6 +22,8 @@ export function DecorFloorPlacer({
   enabled,
   hallWidth,
   hallDepth,
+  hallOffsetX = 0,
+  hallOffsetZ = 0,
   snapEnabled,
   snapStep,
   onPlace,
@@ -66,7 +70,10 @@ export function DecorFloorPlacer({
       event.nativeEvent.clientX,
       event.nativeEvent.clientY,
     );
-    const position = snapPoint(event.point.x, event.point.z);
+    const position = snapPoint(
+      event.point.x - hallOffsetX,
+      event.point.z - hallOffsetZ,
+    );
 
     const finish = (nativeEvent: PointerEvent) => {
       if (nativeEvent.pointerId !== gesture.pointerId) return;

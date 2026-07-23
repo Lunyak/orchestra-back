@@ -1,11 +1,6 @@
-import { useCallback } from "react";
-import { useProject } from "../../project/model/project-context";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
-import {
-  scriptUiActions,
-  type LightPlotMode,
-} from "../../script-ui/model/script-ui-slice";
+import { useProject } from "../../project/model/project-context";
 import { usePlaybook } from "../../playbook";
 import { LightPlotModeTabs } from "../../../shared/components/light-plot/LightPlotModeTabs";
 import { useSpectacleRun } from "../model/useSpectacleRun";
@@ -22,26 +17,12 @@ import { LightConsoleSettingsModal } from "../../../shared/components/light-cons
 import "../../../shared/components/light-console/light-console.css";
 import "./style.css";
 
-export type SpectacleRunPageSectionProps = {
-  onOpenTechCard?: (sceneIndex?: number) => void;
-};
-
-export function SpectacleRunPageSection({
-  onOpenTechCard,
-}: SpectacleRunPageSectionProps) {
-  const dispatch = useAppDispatch();
+export function SpectacleRunPageSection() {
   const { projectName } = useProject();
   const { scenes } = usePlaybook();
   const lightPlotMode = useAppSelector((state) => state.scriptUi.lightPlotMode);
   const { lightChannels } = useAppSelector((state) =>
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
-  );
-
-  const handleModeChange = useCallback(
-    (mode: LightPlotMode) => {
-      dispatch(scriptUiActions.setLightPlotMode({ mode }));
-    },
-    [dispatch],
   );
 
   const run = useSpectacleRun({
@@ -54,9 +35,6 @@ export function SpectacleRunPageSection({
     <SpectacleRunProvider value={run}>
       <div className="spectacle-run-page-section">
         <LightPlotModeTabs
-          mode={lightPlotMode}
-          onModeChange={handleModeChange}
-          onOpenTechCard={onOpenTechCard}
           center={lightPlotMode === "rehearsal" ? <SpectacleRunMeta /> : null}
           trailing={
             lightPlotMode === "rehearsal" ? (

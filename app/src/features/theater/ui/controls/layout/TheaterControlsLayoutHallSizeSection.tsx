@@ -1,10 +1,16 @@
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
-import { labelM } from "../../../model/theater-metrics";
-import { TheaterField } from "../../theater-controls-ui";
+import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
+import { HALL_SIZE_LIMITS } from "../../../model/theater-hall-expand";
+import { labelM, roundM } from "../../../model/theater-metrics";
+import { TheaterField, TheaterRangeField } from "../../theater-controls-ui";
 import type { LayoutSectionProps } from "./types";
 
 export function TheaterControlsLayoutHallSizeSection({ vm, layout }: LayoutSectionProps) {
   const { layoutHallBadge } = layout;
+  const historyTx = {
+    onInteractStart: vm.beginTheaterHistoryTransaction,
+    onInteractEnd: vm.endTheaterHistoryTransaction,
+  };
 
   return (
     <>
@@ -13,50 +19,48 @@ export function TheaterControlsLayoutHallSizeSection({ vm, layout }: LayoutSecti
         title="Габариты зала"
         summary="Ширина, глубина, ряды"
         badge={layoutHallBadge}
+        defaultOpen={vm.layoutOutlineFocused}
       >
         <div className="theater-layout-grid">
-          <TheaterField label={labelM("Ширина")}>
-            <input
-              type="number"
-              className="native-text-input"
-              min={6}
-              step={0.5}
-              value={vm.layout.hallWidth}
-              onFocus={vm.beginTheaterHistoryTransaction}
-              onBlur={vm.endTheaterHistoryTransaction}
-              onChange={(event) =>
-                vm.updateLayout({ hallWidth: Number(event.target.value) || 0 })
-              }
-            />
-          </TheaterField>
-          <TheaterField label={labelM("Глубина")}>
-            <input
-              type="number"
-              className="native-text-input"
-              min={6}
-              step={0.5}
-              value={vm.layout.hallDepth}
-              onFocus={vm.beginTheaterHistoryTransaction}
-              onBlur={vm.endTheaterHistoryTransaction}
-              onChange={(event) =>
-                vm.updateLayout({ hallDepth: Number(event.target.value) || 0 })
-              }
-            />
-          </TheaterField>
-          <TheaterField label={labelM("Высота стен")}>
-            <input
-              type="number"
-              className="native-text-input"
-              min={2.5}
-              step={0.1}
-              value={vm.layout.wallHeight}
-              onFocus={vm.beginTheaterHistoryTransaction}
-              onBlur={vm.endTheaterHistoryTransaction}
-              onChange={(event) =>
-                vm.updateLayout({ wallHeight: Number(event.target.value) || 0 })
-              }
-            />
-          </TheaterField>
+          <LabeledCheckbox
+            className="theater-layout-keep-objects"
+            checked={vm.hallResizeKeepObjects}
+            onChange={(checked) => vm.setHallResizeKeepObjects(checked)}
+          >
+            Объекты на месте при растягивании
+          </LabeledCheckbox>
+          <div className="theater-layout-subtitle">Помещение</div>
+          <TheaterRangeField
+            label={labelM("Ширина")}
+            min={HALL_SIZE_LIMITS.hallWidth.min}
+            max={HALL_SIZE_LIMITS.hallWidth.max}
+            step={0.1}
+            value={vm.layout.hallWidth}
+            formatValue={(value) => `${roundM(value)} м`}
+            onChange={(hallWidth) => vm.updateLayout({ hallWidth })}
+            {...historyTx}
+          />
+          <TheaterRangeField
+            label={labelM("Глубина")}
+            min={HALL_SIZE_LIMITS.hallDepth.min}
+            max={HALL_SIZE_LIMITS.hallDepth.max}
+            step={0.1}
+            value={vm.layout.hallDepth}
+            formatValue={(value) => `${roundM(value)} м`}
+            onChange={(hallDepth) => vm.updateLayout({ hallDepth })}
+            {...historyTx}
+          />
+          <TheaterRangeField
+            label={labelM("Высота стен")}
+            min={HALL_SIZE_LIMITS.wallHeight.min}
+            max={HALL_SIZE_LIMITS.wallHeight.max}
+            step={0.1}
+            value={vm.layout.wallHeight}
+            formatValue={(value) => `${roundM(value)} м`}
+            onChange={(wallHeight) => vm.updateLayout({ wallHeight })}
+            {...historyTx}
+          />
+          <div className="theater-layout-subtitle">Зрительные места</div>
           <TheaterField label={labelM("Проход")}>
             <input
               type="number"

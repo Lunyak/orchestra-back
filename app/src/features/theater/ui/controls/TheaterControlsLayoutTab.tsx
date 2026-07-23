@@ -7,18 +7,24 @@ import { TheaterControlsLayoutMaterialsSection } from "./layout/TheaterControlsL
 import { TheaterControlsLayoutStageSection } from "./layout/TheaterControlsLayoutStageSection";
 import { TheaterControlsLayoutRecessesSection } from "./layout/TheaterControlsLayoutRecessesSection";
 import { TheaterControlsLayoutDoorsSection } from "./layout/TheaterControlsLayoutDoorsSection";
+import { TheaterControlsLayoutSceneTemplatesSection } from "./layout/TheaterControlsLayoutSceneTemplatesSection";
+import { TheaterControlsLayoutViewSection } from "./layout/TheaterControlsLayoutViewSection";
+import { TheaterControlsLayoutExportSection } from "./layout/TheaterControlsLayoutExportSection";
 
 export function TheaterControlsLayoutTab({ vm }: TheaterControlsTabProps) {
   const layout = useTheaterControlsLayoutTab(vm);
   return (
-    <div className="theater-layout-panel">
-      <TheaterControlsLayoutHallSizeSection vm={vm} layout={layout} />
-      <TheaterControlsLayoutMaterialsSection vm={vm} layout={layout} />
+    <div className="theater-layout-panel theater-layout-panel--organized">
+      <TheaterControlsLayoutViewSection vm={vm} layout={layout} />
       <TheaterControlsLayoutTemplateSection vm={vm} layout={layout} />
-      <TheaterControlsLayoutStageGridSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutHallSizeSection vm={vm} layout={layout} />
       <TheaterControlsLayoutStageSection vm={vm} layout={layout} />
-      <TheaterControlsLayoutRecessesSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutStageGridSection vm={vm} layout={layout} />
       <TheaterControlsLayoutDoorsSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutRecessesSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutMaterialsSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutSceneTemplatesSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutExportSection vm={vm} layout={layout} />
     </div>
   );
 }

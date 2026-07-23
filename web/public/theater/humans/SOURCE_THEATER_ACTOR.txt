@@ -1,0 +1,12 @@
+Asset: Man in Suit
+Creator: Quaternius
+Source page: https://poly.pizza/m/mQnGoME1ez
+Source file: https://static.poly.pizza/66b57880-bcb0-479a-8d72-5c3e88afaa39.glb
+License: Creative Commons Zero (CC0 1.0)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+Local changes:
+- Costume materials changed to black.
+- Exported as theater-actor-black.glb.
+- Included animation clips: Stand, Sit, Lie.
+- Lie is based on the final pose of the source Man_Death animation.

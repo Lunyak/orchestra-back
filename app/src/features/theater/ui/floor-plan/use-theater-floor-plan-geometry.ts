@@ -11,20 +11,24 @@ import {
   getFloorPlanHallLayout,
   worldToPlanPoint,
 } from "../../model/theater-floor-plan-geometry";
-import { resolveStageGeometry, resolveStageShape, STAGE_SHAPE_LABELS } from "../../model/theater-stage-geometry";
+import { resolveStageGeometry, resolveStageShape } from "../../model/theater-stage-geometry";
 import { resolveStageOutlinePoints } from "../../model/theater-custom-outline";
 import {
   buildStageGridPlanSegments,
   buildGridCellOutline,
 } from "../../model/theater-zone-grid";
-import { COMPACT_SIZE, EXPANDED_SIZE, type TheaterFloorPlanProps } from "./theater-floor-plan-types";
+import {
+  FLOOR_PLAN_NAV_MIN_SIDE,
+  fitFloorPlanSize,
+  type TheaterFloorPlanProps,
+} from "./theater-floor-plan-types";
 
 export function useTheaterFloorPlanGeometry({
   layout,
   models,
   showSeats,
   showSpotlights,
-  expanded,
+  maxSide,
   activeTab,
   gridStep,
   highlightGridCell = null,
@@ -37,7 +41,7 @@ export function useTheaterFloorPlanGeometry({
   | "models"
   | "showSeats"
   | "showSpotlights"
-  | "expanded"
+  | "maxSide"
   | "activeTab"
   | "gridStep"
   | "highlightGridCell"
@@ -45,11 +49,15 @@ export function useTheaterFloorPlanGeometry({
   | "onPreviewLayout"
   | "onCommitLayout"
 >) {
-  const size = expanded ? EXPANDED_SIZE : COMPACT_SIZE;
+  const size = useMemo(
+    () => fitFloorPlanSize(layout.hallWidth, layout.hallDepth, maxSide),
+    [layout.hallDepth, layout.hallWidth, maxSide],
+  );
   const viewport = useMemo(
     () => createFloorPlanViewport(size.width, size.height),
     [size.height, size.width],
   );
+  const planNavigationEnabled = maxSide >= FLOOR_PLAN_NAV_MIN_SIDE;
   const footprints = useMemo(
     () => buildModelFootprints(models, layout),
     [layout, models],
@@ -135,8 +143,6 @@ export function useTheaterFloorPlanGeometry({
     return { x, y: y + 12 };
   }, [layout, viewport]);
 
-  const shapeLabel = STAGE_SHAPE_LABELS[resolveStageShape(layout)];
-
   const outlineVertices = useMemo(
     () => (isCustomOutline ? resolveStageOutlinePoints(layout) : []),
     [isCustomOutline, layout],
@@ -171,7 +177,7 @@ export function useTheaterFloorPlanGeometry({
     canEditDoor,
     stageLabelPos,
     audienceLabelPos,
-    shapeLabel,
+    planNavigationEnabled,
     outlineVertices,
     outlineVertexPlan,
     layout,

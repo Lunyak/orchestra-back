@@ -1,9 +1,10 @@
 import cn from "classnames";
 import dayjs from "dayjs";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useMemo } from "react";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { type ChatMessageItem } from "../../../sync/api/chat";
-import { getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
+import type { TeamProfile } from "../../../sync/api/profile";
+import { useProfilesBatchQuery } from "../../profile/api/profile-api";
 
 function shortEmail(email: string) {
   const e = email.trim().toLowerCase();
@@ -29,43 +30,23 @@ export const ChatDockMessagesContent = memo(function ChatDockMessagesContent({
   messages: ChatMessageItem[];
   myEmail: string | null;
 }) {
-  const [profileByEmail, setProfileByEmail] = useState<Record<string, TeamProfile | null>>({});
-  const profileByEmailRef = useRef(profileByEmail);
-  profileByEmailRef.current = profileByEmail;
+  const authorEmails = useMemo(() => {
+    if (!messages.length) return [];
+    return [...new Set(messages.map((m) => m.authorEmail.trim().toLowerCase()))];
+  }, [messages]);
 
-  useEffect(() => {
-    if (!messages.length) return;
-    const need = [...new Set(messages.map((m) => m.authorEmail.trim().toLowerCase()))];
-    const missing = need.filter((e) => !(e in profileByEmailRef.current));
-    if (!missing.length) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const rows = await getProfilesBatch(accessToken, missing);
-        if (cancelled) return;
-        setProfileByEmail((prev) => {
-          const next = { ...prev };
-          for (const e of missing) {
-            const p = rows.find((r) => r.email.trim().toLowerCase() === e);
-            next[e] = p ?? null;
-          }
-          return next;
-        });
-      } catch {
-        if (cancelled) return;
-        setProfileByEmail((prev) => {
-          const next = { ...prev };
-          for (const e of missing) {
-            next[e] = null;
-          }
-          return next;
-        });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, messages]);
+  const { data: profiles = [] } = useProfilesBatchQuery(authorEmails, {
+    skip: !accessToken || authorEmails.length === 0,
+  });
+
+  const profileByEmail = useMemo(() => {
+    const map: Record<string, TeamProfile | null> = {};
+    for (const email of authorEmails) {
+      const profile = profiles.find((row) => row.email.trim().toLowerCase() === email);
+      map[email] = profile ?? null;
+    }
+    return map;
+  }, [authorEmails, profiles]);
 
   return (
     <>

@@ -1,7 +1,6 @@
 ﻿import cn from "classnames";
 import React, { useCallback, useRef, useState } from "react";
 import type { DialogueLine } from "../model/dialogue";
-import type { SpeakErrorInfo } from "../model/voice-trainer-speech";
 import type { VoiceExercise } from "../model/voice-trainer-types";
 const voiceIconProps = {
   width: 20,

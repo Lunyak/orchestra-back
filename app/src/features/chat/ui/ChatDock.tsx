@@ -5,13 +5,12 @@ import { useProject } from "../../project";
 import { useMyTroupeQuery } from "../../troupe/api/troupe-api";
 import { disconnectChatSocket, getChatSocket } from "../../../realtime/chat-socket";
 import {
-  fetchChatConversations,
-  fetchChatMessages,
-  markChatConversationRead,
-  postChatMessage,
-  type ChatConversationItem,
-  type ChatMessageItem,
-} from "../../../sync/api/chat";
+  useChatConversationsQuery,
+  useLazyChatMessagesQuery,
+  useMarkChatConversationReadMutation,
+  usePostChatMessageMutation,
+} from "../api/chat-api";
+import type { ChatConversationItem, ChatMessageItem } from "../../../sync/api/chat";
 import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { ChatDockMessagesContent } from "./ChatDockMessagesContent";
 import "./ChatDock.css";
@@ -41,14 +40,24 @@ export function ChatDock() {
   const myTroupe = troupeData?.troupe ?? null;
   const [open, setOpen] = useState(false);
   const [dockHidden, setDockHidden] = useState(readChatDockHidden);
-  const [conversations, setConversations] = useState<ChatConversationItem[]>([]);
+  const conversationsQuery = useChatConversationsQuery(undefined, {
+    skip: !open || !accessToken,
+  });
+  const conversations = useMemo(
+    () => conversationsQuery.data ?? [],
+    [conversationsQuery.data],
+  );
+  const loadingList =
+    conversationsQuery.isLoading ||
+    (conversationsQuery.isFetching && conversationsQuery.data === undefined);
+  const [fetchChatMessages] = useLazyChatMessagesQuery();
+  const [markChatConversationRead] = useMarkChatConversationReadMutation();
+  const [postChatMessage, { isLoading: sending }] = usePostChatMessageMutation();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessageItem[]>([]);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
-  const [loadingList, setLoadingList] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [sending, setSending] = useState(false);
   const [draft, setDraft] = useState("");
   const { data: myProfile } = useMyProfileQuery(undefined, { skip: !accessToken });
   const myEmail = useMemo(
@@ -161,38 +170,20 @@ export function ChatDock() {
   }, [open, expanded]);
 
   useEffect(() => {
-    if (!open || !accessToken) return;
-    let cancelled = false;
-    setLoadingList(true);
-    (async () => {
-      try {
-        const convs = await fetchChatConversations();
-        if (cancelled) return;
-        setConversations(convs);
-        const nextUnread: Record<string, number> = {};
-        for (const c of convs) {
-          nextUnread[c.id] = typeof c.unreadCount === "number" ? c.unreadCount : 0;
-        }
-        setUnreadByConv(nextUnread);
-        if (!convs.length) {
-          setActiveId(null);
-        } else {
-          setActiveId((current) =>
-            current && convs.some((c) => c.id === current) ? current : convs[0]!.id,
-          );
-        }
-      } catch {
-        if (!cancelled) {
-          setConversations([]);
-        }
-      } finally {
-        if (!cancelled) setLoadingList(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open, accessToken]);
+    if (!open || loadingList) return;
+    const nextUnread: Record<string, number> = {};
+    for (const c of conversations) {
+      nextUnread[c.id] = typeof c.unreadCount === "number" ? c.unreadCount : 0;
+    }
+    setUnreadByConv(nextUnread);
+    if (!conversations.length) {
+      setActiveId(null);
+      return;
+    }
+    setActiveId((current) =>
+      current && conversations.some((c) => c.id === current) ? current : conversations[0]!.id,
+    );
+  }, [open, loadingList, conversations]);
 
   useEffect(() => {
     if (!open || !activeId) return;
@@ -200,38 +191,44 @@ export function ChatDock() {
     setLoadingMsgs(true);
     setNextBefore(null);
     setMessages([]);
-    (async () => {
-      try {
-        const res = await fetchChatMessages(activeId, { limit: CHAT_PAGE_SIZE });
-        if (!cancelled) {
-          setMessages(res.messages);
-          setNextBefore(res.nextBeforeMessageId);
-        }
-      } catch {
+    void fetchChatMessages({ conversationId: activeId, limit: CHAT_PAGE_SIZE })
+      .unwrap()
+      .then((res) => {
+        if (cancelled) return;
+        setMessages(res.messages);
+        setNextBefore(res.nextBeforeMessageId);
+      })
+      .catch(() => {
         if (!cancelled) {
           setMessages([]);
           setNextBefore(null);
         }
-      } finally {
+      })
+      .finally(() => {
         if (!cancelled) setLoadingMsgs(false);
-      }
-    })();
+      });
     return () => {
       cancelled = true;
     };
-  }, [open, activeId]);
+  }, [open, activeId, fetchChatMessages]);
 
   const lastVisibleMessageId = messages.length ? messages[messages.length - 1]!.id : null;
 
   useEffect(() => {
     if (!open || !activeId || !accessToken || loadingMsgs || !lastVisibleMessageId) return;
     const t = window.setTimeout(() => {
-      void markChatConversationRead(activeId, lastVisibleMessageId).then((res) => {
-        setUnreadByConv((prev) => ({ ...prev, [activeId]: res.unreadCount }));
-      });
+      void markChatConversationRead({
+        conversationId: activeId,
+        lastSeenMessageId: lastVisibleMessageId,
+      })
+        .unwrap()
+        .then((res) => {
+          setUnreadByConv((prev) => ({ ...prev, [activeId]: res.unreadCount }));
+        })
+        .catch(() => undefined);
     }, 400);
     return () => window.clearTimeout(t);
-  }, [open, activeId, accessToken, loadingMsgs, lastVisibleMessageId]);
+  }, [open, activeId, accessToken, loadingMsgs, lastVisibleMessageId, markChatConversationRead]);
 
   useEffect(() => {
     if (open) setToggleAttention(false);
@@ -327,10 +324,11 @@ export function ChatDock() {
     olderInFlightRef.current = true;
     setLoadingOlder(true);
     try {
-      const res = await fetchChatMessages(activeId, {
+      const res = await fetchChatMessages({
+        conversationId: activeId,
         beforeMessageId: nextBefore,
         limit: CHAT_PAGE_SIZE,
-      });
+      }).unwrap();
       const root = messagesScrollRef.current;
       if (root) {
         scrollRestoreRef.current = {
@@ -348,7 +346,7 @@ export function ChatDock() {
       olderInFlightRef.current = false;
       setLoadingOlder(false);
     }
-  }, [activeId, nextBefore]);
+  }, [activeId, nextBefore, fetchChatMessages]);
 
   useEffect(() => {
     if (!open || !activeId || !nextBefore || loadingMsgs) return;
@@ -380,15 +378,18 @@ export function ChatDock() {
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`;
-    setSending(true);
     try {
-      const msg = await postChatMessage(activeId, text, clientMessageId);
+      const msg = await postChatMessage({
+        conversationId: activeId,
+        body: text,
+        clientMessageId,
+      }).unwrap();
       setDraft("");
       setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
-    } finally {
-      setSending(false);
+    } catch {
+      // ignore
     }
-  }, [draft, activeId, sending]);
+  }, [draft, activeId, sending, postChatMessage]);
 
   if (!accessToken || dockHidden) return null;
 

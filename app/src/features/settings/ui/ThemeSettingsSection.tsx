@@ -128,7 +128,11 @@ export function ThemeSettingsSection() {
           >
             <div className="theme-card__swatches">
               {theme.preview.map((color) => (
-                <span key={color} className="theme-card__swatch" style={{ background: color }} />
+                <span
+                  key={color}
+                  className="theme-card__swatch"
+                  style={{ "--theme-swatch-color": color } as React.CSSProperties}
+                />
               ))}
             </div>
             <div className="theme-card__name">{theme.name}</div>

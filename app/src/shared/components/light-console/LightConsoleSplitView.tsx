@@ -31,10 +31,12 @@ function MiniFader({
       <div className="light-split-fader__meter">
         <div
           className="light-split-fader__fill"
-          style={{
-            height: `${pct}%`,
-            backgroundColor: row.color ?? "var(--color-active-ascent)",
-          }}
+          style={
+            {
+              "--light-split-fader-fill-pct": `${pct}%`,
+              "--light-split-fader-fill-color": row.color ?? "var(--color-active-ascent)",
+            } as React.CSSProperties
+          }
         />
       </div>
       <span className="light-split-fader__pct">{pct}</span>
@@ -110,9 +112,10 @@ export function LightConsoleSplitView({
           className="light-console-split__program-label"
           style={
             model.programColor
-              ? {
-                  backgroundColor: resolveLightColor("", model.programColor) ?? undefined,
-                }
+              ? ({
+                  "--light-program-label-bg":
+                    resolveLightColor("", model.programColor) ?? undefined,
+                } as React.CSSProperties)
               : undefined
           }
         >

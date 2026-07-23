@@ -34,11 +34,17 @@ export function writeRehearsalPlanTab(tab: RehearsalPlanTab): void {
 
 export function rehearsalPlanTabFromPath(pathname: string): RehearsalPlanTab | null {
   if (pathname === "/board") return "board";
-  if (pathname === "/tasks") return "tasks";
+  if (pathname === "/tasks" || pathname.startsWith("/tasks/")) return "tasks";
   if (pathname === "/sessions" || pathname.startsWith("/sessions/")) return "sessions";
   return null;
 }
 
-export function resolveRehearsalPlanEntryPath(): string {
-  return TAB_PATH[readRehearsalPlanTab()];
+export function resolveRehearsalPlanEntryPath(options?: {
+  excludeTasks?: boolean;
+}): string {
+  const tab = readRehearsalPlanTab();
+  if (options?.excludeTasks && tab === "tasks") {
+    return TAB_PATH.sessions;
+  }
+  return TAB_PATH[tab];
 }

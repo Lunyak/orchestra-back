@@ -722,8 +722,7 @@ export function DirectorSessionPage() {
 
   return (
     <div className="director-session-page">
-      <RehearsalPlanSectionChrome activeTab="sessions" />
-
+      <RehearsalPlanSectionChrome activeTab="sessions">
       <div className="director-session-page__header">
         <Link
           to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
@@ -993,6 +992,7 @@ export function DirectorSessionPage() {
           />
         </div>
       )}
+      </RehearsalPlanSectionChrome>
     </div>
   );
 }

@@ -5,6 +5,10 @@ import {
   resolveDecorSize,
 } from "./theater-decor-catalog";
 import { snapTheaterHallPoint } from "./theater-hall-grid";
+import {
+  getGridCellCenter,
+  type TheaterGridCell,
+} from "./theater-zone-grid";
 
 export function resolveModelHalfDepth(model: TheaterModel): number {
   if (isParametricDecorBuiltin(model.builtin)) {
@@ -127,30 +131,12 @@ export function rotateModelByQuarterTurn(
   return [model.rotation[0], nextY, model.rotation[2]];
 }
 
-export type ModelPlacementPreset =
-  | "backWall"
-  | "frontWall"
-  | "center"
-  | "leftWall"
-  | "rightWall";
+export type ModelPlacementPreset = TheaterGridCell;
 
 export function resolveModelPlacementPosition(
   preset: ModelPlacementPreset,
   model: TheaterModel,
   layout: TheaterLayout,
-  snapEnabled: boolean,
-  gridStep: number,
 ): [number, number, number] {
-  switch (preset) {
-    case "backWall":
-      return positionAtBackWall(model, layout, snapEnabled, gridStep);
-    case "frontWall":
-      return positionAtAudienceBoundary(model, layout, snapEnabled, gridStep);
-    case "center":
-      return positionAtHallCenter(model, layout, snapEnabled, gridStep);
-    case "leftWall":
-      return positionAtLeftWall(model, layout, snapEnabled, gridStep);
-    case "rightWall":
-      return positionAtRightWall(model, layout, snapEnabled, gridStep);
-  }
+  return getGridCellCenter(layout, preset.col, preset.row, model.position[1]);
 }

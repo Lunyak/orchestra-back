@@ -261,6 +261,15 @@ export function mapTheaterSpotlightFromApi(sp: any): TheaterSpotlight {
     channel: sp?.channel ?? undefined,
     faderId: readFaderIdFromApiValue(sp?.faderId),
     isRgb: sp?.isRgb ?? undefined,
+    modelLowDetail: sp?.modelLowDetail === true ? true : undefined,
+    mountModelId:
+      typeof sp?.mountModelId === "number" && Number.isFinite(sp.mountModelId)
+        ? sp.mountModelId
+        : undefined,
+    mountPointId:
+      typeof sp?.mountPointId === "string" && sp.mountPointId.trim()
+        ? sp.mountPointId.trim()
+        : undefined,
     hidden: sp?.hidden === true ? true : undefined,
     gridCol:
       typeof sp?.gridCol === "number" && Number.isFinite(sp.gridCol)
@@ -287,6 +296,9 @@ export function mapTheaterSpotlightToSync(spotlight: TheaterSpotlight) {
     enabled: spotlight.enabled,
     channel: spotlight.channel,
     isRgb: spotlight.isRgb,
+    modelLowDetail: spotlight.modelLowDetail ?? false,
+    mountModelId: spotlight.mountModelId ?? null,
+    mountPointId: spotlight.mountPointId ?? null,
     hidden: spotlight.hidden,
     gridCol: spotlight.gridCol,
     gridRow: spotlight.gridRow,

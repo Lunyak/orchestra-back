@@ -8,6 +8,7 @@ export type OrchestraQueryArgs = {
   method?: AxiosRequestConfig["method"];
   data?: unknown;
   params?: unknown;
+  headers?: Record<string, string>;
 };
 
 export type OrchestraQueryError = {
@@ -21,7 +22,7 @@ export const axiosBaseQuery: BaseQueryFn<
   OrchestraQueryArgs,
   unknown,
   OrchestraQueryError
-> = async ({ url, method = "GET", data, params }) => {
+> = async ({ url, method = "GET", data, params, headers }) => {
   try {
     const token = getAccessToken();
     const result = await api({
@@ -29,7 +30,10 @@ export const axiosBaseQuery: BaseQueryFn<
       method,
       data,
       params,
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
     });
     return { data: result.data };
   } catch (error) {

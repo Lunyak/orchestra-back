@@ -23,7 +23,7 @@ export function TheaterControlsLayoutStageSection({ vm, layout }: LayoutSectionP
     <>
       <TheaterCollapsibleSection
         sectionId="layout-stage"
-        title="Контур и форма"
+        title="Форма сцены"
         summary={layoutShapeLabel}
         badge={isCustomStageOutline ? "Свой контур" : undefined}
         defaultOpen={isCustomStageOutline}

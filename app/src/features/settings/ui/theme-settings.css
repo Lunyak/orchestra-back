@@ -53,6 +53,7 @@
   flex: 1;
   height: 24px;
   border: 1px solid var(--settings-chrome-border, #222);
+  background: var(--theme-swatch-color);
 }
 
 .settings-layout .theme-card__name {

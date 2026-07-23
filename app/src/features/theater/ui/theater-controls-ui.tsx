@@ -3,26 +3,18 @@ import type { CSSProperties, MouseEventHandler, ReactNode } from "react";
 import { Button } from "../../../shared/core/button/Button";
 import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
 import type { CustomSelectOption } from "../../../shared/core/custom-select/CustomSelect";
-import { LabeledCheckbox } from "../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import type { TheaterModel } from "../../../shared/types/script";
+import {
+  isTheaterBuiltinTemplateKey,
+  THEATER_BUILTIN_TEMPLATES,
+} from "../model/theater-model-builtin";
 
-export const BUILTIN_MODEL_OPTIONS: CustomSelectOption[] = [
-  { value: "table", label: "Стол" },
-  { value: "roundTable", label: "Круглый стол" },
-  { value: "chair", label: "Стул" },
-  { value: "sofa", label: "Диван" },
-  { value: "bench", label: "Скамейка" },
-  { value: "cabinet", label: "Тумба" },
-  { value: "blackCube", label: "Черный куб" },
-  { value: "strawGrid", label: "Сетка + солома" },
-  { value: "actor", label: "Актер" },
-  { value: "humanStanding", label: "Человек — стоит" },
-  { value: "humanSitting", label: "Человек — сидит" },
-  { value: "humanSmoothStanding", label: "Человек сглаженный — стоит" },
-  { value: "humanSmoothSitting", label: "Человек сглаженный — сидит" },
-  { value: "fence", label: "Забор" },
-  { value: "dancer", label: "Танцор" },
-];
+export const BUILTIN_MODEL_OPTIONS: CustomSelectOption[] = THEATER_BUILTIN_TEMPLATES.map(
+  (item) => ({
+    value: item.key,
+    label: item.label,
+  }),
+);
 
 export function rangeFillStyle(min: number, max: number, value: number): CSSProperties {
   const pct = max <= min ? 0 : ((value - min) / (max - min)) * 100;
@@ -160,6 +152,5 @@ export function TheaterSelect({
 }
 
 export function parseBuiltinKey(value: string): TheaterModel["builtin"] | undefined {
-  const found = BUILTIN_MODEL_OPTIONS.find((o) => o.value === value);
-  return found ? (found.value as TheaterModel["builtin"]) : undefined;
+  return isTheaterBuiltinTemplateKey(value) ? value : undefined;
 }

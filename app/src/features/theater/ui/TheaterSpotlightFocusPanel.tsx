@@ -1,6 +1,6 @@
 import cn from "classnames";
-import type { TheaterSpotlight } from "../../../shared/types/script";
-import { useEffect, useState } from "react";
+import type { TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
+import { useEffect, useMemo, useState } from "react";
 import {
   THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
   THEATER_SPOTLIGHT_UI_INTENSITY_MAX,
@@ -13,6 +13,11 @@ import {
 } from "../model/theater-spotlight-labels";
 import { TheaterRangeField } from "./theater-controls-ui";
 import { tc } from "../../../shared/styles/theme-color";
+import {
+  getLightTrussMountPoint,
+  getOccupiedTrussMountPointIds,
+  LIGHT_TRUSS_6M_MOUNT_POINTS,
+} from "../model/theater-truss-mounts";
 
 export type TheaterSpotlightFocusPanelProps = {
   spotlight: TheaterSpotlight;
@@ -36,6 +41,10 @@ export type TheaterSpotlightFocusPanelProps = {
   gridCol?: number;
   gridRow?: number;
   onClearGridBinding?: () => void;
+  trusses: TheaterModel[];
+  spotlights: TheaterSpotlight[];
+  onAttachToTruss: (mountModelId: number, mountPointId: string) => void;
+  onDetachFromTruss: () => void;
 };
 
 export function TheaterSpotlightFocusPanel({
@@ -60,15 +69,50 @@ export function TheaterSpotlightFocusPanel({
   gridCol,
   gridRow,
   onClearGridBinding,
+  trusses,
+  spotlights,
+  onAttachToTruss,
+  onDetachFromTruss,
 }: TheaterSpotlightFocusPanelProps) {
   const enabled = spotlight.enabled !== false;
   const hidden = spotlight.hidden === true;
   const defaultLabel = spotlight.isRgb ? `RGB ${spotlight.id}` : `Софит ${spotlight.id}`;
   const [labelDraft, setLabelDraft] = useState(spotlight.label);
+  const [selectedTrussId, setSelectedTrussId] = useState<number | null>(
+    spotlight.mountModelId ?? trusses[0]?.id ?? null,
+  );
+  const [selectedMountPointId, setSelectedMountPointId] = useState("");
 
   useEffect(() => {
     setLabelDraft(spotlight.label);
   }, [spotlight.id, spotlight.label]);
+
+  useEffect(() => {
+    setSelectedTrussId(spotlight.mountModelId ?? trusses[0]?.id ?? null);
+  }, [spotlight.id, spotlight.mountModelId, trusses]);
+
+  const occupiedMountPointIds = useMemo(
+    () =>
+      selectedTrussId == null
+        ? new Set<string>()
+        : getOccupiedTrussMountPointIds(
+            spotlights,
+            selectedTrussId,
+            spotlight.id,
+          ),
+    [selectedTrussId, spotlight.id, spotlights],
+  );
+  const availableMountPoints = LIGHT_TRUSS_6M_MOUNT_POINTS.filter(
+    (point) => !occupiedMountPointIds.has(point.id),
+  );
+
+  useEffect(() => {
+    const currentPointAvailable = availableMountPoints.some(
+      (point) => point.id === selectedMountPointId,
+    );
+    if (currentPointAvailable) return;
+    setSelectedMountPointId(availableMountPoints[0]?.id ?? "");
+  }, [availableMountPoints, selectedMountPointId]);
 
   const commitLabel = () => {
     const trimmed = labelDraft.trim();
@@ -86,6 +130,9 @@ export function TheaterSpotlightFocusPanel({
     gridRow != null &&
     Number.isFinite(gridCol) &&
     Number.isFinite(gridRow);
+  const mountedTruss = trusses.find((truss) => truss.id === spotlight.mountModelId);
+  const mountedPoint = getLightTrussMountPoint(spotlight.mountPointId);
+  const sourceIsMounted = Boolean(mountedTruss && mountedPoint);
 
   return (
     <div
@@ -98,7 +145,7 @@ export function TheaterSpotlightFocusPanel({
       <div className="theater-focus-panel__title">
         <input
           type="text"
-          className="native-text-input theater-focus-panel__title-input"
+          className="theater-focus-panel__title-input"
           value={labelDraft}
           placeholder={defaultLabel}
           aria-label="Название софита"
@@ -161,6 +208,66 @@ export function TheaterSpotlightFocusPanel({
           Клик по ячейке на плане или полу сцены
         </p>
       ) : null}
+      {sourceIsMounted ? (
+        <p className="theater-focus-panel__grid-bind">
+          {mountedTruss?.name} · {mountedPoint?.label}
+          <button
+            type="button"
+            className="theater-focus-panel__grid-bind-clear"
+            onClick={onDetachFromTruss}
+          >
+            снять
+          </button>
+        </p>
+      ) : (
+        <>
+          <label className="theater-field">
+            <span className="theater-label">Ферма</span>
+            <select
+              className="native-text-input"
+              value={selectedTrussId ?? ""}
+              onChange={(event) => setSelectedTrussId(Number(event.target.value) || null)}
+              disabled={trusses.length === 0}
+            >
+              {trusses.length === 0 ? <option value="">Ферм нет</option> : null}
+              {trusses.map((truss) => (
+                <option key={truss.id} value={truss.id}>
+                  {truss.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="theater-field">
+            <span className="theater-label">Точка крепления</span>
+            <select
+              className="native-text-input"
+              value={selectedMountPointId}
+              onChange={(event) => setSelectedMountPointId(event.target.value)}
+              disabled={availableMountPoints.length === 0}
+            >
+              {availableMountPoints.length === 0 ? (
+                <option value="">Свободных точек нет</option>
+              ) : null}
+              {availableMountPoints.map((point) => (
+                <option key={point.id} value={point.id}>
+                  {point.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="theater-model-context-menu__item"
+            disabled={selectedTrussId == null || !selectedMountPointId}
+            onClick={() => {
+              if (selectedTrussId == null || !selectedMountPointId) return;
+              onAttachToTruss(selectedTrussId, selectedMountPointId);
+            }}
+          >
+            Повесить на ферму
+          </button>
+        </>
+      )}
       <div className="theater-model-context-menu__row">
         <button
           type="button"
@@ -202,6 +309,8 @@ export function TheaterSpotlightFocusPanel({
             dragMode === "source" && "theater-model-context-menu__item--active",
           )}
           onClick={() => onPickDragMode("source")}
+          disabled={sourceIsMounted}
+          title={sourceIsMounted ? "Источник закреплён на ферме" : undefined}
         >
           Источник
         </button>

@@ -2,6 +2,8 @@ import { ENABLE_3D_THEATER } from "../../shared/build-features";
 
 export const SUFER_ROUTE_PATH = "/sufer";
 export const PROJECT_MEDIA_ROUTE_PATH = "/media";
+export const SPECTACLE_HUB_ROUTE_PATH = "/spectacle";
+export const APP_HUB_ROUTE_PATH = "/home";
 
 function isTheaterRoute(pathname: string) {
   return ENABLE_3D_THEATER && pathname === "/theater";
@@ -9,6 +11,17 @@ function isTheaterRoute(pathname: string) {
 
 export function isTheaterRouteEnabled() {
   return ENABLE_3D_THEATER;
+}
+
+/** Хаб + рабочие creative-views: сценарий, light-plot, прогон, 3D. */
+export function isSpectacleCreativePath(pathname: string) {
+  return (
+    pathname === SPECTACLE_HUB_ROUTE_PATH ||
+    pathname === "/" ||
+    pathname === "/light-plot" ||
+    pathname === SUFER_ROUTE_PATH ||
+    isTheaterRoute(pathname)
+  );
 }
 
 function isScriptStateRoute(pathname: string) {
@@ -36,7 +49,7 @@ function isSessionsRoute(pathname: string) {
 }
 
 function isTasksRoute(pathname: string) {
-  return pathname === "/tasks";
+  return pathname === "/tasks" || pathname.startsWith("/tasks/");
 }
 
 function isRehearsalPlanRoute(pathname: string) {

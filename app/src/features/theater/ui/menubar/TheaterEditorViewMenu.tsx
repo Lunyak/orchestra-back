@@ -48,14 +48,6 @@ export function TheaterEditorViewMenu({ vm }: TheaterEditorViewMenuProps) {
             >
               План сверху
             </TheaterEditorMenubarToggle>
-            {vm.showFloorPlan ? (
-              <TheaterEditorMenubarToggle
-                checked={vm.floorPlanExpanded}
-                onChange={vm.setFloorPlanExpanded}
-              >
-                План развёрнут
-              </TheaterEditorMenubarToggle>
-            ) : null}
             <TheaterEditorMenubarToggle
               checked={vm.spectaclePreviewMode}
               onChange={vm.setSpectaclePreviewMode}

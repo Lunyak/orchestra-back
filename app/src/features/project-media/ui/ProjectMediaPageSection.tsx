@@ -65,7 +65,7 @@ export function ProjectMediaPageSection() {
               <span className="project-media-library-section__count">{counts.playlist}</span>
             </header>
             <p className="project-media-library-section__hint">
-              Треки для плейлиста и прогона. Используются в суфлёре и сценарии.
+              Треки для плейлиста и прогона. Используются в прогоне и сценарии.
             </p>
             <div className="project-media-page__playlist-container">
               <PlaylistSidebar projectName={projectName} sceneName="script" mode="list" />

@@ -147,10 +147,6 @@
   opacity: 0.7;
 }
 
-.script-empty-material__file-input {
-  display: none;
-}
-
 .script-empty-material__hint {
   position: relative;
   z-index: 1;

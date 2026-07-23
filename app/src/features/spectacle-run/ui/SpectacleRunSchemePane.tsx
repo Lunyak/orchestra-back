@@ -100,7 +100,7 @@ export function SpectacleRunSchemePane({
     return (
       <div className="spectacle-run-scheme spectacle-run-scheme--empty">
         <p>
-          В сцене «{tapeItem.sceneTitle}» пока нет картин. Добавьте первую — появится в ленте репетиции
+          В сцене «{tapeItem.sceneTitle}» пока нет картин. Добавьте первую — появится в ленте спектакля
           и в тексте сцены (<code>### Картина 1</code>).
         </p>
       </div>

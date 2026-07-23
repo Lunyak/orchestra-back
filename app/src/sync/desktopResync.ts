@@ -1,4 +1,4 @@
-import { syncPull, syncPullScene } from "./api/entity-sync";
+import { dispatchSyncPull, dispatchSyncPullScene } from "../shared/api/rtk/sync-dispatch";
 import { getDesktopApi } from "../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "./desktopOutbox";
 import {
@@ -113,10 +113,14 @@ export async function resyncDesktopProject(
   try {
     for (const sceneName of sceneNamesToSync) {
       totalScenes += 1;
-      const pull = await syncPullScene(accessToken, projectSlug, sceneName, {
-        scenes: true,
-        theaterLayout: true,
-        lightChannels: true,
+      const pull = await dispatchSyncPullScene({
+        projectSlug,
+        sceneName,
+        include: {
+          scenes: true,
+          theaterLayout: true,
+          lightChannels: true,
+        },
       });
       const serverRaw = buildServerSceneRawFromPull({
         scenes: pullScriptScenesFromSync(pull),
@@ -161,7 +165,11 @@ export async function resyncDesktopProject(
     return { updatedScenes, totalScenes };
   } catch (err) {
     console.warn("[resync] pull-scene failed, fallback to syncPull", err);
-    const pull = await syncPull(accessToken, null, projectSlug, syncPullIncludeForPlaybook());
+    const pull = await dispatchSyncPull({
+      projectSlug,
+      lastSyncAt: null,
+      include: syncPullIncludeForPlaybook(),
+    });
     const serverPlaybooks = pullPlaybooksFromSync(pull);
     const related = serverPlaybooks.filter((s: any) => String(s?.projectId ?? "").trim());
 

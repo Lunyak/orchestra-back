@@ -1448,6 +1448,8 @@
 
 .actor-annotations-popover {
   position: fixed;
+  top: var(--actor-annotations-popover-top, 0);
+  left: var(--actor-annotations-popover-left, 0);
   z-index: 1000;
   width: min(320px, calc(100vw - 24px));
   max-height: min(70vh, 520px);
@@ -2231,6 +2233,12 @@
   vertical-align: baseline;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.markdown-light-chip--themed {
+  background-color: var(--markdown-light-chip-bg);
+  color: var(--markdown-light-chip-fg);
+  border-color: transparent;
 }
 
 .markdown-light-chip {

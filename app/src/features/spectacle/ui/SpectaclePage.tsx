@@ -12,6 +12,7 @@ import {
   useSpectaclePage,
   type SpectaclePageViewModel,
 } from "../model/useSpectaclePage";
+import { SpectacleDirectionSwitch } from "./SpectacleDirectionSwitch";
 
 const LightPlotPage = React.lazy(() =>
   import("../../../shared/components/light-plot/LightPlotPage").then((m) => ({
@@ -39,11 +40,6 @@ const TheaterScene = React.lazy(() =>
 const KanbanBoardPage = React.lazy(() =>
   import("../../../shared/components/kanban/KanbanBoardPage").then((m) => ({
     default: m.KanbanBoardPage,
-  })),
-);
-const TasksPage = React.lazy(() =>
-  import("../../project-tasks/ui/TasksPage").then((m) => ({
-    default: m.TasksPage,
   })),
 );
 
@@ -216,6 +212,12 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     showScenesSidebar &&
     ((isMobile && mobileScenesOpen) || (!isMobile && !isScenesCollapsed));
 
+  const showDirectionSwitch =
+    activeView === "script" ||
+    activeView === "light-plot" ||
+    activeView === "sufer" ||
+    activeView === "theater";
+
   const stepsSidebarNode = stepsSidebarVisible ? (
       <div
         className={cn(
@@ -260,6 +262,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
         playlistNode
       )}
       <div className="app-content">
+        {showDirectionSwitch ? <SpectacleDirectionSwitch /> : null}
         <OfflinePackStatus />
         {showHeaderSounds && !compactMainChrome && !isMobile && (
           <div className="sounds-bar">
@@ -294,13 +297,13 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
           )}
           {activeView === "light-plot" && (
             <Suspense
-              fallback={<PageLoader variant="view" label="Загрузка схемы…" />}
+              fallback={<PageLoader variant="view" label="Загрузка спектакля…" />}
             >
               <LightPlotPage />
             </Suspense>
           )}
           {activeView === "sufer" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка суфлёра…" />}>
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка прогона…" />}>
               <NotesRunPageSection />
             </Suspense>
           )}
@@ -319,13 +322,13 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
             </Suspense>
           )}
           {activeView === "board" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка плана репетиций…" />}>
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка репетиций…" />}>
               <KanbanBoardPage members={kanbanMembers} />
             </Suspense>
           )}
           {activeView === "tasks" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка плана репетиций…" />}>
-              <TasksPage />
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка задач…" />}>
+              <Outlet />
             </Suspense>
           )}
           {activeView === "sessions" && <Outlet />}

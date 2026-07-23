@@ -6,6 +6,8 @@ type TheaterModelPayload = {
   file?: string | null;
   kind?: string;
   allowOutOfBounds?: boolean;
+  ignoreCollisions?: boolean;
+  modelLowDetail?: boolean;
   position?: unknown;
   rotation?: unknown;
   scale?: unknown;
@@ -48,6 +50,8 @@ export function prismaTheaterModelRowToClient(row: Record<string, unknown>) {
     builtin: row.builtin ?? undefined,
     file: row.file ?? undefined,
     allowOutOfBounds: row.allowOutOfBounds ?? false,
+    ignoreCollisions: row.ignoreCollisions ?? false,
+    modelLowDetail: row.modelLowDetail ?? false,
     position: row.position,
     rotation: row.rotation,
     scale: row.scale,
@@ -80,6 +84,8 @@ export function clientTheaterModelToPrisma(
     file: typeof m?.file === 'string' && m.file.trim() ? m.file.trim() : null,
     kind: m?.kind === 'decor' ? 'decor' : 'prop',
     allowOutOfBounds: normalizeBool(m?.allowOutOfBounds, false),
+    ignoreCollisions: normalizeBool(m?.ignoreCollisions, false),
+    modelLowDetail: normalizeBool(m?.modelLowDetail, false),
     position: normalizeVec3(m?.position, [0, 0, 0]),
     rotation: normalizeVec3(m?.rotation, [0, 0, 0]),
     scale: normalizeVec3(m?.scale, [1, 1, 1]),

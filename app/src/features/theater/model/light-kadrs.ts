@@ -180,7 +180,7 @@ export function nextKadrNumberForScene(
   return Math.max(fromMarkdown, fromKadrs, 0) + 1;
 }
 
-/** Найти секцию картины в актуальном markdown (для ленты репетиции / записи). */
+/** Найти секцию картины в актуальном markdown (для ленты спектакля / записи). */
 export function resolveKadrSectionForTapeItem(
   markdown: string,
   item: {
@@ -449,7 +449,7 @@ export function applyKadrToFaders(
 }
 
 export function createKadrTemplateSnippet(kadrNo: number, kadrId: string): string {
-  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: репетиция — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n\n- **Звук**: _трек из плейлиста — при создании картины_\n- **Видео**: _«Записать проектор» — ролик на экран_\n\n- **Действие/задача**: _например: дым-машина_\n- **Комментарий**:\n- **Переход**:\n`;
+  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: спектакль — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n\n- **Звук**: _трек из плейлиста — при создании картины_\n- **Видео**: _«Записать проектор» — ролик на экран_\n\n- **Действие/задача**: _например: дым-машина_\n- **Комментарий**:\n- **Переход**:\n`;
 }
 
 const TOKEN_PROGRAM_RE = /\{\{\s*program\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;

@@ -18,7 +18,6 @@ import {
   useTeamRolesQuery,
   type TeamRoleDefinitionItem,
 } from "../../features/troupe/api/troupe-api";
-import { useListPremisesQuery } from "../../features/premises";
 import {
   getTroupeNarrowLayoutSnapshot,
   isoDate,
@@ -31,8 +30,7 @@ import type {
   TroupeMemberKind,
 } from "../../features/troupe/api/troupe-api";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
-import { PremisesIndexPanel } from "../premises/PremisesIndexPanel";
-import "../premises/style.css";
+import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "../../features/director-sessions/ui/director-sessions.css";
 import "./style.css";
@@ -104,10 +102,6 @@ export function TroupePage() {
   } = useTeamRolesQuery(undefined, { skip: !accessToken });
   const [createTeamRole, { isLoading: creatingTeamRole }] =
     useCreateTeamRoleMutation();
-  const { data: premisesData } = useListPremisesQuery(undefined, {
-    skip: !accessToken,
-  });
-  const premisesCount = premisesData?.premises.length ?? 0;
 
   const projectSelectOptions = useMemo(
     () =>
@@ -120,7 +114,6 @@ export function TroupePage() {
   const isTeamTab = activeTab === "team";
   const isTroupeTab = activeTab === "troupe";
   const isProjectTab = activeTab === "project";
-  const isPremisesTab = activeTab === "premises";
   const teamRolesByParentId = useMemo(() => {
     const groups = new Map<string, TeamRoleDefinitionItem[]>();
     for (const role of teamRoles) {
@@ -403,7 +396,7 @@ export function TroupePage() {
       <div className="app-content">
         <main className="main-content">
           <div className="troupe-view">
-
+            <AdminSectionChrome activeSection="team">
             <div className="troupe-tabs" role="tablist" aria-label="Разделы труппы">
               <button
                 type="button"
@@ -434,16 +427,6 @@ export function TroupePage() {
               >
                 Состав проекта
                 <span className="troupe-tab__count">{projectCastMembers.length}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={isPremisesTab}
-                className={cn("troupe-tab", isPremisesTab && "troupe-tab--active")}
-                onClick={() => setActiveTab("premises")}
-              >
-                Помещения
-                <span className="troupe-tab__count">{premisesCount}</span>
               </button>
             </div>
 
@@ -850,24 +833,6 @@ export function TroupePage() {
               </div>
             ) : null}
 
-            {isPremisesTab ? (
-              <div className="troupe-card troupe-premises-card">
-                <div className="troupe-project-cast-head">
-                  <div>
-                    <div className="troupe-project-cast-title">Помещения</div>
-                    <div className="troupe-project-cast-subtitle">
-                      Календарь аренды и субаренды залов и студий
-                    </div>
-                  </div>
-                </div>
-                <div className="troupe-premises-panel premises-layout">
-                  <div className="sessions-page rehearsals-page">
-                    <PremisesIndexPanel skip={!accessToken} />
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
             {canManageProjectTroupe && isTroupeTab ? (
               <div className="troupe-card troupe-invite-card">
                 <div className="troupe-invite-card__title">
@@ -904,6 +869,7 @@ export function TroupePage() {
                 {addError ? <div className="troupe-error">{addError}</div> : null}
               </div>
             ) : null}
+            </AdminSectionChrome>
           </div>
         </main>
       </div>

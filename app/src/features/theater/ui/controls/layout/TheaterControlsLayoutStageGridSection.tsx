@@ -11,7 +11,7 @@ export function TheaterControlsLayoutStageGridSection({ vm }: LayoutSectionProps
             title="Сетка сцены"
             summary="Столбцы и ряды на полу"
             badge={`${vm.stageGrid.cols}×${vm.stageGrid.rows}`}
-            defaultOpen
+            defaultOpen={vm.stageGridFocused}
           >
             <p className="theater-layout-hint">
               Сетка повторяет контур сцены. Ряд 1 — у задника, последний — у авансцены. При

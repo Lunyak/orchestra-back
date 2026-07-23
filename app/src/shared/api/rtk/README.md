@@ -31,9 +31,12 @@
 - ✅ `roleWorkbook` thunk — роли/труппа/участники/профили через кэш RTK (`initiate`)
 - ✅ `playbook-slice` / `sync.service` — распил на types, thunks, helpers, applier
 - ✅ сценарий (`SceneRolesPanel`, `ScriptMarkdownPreview`) и профиль — роли через `useProjectRolesQuery`
-- ✅ `ChatDock` — `useMyProfileQuery`
+- ✅ `ChatDock` — RTK: conversations, messages (lazy), read, post; профили — `useProfilesBatchQuery`
+- ✅ `profileDataSlice` — save/upload/delete через RTK mutations (`profile-api`)
 - 🗑️ удалены неиспользуемые `troupe-slice` и `profileRolesSlice` из store
-- ⏳ остальные `sync/api/*` (чат, scene notes, sync pull/push, profileData mutations) по мере необходимости
+- ✅ actor scene notes — `actor-notes-api` (get/upsert/delete); thunks в `show-script-slice` через RTK
+- ✅ sync pull/push — `sync-api` + `sync-dispatch` (все app-пути, включая desktop outbox/resync)
+- `sync/api/entity-sync` — deprecated-обёртка над `sync-dispatch` (совместимость экспорта)
 
 `setupListeners` включён в `shared/store/store.ts` — refetch при фокусе вкладки для подписанных query.
 

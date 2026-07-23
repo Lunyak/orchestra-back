@@ -8,8 +8,8 @@ export type TheaterFloorPlanProps = {
   showSeats: boolean;
   showSpotlights: boolean;
   showSpotlightGuideLines: boolean;
-  expanded: boolean;
-  onToggleExpanded: () => void;
+  maxSide: number;
+  onChangeMaxSide: (value: number) => void;
   activeTab: TheaterViewPrefs["activeTab"];
   editMode: "spotlights" | "models" | "decor";
   decorPlaceMode: boolean;
@@ -66,5 +66,35 @@ export type DragState =
   | { kind: "recess-width-end"; recessId: number }
   | { kind: "outline-vertex"; index: number };
 
-export const COMPACT_SIZE = { width: 196, height: 156 };
-export const EXPANDED_SIZE = { width: 420, height: 340 };
+export const FLOOR_PLAN_DEFAULT_MAX_SIDE = 196;
+export const FLOOR_PLAN_MIN_MAX_SIDE = 140;
+export const FLOOR_PLAN_LIMIT_MAX_SIDE = 720;
+export const FLOOR_PLAN_NAV_MIN_SIDE = 220;
+
+export function clampFloorPlanMaxSide(value: number): number {
+  if (!Number.isFinite(value)) return FLOOR_PLAN_DEFAULT_MAX_SIDE;
+  return Math.min(
+    FLOOR_PLAN_LIMIT_MAX_SIDE,
+    Math.max(FLOOR_PLAN_MIN_MAX_SIDE, Math.round(value)),
+  );
+}
+
+/** Размер SVG-плана по пропорциям зала внутри квадратной max-коробки. */
+export function fitFloorPlanSize(
+  hallWidth: number,
+  hallDepth: number,
+  maxSide: number,
+): { width: number; height: number } {
+  const side = clampFloorPlanMaxSide(maxSide);
+  const safeW = Math.max(hallWidth, 0.01);
+  const safeD = Math.max(hallDepth, 0.01);
+  const aspect = safeW / safeD;
+  if (aspect >= 1) {
+    const width = side;
+    const height = Math.max(1, Math.round(width / aspect));
+    return { width, height };
+  }
+  const height = side;
+  const width = Math.max(1, Math.round(height * aspect));
+  return { width, height };
+}

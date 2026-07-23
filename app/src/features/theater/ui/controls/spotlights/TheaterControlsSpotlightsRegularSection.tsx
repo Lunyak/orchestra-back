@@ -1,4 +1,3 @@
-import { tc } from "../../../../../shared/styles/theme-color";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import {
   formatLightChannelSlot,
@@ -15,19 +14,11 @@ import { SpotlightListNameInput } from "./SpotlightListNameInput";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsRegularSection({ vm, spot }: SpotlightsSectionProps) {
+  const activeRegularSpotlight = vm.activeSpotlight?.isRgb ? null : vm.activeSpotlight;
   const {
     spotlightBatchCount,
     setSpotlightBatchCount,
-    rgbBatchCount,
-    setRgbBatchCount,
-    spotlightLayoutRows,
-    setSpotlightLayoutRows,
     regularSpotlights,
-    rgbSpotlights,
-    totalSpotlights,
-    linkStats,
-    spotlightLinkBadge,
-    spotlightCountBadge,
     lightChannels,
     lightFaders,
     selectedLightSlot,
@@ -147,6 +138,16 @@ export function TheaterControlsSpotlightsRegularSection({ vm, spot }: Spotlights
               <span className="theater-spotlight-empty">Софитов нет</span>
             )}
             </div>
+            <LabeledCheckbox
+              checked={activeRegularSpotlight?.modelLowDetail ?? false}
+              onChange={(modelLowDetail) => {
+                if (!activeRegularSpotlight) return;
+                vm.updateSpotlight(activeRegularSpotlight.id, { modelLowDetail });
+              }}
+              disabled={!activeRegularSpotlight}
+            >
+              Упрощённая 3D-модель
+            </LabeledCheckbox>
             <div className="theater-btn-row">
               <TheaterBtn onClick={vm.addSpotlight} disabled={!vm.currentScene}>
                 + Софит

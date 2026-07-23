@@ -1,0 +1,147 @@
+.spectacle-hub-layout .main-content {
+  padding: 24px 20px 40px;
+}
+
+.spectacle-hub {
+  max-width: 512px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.spectacle-hub__header {
+  margin-bottom: 28px;
+}
+
+.spectacle-hub__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 250px));
+  gap: 12px;
+}
+
+.spectacle-hub__grid > li {
+  min-width: 0;
+}
+
+.spectacle-hub__tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  max-width: 250px;
+  max-height: 250px;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 1px solid var(--color-border-panel);
+  background: var(--color-bg-secondary);
+  text-decoration: none;
+  color: inherit;
+  box-sizing: border-box;
+  overflow: hidden;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.spectacle-hub__tile-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transition: transform 0.22s ease;
+}
+
+.spectacle-hub__tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      transparent 28%,
+      rgba(16, 16, 18, 0.55) 62%,
+      rgba(16, 16, 18, 0.92) 100%
+    );
+  pointer-events: none;
+  transition: background 0.18s ease;
+}
+
+.spectacle-hub__tile::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  width: 3px;
+  height: 100%;
+  background: var(--color-border-emphasis);
+  transition: background 0.18s ease;
+}
+
+.spectacle-hub__tile-body {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 16px 16px 20px;
+}
+
+.spectacle-hub__tile:hover {
+  border-color: var(--color-active-ascent);
+  transform: translateY(-2px);
+}
+
+.spectacle-hub__tile:hover .spectacle-hub__tile-image {
+  transform: scale(1.04);
+}
+
+.spectacle-hub__tile:hover::before {
+  background: var(--color-active-ascent);
+}
+
+.spectacle-hub__tile:hover::after {
+  background:
+    linear-gradient(
+      180deg,
+      transparent 22%,
+      rgba(16, 16, 18, 0.45) 55%,
+      rgba(16, 16, 18, 0.88) 100%
+    ),
+    linear-gradient(
+      180deg,
+      transparent 50%,
+      var(--color-accent-orange-bg-soft) 100%
+    );
+}
+
+.spectacle-hub__tile:focus-visible {
+  outline: 2px solid var(--color-active-ascent);
+  outline-offset: 2px;
+}
+
+.spectacle-hub__tile-label {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  color: var(--color-text-primary);
+  transition: color 0.18s ease;
+}
+
+.spectacle-hub__tile:hover .spectacle-hub__tile-label {
+  color: var(--color-active-ascent);
+}
+
+.spectacle-hub__tile-desc {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}

@@ -1,15 +1,14 @@
 .events-page {
-  min-height: 100vh;
+  min-height: 100dvh;
   position: relative;
   display: flex;
   justify-content: center;
-  padding: 28px 24px 72px;
+  padding: clamp(16px, 2.5dvh, 28px) 24px clamp(28px, 5dvh, 72px);
   background:
     radial-gradient(900px 500px at 20% 10%, rgba(184, 53, 74, 0.18), transparent 60%),
     radial-gradient(800px 500px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
     radial-gradient(900px 650px at 50% 95%, rgba(0, 0, 0, 0.55), transparent 65%),
     var(--color-bg);
-  overflow: hidden;
 }
 
 @media (max-width: 980px) {
@@ -121,6 +120,12 @@
   position: relative;
   overflow: hidden;
   aspect-ratio: 3 / 5;
+}
+
+@media (max-height: 900px) and (min-width: 981px) {
+  .events-card {
+    aspect-ratio: 3 / 4;
+  }
 }
 
 @media (max-width: 980px) {

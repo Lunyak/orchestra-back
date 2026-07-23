@@ -1,8 +1,4 @@
-import { store } from "../store/store";
-
 export function getAccessToken(): string | null {
-  const fromStore = store.getState().auth?.accessToken ?? null;
-  if (fromStore) return fromStore;
   if (typeof window === "undefined") return null;
   return localStorage.getItem("accessToken");
 }

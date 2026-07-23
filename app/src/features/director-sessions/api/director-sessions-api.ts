@@ -1,11 +1,11 @@
 import { getAccessToken } from "../../../shared/api/authenticated";
 import { orchestraApi } from "../../../shared/api/rtk/orchestra-api";
+import { syncApi } from "../../../shared/api/rtk/sync-api";
 import type {
   DirectorSession,
   DirectorSessionParticipant,
 } from "../../../sync/api/director-sessions";
 import { projectApi } from "../../project/api/project-api";
-import { syncPull } from "../../../sync/api/entity-sync";
 import {
   loadDirectorSessions,
   type DirectorRehearsalSession,
@@ -96,7 +96,15 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
           return { error: { status: 401, message: "Нет токена авторизации" } };
         }
         try {
-          const pull = await syncPull(token, null, projectSlug, { scenes: true });
+          const pull = await api
+            .dispatch(
+              syncApi.endpoints.syncPull.initiate({
+                projectSlug,
+                lastSyncAt: null,
+                include: { scenes: true },
+              }),
+            )
+            .unwrap();
           const rolesRes = await api
             .dispatch(projectApi.endpoints.projectRoles.initiate(projectSlug))
             .unwrap()

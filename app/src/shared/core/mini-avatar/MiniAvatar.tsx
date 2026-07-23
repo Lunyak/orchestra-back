@@ -28,11 +28,13 @@ export function MiniAvatar({
 
   const placeholder = useMemo(() => initialFromLabel(label), [label]);
 
+  const avatarSizeStyle = { "--mini-avatar-size": `${size}px` } as React.CSSProperties;
+
   if (!url || broken) {
     return (
       <span
         className="mini-avatar mini-avatar--placeholder"
-        style={{ width: size, height: size }}
+        style={avatarSizeStyle}
         title={title ?? label}
         aria-label={label}
       >
@@ -47,7 +49,7 @@ export function MiniAvatar({
       src={url}
       alt={label}
       title={title ?? label}
-      style={{ width: size, height: size }}
+      style={avatarSizeStyle}
       loading="lazy"
       referrerPolicy="no-referrer"
       onError={() => setBroken(true)}

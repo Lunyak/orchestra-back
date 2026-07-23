@@ -45,10 +45,16 @@ export function useTheaterLayoutEditing({
   const [activeDoorId, setActiveDoorIdState] = useState<number | undefined>(undefined);
   const [activeRecessId, setActiveRecessIdState] = useState<number | undefined>(undefined);
   const [layoutOutlineFocused, setLayoutOutlineFocused] = useState(false);
+  const [audienceSeatsFocused, setAudienceSeatsFocused] = useState(false);
+  const [stageGridFocused, setStageGridFocused] = useState(false);
   const [activeOutlineVertexIndex, setActiveOutlineVertexIndex] = useState<number | null>(null);
 
   const setActiveDoorId = useCallback((id: number | undefined) => {
-    setLayoutOutlineFocused(false);
+    if (id != null) {
+      setLayoutOutlineFocused(false);
+      setAudienceSeatsFocused(false);
+      setStageGridFocused(false);
+    }
     setActiveDoorIdState(id);
     if (id != null) setActiveRecessIdState(undefined);
   }, []);
@@ -58,6 +64,8 @@ export function useTheaterLayoutEditing({
     if (id != null) {
       setActiveDoorIdState(undefined);
       setLayoutOutlineFocused(false);
+      setAudienceSeatsFocused(false);
+      setStageGridFocused(false);
     }
   }, []);
 
@@ -219,6 +227,10 @@ export function useTheaterLayoutEditing({
     setActiveRecessId,
     layoutOutlineFocused,
     setLayoutOutlineFocused,
+    audienceSeatsFocused,
+    setAudienceSeatsFocused,
+    stageGridFocused,
+    setStageGridFocused,
     activeOutlineVertexIndex,
     setActiveOutlineVertexIndex,
     updateLayout,

@@ -149,7 +149,9 @@ export function getFurnitureBounds(
       return [TABLE_METRICS.width, TABLE_METRICS.height, TABLE_METRICS.depth];
     case "roundTable": {
       const diameter = ROUND_TABLE_METRICS.radius * 2;
-      return [diameter, 1.05, diameter];
+      // Верх столешницы: mesh y=0.5 + half thickness
+      const height = 0.5 + ROUND_TABLE_METRICS.topThickness / 2;
+      return [diameter, height, diameter];
     }
     case "blackCube":
       return [1, 1, 1];

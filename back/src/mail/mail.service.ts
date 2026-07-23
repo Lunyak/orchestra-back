@@ -64,4 +64,74 @@ export class MailService {
 
     this.logger.log(`Password reset email queued/sent to ${to}`);
   }
+
+  async sendCollectionDebtReminder(
+    to: string,
+    params: {
+      recipientName: string;
+      collectionTitle: string;
+      troupeTitle: string;
+      amountRub: number;
+      dueAt: string | null;
+      collectionUrl: string;
+    },
+  ): Promise<void> {
+    const host = String(this.config.get('SMTP_HOST') ?? '').trim();
+    if (!host) {
+      throw new Error('SMTP_HOST is not set');
+    }
+
+    const port = Number(this.config.get('SMTP_PORT') ?? 587);
+    const secureRaw = String(this.config.get('SMTP_SECURE') ?? '').toLowerCase();
+    const secure =
+      secureRaw === 'true' || secureRaw === '1' || port === 465;
+
+    const user = String(this.config.get('SMTP_USER') ?? '').trim();
+    const pass = String(this.config.get('SMTP_PASS') ?? '');
+
+    const fromRaw =
+      String(this.config.get('MAIL_FROM') ?? '').trim() ||
+      user ||
+      'Orchestra <noreply@localhost>';
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      ...(user ? { auth: { user, pass } } : {}),
+    });
+
+    const amountLabel = `${params.amountRub.toLocaleString('ru-RU')} ₽`;
+    const dueLine = params.dueAt
+      ? `Срок: ${params.dueAt}`
+      : 'Срок не указан';
+    const subject = `Напоминание о взносе: ${params.collectionTitle}`;
+    const text = [
+      `Здравствуйте, ${params.recipientName}!`,
+      '',
+      `Труппа «${params.troupeTitle}» напоминает о сборе «${params.collectionTitle}».`,
+      `К оплате: ${amountLabel}`,
+      dueLine,
+      '',
+      `Открыть сбор: ${params.collectionUrl}`,
+      '',
+      'Если вы уже внесли взнос, сообщите казначею — он отметит платёж в Orchestra.',
+    ].join('\n');
+
+    const html = `<p>Здравствуйте, ${params.recipientName}!</p>
+<p>Труппа «${params.troupeTitle}» напоминает о сборе <strong>${params.collectionTitle}</strong>.</p>
+<p>К оплате: <strong>${amountLabel}</strong><br/>${dueLine}</p>
+<p><a href="${params.collectionUrl}">Открыть сбор в Orchestra</a></p>
+<p style="font-size:12px;color:#666;">Если вы уже внесли взнос, сообщите казначею — он отметит платёж в Orchestra.</p>`;
+
+    await transporter.sendMail({
+      from: fromRaw,
+      to,
+      subject,
+      text,
+      html,
+    });
+
+    this.logger.log(`Collection reminder sent to ${to}`);
+  }
 }

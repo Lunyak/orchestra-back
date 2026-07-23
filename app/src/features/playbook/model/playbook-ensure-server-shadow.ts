@@ -1,7 +1,7 @@
 import { unpackProjectorMedia } from "../../projector/model/playbook-projector-persist";
 import type { AppDispatch } from "../../../shared/store/store";
 import { store } from "../../../shared/store/store";
-import { syncPull } from "../../../sync/api/entity-sync";
+import { dispatchSyncPull } from "../../../shared/api/rtk/sync-dispatch";
 import {
   pullPlaybooksFromSync,
   pullScriptScenesFromSync,
@@ -27,14 +27,18 @@ import {
 
 export async function ensurePlaybookServerShadowForPush(
   dispatch: AppDispatch,
-  token: string,
+  _token: string,
   projectName: string,
   sceneId: string,
 ) {
   if (store.getState().playbook.serverShadow) return;
 
   try {
-    const pull = await syncPull(token, null, projectName, syncPullIncludeForPlaybook());
+    const pull = await dispatchSyncPull({
+      projectSlug: projectName,
+      lastSyncAt: null,
+      include: syncPullIncludeForPlaybook(),
+    });
     const playbooksArr = pullPlaybooksFromSync(pull);
     const sceneRow = playbooksArr.find((s) => String(s?.id ?? "") === sceneId) ?? null;
     if (!sceneRow) return;

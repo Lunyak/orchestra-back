@@ -8,6 +8,27 @@
   gap: 14px;
 }
 
+.premises-page__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--sessions-text-strong, #ccc);
+}
+
+.premises-page__lead {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  color: var(--sessions-text-muted, #666);
+  line-height: 1.45;
+}
+
+.premises-page__body {
+  margin: 0;
+  max-width: none;
+  padding: 0;
+  width: 100%;
+}
+
 .premises-form-row {
   margin-bottom: 8px;
 }

@@ -2,8 +2,7 @@ import type { TheaterControlsTabProps } from "./types";
 import { TheaterBtn } from "../theater-controls-ui";
 
 export function TheaterControlsToolbar({ vm }: TheaterControlsTabProps) {
-  const { activeTab, setActiveTab, setEditMode, lightConsoleExpanded, setLightConsoleExpanded } =
-    vm;
+  const { activeTab, setActiveTab, setEditMode } = vm;
 
   return (
     <div
@@ -26,19 +25,6 @@ export function TheaterControlsToolbar({ vm }: TheaterControlsTabProps) {
         }}
       >
         Софиты
-      </TheaterBtn>
-      <TheaterBtn
-        active={lightConsoleExpanded}
-        onClick={() => {
-          setLightConsoleExpanded((open) => {
-            const next = !open;
-            if (next) setEditMode("spotlights");
-            return next;
-          });
-        }}
-        title="Показать / скрыть пульт света"
-      >
-        Пульт
       </TheaterBtn>
       <TheaterBtn
         active={activeTab === "models"}

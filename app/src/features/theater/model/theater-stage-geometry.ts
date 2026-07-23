@@ -87,8 +87,9 @@ export function resolveStageGeometry(layout: TheaterLayout): StageGeometry {
   let prosceniumWidth = layout.prosceniumWidth ?? layout.hallWidth;
 
   if (stageShape === "rectangle" && !prosceniumEnabled) {
-    stageBackWidth = layout.hallWidth;
-    prosceniumWidth = layout.hallWidth;
+    const width = layout.stageBackWidth ?? layout.prosceniumWidth ?? layout.hallWidth;
+    stageBackWidth = width;
+    prosceniumWidth = width;
   }
 
   const prosceniumHeight = layout.prosceniumHeight ?? layout.wallHeight;

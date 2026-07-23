@@ -297,7 +297,11 @@ export function LightKadrPanel({
                 >
                   <span
                     className="light-kadr-panel__chip-dot"
-                    style={{ backgroundColor: color ?? undefined }}
+                    style={
+                      color
+                        ? ({ "--light-chip-dot-color": color } as React.CSSProperties)
+                        : undefined
+                    }
                   />
                   <span className="light-kadr-panel__chip-text">
                     <span className="light-kadr-panel__chip-no">Картина {section.kadrNo}</span>

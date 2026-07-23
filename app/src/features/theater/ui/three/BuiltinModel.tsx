@@ -21,6 +21,12 @@ import { ParametricDecorBox } from "./ParametricDecorBox";
 import { DancerModel } from "./DancerModel";
 import { HumanModel } from "./HumanModel";
 import { StrawGridModel } from "./StrawGridModel";
+import { ActorModel } from "./ActorModel";
+import { StageBlockingActorModel } from "./StageBlockingActorModel";
+import { StageSpotlightModel } from "./StageSpotlightModel";
+import { LightTruss6mModel } from "./LightTruss6mModel";
+import { getTheaterAssetLibraryItem } from "../../model/theater-asset-library";
+import { TheaterAssetLibraryModel } from "./TheaterAssetLibraryModel";
 
 function ParametricPanel({
   projectName,
@@ -59,7 +65,10 @@ function ParametricPanel({
   return (
     <mesh position={[0, height / 2, 0]}>
       <boxGeometry args={[width, height, depth]} />
-      <meshStandardMaterial {...decorMaterialProps(model)} color={tone || color} />
+      <meshStandardMaterial
+        {...decorMaterialProps(model)}
+        color={tone || color}
+      />
     </mesh>
   );
 }
@@ -67,8 +76,6 @@ function ParametricPanel({
 export const BuiltinModel = ({
   projectName,
   model,
-  isSelected,
-  isHovered,
 }: {
   projectName: string;
   model: TheaterModel;
@@ -76,7 +83,7 @@ export const BuiltinModel = ({
   isHovered?: boolean;
 }) => {
   const kind = model.builtin;
-  const tone = isSelected ? tc("--color-error") : isHovered ? tc("--color-primary-light") : null;
+  const tone = model.decorColor ?? null;
   const decorColor = resolveDecorColor(model) ?? tc("--color-surface-2");
 
   if (kind === "flat") {
@@ -123,7 +130,9 @@ export const BuiltinModel = ({
       return (
         <mesh key={index} position={[x, h / 2, 0]}>
           <boxGeometry args={[panelW, panelH, d]} />
-          <Suspense fallback={<meshStandardMaterial color={tone || decorColor} />}>
+          <Suspense
+            fallback={<meshStandardMaterial color={tone || decorColor} />}
+          >
             <DecorTexturedMaterial
               projectName={projectName}
               model={model}
@@ -144,7 +153,11 @@ export const BuiltinModel = ({
         <mesh position={[0, h + 0.08, 0]}>
           <boxGeometry args={[w * 1.02, 0.16, d * 1.4]} />
           {model.decorTexture ? (
-            <Suspense fallback={<meshStandardMaterial color={tone || tc("--color-3d-gold")} />}>
+            <Suspense
+              fallback={
+                <meshStandardMaterial color={tone || tc("--color-3d-gold")} />
+              }
+            >
               <DecorTexturedMaterial
                 projectName={projectName}
                 model={model}
@@ -230,7 +243,11 @@ export const BuiltinModel = ({
       <group>
         <mesh position={[0, topY, 0]}>
           <boxGeometry
-            args={[TABLE_METRICS.width, TABLE_METRICS.topThickness, TABLE_METRICS.depth]}
+            args={[
+              TABLE_METRICS.width,
+              TABLE_METRICS.topThickness,
+              TABLE_METRICS.depth,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-light")} />
         </mesh>
@@ -289,7 +306,8 @@ export const BuiltinModel = ({
     );
   }
   if (kind === "chair") {
-    const seatCenterY = CHAIR_METRICS.seatHeight - CHAIR_METRICS.seatThickness / 2;
+    const seatCenterY =
+      CHAIR_METRICS.seatHeight - CHAIR_METRICS.seatThickness / 2;
     const legHeight = CHAIR_METRICS.seatHeight - CHAIR_METRICS.seatThickness;
     const legY = legHeight / 2;
     const legX = CHAIR_METRICS.width / 2 - CHAIR_METRICS.legInset;
@@ -304,7 +322,11 @@ export const BuiltinModel = ({
       <group>
         <mesh position={[0, seatCenterY, 0]}>
           <boxGeometry
-            args={[CHAIR_METRICS.width, CHAIR_METRICS.seatThickness, CHAIR_METRICS.depth]}
+            args={[
+              CHAIR_METRICS.width,
+              CHAIR_METRICS.seatThickness,
+              CHAIR_METRICS.depth,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-slate-600")} />
         </mesh>
@@ -327,7 +349,11 @@ export const BuiltinModel = ({
         {legPositions.map(([x, z]) => (
           <mesh key={`${x}:${z}`} position={[x, legY, z]}>
             <boxGeometry
-              args={[CHAIR_METRICS.legThickness, legHeight, CHAIR_METRICS.legThickness]}
+              args={[
+                CHAIR_METRICS.legThickness,
+                legHeight,
+                CHAIR_METRICS.legThickness,
+              ]}
             />
             <meshStandardMaterial color={tone || tc("--color-surface-1")} />
           </mesh>
@@ -336,7 +362,8 @@ export const BuiltinModel = ({
     );
   }
   if (kind === "bench") {
-    const seatCenterY = BENCH_METRICS.seatHeight - BENCH_METRICS.seatThickness / 2;
+    const seatCenterY =
+      BENCH_METRICS.seatHeight - BENCH_METRICS.seatThickness / 2;
     const legHeight = BENCH_METRICS.seatHeight - BENCH_METRICS.seatThickness;
     const legY = legHeight / 2;
     const legX = BENCH_METRICS.width / 2 - BENCH_METRICS.legInset;
@@ -344,16 +371,32 @@ export const BuiltinModel = ({
       <group>
         <mesh position={[0, seatCenterY, 0]}>
           <boxGeometry
-            args={[BENCH_METRICS.width, BENCH_METRICS.seatThickness, BENCH_METRICS.depth]}
+            args={[
+              BENCH_METRICS.width,
+              BENCH_METRICS.seatThickness,
+              BENCH_METRICS.depth,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-tan")} />
         </mesh>
         <mesh position={[-legX, legY, 0]}>
-          <boxGeometry args={[BENCH_METRICS.legThickness, legHeight, BENCH_METRICS.depth * 0.8]} />
+          <boxGeometry
+            args={[
+              BENCH_METRICS.legThickness,
+              legHeight,
+              BENCH_METRICS.depth * 0.8,
+            ]}
+          />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-dark")} />
         </mesh>
         <mesh position={[legX, legY, 0]}>
-          <boxGeometry args={[BENCH_METRICS.legThickness, legHeight, BENCH_METRICS.depth * 0.8]} />
+          <boxGeometry
+            args={[
+              BENCH_METRICS.legThickness,
+              legHeight,
+              BENCH_METRICS.depth * 0.8,
+            ]}
+          />
           <meshStandardMaterial color={tone || tc("--color-3d-wood-dark")} />
         </mesh>
       </group>
@@ -364,7 +407,11 @@ export const BuiltinModel = ({
       <group>
         <mesh position={[0, SOFA_METRICS.seatHeight, 0.05]}>
           <boxGeometry
-            args={[SOFA_METRICS.width, SOFA_METRICS.seatThickness, SOFA_METRICS.depth * 0.72]}
+            args={[
+              SOFA_METRICS.width,
+              SOFA_METRICS.seatThickness,
+              SOFA_METRICS.depth * 0.72,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-slate-600")} />
         </mesh>
@@ -376,7 +423,11 @@ export const BuiltinModel = ({
           ]}
         >
           <boxGeometry
-            args={[SOFA_METRICS.width, SOFA_METRICS.backHeight, SOFA_METRICS.backThickness]}
+            args={[
+              SOFA_METRICS.width,
+              SOFA_METRICS.backHeight,
+              SOFA_METRICS.backThickness,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-border-default")} />
         </mesh>
@@ -388,7 +439,11 @@ export const BuiltinModel = ({
           ]}
         >
           <boxGeometry
-            args={[SOFA_METRICS.armWidth, SOFA_METRICS.armHeight, SOFA_METRICS.depth * 0.78]}
+            args={[
+              SOFA_METRICS.armWidth,
+              SOFA_METRICS.armHeight,
+              SOFA_METRICS.depth * 0.78,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-slate-700")} />
         </mesh>
@@ -400,7 +455,11 @@ export const BuiltinModel = ({
           ]}
         >
           <boxGeometry
-            args={[SOFA_METRICS.armWidth, SOFA_METRICS.armHeight, SOFA_METRICS.depth * 0.78]}
+            args={[
+              SOFA_METRICS.armWidth,
+              SOFA_METRICS.armHeight,
+              SOFA_METRICS.depth * 0.78,
+            ]}
           />
           <meshStandardMaterial color={tone || tc("--color-slate-700")} />
         </mesh>
@@ -439,33 +498,36 @@ export const BuiltinModel = ({
     return <StrawGridModel />;
   }
   if (kind === "actor") {
+    return <ActorModel pose={model.actorPose ?? "stand"} tone={tone} />;
+  }
+  if (kind === "stageActor") {
+    return <StageBlockingActorModel tone={tone} />;
+  }
+  if (kind === "stageSpotlight") {
     return (
-      <group>
-        <mesh position={[0, 1.6, 0]}>
-          <sphereGeometry args={[0.22, 20, 20]} />
-          <meshStandardMaterial color={tone || tc("--color-text-light")} />
-        </mesh>
-        <mesh position={[0, 1.05, 0]}>
-          <cylinderGeometry args={[0.22, 0.28, 0.9, 18]} />
-          <meshStandardMaterial color={tone || tc("--color-text-muted")} />
-        </mesh>
-        <mesh position={[-0.38, 1.08, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.6, 12]} />
-          <meshStandardMaterial color={tone || tc("--color-text-dimmer")} />
-        </mesh>
-        <mesh position={[0.38, 1.08, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, 0.6, 12]} />
-          <meshStandardMaterial color={tone || tc("--color-text-dimmer")} />
-        </mesh>
-        <mesh position={[-0.16, 0.45, 0]}>
-          <cylinderGeometry args={[0.1, 0.1, 0.9, 12]} />
-          <meshStandardMaterial color={tone || tc("--color-slate-600")} />
-        </mesh>
-        <mesh position={[0.16, 0.45, 0]}>
-          <cylinderGeometry args={[0.1, 0.1, 0.9, 12]} />
-          <meshStandardMaterial color={tone || tc("--color-slate-600")} />
-        </mesh>
-      </group>
+      <StageSpotlightModel
+        lowDetail={model.modelLowDetail ?? false}
+        tone={tone}
+      />
+    );
+  }
+  if (kind === "lightTruss6m") {
+    return (
+      <LightTruss6mModel
+        lowDetail={model.modelLowDetail ?? false}
+        tone={tone}
+      />
+    );
+  }
+  const libraryItem = getTheaterAssetLibraryItem(kind);
+  if (libraryItem) {
+    return (
+      <TheaterAssetLibraryModel
+        assetKey={libraryItem.assetKey}
+        lowDetail={model.modelLowDetail ?? false}
+        model={model}
+        projectName={projectName}
+      />
     );
   }
   if (

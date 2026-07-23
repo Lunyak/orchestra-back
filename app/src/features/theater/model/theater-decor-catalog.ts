@@ -5,13 +5,7 @@ export type DecorCatalogKey =
   | "hangingFabric"
   | "flat"
   | "screen"
-  | "platform"
-  | "chair"
-  | "sofa"
-  | "bench"
-  | "blackCube"
-  | "table"
-  | "roundTable";
+  | "platform";
 
 export type DecorCatalogEntry = {
   key: DecorCatalogKey;
@@ -49,7 +43,7 @@ export const DECOR_CATALOG: DecorCatalogEntry[] = [
   },
   {
     key: "screen",
-    label: "Ширма",
+    label: "Параметрическая ширма",
     builtin: "screen",
     parametric: true,
     defaultSize: [1.5, 2, 0.08],
@@ -62,54 +56,6 @@ export const DECOR_CATALOG: DecorCatalogEntry[] = [
     parametric: true,
     defaultSize: [3, 0.4, 2],
     defaultColor: "#3d2817",
-  },
-  {
-    key: "chair",
-    label: "Стул",
-    builtin: "chair",
-    parametric: false,
-    defaultSize: [1, 1, 1],
-    defaultColor: "#64748b",
-  },
-  {
-    key: "sofa",
-    label: "Диван",
-    builtin: "sofa",
-    parametric: false,
-    defaultSize: [1, 1, 1],
-    defaultColor: "#475569",
-  },
-  {
-    key: "bench",
-    label: "Скамейка",
-    builtin: "bench",
-    parametric: false,
-    defaultSize: [1, 1, 1],
-    defaultColor: "#a67c52",
-  },
-  {
-    key: "blackCube",
-    label: "Куб",
-    builtin: "blackCube",
-    parametric: false,
-    defaultSize: [1, 1, 1],
-    defaultColor: "#111111",
-  },
-  {
-    key: "table",
-    label: "Стол",
-    builtin: "table",
-    parametric: false,
-    defaultSize: [1, 1, 1],
-    defaultColor: "#8b6914",
-  },
-  {
-    key: "roundTable",
-    label: "Круглый стол",
-    builtin: "roundTable",
-    parametric: false,
-    defaultSize: [1, 1, 1],
-    defaultColor: "#8b6914",
   },
 ];
 
@@ -142,6 +88,12 @@ export function getDecorCatalogEntry(
   const entry = DECOR_CATALOG.find((item) => item.key === key);
   if (!entry) return DECOR_CATALOG[0];
   return entry;
+}
+
+export function getDecorCatalogEntryByBuiltin(
+  builtin: TheaterModel["builtin"],
+): DecorCatalogEntry | undefined {
+  return DECOR_CATALOG.find((item) => item.builtin === builtin);
 }
 
 export function resolveDecorSize(

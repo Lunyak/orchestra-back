@@ -10,7 +10,7 @@ import {
 import { pruneSceneImages } from "../../../shared/utils/markdownImages";
 import { createId } from "../../../shared/utils/createId";
 import { stableStringify } from "../../../shared/utils/stableStringify";
-import { syncPush } from "../../../sync/api/entity-sync";
+import { dispatchSyncPush } from "../../../shared/api/rtk/sync-dispatch";
 import type { SyncChange } from "../../../sync/api/types/sync";
 import { cleanupProjectImages } from "../../../sync/api/projects";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
@@ -574,7 +574,7 @@ export async function savePlaybookScenesForLightPlot(
         }
 
         if (changes.length > 0) {
-          await syncPush(token, changes);
+          await dispatchSyncPush({ changes });
           try {
             const prevKeys = serverShadowForDiff
               ? extractReferencedRemoteImageKeysFromScenes(serverShadowForDiff.scenes)

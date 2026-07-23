@@ -102,6 +102,9 @@ export interface TheaterSpotlight {
   /** Номер ползунка пульта, к которому привязан софит. */
   faderId?: number;
   isRgb?: boolean;
+  modelLowDetail?: boolean;
+  mountModelId?: number;
+  mountPointId?: string;
   /** Привязка цели к ячейке сетки сцены (столбец, ряд от задника) */
   gridCol?: number;
   gridRow?: number;
@@ -122,6 +125,34 @@ export interface TheaterModel {
     | "blackCube"
     | "strawGrid"
     | "actor"
+    | "stageActor"
+    | "stageSpotlight"
+    | "lightTruss6m"
+    | "libraryWoodenChair"
+    | "libraryVelvetArmchair"
+    | "libraryVelvetSofa"
+    | "libraryDiningTable"
+    | "libraryRoundPedestalTable"
+    | "libraryBarStool"
+    | "libraryWoodenBench"
+    | "libraryDisplayCabinet"
+    | "libraryDresser"
+    | "libraryBookshelf"
+    | "librarySingleBed"
+    | "libraryRoomDivider"
+    | "librarySpiralStaircase"
+    | "libraryTravelTrunk"
+    | "libraryVintageSuitcase"
+    | "libraryWoodenBarrel"
+    | "libraryWoodenCrate"
+    | "libraryFloorLamp"
+    | "libraryCandelabrum"
+    | "libraryStandingMirror"
+    | "libraryCoatRack"
+    | "libraryGramophone"
+    | "libraryRotaryTelephone"
+    | "libraryCeramicVase"
+    | "libraryGildedPictureFrame"
     | "humanStanding"
     | "humanSitting"
     | "humanSmoothStanding"
@@ -152,6 +183,8 @@ export interface TheaterModel {
   decorEmissiveColor?: string;
   decorEmissiveIntensity?: number;
   decorMaterialSide?: "front" | "back" | "double";
+  actorPose?: "stand" | "sit" | "lie";
+  modelLowDetail?: boolean;
   /** Цвета встроенных моделей людей. Работают, если GLB содержит части Skin/Shirt/Pants/Shoes. */
   humanSkinColor?: string;
   humanTopColor?: string;
@@ -170,7 +203,8 @@ export interface TheaterModel {
 export type TheaterDoorWall = "left" | "right" | "back" | "front";
 
 /** Форма сцены в плане (контур стен) */
-export type TheaterStageShape = "rectangle" | "trapezoid" | "t-shape" | "custom";
+export type TheaterStageShape =
+  "rectangle" | "trapezoid" | "t-shape" | "custom";
 
 /** Углубление / ниша в стене сцены */
 export type TheaterWallRecessWall = "left" | "right" | "back";
@@ -208,6 +242,10 @@ export interface TheaterLayout {
   hallWidth: number;
   hallDepth: number;
   wallHeight: number;
+  /** Смещение центра зала по X, м (для одностороннего расширения) */
+  hallOffsetX?: number;
+  /** Смещение центра зала по Z, м (для одностороннего расширения) */
+  hallOffsetZ?: number;
   audienceStartZ: number;
   /** Z передней линии сцены (сторона к залу); не зависит от кресел */
   stageFrontZ?: number;

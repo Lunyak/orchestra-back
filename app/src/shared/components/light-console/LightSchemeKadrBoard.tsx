@@ -204,7 +204,11 @@ export function LightSchemeKadrBoard({
               >
                 <span
                   className="light-kadr-panel__chip-dot"
-                  style={{ backgroundColor: color ?? undefined }}
+                  style={
+                    color
+                      ? ({ "--light-chip-dot-color": color } as React.CSSProperties)
+                      : undefined
+                  }
                 />
                 {section.kadrNo}
                 {kadr?.programId ? ` · П${kadr.programId}` : ""}

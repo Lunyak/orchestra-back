@@ -16,6 +16,8 @@ export type TheaterSceneOutlinerProps = {
   activeModelId?: number;
   activeDoorId?: number;
   layoutFocused?: boolean;
+  audienceSeatsFocused?: boolean;
+  stageGridFocused?: boolean;
   pulseTarget?: { kind: SceneOutlinerItem["kind"]; id: number } | null;
   disabled?: boolean;
   showHidden?: boolean;
@@ -33,6 +35,8 @@ export function TheaterSceneOutliner({
   activeModelId,
   activeDoorId,
   layoutFocused,
+  audienceSeatsFocused,
+  stageGridFocused,
   pulseTarget,
   disabled,
   showHidden = true,
@@ -170,6 +174,8 @@ export function TheaterSceneOutliner({
                         modelId: activeModelId,
                         doorId: activeDoorId,
                         layoutFocused,
+                        audienceSeatsFocused,
+                        stageGridFocused,
                       });
                       const pulsing =
                         pulseTarget?.kind === item.kind && pulseTarget.id === item.id;

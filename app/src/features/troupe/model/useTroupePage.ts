@@ -48,11 +48,11 @@ function normalizeTroupeMemberKind(kind: unknown): TroupeMemberKind {
   return kind === "guest" ? "guest" : "regular";
 }
 
-export type TroupePageTab = "team" | "troupe" | "project" | "premises";
+export type TroupePageTab = "team" | "troupe" | "project";
 
 function readInitialTroupeTab(locationState: unknown): TroupePageTab {
   const tab = (locationState as { tab?: unknown } | null)?.tab;
-  if (tab === "team" || tab === "troupe" || tab === "project" || tab === "premises") {
+  if (tab === "team" || tab === "troupe" || tab === "project") {
     return tab;
   }
   return "team";

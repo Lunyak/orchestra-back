@@ -2,6 +2,8 @@ import type { TheaterLayout } from "../../../shared/types/script";
 
 /** Поля layout, которые не входят в базовые колонки TheaterLayout на сервере. */
 export const THEATER_LAYOUT_EXTRA_KEYS = [
+  "hallOffsetX",
+  "hallOffsetZ",
   "stageShape",
   "stageFrontZ",
   "stageBackWidth",

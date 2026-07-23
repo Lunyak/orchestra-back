@@ -6,7 +6,17 @@ import type { ActiveAlignGuide } from "../../model/theater-align-guides";
 import type { StageGridCell } from "../../playbook-stage/use-stage-grid-highlight";
 import { TheaterStage } from "../three/TheaterStage";
 import { DecorFloorPlacer } from "../three/DecorFloorPlacer";
+import { BuiltinTemplateFloorDrop } from "../three/BuiltinTemplateFloorDrop";
+import { ModelFloorMoveHandles } from "../three/ModelFloorMoveHandles";
+import type { HallExpandResult } from "../../model/theater-hall-expand";
+import type { TheaterBuiltinTemplateKey } from "../../model/theater-model-builtin";
+import {
+  resolveHallOffsetX,
+  resolveHallOffsetZ,
+} from "../../model/theater-hall-expand";
 import { AudienceSeatsHandle } from "../three/AudienceSeatsHandle";
+import { HallSizeHandles } from "../three/HallSizeHandles";
+import { StageGridHandles } from "../three/StageGridHandles";
 import { TheaterFloorGrid } from "../three/TheaterFloorGrid";
 import { TheaterAlignGuides } from "../three/TheaterAlignGuides";
 import { SpotlightItem } from "../three/SpotlightItem";
@@ -14,6 +24,7 @@ import { InstancedFurnitureLayer } from "../three/InstancedFurnitureLayer";
 import { BuiltinModelInstance } from "../three/BuiltinModelInstance";
 import { FileModelInstanceLoader } from "../three/FileModelInstanceLoader";
 import { TheaterOrbitControls } from "../three/TheaterOrbitControls";
+import { LightTrussMountPoints } from "../three/LightTrussMountPoints";
 import type { TheaterCameraState } from "../../model/theater-camera-storage";
 import type { SceneOutlinerKind } from "../../model/theater-scene-outliner";
 import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
@@ -41,11 +52,17 @@ export type TheaterCanvasContentProps = {
   activeTab: TheaterViewPrefs["activeTab"];
   editMode: "spotlights" | "models" | "decor";
   decorPlaceMode: boolean;
+  onDecorPlace: (position: [number, number, number]) => void;
+  onBuiltinTemplateDrop: (
+    key: TheaterBuiltinTemplateKey,
+    position: [number, number, number],
+  ) => void;
   isDragging: boolean;
   dragMode: "target" | "source";
   highlightGridCell: StageGridCell | null;
   spotlightAimMode: "point" | "cell";
   onPickGridCell: (col: number, row: number) => void;
+  spotlights: TheaterSpotlight[];
   visibleSpotlights: TheaterSpotlight[];
   activeSpotlightId: number | undefined;
   multiSelectedSpotlightIds: number[];
@@ -71,16 +88,39 @@ export type TheaterCanvasContentProps = {
   activeModelObjectId: number | undefined;
   modelTransformMode: "translate" | "rotate" | "scale";
   onModelTransformStart: () => void;
+  onTrussMountPointClick: (
+    modelId: number,
+    mountPointId: string,
+    occupiedSpotlightId?: number,
+  ) => void;
   onModelTransformEnd: () => void;
   onModelTransformChange: () => void;
+  activeModel: TheaterModel | undefined;
+  onModelFloorMovePreview: (position: [number, number, number]) => void;
+  onModelFloorMoveCommit: (position: [number, number, number]) => void;
+  onModelFloorMoveDragStart: () => void;
+  onModelFloorMoveDragEnd: () => void;
   onActiveObjectChange: (node: THREE.Object3D | null, id: number) => void;
   onObjectReady: (node: THREE.Object3D | null, id: number) => void;
-  onDecorPlace: (position: [number, number, number]) => void;
   audienceSeatsHighlight: boolean;
+  audienceSeatsFocused: boolean;
+  onSelectAudienceSeats: () => void;
   onAudienceStartZPreview: (z: number) => void;
   onAudienceStartZChange: (z: number) => void;
   onAudienceDragStart: () => void;
   onAudienceDragEnd: () => void;
+  layoutOutlineFocused: boolean;
+  onSelectLayout: () => void;
+  onLayoutSizePreview: (result: HallExpandResult) => void;
+  onLayoutSizeCommit: (result: HallExpandResult) => void;
+  onLayoutSizeDragStart: () => void;
+  onLayoutSizeDragEnd: () => void;
+  stageGridFocused: boolean;
+  onSelectStageGrid: () => void;
+  onStageGridPreview: (patch: Partial<TheaterLayout>) => void;
+  onStageGridCommit: (patch: Partial<TheaterLayout>) => void;
+  onStageGridDragStart: () => void;
+  onStageGridDragEnd: () => void;
 };
 
 export function TheaterCanvasContent({
@@ -111,6 +151,7 @@ export function TheaterCanvasContent({
   highlightGridCell,
   spotlightAimMode,
   onPickGridCell,
+  spotlights,
   visibleSpotlights,
   activeSpotlightId,
   multiSelectedSpotlightIds,
@@ -136,16 +177,37 @@ export function TheaterCanvasContent({
   activeModelObjectId,
   modelTransformMode,
   onModelTransformStart,
+  onTrussMountPointClick,
   onModelTransformEnd,
   onModelTransformChange,
+  activeModel,
+  onModelFloorMovePreview,
+  onModelFloorMoveCommit,
+  onModelFloorMoveDragStart,
+  onModelFloorMoveDragEnd,
   onActiveObjectChange,
   onObjectReady,
   onDecorPlace,
+  onBuiltinTemplateDrop,
   audienceSeatsHighlight,
+  audienceSeatsFocused,
+  onSelectAudienceSeats,
   onAudienceStartZPreview,
   onAudienceStartZChange,
   onAudienceDragStart,
   onAudienceDragEnd,
+  layoutOutlineFocused,
+  onSelectLayout,
+  onLayoutSizePreview,
+  onLayoutSizeCommit,
+  onLayoutSizeDragStart,
+  onLayoutSizeDragEnd,
+  stageGridFocused,
+  onSelectStageGrid,
+  onStageGridPreview,
+  onStageGridCommit,
+  onStageGridDragStart,
+  onStageGridDragEnd,
 }: TheaterCanvasContentProps) {
   const pickingSpotlightGridCell =
     activeTab === "spotlights" && editMode === "spotlights" && spotlightAimMode === "cell";
@@ -155,9 +217,25 @@ export function TheaterCanvasContent({
     visibleSpotlights.some((item) => item.id === activeSpotlightId);
   const showOnlyActiveVisibleSpotlight =
     showOnlyActiveSpotlight && hasActiveVisibleSpotlight;
+  const hoveredLightTruss = individualModels.find(
+    (model) =>
+      model.id === hoveredModelId && model.builtin === "lightTruss6m",
+  );
+  const mountPointTruss =
+    activeModel?.builtin === "lightTruss6m"
+      ? activeModel
+      : hoveredLightTruss;
+  const modelUsesVerticalRotation =
+    (activeModel?.builtin === "actor" ||
+      activeModel?.builtin === "stageActor" ||
+      activeModel?.builtin === "lightTruss6m") &&
+    modelTransformMode === "rotate";
+  const hallOffsetX = resolveHallOffsetX(layout);
+  const hallOffsetZ = resolveHallOffsetZ(layout);
 
   return (
     <>
+      <group position={[hallOffsetX, 0, hallOffsetZ]}>
       <TheaterStage
         projectName={projectName}
         layout={layout}
@@ -181,16 +259,32 @@ export function TheaterCanvasContent({
         }
         hallWidth={layout.hallWidth}
         hallDepth={layout.hallDepth}
+        hallOffsetX={hallOffsetX}
+        hallOffsetZ={hallOffsetZ}
         snapEnabled={snapToGrid}
         snapStep={gridStep}
         onPlace={onDecorPlace}
       />
-      <AudienceSeatsHandle
-        layout={layout}
-        active={showEditorHelpers && activeTab === "layout" && showSeats}
-        highlighted={audienceSeatsHighlight}
+      <BuiltinTemplateFloorDrop
+        enabled={showEditorHelpers && !isDragging}
+        hallWidth={layout.hallWidth}
+        hallDepth={layout.hallDepth}
+        hallOffsetX={hallOffsetX}
+        hallOffsetZ={hallOffsetZ}
         snapEnabled={snapToGrid}
         snapStep={gridStep}
+        onDropTemplate={onBuiltinTemplateDrop}
+      />
+      <AudienceSeatsHandle
+        layout={layout}
+        focused={showEditorHelpers && audienceSeatsFocused && showSeats}
+        highlighted={audienceSeatsHighlight}
+        selectable={
+          showEditorHelpers && showSeats && !isDragging && !decorPlaceMode
+        }
+        snapEnabled={snapToGrid}
+        snapStep={gridStep}
+        onSelect={onSelectAudienceSeats}
         onAudienceStartZPreview={onAudienceStartZPreview}
         onAudienceStartZChange={onAudienceStartZChange}
         onDraggingChange={(dragging) => {
@@ -198,6 +292,38 @@ export function TheaterCanvasContent({
           if (dragging) onAudienceDragStart();
           else onAudienceDragEnd();
         }}
+        onDragStart={onAudienceDragStart}
+        onDragEnd={onAudienceDragEnd}
+      />
+      <StageGridHandles
+        layout={layout}
+        focused={showEditorHelpers && stageGridFocused && showStageGrid}
+        selectable={
+          showEditorHelpers &&
+          showStageGrid &&
+          !isDragging &&
+          !decorPlaceMode &&
+          !(activeTab === "spotlights" && editMode === "spotlights" && spotlightAimMode === "cell")
+        }
+        onSelect={onSelectStageGrid}
+        onPreview={onStageGridPreview}
+        onCommit={onStageGridCommit}
+        onDraggingChange={onDraggingChange}
+        onDragStart={onStageGridDragStart}
+        onDragEnd={onStageGridDragEnd}
+      />
+      <HallSizeHandles
+        layout={layout}
+        active={showEditorHelpers && layoutOutlineFocused}
+        selectable={showEditorHelpers && !isDragging && !decorPlaceMode}
+        snapEnabled={snapToGrid}
+        snapStep={gridStep}
+        onSelect={onSelectLayout}
+        onPreview={onLayoutSizePreview}
+        onCommit={onLayoutSizeCommit}
+        onDraggingChange={onDraggingChange}
+        onDragStart={onLayoutSizeDragStart}
+        onDragEnd={onLayoutSizeDragEnd}
       />
       {showGrid && showEditorHelpers ? (
         <TheaterFloorGrid
@@ -269,6 +395,8 @@ export function TheaterCanvasContent({
           const onHoverChange = (next: boolean) => {
             onModelHoverChange(next ? model.id : null);
           };
+          const selectionBoxEnabled =
+            activeTab !== "spotlights" || model.builtin !== "lightTruss6m";
           if (model.type === "builtin") {
             return (
               <BuiltinModelInstance
@@ -285,6 +413,7 @@ export function TheaterCanvasContent({
                 isHovered={model.id === hoveredModelId}
                 onHoverChange={onHoverChange}
                 passThroughPointerEvents={passModelPointerEventsThrough}
+                selectionBoxEnabled={selectionBoxEnabled}
               />
             );
           }
@@ -310,6 +439,39 @@ export function TheaterCanvasContent({
           return null;
         })}
       </Suspense>
+      {activeTab === "spotlights" && mountPointTruss ? (
+        <LightTrussMountPoints
+          model={mountPointTruss}
+          spotlights={spotlights}
+          onMountPointClick={(mountPointId, occupiedSpotlightId) =>
+            onTrussMountPointClick(
+              mountPointTruss.id,
+              mountPointId,
+              occupiedSpotlightId,
+            )
+          }
+        />
+      ) : null}
+      {isModelEditMode &&
+        showEditorHelpers &&
+        !decorPlaceMode &&
+        activeModel &&
+        activeModelId != null ? (
+        <ModelFloorMoveHandles
+          model={activeModel}
+          object={
+            activeModelObjectId === activeModelId ? activeModelObject : null
+          }
+          layout={layout}
+          snapEnabled={snapToGrid}
+          snapStep={gridStep}
+          onPreview={onModelFloorMovePreview}
+          onCommit={onModelFloorMoveCommit}
+          onDraggingChange={onDraggingChange}
+          onDragStart={onModelFloorMoveDragStart}
+          onDragEnd={onModelFloorMoveDragEnd}
+        />
+      ) : null}
       {isModelEditMode &&
         showEditorHelpers &&
         activeModelObject &&
@@ -318,11 +480,16 @@ export function TheaterCanvasContent({
           <TransformControls
             mode={modelTransformMode}
             object={activeModelObject}
+            space="world"
+            showX={!modelUsesVerticalRotation && modelTransformMode !== "translate"}
+            showY
+            showZ={!modelUsesVerticalRotation && modelTransformMode !== "translate"}
             onMouseDown={onModelTransformStart}
             onMouseUp={onModelTransformEnd}
             onObjectChange={onModelTransformChange}
           />
         )}
+      </group>
       <TheaterOrbitControls
         projectName={projectName}
         initialCamera={initialCamera}

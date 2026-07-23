@@ -1,7 +1,7 @@
-import cn from "classnames";
-import { TheaterStageLayoutGuide } from "./TheaterStageLayoutGuide";
+import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { TheaterFloorPlanSvg } from "./floor-plan/TheaterFloorPlanSvg";
 import type { TheaterFloorPlanProps } from "./floor-plan/theater-floor-plan-types";
+import { clampFloorPlanMaxSide } from "./floor-plan/theater-floor-plan-types";
 import { useTheaterFloorPlanGeometry } from "./floor-plan/use-theater-floor-plan-geometry";
 import { useTheaterFloorPlanInteraction } from "./floor-plan/use-theater-floor-plan-interaction";
 
@@ -9,8 +9,8 @@ export type { TheaterFloorPlanProps } from "./floor-plan/theater-floor-plan-type
 
 export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
   const {
-    expanded,
-    onToggleExpanded,
+    maxSide,
+    onChangeMaxSide,
     activeTab,
     decorPlaceMode,
     outlineDrawMode = false,
@@ -33,29 +33,45 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
 
   const geometry = useTheaterFloorPlanGeometry(props);
   const interaction = useTheaterFloorPlanInteraction(props, geometry);
+  const resizeRef = useRef<{ startX: number; startY: number; startSide: number } | null>(
+    null,
+  );
 
-  const { isLayoutEdit, shapeLabel, canEditOutline } = geometry;
+  const { canEditOutline } = geometry;
   const canPlaceDecor = activeTab === "decor" && decorPlaceMode;
   const canDrawOutline = canEditOutline && outlineDrawMode;
 
+  const handleResizePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget;
+    target.setPointerCapture(event.pointerId);
+    resizeRef.current = {
+      startX: event.clientX,
+      startY: event.clientY,
+      startSide: maxSide,
+    };
+  };
+
+  const handleResizePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = resizeRef.current;
+    if (!drag) return;
+    const deltaX = drag.startX - event.clientX;
+    const deltaY = drag.startY - event.clientY;
+    const delta = Math.max(deltaX, deltaY);
+    onChangeMaxSide(clampFloorPlanMaxSide(drag.startSide + delta));
+  };
+
+  const handleResizePointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!resizeRef.current) return;
+    resizeRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
   return (
-    <div
-      className={cn("theater-floor-plan", expanded && "theater-floor-plan--expanded")}
-    >
-      <div className="theater-floor-plan-header">
-        <span>План{isLayoutEdit ? ` · ${shapeLabel}` : " сверху"}</span>
-        <button
-          type="button"
-          className="theater-floor-plan-toggle"
-          onClick={onToggleExpanded}
-          title={expanded ? "Свернуть план" : "Развернуть план"}
-        >
-          {expanded ? "−" : "+"}
-        </button>
-      </div>
-      {isLayoutEdit ? (
-        <TheaterStageLayoutGuide layout={geometry.layout} compact />
-      ) : null}
+    <div className="theater-floor-plan">
       <div className="theater-floor-plan-canvas">
         <TheaterFloorPlanSvg
           {...geometry}
@@ -78,6 +94,16 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
           onSelectSpotlight={onSelectSpotlight}
           onSelectModel={onSelectModel}
           onModelContextMenu={onModelContextMenu}
+        />
+        <button
+          type="button"
+          className="theater-floor-plan-resize"
+          aria-label="Изменить размер плана"
+          title="Потянуть для изменения размера"
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerUp}
+          onPointerCancel={handleResizePointerUp}
         />
       </div>
     </div>

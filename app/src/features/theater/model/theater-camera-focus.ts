@@ -1,6 +1,7 @@
 import type { TheaterDoor, TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import type { SceneOutlinerItem } from "./theater-scene-outliner";
 import { getDoorCenterOnWall } from "./theater-stage-geometry";
+import { resolveHallOffsetX, resolveHallOffsetZ } from "./theater-hall-expand";
 
 export const THEATER_CAMERA_FOCUS_EVENT = "orchestra:theater-camera-focus";
 
@@ -37,17 +38,35 @@ function computeOrbitPosition(
   return [target[0] + distance * 0.25, target[1] + height, target[2] + distance];
 }
 
-export function focusCameraForSpotlight(spotlight: TheaterSpotlight): TheaterCameraFocusRequest {
-  const target: [number, number, number] = [
+function withHallOffset(
+  layout: Pick<TheaterLayout, "hallOffsetX" | "hallOffsetZ"> | undefined,
+  point: [number, number, number],
+): [number, number, number] {
+  if (!layout) return point;
+  return [
+    point[0] + resolveHallOffsetX(layout),
+    point[1],
+    point[2] + resolveHallOffsetZ(layout),
+  ];
+}
+
+export function focusCameraForSpotlight(
+  spotlight: TheaterSpotlight,
+  layout?: Pick<TheaterLayout, "hallOffsetX" | "hallOffsetZ">,
+): TheaterCameraFocusRequest {
+  const target = withHallOffset(layout, [
     (spotlight.position[0] + spotlight.target[0]) / 2,
     Math.max(0.8, (spotlight.position[1] + spotlight.target[1]) / 2),
     (spotlight.position[2] + spotlight.target[2]) / 2,
-  ];
+  ]);
   return { target, position: computeOrbitPosition(target, 14, 7) };
 }
 
-export function focusCameraForModel(model: TheaterModel): TheaterCameraFocusRequest {
-  const target: [number, number, number] = [...model.position];
+export function focusCameraForModel(
+  model: TheaterModel,
+  layout?: Pick<TheaterLayout, "hallOffsetX" | "hallOffsetZ">,
+): TheaterCameraFocusRequest {
+  const target = withHallOffset(layout, [...model.position]);
   return { target, position: computeOrbitPosition(target, 11, 5) };
 }
 
@@ -68,14 +87,33 @@ export function focusCameraForDoor(
   } else {
     target = [0, door.height / 2, 0];
   }
+  target = withHallOffset(layout, target);
   return { target, position: computeOrbitPosition(target, 12, 5) };
 }
 
 export function focusCameraForLayout(layout: TheaterLayout): TheaterCameraFocusRequest {
+  const offsetX = resolveHallOffsetX(layout);
+  const offsetZ = resolveHallOffsetZ(layout);
   return {
-    target: [0, 1.2, layout.audienceStartZ * 0.25],
-    position: [0, layout.wallHeight + 4, layout.hallDepth * 0.85],
+    target: [offsetX, 1.2, offsetZ + layout.audienceStartZ * 0.25],
+    position: [
+      offsetX,
+      layout.wallHeight + 4,
+      offsetZ + layout.hallDepth * 0.85,
+    ],
   };
+}
+
+export function focusCameraForAudienceSeats(
+  layout: TheaterLayout,
+): TheaterCameraFocusRequest {
+  const offsetX = resolveHallOffsetX(layout);
+  const offsetZ = resolveHallOffsetZ(layout);
+  const blockDepth =
+    layout.seatRows > 0 ? (layout.seatRows - 1) * layout.rowSpacing : 0;
+  const centerZ = layout.audienceStartZ + blockDepth / 2;
+  const target: [number, number, number] = [offsetX, 1.0, offsetZ + centerZ];
+  return { target, position: computeOrbitPosition(target, 10, 5) };
 }
 
 export function resolveOutlinerCameraFocus(
@@ -90,18 +128,19 @@ export function resolveOutlinerCameraFocus(
   switch (item.kind) {
     case "spotlight": {
       const spotlight = ctx.spotlights.find((entry) => entry.id === item.id);
-      return spotlight ? focusCameraForSpotlight(spotlight) : null;
+      return spotlight ? focusCameraForSpotlight(spotlight, ctx.layout) : null;
     }
     case "model":
     case "decor": {
       const model = ctx.models.find((entry) => entry.id === item.id);
-      return model ? focusCameraForModel(model) : null;
+      return model ? focusCameraForModel(model, ctx.layout) : null;
     }
     case "door": {
       const door = ctx.doors.find((entry) => entry.id === item.id);
       return door ? focusCameraForDoor(door, ctx.layout) : null;
     }
     case "layout":
+      if (item.id === 1) return focusCameraForAudienceSeats(ctx.layout);
       return focusCameraForLayout(ctx.layout);
     default:
       return null;

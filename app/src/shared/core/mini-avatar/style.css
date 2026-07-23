@@ -2,6 +2,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: var(--mini-avatar-size, 22px);
+  height: var(--mini-avatar-size, 22px);
   border-radius: 0;
   object-fit: cover;
   background: var(--color-border-subtle);

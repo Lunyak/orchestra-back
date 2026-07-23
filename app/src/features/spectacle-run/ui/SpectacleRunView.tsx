@@ -8,7 +8,7 @@ import { SpectacleRunContent } from "./SpectacleRunContent";
 import "../../../shared/components/light-console/light-console.css";
 import "./style.css";
 
-/** Обёртка с провайдером состояния репетиции (контент без шапки — шапка в light-plot-mode-tabs). */
+/** Обёртка с провайдером состояния спектакля (контент без шапки — шапка в light-plot-mode-tabs). */
 export function SpectacleRunView() {
   const { projectName } = useProject();
   const { scenes } = usePlaybook();

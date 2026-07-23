@@ -59,7 +59,11 @@ export function DecorTexturePreview({
       ) : (
         <div
           className="theater-decor-texture-preview-fallback"
-          style={{ backgroundColor: fallbackColor }}
+          style={
+            fallbackColor
+              ? ({ "--theater-decor-preview-color": fallbackColor } as React.CSSProperties)
+              : undefined
+          }
         />
       )}
       {label ? <span className="theater-decor-texture-preview-label">{label}</span> : null}

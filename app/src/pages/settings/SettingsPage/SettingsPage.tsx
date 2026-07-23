@@ -2,7 +2,6 @@ import cn from "classnames";
 import { Button } from "@shared/core/button/Button";
 import { useState } from "react";
 import { useAuth } from "../../../features/auth";
-import { useProject } from "../../../features/project";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsStylesTab } from "./SettingsStylesTab";
 import "./style.css";
@@ -33,7 +32,6 @@ function writeSettingsActiveTab(tab: SettingsTabId): void {
 
 export function SettingsPage() {
   const { logout } = useAuth();
-  const { currentProjectDisplayName } = useProject();
   const [activeTab, setActiveTabState] = useState<SettingsTabId>(() => readSettingsActiveTab());
 
   const setActiveTab = (tab: SettingsTabId) => {
@@ -47,12 +45,6 @@ export function SettingsPage() {
         <main className="main-content main-content-settings">
           <div className="settings-view">
             <div className="settings-view-header">
-              <div>
-                <h2 className="settings-page-title">Настройки</h2>
-                <p className="settings-view-subtitle">
-                  Проект: <b>{currentProjectDisplayName || "не выбран"}</b>
-                </p>
-              </div>
               <Button type="button" className="danger" onClick={logout}>
                 Выйти из аккаунта
               </Button>

@@ -3,7 +3,6 @@ import {
   AppEditorMenubar,
   AppEditorMenubarProvider,
   AppEditorScriptFormattingMenu,
-  AppEditorScriptMarkdownMenu,
   AppEditorScriptModeNav,
   AppEditorScriptPanelsNav,
   useAppEditorMenubarActionsRender,
@@ -29,7 +28,6 @@ import { useScriptUI } from "../../features/script-ui";
 import { scriptUiActions } from "../../features/script-ui/model/script-ui-slice";
 import { AppRouteDeclarations } from "./AppRouteDeclarations";
 import { getRouteMeta, isScriptMarkdownRoute } from "./routeMeta";
-import type { ShowScriptMarkdownMode } from "../../features/show-script-markdown/model/show-script-markdown-slice";
 
 const SCRIPT_SCENE_NAME = "script";
 
@@ -104,30 +102,6 @@ function AppRoutesContent() {
     );
   }, [annotationsMode, dispatch, isEditing, projectName]);
 
-  const handleSetMarkdownMode = useCallback(
-    (mode: ShowScriptMarkdownMode) => {
-      if (!projectName) return;
-      try {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            `showScript:markdownMode:${projectName}:${SCRIPT_SCENE_NAME}`,
-            mode,
-          );
-        }
-      } catch {
-        // ignore
-      }
-      dispatch(
-        showScriptMarkdownActions.setMarkdownMode({
-          projectSlug: projectName,
-          sceneName: SCRIPT_SCENE_NAME,
-          mode,
-        }),
-      );
-    },
-    [dispatch, projectName],
-  );
-
   const handleTokenizeMatches = useCallback(
     (query: string, mode: ScriptTokenizeMode) => {
       return requestScriptTokenizeMatches(query, mode)?.count ?? 0;
@@ -192,6 +166,7 @@ function AppRoutesContent() {
   const isRehearsalPlanRoute =
     location.pathname === "/board" ||
     location.pathname === "/tasks" ||
+    location.pathname.startsWith("/tasks/") ||
     location.pathname === "/sessions" ||
     location.pathname.startsWith("/sessions/");
 
@@ -199,7 +174,7 @@ function AppRoutesContent() {
   const isScenesVisible = isMobile ? mobileScenesOpen : !isScenesCollapsed;
   const isHeaderScenesCollapsed = !isScenesVisible;
   const fallbackLabel = isRehearsalPlanRoute
-    ? "Загрузка плана репетиций…"
+    ? "Загрузка репетиций…"
     : "Загрузка страницы…";
   const suspenseFallback = isSpectacleLayoutRoute ? (
     <PageLoader
@@ -250,18 +225,12 @@ function AppRoutesContent() {
     0,
     () =>
       showScriptMainChrome && currentScene ? (
-        <>
-          <AppEditorScriptMarkdownMenu
-            markdownMode={markdownMode}
-            onSetMarkdownMode={handleSetMarkdownMode}
-          />
-          <AppEditorScriptFormattingMenu
-            disabled={!isEditing || !kadrMarkdownModes}
-            formatPlayDisabled={!canFormatPlayText}
-            onOpenFormatPlay={() => setFormatPlayModalOpen(true)}
-            onTokenizeMatches={handleTokenizeMatches}
-          />
-        </>
+        <AppEditorScriptFormattingMenu
+          disabled={!isEditing || !kadrMarkdownModes}
+          formatPlayDisabled={!canFormatPlayText}
+          onOpenFormatPlay={() => setFormatPlayModalOpen(true)}
+          onTokenizeMatches={handleTokenizeMatches}
+        />
       ) : null,
   );
 

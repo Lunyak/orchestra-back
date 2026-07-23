@@ -1,12 +1,22 @@
 import { createAsyncThunk, createSelector, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import {
-  deleteMyProfile,
-  getMyProfile,
-  updateMyProfile,
-  uploadMyAvatar,
-  type MyProfile,
-} from "../../../sync/api/profile";
+import type { MyProfile } from "../../../sync/api/profile";
+import { profileApi } from "../api/profile-api";
+
+function rtkErrorMessage(error: unknown, fallback: string): string {
+  if (error && typeof error === "object" && "data" in error) {
+    const data = (error as { data?: { message?: string } }).data;
+    if (data?.message) return String(data.message);
+  }
+  return fallback;
+}
+
+function unwrapProfileResult<T>(result: { data?: T; error?: unknown }): T {
+  if (result.error) {
+    throw result.error;
+  }
+  return result.data as T;
+}
 
 type AvailabilityStatus = "present" | "absent";
 type AvailabilityTimeRange = { from: string; to: string };
@@ -143,8 +153,11 @@ function normalizePatchFromForm(form: Partial<MyProfile>): Partial<MyProfile> {
 
 export const fetchMyProfileThunk = createAsyncThunk<MyProfile, { accessToken: string }, { state: RootState }>(
   "profileData/fetchMyProfile",
-  async ({ accessToken }) => {
-    return await getMyProfile(accessToken);
+  async (_args, { dispatch }) => {
+    const result = await dispatch(
+      profileApi.endpoints.myProfile.initiate(undefined, { forceRefetch: true }),
+    );
+    return unwrapProfileResult(result);
   },
   {
     condition: ({ accessToken }, { getState }) => {
@@ -160,13 +173,17 @@ export const fetchMyProfileThunk = createAsyncThunk<MyProfile, { accessToken: st
 
 export const saveMyProfileThunk = createAsyncThunk<MyProfile, { accessToken: string }, { state: RootState }>(
   "profileData/saveMyProfile",
-  async ({ accessToken }, { getState, rejectWithValue }) => {
+  async (_args, { dispatch, getState, rejectWithValue }) => {
     const state = getState() as any;
     const s = state.profileData as ProfileDataState | undefined;
     const form = s?.form ?? {};
     try {
       const patch = normalizePatchFromForm(form);
-      return await updateMyProfile(accessToken, patch);
+      const result = await dispatch(profileApi.endpoints.updateMyProfile.initiate(patch));
+      if (result.error) {
+        return rejectWithValue(rtkErrorMessage(result.error, "Не удалось сохранить профиль"));
+      }
+      return result.data as MyProfile;
     } catch (e: any) {
       return rejectWithValue(e?.response?.data?.message ?? "Не удалось сохранить профиль");
     }
@@ -186,9 +203,13 @@ export const uploadAvatarThunk = createAsyncThunk<
   MyProfile,
   { accessToken: string; file: File },
   { rejectValue: string }
->("profileData/uploadAvatar", async ({ accessToken, file }, { rejectWithValue }) => {
+>("profileData/uploadAvatar", async ({ file }, { dispatch, rejectWithValue }) => {
   try {
-    return await uploadMyAvatar(accessToken, file);
+    const result = await dispatch(profileApi.endpoints.uploadMyAvatar.initiate(file));
+    if (result.error) {
+      return rejectWithValue(rtkErrorMessage(result.error, "Не удалось загрузить аватар"));
+    }
+    return result.data as MyProfile;
   } catch (e: any) {
     return rejectWithValue(e?.response?.data?.message ?? "Не удалось загрузить аватар");
   }
@@ -198,10 +219,16 @@ export const deleteProfileDataThunk = createAsyncThunk<
   MyProfile,
   { accessToken: string },
   { rejectValue: string }
->("profileData/deleteProfileData", async ({ accessToken }, { rejectWithValue }) => {
+>("profileData/deleteProfileData", async (_args, { dispatch, rejectWithValue }) => {
   try {
-    await deleteMyProfile(accessToken);
-    return await getMyProfile(accessToken);
+    const deleteResult = await dispatch(profileApi.endpoints.deleteMyProfile.initiate());
+    if (deleteResult.error) {
+      return rejectWithValue(rtkErrorMessage(deleteResult.error, "Не удалось удалить профиль"));
+    }
+    const refreshResult = await dispatch(
+      profileApi.endpoints.myProfile.initiate(undefined, { forceRefetch: true }),
+    );
+    return unwrapProfileResult(refreshResult);
   } catch (e: any) {
     return rejectWithValue(e?.response?.data?.message ?? "Не удалось удалить профиль");
   }

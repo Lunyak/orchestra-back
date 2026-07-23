@@ -1,9 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../../../shared/store/store";
-import {
-  getActorSceneNote,
-  upsertActorSceneNote,
-} from "../../../sync/api/actor-notes";
+import { actorNotesApi } from "../../actor/api/actor-notes-api";
 
 type CacheKey = string;
 
@@ -35,12 +32,20 @@ export const loadActorSceneNote = createAsyncThunk<
 >("showScript/loadActorSceneNote", async (args, api) => {
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) return { cacheKey: args.cacheKey, text: "" };
-  const res = await getActorSceneNote(token, {
-    projectSlug: args.projectSlug,
-    sceneName: args.sceneName,
-    sceneId: args.sceneId,
-  });
-  return { cacheKey: args.cacheKey, text: String(res?.note?.text ?? "") };
+  const result = await api.dispatch(
+    actorNotesApi.endpoints.actorSceneNote.initiate(
+      {
+        projectSlug: args.projectSlug,
+        sceneName: args.sceneName,
+        sceneId: args.sceneId,
+      },
+      { forceRefetch: true },
+    ),
+  );
+  if (result.error) {
+    throw result.error;
+  }
+  return { cacheKey: args.cacheKey, text: String(result.data?.note?.text ?? "") };
 });
 
 export const saveActorSceneNote = createAsyncThunk<
@@ -49,13 +54,18 @@ export const saveActorSceneNote = createAsyncThunk<
 >("showScript/saveActorSceneNote", async (args, api) => {
   const token = getAccessToken(api.getState as () => RootState);
   if (!token) return { cacheKey: args.cacheKey, text: args.text };
-  const res = await upsertActorSceneNote(token, {
-    projectSlug: args.projectSlug,
-    sceneName: args.sceneName,
-    sceneId: args.sceneId,
-    text: args.text,
-  });
-  return { cacheKey: args.cacheKey, text: String(res?.note?.text ?? "") };
+  const result = await api.dispatch(
+    actorNotesApi.endpoints.upsertActorSceneNote.initiate({
+      projectSlug: args.projectSlug,
+      sceneName: args.sceneName,
+      sceneId: args.sceneId,
+      text: args.text,
+    }),
+  );
+  if (result.error) {
+    throw result.error;
+  }
+  return { cacheKey: args.cacheKey, text: String(result.data?.note?.text ?? "") };
 });
 
 export const showScriptSlice = createSlice({
@@ -136,4 +146,3 @@ export function selectActorNote(state: RootState, cacheKey: CacheKey): ActorNote
     }
   );
 }
-
