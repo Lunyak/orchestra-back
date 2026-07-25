@@ -12,12 +12,23 @@ import {
 import { DECOR_MATERIAL_SIDE_OPTIONS } from "../../../model/theater-decor-material";
 import { DecorTexturePreview } from "../../DecorTexturePreview";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
+import { TheaterModelPreview } from "../../TheaterModelPreview";
 import {
   TheaterBtn,
   TheaterRangeField,
   TheaterSelect,
 } from "../../theater-controls-ui";
 import type { DecorSectionProps } from "./types";
+
+function UploadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M12 3v12" />
+      <path d="M7 8l5-5 5 5" />
+      <path d="M4 15v4h16v-4" />
+    </svg>
+  );
+}
 
 export function TheaterControlsDecorAppearanceSection({
   vm,
@@ -55,25 +66,21 @@ export function TheaterControlsDecorAppearanceSection({
   return (
     <>
       <div className="theater-decor-selected-model">
-        <span className="theater-label">Выбранный объект</span>
+        <TheaterModelPreview projectName={projectName} model={activeModel} />
         <strong>{activeModel.name}</strong>
       </div>
 
       <TheaterCollapsibleSection
         sectionId="decor-color"
         title="Цвет"
-        summary="Однотонная окраска или оттенок текстуры"
         defaultOpen
       >
-        <p className="theater-layout-hint">
-          Без текстуры это основной цвет. С текстурой — её оттенок.
-        </p>
-        <label className="theater-color-field">
-          <span className="theater-label">Цвет поверхности</span>
+        <div className="theater-color-field theater-color-field--inline theater-decor-color-row">
           <input
             type="color"
             className="theater-color-input"
             value={activeColor}
+            aria-label="Цвет"
             onChange={(event) =>
               vm.updateModel(activeModelId, {
                 decorColor: event.target.value,
@@ -81,27 +88,45 @@ export function TheaterControlsDecorAppearanceSection({
             }
           />
           <span className="theater-decor-color-value">{activeColor}</span>
-        </label>
-        <TheaterBtn
-          onClick={() =>
-            vm.updateModel(activeModelId, { decorColor: undefined })
-          }
-          disabled={!activeModel.decorColor}
-        >
-          Сбросить цвет
-        </TheaterBtn>
+          <TheaterBtn
+            onClick={() =>
+              vm.updateModel(activeModelId, { decorColor: undefined })
+            }
+            disabled={!activeModel.decorColor}
+          >
+            Сбросить
+          </TheaterBtn>
+        </div>
       </TheaterCollapsibleSection>
 
       {showDecorTextures ? (
         <TheaterCollapsibleSection
           sectionId="decor-texture"
           title="Текстура"
-          summary="Материал поверхности и способ наложения"
           defaultOpen
+          headerActions={
+            <>
+              <TheaterBtn
+                className="theater-btn--icon"
+                onClick={() => decorTextureInputRef.current?.click()}
+                disabled={!vm.currentScene}
+                title="Загрузить изображение"
+                aria-label="Загрузить изображение"
+              >
+                <UploadIcon />
+              </TheaterBtn>
+              <TheaterBtn
+                className="theater-btn--danger"
+                onClick={() => vm.clearDecorTexture()}
+                disabled={!activeDecorTexture}
+                title="Убрать текстуру"
+                aria-label="Убрать текстуру"
+              >
+                ×
+              </TheaterBtn>
+            </>
+          }
         >
-          <p className="theater-layout-hint">
-            Выберите готовый материал или загрузите своё изображение.
-          </p>
           <div className="theater-decor-texture-options">
             {DECOR_TEXTURE_PRESETS.map((preset) => {
               const selected = activeDecorTexturePresetId === preset.id;
@@ -142,20 +167,6 @@ export function TheaterControlsDecorAppearanceSection({
             </span>
           )}
 
-          <div className="theater-btn-row">
-            <TheaterBtn
-              onClick={() => decorTextureInputRef.current?.click()}
-              disabled={!vm.currentScene}
-            >
-              Загрузить изображение
-            </TheaterBtn>
-            <TheaterBtn
-              onClick={() => vm.clearDecorTexture()}
-              disabled={!activeDecorTexture}
-            >
-              Убрать текстуру
-            </TheaterBtn>
-          </div>
           <input
             ref={decorTextureInputRef}
             type="file"
@@ -185,22 +196,24 @@ export function TheaterControlsDecorAppearanceSection({
 
           {activeDecorTextureMode === "repeat" ? (
             <TheaterRangeField
-              label={`Повтор узора ${activeDecorTextureRepeat.toFixed(2)}/м`}
+              label="Повтор узора"
               min={0.2}
               max={3}
               step={0.05}
               value={activeDecorTextureRepeat}
+              formatValue={(value) => value.toFixed(2)}
               onChange={(value) => vm.setDecorTextureRepeatForTarget(value)}
               {...historyTx}
             />
           ) : null}
           {activeDecorTextureMode === "once" ? (
             <TheaterRangeField
-              label={`Масштаб изображения ${activeDecorTextureRepeat.toFixed(2)}`}
+              label="Масштаб"
               min={0.1}
               max={2}
               step={0.05}
               value={activeDecorTextureRepeat}
+              formatValue={(value) => value.toFixed(2)}
               onChange={(value) => vm.setDecorTextureRepeatForTarget(value)}
               {...historyTx}
             />
@@ -238,36 +251,39 @@ export function TheaterControlsDecorAppearanceSection({
       <TheaterCollapsibleSection
         sectionId="decor-material"
         title="Дополнительно"
-        summary="Блеск, металл, прозрачность и свечение"
+        className="theater-panel-section--compact-labels"
       >
         <TheaterRangeField
-          label={`Непрозрачность ${(activeModel.decorOpacity ?? 1).toFixed(2)}`}
+          label="Непрозрачность"
           min={0}
           max={1}
           step={0.02}
           value={activeModel.decorOpacity ?? 1}
+          formatValue={(value) => value.toFixed(2)}
           onChange={(value) =>
             vm.updateModel(activeModelId, { decorOpacity: value })
           }
           {...historyTx}
         />
         <TheaterRangeField
-          label={`Шероховатость ${(activeModel.decorRoughness ?? 0.82).toFixed(2)}`}
+          label="Шероховатость"
           min={0}
           max={1}
           step={0.02}
           value={activeModel.decorRoughness ?? 0.82}
+          formatValue={(value) => value.toFixed(2)}
           onChange={(value) =>
             vm.updateModel(activeModelId, { decorRoughness: value })
           }
           {...historyTx}
         />
         <TheaterRangeField
-          label={`Металличность ${(activeModel.decorMetalness ?? 0).toFixed(2)}`}
+          label="Металличность"
           min={0}
           max={1}
           step={0.02}
           value={activeModel.decorMetalness ?? 0}
+          formatValue={(value) => value.toFixed(2)}
           onChange={(value) =>
             vm.updateModel(activeModelId, { decorMetalness: value })
           }
@@ -287,11 +303,12 @@ export function TheaterControlsDecorAppearanceSection({
           />
         </label>
         <TheaterRangeField
-          label={`Яркость свечения ${(activeModel.decorEmissiveIntensity ?? 0).toFixed(2)}`}
+          label="Яркость свечения"
           min={0}
           max={3}
           step={0.05}
           value={activeModel.decorEmissiveIntensity ?? 0}
+          formatValue={(value) => value.toFixed(2)}
           onChange={(value) =>
             vm.updateModel(activeModelId, {
               decorEmissiveIntensity: value,

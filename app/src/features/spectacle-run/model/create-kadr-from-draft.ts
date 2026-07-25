@@ -16,50 +16,16 @@ import { buildKadrFaderSnapshotFromSofitChannels } from "../../theater/model/the
 import {
   buildKadrFromConsole,
   findKadrById,
-  type MarkdownKadrSection,
-  readSceneLightKadrsFromMarkdown,
-  recordKadrToMarkdown,
-  scanMarkdownKadrSections,
-  upsertKadrInScene,
+  readSceneLightKadrs,
 } from "../../theater/model/light-kadrs";
 import {
-  formatProjectorKadrLine,
-  parseProjectorLineInSection,
-  upsertProjectorLineInSection,
-  VIDEO_LINE_PREFIX,
-  type KadrProjectorCue,
-} from "../../theater/model/kadr-projector";
-import {
-  formatSoundKadrLine,
-  parseSoundLineInSection,
-  upsertSoundLineInSection,
-  type KadrSoundCue,
-} from "../../theater/model/kadr-sound";
-import {
-  buildKadrRunLabelsFromDraft,
-  parseKadrLabelsInSection,
-  upsertKadrLabelsInSection,
-} from "./kadr-section-labels";
-import {
-  insertKadrSectionImageAfterTransition,
-  parseKadrSectionImageMarkdownInSection,
-  stripKadrSectionStandaloneImages,
-} from "./kadr-section-image";
-import {
-  parseKadrCommentRawInSection,
-  upsertKadrCommentInSection,
-} from "./kadr-section-comment";
-import {
-  parseKadrTransitionRawInSection,
-  upsertKadrTransitionInSection,
-} from "./kadr-section-transition";
-import {
-  insertKadrAfterInScene,
-  type InsertKadrAfterTarget,
-  type SpectacleTapeItem,
-} from "./spectacle-kadr-tape";
+  insertKadrInSceneData,
+  upsertFullKadrInScene,
+} from "../../theater/model/kadr-store";
+import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { getPlaylistPlaybackSnapshot } from "../../playbook/model/playbook-playback-bridge";
 import { readPlayerVolume } from "../../../shared/player/player-prefs";
+import type { InsertKadrAfterTarget, SpectacleTapeItem } from "./spectacle-kadr-tape";
 
 export type CreateKadrFaderOption = {
   key: string;
@@ -261,80 +227,47 @@ export function buildInitialCreateKadrDraft(args: {
   };
 }
 
-function applyKadrHeadingTitle(
-  markdown: string,
-  section: MarkdownKadrSection,
-  title: string,
-): string {
-  const trimmed = title.trim();
-  if (!trimmed) return markdown;
-  const lineEnd = markdown.indexOf("\n", section.headingStart);
-  const headingLineEnd = lineEnd === -1 ? section.headingEnd : lineEnd;
-  const nextHeading = `### Картина ${section.kadrNo} · ${trimmed}`;
-  return markdown.slice(0, section.headingStart) + nextHeading + markdown.slice(headingLineEnd);
-}
-
-function findSectionByKadrId(markdown: string, kadrId: string): MarkdownKadrSection | null {
-  return scanMarkdownKadrSections(markdown).find((section) => section.id === kadrId) ?? null;
-}
-
 export function parseKadrTitleFromHeading(headingTitle: string, kadrNo: number): string {
   const prefix = new RegExp(`^Картина\\s+${kadrNo}\\s*(?:·\\s*)?`, "i");
   return String(headingTitle ?? "").replace(prefix, "").trim();
 }
 
-const PROJECTOR_PLACEHOLDER_LINE = `${VIDEO_LINE_PREFIX} _«Записать проектор» — ролик на экран_`;
-
 type ApplyKadrDraftArgs = {
   draft: CreateKadrDraft;
   kadrId: string;
   kadrNo: number;
-  markdown: string;
   kadrs: SceneLightKadrsDataV1;
-  section: MarkdownKadrSection;
   lightChannels: string[];
   lightFaders: PlaybookLightFadersDataV1;
   lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
   spotlights: TheaterSpotlight[];
   liveConsoleChannel: number;
   liveFaders: PlaybookLightFadersDataV1;
-  playlist: Array<{ id: number; title: string }>;
-  sounds: Array<{ id: number; title: string }>;
-  videos: Array<{ id: number; title: string }>;
-  holdImages: Array<{ id: number; title: string }>;
   summaryVerb: "создана" | "обновлена";
-  clearEmptyMedia: boolean;
+  smokeMachineEnabled?: boolean;
+  existingTitle?: string;
 };
 
-function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
-  nextMarkdown: string;
+function applyKadrDraftToJson(args: ApplyKadrDraftArgs): {
   nextKadrs: SceneLightKadrsDataV1;
   kadrId: string;
   kadrNo: number;
   summary: string;
 } | null {
   const { draft, kadrId, kadrNo } = args;
-  let markdown = args.markdown;
-  let kadrs = args.kadrs;
-  let section: MarkdownKadrSection | null = args.section;
-
-  markdown = applyKadrHeadingTitle(markdown, section, draft.title);
-  section = findSectionByKadrId(markdown, kadrId);
-  if (!section) return null;
-
   const faders = resolveLightFaders(args.lightFaders);
-  const liveFaders = resolveLightFaders(args.liveFaders);
   const programs = resolveLightPrograms(args.lightPrograms);
   const recordChannels = normalizeSelectedRecordChannels(
     draft.recordChannels,
     args.lightChannels.length,
   );
   const isBlackout = draft.blackout;
+  const title = draft.title.trim() || args.existingTitle?.trim() || undefined;
 
   let kadr: SceneLightKadrV1 = buildKadrFromConsole({
     id: kadrId,
     kadrNo,
-    title: draft.title.trim() || section.headingTitle,
+    title,
     programId: isBlackout ? 0 : Math.max(1, Math.trunc(draft.programId) || 1),
     faders,
     spotlights: args.spotlights,
@@ -347,84 +280,58 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
 
   kadr = applyDraftFaderStates(kadr, draft, args.liveConsoleChannel);
 
-  kadrs = upsertKadrInScene({ kadrs, kadr });
-  markdown = recordKadrToMarkdown({
-    markdown,
-    section: { ...section, id: kadrId },
-    kadr,
-    lightChannels: args.lightChannels,
-    lightFaders: faders,
-    programs: args.lightPrograms,
-  });
-  section = findSectionByKadrId(markdown, kadrId);
-  if (!section) return null;
-
   const hasSound =
     (draft.playTrackId != null && draft.playTrackId > 0) || draft.soundIds.length > 0;
-
-  if (hasSound || args.clearEmptyMedia) {
+  if (hasSound) {
     const snap = getPlaylistPlaybackSnapshot();
-    const cue: KadrSoundCue = hasSound
-      ? {
-          playTrackIds:
-            draft.playTrackId != null && draft.playTrackId > 0 ? [draft.playTrackId] : [],
-          soundIds: [...new Set(draft.soundIds.filter((id) => id > 0))],
-          volume: snap.volume ?? readPlayerVolume(),
-        }
-      : { playTrackIds: [], soundIds: [] };
-    const soundLine = formatSoundKadrLine(cue, {
-      playlist: args.playlist,
-      sounds: args.sounds,
-    });
-    markdown = upsertSoundLineInSection(markdown, section, soundLine);
+    kadr = {
+      ...kadr,
+      sound: {
+        playTrackIds:
+          draft.playTrackId != null && draft.playTrackId > 0 ? [draft.playTrackId] : [],
+        soundIds: [...new Set(draft.soundIds.filter((id) => id > 0))],
+        volume: snap.volume ?? readPlayerVolume(),
+      },
+    };
+  } else {
+    const { sound: _removed, ...rest } = kadr;
+    kadr = rest;
   }
 
-  if (draft.projectorCue || args.clearEmptyMedia) {
-    section = findSectionByKadrId(markdown, kadrId);
-    if (!section) return null;
-    const projectorLine = draft.projectorCue
-      ? formatProjectorKadrLine(draft.projectorCue, {
-          videos: args.videos,
-          holdImages: args.holdImages,
-        })
-      : PROJECTOR_PLACEHOLDER_LINE;
-    markdown = upsertProjectorLineInSection(markdown, section, projectorLine);
+  if (draft.projectorCue) {
+    kadr = { ...kadr, projector: draft.projectorCue };
+  } else {
+    const { projector: _removed, ...rest } = kadr;
+    kadr = rest;
   }
 
-  if (draft.transitionText.trim() || args.clearEmptyMedia) {
-    section = findSectionByKadrId(markdown, kadrId);
-    if (!section) return null;
-    markdown = upsertKadrTransitionInSection(markdown, section, draft.transitionText.trim());
+  const smokeMachineEnabled = args.smokeMachineEnabled === true;
+  kadr = {
+    ...kadr,
+    title,
+    transitionText: draft.transitionText.trim() || undefined,
+    commentText: draft.commentText.trim() || undefined,
+    imageMarkdown: draft.imageMarkdown.trim() || undefined,
+    blackoutDurationSec:
+      draft.blackoutDurationSec != null && draft.blackoutDurationSec > 0
+        ? Math.trunc(draft.blackoutDurationSec)
+        : undefined,
+    smokeDurationSec:
+      draft.smokeDurationSec != null && draft.smokeDurationSec > 0
+        ? Math.trunc(draft.smokeDurationSec)
+        : undefined,
+    ...(smokeMachineEnabled || draft.smokeDurationSec != null
+      ? { smokeMachine: true }
+      : {}),
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (!smokeMachineEnabled && draft.smokeDurationSec == null) {
+    const { smokeMachine: _removed, ...rest } = kadr;
+    kadr = rest;
   }
 
-  if (draft.commentText.trim() || args.clearEmptyMedia) {
-    section = findSectionByKadrId(markdown, kadrId);
-    if (!section) return null;
-    markdown = upsertKadrCommentInSection(markdown, section, draft.commentText.trim());
-  }
-
-  section = findSectionByKadrId(markdown, kadrId);
-  if (!section) return null;
-  if (draft.imageMarkdown.trim()) {
-    markdown = insertKadrSectionImageAfterTransition(markdown, section, draft.imageMarkdown);
-  } else if (args.clearEmptyMedia) {
-    markdown = stripKadrSectionStandaloneImages(markdown, section);
-  }
-
-  const runLabels = buildKadrRunLabelsFromDraft({
-    blackoutDurationSec: draft.blackoutDurationSec,
-    smokeDurationSec: draft.smokeDurationSec,
-  });
-  if (runLabels.length > 0 || args.clearEmptyMedia) {
-    section = findSectionByKadrId(markdown, kadrId);
-    if (!section) return null;
-    markdown = upsertKadrLabelsInSection(markdown, section, runLabels);
-  }
-
-  kadrs = upsertKadrInScene({
-    kadrs,
-    kadr: { ...kadr, title: draft.title.trim() || kadr.title },
-  });
+  const nextKadrs = upsertFullKadrInScene({ kadrs: args.kadrs, kadr });
 
   const parts = [`Картина ${kadrNo} ${args.summaryVerb}`];
   if (isBlackout) parts.push("блекаут");
@@ -432,13 +339,12 @@ function applyKadrDraftToSection(args: ApplyKadrDraftArgs): {
   if (hasSound) parts.push("звук");
   if (draft.projectorCue) parts.push("видео");
   if (draft.imageMarkdown.trim()) parts.push("картинка");
-  if (runLabels.length > 0) parts.push("метки");
+  if (draft.blackoutDurationSec != null || draft.smokeDurationSec != null) parts.push("метки");
   if (draft.transitionText.trim()) parts.push("переход");
   if (draft.commentText.trim()) parts.push("комментарий");
 
   return {
-    nextMarkdown: markdown,
-    nextKadrs: kadrs,
+    nextKadrs,
     kadrId,
     kadrNo,
     summary: parts.join(" · "),
@@ -451,27 +357,18 @@ export function buildEditKadrDraftFromTapeItem(args: {
   lightPrograms: PlaybookLightProgramsDataV1 | null | undefined;
 }): CreateKadrDraft | null {
   const { scene, item } = args;
-  if (item.isPlaceholder || !item.section) return null;
+  if (item.isPlaceholder) return null;
 
-  const markdown = String(scene.markdown ?? "");
-  const section = item.section;
-  const kadrs = readSceneLightKadrsFromMarkdown(scene);
-  const kadrId = item.kadrId ?? section.id;
+  const kadrs = readSceneLightKadrs(scene);
   const kadr =
-    (kadrId ? findKadrById(kadrs, kadrId) : undefined) ??
+    (item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined) ??
     kadrs.kadrs.find((row) => row.kadrNo === item.kadrNo);
   if (!kadr) return null;
 
   const title =
-    parseKadrTitleFromHeading(section.headingTitle, item.kadrNo) ||
     kadr.title?.trim() ||
+    parseKadrTitleFromHeading(item.headingTitle, item.kadrNo) ||
     "";
-
-  const soundCue = parseSoundLineInSection(markdown, section);
-  const projectorCue = parseProjectorLineInSection(markdown, section);
-  const labels = parseKadrLabelsInSection(markdown, section);
-  const blackoutLabel = labels.find((label) => label.type === "blackout");
-  const smokeLabel = labels.find((label) => label.type === "smoke");
 
   const isBlackout = Boolean(kadr.blackout || kadr.programId <= 0);
   const programs = resolveLightPrograms(args.lightPrograms);
@@ -487,9 +384,9 @@ export function buildEditKadrDraftFromTapeItem(args: {
 
   return {
     title,
-    playTrackId: soundCue?.playTrackIds[0] ?? null,
-    soundIds: soundCue?.soundIds ?? [],
-    projectorCue,
+    playTrackId: kadr.sound?.playTrackIds?.[0] ?? null,
+    soundIds: kadr.sound?.soundIds ?? [],
+    projectorCue: kadr.projector ?? null,
     blackout: isBlackout,
     programId: isBlackout
       ? programs.activeProgramId ?? 1
@@ -497,11 +394,11 @@ export function buildEditKadrDraftFromTapeItem(args: {
     recordChannels,
     includedFaderKeys,
     faderLevels,
-    imageMarkdown: parseKadrSectionImageMarkdownInSection(markdown, section),
-    blackoutDurationSec: blackoutLabel?.seconds ?? null,
-    smokeDurationSec: smokeLabel?.seconds ?? null,
-    transitionText: parseKadrTransitionRawInSection(markdown, section),
-    commentText: parseKadrCommentRawInSection(markdown, section),
+    imageMarkdown: kadr.imageMarkdown ?? "",
+    blackoutDurationSec: kadr.blackoutDurationSec ?? null,
+    smokeDurationSec: kadr.smokeDurationSec ?? null,
+    transitionText: kadr.transitionText ?? "",
+    commentText: kadr.commentText ?? kadr.note ?? "",
   };
 }
 
@@ -520,42 +417,28 @@ export function updateKadrFromDraft(args: {
   videos: Array<{ id: number; title: string }>;
   holdImages: Array<{ id: number; title: string }>;
 }): {
-  nextMarkdown: string;
   nextKadrs: SceneLightKadrsDataV1;
   kadrId: string;
   kadrNo: number;
   summary: string;
 } | null {
   const { scene, item, draft } = args;
-  if (item.isPlaceholder || !item.section) return null;
+  if (item.isPlaceholder || !item.kadrId) return null;
 
-  const kadrId = item.kadrId ?? item.section.id;
-  if (!kadrId) return null;
-
-  const markdown = String(scene.markdown ?? "");
-  const kadrs = readSceneLightKadrsFromMarkdown(scene);
-  const section = findSectionByKadrId(markdown, kadrId) ?? item.section;
-  if (!section) return null;
-
-  return applyKadrDraftToSection({
+  return applyKadrDraftToJson({
     draft,
-    kadrId,
+    kadrId: item.kadrId,
     kadrNo: item.kadrNo,
-    markdown,
-    kadrs,
-    section,
+    kadrs: readSceneLightKadrs(scene),
     lightChannels: args.lightChannels,
     lightFaders: args.lightFaders,
     lightPrograms: args.lightPrograms,
     spotlights: args.spotlights,
     liveConsoleChannel: args.liveConsoleChannel,
     liveFaders: args.liveFaders,
-    playlist: args.playlist,
-    sounds: args.sounds,
-    videos: args.videos,
-    holdImages: args.holdImages,
     summaryVerb: "обновлена",
-    clearEmptyMedia: true,
+    smokeMachineEnabled: scene.theaterSmokeMachine === true,
+    existingTitle: item.headingTitle,
   });
 }
 
@@ -574,35 +457,29 @@ export function createKadrFromDraft(args: {
   videos: Array<{ id: number; title: string }>;
   holdImages: Array<{ id: number; title: string }>;
 }): {
-  nextMarkdown: string;
   nextKadrs: SceneLightKadrsDataV1;
   kadrId: string;
   kadrNo: number;
   summary: string;
 } | null {
   const { scene, draft } = args;
-  const base = insertKadrAfterInScene({ scene, after: args.insertAfter ?? null });
-  const section = findSectionByKadrId(base.nextMarkdown, base.kadrId);
-  if (!section) return null;
+  const base = insertKadrInSceneData({
+    scene,
+    afterKadrId: args.insertAfter?.id ?? null,
+  });
 
-  return applyKadrDraftToSection({
+  return applyKadrDraftToJson({
     draft,
     kadrId: base.kadrId,
     kadrNo: base.kadrNo,
-    markdown: base.nextMarkdown,
     kadrs: base.nextKadrs,
-    section,
     lightChannels: args.lightChannels,
     lightFaders: args.lightFaders,
     lightPrograms: args.lightPrograms,
     spotlights: args.spotlights,
     liveConsoleChannel: args.liveConsoleChannel,
     liveFaders: args.liveFaders,
-    playlist: args.playlist,
-    sounds: args.sounds,
-    videos: args.videos,
-    holdImages: args.holdImages,
     summaryVerb: "создана",
-    clearEmptyMedia: false,
+    smokeMachineEnabled: scene.theaterSmokeMachine === true,
   });
 }

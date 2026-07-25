@@ -28,6 +28,12 @@ import { LightTrussMountPoints } from "../three/LightTrussMountPoints";
 import type { TheaterCameraState } from "../../model/theater-camera-storage";
 import type { SceneOutlinerKind } from "../../model/theater-scene-outliner";
 import type { TheaterViewPrefs } from "../../model/theater-view-prefs-storage";
+import type { TheaterSmokePosition } from "../../model/theater-smoke-settings";
+import {
+  THEATER_SMOKE_FOG_FAR,
+  THEATER_SMOKE_FOG_NEAR,
+} from "../../model/theater-scene-lighting";
+import { TheaterSmokeMachine } from "../three/TheaterSmokeMachine";
 
 export type TheaterCanvasContentProps = {
   projectName: string;
@@ -37,13 +43,21 @@ export type TheaterCanvasContentProps = {
   showSeats: boolean;
   showGrid: boolean;
   showStageGrid: boolean;
+  activeDoorId?: number;
+  activeRecessId?: number;
   showSpotlights: boolean;
   showSpotlightGuideLines: boolean;
-  showOnlyActiveSpotlight: boolean;
   wallsOpaque: boolean;
   wallsHidden: boolean;
   wallsHideFromCamera: boolean;
   dutyLightEnabled: boolean;
+  smokeMachineEnabled: boolean;
+  smokePosition: TheaterSmokePosition;
+  smokeIntensity: number;
+  smokeSaturation: number;
+  smokeSize: number;
+  sceneBackgroundColor: string;
+  onSmokePositionChange: (position: TheaterSmokePosition) => void;
   snapToGrid: boolean;
   gridStep: number;
   alignGuidesEnabled: boolean;
@@ -131,13 +145,21 @@ export function TheaterCanvasContent({
   showSeats,
   showGrid,
   showStageGrid,
+  activeDoorId,
+  activeRecessId,
   showSpotlights,
   showSpotlightGuideLines,
-  showOnlyActiveSpotlight,
   wallsOpaque,
   wallsHidden,
   wallsHideFromCamera,
   dutyLightEnabled,
+  smokeMachineEnabled,
+  smokePosition,
+  smokeIntensity,
+  smokeSaturation,
+  smokeSize,
+  sceneBackgroundColor,
+  onSmokePositionChange,
   snapToGrid,
   gridStep,
   alignGuidesEnabled,
@@ -212,11 +234,6 @@ export function TheaterCanvasContent({
   const pickingSpotlightGridCell =
     activeTab === "spotlights" && editMode === "spotlights" && spotlightAimMode === "cell";
   const passModelPointerEventsThrough = pickingSpotlightGridCell;
-  const hasActiveVisibleSpotlight =
-    activeSpotlightId != null &&
-    visibleSpotlights.some((item) => item.id === activeSpotlightId);
-  const showOnlyActiveVisibleSpotlight =
-    showOnlyActiveSpotlight && hasActiveVisibleSpotlight;
   const hoveredLightTruss = individualModels.find(
     (model) =>
       model.id === hoveredModelId && model.builtin === "lightTruss6m",
@@ -235,6 +252,12 @@ export function TheaterCanvasContent({
 
   return (
     <>
+      {smokeMachineEnabled ? (
+        <fog
+          attach="fog"
+          args={[sceneBackgroundColor, THEATER_SMOKE_FOG_NEAR, THEATER_SMOKE_FOG_FAR]}
+        />
+      ) : null}
       <group position={[hallOffsetX, 0, hallOffsetZ]}>
       <TheaterStage
         projectName={projectName}
@@ -245,9 +268,22 @@ export function TheaterCanvasContent({
         wallsHideFromCamera={wallsHideFromCamera}
         dutyLightEnabled={dutyLightEnabled}
         showStageGrid={showStageGrid}
+        activeDoorId={activeDoorId}
+        activeRecessId={activeRecessId}
         highlightGridCell={highlightGridCell}
         spotlightAimMode={pickingSpotlightGridCell ? "cell" : "point"}
         onPickGridCell={onPickGridCell}
+      />
+      <TheaterSmokeMachine
+        layout={layout}
+        enabled={smokeMachineEnabled}
+        position={smokePosition}
+        intensity={smokeIntensity}
+        saturation={smokeSaturation}
+        size={smokeSize}
+        draggable={showEditorHelpers && smokeMachineEnabled}
+        onPositionChange={onSmokePositionChange}
+        onDraggingChange={onDraggingChange}
       />
       <DecorFloorPlacer
         enabled={
@@ -325,7 +361,7 @@ export function TheaterCanvasContent({
         onDragStart={onLayoutSizeDragStart}
         onDragEnd={onLayoutSizeDragEnd}
       />
-      {showGrid && showEditorHelpers ? (
+      {showGrid ? (
         <TheaterFloorGrid
           hallWidth={layout.hallWidth}
           hallDepth={layout.hallDepth}
@@ -357,13 +393,11 @@ export function TheaterCanvasContent({
           layout={layout}
           alignGuidesEnabled={alignGuidesEnabled}
           onAlignGuidesChange={onAlignGuidesChange}
-          showHelpers={
-            showEditorHelpers &&
-            showSpotlights &&
-            (!showOnlyActiveVisibleSpotlight || item.id === activeSpotlightId)
-          }
+          showHelpers={showEditorHelpers && showSpotlights}
           showSpotlightLabels={showEditorHelpers && showSpotlights}
           showGuideLine={showSpotlightGuideLines}
+          smokeBeamVisible={smokeMachineEnabled}
+          smokeSaturation={smokeSaturation}
           onTargetChange={onSpotlightTargetChange}
           onPositionChange={onSpotlightPositionChange}
           onDraggingChange={onDraggingChange}
@@ -386,6 +420,10 @@ export function TheaterCanvasContent({
           passThroughPointerEvents={passModelPointerEventsThrough}
         />
         {individualModels.map((model) => {
+          const hideTrussInPreview =
+            !showEditorHelpers && model.builtin === "lightTruss6m";
+          if (hideTrussInPreview) return null;
+
           const isActive = isModelEditMode && model.id === activeModelId;
           const onSelect = (additive = false) => onModelSelect(model.id, additive);
           const onActivate = () => {
@@ -439,7 +477,7 @@ export function TheaterCanvasContent({
           return null;
         })}
       </Suspense>
-      {activeTab === "spotlights" && mountPointTruss ? (
+      {showEditorHelpers && activeTab === "spotlights" && mountPointTruss ? (
         <LightTrussMountPoints
           model={mountPointTruss}
           spotlights={spotlights}
@@ -453,7 +491,6 @@ export function TheaterCanvasContent({
         />
       ) : null}
       {isModelEditMode &&
-        showEditorHelpers &&
         !decorPlaceMode &&
         activeModel &&
         activeModelId != null ? (
@@ -473,7 +510,6 @@ export function TheaterCanvasContent({
         />
       ) : null}
       {isModelEditMode &&
-        showEditorHelpers &&
         activeModelObject &&
         activeModelObjectId === activeModelId &&
         activeModelObject.parent && (

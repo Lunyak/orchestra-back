@@ -1,17 +1,21 @@
 import type {
   LightCue,
-  LightFixture,
   ScriptRequisite,
   ScriptScene,
+  TheaterLayout,
   TheaterModel,
   TheaterSpotlight,
 } from "../../../shared/types/script";
+import { DEFAULT_THEATER_LAYOUT } from "./theater-defaults";
+import { buildLightPlotFromSpotlights } from "./theater-light-channel-link";
 import { cloneTheaterModels, cloneTheaterSpotlights } from "./theater-history";
 import { readSceneTheaterModels, writeSceneTheaterModels } from "./theater-scene-models";
 
 export type CopySceneTheaterLayoutOptions = {
   includeRequisites?: boolean;
   includeLightCues?: boolean;
+  includeLightKadrs?: boolean;
+  includeSmokeMachine?: boolean;
 };
 
 export function sceneHasTheaterLayoutContent(
@@ -23,30 +27,36 @@ export function sceneHasTheaterLayoutContent(
   if (!scene) return false;
   const models = readSceneTheaterModels(scene);
   const spotlights = scene.theaterSpotlights ?? [];
-  const lightPlot = scene.lightPlot ?? [];
   const requisites = scene.requisites ?? [];
-  return models.length > 0 || spotlights.length > 0 || lightPlot.length > 0 || requisites.length > 0;
+  return models.length > 0 || spotlights.length > 0 || requisites.length > 0;
+}
+
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 export function buildCopySceneTheaterLayoutPatch(args: {
   spotlights: TheaterSpotlight[];
   models: TheaterModel[];
-  lightPlot?: LightFixture[] | null;
+  layout?: TheaterLayout | null;
   requisites?: ScriptRequisite[] | null;
   lightCues?: LightCue[] | null;
+  lightKadrs?: ScriptScene["lightKadrs"];
+  theaterSmokeMachine?: boolean;
   options?: CopySceneTheaterLayoutOptions;
 }): Partial<ScriptScene> {
   const clonedSpotlights = cloneTheaterSpotlights(args.spotlights);
   const clonedModels = cloneTheaterModels(args.models);
   const includeRequisites = args.options?.includeRequisites !== false;
   const includeLightCues = args.options?.includeLightCues === true;
+  const includeLightKadrs = args.options?.includeLightKadrs === true;
+  const includeSmokeMachine = args.options?.includeSmokeMachine === true;
+  const layout = args.layout ?? DEFAULT_THEATER_LAYOUT;
 
   const patch: Partial<ScriptScene> = {
     theaterSpotlights: clonedSpotlights,
+    lightPlot: buildLightPlotFromSpotlights(clonedSpotlights, layout),
     ...writeSceneTheaterModels(clonedModels),
-    ...(args.lightPlot?.length
-      ? { lightPlot: args.lightPlot.map((fixture) => ({ ...fixture })) }
-      : {}),
     theaterActiveSpotlightId: clonedSpotlights[0]?.id,
     theaterActiveModelId: clonedModels[0]?.id,
   };
@@ -59,19 +69,30 @@ export function buildCopySceneTheaterLayoutPatch(args: {
     patch.lightCues = args.lightCues.map((cue) => ({ ...cue }));
   }
 
+  if (includeLightKadrs && args.lightKadrs != null) {
+    patch.lightKadrs = cloneJson(args.lightKadrs);
+  }
+
+  if (includeSmokeMachine) {
+    patch.theaterSmokeMachine = args.theaterSmokeMachine === true;
+  }
+
   return patch;
 }
 
 export function buildCopySceneTheaterLayoutPatchFromScene(
   sourceScene: ScriptScene,
+  layout?: TheaterLayout | null,
   options?: CopySceneTheaterLayoutOptions,
 ): Partial<ScriptScene> {
   return buildCopySceneTheaterLayoutPatch({
     spotlights: sourceScene.theaterSpotlights ?? [],
     models: readSceneTheaterModels(sourceScene),
-    lightPlot: sourceScene.lightPlot,
+    layout,
     requisites: sourceScene.requisites,
     lightCues: sourceScene.lightCues,
+    lightKadrs: sourceScene.lightKadrs,
+    theaterSmokeMachine: sourceScene.theaterSmokeMachine,
     options,
   });
 }

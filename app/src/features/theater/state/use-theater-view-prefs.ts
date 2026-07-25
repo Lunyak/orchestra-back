@@ -11,6 +11,14 @@ import {
   writeTheaterViewPrefs,
   type TheaterViewPrefs,
 } from "../model/theater-view-prefs-storage";
+import type { TheaterSmokePosition } from "../model/theater-smoke-settings";
+import {
+  clampSmokeSize,
+  clampSmokeUnit,
+  THEATER_SMOKE_INTENSITY_DEFAULT,
+  THEATER_SMOKE_SATURATION_DEFAULT,
+  THEATER_SMOKE_SIZE_DEFAULT,
+} from "../model/theater-smoke-settings";
 
 export type TheaterPanelPrefsBridge = {
   swapTheaterPanels: boolean;
@@ -34,14 +42,19 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
   setOutlineDrawMode: (value: boolean) => void;
   setSpotlightAimMode: (mode: TheaterViewPrefs["spotlightAimMode"]) => void;
   setDutyLightEnabled: (value: boolean) => void;
+  setSmokeMachineEnabled: (value: boolean) => void;
+  setSmokePanelOpen: (value: boolean) => void;
+  setSmokePosition: (value: TheaterSmokePosition | null) => void;
+  setSmokeIntensity: (value: number) => void;
+  setSmokeSaturation: (value: number) => void;
+  setSmokeSize: (value: number) => void;
   setSceneBackgroundColor: (value: string) => void;
   setShowSpotlightGuideLines: (value: boolean) => void;
   setLightConsoleExpanded: Dispatch<SetStateAction<boolean>>;
   setHallResizeKeepObjects: (value: boolean) => void;
+  setHallQuickStartDone: (value: boolean) => void;
   showSpotlights: boolean;
   setShowSpotlights: (value: boolean) => void;
-  showOnlyActiveSpotlight: boolean;
-  setShowOnlyActiveSpotlight: (value: boolean) => void;
 };
 
 /**
@@ -102,6 +115,24 @@ export function useTheaterViewPrefs(
   const [dutyLightEnabled, setDutyLightEnabled] = useState(
     () => readTheaterViewPrefs(projectName).dutyLightEnabled,
   );
+  const [smokeMachineEnabled, setSmokeMachineEnabledState] = useState(
+    () => readTheaterViewPrefs(projectName).smokeMachineEnabled,
+  );
+  const [smokePanelOpen, setSmokePanelOpen] = useState(
+    () => readTheaterViewPrefs(projectName).smokePanelOpen,
+  );
+  const [smokePosition, setSmokePosition] = useState<TheaterSmokePosition | null>(
+    () => readTheaterViewPrefs(projectName).smokePosition,
+  );
+  const [smokeIntensity, setSmokeIntensityState] = useState(
+    () => readTheaterViewPrefs(projectName).smokeIntensity,
+  );
+  const [smokeSaturation, setSmokeSaturationState] = useState(
+    () => readTheaterViewPrefs(projectName).smokeSaturation,
+  );
+  const [smokeSize, setSmokeSizeState] = useState(
+    () => readTheaterViewPrefs(projectName).smokeSize,
+  );
   const [sceneBackgroundColor, setSceneBackgroundColor] = useState(
     () => readTheaterViewPrefs(projectName).sceneBackgroundColor,
   );
@@ -114,8 +145,24 @@ export function useTheaterViewPrefs(
   const [hallResizeKeepObjects, setHallResizeKeepObjects] = useState(
     () => readTheaterViewPrefs(projectName).hallResizeKeepObjects,
   );
+  const [hallQuickStartDone, setHallQuickStartDone] = useState(
+    () => readTheaterViewPrefs(projectName).hallQuickStartDone,
+  );
   const [showSpotlights, setShowSpotlights] = useState(true);
-  const [showOnlyActiveSpotlight, setShowOnlyActiveSpotlight] = useState(false);
+
+  const setSmokeMachineEnabled = (value: boolean) => {
+    setSmokeMachineEnabledState(value);
+    if (value) setSmokePanelOpen(true);
+  };
+  const setSmokeIntensity = (value: number) => {
+    setSmokeIntensityState(clampSmokeUnit(value, THEATER_SMOKE_INTENSITY_DEFAULT));
+  };
+  const setSmokeSaturation = (value: number) => {
+    setSmokeSaturationState(clampSmokeUnit(value, THEATER_SMOKE_SATURATION_DEFAULT));
+  };
+  const setSmokeSize = (value: number) => {
+    setSmokeSizeState(clampSmokeSize(value));
+  };
 
   const hydrateFromStorage = useCallback(() => {
     const prefs = readTheaterViewPrefs(projectName);
@@ -135,10 +182,17 @@ export function useTheaterViewPrefs(
     setOutlineDrawMode(prefs.outlineDrawMode);
     setSpotlightAimMode(prefs.spotlightAimMode);
     setDutyLightEnabled(prefs.dutyLightEnabled);
+    setSmokeMachineEnabledState(prefs.smokeMachineEnabled);
+    setSmokePanelOpen(prefs.smokePanelOpen);
+    setSmokePosition(prefs.smokePosition);
+    setSmokeIntensityState(prefs.smokeIntensity);
+    setSmokeSaturationState(prefs.smokeSaturation);
+    setSmokeSizeState(prefs.smokeSize);
     setSceneBackgroundColor(prefs.sceneBackgroundColor);
     setShowSpotlightGuideLines(prefs.showSpotlightGuideLines);
     setLightConsoleExpanded(prefs.lightConsoleExpanded);
     setHallResizeKeepObjects(prefs.hallResizeKeepObjects);
+    setHallQuickStartDone(prefs.hallQuickStartDone);
     skipPersistRef.current = true;
   }, [projectName]);
 
@@ -170,10 +224,17 @@ export function useTheaterViewPrefs(
       showTheaterControls: showControls,
       spotlightAimMode,
       dutyLightEnabled,
+      smokeMachineEnabled,
+      smokePanelOpen,
+      smokePosition,
+      smokeIntensity,
+      smokeSaturation,
+      smokeSize,
       sceneBackgroundColor,
       showSpotlightGuideLines,
       lightConsoleExpanded,
       hallResizeKeepObjects,
+      hallQuickStartDone,
     });
   }, [
     projectName,
@@ -195,10 +256,17 @@ export function useTheaterViewPrefs(
     showControls,
     spotlightAimMode,
     dutyLightEnabled,
+    smokeMachineEnabled,
+    smokePanelOpen,
+    smokePosition,
+    smokeIntensity,
+    smokeSaturation,
+    smokeSize,
     sceneBackgroundColor,
     showSpotlightGuideLines,
     lightConsoleExpanded,
     hallResizeKeepObjects,
+    hallQuickStartDone,
   ]);
 
   return {
@@ -220,10 +288,17 @@ export function useTheaterViewPrefs(
     showTheaterControls: showControls,
     spotlightAimMode,
     dutyLightEnabled,
+    smokeMachineEnabled,
+    smokePanelOpen,
+    smokePosition,
+    smokeIntensity,
+    smokeSaturation,
+    smokeSize,
     sceneBackgroundColor,
     showSpotlightGuideLines,
     lightConsoleExpanded,
     hallResizeKeepObjects,
+    hallQuickStartDone,
     setShowGrid,
     setShowStageGrid,
     setSnapToGrid,
@@ -240,13 +315,18 @@ export function useTheaterViewPrefs(
     setOutlineDrawMode,
     setSpotlightAimMode,
     setDutyLightEnabled,
+    setSmokeMachineEnabled,
+    setSmokePanelOpen,
+    setSmokePosition,
+    setSmokeIntensity,
+    setSmokeSaturation,
+    setSmokeSize,
     setSceneBackgroundColor,
     setShowSpotlightGuideLines,
     setLightConsoleExpanded,
     setHallResizeKeepObjects,
+    setHallQuickStartDone,
     showSpotlights,
     setShowSpotlights,
-    showOnlyActiveSpotlight,
-    setShowOnlyActiveSpotlight,
   };
 }

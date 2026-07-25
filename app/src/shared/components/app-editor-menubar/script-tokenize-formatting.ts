@@ -59,12 +59,13 @@ function findNextUntokenizedMatch(
   return findFrom(normalizedStart, value.length) ?? findFrom(0, normalizedStart);
 }
 
-export function wrapMarkdownMatchesAsTokens(
+/** Диапазоны совпадений поисковика форматирования (без уже обёрнутых `[[…]]`). */
+export function findMarkdownSearchMatches(
   value: string,
   query: string,
-): TokenizeMatchesResult {
+): Array<{ from: number; to: number }> {
   const needle = query.trim();
-  if (!needle) return { value, count: 0 };
+  if (!needle) return [];
 
   const spans = getTokenSpans(value);
   const ranges: Array<{ from: number; to: number }> = [];
@@ -78,6 +79,14 @@ export function wrapMarkdownMatchesAsTokens(
     from = value.indexOf(needle, to);
   }
 
+  return ranges;
+}
+
+export function wrapMarkdownMatchesAsTokens(
+  value: string,
+  query: string,
+): TokenizeMatchesResult {
+  const ranges = findMarkdownSearchMatches(value, query);
   if (!ranges.length) return { value, count: 0 };
 
   let cursor = 0;
@@ -142,4 +151,40 @@ export function subscribeScriptTokenizeRequests(
 
   window.addEventListener(SCRIPT_TOKENIZE_REQUEST_EVENT, listener);
   return () => window.removeEventListener(SCRIPT_TOKENIZE_REQUEST_EVENT, listener);
+}
+
+const SCRIPT_FORMAT_SEARCH_EVENT = "orchestra:script-format-search";
+
+type ScriptFormatSearchDetail = {
+  query: string;
+};
+
+let lastFormatSearchQuery = "";
+
+export function getScriptFormatSearchQuery() {
+  return lastFormatSearchQuery;
+}
+
+/** Подсветка совпадений в тексте при вводе в поисковик форматирования. */
+export function requestScriptFormatSearchHighlight(query: string) {
+  lastFormatSearchQuery = String(query ?? "");
+  if (typeof window === "undefined") return;
+  const detail: ScriptFormatSearchDetail = { query: lastFormatSearchQuery };
+  window.dispatchEvent(new CustomEvent(SCRIPT_FORMAT_SEARCH_EVENT, { detail }));
+}
+
+export function subscribeScriptFormatSearchHighlight(
+  handler: (query: string) => void,
+) {
+  if (typeof window === "undefined") return () => undefined;
+
+  handler(lastFormatSearchQuery);
+
+  const listener = (event: Event) => {
+    const detail = (event as CustomEvent<ScriptFormatSearchDetail>).detail;
+    handler(String(detail?.query ?? ""));
+  };
+
+  window.addEventListener(SCRIPT_FORMAT_SEARCH_EVENT, listener);
+  return () => window.removeEventListener(SCRIPT_FORMAT_SEARCH_EVENT, listener);
 }

@@ -88,6 +88,65 @@ export function dedupeKadrFaderStates(
   );
 }
 
+function normalizePositiveIdList(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw
+        .map((id) => Math.trunc(Number(id) || 0))
+        .filter((id) => id > 0),
+    ),
+  ];
+}
+
+function normalizeKadrSound(
+  raw: SceneLightKadrV1["sound"] | null | undefined,
+): SceneLightKadrV1["sound"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const playTrackIds = normalizePositiveIdList(raw.playTrackIds);
+  const soundIds = normalizePositiveIdList(raw.soundIds);
+  const volume =
+    typeof raw.volume === "number" && Number.isFinite(raw.volume)
+      ? Math.min(1, Math.max(0, raw.volume))
+      : undefined;
+  const fadeMs =
+    typeof raw.fadeMs === "number" && Number.isFinite(raw.fadeMs) && raw.fadeMs > 0
+      ? Math.round(raw.fadeMs)
+      : undefined;
+  if (playTrackIds.length === 0 && soundIds.length === 0 && volume == null && fadeMs == null) {
+    return undefined;
+  }
+  return {
+    ...(playTrackIds.length > 0 ? { playTrackIds } : {}),
+    ...(soundIds.length > 0 ? { soundIds } : {}),
+    ...(volume != null ? { volume } : {}),
+    ...(fadeMs != null ? { fadeMs } : {}),
+  };
+}
+
+function normalizeKadrProjector(
+  raw: SceneLightKadrV1["projector"] | null | undefined,
+): SceneLightKadrV1["projector"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  if (raw.mode === "video") {
+    const videoId = Math.trunc(Number(raw.videoId) || 0);
+    if (videoId <= 0) return undefined;
+    return raw.muted === true
+      ? { mode: "video", videoId, muted: true }
+      : { mode: "video", videoId };
+  }
+  if (raw.mode === "hold") {
+    const holdId = Math.trunc(Number(raw.holdId) || 0);
+    return holdId > 0 ? { mode: "hold", holdId } : { mode: "hold" };
+  }
+  return undefined;
+}
+
+function normalizeOptionalPositiveSec(raw: unknown): number | undefined {
+  const n = Math.trunc(Number(raw) || 0);
+  return n > 0 ? n : undefined;
+}
+
 function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): SceneLightKadrV1 | null {
   if (!raw || typeof raw.id !== "string" || !raw.id.trim()) return null;
   const kadrNo = Math.max(1, Math.trunc(Number(raw.kadrNo) || 1));
@@ -114,6 +173,20 @@ function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): 
     Array.isArray(raw.recordChannels) ? raw.recordChannels : undefined,
     64,
   );
+  const sound = normalizeKadrSound(raw.sound);
+  const projector = normalizeKadrProjector(raw.projector);
+  const transitionText =
+    typeof raw.transitionText === "string" ? raw.transitionText.trim() || undefined : undefined;
+  const commentText =
+    typeof raw.commentText === "string"
+      ? raw.commentText.trim() || undefined
+      : typeof raw.note === "string"
+        ? raw.note.trim() || undefined
+        : undefined;
+  const imageMarkdown =
+    typeof raw.imageMarkdown === "string" ? raw.imageMarkdown.trim() || undefined : undefined;
+  const blackoutDurationSec = normalizeOptionalPositiveSec(raw.blackoutDurationSec);
+  const smokeDurationSec = normalizeOptionalPositiveSec(raw.smokeDurationSec);
   return {
     id: raw.id.trim(),
     kadrNo,
@@ -126,6 +199,14 @@ function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): 
         ? Math.max(1, Math.trunc(Number(raw.nextProgramId)))
         : undefined,
     blackout: raw.blackout === true,
+    smokeMachine: raw.smokeMachine === true ? true : undefined,
+    ...(sound ? { sound } : {}),
+    ...(projector ? { projector } : {}),
+    ...(transitionText ? { transitionText } : {}),
+    ...(commentText ? { commentText } : {}),
+    ...(blackoutDurationSec != null ? { blackoutDurationSec } : {}),
+    ...(smokeDurationSec != null ? { smokeDurationSec } : {}),
+    ...(imageMarkdown ? { imageMarkdown } : {}),
     note: typeof raw.note === "string" ? raw.note.trim() || undefined : undefined,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : undefined,
   };
@@ -169,15 +250,47 @@ export function scanMarkdownKadrSections(markdown: string): MarkdownKadrSection[
 }
 
 export function nextKadrNumberForScene(
-  scene: { markdown?: string | null; lightKadrs?: SceneLightKadrsDataV1 | null } | null | undefined,
+  scene: {
+    lightKadrs?: SceneLightKadrsDataV1 | null;
+    /** Только для нумерации legacy-вставок в текст; JSON — SoT. */
+    markdown?: string | null;
+  } | null | undefined,
 ): number {
-  const sections = scanMarkdownKadrSections(String(scene?.markdown ?? ""));
-  const fromMarkdown =
-    sections.length > 0 ? Math.max(...sections.map((s) => s.kadrNo)) : 0;
   const kadrs = readSceneLightKadrs(scene);
   const fromKadrs =
     kadrs.kadrs.length > 0 ? Math.max(...kadrs.kadrs.map((k) => k.kadrNo)) : 0;
-  return Math.max(fromMarkdown, fromKadrs, 0) + 1;
+  const sections = scanMarkdownKadrSections(String(scene?.markdown ?? ""));
+  const fromMarkdown =
+    sections.length > 0 ? Math.max(...sections.map((s) => s.kadrNo)) : 0;
+  return Math.max(fromKadrs, fromMarkdown, 0) + 1;
+}
+
+/** Перенумеровать картины в JSON подряд: 1…N по текущему порядку. */
+export function renumberSceneLightKadrs(kadrs: SceneLightKadrsDataV1): SceneLightKadrsDataV1 {
+  const sorted = [...kadrs.kadrs].sort(
+    (a, b) => a.kadrNo - b.kadrNo || a.id.localeCompare(b.id),
+  );
+  return {
+    v: 1,
+    kadrs: sorted.map((kadr, index) => ({
+      ...kadr,
+      kadrNo: index + 1,
+    })),
+  };
+}
+
+/** Удалить картину из JSON и перенумеровать. */
+export function deleteKadrFromSceneData(
+  scene: { lightKadrs?: SceneLightKadrsDataV1 | null } | null | undefined,
+  target: { id?: string | null; kadrNo?: number },
+): SceneLightKadrsDataV1 {
+  const kadrs = readSceneLightKadrs(scene);
+  const filtered = kadrs.kadrs.filter((kadr) => {
+    if (target.id && kadr.id === target.id) return false;
+    if (!target.id && target.kadrNo != null && kadr.kadrNo === target.kadrNo) return false;
+    return true;
+  });
+  return renumberSceneLightKadrs({ v: 1, kadrs: filtered });
 }
 
 /** Найти секцию картины в актуальном markdown (для ленты спектакля / записи). */
@@ -522,8 +635,17 @@ export function lightKadrsStableKey(data: SceneLightKadrsDataV1 | null | undefin
       title: k.title ?? null,
       programId: k.programId,
       faders: k.faders,
+      recordChannels: k.recordChannels ?? null,
       nextProgramId: k.nextProgramId ?? null,
       blackout: k.blackout ?? false,
+      smokeMachine: k.smokeMachine ?? false,
+      sound: k.sound ?? null,
+      projector: k.projector ?? null,
+      transitionText: k.transitionText ?? null,
+      commentText: k.commentText ?? null,
+      blackoutDurationSec: k.blackoutDurationSec ?? null,
+      smokeDurationSec: k.smokeDurationSec ?? null,
+      imageMarkdown: k.imageMarkdown ?? null,
       note: k.note ?? null,
     })),
   );
@@ -586,14 +708,14 @@ export function deleteKadrFromSceneMarkdown(
   return { markdown, lightKadrs };
 }
 
-/** Кадры по тех. карте: `scene.markdown` — источник истины, JSON подчищается при чтении. */
+/**
+ * @deprecated JSON — источник истины. Алиас `readSceneLightKadrs`.
+ * Миграцию из markdown делайте через `migrateSceneLightKadrsFromMarkdown`.
+ */
 export function readSceneLightKadrsFromMarkdown(
   scene: { markdown?: string | null; lightKadrs?: SceneLightKadrsDataV1 | null } | null | undefined,
 ): SceneLightKadrsDataV1 {
-  return syncLightKadrsFromMarkdown({
-    markdown: String(scene?.markdown ?? ""),
-    kadrs: readSceneLightKadrs(scene),
-  });
+  return readSceneLightKadrs(scene);
 }
 
 export function syncLightKadrsFromMarkdown(args: {

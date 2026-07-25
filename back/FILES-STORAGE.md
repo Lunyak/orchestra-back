@@ -1,6 +1,28 @@
-# Хранилище файлов (аудио, изображения)
+# Хранилище файлов (аудио, изображения, theater-модели)
 
 Бэкенд поддерживает два режима: **MinIO/S3** и **локальный диск** (`STORAGE_TYPE=local`).
+
+## Built-in theater models (`web/public/theater`)
+
+`.glb` в git не коммитятся. На прод их кладут в MinIO под префиксом `theater/`:
+
+```bash
+# MinIO должен быть up; ключи — как в .env (S3_*)
+make push-theater-assets
+# или: node scripts/push-theater-assets-to-minio.cjs
+# dry-run: node scripts/push-theater-assets-to-minio.cjs --dry-run
+```
+
+URL объекта: `{S3_PUBLIC_URL}/{S3_BUCKET}/theater/...`
+
+В сборке web задайте:
+
+```env
+VITE_THEATER_ASSETS_BASE_URL={S3_PUBLIC_URL}/{S3_BUCKET}
+# HTTPS: https://<WEB_DOMAIN>/minio/orchestra-media
+```
+
+Локально / desktop: переменную можно не задавать — приложение читает из `web/public/theater`.
 
 ## MinIO с постоянными ссылками (без срока действия)
 

@@ -1,6 +1,7 @@
 import type {
   PlaybookData,
   PlaybookLightChannelRolesV1,
+  PlaybookLightConsoleUiV1,
   PlaybookLightFadersDataV1,
   PlaybookLightProgramsDataV1,
 } from "../../../features/playbook/model/playbook-slice";
@@ -17,11 +18,17 @@ export const MIN_LIGHT_CHANNELS = 1;
 export const MAX_LIGHT_CHANNELS = 64;
 export const MIN_LIGHT_CONSOLE_SLOTS = 1;
 export const MAX_LIGHT_CONSOLE_SLOTS = 64;
+export const MIN_LIGHT_CHANNEL_COLUMNS = 2;
+export const MAX_LIGHT_CHANNEL_COLUMNS = 8;
+export const DEFAULT_LIGHT_CHANNEL_COLUMNS = 4;
+
+export type { PlaybookLightConsoleUiV1 };
 
 export type LightConsoleLayoutCounts = {
   channelCount: number;
   faderCount: number;
   programCount: number;
+  channelColumns: number;
 };
 
 export function defaultLightChannelLabel(channel: number): string {
@@ -59,6 +66,27 @@ function clampConsoleSlotCount(raw: number, fallback = MIN_LIGHT_CONSOLE_SLOTS):
   const value = Math.trunc(Number(raw));
   if (!Number.isFinite(value)) return fallback;
   return Math.max(MIN_LIGHT_CONSOLE_SLOTS, Math.min(MAX_LIGHT_CONSOLE_SLOTS, value));
+}
+
+export function clampLightChannelColumns(
+  raw: number,
+  fallback = DEFAULT_LIGHT_CHANNEL_COLUMNS,
+): number {
+  const value = Math.trunc(Number(raw));
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(MIN_LIGHT_CHANNEL_COLUMNS, Math.min(MAX_LIGHT_CHANNEL_COLUMNS, value));
+}
+
+export function resolveLightConsoleUi(
+  raw: PlaybookLightConsoleUiV1 | null | undefined,
+): PlaybookLightConsoleUiV1 {
+  return {
+    v: 1,
+    channelColumns: clampLightChannelColumns(
+      Number(raw?.channelColumns),
+      DEFAULT_LIGHT_CHANNEL_COLUMNS,
+    ),
+  };
 }
 
 export function appendLightChannel(channels: string[]): string[] {
@@ -105,14 +133,17 @@ export function buildLightConsoleLayoutCounts(args: {
   lightChannels: string[];
   lightFaders?: PlaybookLightFadersDataV1 | null;
   lightPrograms?: PlaybookLightProgramsDataV1 | null;
+  lightConsoleUi?: PlaybookLightConsoleUiV1 | null;
 }): LightConsoleLayoutCounts {
   const faders = resolveLightFaders(args.lightFaders);
   const programSlotCount = readLightProgramSlotCount(args.lightPrograms ?? null);
   const programs = resolveLightPrograms(args.lightPrograms);
+  const ui = resolveLightConsoleUi(args.lightConsoleUi);
   return {
     channelCount: args.lightChannels.length,
     faderCount: faders.count ?? faders.faders.length,
     programCount: programSlotCount > 0 ? programSlotCount : programs.programs.length,
+    channelColumns: ui.channelColumns ?? DEFAULT_LIGHT_CHANNEL_COLUMNS,
   };
 }
 
@@ -134,12 +165,26 @@ export function applyLightConsoleLayoutToPlaybookData(
     lightChannels: string[];
     layout: LightConsoleLayoutCounts;
   },
-): Pick<PlaybookData, "lightChannels" | "lightFaders" | "lightPrograms" | "lightChannelRoles"> {
+): Pick<
+  PlaybookData,
+  "lightChannels" | "lightFaders" | "lightPrograms" | "lightChannelRoles" | "lightConsoleUi"
+> {
   const nextChannels = resizeLightChannels(args.lightChannels, args.layout.channelCount);
   return {
     lightChannels: nextChannels,
     lightFaders: resizeLightFaders(prev?.lightFaders, args.layout.faderCount),
-    lightPrograms: resizeLightPrograms(prev?.lightPrograms, args.layout.programCount),
+    lightPrograms: resizeLightPrograms(
+      prev?.lightPrograms,
+      args.layout.programCount,
+      args.layout.channelCount,
+    ),
+    lightConsoleUi: {
+      v: 1,
+      channelColumns: clampLightChannelColumns(
+        args.layout.channelColumns,
+        DEFAULT_LIGHT_CHANNEL_COLUMNS,
+      ),
+    },
     ...patchPlaybookDataForLightChannelsChange(prev, nextChannels),
   };
 }

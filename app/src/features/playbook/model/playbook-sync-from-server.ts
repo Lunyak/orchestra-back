@@ -123,9 +123,13 @@ export async function syncPlaybookFromServer(
       (Array.isArray(theaterLayouts) ? theaterLayouts : []).find((tl) =>
         syncRowMatchesPlaybook(tl, scene.id),
       ) ?? null;
+    const serverLayout =
+      normalizeTheaterLayoutFromServer(layoutRow) ?? DEFAULT_THEATER_LAYOUT;
+    // Live UI may keep a dirty local draft; serverShadow must stay server-only
+    // so later theaterLayout diffs (doors/recesses) still push.
     const normalizedLayout = resolveInitialTheaterLayout(
       effectiveProject,
-      normalizeTheaterLayoutFromServer(layoutRow),
+      serverLayout,
       DEFAULT_THEATER_LAYOUT,
     );
 
@@ -211,7 +215,7 @@ export async function syncPlaybookFromServer(
         serverShadow: {
           playbookData: minimalPlaybookData,
           scenes: nextScenesPayload,
-          theaterLayout: normalizedLayout,
+          theaterLayout: serverLayout,
           lightChannels: normalizedLightChannels,
         },
       }),

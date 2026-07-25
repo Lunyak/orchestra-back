@@ -19,8 +19,13 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AppEditorScriptSceneTitle } from "../../app-editor-menubar";
+import { subscribeScriptFormatSearchHighlight } from "../../app-editor-menubar/script-tokenize-formatting";
 import { markdownHeadingSectionBlocks } from "./markdownHeadingSectionBlocks";
 import { markdownHideKadrAnchors } from "./markdownHideKadrAnchors";
+import {
+  dispatchFormatSearchQuery,
+  markdownFormatSearchHighlight,
+} from "./markdownFormatSearchHighlight";
 import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
 import { orchestraEditorRichTokens } from "./orchestraEditorRichTokens";
 import { scriptMarkdownEditorSyntaxHighlighting } from "./scriptMarkdownEditorHighlight";
@@ -48,6 +53,8 @@ type Props = {
   lightChannels: string[];
   /** Клик по `[…](track:N)` / `[…](playlist:N)` в редакторе (числовой id). */
   onTrackLinkClick?: (trackId: number) => void;
+  /** Клик по лейблу [[РОЛЬ]] в редакторе. */
+  onRoleLabelClick?: (roleToken: string) => void;
   /** Карточки секций по `###` (режим notes / play / explication). */
   kadrSectionBlocks?: boolean;
   /** Вкладка «Текст»: лейблы [[РОЛЬ]] с настройками из settings. */
@@ -71,6 +78,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       accessToken,
       lightChannels,
       onTrackLinkClick,
+      onRoleLabelClick,
       kadrSectionBlocks = false,
       playTextMode = false,
       sceneTitle,
@@ -86,6 +94,8 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
     lightChannelsRef.current = lightChannels;
     const onTrackLinkClickRef = useRef(onTrackLinkClick);
     onTrackLinkClickRef.current = onTrackLinkClick;
+    const onRoleLabelClickRef = useRef(onRoleLabelClick);
+    onRoleLabelClickRef.current = onRoleLabelClick;
     const imageCtxRef = useRef({ projectSlug: "", accessToken: null as string | null });
     imageCtxRef.current = {
       projectSlug: String(projectSlug ?? ""),
@@ -164,6 +174,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
             () => onTrackLinkClickRef.current,
             () => imageCtxRef.current,
             () => playTextModeRef.current,
+            () => onRoleLabelClickRef.current,
           ),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           ph ? cmPlaceholder(ph) : [],
@@ -178,6 +189,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
             },
           }),
           scriptMarkdownCodemirrorTheme,
+          markdownFormatSearchHighlight,
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !suppressOnChangeRef.current) {
               onChangeRef.current(update.state.doc.toString());
@@ -189,12 +201,17 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       const view = new EditorView({ state, parent: host });
       viewRef.current = view;
 
+      const unsubscribeFormatSearch = subscribeScriptFormatSearchHighlight((query) => {
+        dispatchFormatSearchQuery(view, query);
+      });
+
       const sceneTitleEl = document.createElement("div");
       sceneTitleEl.className = "script-markdown-cm__scene-title-mount";
       view.scrollDOM.insertBefore(sceneTitleEl, view.contentDOM);
       setSceneTitleMount(sceneTitleEl);
 
       return () => {
+        unsubscribeFormatSearch();
         sceneTitleEl.remove();
         setSceneTitleMount(null);
         view.destroy();

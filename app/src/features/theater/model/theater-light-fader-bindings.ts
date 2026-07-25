@@ -197,7 +197,7 @@ export function applyFadersToSpotlightsForDisplay(
 }
 
 /**
- * 3D/превью: у каждого софита уровни F своего K (снимок program[K]).
+ * 3D/превью: у каждого софита уровни F своего K (снимок channels[K]).
  * Живая доска пульта — только для выбранного канала (liveConsoleChannel).
  */
 export function applyFadersToSpotlightsPerChannelDisplay(
@@ -225,7 +225,7 @@ export function applyFadersToSpotlightsPerChannelDisplay(
     (max, spotlight) => Math.max(max, readSpotlightChannel(spotlight) ?? 0),
     liveChannel ?? 0,
   );
-  const programs = resolveLightPrograms(lightPrograms, maxSpotChannel);
+  const programs = resolveLightPrograms(lightPrograms, maxSpotChannel, maxSpotChannel);
 
   return spotlights.map((spotlight) => {
     const spotChannel = readSpotlightChannel(spotlight);

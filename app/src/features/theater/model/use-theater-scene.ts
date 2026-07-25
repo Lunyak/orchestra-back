@@ -17,7 +17,6 @@ import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/sho
 import type {
   ScriptScene,
   TheaterLayout,
-  TheaterSpotlight,
 } from "../../../shared/types/script";
 import { resolveStageGrid } from "./theater-zone-grid";
 import { THEATER_HALL_TEMPLATES } from "./theater-hall-templates";
@@ -25,21 +24,22 @@ import { useTheaterViewPrefs } from "../state/use-theater-view-prefs";
 import { useTheaterHistory } from "../state/use-theater-history";
 import { useTheaterSelection } from "../state/use-theater-selection";
 import { useTheaterLayoutEditing } from "../state/use-theater-layout-editing";
-import { useTheaterSpotlights, cloneTheaterSpotlights } from "../state/use-theater-spotlights";
+import { useTheaterSpotlights } from "../state/use-theater-spotlights";
 import { useTheaterModels } from "../state/use-theater-models";
 import { useTheaterDecor } from "../state/use-theater-decor";
 import { useTheaterSceneOutliner } from "../state/use-theater-scene-outliner";
-import { useTheaterRehearsal } from "../state/use-theater-rehearsal";
 import { useTheaterHallLayout } from "../state/use-theater-hall-layout";
 import { useTheaterFloorPlan } from "../state/use-theater-floor-plan";
-import { useTheaterCameraBookmarks } from "../state/use-theater-camera-bookmarks";
 import { useTheaterKeyboardBindings } from "../state/use-theater-keyboard-bindings";
 import { buildTheaterViewModelSlices } from "../state/build-theater-view-model-slices";
 import { DEFAULT_THEATER_LAYOUT } from "./theater-defaults";
-import { formatLightCuesMarkdown } from "./theater-light-cues";
 import type { ActiveAlignGuide } from "./theater-align-guides";
+import { buildLightPlotFromSpotlights } from "./theater-light-channel-link";
 import { syncMountedSpotlights } from "./theater-truss-mounts";
-
+import {
+  applyTheaterSmokeMachineToScene,
+  readSceneSmokeMachineEnabled,
+} from "./theater-smoke-scene";
 export type UseTheaterSceneArgs = {
   projectName: string;
   theaterLayout?: TheaterLayout;
@@ -101,9 +101,6 @@ export function useTheaterScene({
     spotlightAimMode,
     setSpotlightAimMode,
     showSpotlights,
-    setShowSpotlights,
-    showOnlyActiveSpotlight,
-    setShowOnlyActiveSpotlight,
   } = prefs;
   const history = useTheaterHistory({
     projectName,
@@ -193,10 +190,6 @@ export function useTheaterScene({
   const [activeAlignGuides, setActiveAlignGuides] = useState<ActiveAlignGuide[]>(
     [],
   );
-  const [rehearsalSpotlights, setRehearsalSpotlights] = useState<
-    TheaterSpotlight[] | null
-  >(null);
-  const [showHiddenInOutliner, setShowHiddenInOutliner] = useState(true);
   const [decorActionMessage, setDecorActionMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -219,14 +212,12 @@ export function useTheaterScene({
     updateCurrentScene,
     recordTheaterHistory,
     layout,
-    gridStep,
     activeSpotlightId,
     multiSelectedSpotlightIds,
     setMultiSelectedSpotlightIds,
     updateLayout,
     setEditMode,
     setDecorActionMessage,
-    rehearsalSpotlights,
     lightFaders: playbookData?.lightFaders,
     lightPrograms: resolvedLightPrograms,
     consoleChannel: selectedLightSlot > 0 ? selectedLightSlot : undefined,
@@ -245,27 +236,13 @@ export function useTheaterScene({
     updateLayoutZoneGrid,
     removeSpotlight,
     cloneSpotlight,
-    aimSpotlightAtStage,
     addSpotlight,
     addRgbSpotlight,
-    addSpotlightsBatch,
-    layoutSpotlightsInHallGrid,
-    layoutSpotlightsBeforeAudience,
-    applySpotlightLayoutPreset,
-    assignSpotlightChannelsSequential,
-    spawnSpotlightsFromLayoutPreset,
-    aimSpotlightsAtStage,
-    alignSpotlightsSourceHeight,
-    snapAllSpotlightsToGrid,
     applyRgbColorToAll,
     enableSpotlightsByType,
     disableSpotlightsByType,
     blackoutAllSpotlights,
     fullLightAllSpotlights,
-    applySpotlightPreset,
-    syncSpotlightsFromLightPlot,
-    applyLightPlotChannelLabels,
-    syncLightPlotFromSpotlights,
     setSelectedSpotlightsVisibility,
     aimSelectedSpotlightsAtStage,
     removeSelectedSpotlights,
@@ -274,21 +251,6 @@ export function useTheaterScene({
     updateSpotlights,
     ensureSpotlights,
   } = spotlightsApi;
-
-  useEffect(() => {
-    if (!showOnlyActiveSpotlight) return;
-    const hasActiveVisibleSpotlight =
-      activeSpotlightId != null &&
-      visibleSpotlights.some((item) => item.id === activeSpotlightId);
-    if (!hasActiveVisibleSpotlight) {
-      setShowOnlyActiveSpotlight(false);
-    }
-  }, [
-    activeSpotlightId,
-    setShowOnlyActiveSpotlight,
-    showOnlyActiveSpotlight,
-    visibleSpotlights,
-  ]);
 
   const modelsApi = useTheaterModels({
     projectName,
@@ -333,7 +295,6 @@ export function useTheaterScene({
     setPendingSnapModelId: modelsApi.setPendingSnapModelId,
     activeModelId,
     setEditMode,
-    setActiveTab,
     decorActionMessage,
     setDecorActionMessage,
   });
@@ -356,8 +317,6 @@ export function useTheaterScene({
     updateModels,
     resolveModelSrc,
     copyModelsFromPreviousScene,
-    copyTheaterFromPreviousScene,
-    copyTheaterToNextScene,
     addModel,
     addBuiltinModel,
     addBuiltinModelAt,
@@ -390,8 +349,11 @@ export function useTheaterScene({
       (spotlight, index) => spotlight !== spotlights[index],
     );
     if (!hasChanges) return;
-    updateCurrentScene({ theaterSpotlights: syncedSpotlights });
-  }, [isDragging, models, spotlights, updateCurrentScene]);
+    updateCurrentScene({
+      theaterSpotlights: syncedSpotlights,
+      lightPlot: buildLightPlotFromSpotlights(syncedSpotlights, layout),
+    });
+  }, [isDragging, layout, models, spotlights, updateCurrentScene]);
 
   const {
     decorCatalogKey,
@@ -414,21 +376,12 @@ export function useTheaterScene({
     addDecorAt,
     enterDecorPlaceMode,
     exitDecorPlaceMode,
-    applyDecorSceneTemplate,
-    applyDecorSketchTemplate,
-    applyDecorTemplateByListId,
-    applyDecorTemplateJson,
     applyDecorTexturePreset,
     clearDecorTexture,
     copyDecorInventoryToClipboard,
     copyDecorToNextScene,
     exportDecorInventoryCsv,
     syncDecorInventoryToRequisites,
-    importDecorTemplateFromJson,
-    exportCurrentDecorAsJsonTemplate,
-    decorTemplateList,
-    replaceDecorSceneTemplate,
-    saveDecorTemplatesToProject,
     setDecorTextureModeForTarget,
     setDecorTextureRepeatForTarget,
     uploadDecorTextureFile,
@@ -468,13 +421,6 @@ export function useTheaterScene({
     gridStep,
     setDecorActionMessage,
   });
-
-  const {
-    cameraBookmarks,
-    saveCameraBookmark,
-    applyCameraBookmark,
-    deleteCameraBookmark,
-  } = useTheaterCameraBookmarks({ projectName, setDecorActionMessage });
 
   const {
     pulseTarget,
@@ -530,42 +476,6 @@ export function useTheaterScene({
     setActiveAlignGuides,
   });
 
-  const { sceneRehearsalMode, setSceneRehearsalMode } = useTheaterRehearsal({
-    currentPage,
-    currentScene,
-    displaySpotlights,
-    setRehearsalSpotlights,
-    setSpectaclePreviewMode,
-  });
-
-  const copyFromPreviousScene = () => {
-    if (!currentScene || currentPage <= 0) return;
-    const previous = scenes[currentPage - 1];
-    const source = previous?.theaterSpotlights ?? [];
-    const cloned = cloneTheaterSpotlights(source);
-    updateSpotlights(cloned);
-    if (cloned.length > 0) {
-      updateCurrentScene({ theaterActiveSpotlightId: cloned[0].id });
-    }
-  };
-
-  const copyLightCuesToClipboard = useCallback(
-    async (lightChannels?: string[]) => {
-      const text = formatLightCuesMarkdown(currentScene?.lightCues ?? [], {
-        sceneTitle: currentScene?.title?.trim() || undefined,
-        durationMin: currentScene?.durationMin,
-        lightChannels,
-      });
-      try {
-        await navigator.clipboard.writeText(text);
-        setDecorActionMessage("Таймлайн cue скопирован");
-      } catch {
-        setDecorActionMessage("Не удалось скопировать cue");
-      }
-    },
-    [currentScene?.durationMin, currentScene?.lightCues, currentScene?.title],
-  );
-
   useTheaterKeyboardBindings({
     projectName,
     layout,
@@ -604,6 +514,16 @@ export function useTheaterScene({
     clearSceneSelection,
   });
 
+
+  const sceneSmokeEnabled = readSceneSmokeMachineEnabled(currentScene);
+  const setSceneSmokeMachineEnabled = useCallback(
+    (enabled: boolean) => {
+      if (!currentScene) return;
+      updateCurrentScene(applyTheaterSmokeMachineToScene(currentScene, enabled));
+      if (enabled) prefs.setSmokePanelOpen(true);
+    },
+    [currentScene, prefs, updateCurrentScene],
+  );
 
   const slices = buildTheaterViewModelSlices({
     prefs,
@@ -667,13 +587,11 @@ export function useTheaterScene({
     showControls,
     setShowControls,
     setSwapTheaterPanels,
-    showHiddenInOutliner,
-    setShowHiddenInOutliner,
     hallTemplates: THEATER_HALL_TEMPLATES,
     decorActionMessage,
-    copyFromPreviousScene,
-    copyLightCuesToClipboard,
     ...prefs,
+    smokeMachineEnabled: sceneSmokeEnabled,
+    setSmokeMachineEnabled: setSceneSmokeMachineEnabled,
     undoTheater,
     redoTheater,
     canUndoTheater,
@@ -699,10 +617,6 @@ export function useTheaterScene({
     fitLayoutToSeatCount,
     fitLayoutFromOutline,
     applyTargetSeatCount,
-    cameraBookmarks,
-    saveCameraBookmark,
-    applyCameraBookmark,
-    deleteCameraBookmark,
     pulseTarget,
     sceneOutlinerGroups,
     selectAllVisibleInEditMode,
@@ -716,7 +630,5 @@ export function useTheaterScene({
     toggleSceneOutlinerVisibility,
     setSceneOutlinerGroupVisibility,
     toggleActiveSceneVisibility,
-    sceneRehearsalMode,
-    setSceneRehearsalMode,
   };
 }

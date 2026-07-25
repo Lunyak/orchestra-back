@@ -85,6 +85,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     showPlaylistSidebar,
     showTheaterControls,
     scenes,
+    theaterImmersiveMode,
+    setTheaterImmersiveMode,
     theaterOutlinerHost,
     theaterLayout,
     togglePanels,
@@ -143,7 +145,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     );
   }
 
-  const forceHidePlaylistPanel = isTheaterView && shouldSwapPanels;
+  const forceHidePlaylistPanel =
+    (isTheaterView && shouldSwapPanels) || (isTheaterView && theaterImmersiveMode);
   const playlistPanelHidden =
     forceHidePlaylistPanel ||
     (!isMobile && !showPlaylistSidebar) ||
@@ -175,7 +178,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     </div>
   ) : null;
 
-  const showTheaterSettingsHost = isTheaterView && shouldSwapPanels;
+  const showTheaterSettingsHost =
+    isTheaterView && shouldSwapPanels && !theaterImmersiveMode;
   const theaterHostMounted =
     showTheaterSettingsHost && (isMobile || showTheaterControls);
 
@@ -204,19 +208,19 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   ) : null;
 
   /** Сцены на 3D-театре — только в режиме «Музыка и сцены». */
-  const theaterRehearsalMode = isTheaterView && !shouldSwapPanels;
+  const theaterRehearsalMode =
+    isTheaterView && !shouldSwapPanels && !theaterImmersiveMode;
   const showScenesSidebar =
-    shouldShowScenesSidebar && (!isTheaterView || theaterRehearsalMode);
+    shouldShowScenesSidebar &&
+    !theaterImmersiveMode &&
+    (!isTheaterView || theaterRehearsalMode);
 
   const stepsSidebarVisible =
     showScenesSidebar &&
     ((isMobile && mobileScenesOpen) || (!isMobile && !isScenesCollapsed));
 
-  const showDirectionSwitch =
-    activeView === "script" ||
-    activeView === "light-plot" ||
-    activeView === "sufer" ||
-    activeView === "theater";
+  const showModeSwitch =
+    activeView === "script" || activeView === "light-plot";
 
   const stepsSidebarNode = stepsSidebarVisible ? (
       <div
@@ -262,7 +266,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
         playlistNode
       )}
       <div className="app-content">
-        {showDirectionSwitch ? <SpectacleDirectionSwitch /> : null}
+        {showModeSwitch ? <SpectacleDirectionSwitch /> : null}
         <OfflinePackStatus />
         {showHeaderSounds && !compactMainChrome && !isMobile && (
           <div className="sounds-bar">
@@ -292,6 +296,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
                 onTogglePanels={togglePanels}
                 outlinerHost={theaterHostMounted ? theaterOutlinerHost : null}
                 controlsInPanel={shouldSwapPanels}
+                immersiveMode={theaterImmersiveMode}
+                onImmersiveModeChange={setTheaterImmersiveMode}
               />
             </Suspense>
           )}

@@ -15,6 +15,7 @@ import {
   THEATER_SPOTLIGHT_PENUMBRA,
 } from "../../model/theater-scene-lighting";
 import { StageSpotlightModel } from "./StageSpotlightModel";
+import { SpotlightSmokeBeam } from "./SpotlightSmokeBeam";
 
 export const SpotlightItem = ({
   config,
@@ -32,6 +33,8 @@ export const SpotlightItem = ({
   showHelpers,
   showSpotlightLabels = false,
   showGuideLine = true,
+  smokeBeamVisible = false,
+  smokeSaturation = 1,
   onTargetChange,
   onPositionChange,
   onDraggingChange,
@@ -57,6 +60,8 @@ export const SpotlightItem = ({
   /** K / K+F над корпусом софита (все видимые в режиме софитов). */
   showSpotlightLabels?: boolean;
   showGuideLine?: boolean;
+  smokeBeamVisible?: boolean;
+  smokeSaturation?: number;
   onTargetChange: (id: number, next: [number, number, number]) => void;
   onPositionChange: (id: number, next: [number, number, number]) => void;
   onDraggingChange: (value: boolean) => void;
@@ -226,6 +231,16 @@ export const SpotlightItem = ({
           color={config.color || tc("--color-warning")}
         />
       )}
+      {smokeBeamVisible && isEnabled ? (
+        <SpotlightSmokeBeam
+          position={displayPosition}
+          target={displayTarget}
+          angleRad={angle}
+          color={config.color || tc("--color-warning")}
+          uiIntensity={uiIntensity}
+          smokeSaturation={smokeSaturation}
+        />
+      ) : null}
       {showGuideLine && helperVisible && isEnabled ? (
         <primitive object={beamLineObject} raycast={() => null} />
       ) : null}

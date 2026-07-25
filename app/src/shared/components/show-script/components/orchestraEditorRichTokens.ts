@@ -1,5 +1,6 @@
 import {
   EditorSelection,
+  Prec,
   RangeSetBuilder,
   Transaction,
   type EditorState,
@@ -10,6 +11,7 @@ import {
   Decoration,
   DecorationSet,
   EditorView,
+  keymap,
   ViewPlugin,
   WidgetType,
   type ViewUpdate,
@@ -134,6 +136,105 @@ function selectionInsideToken(
 ): boolean {
   if (!sel.empty) return sel.from < to && sel.to > from;
   return sel.from > from && sel.from < to;
+}
+
+type EditableTokenRange = { from: number; to: number; text: string };
+
+function collectEditableTokensOnLine(
+  state: EditorState,
+  pos: number,
+): EditableTokenRange[] {
+  const line = state.doc.lineAt(pos);
+  if (looksLikeFenceLine(line.text)) return [];
+  const out: EditableTokenRange[] = [];
+
+  const pushMatch = (index: number, raw: string) => {
+    const from = line.from + index;
+    const to = from + raw.length;
+    if (to - from < 2) return;
+    out.push({ from, to, text: raw });
+  };
+
+  ORCH_TOKEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ORCH_TOKEN_RE.exec(line.text)) !== null) {
+    pushMatch(m.index, m[0]);
+  }
+
+  TRACK_OR_PLAYLIST_LINK_RE.lastIndex = 0;
+  let tm: RegExpExecArray | null;
+  while ((tm = TRACK_OR_PLAYLIST_LINK_RE.exec(line.text)) !== null) {
+    pushMatch(tm.index, tm[0]);
+  }
+
+  return out;
+}
+
+/** Каретка сразу после чипа → позиция внутри токена (правка `[[РОЛЬ]]`). */
+function caretInsideFromRight(token: EditableTokenRange): number {
+  const { from, to, text } = token;
+  if (
+    (text.startsWith("[[") && text.endsWith("]]")) ||
+    (text.startsWith("{{") && text.endsWith("}}"))
+  ) {
+    return Math.max(from + 1, to - 2);
+  }
+  return Math.max(from + 1, to - 1);
+}
+
+/** Каретка сразу перед чипом → позиция внутри токена. */
+function caretInsideFromLeft(token: EditableTokenRange): number {
+  const { from, to, text } = token;
+  if (
+    (text.startsWith("[[") && text.endsWith("]]")) ||
+    (text.startsWith("{{") && text.endsWith("}}"))
+  ) {
+    return Math.min(to - 1, from + 2);
+  }
+  return Math.min(to - 1, from + 1);
+}
+
+function enterEditableTokenKeymap(): Extension {
+  return Prec.highest(
+    keymap.of([
+      {
+        key: "ArrowLeft",
+        run: (view) => {
+          const sel = view.state.selection.main;
+          if (!sel.empty) return false;
+          const token = collectEditableTokensOnLine(view.state, sel.head).find(
+            (item) => item.to === sel.head,
+          );
+          if (!token) return false;
+          const inside = caretInsideFromRight(token);
+          if (!(inside > token.from && inside < token.to)) return false;
+          view.dispatch({
+            selection: EditorSelection.cursor(inside),
+            scrollIntoView: true,
+          });
+          return true;
+        },
+      },
+      {
+        key: "ArrowRight",
+        run: (view) => {
+          const sel = view.state.selection.main;
+          if (!sel.empty) return false;
+          const token = collectEditableTokensOnLine(view.state, sel.head).find(
+            (item) => item.from === sel.head,
+          );
+          if (!token) return false;
+          const inside = caretInsideFromLeft(token);
+          if (!(inside > token.from && inside < token.to)) return false;
+          view.dispatch({
+            selection: EditorSelection.cursor(inside),
+            scrollIntoView: true,
+          });
+          return true;
+        },
+      },
+    ]),
+  );
 }
 
 function looksLikeFenceLine(text: string): boolean {
@@ -317,6 +418,7 @@ class OrchestraChipWidget extends WidgetType {
   constructor(
     readonly raw: string,
     readonly spec: ChipSpec,
+    readonly getOnRoleClick?: () => ((roleToken: string) => void) | undefined,
   ) {
     super();
   }
@@ -334,6 +436,27 @@ class OrchestraChipWidget extends WidgetType {
   }
 
   toDOM() {
+    const isRoleChip = this.spec.classNames.includes("markdown-speaker-label");
+    const roleToken = isRoleChip ? String(this.spec.title ?? "").trim() : "";
+
+    if (isRoleChip && roleToken) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      for (const c of this.spec.classNames.split(/\s+/)) {
+        if (c) btn.classList.add(c);
+      }
+      btn.classList.add("_");
+      btn.textContent = this.spec.label;
+      btn.title = this.spec.title;
+      if (this.spec.style) btn.setAttribute("style", this.spec.style);
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.getOnRoleClick?.()?.(roleToken);
+      });
+      return btn;
+    }
+
     const el = document.createElement("span");
     for (const c of this.spec.classNames.split(/\s+/)) {
       if (c) el.classList.add(c);
@@ -345,7 +468,16 @@ class OrchestraChipWidget extends WidgetType {
     return el;
   }
 
-  ignoreEvent() {
+  ignoreEvent(event: Event) {
+    if (this.spec.classNames.includes("markdown-speaker-label")) {
+      return (
+        event.type === "mousedown" ||
+        event.type === "mouseup" ||
+        event.type === "click" ||
+        event.type === "pointerdown" ||
+        event.type === "pointerup"
+      );
+    }
     return false;
   }
 }
@@ -554,6 +686,7 @@ function buildRichDecorations(
   state: EditorState,
   lightChannels: string[],
   getOnTrackLinkClick: () => ((trackId: number) => void) | undefined,
+  getOnRoleClick: () => ((roleToken: string) => void) | undefined,
   getImageCtx: () => EditorImageCtx,
   getPlayTextMode: () => boolean,
   view: EditorView,
@@ -617,7 +750,7 @@ function buildRichDecorations(
       tokenOverlays.push({
         from,
         to,
-        widget: new OrchestraChipWidget(m[0], spec),
+        widget: new OrchestraChipWidget(m[0], spec, getOnRoleClick),
       });
     }
 
@@ -723,6 +856,7 @@ export function orchestraEditorRichTokens(
   getOnTrackLinkClick: () => ((trackId: number) => void) | undefined,
   getImageCtx: () => EditorImageCtx,
   getPlayTextMode: () => boolean,
+  getOnRoleClick: () => ((roleToken: string) => void) | undefined = () => undefined,
 ): Extension {
   const plugin = ViewPlugin.fromClass(
     class {
@@ -742,6 +876,7 @@ export function orchestraEditorRichTokens(
           state,
           ch,
           getOnTrackLinkClick,
+          getOnRoleClick,
           getImageCtx,
           getPlayTextMode,
           this.view,
@@ -798,6 +933,6 @@ export function orchestraEditorRichTokens(
     },
   );
 
-  return [plugin];
+  return [plugin, enterEditableTokenKeymap()];
 }
 

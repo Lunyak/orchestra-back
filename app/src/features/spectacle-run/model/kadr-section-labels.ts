@@ -1,9 +1,10 @@
 import type { MarkdownKadrSection } from "../../theater/model/light-kadrs";
 
-export type KadrRunLabelType = "blackout" | "smoke";
+export type KadrRunLabelType = "blackout" | "smoke" | "smoke-machine";
 
 export type KadrRunLabel = {
   type: KadrRunLabelType;
+  /** Для blackout/smoke; у smoke-machine не используется. */
   seconds: number;
 };
 
@@ -12,6 +13,7 @@ export const KADR_LABELS_LINE_PREFIX = "- **Метки**:";
 const LABELS_KADR_LINE_RE = /^-\s*\*\*Метки\*\*:\s*([^\n]*)/im;
 const TOKEN_BLACKOUT_SEC_RE = /\{\{\s*blackout-sec\s*:\s*(\d+)\s*}}/gi;
 const TOKEN_SMOKE_SEC_RE = /\{\{\s*smoke-sec\s*:\s*(\d+)\s*}}/gi;
+const TOKEN_SMOKE_MACHINE_RE = /\{\{\s*smoke-machine\s*}}/gi;
 
 function parseSeconds(raw: string | undefined): number | null {
   const n = Math.trunc(Number(raw) || 0);
@@ -20,12 +22,17 @@ function parseSeconds(raw: string | undefined): number | null {
 
 export function formatKadrRunLabelText(label: KadrRunLabel): string {
   if (label.type === "blackout") return `Блекаут ${label.seconds} с`;
+  if (label.type === "smoke-machine") return "Дым-машина";
   return `Дым ${label.seconds} с`;
 }
 
 export function formatKadrLabelsLine(labels: KadrRunLabel[]): string {
   const parts: string[] = [];
   for (const label of labels) {
+    if (label.type === "smoke-machine") {
+      parts.push("{{smoke-machine}}");
+      continue;
+    }
     const sec = Math.max(1, Math.trunc(label.seconds) || 1);
     if (label.type === "blackout") parts.push(`{{blackout-sec:${sec}}}`);
     if (label.type === "smoke") parts.push(`{{smoke-sec:${sec}}}`);
@@ -41,6 +48,7 @@ export function parseKadrLabelsFromBody(body: string): KadrRunLabel[] {
   const line = match[1];
   TOKEN_BLACKOUT_SEC_RE.lastIndex = 0;
   TOKEN_SMOKE_SEC_RE.lastIndex = 0;
+  TOKEN_SMOKE_MACHINE_RE.lastIndex = 0;
 
   const labels: KadrRunLabel[] = [];
 
@@ -51,6 +59,10 @@ export function parseKadrLabelsFromBody(body: string): KadrRunLabel[] {
   const smokeMatch = TOKEN_SMOKE_SEC_RE.exec(line);
   const smokeSec = parseSeconds(smokeMatch?.[1]);
   if (smokeSec != null) labels.push({ type: "smoke", seconds: smokeSec });
+
+  if (TOKEN_SMOKE_MACHINE_RE.test(line)) {
+    labels.push({ type: "smoke-machine", seconds: 0 });
+  }
 
   return labels;
 }
@@ -95,6 +107,7 @@ export function upsertKadrLabelsInSection(
 export function buildKadrRunLabelsFromDraft(args: {
   blackoutDurationSec: number | null;
   smokeDurationSec: number | null;
+  smokeMachine?: boolean;
 }): KadrRunLabel[] {
   const labels: KadrRunLabel[] = [];
   const blackoutSec = parseSeconds(
@@ -105,5 +118,6 @@ export function buildKadrRunLabelsFromDraft(args: {
   );
   if (blackoutSec != null) labels.push({ type: "blackout", seconds: blackoutSec });
   if (smokeSec != null) labels.push({ type: "smoke", seconds: smokeSec });
+  if (args.smokeMachine) labels.push({ type: "smoke-machine", seconds: 0 });
   return labels;
 }

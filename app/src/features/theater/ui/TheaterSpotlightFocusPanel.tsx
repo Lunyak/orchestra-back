@@ -19,14 +19,21 @@ import {
   LIGHT_TRUSS_6M_MOUNT_POINTS,
 } from "../model/theater-truss-mounts";
 
+function VisibilityIcon({ hidden }: { hidden: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.5" />
+      {hidden ? <path d="M4 4l16 16" /> : null}
+    </svg>
+  );
+}
+
 export type TheaterSpotlightFocusPanelProps = {
   spotlight: TheaterSpotlight;
   dragMode: "target" | "source";
-  showOnlyActive: boolean;
-  onShowOnlyActiveChange: (value: boolean) => void;
   onToggleEnabled: () => void;
   onToggleHidden: () => void;
-  onAimAtStage: () => void;
   onPickDragMode: (mode: "target" | "source") => void;
   onAngleChange: (angleDeg: number) => void;
   onIntensityChange: (intensity: number) => void;
@@ -50,11 +57,8 @@ export type TheaterSpotlightFocusPanelProps = {
 export function TheaterSpotlightFocusPanel({
   spotlight,
   dragMode,
-  showOnlyActive,
-  onShowOnlyActiveChange,
   onToggleEnabled,
   onToggleHidden,
-  onAimAtStage,
   onPickDragMode,
   onAngleChange,
   onIntensityChange,
@@ -165,6 +169,30 @@ export function TheaterSpotlightFocusPanel({
         <span className="theater-focus-panel__tech">
           {formatSpotlightChannelFaderShort(spotlight)}
         </span>
+        <button
+          type="button"
+          className={cn(
+            "theater-focus-panel__power",
+            enabled && "theater-focus-panel__power--on",
+          )}
+          aria-label={enabled ? "Выключить" : "Включить"}
+          title={enabled ? "Выключить" : "Включить"}
+          onClick={onToggleEnabled}
+        >
+          <span className="theater-spotlight-power-dot" />
+        </button>
+        <button
+          type="button"
+          className={cn(
+            "theater-focus-panel__visibility",
+            hidden && "theater-focus-panel__visibility--hidden",
+          )}
+          aria-label={hidden ? "Показать софит" : "Скрыть софит"}
+          title={hidden ? "Показать софит" : "Скрыть софит"}
+          onClick={onToggleHidden}
+        >
+          <VisibilityIcon hidden={hidden} />
+        </button>
       </div>
       <div className="theater-model-context-menu__row">
         <button
@@ -274,38 +302,6 @@ export function TheaterSpotlightFocusPanel({
           className={cn(
             "theater-model-context-menu__item",
             "theater-model-context-menu__item--compact",
-            enabled && "theater-model-context-menu__item--active",
-          )}
-          onClick={onToggleEnabled}
-        >
-          {enabled ? "Вкл" : "Выкл"}
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "theater-model-context-menu__item",
-            "theater-model-context-menu__item--compact",
-            !hidden && "theater-model-context-menu__item--active",
-          )}
-          onClick={onToggleHidden}
-        >
-          {hidden ? "3D скрыт" : "3D виден"}
-        </button>
-      </div>
-      <label className="theater-focus-panel__check">
-        <input
-          type="checkbox"
-          checked={showOnlyActive}
-          onChange={(event) => onShowOnlyActiveChange(event.target.checked)}
-        />
-        <span>Только этот в 3D</span>
-      </label>
-      <div className="theater-model-context-menu__row">
-        <button
-          type="button"
-          className={cn(
-            "theater-model-context-menu__item",
-            "theater-model-context-menu__item--compact",
             dragMode === "source" && "theater-model-context-menu__item--active",
           )}
           onClick={() => onPickDragMode("source")}
@@ -326,13 +322,6 @@ export function TheaterSpotlightFocusPanel({
           Цель
         </button>
       </div>
-      <button
-        type="button"
-        className="theater-model-context-menu__item"
-        onClick={onAimAtStage}
-      >
-        На сцену
-      </button>
       <TheaterRangeField
         label="Угол"
         min={5}

@@ -90,6 +90,9 @@ pull-minio: ## Зеркало бакета MinIO с VPS в локальный (�
 	@chmod +x ./scripts/pull-minio-from-server.sh 2>/dev/null || true
 	@./scripts/pull-minio-from-server.sh
 
+push-theater-assets: ## Залить web/public/theater → MinIO (prefix theater/); нужен npm ci в back/
+	@node ./scripts/push-theater-assets-to-minio.cjs
+
 restore-db: ## Восстановить дамп в локальный postgres: make restore-db DUMP=./backups/file.dump
 	@test -n "$(DUMP)" || (echo "$(RED)Укажите DUMP=путь/к/файлу.dump$(NC)"; exit 1)
 	@chmod +x ./scripts/restore-local-db.sh 2>/dev/null || true

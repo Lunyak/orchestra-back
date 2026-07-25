@@ -1,5 +1,5 @@
+import { LabeledToggle } from "../../../../shared/core/labeled-toggle/LabeledToggle";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
-import { TheaterEditorMenubarToggle } from "./TheaterEditorMenubarToggle";
 
 export function TheaterEditorMenubarWallsSubmenu({ vm }: { vm: TheaterSceneViewModel }) {
   return (
@@ -8,14 +8,14 @@ export function TheaterEditorMenubarWallsSubmenu({ vm }: { vm: TheaterSceneViewM
         СТЕНЫ
       </span>
       <div className="theater-editor-menubar__submenu" role="group" aria-label="Стены">
-        <TheaterEditorMenubarToggle
+        <LabeledToggle
           checked={vm.wallsHideFromCamera}
           disabled={vm.wallsHidden}
           onChange={vm.setWallsHideFromCamera}
         >
           Скрыть перед камерой
-        </TheaterEditorMenubarToggle>
-        <TheaterEditorMenubarToggle
+        </LabeledToggle>
+        <LabeledToggle
           checked={vm.wallsOpaque}
           disabled={vm.wallsHidden}
           onChange={(checked) => {
@@ -24,8 +24,8 @@ export function TheaterEditorMenubarWallsSubmenu({ vm }: { vm: TheaterSceneViewM
           }}
         >
           Непрозрачные
-        </TheaterEditorMenubarToggle>
-        <TheaterEditorMenubarToggle
+        </LabeledToggle>
+        <LabeledToggle
           checked={vm.wallsHidden}
           onChange={(checked) => {
             vm.setWallsHidden(checked);
@@ -33,7 +33,7 @@ export function TheaterEditorMenubarWallsSubmenu({ vm }: { vm: TheaterSceneViewM
           }}
         >
           Скрыть все
-        </TheaterEditorMenubarToggle>
+        </LabeledToggle>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import {
 } from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
 import { usePlaybook } from "../../../../features/playbook";
+import { useProjectRolesQuery } from "../../../../features/project/api/project-api";
 import {
   initShowScriptMarkdownUi,
   loadSceneScriptMarkdownMeta,
@@ -24,6 +25,7 @@ import { ScriptMarkdownCodemirror, type ScriptMarkdownEditorHandle } from "./Scr
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
 import { ScriptMarkdownToolbar } from "./ScriptMarkdownToolbar";
 import { ShowScriptMarkdownToc } from "./ShowScriptMarkdownToc";
+import { normalizeRoleToken } from "./markdown-preview-kadr-parsing";
 import { useShowScriptLightKadrsSync } from "../hooks/useShowScriptLightKadrsSync";
 import { useShowScriptMarkdownAnnotations } from "../hooks/useShowScriptMarkdownAnnotations";
 import { useShowScriptMarkdownInsert } from "../hooks/useShowScriptMarkdownInsert";
@@ -86,6 +88,10 @@ export function ShowScriptMarkdownSection({
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const { playbookData } = usePlaybook();
+  const { data: rolesRes } = useProjectRolesQuery(projectSlug, {
+    skip: !projectSlug,
+  });
+  const roles = rolesRes?.roles ?? [];
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const playbookDataRevision = useAppSelector((s) => s.playbook.playbookDataRevision);
   const serverShadowRevision = useAppSelector((s) => s.playbook.serverShadowRevision);
@@ -233,6 +239,25 @@ export function ShowScriptMarkdownSection({
     [currentScene, updateSceneField],
   );
 
+  const handleRoleLabelClick = useCallback(
+    (roleToken: string) => {
+      const token = normalizeRoleToken(roleToken);
+      if (!token) return;
+      const match =
+        roles.find((role) => normalizeRoleToken(String(role?.title ?? "")) === token) ??
+        roles.find((role) => normalizeRoleToken(String(role?.key ?? "")) === token) ??
+        roles.find((role) =>
+          (Array.isArray(role?.aliases) ? role.aliases : []).some(
+            (alias) => normalizeRoleToken(String(alias ?? "")) === token,
+          ),
+        );
+      const roleId = match?.id != null ? String(match.id) : "";
+      if (!roleId) return;
+      navigate(`/role-workbook/${encodeURIComponent(roleId)}`);
+    },
+    [navigate, roles],
+  );
+
   const markdownEditorProps = currentScene
     ? {
         ref: markdownRef,
@@ -245,6 +270,7 @@ export function ShowScriptMarkdownSection({
         accessToken,
         lightChannels,
         onTrackLinkClick,
+        onRoleLabelClick: handleRoleLabelClick,
         onChange: (next: string) => updateSceneField(currentScene.id, activeMarkdownField, next),
         onClipboardImagePaste: handleClipboardImagePaste,
         sceneTitle: currentScene.title ?? "",

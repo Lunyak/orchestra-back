@@ -44,14 +44,14 @@ html:not([data-theme]) {
   --color-border-dashed: #4b5563;
   --color-border-accent: rgba(14, 15, 15, 0.15);
 
-  /* Нативные поля (.native-select / .native-text-input) — тот же тон, что карточки и list-item */
-  --field-control-bg: rgba(29, 32, 33, 0.97);
-  --field-control-bg-hover: #333b52;
-  --field-control-border: rgba(255, 255, 255, 0.11);
-  --field-control-border-hover: rgba(231, 138, 78, 0.4);
-  --field-control-border-focus: rgba(231, 138, 78, 0.72);
-  --field-control-focus-ring: rgba(231, 138, 78, 0.28);
-  --field-control-inset: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* Нативные поля (.native-select / .native-text-input) — без заливки, компактные */
+  --field-control-bg: transparent;
+  --field-control-bg-hover: transparent;
+  --field-control-border: transparent;
+  --field-control-border-hover: transparent;
+  --field-control-border-focus: transparent;
+  --field-control-focus-ring: transparent;
+  --field-control-inset: none;
   --field-control-text: var(--color-text-lighter);
   /* стрелка в цвете подписей/лейблов как на остальных UI */
   --field-control-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23a9b664' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -403,10 +403,10 @@ html:not([data-theme]) {
 
   /* Нативные поля — размеры (цвета задаются темой) */
   --field-control-radius: 10px;
-  --field-control-padding-y: 8px;
-  --field-control-padding-x: 12px;
-  --field-control-font-size: var(--font-size-md);
-  --field-control-min-height: 38px;
+  --field-control-padding-y: 3px;
+  --field-control-padding-x: 8px;
+  --field-control-font-size: var(--font-size-sm);
+  --field-control-min-height: 26px;
 
   /* Border radius */
   --radius-xs: 4px;

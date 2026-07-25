@@ -55,9 +55,17 @@ export function LightConsolePanel({
         programs={vm.programs}
         spotlights={spotlights}
         consoleChannel={vm.selectedLightSlot > 0 ? vm.selectedLightSlot : undefined}
+        channelColumns={layoutSettings.layout.channelColumns}
         onSelectChannel={vm.selectChannel}
         onSelectProgram={vm.selectProgram}
         onOpenSettings={canEditLayout ? layoutSettings.openSettings : undefined}
+        onSaveActiveProgram={
+          canEditLayout
+            ? () => {
+                vm.saveProgramSnapshot();
+              }
+            : undefined
+        }
         onPatchFader={
           readOnly
             ? undefined

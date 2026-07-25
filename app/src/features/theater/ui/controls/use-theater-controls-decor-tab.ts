@@ -19,7 +19,6 @@ export function useTheaterControlsDecorTab(vm: TheaterSceneViewModel) {
   const modelSelectOptions = useTheaterControlsModelsTab(vm);
   const historyTx = useTheaterControlsHistoryTx(vm);
   const decorTextureInputRef = useRef<HTMLInputElement>(null);
-  const decorTemplateInputRef = useRef<HTMLInputElement>(null);
 
   const draftDecorSize = vm.decorDraftSize ?? vm.activeDecorPreset.defaultSize;
   const draftDecorColor = vm.decorDraftColor ?? vm.activeDecorPreset.defaultColor;
@@ -69,7 +68,6 @@ export function useTheaterControlsDecorTab(vm: TheaterSceneViewModel) {
     modelSelectOptions,
     historyTx,
     decorTextureInputRef,
-    decorTemplateInputRef,
     draftDecorSize,
     draftDecorColor,
     activeParametricSize,

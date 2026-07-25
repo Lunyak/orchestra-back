@@ -170,6 +170,17 @@ export function SpectacleRunToolbarActions() {
         </button>
       ) : null}
 
+      {run.canCopyKadrToNext ? (
+        <button
+          type="button"
+          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--copy-scene"
+          title="Скопировать свет текущей картины на следующую (техсобытие)"
+          onClick={run.copyCurrentKadrToNext}
+        >
+          → след. картина
+        </button>
+      ) : null}
+
       {run.canAddKadr ? (
         <button
           type="button"

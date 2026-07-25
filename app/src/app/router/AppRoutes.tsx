@@ -2,19 +2,16 @@ import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import {
   AppEditorMenubar,
   AppEditorMenubarProvider,
-  AppEditorScriptFormattingMenu,
   AppEditorScriptModeNav,
   AppEditorScriptPanelsNav,
   useAppEditorMenubarActionsRender,
-  useAppEditorViewMenuRender,
-  requestScriptTokenizeMatches,
-  type ScriptTokenizeMode,
 } from "@shared/components/app-editor-menubar";
 import { useIsMobile } from "@shared/hooks/useIsMobile";
 import { PlaylistSidebar } from "@shared/components/playlist-sidebar/PlaylistSidebar";
 import { useAppDispatch, useAppSelector } from "@shared/store/hooks";
-import { Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { FormatPlayTextModal } from "../../features/play-format/ui/FormatPlayTextModal";
+import { subscribeOpenFormatPlay } from "../../features/spectacle/model/format-play-request";
 import { useLocation } from "react-router-dom";
 import { useProject } from "../../features/project";
 import { usePlaybook } from "../../features/playbook";
@@ -102,12 +99,7 @@ function AppRoutesContent() {
     );
   }, [annotationsMode, dispatch, isEditing, projectName]);
 
-  const handleTokenizeMatches = useCallback(
-    (query: string, mode: ScriptTokenizeMode) => {
-      return requestScriptTokenizeMatches(query, mode)?.count ?? 0;
-    },
-    [],
-  );
+  useEffect(() => subscribeOpenFormatPlay(() => setFormatPlayModalOpen(true)), []);
 
   const handleTogglePlayOriginal = useCallback(() => {
     if (!projectName) return;
@@ -133,11 +125,6 @@ function AppRoutesContent() {
 
   const kadrMarkdownModes =
     markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
-
-  const canFormatPlayText =
-    kadrMarkdownModes &&
-    Boolean(currentScene) &&
-    !(markdownMode === "play" && playOriginalMode);
 
   const formatPlaySourceText = String(activeMarkdown ?? "");
 
@@ -219,20 +206,6 @@ function AppRoutesContent() {
     setMobilePlaylistOpen,
     toggleMobileScenes,
   ]);
-
-  useAppEditorViewMenuRender(
-    "script-markdown-menu",
-    0,
-    () =>
-      showScriptMainChrome && currentScene ? (
-        <AppEditorScriptFormattingMenu
-          disabled={!isEditing || !kadrMarkdownModes}
-          formatPlayDisabled={!canFormatPlayText}
-          onOpenFormatPlay={() => setFormatPlayModalOpen(true)}
-          onTokenizeMatches={handleTokenizeMatches}
-        />
-      ) : null,
-  );
 
   useAppEditorMenubarActionsRender(
     "script-mode-nav",

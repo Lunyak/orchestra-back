@@ -811,10 +811,7 @@
 }
 
 .markdown-preview.markdown-preview--kadr {
-  padding:
-    var(--script-markdown-content-padding-top)
-    var(--script-markdown-content-padding-x)
-    var(--script-markdown-content-padding-bottom);
+  padding: 0 0 var(--script-markdown-content-padding-bottom);
   background: var(--color-bg-primary);
   box-sizing: border-box;
   display: flex;
@@ -2263,11 +2260,14 @@
 .markdown-speaker-label {
   display: inline-flex;
   align-items: center;
+  margin: 0;
   padding: 0 6px;
+  border: 0;
   /* border-radius: 999px; */
   background: var(--color-blue-bg);
   /* border: 1px solid var(--color-blue-border); */
   /* color: var(--color-text-label); */
+  font: inherit;
   font-size: 12px;
   /* font-weight: 700; */
   letter-spacing: 0.25px;
@@ -2545,7 +2545,6 @@
 }
 
 .main-content.show-script .markdown-preview {
-  scrollbar-gutter: stable both-edges;
   max-width: min(100%, var(--width-content-page));
 }
 

@@ -228,67 +228,94 @@ function inwardOffsetForWall(wall: string): StagePoint {
   return { x: 0, z: 0 };
 }
 
+function dedupeChainPoints(points: StagePoint[]): StagePoint[] {
+  return points.filter((point, index, arr) => {
+    if (index === 0) return true;
+    const prev = arr[index - 1];
+    return Math.hypot(point.x - prev.x, point.z - prev.z) > 0.02;
+  });
+}
+
+function wallOpeningTarget(
+  chainId: string,
+  points: StagePoint[],
+  pos: number,
+): StagePoint {
+  if (chainId === "back") {
+    return { x: pos, z: points[0].z };
+  }
+  return { x: points[0].x, z: pos };
+}
+
+function applyRecessToPoints(
+  points: StagePoint[],
+  startDist: number,
+  endDist: number,
+  depth: number,
+  inward: StagePoint,
+): StagePoint[] {
+  if (endDist - startDist < 0.05) return points;
+
+  const pStart = pointAtDistance(points, startDist);
+  const pEnd = pointAtDistance(points, endDist);
+  const pInStart = {
+    x: pStart.x + inward.x * depth,
+    z: pStart.z + inward.z * depth,
+  };
+  const pInEnd = {
+    x: pEnd.x + inward.x * depth,
+    z: pEnd.z + inward.z * depth,
+  };
+
+  const rebuilt: StagePoint[] = [points[0]];
+  let cursor = 0;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const b = points[i + 1];
+    const segLen = Math.hypot(b.x - points[i].x, b.z - points[i].z);
+    cursor += segLen;
+    if (cursor < startDist - 1e-6) {
+      rebuilt.push(b);
+    } else {
+      break;
+    }
+  }
+
+  rebuilt.push(pStart, pInStart, pInEnd, pEnd);
+
+  cursor = 0;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const b = points[i + 1];
+    const segLen = Math.hypot(b.x - points[i].x, b.z - points[i].z);
+    cursor += segLen;
+    if (cursor > endDist + 1e-6) {
+      rebuilt.push(b);
+    }
+  }
+
+  return dedupeChainPoints(rebuilt);
+}
+
 function applyRecessesToChain(
   chain: StageWallChain,
   recesses: TheaterWallRecess[],
 ): StagePoint[] {
   const onWall = recesses
     .filter((item) => item.wall === chain.id)
-    .sort((a, b) => a.pos - b.pos);
+    .sort((a, b) => b.pos - a.pos);
   if (onWall.length === 0) return [...chain.points];
 
   const inward = inwardOffsetForWall(chain.id);
   let points = [...chain.points];
 
   for (const recess of onWall) {
-    const centerTarget =
-      chain.id === "back"
-        ? { x: recess.pos, z: points[0].z }
-        : { x: points[0].x, z: recess.pos };
-    const centerDist = distanceToPointOnChain(points, centerTarget);
+    const centerDist = distanceToPointOnChain(
+      points,
+      wallOpeningTarget(chain.id, points, recess.pos),
+    );
     const half = recess.width / 2;
     const startDist = Math.max(0, centerDist - half);
     const endDist = Math.min(chainLength(points), centerDist + half);
-
-    const pStart = pointAtDistance(points, startDist);
-    const pEnd = pointAtDistance(points, endDist);
-    const pInStart = {
-      x: pStart.x + inward.x * recess.depth,
-      z: pStart.z + inward.z * recess.depth,
-    };
-    const pInEnd = {
-      x: pEnd.x + inward.x * recess.depth,
-      z: pEnd.z + inward.z * recess.depth,
-    };
-
-    const rebuilt: StagePoint[] = [];
-    let consumed = 0;
-    for (let i = 0; i < points.length - 1; i += 1) {
-      const segLen = Math.hypot(points[i + 1].x - points[i].x, points[i + 1].z - points[i].z);
-      const segStart = consumed;
-      const segEnd = consumed + segLen;
-
-      if (segEnd <= startDist + 0.01) {
-        if (rebuilt.length === 0) rebuilt.push(points[i]);
-        consumed = segEnd;
-        continue;
-      }
-      if (segStart >= endDist - 0.01) {
-        rebuilt.push(points[i]);
-        consumed = segEnd;
-        continue;
-      }
-
-      if (rebuilt.length === 0) rebuilt.push(points[i]);
-      rebuilt.push(pStart, pInStart, pInEnd, pEnd, points[i + 1]);
-      consumed = segEnd;
-    }
-
-    points = rebuilt.filter((point, index, arr) => {
-      if (index === 0) return true;
-      const prev = arr[index - 1];
-      return Math.hypot(point.x - prev.x, point.z - prev.z) > 0.02;
-    });
+    points = applyRecessToPoints(points, startDist, endDist, recess.depth, inward);
   }
 
   return points;
@@ -384,7 +411,7 @@ function wallTangentRotation(start: StagePoint, end: StagePoint): number {
   return Math.atan2(-dx, dz) - Math.PI / 2;
 }
 
-type WallOpening = { center: number; halfWidth: number };
+type WallOpening = { center: number; halfWidth: number; height: number };
 
 function buildWallSegmentsWithOpenings(
   start: StagePoint,
@@ -421,10 +448,27 @@ function buildWallSegmentsWithOpenings(
     });
   };
 
+  const pushLintel = (s0: number, s1: number, doorHeight: number) => {
+    const segLen = s1 - s0;
+    const clampedDoorHeight = Math.min(doorHeight, wallHeight - 0.05);
+    const lintelHeight = wallHeight - clampedDoorHeight;
+    if (segLen < 0.02 || lintelHeight < 0.02) return;
+    const mid = (s0 + s1) / 2;
+    const midPoint = pointAlongWall(start, end, mid);
+    segments.push({
+      position: [midPoint.x, clampedDoorHeight + lintelHeight / 2, midPoint.z],
+      rotation: [0, rotationY, 0],
+      size: [segLen, lintelHeight],
+      chainId,
+      hideGroup,
+    });
+  };
+
   for (const opening of sorted) {
     const o0 = Math.max(0, opening.center - opening.halfWidth);
     const o1 = Math.min(length, opening.center + opening.halfWidth);
     if (o0 > cursor + 0.01) pushSegment(cursor, o0);
+    pushLintel(o0, o1, opening.height);
     cursor = Math.max(cursor, o1);
   }
   if (cursor < length - 0.01) pushSegment(cursor, length);
@@ -432,27 +476,99 @@ function buildWallSegmentsWithOpenings(
   return segments;
 }
 
-function openingsAlongChain(chain: StageWallChain, doors: TheaterDoor[]): WallOpening[] {
-  const wallDoors = doors.filter((item) => item.wall === chain.id);
-  return wallDoors.map((door) => {
-    const target =
-      chain.id === "back"
-        ? { x: door.pos, z: chain.points[0].z }
-        : { x: chain.points[0].x, z: door.pos };
-    return {
-      center: distanceToPointOnChain(chain.points, target),
+function openingsAlongChain(
+  chain: StageWallChain,
+  doors: TheaterDoor[],
+  recesses: TheaterWallRecess[],
+  wallHeight: number,
+): WallOpening[] {
+  const doorOpenings = doors
+    .filter((item) => item.wall === chain.id)
+    .map((door) => ({
+      center: distanceToPointOnChain(
+        chain.points,
+        wallOpeningTarget(chain.id, chain.points, door.pos),
+      ),
       halfWidth: door.width / 2,
+      height: door.height,
+    }));
+
+  const recessOpenings = recesses
+    .filter((item) => item.wall === chain.id)
+    .map((recess) => ({
+      center: distanceToPointOnChain(
+        chain.points,
+        wallOpeningTarget(chain.id, chain.points, recess.pos),
+      ),
+      halfWidth: recess.width / 2,
+      // Full-height mouth; cavity walls are added separately.
+      height: wallHeight,
+    }));
+
+  return [...doorOpenings, ...recessOpenings];
+}
+
+function buildRecessCavitySegments(
+  chain: StageWallChain,
+  recesses: TheaterWallRecess[],
+  wallHeight: number,
+  hideGroup: WallHideGroup,
+): WallSegment3D[] {
+  const inward = inwardOffsetForWall(chain.id);
+  const segments: WallSegment3D[] = [];
+
+  for (const recess of recesses.filter((item) => item.wall === chain.id)) {
+    const centerDist = distanceToPointOnChain(
+      chain.points,
+      wallOpeningTarget(chain.id, chain.points, recess.pos),
+    );
+    const half = recess.width / 2;
+    const startDist = Math.max(0, centerDist - half);
+    const endDist = Math.min(chainLength(chain.points), centerDist + half);
+    if (endDist - startDist < 0.05) continue;
+
+    const pStart = pointAtDistance(chain.points, startDist);
+    const pEnd = pointAtDistance(chain.points, endDist);
+    const pInStart = {
+      x: pStart.x + inward.x * recess.depth,
+      z: pStart.z + inward.z * recess.depth,
     };
-  });
+    const pInEnd = {
+      x: pEnd.x + inward.x * recess.depth,
+      z: pEnd.z + inward.z * recess.depth,
+    };
+
+    const edges: Array<[StagePoint, StagePoint]> = [
+      [pStart, pInStart],
+      [pInStart, pInEnd],
+      [pInEnd, pEnd],
+    ];
+    for (const [a, b] of edges) {
+      segments.push(
+        ...buildWallSegmentsWithOpenings(
+          a,
+          b,
+          wallHeight,
+          [],
+          undefined,
+          chain.id,
+          hideGroup,
+        ),
+      );
+    }
+  }
+
+  return segments;
 }
 
 function buildChainWallSegments(
   chain: StageWallChain,
   wallHeight: number,
   doors: TheaterDoor[],
+  recesses: TheaterWallRecess[],
   hideGroup: WallHideGroup,
 ): WallSegment3D[] {
-  const openings = openingsAlongChain(chain, doors);
+  const openings = openingsAlongChain(chain, doors, recesses, wallHeight);
   const segments: WallSegment3D[] = [];
   let edgeStart = 0;
 
@@ -462,7 +578,11 @@ function buildChainWallSegments(
     const len = wallLength(a, b);
     const edgeOpenings = openings
       .filter((item) => item.center >= edgeStart - 0.01 && item.center <= edgeStart + len + 0.01)
-      .map((item) => ({ center: item.center - edgeStart, halfWidth: item.halfWidth }));
+      .map((item) => ({
+        center: item.center - edgeStart,
+        halfWidth: item.halfWidth,
+        height: item.height,
+      }));
     segments.push(
       ...buildWallSegmentsWithOpenings(
         a,
@@ -476,6 +596,8 @@ function buildChainWallSegments(
     );
     edgeStart += len;
   }
+
+  segments.push(...buildRecessCavitySegments(chain, recesses, wallHeight, hideGroup));
   return segments;
 }
 
@@ -540,7 +662,10 @@ export function buildStageWallMeshes(
   doors: TheaterDoor[],
 ): StageWallMeshes {
   const geom = resolveStageGeometry(layout);
-  const chains = resolveStageWallChains(layout);
+  // Outer walls use the base outline; recesses are mouth-cut + cavity panels.
+  // Building from the recessed polyline broke door openings and "ate" wall spans.
+  const chains = resolveBaseStageWallChains(layout);
+  const recesses = resolveLayoutWallRecesses(layout);
   const stageCenter = getStageCenterXZ(geom);
 
   if (geom.stageShape === "custom") {
@@ -549,6 +674,7 @@ export function buildStageWallMeshes(
         chain,
         geom.wallHeight,
         doors,
+        recesses,
         resolveWallHideGroup(chain, stageCenter),
       ),
     );
@@ -568,13 +694,13 @@ export function buildStageWallMeshes(
   const rightChain = chains.find((item) => item.id === "right");
 
   const back = backChain
-    ? buildChainWallSegments(backChain, geom.wallHeight, doors, "back")
+    ? buildChainWallSegments(backChain, geom.wallHeight, doors, recesses, "back")
     : [];
   const left = leftChain
-    ? buildChainWallSegments(leftChain, geom.wallHeight, doors, "left")
+    ? buildChainWallSegments(leftChain, geom.wallHeight, doors, recesses, "left")
     : [];
   const right = rightChain
-    ? buildChainWallSegments(rightChain, geom.wallHeight, doors, "right")
+    ? buildChainWallSegments(rightChain, geom.wallHeight, doors, recesses, "right")
     : [];
 
   let lintel: WallSegment3D | null = null;

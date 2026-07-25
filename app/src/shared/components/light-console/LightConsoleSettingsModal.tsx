@@ -2,8 +2,11 @@ import cn from "classnames";
 import { useEffect, useRef, useState } from "react";
 import { Modal } from "../../core/modal/Modal";
 import {
+  MAX_LIGHT_CHANNEL_COLUMNS,
   MAX_LIGHT_CONSOLE_SLOTS,
+  MIN_LIGHT_CHANNEL_COLUMNS,
   MIN_LIGHT_CONSOLE_SLOTS,
+  clampLightChannelColumns,
   type LightConsoleLayoutCounts,
 } from "./light-channels-mutate";
 import "./light-console-settings-modal.css";
@@ -19,6 +22,7 @@ type DraftLayout = {
   channelCount: string;
   faderCount: string;
   programCount: string;
+  channelColumns: string;
 };
 
 function toDraft(layout: LightConsoleLayoutCounts): DraftLayout {
@@ -26,6 +30,7 @@ function toDraft(layout: LightConsoleLayoutCounts): DraftLayout {
     channelCount: String(layout.channelCount),
     faderCount: String(layout.faderCount),
     programCount: String(layout.programCount),
+    channelColumns: String(layout.channelColumns),
   };
 }
 
@@ -63,6 +68,10 @@ export function LightConsoleSettingsModal({
       channelCount: parseDraftValue(draft.channelCount, layout.channelCount),
       faderCount: parseDraftValue(draft.faderCount, layout.faderCount),
       programCount: parseDraftValue(draft.programCount, layout.programCount),
+      channelColumns: clampLightChannelColumns(
+        Number(draft.channelColumns),
+        layout.channelColumns,
+      ),
     });
   };
 
@@ -104,6 +113,22 @@ export function LightConsoleSettingsModal({
             onChange={(event) => updateDraft("channelCount", event.target.value)}
           />
           <span className="light-console-settings-modal__hint">Кнопки K1, K2… слева на пульте</span>
+        </label>
+
+        <label className="light-console-settings-modal__field">
+          <span className="light-console-settings-modal__label">Кнопок K в ряду</span>
+          <input
+            className="light-console-settings-modal__input"
+            type="number"
+            min={MIN_LIGHT_CHANNEL_COLUMNS}
+            max={MAX_LIGHT_CHANNEL_COLUMNS}
+            value={draft.channelColumns}
+            onChange={(event) => updateDraft("channelColumns", event.target.value)}
+          />
+          <span className="light-console-settings-modal__hint">
+            Сколько кнопок каналов показывать в одной строке ({MIN_LIGHT_CHANNEL_COLUMNS}–
+            {MAX_LIGHT_CHANNEL_COLUMNS})
+          </span>
         </label>
 
         <label className="light-console-settings-modal__field">

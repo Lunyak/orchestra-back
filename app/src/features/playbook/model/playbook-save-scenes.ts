@@ -500,6 +500,7 @@ export async function savePlaybookScenesForLightPlot(
             lightPlot: scene.lightPlot ?? [],
             lightCues: (scene as any)?.lightCues ?? [],
             lightKadrs: (scene as any)?.lightKadrs ?? null,
+            theaterSmokeMachine: (scene as any)?.theaterSmokeMachine === true ? true : null,
             ...sceneTheaterSyncPayload(scene),
             theaterSpotlights: Array.isArray((scene as any)?.theaterSpotlights)
               ? (scene as any).theaterSpotlights.map((sp: TheaterSpotlight) =>
@@ -538,6 +539,7 @@ export async function savePlaybookScenesForLightPlot(
               lightPlot: Array.isArray((scene as any)?.lightPlot) ? (scene as any).lightPlot : [],
               lightCues: Array.isArray((scene as any)?.lightCues) ? (scene as any).lightCues : [],
               lightKadrs: (scene as any)?.lightKadrs ?? null,
+              theaterSmokeMachine: (scene as any)?.theaterSmokeMachine === true ? true : null,
               ...sceneTheaterSyncPayload(scene as ScriptScene),
               theaterSpotlights: Array.isArray((scene as any)?.theaterSpotlights)
                 ? (scene as any).theaterSpotlights.map((sp: TheaterSpotlight) =>

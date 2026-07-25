@@ -18,6 +18,14 @@
   overflow: hidden;
 }
 
+.app-shell-with-menubar[data-theater-immersive="true"] .app-editor-menubar {
+  display: none;
+}
+
+.app-shell-with-menubar[data-theater-immersive="true"] {
+  --app-menubar-height: 0px;
+}
+
 .app-editor-menubar {
   flex: 0 0 var(--app-menubar-height);
   z-index: 950;
@@ -66,6 +74,13 @@
 .app-editor-menubar__home--active,
 .app-editor-menubar__home--active:hover {
   color: var(--color-active-ascent);
+}
+
+.app-editor-menubar__directions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  height: 100%;
 }
 
 .app-editor-menubar__burger {
@@ -228,6 +243,16 @@
   color: #666;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+.theater-panels-menubar-btn.app-editor-menubar__panel-btn {
+  width: auto;
+  min-width: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .app-editor-menubar__panel-btn:hover {
@@ -399,7 +424,7 @@
 }
 
 .app-editor-menubar__center .app-editor-menubar__project-select {
-  width: min(42vw, 320px);
+  width: min(28vw, 220px);
   min-width: 0;
 }
 
@@ -409,7 +434,7 @@
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: #aaa;
@@ -424,9 +449,13 @@
   text-align: center;
 }
 
+.app-editor-menubar__project-select .custom-select__chevron {
+  display: none;
+}
+
 .app-editor-menubar__project-select-dropdown {
   z-index: 1300;
-  min-width: min(92vw, 320px);
+  min-width: min(92vw, 240px);
 }
 
 .app-editor-menubar__project-badge {
@@ -504,6 +533,16 @@
     color: #ccc;
     background: rgba(255, 255, 255, 0.035);
     border-bottom: 1px solid #222;
+  }
+
+  .app-editor-menubar__start .app-editor-menubar__directions {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+
+  .app-editor-menubar__start .app-editor-menubar__directions .app-editor-menubar__home {
+    border-right: 0;
   }
 
   .app-editor-menubar__start .theater-editor-menubar__options {

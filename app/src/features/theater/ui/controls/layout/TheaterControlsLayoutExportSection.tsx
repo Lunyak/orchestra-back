@@ -9,7 +9,6 @@ export function TheaterControlsLayoutExportSection({
     <TheaterCollapsibleSection
       sectionId="layout-export"
       title="Экспорт плана"
-      summary="PNG, SVG, PDF и буфер обмена"
     >
       <div className="theater-btn-row theater-btn-row--3">
         <TheaterBtn

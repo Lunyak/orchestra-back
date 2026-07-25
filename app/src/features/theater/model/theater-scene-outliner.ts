@@ -83,7 +83,7 @@ export function buildSceneOutlinerGroups(args: {
         id: 0,
         kind: "layout",
         label: "Зал",
-        meta: `${args.layout.hallWidth}×${args.layout.hallDepth} м`,
+        meta: `${args.layout.hallWidth}×${args.layout.hallDepth}`,
         canHide: false,
       },
       ...(args.layout.seatRows > 0
@@ -181,7 +181,7 @@ export function buildSceneOutlinerGroups(args: {
         id: door.id,
         kind: "door",
         label: `Дверь #${door.id}`,
-        meta: `${THEATER_DOOR_WALL_LABELS[door.wall]} · ${door.width}×${door.height} м`,
+        meta: `${THEATER_DOOR_WALL_LABELS[door.wall]} · ${door.width}×${door.height}`,
         canHide: false,
       })),
     });

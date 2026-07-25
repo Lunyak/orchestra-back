@@ -20,6 +20,7 @@ export type TheaterCollapsibleSectionProps = {
   summary?: string;
   defaultOpen?: boolean;
   badge?: string;
+  headerActions?: ReactNode;
   children: ReactNode;
   className?: string;
 };
@@ -30,6 +31,7 @@ export function TheaterCollapsibleSection({
   summary,
   defaultOpen = false,
   badge,
+  headerActions,
   children,
   className,
 }: TheaterCollapsibleSectionProps) {
@@ -56,18 +58,23 @@ export function TheaterCollapsibleSection({
         className,
       )}
     >
-      <button
-        type="button"
-        className="theater-panel-section__header"
-        onClick={toggle}
-        aria-expanded={open}
-      >
-        <span className="theater-panel-section__chevron" aria-hidden>
-          {open ? "▾" : "▸"}
-        </span>
-        <span className="theater-panel-section__title">{title}</span>
-        {badge ? <span className="theater-panel-section__badge">{badge}</span> : null}
-      </button>
+      <div className="theater-panel-section__header">
+        <button
+          type="button"
+          className="theater-panel-section__toggle"
+          onClick={toggle}
+          aria-expanded={open}
+        >
+          <span className="theater-panel-section__chevron" aria-hidden>
+            {open ? "▾" : "▸"}
+          </span>
+          <span className="theater-panel-section__title">{title}</span>
+          {badge ? <span className="theater-panel-section__badge">{badge}</span> : null}
+        </button>
+        {headerActions ? (
+          <div className="theater-panel-section__actions">{headerActions}</div>
+        ) : null}
+      </div>
       {!open && summary ? (
         <p className="theater-panel-section__summary">{summary}</p>
       ) : null}

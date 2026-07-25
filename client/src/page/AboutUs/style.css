@@ -93,7 +93,7 @@
   place-items: center;
 }
 
-.aboutus-card__img--loading {
+.aboutus-card__img[data-loading="true"] {
   opacity: 0;
 }
 
@@ -111,6 +111,36 @@
 .aboutus-card:hover .aboutus-card__img {
   transform: scale(1.1);
   filter: grayscale(0%) contrast(1.05) brightness(1);
+}
+
+.aboutus-card--figure {
+  background:
+    radial-gradient(circle at 50% 34%, rgba(184, 53, 74, 0.2), transparent 42%),
+    linear-gradient(180deg, #1b191a, #080808);
+}
+
+.aboutus-card__figure {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  touch-action: none;
+}
+
+.aboutus-card__figure canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.aboutus-card__figure-hint {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 12px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  pointer-events: none;
 }
 
 .aboutus-card__name {

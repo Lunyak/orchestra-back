@@ -48,11 +48,7 @@ import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
 } from "../model/theater-scene-models";
-import {
-  buildCopySceneTheaterLayoutPatch,
-  buildCopySceneTheaterLayoutPatchFromScene,
-} from "../model/copy-scene-theater-layout";
-import { cloneTheaterSpotlights } from "./use-theater-spotlights";
+import { buildLightPlotFromSpotlights } from "../model/theater-light-channel-link";
 import type { TheaterEditMode } from "./use-theater-selection";
 import { resolveTheaterModelFileUrlSync } from "../model/theater-model-asset-url";
 import {
@@ -248,13 +244,17 @@ export function useTheaterModels({
         updateCurrentScene({
           ...writeSceneTheaterModels(normalizedModels),
           ...(spotlightsChanged
-            ? { theaterSpotlights: nextSpotlights }
+            ? {
+                theaterSpotlights: nextSpotlights,
+                lightPlot: buildLightPlotFromSpotlights(nextSpotlights, layout),
+              }
             : {}),
         });
       },
       [
         currentScene?.theaterSpotlights,
         displaySpotlights,
+        layout,
         normalizeModels,
         recordTheaterHistory,
         updateCurrentScene,
@@ -274,11 +274,15 @@ export function useTheaterModels({
           (spotlight, index) => spotlight !== sourceSpotlights[index],
         );
         if (!hasChanges) return;
-        updateCurrentScene({ theaterSpotlights: nextSpotlights });
+        updateCurrentScene({
+          theaterSpotlights: nextSpotlights,
+          lightPlot: buildLightPlotFromSpotlights(nextSpotlights, layout),
+        });
       },
       [
         currentScene?.theaterSpotlights,
         displaySpotlights,
+        layout,
         updateCurrentScene,
       ],
     );
@@ -308,32 +312,6 @@ export function useTheaterModels({
         updateCurrentScene({ theaterActiveModelId: cloned[0].id });
       }
     };
-
-    const copyTheaterFromPreviousScene = useCallback(() => {
-      if (!currentScene || currentPage <= 0) return;
-      const previous = scenes[currentPage - 1];
-      if (!previous) return;
-      updateCurrentScene(buildCopySceneTheaterLayoutPatchFromScene(previous));
-      setDecorActionMessage("Сцена скопирована с предыдущей сцены");
-    }, [currentPage, currentScene, scenes, updateCurrentScene]);
-
-    const copyTheaterToNextScene = useCallback(() => {
-      if (!currentScene || currentPage >= scenes.length - 1) return;
-      const nextScene = scenes[currentPage + 1];
-      if (!nextScene) return;
-      updateScene(
-        nextScene.id,
-        buildCopySceneTheaterLayoutPatch({
-          spotlights: displaySpotlights,
-          models,
-          lightPlot: currentScene.lightPlot,
-          requisites: currentScene.requisites,
-        }),
-      );
-      setDecorActionMessage(`Расстановка скопирована на сцену «${nextScene.title}»`);
-    }, [currentPage, currentScene, displaySpotlights, models, scenes, updateScene]);
-
-
 
     const appendFileModel = useCallback(
       (fileRef: string, displayName: string) => {
@@ -923,8 +901,6 @@ export function useTheaterModels({
     updateModel,
     resolveModelSrc,
     copyModelsFromPreviousScene,
-    copyTheaterFromPreviousScene,
-    copyTheaterToNextScene,
     addModel,
     addBuiltinModel,
     addBuiltinModelAt,

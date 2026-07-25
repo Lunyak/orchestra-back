@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
-  findKadrSectionAtOffset,
   lightKadrsStableKey,
   readSceneLightKadrs,
-  syncLightKadrsFromMarkdown,
 } from "../../../../features/theater/model/light-kadrs";
+import { migrateSceneLightKadrsFromMarkdown } from "../../../../features/spectacle-run/model/migrate-kadrs-from-markdown";
 import type { ScriptScene } from "../../../types/script";
 import type { ScriptMarkdownEditorHandle } from "../components/ScriptMarkdownCodemirror";
 
@@ -19,7 +18,7 @@ export function useShowScriptLightKadrsSync(args: {
   ) => void;
   markdownRef: RefObject<ScriptMarkdownEditorHandle | null>;
 }) {
-  const { currentScene, activeMarkdown, isEditing, updateSceneField, markdownRef } = args;
+  const { currentScene, updateSceneField } = args;
   const lastSyncedLightKadrsKeyRef = useRef("");
   const [activeLightKadrId, setActiveLightKadrId] = useState<string | null>(null);
 
@@ -29,27 +28,29 @@ export function useShowScriptLightKadrsSync(args: {
       lastSyncedLightKadrsKeyRef.current = "";
       return;
     }
-    const markdown = String(currentScene.markdown ?? "");
     const prev = readSceneLightKadrs(currentScene);
-    const synced = syncLightKadrsFromMarkdown({ markdown, kadrs: prev });
-    const syncKey = `${currentScene.id}:${markdown.length}:${lightKadrsStableKey(synced)}`;
-    if (lightKadrsStableKey(prev) === lightKadrsStableKey(synced)) {
+    const migrated = migrateSceneLightKadrsFromMarkdown(currentScene);
+    const syncKey = `${currentScene.id}:${lightKadrsStableKey(migrated)}`;
+    if (lightKadrsStableKey(prev) === lightKadrsStableKey(migrated)) {
       lastSyncedLightKadrsKeyRef.current = syncKey;
       return;
     }
     if (lastSyncedLightKadrsKeyRef.current === syncKey) return;
     lastSyncedLightKadrsKeyRef.current = syncKey;
-    updateSceneField(currentScene.id, "lightKadrs", synced);
+    updateSceneField(currentScene.id, "lightKadrs", migrated);
   }, [currentScene?.id, currentScene?.lightKadrs, currentScene?.markdown, updateSceneField]);
 
   useEffect(() => {
-    const ed = markdownRef.current;
-    const sel = ed?.getSelection();
-    const offset = sel?.from ?? String(activeMarkdown ?? "").length;
-    const section = findKadrSectionAtOffset(String(activeMarkdown ?? ""), offset);
-    const nextId = section?.id ?? null;
-    setActiveLightKadrId((prev) => (prev === nextId ? prev : nextId));
-  }, [activeMarkdown, isEditing, markdownRef]);
+    const kadrs = readSceneLightKadrs(currentScene);
+    if (kadrs.kadrs.length === 0) {
+      setActiveLightKadrId(null);
+      return;
+    }
+    setActiveLightKadrId((prev) => {
+      if (prev && kadrs.kadrs.some((kadr) => kadr.id === prev)) return prev;
+      return kadrs.kadrs[0]?.id ?? null;
+    });
+  }, [currentScene?.id, currentScene?.lightKadrs]);
 
   return { activeLightKadrId, setActiveLightKadrId };
 }

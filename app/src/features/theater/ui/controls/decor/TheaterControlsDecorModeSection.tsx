@@ -14,7 +14,6 @@ import type { DecorSectionProps } from "./types";
 export function TheaterControlsDecorModeSection({ vm, decor }: DecorSectionProps) {
   const {
     decorTextureInputRef,
-    decorTemplateInputRef,
     draftDecorSize,
     draftDecorColor,
     activeParametricSize,

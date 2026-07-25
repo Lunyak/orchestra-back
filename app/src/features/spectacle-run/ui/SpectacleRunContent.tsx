@@ -6,7 +6,7 @@ import { usePlaybook } from "../../playbook";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
 import { SpectacleRunSceneText } from "./SpectacleRunSceneText";
 import { SpectacleRunSchemePane } from "./SpectacleRunSchemePane";
-import { SpectacleRunKadrStrip } from "./SpectacleRunKadrStrip";
+import { KadrTape } from "./KadrTape";
 
 export function SpectacleRunContent() {
   const { projectName } = useProject();
@@ -45,11 +45,12 @@ export function SpectacleRunContent() {
             liveStatus={run.liveStatus}
             onLiveStatus={run.setLiveStatus}
             onOpenConsoleSettings={run.consoleLayoutSettings.openSettings}
+            channelColumns={run.consoleLayoutSettings.layout.channelColumns}
           />
         </main>
       </div>
 
-      <SpectacleRunKadrStrip
+      <KadrTape
         variant="rehearsal"
         projectName={projectName ?? ""}
         tape={tape}

@@ -78,12 +78,12 @@ export function TheaterStageLayoutGuide({ layout, compact = false }: TheaterStag
           ) : !compact && shape === "trapezoid" ? (
             <span>
               {portalOn
-                ? `Зад: ${geom.stageBackWidth} м → зал: ${geom.prosceniumWidth} м`
+                ? `Зад: ${geom.stageBackWidth} → зал: ${geom.prosceniumWidth}`
                 : "Портал выключен — на плане как прямоугольник."}
             </span>
           ) : !compact ? (
             <span>
-              Крылья {geom.stageBackWidth} м, «ножка» {geom.prosceniumWidth} м
+              Крылья {geom.stageBackWidth}, «ножка» {geom.prosceniumWidth}
             </span>
           ) : null}
         </div>

@@ -5,6 +5,7 @@ import { normalizeDoors } from "../../theater/model/theater-doors";
 import { mergeTheaterLayoutExtras } from "../../theater/model/theater-layout-extras";
 import { resolveSceneTheaterFromApi } from "../../theater/model/theater-model-serialize";
 import { mapTheaterSpotlightFromApi } from "../../theater/model/theater-light-fader-bindings";
+import { normalizeLightKadrs } from "../../theater/model/light-kadrs";
 import { DEFAULT_THEATER_LAYOUT } from "./playbook-slice";
 
 const KANBAN_STATUSES = ["raw", "text-learned", "almost-ready", "ready"] as const;
@@ -113,8 +114,9 @@ export function normalizeScriptSceneFromSyncApi(st: unknown): ScriptScene | null
       : undefined,
     lightKadrs:
       row?.lightKadrs && typeof row.lightKadrs === "object"
-        ? (row.lightKadrs as ScriptScene["lightKadrs"])
+        ? normalizeLightKadrs(row.lightKadrs as ScriptScene["lightKadrs"])
         : undefined,
+    theaterSmokeMachine: row?.theaterSmokeMachine === true ? true : undefined,
     ...resolveSceneTheaterFromApi(row),
     theaterSpotlights: Array.isArray(row?.theaterSpotlights)
       ? row.theaterSpotlights
@@ -167,9 +169,19 @@ export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | 
   const int = (v: unknown, fallback: number) =>
     v != null && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : fallback;
   const parseDoors = (raw: unknown): TheaterDoor[] | undefined => {
-    if (!Array.isArray(raw)) return undefined;
+    const list =
+      typeof raw === "string"
+        ? (() => {
+            try {
+              return JSON.parse(raw) as unknown;
+            } catch {
+              return null;
+            }
+          })()
+        : raw;
+    if (!Array.isArray(list)) return undefined;
     return normalizeDoors(
-      raw.map((item, index) => {
+      list.map((item, index) => {
         const row = item as Record<string, unknown>;
         return {
           id: int(row.id, index + 1),
@@ -177,6 +189,7 @@ export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | 
           pos: num(row.pos, num(row.doorZ, 0)),
           width: num(row.width, num(row.doorWidth, DEFAULT_THEATER_LAYOUT.doorWidth)),
           height: num(row.height, num(row.doorHeight, DEFAULT_THEATER_LAYOUT.doorHeight)),
+          style: row.style === "metal" ? "metal" : "wood",
         };
       }),
       {
@@ -186,6 +199,10 @@ export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | 
       },
     );
   };
+  const extrasRecord =
+    r.extras && typeof r.extras === "object"
+      ? (r.extras as Record<string, unknown>)
+      : null;
   return normalizePersistedTheaterLayout(
     mergeTheaterLayoutExtras(
       {
@@ -203,7 +220,7 @@ export function normalizeTheaterLayoutFromServer(row: unknown): TheaterLayout | 
         doorWidth: num(r.doorWidth, DEFAULT_THEATER_LAYOUT.doorWidth),
         doorHeight: num(r.doorHeight, DEFAULT_THEATER_LAYOUT.doorHeight),
         doorZ: num(r.doorZ, DEFAULT_THEATER_LAYOUT.doorZ),
-        doors: parseDoors(r.doors),
+        doors: parseDoors(r.doors) ?? parseDoors(extrasRecord?.doors),
       },
       r.extras ?? r,
     ),

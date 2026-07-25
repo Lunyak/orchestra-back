@@ -17,14 +17,13 @@ import {
 import type { LayoutSectionProps } from "./types";
 
 export function TheaterControlsLayoutStageSection({ vm, layout }: LayoutSectionProps) {
-  const { layoutShapeLabel, isCustomStageOutline } = layout;
+  const { isCustomStageOutline } = layout;
 
   return (
     <>
       <TheaterCollapsibleSection
         sectionId="layout-stage"
         title="Форма сцены"
-        summary={layoutShapeLabel}
         badge={isCustomStageOutline ? "Свой контур" : undefined}
         defaultOpen={isCustomStageOutline}
       >

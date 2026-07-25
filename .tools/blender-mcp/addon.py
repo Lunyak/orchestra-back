@@ -2330,13 +2330,11 @@ class BlenderMCPServer:
                 temp_file.write(response.content)
                 temp_file_name = temp_file.name
 
-            # Import the GLB file in the main thread
-            def import_handler():
+            try:
                 bpy.ops.import_scene.gltf(filepath=temp_file_name)
-                os.unlink(temp_file.name)
-                return None
-            
-            bpy.app.timers.register(import_handler)
+            finally:
+                with suppress(Exception):
+                    os.unlink(temp_file_name)
 
             return {
                 "status": "DONE",
@@ -2419,8 +2417,24 @@ class BlenderMCPServer:
                 for chunk in zip_response.iter_content(chunk_size=8192):
                     f.write(chunk)
 
-            # Unzip the ZIP
+            # Unzip the ZIP with zip-slip prevention (mirrors download_sketchfab_model)
             with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
+                for file_info in zip_ref.infolist():
+                    file_path = file_info.filename
+                    target_path = os.path.join(temp_dir, os.path.normpath(file_path))
+                    abs_temp_dir = os.path.abspath(temp_dir)
+                    abs_target_path = os.path.abspath(target_path)
+
+                    if not abs_target_path.startswith(abs_temp_dir + os.sep) and abs_target_path != abs_temp_dir:
+                        with suppress(Exception):
+                            shutil.rmtree(temp_dir)
+                        return {"succeed": False, "error": "Security issue: Zip contains files with path traversal attempt"}
+
+                    if ".." in file_path:
+                        with suppress(Exception):
+                            shutil.rmtree(temp_dir)
+                        return {"succeed": False, "error": "Security issue: Zip contains files with directory traversal sequence"}
+
                 zip_ref.extractall(temp_dir)
 
             # Find the .obj file (there may be multiple, assuming the main file is model.obj)

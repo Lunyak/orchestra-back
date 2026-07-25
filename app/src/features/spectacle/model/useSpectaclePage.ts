@@ -117,12 +117,28 @@ export function useSpectaclePage() {
                 : "script";
   const isTheaterView = activeView === "theater";
 
+  const [theaterImmersiveMode, setTheaterImmersiveModeState] = useState(false);
+  const controlsBeforeImmersiveRef = useRef(true);
   const [theaterOutlinerHost, setTheaterOutlinerHost] =
     useState<HTMLDivElement | null>(null);
   const appliedMobileTheaterPanelDefaultRef = useRef(false);
   const setTheaterOutlinerHostRef = useCallback((node: HTMLDivElement | null) => {
     setTheaterOutlinerHost(node);
   }, []);
+
+  const setTheaterImmersiveMode = useCallback(
+    (value: boolean) => {
+      if (value) {
+        controlsBeforeImmersiveRef.current = showTheaterControls;
+        setShowTheaterControls(false);
+        setTheaterImmersiveModeState(true);
+        return;
+      }
+      setTheaterImmersiveModeState(false);
+      setShowTheaterControls(controlsBeforeImmersiveRef.current);
+    },
+    [setShowTheaterControls, showTheaterControls],
+  );
 
   useEffect(() => {
     if (
@@ -143,6 +159,26 @@ export function useSpectaclePage() {
     mobileScenesOpen,
     showTheaterControls,
   ]);
+
+  useEffect(() => {
+    if (!isTheaterView && theaterImmersiveMode) {
+      setTheaterImmersiveMode(false);
+    }
+  }, [isTheaterView, theaterImmersiveMode, setTheaterImmersiveMode]);
+
+  useEffect(() => {
+    const shell = document.querySelector(".app-shell-with-menubar");
+    if (!shell) return;
+    const immersive = isTheaterView && theaterImmersiveMode;
+    if (immersive) {
+      shell.setAttribute("data-theater-immersive", "true");
+    } else {
+      shell.removeAttribute("data-theater-immersive");
+    }
+    return () => {
+      shell.removeAttribute("data-theater-immersive");
+    };
+  }, [isTheaterView, theaterImmersiveMode]);
 
   useEffect(() => {
     if (!isMobile || activeView !== "theater") {
@@ -247,6 +283,8 @@ export function useSpectaclePage() {
     showPlaylistSidebar,
     showTheaterControls,
     scenes,
+    theaterImmersiveMode,
+    setTheaterImmersiveMode,
     theaterOutlinerHost,
     theaterLayout,
     togglePanels: togglePanelsWithPersist,

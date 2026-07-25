@@ -1,5 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
-import { countSceneLightChannelLinks } from "../../model/theater-light-channel-link";
+import { useCallback, useMemo, useRef } from "react";
 import { bindSpotlightOnFaderBoard, detachSpotlightFromFaderBoard } from "../../model/theater-light-fader-bindings";
 import {
   buildCompleteLightFaders,
@@ -14,44 +13,25 @@ import { usePlaybook } from "../../../playbook";
 export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
   const { lightChannels, selectedLightSlot } = useTheaterControlsLightChannels();
   const { playbookData, setPlaybookData, saveScenesForLightPlot } = usePlaybook();
-  const [spotlightBatchCount, setSpotlightBatchCount] = useState(6);
-  const [rgbBatchCount, setRgbBatchCount] = useState(4);
-  const [spotlightLayoutRows, setSpotlightLayoutRows] = useState(2);
   const bindingSaveTimerRef = useRef<number | null>(null);
 
   const {
     regularSpotlights,
     rgbSpotlights,
-    totalSpotlights,
-    linkStats,
-    spotlightLinkBadge,
     spotlightCountBadge,
-    spotlightSourceHeightLabel,
   } =
     useMemo(() => {
       const regular = vm.displaySpotlights.filter((item) => !item.isRgb);
       const rgb = vm.displaySpotlights.filter((item) => item.isRgb);
       const total = regular.length + rgb.length;
-      const plot = vm.currentScene?.lightPlot ?? [];
-      const stats = countSceneLightChannelLinks(plot, vm.displaySpotlights);
-      const linkBadge = `схема ${stats.fixtures} · 3D ${stats.spotlights}`;
       const countBadge =
         total > 0 ? `${total} (${regular.length} + ${rgb.length} RGB)` : "нет";
-      const averageSourceHeight =
-        total > 0
-          ? vm.displaySpotlights.reduce((sum, item) => sum + item.position[1], 0) / total
-          : 0;
       return {
         regularSpotlights: regular,
         rgbSpotlights: rgb,
-        totalSpotlights: total,
-        linkStats: stats,
-        spotlightLinkBadge: linkBadge,
         spotlightCountBadge: countBadge,
-        spotlightSourceHeightLabel:
-          total > 0 ? `${averageSourceHeight.toFixed(1)} м` : "нет",
       };
-    }, [vm.currentScene?.lightPlot, vm.displaySpotlights]);
+    }, [vm.displaySpotlights]);
 
   const saveSpotlightFaderBinding = useCallback(() => {
     if (bindingSaveTimerRef.current != null) {
@@ -113,19 +93,9 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
         ? playbookData.lightFaders.faders
         : [],
     selectedLightSlot,
-    spotlightBatchCount,
-    setSpotlightBatchCount,
-    rgbBatchCount,
-    setRgbBatchCount,
-    spotlightLayoutRows,
-    setSpotlightLayoutRows,
     regularSpotlights,
     rgbSpotlights,
-    totalSpotlights,
-    linkStats,
-    spotlightLinkBadge,
     spotlightCountBadge,
-    spotlightSourceHeightLabel,
     bindSpotlightToFader,
     unbindSpotlightFromFader,
   };

@@ -2,7 +2,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: stretch;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 4px 12px;
   flex-shrink: 0;
   min-height: 32px;
@@ -12,7 +12,65 @@
   box-sizing: border-box;
 }
 
-.spectacle-direction-switch__list,
+.spectacle-direction-switch__left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.spectacle-direction-switch__right {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.spectacle-direction-switch__formatting {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+
+.spectacle-direction-switch__formatting .theater-editor-menubar__menu {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.spectacle-direction-switch__formatting .theater-editor-menubar__menu-title {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.spectacle-direction-switch__formatting .theater-editor-menubar__menu-title:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-5);
+}
+
+.spectacle-direction-switch__formatting .theater-editor-menubar__options {
+  top: 100%;
+  left: 0;
+  right: auto;
+  min-width: 260px;
+  z-index: 40;
+}
+
 .spectacle-direction-switch__modes {
   list-style: none;
   margin: 0;
@@ -22,10 +80,6 @@
   align-items: center;
   gap: 0;
   min-height: 32px;
-}
-
-.spectacle-direction-switch__modes {
-  margin-left: auto;
 }
 
 .spectacle-direction-switch__item {
@@ -54,20 +108,20 @@
     min-height: 28px;
   }
 
-  .spectacle-direction-switch__list,
+  .spectacle-direction-switch__left {
+    gap: 2px 6px;
+  }
+
   .spectacle-direction-switch__modes {
     min-height: 28px;
   }
 
-  .spectacle-direction-switch__item {
+  .spectacle-direction-switch__item,
+  .spectacle-direction-switch__formatting .theater-editor-menubar__menu-title {
     min-height: 22px;
     padding: 3px 6px;
     font-size: var(--font-size-xs);
     letter-spacing: 0.01em;
-  }
-
-  .spectacle-direction-switch__modes {
-    margin-left: 0;
   }
 }
 

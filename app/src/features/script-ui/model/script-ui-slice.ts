@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { migratePlaybookLegacyBrowserStorage } from "../../playbook/model/playbook-legacy-migration";
 import type { RootState } from "../../../shared/store/store";
 
 export type LightPlotMode = "rehearsal" | "prog-run";
@@ -113,6 +114,7 @@ function persistSpectacleRunTextHidden(hidden: boolean) {
 }
 
 function initialStateFromStorage(): ScriptUiState {
+  migratePlaybookLegacyBrowserStorage();
   const base = defaultState();
   return {
     ...base,
@@ -141,6 +143,7 @@ export const scriptUiSlice = createSlice({
   initialState: initialStateFromStorage(),
   reducers: {
     initScriptUi(state) {
+      migratePlaybookLegacyBrowserStorage();
       const base = defaultState();
       state.showPlaylistSidebar = storedBool("showPlaylistSidebar", base.showPlaylistSidebar);
       state.showHeaderSounds = storedBool("showHeaderSounds", base.showHeaderSounds);

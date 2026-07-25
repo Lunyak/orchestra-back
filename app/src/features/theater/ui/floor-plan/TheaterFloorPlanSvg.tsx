@@ -241,10 +241,9 @@ export function TheaterFloorPlanSvg({
         ))}
         {wallOverlay.doors.map((doorOverlay) => {
           const rect = doorRectGeometry(doorOverlay);
-          const isActive =
-            activeDoorId === doorOverlay.id ||
-            doorHover?.doorId === doorOverlay.id;
-          const isHot = doorHover?.doorId === doorOverlay.id || (doorDragging && isActive);
+          const isActive = activeDoorId === doorOverlay.id;
+          const isHot =
+            doorHover?.doorId === doorOverlay.id || (doorDragging && isActive);
           return (
             <g key={`door-${doorOverlay.id}`}>
               <rect
@@ -287,9 +286,7 @@ export function TheaterFloorPlanSvg({
         })}
         {wallOverlay.recesses.map((recessOverlay) => {
           const rect = doorRectGeometry(recessOverlay);
-          const isActive =
-            activeRecessId === recessOverlay.id ||
-            recessHover?.recessId === recessOverlay.id;
+          const isActive = activeRecessId === recessOverlay.id;
           const isHot =
             recessHover?.recessId === recessOverlay.id ||
             (recessDragging && isActive);

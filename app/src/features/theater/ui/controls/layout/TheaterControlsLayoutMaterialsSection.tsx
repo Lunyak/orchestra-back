@@ -88,7 +88,6 @@ export function TheaterControlsLayoutMaterialsSection({ vm }: LayoutSectionProps
     <TheaterCollapsibleSection
       sectionId="layout-surface-materials"
       title="Материалы пола и стен"
-      summary={config.label}
     >
       <div className="theater-layout-grid">
         <TheaterField label="Поверхность">

@@ -4,6 +4,7 @@ import { ROUTES } from "../../shared/model/routes";
 import Preloader from "../../shared/component/Preloader/Preloader";
 import { siteAsset } from "../../shared/model/siteAssets";
 import { Seo } from "../../shared/component/Seo/Seo";
+import { TeamFigure } from "./TeamFigure";
 import "./style.css";
 
 const items = [
@@ -12,18 +13,21 @@ const items = [
     name: "Анастасия Рябых",
     social: "",
     img: "/actors/nastya.JPG",
+    figure: "/team-figures/anastasia-ryabykh.glb",
   },
   {
     id: 2,
     name: "Виктория Юркова",
     social: "",
     img: "/actors/vica-2.JPG",
+    figure: "/team-figures/victoria-yurkova.glb",
   },
   {
     id: 3,
     name: "Алексей Филатов",
     social: "",
     img: "/actors/lesha.jpg",
+    figure: "/team-figures/alexey-filatov.glb",
   },
   {
     id: 4,
@@ -119,11 +123,21 @@ interface ICard {
   name: string;
   img: string;
   social: string;
+  figure?: string;
 }
 
 const Card: FC<ICardProps> = ({ data }) => {
-  const { name, img } = data;
+  const { name, img, figure } = data;
   const [isLoaded, setIsLoaded] = useState(false);
+
+  if (figure) {
+    return (
+      <div className="aboutus-card aboutus-card--figure" role="listitem">
+        <TeamFigure src={figure} name={name} />
+        <div className="aboutus-card__name">{name}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="aboutus-card" role="listitem">
@@ -133,7 +147,8 @@ const Card: FC<ICardProps> = ({ data }) => {
         </div>
       )}
       <img
-        className={isLoaded ? "aboutus-card__img" : "aboutus-card__img aboutus-card__img--loading"}
+        className="aboutus-card__img"
+        data-loading={isLoaded ? undefined : "true"}
         src={siteAsset(img)}
         alt={name}
         loading="lazy"

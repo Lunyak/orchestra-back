@@ -6,6 +6,7 @@ import type {
   TheaterSpotlight,
 } from "../../../shared/types/script";
 import type { DecorCatalogKey } from "../model/theater-decor-catalog";
+import type { TheaterSmokePosition } from "../model/theater-smoke-settings";
 import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
 
 /** View / display preferences (localStorage per project). */
@@ -26,14 +27,19 @@ export type TheaterPrefsSlice = TheaterViewPrefs & {
   setOutlineDrawMode: (value: boolean) => void;
   setSpotlightAimMode: (mode: TheaterViewPrefs["spotlightAimMode"]) => void;
   setDutyLightEnabled: (value: boolean) => void;
+  setSmokeMachineEnabled: (value: boolean) => void;
+  setSmokePanelOpen: (value: boolean) => void;
+  setSmokePosition: (value: TheaterSmokePosition | null) => void;
+  setSmokeIntensity: (value: number) => void;
+  setSmokeSaturation: (value: number) => void;
+  setSmokeSize: (value: number) => void;
   setSceneBackgroundColor: (value: string) => void;
   setShowSpotlightGuideLines: (value: boolean) => void;
   setLightConsoleExpanded: Dispatch<SetStateAction<boolean>>;
   setHallResizeKeepObjects: (value: boolean) => void;
+  setHallQuickStartDone: (value: boolean) => void;
   showSpotlights: boolean;
   setShowSpotlights: (value: boolean) => void;
-  showOnlyActiveSpotlight: boolean;
-  setShowOnlyActiveSpotlight: (value: boolean) => void;
 };
 
 export type TheaterHistorySlice = {

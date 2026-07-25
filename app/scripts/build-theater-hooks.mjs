@@ -18,7 +18,6 @@ const models1 = slice(560, 860, [
   [733, 794],
 ]);
 const models2 = lines.slice(1311, 1955);
-const decorBody = lines.slice(860, 1310);
 
 const modelsHeader = `import {
   useCallback,
@@ -111,7 +110,7 @@ export function useTheaterModels({
   projectName,
   currentPage,
   currentScene,
-  steps,
+  scenes,
   updateScene,
   updateCurrentScene,
   recordTheaterHistory,
@@ -278,203 +277,9 @@ fs.writeFileSync(
   "utf8",
 );
 
-const decorHeader = `import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
-import { getDesktopApi } from "../../../shared/platform/desktop-api";
-import { desktopAddProjectImage } from "../../../shared/platform/desktop-methods";
-import type { ScriptScene, TheaterLayout, TheaterModel } from "../../../shared/types/script";
-import {
-  getDecorCatalogEntry,
-  isTheaterDecorModel,
-  type DecorCatalogKey,
-} from "../model/theater-decor-catalog";
-import {
-  buildDecorSceneTemplate,
-  DECOR_SCENE_TEMPLATES,
-  type DecorSceneTemplateId,
-} from "../model/theater-decor-scene-templates";
-import {
-  buildModelsFromDecorTemplateJson,
-  downloadDecorTemplateJson,
-  exportDecorModelsToTemplateJson,
-  loadProjectDecorTemplateManifest,
-  persistStoredDecorTemplatesToProject,
-  parseDecorTemplateJson,
-  readStoredDecorTemplates,
-  type DecorTemplateJson,
-  type DecorTemplateListItem,
-  upsertStoredDecorTemplate,
-} from "../model/theater-decor-template-json";
-import {
-  decorInventoryToRequisiteLabels,
-  downloadDecorInventoryCsv,
-  formatDecorInventoryMarkdown,
-  mergeDecorIntoRequisites,
-} from "../model/theater-decor-inventory";
-import {
-  toDecorTextureFileRef,
-  toDecorTexturePresetRef,
-  type DecorTextureMode,
-  type DecorTexturePresetId,
-} from "../model/theater-decor-textures";
-import { buildDecorGridPositions } from "../model/theater-decor-grid";
-import {
-  readSceneTheaterModels,
-  writeSceneTheaterModels,
-} from "../model/theater-scene-models";
-import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
-import type { TheaterEditMode } from "./use-theater-selection";
-
-export type UseTheaterDecorArgs = {
-  projectName: string;
-  currentPage: number;
-  currentScene: ScriptScene | undefined;
-  scenes: ScriptScene[];
-  updateScene: (sceneId: number, patch: Partial<ScriptScene>) => void;
-  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
-  layout: TheaterLayout;
-  gridStep: number;
-  snapToGrid: boolean;
-  models: TheaterModel[];
-  updateModels: (next: TheaterModel[]) => void;
-  updateModel: (id: number, patch: Partial<TheaterModel>) => void;
-  setPendingSnapModelId: Dispatch<SetStateAction<number | null>>;
-  activeModelId: number | undefined;
-  setEditMode: Dispatch<SetStateAction<TheaterEditMode>>;
-  setActiveTab: (tab: TheaterViewPrefs["activeTab"]) => void;
-};
-
-export function useTheaterDecor({
-  projectName,
-  currentPage,
-  currentScene,
-  steps,
-  updateScene,
-  updateCurrentScene,
-  layout,
-  gridStep,
-  snapToGrid,
-  models,
-  updateModels,
-  updateModel,
-  setPendingSnapModelId,
-  activeModelId,
-  setEditMode,
-  setActiveTab,
-}: UseTheaterDecorArgs) {
-  const [decorCatalogKey, setDecorCatalogKey] =
-    useState<DecorCatalogKey>("flat");
-  const [decorDraftSize, setDecorDraftSize] = useState<
-    [number, number, number] | null
-  >(null);
-  const [decorDraftColor, setDecorDraftColor] = useState<string | null>(null);
-  const [decorDraftTexture, setDecorDraftTexture] = useState<string | null>(null);
-  const [decorDraftTextureRepeat, setDecorDraftTextureRepeat] = useState(1);
-  const [decorDraftTextureMode, setDecorDraftTextureMode] =
-    useState<DecorTextureMode>("once");
-  const [decorPlaceMode, setDecorPlaceMode] = useState(false);
-  const [decorGridCols, setDecorGridCols] = useState(1);
-  const [decorGridRows, setDecorGridRows] = useState(1);
-  const [customDecorTemplates, setCustomDecorTemplates] = useState<
-    DecorTemplateJson[]
-  >(() => readStoredDecorTemplates(projectName));
-  const [projectDecorTemplates, setProjectDecorTemplates] = useState<
-    DecorTemplateJson[]
-  >([]);
-  const [decorActionMessage, setDecorActionMessage] = useState<string | null>(
-    null,
-  );
-
-`;
-
-const decorFooter = `
-  return {
-    decorCatalogKey,
-    setDecorCatalogKey,
-    decorDraftSize,
-    setDecorDraftSize,
-    decorDraftColor,
-    setDecorDraftColor,
-    decorDraftTexture,
-    decorDraftTextureRepeat,
-    decorDraftTextureMode,
-    decorPlaceMode,
-    setDecorPlaceMode,
-    decorGridCols,
-    setDecorGridCols,
-    decorGridRows,
-    setDecorGridRows,
-    decorActionMessage,
-    setDecorActionMessage,
-    activeDecorPreset,
-    resolveDecorDraftSize,
-    resolveDecorDraftColor,
-    addDecorAt,
-    enterDecorPlaceMode,
-    exitDecorPlaceMode,
-    applyDecorTexture,
-    applyDecorTexturePreset,
-    clearDecorTexture,
-    uploadDecorTextureFile,
-    setDecorTextureRepeatForTarget,
-    setDecorTextureModeForTarget,
-    applyDecorSceneTemplate,
-    replaceDecorSceneTemplate,
-    applyDecorTemplateJson,
-    copyDecorInventoryToClipboard,
-    exportDecorInventoryCsv,
-    syncDecorInventoryToRequisites,
-    importDecorTemplateFromJson,
-    exportCurrentDecorAsJsonTemplate,
-    decorTemplateList,
-    applyDecorTemplateByListId,
-    applyDecorSketchTemplate,
-    copyDecorToNextStep,
-    saveDecorTemplatesToProject,
-    setDecorDraftTextureRepeat,
-  };
-}
-`;
-
-// Fix applyDecorTemplateByListId deps in decor body
-let decorText = decorBody.map((line) => (line.length ? `  ${line}` : "")).join("\n");
-decorText = decorText.replace(
-  /applyDecorTemplateByListId = useCallback\([\s\S]*?\],\s*\n\s*\);/,
-  (block) => {
-    if (!block.includes("applyLightPlotChannelLabels")) return block;
-    return block.replace(
-      /\[\s*\n\s*applyLightPlotChannelLabels,\s*\n\s*applyDecorSceneTemplate,/,
-      `[
-      replaceDecorSceneTemplate,
-      applyDecorSceneTemplate,`,
-    );
-  },
-);
-// Fix addDecorAt deps - remove decorActionMessage
-decorText = decorText.replace(
-  /(\[)\s*\n\s*currentScene,\s*\n\s*decorActionMessage,\s*\n\s*decorCatalogKey,/,
-  "$1\n      currentScene,\n      decorCatalogKey,",
-);
-
-fs.writeFileSync(
-  path.join(root, "state/use-theater-decor.ts"),
-  decorHeader + decorText + decorFooter,
-  "utf8",
-);
-
 console.log(
   "Wrote use-theater-models.ts",
   (modelsHeader + modelsBody + modelsFooter).split("\n").length,
   "lines",
 );
-console.log(
-  "Wrote use-theater-decor.ts",
-  (decorHeader + decorText + decorFooter).split("\n").length,
-  "lines",
-);
+console.log("Skipped use-theater-decor.ts (maintained manually)");

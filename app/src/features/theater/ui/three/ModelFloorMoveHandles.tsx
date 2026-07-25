@@ -7,6 +7,7 @@ import type { TheaterLayout, TheaterModel } from "../../../../shared/types/scrip
 import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
 import { roundM } from "../../model/theater-metrics";
 import {
+  measureObjectWorldBox,
   resolveTheaterModelWorldSize,
   type TheaterModelWorldSize,
 } from "../../model/theater-model-world-size";
@@ -15,7 +16,8 @@ type MoveSide = "east" | "west" | "south" | "north" | "center";
 
 const HANDLE_SIZE = 0.28;
 const HANDLE_DEPTH = 0.1;
-const PAD_Y = 0.06;
+const MIN_HANDLE_Y = 0.12;
+const LABEL_OFFSET_Y = 0.28;
 
 type ModelFloorMoveHandlesProps = {
   model: TheaterModel;
@@ -41,6 +43,24 @@ function resolveFootprint(
     height: Math.max(0.4, Math.abs(model.scale[1])),
     depth: Math.max(0.4, Math.abs(model.scale[2])),
   };
+}
+
+/** Центр высоты модели — хэндлы не лежат на полу и не тонут в соседних объектах. */
+function resolveHandlesCenterY(
+  model: TheaterModel,
+  object: THREE.Object3D | null,
+  footprint: TheaterModelWorldSize,
+): number {
+  if (object) {
+    const box = measureObjectWorldBox(object);
+    if (box) {
+      const centerY = (box.min.y + box.max.y) / 2;
+      if (Number.isFinite(centerY)) {
+        return Math.max(MIN_HANDLE_Y, centerY);
+      }
+    }
+  }
+  return Math.max(MIN_HANDLE_Y, model.position[1] + footprint.height * 0.5);
 }
 
 export function ModelFloorMoveHandles({
@@ -71,6 +91,7 @@ export function ModelFloorMoveHandles({
   const footprint = resolveFootprint(model, object);
   const halfW = Math.max(0.25, footprint.width / 2);
   const halfD = Math.max(0.25, footprint.depth / 2);
+  const handlesCenterY = resolveHandlesCenterY(model, object, footprint);
   const accent = tc("--color-active-ascent");
   const position = model.position;
 
@@ -128,7 +149,7 @@ export function ModelFloorMoveHandles({
     event.stopPropagation();
     const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(
       new THREE.Vector3(0, 1, 0),
-      new THREE.Vector3(event.point.x, PAD_Y, event.point.z),
+      new THREE.Vector3(event.point.x, handlesCenterY, event.point.z),
     );
     const startPosition: [number, number, number] = [
       position[0],
@@ -172,22 +193,22 @@ export function ModelFloorMoveHandles({
   }> = [
     {
       side: "east",
-      position: [halfW + 0.18, PAD_Y, 0],
+      position: [halfW + 0.18, 0, 0],
       scale: [HANDLE_DEPTH, HANDLE_SIZE, Math.min(1.6, footprint.depth * 0.45)],
     },
     {
       side: "west",
-      position: [-(halfW + 0.18), PAD_Y, 0],
+      position: [-(halfW + 0.18), 0, 0],
       scale: [HANDLE_DEPTH, HANDLE_SIZE, Math.min(1.6, footprint.depth * 0.45)],
     },
     {
       side: "south",
-      position: [0, PAD_Y, halfD + 0.18],
+      position: [0, 0, halfD + 0.18],
       scale: [Math.min(1.6, footprint.width * 0.45), HANDLE_SIZE, HANDLE_DEPTH],
     },
     {
       side: "north",
-      position: [0, PAD_Y, -(halfD + 0.18)],
+      position: [0, 0, -(halfD + 0.18)],
       scale: [Math.min(1.6, footprint.width * 0.45), HANDLE_SIZE, HANDLE_DEPTH],
     },
   ];
@@ -199,9 +220,9 @@ export function ModelFloorMoveHandles({
   ];
 
   return (
-    <group position={[position[0], 0, position[2]]}>
+    <group position={[position[0], handlesCenterY, position[2]]}>
       <mesh
-        position={[0, PAD_Y, 0]}
+        renderOrder={20}
         onPointerDown={(event) => beginDrag("center", event)}
       >
         <boxGeometry args={padSize} />
@@ -209,6 +230,7 @@ export function ModelFloorMoveHandles({
           color={accent}
           transparent
           opacity={draggingSide === "center" ? 0.55 : 0.28}
+          depthTest={false}
           depthWrite={false}
         />
       </mesh>
@@ -217,7 +239,10 @@ export function ModelFloorMoveHandles({
         const isDragging = draggingSide === runner.side;
         return (
           <group key={runner.side} position={runner.position}>
-            <mesh onPointerDown={(event) => beginDrag(runner.side, event)}>
+            <mesh
+              renderOrder={21}
+              onPointerDown={(event) => beginDrag(runner.side, event)}
+            >
               <boxGeometry args={runner.scale} />
               <meshStandardMaterial
                 color={accent}
@@ -225,13 +250,15 @@ export function ModelFloorMoveHandles({
                 emissiveIntensity={isDragging ? 0.55 : 0.2}
                 transparent
                 opacity={isDragging ? 1 : 0.9}
+                depthTest={false}
+                depthWrite={false}
               />
             </mesh>
           </group>
         );
       })}
 
-      <Billboard position={[0, 0.35, 0]} follow>
+      <Billboard position={[0, LABEL_OFFSET_Y, 0]} follow>
         <Text
           fontSize={0.18}
           color={accent}
@@ -239,8 +266,9 @@ export function ModelFloorMoveHandles({
           anchorY="middle"
           outlineWidth={0.012}
           outlineColor="#111"
+          depthOffset={-1}
         >
-          {`${position[0].toFixed(2)} · ${position[2].toFixed(2)} м`}
+          {`${position[0].toFixed(2)} · ${position[2].toFixed(2)}`}
         </Text>
       </Billboard>
     </group>

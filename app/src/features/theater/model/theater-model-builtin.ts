@@ -131,12 +131,13 @@ export function createBuiltinTheaterModel(
   const isLibraryAsset = isTheaterAssetLibraryBuiltin(builtinModelKey);
   const decorPreset = getDecorCatalogEntryByBuiltin(builtinModelKey);
   const initialY = isLightTruss ? 6 : isHumanModel ? 0.02 : 0;
+  const baseName =
+    libraryItem?.label ??
+    THEATER_BUILTIN_MODEL_NAMES[builtinModelKey ?? "table"] ??
+    `Модель ${nextId}`;
   return {
     id: nextId,
-    name:
-      libraryItem?.label ??
-      THEATER_BUILTIN_MODEL_NAMES[builtinModelKey ?? "table"] ??
-      `Модель ${nextId}`,
+    name: isLightTruss ? `${baseName} ${nextId}` : baseName,
     type: "builtin",
     builtin: builtinModelKey,
     allowOutOfBounds: false,

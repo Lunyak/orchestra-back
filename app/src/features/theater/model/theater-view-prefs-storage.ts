@@ -1,3 +1,12 @@
+import type { TheaterSmokePosition } from "./theater-smoke-settings";
+import {
+  THEATER_SMOKE_INTENSITY_DEFAULT,
+  THEATER_SMOKE_SATURATION_DEFAULT,
+  THEATER_SMOKE_SIZE_DEFAULT,
+  clampSmokeSize,
+  clampSmokeUnit,
+} from "./theater-smoke-settings";
+
 export type TheaterViewPrefs = {
   showGrid: boolean;
   /** Столбцы/ряды на полу сцены (софиты, план) */
@@ -24,6 +33,18 @@ export type TheaterViewPrefs = {
   spotlightAimMode: "point" | "cell";
   /** Общий рабочий свет сцены: выключен = светят только софиты. */
   dutyLightEnabled: boolean;
+  /** Дым-машина: haze + видимые лучи софитов. */
+  smokeMachineEnabled: boolean;
+  /** Панель настроек дыма (независимо от включённой машины). */
+  smokePanelOpen: boolean;
+  /** null = авто (центр сцены). */
+  smokePosition: TheaterSmokePosition | null;
+  /** Сила струи / частота выбросов, 0…1. */
+  smokeIntensity: number;
+  /** Плотность / непрозрачность клубов, 0…1. */
+  smokeSaturation: number;
+  /** Масштаб частиц, ~0.3…2.5. */
+  smokeSize: number;
   /** Цвет фона 3D-сцены вокруг театра. */
   sceneBackgroundColor: string;
   /** Направляющие линии от источника софита к цели в 3D и на плане. */
@@ -33,6 +54,8 @@ export type TheaterViewPrefs = {
    * Выключи — поедут вместе со стенами.
    */
   hallResizeKeepObjects: boolean;
+  /** Одноразовый «Быстрый старт» (выбор шаблона зала) уже пройден. */
+  hallQuickStartDone: boolean;
 };
 
 export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
@@ -48,16 +71,23 @@ export const DEFAULT_THEATER_VIEW_PREFS: TheaterViewPrefs = {
   floorPlanMaxSide: 196,
   spectaclePreviewMode: false,
   alignGuidesEnabled: true,
-  activeTab: "spotlights",
+  activeTab: "navigate",
   outlineDrawMode: false,
   swapTheaterPanels: false,
   showTheaterControls: true,
   spotlightAimMode: "point",
   dutyLightEnabled: true,
+  smokeMachineEnabled: false,
+  smokePanelOpen: true,
+  smokePosition: null,
+  smokeIntensity: THEATER_SMOKE_INTENSITY_DEFAULT,
+  smokeSaturation: THEATER_SMOKE_SATURATION_DEFAULT,
+  smokeSize: THEATER_SMOKE_SIZE_DEFAULT,
   sceneBackgroundColor: "#6b7280",
   showSpotlightGuideLines: true,
   lightConsoleExpanded: false,
   hallResizeKeepObjects: true,
+  hallQuickStartDone: false,
 };
 
 export function theaterViewPrefsStorageKey(projectName: string) {
@@ -77,6 +107,24 @@ function readNumber(value: unknown, fallback: number, min?: number) {
 function readHexColor(value: unknown, fallback: string) {
   if (typeof value !== "string") return fallback;
   return /^#[0-9a-fA-F]{6}$/.test(value) ? value : fallback;
+}
+
+function readSmokePosition(value: unknown): TheaterSmokePosition | null {
+  if (!Array.isArray(value) || value.length !== 3) return null;
+  const x = value[0];
+  const y = value[1];
+  const z = value[2];
+  if (
+    typeof x !== "number" ||
+    typeof y !== "number" ||
+    typeof z !== "number" ||
+    !Number.isFinite(x) ||
+    !Number.isFinite(y) ||
+    !Number.isFinite(z)
+  ) {
+    return null;
+  }
+  return [x, y, z];
 }
 
 function readTab(value: unknown): TheaterViewPrefs["activeTab"] {
@@ -149,6 +197,26 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
         parsed.dutyLightEnabled,
         DEFAULT_THEATER_VIEW_PREFS.dutyLightEnabled,
       ),
+      smokeMachineEnabled: readBool(
+        parsed.smokeMachineEnabled,
+        DEFAULT_THEATER_VIEW_PREFS.smokeMachineEnabled,
+      ),
+      smokePanelOpen: readBool(
+        parsed.smokePanelOpen,
+        DEFAULT_THEATER_VIEW_PREFS.smokePanelOpen,
+      ),
+      smokePosition: readSmokePosition(parsed.smokePosition),
+      smokeIntensity: clampSmokeUnit(
+        readNumber(parsed.smokeIntensity, DEFAULT_THEATER_VIEW_PREFS.smokeIntensity),
+        DEFAULT_THEATER_VIEW_PREFS.smokeIntensity,
+      ),
+      smokeSaturation: clampSmokeUnit(
+        readNumber(parsed.smokeSaturation, DEFAULT_THEATER_VIEW_PREFS.smokeSaturation),
+        DEFAULT_THEATER_VIEW_PREFS.smokeSaturation,
+      ),
+      smokeSize: clampSmokeSize(
+        readNumber(parsed.smokeSize, DEFAULT_THEATER_VIEW_PREFS.smokeSize),
+      ),
       sceneBackgroundColor: readHexColor(
         parsed.sceneBackgroundColor,
         DEFAULT_THEATER_VIEW_PREFS.sceneBackgroundColor,
@@ -167,6 +235,8 @@ export function readTheaterViewPrefs(projectName: string): TheaterViewPrefs {
         parsed.hallResizeKeepObjects,
         DEFAULT_THEATER_VIEW_PREFS.hallResizeKeepObjects,
       ),
+      // Нет ключа у старых prefs → уже настроенный проект, окно не показываем.
+      hallQuickStartDone: readBool(parsed.hallQuickStartDone, true),
     };
   } catch {
     return DEFAULT_THEATER_VIEW_PREFS;

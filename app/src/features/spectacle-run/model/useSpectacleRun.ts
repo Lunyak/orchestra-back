@@ -4,21 +4,20 @@ import { showScriptMarkdownActions } from "../../show-script-markdown/model/show
 import { usePlaybook } from "../../playbook";
 import { playbookActions, type PlaybookLightChannelRolesV1 } from "../../playbook/model/playbook-slice";
 import {
-  applyKadrToFaders,
-  deleteKadrFromSceneMarkdown,
+  deleteKadrFromSceneData,
   findKadrById,
   formatDeleteKadrConfirmMessage,
   readSceneLightKadrs,
-  resolveKadrSectionForTapeItem,
 } from "../../theater/model/light-kadrs";
+import { applyKadrLook, copyKadrLookToTarget } from "../../theater/model/kadr-store";
 import { invokePlaylistPause } from "../../playbook/model/playbook-playback-bridge";
-import { parseSoundLineInSection } from "../../theater/model/kadr-sound";
-import { parseProjectorLineInSection, resolveKadrProjectorVideoOptions } from "../../theater/model/kadr-projector";
+import { resolveKadrProjectorVideoOptions } from "../../theater/model/kadr-projector";
 import { applyKadrProjector } from "./apply-kadr-projector";
 import { pauseProjectorVideo } from "../../projector/model/projector-playback-bridge";
 import { applyKadrSound } from "./apply-kadr-sound";
 import { useSpectacleRunProjector } from "./useSpectacleRunProjector";
 import { recordLightKadrForSection } from "../../../shared/components/light-console/light-kadr-record";
+import { migrateSceneLightKadrsFromMarkdown } from "./migrate-kadrs-from-markdown";
 import {
   resolveLightFaders,
   resolveLightProgramMinCount,
@@ -60,7 +59,13 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
   const dispatch = useAppDispatch();
   const { playbookData, setPlaybookData, updateScene, setCurrentPage, currentPage, saveScenesForLightPlot } =
     usePlaybook();
-  const tape = useMemo(() => buildSpectacleKadrTape(scenes), [scenes]);
+  const tape = useMemo(() => {
+    const scenesForTape = scenes.map((scene) => ({
+      ...scene,
+      lightKadrs: migrateSceneLightKadrsFromMarkdown(scene),
+    }));
+    return buildSpectacleKadrTape(scenesForTape);
+  }, [scenes]);
   const [tapeIndex, setTapeIndex] = useState(0);
   const [kadrModalOpen, setKadrModalOpen] = useState(false);
   const kadrModalOpenRef = useRef(false);
@@ -166,20 +171,10 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
 
       const item = tapeRef.current[index];
       const scene = item ? scenesRef.current[item.sceneIndex] : null;
-      if (!item || !scene || item.isPlaceholder) return;
-
-      const markdown = String(scene.markdown ?? "");
-      const section = resolveKadrSectionForTapeItem(markdown, item);
-      if (!section) {
-        setLiveStatus(
-          `Картина ${item.kadrNo}: блок не найден в тех. карте — откройте «Тех. карта» и проверьте ### Картина ${item.kadrNo}`,
-        );
-        return;
-      }
+      if (!item || !scene || item.isPlaceholder || !item.kadrId) return;
 
       const faders = snapshot?.faders ?? liveConsole.faders;
       const programs = snapshot?.programs ?? liveConsole.programs;
-      const kadrId = item.kadrId ?? section.id;
 
       const programId = Math.max(
         1,
@@ -192,9 +187,9 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
           : null;
 
       const result = recordLightKadrForSection({
-        markdown,
-        section,
-        existingKadrId: kadrId,
+        kadrId: item.kadrId,
+        kadrNo: item.kadrNo,
+        title: item.headingTitle,
         kadrs: readSceneLightKadrs(scene),
         lightChannels,
         lightFaders: faders,
@@ -211,7 +206,6 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
 
       updateScene(scene.id, {
         lightKadrs: result.nextKadrs,
-        markdown: result.nextMarkdown,
       } as Partial<ScriptScene>);
       setLiveStatus(result.summary);
       void saveScenesForLightPlot({ force: true });
@@ -235,9 +229,9 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     if (applyingTapeRef.current) return;
     if (kadrModalOpenRef.current) return;
     const item = tapeRef.current[tapeIndexRef.current];
-    if (!item || item.isPlaceholder) return;
+    if (!item || item.isPlaceholder || !item.kadrId) return;
     const scene = scenesRef.current[item.sceneIndex];
-    if (!scene || !resolveKadrSectionForTapeItem(String(scene.markdown ?? ""), item)) {
+    if (!scene) {
       return;
     }
     if (liveSaveTimerRef.current != null) {
@@ -260,46 +254,45 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
         return;
       }
 
-      const markdown = String(scene.markdown ?? "");
-      const section = resolveKadrSectionForTapeItem(markdown, item);
       const applyPlayback =
         options?.applyPlayback ??
         (lightPlotMode === "prog-run" && !progRunPausedRef.current);
-      if (section) {
-        const projectorCue = parseProjectorLineInSection(markdown, section);
-        if (projectorCue) setProjectorDraft(projectorCue);
-        if (applyPlayback) {
-          const soundCue = parseSoundLineInSection(markdown, section);
-          applyKadrSound(soundCue);
-          void (async () => {
-            if (projectorCue) {
-              await ensureProjectorOpen();
-            }
-            await applyKadrProjector(
-              projectorCue,
-              projectorMediaCtx,
-              projectorCue
-                ? resolveKadrProjectorVideoOptions(projectorCue, {
-                    resolveMuted: resolveProjectorVideoMuted,
-                    resolveVolume: resolveProjectorVideoVolume,
-                  })
-                : undefined,
-            );
-          })();
-        }
-      }
 
       const kadrs = readSceneLightKadrs(scene);
-      const kadrId = item.kadrId ?? section?.id ?? null;
-      const kadr = kadrId ? findKadrById(kadrs, kadrId) : undefined;
+      const kadr = item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined;
+      const projectorCue = kadr?.projector ?? null;
+
+      if (projectorCue) setProjectorDraft(projectorCue);
+      if (applyPlayback) {
+        applyKadrSound(kadr?.sound);
+        void (async () => {
+          if (projectorCue) {
+            await ensureProjectorOpen();
+          }
+          await applyKadrProjector(
+            projectorCue,
+            projectorMediaCtx,
+            projectorCue
+              ? resolveKadrProjectorVideoOptions(projectorCue, {
+                  resolveMuted: resolveProjectorVideoMuted,
+                  resolveVolume: resolveProjectorVideoVolume,
+                })
+              : undefined,
+          );
+        })();
+      }
 
       const applyFaders = options?.applyFaders !== false;
       if (kadr && applyFaders) {
-        const nextFaders = applyKadrToFaders(kadr, liveConsole.faders);
-        liveConsole.persistFaders(nextFaders);
-      }
-
-      if (kadr && kadr.programId > 0) {
+        const look = applyKadrLook(kadr, liveConsole.faders);
+        liveConsole.persistFaders(look.faders);
+        if (look.programId != null) {
+          liveConsole.persistPrograms({
+            ...liveConsole.programs,
+            activeProgramId: look.programId,
+          });
+        }
+      } else if (kadr && kadr.programId > 0) {
         liveConsole.persistPrograms({
           ...liveConsole.programs,
           activeProgramId: kadr.programId,
@@ -447,6 +440,53 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     void saveScenesForLightPlot({ force: true });
   }, [currentScene, previousScene, saveScenesForLightPlot, updateScene]);
 
+  const nextTapeItem = tape[tapeIndex + 1] ?? null;
+  const canCopyKadrToNext = Boolean(
+    currentItem &&
+      !currentItem.isPlaceholder &&
+      currentItem.kadrId &&
+      nextTapeItem &&
+      !nextTapeItem.isPlaceholder &&
+      nextTapeItem.kadrId &&
+      nextTapeItem.sceneIndex === currentItem.sceneIndex,
+  );
+
+  const copyCurrentKadrToNext = useCallback(() => {
+    flushLiveSave();
+    const sourceItem = tape[tapeIndex];
+    const targetItem = tape[tapeIndex + 1];
+    if (
+      !sourceItem ||
+      !targetItem ||
+      sourceItem.isPlaceholder ||
+      targetItem.isPlaceholder ||
+      !sourceItem.kadrId ||
+      !targetItem.kadrId ||
+      sourceItem.sceneIndex !== targetItem.sceneIndex
+    ) {
+      setLiveStatus(
+        targetItem && sourceItem && targetItem.sceneIndex !== sourceItem.sceneIndex
+          ? "Следующая карточка — другая сцена. Добавьте картину в этой сцене"
+          : "Нет следующей картины в этой сцене",
+      );
+      return;
+    }
+    const scene = scenes[sourceItem.sceneIndex];
+    if (!scene) return;
+    const nextKadrs = copyKadrLookToTarget({
+      kadrs: readSceneLightKadrs(scene),
+      sourceKadrId: sourceItem.kadrId,
+      targetKadrId: targetItem.kadrId,
+    });
+    if (!nextKadrs) {
+      setLiveStatus("У текущей картины ещё нет записанного света");
+      return;
+    }
+    updateScene(scene.id, { lightKadrs: nextKadrs });
+    setLiveStatus(`Свет скопирован на картину ${targetItem.kadrNo}`);
+    void saveScenesForLightPlot({ force: true });
+  }, [flushLiveSave, saveScenesForLightPlot, scenes, tape, tapeIndex, updateScene]);
+
   const addKadrToCurrentScene = useCallback(() => {
     if (!currentScene) return;
 
@@ -534,7 +574,6 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
         pendingTapeKadrIdRef.current = result.kadrId;
       }
       updateScene(scene.id, {
-        markdown: result.nextMarkdown,
         lightKadrs: result.nextKadrs,
       } as Partial<ScriptScene>);
 
@@ -542,11 +581,14 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
       if (savedKadr && !savedKadr.blackout && savedKadr.programId > 0) {
         applyingTapeRef.current = true;
         try {
-          liveConsole.persistFaders(applyKadrToFaders(savedKadr, liveConsole.faders));
-          liveConsole.persistPrograms({
-            ...liveConsole.programs,
-            activeProgramId: savedKadr.programId,
-          });
+          const look = applyKadrLook(savedKadr, liveConsole.faders);
+          liveConsole.persistFaders(look.faders);
+          if (look.programId != null) {
+            liveConsole.persistPrograms({
+              ...liveConsole.programs,
+              activeProgramId: look.programId,
+            });
+          }
         } finally {
           applyingTapeRef.current = false;
         }
@@ -589,14 +631,13 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
       liveSaveTimerRef.current = null;
     }
 
-    const { markdown, lightKadrs } = deleteKadrFromSceneMarkdown(scene, {
-      id: item.kadrId ?? item.section?.id,
+    const lightKadrs = deleteKadrFromSceneData(scene, {
+      id: item.kadrId,
       kadrNo: item.kadrNo,
-      headingStart: item.section?.headingStart,
     });
 
     pendingTapeIndexAfterDeleteRef.current = clampedIndex;
-    updateScene(scene.id, { markdown, lightKadrs } as Partial<ScriptScene>);
+    updateScene(scene.id, { lightKadrs } as Partial<ScriptScene>);
     void saveScenesForLightPlot({ force: true });
     setLiveStatus(`«${item.headingTitle}» удалена`);
   }, [clampedIndex, saveScenesForLightPlot, scenes, tape, updateScene]);
@@ -762,6 +803,8 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     canCopyTheaterFromPreviousScene,
     currentSceneTheaterEmpty,
     copyTheaterFromPreviousScene,
+    canCopyKadrToNext,
+    copyCurrentKadrToNext,
     kadrModalOpen,
     kadrModalMode,
     closeKadrModal,

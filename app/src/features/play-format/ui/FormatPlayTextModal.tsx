@@ -1,6 +1,7 @@
+import cn from "classnames";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "../../../shared/core/button/Button";
-import { LabeledCheckbox } from "../../../shared/core/labeled-checkbox/LabeledCheckbox";
+import { LabeledToggle } from "../../../shared/core/labeled-toggle/LabeledToggle";
 import { Modal } from "../../../shared/core/modal/Modal";
 import { applyPreviewLineEdits } from "../model/apply-preview-line-edits";
 import {
@@ -22,6 +23,7 @@ import {
   deriveSceneTitleFromChunk,
   splitPlayTextIntoChunks,
 } from "../model/splitPlayTextIntoChunks";
+import { FormatPlayMarkdownPreview } from "./FormatPlayMarkdownPreview";
 import "./format-play-text-modal.css";
 
 const ALIAS_DEBOUNCE_MS = 400;
@@ -306,10 +308,6 @@ export function FormatPlayTextModal({
     preview.stats.unmatchedMarkers.length > 0 &&
     preview.stats.inlineSplits === 0;
   const splitBlocked = splitIntoScenes && sceneChunks.length <= 1;
-  const previewWarningLines = useMemo(
-    () => new Set(displayWarnings.map((warning) => warning.line)),
-    [displayWarnings],
-  );
   const previewWarningByLine = useMemo(() => {
     const map = new Map<number, string>();
     for (const warning of displayWarnings) {
@@ -340,7 +338,7 @@ export function FormatPlayTextModal({
           Отформатировать текст пьесы
         </h2>
         <p className="format-play-text-modal__subtitle">
-          Роли — из «Действующие лица». Псевдонимы — по чекбоксу. Правка строк — в превью.
+          Роли — из «Действующие лица». Псевдонимы — отдельным тоглом. Правка строк — в превью.
         </p>
       </header>
 
@@ -350,78 +348,47 @@ export function FormatPlayTextModal({
           Настройки форматирования
         </summary>
         <div className="format-play-text-modal__options format-play-text-modal__options--compact">
-        <label className="format-play-text-modal__option">
-          <input
-            type="checkbox"
-            checked={cleanOcr}
-            onChange={(event) => setCleanOcr(event.target.checked)}
-          />
-          Почистить OCR (склеить «З о т и к о в и ч»)
-        </label>
-        <label className="format-play-text-modal__option">
-          <input
-            type="checkbox"
+          <LabeledToggle checked={cleanOcr} onChange={setCleanOcr}>
+            Почистить OCR (склеить «З о т и к о в и ч»)
+          </LabeledToggle>
+          <LabeledToggle
             checked={removeOcrNoise}
             disabled={!cleanOcr}
-            onChange={(event) => setRemoveOcrNoise(event.target.checked)}
-          />
-          Убрать служебные строки (FB2, OCR, библиография)
-        </label>
-        <label className="format-play-text-modal__option">
-          <input
-            type="checkbox"
-            checked={formatCastList}
-            onChange={(event) => setFormatCastList(event.target.checked)}
-          />
-          Форматировать «Действующие лица»
-        </label>
-        <label className="format-play-text-modal__option">
-          <input
-            type="checkbox"
-            checked={protectTitlePage}
-            onChange={(event) => setProtectTitlePage(event.target.checked)}
-          />
-          Не трогать титул (до списка персонажей / первого акта)
-        </label>
-        <label className="format-play-text-modal__option">
-          <input
-            type="checkbox"
-            checked={mergeBrokenLines}
-            onChange={(event) => setMergeBrokenLines(event.target.checked)}
-          />
-          Склеить разорванные строки
-        </label>
-        <label className="format-play-text-modal__option">
-          <input
-            type="checkbox"
-            checked={wrapRoleLabels}
-            onChange={(event) => setWrapRoleLabels(event.target.checked)}
-          />
-          Расставить лейблы в строке (ЕЛЕНА: …)
-        </label>
+            onChange={setRemoveOcrNoise}
+          >
+            Убрать служебные строки (FB2, OCR, библиография)
+          </LabeledToggle>
+          <LabeledToggle checked={formatCastList} onChange={setFormatCastList}>
+            Форматировать «Действующие лица»
+          </LabeledToggle>
+          <LabeledToggle checked={protectTitlePage} onChange={setProtectTitlePage}>
+            Не трогать титул (до списка персонажей / первого акта)
+          </LabeledToggle>
+          <LabeledToggle checked={mergeBrokenLines} onChange={setMergeBrokenLines}>
+            Склеить разорванные строки
+          </LabeledToggle>
+          <LabeledToggle checked={wrapRoleLabels} onChange={setWrapRoleLabels}>
+            Расставить лейблы в строке (ЕЛЕНА: …)
+          </LabeledToggle>
         </div>
       </details>
 
       <div className="format-play-text-modal__markers">
         <div className="format-play-text-modal__markers-head">
-          <label className="format-play-text-modal__option format-play-text-modal__option--compact" htmlFor={markersFieldId}>
-            <input
-              id={markersFieldId}
-              type="checkbox"
-              checked={useRoleMarkers}
-              onChange={(event) => setUseRoleMarkers(event.target.checked)}
-            />
+          <LabeledToggle
+            id={markersFieldId}
+            checked={useRoleMarkers}
+            onChange={setUseRoleMarkers}
+          >
             Расставить роли в тексте
-          </label>
-          <label className="format-play-text-modal__option format-play-text-modal__option--compact">
-            <input
-              type="checkbox"
-              checked={useRoleAliases}
-              disabled={!useRoleMarkers}
-              onChange={(event) => setUseRoleAliases(event.target.checked)}
-            />
+          </LabeledToggle>
+          <LabeledToggle
+            checked={useRoleAliases}
+            disabled={!useRoleMarkers}
+            onChange={setUseRoleAliases}
+          >
             Псевдонимы
-          </label>
+          </LabeledToggle>
         </div>
         <p className="format-play-text-modal__markers-hint">
           Список из блока <strong>«Действующие лица»</strong>. Включи «Псевдонимы», если в репликах
@@ -483,7 +450,7 @@ export function FormatPlayTextModal({
                   .filter(Boolean)
                   .join(" ")}
               >
-                <LabeledCheckbox
+                <LabeledToggle
                   className="format-play-text-modal__markers-item"
                   checked={entry.enabled}
                   disabled={!useRoleMarkers}
@@ -526,7 +493,7 @@ export function FormatPlayTextModal({
                   {entry.isCustom ? (
                     <span className="format-play-text-modal__markers-tag">своё</span>
                   ) : null}
-                </LabeledCheckbox>
+                </LabeledToggle>
                 {useRoleAliases ? (
                   <input
                     type="text"
@@ -578,14 +545,9 @@ export function FormatPlayTextModal({
       </div>
 
       <div className="format-play-text-modal__split format-play-text-modal__split--compact">
-        <label className="format-play-text-modal__option format-play-text-modal__option--compact">
-          <input
-            type="checkbox"
-            checked={splitIntoScenes}
-            onChange={(event) => setSplitIntoScenes(event.target.checked)}
-          />
+        <LabeledToggle checked={splitIntoScenes} onChange={setSplitIntoScenes}>
           Разбить на сцены по актам, сценам и картинам
-        </label>
+        </LabeledToggle>
         {splitIntoScenes ? (
           <p className="format-play-text-modal__split-hint">
             {sceneChunks.length > 1
@@ -601,39 +563,34 @@ export function FormatPlayTextModal({
           <pre className="format-play-text-modal__text">{sourceText || "—"}</pre>
         </div>
         <div className="format-play-text-modal__pane">
-          <div className="format-play-text-modal__pane-title">Станет</div>
-          <div className="format-play-text-modal__text">
-            {displayPreviewText
-              ? displayPreviewText.split("\n").map((line, index) => {
-                  const lineNo = index + 1;
-                  const isWarn = previewWarningLines.has(lineNo);
-                  const isEditing = editingLineNo === lineNo;
-                  return (
-                    <div
-                      key={lineNo}
-                      className={[
-                        "format-play-text-modal__text-line",
-                        isWarn ? "format-play-text-modal__text-line--warn" : "",
-                        isEditing ? "format-play-text-modal__text-line--editing" : "",
-                        isWarn ? "format-play-text-modal__text-line--clickable" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      title={
-                        isWarn
-                          ? `${previewWarningByLine.get(lineNo) ?? ""} — кликни, чтобы править`
-                          : undefined
-                      }
-                      onClick={() => {
-                        if (isWarn) openLineEdit(lineNo, line);
-                      }}
-                    >
-                      {line || " "}
-                    </div>
-                  );
-                })
-              : "—"}
-          </div>
+          <div className="format-play-text-modal__pane-title">Станет · чтение</div>
+          {displayWarnings.length > 0 ? (
+            <div className="format-play-text-modal__warn-lines" role="list">
+              {displayWarnings.map((warning) => {
+                const isEditing = editingLineNo === warning.line;
+                return (
+                  <button
+                    key={`${warning.line}-${warning.message}`}
+                    type="button"
+                    role="listitem"
+                    className={cn(
+                      "format-play-text-modal__warn-line",
+                      isEditing && "format-play-text-modal__warn-line--editing",
+                    )}
+                    title={previewWarningByLine.get(warning.line)}
+                    onClick={() => {
+                      const line =
+                        displayPreviewText.split("\n")[warning.line - 1] ?? "";
+                      openLineEdit(warning.line, line);
+                    }}
+                  >
+                    стр. {warning.line}: {warning.message}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          <FormatPlayMarkdownPreview markdown={displayPreviewText} />
         </div>
       </div>
 
@@ -682,7 +639,7 @@ export function FormatPlayTextModal({
             {preview.stats.unmatchedMarkers.map((marker) => `«${marker}»`).join(", ")}.
           </>
         ) : displayWarnings.length > 0 ? (
-          <>Проверь строки: {warningsSummary}. Кликни подсвеченную строку в «Станет».</>
+          <>Проверь строки: {warningsSummary}. Кликни предупреждение над превью «Станет».</>
         ) : preview.stats.inlineSplits > 0 ||
           preview.stats.mergedLines > 0 ||
           preview.stats.labeledLines > 0 ||

@@ -5,6 +5,7 @@ import { AppEditorPlaylistEditToggle } from "./AppEditorPlaylistEditToggle";
 import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
 import { AppEditorHomeLink } from "./AppEditorHomeLink";
 import { AppEditorMenubarProjectSelect } from "./AppEditorMenubarProjectSelect";
+import { AppEditorSpectacleDirectionsNav } from "./AppEditorSpectacleDirectionsNav";
 import { useAppEditorMenubarCenter, useAppEditorMenubarToolbarActions, useAppEditorMenubarViewMenu } from "./AppEditorMenubarContext";
 import "./style.css";
 
@@ -58,6 +59,7 @@ export function AppEditorMenubar() {
             onClick={handleMenusClick}
           >
             <AppEditorHomeLink />
+            <AppEditorSpectacleDirectionsNav />
             {viewMenu}
           </div>
         </div>

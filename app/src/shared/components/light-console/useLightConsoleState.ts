@@ -13,11 +13,10 @@ import {
   coerceProgramId,
   createDefaultLightFaders,
   lightProgramsNeedNormalization,
-  readProgramChannelFaderStates,
   resolveLightProgramMinCount,
   resolveLightPrograms,
   upsertActiveProgramSnapshotFromAllChannels,
-  upsertProgramChannelSnapshot,
+  upsertChannelMemorySnapshot,
 } from "./light-console-data";
 
 type UseLightConsoleStateArgs = {
@@ -34,7 +33,7 @@ type UseLightConsoleStateArgs = {
 
 export function useLightConsoleState({
   projectName,
-  spotlights = [],
+  spotlights: _spotlights = [],
   fadersOverride,
   activeProgramIdOverride,
   readOnly = false,
@@ -43,9 +42,7 @@ export function useLightConsoleState({
 }: UseLightConsoleStateArgs) {
   const dispatch = useAppDispatch();
   const { playbookData, setPlaybookData } = usePlaybook();
-  const programSaveTimerRef = useRef<number | null>(null);
   const channelSaveTimerRef = useRef<number | null>(null);
-  const activeProgramIdRef = useRef<number | null>(null);
   const editingChannelRef = useRef(1);
   const programsBootstrappedRef = useRef(false);
   const { lightChannels, selectedLightSlot } = useAppSelector((state) =>
@@ -67,6 +64,7 @@ export function useLightConsoleState({
       resolveLightPrograms(
         playbookData?.lightPrograms,
         resolveLightProgramMinCount(lightChannels.length, playbookData?.lightPrograms),
+        lightChannels.length,
       ),
     [lightChannels.length, playbookData?.lightPrograms],
   );
@@ -115,11 +113,17 @@ export function useLightConsoleState({
         const resolvedPrograms = resolveLightPrograms(
           prevPrograms,
           resolveLightProgramMinCount(lightChannels.length, prevPrograms, channel),
+          lightChannels.length,
         );
         return {
           ...(prev ?? {}),
           lightFaders: next,
-          lightPrograms: upsertProgramChannelSnapshot(resolvedPrograms, channel, next),
+          lightPrograms: upsertChannelMemorySnapshot(
+            resolvedPrograms,
+            channel,
+            next,
+            lightChannels.length,
+          ),
         };
       });
     },
@@ -137,7 +141,7 @@ export function useLightConsoleState({
   const persistPrograms = useCallback(
     (next: PlaybookLightProgramsDataV1) => {
       if (readOnly) return;
-      const normalized = resolveLightPrograms(next);
+      const normalized = resolveLightPrograms(next, undefined, lightChannels.length);
       if (onProgramsChange) {
         onProgramsChange(normalized);
         return;
@@ -147,19 +151,25 @@ export function useLightConsoleState({
         lightPrograms: normalized,
       }));
     },
-    [onProgramsChange, readOnly, setPlaybookData],
+    [lightChannels.length, onProgramsChange, readOnly, setPlaybookData],
   );
 
   useEffect(() => {
     if (readOnly || fadersOverride || programsBootstrappedRef.current) return;
     const raw = playbookData?.lightPrograms;
-    if (!lightProgramsNeedNormalization(raw)) {
+    if (!lightProgramsNeedNormalization(raw, lightChannels.length)) {
       programsBootstrappedRef.current = true;
       return;
     }
     programsBootstrappedRef.current = true;
-    persistPrograms(resolveLightPrograms(raw));
-  }, [fadersOverride, persistPrograms, readOnly, playbookData?.lightPrograms]);
+    persistPrograms(resolveLightPrograms(raw, undefined, lightChannels.length));
+  }, [
+    fadersOverride,
+    lightChannels.length,
+    persistPrograms,
+    readOnly,
+    playbookData?.lightPrograms,
+  ]);
 
   const patchFader = (
     faderId: number,
@@ -173,21 +183,33 @@ export function useLightConsoleState({
 
   const applyProgram = (program = activeProgram) => {
     if (!program || readOnly) return;
-    const stateByFader = new Map(program.faders.map((state) => [state.faderId, state]));
-    persistFaders({
-      v: 1,
-      count: faders.count,
-      faders: faders.faders.map((item) => {
-        const state = stateByFader.get(item.id);
-        return state
-          ? {
-              ...item,
-              intensity: state.intensity ?? item.intensity,
-              enabled: state.enabled ?? item.enabled,
-              color: state.color ?? item.color,
-            }
-          : item;
-      }),
+    const nextFaders = applyProgramFaderStatesToBoard(faders, program.faders ?? []);
+    const channel = Math.max(1, editingChannelRef.current || selectedLightSlot || 1);
+    if (onFadersChange) {
+      onFadersChange(nextFaders);
+      persistPrograms(
+        upsertChannelMemorySnapshot(programs, channel, nextFaders, lightChannels.length),
+      );
+      return;
+    }
+    setPlaybookData((prev) => {
+      const prevPrograms =
+        prev?.lightPrograms && prev.lightPrograms.v === 1 ? prev.lightPrograms : programs;
+      const resolved = resolveLightPrograms(
+        prevPrograms,
+        resolveLightProgramMinCount(lightChannels.length, prevPrograms),
+        lightChannels.length,
+      );
+      return {
+        ...(prev ?? {}),
+        lightFaders: nextFaders,
+        lightPrograms: upsertChannelMemorySnapshot(
+          resolved,
+          channel,
+          nextFaders,
+          lightChannels.length,
+        ),
+      };
     });
   };
 
@@ -218,9 +240,9 @@ export function useLightConsoleState({
       if (readOnly || fadersOverride) return;
       const id = coerceProgramId(channelId);
       if (id == null) return;
-      persistPrograms(upsertProgramChannelSnapshot(programs, id, faders));
+      persistPrograms(upsertChannelMemorySnapshot(programs, id, faders, lightChannels.length));
     },
-    [faders, fadersOverride, persistPrograms, programs, readOnly],
+    [faders, fadersOverride, lightChannels.length, persistPrograms, programs, readOnly],
   );
 
   useEffect(() => {
@@ -241,26 +263,6 @@ export function useLightConsoleState({
   }, [fadersOverride, fadersSnapshotKey, readOnly, saveChannelSnapshot, selectedLightSlot]);
 
   useEffect(() => {
-    if (!activeProgram || readOnly || fadersOverride) return;
-    if (activeProgramIdRef.current !== activeProgram.id) {
-      activeProgramIdRef.current = activeProgram.id;
-      return;
-    }
-    if (programSaveTimerRef.current != null) {
-      window.clearTimeout(programSaveTimerRef.current);
-    }
-    programSaveTimerRef.current = window.setTimeout(() => {
-      saveProgramSnapshot();
-      programSaveTimerRef.current = null;
-    }, 550);
-    return () => {
-      if (programSaveTimerRef.current != null) {
-        window.clearTimeout(programSaveTimerRef.current);
-      }
-    };
-  }, [activeProgram?.id, fadersOverride, fadersSnapshotKey, readOnly, saveProgramSnapshot]);
-
-  useEffect(() => {
     editingChannelRef.current = Math.max(1, selectedLightSlot || 1);
   }, [selectedLightSlot]);
 
@@ -274,10 +276,16 @@ export function useLightConsoleState({
         window.clearTimeout(channelSaveTimerRef.current);
         channelSaveTimerRef.current = null;
       }
-      const programsAfterSave = upsertProgramChannelSnapshot(programs, prev, faders);
+      const programsAfterSave = upsertChannelMemorySnapshot(
+        programs,
+        prev,
+        faders,
+        lightChannels.length,
+      );
       const resolvedPrograms = resolveLightPrograms(
         programsAfterSave,
         resolveLightProgramMinCount(lightChannels.length, programsAfterSave, next),
+        lightChannels.length,
       );
       const nextFaders = buildFaderBoardForConsoleChannel(faders, resolvedPrograms, next);
       editingChannelRef.current = next;
@@ -302,30 +310,33 @@ export function useLightConsoleState({
     if (id == null) return;
     const program = programs.programs.find((item) => item.id === id);
     if (!program) return;
-    activeProgramIdRef.current = id;
 
+    const channel = Math.max(1, editingChannelRef.current || selectedLightSlot || 1);
     if (channelSaveTimerRef.current != null) {
       window.clearTimeout(channelSaveTimerRef.current);
       channelSaveTimerRef.current = null;
     }
-    const programsAfterChannelSave = upsertProgramChannelSnapshot(
+
+    const programsAfterChannelSave = upsertChannelMemorySnapshot(
       programs,
-      editingChannelRef.current,
+      channel,
       faders,
+      lightChannels.length,
     );
-    const resolvedPrograms = resolveLightPrograms(
-      programsAfterChannelSave,
-      resolveLightProgramMinCount(lightChannels.length, programsAfterChannelSave, id),
-    );
-    const nextFaders = buildFaderBoardForConsoleChannel(faders, resolvedPrograms, id);
-    editingChannelRef.current = id;
-    const nextPrograms = {
-      ...resolvedPrograms,
+    const nextFaders = applyProgramFaderStatesToBoard(faders, program.faders ?? []);
+    const nextPrograms: PlaybookLightProgramsDataV1 = {
+      ...programsAfterChannelSave,
       activeProgramId: id,
+      channels: upsertChannelMemorySnapshot(
+        programsAfterChannelSave,
+        channel,
+        nextFaders,
+        lightChannels.length,
+      ).channels,
     };
 
     if (onProgramsChange) {
-      onProgramsChange(nextPrograms);
+      onProgramsChange(resolveLightPrograms(nextPrograms, undefined, lightChannels.length));
       onFadersChange?.(nextFaders);
       return;
     }
@@ -337,10 +348,7 @@ export function useLightConsoleState({
 
     setPlaybookData((prev) => ({
       ...(prev ?? {}),
-      lightPrograms: resolveLightPrograms({
-        ...(prev?.lightPrograms && prev.lightPrograms.v === 1 ? prev.lightPrograms : programs),
-        activeProgramId: id,
-      }),
+      lightPrograms: resolveLightPrograms(nextPrograms, undefined, lightChannels.length),
       lightFaders: nextFaders,
     }));
   };

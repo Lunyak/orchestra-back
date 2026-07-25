@@ -11,9 +11,7 @@ import {
 import {
   prepareSceneLightBindings,
 } from "../../theater/model/theater-light-fader-bindings";
-import {
-  resolveInitialTheaterLayout,
-} from "../../theater/model/theater-layout-draft-storage";
+import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { playbookActions, DEFAULT_THEATER_LAYOUT } from "./playbook-slice";
 import {
   normalizeLightChannelsFromServer,
@@ -65,11 +63,11 @@ export async function ensurePlaybookServerShadowForPush(
       (Array.isArray((pull as any)?.theaterLayouts) ? (pull as any).theaterLayouts : []).find(
         (tl: any) => syncRowMatchesPlaybook(tl, sceneId),
       ) ?? null;
-    const normalizedLayout = resolveInitialTheaterLayout(
-      projectName,
-      normalizeTheaterLayoutFromServer(layoutRow),
-      DEFAULT_THEATER_LAYOUT,
-    );
+    // Shadow must be server-only. Using the dirty local draft here makes
+    // theaterLayout diffs look empty, so door/recess moves never push.
+    const normalizedLayout =
+      normalizeTheaterLayoutFromServer(layoutRow) ??
+      normalizePersistedTheaterLayout(DEFAULT_THEATER_LAYOUT);
 
     const serverLightFaders = (sceneRow as any)?.lightFaders ?? null;
     const shadowPlaybookData: any = {

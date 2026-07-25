@@ -1,6 +1,5 @@
 import cn from "classnames";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { SPECTACLE_HUB_ROUTE_PATH } from "../../../app/router/routeMeta";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useProject } from "../../project";
 import {
   scriptUiActions,
@@ -13,10 +12,7 @@ import {
 } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../../../shared/components/show-script/script-markdown-tab-labels";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
-import {
-  getSpectacleHubDirections,
-  type SpectacleHubDirection,
-} from "../model/spectacle-hub-directions";
+import { SpectacleScriptFormattingHost } from "./SpectacleScriptFormattingHost";
 import "./spectacle-direction-switch.css";
 
 const SCRIPT_SCENE_NAME = "script";
@@ -41,56 +37,6 @@ const TECH_MODE_ITEMS: ReadonlyArray<{
   { id: "prog-run", label: "Прогон" },
   { id: "tech-card", label: SCRIPT_MARKDOWN_NOTES_TAB_LABEL },
 ];
-
-function isDirectionActive(
-  direction: SpectacleHubDirection,
-  pathname: string,
-) {
-  if (direction.path === "/") {
-    return pathname === "/";
-  }
-  return pathname === direction.path || pathname.startsWith(`${direction.path}/`);
-}
-
-export function SpectacleDirectionSwitchList() {
-  const { pathname } = useLocation();
-  const directions = getSpectacleHubDirections();
-  const hubActive = pathname === SPECTACLE_HUB_ROUTE_PATH;
-
-  return (
-    <ul className="spectacle-direction-switch__list" aria-label="Направления">
-      {directions.map((direction) => {
-        const isActive = isDirectionActive(direction, pathname);
-        return (
-          <li key={direction.id}>
-            <Link
-              to={direction.path}
-              className={cn(
-                "spectacle-direction-switch__item",
-                isActive && "spectacle-direction-switch__item--active",
-              )}
-              aria-current={isActive ? "page" : undefined}
-            >
-              {direction.label}
-            </Link>
-          </li>
-        );
-      })}
-      <li>
-        <Link
-          to={SPECTACLE_HUB_ROUTE_PATH}
-          className={cn(
-            "spectacle-direction-switch__item",
-            hubActive && "spectacle-direction-switch__item--active",
-          )}
-          aria-current={hubActive ? "page" : undefined}
-        >
-          Обзор
-        </Link>
-      </li>
-    </ul>
-  );
-}
 
 function SpectacleScriptModeSwitchList() {
   const dispatch = useAppDispatch();
@@ -216,11 +162,19 @@ export function SpectacleDirectionSwitch() {
   const showScriptModes = pathname === "/";
   const showTechModes = pathname === "/light-plot";
 
+  if (!showScriptModes && !showTechModes) {
+    return null;
+  }
+
   return (
-    <nav className="spectacle-direction-switch" aria-label="Направления спектакля">
-      <SpectacleDirectionSwitchList />
-      {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
-      {showTechModes ? <SpectacleTechModeSwitchList /> : null}
+    <nav className="spectacle-direction-switch" aria-label="Режимы спектакля">
+      <div className="spectacle-direction-switch__left">
+        {showScriptModes ? <SpectacleScriptFormattingHost /> : null}
+      </div>
+      <div className="spectacle-direction-switch__right">
+        {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
+        {showTechModes ? <SpectacleTechModeSwitchList /> : null}
+      </div>
     </nav>
   );
 }

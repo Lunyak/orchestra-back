@@ -34,7 +34,7 @@ export type ChairMetrics = {
 };
 
 export function labelM(name: string) {
-  return `${name}, ${THEATER_UNIT}`;
+  return name;
 }
 
 export function roundM(value: number) {

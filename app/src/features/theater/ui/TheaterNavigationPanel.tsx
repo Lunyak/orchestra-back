@@ -2,10 +2,11 @@ import { useState } from "react";
 import cn from "classnames";
 import type { TheaterSceneViewModel } from "../model/use-theater-scene";
 import { TheaterControlsOutlinerSection } from "./controls/TheaterControlsOutlinerSection";
-import { TheaterControlsProjectSection } from "./controls/TheaterControlsProjectSection";
+import { TheaterControlsViewSection } from "./controls/TheaterControlsViewSection";
 import { TheaterKeyboardShortcuts } from "./TheaterKeyboardShortcuts";
+import { TheaterKadrTape } from "./TheaterKadrTape";
 
-type NavigationPanelTab = "scene" | "project" | "help";
+type NavigationPanelTab = "scene" | "kadrs" | "view" | "help";
 
 export type TheaterNavigationPanelProps = {
   vm: TheaterSceneViewModel;
@@ -13,11 +14,17 @@ export type TheaterNavigationPanelProps = {
   embedded?: boolean;
 };
 
-/** Outliner, проект и закладки камеры — отдельно от настроек инструментов. */
+/** Outliner, картины, вид и справка — отдельно от настроек инструментов. */
 export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelProps) {
   const [tab, setTab] = useState<NavigationPanelTab>("scene");
   const activePanelLabel =
-    tab === "scene" ? "Сцена" : tab === "project" ? "Проект" : "Справка";
+    tab === "scene"
+      ? "Сцена"
+      : tab === "kadrs"
+        ? "Картины"
+        : tab === "view"
+          ? "Вид"
+          : "Справка";
 
   return (
     <div
@@ -30,7 +37,7 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
       <div
         className="theater-navigation-panel-tabs"
         role="tablist"
-        aria-label="Сцена и проект"
+        aria-label="Сцена, картины, вид и справка"
       >
         <button
           type="button"
@@ -47,14 +54,26 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
         <button
           type="button"
           role="tab"
-          aria-selected={tab === "project"}
+          aria-selected={tab === "kadrs"}
           className={cn(
             "theater-navigation-panel-tab",
-            tab === "project" && "theater-navigation-panel-tab--selected",
+            tab === "kadrs" && "theater-navigation-panel-tab--selected",
           )}
-          onClick={() => setTab("project")}
+          onClick={() => setTab("kadrs")}
         >
-          Проект
+          Картины
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "view"}
+          className={cn(
+            "theater-navigation-panel-tab",
+            tab === "view" && "theater-navigation-panel-tab--selected",
+          )}
+          onClick={() => setTab("view")}
+        >
+          Вид
         </button>
         <button
           type="button"
@@ -75,7 +94,8 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
         aria-label={activePanelLabel}
       >
         {tab === "scene" ? <TheaterControlsOutlinerSection vm={vm} /> : null}
-        {tab === "project" ? <TheaterControlsProjectSection vm={vm} /> : null}
+        {tab === "kadrs" ? <TheaterKadrTape vm={vm} /> : null}
+        {tab === "view" ? <TheaterControlsViewSection vm={vm} /> : null}
         {tab === "help" ? <TheaterKeyboardShortcuts /> : null}
       </div>
     </div>

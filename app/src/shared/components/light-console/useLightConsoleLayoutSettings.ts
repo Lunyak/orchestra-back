@@ -25,8 +25,9 @@ export function useLightConsoleLayoutSettings(projectName: string) {
         lightChannels,
         lightFaders: playbookData?.lightFaders,
         lightPrograms: playbookData?.lightPrograms,
+        lightConsoleUi: playbookData?.lightConsoleUi,
       }),
-    [lightChannels, playbookData?.lightFaders, playbookData?.lightPrograms],
+    [lightChannels, playbookData?.lightFaders, playbookData?.lightPrograms, playbookData?.lightConsoleUi],
   );
 
   const applyLayout = useCallback(

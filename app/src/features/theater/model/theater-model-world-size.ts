@@ -120,10 +120,8 @@ function isHelperMesh(mesh: THREE.Mesh): boolean {
   });
 }
 
-/** Реальные габариты того, что видно на сцене (мировой AABB). */
-export function measureObjectWorldSize(
-  root: THREE.Object3D,
-): TheaterModelWorldSize | null {
+/** Мировой AABB видимой геометрии (без helper-mesh). */
+export function measureObjectWorldBox(root: THREE.Object3D): THREE.Box3 | null {
   root.updateWorldMatrix(true, true);
   const box = new THREE.Box3();
   const temp = new THREE.Box3();
@@ -143,6 +141,15 @@ export function measureObjectWorldSize(
   });
 
   if (!hasMesh || box.isEmpty()) return null;
+  return box;
+}
+
+/** Реальные габариты того, что видно на сцене (мировой AABB). */
+export function measureObjectWorldSize(
+  root: THREE.Object3D,
+): TheaterModelWorldSize | null {
+  const box = measureObjectWorldBox(root);
+  if (!box) return null;
   const size = box.getSize(new THREE.Vector3());
   if (
     !Number.isFinite(size.x) ||
@@ -176,7 +183,7 @@ export function resolveTheaterModelWorldSize(
 export function formatTheaterModelWorldSize(
   size: TheaterModelWorldSize,
 ): string {
-  return `Ш ${size.width.toFixed(2)} · Д ${size.depth.toFixed(2)} · В ${size.height.toFixed(2)} м`;
+  return `Ш ${size.width.toFixed(2)} · Д ${size.depth.toFixed(2)} · В ${size.height.toFixed(2)}`;
 }
 
 const MIN_MODEL_SIZE_M = 0.05;

@@ -16,7 +16,7 @@ import {
 
   findKadrById,
 
-  readSceneLightKadrsFromMarkdown,
+  readSceneLightKadrs,
 
 } from "../../theater/model/light-kadrs";
 
@@ -37,7 +37,7 @@ import {
 } from "../model/spectacle-kadr-tape";
 
 import { parseKadrTitleFromHeading } from "../model/create-kadr-from-draft";
-import { findFirstKadrSectionImageHref } from "../model/kadr-section-image";
+import { findFirstMarkdownImageHref } from "../../../shared/utils/markdownImages";
 
 import { formatKadrRunLabelText } from "../model/kadr-section-labels";
 
@@ -119,7 +119,7 @@ function kadrProgramColor(
 
   if (item.isPlaceholder || !scene) return null;
 
-  const kadrs = readSceneLightKadrsFromMarkdown(scene);
+  const kadrs = readSceneLightKadrs(scene);
 
   const kadr =
 
@@ -516,9 +516,8 @@ function SpectacleRunKadrStripProgRunChip({
                     "spectacle-run-kadr-strip__chip-corner-label",
 
                     label.type === "blackout" && "spectacle-run-kadr-strip__chip-corner-label--blackout",
-
-                    label.type === "smoke" && "spectacle-run-kadr-strip__chip-corner-label--smoke",
-
+                    (label.type === "smoke" || label.type === "smoke-machine") &&
+                      "spectacle-run-kadr-strip__chip-corner-label--smoke",
                   )}
 
                 >
@@ -741,13 +740,14 @@ export function SpectacleRunKadrStrip({
                     ? `${chipLabel} · ${displayKadrTitle}`
                     : chipLabel;
 
-                const markdown = String(scene?.markdown ?? "");
+                const kadrForImage =
+                  scene && item.kadrId
+                    ? findKadrById(readSceneLightKadrs(scene), item.kadrId)
+                    : undefined;
 
                 const imageHref = item.isPlaceholder
-
                   ? null
-
-                  : findFirstKadrSectionImageHref(markdown, item.section);
+                  : findFirstMarkdownImageHref(kadrForImage?.imageMarkdown ?? "");
 
                 const chipKey = `${item.sceneId}-${item.kadrId ?? "ph"}-${item.kadrNo}-${index}`;
 

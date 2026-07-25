@@ -10,19 +10,26 @@ import * as THREE from "three";
 import type { TheaterLayout } from "../../../../shared/types/script";
 import { resolveLayoutDoors } from "../../model/theater-doors";
 import {
+  getRecessCenterOnWall,
+  resolveLayoutWallRecesses,
+} from "../../model/theater-wall-recesses";
+import {
   buildStageWallMeshes,
   findStageWallChainHiddenFromCamera,
+  getDoorCenterOnWall,
   resolveStageGeometry,
   type WallHideGroup,
   type WallSegment3D,
 } from "../../model/theater-stage-geometry";
 import { InstancedAudienceSeats } from "./InstancedAudienceSeats";
 import { AudienceBoundaryLine } from "./AudienceBoundaryLine";
+import { STAGE_DOOR_MODEL_BASE, StageDoorModel } from "./StageDoorModel";
 import { TheaterStageFloor } from "./TheaterStageFloor";
 import { TheaterStageGridOverlay } from "./TheaterStageGridOverlay";
 import { TheaterStageGridPicker } from "./TheaterStageGridPicker";
 import { TheaterSurfaceMaterial } from "./TheaterSurfaceMaterial";
 import { resolveHallOffsetX, resolveHallOffsetZ } from "../../model/theater-hall-expand";
+import type { TheaterDoor, TheaterWallRecess } from "../../../../shared/types/script";
 
 const WALL_OPACITY = 0.38;
 
@@ -248,6 +255,144 @@ function StageWalls({
   );
 }
 
+function doorPlacementOnWall(
+  wall: TheaterDoor["wall"] | TheaterWallRecess["wall"],
+  center: { x: number; z: number },
+  inset: number,
+) {
+  let x = center.x;
+  let z = center.z;
+  let rotationY = 0;
+  if (wall === "left") {
+    x += inset;
+    rotationY = Math.PI / 2;
+  } else if (wall === "right") {
+    x -= inset;
+    rotationY = -Math.PI / 2;
+  } else if (wall === "back") {
+    z += inset;
+    rotationY = Math.PI;
+  } else {
+    z -= inset;
+  }
+  return { x, z, rotationY };
+}
+
+function DoorLeaf({
+  layout,
+  door,
+  isActive,
+}: {
+  layout: TheaterLayout;
+  door: TheaterDoor;
+  isActive: boolean;
+}) {
+  const center = getDoorCenterOnWall(door, layout);
+  const planeGeometry = useMemo(
+    () => new THREE.PlaneGeometry(door.width, door.height),
+    [door.width, door.height],
+  );
+  const edgesGeometry = useMemo(
+    () => new THREE.EdgesGeometry(planeGeometry),
+    [planeGeometry],
+  );
+
+  if (!center) return null;
+
+  const { x, z, rotationY } = doorPlacementOnWall(door.wall, center, 0.05);
+  const scaleX = door.width / STAGE_DOOR_MODEL_BASE.width;
+  const scaleY = door.height / STAGE_DOOR_MODEL_BASE.height;
+  const highlightColor = tc("--color-active-ascent");
+  const doorStyle = door.style === "metal" ? "metal" : "wood";
+
+  return (
+    <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
+      <group scale={[scaleX, scaleY, 1]}>
+        <StageDoorModel style={doorStyle} />
+      </group>
+      {isActive ? (
+        <group position={[0, door.height / 2, 0.03]}>
+          <mesh geometry={planeGeometry}>
+            <meshBasicMaterial
+              color={highlightColor}
+              transparent
+              opacity={0.22}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          <lineSegments geometry={edgesGeometry}>
+            <lineBasicMaterial color={highlightColor} />
+          </lineSegments>
+        </group>
+      ) : null}
+    </group>
+  );
+}
+
+function StageDoors({
+  layout,
+  activeDoorId,
+}: {
+  layout: TheaterLayout;
+  activeDoorId?: number;
+}) {
+  const doors = useMemo(() => resolveLayoutDoors(layout), [layout]);
+  return (
+    <>
+      {doors.map((door) => (
+        <DoorLeaf
+          key={door.id}
+          layout={layout}
+          door={door}
+          isActive={door.id === activeDoorId}
+        />
+      ))}
+    </>
+  );
+}
+
+function ActiveRecessHighlight({
+  layout,
+  recess,
+}: {
+  layout: TheaterLayout;
+  recess: TheaterWallRecess;
+}) {
+  const center = getRecessCenterOnWall(recess, layout);
+  const wallHeight = layout.wallHeight;
+  const planeGeometry = useMemo(
+    () => new THREE.PlaneGeometry(recess.width, wallHeight),
+    [recess.width, wallHeight],
+  );
+  const edgesGeometry = useMemo(
+    () => new THREE.EdgesGeometry(planeGeometry),
+    [planeGeometry],
+  );
+
+  if (!center) return null;
+
+  const { x, z, rotationY } = doorPlacementOnWall(recess.wall, center, 0.06);
+  const highlightColor = tc("--color-active-ascent");
+
+  return (
+    <group position={[x, wallHeight / 2, z]} rotation={[0, rotationY, 0]}>
+      <mesh geometry={planeGeometry}>
+        <meshBasicMaterial
+          color={highlightColor}
+          transparent
+          opacity={0.28}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+        />
+      </mesh>
+      <lineSegments geometry={edgesGeometry}>
+        <lineBasicMaterial color={highlightColor} />
+      </lineSegments>
+    </group>
+  );
+}
+
 type TheaterStageProps = {
   projectName: string;
   layout: TheaterLayout;
@@ -257,6 +402,8 @@ type TheaterStageProps = {
   wallsHideFromCamera?: boolean;
   showStageGrid?: boolean;
   dutyLightEnabled?: boolean;
+  activeDoorId?: number;
+  activeRecessId?: number;
   highlightGridCell?: { col: number; row: number } | null;
   spotlightAimMode?: "point" | "cell";
   onPickGridCell?: (col: number, row: number) => void;
@@ -271,10 +418,21 @@ export const TheaterStage = ({
   wallsHideFromCamera = true,
   showStageGrid = true,
   dutyLightEnabled = true,
+  activeDoorId,
+  activeRecessId,
   highlightGridCell,
   spotlightAimMode = "point",
   onPickGridCell,
 }: TheaterStageProps) => {
+  const activeRecess = useMemo(() => {
+    if (activeRecessId == null) return null;
+    return (
+      resolveLayoutWallRecesses(layout).find(
+        (recess) => recess.id === activeRecessId,
+      ) ?? null
+    );
+  }, [activeRecessId, layout]);
+
   return (
     <>
       <hemisphereLight
@@ -318,6 +476,11 @@ export const TheaterStage = ({
           wallsOpaque={wallsOpaque}
           wallsHideFromCamera={wallsHideFromCamera}
         />
+      ) : null}
+
+      <StageDoors layout={layout} activeDoorId={activeDoorId} />
+      {activeRecess ? (
+        <ActiveRecessHighlight layout={layout} recess={activeRecess} />
       ) : null}
 
       {showSeats && layout.seatRows > 0 ? (

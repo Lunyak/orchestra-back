@@ -1,3 +1,4 @@
+import cn from "classnames";
 import {
   buildLightChannelSelectOptions,
   formatLightChannelSlot,
@@ -29,7 +30,7 @@ export function LightChannelSelect({
 
   return (
     <select
-      className={className}
+      className={cn("native-select", className)}
       value={normalized}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}

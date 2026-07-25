@@ -1,115 +1,43 @@
-import { tc } from "../../../../../shared/styles/theme-color";
-import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
-import {
-  formatLightChannelSlot,
-  spotlightMatchesChannelSlot,
-} from "../../../model/theater-light-channel-link";
-import { LightChannelSelect } from "../../LightChannelSelect";
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
-import { TheaterBtn, TheaterField } from "../../theater-controls-ui";
+import { TheaterBtn } from "../../theater-controls-ui";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: SpotlightsSectionProps) {
-  const {
-    spotlightBatchCount,
-    setSpotlightBatchCount,
-    rgbBatchCount,
-    setRgbBatchCount,
-    spotlightLayoutRows,
-    setSpotlightLayoutRows,
-    regularSpotlights,
-    rgbSpotlights,
-    totalSpotlights,
-    linkStats,
-    spotlightLinkBadge,
-    spotlightCountBadge,
-    lightChannels,
-    selectedLightSlot,
-  } = spot;
+  const { spotlightCountBadge } = spot;
   return (
-<>
-<TheaterCollapsibleSection
-            sectionId="spotlights-lightplot"
-            title="Схема света"
-            summary="Каналы света, связь с 3D"
-            badge={spotlightLinkBadge}
-            defaultOpen
-          >
-            <p className="theater-layout-hint">
-              Слот {selectedLightSlot} подсвечен при совпадении канала на софите.
-            </p>
-            <div className="theater-btn-row theater-btn-row--3">
-              <TheaterBtn
-                onClick={() => vm.syncSpotlightsFromLightPlot(lightChannels)}
-                disabled={!vm.currentScene || linkStats.fixtures === 0}
-                title="Схема → 3D"
-              >
-                Из схемы
-              </TheaterBtn>
-              <TheaterBtn
-                onClick={vm.syncLightPlotFromSpotlights}
-                disabled={!vm.currentScene || totalSpotlights === 0}
-                title="3D → схема"
-              >
-                В схему
-              </TheaterBtn>
-              <TheaterBtn
-                onClick={vm.applyLightPlotChannelLabels}
-                disabled={!vm.currentScene || linkStats.fixtures === 0}
-                title="Подписи каналов"
-              >
-                Каналы
-              </TheaterBtn>
-            </div>
-            <div className="theater-btn-row">
-              <TheaterBtn
-                disabled={!vm.currentScene}
-                title="Ctrl+A"
-                onClick={vm.selectAllVisibleInEditMode}
-              >
-                Выбрать все
-              </TheaterBtn>
-              <TheaterBtn
-                disabled={!vm.currentScene || (!vm.activeSpotlightId && vm.multiSelectedSpotlightIds.length === 0)}
-                title="Esc"
-                onClick={vm.clearSceneSelection}
-              >
-                Снять выдел.
-              </TheaterBtn>
-            </div>
-            <div className="theater-btn-row">
-              <LabeledCheckbox checked={vm.showSpotlights} onChange={vm.setShowSpotlights}>
-                Показать в 3D
-              </LabeledCheckbox>
-              <LabeledCheckbox
-                checked={vm.showOnlyActiveSpotlight}
-                onChange={vm.setShowOnlyActiveSpotlight}
-                disabled={!vm.activeSpotlight}
-              >
-                Только активный
-              </LabeledCheckbox>
-            </div>
-            <p className="theater-layout-hint">
-              Клик по софиту — панель настроек. Режим «Ячейка»: клик по сетке на плане или полу
-              ставит цель активного софита в центр ячейки.
-            </p>
-            <div className="theater-model-context-menu__row">
-              <TheaterBtn
-                active={vm.spotlightAimMode === "point"}
-                onClick={() => vm.setSpotlightAimMode("point")}
-                disabled={!vm.currentScene}
-              >
-                Точка
-              </TheaterBtn>
-              <TheaterBtn
-                active={vm.spotlightAimMode === "cell"}
-                onClick={() => vm.setSpotlightAimMode("cell")}
-                disabled={!vm.currentScene}
-              >
-                Ячейка
-              </TheaterBtn>
-            </div>
-          </TheaterCollapsibleSection>
-</>
+    <TheaterCollapsibleSection
+      sectionId="spotlights-lightplot"
+      title="Управление"
+      badge={spotlightCountBadge}
+      defaultOpen
+    >
+      <div className="theater-btn-row">
+        <TheaterBtn
+          disabled={!vm.currentScene}
+          title="Ctrl+A"
+          onClick={vm.selectAllVisibleInEditMode}
+        >
+          Выбрать все
+        </TheaterBtn>
+        <TheaterBtn
+          disabled={
+            !vm.currentScene ||
+            (!vm.activeSpotlightId && vm.multiSelectedSpotlightIds.length === 0)
+          }
+          title="Esc"
+          onClick={vm.clearSceneSelection}
+        >
+          Снять выдел.
+        </TheaterBtn>
+      </div>
+      <div className="theater-btn-row">
+        <TheaterBtn onClick={vm.fullLightAllSpotlights} disabled={!vm.currentScene}>
+          Полный свет
+        </TheaterBtn>
+        <TheaterBtn onClick={vm.blackoutAllSpotlights} disabled={!vm.currentScene}>
+          Блекаут
+        </TheaterBtn>
+      </div>
+    </TheaterCollapsibleSection>
   );
 }

@@ -1,4 +1,5 @@
 import cn from "classnames";
+import { useEffect, useState } from "react";
 import type { ModelPlacementPreset } from "../model/theater-model-placement";
 import type { TheaterModelWorldSize } from "../model/theater-model-world-size";
 import { TheaterModelSizeFields } from "./TheaterModelSizeFields";
@@ -55,6 +56,8 @@ function VisibilityIcon({ hidden }: { hidden: boolean }) {
 
 export type TheaterModelFocusPanelProps = {
   modelName: string;
+  modelId: number;
+  onNameChange?: (name: string) => void;
   size?: TheaterModelWorldSize | null;
   onSizeCommit?: (next: Partial<TheaterModelWorldSize>) => void;
   transformMode: TheaterModelTransformMode;
@@ -72,6 +75,8 @@ export type TheaterModelFocusPanelProps = {
 
 export function TheaterModelFocusPanel({
   modelName,
+  modelId,
+  onNameChange,
   size,
   onSizeCommit,
   transformMode,
@@ -86,6 +91,26 @@ export function TheaterModelFocusPanel({
   onClone,
   onDelete,
 }: TheaterModelFocusPanelProps) {
+  const defaultName = `Модель ${modelId}`;
+  const [nameDraft, setNameDraft] = useState(modelName);
+
+  useEffect(() => {
+    setNameDraft(modelName);
+  }, [modelId, modelName]);
+
+  const commitName = () => {
+    if (!onNameChange) return;
+    const trimmed = nameDraft.trim();
+    const next = trimmed || defaultName;
+    if (next !== modelName) {
+      onNameChange(next);
+      return;
+    }
+    if (nameDraft !== modelName) {
+      setNameDraft(modelName);
+    }
+  };
+
   const placementCells = placementGrid
     ? Array.from(
         { length: placementGrid.cols * placementGrid.rows },
@@ -108,7 +133,29 @@ export function TheaterModelFocusPanel({
       onClick={(event) => event.stopPropagation()}
     >
       <div className="theater-focus-panel__title">
-        <span>{modelName}</span>
+        {onNameChange ? (
+          <input
+            type="text"
+            className="theater-focus-panel__title-input"
+            value={nameDraft}
+            placeholder={defaultName}
+            aria-label="Название модели"
+            onChange={(event) => setNameDraft(event.target.value)}
+            onBlur={commitName}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+              if (event.key === "Escape") {
+                setNameDraft(modelName);
+                event.currentTarget.blur();
+              }
+            }}
+          />
+        ) : (
+          <span>{modelName}</span>
+        )}
         {onToggleHidden ? (
           <button
             type="button"

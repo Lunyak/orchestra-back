@@ -203,7 +203,7 @@ export function AudienceSeatsHandle({
 
   const frontHandlePos: [number, number, number] = [0, 0.45, metrics.endZ];
   const backHandlePos: [number, number, number] = [0, 0.45, metrics.startZ];
-  const label = `${roundM(layout.audienceStartZ)} м`;
+  const label = String(roundM(layout.audienceStartZ));
 
   return (
     <group>

@@ -6,29 +6,41 @@ import type { TheaterControlsTabProps } from "./types";
 
 export function TheaterControlsModelsTab({ vm }: TheaterControlsTabProps) {
   return (
-    <TheaterCollapsibleSection
-      sectionId="models-add"
-      title="Модели"
-      summary="Встроенные и из файла"
-      defaultOpen
-    >
-      <TheaterBuiltinTemplatePicker
-        value={
-          isTheaterBuiltinTemplateKey(vm.builtinModelKey)
-            ? vm.builtinModelKey
-            : undefined
+    <div className="theater-layout-panel theater-layout-panel--fill">
+      <TheaterCollapsibleSection
+        sectionId="models-add"
+        title="Модели"
+        defaultOpen
+        className="theater-panel-section--fill"
+        headerActions={
+          <>
+            <TheaterBtn
+              onClick={vm.addBuiltinModel}
+              disabled={!vm.currentScene}
+              title="Добавить выбранную"
+            >
+              +
+            </TheaterBtn>
+            <TheaterBtn
+              onClick={vm.addModel}
+              disabled={!vm.currentScene}
+              title="Добавить из файла"
+            >
+              + Файл
+            </TheaterBtn>
+          </>
         }
-        onChange={(nextKey) => vm.setBuiltinModelKey(nextKey)}
-        dragEnabled={Boolean(vm.currentScene)}
-      />
-      <div className="theater-model-actions">
-        <TheaterBtn onClick={vm.addBuiltinModel} disabled={!vm.currentScene}>
-          + Модель
-        </TheaterBtn>
-        <TheaterBtn onClick={vm.addModel} disabled={!vm.currentScene}>
-          + Файл
-        </TheaterBtn>
-      </div>
-    </TheaterCollapsibleSection>
+      >
+        <TheaterBuiltinTemplatePicker
+          value={
+            isTheaterBuiltinTemplateKey(vm.builtinModelKey)
+              ? vm.builtinModelKey
+              : undefined
+          }
+          onChange={(nextKey) => vm.setBuiltinModelKey(nextKey)}
+          dragEnabled={Boolean(vm.currentScene)}
+        />
+      </TheaterCollapsibleSection>
+    </div>
   );
 }

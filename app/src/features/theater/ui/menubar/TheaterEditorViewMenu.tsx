@@ -54,12 +54,6 @@ export function TheaterEditorViewMenu({ vm }: TheaterEditorViewMenuProps) {
             >
               Просмотр
             </TheaterEditorMenubarToggle>
-            <TheaterEditorMenubarToggle
-              checked={vm.sceneRehearsalMode}
-              onChange={vm.setSceneRehearsalMode}
-            >
-              Репетиция сцены
-            </TheaterEditorMenubarToggle>
             <TheaterEditorMenubarTheaterFields vm={vm} />
           </div>
         </div>

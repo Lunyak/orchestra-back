@@ -49,7 +49,7 @@ function decorLineKey(model: TheaterModel): string {
 }
 
 function formatSize(size: [number, number, number]): string {
-  return `${roundM(size[0])}×${roundM(size[1])}×${roundM(size[2])} м`;
+  return `${roundM(size[0])}×${roundM(size[1])}×${roundM(size[2])}`;
 }
 
 function formatPosition(position: [number, number, number]): string {

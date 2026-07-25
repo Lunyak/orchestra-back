@@ -25,7 +25,13 @@ export interface PlaybookData {
   holdImages?: PlaybookHoldImage[];
   projector?: SceneProjectorSettingsV1;
   lightChannels?: string[];
+  lightConsoleUi?: PlaybookLightConsoleUiV1;
 }
+
+export type PlaybookLightConsoleUiV1 = {
+  v: 1;
+  channelColumns?: number;
+};
 
 export type SceneLightFaderLinkV1 = {
   channel: number;
@@ -62,11 +68,20 @@ export type PlaybookLightProgramV1 = {
   faders: SceneLightProgramFaderStateV1[];
 };
 
+/** Память уровней F для одного канала K. */
+export type PlaybookLightChannelBankV1 = {
+  channel: number;
+  faders: SceneLightProgramFaderStateV1[];
+};
+
 export type PlaybookLightProgramsDataV1 = {
   v: 1;
   count?: number;
   activeProgramId?: number;
+  /** Пресеты П1…Пn (заливка). */
   programs: PlaybookLightProgramV1[];
+  /** Память F по каналам K1…Kn (отдельно от пресетов П). */
+  channels?: PlaybookLightChannelBankV1[];
 };
 
 export type PlaybookLightChannelRolesV1 = {

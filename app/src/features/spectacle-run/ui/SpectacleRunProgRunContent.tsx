@@ -4,7 +4,7 @@ import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { usePlaybook } from "../../playbook";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
-import { SpectacleRunKadrStrip } from "./SpectacleRunKadrStrip";
+import { KadrTape } from "./KadrTape";
 import { SpectacleRunProgRunNav } from "./SpectacleRunToolbar";
 
 export function SpectacleRunProgRunContent() {
@@ -44,7 +44,7 @@ export function SpectacleRunProgRunContent() {
   return (
     <div className="spectacle-run spectacle-run--prog-run-only">
       <div className="spectacle-run__prog-run-main">
-        <SpectacleRunKadrStrip
+        <KadrTape
           variant="prog-run"
           projectName={projectName ?? ""}
           tape={tape}

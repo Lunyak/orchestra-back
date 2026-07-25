@@ -11,6 +11,10 @@ ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=$VITE_BASE_PATH
 
+# Theater GLB из MinIO: {S3_PUBLIC_URL}/{S3_BUCKET} (пусто = раздача из web/public)
+ARG VITE_THEATER_ASSETS_BASE_URL=
+ENV VITE_THEATER_ASSETS_BASE_URL=$VITE_THEATER_ASSETS_BASE_URL
+
 # Сначала зависимости web и app
 COPY web/package.json web/package-lock.json ./web/
 COPY app/package.json app/package-lock.json ./app/

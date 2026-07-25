@@ -1,11 +1,16 @@
-import { useId, useState, type FormEvent } from "react";
-import type { ScriptTokenizeMode } from "./script-tokenize-formatting";
+import { useEffect, useId, useState, type FormEvent } from "react";
+import {
+  requestScriptFormatSearchHighlight,
+  type ScriptTokenizeMode,
+} from "./script-tokenize-formatting";
 
 export type AppEditorScriptFormattingMenuProps = {
   disabled?: boolean;
   formatPlayDisabled?: boolean;
   onOpenFormatPlay: () => void;
   onTokenizeMatches: (query: string, mode: ScriptTokenizeMode) => number;
+  /** Ввод в поиск в режиме чтения → перейти в редактирование. */
+  onRequestEditing?: () => void;
 };
 
 export function AppEditorScriptFormattingMenu({
@@ -13,6 +18,7 @@ export function AppEditorScriptFormattingMenu({
   formatPlayDisabled = false,
   onOpenFormatPlay,
   onTokenizeMatches,
+  onRequestEditing,
 }: AppEditorScriptFormattingMenuProps) {
   const inputId = useId();
   const [query, setQuery] = useState("");
@@ -20,6 +26,11 @@ export function AppEditorScriptFormattingMenu({
 
   const trimmedQuery = query.trim();
   const canSubmit = !disabled && trimmedQuery.length > 0;
+
+  useEffect(() => {
+    requestScriptFormatSearchHighlight(query);
+    return () => requestScriptFormatSearchHighlight("");
+  }, [query]);
 
   const runTokenize = (mode: ScriptTokenizeMode) => {
     if (!canSubmit) return;
@@ -54,11 +65,14 @@ export function AppEditorScriptFormattingMenu({
               id={inputId}
               className="theater-editor-menubar__field-input native-text-input"
               value={query}
-              disabled={disabled}
               placeholder="слово или фраза"
               onChange={(event) => {
-                setQuery(event.target.value);
+                const nextQuery = event.target.value;
+                setQuery(nextQuery);
                 setResultText("");
+                if (disabled && nextQuery.length > 0) {
+                  onRequestEditing?.();
+                }
               }}
             />
           </label>
@@ -81,7 +95,7 @@ export function AppEditorScriptFormattingMenu({
           </div>
           <div className="theater-editor-menubar__field-meta app-editor-format-menu__hint">
             {disabled
-              ? "Доступно в редактировании текста"
+              ? "Введите текст — откроется редактирование"
               : resultText || "Можно обернуть все сразу или шагать по совпадениям."}
           </div>
         </form>

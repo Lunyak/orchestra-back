@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MutableRefObject } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import type {
+  TheaterDoorStyle,
   TheaterDoorWall,
   TheaterLayout,
   TheaterWallRecessWall,
@@ -119,15 +120,27 @@ export function useTheaterLayoutEditing({
     [layout, setActiveDoorId, updateLayout],
   );
 
-  const removeActiveDoor = useCallback(() => {
-    if (activeDoorId == null) return;
-    const doors = removeLayoutDoor(layout, activeDoorId);
-    updateLayout({ doors });
-    setActiveDoorId(doors[0]?.id);
-  }, [activeDoorId, layout, setActiveDoorId, updateLayout]);
+  const removeActiveDoor = useCallback(
+    (doorId?: number) => {
+      const id = typeof doorId === "number" ? doorId : activeDoorId;
+      if (id == null) return;
+      const doors = removeLayoutDoor(layout, id);
+      updateLayout({ doors });
+      setActiveDoorId(doors[0]?.id);
+    },
+    [activeDoorId, layout, setActiveDoorId, updateLayout],
+  );
 
   const updateActiveDoor = useCallback(
-    (patch: Partial<{ pos: number; width: number; height: number; wall: TheaterDoorWall }>) => {
+    (
+      patch: Partial<{
+        pos: number;
+        width: number;
+        height: number;
+        wall: TheaterDoorWall;
+        style: TheaterDoorStyle;
+      }>,
+    ) => {
       if (activeDoorId == null) return;
       updateLayout({ doors: patchLayoutDoor(layout, activeDoorId, patch) });
     },
@@ -143,12 +156,16 @@ export function useTheaterLayoutEditing({
     [layout, setActiveRecessId, updateLayout],
   );
 
-  const removeActiveWallRecess = useCallback(() => {
-    if (activeRecessId == null) return;
-    const wallRecesses = removeLayoutWallRecess(layout, activeRecessId);
-    updateLayout({ wallRecesses });
-    setActiveRecessId(wallRecesses[0]?.id);
-  }, [activeRecessId, layout, setActiveRecessId, updateLayout]);
+  const removeActiveWallRecess = useCallback(
+    (recessId?: number) => {
+      const id = typeof recessId === "number" ? recessId : activeRecessId;
+      if (id == null) return;
+      const wallRecesses = removeLayoutWallRecess(layout, id);
+      updateLayout({ wallRecesses });
+      setActiveRecessId(wallRecesses[0]?.id);
+    },
+    [activeRecessId, layout, setActiveRecessId, updateLayout],
+  );
 
   const updateActiveWallRecess = useCallback(
     (

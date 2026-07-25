@@ -69,8 +69,8 @@ export function TheaterModelSizeFields({
             className="native-text-input theater-model-size-fields__input"
             value={draft[axis]}
             disabled={disabled}
-            aria-label={`${AXIS_LABEL[axis]}, метры`}
-            title={`${AXIS_LABEL[axis]}, м`}
+            aria-label={AXIS_LABEL[axis]}
+            title={AXIS_LABEL[axis]}
             onFocus={() => setFocusedAxis(axis)}
             onChange={(event) => {
               const nextValue = event.target.value;

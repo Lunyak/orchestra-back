@@ -20,8 +20,6 @@ export type TheaterSceneOutlinerProps = {
   stageGridFocused?: boolean;
   pulseTarget?: { kind: SceneOutlinerItem["kind"]; id: number } | null;
   disabled?: boolean;
-  showHidden?: boolean;
-  onShowHiddenChange?: (value: boolean) => void;
   onRevealAllHidden?: () => void;
   onIsolateSelection?: () => void;
   onFocusItem: (item: SceneOutlinerItem, additive?: boolean) => void;
@@ -39,8 +37,6 @@ export function TheaterSceneOutliner({
   stageGridFocused,
   pulseTarget,
   disabled,
-  showHidden = true,
-  onShowHiddenChange,
   onRevealAllHidden,
   onIsolateSelection,
   onFocusItem,
@@ -51,15 +47,14 @@ export function TheaterSceneOutliner({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const filteredGroups = useMemo(
-    () => filterSceneOutlinerGroups(groups, filter, { hideHidden: !showHidden }),
-    [filter, groups, showHidden],
+    () => filterSceneOutlinerGroups(groups, filter),
+    [filter, groups],
   );
   const totalCount = countSceneOutlinerItems(groups);
   const visibleCount = countSceneOutlinerItems(filteredGroups);
 
   return (
     <div className="theater-editor-scene">
-      <div className="theater-editor-panel-heading">Сцена</div>
       <div className="theater-editor-outliner-toolbar">
         <input
           type="search"
@@ -73,42 +68,6 @@ export function TheaterSceneOutliner({
           {filter.trim() ? `${visibleCount}/${totalCount}` : totalCount}
         </span>
       </div>
-      {onShowHiddenChange ? (
-        <label className="theater-editor-outliner-toggle">
-          <input
-            type="checkbox"
-            checked={showHidden}
-            disabled={disabled}
-            onChange={(event) => onShowHiddenChange(event.target.checked)}
-          />
-          <span>Скрытые</span>
-        </label>
-      ) : null}
-      {onRevealAllHidden || onIsolateSelection ? (
-        <div className="theater-editor-outliner-actions">
-          {onRevealAllHidden ? (
-            <button
-              type="button"
-              className="theater-editor-outliner-action"
-              disabled={disabled}
-              onClick={onRevealAllHidden}
-            >
-              Показать все
-            </button>
-          ) : null}
-          {onIsolateSelection ? (
-            <button
-              type="button"
-              className="theater-editor-outliner-action"
-              disabled={disabled}
-              title="Скрыть всё, кроме выбранного"
-              onClick={onIsolateSelection}
-            >
-              Изолировать
-            </button>
-          ) : null}
-        </div>
-      ) : null}
       <div
         className="theater-editor-outliner-listbox"
         role="listbox"
@@ -243,6 +202,31 @@ export function TheaterSceneOutliner({
           })
         )}
       </div>
+      {onRevealAllHidden || onIsolateSelection ? (
+        <div className="theater-editor-outliner-actions">
+          {onRevealAllHidden ? (
+            <button
+              type="button"
+              className="theater-editor-outliner-action"
+              disabled={disabled}
+              onClick={onRevealAllHidden}
+            >
+              Показать все
+            </button>
+          ) : null}
+          {onIsolateSelection ? (
+            <button
+              type="button"
+              className="theater-editor-outliner-action"
+              disabled={disabled}
+              title="Скрыть всё, кроме выбранного"
+              onClick={onIsolateSelection}
+            >
+              Изолировать
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

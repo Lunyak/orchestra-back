@@ -4,10 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import * as THREE from "three";
 import {
-  THEATER_CAMERA_CAPTURE_EVENT,
-  type TheaterCameraBookmark,
-} from "../../model/theater-camera-bookmarks";
-import {
   THEATER_CAMERA_FOCUS_EVENT,
   type TheaterCameraFocusRequest,
 } from "../../model/theater-camera-focus";
@@ -164,42 +160,6 @@ export function TheaterOrbitControls({
     };
     window.addEventListener(THEATER_CAMERA_FOCUS_EVENT, onFocus);
     return () => window.removeEventListener(THEATER_CAMERA_FOCUS_EVENT, onFocus);
-  }, [animateTo]);
-
-  useEffect(() => {
-    const onCaptureRequest = () => {
-      const state = readCameraState();
-      window.dispatchEvent(
-        new CustomEvent(THEATER_CAMERA_CAPTURE_EVENT, { detail: state }),
-      );
-    };
-    window.addEventListener(
-      "orchestra:theater-camera-capture-request",
-      onCaptureRequest,
-    );
-    return () =>
-      window.removeEventListener(
-        "orchestra:theater-camera-capture-request",
-        onCaptureRequest,
-      );
-  }, [readCameraState]);
-
-  useEffect(() => {
-    const onApplyBookmark = (event: Event) => {
-      const bookmark = (event as CustomEvent<TheaterCameraBookmark>).detail;
-      if (!bookmark?.state) return;
-      animateTo({
-        position: bookmark.state.position,
-        target: bookmark.state.target,
-        fov: bookmark.state.fov,
-      });
-    };
-    window.addEventListener("orchestra:theater-camera-apply-bookmark", onApplyBookmark);
-    return () =>
-      window.removeEventListener(
-        "orchestra:theater-camera-apply-bookmark",
-        onApplyBookmark,
-      );
   }, [animateTo]);
 
   useEffect(() => {

@@ -10,7 +10,11 @@ export {
   useAppEditorViewMenuRender,
 } from "./AppEditorMenubarContext";
 export {
+  findMarkdownSearchMatches,
+  getScriptFormatSearchQuery,
+  requestScriptFormatSearchHighlight,
   requestScriptTokenizeMatches,
+  subscribeScriptFormatSearchHighlight,
   subscribeScriptTokenizeRequests,
   wrapMarkdownMatchesAsTokens,
   wrapNextMarkdownMatchAsToken,

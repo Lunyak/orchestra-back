@@ -165,9 +165,9 @@ export function hallSideLabel(
   layout: Pick<TheaterLayout, "hallWidth" | "hallDepth" | "wallHeight">,
   side: HallExpandSide,
 ): string {
-  if (side === "up") return `${roundM(layout.wallHeight)} м`;
-  if (side === "east" || side === "west") return `${roundM(layout.hallWidth)} м`;
-  return `${roundM(layout.hallDepth)} м`;
+  if (side === "up") return String(roundM(layout.wallHeight));
+  if (side === "east" || side === "west") return String(roundM(layout.hallWidth));
+  return String(roundM(layout.hallDepth));
 }
 
 export function hallSideAxis(side: HallExpandSide): "x" | "y" | "z" {

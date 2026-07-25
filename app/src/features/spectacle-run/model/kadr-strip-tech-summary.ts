@@ -5,22 +5,15 @@ import type {
 import {
   fadersForKadrDisplay,
   findKadrById,
-  type MarkdownKadrSection,
-  readSceneLightKadrsFromMarkdown,
+  readSceneLightKadrs,
 } from "../../theater/model/light-kadrs";
-import {
-  findProjectorLineInSection,
-  parseProjectorLineInSection,
-  type KadrProjectorCue,
-} from "../../theater/model/kadr-projector";
-import { findSoundLineInSection, parseSoundLineInSection } from "../../theater/model/kadr-sound";
+import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { formatFaderShort } from "../../../shared/components/light-console/light-console-labels";
 import { buildLightConsoleSplitModel } from "../../../shared/components/light-console/light-console-split";
 import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
 import type { ScriptScene, SceneLightKadrV1 } from "../../../shared/types/script";
 import { parseKadrTitleFromHeading } from "./create-kadr-from-draft";
-import { parseKadrLabelsInSection, type KadrRunLabel } from "./kadr-section-labels";
-import { parseKadrCommentRawInSection } from "./kadr-section-comment";
+import type { KadrRunLabel } from "./kadr-section-labels";
 import type { SpectacleTapeItem } from "./spectacle-kadr-tape";
 
 export type KadrStripProjectorPreview = {
@@ -51,21 +44,6 @@ type MediaLookup = {
   holdImages?: Array<{ id: number; title: string }>;
 };
 
-const ACTION_FIELD_RE = /^-\s*\*\*Действие\/задача\*\*:\s*([^\n]*)/im;
-
-function stripKadrFieldMarkdown(text: string): string {
-  return String(text ?? "")
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, " ")
-    .replace(/\{\{[^}]+\}\}/g, " ")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/_([^_]+)_/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/orchestra-image:[^\s]+/gi, " ")
-    .replace(/https?:\/\/\S+/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function humanizeStripFieldValue(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -74,30 +52,12 @@ function humanizeStripFieldValue(value: string): string {
   return trimmed;
 }
 
-function isKadrPlaceholderText(text: string): boolean {
-  const value = text.trim();
-  if (!value) return true;
-  if (/^_/.test(value) && /_$/.test(value)) return true;
-  if (/не записано|при создании картины|репетиция|пульт ниже/i.test(value)) return true;
-  return false;
-}
-
-function findFieldBody(
-  markdown: string,
-  section: MarkdownKadrSection,
-  pattern: RegExp,
-): string | null {
-  const slice = String(markdown ?? "").slice(section.headingEnd, section.sectionEnd);
-  const match = pattern.exec(slice);
-  return match?.[1] != null ? match[1].trim() : null;
-}
-
 function resolveKadrForItem(
   item: SpectacleTapeItem,
   scene: ScriptScene | undefined,
 ): SceneLightKadrV1 | undefined {
-  if (!scene || item.isPlaceholder || !item.section) return undefined;
-  const kadrs = readSceneLightKadrsFromMarkdown(scene);
+  if (!scene || item.isPlaceholder) return undefined;
+  const kadrs = readSceneLightKadrs(scene);
   return (
     (item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined) ??
     kadrs.kadrs.find((k) => k.kadrNo === item.kadrNo)
@@ -153,39 +113,30 @@ function formatFaderSummary(kadr: SceneLightKadrV1): string | null {
 }
 
 function formatSoundSummary(
-  markdown: string,
-  section: MarkdownKadrSection,
+  kadr: SceneLightKadrV1,
   media: MediaLookup,
 ): string | null {
-  const cue = parseSoundLineInSection(markdown, section);
+  const cue = kadr.sound;
   if (!cue) return null;
+  const playTrackIds = cue.playTrackIds ?? [];
+  const soundIds = cue.soundIds ?? [];
+  if (playTrackIds.length === 0 && soundIds.length === 0) return null;
 
   const parts: string[] = [];
-  for (const trackId of cue.playTrackIds) {
+  for (const trackId of playTrackIds) {
     const title = media.playlist?.find((t) => t.id === trackId)?.title?.trim();
     parts.push(title ? `«${title}»` : `трек ${trackId}`);
   }
-  for (const soundId of cue.soundIds) {
+  for (const soundId of soundIds) {
     const title = media.sounds?.find((s) => s.id === soundId)?.title?.trim();
     parts.push(title ? `SFX «${title}»` : `SFX ${soundId}`);
   }
-  if (cue.volume != null && Number.isFinite(cue.volume) && cue.playTrackIds.length > 0) {
+  if (cue.volume != null && Number.isFinite(cue.volume) && playTrackIds.length > 0) {
     parts.push(`${Math.round(cue.volume * 100)}%`);
   }
 
   const value = humanizeStripFieldValue(parts.join(", "));
   return value || null;
-}
-
-function formatSoundFallback(
-  markdown: string,
-  section: MarkdownKadrSection,
-): string | null {
-  const body = findSoundLineInSection(markdown, section);
-  if (body == null) return null;
-  const value = humanizeStripFieldValue(stripKadrFieldMarkdown(body));
-  if (!value || isKadrPlaceholderText(value)) return null;
-  return value;
 }
 
 function buildProjectorPreview(
@@ -212,48 +163,45 @@ function buildProjectorPreview(
 }
 
 function formatVideoSummary(
-  markdown: string,
-  section: MarkdownKadrSection,
+  kadr: SceneLightKadrV1,
   media: MediaLookup,
 ): { value: string; projectorPreview?: KadrStripProjectorPreview } | null {
-  const cue = parseProjectorLineInSection(markdown, section);
-  if (cue) {
-    const projectorPreview = buildProjectorPreview(cue, media);
-    if (cue.mode === "video") {
-      const title = media.videos?.find((v) => v.id === cue.videoId)?.title?.trim();
-      const baseValue = title ? title : `Видео ${cue.videoId}`;
-      const value = cue.muted ? `${baseValue} · без звука` : baseValue;
-      return { value, projectorPreview };
-    }
-
-    if (cue.holdId != null && cue.holdId > 0) {
-      const title = media.holdImages?.find((h) => h.id === cue.holdId)?.title?.trim();
-      const value = title ? title : `Заставка ${cue.holdId}`;
-      return { value, projectorPreview };
-    }
-
-    return { value: "Заставка", projectorPreview };
+  const cue = kadr.projector;
+  if (!cue) return null;
+  const projectorPreview = buildProjectorPreview(cue, media);
+  if (cue.mode === "video") {
+    const title = media.videos?.find((v) => v.id === cue.videoId)?.title?.trim();
+    const baseValue = title ? title : `Видео ${cue.videoId}`;
+    const value = cue.muted ? `${baseValue} · без звука` : baseValue;
+    return { value, projectorPreview };
   }
 
-  const body = findProjectorLineInSection(markdown, section);
-  if (body == null) return null;
-  const value = humanizeStripFieldValue(stripKadrFieldMarkdown(body));
-  if (!value || isKadrPlaceholderText(value)) return null;
-  return { value };
+  if (cue.holdId != null && cue.holdId > 0) {
+    const title = media.holdImages?.find((h) => h.id === cue.holdId)?.title?.trim();
+    const value = title ? title : `Заставка ${cue.holdId}`;
+    return { value, projectorPreview };
+  }
+
+  return { value: "Заставка", projectorPreview };
 }
 
-function pushTextField(
-  rows: KadrStripTechRow[],
-  label: string,
-  markdown: string,
-  section: MarkdownKadrSection,
-  pattern: RegExp,
-): void {
-  const body = findFieldBody(markdown, section, pattern);
-  if (body == null) return;
-  const value = humanizeStripFieldValue(stripKadrFieldMarkdown(body));
-  if (!value || isKadrPlaceholderText(value)) return;
-  rows.push({ label, value });
+function buildCornerLabels(kadr: SceneLightKadrV1 | undefined, scene: ScriptScene): KadrRunLabel[] {
+  const labels: KadrRunLabel[] = [];
+  if (kadr?.blackoutDurationSec != null && kadr.blackoutDurationSec > 0) {
+    labels.push({ type: "blackout", seconds: kadr.blackoutDurationSec });
+  }
+  if (kadr?.smokeDurationSec != null && kadr.smokeDurationSec > 0) {
+    labels.push({ type: "smoke", seconds: kadr.smokeDurationSec });
+  }
+  const smokeMachineActive =
+    kadr?.smokeMachine === true || scene.theaterSmokeMachine === true;
+  if (
+    smokeMachineActive &&
+    !labels.some((label) => label.type === "smoke-machine" || label.type === "smoke")
+  ) {
+    labels.push({ type: "smoke-machine", seconds: 0 });
+  }
+  return labels;
 }
 
 export function buildKadrStripTechSummary(args: {
@@ -267,14 +215,22 @@ export function buildKadrStripTechSummary(args: {
   const { item, scene } = args;
   const headingTitle = item.isPlaceholder
     ? "Без картин"
-    : parseKadrTitleFromHeading(item.headingTitle ?? "", item.kadrNo);
+    : parseKadrTitleFromHeading(item.headingTitle ?? "", item.kadrNo) ||
+      item.headingTitle;
 
-  if (item.isPlaceholder || !item.section || !scene) {
-    return { headingTitle, rows: [], blackout: false, cornerLabels: [] };
+  if (item.isPlaceholder || !scene) {
+    const sceneSmokeLabels =
+      scene?.theaterSmokeMachine === true
+        ? [{ type: "smoke-machine" as const, seconds: 0 }]
+        : [];
+    return {
+      headingTitle,
+      rows: [],
+      blackout: false,
+      cornerLabels: sceneSmokeLabels,
+    };
   }
 
-  const markdown = String(scene.markdown ?? "");
-  const section = item.section;
   const kadr = resolveKadrForItem(item, scene);
   const rows: KadrStripTechRow[] = [];
   const media = args.media ?? {};
@@ -290,37 +246,37 @@ export function buildKadrStripTechSummary(args: {
       const next = programLabel(kadr.nextProgramId, args.lightChannels, args.lightPrograms);
       rows.push({ label: "Далее", value: `П${kadr.nextProgramId} · ${next}` });
     }
+
+    const sound = formatSoundSummary(kadr, media);
+    if (sound) rows.push({ label: "Звук", value: sound });
+
+    const video = formatVideoSummary(kadr, media);
+    if (video) {
+      rows.push({
+        label: "Видео",
+        value: video.value,
+        projectorPreview: video.projectorPreview,
+      });
+    }
+
+    if (kadr.transitionText?.trim()) {
+      rows.push({ label: "Переход", value: kadr.transitionText.trim() });
+    }
+
+    const comment = (kadr.commentText ?? kadr.note ?? "").trim();
+    if (comment) {
+      rows.push({
+        label: "Комментарий",
+        value: comment,
+        multiline: comment.includes("\n"),
+      });
+    }
   }
-
-  const sound = formatSoundSummary(markdown, section, media) ?? formatSoundFallback(markdown, section);
-  if (sound) rows.push({ label: "Звук", value: sound });
-
-  const video = formatVideoSummary(markdown, section, media);
-  if (video) {
-    rows.push({
-      label: "Видео",
-      value: video.value,
-      projectorPreview: video.projectorPreview,
-    });
-  }
-
-  pushTextField(rows, "Действие", markdown, section, ACTION_FIELD_RE);
-
-  const commentRaw = parseKadrCommentRawInSection(markdown, section).trim();
-  if (commentRaw && !isKadrPlaceholderText(commentRaw)) {
-    rows.push({
-      label: "Комментарий",
-      value: commentRaw,
-      multiline: commentRaw.includes("\n"),
-    });
-  }
-
-  const cornerLabels = parseKadrLabelsInSection(markdown, section);
 
   return {
     headingTitle,
     rows,
     blackout: Boolean(kadr?.blackout || (kadr && kadr.programId <= 0)),
-    cornerLabels,
+    cornerLabels: buildCornerLabels(kadr, scene),
   };
 }

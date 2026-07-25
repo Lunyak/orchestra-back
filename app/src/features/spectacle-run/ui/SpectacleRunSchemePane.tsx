@@ -8,7 +8,7 @@ import type { ScriptScene } from "../../../shared/types/script";
 import {
   fadersForKadrDisplay,
   findKadrById,
-  readSceneLightKadrsFromMarkdown,
+  readSceneLightKadrs,
 } from "../../theater/model/light-kadrs";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import { buildLightSchemeLookModel } from "../../../shared/components/light-console/light-scheme-preview";
@@ -35,6 +35,7 @@ export type SpectacleRunSchemePaneProps = {
   liveStatus: string | null;
   onLiveStatus?: (message: string | null) => void;
   onOpenConsoleSettings?: () => void;
+  channelColumns?: number;
 };
 
 export function SpectacleRunSchemePane({
@@ -50,16 +51,18 @@ export function SpectacleRunSchemePane({
   liveStatus,
   onLiveStatus,
   onOpenConsoleSettings,
+  channelColumns,
 }: SpectacleRunSchemePaneProps) {
   const [highlightedChannel, setHighlightedChannel] = useState<number | null>(null);
   const lightPlot = scene?.lightPlot ?? [];
-  const plotEmpty = lightPlot.length === 0;
+  const theaterSpotlights = scene?.theaterSpotlights ?? [];
+  const plotEmpty = theaterSpotlights.length === 0 && lightPlot.length === 0;
   const gridCols = 12;
   const gridRows = 20;
 
   const kadrs = useMemo(
-    () => readSceneLightKadrsFromMarkdown(scene),
-    [scene?.markdown, scene?.lightKadrs, scene?.id],
+    () => readSceneLightKadrs(scene),
+    [scene?.lightKadrs, scene?.id],
   );
   const activeKadr = useMemo(() => {
     if (!tapeItem?.kadrId) return kadrs.kadrs.find((k) => k.kadrNo === tapeItem?.kadrNo);
@@ -129,7 +132,8 @@ export function SpectacleRunSchemePane({
             F1–F{liveConsole.faders.count ?? liveConsole.faders.faders.length}
           </strong>{" "}
           → слева <strong>K3</strong>, подстройте
-          ползунки → <strong>K4</strong>, другие уровни (память на канал) → <strong>П3</strong> заливка.
+          ползунки → <strong>K4</strong>, другие уровни → кнопка{" "}
+          <strong>Сохранить пресет П…</strong>, затем <strong>П3</strong> применит заливку.
         </p>
       )}
 
@@ -172,6 +176,7 @@ export function SpectacleRunSchemePane({
         onSelectChannel={liveConsole.selectChannel}
         onSelectProgram={liveConsole.selectProgram}
         onOpenSettings={onOpenConsoleSettings}
+        channelColumns={channelColumns}
         onPatchFader={liveConsole.patchFader}
         onSaveActiveProgram={() => {
           const pid = Math.max(

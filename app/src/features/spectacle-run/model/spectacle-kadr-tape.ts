@@ -1,13 +1,9 @@
 import {
-  createKadrTemplateSnippet,
-  createLightKadrId,
   type MarkdownKadrSection,
+  nextKadrNumberForScene,
   readSceneLightKadrs,
-  readSceneLightKadrsFromMarkdown,
-  renumberKadrSectionsInMarkdown,
-  scanMarkdownKadrSections,
-  syncLightKadrsFromMarkdown,
 } from "../../theater/model/light-kadrs";
+import { insertKadrInSceneData, kadrDisplayTitle } from "../../theater/model/kadr-store";
 import type { ScriptScene, SceneLightKadrsDataV1 } from "../../../shared/types/script";
 
 export type SpectacleTapeItem = {
@@ -20,8 +16,9 @@ export type SpectacleTapeItem = {
   kadrNo: number;
   kadrId: string | null;
   headingTitle: string;
+  /** @deprecated markdown-секции больше не SoT; всегда null для JSON-ленты */
   section: MarkdownKadrSection | null;
-  /** Сцена без ### Картина — placeholder в ленте */
+  /** Сцена без картин — placeholder в ленте */
   isPlaceholder?: boolean;
 };
 
@@ -31,27 +28,22 @@ export function buildSpectacleKadrTape(scenes: ScriptScene[]): SpectacleTapeItem
   scenes.forEach((scene, sceneIndex) => {
     const sceneOrdinal = sceneIndex + 1;
     const sceneTitle = String(scene.title ?? "").trim() || `Сцена ${sceneOrdinal}`;
-    const markdown = String(scene.markdown ?? "");
-    const sections = scanMarkdownKadrSections(markdown);
-    const kadrs = readSceneLightKadrsFromMarkdown(scene);
+    const kadrs = readSceneLightKadrs(scene);
+    const sorted = [...kadrs.kadrs].sort(
+      (a, b) => a.kadrNo - b.kadrNo || a.id.localeCompare(b.id),
+    );
 
-    if (sections.length > 0) {
-      for (const section of sections) {
-        const sameNoCount = sections.filter((s) => s.kadrNo === section.kadrNo).length;
-        const linked =
-          (section.id ? kadrs.kadrs.find((k) => k.id === section.id) : undefined) ??
-          (sameNoCount === 1
-            ? kadrs.kadrs.find((k) => k.kadrNo === section.kadrNo)
-            : undefined);
+    if (sorted.length > 0) {
+      for (const kadr of sorted) {
         items.push({
           sceneIndex,
           sceneId: scene.id,
           sceneTitle,
           sceneOrdinal,
-          kadrNo: section.kadrNo,
-          kadrId: section.id ?? linked?.id ?? null,
-          headingTitle: section.headingTitle,
-          section,
+          kadrNo: kadr.kadrNo,
+          kadrId: kadr.id,
+          headingTitle: kadrDisplayTitle(kadr),
+          section: null,
         });
       }
       return;
@@ -115,52 +107,33 @@ export function isLastTapeItemInScene(
   return !next || next.sceneId !== item.sceneId;
 }
 
-export { nextKadrNumberForScene } from "../../theater/model/light-kadrs";
+export { nextKadrNumberForScene };
 
 export type InsertKadrAfterTarget = {
   id?: string | null;
   kadrNo?: number;
 };
 
-/** Вставить картину после указанной (или в конец сцены) и перенумеровать 1…N. */
+/** @deprecated используйте insertKadrInSceneData из kadr-store */
 export function insertKadrAfterInScene(args: {
   scene: ScriptScene;
   after?: InsertKadrAfterTarget | null;
   kadrId?: string;
 }): { nextMarkdown: string; nextKadrs: SceneLightKadrsDataV1; kadrId: string; kadrNo: number } {
-  const markdown = String(args.scene.markdown ?? "");
-  const kadrId = args.kadrId ?? createLightKadrId();
-  const sections = scanMarkdownKadrSections(markdown);
-
-  let insertAt = markdown.trimEnd().length;
-  let tempKadrNo = sections.length > 0 ? sections.length + 1 : 1;
-
-  if (args.after && sections.length > 0) {
-    const target =
-      (args.after.id ? sections.find((section) => section.id === args.after!.id) : undefined) ??
-      (args.after.kadrNo != null && args.after.kadrNo > 0
-        ? sections.find((section) => section.kadrNo === args.after!.kadrNo)
-        : undefined);
-    if (target) {
-      insertAt = target.sectionEnd;
-      tempKadrNo = target.kadrNo + 1;
-    }
-  }
-
-  const snippet = createKadrTemplateSnippet(tempKadrNo, kadrId);
-  const prefix = markdown.slice(insertAt, insertAt + 1) === "\n" || insertAt === 0 ? "" : "\n";
-  const insertedMarkdown = `${markdown.slice(0, insertAt)}${prefix}${snippet}${markdown.slice(insertAt)}`;
-  const nextMarkdown = renumberKadrSectionsInMarkdown(insertedMarkdown);
-  const prevKadrs = readSceneLightKadrs(args.scene);
-  const nextKadrs = syncLightKadrsFromMarkdown({ markdown: nextMarkdown, kadrs: prevKadrs });
-  const createdSection =
-    scanMarkdownKadrSections(nextMarkdown).find((section) => section.id === kadrId) ?? null;
-  const kadrNo = createdSection?.kadrNo ?? tempKadrNo;
-
-  return { nextMarkdown, nextKadrs, kadrId, kadrNo };
+  const result = insertKadrInSceneData({
+    scene: args.scene,
+    afterKadrId: args.after?.id ?? null,
+    kadrId: args.kadrId,
+  });
+  return {
+    nextMarkdown: String(args.scene.markdown ?? ""),
+    nextKadrs: result.nextKadrs,
+    kadrId: result.kadrId,
+    kadrNo: result.kadrNo,
+  };
 }
 
-/** Добавить в конец markdown сцены блок ### Картина N. */
+/** @deprecated */
 export function appendKadrToScene(args: {
   scene: ScriptScene;
   kadrNo?: number;

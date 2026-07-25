@@ -11,8 +11,10 @@ export interface ScriptScene {
   lightPlot?: LightFixture[];
   /** Таймлайн световых cue для сцены */
   lightCues?: LightCue[];
-  /** Световые картины (look на границе ### Картина N) */
+  /** Картины сцены (свет / звук / проектор). Источник истины — JSON, не markdown. */
   lightKadrs?: SceneLightKadrsDataV1;
+  /** Дым-машина включена на сцене (пометка техкарты). */
+  theaterSmokeMachine?: boolean;
   theaterSpotlights?: TheaterSpotlight[];
   theaterActiveSpotlightId?: number;
   theaterModels?: TheaterModel[];
@@ -48,7 +50,21 @@ export interface LightFixture {
   length?: number;
 }
 
-/** Снимок света для картины (### Картина N + <!-- lk:id -->). */
+/** Звук картины (плейлист / SFX). */
+export type SceneLightKadrSoundCueV1 = {
+  playTrackIds?: number[];
+  soundIds?: number[];
+  /** Громкость плеера 0…1. */
+  volume?: number;
+  fadeMs?: number;
+};
+
+/** Проектор / видео картины. */
+export type SceneLightKadrProjectorCueV1 =
+  | { mode: "hold"; holdId?: number }
+  | { mode: "video"; videoId: number; muted?: boolean };
+
+/** Картина сцены: look + медиа (источник истины — JSON). */
 export interface SceneLightKadrV1 {
   id: string;
   kadrNo: number;
@@ -59,6 +75,16 @@ export interface SceneLightKadrV1 {
   recordChannels?: number[];
   nextProgramId?: number;
   blackout?: boolean;
+  /** Дым-машина активна на этом шаге. */
+  smokeMachine?: boolean;
+  sound?: SceneLightKadrSoundCueV1;
+  projector?: SceneLightKadrProjectorCueV1;
+  transitionText?: string;
+  commentText?: string;
+  blackoutDurationSec?: number;
+  smokeDurationSec?: number;
+  /** Markdown-фрагмент картинки для превью в ленте. */
+  imageMarkdown?: string;
   note?: string;
   updatedAt?: string;
 }
@@ -220,6 +246,8 @@ export interface TheaterWallRecess {
   depth: number;
 }
 
+export type TheaterDoorStyle = "wood" | "metal";
+
 export interface TheaterDoor {
   id: number;
   wall: TheaterDoorWall;
@@ -227,6 +255,8 @@ export interface TheaterDoor {
   pos: number;
   width: number;
   height: number;
+  /** Внешний вид 3D-модели двери */
+  style?: TheaterDoorStyle;
 }
 
 export type TheaterSurfaceTextureMode = "repeat" | "cover" | "contain" | "once";

@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import cn from "classnames";
 import {
   useAppEditorMenubarActionsRender,
-  useAppEditorViewMenuRender,
 } from "@shared/components/app-editor-menubar";
 import { usePlaybook } from "../../playbook";
 import {
@@ -17,7 +16,7 @@ import {
 import {
   resolveLightProgramMinCount,
   resolveLightPrograms,
-  upsertProgramChannelSnapshot,
+  upsertChannelMemorySnapshot,
 } from "../../../shared/components/light-console/light-console-data";
 import {
   THEATER_SPOTLIGHT_DEFAULT_UI_INTENSITY,
@@ -41,17 +40,21 @@ import {
   shiftTheaterSpotlights,
   type HallExpandResult,
 } from "../model/theater-hall-expand";
+import { buildLightPlotFromSpotlights } from "../model/theater-light-channel-link";
 import { buildTheaterModelSizePatch, type TheaterModelWorldSize } from "../model/theater-model-world-size";
 import { writeSceneTheaterModels } from "../model/theater-scene-models";
 import type { TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import { TheaterControls } from "./TheaterControls";
-import { TheaterEditorViewMenu } from "./menubar/TheaterEditorViewMenu";
-import { TheaterEditorLightConsoleMenu } from "./menubar/TheaterEditorLightConsoleMenu";
+import { TheaterEditorToolsBar } from "./menubar/TheaterEditorToolsBar";
 import { TheaterBtn } from "./theater-controls-ui";
 import { TheaterFloorPlan } from "./TheaterFloorPlan";
+import { isTheaterDecorModel } from "../model/theater-decor-catalog";
+import { resolveSmokePosition } from "../model/theater-smoke-settings";
 import { TheaterModelFocusPanel } from "./TheaterModelFocusPanel";
+import { TheaterSmokeFocusPanel } from "./TheaterSmokeFocusPanel";
 import { TheaterSpotlightFocusPanel } from "./TheaterSpotlightFocusPanel";
 import { TheaterLightConsolePanel } from "./TheaterLightConsolePanel";
+import { TheaterHallQuickStartModal } from "./TheaterHallQuickStartModal";
 import { TheaterCanvasShell } from "./canvas/TheaterCanvasShell";
 import { TheaterCanvasContent } from "./canvas/TheaterCanvasContent";
 import { TheaterControlsLayoutTab } from "./controls/TheaterControlsLayoutTab";
@@ -69,6 +72,8 @@ export const TheaterScene = ({
   outlinerHost,
   controlsInPanel,
   embeddedLightRehearsal = false,
+  immersiveMode = false,
+  onImmersiveModeChange,
 }: TheaterSceneProps) => {
   const vm = useTheaterScene({
     projectName,
@@ -89,6 +94,16 @@ export const TheaterScene = ({
     vm.setSpotlightAimMode("point");
   }, [embeddedLightRehearsal]);
 
+  useEffect(() => {
+    if (!immersiveMode || !onImmersiveModeChange) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      onImmersiveModeChange(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [immersiveMode, onImmersiveModeChange]);
+
   const isModelEditMode = vm.editMode === "models" || vm.editMode === "decor";
   const showEditorHelpers = embeddedLightRehearsal
     ? vm.activeTab === "spotlights"
@@ -97,17 +112,7 @@ export const TheaterScene = ({
   const controlsInSidebar = Boolean(controlsInPanel);
   const showEditorChrome = controlsInSidebar && vm.showControls && !mobileTheaterLayout;
 
-  useAppEditorViewMenuRender(
-    "theater-view-menu",
-    10,
-    () =>
-      embeddedLightRehearsal ? null : (
-        <>
-          <TheaterEditorViewMenu vm={vm} />
-          <TheaterEditorLightConsoleMenu vm={vm} />
-        </>
-      ),
-  );
+  const showTheaterToolsBar = !embeddedLightRehearsal && !mobileTheaterLayout;
 
   const sceneSettingsActive = !isPanelsSwapped;
   const panelsToggleLabel = isPanelsSwapped ? "Музыка и сцены" : "Настройки сцены";
@@ -182,21 +187,20 @@ export const TheaterScene = ({
   );
 
   const showSpotlightFocusPanel =
-    showEditorHelpers &&
-    vm.activeTab === "spotlights" &&
     vm.editMode === "spotlights" &&
     vm.activeSpotlightId != null &&
     activeSpotlight != null;
 
-  const isDecorTab = vm.activeTab === "decor";
+  const isDecorEditMode = vm.editMode === "decor";
 
   const showModelFocusPanel =
-    showEditorHelpers &&
     isModelEditMode &&
     vm.activeModelId != null &&
-    vm.activeModel != null &&
-    ((vm.activeTab === "models" && vm.editMode === "models") ||
-      (vm.activeTab === "decor" && vm.editMode === "decor"));
+    vm.activeModel != null;
+
+  const smokePosition = resolveSmokePosition(vm.layout, vm.smokePosition);
+  const showSmokeFocusPanel = vm.smokeMachineEnabled && vm.smokePanelOpen;
+  const showSmokePanelTab = vm.smokeMachineEnabled && !vm.smokePanelOpen;
 
   const hallExpandStartRef = useRef<{
     models: TheaterModel[];
@@ -213,9 +217,11 @@ export const TheaterScene = ({
       const start = hallExpandStartRef.current;
       const [sx, sy, sz] = result.objectShift;
       if (!start || (sx === 0 && sy === 0 && sz === 0)) return;
+      const nextSpotlights = shiftTheaterSpotlights(start.spotlights, result.objectShift);
       vm.updateCurrentScene({
         ...writeSceneTheaterModels(shiftTheaterModels(start.models, result.objectShift)),
-        theaterSpotlights: shiftTheaterSpotlights(start.spotlights, result.objectShift),
+        theaterSpotlights: nextSpotlights,
+        lightPlot: buildLightPlotFromSpotlights(nextSpotlights, vm.layout),
       });
     },
     [vm],
@@ -256,30 +262,26 @@ export const TheaterScene = ({
       vm.setLayoutOutlineFocused(false);
       vm.setAudienceSeatsFocused(false);
       vm.setStageGridFocused(false);
-      const selectingLightTruss =
-        vm.activeTab === "spotlights" &&
-        vm.models.some(
-          (model) => model.id === id && model.builtin === "lightTruss6m",
-        );
-      if (selectingLightTruss) {
-        vm.setEditMode("models");
-      } else {
-        vm.exitDecorPlaceMode();
-        vm.setActiveTab("decor");
-        vm.setEditMode("decor");
+      const model = vm.models.find((entry) => entry.id === id);
+      const isDecor = model != null && isTheaterDecorModel(model);
+
+      vm.exitDecorPlaceMode();
+      if (vm.spectaclePreviewMode) {
+        vm.setSpectaclePreviewMode(false);
       }
+      vm.setEditMode(isDecor ? "decor" : "models");
       vm.selectTheaterModel(id, additive);
     },
     [
-      vm.activeTab,
       vm.exitDecorPlaceMode,
       vm.models,
       vm.selectTheaterModel,
-      vm.setActiveTab,
       vm.setAudienceSeatsFocused,
       vm.setEditMode,
       vm.setLayoutOutlineFocused,
+      vm.setSpectaclePreviewMode,
       vm.setStageGridFocused,
+      vm.spectaclePreviewMode,
     ],
   );
 
@@ -301,8 +303,6 @@ export const TheaterScene = ({
     ? {
         spotlight: activeSpotlight,
         dragMode: vm.dragMode,
-        showOnlyActive: vm.showOnlyActiveSpotlight,
-        onShowOnlyActiveChange: vm.setShowOnlyActiveSpotlight,
         onToggleEnabled: () => {
           const nextEnabled = !(activeSpotlight.enabled ?? true);
           const currentIntensity =
@@ -329,14 +329,30 @@ export const TheaterScene = ({
                 faderId,
                 nextEnabled ? 1 : 0,
               );
+              const channelCount = Math.max(
+                channel,
+                Array.isArray(playbookData?.lightChannels)
+                  ? playbookData.lightChannels.length
+                  : channel,
+              );
               const programs = resolveLightPrograms(
                 prev?.lightPrograms ?? playbookData?.lightPrograms,
-                resolveLightProgramMinCount(channel, prev?.lightPrograms ?? playbookData?.lightPrograms, channel),
+                resolveLightProgramMinCount(
+                  channelCount,
+                  prev?.lightPrograms ?? playbookData?.lightPrograms,
+                  channel,
+                ),
+                channelCount,
               );
               return {
                 ...(prev ?? {}),
                 lightFaders: nextFaders,
-                lightPrograms: upsertProgramChannelSnapshot(programs, channel, nextFaders),
+                lightPrograms: upsertChannelMemorySnapshot(
+                  programs,
+                  channel,
+                  nextFaders,
+                  channelCount,
+                ),
               };
             });
           }
@@ -348,7 +364,6 @@ export const TheaterScene = ({
           vm.updateSpotlight(activeSpotlight.id, {
             hidden: activeSpotlight.hidden !== true,
           }),
-        onAimAtStage: () => vm.aimSpotlightAtStage(activeSpotlight.id),
         onPickDragMode: (mode: "target" | "source") => vm.setDragMode(mode),
         onAngleChange: (angleDeg: number) =>
           vm.updateSpotlight(activeSpotlight.id, { angleDeg }),
@@ -395,6 +410,8 @@ export const TheaterScene = ({
     const modelId = activeModel.id;
     return {
       modelName: activeModel.name,
+      modelId,
+      onNameChange: (name: string) => vm.updateModel(modelId, { name }),
       size: vm.activeModelWorldSize,
       onSizeCommit: (next: Partial<TheaterModelWorldSize>) => {
         const current = vm.activeModelWorldSize;
@@ -405,7 +422,7 @@ export const TheaterScene = ({
         vm.setPendingSnapModelId(modelId);
       },
       transformMode: vm.modelTransformMode,
-      showDecorActions: isDecorTab,
+      showDecorActions: isDecorEditMode,
       hidden: activeModel.hidden === true,
       onToggleHidden: () =>
         vm.updateModel(modelId, {
@@ -413,12 +430,12 @@ export const TheaterScene = ({
         }),
       onPickTransform: (mode: "translate" | "rotate" | "scale") => {
         vm.exitDecorPlaceMode();
-        vm.setEditMode(isDecorTab ? "decor" : "models");
+        vm.setEditMode(isDecorEditMode ? "decor" : "models");
         vm.setModelTransformMode(mode);
       },
       onRotateQuarter: (direction: "cw" | "ccw") => vm.rotateActiveModel(direction),
-      placementGrid: isDecorTab ? vm.stageGrid : undefined,
-      onPlace: isDecorTab
+      placementGrid: isDecorEditMode ? vm.stageGrid : undefined,
+      onPlace: isDecorEditMode
         ? (preset: ModelPlacementPreset) => vm.placeActiveModel(preset)
         : undefined,
       onResetTransform: () => {
@@ -436,6 +453,13 @@ export const TheaterScene = ({
   })();
 
   const embedLight = embeddedLightRehearsal;
+  const showHallQuickStart =
+    !embedLight && Boolean(vm.currentScene) && !vm.hallQuickStartDone;
+
+  const finishHallQuickStart = (templateId?: string) => {
+    if (templateId) vm.applyHallTemplate(templateId);
+    vm.setHallQuickStartDone(true);
+  };
 
   return (
     <div
@@ -449,6 +473,13 @@ export const TheaterScene = ({
         .join(" ")}
     >
       {sidebarRender}
+      {showTheaterToolsBar ? (
+        <TheaterEditorToolsBar
+          vm={vm}
+          immersiveMode={immersiveMode}
+          onImmersiveModeChange={onImmersiveModeChange}
+        />
+      ) : null}
       <div className="theater-scene-main">
         <div className="theater-scene-body">
       {mobileTheaterLayout && controlsInSidebar && !vm.showControls ? (
@@ -463,6 +494,31 @@ export const TheaterScene = ({
       ) : null}
       {showModelFocusPanel && modelFocusPanelProps ? (
         <TheaterModelFocusPanel {...modelFocusPanelProps} />
+      ) : null}
+      {showSmokeFocusPanel ? (
+        <TheaterSmokeFocusPanel
+          position={smokePosition}
+          intensity={vm.smokeIntensity}
+          saturation={vm.smokeSaturation}
+          size={vm.smokeSize}
+          onPositionChange={vm.setSmokePosition}
+          onIntensityChange={vm.setSmokeIntensity}
+          onSaturationChange={vm.setSmokeSaturation}
+          onSizeChange={vm.setSmokeSize}
+          onResetPosition={() => vm.setSmokePosition(null)}
+          onHide={() => vm.setSmokePanelOpen(false)}
+          onDisable={() => vm.setSmokeMachineEnabled(false)}
+        />
+      ) : null}
+      {showSmokePanelTab ? (
+        <button
+          type="button"
+          className="theater-smoke-panel-tab"
+          title="Показать настройки дыма"
+          onClick={() => vm.setSmokePanelOpen(true)}
+        >
+          Дым
+        </button>
       ) : null}
       {vm.showFloorPlan && !embedLight ? (
         <TheaterFloorPlan
@@ -547,6 +603,12 @@ export const TheaterScene = ({
           collapsed={!vm.lightConsoleExpanded}
         />
       ) : null}
+      <TheaterHallQuickStartModal
+        open={showHallQuickStart}
+        templates={vm.hallTemplates}
+        onPick={finishHallQuickStart}
+        onSkip={() => finishHallQuickStart()}
+      />
       {!embedLight ? (
         <TheaterMobileActionBar
           vm={vm}
@@ -566,13 +628,21 @@ export const TheaterScene = ({
           showSeats={vm.showSeats}
           showGrid={vm.showGrid}
           showStageGrid={vm.showStageGrid}
+          activeDoorId={vm.activeDoorId}
+          activeRecessId={vm.activeRecessId}
           showSpotlights={vm.showSpotlights}
           showSpotlightGuideLines={vm.showSpotlightGuideLines}
-          showOnlyActiveSpotlight={vm.showOnlyActiveSpotlight}
           wallsOpaque={vm.wallsOpaque}
           wallsHidden={vm.wallsHidden}
           wallsHideFromCamera={vm.wallsHideFromCamera}
           dutyLightEnabled={vm.dutyLightEnabled}
+          smokeMachineEnabled={vm.smokeMachineEnabled}
+          smokePosition={smokePosition}
+          smokeIntensity={vm.smokeIntensity}
+          smokeSaturation={vm.smokeSaturation}
+          smokeSize={vm.smokeSize}
+          sceneBackgroundColor={vm.sceneBackgroundColor}
+          onSmokePositionChange={vm.setSmokePosition}
           snapToGrid={vm.snapToGrid}
           gridStep={vm.gridStep}
           alignGuidesEnabled={vm.alignGuidesEnabled}
@@ -991,6 +1061,28 @@ function TheaterMobileActionBar({
                   onClick={() => vm.setLightConsoleExpanded((open) => !open)}
                 >
                   Пульт света
+                </MobileActionButton>
+                <MobileActionButton
+                  active={vm.dutyLightEnabled}
+                  onClick={() => vm.setDutyLightEnabled(!vm.dutyLightEnabled)}
+                >
+                  Дежурка
+                </MobileActionButton>
+                <MobileActionButton
+                  active={vm.smokeMachineEnabled}
+                  onClick={() => {
+                    if (!vm.smokeMachineEnabled) {
+                      if (vm.spectaclePreviewMode) {
+                        vm.setSpectaclePreviewMode(false);
+                      }
+                      vm.setSmokeMachineEnabled(true);
+                      vm.setSmokePanelOpen(true);
+                      return;
+                    }
+                    vm.setSmokePanelOpen(!vm.smokePanelOpen);
+                  }}
+                >
+                  Дым
                 </MobileActionButton>
                 <MobileActionButton
                   active={vm.snapToGrid}

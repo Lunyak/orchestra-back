@@ -11,8 +11,6 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import { useNavigate } from "react-router-dom";
 import { useProjectRolesQuery } from "../../../../features/project/api/project-api";
-import { readPlaybookRolesBySceneId } from "../../../../features/playbook/model/playbook-roles-storage";
-import type { PlaybookRolesDataV1 } from "../../../../features/playbook";
 import {
   selectActiveSceneMarkdownContext,
   selectShowScriptMarkdownUi,
@@ -726,15 +724,6 @@ export function ScriptMarkdownPreview({
     return null;
   };
 
-  const isRoleAttachedToCurrentScene = (roleId: string): boolean => {
-    if (!currentScene?.id) return false;
-    const sr = (playbookData as { sceneRoles?: PlaybookRolesDataV1 })?.sceneRoles;
-    const bySceneId = readPlaybookRolesBySceneId(sr ?? null);
-    const sceneMap = bySceneId[String(currentScene.id)];
-    if (!sceneMap || typeof sceneMap !== "object") return false;
-    return Boolean(sceneMap[String(roleId)]);
-  };
-
   const handleSpeakerLabelClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed && String(sel.toString() ?? "").trim()) {
@@ -807,11 +796,10 @@ export function ScriptMarkdownPreview({
 
     const el = target.closest?.(".markdown-speaker-label") as HTMLElement | null;
     if (!el) return;
-    const token = String(el.getAttribute("title") ?? "").trim();
+    const token = String(el.getAttribute("title") ?? el.textContent ?? "").trim();
     if (!token) return;
     const roleId = resolveRoleIdFromToken(token);
     if (!roleId) return;
-    if (!isRoleAttachedToCurrentScene(roleId)) return;
     e.preventDefault();
     e.stopPropagation();
     navigate(`/role-workbook/${encodeURIComponent(roleId)}`);

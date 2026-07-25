@@ -1,4 +1,9 @@
-import type { TheaterDoor, TheaterDoorWall, TheaterLayout } from "../../../shared/types/script";
+import type {
+  TheaterDoor,
+  TheaterDoorStyle,
+  TheaterDoorWall,
+  TheaterLayout,
+} from "../../../shared/types/script";
 import { roundM } from "./theater-metrics";
 import {
   distancePointToWallChain,
@@ -20,8 +25,14 @@ export const THEATER_DOOR_WALL_LABELS: Record<TheaterDoorWall, string> = {
   front: "Передняя (зал)",
 };
 
+export const THEATER_DOOR_STYLE_LABELS: Record<TheaterDoorStyle, string> = {
+  wood: "Деревянная",
+  metal: "Металлическая",
+};
+
 const DEFAULT_DOOR_WIDTH = 1.2;
 const DEFAULT_DOOR_HEIGHT = 2.2;
+const DEFAULT_DOOR_STYLE: TheaterDoorStyle = "wood";
 
 function clampDoor(
   door: TheaterDoor,
@@ -52,6 +63,7 @@ function clampDoor(
     width,
     height,
     pos,
+    style: door.style === "metal" ? "metal" : "wood",
   };
 }
 
@@ -76,6 +88,10 @@ function parseDoorWall(raw: unknown): TheaterDoorWall {
   return "left";
 }
 
+function parseDoorStyle(raw: unknown): TheaterDoorStyle {
+  return raw === "metal" ? "metal" : DEFAULT_DOOR_STYLE;
+}
+
 export function doorFromLegacyLayout(
   layout: Pick<TheaterLayout, "doorWidth" | "doorHeight" | "doorZ">,
 ): TheaterDoor {
@@ -85,6 +101,7 @@ export function doorFromLegacyLayout(
     pos: layout.doorZ,
     width: layout.doorWidth,
     height: layout.doorHeight,
+    style: DEFAULT_DOOR_STYLE,
   };
 }
 
@@ -107,6 +124,7 @@ export function normalizeDoors(
         pos: Number.isFinite(door.pos) ? door.pos : 0,
         width: Number.isFinite(door.width) ? door.width : DEFAULT_DOOR_WIDTH,
         height: Number.isFinite(door.height) ? door.height : DEFAULT_DOOR_HEIGHT,
+        style: parseDoorStyle(door.style),
       },
       layout,
     ),
@@ -171,7 +189,7 @@ export function normalizeLayoutDoorsFields(
 export function patchLayoutDoor(
   layout: TheaterLayout,
   doorId: number,
-  patch: Partial<Pick<TheaterDoor, "pos" | "width" | "height" | "wall">>,
+  patch: Partial<Pick<TheaterDoor, "pos" | "width" | "height" | "wall" | "style">>,
 ): TheaterDoor[] {
   return normalizeDoors(
     resolveLayoutDoors(layout).map((door) =>
@@ -227,6 +245,7 @@ export function createLayoutDoor(
       pos: suggestDoorPos(wall, existing, layout),
       width: DEFAULT_DOOR_WIDTH,
       height: DEFAULT_DOOR_HEIGHT,
+      style: DEFAULT_DOOR_STYLE,
     },
     layout,
   );

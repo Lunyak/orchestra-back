@@ -13,7 +13,7 @@ export function TheaterControlsToolbar({ vm }: TheaterControlsTabProps) {
       <TheaterBtn
         active={activeTab === "navigate"}
         onClick={() => setActiveTab("navigate")}
-        title="Сцена, проект, закладки камеры"
+        title="Сцена и вид"
       >
         Обзор
       </TheaterBtn>

@@ -1,10 +1,7 @@
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 import { labelM } from "../../model/theater-metrics";
-import { useTheaterControlsLightChannels } from "../controls/use-theater-controls-light-channels";
 
 export function TheaterEditorMenubarTheaterFields({ vm }: { vm: TheaterSceneViewModel }) {
-  const { lightChannels } = useTheaterControlsLightChannels();
-
   return (
     <div
       className="theater-editor-menubar__submenu-fields"
@@ -32,15 +29,6 @@ export function TheaterEditorMenubarTheaterFields({ vm }: { vm: TheaterSceneView
           onChange={(event) => vm.setSceneBackgroundColor(event.target.value)}
         />
       </label>
-      <button
-        type="button"
-        className="theater-editor-menubar__field-action"
-        disabled={!vm.currentScene || (vm.currentScene.lightCues?.length ?? 0) === 0}
-        title="Скопировать таймлайн light cue в буфер"
-        onClick={() => void vm.copyLightCuesToClipboard(lightChannels)}
-      >
-        Cue → буфер
-      </button>
     </div>
   );
 }

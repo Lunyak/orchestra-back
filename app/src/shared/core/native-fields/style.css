@@ -7,8 +7,10 @@
  * color-scheme: dark помогает тёмной теме там, где ОС это учитывает.
  */
 
+/* select.native-text-input — тот же стиль: часто ошибочно вешают text-input на <select> */
 .native-select,
-select.native-select {
+select.native-select,
+select.native-text-input {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -20,48 +22,45 @@ select.native-select {
     calc(var(--field-control-padding-x) + 22px)
     var(--field-control-padding-y)
     var(--field-control-padding-x);
-  border: 1px solid var(--field-control-border);
-  background-color: var(--field-control-bg-hover);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background-color: var(--color-bg-secondary);
   background-image: var(--field-control-chevron);
   background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 14px 14px;
-  box-shadow: var(--field-control-inset);
-  color: var(--field-control-text);
+  background-position: right 8px center;
+  background-size: 12px 12px;
+  box-shadow: none;
+  color: var(--color-text-lighter);
   color-scheme: dark;
   font-family: var(--font-family-script-body);
   font-size: var(--field-control-font-size);
   font-weight: var(--font-weight-medium);
-  line-height: 1.35;
+  line-height: 1.3;
   cursor: pointer;
   outline: none;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease;
 }
 
 .native-select:hover,
-select.native-select:hover {
-  background-color: var(--field-control-bg-hover);
-  border-color: var(--field-control-border-hover);
+select.native-select:hover,
+select.native-text-input:hover {
+  background-color: color-mix(in srgb, var(--color-bg-primary) 70%, var(--color-bg-secondary));
   background-image: var(--field-control-chevron);
   background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 14px 14px;
-  box-shadow: var(--field-control-inset);
+  background-position: right 8px center;
+  background-size: 12px 12px;
+  border-color: color-mix(in srgb, var(--color-active-ascent) 50%, transparent);
 }
 
 .native-select:focus-visible,
-select.native-select:focus-visible {
-  border-color: var(--field-control-border-focus);
-  box-shadow:
-    var(--field-control-inset),
-    0 0 0 2px var(--field-control-focus-ring);
+select.native-select:focus-visible,
+select.native-text-input:focus-visible {
+  outline: none;
+  border-color: var(--color-active-ascent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-active-ascent) 28%, transparent);
 }
 
 .native-select:disabled,
-select.native-select:disabled {
+select.native-select:disabled,
+select.native-text-input:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
@@ -69,7 +68,8 @@ select.native-select:disabled {
 /* --- option / optgroup (ограниченная поддержка браузеров) --- */
 
 .native-select option,
-select.native-select option {
+select.native-select option,
+select.native-text-input option {
   font-family: var(--font-family-script-body);
   font-size: var(--field-control-font-size);
   font-weight: var(--font-weight-medium);
@@ -80,19 +80,22 @@ select.native-select option {
 }
 
 .native-select option:checked,
-select.native-select option:checked {
+select.native-select option:checked,
+select.native-text-input option:checked {
   background-color: var(--color-bg-quaternary);
-  color: var(--color-text-primary);
+  color: var(--color-text-lighter);
 }
 
 .native-select option:hover,
-select.native-select option:hover {
-  background-color: color-mix(in srgb, var(--color-bg-tertiary) 32%, var(--color-bg-primary));
-  color: var(--color-text-dark);
+select.native-select option:hover,
+select.native-text-input option:hover {
+  background-color: color-mix(in srgb, var(--color-active-ascent) 28%, var(--color-bg-primary));
+  color: var(--color-text-lighter);
 }
 
 .native-select optgroup,
-select.native-select optgroup {
+select.native-select optgroup,
+select.native-text-input optgroup {
   font-family: var(--font-family-script-label);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
@@ -117,26 +120,22 @@ textarea.native-text-input {
   box-sizing: border-box;
   min-height: var(--field-control-min-height);
   padding: var(--field-control-padding-y) var(--field-control-padding-x);
-  border: 1px solid var(--field-control-border);
-  background: var(--field-control-bg-hover);
-  box-shadow: var(--field-control-inset);
+  border: none;
+  background: var(--field-control-bg);
+  box-shadow: none;
   color: var(--field-control-text);
   font-family: var(--font-family-script-body);
   font-size: var(--field-control-font-size);
   font-weight: var(--font-weight-medium);
-  line-height: 1.35;
+  line-height: 1.3;
   outline: none;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease;
 }
 
 textarea.native-text-input {
-  min-height: 6.5rem;
+  min-height: 4.5rem;
   max-height: min(40vh, 22rem);
   resize: vertical;
-  line-height: 1.45;
+  line-height: 1.4;
   vertical-align: top;
 }
 
@@ -144,16 +143,13 @@ textarea.native-text-input {
 input.native-text-input:hover,
 textarea.native-text-input:hover {
   background: var(--field-control-bg-hover);
-  border-color: var(--field-control-border-hover);
 }
 
 .native-text-input:focus-visible,
 input.native-text-input:focus-visible,
 textarea.native-text-input:focus-visible {
-  border-color: var(--field-control-border-focus);
-  box-shadow:
-    var(--field-control-inset),
-    0 0 0 2px var(--field-control-focus-ring);
+  outline: none;
+  box-shadow: none;
 }
 
 .native-text-input:disabled,

@@ -9,16 +9,14 @@ import {
   buildKadrFromConsole,
   createLightKadrId,
   findKadrById,
-  type MarkdownKadrSection,
-  recordKadrToMarkdown,
   upsertKadrInScene,
 } from "../../../features/theater/model/light-kadrs";
 import { resolveLightFaders, resolveLightPrograms } from "./light-console-data";
 
 export type RecordLightKadrInput = {
-  markdown: string;
-  section: MarkdownKadrSection;
-  existingKadrId?: string | null;
+  kadrId?: string | null;
+  kadrNo?: number;
+  title?: string;
   kadrs: SceneLightKadrsDataV1;
   lightChannels: string[];
   lightFaders: PlaybookLightFadersDataV1 | null | undefined;
@@ -30,24 +28,34 @@ export type RecordLightKadrInput = {
   /** Активный K на пульте при записи. */
   liveConsoleChannel?: number;
   lightChannelRoles?: PlaybookLightChannelRolesV1 | null;
+  /** @deprecated markdown больше не пишется */
+  markdown?: string;
+  /** @deprecated */
+  section?: { id?: string | null; kadrNo?: number; headingTitle?: string } | null;
+  /** @deprecated */
+  existingKadrId?: string | null;
 };
 
 export type RecordLightKadrResult = {
   kadrId: string;
   nextKadrs: SceneLightKadrsDataV1;
+  /** @deprecated всегда исходный markdown / пустая строка */
   nextMarkdown: string;
   summary: string;
 };
 
 export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLightKadrResult | null {
-  if (!input.section) return null;
-
   const faders = resolveLightFaders(input.lightFaders ?? undefined);
-  const kadrId = input.section.id ?? input.existingKadrId ?? createLightKadrId();
+  const kadrId =
+    input.kadrId ??
+    input.existingKadrId ??
+    input.section?.id ??
+    createLightKadrId();
+  const existing = findKadrById(input.kadrs, kadrId);
+  const kadrNo =
+    existing?.kadrNo ??
+    Math.max(1, Math.trunc(input.kadrNo ?? input.section?.kadrNo ?? 1) || 1);
   const programId = Math.max(1, Math.trunc(input.programId) || 1);
-  const existing = input.existingKadrId
-    ? findKadrById(input.kadrs, input.existingKadrId)
-    : undefined;
 
   const roles = resolveLightChannelRoles(
     input.lightChannelRoles,
@@ -58,8 +66,8 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
 
   const kadr = buildKadrFromConsole({
     id: kadrId,
-    kadrNo: existing?.kadrNo ?? input.section.kadrNo,
-    title: input.section.headingTitle,
+    kadrNo,
+    title: input.title ?? existing?.title ?? input.section?.headingTitle,
     programId,
     faders,
     spotlights: input.spotlights ?? [],
@@ -69,23 +77,30 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
     lightChannelsCount: input.lightChannels.length,
   });
 
-  const nextKadrs = upsertKadrInScene({ kadrs: input.kadrs, kadr });
-  const nextMarkdown = recordKadrToMarkdown({
-    markdown: input.markdown,
-    section: { ...input.section, id: kadrId },
-    kadr,
-    lightChannels: input.lightChannels,
-    lightFaders: faders,
-    programs: input.lightPrograms,
-  });
+  const preserved: typeof kadr = {
+    ...kadr,
+    ...(existing?.sound ? { sound: existing.sound } : {}),
+    ...(existing?.projector ? { projector: existing.projector } : {}),
+    ...(existing?.transitionText ? { transitionText: existing.transitionText } : {}),
+    ...(existing?.commentText ? { commentText: existing.commentText } : {}),
+    ...(existing?.imageMarkdown ? { imageMarkdown: existing.imageMarkdown } : {}),
+    ...(existing?.blackoutDurationSec != null
+      ? { blackoutDurationSec: existing.blackoutDurationSec }
+      : {}),
+    ...(existing?.smokeDurationSec != null
+      ? { smokeDurationSec: existing.smokeDurationSec }
+      : {}),
+    ...(existing?.smokeMachine ? { smokeMachine: true } : {}),
+  };
 
-  const totalFaders = kadr.faders.length;
-  const activeFaders = kadr.faders.filter(
+  const nextKadrs = upsertKadrInScene({ kadrs: input.kadrs, kadr: preserved });
+
+  const totalFaders = preserved.faders.length;
+  const activeFaders = preserved.faders.filter(
     (f) => (f.enabled ?? true) && (f.intensity ?? 0) > 0.02,
   ).length;
   const offFaders = totalFaders - activeFaders;
 
-  const prev = input.existingKadrId ? findKadrById(input.kadrs, input.existingKadrId) : undefined;
   const faderSummary =
     totalFaders === 0
       ? "нет F с оборудованием на отмеченных K"
@@ -94,12 +109,17 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
         : `${activeFaders} вкл`;
   const summary =
     totalFaders === 0
-      ? `Картина ${kadr.kadrNo}: П${programId} · ${faderSummary}`
-      : prev
-        ? `Картина ${kadr.kadrNo}: обновлено · П${programId} · ${faderSummary}`
-        : `Картина ${kadr.kadrNo}: записано · П${programId} · ${faderSummary}`;
+      ? `Картина ${preserved.kadrNo}: П${programId} · ${faderSummary}`
+      : existing
+        ? `Картина ${preserved.kadrNo}: обновлено · П${programId} · ${faderSummary}`
+        : `Картина ${preserved.kadrNo}: записано · П${programId} · ${faderSummary}`;
 
-  return { kadrId, nextKadrs, nextMarkdown, summary };
+  return {
+    kadrId,
+    nextKadrs,
+    nextMarkdown: String(input.markdown ?? ""),
+    summary,
+  };
 }
 
 export function resolveActiveProgramId(

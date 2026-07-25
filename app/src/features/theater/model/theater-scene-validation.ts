@@ -1,5 +1,4 @@
 import type {
-  LightFixture,
   TheaterDoor,
   TheaterLayout,
   TheaterModel,
@@ -7,7 +6,6 @@ import type {
 } from "../../../shared/types/script";
 import { isTheaterDecorModel } from "./theater-decor-catalog";
 import { resolveLayoutDoors } from "./theater-doors";
-import { countSceneLightChannelLinks } from "./theater-light-channel-link";
 
 export type SceneValidationIssue = {
   id: string;
@@ -37,7 +35,6 @@ export function validateTheaterScene(args: {
   spotlights: TheaterSpotlight[];
   models: TheaterModel[];
   layout: TheaterLayout;
-  lightPlot?: LightFixture[];
 }): SceneValidationIssue[] {
   const issues: SceneValidationIssue[] = [];
   const { spotlights, models, layout } = args;
@@ -102,15 +99,6 @@ export function validateTheaterScene(args: {
         });
       }
     }
-  }
-
-  const linkStats = countSceneLightChannelLinks(args.lightPlot, spotlights);
-  if ((args.lightPlot?.length ?? 0) > 0 && linkStats.linkedSlots === 0) {
-    issues.push({
-      id: "light-plot-unlinked",
-      level: "warn",
-      message: "Схема света не связана с 3D-софитами по каналам",
-    });
   }
 
   const decorCount = models.filter(isTheaterDecorModel).length;

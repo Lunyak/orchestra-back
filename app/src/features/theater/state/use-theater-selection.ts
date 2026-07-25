@@ -56,7 +56,8 @@ export function useTheaterSelection({
   );
 
   const selectTheaterSpotlight = useCallback(
-    (id: number, additive = false) => {
+    (id: number, additive = false, options?: { switchTab?: boolean }) => {
+      const shouldSwitchTab = options?.switchTab !== false;
       if (additive) {
         setMultiSelectedSpotlightIds((prev) => {
           const has = prev.includes(id);
@@ -66,7 +67,9 @@ export function useTheaterSelection({
       } else {
         setMultiSelectedSpotlightIds([id]);
       }
-      setActiveTab("spotlights");
+      if (shouldSwitchTab) {
+        setActiveTab("spotlights");
+      }
       setEditMode("spotlights");
       updateCurrentScene({ theaterActiveSpotlightId: id });
     },

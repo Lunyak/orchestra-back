@@ -256,58 +256,48 @@ export function mergeSpotlightsFromLightPlot(
   return result;
 }
 
-export function mergeLightPlotFromSpotlights(
+/** 3D-софиты → lightPlot (источник истины: theaterSpotlights). */
+export function buildLightPlotFromSpotlights(
   spotlights: TheaterSpotlight[],
-  existing: LightFixture[],
   layout: TheaterLayout,
   gridCols = 12,
   gridRows = 20,
 ): LightFixture[] {
-  const result = existing.map((item) => ({ ...item }));
-  const usedIds = new Set<number>();
-
-  for (const spotlight of spotlights) {
-    if (spotlight.hidden) continue;
-    const slot = parseLightChannelSlot(spotlight.channel ?? spotlight.id);
-    const [gridX, gridY] = worldToLightPlotGrid(
-      spotlight.position[0],
-      spotlight.position[2],
-      layout,
-      gridCols,
-      gridRows,
-    );
-    const patch = {
-      label: spotlight.label?.trim() || `Софит ${spotlight.id}`,
-      channel: slot != null ? formatLightChannelSlot(slot) : String(spotlight.channel ?? spotlight.id),
-      x: Math.round(Math.max(1, Math.min(gridCols, gridX))),
-      y: Math.round(Math.max(1, Math.min(gridRows, gridY))),
-      angle: spotlightBeamToFixtureAngle(spotlight),
-      length: spotlightBeamToFixtureLength(spotlight),
-    };
-
-    let matchIdx = -1;
-    if (slot != null) {
-      matchIdx = result.findIndex(
-        (item) => !usedIds.has(item.id) && fixtureMatchesChannelSlot(item, slot),
+  return spotlights
+    .filter((spotlight) => spotlight.hidden !== true)
+    .map((spotlight) => {
+      const slot = parseLightChannelSlot(spotlight.channel ?? spotlight.id);
+      const [gridX, gridY] = worldToLightPlotGrid(
+        spotlight.position[0],
+        spotlight.position[2],
+        layout,
+        gridCols,
+        gridRows,
       );
-    }
-    if (matchIdx < 0) {
-      matchIdx = result.findIndex(
-        (item) => !usedIds.has(item.id) && item.label === patch.label,
-      );
-    }
+      return {
+        id: spotlight.id,
+        label: spotlight.label?.trim() || `Софит ${spotlight.id}`,
+        channel:
+          slot != null
+            ? formatLightChannelSlot(slot)
+            : String(spotlight.channel ?? spotlight.id),
+        x: Math.round(Math.max(1, Math.min(gridCols, gridX))),
+        y: Math.round(Math.max(1, Math.min(gridRows, gridY))),
+        angle: spotlightBeamToFixtureAngle(spotlight),
+        length: spotlightBeamToFixtureLength(spotlight),
+      };
+    });
+}
 
-    if (matchIdx >= 0) {
-      result[matchIdx] = { ...result[matchIdx], ...patch };
-      usedIds.add(result[matchIdx].id);
-    } else {
-      const nextId = result.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
-      result.push({ id: nextId, ...patch });
-      usedIds.add(nextId);
-    }
-  }
-
-  return result;
+/** @deprecated use buildLightPlotFromSpotlights — existing plot is ignored */
+export function mergeLightPlotFromSpotlights(
+  spotlights: TheaterSpotlight[],
+  _existing: LightFixture[],
+  layout: TheaterLayout,
+  gridCols = 12,
+  gridRows = 20,
+): LightFixture[] {
+  return buildLightPlotFromSpotlights(spotlights, layout, gridCols, gridRows);
 }
 
 export function applyLightPlotChannelsToSpotlights(

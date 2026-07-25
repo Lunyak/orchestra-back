@@ -6,9 +6,11 @@ import type {
 import { roundM } from "./theater-metrics";
 import {
   getStageBackWallSpanX,
+  getStageSideWallX,
   getStageWallSpanZ,
   resolveStageGeometry,
   resolveStageWallChains,
+  type StagePoint,
 } from "./theater-stage-geometry";
 
 function clamp(value: number, min: number, max: number) {
@@ -77,6 +79,23 @@ export function clampWallRecess(
 export function resolveLayoutWallRecesses(layout: TheaterLayout): TheaterWallRecess[] {
   if (!Array.isArray(layout.wallRecesses)) return [];
   return layout.wallRecesses;
+}
+
+export function getRecessCenterOnWall(
+  recess: TheaterWallRecess,
+  layout: TheaterLayout,
+): StagePoint | null {
+  const geom = resolveStageGeometry(layout);
+  if (recess.wall === "back") {
+    return { x: recess.pos, z: geom.backZ };
+  }
+  if (recess.wall === "left") {
+    return { x: getStageSideWallX("left", recess.pos, geom), z: recess.pos };
+  }
+  if (recess.wall === "right") {
+    return { x: getStageSideWallX("right", recess.pos, geom), z: recess.pos };
+  }
+  return null;
 }
 
 export function normalizeWallRecesses(

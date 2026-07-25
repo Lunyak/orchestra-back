@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
   type Dispatch,
   type SetStateAction,
@@ -14,23 +13,6 @@ import {
   isTheaterDecorModel,
   type DecorCatalogKey,
 } from "../model/theater-decor-catalog";
-import {
-  buildDecorSceneTemplate,
-  DECOR_SCENE_TEMPLATES,
-  type DecorSceneTemplateId,
-} from "../model/theater-decor-scene-templates";
-import {
-  buildModelsFromDecorTemplateJson,
-  downloadDecorTemplateJson,
-  exportDecorModelsToTemplateJson,
-  loadProjectDecorTemplateManifest,
-  persistStoredDecorTemplatesToProject,
-  parseDecorTemplateJson,
-  readStoredDecorTemplates,
-  type DecorTemplateJson,
-  type DecorTemplateListItem,
-  upsertStoredDecorTemplate,
-} from "../model/theater-decor-template-json";
 import {
   decorInventoryToRequisiteLabels,
   downloadDecorInventoryCsv,
@@ -48,7 +30,6 @@ import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
 } from "../model/theater-scene-models";
-import type { TheaterViewPrefs } from "../model/theater-view-prefs-storage";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 export type UseTheaterDecorArgs = {
@@ -67,7 +48,6 @@ export type UseTheaterDecorArgs = {
   setPendingSnapModelId: Dispatch<SetStateAction<number | null>>;
   activeModelId: number | undefined;
   setEditMode: Dispatch<SetStateAction<TheaterEditMode>>;
-  setActiveTab: (tab: TheaterViewPrefs["activeTab"]) => void;
   decorActionMessage: string | null;
   setDecorActionMessage: (message: string | null) => void;
 };
@@ -88,7 +68,6 @@ export function useTheaterDecor({
   setPendingSnapModelId,
   activeModelId,
   setEditMode,
-  setActiveTab,
   decorActionMessage,
   setDecorActionMessage,
 }: UseTheaterDecorArgs) {
@@ -105,12 +84,6 @@ export function useTheaterDecor({
   const [decorPlaceMode, setDecorPlaceMode] = useState(false);
   const [decorGridCols, setDecorGridCols] = useState(1);
   const [decorGridRows, setDecorGridRows] = useState(1);
-  const [customDecorTemplates, setCustomDecorTemplates] = useState<
-    DecorTemplateJson[]
-  >(() => readStoredDecorTemplates(projectName));
-  const [projectDecorTemplates, setProjectDecorTemplates] = useState<
-    DecorTemplateJson[]
-  >([]);
   const activeDecorPreset = getDecorCatalogEntry(decorCatalogKey);
 
     const resolveDecorDraftSize = useCallback((): [number, number, number] => {
@@ -305,64 +278,6 @@ export function useTheaterDecor({
       ],
     );
 
-    const applyDecorSceneTemplate = useCallback(
-      (templateId: DecorSceneTemplateId) => {
-        if (!currentScene) return;
-        const startId = models.reduce((acc, item) => Math.max(acc, item.id), 0);
-        const sketch = buildDecorSceneTemplate(templateId, layout, startId);
-        if (sketch.length === 0) return;
-        updateModels([...models, ...sketch]);
-        const lastId = sketch[sketch.length - 1]?.id;
-        if (lastId != null) {
-          updateCurrentScene({ theaterActiveModelId: lastId });
-        }
-        setDecorPlaceMode(false);
-        setEditMode("decor");
-        setActiveTab("decor");
-      },
-      [currentScene, layout, models, updateCurrentScene, updateModels],
-    );
-
-    const replaceDecorSceneTemplate = useCallback(
-      (templateId: DecorSceneTemplateId) => {
-        if (!currentScene) return;
-        const kept = models.filter((item) => !isTheaterDecorModel(item));
-        const startId = kept.reduce((acc, item) => Math.max(acc, item.id), 0);
-        const sketch = buildDecorSceneTemplate(templateId, layout, startId);
-        updateModels([...kept, ...sketch]);
-        const lastId = sketch[sketch.length - 1]?.id;
-        if (lastId != null) {
-          updateCurrentScene({ theaterActiveModelId: lastId });
-        }
-        const label =
-          DECOR_SCENE_TEMPLATES.find((item) => item.id === templateId)?.label ??
-          templateId;
-        setDecorPlaceMode(false);
-        setEditMode("decor");
-        setActiveTab("decor");
-        setDecorActionMessage(`Декор заменён шаблоном «${label}»`);
-      },
-      [currentScene, layout, models, updateCurrentScene, updateModels],
-    );
-
-    const applyDecorTemplateJson = useCallback(
-      (template: DecorTemplateJson) => {
-        if (!currentScene) return;
-        const startId = models.reduce((acc, item) => Math.max(acc, item.id), 0);
-        const sketch = buildModelsFromDecorTemplateJson(template, layout, startId);
-        if (sketch.length === 0) return;
-        updateModels([...models, ...sketch]);
-        const lastId = sketch[sketch.length - 1]?.id;
-        if (lastId != null) {
-          updateCurrentScene({ theaterActiveModelId: lastId });
-        }
-        setDecorPlaceMode(false);
-        setEditMode("decor");
-        setActiveTab("decor");
-      },
-      [currentScene, layout, models, updateCurrentScene, updateModels],
-    );
-
     const copyDecorInventoryToClipboard = useCallback(async () => {
       const text = formatDecorInventoryMarkdown(
         models,
@@ -397,126 +312,11 @@ export function useTheaterDecor({
       );
     }, [currentScene, models, updateScene]);
 
-    const importDecorTemplateFromJson = useCallback(
-      (raw: unknown, persist = true) => {
-        const parsed = parseDecorTemplateJson(raw);
-        if (!parsed) {
-          setDecorActionMessage("Некорректный JSON шаблона");
-          return false;
-        }
-        if (persist) {
-          const next = upsertStoredDecorTemplate(projectName, parsed);
-          setCustomDecorTemplates(next);
-        }
-        applyDecorTemplateJson(parsed);
-        setDecorActionMessage(`Шаблон «${parsed.label}» применён`);
-        return true;
-      },
-      [applyDecorTemplateJson, projectName],
-    );
-
-    const exportCurrentDecorAsJsonTemplate = useCallback(() => {
-      const sceneTitle = currentScene?.title?.trim() || "Сцена";
-      const slug = sceneTitle
-        .toLowerCase()
-        .replace(/[^a-z0-9а-яё]+/gi, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 40);
-      const template = exportDecorModelsToTemplateJson(models, layout, {
-        id: slug || "decor-scene",
-        label: sceneTitle,
-        description: "Экспорт текущего декора сцены",
-      });
-      if (template.items.length === 0) {
-        setDecorActionMessage("На сцене нет декора для экспорта");
-        return;
-      }
-      downloadDecorTemplateJson(template);
-      setDecorActionMessage("JSON шаблон сохранён");
-    }, [currentScene?.title, layout, models]);
-
-    const decorTemplateList = useMemo((): DecorTemplateListItem[] => {
-      const builtin: DecorTemplateListItem[] = DECOR_SCENE_TEMPLATES.map(
-        (item) => ({
-          id: item.id,
-          label: item.label,
-          description: item.description,
-          source: "builtin" as const,
-        }),
-      );
-      const project: DecorTemplateListItem[] = projectDecorTemplates.map(
-        (item) => ({
-          id: `project:${item.id}`,
-          label: item.label,
-          description: item.description,
-          revision: item.revision,
-          source: "project" as const,
-        }),
-      );
-      const imported: DecorTemplateListItem[] = customDecorTemplates.map(
-        (item) => ({
-          id: `custom:${item.id}`,
-          label: item.label,
-          description: item.description,
-          revision: item.revision,
-          source: "imported" as const,
-        }),
-      );
-      return [...builtin, ...project, ...imported];
-    }, [customDecorTemplates, projectDecorTemplates]);
-
-    const applyDecorTemplateByListId = useCallback(
-      (listId: string, replace = false) => {
-        const sceneTemplate = DECOR_SCENE_TEMPLATES.find((item) => item.id === listId);
-        if (sceneTemplate) {
-          if (replace) {
-            replaceDecorSceneTemplate(sceneTemplate.id);
-          } else {
-            applyDecorSceneTemplate(sceneTemplate.id);
-          }
-          return;
-        }
-        if (listId.startsWith("project:")) {
-          const id = listId.slice("project:".length);
-          const template = projectDecorTemplates.find((item) => item.id === id);
-          if (template) applyDecorTemplateJson(template);
-          return;
-        }
-        if (listId.startsWith("custom:")) {
-          const id = listId.slice("custom:".length);
-          const template = customDecorTemplates.find((item) => item.id === id);
-          if (template) applyDecorTemplateJson(template);
-        }
-      },
-      [
-      replaceDecorSceneTemplate,
-      applyDecorSceneTemplate,
-        applyDecorTemplateJson,
-        customDecorTemplates,
-        projectDecorTemplates,
-      ],
-    );
-
-    useEffect(() => {
-      setCustomDecorTemplates(readStoredDecorTemplates(projectName));
-      let cancelled = false;
-      void loadProjectDecorTemplateManifest(projectName).then((items) => {
-        if (!cancelled) setProjectDecorTemplates(items);
-      });
-      return () => {
-        cancelled = true;
-      };
-    }, [projectName]);
-
     useEffect(() => {
       if (!decorActionMessage) return;
       const timer = window.setTimeout(() => setDecorActionMessage(null), 2600);
       return () => window.clearTimeout(timer);
     }, [decorActionMessage]);
-
-    const applyDecorSketchTemplate = useCallback(() => {
-      applyDecorSceneTemplate("basic");
-    }, [applyDecorSceneTemplate]);
 
     const copyDecorToNextScene = useCallback(() => {
       if (!currentScene || currentPage >= scenes.length - 1) return;
@@ -548,17 +348,6 @@ export function useTheaterDecor({
       );
     }, [currentPage, currentScene, models, scenes, updateScene]);
 
-    const saveDecorTemplatesToProject = useCallback(async () => {
-      const result = await persistStoredDecorTemplatesToProject(projectName);
-      if (!result.ok) {
-        setDecorActionMessage("Сохранение шаблонов в проект недоступно");
-        return;
-      }
-      const items = await loadProjectDecorTemplateManifest(projectName);
-      setProjectDecorTemplates(items);
-      setDecorActionMessage(`Шаблоны сохранены в проект (${result.count})`);
-    }, [projectName]);
-
   return {
     decorCatalogKey,
     setDecorCatalogKey,
@@ -587,19 +376,10 @@ export function useTheaterDecor({
     uploadDecorTextureFile,
     setDecorTextureRepeatForTarget,
     setDecorTextureModeForTarget,
-    applyDecorSceneTemplate,
-    replaceDecorSceneTemplate,
-    applyDecorTemplateJson,
     copyDecorInventoryToClipboard,
     exportDecorInventoryCsv,
     syncDecorInventoryToRequisites,
-    importDecorTemplateFromJson,
-    exportCurrentDecorAsJsonTemplate,
-    decorTemplateList,
-    applyDecorTemplateByListId,
-    applyDecorSketchTemplate,
     copyDecorToNextScene,
-    saveDecorTemplatesToProject,
     setDecorDraftTextureRepeat,
   };
 }

@@ -122,6 +122,7 @@ type TheaterSelectProps = {
   disabled?: boolean;
   placeholder?: string;
   noOptionsLabel?: string;
+  searchable?: boolean;
   "aria-label"?: string;
 };
 
@@ -133,6 +134,7 @@ export function TheaterSelect({
   disabled,
   placeholder,
   noOptionsLabel,
+  searchable = false,
   "aria-label": ariaLabel,
 }: TheaterSelectProps) {
   return (
@@ -144,6 +146,7 @@ export function TheaterSelect({
         disabled={disabled}
         placeholder={placeholder}
         noOptionsLabel={noOptionsLabel}
+        searchable={searchable}
         triggerClassName="theater-select"
         aria-label={ariaLabel ?? label}
       />

@@ -1,9 +1,21 @@
 /**
  * Собирает URL для файлов из public/ с учётом Vite BASE_URL (/orkestr/ и т.д.).
- * Не использует `new URL(path, BASE_URL)` напрямую — пустой или относительный base ломает конструктор.
+ * Для theater/* при заданном VITE_THEATER_ASSETS_BASE_URL — MinIO/S3
+ * (обычно `{S3_PUBLIC_URL}/{S3_BUCKET}`).
  */
 export function resolvePublicAssetUrl(pathname: string): string {
   const path = String(pathname ?? "").replace(/^\/+/, "");
+  const isTheaterAsset = path === "theater" || path.startsWith("theater/");
+  const theaterAssetsBase = String(
+    (import.meta as ImportMeta).env?.VITE_THEATER_ASSETS_BASE_URL ?? "",
+  )
+    .trim()
+    .replace(/\/+$/, "");
+
+  if (isTheaterAsset && theaterAssetsBase) {
+    return `${theaterAssetsBase}/${path}`;
+  }
+
   const rawBase = String((import.meta as ImportMeta).env?.BASE_URL ?? "/").trim() || "/";
   const baseWithSlash = rawBase.endsWith("/") ? rawBase : `${rawBase}/`;
 
