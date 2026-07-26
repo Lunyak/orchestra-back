@@ -3277,6 +3277,11 @@ input.theater-range[type="range"]::-moz-range-thumb {
   padding: 0 6px 6px;
 }
 
+.theater-focus-panel__requisite {
+  padding: 0 6px 6px;
+  font-size: 12px;
+}
+
 .theater-focus-panel__size-fields .theater-model-size-fields__item {
   display: block;
   min-width: 0;

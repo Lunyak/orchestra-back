@@ -188,10 +188,20 @@ function ProjectorTapeCard({
   );
 }
 
-export function SpectacleRunProjectorPanel() {
+export type SpectacleRunProjectorPanelMode = "full" | "video" | "projector";
+
+export function SpectacleRunProjectorPanel({
+  mode = "full",
+}: {
+  mode?: SpectacleRunProjectorPanelMode;
+}) {
   const run = useSpectacleRunContext();
   const { saveScenesForLightPlot, playbookData } = usePlaybook();
   const dispatch = useAppDispatch();
+  const showVideo = mode === "full" || mode === "video";
+  const showProjector = mode === "full" || mode === "projector";
+  const panelTitle =
+    mode === "video" ? "Видео" : mode === "projector" ? "Проектор" : "Проектор";
 
   const projectorCtx = useMemo<ProjectorMediaContext>(
     () => ({
@@ -338,163 +348,198 @@ export function SpectacleRunProjectorPanel() {
     run.setProjectorVideoVolumeLevel(activeVideoId, Number(raw) / 100);
   };
 
+  const videoEmpty = videos.length === 0;
+  const holdEmpty = holdImages.length === 0;
+  const tapeEmpty =
+    mode === "video" ? videoEmpty : mode === "projector" ? holdEmpty : !hasMedia;
+
   return (
-    <section className="media-projector" aria-label="Проектор">
+    <section className="media-projector" aria-label={panelTitle}>
       <div className="media-projector__header">
-        <span className="media-projector__title">Проектор</span>
+        <span className="media-projector__title">{panelTitle}</span>
         <div className="media-projector__toolbar">
-          <button
-            type="button"
-            className="media-projector__btn"
-            data-active={run.isProjectorOpen || undefined}
-            onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
-          >
-            {run.isProjectorOpen ? "Закрыть окно" : "Открыть окно"}
-          </button>
-          <button
-            type="button"
-            className="media-projector__btn"
-            onClick={() => videoInputRef.current?.click()}
-          >
-            + Видео
-          </button>
-          <input
-            ref={videoInputRef}
-            type="file"
-            accept="video/*"
-            multiple
-            hidden
-            onChange={(e) => void handleAddVideos(e.target.files)}
-          />
-          <button
-            type="button"
-            className="media-projector__btn"
-            onClick={() => holdInputRef.current?.click()}
-            title="Картинки между роликами и после конца видео"
-          >
-            + Заставка
-          </button>
-          <input
-            ref={holdInputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            hidden
-            onChange={(e) => void handleAddHoldImages(e.target.files)}
-          />
+          {showProjector ? (
+            <button
+              type="button"
+              className="media-projector__btn"
+              data-active={run.isProjectorOpen || undefined}
+              onClick={run.isProjectorOpen ? run.closeProjector : run.openProjector}
+            >
+              {run.isProjectorOpen ? "Закрыть окно" : "Открыть окно"}
+            </button>
+          ) : null}
+          {showVideo ? (
+            <>
+              <button
+                type="button"
+                className="media-projector__btn"
+                onClick={() => videoInputRef.current?.click()}
+              >
+                + Видео
+              </button>
+              <input
+                ref={videoInputRef}
+                type="file"
+                accept="video/*"
+                multiple
+                hidden
+                onChange={(e) => void handleAddVideos(e.target.files)}
+              />
+            </>
+          ) : null}
+          {showProjector ? (
+            <>
+              <button
+                type="button"
+                className="media-projector__btn"
+                onClick={() => holdInputRef.current?.click()}
+                title="Картинки между роликами и после конца видео"
+              >
+                + Заставка
+              </button>
+              <input
+                ref={holdInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => void handleAddHoldImages(e.target.files)}
+              />
+            </>
+          ) : null}
           <DownloadProjectorMediaButton
             buttonClassName="media-projector__btn"
             onStatus={(message) => run.setLiveStatus(message)}
           />
         </div>
-        <span
-          className={cn(
-            "media-projector__status",
-            run.isProjectorOpen && "media-projector__status--on",
-          )}
-        >
-          {run.isProjectorOpen ? "выход открыт" : "выход закрыт"}
-        </span>
+        {showProjector ? (
+          <span
+            className={cn(
+              "media-projector__status",
+              run.isProjectorOpen && "media-projector__status--on",
+            )}
+          >
+            {run.isProjectorOpen ? "выход открыт" : "выход закрыт"}
+          </span>
+        ) : null}
       </div>
 
       <div className="media-projector__tape-container">
-        <div className="media-projector__tape" role="list" aria-label="Медиа проектора">
-          {!hasMedia ? (
-            <p className="media-projector__tape-empty">Добавьте видео или заставку</p>
+        <div
+          className="media-projector__tape"
+          role="list"
+          aria-label={mode === "video" ? "Видео" : "Медиа проектора"}
+        >
+          {tapeEmpty ? (
+            <p className="media-projector__tape-empty">
+              {mode === "video"
+                ? "Добавьте видео"
+                : mode === "projector"
+                  ? "Добавьте заставку"
+                  : "Добавьте видео или заставку"}
+            </p>
           ) : null}
-          {holdImages.map((hold: PlaybookHoldImage) => {
-            const isActive =
-              playback.mode === "hold" &&
-              playback.holdId === hold.id &&
-              run.isProjectorOpen;
-            const holdTitle = hold.title?.trim() || `Заставка ${hold.id}`;
-            return (
-              <ProjectorTapeCard
-                key={`hold-${hold.id}`}
-                kind="hold"
-                id={hold.id}
-                title={holdTitle}
-                isActive={isActive}
-                projectorCtx={projectorCtx}
-                titleProps={titleProps}
-                onPrimary={() => run.showProjectorHold(hold.id)}
-                onDelete={() => void handleRemoveHold(hold)}
-                primaryLabel="Показать"
-                activePrimaryLabel="На экране"
-              />
-            );
-          })}
-          {videos.map((video: PlaybookVideo) => {
-            const isActive =
-              playback.videoId === video.id && playback.playing && run.isProjectorOpen;
-            const isPausedSame =
-              playback.videoId === video.id &&
-              !playback.playing &&
-              run.isProjectorOpen &&
-              playback.mode === "video";
-            const videoTitle = video.title?.trim() || `Видео ${video.id}`;
-            const isMuted = run.isProjectorVideoMuted(video.id);
-            return (
-              <ProjectorTapeCard
-                key={`video-${video.id}`}
-                kind="video"
-                id={video.id}
-                title={videoTitle}
-                isActive={isActive}
-                isPaused={isPausedSame}
-                isMuted={isMuted}
-                projectorCtx={projectorCtx}
-                titleProps={titleProps}
-                onPrimary={() => run.toggleProjectorVideo(video.id)}
-                onToggleMute={() => run.toggleProjectorVideoMute(video.id)}
-                onDelete={() => void handleRemoveVideo(video)}
-                primaryLabel="Пуск"
-                activePrimaryLabel="Пауза"
-                pausedPrimaryLabel="Продолжить"
-              />
-            );
-          })}
+          {showProjector
+            ? holdImages.map((hold: PlaybookHoldImage) => {
+                const isActive =
+                  playback.mode === "hold" &&
+                  playback.holdId === hold.id &&
+                  run.isProjectorOpen;
+                const holdTitle = hold.title?.trim() || `Заставка ${hold.id}`;
+                return (
+                  <ProjectorTapeCard
+                    key={`hold-${hold.id}`}
+                    kind="hold"
+                    id={hold.id}
+                    title={holdTitle}
+                    isActive={isActive}
+                    projectorCtx={projectorCtx}
+                    titleProps={titleProps}
+                    onPrimary={() => run.showProjectorHold(hold.id)}
+                    onDelete={() => void handleRemoveHold(hold)}
+                    primaryLabel="Показать"
+                    activePrimaryLabel="На экране"
+                  />
+                );
+              })
+            : null}
+          {showVideo
+            ? videos.map((video: PlaybookVideo) => {
+                const isActive =
+                  playback.videoId === video.id &&
+                  playback.playing &&
+                  run.isProjectorOpen;
+                const isPausedSame =
+                  playback.videoId === video.id &&
+                  !playback.playing &&
+                  run.isProjectorOpen &&
+                  playback.mode === "video";
+                const videoTitle = video.title?.trim() || `Видео ${video.id}`;
+                const isMuted = run.isProjectorVideoMuted(video.id);
+                return (
+                  <ProjectorTapeCard
+                    key={`video-${video.id}`}
+                    kind="video"
+                    id={video.id}
+                    title={videoTitle}
+                    isActive={isActive}
+                    isPaused={isPausedSame}
+                    isMuted={isMuted}
+                    projectorCtx={projectorCtx}
+                    titleProps={titleProps}
+                    onPrimary={() => run.toggleProjectorVideo(video.id)}
+                    onToggleMute={() => run.toggleProjectorVideoMute(video.id)}
+                    onDelete={() => void handleRemoveVideo(video)}
+                    primaryLabel="Пуск"
+                    activePrimaryLabel="Пауза"
+                    pausedPrimaryLabel="Продолжить"
+                  />
+                );
+              })
+            : null}
         </div>
       </div>
 
-      <div className="media-projector__transport">
-        <label className="media-projector__slider-field">
-          <span className="media-projector__slider-label">
-            Прогресс
-            <span className="media-projector__slider-value">
-              {formatPlaybackTime(currentTime)} / {formatPlaybackTime(duration)}
+      {showProjector || showVideo ? (
+        <div className="media-projector__transport">
+          <label className="media-projector__slider-field">
+            <span className="media-projector__slider-label">
+              Прогресс
+              <span className="media-projector__slider-value">
+                {formatPlaybackTime(currentTime)} / {formatPlaybackTime(duration)}
+              </span>
             </span>
-          </span>
-          <input
-            className="media-projector__slider"
-            type="range"
-            min={0}
-            max={duration > 0 ? duration : 1}
-            step={0.1}
-            value={currentTime}
-            disabled={!transportEnabled || duration <= 0}
-            onChange={(e) => handleSeek(e.target.value)}
-            aria-label="Прогресс видео"
-          />
-        </label>
-        <label className="media-projector__slider-field">
-          <span className="media-projector__slider-label">
-            Громкость
-            <span className="media-projector__slider-value">{volumePercent}%</span>
-          </span>
-          <input
-            className="media-projector__slider"
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            value={volumePercent}
-            disabled={activeVideoId == null}
-            onChange={(e) => handleVolume(e.target.value)}
-            aria-label="Громкость видео"
-          />
-        </label>
-      </div>
+            <input
+              className="media-projector__slider"
+              type="range"
+              min={0}
+              max={duration > 0 ? duration : 1}
+              step={0.1}
+              value={currentTime}
+              disabled={!transportEnabled || duration <= 0}
+              onChange={(e) => handleSeek(e.target.value)}
+              aria-label="Прогресс видео"
+            />
+          </label>
+          <label className="media-projector__slider-field">
+            <span className="media-projector__slider-label">
+              Громкость
+              <span className="media-projector__slider-value">{volumePercent}%</span>
+            </span>
+            <input
+              className="media-projector__slider"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={volumePercent}
+              disabled={activeVideoId == null}
+              onChange={(e) => handleVolume(e.target.value)}
+              aria-label="Громкость видео"
+            />
+          </label>
+        </div>
+      ) : null}
     </section>
   );
 }

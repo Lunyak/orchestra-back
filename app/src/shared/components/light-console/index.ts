@@ -3,8 +3,6 @@ export type { LightConsolePanelProps } from "./LightConsolePanel";
 export { LightConsoleView } from "./LightConsoleView";
 export { LightConsoleSplitView } from "./LightConsoleSplitView";
 export { buildLightConsoleSplitModel, DEFAULT_SOFIT_CHANNELS } from "./light-console-split";
-export { LightKadrPanel } from "./LightKadrPanel";
-export type { LightKadrPanelProps } from "./LightKadrPanel";
 export { LightSchemeKadrBoard } from "./LightSchemeKadrBoard";
 export type { LightSchemeKadrBoardProps } from "./LightSchemeKadrBoard";
 export { LightSchemeStageMap } from "./LightSchemeStageMap";

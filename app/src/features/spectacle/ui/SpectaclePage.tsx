@@ -13,6 +13,7 @@ import {
   type SpectaclePageViewModel,
 } from "../model/useSpectaclePage";
 import { SpectacleDirectionSwitch } from "./SpectacleDirectionSwitch";
+import { SpectacleTechChromeSlotsProvider } from "./spectacle-tech-chrome-slots";
 
 const LightPlotPage = React.lazy(() =>
   import("../../../shared/components/light-plot/LightPlotPage").then((m) => ({
@@ -266,6 +267,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
         playlistNode
       )}
       <div className="app-content">
+        <SpectacleTechChromeSlotsProvider>
         {showModeSwitch ? <SpectacleDirectionSwitch /> : null}
         <OfflinePackStatus />
         {showHeaderSounds && !compactMainChrome && !isMobile && (
@@ -339,6 +341,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
           )}
           {activeView === "sessions" && <Outlet />}
         </main>
+        </SpectacleTechChromeSlotsProvider>
       </div>
       {theaterHostMounted ? theaterOutlinerNode : null}
       {stepsSidebarNode}

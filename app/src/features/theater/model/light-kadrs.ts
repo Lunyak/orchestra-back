@@ -5,23 +5,18 @@ import type {
 } from "../../playbook/model/playbook-slice";
 import type {
   SceneLightKadrFaderStateV1,
+  SceneLightKadrRequisiteActionV1,
+  SceneLightKadrRequisiteCueV1,
   SceneLightKadrV1,
   SceneLightKadrsDataV1,
 } from "../../../shared/types/script";
 import { createId } from "../../../shared/utils/createId";
-import {
-  formatChannelShort,
-  formatFaderShort,
-  parseChannelFaderFromTokenPipe,
-  parseFaderTokenPipe,
-} from "../../../shared/components/light-console/light-console-labels";
 import {
   buildKadrFaderSnapshotForScene,
   buildKadrFaderSnapshotFromSofitChannels,
   resolveKadrFaderChannel,
 } from "./theater-light-fader-bindings";
 import type { TheaterSpotlight } from "../../../shared/types/script";
-import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
 import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";
 
 export const LIGHT_KADR_ANCHOR_RE = /<!--\s*lk:([a-zA-Z0-9_-]+)\s*-->/g;
@@ -37,8 +32,6 @@ export function extractLightKadrIdFromAnchorLine(line: string): string | null {
   return m?.[1] ?? null;
 }
 export const LIGHT_KADR_HEADING_RE = /^###\s*Картина\s+(\d+)\b/im;
-export const LIGHT_KADR_LINE_RE = /^-\s*\*\*Свет\*\*:\s*([^\n]*)/im;
-export const LIGHT_LINE_PREFIX = "- **Свет**:";
 
 export function createLightKadrId(): string {
   return createId();
@@ -147,6 +140,31 @@ function normalizeOptionalPositiveSec(raw: unknown): number | undefined {
   return n > 0 ? n : undefined;
 }
 
+const KADR_REQUISITE_ACTIONS: ReadonlySet<SceneLightKadrRequisiteActionV1> = new Set([
+  "setup",
+  "strike",
+  "use",
+]);
+
+function normalizeKadrRequisites(
+  raw: SceneLightKadrV1["requisites"] | null | undefined,
+): SceneLightKadrRequisiteCueV1[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SceneLightKadrRequisiteCueV1[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const requisiteId = Math.trunc(Number(item.requisiteId) || 0);
+    const action = item.action as SceneLightKadrRequisiteActionV1;
+    if (requisiteId <= 0 || !KADR_REQUISITE_ACTIONS.has(action)) continue;
+    const key = `${requisiteId}:${action}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ requisiteId, action });
+  }
+  return out;
+}
+
 function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): SceneLightKadrV1 | null {
   if (!raw || typeof raw.id !== "string" || !raw.id.trim()) return null;
   const kadrNo = Math.max(1, Math.trunc(Number(raw.kadrNo) || 1));
@@ -175,6 +193,7 @@ function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): 
   );
   const sound = normalizeKadrSound(raw.sound);
   const projector = normalizeKadrProjector(raw.projector);
+  const requisites = normalizeKadrRequisites(raw.requisites);
   const transitionText =
     typeof raw.transitionText === "string" ? raw.transitionText.trim() || undefined : undefined;
   const commentText =
@@ -202,6 +221,7 @@ function normalizeLightKadr(raw: Partial<SceneLightKadrV1> | null | undefined): 
     smokeMachine: raw.smokeMachine === true ? true : undefined,
     ...(sound ? { sound } : {}),
     ...(projector ? { projector } : {}),
+    ...(requisites.length > 0 ? { requisites } : {}),
     ...(transitionText ? { transitionText } : {}),
     ...(commentText ? { commentText } : {}),
     ...(blackoutDurationSec != null ? { blackoutDurationSec } : {}),
@@ -336,23 +356,6 @@ export function findKadrSectionInMarkdown(
   return null;
 }
 
-function mergeParsedIntoKadr(
-  base: SceneLightKadrV1,
-  parsed: Partial<SceneLightKadrV1> | null,
-): SceneLightKadrV1 {
-  if (!parsed) return base;
-  const patch: Partial<SceneLightKadrV1> = {};
-  if (parsed.blackout === true) {
-    patch.blackout = true;
-    patch.programId = 0;
-  } else if (parsed.programId != null && parsed.programId > 0) {
-    patch.programId = parsed.programId;
-  }
-  if (parsed.nextProgramId != null) patch.nextProgramId = parsed.nextProgramId;
-  if (parsed.note != null) patch.note = parsed.note;
-  if (parsed.faders && parsed.faders.length > 0) patch.faders = parsed.faders;
-  return normalizeLightKadr({ ...base, ...patch })!;
-}
 
 export function findKadrSectionAtOffset(
   markdown: string,
@@ -434,82 +437,6 @@ export function buildKadrFromConsole(args: {
   };
 }
 
-function programLabel(
-  programId: number,
-  programs: PlaybookLightProgramsDataV1 | null | undefined,
-  lightChannels: string[],
-): string {
-  if (programId <= 0) return "блекаут";
-  const program = programs?.programs.find((p) => p.id === programId);
-  if (program?.label?.trim()) return program.label.trim();
-  const channelRaw = lightChannels[programId - 1];
-  if (channelRaw) {
-    const parsed = parseLightChannel(channelRaw);
-    if (parsed.label) return parsed.label;
-  }
-  return `П${programId}`;
-}
-
-export function formatLightKadrLine(
-  kadr: SceneLightKadrV1,
-  options: {
-    lightChannels: string[];
-    lightFaders: PlaybookLightFadersDataV1;
-    programs?: PlaybookLightProgramsDataV1 | null;
-  },
-): string {
-  if (kadr.blackout || kadr.programId <= 0) {
-    return `${LIGHT_LINE_PREFIX} {{blackout|Блекаут}} {{lightpanel:${kadr.id}}}`;
-  }
-
-  const parts: string[] = [`{{lightpanel:${kadr.id}}}`];
-
-  if (kadr.nextProgramId != null && kadr.nextProgramId > 0) {
-    const nextLabel = programLabel(
-      kadr.nextProgramId,
-      options.programs ?? null,
-      options.lightChannels,
-    );
-    parts.push(`→ {{program:${kadr.nextProgramId}|${nextLabel}}}`);
-  }
-
-  return `${LIGHT_LINE_PREFIX} ${parts.join(" ")}`;
-}
-
-export function ensureKadrAnchorInMarkdown(
-  markdown: string,
-  section: MarkdownKadrSection,
-  kadrId: string,
-): string {
-  if (section.id === kadrId) return markdown;
-  const text = String(markdown ?? "");
-  const anchor = `\n<!-- lk:${kadrId} -->`;
-  if (section.id) {
-    const oldAnchor = new RegExp(`\\n\\s*<!--\\s*lk:${section.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*-->`, "i");
-    return text.replace(oldAnchor, anchor);
-  }
-  const insertAt = section.headingEnd;
-  return text.slice(0, insertAt) + anchor + text.slice(insertAt);
-}
-
-export function upsertLightLineInSection(
-  markdown: string,
-  section: MarkdownKadrSection,
-  lightLine: string,
-): string {
-  const text = String(markdown ?? "");
-  const slice = text.slice(section.headingEnd, section.sectionEnd);
-  const lineMatch = slice.match(LIGHT_KADR_LINE_RE);
-  if (lineMatch && lineMatch.index != null) {
-    const absStart = section.headingEnd + lineMatch.index;
-    const absEnd = absStart + lineMatch[0].length;
-    return text.slice(0, absStart) + lightLine + text.slice(absEnd);
-  }
-  const insertAt = section.headingEnd;
-  const prefix = text.slice(insertAt, insertAt + 1) === "\n" ? "" : "\n";
-  return text.slice(0, insertAt) + `${prefix}\n${lightLine}\n` + text.slice(insertAt);
-}
-
 export function upsertKadrInScene(args: {
   kadrs: SceneLightKadrsDataV1;
   kadr: SceneLightKadrV1;
@@ -518,28 +445,6 @@ export function upsertKadrInScene(args: {
   next.push(args.kadr);
   next.sort((a, b) => a.kadrNo - b.kadrNo || a.id.localeCompare(b.id));
   return { v: 1, kadrs: next };
-}
-
-export function recordKadrToMarkdown(args: {
-  markdown: string;
-  section: MarkdownKadrSection;
-  kadr: SceneLightKadrV1;
-  lightChannels: string[];
-  lightFaders: PlaybookLightFadersDataV1;
-  programs?: PlaybookLightProgramsDataV1 | null;
-}): string {
-  let next = ensureKadrAnchorInMarkdown(args.markdown, args.section, args.kadr.id);
-  const sectionAfterAnchor = scanMarkdownKadrSections(next).find(
-    (s) => s.id === args.kadr.id || s.kadrNo === args.kadr.kadrNo,
-  );
-  if (!sectionAfterAnchor) return next;
-  const lightLine = formatLightKadrLine(args.kadr, {
-    lightChannels: args.lightChannels,
-    lightFaders: args.lightFaders,
-    programs: args.programs,
-  });
-  next = upsertLightLineInSection(next, sectionAfterAnchor, lightLine);
-  return next;
 }
 
 export function applyKadrToFaders(
@@ -558,71 +463,6 @@ export function applyKadrToFaders(
         enabled: state.enabled ?? fader.enabled,
       };
     }),
-  };
-}
-
-export function createKadrTemplateSnippet(kadrNo: number, kadrId: string): string {
-  return `\n\n### Картина ${kadrNo}\n<!-- lk:${kadrId} -->\n\n${LIGHT_LINE_PREFIX} _свет: спектакль — пульт ниже, кнопка «Записать свет» или сдвиньте фейдер_\n\n- **Звук**: _трек из плейлиста — при создании картины_\n- **Видео**: _«Записать проектор» — ролик на экран_\n\n- **Действие/задача**: _например: дым-машина_\n- **Комментарий**:\n- **Переход**:\n`;
-}
-
-const TOKEN_PROGRAM_RE = /\{\{\s*program\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;
-const TOKEN_FADER_RE = /\{\{\s*fader\s*:\s*(\d+)\s*(?:\|\s*([^}]+?))?\s*}}/gi;
-const TOKEN_BLACKOUT_RE = /\{\{\s*blackout\s*(?:\|\s*([^}]+?))?\s*}}/gi;
-
-export function parseLightKadrLine(line: string): Partial<SceneLightKadrV1> | null {
-  const trimmed = String(line ?? "").trim();
-  if (!trimmed.toLowerCase().startsWith("- **свет**:")) return null;
-
-  TOKEN_BLACKOUT_RE.lastIndex = 0;
-  TOKEN_PROGRAM_RE.lastIndex = 0;
-  TOKEN_FADER_RE.lastIndex = 0;
-
-  const hasBlackout = TOKEN_BLACKOUT_RE.test(trimmed);
-  TOKEN_PROGRAM_RE.lastIndex = 0;
-  const programMatches = [...trimmed.matchAll(TOKEN_PROGRAM_RE)];
-  TOKEN_FADER_RE.lastIndex = 0;
-  const faderMatches = [...trimmed.matchAll(TOKEN_FADER_RE)];
-
-  if (!hasBlackout && programMatches.length === 0 && faderMatches.length === 0) {
-    return null;
-  }
-
-  let programId = 0;
-  let blackout = false;
-  const faders: SceneLightKadrV1["faders"] = [];
-  let nextProgramId: number | undefined;
-
-  if (hasBlackout) {
-    blackout = true;
-    programId = 0;
-  }
-
-  if (programMatches.length > 0) {
-    programId = Math.max(1, Math.trunc(Number(programMatches[0][1]) || 1));
-    if (programMatches.length > 1) {
-      nextProgramId = Math.max(1, Math.trunc(Number(programMatches[1][1]) || 1));
-    }
-  }
-
-  for (const match of faderMatches) {
-    const faderId = Math.max(1, Math.trunc(Number(match[1]) || 0));
-    if (faderId <= 0) continue;
-    const fromPipe = parseFaderTokenPipe(match[2], faderId);
-    const chF = parseChannelFaderFromTokenPipe(match[2], faderId);
-    const intensity = fromPipe.intensity;
-    faders.push({
-      faderId: chF.faderId,
-      ...(chF.channel != null ? { channel: chF.channel } : {}),
-      intensity,
-      enabled: intensity > 0,
-    });
-  }
-
-  return {
-    programId: blackout ? 0 : programId || 1,
-    blackout,
-    faders,
-    nextProgramId,
   };
 }
 
@@ -651,120 +491,9 @@ export function lightKadrsStableKey(data: SceneLightKadrsDataV1 | null | undefin
   );
 }
 
-/** Удалить блок картины из тех. карты (от `### Картина` до следующего такого заголовка). */
-export function removeKadrSectionFromMarkdown(
-  markdown: string,
-  target: { id?: string | null; kadrNo?: number; headingStart?: number },
-): string {
-  const section = findKadrSectionInMarkdown(markdown, target);
-  if (!section) return String(markdown ?? "");
-  const text = String(markdown ?? "");
-  return text.slice(0, section.headingStart) + text.slice(section.sectionEnd);
-}
-
-/** Перенумеровать оставшиеся картины подряд: 1, 2, 3… (заголовок `### Картина N` и kadrNo в JSON). */
-export function renumberKadrSectionsInMarkdown(markdown: string): string {
-  const text = String(markdown ?? "");
-  const sections = scanMarkdownKadrSections(text);
-  if (sections.length === 0) return text;
-
-  let result = text;
-  for (let i = sections.length - 1; i >= 0; i -= 1) {
-    const section = sections[i];
-    const newNo = i + 1;
-    if (section.kadrNo === newNo) continue;
-
-    const slice = result.slice(section.headingStart);
-    const lineEnd = slice.indexOf("\n");
-    const headingLine = lineEnd >= 0 ? slice.slice(0, lineEnd) : slice;
-    const newHeadingLine = headingLine.replace(
-      /^###\s*Картина\s+\d+/i,
-      `### Картина ${newNo}`,
-    );
-    if (newHeadingLine === headingLine) continue;
-
-    const replaceEnd = section.headingStart + headingLine.length;
-    result = result.slice(0, section.headingStart) + newHeadingLine + result.slice(replaceEnd);
-  }
-  return result;
-}
-
 export function formatDeleteKadrConfirmMessage(headingTitle: string): string {
   const label = String(headingTitle ?? "").trim() || "картину";
   return `Удалить «${label}»?\n\nОстальные картины в сцене будут перенумерованы (1, 2, 3…).`;
-}
-
-/** Синхронизировать markdown сцены и lightKadrs после удаления картины. */
-export function deleteKadrFromSceneMarkdown(
-  scene: { markdown?: string | null; lightKadrs?: SceneLightKadrsDataV1 | null } | null | undefined,
-  target: { id?: string | null; kadrNo?: number; headingStart?: number },
-): { markdown: string; lightKadrs: SceneLightKadrsDataV1 } {
-  const removed = removeKadrSectionFromMarkdown(String(scene?.markdown ?? ""), target);
-  const markdown = renumberKadrSectionsInMarkdown(removed);
-  const lightKadrs = syncLightKadrsFromMarkdown({
-    markdown,
-    kadrs: readSceneLightKadrs(scene),
-  });
-  return { markdown, lightKadrs };
-}
-
-/**
- * @deprecated JSON — источник истины. Алиас `readSceneLightKadrs`.
- * Миграцию из markdown делайте через `migrateSceneLightKadrsFromMarkdown`.
- */
-export function readSceneLightKadrsFromMarkdown(
-  scene: { markdown?: string | null; lightKadrs?: SceneLightKadrsDataV1 | null } | null | undefined,
-): SceneLightKadrsDataV1 {
-  return readSceneLightKadrs(scene);
-}
-
-export function syncLightKadrsFromMarkdown(args: {
-  markdown: string;
-  kadrs: SceneLightKadrsDataV1;
-}): SceneLightKadrsDataV1 {
-  const sections = scanMarkdownKadrSections(args.markdown);
-  if (sections.length === 0) return { v: 1, kadrs: [] };
-
-  const byId = new Map(args.kadrs.kadrs.map((k) => [k.id, { ...k }]));
-  const nextKadrs: SceneLightKadrV1[] = [];
-
-  for (const section of sections) {
-    const slice = args.markdown.slice(section.headingEnd, section.sectionEnd);
-    const lineMatch = slice.match(LIGHT_KADR_LINE_RE);
-    const parsed = lineMatch ? parseLightKadrLine(lineMatch[0]) : null;
-    const existingById = section.id ? byId.get(section.id) : undefined;
-    const existingByNo = args.kadrs.kadrs.find((k) => k.kadrNo === section.kadrNo);
-    const existing = existingById ?? existingByNo;
-    const id = section.id ?? existing?.id ?? createLightKadrId();
-    const base: SceneLightKadrV1 = existing ?? {
-      id,
-      kadrNo: section.kadrNo,
-      programId: 1,
-      faders: [],
-    };
-
-    const merged = mergeParsedIntoKadr(
-      normalizeLightKadr({
-        ...base,
-        id,
-        kadrNo: section.kadrNo,
-        title: section.headingTitle,
-      })!,
-      parsed,
-    );
-    const prevSnapshot = existing
-      ? lightKadrsStableKey({ v: 1, kadrs: [existing] })
-      : "";
-    const nextSnapshot = lightKadrsStableKey({ v: 1, kadrs: [merged] });
-    const contentChanged = prevSnapshot !== nextSnapshot;
-    nextKadrs.push({
-      ...merged,
-      updatedAt:
-        parsed && contentChanged ? new Date().toISOString() : base.updatedAt ?? merged.updatedAt,
-    });
-  }
-
-  return { v: 1, kadrs: nextKadrs };
 }
 
 export function fadersForKadrDisplay(

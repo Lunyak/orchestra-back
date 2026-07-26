@@ -10,7 +10,7 @@ export function NotesRunOfflineMediaBar() {
   const soundCount = useAppSelector((s) => s.playbook.playbookData?.sounds?.length ?? 0);
 
   return (
-    <div className="notes-run__offline-bar" role="region" aria-label="Медиа прогона">
+    <div className="notes-run__offline-bar" role="region" aria-label="Медиа суфлера">
       <div className="notes-run__offline-bar-text">
         <strong className="notes-run__offline-bar-title">Медиа</strong>
         <span>

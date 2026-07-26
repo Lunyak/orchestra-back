@@ -163,6 +163,105 @@ export function mergeDecorIntoRequisites(
   return [...existing, ...appended];
 }
 
+/** Models flagged as prop in 3D and not yet in the scene requisites list. */
+export function listTheaterRequisiteCandidates(
+  models: TheaterModel[],
+  existing: ScriptRequisite[],
+): Array<Pick<TheaterModel, "id" | "name">> {
+  const linkedIds = new Set(
+    existing
+      .map((item) => item.theaterModelId)
+      .filter((id): id is number => id != null && id > 0),
+  );
+  return models
+    .filter((model) => model.isRequisite === true && !linkedIds.has(model.id))
+    .map((model) => ({
+      id: model.id,
+      name: String(model.name ?? "").trim() || `Модель ${model.id}`,
+    }));
+}
+
+/** Explicit add of a 3D prop into the scene requisites list. */
+export function addRequisiteFromTheaterModel(
+  existing: ScriptRequisite[],
+  model: Pick<TheaterModel, "id" | "name">,
+): ScriptRequisite[] {
+  const modelId = Math.trunc(Number(model.id) || 0);
+  if (modelId <= 0) return existing;
+  if (existing.some((item) => item.theaterModelId === modelId)) return existing;
+  const label = String(model.name ?? "").trim() || `Модель ${modelId}`;
+  const labelKey = label.toLowerCase();
+  const orphanIndex = existing.findIndex(
+    (item) =>
+      (item.theaterModelId == null || item.theaterModelId <= 0) &&
+      item.label.trim().toLowerCase() === labelKey,
+  );
+  if (orphanIndex >= 0) {
+    return existing.map((item, index) =>
+      index === orphanIndex ? { ...item, label, theaterModelId: modelId } : item,
+    );
+  }
+  const maxId = existing.reduce((acc, item) => Math.max(acc, item.id), 0);
+  return [
+    ...existing,
+    {
+      id: maxId + 1,
+      label,
+      checked: false,
+      theaterModelId: modelId,
+    },
+  ];
+}
+
+/** Drop scene requisite linked to a deleted 3D model (manual items untouched). */
+export function unlinkRequisiteFromTheaterModel(
+  existing: ScriptRequisite[],
+  theaterModelId: number,
+): ScriptRequisite[] {
+  const modelId = Math.trunc(Number(theaterModelId) || 0);
+  if (modelId <= 0) return existing;
+  const next = existing.filter((item) => item.theaterModelId !== modelId);
+  return next.length === existing.length ? existing : next;
+}
+
+/**
+ * Subscription for items added from 3D (`theaterModelId`):
+ * - model gone or `isRequisite` off → drop from list
+ * - still linked → keep label in sync with model name
+ * Manual requisites (no theaterModelId) are untouched.
+ */
+export function syncSubscribedTheaterRequisites(
+  existing: ScriptRequisite[],
+  models: TheaterModel[],
+): ScriptRequisite[] {
+  if (existing.length === 0) return existing;
+  const byId = new Map(models.map((model) => [model.id, model]));
+  let changed = false;
+  const next: ScriptRequisite[] = [];
+
+  for (const item of existing) {
+    const modelId = item.theaterModelId;
+    if (modelId == null || modelId <= 0) {
+      next.push(item);
+      continue;
+    }
+    const model = byId.get(modelId);
+    if (!model || model.isRequisite !== true) {
+      changed = true;
+      continue;
+    }
+    const label = String(model.name ?? "").trim() || `Модель ${modelId}`;
+    if (item.label !== label) {
+      changed = true;
+      next.push({ ...item, label });
+      continue;
+    }
+    next.push(item);
+  }
+
+  return changed ? next : existing;
+}
+
 function escapeCsvCell(value: string): string {
   if (/[",\n\r]/.test(value)) {
     return `"${value.replace(/"/g, '""')}"`;

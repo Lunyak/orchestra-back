@@ -34,6 +34,9 @@ back/prisma/generated/
 .temp
 .tmp
 
+# One-shot dumps (tech card export)
+.tools/tech-card-export/
+
 # 3D-модели (тяжёлые, не нужны на сервере / в репо)
 *.glb
 

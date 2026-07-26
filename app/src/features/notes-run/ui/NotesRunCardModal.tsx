@@ -288,7 +288,7 @@ export function NotesRunCardModal({
         </label>
 
         <label className="create-kadr-modal__field">
-          <span className="create-kadr-modal__label">Переход (внизу при прогоне)</span>
+          <span className="create-kadr-modal__label">Переход (внизу в суфлере)</span>
           <input
             type="text"
             className="create-kadr-modal__input"

@@ -123,7 +123,7 @@ export function ProjectorOutputPage() {
           "hold",
           "файл заставки не найден в хранилище — перезагрузите заставку в панели проектора",
         );
-        setOutputHint("Заставка не найдена — нажмите «Выбрать папку…» в Прогоне");
+        setOutputHint("Заставка не найдена — нажмите «Выбрать папку…» в Суфлере");
       } finally {
         if (loadHoldSeqRef.current === seq) {
           setHoldLoading(false);
@@ -164,7 +164,7 @@ export function ProjectorOutputPage() {
           "video",
           "файл видео не найден в хранилище — перезагрузите видео в панели проектора",
         );
-        setOutputHint("Видео не найдено — нажмите «Выбрать папку…» в Прогоне");
+        setOutputHint("Видео не найдено — нажмите «Выбрать папку…» в Суфлере");
       } finally {
         if (loadVideoSeqRef.current === seq) {
           setVideoLoading(false);

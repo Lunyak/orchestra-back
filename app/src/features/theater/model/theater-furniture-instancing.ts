@@ -18,6 +18,7 @@ export type FurnitureInstanceGroup = {
 
 export function canInstanceTheaterModel(model: TheaterModel): boolean {
   if (model.type === "file" || model.file) return false;
+  if (model.isRequisite === true) return false;
   if (!model.builtin || !INSTANCED_FURNITURE_BUILTINS.has(model.builtin)) {
     return false;
   }

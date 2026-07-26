@@ -26,6 +26,7 @@ import {
   dispatchFormatSearchQuery,
   markdownFormatSearchHighlight,
 } from "./markdownFormatSearchHighlight";
+import { markdownLiveConceal } from "./markdownLiveConceal";
 import { markdownParagraphLineGaps } from "./markdownParagraphLineGaps";
 import { orchestraEditorRichTokens } from "./orchestraEditorRichTokens";
 import { scriptMarkdownEditorSyntaxHighlighting } from "./scriptMarkdownEditorHighlight";
@@ -59,10 +60,12 @@ type Props = {
   kadrSectionBlocks?: boolean;
   /** Вкладка «Текст»: лейблы [[РОЛЬ]] с настройками из settings. */
   playTextMode?: boolean;
-  /** Название сцены — дублирует menubar внутри области прокрутки редактора. */
+  /** Название сцены — внутри области прокрутки редактора. */
   sceneTitle?: string;
   sceneTitleEditing?: boolean;
   onSceneTitleChange?: (title: string) => void;
+  isModeEditing?: boolean;
+  onToggleModeEditing?: () => void;
 };
 
 export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, Props>(
@@ -84,6 +87,8 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       sceneTitle,
       sceneTitleEditing = false,
       onSceneTitleChange,
+      isModeEditing = false,
+      onToggleModeEditing,
     },
     ref,
   ) {
@@ -169,6 +174,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
           indentOnInput(),
           markdown(),
           scriptMarkdownEditorSyntaxHighlighting,
+          markdownLiveConceal(),
           orchestraEditorRichTokens(
             () => lightChannelsRef.current,
             () => onTrackLinkClickRef.current,
@@ -206,7 +212,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       });
 
       const sceneTitleEl = document.createElement("div");
-      sceneTitleEl.className = "script-markdown-cm__scene-title-mount";
+      sceneTitleEl.className = "script-scene-title-mount";
       view.scrollDOM.insertBefore(sceneTitleEl, view.contentDOM);
       setSceneTitleMount(sceneTitleEl);
 
@@ -258,7 +264,10 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       view.dispatch({ selection: sel });
     }, [imageCtxKey]);
 
-    const showSceneTitle = sceneTitleEditing || Boolean(String(sceneTitle ?? "").trim());
+    const showSceneTitle =
+      onToggleModeEditing != null ||
+      sceneTitleEditing ||
+      Boolean(String(sceneTitle ?? "").trim());
 
     return (
       <>
@@ -271,12 +280,14 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
             showSceneTitle && "script-markdown-cm--with-scene-title",
           )}
         />
-        {sceneTitleMount && showSceneTitle
+        {sceneTitleMount && showSceneTitle && onToggleModeEditing
           ? createPortal(
               <AppEditorScriptSceneTitle
                 title={String(sceneTitle ?? "")}
-                isEditing={sceneTitleEditing}
+                titleEditable={sceneTitleEditing}
                 onTitleChange={onSceneTitleChange ?? (() => {})}
+                isModeEditing={isModeEditing}
+                onToggleModeEditing={onToggleModeEditing}
               />,
               sceneTitleMount,
             )

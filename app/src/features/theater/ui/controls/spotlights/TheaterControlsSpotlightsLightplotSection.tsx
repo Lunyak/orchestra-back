@@ -31,10 +31,25 @@ export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: Spotligh
         </TheaterBtn>
       </div>
       <div className="theater-btn-row">
-        <TheaterBtn onClick={vm.fullLightAllSpotlights} disabled={!vm.currentScene}>
+        <TheaterBtn
+          onClick={() => {
+            vm.setLiveBlackoutEnabled(false);
+            vm.fullLightAllSpotlights();
+          }}
+          disabled={!vm.currentScene}
+        >
           Полный свет
         </TheaterBtn>
-        <TheaterBtn onClick={vm.blackoutAllSpotlights} disabled={!vm.currentScene}>
+        <TheaterBtn
+          active={vm.liveBlackoutEnabled}
+          onClick={() => vm.setLiveBlackoutEnabled(!vm.liveBlackoutEnabled)}
+          disabled={!vm.currentScene}
+          title={
+            vm.liveBlackoutEnabled
+              ? "Снять блекаут — снова работают фейдеры"
+              : "Блекаут: погасить сцену, фейдеры не менять"
+          }
+        >
           Блекаут
         </TheaterBtn>
       </div>

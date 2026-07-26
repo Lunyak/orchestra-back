@@ -1,23 +1,51 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FC, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Marquee } from "../../shared/component/Marquee/Marquee";
 import { Seo } from "../../shared/component/Seo/Seo";
+import { cn } from "../../shared/lib/cn";
 import { ROUTES } from "../../shared/model/routes";
 import { fetchSiteMarquee } from "../../shared/model/siteMarquee";
 import { GlitchHero } from "./GlitchHero";
+import { HomePlaybill } from "./HomePlaybill";
 import "./style.css";
-import Particles, { initParticlesEngine } from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
-import type { ISourceOptions } from "@tsparticles/engine";
 
-type FilterTarget =
-  | { variant: "swirl"; key: "events" | "team" }
-  | { variant: "hue"; key: "orkestr" };
+const ORKESTR_URL = "https://xn--80ahnpgc6b.xn--p1acf/orkestr/";
+
+type TopNavItem = {
+  key: string;
+  label: string;
+  badge?: string;
+  to?: string;
+  href?: string;
+};
+
+const TOP_NAV_ITEMS: TopNavItem[] = [
+  {
+    key: "team",
+    label: "Команда",
+    to: ROUTES.ABOUTUS,
+  },
+  {
+    key: "contacts",
+    label: "Контакты",
+    to: ROUTES.CONTACTS,
+  },
+  {
+    key: "theater",
+    label: "3D холл",
+    to: ROUTES.THEATER_WALK,
+  },
+];
+
+const ORKESTR_NAV_ITEM: TopNavItem = {
+  key: "orkestr",
+  label: "Оркестр",
+  badge: "SOFT",
+  href: ORKESTR_URL,
+};
 
 const HomePage: FC = () => {
   const [effectsEnabled, setEffectsEnabled] = useState(false);
-  const particlesInitRef = useRef(false);
-  const [particlesReady, setParticlesReady] = useState(false);
   const [marqueeItems, setMarqueeItems] = useState<string[]>([
     "Театр «Дофамин»",
     "Спектакли и даты",
@@ -46,48 +74,6 @@ const HomePage: FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!effectsEnabled) return;
-    if (particlesInitRef.current) return;
-    particlesInitRef.current = true;
-    initParticlesEngine(async (engine) => {
-      await loadSlim(engine);
-    })
-      .then(() => setParticlesReady(true))
-      .catch(() => setParticlesReady(false));
-  }, [effectsEnabled]);
-
-  const particlesOptions: ISourceOptions = useMemo(() => {
-    // Based on tsParticles "Basic" sample:
-    // https://particles.js.org/samples/#basic
-    return {
-      fpsLimit: 60,
-      detectRetina: true,
-      fullScreen: { enable: false },
-      background: { color: { value: "transparent" } },
-      particles: {
-        number: { value: 80, density: { enable: true, area: 800 } },
-        color: { value: "#ffffff" },
-        shape: { type: "circle" },
-        opacity: { value: 0.5 },
-        size: { value: { min: 1, max: 3 } },
-        links: { enable: true, distance: 150, color: "#ffffff", opacity: 0.4, width: 1 },
-        move: { enable: true, speed: 2, direction: "none", outModes: { default: "bounce" } },
-      },
-      interactivity: {
-        events: {
-          onHover: { enable: true, mode: "repulse" },
-          onClick: { enable: true, mode: "push" },
-          resize: { enable: true },
-        },
-        modes: {
-          repulse: { distance: 100, duration: 0.4 },
-          push: { quantity: 4 },
-        },
-      },
-    };
-  }, []);
-
-  useEffect(() => {
     let alive = true;
     fetchSiteMarquee()
       .then((remote) => {
@@ -107,47 +93,14 @@ const HomePage: FC = () => {
     };
   }, []);
 
-  const startFilterAnimation = useCallback(
-    ({ variant, key }: FilterTarget) => {
-      if (!effectsEnabled) return;
-
-      const ids =
-        variant === "swirl"
-          ? [`hp-swirl-dx-${key}`, `hp-swirl-dy-${key}`]
-          : [`hp-hue-rotate-${key}`, `hp-hue-dx-${key}`];
-
-      for (const id of ids) {
-        const el = document.getElementById(id) as SVGAnimationElement | null;
-        el?.beginElement?.();
-      }
-    },
-    [effectsEnabled]
-  );
-
-  const stopFilterAnimation = useCallback(
-    ({ variant, key }: FilterTarget) => {
-      if (!effectsEnabled) return;
-
-      const ids =
-        variant === "swirl"
-          ? [`hp-swirl-dx-${key}`, `hp-swirl-dy-${key}`]
-          : [`hp-hue-rotate-${key}`, `hp-hue-dx-${key}`];
-
-      for (const id of ids) {
-        const el = document.getElementById(id) as SVGAnimationElement | null;
-        el?.endElement?.();
-      }
-    },
-    [effectsEnabled]
-  );
-
   return (
-    <div className="home-page" data-effects={effectsEnabled ? "on" : "off"}>
-      {effectsEnabled && particlesReady && (
-        <div className="home-page__particles" aria-hidden>
-          <Particles id="homeParticles" options={particlesOptions} />
-        </div>
-      )}
+    <div
+      className="home-page"
+      data-effects={effectsEnabled ? "on" : "off"}
+      data-home-variant="bands"
+    >
+      <div className="home-page__grain" aria-hidden />
+
       <Seo
         title="Дофамин — театр в Санкт-Петербурге"
         description="Театр «Дофамин» в Санкт-Петербурге: спектакли (комедия, драма, трагедия), афиша и билеты онлайн."
@@ -174,270 +127,32 @@ const HomePage: FC = () => {
           },
         ]}
       />
-      {effectsEnabled && (
-        <svg className="home-page__filters" aria-hidden>
-          <defs>
-            <filter id="threshold">
-              <feColorMatrix
-                in="SourceGraphic"
-                type="matrix"
-                values="
-                  1 0 0 0 0
-                  0 1 0 0 0
-                  0 0 1 0 0
-                  0 0 0 255 -140"
-              />
-            </filter>
 
-            <filter
-              id="electricSwirlEvents"
-              colorInterpolationFilters="sRGB"
-              x="-20%"
-              y="-20%"
-              width="140%"
-              height="140%"
-            >
-              <feTurbulence type="turbulence" baseFrequency="0.015" numOctaves="2" seed="2" result="noise" />
-              <feOffset in="noise" dx="0" dy="0" result="noiseOffset">
-                <animate
-                  id="hp-swirl-dy-events"
-                  attributeName="dy"
-                  values="0; 700"
-                  dur="6s"
-                  repeatCount="indefinite"
-                  begin="indefinite"
-                  calcMode="linear"
-                />
-                <animate
-                  id="hp-swirl-dx-events"
-                  attributeName="dx"
-                  values="0; -490"
-                  dur="6s"
-                  repeatCount="indefinite"
-                  begin="indefinite"
-                  calcMode="linear"
-                />
-              </feOffset>
-              <feDisplacementMap
-                in="SourceGraphic"
-                in2="noiseOffset"
-                scale="22"
-                xChannelSelector="R"
-                yChannelSelector="B"
-              />
-            </filter>
+      <nav className="home-top-nav" aria-label="Разделы сайта">
+        {TOP_NAV_ITEMS.map((item) => (
+          <TopNavLink key={item.key} item={item} />
+        ))}
+      </nav>
 
-            <filter
-              id="electricSwirlTeam"
-              colorInterpolationFilters="sRGB"
-              x="-20%"
-              y="-20%"
-              width="140%"
-              height="140%"
-            >
-              <feTurbulence type="turbulence" baseFrequency="0.015" numOctaves="2" seed="2" result="noise" />
-              <feOffset in="noise" dx="0" dy="0" result="noiseOffset">
-                <animate
-                  id="hp-swirl-dy-team"
-                  attributeName="dy"
-                  values="0; 700"
-                  dur="6s"
-                  repeatCount="indefinite"
-                  begin="indefinite"
-                  calcMode="linear"
-                />
-                <animate
-                  id="hp-swirl-dx-team"
-                  attributeName="dx"
-                  values="0; -490"
-                  dur="6s"
-                  repeatCount="indefinite"
-                  begin="indefinite"
-                  calcMode="linear"
-                />
-              </feOffset>
-              <feDisplacementMap
-                in="SourceGraphic"
-                in2="noiseOffset"
-                scale="22"
-                xChannelSelector="R"
-                yChannelSelector="B"
-              />
-            </filter>
-
-            <filter
-              id="electricHue"
-              colorInterpolationFilters="sRGB"
-              x="-20%"
-              y="-20%"
-              width="140%"
-              height="140%"
-            >
-              <feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="2" seed="5" result="noise" />
-              <feOffset in="noise" dx="0" dy="0" result="noiseOffset">
-                <animate
-                  id="hp-hue-dx-orkestr"
-                  attributeName="dx"
-                  values="0; 240"
-                  dur="4s"
-                  repeatCount="indefinite"
-                  begin="indefinite"
-                  calcMode="linear"
-                />
-              </feOffset>
-              <feColorMatrix in="noiseOffset" type="hueRotate" values="140" result="hueNoise">
-                <animate
-                  id="hp-hue-rotate-orkestr"
-                  attributeName="values"
-                  values="140; 360; 140"
-                  dur="2.2s"
-                  repeatCount="indefinite"
-                  begin="indefinite"
-                  calcMode="paced"
-                />
-              </feColorMatrix>
-              <feDisplacementMap
-                in="SourceGraphic"
-                in2="hueNoise"
-                scale="22"
-                xChannelSelector="R"
-                yChannelSelector="B"
-              />
-            </filter>
-          </defs>
-        </svg>
-      )}
+      <div className="home-top-nav home-top-nav--right" aria-label="Оркестр">
+        <TopNavLink item={ORKESTR_NAV_ITEM} />
+        {homeAudioUrl.trim() && (
+          <HomeAudioToggle url={homeAudioUrl.trim()} label={homeAudioLabel} />
+        )}
+      </div>
 
       <div className="home-page__container">
-        {homeAudioUrl.trim() && (
-          <div className="home-page__toggles">
-            <HomeAudioToggle url={homeAudioUrl.trim()} label={homeAudioLabel} />
-          </div>
-        )}
 
-        {/* <div className="home-page__hero" aria-label="Дофамин. Театр. Спектакли.">
-          <div className="home-page__morph-container">
-            <div className="word-rotator">
-              <div className="word">Дофамин</div>
-              <div className="word">Театр</div>
-              <div className="word">Оркестр</div>
-            </div>
-          </div>
-        </div> */}
+        <header className="home-page__hero-block">
+          <GlitchHero
+            text="Дофамин"
+            as="h1"
+            className="home-page__glitch-hero--home home-page__glitch-hero--bands"
+          />
+          <p className="home-page__tagline">театр в Санкт-Петербурге</p>
+        </header>
 
-        <GlitchHero text="Дофамин" className="home-page__glitch-hero--home" />
-
-        <nav className="home-nav" aria-label="Навигация">
-          <Link
-            to={ROUTES.EVENTS}
-            className="home-nav__card card-container"
-            data-variant="swirl"
-            data-filter="events"
-            onMouseEnter={() => startFilterAnimation({ variant: "swirl", key: "events" })}
-            onMouseLeave={() => stopFilterAnimation({ variant: "swirl", key: "events" })}
-            onFocus={() => startFilterAnimation({ variant: "swirl", key: "events" })}
-            onBlur={() => stopFilterAnimation({ variant: "swirl", key: "events" })}
-          >
-            <div className="inner-container" aria-hidden>
-              <div className="border-outer">
-                <div className="main-card" />
-              </div>
-              <div className="glow-layer-1" />
-              <div className="glow-layer-2" />
-            </div>
-
-            <div className="overlay-1" aria-hidden />
-            <div className="overlay-2" aria-hidden />
-            <div className="background-glow" aria-hidden />
-
-            <div className="content-container">
-              <div className="content-top">
-
-                <p className="title">Спектакли</p>
-              </div>
-
-              <hr className="divider" />
-
-              <div className="content-bottom">
-                <p className="description">Афиша и даты</p>
-              </div>
-            </div>
-          </Link>
-
-          <a
-            href="https://xn--80ahnpgc6b.xn--p1acf/orkestr/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="home-nav__card card-container"
-            data-variant="hue"
-            data-filter="orkestr"
-            onMouseEnter={() => startFilterAnimation({ variant: "hue", key: "orkestr" })}
-            onMouseLeave={() => stopFilterAnimation({ variant: "hue", key: "orkestr" })}
-            onFocus={() => startFilterAnimation({ variant: "hue", key: "orkestr" })}
-            onBlur={() => stopFilterAnimation({ variant: "hue", key: "orkestr" })}
-          >
-            <div className="inner-container" aria-hidden>
-              <div className="border-outer">
-                <div className="main-card" />
-              </div>
-              <div className="glow-layer-1" />
-              <div className="glow-layer-2" />
-            </div>
-
-            <div className="overlay-1" aria-hidden />
-            <div className="overlay-2" aria-hidden />
-            <div className="background-glow" aria-hidden />
-
-            <div className="content-container">
-              <div className="content-top">
-                <div className="scrollbar-glass">SOFT</div>
-                <p className="title">Оркестр</p>
-              </div>
-
-              <hr className="divider" />
-
-              <div className="content-bottom">
-                <p className="description">WEB-приложение для работы над спектаклем и ролью</p>
-              </div>
-            </div>
-          </a>
-
-          <Link
-            to={ROUTES.ABOUTUS}
-            className="home-nav__card card-container"
-            data-variant="swirl"
-            data-filter="team"
-            onMouseEnter={() => startFilterAnimation({ variant: "swirl", key: "team" })}
-            onMouseLeave={() => stopFilterAnimation({ variant: "swirl", key: "team" })}
-            onFocus={() => startFilterAnimation({ variant: "swirl", key: "team" })}
-            onBlur={() => stopFilterAnimation({ variant: "swirl", key: "team" })}
-          >
-            <div className="inner-container" aria-hidden>
-              <div className="border-outer">
-                <div className="main-card" />
-              </div>
-              <div className="glow-layer-1" />
-              <div className="glow-layer-2" />
-            </div>
-
-            <div className="overlay-1" aria-hidden />
-            <div className="overlay-2" aria-hidden />
-            <div className="background-glow" aria-hidden />
-
-            <div className="content-container">
-              <div className="content-top">
-                {/* <div className="scrollbar-glass">Dramatic</div> */}
-                <p className="title">Команда</p>
-              </div>
-
-              <hr className="divider" />
-
-              <div className="content-bottom">
-                <p className="description">Актёры и команда</p>
-              </div>
-            </div>
-          </Link>
-        </nav>
+        <HomePlaybill />
 
         <Marquee
           className="home-page__marquee"
@@ -445,18 +160,45 @@ const HomePage: FC = () => {
           items={marqueeItems}
           duration={marqueeDuration}
         />
-
-        <div className="home-nav__contacts">
-          <Link to={ROUTES.CONTACTS} className="home-nav__contacts-link">
-            Контакты
-          </Link>
-        </div>
       </div>
     </div>
   );
 };
 
 export const Component = HomePage;
+
+function TopNavLink({ item }: { item: TopNavItem }) {
+  const className = cn(
+    "home-top-nav__btn",
+    item.badge && "home-top-nav__btn--soft"
+  );
+
+  const label = (
+    <>
+      {item.badge && <span className="home-top-nav__badge">{item.badge}</span>}
+      <span>{item.label}</span>
+    </>
+  );
+
+  if (item.href) {
+    return (
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        {label}
+      </a>
+    );
+  }
+
+  return (
+    <Link to={item.to ?? ROUTES.HOME} className={className}>
+      {label}
+    </Link>
+  );
+}
 
 function HomeAudioToggle({ url, label }: { url: string; label: string }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -496,7 +238,7 @@ function HomeAudioToggle({ url, label }: { url: string; label: string }) {
   return (
     <button
       type="button"
-      className={isOn ? "home-audio-toggle is-on" : "home-audio-toggle"}
+      className={cn("home-audio-toggle", isOn && "is-on")}
       aria-pressed={isOn}
       disabled={isLoading}
       aria-busy={isLoading}

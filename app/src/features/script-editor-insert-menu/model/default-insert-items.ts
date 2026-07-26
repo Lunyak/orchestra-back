@@ -5,12 +5,6 @@ import type {
   ScriptEditorInsertResolveResult,
 } from "./types";
 
-import {
-  createKadrTemplateSnippet,
-  createLightKadrId,
-  nextKadrNumberForScene,
-} from "../../../features/theater/model/light-kadrs";
-
 export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinition[] = [
   {
     id: "copy",
@@ -115,22 +109,6 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
         }),
       },
     }),
-  },
-  {
-    id: "kadr",
-    label: "Картина (шаблон)",
-    group: "Структура",
-    resolve: (ctx) => {
-      const nextN = nextKadrNumberForScene({ markdown: ctx.activeMarkdown });
-      const kadrId = createLightKadrId();
-      return {
-        state: "ok",
-        pick: {
-          kind: "snippet",
-          text: createKadrTemplateSnippet(nextN, kadrId),
-        },
-      };
-    },
   },
   {
     id: "heading2",

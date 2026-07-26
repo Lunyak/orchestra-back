@@ -37,6 +37,10 @@ export const router = createBrowserRouter([
         lazy: () => import("../page/HomePage/HomePage"),
       },
       {
+        path: ROUTES.THEATER_WALK,
+        lazy: () => import("../page/TheaterWalk/TheaterWalkPage"),
+      },
+      {
         path: ROUTES.CONTACTS,
         lazy: () => import("../page/ContactsPage/ContactsPage"),
       },

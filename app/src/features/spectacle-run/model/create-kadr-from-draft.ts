@@ -5,6 +5,7 @@ import type {
 } from "../../playbook/model/playbook-slice";
 import type {
   ScriptScene,
+  SceneLightKadrRequisiteCueV1,
   SceneLightKadrV1,
   SceneLightKadrsDataV1,
   TheaterSpotlight,
@@ -43,6 +44,7 @@ export type CreateKadrDraft = {
   playTrackId: number | null;
   soundIds: number[];
   projectorCue: KadrProjectorCue | null;
+  requisites: SceneLightKadrRequisiteCueV1[];
   blackout: boolean;
   programId: number;
   recordChannels: number[];
@@ -214,6 +216,7 @@ export function buildInitialCreateKadrDraft(args: {
     playTrackId: null,
     soundIds: [],
     projectorCue: null,
+    requisites: [],
     blackout: false,
     programId: programs.activeProgramId ?? 1,
     recordChannels,
@@ -305,6 +308,13 @@ function applyKadrDraftToJson(args: ApplyKadrDraftArgs): {
     kadr = rest;
   }
 
+  if (draft.requisites.length > 0) {
+    kadr = { ...kadr, requisites: draft.requisites };
+  } else {
+    const { requisites: _removed, ...rest } = kadr;
+    kadr = rest;
+  }
+
   const smokeMachineEnabled = args.smokeMachineEnabled === true;
   kadr = {
     ...kadr,
@@ -338,6 +348,7 @@ function applyKadrDraftToJson(args: ApplyKadrDraftArgs): {
   else if (kadr.faders.length > 0) parts.push(`свет · ${kadr.faders.length} F`);
   if (hasSound) parts.push("звук");
   if (draft.projectorCue) parts.push("видео");
+  if (draft.requisites.length > 0) parts.push("реквизит");
   if (draft.imageMarkdown.trim()) parts.push("картинка");
   if (draft.blackoutDurationSec != null || draft.smokeDurationSec != null) parts.push("метки");
   if (draft.transitionText.trim()) parts.push("переход");
@@ -387,6 +398,7 @@ export function buildEditKadrDraftFromTapeItem(args: {
     playTrackId: kadr.sound?.playTrackIds?.[0] ?? null,
     soundIds: kadr.sound?.soundIds ?? [],
     projectorCue: kadr.projector ?? null,
+    requisites: kadr.requisites ?? [],
     blackout: isBlackout,
     programId: isBlackout
       ? programs.activeProgramId ?? 1

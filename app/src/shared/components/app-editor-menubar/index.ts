@@ -28,7 +28,6 @@ export type { AppEditorScriptFormattingMenuProps } from "./AppEditorScriptFormat
 export { AppEditorScriptMarkdownMenu } from "./AppEditorScriptMarkdownMenu";
 export type { AppEditorScriptMarkdownMenuProps } from "./AppEditorScriptMarkdownMenu";
 export { AppEditorScriptPlayOriginalToggle } from "./AppEditorScriptPlayOriginalToggle";
-export { AppEditorScriptTocToggle } from "./AppEditorScriptTocToggle";
 export { AppEditorScriptSceneTitle } from "./AppEditorScriptSceneTitle";
 export type { AppEditorScriptSceneTitleProps } from "./AppEditorScriptSceneTitle";
 export { AppEditorScriptModeNav } from "./AppEditorScriptModeNav";

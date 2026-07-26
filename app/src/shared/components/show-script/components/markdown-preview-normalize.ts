@@ -136,3 +136,27 @@ export function injectNbspParagraphsForTripleNewlines(markdown: string): string 
   parts.push(injectNbspParagraphsForTripleNewlinesInSegment(src.slice(last)));
   return parts.join("");
 }
+
+/**
+ * `[[РОЛЬ]](ремарка)` micromark читает как ссылку `[РОЛЬ](ремарка)` —
+ * лейбл ломается, ремарка пропадает. Разрываем `](` нулевой шириной (вне code fence).
+ */
+function protectRoleLabelParentheticalsInSegment(segment: string): string {
+  return segment.replace(/\]\]\(/g, "]]\u200B(");
+}
+
+export function protectRoleLabelParentheticals(markdown: string): string {
+  const src = String(markdown ?? "");
+  if (!src || !src.includes("]](")) return src;
+  FENCE_RE.lastIndex = 0;
+  const parts: string[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = FENCE_RE.exec(src)) !== null) {
+    parts.push(protectRoleLabelParentheticalsInSegment(src.slice(last, m.index)));
+    parts.push(m[0]);
+    last = m.index + m[0].length;
+  }
+  parts.push(protectRoleLabelParentheticalsInSegment(src.slice(last)));
+  return parts.join("");
+}

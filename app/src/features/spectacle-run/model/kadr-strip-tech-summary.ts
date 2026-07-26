@@ -11,7 +11,13 @@ import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { formatFaderShort } from "../../../shared/components/light-console/light-console-labels";
 import { buildLightConsoleSplitModel } from "../../../shared/components/light-console/light-console-split";
 import { parseLightChannel } from "../../../shared/components/show-script/utils/lightTokens";
-import type { ScriptScene, SceneLightKadrV1 } from "../../../shared/types/script";
+import type {
+  ScriptScene,
+  ScriptRequisite,
+  ScriptRequisiteDuty,
+  SceneLightKadrRequisiteActionV1,
+  SceneLightKadrV1,
+} from "../../../shared/types/script";
 import { parseKadrTitleFromHeading } from "./create-kadr-from-draft";
 import type { KadrRunLabel } from "./kadr-section-labels";
 import type { SpectacleTapeItem } from "./spectacle-kadr-tape";
@@ -30,11 +36,19 @@ export type KadrStripTechRow = {
   projectorPreview?: KadrStripProjectorPreview;
 };
 
+export type KadrStripRequisiteItem = {
+  actionLabel: string;
+  name: string;
+};
+
 export type KadrStripTechSummary = {
   headingTitle: string;
   rows: KadrStripTechRow[];
+  requisites: KadrStripRequisiteItem[];
   blackout: boolean;
   cornerLabels: KadrRunLabel[];
+  /** Превью проектора для обложки карточки (hold/video). */
+  projectorPreview?: KadrStripProjectorPreview;
 };
 
 type MediaLookup = {
@@ -162,6 +176,69 @@ function buildProjectorPreview(
   return undefined;
 }
 
+const REQUISITE_ACTION_LABELS: Record<SceneLightKadrRequisiteActionV1, string> = {
+  setup: "занести",
+  strike: "унести",
+  use: "манипуляции",
+};
+
+const SCENE_DUTY_LABELS: Record<ScriptRequisiteDuty, string> = {
+  setup: "занести",
+  strike: "унести",
+  use: "манипуляции",
+};
+
+function formatRequisiteLine(req: ScriptRequisite | undefined, fallbackName: string): string {
+  const name = req?.label?.trim() || fallbackName;
+  const duty = req?.duty;
+  const note =
+    duty === "setup"
+      ? String(req?.placeNote ?? "").trim()
+      : duty === "use"
+        ? String(req?.actionNote ?? "").trim()
+        : "";
+  return note ? `${name} · ${note}` : name;
+}
+
+function formatRequisiteItems(
+  kadr: SceneLightKadrV1,
+  scene: ScriptScene,
+  isFirstKadrInScene: boolean,
+): KadrStripRequisiteItem[] {
+  const sceneRequisites = scene.requisites ?? [];
+  const byId = new Map(sceneRequisites.map((item) => [item.id, item]));
+  const cues = kadr.requisites ?? [];
+  const cueIds = new Set(cues.map((cue) => cue.requisiteId));
+
+  const fromCues: KadrStripRequisiteItem[] = cues.map((cue) => {
+    const req = byId.get(cue.requisiteId);
+    const actionLabel = REQUISITE_ACTION_LABELS[cue.action] ?? cue.action;
+    const note =
+      cue.action === "setup"
+        ? String(req?.placeNote ?? "").trim()
+        : cue.action === "use"
+          ? String(req?.actionNote ?? "").trim()
+          : "";
+    const baseName = req?.label?.trim() || `Реквизит ${cue.requisiteId}`;
+    return {
+      actionLabel,
+      name: note ? `${baseName} · ${note}` : baseName,
+    };
+  });
+
+  // Сценическое «Занести» без галочки «В эту картину» — на первой картине сцены.
+  const fromSceneSetup: KadrStripRequisiteItem[] = isFirstKadrInScene
+    ? sceneRequisites
+        .filter((req) => !cueIds.has(req.id) && req.duty === "setup")
+        .map((req) => ({
+          actionLabel: SCENE_DUTY_LABELS.setup,
+          name: formatRequisiteLine(req, `Реквизит ${req.id}`),
+        }))
+    : [];
+
+  return [...fromCues, ...fromSceneSetup];
+}
+
 function formatVideoSummary(
   kadr: SceneLightKadrV1,
   media: MediaLookup,
@@ -187,7 +264,9 @@ function formatVideoSummary(
 
 function buildCornerLabels(kadr: SceneLightKadrV1 | undefined, scene: ScriptScene): KadrRunLabel[] {
   const labels: KadrRunLabel[] = [];
-  if (kadr?.blackoutDurationSec != null && kadr.blackoutDurationSec > 0) {
+  const isBlackout = Boolean(kadr?.blackout || (kadr && kadr.programId <= 0));
+  // Блекаут-картина уже с badge — длительность блекаута не дублируем в углу.
+  if (!isBlackout && kadr?.blackoutDurationSec != null && kadr.blackoutDurationSec > 0) {
     labels.push({ type: "blackout", seconds: kadr.blackoutDurationSec });
   }
   if (kadr?.smokeDurationSec != null && kadr.smokeDurationSec > 0) {
@@ -226,14 +305,21 @@ export function buildKadrStripTechSummary(args: {
     return {
       headingTitle,
       rows: [],
+      requisites: [],
       blackout: false,
       cornerLabels: sceneSmokeLabels,
     };
   }
 
   const kadr = resolveKadrForItem(item, scene);
+  const sceneKadrs = readSceneLightKadrs(scene).kadrs;
+  const firstKadrNo = sceneKadrs[0]?.kadrNo;
+  const isFirstKadrInScene =
+    kadr != null && firstKadrNo != null && kadr.kadrNo === firstKadrNo;
   const rows: KadrStripTechRow[] = [];
   const media = args.media ?? {};
+  let projectorPreview: KadrStripProjectorPreview | undefined;
+  let requisites: KadrStripRequisiteItem[] = [];
 
   if (kadr) {
     rows.push({
@@ -252,12 +338,15 @@ export function buildKadrStripTechSummary(args: {
 
     const video = formatVideoSummary(kadr, media);
     if (video) {
+      projectorPreview = video.projectorPreview;
       rows.push({
         label: "Видео",
         value: video.value,
         projectorPreview: video.projectorPreview,
       });
     }
+
+    requisites = formatRequisiteItems(kadr, scene, isFirstKadrInScene);
 
     if (kadr.transitionText?.trim()) {
       rows.push({ label: "Переход", value: kadr.transitionText.trim() });
@@ -276,7 +365,9 @@ export function buildKadrStripTechSummary(args: {
   return {
     headingTitle,
     rows,
+    requisites,
     blackout: Boolean(kadr?.blackout || (kadr && kadr.programId <= 0)),
     cornerLabels: buildCornerLabels(kadr, scene),
+    ...(projectorPreview ? { projectorPreview } : {}),
   };
 }

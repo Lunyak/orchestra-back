@@ -10,6 +10,7 @@ import {
   flattenClientTheaterModels,
 } from './theater-model-sync';
 import {
+  syncMapSceneRequisiteRow,
   syncMapTheaterSpotlightRow,
   syncNormalizeBool,
   syncNormalizeFloat,
@@ -109,25 +110,12 @@ export class SyncService {
 
     const requisitesData = parsed.flatMap((st) =>
       (st.requisites ?? [])
-        .map((r: any) => {
-          const sourceId = syncNormalizeInt(r?.id, -1);
-          if (sourceId <= 0) return null;
-          const label = syncNormalizeString(r?.label, '');
-          if (!label) return null;
-          return {
-            sceneId: st.id,
-            sourceId,
-            label,
-            checked: syncNormalizeBool(r?.checked, false),
-          };
-        })
-        .filter(Boolean),
-    ) as Array<{
-      sceneId: string;
-      sourceId: number;
-      label: string;
-      checked: boolean;
-    }>;
+        .map((r: unknown) => syncMapSceneRequisiteRow(st.id, r))
+        .filter(
+          (row): row is NonNullable<ReturnType<typeof syncMapSceneRequisiteRow>> =>
+            row != null,
+        ),
+    );
 
     const lightPlotData = parsed.flatMap((st) =>
       (st.lightPlot ?? [])

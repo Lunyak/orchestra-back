@@ -1,5 +1,12 @@
 import { useMemo } from "react";
+import { useProjectMembersQuery } from "../../project/api/project-api";
 import { usePlaybook } from "../../playbook";
+import { mergeTaskAssigneeMembers } from "../../project-tasks/model/merge-task-assignee-members";
+import { useMyTroupeQuery } from "../../troupe/api/troupe-api";
+import { memberLabel } from "../../troupe/model/troupe-page-utils";
+import { readSceneTheaterModels } from "../../theater/model/theater-scene-models";
+import { useAppSelector } from "../../../shared/store/hooks";
+import type { ScriptRequisite } from "../../../shared/types/script";
 import {
   buildEditKadrDraftFromTapeItem,
   type CreateKadrDraft,
@@ -9,9 +16,37 @@ import { CreateKadrModal } from "./CreateKadrModal";
 
 export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[] }) {
   const run = useSpectacleRunContext();
-  const { playbookData } = usePlaybook();
+  const { playbookData, updateScene } = usePlaybook();
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
   const scene = run.currentScene;
   const currentItem = run.currentItem;
+  const projectSlug = run.projectName;
+
+  const { data: troupeData } = useMyTroupeQuery(
+    { project: projectSlug },
+    { skip: !projectSlug },
+  );
+  const { data: projectMembersData } = useProjectMembersQuery(projectSlug, {
+    skip: !accessToken || !projectSlug,
+  });
+
+  const assigneeOptions = useMemo(() => {
+    const members = mergeTaskAssigneeMembers(troupeData, projectMembersData);
+    return members.map((member) => {
+      const label = memberLabel(member);
+      return {
+        value: member.email,
+        label,
+        searchText: [label, member.email].filter(Boolean).join(" "),
+        person: member,
+      };
+    });
+  }, [projectMembersData, troupeData]);
+
+  const theaterModels = useMemo(
+    () => (scene ? readSceneTheaterModels(scene) : []),
+    [scene],
+  );
 
   const editDraft = useMemo((): CreateKadrDraft | null => {
     if (run.kadrModalMode !== "edit" || !scene || !currentItem) return null;
@@ -35,6 +70,10 @@ export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[]
 
   const editKadrNo = currentItem?.isPlaceholder ? null : currentItem?.kadrNo ?? null;
 
+  const handleSceneRequisitesChange = (next: ScriptRequisite[]) => {
+    updateScene(scene.id, { requisites: next });
+  };
+
   return (
     <CreateKadrModal
       isOpen={run.kadrModalOpen}
@@ -54,6 +93,11 @@ export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[]
       videos={run.videos}
       holdImages={run.holdImages}
       projector={playbookData?.projector ?? null}
+      sceneRequisites={scene.requisites ?? []}
+      theaterModels={theaterModels}
+      assigneeOptions={assigneeOptions}
+      accessToken={accessToken}
+      onSceneRequisitesChange={handleSceneRequisitesChange}
       onClose={run.closeKadrModal}
       onSubmit={run.submitKadrModal}
     />

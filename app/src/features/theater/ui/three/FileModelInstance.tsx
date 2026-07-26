@@ -107,6 +107,7 @@ export const FileModelInstance = ({
         if (standard.emissive && !data.originalEmissive) {
           data.originalEmissive = standard.emissive.clone();
         }
+        const isRequisite = model.isRequisite === true;
         if (isSelected) {
           standard.color.set(tc("--color-error"));
           if (standard.emissive) {
@@ -119,6 +120,12 @@ export const FileModelInstance = ({
             standard.emissive.set(tc("--color-primary-dark"));
             standard.emissiveIntensity = 0.35;
           }
+        } else if (isRequisite) {
+          standard.color.copy(data.originalColor);
+          if (standard.emissive) {
+            standard.emissive.set(tc("--color-active-ascent"));
+            standard.emissiveIntensity = 0.22;
+          }
         } else {
           standard.color.copy(data.originalColor);
           if (standard.emissive && data.originalEmissive) {
@@ -128,7 +135,7 @@ export const FileModelInstance = ({
         }
       });
     });
-  }, [isHovered, isSelected]);
+  }, [isHovered, isSelected, model.isRequisite]);
 
   return (
     <group

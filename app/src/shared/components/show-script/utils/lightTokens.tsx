@@ -27,6 +27,11 @@ export function formatSpeakerLabelDisplay(raw: string): string {
   return t.charAt(0).toLocaleUpperCase("ru-RU") + t.slice(1).toLocaleLowerCase("ru-RU");
 }
 
+/** Пробел/таб после `]]` — показываем gap; ZWSP после защиты `]](` — нет. */
+function hasRealSpaceAfterRoleToken(nextChar: string): boolean {
+  return nextChar === " " || nextChar === "\t";
+}
+
 export function resolveLightColor(
   label: string,
   channelColor?: string | null,
@@ -170,15 +175,24 @@ export function createRenderLightTokens(
         if (rawLabel != null) {
           const normalized = String(rawLabel).trim();
           const text = formatSpeakerLabelDisplay(normalized);
+          const nextChar = node[start + raw.length] ?? "";
+          const trailingGap = hasRealSpaceAfterRoleToken(nextChar);
           result.push(
             <span
               key={`${keyPrefix}-${counter}-lbl`}
-              className="markdown-speaker-label"
+              className={
+                trailingGap
+                  ? "markdown-speaker-label markdown-speaker-label--gap"
+                  : "markdown-speaker-label"
+              }
               title={normalized}
             >
               {text}
             </span>,
           );
+          counter += 1;
+          lastIndex = start + raw.length + (trailingGap ? 1 : 0);
+          continue;
         } else if (rawType?.toLowerCase() === "play") {
           const payload = String(rawIndex ?? "").trim();
           const labelText = String(rawColor ?? "").trim() || "Play";
@@ -347,9 +361,19 @@ export function createRehypeScriptTokens(
           if (rawLabel != null) {
             const normalized = String(rawLabel).trim();
             const text = formatSpeakerLabelDisplay(normalized);
+            const nextChar = value[start + raw.length] ?? "";
+            const trailingGap = hasRealSpaceAfterRoleToken(nextChar);
             out.push(
-              hastSpan(["markdown-speaker-label"], [hastText(text)], { title: normalized }),
+              hastSpan(
+                trailingGap
+                  ? ["markdown-speaker-label", "markdown-speaker-label--gap"]
+                  : ["markdown-speaker-label"],
+                [hastText(text)],
+                { title: normalized },
+              ),
             );
+            lastIndex = start + raw.length + (trailingGap ? 1 : 0);
+            continue;
           } else if (rawType?.toLowerCase() === "play") {
             const payload = String(rawIndex ?? "").trim();
             const labelText = String(rawColor ?? "").trim() || "Play";

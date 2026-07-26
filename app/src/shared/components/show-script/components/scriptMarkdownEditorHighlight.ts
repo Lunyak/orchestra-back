@@ -22,7 +22,11 @@ export const scriptMarkdownEditorSyntaxHighlighting = syntaxHighlighting(
     { tag: tags.string, color: "var(--color-text-slate-strong)" },
     { tag: tags.url, color: "var(--color-link-alpha)" },
     { tag: tags.link, color: "var(--color-script-link)" },
-    { tag: tags.emphasis, fontStyle: "italic", color: body },
+    {
+      tag: tags.emphasis,
+      fontStyle: "italic",
+      color: "color-mix(in srgb, var(--script-play-text-color, var(--color-text-primary)) 72%, transparent)",
+    },
     { tag: tags.strong, fontWeight: "700", color: body },
     {
       tag: tags.monospace,

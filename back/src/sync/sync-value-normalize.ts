@@ -45,6 +45,35 @@ export function syncNormalizeOptionalInt(v: unknown): number | null {
   return Math.trunc(n);
 }
 
+const REQUISITE_DUTIES = new Set(["setup", "strike", "use"]);
+
+export function syncMapSceneRequisiteRow(sceneId: string, raw: unknown) {
+  const row = raw as Record<string, unknown> | null | undefined;
+  const sourceId = syncNormalizeInt(row?.id ?? row?.sourceId, -1);
+  if (sourceId <= 0) return null;
+  const label = syncNormalizeString(row?.label, "");
+  if (!label) return null;
+  const theaterModelId = syncNormalizeInt(row?.theaterModelId, 0);
+  const avatarKey = syncNormalizeString(row?.avatarKey, "");
+  const assigneeEmail = syncNormalizeString(row?.assigneeEmail, "").toLowerCase();
+  const dutyRaw = syncNormalizeString(row?.duty, "");
+  const duty = REQUISITE_DUTIES.has(dutyRaw) ? dutyRaw : null;
+  const placeNote = syncNormalizeString(row?.placeNote, "");
+  const actionNote = syncNormalizeString(row?.actionNote, "");
+  return {
+    sceneId,
+    sourceId,
+    label,
+    checked: syncNormalizeBool(row?.checked, false),
+    theaterModelId: theaterModelId > 0 ? theaterModelId : null,
+    avatarKey: avatarKey || null,
+    assigneeEmail: assigneeEmail || null,
+    duty,
+    placeNote: placeNote || null,
+    actionNote: actionNote || null,
+  };
+}
+
 export function syncMapTheaterSpotlightRow(sceneId: string, sp: unknown) {
   const row = sp as Record<string, unknown> | null | undefined;
   const sourceId = syncNormalizeInt(row?.id, -1);

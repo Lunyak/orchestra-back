@@ -254,7 +254,7 @@ export function useNotesRun(projectName: string) {
 
   const startRun = useCallback(() => {
     if (cards.length === 0) {
-      setLiveStatus("Добавьте карточки для прогона");
+      setLiveStatus("Добавьте карточки для суфлера");
       return;
     }
     runActiveRef.current = true;
@@ -265,7 +265,7 @@ export function useNotesRun(projectName: string) {
     void applyCardPlayback(cards[clampedIndex]).finally(() => {
       applyingRef.current = false;
     });
-    setLiveStatus("Прогон запущен");
+    setLiveStatus("Суфлер запущен");
   }, [applyCardPlayback, cards, clampedIndex]);
 
   const togglePause = useCallback(() => {

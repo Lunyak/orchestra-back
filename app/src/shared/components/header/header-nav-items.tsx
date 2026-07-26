@@ -106,7 +106,7 @@ export const SPECTACLE_NAV_CHILDREN: HeaderNavSubItem[] = [
   {
     id: "sufer",
     path: SUFER_ROUTE_PATH,
-    label: "Прогон",
+    label: "Суфлер",
     isActive: isSpectacleSuferPath,
   },
   {

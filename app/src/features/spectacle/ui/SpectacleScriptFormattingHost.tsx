@@ -28,7 +28,7 @@ export function SpectacleScriptFormattingHost() {
   const markdownMode = useAppSelector((state) =>
     projectName
       ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).markdownMode
-      : "notes",
+      : "play",
   );
   const playOriginalMode = useAppSelector((state) =>
     projectName

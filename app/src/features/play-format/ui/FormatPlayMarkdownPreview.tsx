@@ -7,6 +7,7 @@ import {
   expandScriptLineParagraphBreaks,
   injectNbspParagraphsForTripleNewlines,
   markdownHasRoleLightOrPlayLineLabels,
+  protectRoleLabelParentheticals,
 } from "../../../shared/components/show-script/components/markdown-preview-normalize";
 import type { MarkdownPreviewParagraphProps } from "../../../shared/components/show-script/components/markdown-preview-types";
 import {
@@ -31,7 +32,8 @@ export function FormatPlayMarkdownPreview({
 }: FormatPlayMarkdownPreviewProps) {
   const markdownForPreview = useMemo(() => {
     const expanded = expandScriptLineParagraphBreaks(String(markdown ?? ""), false, 0);
-    return injectNbspParagraphsForTripleNewlines(expanded);
+    const withProtectedRemarks = protectRoleLabelParentheticals(expanded);
+    return injectNbspParagraphsForTripleNewlines(withProtectedRemarks);
   }, [markdown]);
 
   const hasRoleOrLightLabels = useMemo(

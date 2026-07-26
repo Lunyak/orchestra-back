@@ -19,6 +19,16 @@ import {
   THEATER_SMOKE_SATURATION_DEFAULT,
   THEATER_SMOKE_SIZE_DEFAULT,
 } from "../model/theater-smoke-settings";
+import {
+  THEATER_DUTY_LIGHT_EVENT,
+  type TheaterDutyLightRequest,
+} from "../model/theater-duty-light";
+import {
+  getTheaterLiveBlackoutEnabled,
+  requestTheaterLiveBlackout,
+  THEATER_LIVE_BLACKOUT_EVENT,
+  type TheaterLiveBlackoutRequest,
+} from "../model/theater-live-blackout";
 
 export type TheaterPanelPrefsBridge = {
   swapTheaterPanels: boolean;
@@ -42,6 +52,8 @@ export type UseTheaterViewPrefsResult = TheaterViewPrefs & {
   setOutlineDrawMode: (value: boolean) => void;
   setSpotlightAimMode: (mode: TheaterViewPrefs["spotlightAimMode"]) => void;
   setDutyLightEnabled: (value: boolean) => void;
+  liveBlackoutEnabled: boolean;
+  setLiveBlackoutEnabled: (value: boolean) => void;
   setSmokeMachineEnabled: (value: boolean) => void;
   setSmokePanelOpen: (value: boolean) => void;
   setSmokePosition: (value: TheaterSmokePosition | null) => void;
@@ -112,8 +124,11 @@ export function useTheaterViewPrefs(
   const [spotlightAimMode, setSpotlightAimMode] = useState<
     TheaterViewPrefs["spotlightAimMode"]
   >(() => readTheaterViewPrefs(projectName).spotlightAimMode);
-  const [dutyLightEnabled, setDutyLightEnabled] = useState(
+  const [dutyLightEnabled, setDutyLightEnabledState] = useState(
     () => readTheaterViewPrefs(projectName).dutyLightEnabled,
+  );
+  const [liveBlackoutEnabled, setLiveBlackoutEnabledState] = useState(
+    () => getTheaterLiveBlackoutEnabled(),
   );
   const [smokeMachineEnabled, setSmokeMachineEnabledState] = useState(
     () => readTheaterViewPrefs(projectName).smokeMachineEnabled,
@@ -181,7 +196,7 @@ export function useTheaterViewPrefs(
     setActiveTab(prefs.activeTab);
     setOutlineDrawMode(prefs.outlineDrawMode);
     setSpotlightAimMode(prefs.spotlightAimMode);
-    setDutyLightEnabled(prefs.dutyLightEnabled);
+    setDutyLightEnabledState(prefs.dutyLightEnabled);
     setSmokeMachineEnabledState(prefs.smokeMachineEnabled);
     setSmokePanelOpen(prefs.smokePanelOpen);
     setSmokePosition(prefs.smokePosition);
@@ -199,6 +214,39 @@ export function useTheaterViewPrefs(
   useEffect(() => {
     hydrateFromStorage();
   }, [hydrateFromStorage]);
+
+  const setDutyLightEnabled = useCallback((value: boolean) => {
+    setDutyLightEnabledState(value);
+    window.dispatchEvent(
+      new CustomEvent<TheaterDutyLightRequest>(THEATER_DUTY_LIGHT_EVENT, {
+        detail: { enabled: value },
+      }),
+    );
+  }, []);
+
+  const setLiveBlackoutEnabled = useCallback((value: boolean) => {
+    requestTheaterLiveBlackout(value);
+  }, []);
+
+  useEffect(() => {
+    const onDutyLight = (event: Event) => {
+      const enabled = (event as CustomEvent<TheaterDutyLightRequest>).detail?.enabled;
+      if (typeof enabled !== "boolean") return;
+      setDutyLightEnabledState(enabled);
+    };
+    window.addEventListener(THEATER_DUTY_LIGHT_EVENT, onDutyLight);
+    return () => window.removeEventListener(THEATER_DUTY_LIGHT_EVENT, onDutyLight);
+  }, []);
+
+  useEffect(() => {
+    const onLiveBlackout = (event: Event) => {
+      const enabled = (event as CustomEvent<TheaterLiveBlackoutRequest>).detail?.enabled;
+      if (typeof enabled !== "boolean") return;
+      setLiveBlackoutEnabledState(enabled);
+    };
+    window.addEventListener(THEATER_LIVE_BLACKOUT_EVENT, onLiveBlackout);
+    return () => window.removeEventListener(THEATER_LIVE_BLACKOUT_EVENT, onLiveBlackout);
+  }, []);
 
   useEffect(() => {
     if (skipPersistRef.current) {
@@ -288,6 +336,7 @@ export function useTheaterViewPrefs(
     showTheaterControls: showControls,
     spotlightAimMode,
     dutyLightEnabled,
+    liveBlackoutEnabled,
     smokeMachineEnabled,
     smokePanelOpen,
     smokePosition,
@@ -315,6 +364,7 @@ export function useTheaterViewPrefs(
     setOutlineDrawMode,
     setSpotlightAimMode,
     setDutyLightEnabled,
+    setLiveBlackoutEnabled,
     setSmokeMachineEnabled,
     setSmokePanelOpen,
     setSmokePosition,

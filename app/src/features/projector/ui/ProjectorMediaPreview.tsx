@@ -2,7 +2,7 @@ import cn from "classnames";
 import { useEffect, useRef, useState } from "react";
 import {
   fetchProjectorImageBlobUrl,
-  fetchProjectorVideoBlobUrl,
+  fetchProjectorVideoPreviewUrl,
   resolveProjectorHoldAsset,
   resolveProjectorVideoAsset,
   type ProjectorMediaContext,
@@ -18,8 +18,16 @@ export type ProjectorMediaPreviewProps = {
   title: string;
   className?: string;
   fallbackClassName?: string;
+  /** Пустой fallback без текста (для обложки, где название уже есть ниже). */
+  hideFallbackLabel?: boolean;
   interactive?: boolean;
   onActivate?: () => void;
+};
+
+type PreviewResolveResult = {
+  src: string | null;
+  blob: boolean;
+  storageKey: string | null;
 };
 
 export async function resolveProjectorPreviewSrc(
@@ -27,37 +35,62 @@ export async function resolveProjectorPreviewSrc(
   mode: "video" | "hold",
   videoId: number | null,
   holdId: number | null,
-): Promise<{ src: string | null; blob: boolean }> {
+  opts?: { preferRemote?: boolean },
+): Promise<PreviewResolveResult> {
+  const preferRemote = opts?.preferRemote === true;
+
   if (mode === "hold") {
     const asset = resolveProjectorHoldAsset(ctx, holdId);
-    if (!asset) return { src: null, blob: false };
-    if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
-      return { src: asset.fallbackSrc, blob: false };
-    }
-    if (!asset.storageKey && asset.fallbackSrc) {
-      return { src: asset.fallbackSrc, blob: false };
+    if (!asset) return { src: null, blob: false, storageKey: null };
+    if (!preferRemote) {
+      if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
+        return { src: asset.fallbackSrc, blob: false, storageKey: asset.storageKey };
+      }
+      if (!asset.storageKey && asset.fallbackSrc) {
+        return { src: asset.fallbackSrc, blob: false, storageKey: null };
+      }
     }
     if (asset.storageKey) {
       const blobUrl = await fetchProjectorImageBlobUrl(asset.storageKey);
-      if (blobUrl) return { src: blobUrl, blob: true };
+      if (blobUrl) return { src: blobUrl, blob: true, storageKey: asset.storageKey };
     }
-    return { src: asset.fallbackSrc, blob: false };
+    return { src: preferRemote ? null : asset.fallbackSrc, blob: false, storageKey: asset.storageKey };
   }
 
-  if (videoId == null || videoId <= 0) return { src: null, blob: false };
+  if (videoId == null || videoId <= 0) return { src: null, blob: false, storageKey: null };
   const asset = resolveProjectorVideoAsset(ctx, videoId);
-  if (!asset) return { src: null, blob: false };
-  if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
-    return { src: asset.fallbackSrc, blob: false };
+  if (!asset) return { src: null, blob: false, storageKey: null };
+
+  if (!preferRemote) {
+    if (asset.fallbackSrc && isLocalProjectMediaUrl(asset.fallbackSrc)) {
+      return { src: asset.fallbackSrc, blob: false, storageKey: asset.storageKey };
+    }
+    if (!asset.storageKey && asset.fallbackSrc) {
+      return { src: asset.fallbackSrc, blob: false, storageKey: null };
+    }
   }
-  if (!asset.storageKey && asset.fallbackSrc) {
-    return { src: asset.fallbackSrc, blob: false };
-  }
+
   if (asset.storageKey) {
-    const blobUrl = await fetchProjectorVideoBlobUrl(asset.storageKey);
-    if (blobUrl) return { src: blobUrl, blob: true };
+    const remote = await fetchProjectorVideoPreviewUrl(asset.storageKey);
+    if (remote) return { ...remote, storageKey: asset.storageKey };
   }
-  return { src: asset.fallbackSrc, blob: false };
+
+  return {
+    src: preferRemote ? null : asset.fallbackSrc,
+    blob: false,
+    storageKey: asset.storageKey,
+  };
+}
+
+function seekVideoPreviewFrame(video: HTMLVideoElement) {
+  if (!Number.isFinite(video.duration) || video.duration <= 0) {
+    if (video.currentTime < 0.05) video.currentTime = 0.1;
+    return;
+  }
+  const target = Math.min(0.25, Math.max(0.05, video.duration * 0.02));
+  if (Math.abs(video.currentTime - target) > 0.01) {
+    video.currentTime = target;
+  }
 }
 
 export function ProjectorMediaPreview({
@@ -68,23 +101,29 @@ export function ProjectorMediaPreview({
   title,
   className,
   fallbackClassName,
+  hideFallbackLabel = false,
   interactive = false,
   onActivate,
 }: ProjectorMediaPreviewProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const blobRef = useRef<string | null>(null);
+  const storageKeyRef = useRef<string | null>(null);
+  const triedRemoteRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     setSrc(null);
     setFailed(false);
+    storageKeyRef.current = null;
+    triedRemoteRef.current = false;
 
     void resolveProjectorPreviewSrc(ctx, mode, videoId, holdId).then((result) => {
       if (cancelled) {
         if (result.blob && result.src) URL.revokeObjectURL(result.src);
         return;
       }
+      storageKeyRef.current = result.storageKey;
       if (!result.src) {
         setFailed(true);
         return;
@@ -102,8 +141,33 @@ export function ProjectorMediaPreview({
     };
   }, [ctx, mode, videoId, holdId]);
 
+  const retryRemoteOrFail = () => {
+    const key = storageKeyRef.current;
+    if (!key || triedRemoteRef.current) {
+      setFailed(true);
+      return;
+    }
+    triedRemoteRef.current = true;
+    void resolveProjectorPreviewSrc(ctx, mode, videoId, holdId, { preferRemote: true }).then(
+      (result) => {
+        if (!result.src) {
+          setFailed(true);
+          return;
+        }
+        if (blobRef.current) {
+          URL.revokeObjectURL(blobRef.current);
+          blobRef.current = null;
+        }
+        if (result.blob) blobRef.current = result.src;
+        setFailed(false);
+        setSrc(result.src);
+      },
+    );
+  };
+
   const previewLabel = title.trim() || (mode === "hold" ? "Заставка" : "Видео");
   const fallbackClass = cn("projector-media-preview__fallback", fallbackClassName);
+  const fallbackLabel = hideFallbackLabel ? null : previewLabel;
 
   if (failed || !src) {
     if (interactive && onActivate) {
@@ -115,11 +179,11 @@ export function ProjectorMediaPreview({
           title={previewLabel}
           aria-label={previewLabel}
         >
-          <span className={fallbackClass}>{previewLabel}</span>
+          <span className={fallbackClass}>{fallbackLabel}</span>
         </button>
       );
     }
-    return <span className={fallbackClass}>{previewLabel}</span>;
+    return <span className={fallbackClass}>{fallbackLabel}</span>;
   }
 
   const media =
@@ -128,7 +192,7 @@ export function ProjectorMediaPreview({
         src={src}
         alt=""
         className="projector-media-preview__img"
-        onError={() => setFailed(true)}
+        onError={retryRemoteOrFail}
       />
     ) : (
       <video
@@ -137,7 +201,9 @@ export function ProjectorMediaPreview({
         muted
         playsInline
         preload="metadata"
-        onError={() => setFailed(true)}
+        onLoadedMetadata={(event) => seekVideoPreviewFrame(event.currentTarget)}
+        onLoadedData={(event) => seekVideoPreviewFrame(event.currentTarget)}
+        onError={retryRemoteOrFail}
       />
     );
 
@@ -155,5 +221,9 @@ export function ProjectorMediaPreview({
     );
   }
 
-  return <span className={cn("projector-media-preview", "projector-media-preview--static", className)}>{media}</span>;
+  return (
+    <span className={cn("projector-media-preview", "projector-media-preview--static", className)}>
+      {media}
+    </span>
+  );
 }

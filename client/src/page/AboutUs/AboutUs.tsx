@@ -1,111 +1,55 @@
 import { FC, useState } from "react";
 import { Link } from "react-router-dom";
-import { ROUTES } from "../../shared/model/routes";
 import Preloader from "../../shared/component/Preloader/Preloader";
-import { siteAsset } from "../../shared/model/siteAssets";
 import { Seo } from "../../shared/component/Seo/Seo";
-import { TeamFigure } from "./TeamFigure";
+import { siteAsset } from "../../shared/model/siteAssets";
+import { ROUTES } from "../../shared/model/routes";
+import { GlitchHero } from "../HomePage/GlitchHero";
+import "../../shared/styles/site-bands-page.css";
 import "./style.css";
 
 const items = [
-  {
-    id: 1,
-    name: "Анастасия Рябых",
-    social: "",
-    img: "/actors/nastya.JPG",
-    figure: "/team-figures/anastasia-ryabykh.glb",
-  },
-  {
-    id: 2,
-    name: "Виктория Юркова",
-    social: "",
-    img: "/actors/vica-2.JPG",
-    figure: "/team-figures/victoria-yurkova.glb",
-  },
-  {
-    id: 3,
-    name: "Алексей Филатов",
-    social: "",
-    img: "/actors/lesha.jpg",
-    figure: "/team-figures/alexey-filatov.glb",
-  },
-  {
-    id: 4,
-    name: " Антон Васильев",
-    social: "",
-    img: "/actors/anton.jpg",
-  },
-  {
-    id: 5,
-    name: "Ксения",
-    social: "",
-    img: "/actors/ksysha-2.JPG",
-  },
-  {
-    id: 6,
-    name: "Григорий Найдёнов",
-    social: "",
-    img: "/actors/grisha.jpg",
-  },
-  {
-    id: 7,
-    name: "Алена Паршина",
-    social: "",
-    img: "/actors/alena.JPG",
-  },
-  {
-    id: 8,
-    name: "Еатерина Слыххановская",
-    social: "",
-    img: "/actors/katya.JPG",
-  },
-  {
-    id: 9,
-    name: "Полина Смолкина",
-    social: "",
-    img: "/actors/polina.jpg",
-  },
-  {
-    id: 10,
-    name: "Вероника Атушева",
-    social: "",
-    img: "/actors/nika.JPG",
-  },
-  {
-    id: 11,
-    name: "Сергей Луняка",
-    social: "",
-    img: "/actors/ya.JPG",
-  },
-  {
-    id: 12,
-    name: "Лера Буракова",
-    social: "",
-    img: "/actors/lera.jpg",
-  },
+  { id: 1, name: "Анастасия Рябых", img: "/actors/nastya.JPG" },
+  { id: 2, name: "Виктория Юркова", img: "/actors/vica-2.JPG" },
+  { id: 3, name: "Алексей Филатов", img: "/actors/lesha.jpg" },
+  { id: 4, name: "Антон Васильев", img: "/actors/anton.jpg" },
+  { id: 5, name: "Ксения", img: "/actors/ksysha-2.JPG" },
+  { id: 6, name: "Григорий Найдёнов", img: "/actors/grisha.jpg" },
+  { id: 7, name: "Алена Паршина", img: "/actors/alena.JPG" },
+  { id: 8, name: "Екатерина Слыххановская", img: "/actors/katya.JPG" },
+  { id: 9, name: "Полина Смолкина", img: "/actors/polina.jpg" },
+  { id: 10, name: "Вероника Атушева", img: "/actors/nika.JPG" },
+  { id: 11, name: "Сергей Луняка", img: "/actors/ya.JPG" },
+  { id: 12, name: "Лера Буракова", img: "/actors/lera.jpg" },
 ];
 
 const AboutUs: FC = () => {
   return (
-    <div className="aboutus-page">
-      <div className="aboutus-page__content">
-        <Seo
-          title="Команда — Театр «Дофамин»"
-          description="Актёры и команда театра «Дофамин»."
-          canonicalPath="/команда"
-        />
-        <Link to={ROUTES.HOME} className="events-page__back">
-          Назад
-        </Link>
+    <div className="aboutus-page site-bands-page">
+      <div className="site-bands-page__grain" aria-hidden />
+      <Seo
+        title="Команда — Театр «Дофамин»"
+        description="Актёры и команда театра «Дофамин»."
+        canonicalPath="/команда"
+      />
 
-        <header className="aboutus-page__header">
-          <h1 className="aboutus-page__title">Команда</h1>
-          <p className="aboutus-page__subtitle">Актёры и команда</p>
+      <Link to={ROUTES.HOME} className="site-bands-page__back">
+        Назад
+      </Link>
+
+      <div className="site-bands-page__content">
+        <header className="site-bands-page__hero">
+          <GlitchHero
+            as="h1"
+            text="Команда"
+            className="home-page__glitch-hero--page"
+          />
+          <p className="site-bands-page__tagline">актёры и команда</p>
         </header>
 
-        <div className="aboutus-grid" role="list" aria-label="Команда">
+        <div className="site-bands-list" role="list" aria-label="Команда">
           {items.map((data) => (
-            <Card key={data.id} data={data} />
+            <TeamRow key={data.id} name={data.name} img={data.img} />
           ))}
         </div>
       </div>
@@ -115,48 +59,32 @@ const AboutUs: FC = () => {
 
 export const Component = AboutUs;
 
-interface ICardProps {
-  data: ICard;
-}
-
-interface ICard {
-  name: string;
-  img: string;
-  social: string;
-  figure?: string;
-}
-
-const Card: FC<ICardProps> = ({ data }) => {
-  const { name, img, figure } = data;
+function TeamRow({ name, img }: { name: string; img: string }) {
   const [isLoaded, setIsLoaded] = useState(false);
-
-  if (figure) {
-    return (
-      <div className="aboutus-card aboutus-card--figure" role="listitem">
-        <TeamFigure src={figure} name={name} />
-        <div className="aboutus-card__name">{name}</div>
-      </div>
-    );
-  }
+  const title = name.trim();
 
   return (
-    <div className="aboutus-card" role="listitem">
-      {!isLoaded && (
-        <div className="aboutus-card__loader" aria-hidden="true">
-          <Preloader />
+    <div className="site-bands-row aboutus-row" role="listitem">
+      <div className="site-bands-row__main">
+        <div className="aboutus-row__avatar-wrap">
+          {!isLoaded && (
+            <div className="aboutus-row__loader" aria-hidden>
+              <Preloader />
+            </div>
+          )}
+          <img
+            className="site-bands-row__avatar"
+            data-loading={isLoaded ? undefined : "true"}
+            src={siteAsset(img)}
+            alt={title}
+            loading="lazy"
+            decoding="async"
+            onLoad={() => setIsLoaded(true)}
+            onError={() => setIsLoaded(true)}
+          />
         </div>
-      )}
-      <img
-        className="aboutus-card__img"
-        data-loading={isLoaded ? undefined : "true"}
-        src={siteAsset(img)}
-        alt={name}
-        loading="lazy"
-        decoding="async"
-        onLoad={() => setIsLoaded(true)}
-        onError={() => setIsLoaded(true)}
-      />
-      <div className="aboutus-card__name">{name}</div>
+        <span className="site-bands-row__title">{title}</span>
+      </div>
     </div>
   );
-};
+}

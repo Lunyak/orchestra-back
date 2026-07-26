@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { useProject } from "../../../features/project";
 import { usePlaybook } from "../../../features/playbook";
 import { isScenarioWithoutMaterial } from "../../../features/playbook/model/scenario-material";
@@ -6,9 +6,9 @@ import { ScriptEmptyMaterialPrompt } from "../../../features/playbook/ui/ScriptE
 import { useScriptUI } from '../../../features/script-ui';
 import { showScriptMarkdownActions } from "../../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useAppDispatch } from "../../store/hooks";
-import { useMyTroupeQuery } from "../../../features/troupe/api/troupe-api";
-import { ScriptRequisite, ScriptScene } from "../../types/script";
-import { RequisitesPanel } from "./components/RequisitesPanel";
+import {
+  ScriptScene,
+} from "../../types/script";
 import { ShowScriptMarkdownSection } from "./components/ShowScriptMarkdownSection";
 import './style.css';
 
@@ -24,7 +24,6 @@ export const ShowScript: React.FC = () => {
     currentPage,
     updateScene,
     splitSceneFromSelection,
-    resetAllRequisites,
     handleTrackLinkClick,
     handleSoundLinkClick,
     hasLocalEdits,
@@ -35,11 +34,7 @@ export const ShowScript: React.FC = () => {
     seedScenarioFromPlayText,
   } = usePlaybook();
 
-  const [newRequisite, setNewRequisite] = useState('');
-  const requisitesClipboardRef = useRef<ScriptRequisite[] | null>(null);
-
   const {
-    isEditing,
     setIsEditing,
   } = useScriptUI();
 
@@ -64,27 +59,6 @@ export const ShowScript: React.FC = () => {
   );
 
   const currentScene = scenes[currentPage];
-  const currentRequisites = currentScene?.requisites ?? [];
-  const { data: troupeData } = useMyTroupeQuery(
-    { project: projectSlug },
-    { skip: !projectSlug },
-  );
-  const requisiteAssigneeOptions = useMemo(
-    () =>
-      (troupeData?.members ?? [])
-        .map((member) => {
-          const email = String(member.email ?? "").trim();
-          const fullName = [member.profile?.firstName, member.profile?.lastName]
-            .map((part) => String(part ?? "").trim())
-            .filter(Boolean)
-            .join(" ");
-          const name = member.profile?.displayName?.trim() || fullName || email;
-          if (!name) return null;
-          return { value: name, label: name };
-        })
-        .filter((item): item is { value: string; label: string } => Boolean(item)),
-    [troupeData?.members],
-  );
   const updateSceneField = <K extends keyof ScriptScene>(
     id: number,
     field: K,
@@ -93,65 +67,6 @@ export const ShowScript: React.FC = () => {
     updateScene(id, { [field]: value } as Partial<ScriptScene>);
   };
 
-  const toggleRequisite = (requisiteId: number) => {
-    if (!currentScene) return;
-    const nextRequisites = currentRequisites.map((item) =>
-      item.id === requisiteId ? { ...item, checked: !item.checked } : item
-    );
-    updateSceneField(currentScene.id, 'requisites', nextRequisites);
-  };
-
-  const removeRequisite = (requisiteId: number) => {
-    if (!currentScene) return;
-    const nextRequisites = currentRequisites.filter((item) => item.id !== requisiteId);
-    updateSceneField(currentScene.id, 'requisites', nextRequisites);
-  };
-
-  const updateRequisiteAssignees = (
-    requisiteId: number,
-    field: "setupAssignees" | "removeAssignees",
-    assignees: string[],
-  ) => {
-    if (!currentScene) return;
-    const nextRequisites = currentRequisites.map((item) =>
-      item.id === requisiteId ? { ...item, [field]: assignees } : item
-    );
-    updateSceneField(currentScene.id, 'requisites', nextRequisites);
-  };
-
-  const addRequisite = () => {
-    if (!currentScene) return;
-    const label = newRequisite.trim();
-    if (!label) return;
-    const nextId =
-      currentRequisites.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
-    const nextItem: ScriptRequisite = {
-      id: nextId,
-      label,
-      checked: false,
-      setupAssignees: [],
-      removeAssignees: [],
-    };
-    updateSceneField(currentScene.id, 'requisites', [...currentRequisites, nextItem]);
-    setNewRequisite('');
-  };
-
-  const copyRequisites = () => {
-    if (!currentScene) return;
-    requisitesClipboardRef.current = currentRequisites.map((item) => ({ ...item }));
-  };
-
-  const resetRequisites = () => {
-    resetAllRequisites();
-  };
-
-  const pasteRequisites = () => {
-    if (!currentScene || !requisitesClipboardRef.current) return;
-    const cloned = requisitesClipboardRef.current.map((item) => ({ ...item }));
-    updateSceneField(currentScene.id, 'requisites', cloned);
-  };
-
-  const hasCopiedRequisites = requisitesClipboardRef.current != null;
   const createSceneFromSelection = (
     sourceSceneId: number,
     selectedText: string,
@@ -207,26 +122,6 @@ export const ShowScript: React.FC = () => {
           onTrackLinkClick={handleTrackLinkClick}
           onSoundLinkClick={handleSoundLinkClick}
           onCreateSceneFromSelection={createSceneFromSelection}
-          requisitesPane={
-            currentScene ? (
-              <RequisitesPanel
-                show
-                isEditing={isEditing}
-                requisites={currentRequisites}
-                assigneeOptions={requisiteAssigneeOptions}
-                hasCopiedRequisites={hasCopiedRequisites}
-                newRequisite={newRequisite}
-                setNewRequisite={setNewRequisite}
-                onCopy={copyRequisites}
-                onPaste={pasteRequisites}
-                onResetAll={resetRequisites}
-                onAdd={addRequisite}
-                onToggle={toggleRequisite}
-                onRemove={removeRequisite}
-                onAssigneesChange={updateRequisiteAssignees}
-              />
-            ) : null
-          }
           renderBody={({ markdownPane }) =>
             currentScene ? (
               <div className="script-scene-editor">

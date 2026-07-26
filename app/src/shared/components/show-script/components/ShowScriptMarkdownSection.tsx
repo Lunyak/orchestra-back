@@ -7,7 +7,6 @@ import {
   type ScriptEditorInsertItemDefinition,
 } from "../../../../features/script-editor-insert-menu";
 import { useScriptUI } from "../../../../features/script-ui";
-import { usePlaybook } from "../../../../features/playbook";
 import { useProjectRolesQuery } from "../../../../features/project/api/project-api";
 import {
   initShowScriptMarkdownUi,
@@ -19,17 +18,13 @@ import {
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import type { ScriptScene } from "../../../types/script";
 import type { NewAnnotationDraft } from "../annotations/ActorAnnotationsPopover";
-import { LightKadrPanel } from "../../light-console/LightKadrPanel";
-import "../../light-console/light-console.css";
 import { ScriptMarkdownCodemirror, type ScriptMarkdownEditorHandle } from "./ScriptMarkdownCodemirror";
 import { ScriptMarkdownPreview } from "./ScriptMarkdownPreview";
 import { ScriptMarkdownToolbar } from "./ScriptMarkdownToolbar";
-import { ShowScriptMarkdownToc } from "./ShowScriptMarkdownToc";
 import { normalizeRoleToken } from "./markdown-preview-kadr-parsing";
-import { useShowScriptLightKadrsSync } from "../hooks/useShowScriptLightKadrsSync";
+import { useShowScriptKadrLayout } from "../hooks/useShowScriptKadrLayout";
 import { useShowScriptMarkdownAnnotations } from "../hooks/useShowScriptMarkdownAnnotations";
 import { useShowScriptMarkdownInsert } from "../hooks/useShowScriptMarkdownInsert";
-import { useShowScriptMarkdownToc } from "../hooks/useShowScriptMarkdownToc";
 import { useShowScriptSceneComment } from "../hooks/useShowScriptSceneComment";
 
 const ScriptMarkdownCodemirrorLazy = lazy(() =>
@@ -58,7 +53,6 @@ interface IProps {
     trimmedSourceText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => void;
-  requisitesPane?: React.ReactNode;
   renderBody?: (args: {
     markdownPane: React.ReactNode;
     currentScene: ScriptScene | undefined;
@@ -80,14 +74,12 @@ export function ShowScriptMarkdownSection({
   onTrackLinkClick,
   onSoundLinkClick,
   onCreateSceneFromSelection,
-  requisitesPane,
   renderBody,
   lazyScriptBody = false,
   inlineMarkdownTabs = true,
 }: IProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { playbookData } = usePlaybook();
   const { data: rolesRes } = useProjectRolesQuery(projectSlug, {
     skip: !projectSlug,
   });
@@ -103,27 +95,16 @@ export function ShowScriptMarkdownSection({
   const soundsOptions = ui.soundsOptions;
   const lightChannels = ui.lightChannels;
 
-  const { isEditing } = useScriptUI();
+  const { isEditing, toggleEditing } = useScriptUI();
 
   const { currentScene, activeMarkdownField, activeMarkdown, activeField } = useAppSelector(
     (s) => selectActiveSceneMarkdownContext(s, projectSlug, sceneName),
   );
 
-  const lightFaders =
-    playbookData?.lightFaders && playbookData.lightFaders.v === 1
-      ? playbookData.lightFaders
-      : null;
-  const lightPrograms =
-    playbookData?.lightPrograms && playbookData.lightPrograms.v === 1
-      ? playbookData.lightPrograms
-      : null;
-
   const markdownRef = useRef<ScriptMarkdownEditorHandle | null>(null);
 
   const [newAnnotation, setNewAnnotation] = useState<NewAnnotationDraft | null>(null);
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
-
-  const editorTocEnabled = ui.editorTocEnabled;
 
   const scriptEditorInsertDefinitions = useMemo(
     () =>
@@ -133,17 +114,9 @@ export function ShowScriptMarkdownSection({
     [extraScriptEditorInsertItems],
   );
 
-  const { kadrLayoutEnabled, hasKadrSections, tocItems, jumpToOffset } = useShowScriptMarkdownToc({
+  const { kadrLayoutEnabled } = useShowScriptKadrLayout({
     activeMarkdown,
     markdownMode,
-  });
-
-  const { activeLightKadrId, setActiveLightKadrId } = useShowScriptLightKadrsSync({
-    currentScene,
-    activeMarkdown,
-    isEditing,
-    updateSceneField,
-    markdownRef,
   });
 
   const {
@@ -276,6 +249,8 @@ export function ShowScriptMarkdownSection({
         sceneTitle: currentScene.title ?? "",
         sceneTitleEditing: isEditing,
         onSceneTitleChange: handleSceneTitleChange,
+        isModeEditing: isEditing,
+        onToggleModeEditing: toggleEditing,
         placeholder:
           markdownMode === "play"
             ? "Текст пьесы для этой сцены"
@@ -316,118 +291,10 @@ export function ShowScriptMarkdownSection({
               }),
             );
           }}
-          editorToggles={
-            isEditing && kadrLayoutEnabled
-              ? {
-                  tocEnabled: editorTocEnabled,
-                  onToggleToc: () => {
-                    const next = !editorTocEnabled;
-                    try {
-                      if (typeof window !== "undefined") {
-                        localStorage.setItem(
-                          `showScript:editorToc:${projectSlug}:${sceneName}`,
-                          String(next),
-                        );
-                      }
-                    } catch {
-                      // ignore
-                    }
-                    dispatch(
-                      showScriptMarkdownActions.setEditorTocEnabled({
-                        projectSlug,
-                        sceneName,
-                        enabled: next,
-                      }),
-                    );
-                  },
-                }
-              : null
-          }
         />
       ) : null}
 
-      {markdownMode === "notes" && hasKadrSections ? (
-        <div className="script-kadr-light-banner" role="note">
-          <div className="script-kadr-light-banner__actions">
-            <button
-              type="button"
-              className="script-kadr-light-banner__btn script-kadr-light-banner__btn--primary"
-              onClick={() => navigate("/light-plot")}
-            >
-              Спектакль
-            </button>
-            <button
-              type="button"
-              className="script-kadr-light-banner__btn"
-              onClick={() => {
-                try {
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem(
-                      `showScript:markdownMode:${projectSlug}:${sceneName}`,
-                      "light",
-                    );
-                  }
-                } catch {
-                  // ignore
-                }
-                dispatch(
-                  showScriptMarkdownActions.setMarkdownMode({
-                    projectSlug,
-                    sceneName,
-                    mode: "light",
-                  }),
-                );
-              }}
-            >
-              Свет этой сцены
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {markdownMode === "light" ? (
-        <div className="script-scene-light-pane">
-          <div className="script-kadr-light-banner script-kadr-light-banner--compact" role="note">
-            <button
-              type="button"
-              className="script-kadr-light-banner__btn script-kadr-light-banner__btn--primary"
-              onClick={() => navigate("/light-plot")}
-            >
-              Открыть репетицию
-            </button>
-          </div>
-          <LightKadrPanel
-            projectName={projectSlug}
-            scene={currentScene}
-            markdown={String(activeMarkdown ?? "")}
-            activeKadrId={activeLightKadrId}
-            onActiveKadrIdChange={setActiveLightKadrId}
-            lightChannels={lightChannels}
-            lightFaders={lightFaders}
-            lightPrograms={lightPrograms}
-            spotlights={currentScene?.theaterSpotlights}
-            onUpdateScene={(changes) => {
-              if (!currentScene) return;
-              if (changes.lightKadrs) {
-                updateSceneField(currentScene.id, "lightKadrs", changes.lightKadrs);
-              }
-            }}
-            onUpdateMarkdown={(next) => {
-              if (!currentScene) return;
-              const ed = markdownRef.current;
-              if (ed) {
-                ed.applyDocument(next, ed.getSelection()?.from ?? next.length);
-              } else {
-                updateSceneField(currentScene.id, activeMarkdownField, next);
-              }
-            }}
-          />
-        </div>
-      ) : markdownMode === "requisites" ? (
-        <div className="script-scene-requisites-pane">
-          {requisitesPane}
-        </div>
-      ) : markdownMode === "comments" ? (
+      {markdownMode === "comments" ? (
         <div className="script-scene-comment-pane">
           <textarea
             id={`scene-comment-${currentScene.id}`}
@@ -457,15 +324,6 @@ export function ShowScriptMarkdownSection({
             .join(" ")}
         >
           <div className="script-markdown-editor-split">
-            {kadrLayoutEnabled && editorTocEnabled ? (
-              <ShowScriptMarkdownToc
-                items={tocItems}
-                onJump={(offset) =>
-                  jumpToOffset(offset, markdownRef, String(activeMarkdown ?? ""))
-                }
-              />
-            ) : null}
-
             <div
               className={[
                 "script-markdown-editor-main",
@@ -497,7 +355,14 @@ export function ShowScriptMarkdownSection({
           </div>
         </div>
       ) : (
-        <div className="form-group">
+        <div
+          className={[
+            "form-group form-group-grow",
+            kadrLayoutEnabled ? "script-markdown-edit--kadr" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
           {lazyScriptBody ? (
             <Suspense
               key={`${markdownMode}-ro`}
@@ -506,7 +371,9 @@ export function ShowScriptMarkdownSection({
               <ScriptMarkdownPreviewLazy
                 projectName={projectSlug}
                 sceneName={sceneName}
-                showSceneTitle={inlineMarkdownTabs}
+                showSceneTitle
+                isModeEditing={isEditing}
+                onToggleModeEditing={toggleEditing}
                 onTrackLinkClick={onTrackLinkClick}
                 onSoundLinkClick={onSoundLinkClick}
                 newAnnotation={newAnnotation}
@@ -522,7 +389,9 @@ export function ShowScriptMarkdownSection({
             <ScriptMarkdownPreview
               projectName={projectSlug}
               sceneName={sceneName}
-              showSceneTitle={inlineMarkdownTabs}
+              showSceneTitle
+              isModeEditing={isEditing}
+              onToggleModeEditing={toggleEditing}
               onTrackLinkClick={onTrackLinkClick}
               onSoundLinkClick={onSoundLinkClick}
               newAnnotation={newAnnotation}

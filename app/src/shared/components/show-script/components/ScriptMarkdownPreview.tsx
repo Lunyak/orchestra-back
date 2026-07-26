@@ -16,6 +16,7 @@ import {
   selectShowScriptMarkdownUi,
 } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useSceneActorAnnotations } from "../../../../features/show-script-markdown/model/use-scene-actor-annotations";
+import { AppEditorScriptSceneTitle } from "../../app-editor-menubar";
 import { Buttons } from "../../buttons/Buttons";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
@@ -71,6 +72,7 @@ import {
   injectNbspParagraphsForTripleNewlines,
   looksLikeOpaqueMediaId,
   markdownHasRoleLightOrPlayLineLabels,
+  protectRoleLabelParentheticals,
 } from "./markdown-preview-normalize";
 import type {
   MarkdownLightboxState,
@@ -99,6 +101,8 @@ export function ScriptMarkdownPreview({
   setActiveAnnotationId,
   readModeActivateEdit,
   showSceneTitle = true,
+  isModeEditing = false,
+  onToggleModeEditing,
 }: {
   projectName: string;
   sceneName?: string;
@@ -114,6 +118,8 @@ export function ScriptMarkdownPreview({
   /** Режим чтения: клик по тексту (не по кнопкам/ссылкам) включает редактирование. */
   readModeActivateEdit?: () => void;
   showSceneTitle?: boolean;
+  isModeEditing?: boolean;
+  onToggleModeEditing?: () => void;
 }) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -128,9 +134,7 @@ export function ScriptMarkdownPreview({
     selectActiveSceneMarkdownContext(s, projectName, sceneName),
   );
   const annotationsLoadEnabled =
-    ui.markdownMode !== "comments" &&
-    ui.markdownMode !== "requisites" &&
-    ui.markdownMode !== "light";
+    ui.markdownMode !== "comments";
   const { items: annotations } = useSceneActorAnnotations({
     projectSlug: projectName,
     sceneName,
@@ -147,8 +151,9 @@ export function ScriptMarkdownPreview({
       annotations.length,
     );
     const withKadrBreaks = expandKadrLabelBlockBreaks(expanded);
-    if (annotationsMode && annotations.length > 0) return withKadrBreaks;
-    return injectNbspParagraphsForTripleNewlines(withKadrBreaks);
+    const withProtectedRemarks = protectRoleLabelParentheticals(withKadrBreaks);
+    if (annotationsMode && annotations.length > 0) return withProtectedRemarks;
+    return injectNbspParagraphsForTripleNewlines(withProtectedRemarks);
   }, [markdown, annotationsMode, annotations.length]);
 
   const onReadModePointerDown = (e: React.PointerEvent) => {
@@ -503,11 +508,10 @@ export function ScriptMarkdownPreview({
     [lightChannels, renderLightPanel],
   );
 
-  /** Блоки `.markdown-kadr` по заголовкам h1–h3 — и для текста пьесы (`play`), не только notes/explication. */
+  /** Блоки `.markdown-kadr` по заголовкам h1–h3 — текст пьесы и экспликация. */
   const kadrLayoutEnabled =
-    markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
-  /** Колонка картинки + свет — только в тех. карте, не в тексте пьесы и экспликации. */
-  const kadrSplitLayoutEnabled = markdownMode === "notes";
+    markdownMode === "explication" || markdownMode === "play";
+  const kadrSplitLayoutEnabled = false;
 
   const hasRoleOrLightLabels = useMemo(
     () => markdownHasRoleLightOrPlayLineLabels(markdown || ""),
@@ -805,10 +809,16 @@ export function ScriptMarkdownPreview({
     navigate(`/role-workbook/${encodeURIComponent(roleId)}`);
   };
 
+  const sceneTitleText = String(currentScene?.title ?? "").trim();
+  const hasSceneTitle =
+    showSceneTitle &&
+    (onToggleModeEditing != null || Boolean(sceneTitleText));
+
   return (
     <div
       className={cn(
         "markdown-preview",
+        hasSceneTitle && "markdown-preview--with-scene-title",
         hasRoleOrLightLabels && "markdown-preview--has-line-labels",
         markdownMode === "play" && "markdown-preview--play-inline-labels",
         kadrLayoutEnabled && "markdown-preview--kadr",
@@ -820,15 +830,30 @@ export function ScriptMarkdownPreview({
           : undefined
       }
     >
+      {hasSceneTitle && onToggleModeEditing ? (
+        <div className="script-scene-title-mount">
+          <AppEditorScriptSceneTitle
+            title={String(currentScene?.title ?? "")}
+            titleEditable={false}
+            onTitleChange={() => {}}
+            isModeEditing={isModeEditing}
+            onToggleModeEditing={onToggleModeEditing}
+          />
+        </div>
+      ) : hasSceneTitle ? (
+        <div className="script-scene-title-mount">
+          <div className="script-scene-title app-editor-menubar__scene-title">
+            {sceneTitleText}
+          </div>
+        </div>
+      ) : null}
       <div
         ref={rootRef}
+        className="markdown-preview__body"
         onClick={handleSpeakerLabelClick}
         onPointerDownCapture={readModeActivateEdit ? onReadModePointerDown : undefined}
         onMouseUp={annotationsMode ? handleMarkdownMouseUp : undefined}
       >
-        {showSceneTitle && currentScene?.title ? (
-          <div className="script-scene-title">{currentScene.title}</div>
-        ) : null}
         <MarkdownPreviewImageContext.Provider value={markdownPreviewImageCtx}>
         <MarkdownPreviewParagraphBridgeContext.Provider value={markdownParagraphProps}>
         <MarkdownPreviewLightTokensBridgeContext.Provider value={renderLightTokens}>

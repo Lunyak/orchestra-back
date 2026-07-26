@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { TheaterModel } from "../../../../shared/types/script";
+import { tc } from "../../../../shared/styles/theme-color";
 import {
   getFurnitureBounds,
   isSeatableBuiltin,
@@ -189,6 +190,21 @@ export const BuiltinModelInstance = ({
             opacity={0.001}
             depthWrite={false}
             colorWrite={false}
+          />
+        </mesh>
+      ) : null}
+      {selectionBox && model.isRequisite === true ? (
+        <mesh
+          position={selectionBox.center}
+          userData={{ theaterHelper: true }}
+        >
+          <boxGeometry args={selectionBox.size} />
+          <meshBasicMaterial
+            color={tc("--color-active-ascent")}
+            wireframe
+            transparent
+            opacity={isSelected || isHovered ? 0.85 : 0.4}
+            depthWrite={false}
           />
         </mesh>
       ) : null}

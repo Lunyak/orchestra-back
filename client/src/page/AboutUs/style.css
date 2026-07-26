@@ -1,198 +1,31 @@
-.aboutus-page {
-  min-height: 100dvh;
+.aboutus-row__avatar-wrap {
   position: relative;
-  display: flex;
-  justify-content: center;
-  padding: clamp(16px, 2.5dvh, 28px) 24px clamp(28px, 5dvh, 72px);
-  background:
-    radial-gradient(900px 500px at 20% 10%, rgba(184, 53, 74, 0.18), transparent 60%),
-    radial-gradient(800px 500px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
-    radial-gradient(900px 650px at 50% 95%, rgba(0, 0, 0, 0.55), transparent 65%),
-    var(--color-bg);
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
 }
 
-.aboutus-page__content {
-  width: min(1170px, 92vw);
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-/* Back link shared with /events (duplicated here so it works on direct visit) */
-.events-page__back {
-  align-self: flex-start;
-  font-family: "Russo One", sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.04em;
-  color: var(--color-accent);
-  transition: color var(--transition), transform var(--transition);
-  z-index: 10;
-}
-
-.events-page__back:hover {
-  color: var(--color-accent-hover);
-  transform: translateX(-1px);
-}
-
-.aboutus-page__header {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.aboutus-page__title {
-  margin: 0;
-  font-family: "Russo One", sans-serif;
-  font-weight: 400;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  font-size: clamp(26px, 4vw, 44px);
-  color: var(--color-text);
-}
-
-.aboutus-page__subtitle {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 16px;
-  letter-spacing: 0.02em;
-}
-
-.aboutus-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.aboutus-card {
-  position: relative;
-  height: clamp(280px, 42dvh, 420px);
-  border-radius: 1rem;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
-  box-shadow:
-    0 22px 60px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-}
-
-.aboutus-card::after {
-  content: "";
+.aboutus-row__loader {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent 55%);
-  opacity: 1;
   z-index: 1;
-  pointer-events: none;
-}
-
-.aboutus-card__loader {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
   display: grid;
   place-items: center;
+  background: rgba(8, 5, 7, 0.55);
 }
 
-.aboutus-card__img[data-loading="true"] {
+.aboutus-row .site-bands-row__avatar[data-loading="true"] {
   opacity: 0;
 }
 
-.aboutus-card__img {
+.aboutus-row .site-bands-row__avatar {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  display: block;
-  opacity: 1;
-  filter: grayscale(100%) contrast(1.05) brightness(0.92);
-  transform: scale(1.02);
-  transition: transform 0.45s ease, filter 0.45s ease, opacity 0.25s ease;
-}
-
-.aboutus-card:hover .aboutus-card__img {
-  transform: scale(1.1);
-  filter: grayscale(0%) contrast(1.05) brightness(1);
-}
-
-.aboutus-card--figure {
-  background:
-    radial-gradient(circle at 50% 34%, rgba(184, 53, 74, 0.2), transparent 42%),
-    linear-gradient(180deg, #1b191a, #080808);
-}
-
-.aboutus-card__figure {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  touch-action: none;
-}
-
-.aboutus-card__figure canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.aboutus-card__figure-hint {
-  position: absolute;
-  z-index: 2;
-  top: 12px;
-  left: 12px;
-  color: var(--color-text-muted);
-  font-size: 11px;
-  letter-spacing: 0.03em;
-  pointer-events: none;
-}
-
-.aboutus-card__name {
-  position: absolute;
-  z-index: 3;
-  left: 14px;
-  right: 14px;
-  bottom: 14px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.72);
-  color: var(--color-text);
-  font-family: "Russo One", sans-serif;
-  font-weight: 400;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  font-size: 14px;
-}
-
-@media (max-width: 1200px) {
-  .aboutus-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .aboutus-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .aboutus-card {
-    height: clamp(260px, 40dvh, 380px);
-  }
-}
-
-@media (max-width: 520px) {
-  .aboutus-page {
-    padding: 22px 16px 56px;
-  }
-
-  .aboutus-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .aboutus-card {
-    height: clamp(240px, 48dvh, 320px);
-  }
+  transition: opacity 0.25s ease, filter var(--transition);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aboutus-card__img,
-  .events-page__back {
+  .aboutus-row .site-bands-row__avatar {
     transition: none;
   }
 }

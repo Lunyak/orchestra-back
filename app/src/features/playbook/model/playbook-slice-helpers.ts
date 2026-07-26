@@ -8,12 +8,50 @@ import { ensureProject } from "../../../sync/api/projects";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import { normalizeHoldImages } from "../../projector/model/playbook-projector-persist";
 import type { PlaylistTrack } from "../../../shared/types/playlist";
-import type { ScriptScene } from "../../../shared/types/script";
+import type {
+  SceneLightKadrsDataV1,
+  ScriptScene,
+} from "../../../shared/types/script";
+import { syncSubscribedTheaterRequisites } from "../../theater/model/theater-decor-inventory";
+import { normalizeLightKadrs } from "../../theater/model/light-kadrs";
+import { readSceneTheaterModels } from "../../theater/model/theater-scene-models";
+import {
+  normalizeScriptRequisites,
+  normalizeScriptRequisitesWithRemap,
+} from "./playbook-normalize";
 import type {
   PlaybookData,
   PlaybookHoldImage,
   PlaybookVideo,
 } from "./playbook-types";
+
+export { normalizeScriptRequisites };
+
+function remapKadrRequisiteIds(
+  lightKadrs: SceneLightKadrsDataV1 | null | undefined,
+  idRemap: Map<number, number>,
+): SceneLightKadrsDataV1 | null | undefined {
+  if (!lightKadrs || idRemap.size === 0) return lightKadrs;
+  const kadrs = lightKadrs.kadrs;
+  if (!Array.isArray(kadrs) || kadrs.length === 0) return lightKadrs;
+  let changed = false;
+  const nextKadrs = kadrs.map((kadr) => {
+    const cues = kadr.requisites;
+    if (!Array.isArray(cues) || cues.length === 0) return kadr;
+    let cuesChanged = false;
+    const remapped = cues.map((cue) => {
+      const nextId = idRemap.get(cue.requisiteId) ?? cue.requisiteId;
+      if (nextId === cue.requisiteId) return cue;
+      cuesChanged = true;
+      return { ...cue, requisiteId: nextId };
+    });
+    if (!cuesChanged) return kadr;
+    changed = true;
+    return { ...kadr, requisites: remapped };
+  });
+  if (!changed) return lightKadrs;
+  return normalizeLightKadrs(nextKadrs) ?? lightKadrs;
+}
 
 type ProjectorMediaWithPath = {
   id?: number;
@@ -96,7 +134,22 @@ export function ensureProjectIdCached(projectSlug: string, projectId: string) {
 }
 
 export function normalizeHydratedScenes(raw: ScriptScene[]): ScriptScene[] {
-  return Array.isArray(raw) ? raw : [];
+  if (!Array.isArray(raw)) return [];
+  return raw.map((scene) => {
+    const { items, idRemap } = normalizeScriptRequisitesWithRemap(
+      scene.requisites,
+    );
+    const requisites = syncSubscribedTheaterRequisites(
+      items,
+      readSceneTheaterModels(scene),
+    );
+    const lightKadrs = remapKadrRequisiteIds(scene.lightKadrs, idRemap);
+    return {
+      ...scene,
+      requisites,
+      ...(lightKadrs !== scene.lightKadrs ? { lightKadrs } : {}),
+    };
+  });
 }
 
 export function nextSoundIds(sounds: any[] | undefined, count: number): number[] {

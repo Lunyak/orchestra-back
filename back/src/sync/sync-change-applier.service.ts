@@ -7,6 +7,7 @@ import {
   flattenClientTheaterModels,
 } from './theater-model-sync';
 import {
+  syncMapSceneRequisiteRow,
   syncMapTheaterSpotlightRow,
   syncNormalizeBool,
   syncNormalizeFloat,
@@ -612,27 +613,10 @@ export class SyncChangeApplierService {
 
       if (Array.isArray(requisitesValue)) {
         const data = requisitesValue
-          .map((r: any) => {
-            const sourceId = syncNormalizeInt(r?.id, -1);
-            if (sourceId <= 0) return null;
-            const label = syncNormalizeString(r?.label, '');
-            if (!label) return null;
-            return {
-              sceneId,
-              sourceId,
-              label,
-              checked: syncNormalizeBool(r?.checked, false),
-            };
-          })
+          .map((r: unknown) => syncMapSceneRequisiteRow(sceneId, r))
           .filter(
-            (
-              x,
-            ): x is {
-              sceneId: string;
-              sourceId: number;
-              label: string;
-              checked: boolean;
-            } => x !== null,
+            (row): row is NonNullable<ReturnType<typeof syncMapSceneRequisiteRow>> =>
+              row != null,
           );
         tx.push(this.prisma.sceneRequisite.deleteMany({ where: { sceneId } }));
         if (data.length)

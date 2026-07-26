@@ -135,6 +135,39 @@
   }
 }
 
+.home-page__glitch-hero--split {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.home-page__glitch-hero--split .home-glitch__text {
+  margin: 0;
+  text-align: left;
+  font-size: clamp(42px, 7dvh, 96px);
+  letter-spacing: clamp(2px, 0.8cqw, 8px);
+}
+
+.home-page__glitch-hero--bands .home-glitch__text {
+  margin: 0 auto;
+  font-family: "HouseBroken", "Russo One", sans-serif;
+  font-weight: 500;
+  font-size: clamp(52px, 12vw, 160px);
+  letter-spacing: 0.06em;
+  text-shadow:
+    2px 2px 0 rgba(184, 53, 74, 0.35),
+    0 0 28px rgba(152, 152, 152, 0.35);
+}
+
+@supports (font-size: 1cqw) {
+  .home-page__glitch-hero--split .home-glitch__text {
+    font-size: clamp(42px, min(7dvh, 12cqw), 96px);
+  }
+
+  .home-page__glitch-hero--bands .home-glitch__text {
+    font-size: clamp(52px, min(14vw, 18cqw), 160px);
+  }
+}
+
 /* Внутренние страницы: компактный заголовок под ноутбуки (~Air) */
 .home-page__glitch-hero--page .home-glitch__text {
   margin: clamp(6px, 1.5dvh, 24px) auto clamp(10px, 2dvh, 32px);
@@ -258,6 +291,12 @@
     margin-top: -20px;
     margin-bottom: 20px;
   }
+
+  .home-page__glitch-hero--split .home-glitch__text,
+  .home-page__glitch-hero--bands .home-glitch__text {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
 }
 
 @media (max-width: 480px) {
@@ -268,6 +307,11 @@
 
   .home-page__glitch-hero--home .home-glitch__text {
     margin-top: -20px;
+  }
+
+  .home-page__glitch-hero--split .home-glitch__text,
+  .home-page__glitch-hero--bands .home-glitch__text {
+    margin-top: 0;
   }
 }
 

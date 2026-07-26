@@ -79,8 +79,10 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
 
   const preserved: typeof kadr = {
     ...kadr,
+    ...(existing?.blackout === true ? { blackout: true, programId: 0 } : {}),
     ...(existing?.sound ? { sound: existing.sound } : {}),
     ...(existing?.projector ? { projector: existing.projector } : {}),
+    ...(existing?.requisites?.length ? { requisites: existing.requisites } : {}),
     ...(existing?.transitionText ? { transitionText: existing.transitionText } : {}),
     ...(existing?.commentText ? { commentText: existing.commentText } : {}),
     ...(existing?.imageMarkdown ? { imageMarkdown: existing.imageMarkdown } : {}),

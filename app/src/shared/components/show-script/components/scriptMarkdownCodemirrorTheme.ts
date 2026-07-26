@@ -22,11 +22,17 @@ export const scriptMarkdownCodemirrorTheme = EditorView.theme(
     ".cm-line": {
       padding: 0,
     },
+    ".cm-line:hover": {
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
+    },
     ".cm-cursor, .cm-dropCursor": {
       borderLeftColor: "var(--color-text-primary)",
     },
     ".cm-activeLine": {
       backgroundColor: "inherit",
+    },
+    ".cm-activeLine:hover": {
+      backgroundColor: "rgba(255, 255, 255, 0.04)",
     },
     ".cm-gutters": { display: "none" },
     ".cm-placeholder": { color: "rgba(148,163,184,0.75)" },

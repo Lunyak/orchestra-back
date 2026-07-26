@@ -45,10 +45,10 @@ export const SPECTACLE_HUB_DIRECTIONS: SpectacleHubDirection[] = [
   {
     id: "sufer",
     path: SUFER_ROUTE_PATH,
-    label: "Прогон",
-    description: "Карточный прогон / суфлёр",
+    label: "Суфлер",
+    description: "Карточки подсказок для прогона",
     imageSrc: suferImageUrl,
-    imageAlt: "Карточки прогона",
+    imageAlt: "Карточки суфлера",
   },
   {
     id: "theater",

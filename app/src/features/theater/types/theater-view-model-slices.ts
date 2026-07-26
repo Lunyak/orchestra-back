@@ -27,6 +27,8 @@ export type TheaterPrefsSlice = TheaterViewPrefs & {
   setOutlineDrawMode: (value: boolean) => void;
   setSpotlightAimMode: (mode: TheaterViewPrefs["spotlightAimMode"]) => void;
   setDutyLightEnabled: (value: boolean) => void;
+  liveBlackoutEnabled: boolean;
+  setLiveBlackoutEnabled: (value: boolean) => void;
   setSmokeMachineEnabled: (value: boolean) => void;
   setSmokePanelOpen: (value: boolean) => void;
   setSmokePosition: (value: TheaterSmokePosition | null) => void;

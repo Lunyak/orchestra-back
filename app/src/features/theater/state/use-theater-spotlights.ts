@@ -56,6 +56,8 @@ export type UseTheaterSpotlightsArgs = {
   lightPrograms?: PlaybookLightProgramsDataV1 | null;
   /** Активный канал на пульте — живая доска только для этого K. */
   consoleChannel?: number;
+  /** Живой блекаут: гасит отображение, фейдеры не трогает. */
+  liveBlackoutEnabled?: boolean;
 };
 
 export type TrussMountFixtureType = "regular" | "rgb";
@@ -81,6 +83,7 @@ export function useTheaterSpotlights({
   lightFaders,
   lightPrograms,
   consoleChannel,
+  liveBlackoutEnabled = false,
   updateLayout,
 }: UseTheaterSpotlightsArgs) {
   const [trussMountFixtureType, setTrussMountFixtureType] =
@@ -95,13 +98,25 @@ export function useTheaterSpotlights({
       ? displaySpotlights.find((item) => item.id === activeSpotlightId)
       : undefined;
   const renderSpotlights = useMemo(() => {
-    return applyFadersToSpotlightsPerChannelDisplay(
+    const withFaders = applyFadersToSpotlightsPerChannelDisplay(
       displaySpotlights,
       lightFaders,
       lightPrograms,
       consoleChannel,
     );
-  }, [consoleChannel, displaySpotlights, lightFaders, lightPrograms]);
+    if (!liveBlackoutEnabled) return withFaders;
+    return withFaders.map((spotlight) => ({
+      ...spotlight,
+      intensity: 0,
+      enabled: false,
+    }));
+  }, [
+    consoleChannel,
+    displaySpotlights,
+    lightFaders,
+    lightPrograms,
+    liveBlackoutEnabled,
+  ]);
   const visibleSpotlights = useMemo(
     () => renderSpotlights.filter((spotlight) => !spotlight.hidden),
     [renderSpotlights],

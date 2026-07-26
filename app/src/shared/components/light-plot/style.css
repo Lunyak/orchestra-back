@@ -9,28 +9,16 @@
 }
 
 .light-plot-mode-tabs--with-center {
-  position: relative;
   justify-content: space-between;
+  align-items: flex-start;
 }
 
 .light-plot-mode-tabs__center {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
-  justify-content: center;
-  max-width: min(520px, calc(100% - 160px));
   min-width: 0;
-  padding: 0 8px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.light-plot-mode-tabs--with-center .light-plot-mode-tabs__end {
-  position: relative;
-  z-index: 1;
+  flex: 1 1 auto;
+  max-width: min(280px, 36%);
 }
 
 .light-plot-mode-tabs__end {
@@ -38,7 +26,7 @@
   align-items: center;
   justify-content: flex-end;
   min-width: 0;
-  flex-shrink: 0;
+  flex: 0 1 auto;
 }
 
 .light-plot-mode-tabs:not(.light-plot-mode-tabs--with-center) .light-plot-mode-tabs__end {
@@ -68,7 +56,6 @@
 .light-plot-panel {
   background: var(--color-surface-1);
   border: 1px solid var(--color-border-default);
-  border-radius: 8px;
   padding: 12px;
   color: var(--color-text-ui);
   display: flex;
@@ -96,7 +83,6 @@
   background: var(--color-border-default);
   color: var(--color-text-ui);
   border: 1px solid var(--color-border-light);
-  border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
   cursor: pointer;
@@ -147,7 +133,6 @@
   min-height: 240px;
   background: var(--color-surface-3);
   border: 1px dashed var(--color-border-default);
-  border-radius: 8px;
   padding: 8px;
   position: relative;
 }
@@ -170,7 +155,6 @@
   gap: 2px;
   background: var(--color-border-default);
   border: 1px solid var(--color-border-lighter);
-  border-radius: 6px;
   padding: 2px 4px;
   text-align: center;
   font-size: 10px;
@@ -190,7 +174,6 @@
   transform-origin: left center;
   transform: translateY(-50%) rotate(var(--angle, 0deg));
   opacity: 0.9;
-  border-radius: 999px;
   box-shadow: 0 0 6px var(--color-warning-inset);
 }
 
@@ -224,7 +207,6 @@
   background: var(--color-border-default);
   color: var(--color-text-ui);
   border: 1px solid var(--color-border-light);
-  border-radius: 6px;
   padding: 4px 6px;
   font-size: 12px;
 }
@@ -233,7 +215,6 @@
   background: var(--color-primary);
   color: var(--color-text-primary);
   border: none;
-  border-radius: 6px;
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -258,7 +239,6 @@
   background: var(--color-surface-1);
   color: var(--color-text-ui);
   border: 1px solid var(--color-border-lighter);
-  border-radius: 6px;
   padding: 4px 6px;
   font-size: 12px;
 }
@@ -319,7 +299,6 @@
 .light-cue-scrub button {
   background: var(--color-surface-2);
   border: 1px solid var(--color-border-lighter);
-  border-radius: 6px;
   color: var(--color-text-ui);
   padding: 4px 10px;
   font-size: 12px;
@@ -334,7 +313,6 @@
 .light-cue-track {
   position: relative;
   height: 10px;
-  border-radius: 999px;
   background: var(--color-surface-2);
   border: 1px solid var(--color-border-lighter);
 }
@@ -347,7 +325,6 @@
   height: 8px;
   margin-left: -4px;
   margin-top: -4px;
-  border-radius: 50%;
   border: 1px solid var(--color-primary);
   background: var(--color-primary);
   padding: 0;
@@ -372,7 +349,6 @@
   background: var(--color-surface-1);
   color: var(--color-text-ui);
   border: 1px solid var(--color-border-lighter);
-  border-radius: 6px;
   padding: 4px 6px;
   font-size: 12px;
 }

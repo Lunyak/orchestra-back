@@ -530,13 +530,16 @@ export function setScriptPlayParagraphGapEm(value: number | null): number | null
 /** Inline-стили виджета [[РОЛЬ]] в CodeMirror (вкладка «Текст»): var() на :root обновляются без пересборки чипов. */
 export const SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE =
   "display:inline-flex;align-items:center;white-space:nowrap;padding:0 6px;letter-spacing:0.25px;vertical-align:baseline;" +
-  "margin-right:var(--script-play-label-text-gap,4px);" +
   "font-weight:var(--script-play-label-font-weight,100);" +
   "font-size:var(--script-play-label-font-size,var(--script-font-size-label));" +
   "font-family:var(--script-play-label-font-family,inherit);" +
   "color:var(--script-play-label-color,var(--script-play-text-color,var(--color-text-primary)));" +
   "background:var(--script-play-label-bg,var(--color-blue-bg));" +
   "text-transform:var(--script-play-label-text-transform,capitalize);";
+
+/** Отступ справа — только если после `]]` в исходнике есть пробел. */
+export const SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_GAP_STYLE =
+  "margin-right:var(--script-play-label-text-gap,4px);";
 
 export function applyScriptPlayTextAppearance(): void {
   applyScriptPlayFontSizePx();

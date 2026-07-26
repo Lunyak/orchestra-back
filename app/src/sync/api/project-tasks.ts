@@ -68,7 +68,7 @@ export type ImportRequisiteTaskPayload = {
   assigneeEmail?: string;
   refSceneId: number;
   refRequisiteId: number;
-  refAction: "setup" | "remove";
+  refAction: "setup" | "remove" | "use";
 };
 
 export type ImportRequisiteTasksPayload = {

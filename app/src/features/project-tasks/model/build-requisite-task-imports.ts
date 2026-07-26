@@ -1,5 +1,5 @@
 import type { ImportRequisiteTaskPayload } from "../../../sync/api/project-tasks";
-import type { ScriptScene } from "../../../shared/types/script";
+import type { ScriptRequisiteDuty, ScriptScene } from "../../../shared/types/script";
 
 function normalizeEmail(value: unknown): string {
   return String(value ?? "")
@@ -7,16 +7,14 @@ function normalizeEmail(value: unknown): string {
     .toLowerCase();
 }
 
-function parseAssigneeList(values: string[] | undefined): string[] {
-  if (!Array.isArray(values)) return [];
-  return Array.from(
-    new Set(
-      values
-        .map((item) => normalizeEmail(item))
-        .filter((item) => item.length > 0),
-    ),
-  );
-}
+const DUTY_TASK_META: Record<
+  ScriptRequisiteDuty,
+  { titleVerb: string; refAction: ImportRequisiteTaskPayload["refAction"] }
+> = {
+  setup: { titleVerb: "Занести", refAction: "setup" },
+  strike: { titleVerb: "Унести", refAction: "remove" },
+  use: { titleVerb: "Манипуляции", refAction: "use" },
+};
 
 export function buildRequisiteTaskImports(scenes: ScriptScene[]): ImportRequisiteTaskPayload[] {
   const result: ImportRequisiteTaskPayload[] = [];
@@ -29,30 +27,32 @@ export function buildRequisiteTaskImports(scenes: ScriptScene[]): ImportRequisit
     for (const requisite of requisites) {
       const requisiteId = requisite.id;
       const label = String(requisite.label ?? "").trim() || "Реквизит";
-      const setupAssignees = parseAssigneeList(requisite.setupAssignees);
-      const removeAssignees = parseAssigneeList(requisite.removeAssignees);
+      const assigneeEmail = normalizeEmail(requisite.assigneeEmail);
+      if (!assigneeEmail) continue;
 
-      for (const assigneeEmail of setupAssignees) {
-        result.push({
-          title: `Выставить «${label}» · ${sceneTitle}`,
-          sourceKey: `requisite:${sceneId}:${requisiteId}:setup:${assigneeEmail}`,
-          assigneeEmail,
-          refSceneId: sceneId,
-          refRequisiteId: requisiteId,
-          refAction: "setup",
-        });
-      }
+      const duty: ScriptRequisiteDuty =
+        requisite.duty === "strike" || requisite.duty === "use"
+          ? requisite.duty
+          : "setup";
+      const meta = DUTY_TASK_META[duty];
+      const detail =
+        duty === "setup"
+          ? String(requisite.placeNote ?? "").trim()
+          : duty === "use"
+            ? String(requisite.actionNote ?? "").trim()
+            : "";
+      const title = detail
+        ? `${meta.titleVerb} «${label}» · ${detail} · ${sceneTitle}`
+        : `${meta.titleVerb} «${label}» · ${sceneTitle}`;
 
-      for (const assigneeEmail of removeAssignees) {
-        result.push({
-          title: `Убрать «${label}» · ${sceneTitle}`,
-          sourceKey: `requisite:${sceneId}:${requisiteId}:remove:${assigneeEmail}`,
-          assigneeEmail,
-          refSceneId: sceneId,
-          refRequisiteId: requisiteId,
-          refAction: "remove",
-        });
-      }
+      result.push({
+        title,
+        sourceKey: `requisite:${sceneId}:${requisiteId}:${meta.refAction}:${assigneeEmail}`,
+        assigneeEmail,
+        refSceneId: sceneId,
+        refRequisiteId: requisiteId,
+        refAction: meta.refAction,
+      });
     }
   }
 

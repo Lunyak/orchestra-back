@@ -428,6 +428,10 @@ export const TheaterScene = ({
         vm.updateModel(modelId, {
           hidden: activeModel.hidden !== true,
         }),
+      isRequisite: activeModel.isRequisite === true,
+      onToggleRequisite: (next: boolean) => {
+        vm.updateModel(modelId, { isRequisite: next });
+      },
       onPickTransform: (mode: "translate" | "rotate" | "scale") => {
         vm.exitDecorPlaceMode();
         vm.setEditMode(isDecorEditMode ? "decor" : "models");
@@ -635,7 +639,7 @@ export const TheaterScene = ({
           wallsOpaque={vm.wallsOpaque}
           wallsHidden={vm.wallsHidden}
           wallsHideFromCamera={vm.wallsHideFromCamera}
-          dutyLightEnabled={vm.dutyLightEnabled}
+          dutyLightEnabled={vm.dutyLightEnabled && !vm.liveBlackoutEnabled}
           smokeMachineEnabled={vm.smokeMachineEnabled}
           smokePosition={smokePosition}
           smokeIntensity={vm.smokeIntensity}

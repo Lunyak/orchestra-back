@@ -48,7 +48,6 @@ function AppRoutesContent() {
     setMobileScenesOpen,
     toggleMobileScenes,
     isEditing,
-    toggleEditing,
   } = useScriptUI();
 
   const isMobile = useIsMobile();
@@ -70,17 +69,12 @@ function AppRoutesContent() {
   const markdownMode = useAppSelector((state) =>
     projectName
       ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).markdownMode
-      : "notes",
+      : "play",
   );
   const playOriginalMode = useAppSelector((state) =>
     projectName
       ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).playOriginalMode
       : false,
-  );
-  const editorTocEnabled = useAppSelector((state) =>
-    projectName
-      ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).editorTocEnabled
-      : true,
   );
   const annotationsMode = useAppSelector((state) =>
     projectName
@@ -123,32 +117,7 @@ function AppRoutesContent() {
     );
   }, [dispatch, playOriginalMode, projectName]);
 
-  const kadrMarkdownModes =
-    markdownMode === "notes" || markdownMode === "explication" || markdownMode === "play";
-
   const formatPlaySourceText = String(activeMarkdown ?? "");
-
-  const handleToggleEditorToc = useCallback(() => {
-    if (!projectName) return;
-    const next = !editorTocEnabled;
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          `showScript:editorToc:${projectName}:${SCRIPT_SCENE_NAME}`,
-          String(next),
-        );
-      }
-    } catch {
-      // ignore
-    }
-    dispatch(
-      showScriptMarkdownActions.setEditorTocEnabled({
-        projectSlug: projectName,
-        sceneName: SCRIPT_SCENE_NAME,
-        enabled: next,
-      }),
-    );
-  }, [dispatch, editorTocEnabled, projectName]);
 
   const isRehearsalPlanRoute =
     location.pathname === "/board" ||
@@ -214,18 +183,11 @@ function AppRoutesContent() {
       showScriptMainChrome ? (
         <AppEditorScriptModeNav
           isEditing={isEditing}
-          onToggleEditing={toggleEditing}
           annotationsMode={annotationsMode}
           onToggleAnnotations={toggleAnnotations}
           playOriginalMode={markdownMode === "play" ? playOriginalMode : undefined}
           onTogglePlayOriginal={
             markdownMode === "play" ? handleTogglePlayOriginal : undefined
-          }
-          editorTocEnabled={
-            isEditing && kadrMarkdownModes ? editorTocEnabled : undefined
-          }
-          onToggleEditorToc={
-            isEditing && kadrMarkdownModes ? handleToggleEditorToc : undefined
           }
         />
       ) : null,

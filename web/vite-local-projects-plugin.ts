@@ -117,6 +117,15 @@ function resolveMediaRootProjectFile(
   return resolveScriptFileInDir(root);
 }
 
+function normalizeMediaTitle(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/-\d{10,}$/g, "")
+    .replace(/[^a-z0-9а-яё]+/gi, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 function resolveFlatMediaFile(
   mediaRoot: string,
   fileName: string,
@@ -152,11 +161,11 @@ function resolveFlatMediaFile(
 
   const title = String(titleHint ?? "").trim();
   if (title) {
-    const norm = title.toLowerCase();
+    const norm = normalizeMediaTitle(title);
     try {
       for (const entry of fs.readdirSync(base)) {
         if (entry.startsWith(".")) continue;
-        const stem = entry.replace(/\.[^.]+$/, "").toLowerCase();
+        const stem = normalizeMediaTitle(entry.replace(/\.[^.]+$/, ""));
         if (stem === norm) {
           const matched = tryPath(entry);
           if (matched) return matched;

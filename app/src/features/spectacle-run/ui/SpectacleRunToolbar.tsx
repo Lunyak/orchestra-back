@@ -1,221 +1,203 @@
 import cn from "classnames";
-import { formatKadrTransitionForDisplay, parseKadrTransitionRawInSection } from "../model/kadr-section-transition";
+import {
+  formatKadrTransitionForDisplay,
+  parseKadrTransitionRawInSection,
+} from "../model/kadr-section-transition";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
+
+function kadrMetaLabel(item: {
+  isPlaceholder?: boolean;
+  kadrNo?: number;
+  headingTitle?: string;
+}): string {
+  if (item.isPlaceholder) return "Нет картин";
+  const kadrNo = item.kadrNo ?? "—";
+  const heading = String(item.headingTitle ?? "").trim();
+  const defaultTitle = `Картина ${kadrNo}`;
+  const headingIsDefault =
+    !heading ||
+    heading === defaultTitle ||
+    /^картина\s+\d+$/i.test(heading);
+  if (headingIsDefault) return `К${kadrNo}`;
+  return `К${kadrNo} · ${heading}`;
+}
 
 export function SpectacleRunMeta() {
   const run = useSpectacleRunContext();
-  const { tape, currentItem } = run;
+  const { tape, currentItem, currentScene } = run;
 
   if (tape.length === 0) return null;
 
-  return (
-    <div className="spectacle-run__meta" aria-live="polite">
-      <span className="spectacle-run__meta-scene">
-        Сцена {currentItem?.sceneOrdinal ?? "—"}
-        {currentItem?.sceneTitle ? ` · ${currentItem.sceneTitle}` : ""}
-      </span>
-      <span className="spectacle-run__meta-kadr">
-        {currentItem?.isPlaceholder
-          ? "Нет картин"
-          : `Картина ${currentItem?.kadrNo ?? "—"}${currentItem?.headingTitle ? ` · ${currentItem.headingTitle}` : ""}`}
-      </span>
-    </div>
-  );
-}
-
-export function SpectacleRunProgRunNav() {
-  const run = useSpectacleRunContext();
-  const {
-    tape,
-    tapeIndex,
-    currentItem,
-    currentScene,
-    canGoPrev,
-    canGoNext,
-    nextLabel,
-    progRunPaused,
-  } = run;
-  const tapeLen = tape.length;
-
-  if (tapeLen === 0) return null;
-
+  const sceneOrdinal = currentItem?.sceneOrdinal ?? "—";
+  const sceneTitle = String(currentItem?.sceneTitle ?? "").trim();
   const transitionLine =
     currentItem?.section && currentScene && !currentItem.isPlaceholder
       ? formatKadrTransitionForDisplay(
-          parseKadrTransitionRawInSection(String(currentScene.markdown ?? ""), currentItem.section),
+          parseKadrTransitionRawInSection(
+            String(currentScene.markdown ?? ""),
+            currentItem.section,
+          ),
         )
       : "";
 
   return (
-    <div className="spectacle-run__prog-run-nav" aria-label="Навигация по сценам">
-      <div className="spectacle-run__prog-run-nav-transport">
-        <button
-          type="button"
-          className="spectacle-run__prog-run-start-btn"
-          onClick={run.startProgRun}
-        >
-          Старт
-        </button>
-        <button
-          type="button"
-          className="spectacle-run__prog-run-pause-btn"
-          data-paused={progRunPaused ? "true" : undefined}
-          aria-pressed={progRunPaused}
-          onClick={run.toggleProgRunPause}
-        >
-          {progRunPaused ? "Продолжить" : "Пауза"}
-        </button>
-      </div>
-      <div className="spectacle-run__prog-run-nav-center" aria-live="polite">
-        {transitionLine ? (
-          <span className="spectacle-run__prog-run-nav-kadr" title={transitionLine}>
-            {transitionLine}
-          </span>
-        ) : null}
-        <div className="spectacle-run__prog-run-nav-meta">
-          <span className="spectacle-run__prog-run-nav-counter">
-            {tapeIndex + 1} / {tapeLen}
-          </span>
-        </div>
-      </div>
-      <div className="spectacle-run__prog-run-nav-scene">
-        <button
-          type="button"
-          className="spectacle-run__prog-run-nav-btn"
-          disabled={!canGoPrev}
-          onClick={run.goPrev}
-        >
-          ◀ Назад
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "spectacle-run__prog-run-nav-btn",
-            "spectacle-run__prog-run-nav-btn--forward",
-            canGoNext && "spectacle-run__prog-run-nav-btn--primary",
-          )}
-          disabled={!canGoNext}
-          onClick={run.goNext}
-        >
-          {nextLabel} ▶
-        </button>
-      </div>
+    <div className="spectacle-run__meta" aria-live="polite">
+      <span className="spectacle-run__meta-scene">
+        {sceneTitle ? `С${sceneOrdinal} · ${sceneTitle}` : `С${sceneOrdinal}`}
+      </span>
+      <span className="spectacle-run__meta-kadr">
+        {kadrMetaLabel(currentItem ?? { isPlaceholder: true })}
+      </span>
+      {transitionLine ? (
+        <span className="spectacle-run__meta-transition" title={transitionLine}>
+          {transitionLine}
+        </span>
+      ) : null}
     </div>
   );
 }
 
-export function SpectacleRunProgRunToolbar() {
-  const run = useSpectacleRunContext();
-  const { tape } = run;
+export type SpectacleRunChromeControlsProps = {
+  mode: "rehearsal" | "prog-run";
+};
 
-  if (tape.length === 0 || !run.canEditKadr) return null;
-
-  return (
-    <div className="spectacle-run__toolbar-actions" aria-label="Управление прогоном">
-      <button
-        type="button"
-        className="spectacle-run__add-kadr-btn"
-        data-primary="true"
-        title="Редактировать выбранную картину"
-        onClick={run.editCurrentKadr}
-      >
-        Редактировать
-      </button>
-    </div>
-  );
-}
-
-export function SpectacleRunToolbarActions() {
+/** Общий ряд управления в шапке техчасти — одно место для сборки и прогона. */
+export function SpectacleRunChromeControls({ mode }: SpectacleRunChromeControlsProps) {
   const run = useSpectacleRunContext();
   const { tape, tapeIndex } = run;
   const tapeLen = tape.length;
+  const isAssembly = mode === "rehearsal";
+  const nextIsScene = run.nextLabel !== "Далее";
+  const nextTitle = run.nextLabel;
+  const addTitle = run.currentItem?.isPlaceholder
+    ? "Добавить первую картину в сцену"
+    : `Вставить картину ${run.nextKadrNo} после текущей`;
 
   if (tapeLen === 0) return null;
 
   return (
-    <div className="spectacle-run__toolbar-actions" aria-label="Навигация спектакля">
+    <div
+      className="spectacle-run__toolbar-actions"
+      aria-label={isAssembly ? "Навигация сборки" : "Навигация прогона"}
+    >
       <div className="spectacle-run__nav">
         <button
           type="button"
-          className="spectacle-run__nav-btn"
+          className="spectacle-run__nav-btn spectacle-run__nav-btn--icon"
           disabled={!run.canGoPrev}
           onClick={run.goPrev}
           title="Предыдущая картина"
+          aria-label="Предыдущая картина"
         >
           ◀
         </button>
         <button
           type="button"
-          className="spectacle-run__nav-btn spectacle-run__nav-btn--primary"
+          className={cn(
+            "spectacle-run__nav-btn",
+            "spectacle-run__nav-btn--icon",
+            "spectacle-run__nav-btn--primary",
+          )}
           disabled={!run.canGoNext}
           onClick={run.goNext}
-          title={run.nextLabel}
+          title={nextTitle}
+          aria-label={nextTitle}
         >
-          {run.nextLabel} ▶
+          {nextIsScene ? "≫" : "▶"}
         </button>
       </div>
 
       <span className="spectacle-run__tape-counter" aria-live="polite">
-        {tapeIndex + 1} / {tapeLen}
+        {tapeIndex + 1}/{tapeLen}
       </span>
 
-      {run.canCopyTheaterFromPreviousScene ? (
+      {!isAssembly ? (
+        <>
+          <button
+            type="button"
+            className="spectacle-run__add-kadr-btn"
+            title="Старт прогона"
+            aria-label="Старт прогона"
+            onClick={run.startProgRun}
+          >
+            Старт
+          </button>
+          <button
+            type="button"
+            className="spectacle-run__add-kadr-btn"
+            data-primary={run.progRunPaused ? "true" : undefined}
+            aria-pressed={run.progRunPaused}
+            title={run.progRunPaused ? "Продолжить" : "Пауза"}
+            aria-label={run.progRunPaused ? "Продолжить" : "Пауза"}
+            onClick={run.toggleProgRunPause}
+          >
+            {run.progRunPaused ? "Продолжить" : "Пауза"}
+          </button>
+        </>
+      ) : null}
+
+      {isAssembly && run.canCopyTheaterFromPreviousScene ? (
         <button
           type="button"
-          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--copy-scene"
-          title="Скопировать мебель, декор, софиты и реквизит с предыдущей сцены"
+          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--icon"
+          title="Скопировать расстановку с предыдущей сцены"
+          aria-label="Скопировать расстановку с предыдущей сцены"
           onClick={run.copyTheaterFromPreviousScene}
         >
-          ← пред. сцена
+          ↶С
         </button>
       ) : null}
 
-      {run.canCopyKadrToNext ? (
+      {isAssembly && run.canCopyKadrToNext ? (
         <button
           type="button"
-          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--copy-scene"
-          title="Скопировать свет текущей картины на следующую (техсобытие)"
+          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--icon"
+          title="Скопировать свет на следующую картину"
+          aria-label="Скопировать свет на следующую картину"
           onClick={run.copyCurrentKadrToNext}
         >
-          → след. картина
+          ↷К
         </button>
       ) : null}
 
-      {run.canAddKadr ? (
+      {isAssembly && run.canAddKadr ? (
         <button
           type="button"
-          className="spectacle-run__add-kadr-btn"
-          title={
-            run.currentItem?.isPlaceholder
-              ? "Добавить первую картину в сцену"
-              : `Вставить картину ${run.nextKadrNo} после текущей`
-          }
+          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--icon"
+          title={addTitle}
+          aria-label={addTitle}
           onClick={run.addKadrToCurrentScene}
         >
-          + Картина {run.nextKadrNo}
+          +
         </button>
       ) : null}
 
       {run.canEditKadr ? (
         <button
           type="button"
-          className="spectacle-run__add-kadr-btn"
+          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--icon"
           data-primary="true"
-          title="Редактировать выбранную картину"
+          title="Изменить картину"
+          aria-label="Изменить картину"
           onClick={run.editCurrentKadr}
         >
-          Редактировать
+          ✎
         </button>
       ) : null}
 
-      {run.canDeleteKadr ? (
+      {isAssembly && run.canDeleteKadr ? (
         <button
           type="button"
-          className="spectacle-run__add-kadr-btn spectacle-run__add-kadr-btn--danger"
-          title="Удалить текущую картину и перенумеровать остальные в сцене"
+          className={cn(
+            "spectacle-run__add-kadr-btn",
+            "spectacle-run__add-kadr-btn--icon",
+            "spectacle-run__add-kadr-btn--danger",
+          )}
+          title="Удалить картину"
+          aria-label="Удалить картину"
           onClick={run.deleteCurrentKadr}
         >
-          Удалить картину
+          ×
         </button>
       ) : null}
     </div>

@@ -70,6 +70,101 @@
   gap: 8px;
 }
 
+.create-kadr-modal__requisite-list {
+  display: grid;
+  gap: 8px;
+}
+
+.create-kadr-modal__requisite-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.create-kadr-modal__requisites-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.create-kadr-modal__requisites-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted-bright);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.create-kadr-modal__requisites-toggle:hover {
+  color: var(--color-active-ascent);
+}
+
+.create-kadr-modal__requisites-chevron {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.create-kadr-modal__requisites-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.create-kadr-modal__requisites-count,
+.create-kadr-modal__requisites-cues {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-text-muted);
+}
+
+.create-kadr-modal__requisites-count {
+  padding: 2px 8px;
+  border: 1px solid var(--stage-brutal-border, var(--color-border-light));
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.create-kadr-modal__requisites--open .create-kadr-modal__requisites-toggle {
+  color: var(--color-active-ascent);
+}
+
+.create-kadr-modal__requisites .requisites-panel {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.create-kadr-modal__requisite-cue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.create-kadr-modal__select--compact {
+  width: auto;
+  min-width: 140px;
+}
+
+.create-kadr-modal__requisite-action-select {
+  width: auto;
+  min-width: 140px;
+}
+
 .create-kadr-modal__check--projector-mute {
   min-height: 34px;
   align-self: end;
@@ -82,7 +177,6 @@
 }
 
 .create-kadr-modal__input,
-.create-kadr-modal__select,
 .create-kadr-modal__textarea {
   min-height: 34px;
   padding: 0 10px;
@@ -90,6 +184,11 @@
   background: rgba(0, 0, 0, 0.25);
   color: var(--color-text-bright);
   font-size: 13px;
+}
+
+.create-kadr-modal__select {
+  width: 100%;
+  min-width: 0;
 }
 
 .create-kadr-modal__textarea {

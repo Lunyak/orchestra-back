@@ -13,13 +13,28 @@ import type { ActorAnnotationField } from "../../../sync/api/actor-notes";
 
 type SceneKey = string;
 
-export type ShowScriptMarkdownMode = "notes" | "play" | "explication" | "comments" | "requisites" | "light";
+export type ShowScriptMarkdownMode =
+  | "play"
+  | "explication"
+  | "comments";
+
+const SHOW_SCRIPT_MARKDOWN_MODES: ReadonlyArray<ShowScriptMarkdownMode> = [
+  "play",
+  "explication",
+  "comments",
+];
+
+function normalizeShowScriptMarkdownMode(raw: unknown): ShowScriptMarkdownMode {
+  if (raw === "notes" || raw === "light" || raw === "requisites") return "play";
+  if (raw === "play" || raw === "explication" || raw === "comments") {
+    return raw;
+  }
+  return "play";
+}
 
 type SceneUiState = {
   markdownMode: ShowScriptMarkdownMode;
   playOriginalMode: boolean;
-  /** Оглавление «Картины» в режиме редактирования (notes / play / explication). */
-  editorTocEnabled: boolean;
   annotationsMode: boolean;
   playlistOptions: { id: number; title: string }[];
   soundsOptions: { id: number; title: string; icon?: string; iconRemoteUrl?: string }[];
@@ -45,16 +60,14 @@ function getUiStorageKeys(projectSlug: string, sceneName: string) {
   return {
     markdownModeStorageKey: `showScript:markdownMode:${projectSlug}:${sceneName}`,
     playOriginalModeStorageKey: `showScript:playOriginalMode:${projectSlug}:${sceneName}`,
-    editorTocStorageKey: `showScript:editorToc:${projectSlug}:${sceneName}`,
     annotationsModeStorageKey: `showScript:annotationsMode:${projectSlug}:${sceneName}`,
   };
 }
 
 function defaultSceneUi(): SceneUiState {
   return {
-    markdownMode: "notes",
+    markdownMode: "play",
     playOriginalMode: false,
-    editorTocEnabled: true,
     annotationsMode: true,
     playlistOptions: [],
     soundsOptions: [],
@@ -118,27 +131,24 @@ export const initShowScriptMarkdownUi = createAsyncThunk<
   const keys = getUiStorageKeys(args.projectSlug, args.sceneName);
   const storedMarkdown = localStorage.getItem(keys.markdownModeStorageKey);
   const storedPlayOriginal = localStorage.getItem(keys.playOriginalModeStorageKey);
-  const storedEditorToc = localStorage.getItem(keys.editorTocStorageKey);
   const storedAnnotations = localStorage.getItem(keys.annotationsModeStorageKey);
   const ui: Partial<SceneUiState> = {};
-  if (
-    storedMarkdown === "notes" ||
-    storedMarkdown === "play" ||
-    storedMarkdown === "explication" ||
-    storedMarkdown === "comments" ||
-    storedMarkdown === "requisites" ||
-    storedMarkdown === "light"
-  ) {
-    ui.markdownMode = storedMarkdown;
+  if (storedMarkdown != null) {
+    const mode = normalizeShowScriptMarkdownMode(storedMarkdown);
+    ui.markdownMode = mode;
+    if (storedMarkdown === "notes" || !SHOW_SCRIPT_MARKDOWN_MODES.includes(storedMarkdown as ShowScriptMarkdownMode)) {
+      try {
+        localStorage.setItem(keys.markdownModeStorageKey, mode);
+      } catch {
+        // ignore
+      }
+    }
   }
   if (storedAnnotations != null) {
     ui.annotationsMode = storedAnnotations === "true";
   }
   if (storedPlayOriginal != null) {
     ui.playOriginalMode = storedPlayOriginal === "true";
-  }
-  if (storedEditorToc != null) {
-    ui.editorTocEnabled = storedEditorToc === "true";
   }
   return { sceneKey, ui };
 });
@@ -230,12 +240,12 @@ export const showScriptMarkdownSlice = createSlice({
       action: PayloadAction<{
         projectSlug: string;
         sceneName: string;
-        mode: ShowScriptMarkdownMode;
+        mode: ShowScriptMarkdownMode | "notes" | "light";
       }>,
     ) {
       const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
       const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
-      entry.markdownMode = action.payload.mode;
+      entry.markdownMode = normalizeShowScriptMarkdownMode(action.payload.mode);
       state.uiBySceneKey[sceneKey] = entry;
     },
     setPlayOriginalMode(
@@ -245,15 +255,6 @@ export const showScriptMarkdownSlice = createSlice({
       const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
       const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
       entry.playOriginalMode = action.payload.enabled;
-      state.uiBySceneKey[sceneKey] = entry;
-    },
-    setEditorTocEnabled(
-      state,
-      action: PayloadAction<{ projectSlug: string; sceneName: string; enabled: boolean }>,
-    ) {
-      const sceneKey = getSceneKey(action.payload.projectSlug, action.payload.sceneName);
-      const entry = state.uiBySceneKey[sceneKey] ?? defaultSceneUi();
-      entry.editorTocEnabled = action.payload.enabled;
       state.uiBySceneKey[sceneKey] = entry;
     },
     setAnnotationsMode(
@@ -346,8 +347,12 @@ export const selectShowScriptMarkdownUi = createSelector(
     (_state: RootState, projectSlug: string, sceneName: string) =>
       getSceneKey(projectSlug, sceneName),
   ],
-  (uiBySceneKey, sceneKey): SceneUiState =>
-    uiBySceneKey[sceneKey] ?? getDefaultUiForSceneKey(sceneKey),
+  (uiBySceneKey, sceneKey): SceneUiState => {
+    const ui = uiBySceneKey[sceneKey] ?? getDefaultUiForSceneKey(sceneKey);
+    const markdownMode = normalizeShowScriptMarkdownMode(ui.markdownMode);
+    if (markdownMode === ui.markdownMode) return ui;
+    return { ...ui, markdownMode };
+  },
 );
 
 export const selectActiveSceneMarkdownContext = createSelector(

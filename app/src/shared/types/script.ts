@@ -13,7 +13,7 @@ export interface ScriptScene {
   lightCues?: LightCue[];
   /** Картины сцены (свет / звук / проектор). Источник истины — JSON, не markdown. */
   lightKadrs?: SceneLightKadrsDataV1;
-  /** Дым-машина включена на сцене (пометка техкарты). */
+  /** Дым-машина включена на сцене. */
   theaterSmokeMachine?: boolean;
   theaterSpotlights?: TheaterSpotlight[];
   theaterActiveSpotlightId?: number;
@@ -30,15 +30,34 @@ export interface ScriptScene {
   kanbanOrder?: number;
 }
 
+/** Назначение реквизита на сцене: занести / унести / манипуляции. */
+export type ScriptRequisiteDuty = "setup" | "strike" | "use";
+
 export interface ScriptRequisite {
   id: number;
   label: string;
   checked: boolean;
-  /** Кто выставляет/подготавливает реквизит для сцены. */
-  setupAssignees?: string[];
-  /** Кто уносит/убирает реквизит после сцены. */
-  removeAssignees?: string[];
+  /** Связь с моделью 3D-театра (если реквизит создан из flagged-модели). */
+  theaterModelId?: number;
+  /** Ключ файла аватарки реквизита в project files. */
+  avatarKey?: string;
+  /** Ответственный (email участника театра). */
+  assigneeEmail?: string;
+  /** Действие ответственного. */
+  duty?: ScriptRequisiteDuty;
+  /** Куда ставить (для duty=setup / занести). */
+  placeNote?: string;
+  /** Что сделать (для duty=use / манипуляции). */
+  actionNote?: string;
 }
+
+/** Действие с реквизитом на картине. */
+export type SceneLightKadrRequisiteActionV1 = "setup" | "strike" | "use";
+
+export type SceneLightKadrRequisiteCueV1 = {
+  requisiteId: number;
+  action: SceneLightKadrRequisiteActionV1;
+};
 
 export interface LightFixture {
   id: number;
@@ -79,6 +98,8 @@ export interface SceneLightKadrV1 {
   smokeMachine?: boolean;
   sound?: SceneLightKadrSoundCueV1;
   projector?: SceneLightKadrProjectorCueV1;
+  /** Реквизит на картине: вынести / убрать / использовать. */
+  requisites?: SceneLightKadrRequisiteCueV1[];
   transitionText?: string;
   commentText?: string;
   blackoutDurationSec?: number;
@@ -221,6 +242,8 @@ export interface TheaterModel {
   ignoreCollisions?: boolean;
   /** Скрыт в редакторе (данные сохраняются) */
   hidden?: boolean;
+  /** Модель помечена как реквизит сцены. */
+  isRequisite?: boolean;
   position: [number, number, number];
   rotation: [number, number, number];
   scale: [number, number, number];

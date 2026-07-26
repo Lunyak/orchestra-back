@@ -106,7 +106,7 @@ export function AppEditorScriptFormattingMenu({
           disabled={formatPlayDisabled}
           title={
             formatPlayDisabled
-              ? "Откройте сцену на вкладке Текст, Тех. карта или Экспликация"
+              ? "Откройте сцену на вкладке Текст или Экспликация"
               : undefined
           }
           onClick={() => {

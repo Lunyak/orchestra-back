@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import cn from "classnames";
+import { useEffect, useMemo, useState } from "react";
 import type {
   PlaybookLightChannelRolesV1,
   PlaybookLightFadersDataV1,
@@ -14,13 +15,37 @@ import { resolveLightFaders } from "../../../shared/components/light-console/lig
 import { buildLightSchemeLookModel } from "../../../shared/components/light-console/light-scheme-preview";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { LightSchemeStageMap } from "../../../shared/components/light-console/LightSchemeStageMap";
-import { LightSchemeLookCard } from "../../../shared/components/light-console/LightSchemeLookCard";
 import { SpectacleRunTheaterEmbed } from "./SpectacleRunTheaterEmbed";
 import { LightConsoleView } from "../../../shared/components/light-console/LightConsoleView";
 import type { useLightConsoleState } from "../../../shared/components/light-console/useLightConsoleState";
 import type { SpectacleTapeItem } from "../model/spectacle-kadr-tape";
-import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../../../shared/components/show-script/script-markdown-tab-labels";
 import { SpectacleRunProjectorPanel } from "../../projector/ui/SpectacleRunProjectorPanel";
+import { SpectacleRunRequisitesPanel } from "./SpectacleRunRequisitesPanel";
+import { useProject } from "../../project/model/project-context";
+import {
+  patchTheaterViewPrefs,
+  readTheaterViewPrefs,
+} from "../../theater/model/theater-view-prefs-storage";
+import {
+  requestTheaterDutyLight,
+  THEATER_DUTY_LIGHT_EVENT,
+  type TheaterDutyLightRequest,
+} from "../../theater/model/theater-duty-light";
+import {
+  getTheaterLiveBlackoutEnabled,
+  requestTheaterLiveBlackout,
+  THEATER_LIVE_BLACKOUT_EVENT,
+  type TheaterLiveBlackoutRequest,
+} from "../../theater/model/theater-live-blackout";
+
+type SchemeTabId = "light" | "requisites" | "video" | "projector";
+
+const SCHEME_TABS: ReadonlyArray<{ id: SchemeTabId; label: string }> = [
+  { id: "light", label: "Свет" },
+  { id: "requisites", label: "Реквизит" },
+  { id: "video", label: "Видео" },
+  { id: "projector", label: "Проектор" },
+];
 
 export type SpectacleRunSchemePaneProps = {
   scene: ScriptScene | null;
@@ -53,12 +78,43 @@ export function SpectacleRunSchemePane({
   onOpenConsoleSettings,
   channelColumns,
 }: SpectacleRunSchemePaneProps) {
-  const [highlightedChannel, setHighlightedChannel] = useState<number | null>(null);
+  const { projectName } = useProject();
+  const [activeTab, setActiveTab] = useState<SchemeTabId>("light");
+  const [dutyLightEnabled, setDutyLightEnabled] = useState(
+    () => readTheaterViewPrefs(projectName).dutyLightEnabled,
+  );
+  const [liveBlackoutEnabled, setLiveBlackoutEnabled] = useState(
+    () => getTheaterLiveBlackoutEnabled(),
+  );
   const lightPlot = scene?.lightPlot ?? [];
   const theaterSpotlights = scene?.theaterSpotlights ?? [];
   const plotEmpty = theaterSpotlights.length === 0 && lightPlot.length === 0;
   const gridCols = 12;
   const gridRows = 20;
+
+  useEffect(() => {
+    setDutyLightEnabled(readTheaterViewPrefs(projectName).dutyLightEnabled);
+  }, [projectName]);
+
+  useEffect(() => {
+    const onDutyLight = (event: Event) => {
+      const enabled = (event as CustomEvent<TheaterDutyLightRequest>).detail?.enabled;
+      if (typeof enabled !== "boolean") return;
+      setDutyLightEnabled(enabled);
+    };
+    window.addEventListener(THEATER_DUTY_LIGHT_EVENT, onDutyLight);
+    return () => window.removeEventListener(THEATER_DUTY_LIGHT_EVENT, onDutyLight);
+  }, []);
+
+  useEffect(() => {
+    const onLiveBlackout = (event: Event) => {
+      const enabled = (event as CustomEvent<TheaterLiveBlackoutRequest>).detail?.enabled;
+      if (typeof enabled !== "boolean") return;
+      setLiveBlackoutEnabled(enabled);
+    };
+    window.addEventListener(THEATER_LIVE_BLACKOUT_EVENT, onLiveBlackout);
+    return () => window.removeEventListener(THEATER_LIVE_BLACKOUT_EVENT, onLiveBlackout);
+  }, []);
 
   const kadrs = useMemo(
     () => readSceneLightKadrs(scene),
@@ -79,7 +135,7 @@ export function SpectacleRunSchemePane({
   );
 
   const lookModel = useMemo(() => {
-    if (!activeKadr) return null;
+    if (!activeKadr || ENABLE_3D_THEATER) return null;
     return buildLightSchemeLookModel({
       kadr: activeKadr,
       sectionTitle: tapeItem?.headingTitle,
@@ -112,85 +168,165 @@ export function SpectacleRunSchemePane({
 
   return (
     <div className="spectacle-run-scheme">
-      {plotEmpty ? (
-        <div className="spectacle-run-scheme__plot-setup" role="note">
-          <p className="spectacle-run-scheme__plot-setup-text">
-            <strong className="spectacle-run-scheme__plot-setup-title">План софитов пуст</strong> — на схеме нечего подсвечивать. Картины и текст — в{" "}
-            <strong>{SCRIPT_MARKDOWN_NOTES_TAB_LABEL}</strong>, позиции софитов — в 3D-театре ниже.
-          </p>
-        </div>
-      ) : null}
-
-      {liveStatus ? (
-        <p className="spectacle-run-scheme__live-status" role="status">
-          {liveStatus}
-        </p>
-      ) : (
-        <p className="spectacle-run-scheme__live-hint">
-          <strong>Как записать свет:</strong> картина в ленте → на пульте всегда ваши{" "}
-          <strong>
-            F1–F{liveConsole.faders.count ?? liveConsole.faders.faders.length}
-          </strong>{" "}
-          → слева <strong>K3</strong>, подстройте
-          ползунки → <strong>K4</strong>, другие уровни → кнопка{" "}
-          <strong>Сохранить пресет П…</strong>, затем <strong>П3</strong> применит заливку.
-        </p>
-      )}
-
-      <div className="light-scheme-layout spectacle-run-scheme__stage-row">
-        {ENABLE_3D_THEATER ? (
-          <SpectacleRunTheaterEmbed />
-        ) : (
-          <LightSchemeStageMap
-            fixtures={lightPlot}
-            gridCols={gridCols}
-            gridRows={gridRows}
-            lookModel={lookModel}
-            selectedLightSlot={selectedLightSlot}
-            highlightedChannel={highlightedChannel}
-            editable={false}
-            emptyPlotHint={`Нет точек на плане. Добавьте софиты в «${SCRIPT_MARKDOWN_NOTES_TAB_LABEL}» или расставьте в 3D-театре.`}
-          />
-        )}
-        <LightSchemeLookCard
-          lookModel={lookModel}
-          lightChannels={lightChannels}
-          activeKadr={activeKadr}
-          lightFaders={displayFaders}
-          boardFaders={baseFaders}
-          spotlights={scene?.theaterSpotlights ?? []}
-          onHighlightChannel={setHighlightedChannel}
-        />
+      <div
+        className="spectacle-run-scheme__tabs"
+        role="tablist"
+        aria-label="Разделы спектакля"
+      >
+        {SCHEME_TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              className={cn(
+                "spectacle-run-scheme__tab",
+                isActive && "spectacle-run-scheme__tab--active",
+              )}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <SpectacleRunProjectorPanel />
+      <div className="spectacle-run-scheme__tab-panel" role="tabpanel">
+        {activeTab === "light" ? (
+          <>
+            {plotEmpty ? (
+              <div className="spectacle-run-scheme__plot-setup" role="note">
+                <p className="spectacle-run-scheme__plot-setup-text">
+                  <strong className="spectacle-run-scheme__plot-setup-title">
+                    План софитов пуст
+                  </strong>{" "}
+                  — на схеме нечего подсвечивать. Картины — в прогоне, позиции софитов — в
+                  3D-театре ниже.
+                </p>
+              </div>
+            ) : null}
 
-      <LightConsoleView
-        mode="live"
-        lightChannels={liveConsole.lightChannels}
-        selectedLightSlot={liveConsole.selectedLightSlot}
-        faders={liveConsole.faders}
-        programs={liveConsole.programs}
-        spotlights={scene?.theaterSpotlights ?? []}
-        consoleChannel={liveConsole.selectedLightSlot}
-        onSelectChannel={liveConsole.selectChannel}
-        onSelectProgram={liveConsole.selectProgram}
-        onOpenSettings={onOpenConsoleSettings}
-        channelColumns={channelColumns}
-        onPatchFader={liveConsole.patchFader}
-        onSaveActiveProgram={() => {
-          const pid = Math.max(
-            1,
-            Math.trunc(liveConsole.programs.activeProgramId ?? 1) || 1,
-          );
-          const prog = liveConsole.programs.programs.find((p) => p.id === pid);
-          liveConsole.saveProgramSnapshot();
-          onLiveStatus?.(
-            `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы).`,
-          );
-        }}
-        className="spectacle-run-scheme__console"
-      />
+            <div className="light-scheme-layout spectacle-run-scheme__stage-row">
+              {liveStatus ? (
+                <span
+                  className="spectacle-run-scheme__live-dot"
+                  role="status"
+                  title={liveStatus}
+                  aria-label={liveStatus}
+                />
+              ) : null}
+              {ENABLE_3D_THEATER ? (
+                <SpectacleRunTheaterEmbed />
+              ) : (
+                <LightSchemeStageMap
+                  fixtures={lightPlot}
+                  gridCols={gridCols}
+                  gridRows={gridRows}
+                  lookModel={lookModel}
+                  selectedLightSlot={selectedLightSlot}
+                  highlightedChannel={null}
+                  editable={false}
+                  emptyPlotHint="Нет точек на плане. Расставьте софиты в 3D-театре."
+                />
+              )}
+              <div className="spectacle-run-scheme__console-col">
+                <LightConsoleView
+                  mode="live"
+                  lightChannels={liveConsole.lightChannels}
+                  selectedLightSlot={liveConsole.selectedLightSlot}
+                  faders={liveConsole.faders}
+                  programs={liveConsole.programs}
+                  spotlights={scene?.theaterSpotlights ?? []}
+                  consoleChannel={liveConsole.selectedLightSlot}
+                  onSelectChannel={liveConsole.selectChannel}
+                  onSelectProgram={liveConsole.selectProgram}
+                  onOpenSettings={onOpenConsoleSettings}
+                  channelColumns={channelColumns}
+                  onPatchFader={liveConsole.patchFader}
+                  onSaveActiveProgram={() => {
+                    const pid = Math.max(
+                      1,
+                      Math.trunc(liveConsole.programs.activeProgramId ?? 1) || 1,
+                    );
+                    const prog = liveConsole.programs.programs.find((p) => p.id === pid);
+                    liveConsole.saveProgramSnapshot();
+                    onLiveStatus?.(
+                      `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы).`,
+                    );
+                  }}
+                  className="spectacle-run-scheme__console"
+                />
+                <div
+                  className="spectacle-run-scheme__live-actions"
+                  role="group"
+                  aria-label="Живой свет"
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      "spectacle-run-scheme__live-action",
+                      liveBlackoutEnabled && "spectacle-run-scheme__live-action--active",
+                    )}
+                    aria-pressed={liveBlackoutEnabled}
+                    title={
+                      liveBlackoutEnabled
+                        ? "Снять блекаут — снова работают фейдеры"
+                        : "Блекаут: погасить сцену, фейдеры не менять"
+                    }
+                    onClick={() => {
+                      const nextEnabled = !liveBlackoutEnabled;
+                      requestTheaterLiveBlackout(nextEnabled);
+                      onLiveStatus?.(
+                        nextEnabled
+                          ? "Блекаут включён — сцена тёмная, фейдеры без изменений."
+                          : "Блекаут снят — снова работают установленные фейдеры.",
+                      );
+                    }}
+                  >
+                    Блекаут
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "spectacle-run-scheme__live-action",
+                      dutyLightEnabled && "spectacle-run-scheme__live-action--active",
+                    )}
+                    aria-pressed={dutyLightEnabled}
+                    title={
+                      dutyLightEnabled
+                        ? "Выключить дежурный свет"
+                        : "Включить дежурный свет"
+                    }
+                    onClick={() => {
+                      const nextEnabled = !dutyLightEnabled;
+                      patchTheaterViewPrefs(projectName, {
+                        dutyLightEnabled: nextEnabled,
+                      });
+                      requestTheaterDutyLight(nextEnabled);
+                    }}
+                  >
+                    Дежурка
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {activeTab === "requisites" ? (
+          <SpectacleRunRequisitesPanel scene={scene} tapeItem={tapeItem} />
+        ) : null}
+
+        {activeTab === "video" ? (
+          <SpectacleRunProjectorPanel mode="video" />
+        ) : null}
+
+        {activeTab === "projector" ? (
+          <SpectacleRunProjectorPanel mode="projector" />
+        ) : null}
+      </div>
     </div>
   );
 }

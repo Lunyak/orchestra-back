@@ -73,6 +73,8 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
   const textHidden = useAppSelector((state) => state.scriptUi.spectacleRunTextHidden);
   const lightPlotMode = useAppSelector((state) => state.scriptUi.lightPlotMode);
   const isProgRun = lightPlotMode === "prog-run";
+  const isProgRunRef = useRef(isProgRun);
+  isProgRunRef.current = isProgRun;
   const [progRunPaused, setProgRunPaused] = useState(() =>
     readProgRunPaused(projectName),
   );
@@ -168,10 +170,19 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
       },
     ) => {
       if (kadrModalOpenRef.current) return;
+      // Прогон только применяет look с ленты — пульт туда не пишет.
+      if (isProgRunRef.current) return;
 
       const item = tapeRef.current[index];
       const scene = item ? scenesRef.current[item.sceneIndex] : null;
       if (!item || !scene || item.isPlaceholder || !item.kadrId) return;
+
+      const kadrs = readSceneLightKadrs(scene);
+      const existingKadr = findKadrById(kadrs, item.kadrId);
+      const isBlackoutKadr =
+        existingKadr?.blackout === true ||
+        (existingKadr != null && existingKadr.programId <= 0);
+      if (isBlackoutKadr) return;
 
       const faders = snapshot?.faders ?? liveConsole.faders;
       const programs = snapshot?.programs ?? liveConsole.programs;
@@ -190,7 +201,7 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
         kadrId: item.kadrId,
         kadrNo: item.kadrNo,
         title: item.headingTitle,
-        kadrs: readSceneLightKadrs(scene),
+        kadrs,
         lightChannels,
         lightFaders: faders,
         lightPrograms: programs,
@@ -228,6 +239,7 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
   const scheduleLiveSave = useCallback(() => {
     if (applyingTapeRef.current) return;
     if (kadrModalOpenRef.current) return;
+    if (isProgRunRef.current) return;
     const item = tapeRef.current[tapeIndexRef.current];
     if (!item || item.isPlaceholder || !item.kadrId) return;
     const scene = scenesRef.current[item.sceneIndex];
@@ -399,12 +411,22 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
   }, [flushLiveSaveAtIndex]);
 
   useEffect(() => {
+    if (isProgRun) {
+      cancelPendingLiveSave();
+      return;
+    }
     if (applyingTapeRef.current) return;
     scheduleLiveSave();
     return () => {
       flushPendingLiveSave();
     };
-  }, [consoleSnapshotKey, flushPendingLiveSave, scheduleLiveSave]);
+  }, [
+    cancelPendingLiveSave,
+    consoleSnapshotKey,
+    flushPendingLiveSave,
+    isProgRun,
+    scheduleLiveSave,
+  ]);
 
   useEffect(() => {
     const onPageHide = () => {

@@ -8,6 +8,7 @@ export const ROUTES = {
   EVENT: "события/:eventSlug",
   ABOUTUS: "/команда",
   CONTACTS: "/контакты",
+  THEATER_WALK: "/театр",
 
   // Legacy (English) URLs — keep working for old bookmarks/links
   LEGACY_EVENTS: "events",

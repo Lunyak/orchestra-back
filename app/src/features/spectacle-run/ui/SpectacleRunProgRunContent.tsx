@@ -5,7 +5,6 @@ import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/sho
 import { usePlaybook } from "../../playbook";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
 import { KadrTape } from "./KadrTape";
-import { SpectacleRunProgRunNav } from "./SpectacleRunToolbar";
 
 export function SpectacleRunProgRunContent() {
   const { projectName } = useProject();
@@ -61,7 +60,6 @@ export function SpectacleRunProgRunContent() {
           onSelectIndex={run.goToTapeIndex}
         />
       </div>
-      <SpectacleRunProgRunNav />
     </div>
   );
 }

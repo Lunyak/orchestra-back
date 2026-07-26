@@ -107,7 +107,7 @@ export function NotesRunCardStrip({
 
   return (
     <div className="notes-run__strip-container">
-      <div ref={stripRef} className="notes-run__strip" role="tablist" aria-label="Карточки прогона">
+      <div ref={stripRef} className="notes-run__strip" role="tablist" aria-label="Карточки суфлера">
         {cards.map((card, index) => {
           const activeChip = index === cardIndex;
           const chipRef = activeChip ? activeChipRef : undefined;

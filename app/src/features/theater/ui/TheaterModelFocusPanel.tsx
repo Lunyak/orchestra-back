@@ -1,5 +1,6 @@
 import cn from "classnames";
 import { useEffect, useState } from "react";
+import { LabeledCheckbox } from "../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import type { ModelPlacementPreset } from "../model/theater-model-placement";
 import type { TheaterModelWorldSize } from "../model/theater-model-world-size";
 import { TheaterModelSizeFields } from "./TheaterModelSizeFields";
@@ -64,6 +65,8 @@ export type TheaterModelFocusPanelProps = {
   showDecorActions: boolean;
   hidden?: boolean;
   onToggleHidden?: () => void;
+  isRequisite?: boolean;
+  onToggleRequisite?: (next: boolean) => void;
   onPickTransform: (mode: TheaterModelTransformMode) => void;
   onRotateQuarter: (direction: "cw" | "ccw") => void;
   placementGrid?: { cols: number; rows: number };
@@ -83,6 +86,8 @@ export function TheaterModelFocusPanel({
   showDecorActions,
   hidden = false,
   onToggleHidden,
+  isRequisite = false,
+  onToggleRequisite,
   onPickTransform,
   onRotateQuarter,
   placementGrid,
@@ -177,6 +182,15 @@ export function TheaterModelFocusPanel({
           className="theater-focus-panel__size-fields"
           onCommit={onSizeCommit}
         />
+      ) : null}
+      {onToggleRequisite ? (
+        <LabeledCheckbox
+          className="theater-focus-panel__requisite"
+          checked={isRequisite}
+          onChange={onToggleRequisite}
+        >
+          Реквизит
+        </LabeledCheckbox>
       ) : null}
       <div className="theater-model-context-menu__row theater-model-focus-transform-row">
         {(["translate", "rotate", "scale"] as const).map((mode) => {

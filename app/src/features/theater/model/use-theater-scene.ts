@@ -221,6 +221,7 @@ export function useTheaterScene({
     lightFaders: playbookData?.lightFaders,
     lightPrograms: resolvedLightPrograms,
     consoleChannel: selectedLightSlot > 0 ? selectedLightSlot : undefined,
+    liveBlackoutEnabled: prefs.liveBlackoutEnabled,
   });
   const {
     spotlights,

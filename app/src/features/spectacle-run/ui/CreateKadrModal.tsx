@@ -1,5 +1,9 @@
 import cn from "classnames";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from "../../../shared/core/custom-select/CustomSelect";
 import { Modal } from "../../../shared/core/modal/Modal";
 import type {
   PlaybookHoldImage,
@@ -9,7 +13,14 @@ import type {
   SceneProjectorSettingsV1,
   PlaybookVideo,
 } from "../../playbook/model/playbook-slice";
-import type { TheaterSpotlight } from "../../../shared/types/script";
+import type {
+  SceneLightKadrRequisiteActionV1,
+  ScriptRequisite,
+  TheaterModel,
+  TheaterSpotlight,
+} from "../../../shared/types/script";
+import type { RequisiteAssigneeOption } from "../../../shared/components/show-script/components/RequisitesPanel";
+import { CreateKadrRequisitesSection } from "./CreateKadrRequisitesSection";
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
@@ -47,6 +58,11 @@ export type CreateKadrModalProps = {
   videos: PlaybookVideo[];
   holdImages: PlaybookHoldImage[];
   projector?: SceneProjectorSettingsV1 | null;
+  sceneRequisites?: ScriptRequisite[];
+  theaterModels?: TheaterModel[];
+  assigneeOptions?: RequisiteAssigneeOption[];
+  accessToken?: string | null;
+  onSceneRequisitesChange?: (next: ScriptRequisite[]) => void;
   onClose: () => void;
   onSubmit: (draft: CreateKadrDraft) => void;
 };
@@ -149,6 +165,11 @@ export function CreateKadrModal({
   videos,
   holdImages,
   projector = null,
+  sceneRequisites = [],
+  theaterModels = [],
+  assigneeOptions = [],
+  accessToken = null,
+  onSceneRequisitesChange,
   onClose,
   onSubmit,
 }: CreateKadrModalProps) {
@@ -351,6 +372,34 @@ export function CreateKadrModal({
     });
   }, []);
 
+  const toggleRequisiteCue = useCallback((requisiteId: number) => {
+    setDraft((prev) => {
+      const exists = prev.requisites.some((cue) => cue.requisiteId === requisiteId);
+      if (exists) {
+        return {
+          ...prev,
+          requisites: prev.requisites.filter((cue) => cue.requisiteId !== requisiteId),
+        };
+      }
+      return {
+        ...prev,
+        requisites: [...prev.requisites, { requisiteId, action: "setup" }],
+      };
+    });
+  }, []);
+
+  const setRequisiteAction = useCallback(
+    (requisiteId: number, action: SceneLightKadrRequisiteActionV1) => {
+      setDraft((prev) => ({
+        ...prev,
+        requisites: prev.requisites.map((cue) =>
+          cue.requisiteId === requisiteId ? { ...cue, action } : cue,
+        ),
+      }));
+    },
+    [],
+  );
+
   const toggleChannel = useCallback(
     (channel: number) => {
       setDraft((prev) => {
@@ -438,6 +487,40 @@ export function CreateKadrModal({
   const channelsLabel = formatSofitChannelsLabel(draft.recordChannels);
   const programCount = Math.max(lightChannels.length, programs.programs.length, 8);
 
+  const playlistOptions: CustomSelectOption[] = [
+    { value: "", label: "— без музыки —" },
+    ...playlist.map((track) => ({
+      value: String(track.id),
+      label: track.title?.trim() || `Трек ${track.id}`,
+    })),
+  ];
+
+  const projectorOptions: CustomSelectOption[] = [
+    { value: "none", label: "— без видео —" },
+    { value: "hold", label: "Заставка по умолчанию" },
+    ...holdImages.map((hold) => ({
+      value: `hold:${hold.id}`,
+      label: `Заставка: ${hold.title?.trim() || hold.id}`,
+    })),
+    ...videos.map((video) => ({
+      value: String(video.id),
+      label: `Видео: ${video.title?.trim() || video.id}`,
+    })),
+  ];
+
+  const programOptions: CustomSelectOption[] = Array.from(
+    { length: programCount },
+    (_, index) => {
+      const id = index + 1;
+      const program = programs.programs.find((item) => item.id === id);
+      const label = program?.label?.trim() || `П${id}`;
+      return {
+        value: String(id),
+        label: `П${id} · ${label}`,
+      };
+    },
+  );
+
   return (
     <Modal
       isOpen={isOpen}
@@ -470,24 +553,20 @@ export function CreateKadrModal({
           <h3 className="create-kadr-modal__section-title">Звук</h3>
           <label className="create-kadr-modal__field">
             <span className="create-kadr-modal__label">Музыка из плейлиста</span>
-            <select
-              className="create-kadr-modal__select"
-              value={draft.playTrackId ?? ""}
-              onChange={(e) => {
-                const id = Math.trunc(Number(e.target.value) || 0);
+            <CustomSelect
+              value={draft.playTrackId != null ? String(draft.playTrackId) : ""}
+              options={playlistOptions}
+              onChange={(value) => {
+                const id = Math.trunc(Number(value) || 0);
                 setDraft((prev) => ({
                   ...prev,
                   playTrackId: id > 0 ? id : null,
                 }));
               }}
-            >
-              <option value="">— без музыки —</option>
-              {playlist.map((track) => (
-                <option key={track.id} value={track.id}>
-                  {track.title?.trim() || `Трек ${track.id}`}
-                </option>
-              ))}
-            </select>
+              searchable={playlist.length > 6}
+              className="create-kadr-modal__select"
+              aria-label="Музыка из плейлиста"
+            />
           </label>
           {sounds.length > 0 ? (
             <div className="create-kadr-modal__checks">
@@ -519,29 +598,19 @@ export function CreateKadrModal({
           <div className="create-kadr-modal__projector-row">
             <label className="create-kadr-modal__field create-kadr-modal__field--grow">
               <span className="create-kadr-modal__label">Видео или заставка</span>
-              <select
-                className="create-kadr-modal__select"
+              <CustomSelect
                 value={projectorValue}
-                onChange={(e) =>
+                options={projectorOptions}
+                onChange={(value) =>
                   setDraft((prev) => ({
                     ...prev,
-                    projectorCue: parseProjectorSelectValue(e.target.value, prev.projectorCue),
+                    projectorCue: parseProjectorSelectValue(value, prev.projectorCue),
                   }))
                 }
-              >
-                <option value="none">— без видео —</option>
-                <option value="hold">Заставка по умолчанию</option>
-                {holdImages.map((hold) => (
-                  <option key={`hold-${hold.id}`} value={`hold:${hold.id}`}>
-                    Заставка: {hold.title?.trim() || hold.id}
-                  </option>
-                ))}
-                {videos.map((video) => (
-                  <option key={`video-${video.id}`} value={String(video.id)}>
-                    Видео: {video.title?.trim() || video.id}
-                  </option>
-                ))}
-              </select>
+                searchable={projectorOptions.length > 8}
+                className="create-kadr-modal__select"
+                aria-label="Видео или заставка"
+              />
             </label>
             {isProjectorVideo ? (
               <label
@@ -609,27 +678,19 @@ export function CreateKadrModal({
             <>
               <label className="create-kadr-modal__field">
                 <span className="create-kadr-modal__label">Программа</span>
-                <select
-                  className="create-kadr-modal__select"
-                  value={draft.programId}
-                  onChange={(e) =>
+                <CustomSelect
+                  value={String(draft.programId)}
+                  options={programOptions}
+                  onChange={(value) =>
                     setDraft((prev) => ({
                       ...prev,
-                      programId: Math.max(1, Math.trunc(Number(e.target.value) || 1)),
+                      programId: Math.max(1, Math.trunc(Number(value) || 1)),
                     }))
                   }
-                >
-                  {Array.from({ length: programCount }, (_, index) => {
-                    const id = index + 1;
-                    const program = programs.programs.find((item) => item.id === id);
-                    const label = program?.label?.trim() || `П${id}`;
-                    return (
-                      <option key={id} value={id}>
-                        П{id} · {label}
-                      </option>
-                    );
-                  })}
-                </select>
+                  searchable={false}
+                  className="create-kadr-modal__select"
+                  aria-label="Программа света"
+                />
               </label>
 
               <div className="create-kadr-modal__channels">
@@ -718,7 +779,7 @@ export function CreateKadrModal({
             </>
           ) : (
             <p className="create-kadr-modal__hint">
-              В тех. карте картина будет помечена как блекаут.
+              В прогоне картина будет помечена как блекаут.
             </p>
           )}
         </section>
@@ -878,6 +939,25 @@ export function CreateKadrModal({
             ) : null}
           </div>
         </section>
+
+        <CreateKadrRequisitesSection
+          sceneRequisites={sceneRequisites}
+          onSceneRequisitesChange={(next) => {
+            onSceneRequisitesChange?.(next);
+            const ids = new Set(next.map((item) => item.id));
+            setDraft((prev) => ({
+              ...prev,
+              requisites: prev.requisites.filter((cue) => ids.has(cue.requisiteId)),
+            }));
+          }}
+          theaterModels={theaterModels}
+          draftCues={draft.requisites}
+          onToggleCue={toggleRequisiteCue}
+          onCueActionChange={setRequisiteAction}
+          assigneeOptions={assigneeOptions}
+          accessToken={accessToken}
+          projectSlug={projectName}
+        />
       </div>
 
       <footer className="create-kadr-modal__foot">

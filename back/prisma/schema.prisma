@@ -283,7 +283,7 @@ model Playbook {
   lightFaders Json?
   /// Программы света: сохранённые состояния фейдеров
   lightPrograms Json?
-  /// Какие K отмечены для записи в техкарту (toggles над схемой)
+  /// Какие K отмечены для записи в картину (toggles над схемой)
   lightChannelRoles Json?
   /// Видео проектора и заставка (v1: videos + projector)
   projectorMedia Json?
@@ -454,7 +454,7 @@ model Scene {
   kanbanStatus String?
   kanbanOrder  Int?
   cast         Json?
-  /// Снимки картин света (фейдеры по K+F), синхронизируются с markdown
+  /// Снимки картин света (фейдеры по K+F). Источник истины для прогона — JSON.
   lightKadrs   Json?
   order        Int
   createdAt    DateTime @default(now())
@@ -470,11 +470,23 @@ model Scene {
 }
 
 model SceneRequisite {
-  id       String @id @default(cuid())
-  sceneId  String
-  sourceId Int
-  label    String
-  checked  Boolean @default(false)
+  id             String  @id @default(cuid())
+  sceneId        String
+  sourceId       Int
+  label          String
+  checked        Boolean @default(false)
+  /// sourceId модели 3D-театра, если реквизит связан с ней
+  theaterModelId Int?
+  /// Ключ аватарки реквизита в project files
+  avatarKey      String?
+  /// Ответственный (email участника)
+  assigneeEmail  String?
+  /// Действие: setup | strike | use
+  duty           String?
+  /// Куда ставить (duty=setup)
+  placeNote      String?
+  /// Что сделать (duty=use)
+  actionNote     String?
 
   scene    Scene  @relation(fields: [sceneId], references: [id])
 }
@@ -505,6 +517,7 @@ model TheaterModel {
   allowOutOfBounds Boolean @default(false)
   ignoreCollisions Boolean @default(false)
   modelLowDetail   Boolean @default(false)
+  isRequisite      Boolean @default(false)
   position        Json
   rotation        Json
   scale           Json

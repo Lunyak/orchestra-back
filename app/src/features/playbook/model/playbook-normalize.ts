@@ -1,4 +1,10 @@
-import type { ScriptScene, TheaterDoor, TheaterLayout } from "../../../shared/types/script";
+import type {
+  ScriptRequisite,
+  ScriptRequisiteDuty,
+  ScriptScene,
+  TheaterDoor,
+  TheaterLayout,
+} from "../../../shared/types/script";
 import { readLegacyPlaybookScenesArray } from "../../../shared/playbook/legacy-scene-json";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { normalizeDoors } from "../../theater/model/theater-doors";
@@ -44,6 +50,177 @@ export function normalizeRequisiteAssignees(value: unknown): string[] {
     : [];
 }
 
+const REQUISITE_DUTIES: ReadonlySet<ScriptRequisiteDuty> = new Set([
+  "setup",
+  "strike",
+  "use",
+]);
+
+function normalizeRequisiteDuty(value: unknown): ScriptRequisiteDuty | undefined {
+  const raw = String(value ?? "").trim();
+  return REQUISITE_DUTIES.has(raw as ScriptRequisiteDuty)
+    ? (raw as ScriptRequisiteDuty)
+    : undefined;
+}
+
+function normalizeRequisiteAssigneeEmail(value: unknown): string | undefined {
+  const email = String(value ?? "")
+    .trim()
+    .toLowerCase();
+  return email || undefined;
+}
+
+function normalizeRequisiteNote(value: unknown): string | undefined {
+  const note = String(value ?? "").trim();
+  return note || undefined;
+}
+
+function resolveRequisiteAssignment(req: Record<string, unknown>): {
+  assigneeEmail?: string;
+  duty?: ScriptRequisiteDuty;
+} {
+  const directEmail = normalizeRequisiteAssigneeEmail(req.assigneeEmail);
+  const directDuty = normalizeRequisiteDuty(req.duty);
+  if (directEmail) {
+    return {
+      assigneeEmail: directEmail,
+      duty: directDuty ?? "setup",
+    };
+  }
+
+  const setupLegacy = normalizeRequisiteAssignees(req.setupAssignees)[0];
+  if (setupLegacy) {
+    return {
+      assigneeEmail: normalizeRequisiteAssigneeEmail(setupLegacy),
+      duty: "setup",
+    };
+  }
+
+  const removeLegacy = normalizeRequisiteAssignees(req.removeAssignees)[0];
+  if (removeLegacy) {
+    return {
+      assigneeEmail: normalizeRequisiteAssigneeEmail(removeLegacy),
+      duty: "strike",
+    };
+  }
+
+  if (directDuty) {
+    return { duty: directDuty };
+  }
+
+  return {};
+}
+
+function requisiteLabelKey(label: string): string {
+  return label.trim().toLowerCase();
+}
+
+/**
+ * Unique positive ids + collapse accidental duplicates
+ * (same theaterModelId or same label after lost 3D link / repeated sync).
+ * idRemap: old id → kept id (for kadr cues).
+ */
+export function normalizeScriptRequisitesWithRemap(raw: unknown): {
+  items: ScriptRequisite[];
+  idRemap: Map<number, number>;
+} {
+  if (!Array.isArray(raw)) return { items: [], idRemap: new Map() };
+  const usedIds = new Set<number>();
+  let maxId = 0;
+  const mapped: ScriptRequisite[] = [];
+
+  for (const row of raw) {
+    const req = row as Record<string, unknown> | null;
+    if (!req || typeof req !== "object") continue;
+    const theaterModelIdRaw = Number(req.theaterModelId ?? 0);
+    const hasTheaterModelId =
+      Number.isFinite(theaterModelIdRaw) && theaterModelIdRaw > 0;
+    const assignment = resolveRequisiteAssignment(req);
+    const placeNote = normalizeRequisiteNote(req.placeNote);
+    const actionNote = normalizeRequisiteNote(req.actionNote);
+    const avatarKey = String(req.avatarKey ?? "").trim() || undefined;
+    mapped.push({
+      id: Math.trunc(Number(req.sourceId ?? req.id ?? 0)) || 0,
+      label: String(req.label ?? ""),
+      checked: Boolean(req.checked),
+      ...(hasTheaterModelId
+        ? { theaterModelId: Math.trunc(theaterModelIdRaw) }
+        : {}),
+      ...(avatarKey ? { avatarKey } : {}),
+      ...assignment,
+      ...(placeNote ? { placeNote } : {}),
+      ...(actionNote ? { actionNote } : {}),
+    });
+  }
+
+  for (const item of mapped) {
+    if (item.id > 0) maxId = Math.max(maxId, item.id);
+  }
+
+  const withUniqueIds = mapped.map((item) => {
+    const idValid = item.id > 0 && !usedIds.has(item.id);
+    const id = idValid ? item.id : ++maxId;
+    usedIds.add(id);
+    return id === item.id ? item : { ...item, id };
+  });
+
+  const items: ScriptRequisite[] = [];
+  const idRemap = new Map<number, number>();
+  const keptByModelId = new Map<number, number>();
+  const keptByLabel = new Map<string, number>();
+  const keptIndexById = new Map<number, number>();
+
+  const mergeIntoKept = (keptId: number, incoming: ScriptRequisite) => {
+    const keptIndex = keptIndexById.get(keptId);
+    if (keptIndex == null) return;
+    const kept = items[keptIndex];
+    if (!kept) return;
+    items[keptIndex] = {
+      ...kept,
+      ...(incoming.assigneeEmail ? { assigneeEmail: incoming.assigneeEmail } : {}),
+      ...(incoming.duty ? { duty: incoming.duty } : {}),
+      ...(incoming.placeNote ? { placeNote: incoming.placeNote } : {}),
+      ...(incoming.actionNote ? { actionNote: incoming.actionNote } : {}),
+      ...(incoming.avatarKey ? { avatarKey: incoming.avatarKey } : {}),
+    };
+  };
+
+  for (const item of withUniqueIds) {
+    const modelId = item.theaterModelId;
+    if (modelId != null && modelId > 0) {
+      const keptId = keptByModelId.get(modelId);
+      if (keptId != null) {
+        idRemap.set(item.id, keptId);
+        mergeIntoKept(keptId, item);
+        continue;
+      }
+      keptByModelId.set(modelId, item.id);
+    }
+
+    const labelKey = requisiteLabelKey(item.label);
+    if (labelKey) {
+      const keptId = keptByLabel.get(labelKey);
+      if (keptId != null) {
+        idRemap.set(item.id, keptId);
+        mergeIntoKept(keptId, item);
+        continue;
+      }
+      keptByLabel.set(labelKey, item.id);
+    }
+
+    idRemap.set(item.id, item.id);
+    keptIndexById.set(item.id, items.length);
+    items.push(item);
+  }
+
+  return { items, idRemap };
+}
+
+/** Unique positive ids — duplicate sourceId makes assignee edits apply to every twin. */
+export function normalizeScriptRequisites(raw: unknown): ScriptRequisite[] {
+  return normalizeScriptRequisitesWithRemap(raw).items;
+}
+
 /** Единый маппинг сцены из sync API (web pull, desktop resync, prefetch). */
 export function normalizeScriptSceneFromSyncApi(st: unknown): ScriptScene | null {
   const row = st as Record<string, unknown> | null;
@@ -67,18 +244,7 @@ export function normalizeScriptSceneFromSyncApi(st: unknown): ScriptScene | null
       row?.kanbanOrder != null && Number.isFinite(Number(row.kanbanOrder))
         ? Math.trunc(Number(row.kanbanOrder))
         : undefined,
-    requisites: Array.isArray(row?.requisites)
-      ? row.requisites.map((r: unknown) => {
-          const req = r as Record<string, unknown>;
-          return {
-            id: Number(req?.sourceId ?? req?.id ?? 0),
-            label: String(req?.label ?? ""),
-            checked: Boolean(req?.checked),
-            setupAssignees: normalizeRequisiteAssignees(req?.setupAssignees),
-            removeAssignees: normalizeRequisiteAssignees(req?.removeAssignees),
-          };
-        })
-      : [],
+    requisites: normalizeScriptRequisites(row?.requisites),
     lightPlot: Array.isArray(row?.lightPlot)
       ? row.lightPlot.map((f: unknown) => {
           const fixture = f as Record<string, unknown>;

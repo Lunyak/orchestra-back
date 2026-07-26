@@ -815,6 +815,8 @@ export function formatPlayText(
   }
 
   text = joinPlayTextZones({ prefix, castContent, body });
+  // Пробел перед ремаркой даёт «дырку» у лейбла; `]](…)` в превью защищается отдельно.
+  text = text.replace(/\]\]\s+\(/g, "]](");
 
   const resolvedUnmatched =
     roleSpecs.length > 0 ? findUnmatchedRoleMarkers(text, roleSpecs) : [];

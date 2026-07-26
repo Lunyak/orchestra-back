@@ -1,4 +1,3 @@
-import { Button } from "@shared/core/button/Button";
 import type { ShowScriptMarkdownMode } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 import { ScriptMarkdownTabs } from "./ScriptMarkdownTabs";
 
@@ -8,34 +7,27 @@ export function ScriptMarkdownToolbar({
   playOriginalMode,
   onTogglePlayOriginal,
   showTabs = true,
-  editorToggles,
 }: {
   markdownMode: ShowScriptMarkdownMode;
   onSetMarkdownMode: (mode: ShowScriptMarkdownMode) => void;
   playOriginalMode?: boolean;
   onTogglePlayOriginal?: () => void;
   showTabs?: boolean;
-  editorToggles?: null | {
-    tocEnabled: boolean;
-    onToggleToc: () => void;
-  };
 }) {
-  if (!showTabs && !editorToggles) return null;
+  if (!showTabs) return null;
 
   const showPlayOriginalToggle =
-    showTabs && markdownMode === "play" && onTogglePlayOriginal != null;
+    markdownMode === "play" && onTogglePlayOriginal != null;
 
   return (
     <div className="script-markdown-toolbar">
-      {showTabs ? (
-        <ScriptMarkdownTabs
-          markdownMode={markdownMode}
-          onSetMarkdownMode={onSetMarkdownMode}
-          tabsClassName="script-markdown-tabs"
-          tabClassName="script-markdown-tab"
-          activeTabClassName="script-markdown-tab--active"
-        />
-      ) : null}
+      <ScriptMarkdownTabs
+        markdownMode={markdownMode}
+        onSetMarkdownMode={onSetMarkdownMode}
+        tabsClassName="script-markdown-tabs"
+        tabClassName="script-markdown-tab"
+        activeTabClassName="script-markdown-tab--active"
+      />
       {showPlayOriginalToggle ? (
         <button
           type="button"
@@ -55,25 +47,6 @@ export function ScriptMarkdownToolbar({
         >
           Оригинал
         </button>
-      ) : null}
-      {editorToggles ? (
-        <div className="show-script__control-wrap">
-          <Button
-            variant="ghost"
-            className="show-script__rail-btn"
-            data-role="toc-toggle"
-            onClick={editorToggles.onToggleToc}
-            title={
-              editorToggles.tocEnabled
-                ? "Скрыть оглавление"
-                : "Показать оглавление"
-            }
-            aria-pressed={editorToggles.tocEnabled}
-            data-active={editorToggles.tocEnabled ? "true" : "false"}
-          >
-            &#129526;
-          </Button>
-        </div>
       ) : null}
     </div>
   );

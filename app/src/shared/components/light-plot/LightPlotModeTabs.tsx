@@ -1,3 +1,4 @@
+import cn from "classnames";
 import type { ReactNode } from "react";
 
 export type LightPlotModeTabsProps = {
@@ -13,12 +14,10 @@ export function LightPlotModeTabs({
 
   return (
     <div
-      className={[
+      className={cn(
         "light-plot-mode-tabs",
-        hasCenter ? "light-plot-mode-tabs--with-center" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        hasCenter && "light-plot-mode-tabs--with-center",
+      )}
     >
       {hasCenter ? <div className="light-plot-mode-tabs__center">{center}</div> : null}
       {trailing ? <div className="light-plot-mode-tabs__end">{trailing}</div> : null}

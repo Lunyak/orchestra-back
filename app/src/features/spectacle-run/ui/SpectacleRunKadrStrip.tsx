@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type Ref } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type Ref,
+} from "react";
 
 import cn from "classnames";
 
@@ -66,6 +75,14 @@ import { useKadrStripDragScroll } from "../model/useKadrStripDragScroll";
 import { useKadrStripImageSrc } from "../model/useKadrStripImageSrc";
 
 import { useProgRunKadrChipHeight } from "../model/useProgRunKadrChipHeight";
+
+const PRIMARY_PROG_RUN_ROW_LABELS = new Set([
+  "Свет",
+  "Звук",
+  "Видео",
+  "Переход",
+  "Комментарий",
+]);
 
 export type SpectacleRunKadrStripVariant = "rehearsal" | "prog-run";
 
@@ -167,7 +184,7 @@ type KadrStripChipBaseProps = {
 
   onSelect: () => void;
 
-  chipRef?: Ref<HTMLButtonElement>;
+  chipRef?: Ref<HTMLElement>;
 
 };
 
@@ -201,17 +218,25 @@ function SpectacleRunKadrStripChipFieldValue({
 
   projectorCtx,
 
+  hideProjectorPreview = false,
+
 }: {
 
   row: KadrStripTechRow;
 
   projectorCtx: ProjectorMediaContext | null;
 
+  hideProjectorPreview?: boolean;
+
 }) {
 
   const preview = row.projectorPreview;
 
-  const hasPreview = row.label === "Видео" && preview != null && projectorCtx != null;
+  const hasPreview =
+    !hideProjectorPreview &&
+    row.label === "Видео" &&
+    preview != null &&
+    projectorCtx != null;
 
 
 
@@ -407,6 +432,8 @@ function SpectacleRunKadrStripProgRunChip({
 
 }) {
 
+  const [requisitesOpen, setRequisitesOpen] = useState(false);
+
   const { imageSrc, onImageError, hasThumb, fallbackColor, chipAccentStyle } = useKadrStripChipImage(
 
     projectName,
@@ -417,15 +444,87 @@ function SpectacleRunKadrStripProgRunChip({
 
   );
 
+  const preferredRows = summary.rows.filter((row) =>
+    PRIMARY_PROG_RUN_ROW_LABELS.has(row.label),
+  );
 
+  const unorderedPrimary =
+    preferredRows.length > 0 ? preferredRows : summary.rows.slice(0, 5);
+
+  const rowsBeforeTransition = unorderedPrimary.filter((row) => row.label !== "Переход");
+
+  const transitionRows = unorderedPrimary.filter((row) => row.label === "Переход");
+
+  const primaryLabelSet = new Set(unorderedPrimary.map((row) => row.label));
+
+  const hiddenRowCount = summary.rows.filter((row) => !primaryLabelSet.has(row.label)).length;
+
+  const requisiteItems = summary.requisites;
+
+  const hasRequisites = requisiteItems.length > 0;
+
+  const hasFields =
+    rowsBeforeTransition.length > 0 ||
+    transitionRows.length > 0 ||
+    hasRequisites ||
+    hiddenRowCount > 0;
+
+  const cornerLabels = summary.cornerLabels.filter(
+
+    (label) => !(summary.blackout && label.type === "blackout"),
+
+  );
+
+  const projectorPreview = summary.projectorPreview;
+
+  const coverHoldId =
+    projectorPreview?.mode === "hold"
+      ? projectorPreview.holdId ??
+        (projectorCtx ? resolveDefaultHoldId(projectorCtx) : null)
+      : null;
+
+  const showImageCover = hasThumb;
+
+  const showProjectorCover =
+    !showImageCover &&
+    projectorPreview != null &&
+    projectorCtx != null &&
+    (projectorPreview.mode === "video"
+      ? projectorPreview.videoId != null && projectorPreview.videoId > 0
+      : true);
+
+  const handleChipKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelect();
+  };
+
+  const handleRequisitesToggle = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setRequisitesOpen((prev) => !prev);
+  };
+
+  const renderFieldRow = (row: KadrStripTechRow) => (
+    <span key={row.label} className="spectacle-run-kadr-strip__chip-field">
+      <span className="spectacle-run-kadr-strip__chip-field-label">{row.label}</span>
+      <SpectacleRunKadrStripChipFieldValue
+        row={row}
+        projectorCtx={projectorCtx}
+        hideProjectorPreview={showProjectorCover}
+      />
+    </span>
+  );
 
   return (
 
-    <button
+    <div
 
       ref={chipRef}
 
-      type="button"
+      role="button"
+
+      tabIndex={0}
 
       className="spectacle-run-kadr-strip__chip"
 
@@ -433,7 +532,7 @@ function SpectacleRunKadrStripProgRunChip({
 
       data-placeholder={item.isPlaceholder ? "true" : undefined}
 
-      data-has-thumb={hasThumb ? "true" : undefined}
+      data-has-thumb={showImageCover || showProjectorCover ? "true" : undefined}
 
       data-has-fallback-color={fallbackColor ? "true" : undefined}
 
@@ -444,6 +543,8 @@ function SpectacleRunKadrStripProgRunChip({
       title={title}
 
       onClick={onSelect}
+
+      onKeyDown={handleChipKeyDown}
 
     >
 
@@ -477,7 +578,7 @@ function SpectacleRunKadrStripProgRunChip({
 
             "spectacle-run-kadr-strip__chip-cover",
 
-            hasThumb && "spectacle-run-kadr-strip__chip-cover--thumb",
+            (showImageCover || showProjectorCover) && "spectacle-run-kadr-strip__chip-cover--thumb",
 
           )}
 
@@ -485,7 +586,7 @@ function SpectacleRunKadrStripProgRunChip({
 
         >
 
-          {hasThumb ? (
+          {showImageCover ? (
 
             <img
 
@@ -499,13 +600,35 @@ function SpectacleRunKadrStripProgRunChip({
 
             />
 
+          ) : showProjectorCover && projectorPreview && projectorCtx ? (
+
+            <ProjectorMediaPreview
+
+              ctx={projectorCtx}
+
+              mode={projectorPreview.mode}
+
+              videoId={projectorPreview.videoId}
+
+              holdId={coverHoldId}
+
+              title={projectorPreview.title}
+
+              className="spectacle-run-kadr-strip__chip-cover-preview"
+
+              fallbackClassName="spectacle-run-kadr-strip__chip-cover-fallback"
+
+              hideFallbackLabel
+
+            />
+
           ) : null}
 
-          {summary.cornerLabels.length > 0 ? (
+          {cornerLabels.length > 0 ? (
 
             <span className="spectacle-run-kadr-strip__chip-corner-labels">
 
-              {summary.cornerLabels.map((label) => (
+              {cornerLabels.map((label) => (
 
                 <span
 
@@ -536,21 +659,66 @@ function SpectacleRunKadrStripProgRunChip({
 
         <span className="spectacle-run-kadr-strip__chip-body">
 
-          {summary.rows.length > 0 ? (
+          {hasFields ? (
 
             <span className="spectacle-run-kadr-strip__chip-fields">
 
-              {summary.rows.map((row) => (
+              {rowsBeforeTransition.map(renderFieldRow)}
 
-                <span key={row.label} className="spectacle-run-kadr-strip__chip-field">
+              {hasRequisites ? (
 
-                  <span className="spectacle-run-kadr-strip__chip-field-label">{row.label}</span>
-
-                  <SpectacleRunKadrStripChipFieldValue row={row} projectorCtx={projectorCtx} />
-
+                <span
+                  className={cn(
+                    "spectacle-run-kadr-strip__chip-requisites",
+                    requisitesOpen && "spectacle-run-kadr-strip__chip-requisites--open",
+                  )}
+                >
+                  <button
+                    type="button"
+                    className="spectacle-run-kadr-strip__chip-requisites-toggle"
+                    aria-expanded={requisitesOpen}
+                    onClick={handleRequisitesToggle}
+                  >
+                    <span
+                      className="spectacle-run-kadr-strip__chip-requisites-chevron"
+                      aria-hidden
+                    >
+                      {requisitesOpen ? "▾" : "▸"}
+                    </span>
+                    <span className="spectacle-run-kadr-strip__chip-requisites-title">
+                      Реквизит
+                    </span>
+                    <span className="spectacle-run-kadr-strip__chip-requisites-count">
+                      {requisiteItems.length}
+                    </span>
+                  </button>
+                  {requisitesOpen ? (
+                    <span className="spectacle-run-kadr-strip__chip-requisites-list">
+                      {requisiteItems.map((itemRow, index) => {
+                        const line = `${itemRow.actionLabel} · ${itemRow.name}`;
+                        return (
+                          <span
+                            key={`${itemRow.name}-${itemRow.actionLabel}-${index}`}
+                            className="spectacle-run-kadr-strip__chip-requisites-item"
+                            title={line}
+                          >
+                            {line}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  ) : null}
                 </span>
 
-              ))}
+              ) : null}
+
+              {transitionRows.map(renderFieldRow)}
+
+              {hiddenRowCount > 0 ? (
+
+                <span className="spectacle-run-kadr-strip__chip-more">ещё {hiddenRowCount}</span>
+
+              ) : null}
 
             </span>
 
@@ -564,7 +732,7 @@ function SpectacleRunKadrStripProgRunChip({
 
       </span>
 
-    </button>
+    </div>
 
   );
 
@@ -628,7 +796,7 @@ export function SpectacleRunKadrStrip({
 
   const stripRef = useRef<HTMLElement>(null);
 
-  const activeChipRef = useRef<HTMLButtonElement | null>(null);
+  const activeChipRef = useRef<HTMLElement | null>(null);
 
   const { consumeDrag } = useKadrStripDragScroll(trackRef);
 

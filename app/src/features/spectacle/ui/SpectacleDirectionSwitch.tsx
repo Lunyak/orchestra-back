@@ -1,5 +1,5 @@
 import cn from "classnames";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useProject } from "../../project";
 import {
   scriptUiActions,
@@ -10,9 +10,12 @@ import {
   type ShowScriptMarkdownMode,
   selectShowScriptMarkdownUi,
 } from "../../show-script-markdown/model/show-script-markdown-slice";
-import { SCRIPT_MARKDOWN_NOTES_TAB_LABEL } from "../../../shared/components/show-script/script-markdown-tab-labels";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { SpectacleScriptFormattingHost } from "./SpectacleScriptFormattingHost";
+import {
+  SpectacleTechChromeCenterSlot,
+  SpectacleTechChromeLeftSlot,
+} from "./spectacle-tech-chrome-slots";
 import "./spectacle-direction-switch.css";
 
 const SCRIPT_SCENE_NAME = "script";
@@ -23,19 +26,15 @@ const SCRIPT_MODE_ITEMS: ReadonlyArray<{
 }> = [
   { mode: "play", label: "Текст" },
   { mode: "explication", label: "Экспликация" },
-  { mode: "notes", label: SCRIPT_MARKDOWN_NOTES_TAB_LABEL },
   { mode: "comments", label: "Комментарии" },
-  { mode: "requisites", label: "Реквизит" },
-  { mode: "light", label: "Свет" },
 ];
 
 const TECH_MODE_ITEMS: ReadonlyArray<{
-  id: LightPlotMode | "tech-card";
+  id: LightPlotMode;
   label: string;
 }> = [
-  { id: "rehearsal", label: "Спектакль" },
+  { id: "rehearsal", label: "Сборка" },
   { id: "prog-run", label: "Прогон" },
-  { id: "tech-card", label: SCRIPT_MARKDOWN_NOTES_TAB_LABEL },
 ];
 
 function SpectacleScriptModeSwitchList() {
@@ -46,7 +45,7 @@ function SpectacleScriptModeSwitchList() {
     projectName
       ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME)
           .markdownMode
-      : "notes",
+      : "play",
   );
 
   const handleSelectMode = (mode: ShowScriptMarkdownMode) => {
@@ -100,32 +99,9 @@ function SpectacleScriptModeSwitchList() {
 
 function SpectacleTechModeSwitchList() {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
-  const { projectName } = useProject();
   const lightPlotMode = useAppSelector((state) => state.scriptUi.lightPlotMode);
 
-  const handleSelectMode = (id: LightPlotMode | "tech-card") => {
-    if (id === "tech-card") {
-      if (!projectName) return;
-      try {
-        localStorage.setItem(
-          `showScript:markdownMode:${projectName}:${SCRIPT_SCENE_NAME}`,
-          "notes",
-        );
-      } catch {
-        // ignore
-      }
-      dispatch(
-        showScriptMarkdownActions.setMarkdownMode({
-          projectSlug: projectName,
-          sceneName: SCRIPT_SCENE_NAME,
-          mode: "notes",
-        }),
-      );
-      navigate("/");
-      return;
-    }
-
+  const handleSelectMode = (id: LightPlotMode) => {
     dispatch(scriptUiActions.setLightPlotMode({ mode: id }));
   };
 
@@ -135,7 +111,7 @@ function SpectacleTechModeSwitchList() {
       aria-label="Режим техчасти"
     >
       {TECH_MODE_ITEMS.map(({ id, label }) => {
-        const isActive = id !== "tech-card" && lightPlotMode === id;
+        const isActive = lightPlotMode === id;
         return (
           <li key={id}>
             <button
@@ -145,7 +121,6 @@ function SpectacleTechModeSwitchList() {
                 isActive && "spectacle-direction-switch__item--active",
               )}
               aria-pressed={isActive}
-              disabled={id === "tech-card" ? !projectName : false}
               onClick={() => handleSelectMode(id)}
             >
               {label}
@@ -167,10 +142,18 @@ export function SpectacleDirectionSwitch() {
   }
 
   return (
-    <nav className="spectacle-direction-switch" aria-label="Режимы спектакля">
+    <nav
+      className={cn(
+        "spectacle-direction-switch",
+        showTechModes && "spectacle-direction-switch--tech",
+      )}
+      aria-label="Режимы спектакля"
+    >
       <div className="spectacle-direction-switch__left">
         {showScriptModes ? <SpectacleScriptFormattingHost /> : null}
+        {showTechModes ? <SpectacleTechChromeLeftSlot /> : null}
       </div>
+      {showTechModes ? <SpectacleTechChromeCenterSlot /> : null}
       <div className="spectacle-direction-switch__right">
         {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
         {showTechModes ? <SpectacleTechModeSwitchList /> : null}

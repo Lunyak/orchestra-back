@@ -18,7 +18,10 @@ import {
 } from "@codemirror/view";
 import { getPlayUrl, fetchImageStreamBlobUrl } from "../../../../sync/api/files";
 import { decodeOrchestraImageStorageKey } from "../../../utils/markdownImages";
-import { SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE } from "../../../settings/scriptPlayFontSize";
+import {
+  SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_GAP_STYLE,
+  SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE,
+} from "../../../settings/scriptPlayFontSize";
 import {
   formatSpeakerLabelDisplay,
   getReadableTextColor,
@@ -194,6 +197,41 @@ function caretInsideFromLeft(token: EditableTokenRange): number {
   return Math.min(to - 1, from + 1);
 }
 
+function isTokenGapOnly(docText: string): boolean {
+  return /^[\s\u200B]*$/.test(docText);
+}
+
+/** Чип слева от каретки: граница или только пробел/ZWSP (как у `[[РОЛЬ]] (ремарка)`). */
+function findTokenJustBeforeCaret(
+  state: EditorState,
+  head: number,
+): EditableTokenRange | null {
+  const tokens = collectEditableTokensOnLine(state, head);
+  let best: EditableTokenRange | null = null;
+  for (const token of tokens) {
+    if (token.to > head) continue;
+    const gap = state.doc.sliceString(token.to, head);
+    if (!isTokenGapOnly(gap)) continue;
+    if (!best || token.to > best.to) best = token;
+  }
+  return best;
+}
+
+function findTokenJustAfterCaret(
+  state: EditorState,
+  head: number,
+): EditableTokenRange | null {
+  const tokens = collectEditableTokensOnLine(state, head);
+  let best: EditableTokenRange | null = null;
+  for (const token of tokens) {
+    if (token.from < head) continue;
+    const gap = state.doc.sliceString(head, token.from);
+    if (!isTokenGapOnly(gap)) continue;
+    if (!best || token.from < best.from) best = token;
+  }
+  return best;
+}
+
 function enterEditableTokenKeymap(): Extension {
   return Prec.highest(
     keymap.of([
@@ -202,9 +240,7 @@ function enterEditableTokenKeymap(): Extension {
         run: (view) => {
           const sel = view.state.selection.main;
           if (!sel.empty) return false;
-          const token = collectEditableTokensOnLine(view.state, sel.head).find(
-            (item) => item.to === sel.head,
-          );
+          const token = findTokenJustBeforeCaret(view.state, sel.head);
           if (!token) return false;
           const inside = caretInsideFromRight(token);
           if (!(inside > token.from && inside < token.to)) return false;
@@ -220,9 +256,7 @@ function enterEditableTokenKeymap(): Extension {
         run: (view) => {
           const sel = view.state.selection.main;
           if (!sel.empty) return false;
-          const token = collectEditableTokensOnLine(view.state, sel.head).find(
-            (item) => item.from === sel.head,
-          );
+          const token = findTokenJustAfterCaret(view.state, sel.head);
           if (!token) return false;
           const inside = caretInsideFromLeft(token);
           if (!(inside > token.from && inside < token.to)) return false;
@@ -299,11 +333,16 @@ type ChipSpec = {
   style?: string;
 };
 
+function hasRealSpaceAfterRoleToken(nextChar: string): boolean {
+  return nextChar === " " || nextChar === "\t";
+}
+
 function resolveChip(
   full: string,
   m: RegExpExecArray,
   lightChannels: string[],
   playTextMode: boolean,
+  nextChar = "",
 ): ChipSpec | null {
   if (m[7]) {
     const altM = /!\[([^\]]*)\]\(\s*orchestra-image:/.exec(full);
@@ -319,13 +358,18 @@ function resolveChip(
   if (m[5] != null && m[6] != null) {
     const normalized = String(m[6]).trim();
     const text = formatSpeakerLabelDisplay(normalized);
+    const trailingGap = hasRealSpaceAfterRoleToken(nextChar);
+    const playClass = playTextMode
+      ? "markdown-speaker-label markdown-speaker-label--play"
+      : "markdown-speaker-label";
     return {
       label: text,
-      classNames: playTextMode
-        ? "markdown-speaker-label markdown-speaker-label--play"
-        : "markdown-speaker-label",
+      classNames: trailingGap ? `${playClass} markdown-speaker-label--gap` : playClass,
       title: normalized,
-      style: playTextMode ? SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE : undefined,
+      style: playTextMode
+        ? SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_STYLE +
+          (trailingGap ? SCRIPT_PLAY_SPEAKER_LABEL_WIDGET_GAP_STYLE : "")
+        : undefined,
     };
   }
 
@@ -743,13 +787,16 @@ function buildRichDecorations(
           continue;
         }
       }
-      const spec = resolveChip(m[0], m, lightChannels, playTextMode);
+      const nextChar = text[m.index + m[0].length] ?? "";
+      const spec = resolveChip(m[0], m, lightChannels, playTextMode, nextChar);
       if (!spec) continue;
-      if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
-      pushHidden(from, to);
+      const hideTo =
+        m[5] != null && hasRealSpaceAfterRoleToken(nextChar) ? to + 1 : to;
+      if (spans.some((s) => spansOverlap(s.from, s.to, from, hideTo))) continue;
+      pushHidden(from, hideTo);
       tokenOverlays.push({
         from,
-        to,
+        to: hideTo,
         widget: new OrchestraChipWidget(m[0], spec, getOnRoleClick),
       });
     }
@@ -788,7 +835,8 @@ function buildRichDecorations(
       const from = line.from + pm.index;
       const to = from + pm[0].length;
       const before = text[pm.index - 1] ?? "";
-      if (before === "]") continue;
+      // Пропуск markdown-ссылок `](…`, но не ремарок после `]](…`
+      if (before === "]" && text[pm.index - 2] !== "]") continue;
       if (spans.some((s) => spansOverlap(s.from, s.to, from, to))) continue;
       spans.push({
         from,

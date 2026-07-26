@@ -7,6 +7,7 @@ import { attachPlaybookThunkExtraReducers } from "./playbook-slice-extra-reducer
 import {
   mergeProjectorPlaybookDataOnHydrate,
   normalizeHydratedScenes,
+  normalizeScriptRequisites,
 } from "./playbook-slice-helpers";
 import {
   DEFAULT_THEATER_LAYOUT,
@@ -147,7 +148,14 @@ export const playbookSlice = createSlice({
       const { id, changes } = action.payload;
       const idx = state.scenes.findIndex((s) => s.id === id);
       if (idx === -1) return;
-      state.scenes[idx] = { ...state.scenes[idx], ...changes };
+      const nextChanges =
+        changes.requisites != null
+          ? {
+              ...changes,
+              requisites: normalizeScriptRequisites(changes.requisites),
+            }
+          : changes;
+      state.scenes[idx] = { ...state.scenes[idx], ...nextChanges };
       state.hasLocalEdits = true;
       state.scenesRevision += 1;
     },

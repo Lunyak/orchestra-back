@@ -44,6 +44,7 @@ import {
   resolveTheaterModelWorldSize,
   type TheaterModelWorldSize,
 } from "../model/theater-model-world-size";
+import { syncSubscribedTheaterRequisites } from "../model/theater-decor-inventory";
 import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
@@ -241,6 +242,12 @@ export function useTheaterModels({
         const spotlightsChanged = nextSpotlights.some(
           (spotlight, index) => spotlight !== sourceSpotlights[index],
         );
+        const prevRequisites = currentScene?.requisites ?? [];
+        const nextRequisites = syncSubscribedTheaterRequisites(
+          prevRequisites,
+          normalizedModels,
+        );
+        const requisitesChanged = nextRequisites !== prevRequisites;
         updateCurrentScene({
           ...writeSceneTheaterModels(normalizedModels),
           ...(spotlightsChanged
@@ -249,9 +256,11 @@ export function useTheaterModels({
                 lightPlot: buildLightPlotFromSpotlights(nextSpotlights, layout),
               }
             : {}),
+          ...(requisitesChanged ? { requisites: nextRequisites } : {}),
         });
       },
       [
+        currentScene?.requisites,
         currentScene?.theaterSpotlights,
         displaySpotlights,
         layout,

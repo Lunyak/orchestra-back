@@ -6,6 +6,7 @@ import { storageKeyToImageBasename } from "../../../shared/utils/markdownImages"
 import {
   fetchImageStreamBlobUrl,
   fetchVideoStreamBlobUrl,
+  getPlayUrl,
 } from "../../../sync/api/files";
 import type {
   PlaybookHoldImage,
@@ -98,7 +99,7 @@ function resolveProjectorMediaAsset(
 
   if (!getDesktopApi()) {
     const picked = resolveBrowserPickedMediaUrl(fileName || enriched.file, titleHint, ctx.projectSlug);
-    if (picked) return { storageKey: null, fallbackSrc: picked };
+    if (picked) return { storageKey, fallbackSrc: picked };
   }
 
   const devLocal = localProjectMediaDevUrl(
@@ -111,8 +112,9 @@ function resolveProjectorMediaAsset(
   const localPlay = desktopLocal ?? devLocal;
 
   // Браузер + npm run dev: всегда с диска (Desktop/xxx), не с сервера.
+  // storageKey оставляем — если локальный файл не найден, превью уйдёт на remote.
   if (isBrowserDevLocalProjects() && localPlay) {
-    return { storageKey: null, fallbackSrc: localPlay };
+    return { storageKey, fallbackSrc: localPlay };
   }
 
   const offline = resolveOfflineMediaUrl({
@@ -121,6 +123,7 @@ function resolveProjectorMediaAsset(
     fileName: fileName || enriched.file,
     filePath: enriched.filePath,
     remoteUrl: enriched.remoteUrl,
+    titleHint,
   });
   const resolvedOffline = offline.trim();
   const localSrc =
@@ -129,11 +132,11 @@ function resolveProjectorMediaAsset(
 
   // Локальная копия на диске — без повторной загрузки с сервера.
   if (localSrc && (String(enriched.filePath ?? "").trim() || localPlayResolved)) {
-    return { storageKey: null, fallbackSrc: localSrc };
+    return { storageKey, fallbackSrc: localSrc };
   }
 
   if (localPlayResolved) {
-    return { storageKey: null, fallbackSrc: localPlayResolved };
+    return { storageKey, fallbackSrc: localPlayResolved };
   }
 
   const remote = String(enriched.remoteUrl ?? "").trim();
@@ -181,4 +184,23 @@ export async function fetchProjectorImageBlobUrl(storageKey: string): Promise<st
 
 export async function fetchProjectorVideoBlobUrl(storageKey: string): Promise<string | null> {
   return fetchVideoStreamBlobUrl(readAccessToken(), storageKey);
+}
+
+/** Для превью: signed play-url (без скачивания всего файла), иначе blob. */
+export async function fetchProjectorVideoPreviewUrl(
+  storageKey: string,
+): Promise<{ src: string; blob: boolean } | null> {
+  const token = readAccessToken();
+  if (token) {
+    try {
+      const { url } = await getPlayUrl(token, storageKey);
+      const playUrl = String(url ?? "").trim();
+      if (playUrl) return { src: playUrl, blob: false };
+    } catch {
+      /* fall through to stream blob */
+    }
+  }
+  const blobUrl = await fetchVideoStreamBlobUrl(token, storageKey);
+  if (!blobUrl) return null;
+  return { src: blobUrl, blob: true };
 }

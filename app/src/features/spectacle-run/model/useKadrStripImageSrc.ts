@@ -133,18 +133,26 @@ export function useKadrStripImageSrc(
 
   const onImageError = useCallback(() => {
     const rawHref = String(href ?? "").trim();
-    if (!rawHref.startsWith("orchestra-image:")) return;
-    if (streamRetriedRef.current || blobRef.current) return;
-    streamRetriedRef.current = true;
-
-    void resolveOrchestraImageSrc(projectName, rawHref, true).then((result) => {
-      if (blobRef.current) {
-        URL.revokeObjectURL(blobRef.current);
-        blobRef.current = null;
+    if (rawHref.startsWith("orchestra-image:")) {
+      if (streamRetriedRef.current || blobRef.current) {
+        setSrc(null);
+        return;
       }
-      if (result.blob && result.src) blobRef.current = result.src;
-      setSrc(result.src);
-    });
+      streamRetriedRef.current = true;
+
+      void resolveOrchestraImageSrc(projectName, rawHref, true).then((result) => {
+        if (blobRef.current) {
+          URL.revokeObjectURL(blobRef.current);
+          blobRef.current = null;
+        }
+        if (result.blob && result.src) blobRef.current = result.src;
+        setSrc(result.src);
+      });
+      return;
+    }
+
+    // Битая локальная/remote картинка — освобождаем обложку под заставку/видео.
+    setSrc(null);
   }, [projectName, href]);
 
   return { src, onImageError };

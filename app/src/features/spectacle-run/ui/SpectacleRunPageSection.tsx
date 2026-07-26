@@ -1,14 +1,13 @@
-import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { useProject } from "../../project/model/project-context";
 import { usePlaybook } from "../../playbook";
-import { LightPlotModeTabs } from "../../../shared/components/light-plot/LightPlotModeTabs";
+import { SpectacleTechChromePortal } from "../../spectacle/ui/spectacle-tech-chrome-slots";
 import { useSpectacleRun } from "../model/useSpectacleRun";
 import { SpectacleRunProvider } from "../model/spectacle-run-context";
 import {
+  SpectacleRunChromeControls,
   SpectacleRunMeta,
-  SpectacleRunProgRunToolbar,
-  SpectacleRunToolbarActions,
 } from "./SpectacleRunToolbar";
 import { SpectacleRunContent } from "./SpectacleRunContent";
 import { SpectacleRunProgRunContent } from "./SpectacleRunProgRunContent";
@@ -31,28 +30,21 @@ export function SpectacleRunPageSection() {
     lightChannels,
   });
 
+  const isAssembly = lightPlotMode === "rehearsal";
+  const chromeMode = isAssembly ? "rehearsal" : "prog-run";
+
   return (
     <SpectacleRunProvider value={run}>
       <div className="spectacle-run-page-section">
-        <LightPlotModeTabs
-          center={lightPlotMode === "rehearsal" ? <SpectacleRunMeta /> : null}
-          trailing={
-            lightPlotMode === "rehearsal" ? (
-              <SpectacleRunToolbarActions />
-            ) : (
-              <SpectacleRunProgRunToolbar />
-            )
-          }
+        <SpectacleTechChromePortal
+          left={<SpectacleRunChromeControls mode={chromeMode} />}
+          center={<SpectacleRunMeta />}
         />
-        {lightPlotMode === "rehearsal" ? (
-          <SpectacleRunContent />
-        ) : (
-          <SpectacleRunProgRunContent />
-        )}
-        {lightPlotMode === "rehearsal" || run.canEditKadr ? (
+        {isAssembly ? <SpectacleRunContent /> : <SpectacleRunProgRunContent />}
+        {isAssembly || run.canEditKadr ? (
           <CreateKadrModalHost lightChannels={lightChannels} />
         ) : null}
-        {lightPlotMode === "rehearsal" ? (
+        {isAssembly ? (
           <LightConsoleSettingsModal
             isOpen={run.consoleLayoutSettings.settingsOpen}
             layout={run.consoleLayoutSettings.layout}
