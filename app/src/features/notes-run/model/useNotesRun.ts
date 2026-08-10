@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePlaybook } from "../../playbook";
 import { invokePlaylistPause, invokePlaylistPlay, invokeSoundPlay } from "../../playbook/model/playbook-playback-bridge";
-import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { normalizeHoldImages } from "../../projector/model/playbook-projector-persist";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
 import {
@@ -12,7 +11,6 @@ import {
   pauseProjectorVideo,
   pingProjectorOutput,
   subscribeProjectorOutputErrors,
-  subscribeProjectorPlayback,
 } from "../../projector/model/projector-playback-bridge";
 import { applyKadrProjector, showProjectorHold } from "../../spectacle-run/model/apply-kadr-projector";
 import { resolveKadrProjectorVideoOptions } from "../../theater/model/kadr-projector";
@@ -21,9 +19,13 @@ import {
   buildEmptyNotesRunDraft,
   buildNotesRunCardsFromScenes,
   buildNotesRunDraftFromCard,
+  buildNotesRunSceneGroups,
+  findFirstCardIndexForScene,
   loadNotesRun,
   renumberNotesRunCards,
   saveNotesRun,
+  sceneTitleAt,
+  syncNotesRunCardsWithScenes,
 } from "./notes-run-storage";
 import type { NotesRunCardDraft, NotesRunCardV1, NotesRunDataV1 } from "./notes-run-types";
 import {
@@ -46,17 +48,15 @@ function resolvePlaylistTrack(
 }
 
 export function useNotesRun(projectName: string) {
-  const { playbookData, scenes, isPlaybookReady } = usePlaybook();
+  const { playbookData, scenes, isPlaybookReady, currentPage, setCurrentPage } = usePlaybook();
   const [notesRun, setNotesRun] = useState<NotesRunDataV1>({ v: 1, cards: [] });
   const [notesLoaded, setNotesLoaded] = useState(false);
   const [cardIndex, setCardIndex] = useState(0);
-  /** Прогон не стартует сам при открытии страницы — только по кнопке «Старт». */
   const [runActive, setRunActive] = useState(false);
   const [paused, setPaused] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editCardId, setEditCardId] = useState<string | null>(null);
-  /** Индекс карточки, после которой вставляем новую (create). */
   const [createInsertAfterIndex, setCreateInsertAfterIndex] = useState<number | null>(null);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [isProjectorOpen, setIsProjectorOpen] = useState(false);
@@ -67,6 +67,8 @@ export function useNotesRun(projectName: string) {
   const runActiveRef = useRef(runActive);
   const cardIndexRef = useRef(cardIndex);
   const notesRunRef = useRef(notesRun);
+  const applyingSceneRef = useRef(false);
+  const skipSceneSyncRef = useRef(false);
   pausedRef.current = paused;
   runActiveRef.current = runActive;
   cardIndexRef.current = cardIndex;
@@ -107,9 +109,30 @@ export function useNotesRun(projectName: string) {
     return data;
   }, [projectName]);
 
+  useEffect(() => {
+    if (!notesLoaded || !projectName || scenes.length === 0) return;
+    const prevCards = notesRunRef.current.cards;
+    if (prevCards.length === 0) return;
+    const synced = syncNotesRunCardsWithScenes(prevCards, scenes);
+    const changed = synced.some((card, index) => {
+      const prev = prevCards[index];
+      return !prev || prev.sceneId !== card.sceneId || prev.sceneLabel !== card.sceneLabel;
+    });
+    if (!changed) return;
+    const nextData: NotesRunDataV1 = { v: 1, cards: synced };
+    setNotesRun(nextData);
+    void saveNotesRun(projectName, nextData).catch((err) => {
+      console.error("[notes-run] scene sync save failed:", err);
+    });
+  }, [notesLoaded, projectName, scenes]);
+
   const cards = notesRun.cards;
   const clampedIndex = cards.length === 0 ? 0 : Math.min(cardIndex, cards.length - 1);
   const currentCard = cards[clampedIndex] ?? null;
+  const sceneGroups = useMemo(
+    () => buildNotesRunSceneGroups(cards, scenes),
+    [cards, scenes],
+  );
 
   const projectorMediaCtx = useMemo<ProjectorMediaContext>(
     () => ({
@@ -220,6 +243,33 @@ export function useNotesRun(projectName: string) {
       setCardIndex(cards.length - 1);
     }
   }, [cardIndex, cards.length]);
+
+  useEffect(() => {
+    if (!currentCard || applyingSceneRef.current) return;
+    const sceneIndex =
+      currentCard.sceneId != null
+        ? scenes.findIndex((scene) => scene.id === currentCard.sceneId)
+        : scenes.findIndex(
+            (scene) => String(scene.title ?? "").trim() === currentCard.sceneLabel.trim(),
+          );
+    if (sceneIndex < 0 || sceneIndex === currentPage) return;
+    skipSceneSyncRef.current = true;
+    setCurrentPage(sceneIndex);
+  }, [currentCard, currentPage, scenes, setCurrentPage]);
+
+  useEffect(() => {
+    if (!notesLoaded || cards.length === 0) return;
+    if (skipSceneSyncRef.current) {
+      skipSceneSyncRef.current = false;
+      return;
+    }
+    if (applyingSceneRef.current) return;
+    const targetIndex = findFirstCardIndexForScene(cards, scenes, currentPage);
+    if (targetIndex < 0 || targetIndex === cardIndexRef.current) return;
+    applyingSceneRef.current = true;
+    setCardIndex(targetIndex);
+    applyingSceneRef.current = false;
+  }, [cards, currentPage, notesLoaded, scenes]);
 
   useEffect(() => {
     const unsubReady = notifyProjectorReady();
@@ -390,11 +440,37 @@ export function useNotesRun(projectName: string) {
       const card = cards.find((c) => c.id === editCardId);
       if (card) return buildNotesRunDraftFromCard(card);
     }
-    const firstScene = scenes[0];
-    const draft = buildEmptyNotesRunDraft();
-    if (firstScene?.title) draft.sceneLabel = firstScene.title;
-    return draft;
-  }, [cards, editCardId, modalMode, scenes]);
+    const sceneFromCurrent =
+      currentCard?.sceneId != null
+        ? scenes.find((scene) => scene.id === currentCard.sceneId)
+        : null;
+    const scene =
+      sceneFromCurrent ??
+      scenes[currentPage] ??
+      scenes[0] ??
+      null;
+    const sceneIndex =
+      scene != null ? scenes.findIndex((item) => item.id === scene.id) : currentPage;
+    return buildEmptyNotesRunDraft(scene, Math.max(0, sceneIndex));
+  }, [cards, currentCard?.sceneId, currentPage, editCardId, modalMode, scenes]);
+
+  const currentSceneMeta = useMemo(() => {
+    if (!currentCard) return null;
+    const sceneIndex =
+      currentCard.sceneId != null
+        ? scenes.findIndex((scene) => scene.id === currentCard.sceneId)
+        : scenes.findIndex(
+            (scene) => String(scene.title ?? "").trim() === currentCard.sceneLabel.trim(),
+          );
+    if (sceneIndex >= 0) {
+      return {
+        sceneOrdinal: sceneIndex + 1,
+        sceneTitle: sceneTitleAt(scenes, sceneIndex),
+      };
+    }
+    const label = currentCard.sceneLabel.trim();
+    return label ? { sceneOrdinal: null as number | null, sceneTitle: label } : null;
+  }, [currentCard, scenes]);
 
   useEffect(() => {
     if (cards.length === 0 || modalOpen) return;
@@ -414,6 +490,9 @@ export function useNotesRun(projectName: string) {
     cards,
     cardIndex: clampedIndex,
     currentCard,
+    currentSceneMeta,
+    sceneGroups,
+    scenes,
     runActive,
     paused,
     liveStatus,

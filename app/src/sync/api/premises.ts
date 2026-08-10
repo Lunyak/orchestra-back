@@ -3,21 +3,25 @@ export type PremiseKind = "OWNED" | "RENTED";
 export type PremiseMemberRole = "owner" | "manager" | "tenant" | "viewer";
 
 export type PremiseSlotStatus = "confirmed" | "pending" | "cancelled";
+export type PremiseSlotPaymentStatus = "unpaid" | "paid" | "waived";
 
 export type PremiseSummary = {
   id: string;
-  troupeId: string;
+  troupeId: string | null;
+  theaterId: string | null;
+  studioId: string | null;
   name: string;
   kind: PremiseKind;
   address: string | null;
   capacity: number | null;
+  paymentDueDay: number | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  troupeTitle: string;
+  ownerTitle: string;
   canManage: boolean;
   canBook: boolean;
-  myRole: PremiseMemberRole | "troupe_owner" | null;
+  myRole: PremiseMemberRole | "organization_admin" | null;
 };
 
 export type PremiseMemberItem = {
@@ -38,8 +42,12 @@ export type PremiseSlotItem = {
   title: string;
   purpose: string | null;
   rentalNotes: string | null;
+  rentalAmountKopecks: number | null;
+  rentalAmountRub: number | null;
+  paymentStatus: PremiseSlotPaymentStatus;
   contactEmail: string | null;
   contactName: string | null;
+  contactPhone: string | null;
   status: PremiseSlotStatus;
   createdByEmail: string;
   createdAt: string;
@@ -60,9 +68,12 @@ export type PremiseMembersResponse = {
 
 export type CreatePremisePayload = {
   name: string;
+  theaterId?: string;
+  studioId?: string;
   kind?: PremiseKind;
   address?: string;
   capacity?: number;
+  paymentDueDay?: number;
   notes?: string;
 };
 
@@ -71,6 +82,7 @@ export type UpdatePremisePayload = Partial<{
   kind: PremiseKind;
   address: string | null;
   capacity: number | null;
+  paymentDueDay: number | null;
   notes: string | null;
 }>;
 
@@ -80,8 +92,11 @@ export type CreatePremiseSlotPayload = {
   title: string;
   purpose?: string;
   rentalNotes?: string;
+  rentalAmountRub?: number;
+  paymentStatus?: PremiseSlotPaymentStatus;
   contactEmail?: string;
   contactName?: string;
+  contactPhone?: string;
   status?: PremiseSlotStatus;
 };
 
@@ -91,8 +106,11 @@ export type UpdatePremiseSlotPayload = Partial<{
   title: string;
   purpose: string | null;
   rentalNotes: string | null;
+  rentalAmountRub: number | null;
+  paymentStatus: PremiseSlotPaymentStatus;
   contactEmail: string | null;
   contactName: string | null;
+  contactPhone: string | null;
   status: PremiseSlotStatus;
 }>;
 

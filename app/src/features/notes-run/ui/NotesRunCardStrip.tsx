@@ -2,7 +2,7 @@ import cn from "classnames";
 import { useEffect, useMemo, useRef } from "react";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
 import type { ProjectorMediaContext } from "../../projector/model/projector-media";
-import type { NotesRunCardV1 } from "../model/notes-run-types";
+import type { NotesRunCardV1, NotesRunSceneGroup } from "../model/notes-run-types";
 import "./notes-run.css";
 
 type MediaLookup = {
@@ -40,19 +40,23 @@ function formatVideoLine(card: NotesRunCardV1, media: MediaLookup): string | nul
 }
 
 export function NotesRunCardStrip({
-  cards,
+  groups,
   cardIndex,
   media,
   projectorCtx,
   onSelectIndex,
+  onInitFromScenes,
 }: {
-  cards: NotesRunCardV1[];
+  groups: NotesRunSceneGroup[];
   cardIndex: number;
   media: MediaLookup;
   projectorCtx: ProjectorMediaContext;
   onSelectIndex: (index: number) => void;
+  onInitFromScenes: () => void;
 }) {
-  const active = cards[cardIndex] ?? null;
+  const activeCard =
+    groups.flatMap((group) => group.items).find((item) => item.cardIndex === cardIndex)
+      ?.card ?? null;
   const stripRef = useRef<HTMLDivElement>(null);
   const activeChipRef = useRef<HTMLButtonElement>(null);
 
@@ -75,8 +79,8 @@ export function NotesRunCardStrip({
   }, [cardIndex]);
 
   const activePreview = useMemo(() => {
-    if (!active?.projectorCue) return null;
-    const cue = active.projectorCue;
+    if (!activeCard?.projectorCue) return null;
+    const cue = activeCard.projectorCue;
     if (cue.mode === "video") {
       return {
         mode: "video" as const,
@@ -95,63 +99,110 @@ export function NotesRunCardStrip({
         media.holdImages.find((h) => h.id === cue.holdId)?.title?.trim() ||
         (cue.holdId != null ? `Заставка ${cue.holdId}` : "Заставка"),
     };
-  }, [active, media.holdImages, media.videos]);
+  }, [activeCard, media.holdImages, media.videos]);
 
-  if (cards.length === 0) {
+  if (groups.length === 0) {
     return (
       <div className="notes-run__empty">
-        <p>Карточек пока нет. Создайте вручную или «Из сцен сценария».</p>
+        <p>
+          Карточек пока нет. Создайте программу вручную или по сценам сценария —
+          как прогон, только текст пишете сами.
+        </p>
+        <button
+          type="button"
+          className="notes-run__empty-action"
+          onClick={onInitFromScenes}
+        >
+          Из сцен сценария
+        </button>
       </div>
     );
   }
 
   return (
     <div className="notes-run__strip-container">
-      <div ref={stripRef} className="notes-run__strip" role="tablist" aria-label="Карточки суфлера">
-        {cards.map((card, index) => {
-          const activeChip = index === cardIndex;
-          const chipRef = activeChip ? activeChipRef : undefined;
-          const soundLine = formatSoundLine(card, media);
-          const videoLine = formatVideoLine(card, media);
+      <div
+        ref={stripRef}
+        className="notes-run__strip"
+        role="tablist"
+        aria-label="Карточки суфлера по сценам"
+      >
+        {groups.map((group) => {
+          const groupKey = group.sceneId ?? `label:${group.sceneTitle}`;
+          const sceneHeading =
+            group.sceneOrdinal > 0
+              ? `С${group.sceneOrdinal} · ${group.sceneTitle}`
+              : group.sceneTitle;
           return (
-            <button
-              key={card.id}
-              ref={chipRef}
-              type="button"
-              role="tab"
-              aria-selected={activeChip}
-              className={cn("notes-run__chip", activeChip && "notes-run__chip--active")}
-              onClick={() => onSelectIndex(index)}
+            <section
+              key={groupKey}
+              className="notes-run__scene-group"
+              aria-label={sceneHeading}
             >
-              <header className="notes-run__chip-header">
-                <span className="notes-run__chip-number">#{card.cardNo}</span>
-                {card.sceneLabel ? (
-                  <span className="notes-run__chip-scene">{card.sceneLabel}</span>
+              <header className="notes-run__scene-group-header">
+                {group.sceneOrdinal > 0 ? (
+                  <span className="notes-run__scene-group-number">{group.sceneOrdinal}</span>
                 ) : null}
+                <span className="notes-run__scene-group-title" title={group.sceneTitle}>
+                  {group.sceneTitle}
+                </span>
               </header>
-              <h3 className="notes-run__chip-title">
-                {card.title.trim() || `Картина ${card.cardNo}`}
-              </h3>
-              {card.commentText ? (
-                <p className="notes-run__chip-comment">{card.commentText}</p>
-              ) : null}
-              <div className="notes-run__chip-light">
-                {card.lightLines.length > 0 ? (
-                  card.lightLines.map((row, rowIndex) => (
-                    <div key={`${card.id}-line-${rowIndex}`} className="notes-run__chip-light-row">
-                      {row.label ? <span className="notes-run__chip-light-label">{row.label}</span> : null}
-                      {row.value ? <span className="notes-run__chip-light-value">{row.value}</span> : null}
-                    </div>
-                  ))
-                ) : card.lightNotes ? (
-                  <p className="notes-run__chip-light-notes">{card.lightNotes}</p>
-                ) : (
-                  <span className="notes-run__chip-light-placeholder">свет не записан</span>
-                )}
+              <div className="notes-run__scene-group-chips">
+                {group.items.map(({ card, cardIndex: index }) => {
+                  const activeChip = index === cardIndex;
+                  const chipRef = activeChip ? activeChipRef : undefined;
+                  const soundLine = formatSoundLine(card, media);
+                  const videoLine = formatVideoLine(card, media);
+                  const chipTitle = card.title.trim() || `Карточка ${card.cardNo}`;
+                  return (
+                    <button
+                      key={card.id}
+                      ref={chipRef}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeChip}
+                      className={cn("notes-run__chip", activeChip && "notes-run__chip--active")}
+                      onClick={() => onSelectIndex(index)}
+                    >
+                      <header className="notes-run__chip-header">
+                        <span className="notes-run__chip-number">#{card.cardNo}</span>
+                      </header>
+                      <h3 className="notes-run__chip-title">{chipTitle}</h3>
+                      {card.commentText ? (
+                        <p className="notes-run__chip-comment">{card.commentText}</p>
+                      ) : null}
+                      <div className="notes-run__chip-light">
+                        {card.lightLines.length > 0 ? (
+                          card.lightLines.map((row, rowIndex) => (
+                            <div
+                              key={`${card.id}-line-${rowIndex}`}
+                              className="notes-run__chip-light-row"
+                            >
+                              {row.label ? (
+                                <span className="notes-run__chip-light-label">{row.label}</span>
+                              ) : null}
+                              {row.value ? (
+                                <span className="notes-run__chip-light-value">{row.value}</span>
+                              ) : null}
+                            </div>
+                          ))
+                        ) : card.lightNotes ? (
+                          <p className="notes-run__chip-light-notes">{card.lightNotes}</p>
+                        ) : (
+                          <span className="notes-run__chip-light-placeholder">свет не записан</span>
+                        )}
+                      </div>
+                      {soundLine ? <p className="notes-run__chip-media">{soundLine}</p> : null}
+                      {videoLine ? (
+                        <p className="notes-run__chip-media notes-run__chip-media--video">
+                          {videoLine}
+                        </p>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
-              {soundLine ? <p className="notes-run__chip-media">{soundLine}</p> : null}
-              {videoLine ? <p className="notes-run__chip-media notes-run__chip-media--video">{videoLine}</p> : null}
-            </button>
+            </section>
           );
         })}
       </div>

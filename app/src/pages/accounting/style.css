@@ -57,6 +57,17 @@
   font-size: 0.9rem;
 }
 
+.accounting-page__wip {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border: 1px dashed color-mix(in srgb, var(--color-active-ascent) 55%, #444);
+  background: color-mix(in srgb, var(--color-active-ascent) 10%, transparent);
+  color: var(--color-active-ascent);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+
 .accounting-page__back {
   color: var(--color-text-muted, #888);
   text-decoration: none;
@@ -70,6 +81,56 @@
 .accounting-page__error {
   margin: 0 0 16px;
   color: var(--color-danger, #c44);
+}
+
+.accounting-tabs {
+  display: flex;
+  gap: 0;
+  margin: 0 0 16px;
+  border-bottom: 1px solid var(--color-border, #333);
+}
+
+.accounting-tabs__item {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted, #888);
+  cursor: pointer;
+  font: inherit;
+  margin-bottom: -1px;
+  padding: 10px 14px;
+}
+
+.accounting-tabs__item--active,
+.accounting-tabs__item[aria-selected="true"] {
+  color: var(--color-active-ascent);
+  border-bottom-color: var(--color-active-ascent);
+}
+
+.accounting-scope-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.accounting-scope-row__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #888);
+}
+
+.accounting-scope-row__field select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border, #333);
+  background: var(--color-surface, transparent);
+  color: inherit;
+  font: inherit;
 }
 
 .accounting-progress {

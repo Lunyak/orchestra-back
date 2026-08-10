@@ -3,6 +3,7 @@ import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { studioPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import {
@@ -123,7 +124,7 @@ export function StudioVideoPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to={`/studio/${studioId}`}>
+              <Link className="studio-page__back" to={studioPath(studioId)}>
                 ← Студия
               </Link>
               <p className="studio-page__error">Видео не найдено.</p>
@@ -139,7 +140,7 @@ export function StudioVideoPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to={`/studio/${studioId}`}>
+            <Link className="studio-page__back" to={studioPath(studioId)}>
               ← Студия
             </Link>
 

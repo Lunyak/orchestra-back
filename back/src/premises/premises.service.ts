@@ -9,6 +9,8 @@ import {
   PremiseMemberRole,
   PremiseSlotStatus,
   Prisma,
+  WorkspaceRole,
+  WorkspaceType,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AddPremiseMemberDto } from './dto/add-premise-member.dto';
@@ -26,13 +28,33 @@ function normalizeEmail(v: unknown): string {
   return email;
 }
 
+function rubToKopecks(rub: number): number {
+  if (!Number.isInteger(rub) || rub < 0) {
+    throw new BadRequestException(
+      'rentalAmountRub must be a non-negative integer',
+    );
+  }
+  return rub * 100;
+}
+
 type PremiseAccess = {
   premise: {
     id: string;
-    troupeId: string;
-    troupe: { ownerUserId: string; title: string };
+    troupeId: string | null;
+    theaterId: string | null;
+    studioId: string | null;
+    troupe: { ownerUserId: string; title: string } | null;
+    theater: {
+      title: string;
+      workspace: { memberships: { id: string; role: WorkspaceRole }[] };
+    } | null;
+    studio: {
+      ownerUserId: string;
+      title: string;
+      members: { role: string }[];
+    } | null;
   };
-  isTroupeOwner: boolean;
+  isOrganizationManager: boolean;
   member: {
     role: PremiseMemberRole;
     canBook: boolean;
@@ -45,14 +67,19 @@ type PremiseAccess = {
 const premiseSelect = {
   id: true,
   troupeId: true,
+  theaterId: true,
+  studioId: true,
   name: true,
   kind: true,
   address: true,
   capacity: true,
+  paymentDueDay: true,
   notes: true,
   createdAt: true,
   updatedAt: true,
   troupe: { select: { ownerUserId: true, title: true } },
+  theater: { select: { title: true } },
+  studio: { select: { ownerUserId: true, title: true } },
 } as const;
 
 const slotSelect = {
@@ -63,8 +90,11 @@ const slotSelect = {
   title: true,
   purpose: true,
   rentalNotes: true,
+  rentalAmountKopecks: true,
+  paymentStatus: true,
   contactEmail: true,
   contactName: true,
+  contactPhone: true,
   status: true,
   createdByEmail: true,
   createdAt: true,
@@ -89,11 +119,12 @@ function serializePremise(
     ...row,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    troupeTitle: row.troupe.title,
+    ownerTitle:
+      row.theater?.title ?? row.studio?.title ?? row.troupe?.title ?? '',
     canManage: access.canManage,
     canBook: access.canBook,
-    myRole: access.isTroupeOwner
-      ? ('troupe_owner' as const)
+    myRole: access.isOrganizationManager
+      ? ('organization_admin' as const)
       : (access.member?.role ?? null),
   };
 }
@@ -104,6 +135,8 @@ function serializeSlot(
   return {
     ...row,
     startsAt: row.startsAt.toISOString(),
+    rentalAmountRub:
+      row.rentalAmountKopecks == null ? null : row.rentalAmountKopecks / 100,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -128,12 +161,52 @@ export class PremisesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async getOrCreateMyTroupe(userId: string) {
-    const existing = await this.prisma.troupe.findUnique({
+    const existing = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
     });
     if (existing) return existing;
-    return await this.prisma.troupe.create({
-      data: { ownerUserId: userId, title: 'Моя труппа' },
+
+    const theater = await this.prisma.theater.findFirst({
+      where: {
+        workspace: {
+          memberships: {
+            some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, title: true },
+    });
+    if (!theater) {
+      throw new BadRequestException(
+        'Сначала создайте театр — труппа существует только внутри театра',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const troupe = await tx.troupe.create({
+        data: {
+          title: 'Основная труппа',
+          theater: { connect: { id: theater.id } },
+          owner: { connect: { id: userId } },
+          workspace: {
+            create: {
+              type: WorkspaceType.TROUPE,
+              name: `${theater.title} — Основная труппа`,
+              memberships: { create: { userId, role: WorkspaceRole.OWNER } },
+            },
+          },
+        },
+      });
+      await tx.theaterTroupe.create({
+        data: {
+          theaterId: theater.id,
+          troupeId: troupe.id,
+          participationType: 'HOME',
+        },
+      });
+      return troupe;
     });
   }
 
@@ -148,12 +221,55 @@ export class PremisesService {
       select: {
         id: true,
         troupeId: true,
+        theaterId: true,
+        studioId: true,
         troupe: { select: { ownerUserId: true, title: true } },
+        theater: {
+          select: {
+            title: true,
+            workspace: {
+              select: {
+                memberships: {
+                  where: { userId },
+                  select: { id: true, role: true },
+                },
+              },
+            },
+          },
+        },
+        studio: {
+          select: {
+            ownerUserId: true,
+            title: true,
+            members: {
+              where: {
+                OR: [{ userId }, { email: userEmail }],
+              },
+              select: { role: true },
+            },
+          },
+        },
       },
     });
     if (!premise) throw new NotFoundException('Premise not found');
 
-    const isTroupeOwner = premise.troupe.ownerUserId === userId;
+    const theaterMembership = premise.theater?.workspace.memberships[0] ?? null;
+    const studioMembership = premise.studio?.members[0] ?? null;
+    const isTheaterManager =
+      theaterMembership?.role === WorkspaceRole.OWNER ||
+      theaterMembership?.role === WorkspaceRole.ADMIN;
+    const isStudioManager =
+      premise.studio?.ownerUserId === userId ||
+      studioMembership?.role === 'owner' ||
+      studioMembership?.role === 'teacher';
+    const isOrganizationManager =
+      premise.troupe?.ownerUserId === userId ||
+      isTheaterManager ||
+      isStudioManager;
+    const isOrganizationMember =
+      theaterMembership != null ||
+      premise.studio?.ownerUserId === userId ||
+      studioMembership != null;
     const member = await this.prisma.premiseMember.findUnique({
       where: {
         premiseId_email: { premiseId, email: userEmail },
@@ -161,13 +277,14 @@ export class PremisesService {
       select: { role: true, canBook: true },
     });
 
-    const canView = isTroupeOwner || member != null;
+    const canView =
+      isOrganizationManager || isOrganizationMember || member != null;
     if (!canView) {
       throw new ForbiddenException('Нет доступа к этому помещению');
     }
 
     const canManage =
-      isTroupeOwner || (member != null && isManagerRole(member.role));
+      isOrganizationManager || (member != null && isManagerRole(member.role));
     const canBook =
       canManage ||
       (member != null &&
@@ -178,7 +295,7 @@ export class PremisesService {
 
     return {
       premise,
-      isTroupeOwner,
+      isOrganizationManager,
       member: member ?? null,
       canView,
       canManage,
@@ -250,66 +367,55 @@ export class PremisesService {
     return { fromDate, toDate };
   }
 
-  async listPremises(userId: string, userEmail: string) {
+  async listPremises(
+    userId: string,
+    userEmail: string,
+    theaterId?: string,
+    studioId?: string,
+  ) {
     const email = normalizeEmail(userEmail);
-    const ownTroupe = await this.prisma.troupe.findUnique({
-      where: { ownerUserId: userId },
-      select: { id: true },
-    });
-
-    const memberRows = await this.prisma.premiseMember.findMany({
-      where: { email },
-      select: { premiseId: true, role: true, canBook: true },
-    });
-    const memberByPremiseId = new Map(
-      memberRows.map((m) => [m.premiseId, m]),
-    );
-    const memberPremiseIds = memberRows.map((m) => m.premiseId);
-
-    if (!ownTroupe && memberPremiseIds.length === 0) {
-      return { premises: [] };
+    if (theaterId && studioId) {
+      throw new BadRequestException(
+        'Укажите только одну организацию для списка помещений',
+      );
     }
 
     const rows = await this.prisma.premise.findMany({
       where: {
+        ...(theaterId ? { theaterId } : {}),
+        ...(studioId ? { studioId } : {}),
         OR: [
-          ...(ownTroupe ? [{ troupeId: ownTroupe.id }] : []),
-          ...(memberPremiseIds.length
-            ? [{ id: { in: memberPremiseIds } }]
-            : []),
+          { troupe: { ownerUserId: userId } },
+          {
+            theater: {
+              workspace: { memberships: { some: { userId } } },
+            },
+          },
+          { studio: { ownerUserId: userId } },
+          {
+            studio: {
+              members: {
+                some: {
+                  OR: [{ userId }, { email }],
+                },
+              },
+            },
+          },
+          { members: { some: { email } } },
         ],
       },
       select: premiseSelect,
       orderBy: [{ name: 'asc' }],
     });
 
-    const unique = new Map<string, (typeof rows)[number]>();
-    for (const row of rows) unique.set(row.id, row);
-
-    return {
-      premises: [...unique.values()].map((row) => {
-        const isTroupeOwner = ownTroupe?.id === row.troupeId;
-        const memberRow = memberByPremiseId.get(row.id) ?? null;
-        const member = memberRow
-          ? { role: memberRow.role, canBook: memberRow.canBook }
-          : null;
-        const canManage =
-          isTroupeOwner || (member != null && isManagerRole(member.role));
-        const canBook =
-          canManage ||
-          (member != null &&
-            member.canBook &&
-            (member.role === PremiseMemberRole.tenant ||
-              member.role === PremiseMemberRole.manager ||
-              member.role === PremiseMemberRole.owner));
-        return serializePremise(row, {
-          isTroupeOwner,
-          member,
-          canView: true,
-          canManage,
-          canBook,
-        });
+    const premises = await Promise.all(
+      rows.map(async (row) => {
+        const access = await this.resolveAccess(userId, email, row.id);
+        return serializePremise(row, access);
       }),
+    );
+    return {
+      premises,
     };
   }
 
@@ -328,24 +434,78 @@ export class PremisesService {
   }
 
   async createPremise(userId: string, body: CreatePremiseDto) {
-    const troupe = await this.getOrCreateMyTroupe(userId);
     const name = String(body.name ?? '').trim();
     if (!name) throw new BadRequestException('name is required');
+    if (body.theaterId && body.studioId) {
+      throw new BadRequestException(
+        'Помещение может принадлежать только одной организации',
+      );
+    }
+
+    let owner:
+      | { theaterId: string; studioId?: never; troupeId?: never }
+      | { studioId: string; theaterId?: never; troupeId?: never }
+      | { troupeId: string; theaterId?: never; studioId?: never };
+
+    if (body.theaterId) {
+      const theater = await this.prisma.theater.findFirst({
+        where: {
+          id: body.theaterId,
+          workspace: {
+            memberships: {
+              some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+            },
+          },
+        },
+        select: { id: true },
+      });
+      if (!theater) {
+        throw new ForbiddenException(
+          'Недостаточно прав для добавления помещения театра',
+        );
+      }
+      owner = { theaterId: theater.id };
+    } else if (body.studioId) {
+      const studio = await this.prisma.studio.findFirst({
+        where: {
+          id: body.studioId,
+          OR: [
+            { ownerUserId: userId },
+            {
+              members: {
+                some: { userId, role: { in: ['owner', 'teacher'] } },
+              },
+            },
+          ],
+        },
+        select: { id: true },
+      });
+      if (!studio) {
+        throw new ForbiddenException(
+          'Недостаточно прав для добавления помещения студии',
+        );
+      }
+      owner = { studioId: studio.id };
+    } else {
+      const troupe = await this.getOrCreateMyTroupe(userId);
+      owner = { troupeId: troupe.id };
+    }
 
     const created = await this.prisma.premise.create({
       data: {
-        troupeId: troupe.id,
+        ...owner,
         name,
         kind: body.kind ?? 'OWNED',
         address: body.address?.trim() || null,
         capacity: body.capacity ?? null,
+        paymentDueDay: body.paymentDueDay ?? null,
         notes: body.notes?.trim() || null,
       },
       select: premiseSelect,
     });
 
     return serializePremise(created, {
-      isTroupeOwner: true,
+      isOrganizationManager: true,
       member: null,
       canView: true,
       canManage: true,
@@ -374,6 +534,9 @@ export class PremisesService {
         body.address == null ? null : String(body.address).trim() || null;
     }
     if (body.capacity !== undefined) data.capacity = body.capacity;
+    if (body.paymentDueDay !== undefined) {
+      data.paymentDueDay = body.paymentDueDay;
+    }
     if (body.notes !== undefined) {
       data.notes =
         body.notes == null ? null : String(body.notes).trim() || null;
@@ -431,6 +594,9 @@ export class PremisesService {
   ) {
     const access = await this.resolveAccess(userId, userEmail, premiseId);
     this.assertCanBook(access);
+    const includesPaymentData =
+      body.rentalAmountRub !== undefined || body.paymentStatus !== undefined;
+    if (includesPaymentData) this.assertCanManage(access);
 
     const startsAt = new Date(body.startsAt);
     if (Number.isNaN(startsAt.getTime())) {
@@ -458,10 +624,16 @@ export class PremisesService {
         title,
         purpose: body.purpose?.trim() || null,
         rentalNotes: body.rentalNotes?.trim() || null,
+        rentalAmountKopecks:
+          body.rentalAmountRub === undefined
+            ? null
+            : rubToKopecks(body.rentalAmountRub),
+        paymentStatus: body.paymentStatus,
         contactEmail: body.contactEmail
           ? normalizeEmail(body.contactEmail)
           : email,
         contactName: body.contactName?.trim() || null,
+        contactPhone: body.contactPhone?.trim() || null,
         status: body.status ?? PremiseSlotStatus.confirmed,
         createdByEmail: email,
       },
@@ -487,8 +659,13 @@ export class PremisesService {
     if (!this.canEditSlot(access, userEmail, existing)) {
       throw new ForbiddenException('Недостаточно прав для изменения слота');
     }
+    const includesPaymentData =
+      body.rentalAmountRub !== undefined || body.paymentStatus !== undefined;
+    if (includesPaymentData) this.assertCanManage(access);
 
-    const startsAt = body.startsAt ? new Date(body.startsAt) : existing.startsAt;
+    const startsAt = body.startsAt
+      ? new Date(body.startsAt)
+      : existing.startsAt;
     if (Number.isNaN(startsAt.getTime())) {
       throw new BadRequestException('Invalid startsAt');
     }
@@ -522,17 +699,30 @@ export class PremisesService {
           ? null
           : String(body.rentalNotes).trim() || null;
     }
+    if (body.rentalAmountRub !== undefined) {
+      data.rentalAmountKopecks =
+        body.rentalAmountRub == null
+          ? null
+          : rubToKopecks(body.rentalAmountRub);
+    }
+    if (body.paymentStatus !== undefined) {
+      data.paymentStatus = body.paymentStatus;
+    }
     if (body.contactEmail !== undefined) {
       data.contactEmail =
-        body.contactEmail == null
-          ? null
-          : normalizeEmail(body.contactEmail);
+        body.contactEmail == null ? null : normalizeEmail(body.contactEmail);
     }
     if (body.contactName !== undefined) {
       data.contactName =
         body.contactName == null
           ? null
           : String(body.contactName).trim() || null;
+    }
+    if (body.contactPhone !== undefined) {
+      data.contactPhone =
+        body.contactPhone == null
+          ? null
+          : String(body.contactPhone).trim() || null;
     }
     if (body.status !== undefined) data.status = body.status;
 

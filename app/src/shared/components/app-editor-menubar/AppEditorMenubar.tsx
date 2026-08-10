@@ -1,11 +1,16 @@
+import cn from "classnames";
 import { useState, type MouseEvent } from "react";
+import { useLocation } from "react-router-dom";
+import { isProjectPath } from "../../../app/router/paths";
 import { useProject } from "../../../features/project";
 import { AppEditorChatToggle } from "./AppEditorChatToggle";
 import { AppEditorPlaylistEditToggle } from "./AppEditorPlaylistEditToggle";
 import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
 import { AppEditorHomeLink } from "./AppEditorHomeLink";
 import { AppEditorMenubarProjectSelect } from "./AppEditorMenubarProjectSelect";
-import { AppEditorSpectacleDirectionsNav } from "./AppEditorSpectacleDirectionsNav";
+import { AppEditorProjectDirectionsNav } from "./AppEditorProjectDirectionsNav";
+import { AppEditorProjectMenu } from "./AppEditorProjectMenu";
+import { AppEditorUserMenu } from "./AppEditorUserMenu";
 import { useAppEditorMenubarCenter, useAppEditorMenubarToolbarActions, useAppEditorMenubarViewMenu } from "./AppEditorMenubarContext";
 import "./style.css";
 
@@ -14,6 +19,8 @@ export function AppEditorMenubar() {
   const centerContent = useAppEditorMenubarCenter();
   const toolbarActions = useAppEditorMenubarToolbarActions();
   const { projectName } = useProject();
+  const { pathname } = useLocation();
+  const isProjectRoute = isProjectPath(pathname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const handleMenusClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -32,13 +39,11 @@ export function AppEditorMenubar() {
 
   return (
     <header
-      className={[
+      className={cn(
         "theater-editor-menubar",
         "app-editor-menubar",
-        mobileMenuOpen ? "app-editor-menubar--mobile-open" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        mobileMenuOpen && "app-editor-menubar--mobile-open",
+      )}
       aria-label="Меню приложения"
     >
       <div className="theater-editor-menubar__track app-editor-menubar__track">
@@ -59,14 +64,15 @@ export function AppEditorMenubar() {
             onClick={handleMenusClick}
           >
             <AppEditorHomeLink />
-            <AppEditorSpectacleDirectionsNav />
+            {isProjectRoute ? <AppEditorProjectDirectionsNav /> : null}
             {viewMenu}
           </div>
         </div>
-        {projectName || centerContent ? (
+        {(projectName && isProjectRoute) || centerContent ? (
           <div className="app-editor-menubar__center">
             {centerContent}
-            {projectName ? <AppEditorMenubarProjectSelect /> : null}
+            {projectName && isProjectRoute ? <AppEditorMenubarProjectSelect /> : null}
+            {projectName && isProjectRoute ? <AppEditorProjectMenu /> : null}
           </div>
         ) : null}
         <div className="app-editor-menubar__end">
@@ -76,6 +82,7 @@ export function AppEditorMenubar() {
             <AppEditorPlaylistEditToggle />
             <AppEditorChatToggle />
           </div>
+          <AppEditorUserMenu />
         </div>
       </div>
     </header>

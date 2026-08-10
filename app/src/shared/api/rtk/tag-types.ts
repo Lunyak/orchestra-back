@@ -1,5 +1,6 @@
 /** Теги кэша RTK Query — добавляйте домены по мере миграции sync/api. */
 export const orchestraApiTagTypes = [
+  "Dashboard",
   "Rehearsal",
   "RehearsalList",
   "RehearsalScenes",
@@ -8,6 +9,7 @@ export const orchestraApiTagTypes = [
   "ProfileBatch",
   "ProjectRoles",
   "ProjectMembers",
+  "ProductionTeam",
   "Troupe",
   "Premises",
   "PremiseSlots",

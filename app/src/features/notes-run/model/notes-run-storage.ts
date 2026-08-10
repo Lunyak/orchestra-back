@@ -4,7 +4,18 @@ import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { fetchDevLocalProjectJson } from "../../../shared/platform/local-project-dev";
 import { readProjectFolderJson } from "../../../shared/platform/project-media-folder";
 import type { ScriptScene } from "../../../shared/types/script";
-import type { NotesRunCardDraft, NotesRunCardV1, NotesRunDataV1 } from "./notes-run-types";
+import type {
+  NotesRunCardDraft,
+  NotesRunCardV1,
+  NotesRunDataV1,
+  NotesRunSceneGroup,
+} from "./notes-run-types";
+
+function readSceneId(raw: Partial<NotesRunCardV1> | Record<string, unknown>): number | null {
+  const value = Number((raw as { sceneId?: unknown }).sceneId);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return Math.trunc(value);
+}
 
 export function normalizeNotesRunData(raw: unknown): NotesRunDataV1 {
   const data = raw as NotesRunDataV1 | null | undefined;
@@ -33,6 +44,7 @@ function normalizeNotesRunCard(raw: Partial<NotesRunCardV1>, fallbackNo: number)
     id,
     cardNo,
     title: String(raw?.title ?? "").trim(),
+    sceneId: readSceneId(raw ?? {}),
     sceneLabel: readLegacySceneLabel(raw as Record<string, unknown>),
     lightLines,
     lightNotes: String(raw?.lightNotes ?? "").trim(),
@@ -81,7 +93,7 @@ function readNotesRunLocalBackup(projectSlug: string): NotesRunDataV1 | null {
   }
 }
 
-/** Загрузка прогона — только локально, sync не участвует. */
+/** Загрузка суфлера — только локально, sync не участвует. */
 export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1> {
   if (!projectSlug) return { v: 1, cards: [] };
 
@@ -98,7 +110,6 @@ export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1>
       /* notes-run.json missing or unreadable */
     }
 
-    // Одноразовая миграция из старого script.json (если было)
     if (api.readProjectPlaybook) {
       try {
         const script = await api.readProjectPlaybook(projectSlug, "script");
@@ -142,7 +153,7 @@ export async function loadNotesRun(projectSlug: string): Promise<NotesRunDataV1>
   return readNotesRunLocalBackup(projectSlug) ?? { v: 1, cards: [] };
 }
 
-/** Сохранение прогона — отдельный файл + localStorage, без script.json и сервера. */
+/** Сохранение суфлера — отдельный файл + localStorage, без script.json и сервера. */
 export async function saveNotesRun(projectSlug: string, data: NotesRunDataV1): Promise<void> {
   const normalized = normalizeNotesRunData(data);
   saveNotesRunLocalBackup(projectSlug, normalized);
@@ -152,14 +163,113 @@ export async function saveNotesRun(projectSlug: string, data: NotesRunDataV1): P
 
   const result = await api.saveNotesRun(projectSlug, normalized);
   if (!result?.ok) {
-    throw new Error(result?.error ?? "Не удалось сохранить прогон");
+    throw new Error(result?.error ?? "Не удалось сохранить суфлер");
   }
 }
 
-export function buildEmptyNotesRunDraft(): NotesRunCardDraft {
+export function sceneTitleAt(scenes: ScriptScene[], index: number): string {
+  const scene = scenes[index];
+  const ordinal = index + 1;
+  return String(scene?.title ?? "").trim() || `Сцена ${ordinal}`;
+}
+
+/** Подтягивает sceneLabel из актуальных сцен по sceneId; для старых карточек — матч по title. */
+export function syncNotesRunCardsWithScenes(
+  cards: NotesRunCardV1[],
+  scenes: ScriptScene[],
+): NotesRunCardV1[] {
+  if (scenes.length === 0) return cards;
+
+  const byId = new Map(scenes.map((scene) => [scene.id, scene]));
+  const byTitle = new Map<string, ScriptScene>();
+  for (const scene of scenes) {
+    const title = String(scene.title ?? "").trim();
+    if (title && !byTitle.has(title)) byTitle.set(title, scene);
+  }
+
+  return cards.map((card) => {
+    const bySceneId = card.sceneId != null ? byId.get(card.sceneId) : undefined;
+    if (bySceneId) {
+      const sceneLabel = String(bySceneId.title ?? "").trim() || card.sceneLabel;
+      if (sceneLabel === card.sceneLabel && card.sceneId === bySceneId.id) return card;
+      return { ...card, sceneId: bySceneId.id, sceneLabel };
+    }
+
+    const label = card.sceneLabel.trim();
+    if (!label || card.sceneId != null) return card;
+    const matched = byTitle.get(label);
+    if (!matched) return card;
+    return {
+      ...card,
+      sceneId: matched.id,
+      sceneLabel: String(matched.title ?? "").trim() || label,
+    };
+  });
+}
+
+export function buildNotesRunSceneGroups(
+  cards: NotesRunCardV1[],
+  scenes: ScriptScene[],
+): NotesRunSceneGroup[] {
+  const groups: NotesRunSceneGroup[] = [];
+  const sceneIndexById = new Map(scenes.map((scene, index) => [scene.id, index]));
+
+  cards.forEach((card, cardIndex) => {
+    const sceneIndex =
+      card.sceneId != null ? (sceneIndexById.get(card.sceneId) ?? -1) : -1;
+    const sceneOrdinal = sceneIndex >= 0 ? sceneIndex + 1 : 0;
+    const sceneTitle =
+      sceneIndex >= 0
+        ? sceneTitleAt(scenes, sceneIndex)
+        : card.sceneLabel.trim() || "Без сцены";
+    const groupKey = card.sceneId ?? `label:${sceneTitle}`;
+    const last = groups[groups.length - 1];
+    const lastKey = last
+      ? (last.sceneId ?? `label:${last.sceneTitle}`)
+      : null;
+
+    if (!last || lastKey !== groupKey) {
+      groups.push({
+        sceneIndex,
+        sceneId: card.sceneId,
+        sceneOrdinal,
+        sceneTitle,
+        items: [{ cardIndex, card }],
+      });
+      return;
+    }
+
+    last.items.push({ cardIndex, card });
+  });
+
+  return groups;
+}
+
+export function findFirstCardIndexForScene(
+  cards: NotesRunCardV1[],
+  scenes: ScriptScene[],
+  sceneIndex: number,
+): number {
+  const scene = scenes[sceneIndex];
+  if (!scene) return -1;
+  const byId = cards.findIndex((card) => card.sceneId === scene.id);
+  if (byId >= 0) return byId;
+  const title = String(scene.title ?? "").trim();
+  if (!title) return -1;
+  return cards.findIndex((card) => card.sceneLabel.trim() === title);
+}
+
+export function buildEmptyNotesRunDraft(
+  scene?: ScriptScene | null,
+  sceneIndex = 0,
+): NotesRunCardDraft {
+  const sceneLabel = scene
+    ? String(scene.title ?? "").trim() || `Сцена ${sceneIndex + 1}`
+    : "";
   return {
     title: "",
-    sceneLabel: "",
+    sceneId: scene?.id ?? null,
+    sceneLabel,
     lightLines: [{ label: "", value: "" }],
     lightNotes: "",
     playTrackId: null,
@@ -173,6 +283,7 @@ export function buildEmptyNotesRunDraft(): NotesRunCardDraft {
 export function buildNotesRunDraftFromCard(card: NotesRunCardV1): NotesRunCardDraft {
   return {
     title: card.title,
+    sceneId: card.sceneId,
     sceneLabel: card.sceneLabel,
     lightLines:
       card.lightLines.length > 0
@@ -204,6 +315,7 @@ export function applyNotesRunDraft(
     id: cardId ?? createId(),
     cardNo: cardId ? cards.find((c) => c.id === cardId)?.cardNo ?? cards.length + 1 : cards.length + 1,
     title: draft.title.trim(),
+    sceneId: draft.sceneId != null && draft.sceneId > 0 ? draft.sceneId : null,
     sceneLabel: draft.sceneLabel.trim(),
     lightLines,
     lightNotes: draft.lightNotes.trim(),
@@ -227,11 +339,13 @@ export function applyNotesRunDraft(
   return normalizeNotesRunData({ v: 1, cards: renumberNotesRunCards(nextCards) });
 }
 
+/** Одна пустая карточка на каждую сцену сценария — скелет рукописной программы. */
 export function buildNotesRunCardsFromScenes(scenes: ScriptScene[]): NotesRunDataV1 {
   const cards: NotesRunCardV1[] = scenes.map((scene, index) => ({
     id: createId(),
     cardNo: index + 1,
     title: "",
+    sceneId: scene.id,
     sceneLabel: String(scene.title ?? "").trim() || `Сцена ${index + 1}`,
     lightLines: [],
     lightNotes: "",

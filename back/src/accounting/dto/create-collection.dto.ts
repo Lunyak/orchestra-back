@@ -31,6 +31,14 @@ export class CreateCollectionParticipantDto {
 }
 
 export class CreateCollectionDto {
+  @IsOptional()
+  @IsString()
+  troupeId?: string;
+
+  @IsOptional()
+  @IsString()
+  studioId?: string;
+
   @IsString()
   @MaxLength(200)
   title!: string;

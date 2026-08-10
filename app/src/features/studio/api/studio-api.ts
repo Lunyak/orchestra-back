@@ -146,6 +146,7 @@ export const studioApi = orchestraApi.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, { studioId }) => [
         { type: "StudioInvites", id: studioId },
+        "Dashboard",
       ],
     }),
 
@@ -173,7 +174,7 @@ export const studioApi = orchestraApi.injectEndpoints({
         url: `/studios/invites/${encodeURIComponent(token)}/accept`,
         method: "POST",
       }),
-      invalidatesTags: ["Studios"],
+      invalidatesTags: ["Studios", "Dashboard"],
     }),
 
     createStudioModule: build.mutation<

@@ -28,6 +28,7 @@ export interface Rehearsal {
   telegramThreadId?: string | null;
   publishedAt?: string | null;
   participants?: RehearsalParticipant[];
+  workspaces?: Array<{ rehearsalId: string; workspaceId: string }>;
 }
 
 export interface RehearsalMyComment {
@@ -95,6 +96,7 @@ export async function createRehearsal(
     startsAt: string;
     durationMin?: number;
     notes?: string;
+    calendarWorkspaceIds?: string[];
   },
 ): Promise<Rehearsal> {
   const { data } = await api.post("/rehearsals", body, {

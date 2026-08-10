@@ -126,6 +126,7 @@
 .spectacle-direction-switch__item {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 24px;
   padding: 4px 8px;
   border: 0;
@@ -140,6 +141,20 @@
   cursor: pointer;
   box-sizing: border-box;
   transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.spectacle-direction-switch__count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-5, rgba(255, 255, 255, 0.06));
+  color: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 @media (max-width: 1366px) {

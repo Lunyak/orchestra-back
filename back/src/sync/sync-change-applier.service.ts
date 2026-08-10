@@ -31,18 +31,26 @@ export class SyncChangeApplierService {
     }
     return true;
   }
-  async applyProjectChange(
-    userId: string,
-    operation: string,
-    payload: any,
-  ) {
+  async applyProjectChange(userId: string, operation: string, payload: any) {
     if (operation === 'delete') {
       await this.prisma.project.updateMany({
-        where: { id: payload.id, ownerId: userId },
+        where: { id: payload.id },
         data: { deletedAt: new Date(payload.updatedAt) },
       });
       return;
     }
+
+    const workspace = await this.prisma.workspace.upsert({
+      where: { personalOwnerId: userId },
+      update: {},
+      create: {
+        type: 'PERSONAL',
+        name: 'Личное пространство',
+        personalOwnerId: userId,
+        memberships: { create: { userId, role: 'OWNER' } },
+      },
+      select: { id: true },
+    });
 
     await this.prisma.project.upsert({
       where: { id: payload.id },
@@ -57,6 +65,7 @@ export class SyncChangeApplierService {
         slug: payload.slug,
         name: payload.name,
         description: payload.description ?? null,
+        workspaceId: workspace.id,
       },
     });
   }
@@ -68,8 +77,8 @@ export class SyncChangeApplierService {
     allowNullWipe = false,
   ) {
     if (operation === 'delete') {
-      await this.prisma.playbook.updateMany({ where: { id: payload.id, project: { ownerId: userId },
-        },
+      await this.prisma.playbook.updateMany({
+        where: { id: payload.id },
         data: { deletedAt: new Date(payload.updatedAt) },
       });
       return;
@@ -118,7 +127,10 @@ export class SyncChangeApplierService {
       ? (payload?.projectorMedia ?? null)
       : undefined;
 
-    const existing = await this.prisma.playbook.findUnique({ where: { id: payload.id }, select: { sceneRoles: true,
+    const existing = await this.prisma.playbook.findUnique({
+      where: { id: payload.id },
+      select: {
+        sceneRoles: true,
         lightFaders: true,
         lightPrograms: true,
         lightChannelRoles: true,
@@ -174,7 +186,10 @@ export class SyncChangeApplierService {
       'projectorMedia',
     );
 
-    const result = await this.prisma.playbook.upsert({ where: { id: payload.id }, update: { name: payload.name,
+    const result = await this.prisma.playbook.upsert({
+      where: { id: payload.id },
+      update: {
+        name: payload.name,
         ...(applySceneRoles ? { sceneRoles: nextSceneRoles } : {}),
         ...(applyLightFaders ? { lightFaders: nextLightFaders } : {}),
         ...(applyLightPrograms ? { lightPrograms: nextLightPrograms } : {}),
@@ -209,7 +224,9 @@ export class SyncChangeApplierService {
     payload: any,
     sourceClientId?: string | null,
   ) {
-    const playbookId = String(payload?.playbookId ?? payload?.sceneId ?? '').trim();
+    const playbookId = String(
+      payload?.playbookId ?? payload?.sceneId ?? '',
+    ).trim();
     const sourceId = syncNormalizeInt(payload?.sourceId, -1);
     if (!playbookId || sourceId <= 0) return;
     const projectId = syncProjectIdFromCompoundId(playbookId);
@@ -218,7 +235,8 @@ export class SyncChangeApplierService {
       await this.prisma.playlistItem.deleteMany({
         where: { playbookId, sourceId },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -246,13 +264,14 @@ export class SyncChangeApplierService {
         where: { id: existing.id },
         data: { order, title, file, fadeMs, loop, remoteUrl, remoteKey },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
     await this.prisma.playlistItem.create({
       data: {
         playbookId,
-          sourceId,
+        sourceId,
         order,
         title,
         file,
@@ -262,14 +281,17 @@ export class SyncChangeApplierService {
         remoteKey,
       },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+    if (projectId)
+      this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
   async applySoundChange(
     operation: string,
     payload: any,
     sourceClientId?: string | null,
   ) {
-    const playbookId = String(payload?.playbookId ?? payload?.sceneId ?? '').trim();
+    const playbookId = String(
+      payload?.playbookId ?? payload?.sceneId ?? '',
+    ).trim();
     const sourceId = syncNormalizeInt(payload?.sourceId, -1);
     if (!playbookId || sourceId <= 0) return;
     const projectId = syncProjectIdFromCompoundId(playbookId);
@@ -278,7 +300,8 @@ export class SyncChangeApplierService {
       await this.prisma.sound.deleteMany({
         where: { playbookId, sourceId },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -331,13 +354,14 @@ export class SyncChangeApplierService {
           loop,
         },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
     await this.prisma.sound.create({
       data: {
         playbookId,
-          sourceId,
+        sourceId,
         title,
         file,
         icon,
@@ -350,14 +374,17 @@ export class SyncChangeApplierService {
         loop,
       },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+    if (projectId)
+      this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
   async applyGlobalLightChannelChange(
     operation: string,
     payload: any,
     sourceClientId?: string | null,
   ) {
-    const playbookId = String(payload?.playbookId ?? payload?.sceneId ?? '').trim();
+    const playbookId = String(
+      payload?.playbookId ?? payload?.sceneId ?? '',
+    ).trim();
     const index = syncNormalizeInt(payload?.index, -1);
     if (!playbookId || index < 0) return;
     const projectId = syncProjectIdFromCompoundId(playbookId);
@@ -366,7 +393,8 @@ export class SyncChangeApplierService {
       await this.prisma.globalLightChannel.deleteMany({
         where: { playbookId, index },
       });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -379,9 +407,12 @@ export class SyncChangeApplierService {
     await this.prisma.globalLightChannel.create({
       data: { playbookId, index, raw },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+    if (projectId)
+      this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
-  private buildTheaterLayoutExtras(payload: any): Prisma.InputJsonValue | undefined {
+  private buildTheaterLayoutExtras(
+    payload: any,
+  ): Prisma.InputJsonValue | undefined {
     const keys = [
       'stageShape',
       'stageFrontZ',
@@ -414,12 +445,15 @@ export class SyncChangeApplierService {
     payload: any,
     sourceClientId?: string | null,
   ) {
-    const playbookId = String(payload?.playbookId ?? payload?.sceneId ?? '').trim();
+    const playbookId = String(
+      payload?.playbookId ?? payload?.sceneId ?? '',
+    ).trim();
     if (!playbookId) return;
     const projectId = syncProjectIdFromCompoundId(playbookId);
     if (operation === 'delete') {
       await this.prisma.theaterLayout.deleteMany({ where: { playbookId } });
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
     const num = (v: any, fallback: number) =>
@@ -431,7 +465,9 @@ export class SyncChangeApplierService {
       return value != null && value > 0 ? value : undefined;
     };
     const optionalInt = (v: any) =>
-      v != null && Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : undefined;
+      v != null && Number.isFinite(Number(v))
+        ? Math.trunc(Number(v))
+        : undefined;
     const extras = this.buildTheaterLayoutExtras(payload);
     await this.prisma.theaterLayout.upsert({
       where: { playbookId },
@@ -481,7 +517,8 @@ export class SyncChangeApplierService {
         extras,
       },
     });
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+    if (projectId)
+      this.notifications.notifySceneUpdated(projectId, sourceClientId);
   }
   async applySceneChange(
     userId: string,
@@ -489,21 +526,21 @@ export class SyncChangeApplierService {
     payload: any,
     sourceClientId?: string | null,
   ) {
-    const playbookId = String(payload?.playbookId ?? payload?.sceneId ?? '').trim();
+    const playbookId = String(
+      payload?.playbookId ?? payload?.sceneId ?? '',
+    ).trim();
     if (playbookId && !payload?.playbookId) {
       payload = { ...payload, playbookId };
     }
 
     if (operation === 'delete') {
       await this.prisma.scene.updateMany({
-        where: {
-          id: payload.id,
-          playbook: { project: { ownerId: userId } },
-        },
+        where: { id: payload.id },
         data: { deletedAt: new Date(payload.updatedAt) },
       });
       const projectId = syncProjectIdFromCompoundId(payload?.id);
-      if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+      if (projectId)
+        this.notifications.notifySceneUpdated(projectId, sourceClientId);
       return;
     }
 
@@ -516,7 +553,8 @@ export class SyncChangeApplierService {
     });
 
     // Проверяем, существует ли Playbook перед созданием Scene
-    const playbookExists = await this.prisma.playbook.findUnique({ where: { id: payload.playbookId },
+    const playbookExists = await this.prisma.playbook.findUnique({
+      where: { id: payload.playbookId },
     });
 
     if (!playbookExists) {
@@ -596,7 +634,8 @@ export class SyncChangeApplierService {
     });
 
     const projectId = syncProjectIdFromCompoundId(payload?.playbookId);
-    if (projectId) this.notifications.notifySceneUpdated(projectId, sourceClientId);
+    if (projectId)
+      this.notifications.notifySceneUpdated(projectId, sourceClientId);
 
     // Optional: normalize nested scene data if provided in payload (requisites/light/theater).
     try {
@@ -615,8 +654,11 @@ export class SyncChangeApplierService {
         const data = requisitesValue
           .map((r: unknown) => syncMapSceneRequisiteRow(sceneId, r))
           .filter(
-            (row): row is NonNullable<ReturnType<typeof syncMapSceneRequisiteRow>> =>
-              row != null,
+            (
+              row,
+            ): row is NonNullable<
+              ReturnType<typeof syncMapSceneRequisiteRow>
+            > => row != null,
           );
         tx.push(this.prisma.sceneRequisite.deleteMany({ where: { sceneId } }));
         if (data.length)
@@ -663,10 +705,17 @@ export class SyncChangeApplierService {
           tx.push(this.prisma.sceneLightPlot.createMany({ data }));
       }
 
-      if (Array.isArray(theaterModelsValue) || Array.isArray(theaterDecorValue)) {
+      if (
+        Array.isArray(theaterModelsValue) ||
+        Array.isArray(theaterDecorValue)
+      ) {
         const flat = flattenClientTheaterModels({
-          theaterModels: Array.isArray(theaterModelsValue) ? theaterModelsValue : [],
-          theaterDecor: Array.isArray(theaterDecorValue) ? theaterDecorValue : [],
+          theaterModels: Array.isArray(theaterModelsValue)
+            ? theaterModelsValue
+            : [],
+          theaterDecor: Array.isArray(theaterDecorValue)
+            ? theaterDecorValue
+            : [],
         });
         const data = flat
           .map((m: any) =>
@@ -693,7 +742,9 @@ export class SyncChangeApplierService {
         const data = theaterSpotlightsValue
           .map((sp: any) => syncMapTheaterSpotlightRow(sceneId, sp))
           .filter(Boolean) as Prisma.TheaterSpotlightCreateManyInput[];
-        tx.push(this.prisma.theaterSpotlight.deleteMany({ where: { sceneId } }));
+        tx.push(
+          this.prisma.theaterSpotlight.deleteMany({ where: { sceneId } }),
+        );
         if (data.length)
           tx.push(this.prisma.theaterSpotlight.createMany({ data }));
       }

@@ -1,3 +1,5 @@
+import { projectTaskPath } from "../../../app/router/paths";
+
 const CYRILLIC_TRANSLIT: Record<string, string> = {
   а: "a",
   б: "b",
@@ -49,13 +51,17 @@ export function slugifyTaskTitle(title: string): string {
     .slice(0, 80);
 }
 
-/** `/tasks/{id}` or `/tasks/{id}-{slug}` — id is cuid (no dashes). */
-export function buildTaskPath(taskId: string, title?: string | null): string {
+/** Canonical project task URL; id is cuid (no dashes). */
+export function buildTaskPath(
+  projectSlug: string,
+  taskId: string,
+  title?: string | null,
+): string {
   const id = taskId.trim();
-  if (!id) return "/tasks";
+  if (!id) return projectTaskPath(projectSlug);
   const slug = title ? slugifyTaskTitle(title) : "";
-  if (!slug) return `/tasks/${id}`;
-  return `/tasks/${id}-${slug}`;
+  if (!slug) return projectTaskPath(projectSlug, id);
+  return projectTaskPath(projectSlug, `${id}-${slug}`);
 }
 
 export function parseTaskPathParam(param: string): string {

@@ -240,8 +240,8 @@ export function KanbanBoardPage({
     error: rolesQueryError,
   } = useProjectRolesQuery(projectName, { skip: skipRoles });
   const { data: troupeRes } = useMyTroupeQuery(
-    { project: projectName },
-    { skip: skipRoles },
+    {},
+    { skip: !accessToken },
   );
   const { data: projectMembersRes } = useProjectMembersQuery(projectName, {
     skip: skipRoles,

@@ -2,6 +2,7 @@ import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import cn from "classnames";
 import { Link } from "react-router-dom";
+import { projectPath } from "../../../app/router/paths";
 import { PersonSelectPreview } from "../../../shared/components/person-select/PersonSelectPreview";
 import { RehearsalPlanSectionChrome } from "../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
 import {
@@ -22,6 +23,7 @@ import "./tasks.css";
 function TaskDetailPageView({ vm }: { vm: ProjectTaskDetailPageViewModel }) {
   const {
     accessToken,
+    projectSlug,
     task,
     project,
     loading,
@@ -108,7 +110,10 @@ function TaskDetailPageView({ vm }: { vm: ProjectTaskDetailPageViewModel }) {
           <div className="tasks-page__content">
             <div className="tasks-page__panel">
               <p className="tasks-page__hint">{error ?? "Задача не найдена"}</p>
-              <Link className="tasks-page__back-link" to="/tasks">
+              <Link
+                className="tasks-page__back-link"
+                to={projectPath(projectSlug, "tasks")}
+              >
                 ← К списку задач
               </Link>
             </div>
@@ -128,7 +133,10 @@ function TaskDetailPageView({ vm }: { vm: ProjectTaskDetailPageViewModel }) {
       <RehearsalPlanSectionChrome activeTab="tasks">
         <div className="tasks-page__content tasks-page__content--detail">
           <div className="tasks-page__detail-head">
-            <Link className="tasks-page__back-link" to="/tasks">
+            <Link
+              className="tasks-page__back-link"
+              to={projectPath(projectSlug, "tasks")}
+            >
               ← К списку задач
             </Link>
             <div className="tasks-page__detail-actions">

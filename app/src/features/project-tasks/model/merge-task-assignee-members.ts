@@ -1,5 +1,5 @@
 import type { ProjectMembersResponse } from "../../project/api/project-api";
-import type { MyTroupeResponse } from "../../troupe/api/troupe-api";
+import type { TroupeResponse } from "../../troupe/api/troupe-api";
 
 export type TaskAssigneeMember = {
   email: string;
@@ -49,7 +49,7 @@ function mergeMember(
 }
 
 export function mergeTaskAssigneeMembers(
-  troupeRes: MyTroupeResponse | undefined,
+  troupeRes: TroupeResponse | undefined,
   projectMembersRes: ProjectMembersResponse | undefined,
 ): TaskAssigneeMember[] {
   const map = new Map<string, TaskAssigneeMember>();
@@ -59,10 +59,6 @@ export function mergeTaskAssigneeMembers(
   }
 
   for (const member of troupeRes?.teamMembers ?? []) {
-    mergeMember(map, member.email, member.profile ?? null);
-  }
-
-  for (const member of troupeRes?.projectCastMembers ?? []) {
     mergeMember(map, member.email, member.profile ?? null);
   }
 

@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { studioAssignmentPath } from "../../app/router/paths";
 import type { StudioDetail } from "../../features/studio";
 import { useCreateStudioAssignmentMutation } from "../../features/studio";
 import "./style.css";
@@ -107,7 +108,7 @@ export function StudioAssignmentsPanel({ studio }: StudioAssignmentsPanelProps) 
             return (
               <li key={assignment.id}>
                 <Link
-                  to={`/studio/${studio.id}/assignments/${assignment.id}`}
+                  to={studioAssignmentPath(studio.id, assignment.id)}
                   className="studio-assignment-item"
                 >
                   <div className="studio-assignment-item__row">

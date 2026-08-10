@@ -1,5 +1,9 @@
 import { orchestraApi } from "../../../shared/api/rtk/orchestra-api";
-import type { ProjectMemberInfo, ProjectRoleInfo } from "../../../sync/api/projects";
+import type {
+  ProjectMemberInfo,
+  ProjectRoleInfo,
+} from "../../../sync/api/projects";
+import type { TeamRoleDefinitionItem } from "../../../sync/api/troupe";
 
 export type ProjectMembersResponse = {
   id: string;
@@ -7,9 +11,70 @@ export type ProjectMembersResponse = {
   members: ProjectMemberInfo[];
 };
 
+export type ProjectAccessResponse = {
+  project: {
+    id: string;
+    slug: string;
+    name: string;
+    workspaceId: string;
+    workspaceType: "PERSONAL" | "THEATER" | "TROUPE";
+    ownerId: string;
+  };
+  workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | null;
+  projectRole: "editor" | "viewer" | null;
+  capabilities: {
+    read: boolean;
+    write: boolean;
+    manageMembers: boolean;
+    owner: boolean;
+    admin: boolean;
+  };
+};
+
+export type ProjectTeamRoleAssignee = {
+  id: string;
+  email: string;
+  profile: {
+    displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  } | null;
+};
+
+export type ProjectTeamRoleItem = {
+  id: string;
+  projectId: string;
+  slug: string;
+  title: string;
+  parentId: string | null;
+  sortOrder: number;
+  description: string;
+  avatarKey: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assignmentCount: number;
+  assignees: ProjectTeamRoleAssignee[];
+  assignments: Array<{
+    id: string;
+    email: string;
+    createdAt: string;
+    assignee: ProjectTeamRoleAssignee;
+  }>;
+};
+
+export type ProductionTeamResponse = {
+  theater: { id: string; title: string } | null;
+  theaterRoles: TeamRoleDefinitionItem[];
+  projectRoles: ProjectTeamRoleItem[];
+};
+
 export const projectApi = orchestraApi.injectEndpoints({
   endpoints: (build) => ({
-    projectRoles: build.query<{ projectId: string; roles: ProjectRoleInfo[] }, string>({
+    projectRoles: build.query<
+      { projectId: string; roles: ProjectRoleInfo[] },
+      string
+    >({
       query: (projectSlug) => ({
         url: `/projects/${encodeURIComponent(projectSlug)}/roles`,
       }),
@@ -27,8 +92,21 @@ export const projectApi = orchestraApi.injectEndpoints({
       ],
     }),
 
+    projectAccess: build.query<ProjectAccessResponse, string>({
+      query: (projectSlug) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/access`,
+      }),
+    }),
+
     inviteProjectMember: build.mutation<
-      { id: string; projectId: string; userId: string; role: string },
+      {
+        id: string;
+        token: string;
+        invitePath: string;
+        role: string;
+        email: string;
+        pending?: true;
+      },
       { projectSlug: string; email: string; role?: string }
     >({
       query: ({ projectSlug, email, role }) => ({
@@ -38,6 +116,7 @@ export const projectApi = orchestraApi.injectEndpoints({
       }),
       invalidatesTags: (_r, _e, { projectSlug }) => [
         { type: "ProjectMembers", id: projectSlug },
+        "Dashboard",
       ],
     }),
 
@@ -66,6 +145,20 @@ export const projectApi = orchestraApi.injectEndpoints({
       query: ({ projectSlug, memberId }) => ({
         url: `/projects/${encodeURIComponent(projectSlug)}/members/${encodeURIComponent(memberId)}`,
         method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, { projectSlug }) => [
+        { type: "ProjectMembers", id: projectSlug },
+      ],
+    }),
+
+    transferProjectOwnership: build.mutation<
+      { ok: true; ownerId: string },
+      { projectSlug: string; userId: string }
+    >({
+      query: ({ projectSlug, userId }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/transfer-ownership`,
+        method: "POST",
+        data: { userId },
       }),
       invalidatesTags: (_r, _e, { projectSlug }) => [
         { type: "ProjectMembers", id: projectSlug },
@@ -129,7 +222,14 @@ export const projectApi = orchestraApi.injectEndpoints({
         avatarKey?: string | null;
       }
     >({
-      query: ({ projectSlug, roleId, title, description, aliases, avatarKey }) => ({
+      query: ({
+        projectSlug,
+        roleId,
+        title,
+        description,
+        aliases,
+        avatarKey,
+      }) => ({
         url: `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}`,
         method: "PUT",
         data: { title, description, aliases, avatarKey },
@@ -138,17 +238,132 @@ export const projectApi = orchestraApi.injectEndpoints({
         { type: "ProjectRoles", id: projectSlug },
       ],
     }),
+
+    productionTeam: build.query<ProductionTeamResponse, string>({
+      query: (projectSlug) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/production-team`,
+      }),
+      providesTags: (_r, _e, projectSlug) => [
+        { type: "ProductionTeam", id: projectSlug },
+      ],
+    }),
+
+    projectTeamRole: build.query<
+      ProjectTeamRoleItem,
+      { projectSlug: string; roleId: string }
+    >({
+      query: ({ projectSlug, roleId }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/team-roles/${encodeURIComponent(roleId)}`,
+      }),
+      providesTags: (_r, _e, { projectSlug, roleId }) => [
+        { type: "ProductionTeam", id: `${projectSlug}:${roleId}` },
+      ],
+    }),
+
+    createProjectTeamRole: build.mutation<
+      ProjectTeamRoleItem,
+      {
+        projectSlug: string;
+        title: string;
+        parentId?: string | null;
+        description?: string;
+      }
+    >({
+      query: ({ projectSlug, title, parentId, description }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/team-roles`,
+        method: "POST",
+        data: { title, parentId, description },
+      }),
+      invalidatesTags: (_r, _e, { projectSlug }) => [
+        { type: "ProductionTeam", id: projectSlug },
+      ],
+    }),
+
+    updateProjectTeamRole: build.mutation<
+      ProjectTeamRoleItem,
+      {
+        projectSlug: string;
+        roleId: string;
+        patch: {
+          title?: string;
+          parentId?: string | null;
+          description?: string;
+          avatarKey?: string | null;
+        };
+      }
+    >({
+      query: ({ projectSlug, roleId, patch }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/team-roles/${encodeURIComponent(roleId)}`,
+        method: "PATCH",
+        data: patch,
+      }),
+      invalidatesTags: (_r, _e, { projectSlug, roleId }) => [
+        { type: "ProductionTeam", id: projectSlug },
+        { type: "ProductionTeam", id: `${projectSlug}:${roleId}` },
+      ],
+    }),
+
+    removeProjectTeamRole: build.mutation<
+      { ok: true },
+      { projectSlug: string; roleId: string }
+    >({
+      query: ({ projectSlug, roleId }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/team-roles/${encodeURIComponent(roleId)}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, { projectSlug }) => [
+        { type: "ProductionTeam", id: projectSlug },
+      ],
+    }),
+
+    addProjectTeamRoleAssignment: build.mutation<
+      ProjectTeamRoleItem,
+      { projectSlug: string; roleId: string; email: string }
+    >({
+      query: ({ projectSlug, roleId, email }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/team-roles/${encodeURIComponent(roleId)}/assignments`,
+        method: "POST",
+        data: { email },
+      }),
+      invalidatesTags: (_r, _e, { projectSlug, roleId }) => [
+        { type: "ProductionTeam", id: projectSlug },
+        { type: "ProductionTeam", id: `${projectSlug}:${roleId}` },
+      ],
+    }),
+
+    removeProjectTeamRoleAssignment: build.mutation<
+      ProjectTeamRoleItem,
+      { projectSlug: string; roleId: string; assignmentId: string }
+    >({
+      query: ({ projectSlug, roleId, assignmentId }) => ({
+        url: `/projects/${encodeURIComponent(projectSlug)}/team-roles/${encodeURIComponent(roleId)}/assignments/${encodeURIComponent(assignmentId)}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, { projectSlug, roleId }) => [
+        { type: "ProductionTeam", id: projectSlug },
+        { type: "ProductionTeam", id: `${projectSlug}:${roleId}` },
+      ],
+    }),
   }),
 });
 
 export const {
   useProjectRolesQuery,
   useProjectMembersQuery,
+  useProjectAccessQuery,
   useInviteProjectMemberMutation,
   useUpdateProjectMemberRoleMutation,
   useRemoveProjectMemberMutation,
+  useTransferProjectOwnershipMutation,
   useCreateProjectRoleMutation,
   useDeleteProjectRoleMutation,
   useSetProjectRoleAssignmentsMutation,
   useUpdateProjectRoleMutation,
+  useProductionTeamQuery,
+  useProjectTeamRoleQuery,
+  useCreateProjectTeamRoleMutation,
+  useUpdateProjectTeamRoleMutation,
+  useRemoveProjectTeamRoleMutation,
+  useAddProjectTeamRoleAssignmentMutation,
+  useRemoveProjectTeamRoleAssignmentMutation,
 } = projectApi;

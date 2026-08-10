@@ -5,6 +5,8 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { Button } from "@shared/core/button/Button";
 import { useAuth } from "../../auth";
+import { useProject } from "../../project";
+import { projectSessionPath } from "../../../app/router/paths";
 import {
   getRehearsal,
   getMyRehearsalComment,
@@ -17,6 +19,7 @@ dayjs.locale("ru");
 
 export function RehearsalDetailsPage() {
   const { accessToken } = useAuth();
+  const { projectName } = useProject();
   const { rehearsalId } = useParams();
 
   const id = String(rehearsalId ?? "").trim();
@@ -122,7 +125,10 @@ export function RehearsalDetailsPage() {
   return (
     <div className="rehearsal-details-page">
       <div className="rehearsal-details-page__header">
-        <Link to="/sessions" className="rehearsal-details-page__back-link">
+        <Link
+          to={projectSessionPath(projectName)}
+          className="rehearsal-details-page__back-link"
+        >
           ← Все сессии
         </Link>
         <div className="rehearsal-details-page__title">Сессия</div>

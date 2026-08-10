@@ -57,16 +57,16 @@ export function CalendarSection({
   showStatusMarks?: boolean;
 }) {
   const [currentMonth, setCurrentMonth] = useState(() => {
-    const saved = localStorage.getItem(storageMonthKey);
+    const saved = sessionStorage.getItem(storageMonthKey);
     if (saved) {
       try {
         const date = new Date(saved);
-        if (!isNaN(date.getTime())) return date;
+        if (!isNaN(date.getTime())) return startOfMonth(date);
       } catch {
         // ignore
       }
     }
-    return new Date();
+    return startOfMonth(new Date());
   });
 
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -75,7 +75,7 @@ export function CalendarSection({
   });
 
   useEffect(() => {
-    localStorage.setItem(storageMonthKey, currentMonth.toISOString());
+    sessionStorage.setItem(storageMonthKey, currentMonth.toISOString());
   }, [currentMonth, storageMonthKey]);
 
   const monthStartDate = useMemo(() => startOfMonth(currentMonth), [currentMonth]);

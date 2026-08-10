@@ -25,6 +25,9 @@ import { PremisesModule } from './premises/premises.module';
 import { ProjectTasksModule } from './project-tasks/project-tasks.module';
 import { AccountingModule } from './accounting/accounting.module';
 import { StudioModule } from './studio/studio.module';
+import { WorkspacesModule } from './workspaces/workspaces.module';
+import { ProjectAccessModule } from './project-access/project-access.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -52,6 +55,9 @@ import { StudioModule } from './studio/studio.module';
     ProjectTasksModule,
     AccountingModule,
     StudioModule,
+    WorkspacesModule,
+    ProjectAccessModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

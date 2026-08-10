@@ -10,10 +10,35 @@ export async function fetchProjects(
   return data;
 }
 
+export type ProjectLinks = {
+  workspaceId: string;
+  theaters: Array<{
+    participationType: string;
+    theater: {
+      id: string;
+      title: string;
+    };
+  }>;
+};
+
+export async function fetchProjectLinks(
+  accessToken: string,
+  projectSlug: string,
+): Promise<ProjectLinks> {
+  const { data } = await api.get<ProjectLinks>(
+    `/projects/${encodeURIComponent(projectSlug)}/links`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+  return data;
+}
+
 export async function ensureProject(
   accessToken: string,
   slug: string,
   name?: string,
+  workspaceId?: string,
 ): Promise<ProjectSummary> {
   const projects = await fetchProjects(accessToken);
   const existing = projects.find((p) => p.slug === slug);
@@ -22,7 +47,7 @@ export async function ensureProject(
   try {
     const { data } = await api.post<ProjectSummary>(
       "/projects",
-      { slug, name: name ?? slug },
+      { slug, name: name ?? slug, workspaceId },
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       },
@@ -59,7 +84,13 @@ export async function inviteToProject(
   slug: string,
   email: string,
   role?: string,
-): Promise<{ id: string; projectId: string; userId: string; role: string }> {
+): Promise<{
+  id: string;
+  token: string;
+  invitePath: string;
+  role: string;
+  email: string;
+}> {
   const { data } = await api.post(
     `/projects/${encodeURIComponent(slug)}/invite`,
     { email: email.trim(), role: role ?? "editor" },
@@ -115,7 +146,12 @@ export async function getProjectRoles(
 export async function createProjectRole(
   accessToken: string,
   projectSlug: string,
-  body: { title: string; description?: string; aliases?: string[]; avatarKey?: string | null },
+  body: {
+    title: string;
+    description?: string;
+    aliases?: string[];
+    avatarKey?: string | null;
+  },
 ): Promise<{ ok: boolean; roleId: string }> {
   const { data } = await api.post(
     `/projects/${encodeURIComponent(projectSlug)}/roles`,
@@ -129,7 +165,12 @@ export async function updateProjectRole(
   accessToken: string,
   projectSlug: string,
   roleId: string,
-  body: { title?: string; description?: string; aliases?: string[]; avatarKey?: string | null },
+  body: {
+    title?: string;
+    description?: string;
+    aliases?: string[];
+    avatarKey?: string | null;
+  },
 ): Promise<{ ok: boolean; roleId: string }> {
   const { data } = await api.put(
     `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}`,
@@ -180,7 +221,10 @@ export async function getProjectRoleNotes(
   accessToken: string,
   projectSlug: string,
   roleId: string,
-): Promise<{ role: { id: string; title: string; key: string }; notes: RoleNoteItem[] }> {
+): Promise<{
+  role: { id: string; title: string; key: string };
+  notes: RoleNoteItem[];
+}> {
   const { data } = await api.get(
     `/projects/${encodeURIComponent(projectSlug)}/roles/${encodeURIComponent(roleId)}/notes`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -249,4 +293,104 @@ export async function removeProjectMember(
     )}`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
+}
+
+export async function transferProjectOwnership(
+  accessToken: string,
+  slug: string,
+  userId: string,
+): Promise<{ ok: true; ownerId: string }> {
+  const { data } = await api.post(
+    `/projects/${encodeURIComponent(slug)}/transfer-ownership`,
+    { userId },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function unlinkProjectTheater(
+  accessToken: string,
+  projectSlug: string,
+  theaterId: string,
+): Promise<void> {
+  await api.delete(
+    `/projects/${encodeURIComponent(projectSlug)}/theaters/${encodeURIComponent(theaterId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+}
+
+export type ProjectTheaterInviteCreated = {
+  id: string;
+  token: string;
+  invitePath: string;
+  expiresAt: string | null;
+};
+
+export async function createProjectTheaterInvite(
+  accessToken: string,
+  projectSlug: string,
+): Promise<ProjectTheaterInviteCreated> {
+  const { data } = await api.post(
+    `/projects/${encodeURIComponent(projectSlug)}/theater-invites`,
+    null,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function listProjectTheaterInvites(
+  accessToken: string,
+  projectSlug: string,
+): Promise<Array<{ id: string; expiresAt: string | null; createdAt: string }>> {
+  const { data } = await api.get(
+    `/projects/${encodeURIComponent(projectSlug)}/theater-invites`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function revokeProjectTheaterInvite(
+  accessToken: string,
+  projectSlug: string,
+  inviteId: string,
+): Promise<void> {
+  await api.post(
+    `/projects/${encodeURIComponent(projectSlug)}/theater-invites/${encodeURIComponent(inviteId)}/revoke`,
+    null,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+}
+
+export type ProjectTheaterInvitePreview = {
+  kind: "project_theater_invite";
+  id: string;
+  project: { id: string; slug: string; name: string };
+  invitedByEmail: string;
+  expiresAt: string | null;
+  createdAt: string;
+  theaters: Array<{ id: string; title: string }>;
+};
+
+export async function previewProjectTheaterInvite(
+  accessToken: string,
+  token: string,
+): Promise<ProjectTheaterInvitePreview> {
+  const { data } = await api.get(
+    `/projects/theater-invites/${encodeURIComponent(token)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function acceptProjectTheaterInvite(
+  accessToken: string,
+  token: string,
+  theaterId: string,
+): Promise<{ ok: true; projectSlug: string; theaterId: string }> {
+  const { data } = await api.post(
+    `/projects/theater-invites/${encodeURIComponent(token)}/accept`,
+    { theaterId },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
 }

@@ -1,4 +1,5 @@
 import dayjs from "dayjs";
+import "dayjs/locale/ru";
 
 export function isoDate(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
@@ -8,6 +9,14 @@ export function monthKey(d: Date): string {
   return dayjs(d).format("YYYY-MM");
 }
 
+export function monthLabel(d: Date): string {
+  return dayjs(d).locale("ru").format("MMMM YYYY");
+}
+
+export function currentMonthStart(): Date {
+  return dayjs().startOf("month").toDate();
+}
+
 export function dateFromMonthKey(key: string): Date | null {
   const m = /^(\d{4})-(\d{2})$/.exec(key.trim());
   if (!m) return null;
@@ -15,26 +24,6 @@ export function dateFromMonthKey(key: string): Date | null {
   const mo = Number(m[2]) - 1;
   if (!Number.isFinite(y) || mo < 0 || mo > 11) return null;
   return new Date(y, mo, 1);
-}
-
-export function readStoredTroupeMonth(): Date {
-  if (typeof window === "undefined") return new Date();
-  try {
-    const saved = localStorage.getItem("troupe-month");
-    if (!saved) return new Date();
-    const t = saved.trim();
-    const fromKey = dateFromMonthKey(t);
-    if (fromKey) return fromKey;
-    if (t.includes("T") || t.length > 7) {
-      return new Date();
-    }
-    const legacy = new Date(t);
-    return !isNaN(legacy.getTime())
-      ? dayjs(legacy).startOf("month").toDate()
-      : new Date();
-  } catch {
-    return new Date();
-  }
 }
 
 export function memberLabel(m: {

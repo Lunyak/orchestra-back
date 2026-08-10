@@ -1,0 +1,47 @@
+.project-sessions-page__content {
+  width: 100%;
+  min-width: 0;
+}
+
+.project-sessions-page__panel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28px 16px;
+  border: 1px dashed var(--sessions-border);
+  background: color-mix(in srgb, var(--sessions-panel) 70%, transparent);
+  text-align: center;
+}
+
+.project-sessions-page__eyebrow {
+  margin: 0 0 var(--spacing-4);
+  color: var(--color-active-ascent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.project-sessions-page__title {
+  margin: 0;
+  font-size: var(--font-size-xl, 1.25rem);
+  font-weight: var(--font-weight-semibold);
+  color: var(--sessions-text-strong);
+  line-height: 1.35;
+}
+
+.project-sessions-page__hint {
+  margin: var(--spacing-4) 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sessions-text-muted);
+}
+
+.project-sessions-page__theater-link {
+  color: var(--color-active-ascent);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.project-sessions-page__theater-link:hover {
+  color: var(--color-active-ascent);
+}

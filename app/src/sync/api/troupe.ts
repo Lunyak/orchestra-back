@@ -57,6 +57,7 @@ export interface TeamRoleDefinitionItem {
   parentId: string | null;
   sortOrder: number;
   description: string;
+  avatarKey?: string | null;
   createdAt: string;
   updatedAt: string;
   assignmentCount: number;
@@ -75,24 +76,35 @@ export interface ProjectCastMemberItem extends TroupeMemberItem {
   teamMemberId?: string | null;
 }
 
-export interface MyTroupeResponse {
+export interface TroupeResponse {
   troupe: TroupeSummary | null;
   members: TroupeMemberItem[];
-  troupeMembers: TroupeMemberItem[];
   teamMembers: TeamMemberItem[];
-  projectCastMembers: ProjectCastMemberItem[];
 }
 
 export async function getMyTroupe(
   accessToken: string,
-  opts: { month?: string; project: string },
-): Promise<MyTroupeResponse> {
+  opts: { month?: string } = {},
+): Promise<TroupeResponse> {
   const { data } = await api.get("/troupe", {
     headers: { Authorization: `Bearer ${accessToken}` },
-    params: {
-      project: opts.project,
-      ...(opts.month ? { month: opts.month } : {}),
-    },
+    params: opts.month ? { month: opts.month } : undefined,
+  });
+  return data;
+}
+
+export interface ProjectParticipantsResponse {
+  project: { id: string; slug: string; name: string };
+  members: ProjectCastMemberItem[];
+}
+
+export async function getProjectParticipants(
+  accessToken: string,
+  opts: { project: string; month?: string },
+): Promise<ProjectParticipantsResponse> {
+  const { data } = await api.get("/troupe/project-members", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: opts,
   });
   return data;
 }
@@ -100,15 +112,19 @@ export async function getMyTroupe(
 export async function addTroupeMember(
   accessToken: string,
   email: string,
-  opts: { project: string },
-): Promise<TroupeMemberItem> {
+): Promise<{
+  id: string;
+  token: string;
+  invitePath: string;
+  email: string;
+  kind: TroupeMemberKind;
+  pending: true;
+  troupe: { id: string; title: string };
+}> {
   const { data } = await api.post(
     "/troupe/members",
     { email: email.trim() },
-    {
-      headers: { Authorization: `Bearer ${accessToken}` },
-      params: { project: opts.project },
-    },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;
 }
@@ -116,11 +132,9 @@ export async function addTroupeMember(
 export async function removeTroupeMember(
   accessToken: string,
   memberId: string,
-  opts: { project: string },
 ): Promise<void> {
   await api.delete(`/troupe/members/${encodeURIComponent(memberId)}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    params: { project: opts.project },
   });
 }
 
@@ -128,14 +142,12 @@ export async function patchTroupeMemberKind(
   accessToken: string,
   memberId: string,
   kind: TroupeMemberKind,
-  opts: { project: string },
 ): Promise<TroupeMemberItem> {
   const { data } = await api.patch<TroupeMemberItem>(
     `/troupe/members/${encodeURIComponent(memberId)}`,
     { kind },
     {
       headers: { Authorization: `Bearer ${accessToken}` },
-      params: { project: opts.project },
     },
   );
   return data;

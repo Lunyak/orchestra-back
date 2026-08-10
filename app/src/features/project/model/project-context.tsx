@@ -1,5 +1,9 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
-import { ensureProject, fetchProjects, updateProject } from "../../../sync/api/projects";
+import {
+  ensureProject,
+  fetchProjects,
+  updateProject,
+} from "../../../sync/api/projects";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
 import { syncApi } from "../../../shared/api/rtk/sync-api";
 import { store } from "../../../shared/store/store";
@@ -21,7 +25,7 @@ export interface ProjectContextValue {
   /** true пока идёт загрузка списка проектов. */
   projectsLoading: boolean;
   onProjectChange: (name: string) => void;
-  createProject: (name: string) => Promise<void>;
+  createProject: (name: string, workspaceId?: string) => Promise<void>;
   updateProjectDisplayName: (name: string) => Promise<void>;
   deleteProject: (name: string) => Promise<void>;
   ensureRemoteProject: (token?: string | null) => Promise<string | null>;
@@ -30,6 +34,7 @@ export interface ProjectContextValue {
 const ProjectContext = createContext<ProjectContextValue | null>(null);
 
 const PROJECT_DISPLAY_NAME_KEY_PREFIX = "projectDisplayName:";
+const PROJECT_LAST_OPENED_KEY_PREFIX = "projectLastOpenedAt:";
 
 const CYRILLIC_TRANSLIT: Record<string, string> = {
   а: "a",
@@ -98,6 +103,66 @@ function removeStoredProjectDisplayName(slug: string) {
   }
 }
 
+function projectLastOpenedKey(slug: string) {
+  return `${PROJECT_LAST_OPENED_KEY_PREFIX}${slug}`;
+}
+
+function readProjectLastOpenedAt(slug: string): number {
+  try {
+    if (typeof window === "undefined") return 0;
+    const storedValue = localStorage.getItem(projectLastOpenedKey(slug));
+    const timestamp = Number(storedValue);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function storeProjectLastOpenedAt(slug: string) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(projectLastOpenedKey(slug), String(Date.now()));
+  } catch {
+    // ignore
+  }
+}
+
+function removeProjectLastOpenedAt(slug: string) {
+  try {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(projectLastOpenedKey(slug));
+  } catch {
+    // ignore
+  }
+}
+
+function sortProjectsByLastOpened(items: ProjectSummary[]) {
+  return items
+    .map((project, index) => ({
+      project,
+      index,
+      lastOpenedAt: readProjectLastOpenedAt(project.slug),
+    }))
+    .sort(
+      (left, right) =>
+        right.lastOpenedAt - left.lastOpenedAt || left.index - right.index,
+    )
+    .map(({ project }) => project);
+}
+
+function moveProjectItemToStart(items: ProjectSummary[], slug: string) {
+  const projectIndex = items.findIndex((project) => project.slug === slug);
+  if (projectIndex <= 0) return items;
+  const project = items[projectIndex];
+  return [project, ...items.filter((item) => item.slug !== slug)];
+}
+
+function moveProjectSlugToStart(items: string[], slug: string) {
+  const projectIndex = items.indexOf(slug);
+  if (projectIndex <= 0) return items;
+  return [slug, ...items.filter((item) => item !== slug)];
+}
+
 function slugifyProjectName(name: string): string {
   const transliterated = Array.from(name.trim().toLowerCase().normalize("NFKD"))
     .map((char) => {
@@ -107,10 +172,7 @@ function slugifyProjectName(name: string): string {
     })
     .join("");
 
-  return transliterated
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80);
+  return transliterated.replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
 }
 
 function makeUniqueProjectSlug(name: string, usedSlugs: string[]): string {
@@ -140,7 +202,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projectName, setProjectName] = useState("");
   const [isProjectsLoaded, setIsProjectsLoaded] = useState(false);
   const [projectsLoading, setProjectsLoading] = useState(false);
-  const ensureRemoteInFlightRef = React.useRef<Record<string, Promise<string | null> | undefined>>({});
+  const ensureRemoteInFlightRef = React.useRef<
+    Record<string, Promise<string | null> | undefined>
+  >({});
 
   const currentProject = React.useMemo(
     () => projectItems.find((project) => project.slug === projectName) ?? null,
@@ -161,64 +225,70 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     return api as {
       listProjects: () => Promise<string[]>;
       createProject: (
-        name: string
+        name: string,
       ) => Promise<{ ok: boolean; name?: string; error?: string }>;
       deleteProject: (name: string) => Promise<{ ok: boolean; error?: string }>;
     };
   }, []);
 
-  const loadProjects = useCallback(async (prefer?: string) => {
-    setProjectsLoading(true);
-    try {
-      const desktopApi = getDesktopApi();
-      let listRaw: ProjectSummary[] = desktopApi
-        ? (await desktopApi.listProjects()).map(desktopProjectSummary)
-        : accessToken
-          ? await fetchProjects(accessToken)
-          : [];
-      if (listRaw.length === 0 && import.meta.env.DEV) {
-        try {
-          const res = await fetch("/local-project-dev/projects");
-          if (res.ok) {
-            const data = (await res.json()) as { projects?: string[] };
-            listRaw = (Array.isArray(data.projects) ? data.projects : []).map((slug) =>
-              desktopProjectSummary(slug),
-            );
+  const loadProjects = useCallback(
+    async (prefer?: string) => {
+      setProjectsLoading(true);
+      try {
+        const desktopApi = getDesktopApi();
+        let listRaw: ProjectSummary[] = desktopApi
+          ? (await desktopApi.listProjects()).map(desktopProjectSummary)
+          : accessToken
+            ? await fetchProjects(accessToken)
+            : [];
+        if (listRaw.length === 0 && import.meta.env.DEV) {
+          try {
+            const res = await fetch("/local-project-dev/projects");
+            if (res.ok) {
+              const data = (await res.json()) as { projects?: string[] };
+              listRaw = (Array.isArray(data.projects) ? data.projects : []).map(
+                (slug) => desktopProjectSummary(slug),
+              );
+            }
+          } catch {
+            /* dev local list unavailable */
           }
-        } catch {
-          /* dev local list unavailable */
         }
+        const visibleItems = listRaw.filter(
+          (project) => !isDirectorSessionsSlug(project.slug),
+        );
+        const items = sortProjectsByLastOpened(visibleItems);
+        const list = items.map((project) => project.slug);
+        setProjectItems(items);
+        setProjects(list);
+        const stored = localStorage.getItem("selectedProject") || "";
+        // Не затирать выбранный проект при каждом loadProjects (смена токена, повторный mount):
+        // иначе при несовпадении stored со списком на мгновение или при сортировке list[0] — «прыжок»
+        // на другой slug (часто первый по алфавиту).
+        setProjectName((prev) => {
+          if (prefer && list.includes(prefer)) return prefer;
+          if (prev && list.includes(prev)) return prev;
+          if (stored && list.includes(stored)) return stored;
+          return list[0] || "";
+        });
+      } catch (error: any) {
+        console.error("[projects] failed to load:", error);
+
+        // При 401 — токен невалидный, нужен повторный логин
+        if (error?.response?.status === 401) {
+          console.warn("[projects] Unauthorized (401) — logging out");
+          logout();
+        }
+
+        setProjects([]);
+        setProjectItems([]);
+      } finally {
+        setProjectsLoading(false);
+        setIsProjectsLoaded(true);
       }
-      const items = listRaw.filter((project) => !isDirectorSessionsSlug(project.slug));
-      const list = items.map((project) => project.slug);
-      setProjectItems(items);
-      setProjects(list);
-      const stored = localStorage.getItem("selectedProject") || "";
-      // Не затирать выбранный проект при каждом loadProjects (смена токена, повторный mount):
-      // иначе при несовпадении stored со списком на мгновение или при сортировке list[0] — «прыжок»
-      // на другой slug (часто первый по алфавиту).
-      setProjectName((prev) => {
-        if (prefer && list.includes(prefer)) return prefer;
-        if (prev && list.includes(prev)) return prev;
-        if (stored && list.includes(stored)) return stored;
-        return list[0] || "";
-      });
-    } catch (error: any) {
-      console.error("[projects] failed to load:", error);
-      
-      // При 401 — токен невалидный, нужен повторный логин
-      if (error?.response?.status === 401) {
-        console.warn("[projects] Unauthorized (401) — logging out");
-        logout();
-      }
-      
-      setProjects([]);
-      setProjectItems([]);
-    } finally {
-      setProjectsLoading(false);
-      setIsProjectsLoaded(true);
-    }
-  }, [accessToken, getDesktopApi, logout]);
+    },
+    [accessToken, getDesktopApi, logout],
+  );
 
   const ensureRemoteProject = useCallback(
     async (token?: string | null) => {
@@ -254,19 +324,19 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
     },
-    [accessToken, currentProjectDisplayName, projectName]
+    [accessToken, currentProjectDisplayName, projectName],
   );
 
-  const onProjectChange = useCallback(
-    (name: string) => {
-      setProjectName(name);
-      // Scene will react to projectName change and clear/load its state
-    },
-    []
-  );
+  const onProjectChange = useCallback((name: string) => {
+    storeProjectLastOpenedAt(name);
+    setProjectItems((items) => moveProjectItemToStart(items, name));
+    setProjects((items) => moveProjectSlugToStart(items, name));
+    setProjectName(name);
+    // Scene will react to projectName change and clear/load its state
+  }, []);
 
   const createProject = useCallback(
-    async (name: string) => {
+    async (name: string, workspaceId?: string) => {
       const value = name.trim();
       if (!value) return;
       const slug = makeUniqueProjectSlug(value, projects);
@@ -283,13 +353,18 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       }
       if (!accessToken) return;
       try {
-        const project = await ensureProject(accessToken, slug, value);
+        const project = await ensureProject(
+          accessToken,
+          slug,
+          value,
+          workspaceId,
+        );
         await loadProjects(project.slug);
       } catch (error) {
         console.error("createProject failed:", error);
       }
     },
-    [accessToken, getDesktopApi, loadProjects, projects]
+    [accessToken, getDesktopApi, loadProjects, projects],
   );
 
   const updateProjectDisplayName = useCallback(
@@ -306,17 +381,23 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
       if (!accessToken || getDesktopApi()) return;
       try {
-        const updated = await updateProject(accessToken, projectName, { name: value });
+        const updated = await updateProject(accessToken, projectName, {
+          name: value,
+        });
         setProjectItems((prev) =>
           prev.map((project) =>
-            project.slug === updated.slug ? { ...project, ...updated } : project,
+            project.slug === updated.slug
+              ? { ...project, ...updated }
+              : project,
           ),
         );
       } catch (error: any) {
         if (error?.response?.status === 404) {
           const ensured = await ensureProject(accessToken, projectName, value);
           setProjectItems((prev) => {
-            const exists = prev.some((project) => project.slug === ensured.slug);
+            const exists = prev.some(
+              (project) => project.slug === ensured.slug,
+            );
             if (!exists) return [...prev, ensured];
             return prev.map((project) =>
               project.slug === ensured.slug
@@ -383,9 +464,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(`projectId:${name}`);
       }
       removeStoredProjectDisplayName(name);
+      removeProjectLastOpenedAt(name);
       await loadProjects();
     },
-    [accessToken, getDesktopApi, loadProjects, projectItems]
+    [accessToken, getDesktopApi, loadProjects, projectItems],
   );
 
   useEffect(() => {
@@ -402,6 +484,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (projectName) {
+      storeProjectLastOpenedAt(projectName);
+      setProjectItems((items) => moveProjectItemToStart(items, projectName));
+      setProjects((items) => moveProjectSlugToStart(items, projectName));
       localStorage.setItem("selectedProject", projectName);
     }
   }, [projectName]);
@@ -412,7 +497,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     projectName,
     currentProject,
     currentProjectDisplayName,
-    setProjectName,
+    setProjectName: onProjectChange,
     loadProjects,
     isProjectsLoaded,
     projectsLoading,

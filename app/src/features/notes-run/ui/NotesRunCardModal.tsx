@@ -1,6 +1,11 @@
 import cn from "classnames";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Modal } from "../../../shared/core/modal/Modal";
+import {
+  CustomSelect,
+  type CustomSelectOption,
+} from "../../../shared/core/custom-select/CustomSelect";
+import type { ScriptScene } from "../../../shared/types/script";
 import type { PlaybookHoldImage, PlaybookVideo } from "../../playbook/model/playbook-slice";
 import type { KadrProjectorCue } from "../../theater/model/kadr-projector";
 import { ProjectorMediaPreview } from "../../projector/ui/ProjectorMediaPreview";
@@ -33,6 +38,7 @@ export function NotesRunCardModal({
   mode,
   initialDraft,
   cardNo,
+  scenes,
   playlist,
   sounds,
   videos,
@@ -45,6 +51,7 @@ export function NotesRunCardModal({
   mode: "create" | "edit";
   initialDraft: NotesRunCardDraft;
   cardNo: number;
+  scenes: ScriptScene[];
   playlist: Array<{ id: number; title: string }>;
   sounds: Array<{ id: number; title: string }>;
   videos: PlaybookVideo[];
@@ -72,6 +79,41 @@ export function NotesRunCardModal({
     draft.projectorCue?.mode === "video" ? draft.projectorCue.videoId : null;
   const projectorPreviewHoldId =
     draft.projectorCue?.mode === "hold" ? (draft.projectorCue.holdId ?? null) : null;
+
+  const sceneOptions = useMemo<CustomSelectOption[]>(() => {
+    const options: CustomSelectOption[] = [
+      { value: "", label: "— без сцены —" },
+      ...scenes.map((scene, index) => {
+        const sceneTitle = String(scene.title ?? "").trim() || `Сцена ${index + 1}`;
+        return {
+          value: String(scene.id),
+          label: `С${index + 1} · ${sceneTitle}`,
+        };
+      }),
+    ];
+    return options;
+  }, [scenes]);
+
+  const selectedSceneValue =
+    draft.sceneId != null && draft.sceneId > 0 ? String(draft.sceneId) : "";
+
+  const handleSceneChange = (value: string) => {
+    if (!value) {
+      setDraft((prev) => ({ ...prev, sceneId: null, sceneLabel: "" }));
+      return;
+    }
+    const sceneId = Math.trunc(Number(value) || 0);
+    const sceneIndex = scenes.findIndex((scene) => scene.id === sceneId);
+    const scene = sceneIndex >= 0 ? scenes[sceneIndex] : null;
+    const sceneLabel = scene
+      ? String(scene.title ?? "").trim() || `Сцена ${sceneIndex + 1}`
+      : "";
+    setDraft((prev) => ({
+      ...prev,
+      sceneId: sceneId > 0 ? sceneId : null,
+      sceneLabel,
+    }));
+  };
 
   const updateLightLine = (index: number, field: "label" | "value", raw: string) => {
     setDraft((prev) => ({
@@ -137,13 +179,14 @@ export function NotesRunCardModal({
         </label>
 
         <label className="create-kadr-modal__field">
-          <span className="create-kadr-modal__label">Сцена (метка)</span>
-          <input
-            type="text"
-            className="create-kadr-modal__input"
-            value={draft.sceneLabel}
-            placeholder="Например: Сцена 3 · Кухня"
-            onChange={(e) => setDraft((prev) => ({ ...prev, sceneLabel: e.target.value }))}
+          <span className="create-kadr-modal__label">Сцена сценария</span>
+          <CustomSelect
+            value={selectedSceneValue}
+            options={sceneOptions}
+            onChange={handleSceneChange}
+            placeholder="Выберите сцену"
+            className="create-kadr-modal__select"
+            aria-label="Сцена сценария"
           />
         </label>
 

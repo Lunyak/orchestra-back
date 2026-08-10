@@ -7,9 +7,10 @@ import "./RoleAvatarEditor.css";
 export type RoleAvatarEditorProps = {
   accessToken: string;
   projectId: string;
-  role: ProjectRoleInfo;
+  role: Pick<ProjectRoleInfo, "id" | "title" | "avatarKey">;
   canEdit: boolean;
   busy?: boolean;
+  variant?: "default" | "plain";
   onSaveAvatarKey: (avatarKey: string | null) => Promise<void>;
 };
 
@@ -19,6 +20,7 @@ export function RoleAvatarEditor({
   role,
   canEdit,
   busy = false,
+  variant = "default",
   onSaveAvatarKey,
 }: RoleAvatarEditorProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -88,7 +90,7 @@ export function RoleAvatarEditor({
             onChange={(e) => void uploadFile(e.target.files?.[0] ?? null)}
           />
           <div className="role-avatar-editor__card-frame">
-            <RolePlayingCard role={role} accessToken={accessToken} imageUrl={previewUrl} size="lg" />
+            <RolePlayingCard role={role} accessToken={accessToken} imageUrl={previewUrl} size="lg" variant={variant} />
             {!hasAvatar ? (
               <button
                 className="role-avatar-editor__upload-overlay"
@@ -117,7 +119,7 @@ export function RoleAvatarEditor({
           {error ? <div className="role-avatar-editor__error">{error}</div> : null}
         </div>
       ) : (
-        <RolePlayingCard role={role} accessToken={accessToken} imageUrl={previewUrl} size="lg" />
+        <RolePlayingCard role={role} accessToken={accessToken} imageUrl={previewUrl} size="lg" variant={variant} />
       )}
     </div>
   );

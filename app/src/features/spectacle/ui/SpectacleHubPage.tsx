@@ -1,9 +1,11 @@
 import { Link } from "react-router-dom";
+import { useProject } from "../../project";
 import { getSpectacleHubDirections } from "../model/spectacle-hub-directions";
 import "./spectacle-hub.css";
 
 export function SpectacleHubPage() {
-  const directions = getSpectacleHubDirections();
+  const { projectName } = useProject();
+  const directions = getSpectacleHubDirections(projectName);
 
   return (
     <div className="app-layout spectacle-hub-layout">

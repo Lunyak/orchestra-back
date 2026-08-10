@@ -6,15 +6,16 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Controller, Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
-import { CastList } from "../../shared/component/CastList/CastList";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
 import { Seo } from "../../shared/component/Seo/Seo";
+import { cn } from "../../shared/lib/cn";
 import { ROUTES } from "../../shared/model/routes";
 import type { SiteEvent } from "../../shared/model/siteContent";
 import { fetchSiteEvents } from "../../shared/model/siteContent";
 import { isAbsoluteUrl, siteAsset } from "../../shared/model/siteAssets";
 import { hitSiteEventView } from "../../shared/model/siteViews";
 import { GlitchHero } from "../HomePage/GlitchHero";
+import "../../shared/styles/site-bands-page.css";
 import "./style.css";
 import Particles, { initParticlesEngine } from "@tsparticles/react";
 import type { ISourceOptions } from "@tsparticles/engine";
@@ -199,7 +200,6 @@ const EventPage: FC = () => {
   }
 
   const title = curentEvent.name?.trim() || "Спектакль";
-  const subtitle = curentEvent.subtitle?.trim();
 
   const cast = Array.isArray(curentEvent.cast) ? curentEvent.cast : null;
   const reviews = Array.isArray(curentEvent.reviews) ? curentEvent.reviews : [];
@@ -349,16 +349,29 @@ const EventPage: FC = () => {
       : null),
   };
 
+  const photos = (curentEvent.photos ?? []).map(siteAsset);
+  const pageClassName = cn(
+    "event-page",
+    "site-bands-page",
+    isZaklyatie && "event-page--zaklyatie"
+  );
+
   return (
-    <div
-      className={isZaklyatie ? "event-page event-page--zaklyatie" : "event-page"}
-      style={styleWithBg}
-    >
+    <div className={pageClassName} style={styleWithBg} data-hero-variant="strip">
+      <div className="site-bands-page__grain" aria-hidden />
+
       {effectsEnabled && isZheleznova && fireReady && (
         <div className="event-page__particles event-page__particles--fire" aria-hidden>
           <Particles id="eventFireParticles" options={fireOptions} />
         </div>
       )}
+
+      {isZaklyatie && (
+        <ZaklyatieAtmosphere
+          fallbackSrc={photos[0]}
+        />
+      )}
+
       <Seo
         title={`${title} — Дофамин`}
         description={metaDescription}
@@ -367,116 +380,137 @@ const EventPage: FC = () => {
         jsonLd={[breadcrumbLd, eventLd]}
       />
 
-      {isZaklyatie ? (
-        <ZaklyatieAtmosphere
-          fallbackSrc={curentEvent.photos?.[0] ? siteAsset(curentEvent.photos[0]) : undefined}
-        />
-      ) : curentEvent.disableGlass ? null : (
-        <div className="event-page__glass" aria-hidden="true" />
+      <Link to={eventsPath} className="site-bands-page__back">
+        Назад
+      </Link>
+
+      {showRainToggle && (
+        <div className="event-page__rainCorner">
+          <RainAmbienceToggle url={rainAudioUrl} label={rainButtonLabel} />
+        </div>
       )}
 
-      <div className="event-page__content">
-        <Link to={eventsPath} className="events-page__back">
-          Назад
-        </Link>
+      <div className="site-bands-page__content">
+        <div className="event-page__heroStage">
+          <header className="site-bands-page__hero event-page__hero">
+            <div className="event-page__meta event-page__meta--left" aria-label="Характеристики спектакля">
+              {curentEvent.soon && <span className="event-page__chip">скоро</span>}
+              {curentEvent.old?.trim() && (
+                <span className="event-page__chip">{curentEvent.old.trim()}</span>
+              )}
+              {curentEvent.type?.trim() && (
+                <span className="event-page__chip">{curentEvent.type.trim()}</span>
+              )}
+            </div>
+            <div className="event-page__heroMain">
+              <GlitchHero as="h1" text={title} className="home-page__glitch-hero--page" />
+            </div>
+            <div className="event-page__meta event-page__meta--right" aria-label="Дата спектакля">
+              {curentEvent.date?.trim() && (
+                <span className="event-page__chip">{curentEvent.date.trim()}</span>
+              )}
+            </div>
+          </header>
 
-        <div className="event-page__meta" aria-label="Характеристики спектакля">
-          {curentEvent.soon && <span className="event-page__chip">скоро</span>}
-          {curentEvent.old?.trim() && (
-            <span className="event-page__chip">{curentEvent.old.trim()}</span>
+          {photos.length > 0 && (
+            <section className="event-page__photo" aria-label="Фотографии спектакля">
+              <PhotoCarousel images={photos} title={title} />
+            </section>
           )}
-          {curentEvent.type?.trim() && (
-            <span className="event-page__chip">{curentEvent.type.trim()}</span>
-          )}
-          {curentEvent.date?.trim() && (
-            <span className="event-page__chip">{curentEvent.date.trim()}</span>
-          )}
-          {showRainToggle && <RainAmbienceToggle url={rainAudioUrl} label={rainButtonLabel} />}
         </div>
 
-        <header className="event-page__header">
-          <div className="event-page__hero">
-            <GlitchHero as="h1" text={title} className="home-page__glitch-hero--page" />
-          </div>
-          {subtitle && <p className="event-page__subtitle">{subtitle}</p>}
-
-
-        </header>
-
-
-
-        <div className="event-page__main">
-          <section className="event-page__gallery" aria-label="Фотографии спектакля">
-            <PhotoCarousel images={(curentEvent.photos ?? []).map(siteAsset)} title={title} />
+        {curentEvent.anonse?.trim() && (
+          <section className="event-page__about site-bands-row" aria-label="Описание спектакля">
+            <p className="event-page__description">{curentEvent.anonse}</p>
           </section>
+        )}
 
+        <div className="site-bands-list" role="list" aria-label="Действия">
+          {hasTicketsCloud && (
+            <div className="site-bands-row" role="listitem">
+              <div className="site-bands-row__main">
+                <span className="site-bands-row__title">Билеты</span>
+              </div>
+              {ticketsCloudEventId && ticketsCloudToken ? (
+                <button
+                  type="button"
+                  className="event-page__ticketsButton"
+                  data-tc-event={ticketsCloudEventId}
+                  data-tc-token={ticketsCloudToken}
+                >
+                  Купить билет
+                </button>
+              ) : (
+                <span className="site-bands-row__meta">скоро в продаже</span>
+              )}
+            </div>
+          )}
 
+          <a
+            className="site-bands-row"
+            href={howToFindVideoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            role="listitem"
+          >
+            <div className="site-bands-row__main">
+              <span className="site-bands-row__title">Как нас найти</span>
+            </div>
+            <span className="site-bands-row__meta">видео</span>
+          </a>
+        </div>
 
-          <section className="event-page__text" aria-label="Описание спектакля">
-            <div className="event-page__description">{curentEvent.anonse}</div>
-            {hasTicketsCloud && (
-              <section className="event-page__tickets" aria-label="Билеты">
-                {ticketsCloudEventId && ticketsCloudToken ? (
-                  <button
-                    type="button"
-                    className="event-page__ticketsButton"
-                    data-tc-event={ticketsCloudEventId}
-                    data-tc-token={ticketsCloudToken}
-                  >
-                    Купить билет
-                  </button>
-                ) : (
-                  <div className="event-page__ticketsHint">
-                    Добавь `ticketsCloudEventId` и `ticketsCloudToken` для этого события в `site/content/events.json` через админку.
+        {cast && cast.length > 0 && (
+          <section className="event-page__section" aria-label="Состав">
+            <h2 className="event-page__sectionTitle">Состав</h2>
+            <div className="site-bands-list" role="list">
+              {cast.map((item) => {
+                const role = (item.role || "").trim() || "роль";
+                const actor = (item.actor || "").trim() || "—";
+                return (
+                  <div key={`${role}-${actor}`} className="site-bands-row" role="listitem">
+                    <div className="site-bands-row__main">
+                      <span className="site-bands-row__title">{actor}</span>
+                    </div>
+                    <span className="site-bands-row__meta">{role}</span>
                   </div>
-                )}
-              </section>
-            )}
-
-            <div className="event-page__howtofind" aria-label="Как нас найти">
-              <a href={howToFindVideoUrl} target="_blank" rel="noopener noreferrer">
-                Как нас найти — видео
-              </a>
+                );
+              })}
             </div>
           </section>
+        )}
 
-          {cast && cast.length > 0 && (
-            <section className="event-page__cast" aria-label="Состав">
-              <h2 className="event-page__sectionTitle">Состав</h2>
-              <CastList items={cast} />
-            </section>
-          )}
-
-          {reviews.length > 0 && (
-            <section className="event-page__reviews" aria-label="Отзывы">
-              <h2 className="event-page__sectionTitle">Отзывы</h2>
+        {reviews.length > 0 && (
+          <section className="event-page__section" aria-label="Отзывы">
+            <h2 className="event-page__sectionTitle">Отзывы</h2>
+            <div className="event-page__bandBlock">
               <ReviewsSlider reviews={reviews} />
-            </section>
-          )}
-
-          {reviewImages.length > 0 && (
-            <section className="event-page__reviews" aria-label="Отзывы (фото)">
-              <h2 className="event-page__sectionTitle">Отзывы (фото)</h2>
-              <ReviewImagesSlider images={reviewImages.map((p) => siteAsset(p))} />
-            </section>
-          )}
-
-          {(reviews.length > 0 || reviewImages.length > 0) && (
-            <div className="event-page__reviewsHint" aria-label="Где оставить отзыв">
-              Вы можете оставить свой комментарий на наших ресурсах:{" "}
-              <a href="https://t.me/dofamintheatre" target="_blank" rel="noopener noreferrer">
-                @dofamintheatre
-              </a>{" "}
-              и{" "}
-              <a href="https://vk.com/dofaminspb" target="_blank" rel="noopener noreferrer">
-                vk.com/dofaminspb
-              </a>
-              .
             </div>
-          )}
+          </section>
+        )}
 
+        {reviewImages.length > 0 && (
+          <section className="event-page__section" aria-label="Отзывы (фото)">
+            <h2 className="event-page__sectionTitle">Отзывы (фото)</h2>
+            <div className="event-page__bandBlock">
+              <ReviewImagesSlider images={reviewImages.map((p) => siteAsset(p))} />
+            </div>
+          </section>
+        )}
 
-        </div>
+        {(reviews.length > 0 || reviewImages.length > 0) && (
+          <p className="event-page__reviewsHint" aria-label="Где оставить отзыв">
+            Вы можете оставить свой комментарий на наших ресурсах:{" "}
+            <a href="https://t.me/dofamintheatre" target="_blank" rel="noopener noreferrer">
+              @dofamintheatre
+            </a>{" "}
+            и{" "}
+            <a href="https://vk.com/dofaminspb" target="_blank" rel="noopener noreferrer">
+              vk.com/dofaminspb
+            </a>
+            .
+          </p>
+        )}
       </div>
     </div>
   );

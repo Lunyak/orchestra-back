@@ -1,6 +1,14 @@
 import cn from "classnames";
-import { useLocation } from "react-router-dom";
+import { useSyncExternalStore } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useProject } from "../../project";
+import {
+  getProjectTaskFilterSnapshot,
+  setProjectTaskFilter,
+  subscribeProjectTaskFilter,
+  type ProjectTaskFilterCounts,
+} from "../../project-tasks/model/project-task-filter";
+import type { ProjectTaskFilter } from "../../project-tasks/model/project-task-labels";
 import {
   scriptUiActions,
   type LightPlotMode,
@@ -10,6 +18,10 @@ import {
   type ShowScriptMarkdownMode,
   selectShowScriptMarkdownUi,
 } from "../../show-script-markdown/model/show-script-markdown-slice";
+import {
+  getProjectSectionFromPath,
+  projectPath,
+} from "../../../app/router/paths";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import { SpectacleScriptFormattingHost } from "./SpectacleScriptFormattingHost";
 import {
@@ -35,6 +47,34 @@ const TECH_MODE_ITEMS: ReadonlyArray<{
 }> = [
   { id: "rehearsal", label: "Сборка" },
   { id: "prog-run", label: "Прогон" },
+];
+
+const PLAN_MODE_ITEMS: ReadonlyArray<{
+  id: "sessions" | "board" | "tasks";
+  label: string;
+}> = [
+  {
+    id: "sessions",
+    label: "Сессии",
+  },
+  {
+    id: "board",
+    label: "Доска",
+  },
+  {
+    id: "tasks",
+    label: "Задачи",
+  },
+];
+
+const TASK_MODE_ITEMS: ReadonlyArray<{
+  id: ProjectTaskFilter;
+  label: string;
+  countKey: keyof ProjectTaskFilterCounts;
+}> = [
+  { id: "open", label: "Открытые", countKey: "open" },
+  { id: "mine", label: "Мои", countKey: "mine" },
+  { id: "all", label: "Все", countKey: "all" },
 ];
 
 function SpectacleScriptModeSwitchList() {
@@ -132,31 +172,113 @@ function SpectacleTechModeSwitchList() {
   );
 }
 
+function SpectaclePlanModeSwitchList() {
+  const { pathname } = useLocation();
+  const { projectName } = useProject();
+  const activeSection = getProjectSectionFromPath(pathname);
+
+  return (
+    <ul
+      className="spectacle-direction-switch__modes"
+      aria-label="Режим репетиций"
+    >
+      {PLAN_MODE_ITEMS.map(({ id, label }) => {
+        const active = activeSection === id;
+        return (
+          <li key={id}>
+            <Link
+              to={projectPath(projectName, id)}
+              className={cn(
+                "spectacle-direction-switch__item",
+                active && "spectacle-direction-switch__item--active",
+              )}
+              aria-current={active ? "page" : undefined}
+            >
+              {label}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function SpectacleTasksModeSwitchList() {
+  const snapshot = useSyncExternalStore(
+    subscribeProjectTaskFilter,
+    getProjectTaskFilterSnapshot,
+    getProjectTaskFilterSnapshot,
+  );
+
+  return (
+    <ul
+      className="spectacle-direction-switch__modes"
+      aria-label="Фильтр задач"
+    >
+      {TASK_MODE_ITEMS.map(({ id, label, countKey }) => {
+        const isActive = snapshot.filter === id;
+        return (
+          <li key={id}>
+            <button
+              type="button"
+              className={cn(
+                "spectacle-direction-switch__item",
+                isActive && "spectacle-direction-switch__item--active",
+              )}
+              aria-pressed={isActive}
+              onClick={() => setProjectTaskFilter(id)}
+            >
+              {label}
+              <span className="spectacle-direction-switch__count">
+                {snapshot.counts[countKey]}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function SpectacleDirectionSwitch() {
   const { pathname } = useLocation();
-  const showScriptModes = pathname === "/";
-  const showTechModes = pathname === "/light-plot";
+  const activeSection = getProjectSectionFromPath(pathname);
+  const showScriptModes = activeSection === "script";
+  const showTechModes = activeSection === "light-plot";
+  const showPlanModes =
+    activeSection === "sessions" ||
+    activeSection === "board" ||
+    activeSection === "tasks";
+  const showTasksModes = activeSection === "tasks";
+  const showSuferChrome = activeSection === "sufer";
+  const showTechChrome = showTechModes || showSuferChrome;
 
-  if (!showScriptModes && !showTechModes) {
+  if (!showScriptModes && !showTechChrome && !showPlanModes) {
     return null;
   }
+
+  const ariaLabel = showPlanModes
+    ? "Режимы репетиций"
+    : "Режимы спектакля";
 
   return (
     <nav
       className={cn(
         "spectacle-direction-switch",
-        showTechModes && "spectacle-direction-switch--tech",
+        showTechChrome && "spectacle-direction-switch--tech",
       )}
-      aria-label="Режимы спектакля"
+      aria-label={ariaLabel}
     >
       <div className="spectacle-direction-switch__left">
         {showScriptModes ? <SpectacleScriptFormattingHost /> : null}
-        {showTechModes ? <SpectacleTechChromeLeftSlot /> : null}
+        {showTechChrome ? <SpectacleTechChromeLeftSlot /> : null}
+        {showTasksModes ? <SpectacleTasksModeSwitchList /> : null}
       </div>
-      {showTechModes ? <SpectacleTechChromeCenterSlot /> : null}
+      {showTechChrome ? <SpectacleTechChromeCenterSlot /> : null}
       <div className="spectacle-direction-switch__right">
         {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
         {showTechModes ? <SpectacleTechModeSwitchList /> : null}
+        {showPlanModes ? <SpectaclePlanModeSwitchList /> : null}
       </div>
     </nav>
   );

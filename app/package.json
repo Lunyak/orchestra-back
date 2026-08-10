@@ -2,6 +2,10 @@
   "name": "app",
   "private": true,
   "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test:routes": "node --test tests/router-paths.test.mjs tests/dashboard.test.mjs"
+  },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-markdown": "^6.5.0",

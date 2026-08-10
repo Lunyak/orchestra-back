@@ -1,10 +1,20 @@
 import { useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import {
+  getProjectSectionFromPath,
+  projectPath,
+  type ProjectSection,
+} from "../../../app/router/paths";
 import { useProject } from "../../../features/project";
 import { CustomSelect } from "../../core/custom-select/CustomSelect";
 
 export function AppEditorMenubarProjectSelect() {
   const { projectItems, projects, projectName, projectsLoading, onProjectChange } = useProject();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
   const hasProjects = projects.length > 0;
+  const activeSection =
+    (getProjectSectionFromPath(pathname) as ProjectSection | null) ?? "overview";
 
   const projectSelectOptions = useMemo(
     () =>
@@ -22,11 +32,16 @@ export function AppEditorMenubarProjectSelect() {
     [projectItems, projects],
   );
 
+  const handleProjectChange = (slug: string) => {
+    onProjectChange(slug);
+    navigate(projectPath(slug, activeSection));
+  };
+
   return (
     <CustomSelect
       value={hasProjects ? projectName : ""}
       options={projectSelectOptions}
-      onChange={onProjectChange}
+      onChange={handleProjectChange}
       placeholder="Выберите проект"
       noOptionsLabel="Проектов нет"
       searchPlaceholder="Поиск проекта…"

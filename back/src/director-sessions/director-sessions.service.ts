@@ -5,11 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { RolesService } from '../roles/roles.service';
 import { extractRoleKeysFromSceneRoles } from '../playbook/scene-roles-data';
 import { UpsertMyDirectorSessionCommentDto } from './dto/upsert-my-director-session-comment.dto';
+import { ProjectAccessService } from '../project-access/project-access.service';
+import { touchProjectActivity } from '../projects/project-activity';
 
 type DirectorSlotRef = { projectSlug: string; sceneId: number };
 type DirectorSlotRoleRehearsalPick = {
@@ -21,8 +24,10 @@ type DirectorSessionSlot = {
   id: string;
   offsetMin: number;
   durationMin: number;
+  title?: string;
   ref?: DirectorSlotRef;
   notes?: string;
+  participantEmails?: string[];
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 type DirectorSessionParticipantStatus =
@@ -45,6 +50,8 @@ type DirectorRehearsalSession = {
   id: string;
   title: string;
   startsAt: string; // ISO
+  theaterId?: string;
+  projectSlugs?: string[];
   slots: DirectorSessionSlot[];
   comment?: string | null;
   plannedEmails?: string[];
@@ -102,7 +109,9 @@ function normalizePlannedEmails(value: unknown): string[] | undefined {
   return uniq.length ? uniq : [];
 }
 
-function isRoleRehearsalPickChecked(p: DirectorSlotRoleRehearsalPick | undefined): boolean {
+function isRoleRehearsalPickChecked(
+  p: DirectorSlotRoleRehearsalPick | undefined,
+): boolean {
   if (!p) return false;
   const c = (p as { checked?: unknown }).checked;
   return c === true || c === 1;
@@ -119,6 +128,16 @@ function sessionPayloadInvitesEmail(
   if (parts.some((p) => normEmail(String((p as any)?.email ?? '')) === email))
     return true;
   for (const sl of cur.slots ?? []) {
+    const participantEmails = Array.isArray(sl.participantEmails)
+      ? sl.participantEmails
+      : [];
+    if (
+      participantEmails.some(
+        (item) => normEmail(String(item ?? '')) === email,
+      )
+    ) {
+      return true;
+    }
     const picks = (sl as DirectorSessionSlot).roleRehearsalPicks;
     if (!Array.isArray(picks)) continue;
     for (const p of picks) {
@@ -271,6 +290,7 @@ export class DirectorSessionsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly roles: RolesService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private async getDirectorProjectForUser(userId: string) {
@@ -283,13 +303,19 @@ export class DirectorSessionsService {
       .toLowerCase();
     if (!email) throw new BadRequestException('User email not found');
     const slug = directorSessionsProjectSlug(email);
-    const project = await this.prisma.project.findFirst({
-      where: { slug, ownerId: userId, deletedAt: null },
-      select: { id: true, slug: true },
-    });
-    if (!project)
-      throw new NotFoundException('Director sessions project not found');
-    return project;
+    try {
+      const { project } = await this.projectAccess.assertBySlug(
+        userId,
+        slug,
+        'owner',
+      );
+      return project;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new NotFoundException('Director sessions project not found');
+      }
+      throw error;
+    }
   }
 
   private normalizeSessionInput(raw: any): DirectorRehearsalSession | null {
@@ -309,6 +335,16 @@ export class DirectorSessionsService {
       id,
       title,
       startsAt,
+      theaterId: String(raw.theaterId ?? '').trim() || undefined,
+      projectSlugs: Array.isArray(raw.projectSlugs)
+        ? Array.from(
+            new Set(
+              raw.projectSlugs
+                .map((slug: unknown) => String(slug ?? '').trim())
+                .filter(Boolean),
+            ),
+          )
+        : undefined,
       slots: slots as any,
       comment,
       plannedEmails: normalizePlannedEmails(raw.plannedEmails),
@@ -343,23 +379,156 @@ export class DirectorSessionsService {
     session: DirectorRehearsalSession,
   ) {
     const startsAt = new Date(session.startsAt);
-    await this.prisma.directorSession.upsert({
+    await this.prisma.$transaction(async (tx) => {
+      await this.syncCanonicalRehearsal(tx, projectId, userId, session);
+      await tx.directorSession.upsert({
+        where: { id: session.id },
+        update: {
+          projectId,
+          userId,
+          title: session.title,
+          startsAt,
+          payload: session as any,
+        },
+        create: {
+          id: session.id,
+          projectId,
+          userId,
+          title: session.title,
+          startsAt,
+          payload: session as any,
+        },
+      });
+    });
+    await touchProjectActivity(this.prisma, projectId);
+  }
+
+  private async syncCanonicalRehearsal(
+    tx: Prisma.TransactionClient,
+    directorProjectId: string,
+    userId: string,
+    session: DirectorRehearsalSession,
+  ) {
+    const projectSlugs = Array.from(
+      new Set(
+        [
+          ...(session.projectSlugs ?? []),
+          ...session.slots.map((slot) => slot.ref?.projectSlug ?? ''),
+        ]
+          .map((slug) => slug.trim())
+          .filter((slug): slug is string => Boolean(slug)),
+      ),
+    );
+    const matchedProjects = projectSlugs.length
+      ? await tx.project.findMany({
+          where: { slug: { in: projectSlugs }, deletedAt: null },
+          select: {
+            id: true,
+            slug: true,
+            workspaceId: true,
+            theaters: {
+              select: {
+                theater: { select: { workspaceId: true } },
+              },
+            },
+          },
+        })
+      : [];
+    const projectsBySlug = new Map(
+      matchedProjects.map((project) => [project.slug, project]),
+    );
+    const projects = projectSlugs.flatMap((slug) => {
+      const project = projectsBySlug.get(slug);
+      return project ? [project] : [];
+    });
+    const primaryProjectId = projects[0]?.id ?? directorProjectId;
+    const rehearsalProjectIds = projects.length
+      ? projects.map((project) => project.id)
+      : [directorProjectId];
+    const calendarWorkspaceIds = Array.from(
+      new Set(
+        projects.flatMap((project) => [
+          project.workspaceId,
+          ...project.theaters.map(({ theater }) => theater.workspaceId),
+        ]),
+      ),
+    );
+    if (session.theaterId) {
+      const theater = await tx.theater.findFirst({
+        where: {
+          id: session.theaterId,
+          workspace: {
+            memberships: {
+              some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+            },
+          },
+        },
+        select: { workspaceId: true },
+      });
+      if (!theater) {
+        throw new ForbiddenException('Cannot manage this theater');
+      }
+      calendarWorkspaceIds.push(theater.workspaceId);
+    }
+    const directorWorkspace = calendarWorkspaceIds.length
+      ? null
+      : await tx.project.findUnique({
+          where: { id: directorProjectId },
+          select: { workspaceId: true },
+        });
+    if (directorWorkspace) {
+      calendarWorkspaceIds.push(directorWorkspace.workspaceId);
+    }
+    const durationMin = session.slots.reduce(
+      (maximum, slot) =>
+        Math.max(maximum, slot.offsetMin + slot.durationMin),
+      0,
+    );
+    const publishedAt = session.publishedAt
+      ? new Date(session.publishedAt)
+      : null;
+
+    await tx.rehearsal.upsert({
       where: { id: session.id },
       update: {
-        projectId,
-        userId,
+        projectId: primaryProjectId,
         title: session.title,
-        startsAt,
-        payload: session as any,
+        startsAt: new Date(session.startsAt),
+        durationMin: durationMin || null,
+        publishedAt,
+        createdBy: userId,
+        createdVia: 'director-session',
       },
       create: {
         id: session.id,
-        projectId,
-        userId,
+        projectId: primaryProjectId,
         title: session.title,
-        startsAt,
-        payload: session as any,
+        startsAt: new Date(session.startsAt),
+        durationMin: durationMin || null,
+        publishedAt,
+        createdBy: userId,
+        createdVia: 'director-session',
       },
+    });
+    await tx.rehearsalProject.deleteMany({
+      where: { rehearsalId: session.id },
+    });
+    await tx.rehearsalProject.createMany({
+      data: rehearsalProjectIds.map((projectId) => ({
+        rehearsalId: session.id,
+        projectId,
+      })),
+      skipDuplicates: true,
+    });
+    await tx.rehearsalWorkspace.deleteMany({
+      where: { rehearsalId: session.id },
+    });
+    await tx.rehearsalWorkspace.createMany({
+      data: calendarWorkspaceIds.map((workspaceId) => ({
+        rehearsalId: session.id,
+        workspaceId,
+      })),
+      skipDuplicates: true,
     });
   }
 
@@ -403,7 +572,17 @@ export class DirectorSessionsService {
     } else {
       const now = new Date();
       from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-      to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 0, 23, 59, 59, 999));
+      to = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth() + 2,
+          0,
+          23,
+          59,
+          59,
+          999,
+        ),
+      );
     }
 
     /** Пока без JSON-индекса: узкий диапазон дат + лимит; фильтр по email в памяти. */
@@ -417,7 +596,8 @@ export class DirectorSessionsService {
     const sessions = rows
       .map((r) => r.payload as any as DirectorRehearsalSession | undefined)
       .filter((cur): cur is DirectorRehearsalSession => {
-        if (!cur || !String((cur as any).publishedAt ?? '').trim()) return false;
+        if (!cur || !String((cur as any).publishedAt ?? '').trim())
+          return false;
         return sessionPayloadInvitesEmail(cur, email);
       });
 
@@ -440,7 +620,8 @@ export class DirectorSessionsService {
       where: { projectId: directorProject.id, userId, id: sid },
       select: { payload: true },
     });
-    if (owned) return (owned.payload ?? { id: sid }) as DirectorRehearsalSession;
+    if (owned)
+      return (owned.payload ?? { id: sid }) as DirectorRehearsalSession;
 
     const email = normEmail(String(userEmail ?? ''));
     if (!email) throw new NotFoundException('Session not found');
@@ -543,7 +724,9 @@ export class DirectorSessionsService {
     if (!exists) throw new NotFoundException('Session not found');
 
     const comment = await this.prisma.directorSessionComment.findUnique({
-      where: { sessionId_authorUserId: { sessionId: sid, authorUserId: userId } },
+      where: {
+        sessionId_authorUserId: { sessionId: sid, authorUserId: userId },
+      },
       select: { id: true, content: true, createdAt: true, updatedAt: true },
     });
     return { comment: comment ?? null };
@@ -564,7 +747,9 @@ export class DirectorSessionsService {
     });
     if (!exists) throw new NotFoundException('Session not found');
 
-    const email = String(userEmail ?? '').trim().toLowerCase();
+    const email = String(userEmail ?? '')
+      .trim()
+      .toLowerCase();
     if (!email) throw new BadRequestException('Invalid user email');
 
     const content = String(dto?.content ?? '').trim();
@@ -576,9 +761,16 @@ export class DirectorSessionsService {
     }
 
     const comment = await this.prisma.directorSessionComment.upsert({
-      where: { sessionId_authorUserId: { sessionId: sid, authorUserId: userId } },
+      where: {
+        sessionId_authorUserId: { sessionId: sid, authorUserId: userId },
+      },
       update: { content, authorEmail: email },
-      create: { sessionId: sid, authorUserId: userId, authorEmail: email, content },
+      create: {
+        sessionId: sid,
+        authorUserId: userId,
+        authorEmail: email,
+        content,
+      },
       select: { id: true, content: true, createdAt: true, updatedAt: true },
     });
     return { comment };
@@ -593,6 +785,14 @@ export class DirectorSessionsService {
 
     const ids = Array.from(new Set(sessions.map((s) => s.id))).filter(Boolean);
     await this.prisma.$transaction(async (tx) => {
+      const removedSessions = await tx.directorSession.findMany({
+        where: {
+          projectId: directorProject.id,
+          userId,
+          ...(ids.length ? { id: { notIn: ids } } : {}),
+        },
+        select: { id: true },
+      });
       await tx.directorSession.deleteMany({
         where: {
           projectId: directorProject.id,
@@ -600,19 +800,35 @@ export class DirectorSessionsService {
           ...(ids.length ? { id: { notIn: ids } } : {}),
         },
       });
+      if (removedSessions.length) {
+        await tx.rehearsal.deleteMany({
+          where: {
+            id: { in: removedSessions.map(({ id }) => id) },
+            createdVia: 'director-session',
+          },
+        });
+      }
       for (let i = 0; i < sessions.length; i += 1) {
         let s = sessions[i];
         const existing = await tx.directorSession.findUnique({
           where: { id: s.id },
           select: { payload: true },
         });
-        const prev = existing?.payload as any as DirectorRehearsalSession | undefined;
+        const prev = existing?.payload as any as
+          | DirectorRehearsalSession
+          | undefined;
         if (prev) {
           const incomingPub = String((s as any).publishedAt ?? '').trim();
           if (!incomingPub && String((prev as any).publishedAt ?? '').trim()) {
             s = { ...s, publishedAt: (prev as any).publishedAt };
           }
         }
+        await this.syncCanonicalRehearsal(
+          tx,
+          directorProject.id,
+          userId,
+          s,
+        );
         await tx.directorSession.upsert({
           where: { id: s.id },
           update: {
@@ -635,6 +851,7 @@ export class DirectorSessionsService {
         });
       }
     });
+    await touchProjectActivity(this.prisma, directorProject.id);
     return { ok: true };
   }
 
@@ -656,22 +873,6 @@ export class DirectorSessionsService {
     // legacy no-op: sessions are stored in DirectorSession table now
     void projectId;
     void sessions;
-  }
-
-  private async assertUserHasProjectAccessBySlug(userId: string, slug: string) {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId, role: 'editor' } } },
-        ],
-      },
-      select: { id: true, slug: true },
-    });
-    if (!project) throw new ForbiddenException('No access to project');
-    return project;
   }
 
   private async loadProjectScriptData(projectId: string) {
@@ -787,9 +988,7 @@ export class DirectorSessionsService {
         const lastName = String(p.lastName ?? '').trim() || null;
         const userName =
           String(p.displayName ?? '').trim() ||
-          [firstName, lastName]
-            .filter(Boolean)
-            .join(' ') ||
+          [firstName, lastName].filter(Boolean).join(' ') ||
           null;
         return {
           email,
@@ -831,28 +1030,57 @@ export class DirectorSessionsService {
     userId: string,
     session: DirectorRehearsalSession,
   ): Promise<string[]> {
+    const customSlots = (session.slots ?? []).filter(
+      (slot) => !slot.ref && Boolean(String(slot.title ?? '').trim()),
+    );
     const refs = (session.slots ?? [])
       .map((s) => s.ref)
       .filter(Boolean) as DirectorSlotRef[];
     const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(
       Boolean,
     );
-    if (slugs.length === 0) {
+    if (slugs.length === 0 && customSlots.length === 0) {
       throw new BadRequestException(
-        'Перед публикацией выберите материалы (слоты)',
+        'Перед публикацией выберите материал или укажите название слота',
       );
     }
 
     const neededEmails = new Set<string>();
     const allowedEmails = new Set<string>();
+    const explicitlySelectedEmails = new Set<string>();
 
-    const troupe = await this.prisma.troupe.findUnique({
-      where: { ownerUserId: userId },
-      select: { id: true },
-    });
-    if (troupe?.id) {
+    const troupeIds = new Set<string>();
+    if (session.theaterId) {
+      const theater = await this.prisma.theater.findFirst({
+        where: {
+          id: session.theaterId,
+          workspace: {
+            memberships: {
+              some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+            },
+          },
+        },
+        select: {
+          homeTroupes: { select: { id: true } },
+          troupes: { select: { troupeId: true } },
+        },
+      });
+      if (!theater) {
+        throw new ForbiddenException('Cannot manage this theater');
+      }
+      theater.homeTroupes.forEach(({ id }) => troupeIds.add(id));
+      theater.troupes.forEach(({ troupeId }) => troupeIds.add(troupeId));
+    } else {
+      const troupe = await this.prisma.troupe.findFirst({
+        where: { ownerUserId: userId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (troupe?.id) troupeIds.add(troupe.id);
+    }
+    if (troupeIds.size > 0) {
       const troupeMembers = await this.prisma.troupeMember.findMany({
-        where: { troupeId: troupe.id },
+        where: { troupeId: { in: Array.from(troupeIds) } },
         select: { email: true },
       });
       troupeMembers
@@ -861,9 +1089,27 @@ export class DirectorSessionsService {
         .forEach((e) => allowedEmails.add(e));
     }
 
+    for (const slot of customSlots) {
+      const participantEmails = Array.isArray(slot.participantEmails)
+        ? slot.participantEmails
+        : [];
+      for (const value of participantEmails) {
+        const email = normEmail(String(value ?? ''));
+        if (!email || !looksLikeEmail(email)) continue;
+        explicitlySelectedEmails.add(email);
+        neededEmails.add(email);
+      }
+    }
+
     for (const slug of slugs) {
-      const project = await this.assertUserHasProjectAccessBySlug(userId, slug);
-      const { scenes, sceneRoles } = await this.loadProjectScriptData(project.id);
+      const { project } = await this.projectAccess.assertBySlug(
+        userId,
+        slug,
+        'read',
+      );
+      const { scenes, sceneRoles } = await this.loadProjectScriptData(
+        project.id,
+      );
       const sceneById = new Map<number, RawSceneLike>();
       scenes.forEach((st) => {
         if (typeof st?.id === 'number') sceneById.set(st.id, st);
@@ -909,7 +1155,13 @@ export class DirectorSessionsService {
     const filtered = Array.from(neededEmails).filter((email) =>
       allowedEmails.size > 0 ? allowedEmails.has(normEmail(email)) : true,
     );
+    if (explicitlySelectedEmails.size > 0 && filtered.length === 0) {
+      throw new BadRequestException(
+        'Выбранные участники не входят в труппу театра',
+      );
+    }
     if (filtered.length === 0) {
+      if (customSlots.length > 0) return [];
       throw new BadRequestException(
         `Нельзя опубликовать сессию: не нашли emails актёров по roleAssignments (или нет доступа к ним)`,
       );
@@ -928,7 +1180,10 @@ export class DirectorSessionsService {
     const dateKey = getDateKey(session.startsAt);
     if (!dateKey) throw new BadRequestException('Invalid session startsAt');
 
-    const neededEmails = await this.collectNeededEmailsForSession(userId, session);
+    const neededEmails = await this.collectNeededEmailsForSession(
+      userId,
+      session,
+    );
     const profiles = await this.prisma.userProfile.findMany({
       where: { email: { in: neededEmails } },
       select: {
@@ -947,7 +1202,11 @@ export class DirectorSessionsService {
       if (email) profileByEmail.set(email, profile);
     }
 
-    const recipients: Array<{ telegramId: string; email: string; name?: string }> = [];
+    const recipients: Array<{
+      telegramId: string;
+      email: string;
+      name?: string;
+    }> = [];
     let totalWithoutAvailability = 0;
     for (const email of neededEmails) {
       const profile = profileByEmail.get(normEmail(email));
@@ -977,7 +1236,9 @@ export class DirectorSessionsService {
 
     const botUrl =
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
-    const secret = String(this.config.get<string>('INTERNAL_API_SECRET') ?? '').trim();
+    const secret = String(
+      this.config.get<string>('INTERNAL_API_SECRET') ?? '',
+    ).trim();
     if (!secret) {
       throw new BadRequestException('INTERNAL_API_SECRET is not configured');
     }
@@ -1059,7 +1320,9 @@ export class DirectorSessionsService {
       const n = normEmail(e);
       if (n) plannedSet.add(n);
     }
-    const mergedPlanned = Array.from(plannedSet).filter((e) => looksLikeEmail(e));
+    const mergedPlanned = Array.from(plannedSet).filter((e) =>
+      looksLikeEmail(e),
+    );
     const nowIso = new Date().toISOString();
     const updated: DirectorRehearsalSession = {
       ...session,
@@ -1073,7 +1336,9 @@ export class DirectorSessionsService {
 
     const botUrl =
       this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
-    const secret = String(this.config.get<string>('INTERNAL_API_SECRET') ?? '').trim();
+    const secret = String(
+      this.config.get<string>('INTERNAL_API_SECRET') ?? '',
+    ).trim();
 
     const pref = await this.prisma.projectTelegramBotPreference.findUnique({
       where: { projectId_userId: { projectId: directorProject.id, userId } },
@@ -1206,16 +1471,20 @@ export class DirectorSessionsService {
           timeEnd,
           projectSlug: null,
           sceneId: null,
-          sceneTitle: null,
+          sceneTitle: String(sl.title ?? '').trim() || null,
+          stepTitle: String(sl.title ?? '').trim() || null,
         };
       const scene = scenesBySlug.get(ref.projectSlug)?.get(ref.sceneId);
+      const slotTitle =
+        String(sl.title ?? '').trim() || String(scene?.title ?? '').trim() || null;
       return {
         ...sl,
         timeStart,
         timeEnd,
         projectSlug: ref.projectSlug,
         sceneId: ref.sceneId,
-        sceneTitle: scene?.title ?? null,
+        sceneTitle: slotTitle,
+        stepTitle: slotTitle,
       };
     });
 

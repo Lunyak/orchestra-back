@@ -1,6 +1,6 @@
 import { orchestraApi } from "../../../shared/api/rtk/orchestra-api";
 import type {
-  MyTroupeResponse,
+  ProjectParticipantsResponse,
   ProjectCastMemberItem,
   TeamMemberItem,
   TeamMemberRole,
@@ -8,16 +8,21 @@ import type {
   TeamRoleDetails,
   TroupeMemberKind,
   TroupeMemberItem,
+  TroupeResponse,
   TroupeSummary,
 } from "../../../sync/api/troupe";
 
 export type MyTroupeArgs = {
-  project: string;
+  month?: string;
+};
+
+export type TheaterTroupeArgs = {
+  theaterId: string;
   month?: string;
 };
 
 export type {
-  MyTroupeResponse,
+  ProjectParticipantsResponse,
   ProjectCastMemberItem,
   TeamMemberItem,
   TeamMemberRole,
@@ -25,68 +30,83 @@ export type {
   TeamRoleDetails,
   TroupeMemberKind,
   TroupeMemberItem,
+  TroupeResponse,
 };
 
 export const troupeApi = orchestraApi.injectEndpoints({
   endpoints: (build) => ({
-    myTroupe: build.query<MyTroupeResponse, MyTroupeArgs>({
-      query: ({ project, month }) => ({
+    myTroupe: build.query<TroupeResponse, MyTroupeArgs>({
+      query: ({ month }) => ({
         url: "/troupe",
-        params: {
-          project,
-          ...(month ? { month } : {}),
-        },
+        params: month ? { month } : undefined,
       }),
-      providesTags: (_r, _e, arg) => [
-        { type: "Troupe", id: `${arg.project}:${arg.month ?? ""}` },
+      providesTags: [{ type: "Troupe", id: "MY" }],
+    }),
+
+    theaterHomeTroupe: build.query<TroupeResponse, TheaterTroupeArgs>({
+      query: ({ theaterId, month }) => ({
+        url: `/workspaces/theaters/${encodeURIComponent(theaterId)}/troupe`,
+        params: month ? { month } : undefined,
+      }),
+      providesTags: (_r, _e, { theaterId }) => [
+        { type: "Troupe", id: `theater:${theaterId}` },
+      ],
+    }),
+
+    projectParticipants: build.query<
+      ProjectParticipantsResponse,
+      { project: string; month?: string }
+    >({
+      query: ({ project, month }) => ({
+        url: "/troupe/project-members",
+        params: { project, ...(month ? { month } : {}) },
+      }),
+      providesTags: (_r, _e, { project }) => [
+        { type: "Troupe", id: `project:${project}` },
       ],
     }),
 
     addTroupeMember: build.mutation<
-      TroupeMemberItem,
-      { project: string; email: string; month?: string }
+      {
+        id: string;
+        token: string;
+        invitePath: string;
+        email: string;
+        kind: TroupeMemberKind;
+        pending: true;
+        troupe: { id: string; title: string };
+      },
+      { email: string }
     >({
-      query: ({ project, email }) => ({
+      query: ({ email }) => ({
         url: "/troupe/members",
         method: "POST",
         data: { email: email.trim() },
-        params: { project },
       }),
-      invalidatesTags: (_r, _e, { project, month }) => [
-        { type: "Troupe", id: `${project}:${month ?? ""}` },
-        { type: "Troupe", id: `${project}:` },
-      ],
+      invalidatesTags: [{ type: "Troupe", id: "MY" }, "Troupe", "Dashboard"],
     }),
 
     removeTroupeMember: build.mutation<
       void,
-      { project: string; memberId: string; month?: string }
+      { memberId: string }
     >({
-      query: ({ project, memberId }) => ({
+      query: ({ memberId }) => ({
         url: `/troupe/members/${encodeURIComponent(memberId)}`,
         method: "DELETE",
-        params: { project },
       }),
-      invalidatesTags: (_r, _e, { project, month }) => [
-        { type: "Troupe", id: `${project}:${month ?? ""}` },
-        { type: "Troupe", id: `${project}:` },
-      ],
+      invalidatesTags: [{ type: "Troupe", id: "MY" }, "Troupe"],
     }),
 
     updateTroupeMemberKind: build.mutation<
       TroupeMemberItem,
-      { project: string; memberId: string; kind: TroupeMemberKind; month?: string }
+      { memberId: string; kind: TroupeMemberKind }
     >({
-      query: ({ project, memberId, kind }) => ({
+      query: ({ memberId, kind }) => ({
         url: `/troupe/members/${encodeURIComponent(memberId)}`,
         method: "PATCH",
         data: { kind },
-        params: { project },
       }),
-      invalidatesTags: (_r, _e, { project, month }) => [
-        { type: "Troupe", id: `${project}:${month ?? ""}` },
-        { type: "Troupe", id: `${project}:` },
-      ],
+      invalidatesTags: [{ type: "Troupe", id: "MY" }, "Troupe"],
     }),
 
     patchTroupeTitle: build.mutation<TroupeSummary, { title: string }>({
@@ -168,7 +188,10 @@ export const troupeApi = orchestraApi.injectEndpoints({
       {
         roleId: string;
         patch: Partial<
-          Pick<TeamRoleDetails, "title" | "parentId" | "sortOrder" | "description">
+          Pick<
+            TeamRoleDetails,
+            "title" | "parentId" | "sortOrder" | "description" | "avatarKey"
+          >
         >;
       }
     >({
@@ -229,6 +252,8 @@ export const troupeApi = orchestraApi.injectEndpoints({
 
 export const {
   useMyTroupeQuery,
+  useTheaterHomeTroupeQuery,
+  useProjectParticipantsQuery,
   useAddTroupeMemberMutation,
   useRemoveTroupeMemberMutation,
   useUpdateTroupeMemberKindMutation,

@@ -1,17 +1,26 @@
 import { UnderDevelopmentPage } from "@shared/components/under-development-page/UnderDevelopmentPage";
 import { lazy } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import {
   ENABLE_ACTOR_PAGE,
   ENABLE_ROLE_WORKBOOK_PAGE,
 } from "../../shared/build-features";
 import {
-  APP_HUB_ROUTE_PATH,
   isTheaterRouteEnabled,
-  PROJECT_MEDIA_ROUTE_PATH,
-  SPECTACLE_HUB_ROUTE_PATH,
-  SUFER_ROUTE_PATH,
+  PROJECTS_ROUTE_PATH,
 } from "./routeMeta";
+import { accountingPath, DEFAULT_APP_PATH, globalPaths } from "./paths";
+import {
+  LegacyProjectRedirect,
+  LegacyStudioRedirect,
+  ProjectIndexRedirect,
+  ProjectRouteBoundary,
+} from "./ProjectRouteBoundary";
+
+function ProjectAccountingRedirect() {
+  const { collectionId } = useParams();
+  return <Navigate to={accountingPath(collectionId)} replace />;
+}
 
 const SpectaclePage = lazy(() =>
   import("../../features/spectacle").then((m) => ({
@@ -25,18 +34,106 @@ const SpectacleHubPage = lazy(() =>
   })),
 );
 
-const AppHubPage = lazy(() =>
+const MyProjectsPage = lazy(() =>
   import("../../features/app-hub").then((m) => ({
-    default: m.AppHubPage,
+    default: m.MyProjectsPage,
   })),
 );
 
-const DirectorSessionsPage = lazy(() =>
-  import("../../features/director-sessions/ui/DirectorSessionsPage").then(
-    (m) => ({
-      default: m.DirectorSessionsPage,
-    }),
-  ),
+const ProjectTheaterInvitePage = lazy(() =>
+  import("../../features/project/ui/ProjectTheaterInvitePage").then((m) => ({
+    default: m.ProjectTheaterInvitePage,
+  })),
+);
+
+const GlobalDashboardPage = lazy(() =>
+  import("../../features/global-dashboard").then((m) => ({
+    default: m.GlobalDashboardPage,
+  })),
+);
+
+const ProjectOverviewPage = lazy(() =>
+  import("../../features/project/ui/ProjectOverviewPage").then((m) => ({
+    default: m.ProjectOverviewPage,
+  })),
+);
+
+const OrganizationsPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.OrganizationsPage,
+  })),
+);
+
+const TheatersIndexPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.TheatersIndexPage,
+  })),
+);
+
+const TheaterOrganizationPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.TheaterOrganizationPage,
+  })),
+);
+
+const TheaterOverviewPage = lazy(() =>
+  import("../../features/organizations/ui/TheaterOverviewPage").then((m) => ({
+    default: m.TheaterOverviewPage,
+  })),
+);
+
+const TheaterRehearsalsPage = lazy(() =>
+  import("../../features/organizations/ui/TheaterRehearsalsPage").then((m) => ({
+    default: m.TheaterRehearsalsPage,
+  })),
+);
+
+const TroupesIndexPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.TroupesIndexPage,
+  })),
+);
+
+const TroupeOrganizationPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.TroupeOrganizationPage,
+  })),
+);
+
+const StudioOrganizationPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.StudioOrganizationPage,
+  })),
+);
+
+const ProjectSessionsPage = lazy(() =>
+  import("../../features/project/ui/ProjectSessionsPage").then((m) => ({
+    default: m.ProjectSessionsPage,
+  })),
+);
+
+const ProjectProductionTeamPage = lazy(() =>
+  import("../../features/project/ui/ProjectProductionTeamPage").then((m) => ({
+    default: m.ProjectProductionTeamPage,
+  })),
+);
+
+const ProjectTeamRolePage = lazy(() =>
+  import("../../features/project/ui/ProjectTeamRolePage").then((m) => ({
+    default: m.ProjectTeamRolePage,
+  })),
+);
+
+const ProjectRolesPage = lazy(() =>
+  import("../../features/project/ui/ProjectRolesPage").then((m) => ({
+    default: m.ProjectRolesPage,
+  })),
+);
+
+const ProjectCastPage = lazy(() =>
+  import("../../features/project/ui/ProjectCastPage").then((m) => ({
+    default: m.ProjectCastPage,
+  })),
 );
 
 const DirectorSessionPage = lazy(() =>
@@ -68,6 +165,12 @@ const ProfilePage = lazy(() =>
 const TroupePage = lazy(() =>
   import("../../pages/troupe/TroupePage").then((m) => ({
     default: m.TroupePage,
+  })),
+);
+
+const TheaterTeamPage = lazy(() =>
+  import("../../pages/troupe/TheaterTeamPage").then((m) => ({
+    default: m.TheaterTeamPage,
   })),
 );
 
@@ -140,12 +243,6 @@ const AccountingPage = lazy(() =>
 const CollectionDetailPage = lazy(() =>
   import("../../pages/accounting/CollectionDetailPage").then((m) => ({
     default: m.CollectionDetailPage,
-  })),
-);
-
-const AdminRedirectPage = lazy(() =>
-  import("../../pages/admin/AdminRedirectPage").then((m) => ({
-    default: m.AdminRedirectPage,
   })),
 );
 
@@ -238,34 +335,121 @@ export function AppRouteDeclarations() {
     <Routes>
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/projector-output" element={<ProjectorOutputPage />} />
-      <Route path={APP_HUB_ROUTE_PATH} element={<AppHubPage />} />
-      <Route path={SPECTACLE_HUB_ROUTE_PATH} element={<SpectacleHubPage />} />
-      <Route path="/" element={<SpectaclePage />} />
+      <Route path={globalPaths.dashboard} element={<GlobalDashboardPage />} />
+      <Route path={PROJECTS_ROUTE_PATH} element={<MyProjectsPage />} />
       <Route
-        path="/theater"
-        element={
-          isTheaterRouteEnabled() ? <SpectaclePage /> : <Navigate to="/" replace />
-        }
+        path={`${globalPaths.projects}/theater-invite/:token`}
+        element={<ProjectTheaterInvitePage />}
       />
-      <Route path="/light-plot" element={<SpectaclePage />} />
-      <Route path="/notes-run" element={<Navigate to={SUFER_ROUTE_PATH} replace />} />
-      <Route path={SUFER_ROUTE_PATH} element={<SpectaclePage />} />
-      <Route path={PROJECT_MEDIA_ROUTE_PATH} element={<SpectaclePage />} />
-      <Route path="/board" element={<SpectaclePage />} />
-      <Route path="/tasks" element={<SpectaclePage />}>
-        <Route index element={<TasksPage />} />
-        <Route path=":taskId" element={<TaskDetailPage />} />
-      </Route>
-      <Route path="/admin" element={<AdminRedirectPage />} />
-      <Route path="/rehearsals" element={<Navigate to="/sessions" replace />} />
+      <Route path="/home" element={<Navigate to={DEFAULT_APP_PATH} replace />} />
+      <Route path={globalPaths.organizations} element={<OrganizationsPage />} />
       <Route
-        path="/rehearsals/:rehearsalId"
-        element={<Navigate to="/sessions" replace />}
+        path={`${globalPaths.organizations}/theaters`}
+        element={<TheatersIndexPage />}
       />
-      <Route path="/sessions" element={<SpectaclePage />}>
-        <Route index element={<DirectorSessionsPage />} />
-        <Route path=":sessionId/slots/:slotId" element={<DirectorSessionPage />} />
-        <Route path=":sessionId" element={<DirectorSessionPage />} />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId`}
+        element={<TheaterOrganizationPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/overview`}
+        element={<TheaterOverviewPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/troupe`}
+        element={<TroupePage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/rehearsals`}
+        element={<TheaterRehearsalsPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/rehearsals/:sessionId/slots/:slotId`}
+        element={<DirectorSessionPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/rehearsals/:sessionId`}
+        element={<DirectorSessionPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/team`}
+        element={<TheaterTeamPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/team/roles/:roleId`}
+        element={<TeamRolePage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/premises`}
+        element={<PremisesPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/theaters/:theaterId/premises/:premiseId`}
+        element={<PremiseDetailPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/troupes`}
+        element={<TroupesIndexPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/troupes/:troupeId`}
+        element={<TroupeOrganizationPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId`}
+        element={<StudioOrganizationPage />}
+      />
+      <Route path="/projects/:projectSlug" element={<ProjectRouteBoundary />}>
+        <Route index element={<ProjectIndexRedirect />} />
+        <Route path="overview" element={<ProjectOverviewPage />} />
+        <Route path="roles" element={<ProjectRolesPage />} />
+        <Route path="cast" element={<ProjectCastPage />} />
+        <Route path="spectacle" element={<SpectacleHubPage />} />
+        <Route path="script" element={<SpectaclePage />} />
+        <Route path="light-plot" element={<SpectaclePage />} />
+        <Route path="sufer" element={<SpectaclePage />} />
+        <Route path="media" element={<SpectaclePage />} />
+        <Route
+          path="theater"
+          element={
+            isTheaterRouteEnabled() ? (
+              <SpectaclePage />
+            ) : (
+              <Navigate to="../script" replace />
+            )
+          }
+        />
+        <Route path="board" element={<SpectaclePage />} />
+        <Route path="tasks" element={<SpectaclePage />}>
+          <Route index element={<TasksPage />} />
+          <Route path=":taskId" element={<TaskDetailPage />} />
+        </Route>
+        <Route path="sessions" element={<SpectaclePage />}>
+          <Route index element={<ProjectSessionsPage />} />
+          <Route path=":sessionId/slots/:slotId" element={<DirectorSessionPage />} />
+          <Route path=":sessionId" element={<DirectorSessionPage />} />
+        </Route>
+        <Route path="team" element={<SpectaclePage />}>
+          <Route index element={<ProjectProductionTeamPage />} />
+          <Route path="roles/:roleId" element={<ProjectTeamRolePage />} />
+        </Route>
+        <Route
+          path="premises"
+          element={<Navigate to={globalPaths.premises} replace />}
+        />        <Route
+          path="premises/:premiseId"
+          element={<Navigate to={globalPaths.premises} replace />}
+        />
+        <Route
+          path="accounting"
+          element={<Navigate to={globalPaths.accounting} replace />}
+        />
+        <Route
+          path="accounting/:collectionId"
+          element={<ProjectAccountingRedirect />}
+        />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings/bot" element={<SettingsBotPage />} />
       </Route>
       <Route
         path="/actor"
@@ -274,42 +458,69 @@ export function AppRouteDeclarations() {
       <Route path="/trainers" element={<TrainersPage />} />
       <Route path="/trainers/speech" element={<SpeechTrainerPage />} />
       <Route path="/trainers/diction" element={<DictionTrainerPage />} />
-      <Route path="/studio" element={<StudiosPage />} />
-      <Route path="/studio/invite/:token" element={<StudioInvitePage />} />
-      <Route path="/studio/:studioId" element={<StudioDetailPage />} />
+      <Route path={globalPaths.studios} element={<StudiosPage />} />
+      <Route path={globalPaths.premises} element={<PremisesPage />} />
       <Route
-        path="/studio/:studioId/programs/:programId"
+        path={`${globalPaths.premises}/:premiseId`}
+        element={<PremiseDetailPage />}
+      />
+      <Route path={`${globalPaths.studios}/invite/:token`} element={<StudioInvitePage />} />
+      <Route path={`${globalPaths.studios}/:studioId`} element={<StudioDetailPage />} />
+      <Route
+        path={`${globalPaths.studios}/:studioId/premises`}
+        element={<PremisesPage />}
+      />
+      <Route
+        path={`${globalPaths.studios}/:studioId/premises/:premiseId`}
+        element={<PremiseDetailPage />}
+      />
+      <Route
+        path={`${globalPaths.studios}/:studioId/programs/:programId`}
         element={<StudioProgramPage />}
       />
       <Route
-        path="/studio/:studioId/programs/:programId/lessons/:lessonId"
+        path={`${globalPaths.studios}/:studioId/programs/:programId/lessons/:lessonId`}
         element={<StudioLessonPage />}
       />
       <Route
-        path="/studio/:studioId/assignments/:assignmentId"
+        path={`${globalPaths.studios}/:studioId/assignments/:assignmentId`}
         element={<StudioAssignmentPage />}
       />
       <Route
-        path="/studio/:studioId/videos/:videoId"
+        path={`${globalPaths.studios}/:studioId/videos/:videoId`}
         element={<StudioVideoPage />}
       />
+      <Route path="/studio" element={<LegacyStudioRedirect />} />
+      <Route path="/studio/*" element={<LegacyStudioRedirect />} />
       <Route
         path="/role-workbook/:roleId"
         element={roleWorkbookPageElement}
       />
       <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/troupe" element={<TroupePage />} />
-      <Route path="/troupe/roles/:roleId" element={<TeamRolePage />} />
-      <Route path="/premises" element={<PremisesPage />} />
-      <Route path="/premises/:premiseId" element={<PremiseDetailPage />} />
-      <Route path="/accounting" element={<AccountingPage />} />
-      <Route path="/accounting/:collectionId" element={<CollectionDetailPage />} />
-      <Route path="/roles" element={<Navigate to="/board" replace />} />
-      <Route path="/settings" element={<SettingsPage />} />
-      <Route path="/settings/bot" element={<SettingsBotPage />} />
+      <Route path="/" element={<Navigate to={DEFAULT_APP_PATH} replace />} />
+      <Route path="/spectacle/*" element={<LegacyProjectRedirect />} />
+      <Route path="/light-plot/*" element={<LegacyProjectRedirect />} />
+      <Route path="/notes-run/*" element={<LegacyProjectRedirect />} />
+      <Route path="/sufer/*" element={<LegacyProjectRedirect />} />
+      <Route path="/media/*" element={<LegacyProjectRedirect />} />
+      <Route path="/theater/*" element={<LegacyProjectRedirect />} />
+      <Route path="/board/*" element={<LegacyProjectRedirect />} />
+      <Route path="/tasks/*" element={<LegacyProjectRedirect />} />
+      <Route path="/sessions/*" element={<LegacyProjectRedirect />} />
+      <Route path="/rehearsals/*" element={<LegacyProjectRedirect />} />
+      <Route path="/troupe/*" element={<LegacyProjectRedirect />} />
+      <Route path="/premises/*" element={<LegacyProjectRedirect />} />
+      <Route path={globalPaths.accounting} element={<AccountingPage />} />
+      <Route
+        path={`${globalPaths.accounting}/:collectionId`}
+        element={<CollectionDetailPage />}
+      />
+      <Route path="/settings/*" element={<LegacyProjectRedirect />} />
+      <Route path="/roles/*" element={<LegacyProjectRedirect />} />
+      <Route path="/admin/*" element={<LegacyProjectRedirect />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
-      <Route path="*" element={<Navigate to={APP_HUB_ROUTE_PATH} replace />} />
+      <Route path="*" element={<Navigate to={DEFAULT_APP_PATH} replace />} />
     </Routes>
   );
 }

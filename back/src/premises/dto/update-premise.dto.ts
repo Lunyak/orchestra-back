@@ -3,6 +3,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -27,6 +28,12 @@ export class UpdatePremiseDto {
   @IsInt()
   @Min(1)
   capacity?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  paymentDueDay?: number | null;
 
   @IsOptional()
   @IsString()

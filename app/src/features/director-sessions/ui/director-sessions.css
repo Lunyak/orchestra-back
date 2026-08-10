@@ -2,7 +2,11 @@
 
 .sessions-page,
 .director-session-page,
-.tasks-page {
+.tasks-page,
+.organizations-page,
+.project-overview,
+.theater-overview,
+.global-dashboard {
   --sessions-bg: #111;
   --sessions-bg-deep: #0a0a0a;
   --sessions-panel: #1b1b1b;
@@ -254,6 +258,17 @@
   background: var(--sessions-bg);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   box-sizing: border-box;
+}
+
+/* Театральный роут: страница рендерится прямо в shell без app-layout */
+.app-shell-body > .director-session-page {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  overflow: auto;
 }
 
 .director-session-page__header {
@@ -1238,34 +1253,37 @@
   justify-content: flex-start;
 }
 
+.app-shell-body > .director-session-page > .spectacle-direction-switch {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.app-shell-body > .director-session-page > .director-session-page__header,
+.app-shell-body > .director-session-page > .director-session-page__title,
+.app-shell-body > .director-session-page > .director-session-page__grid,
+.app-shell-body > .director-session-page > .director-session-page__loading,
+.app-shell-body > .director-session-page > .director-session-page__error {
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
 .director-session-page > .admin-chrome-layout {
   width: 100%;
   align-self: stretch;
 }
 
-.director-session-page__header {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-
-  justify-content: space-between;
-  width: 100%;
-}
-
-.director-session-page__back {
-  text-decoration: none;
-  color: inherit;
-  opacity: 0.85;
-  font-size: 13px;
-  color: var(--color-text-primary);
-}
-
 .director-session-page__title {
   font-weight: 800;
   font-size: 16px;
-
   color: var(--color-text-primary);
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
 }
 
 .director-session-page__meta {
@@ -1276,12 +1294,28 @@
 
 .director-session-page__grid {
   margin-top: 14px;
+  margin-left: auto;
+  margin-right: auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+  justify-items: center;
   width: 100%;
   max-width: 600px;
+  box-sizing: border-box;
+}
+
+.director-session-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
   box-sizing: border-box;
 }
 
@@ -1298,6 +1332,9 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .director-session-slots-panel__slot-settings {

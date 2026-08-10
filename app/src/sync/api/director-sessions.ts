@@ -14,8 +14,10 @@ export type DirectorSessionSlot = {
   id: string;
   offsetMin: number;
   durationMin: number;
+  title?: string;
   ref?: DirectorSessionSlotRef;
   notes?: string;
+  participantEmails?: string[];
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 
@@ -35,6 +37,7 @@ export type DirectorSession = {
   id: string;
   title: string;
   startsAt: string;
+  theaterId?: string;
   slots: DirectorSessionSlot[];
   comment?: string | null;
   plannedEmails?: string[];

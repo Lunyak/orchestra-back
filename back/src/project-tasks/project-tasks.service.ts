@@ -11,6 +11,8 @@ import {
   ProjectTaskStatus,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectAccessService } from '../project-access/project-access.service';
+import { touchProjectActivity } from '../projects/project-activity';
 import {
   CreateProjectTaskDto,
   ImportRequisiteTasksDto,
@@ -76,21 +78,20 @@ function serializeTask(row: TaskRow, viewer?: TaskViewer) {
 
 @Injectable()
 export class ProjectTasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
   private async resolveProject(userId: string, projectSlugRaw: string) {
     const slug = normSlug(projectSlugRaw);
     if (!slug) throw new BadRequestException('projectSlug is required');
 
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      select: { id: true, slug: true, name: true },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    const { project } = await this.projectAccess.assertBySlug(
+      userId,
+      slug,
+      'read',
+    );
     return project;
   }
 
@@ -104,16 +105,12 @@ export class ProjectTasksService {
             id: true,
             slug: true,
             name: true,
-            ownerId: true,
-            members: { where: { userId }, select: { id: true } },
           },
         },
       },
     });
     if (!task) throw new NotFoundException('Task not found');
-    const hasAccess =
-      task.project.ownerId === userId || task.project.members.length > 0;
-    if (!hasAccess) throw new ForbiddenException('No access');
+    await this.projectAccess.assertById(userId, task.project.id, 'read');
     return task;
   }
 
@@ -176,6 +173,7 @@ export class ProjectTasksService {
       select: taskSelect,
     });
 
+    await touchProjectActivity(this.prisma, project.id);
     return serializeTask(row, { userId, email });
   }
 
@@ -226,12 +224,14 @@ export class ProjectTasksService {
       data,
       select: taskSelect,
     });
+    await touchProjectActivity(this.prisma, task.project.id);
     return serializeTask(row, viewer);
   }
 
   async remove(userId: string, taskId: string) {
-    await this.getTaskForUser(userId, taskId);
+    const task = await this.getTaskForUser(userId, taskId);
     await this.prisma.projectTask.delete({ where: { id: taskId } });
+    await touchProjectActivity(this.prisma, task.project.id);
     return { ok: true as const };
   }
 
@@ -242,7 +242,12 @@ export class ProjectTasksService {
   ) {
     const project = await this.resolveProject(userId, body.projectSlug);
     const items = Array.isArray(body.tasks) ? body.tasks : [];
-    if (!items.length) return { created: 0, skipped: 0, tasks: [] as ReturnType<typeof serializeTask>[] };
+    if (!items.length)
+      return {
+        created: 0,
+        skipped: 0,
+        tasks: [] as ReturnType<typeof serializeTask>[],
+      };
 
     const viewer = { userId, email };
 
@@ -293,6 +298,9 @@ export class ProjectTasksService {
       created.push(serializeTask(row, viewer));
     }
 
+    if (created.length) {
+      await touchProjectActivity(this.prisma, project.id);
+    }
     return { created: created.length, skipped, tasks: created };
   }
 }

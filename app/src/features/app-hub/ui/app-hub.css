@@ -2,11 +2,35 @@
   padding: 24px 20px 40px;
 }
 
+.app-hub-layout--projects {
+  background: #111;
+  color: #888;
+  min-height: 100%;
+}
+
+.app-hub-layout--projects .main-content {
+  padding: 18px 18px 28px;
+}
+
 .app-hub {
-  max-width: 780px;
+  max-width: 1080px;
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
+}
+
+.app-hub--projects {
+  max-width: var(--width-content-page);
+}
+
+.app-hub__destinations {
+  margin-top: var(--spacing-16);
+}
+
+.app-hub__destinations h2 {
+  margin: 0 0 var(--spacing-8);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-2xl);
 }
 
 .app-hub__grid {
@@ -144,10 +168,6 @@
 }
 
 @media (max-width: 840px) {
-  .app-hub {
-    max-width: 520px;
-  }
-
   .app-hub__grid {
     grid-template-columns: repeat(2, minmax(0, 250px));
   }

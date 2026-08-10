@@ -23,8 +23,13 @@ import {
 } from "../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useScriptUI } from "../../features/script-ui";
 import { scriptUiActions } from "../../features/script-ui/model/script-ui-slice";
+import { RecentOrganizationsTracker } from "../../features/global-dashboard/ui/RecentOrganizationsTracker";
 import { AppRouteDeclarations } from "./AppRouteDeclarations";
 import { getRouteMeta, isScriptMarkdownRoute } from "./routeMeta";
+import {
+  getProjectSectionFromPath,
+  isProjectPath,
+} from "./paths";
 
 const SCRIPT_SCENE_NAME = "script";
 
@@ -56,7 +61,9 @@ function AppRoutesContent() {
   const { shouldShowScriptState, isSpectacleLayoutRoute } = getRouteMeta(
     location.pathname,
   );
-  const isLightPlotRoute = location.pathname === "/light-plot";
+  const projectSection = getProjectSectionFromPath(location.pathname);
+  const isProjectRoute = isProjectPath(location.pathname);
+  const isLightPlotRoute = projectSection === "light-plot";
   const spectacleRunTextHidden = useAppSelector(
     (state) => state.scriptUi.spectacleRunTextHidden,
   );
@@ -120,11 +127,9 @@ function AppRoutesContent() {
   const formatPlaySourceText = String(activeMarkdown ?? "");
 
   const isRehearsalPlanRoute =
-    location.pathname === "/board" ||
-    location.pathname === "/tasks" ||
-    location.pathname.startsWith("/tasks/") ||
-    location.pathname === "/sessions" ||
-    location.pathname.startsWith("/sessions/");
+    projectSection === "board" ||
+    projectSection === "tasks" ||
+    projectSection === "sessions";
 
   const isPlaylistVisible = isMobile ? mobilePlaylistOpen : showPlaylistSidebar;
   const isScenesVisible = isMobile ? mobileScenesOpen : !isScenesCollapsed;
@@ -242,7 +247,7 @@ function AppRoutesContent() {
       <Suspense fallback={suspenseFallback}>
         <AppRouteDeclarations />
       </Suspense>
-      {projectName ? (
+      {projectName && isProjectRoute ? (
         <PlaylistSidebar
           projectName={projectName}
           sceneName={SCRIPT_SCENE_NAME}
@@ -279,6 +284,7 @@ export function AppRoutes() {
 
   return (
     <AppEditorMenubarProvider>
+      <RecentOrganizationsTracker />
       <div className="app-shell-with-menubar">
         <AppEditorMenubar />
         <div className="app-shell-body">

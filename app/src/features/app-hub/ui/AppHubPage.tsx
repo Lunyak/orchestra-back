@@ -1,36 +1,23 @@
-import { Link } from "react-router-dom";
-import { getAppHubDestinations } from "../model/app-hub-destinations";
+import { useNavigate } from "react-router-dom";
+import { projectPath } from "../../../app/router/paths";
+import { ProjectWorkspace } from "../../project/ui/ProjectWorkspace";
 import "./app-hub.css";
 
-export function AppHubPage() {
-  const destinations = getAppHubDestinations();
+function ProjectsSection() {
+  const navigate = useNavigate();
 
   return (
-    <div className="app-layout app-hub-layout">
+    <ProjectWorkspace onProjectOpen={(slug) => navigate(projectPath(slug))} />
+  );
+}
+
+export function MyProjectsPage() {
+  return (
+    <div className="app-layout app-hub-layout app-hub-layout--projects">
       <div className="app-content">
         <main className="main-content">
-          <div className="app-hub">
-            <ul className="app-hub__grid">
-              {destinations.map((destination) => (
-                <li key={destination.id}>
-                  <Link to={destination.path} className="app-hub__tile">
-                    <img
-                      src={destination.imageSrc}
-                      alt={destination.imageAlt}
-                      className="app-hub__tile-image"
-                    />
-                    <span className="app-hub__tile-body">
-                      <span className="app-hub__tile-label">
-                        {destination.label}
-                      </span>
-                      <span className="app-hub__tile-desc">
-                        {destination.description}
-                      </span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+          <div className="app-hub app-hub--projects">
+            <ProjectsSection />
           </div>
         </main>
       </div>

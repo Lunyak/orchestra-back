@@ -79,6 +79,7 @@ export const rehearsalsApi = orchestraApi.injectEndpoints({
         startsAt: string;
         durationMin?: number;
         notes?: string;
+        calendarWorkspaceIds?: string[];
       }
     >({
       query: (body) => ({ url: "/rehearsals", method: "POST", data: body }),

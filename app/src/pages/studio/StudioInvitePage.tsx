@@ -1,6 +1,7 @@
 import { Button } from "@shared/core/button/Button";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { studioPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import {
@@ -27,7 +28,7 @@ export function StudioInvitePage() {
     setFormError(null);
     try {
       const studio = await acceptInvite(token).unwrap();
-      navigate(`/studio/${studio.id}`, { replace: true });
+      navigate(studioPath(studio.id), { replace: true });
     } catch (e) {
       setFormError(
         e instanceof Error ? e.message : "Не удалось принять приглашение",
@@ -69,7 +70,7 @@ export function StudioInvitePage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to="/studio">
+              <Link className="studio-page__back" to={studioPath()}>
                 ← Студии
               </Link>
               <p className="studio-page__error">Приглашение не найдено или истекло.</p>
@@ -88,7 +89,7 @@ export function StudioInvitePage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to="/studio">
+            <Link className="studio-page__back" to={studioPath()}>
               ← Студии
             </Link>
 

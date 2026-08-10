@@ -1,7 +1,7 @@
 .aboutus-row__avatar-wrap {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: clamp(200px, 32vw, 340px);
+  height: clamp(200px, 32vw, 340px);
   flex-shrink: 0;
 }
 
@@ -22,6 +22,31 @@
   width: 100%;
   height: 100%;
   transition: opacity 0.25s ease, filter var(--transition);
+}
+
+.aboutus-row .site-bands-row__main {
+  gap: 28px;
+}
+
+.aboutus-row__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.aboutus-row__role {
+  font-family: "Russo One", sans-serif;
+  font-size: clamp(0.85rem, 1vw + 0.35rem, 1.05rem);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.aboutus-row.site-bands-row {
+  padding-top: clamp(22px, 3.5dvh, 40px);
+  padding-bottom: clamp(22px, 3.5dvh, 40px);
 }
 
 @media (prefers-reduced-motion: reduce) {

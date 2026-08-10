@@ -1,7 +1,7 @@
 import cn from "classnames";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { PROJECT_MEDIA_ROUTE_PATH } from "../../../app/router/routeMeta";
+import { projectPath } from "../../../app/router/paths";
 import { HeaderPlayer } from "../../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { usePlaybook } from "../../playbook";
@@ -110,8 +110,12 @@ export function ProjectMediaPageSection() {
 }
 
 export function ProjectMediaPageLink({ className }: { className?: string }) {
+  const { projectName } = useProject();
   return (
-    <Link to={PROJECT_MEDIA_ROUTE_PATH} className={cn("project-media-page-link", className)}>
+    <Link
+      to={projectPath(projectName, "media")}
+      className={cn("project-media-page-link", className)}
+    >
       Библиотека медиа
     </Link>
   );

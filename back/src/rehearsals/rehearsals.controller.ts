@@ -84,6 +84,20 @@ export class RehearsalsController {
     return this.rehearsals.setParticipants(req.user.userId, id, body);
   }
 
+  @Post(':id/my-attendance')
+  setMyAttendance(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { status?: 'present' | 'absent' },
+  ) {
+    return this.rehearsals.setMyAttendance(
+      req.user.userId,
+      req.user.email,
+      id,
+      body.status,
+    );
+  }
+
   @Post(':id/plan')
   plan(@Req() req: any, @Param('id') id: string) {
     return this.rehearsals.plan(req.user.userId, id);

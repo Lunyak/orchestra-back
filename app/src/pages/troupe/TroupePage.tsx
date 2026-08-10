@@ -8,21 +8,16 @@ import "dayjs/locale/ru";
 import {
   Fragment,
   useMemo,
-  useState,
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
-import { Link } from "react-router-dom";
-import {
-  useCreateTeamRoleMutation,
-  useTeamRolesQuery,
-  type TeamRoleDefinitionItem,
-} from "../../features/troupe/api/troupe-api";
+import { useParams } from "react-router-dom";
+import { TheaterSectionNav } from "../../features/organizations/ui/TheaterSectionNav";
 import {
   getTroupeNarrowLayoutSnapshot,
   isoDate,
   memberLabel,
-  monthKey,
+  monthLabel,
   subscribeTroupeNarrowLayout,
   useTroupePage,
 } from "../../features/troupe";
@@ -33,13 +28,13 @@ import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "../../features/director-sessions/ui/director-sessions.css";
+import "../../features/organizations/ui/organizations.css";
 import "./style.css";
 
 dayjs.locale("ru");
 
 export function TroupePage() {
-  const [newTeamRoleTitle, setNewTeamRoleTitle] = useState("");
-  const [newTeamRoleParentId, setNewTeamRoleParentId] = useState("");
+  const { theaterId = "" } = useParams();
   const narrowLayout = useSyncExternalStore(
     subscribeTroupeNarrowLayout,
     getTroupeNarrowLayoutSnapshot,
@@ -48,10 +43,10 @@ export function TroupePage() {
 
   const {
     accessToken,
-    activeTab,
     adding,
     addError,
     addMemberByEmail,
+    canManageTroupe,
     canManageProjectTroupe,
     currentMonth,
     days,
@@ -67,7 +62,6 @@ export function TroupePage() {
     patchTitleError,
     patchingTitle,
     projectName,
-    projectCastMembers,
     projects,
     projectsLoading,
     projectMembersLoading,
@@ -80,7 +74,6 @@ export function TroupePage() {
     selectedMember,
     selectedMemberId,
     selectedMemberInProject,
-    setActiveTab,
     setCurrentMonth,
     setEmail,
     setSelectedDayIso,
@@ -89,19 +82,10 @@ export function TroupePage() {
     titleDraft,
     todayIso,
     troupe,
-    troupeMembers,
     updateSelectedTroupeMemberKind,
     projectItems,
     currentProjectDisplayName,
   } = useTroupePage();
-
-  const {
-    data: teamRoles = [],
-    isLoading: teamRolesLoading,
-    error: teamRolesError,
-  } = useTeamRolesQuery(undefined, { skip: !accessToken });
-  const [createTeamRole, { isLoading: creatingTeamRole }] =
-    useCreateTeamRoleMutation();
 
   const projectSelectOptions = useMemo(
     () =>
@@ -111,107 +95,10 @@ export function TroupePage() {
       })),
     [projectItems],
   );
-  const isTeamTab = activeTab === "team";
-  const isTroupeTab = activeTab === "troupe";
-  const isProjectTab = activeTab === "project";
-  const teamRolesByParentId = useMemo(() => {
-    const groups = new Map<string, TeamRoleDefinitionItem[]>();
-    for (const role of teamRoles) {
-      const key = role.parentId ?? "root";
-      groups.set(key, [...(groups.get(key) ?? []), role]);
-    }
-    for (const roles of groups.values()) {
-      roles.sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title));
-    }
-    return groups;
-  }, [teamRoles]);
-  const teamRoleParentOptions = useMemo(
-    () => [
-      { value: "", label: "Верхний уровень" },
-      ...teamRoles.map((role) => ({
-        value: role.id,
-        label: role.title,
-      })),
-    ],
-    [teamRoles],
-  );
   const troupeMemberKindOptions = [
     { value: "regular", label: "Основной" },
     { value: "guest", label: "Приходящий" },
   ];
-
-  const handleCreateTeamRole = async () => {
-    const title = newTeamRoleTitle.trim();
-    if (!title) return;
-    try {
-      await createTeamRole({
-        title,
-        parentId: newTeamRoleParentId || null,
-      }).unwrap();
-      setNewTeamRoleTitle("");
-      setNewTeamRoleParentId("");
-    } catch {
-      alert("Не удалось создать должность");
-    }
-  };
-
-  const renderTeamRoleCards = (parentId: string | null = null, depth = 0) => {
-    const roles = teamRolesByParentId.get(parentId ?? "root") ?? [];
-    if (roles.length === 0) return null;
-    return (
-      <div
-        className={cn(
-          "troupe-role-tree-level",
-          depth > 0 && "troupe-role-tree-level--nested",
-        )}
-      >
-        {roles.map((role) => {
-          const childNodes = renderTeamRoleCards(role.id, depth + 1);
-          const description = role.description.trim();
-          return (
-            <div key={role.id} className="troupe-role-node">
-              <Link to={`/troupe/roles/${role.id}`} className="troupe-role-card">
-                <div className="troupe-role-card__top">
-                  <div>
-                    <div className="troupe-role-card__title">{role.title}</div>
-                  </div>
-                  <div className="troupe-role-card__count">
-                    {role.assignmentCount}
-                  </div>
-                </div>
-                <div className="troupe-role-card__description">
-                  {description || "Инструкция пока не заполнена."}
-                </div>
-                <div className="troupe-role-card__assignees">
-                  {role.assignees.length === 0 ? (
-                    <span className="troupe-role-card__empty">Никто не назначен</span>
-                  ) : (
-                    role.assignees.slice(0, 4).map((member) => {
-                      const label = memberLabel(member);
-                      return (
-                        <MiniAvatar
-                          key={member.id}
-                          src={String(member.profile?.avatarUrl ?? "").trim() || null}
-                          label={label || member.email}
-                          size={22}
-                        />
-                      );
-                    })
-                  )}
-                  {role.assignees.length > 4 ? (
-                    <span className="troupe-role-card__more">
-                      +{role.assignees.length - 4}
-                    </span>
-                  ) : null}
-                </div>
-              </Link>
-              {childNodes}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
 
   const renderScheduleGrid = (
     scheduleMembers: typeof members,
@@ -394,100 +281,18 @@ export function TroupePage() {
   return (
     <div className="app-layout troupe-layout">
       <div className="app-content">
+        {theaterId ? (
+          <TheaterSectionNav theaterId={theaterId} active="troupe" />
+        ) : null}
         <main className="main-content">
           <div className="troupe-view">
             <AdminSectionChrome activeSection="team">
-            <div className="troupe-tabs" role="tablist" aria-label="Разделы труппы">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={isTeamTab}
-                className={cn("troupe-tab", isTeamTab && "troupe-tab--active")}
-                onClick={() => setActiveTab("team")}
-              >
-                Команда
-                <span className="troupe-tab__count">{teamRoles.length}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={isTroupeTab}
-                className={cn("troupe-tab", isTroupeTab && "troupe-tab--active")}
-                onClick={() => setActiveTab("troupe")}
-              >
-                Состав труппы
-                <span className="troupe-tab__count">{troupeMembers.length}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={isProjectTab}
-                className={cn("troupe-tab", isProjectTab && "troupe-tab--active")}
-                onClick={() => setActiveTab("project")}
-              >
-                Состав проекта
-                <span className="troupe-tab__count">{projectCastMembers.length}</span>
-              </button>
-            </div>
-
-            {isTeamTab ? (
-              <div className="troupe-card troupe-team-card troupe-role-tree-card">
-                <div className="troupe-team-head">
-                  <div>
-                    <div className="troupe-team-title">Команда</div>
-                    <div className="troupe-team-subtitle">
-                      Дерево должностей труппы. Откройте карточку, чтобы назначить людей и заполнить инструкцию.
-                    </div>
-                  </div>
-                </div>
-                <FormInlineRow className="troupe-form-row troupe-team-form">
-                  <InlineTextField
-                    className="troupe-title-field"
-                    placeholder="Новая должность"
-                    value={newTeamRoleTitle}
-                    onChange={(e) => setNewTeamRoleTitle(e.target.value)}
-                    maxLength={80}
-                  />
-                  <CustomSelect
-                    value={newTeamRoleParentId}
-                    options={teamRoleParentOptions}
-                    onChange={setNewTeamRoleParentId}
-                    triggerClassName="troupe-role-parent-select"
-                    aria-label="Родительская должность"
-                  />
-                  <button
-                    type="button"
-                    className="troupe-form-row__btn troupe-invite-card__submit"
-                    disabled={creatingTeamRole || !newTeamRoleTitle.trim()}
-                    onClick={() => {
-                      void handleCreateTeamRole();
-                    }}
-                  >
-                    {creatingTeamRole ? "Создание…" : "Создать должность"}
-                  </button>
-                </FormInlineRow>
-                {teamRolesError ? (
-                  <div className="troupe-error">Не удалось загрузить должности</div>
-                ) : null}
-                {teamRolesLoading ? (
-                  <div className="troupe-team-empty">Загружаем дерево должностей…</div>
-                ) : teamRoles.length === 0 ? (
-                  <div className="troupe-team-empty">
-                    Должностей пока нет — создайте первую карточку.
-                  </div>
-                ) : (
-                  <div className="troupe-role-tree">{renderTeamRoleCards()}</div>
-                )}
-              </div>
-            ) : null}
-
-            {canManageProjectTroupe && isTroupeTab ? (
+            {canManageTroupe ? (
               <div className="troupe-card">
                 {!loading && !troupe ? (
                   <p className="troupe-hint">
-                    Своей труппы пока нет — запись и чат появятся после того, как
-                    вы добавите первого участника по email в блоке ниже. Чаты
-                    трупп, куда вас пригласили другие, доступны сразу.
+                    Труппа театра пока пуста — добавьте первого участника по email
+                    в блоке ниже.
                   </p>
                 ) : null}
                 <FormInlineRow className="troupe-form-row">
@@ -495,7 +300,7 @@ export function TroupePage() {
                     className="troupe-title-field"
                     value={titleDraft}
                     onChange={(e) => setTitleDraft(e.target.value)}
-                    placeholder="Например, Студия «Гоголь-центр»"
+                    placeholder="Название труппы"
                     maxLength={120}
                     disabled={loading || !troupe}
                     aria-label="Название труппы"
@@ -520,7 +325,6 @@ export function TroupePage() {
               </div>
             ) : null}
 
-            {isTroupeTab ? (
             <div className="troupe-card troupe-schedule-card">
               <div className="troupe-scale-head">
                 <div className="troupe-scale-head__titleblock">
@@ -528,7 +332,7 @@ export function TroupePage() {
                     Шкала занятости
                   </div>
                   <div className="troupe-scale-head__subtitle">
-                    Месяц: <b>{monthKey(currentMonth)}</b>
+                    Месяц: <b>{monthLabel(currentMonth)}</b>
                   </div>
                 </div>
                 <div className="troupe-scale-toolbar">
@@ -639,17 +443,6 @@ export function TroupePage() {
                         onClick={() => {
                           void inviteSelectedToProject();
                         }}
-                        title={
-                          !projectName
-                            ? "Выберите проект"
-                            : projectMembersLoading
-                              ? "Проверяем участников проекта"
-                            : selectedMember
-                              ? selectedMemberInProject
-                                ? "Этот человек уже есть в проекте"
-                                : `Добавить в проект «${currentProjectDisplayName}»`
-                              : "Выбери участника"
-                        }
                       >
                         {selectedMember && invitingIds[selectedMember.id]
                           ? "…"
@@ -672,11 +465,6 @@ export function TroupePage() {
                           if (!confirm("Удалить участника из труппы?")) return;
                           void removeSelectedFromTroupe();
                         }}
-                        title={
-                          selectedMember?.troupeMemberId
-                            ? "Удалить из труппы"
-                            : "Только участники из вашей труппы, совпадающие с командой проекта"
-                        }
                       >
                         {selectedMember?.troupeMemberId &&
                         removingIds[String(selectedMember.troupeMemberId)]
@@ -695,7 +483,6 @@ export function TroupePage() {
                       setSelectedMemberId(null);
                       setSelectedDayIso(null);
                     }}
-                    title="Снять выделение строки и колонки"
                   >
                     {narrowLayout ? "Сбросить" : "Снять выделение"}
                   </Button>
@@ -718,122 +505,29 @@ export function TroupePage() {
                 true,
               )}
             </div>
-            ) : null}
 
-            {isTroupeTab ? (
-              <div className="troupe-card troupe-schedule-card troupe-schedule-card--guest">
-                <div className="troupe-scale-head">
-                  <div className="troupe-scale-head__titleblock">
-                    <div className="troupe-scale-head__title">
-                      Приходящие актёры
-                    </div>
-                    <div className="troupe-scale-head__subtitle">
-                      Отдельный график для актёров, которые не входят в основной состав.
-                    </div>
+            <div className="troupe-card troupe-schedule-card troupe-schedule-card--guest">
+              <div className="troupe-scale-head">
+                <div className="troupe-scale-head__titleblock">
+                  <div className="troupe-scale-head__title">
+                    Приходящие актёры
+                  </div>
+                  <div className="troupe-scale-head__subtitle">
+                    Отдельный график для актёров, которые не входят в основной состав.
                   </div>
                 </div>
-                {renderScheduleGrid(
-                  guestTroupeMembers,
-                  "Приходящих актёров пока нет — выберите актёра и смените тип на «Приходящий».",
-                  "График занятости приходящих актёров",
-                  true,
-                )}
               </div>
-            ) : null}
+              {renderScheduleGrid(
+                guestTroupeMembers,
+                "Приходящих актёров пока нет — выберите актёра и смените тип на «Приходящий».",
+                "График занятости приходящих актёров",
+                true,
+              )}
+            </div>
 
             {error ? <div className="troupe-error">{error}</div> : null}
 
-            {isProjectTab ? (
-              <div className="troupe-card troupe-project-cast-card">
-                <div className="troupe-project-cast-head">
-                  <div>
-                    <div className="troupe-project-cast-title">Состав проекта</div>
-                    <div className="troupe-project-cast-subtitle">
-                      {projectName
-                        ? currentProjectDisplayName
-                        : "Нет активного проекта"}
-                    </div>
-                  </div>
-                  <div className="troupe-project-cast-tools">
-                    {canManageProjectTroupe ? (
-                      <label className="troupe-project-field">
-                        <span className="troupe-project-field__label">Проект</span>
-                        <CustomSelect
-                          value={projects.length > 0 ? projectName : ""}
-                          options={projectSelectOptions}
-                          onChange={onProjectChange}
-                          placeholder="Выберите проект"
-                          noOptionsLabel="Проектов нет"
-                          disabled={projects.length === 0 || projectsLoading}
-                          triggerClassName="troupe-project-select"
-                          aria-label="Проект для просмотра состава"
-                        />
-                      </label>
-                    ) : null}
-                    <div className="troupe-month-nav">
-                      <button
-                        type="button"
-                        aria-label="Предыдущий месяц"
-                        onClick={() =>
-                          setCurrentMonth(
-                            dayjs(currentMonth).subtract(1, "month").toDate(),
-                          )
-                        }
-                      >
-                        ←
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Следующий месяц"
-                        onClick={() =>
-                          setCurrentMonth(
-                            dayjs(currentMonth).add(1, "month").toDate(),
-                          )
-                        }
-                      >
-                        →
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div className="troupe-project-cast-schedule-head">
-                  <div className="troupe-scale-head__subtitle">
-                    Месяц: <b>{monthKey(currentMonth)}</b>
-                  </div>
-                  <div className="troupe-legend">
-                    <span className="troupe-legend-item">
-                      <span className="troupe-dot free" /> свободен
-                    </span>
-                    <span className="troupe-legend-item">
-                      <span className="troupe-dot partial" />
-                      <span className="troupe-legend-desktop">
-                        свободен (время)
-                      </span>
-                      <span className="troupe-legend-mobile">по времени</span>
-                    </span>
-                    <span className="troupe-legend-item">
-                      <span className="troupe-dot busy" /> занят
-                    </span>
-                    <span className="troupe-legend-item">
-                      <span className="troupe-dot unknown" /> не отмечено
-                    </span>
-                  </div>
-                </div>
-                <p className="troupe-schedule-scroll-hint">
-                  Листайте таблицу вправо, чтобы увидеть все дни месяца.
-                </p>
-                {renderScheduleGrid(
-                  projectCastMembers,
-                  projectName
-                    ? `В проекте «${currentProjectDisplayName}» пока нет участников.`
-                    : "Нет активного проекта — выберите проект в шапке приложения.",
-                  "График занятости состава проекта",
-                  false,
-                )}
-              </div>
-            ) : null}
-
-            {canManageProjectTroupe && isTroupeTab ? (
+            {canManageTroupe ? (
               <div className="troupe-card troupe-invite-card">
                 <div className="troupe-invite-card__title">
                   <span className="troupe-invite-card__title-desktop">
@@ -858,12 +552,12 @@ export function TroupePage() {
                   <button
                     type="button"
                     className="troupe-form-row__btn troupe-invite-card__submit"
-                    disabled={adding || !email.trim() || !projectName}
+                    disabled={adding || !email.trim()}
                     onClick={() => {
                       void addMemberByEmail();
                     }}
                   >
-                    {adding ? "Добавление…" : "Добавить"}
+                    {adding ? "Отправка…" : "Пригласить"}
                   </button>
                 </FormInlineRow>
                 {addError ? <div className="troupe-error">{addError}</div> : null}

@@ -1,11 +1,12 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ActorAnnotationField } from '@prisma/client';
+import { ProjectAccessService } from '../project-access/project-access.service';
+import { touchProjectActivity } from '../projects/project-activity';
 
 function safeToString(v: unknown): string {
   if (v == null) return '';
@@ -35,33 +36,23 @@ function normText(v: unknown): string {
 
 @Injectable()
 export class ActorNotesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
   private async assertUserHasProjectAccess(userId: string, projectId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: {
-        ownerId: true,
-        members: { where: { userId }, select: { id: true } },
-      },
-    });
-    if (!project) throw new NotFoundException('Project not found');
-    if (project.ownerId === userId) return;
-    if (!project.members.length) throw new ForbiddenException('No access');
+    await this.projectAccess.assertById(userId, projectId, 'read');
   }
 
   private async resolveProjectId(userId: string, projectSlug: string) {
     const slug = normSlug(projectSlug);
     if (!slug) throw new BadRequestException('projectSlug is required');
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      select: { id: true },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    const { project } = await this.projectAccess.assertBySlug(
+      userId,
+      slug,
+      'read',
+    );
     return project.id;
   }
 
@@ -130,6 +121,7 @@ export class ActorNotesService {
           sceneSourceId: sourceId,
         },
       });
+      await touchProjectActivity(this.prisma, projectId);
       return { note: null };
     }
 
@@ -152,6 +144,7 @@ export class ActorNotesService {
       select: { id: true, text: true, createdAt: true, updatedAt: true },
     });
 
+    await touchProjectActivity(this.prisma, projectId);
     return { note };
   }
 
@@ -178,6 +171,7 @@ export class ActorNotesService {
         sceneSourceId: sourceId,
       },
     });
+    await touchProjectActivity(this.prisma, projectId);
     return { ok: true };
   }
 
@@ -284,6 +278,7 @@ export class ActorNotesService {
       },
     });
 
+    await touchProjectActivity(this.prisma, projectId);
     return { annotation: created };
   }
 
@@ -299,7 +294,7 @@ export class ActorNotesService {
 
     const existing = await this.prisma.actorAnnotation.findFirst({
       where: { id, userId },
-      select: { id: true },
+      select: { id: true, projectId: true },
     });
     if (!existing) throw new NotFoundException('Annotation not found');
 
@@ -317,17 +312,19 @@ export class ActorNotesService {
       },
     });
 
+    await touchProjectActivity(this.prisma, existing.projectId);
     return { annotation: updated };
   }
 
   async deleteAnnotation(userId: string, id: string) {
     const existing = await this.prisma.actorAnnotation.findFirst({
       where: { id, userId },
-      select: { id: true },
+      select: { id: true, projectId: true },
     });
     if (!existing) return { ok: true };
 
     await this.prisma.actorAnnotation.delete({ where: { id } });
+    await touchProjectActivity(this.prisma, existing.projectId);
     return { ok: true };
   }
 }

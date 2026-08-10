@@ -10,7 +10,6 @@ import {
   isAdminPlanPath,
   isAdminPremisesPath,
   isAdminTasksPath,
-  isAdminTeamPath,
   resolveAdminPlanEntryPath,
 } from "../../settings/adminSection";
 
@@ -45,12 +44,6 @@ export const ADMIN_NAV_CHILDREN: HeaderNavSubItem[] = [
     isActive: isAdminPlanPath,
   },
   {
-    id: "team",
-    path: "/troupe",
-    label: "Команда",
-    isActive: isAdminTeamPath,
-  },
-  {
     id: "tasks",
     path: "/tasks",
     label: "Задачи",
@@ -59,7 +52,7 @@ export const ADMIN_NAV_CHILDREN: HeaderNavSubItem[] = [
   {
     id: "accounting",
     path: "/accounting",
-    label: "Бухгалтерия",
+    label: "Бухгалтерия · скоро",
     isActive: isAdminAccountingPath,
   },
   {
@@ -208,7 +201,6 @@ export function isHeaderNavItemActive(path: string, currentPath: string) {
       currentPath === "/admin" ||
       isAdminPlanPath(currentPath) ||
       isAdminTasksPath(currentPath) ||
-      isAdminTeamPath(currentPath) ||
       isAdminAccountingPath(currentPath) ||
       isAdminPremisesPath(currentPath)
     );

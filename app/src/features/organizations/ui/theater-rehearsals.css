@@ -1,0 +1,44 @@
+.app-content:has(> .theater-rehearsals-page) > .theater-rehearsals-page {
+  align-self: center;
+}
+
+.theater-rehearsals-page {
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  max-width: var(--width-content-page);
+  box-sizing: border-box;
+}
+
+.theater-rehearsals-page__head {
+  margin: 0 auto 14px;
+  width: 100%;
+}
+
+.theater-rehearsals-page__head .rehearsals-title {
+  margin: 0;
+}
+
+.theater-rehearsals-page__head .rehearsals-muted {
+  margin: 6px 0 0;
+}
+
+.theater-rehearsals-page__layout {
+  margin: 0 auto;
+  width: 100%;
+}
+
+.theater-rehearsals-page .sessions-flow {
+  margin: 0;
+  max-width: none;
+}
+
+.theater-rehearsals-page .sessions-day-stage .sessions-day-list {
+  max-height: none;
+}
+
+@media (max-width: 960px) {
+  .theater-rehearsals-page__layout.sessions-layout {
+    grid-template-columns: 1fr;
+  }
+}

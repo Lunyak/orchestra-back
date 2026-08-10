@@ -1,14 +1,9 @@
-import {
-  SPECTACLE_HUB_ROUTE_PATH,
-  SUFER_ROUTE_PATH,
-} from "../../../app/router/routeMeta";
+import { projectPath } from "../../../app/router/paths";
 import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import lightPlotImageUrl from "../assets/spectacle-hub-light.png";
 import scriptImageUrl from "../assets/spectacle-hub-script.png";
 import suferImageUrl from "../assets/spectacle-hub-sufer.png";
 import theaterImageUrl from "../assets/spectacle-hub-theater.png";
-
-export { SPECTACLE_HUB_ROUTE_PATH as SPECTACLE_HUB_PATH };
 
 export type SpectacleHubDirectionId =
   | "script"
@@ -25,10 +20,9 @@ export type SpectacleHubDirection = {
   imageAlt: string;
 };
 
-export const SPECTACLE_HUB_DIRECTIONS: SpectacleHubDirection[] = [
+const SPECTACLE_HUB_DIRECTIONS: Omit<SpectacleHubDirection, "path">[] = [
   {
     id: "script",
-    path: "/",
     label: "Сценарий",
     description: "Текст и сцены",
     imageSrc: scriptImageUrl,
@@ -36,7 +30,6 @@ export const SPECTACLE_HUB_DIRECTIONS: SpectacleHubDirection[] = [
   },
   {
     id: "light-plot",
-    path: "/light-plot",
     label: "Техчасть",
     description: "Свет, схема и кадры",
     imageSrc: lightPlotImageUrl,
@@ -44,7 +37,6 @@ export const SPECTACLE_HUB_DIRECTIONS: SpectacleHubDirection[] = [
   },
   {
     id: "sufer",
-    path: SUFER_ROUTE_PATH,
     label: "Суфлер",
     description: "Карточки подсказок для прогона",
     imageSrc: suferImageUrl,
@@ -52,7 +44,6 @@ export const SPECTACLE_HUB_DIRECTIONS: SpectacleHubDirection[] = [
   },
   {
     id: "theater",
-    path: "/theater",
     label: "3D театр",
     description: "Сцена в пространстве",
     imageSrc: theaterImageUrl,
@@ -60,8 +51,13 @@ export const SPECTACLE_HUB_DIRECTIONS: SpectacleHubDirection[] = [
   },
 ];
 
-export function getSpectacleHubDirections(): SpectacleHubDirection[] {
+export function getSpectacleHubDirections(
+  projectSlug: string,
+): SpectacleHubDirection[] {
   return SPECTACLE_HUB_DIRECTIONS.filter(
     (direction) => ENABLE_3D_THEATER || direction.id !== "theater",
-  );
+  ).map((direction) => ({
+    ...direction,
+    path: projectPath(projectSlug, direction.id),
+  }));
 }

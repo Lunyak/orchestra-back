@@ -1,9 +1,14 @@
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
-import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  theaterOrganizationPath,
+  theaterTeamPath,
+} from "../../app/router/paths";
+import { TheaterSectionNav } from "../../features/organizations/ui/TheaterSectionNav";
+import { memberLabel } from "../../features/troupe";
 import {
   useAddTeamRoleAssignmentMutation,
   useRemoveTeamRoleMutation,
@@ -12,13 +17,13 @@ import {
   useTeamRolesQuery,
   useUpdateTeamRoleMutation,
 } from "../../features/troupe/api/troupe-api";
-import { memberLabel } from "../../features/troupe";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
-import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
-import "./style.css";
+import "../../features/organizations/ui/organizations.css";
+import "./theater-team-page.css";
 
 export function TeamRolePage() {
-  const { roleId = "" } = useParams();
+  const { theaterId = "", roleId = "" } = useParams();
+  const teamPath = theaterTeamPath(theaterId);
   const navigate = useNavigate();
   const [titleDraft, setTitleDraft] = useState("");
   const [parentIdDraft, setParentIdDraft] = useState("");
@@ -70,7 +75,9 @@ export function TeamRolePage() {
         },
       }).unwrap();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось сохранить должность");
+      setError(
+        e instanceof Error ? e.message : "Не удалось сохранить должность",
+      );
     }
   };
 
@@ -83,7 +90,9 @@ export function TeamRolePage() {
       await addAssignment({ roleId: role.id, email }).unwrap();
       setEmailDraft("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Не удалось назначить человека");
+      setError(
+        e instanceof Error ? e.message : "Не удалось назначить человека",
+      );
     }
   };
 
@@ -96,7 +105,7 @@ export function TeamRolePage() {
     setError(null);
     try {
       await removeRole({ roleId: role.id }).unwrap();
-      navigate("/troupe");
+      navigate(teamPath);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Не удалось удалить должность");
     }
@@ -112,51 +121,89 @@ export function TeamRolePage() {
     }
   };
 
+  if (!theaterId) {
+    return <Navigate to={theaterOrganizationPath()} replace />;
+  }
+
   if (isLoading) {
-    return <div className="troupe-role-page">Загружаем должность…</div>;
+    return (
+      <div className="app-layout">
+        <div className="app-content">
+          <TheaterSectionNav theaterId={theaterId} active="team" />
+          <main className="organizations-page organizations-page--detail">
+            <p>Загружаем должность…</p>
+          </main>
+        </div>
+      </div>
+    );
   }
 
   if (!role) {
     return (
-      <div className="troupe-role-page">
-        <Link className="troupe-role-page__back" to="/troupe">
-          ← Команда
-        </Link>
-        <div className="troupe-error">Должность не найдена</div>
+      <div className="app-layout">
+        <div className="app-content">
+          <TheaterSectionNav theaterId={theaterId} active="team" />
+          <main className="organizations-page organizations-page--detail">
+            <Link className="theater-team-page__back" to={teamPath}>
+              ← Команда
+            </Link>
+            <p role="alert">Должность не найдена</p>
+          </main>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="app-layout troupe-layout">
+    <div className="app-layout">
       <div className="app-content">
-        <main className="main-content">
-          <div className="troupe-view troupe-role-page">
-            <AdminSectionChrome activeSection="team">
-            <Link className="troupe-role-page__back" to="/troupe">
-              ← Команда
-            </Link>
+        <TheaterSectionNav theaterId={theaterId} active="team" />
+        <main className="organizations-page organizations-page--detail">
+          <Link className="theater-team-page__back" to={teamPath}>
+            ← Команда
+          </Link>
+          <header className="theater-team-page__header">
+            <p className="organizations-page__eyebrow">Должность</p>
+            <h1>{role.title}</h1>
+            <span>Карточка должности театральной команды.</span>
+          </header>
 
-            <div className="troupe-card troupe-role-page-card">
-              <div className="troupe-team-title">Карточка должности</div>
-              <FormInlineRow className="troupe-form-row">
+          <section className="theater-team-page__section">
+            <div className="theater-team-page__fields">
+              <label className="theater-team-page__field">
+                <span className="theater-team-page__label">Название</span>
                 <InlineTextField
-                  className="troupe-title-field"
                   value={titleDraft}
                   onChange={(e) => setTitleDraft(e.target.value)}
                   maxLength={80}
-                  aria-label="Название должности"
                 />
+              </label>
+              <label className="theater-team-page__field">
+                <span className="theater-team-page__label">Родитель</span>
                 <CustomSelect
                   value={parentIdDraft}
                   options={parentRoleOptions}
                   onChange={setParentIdDraft}
-                  triggerClassName="troupe-role-parent-select"
                   aria-label="Родительская должность"
                 />
+              </label>
+              <label className="theater-team-page__field">
+                <span className="theater-team-page__label">Инструкция</span>
+                <textarea
+                  className="theater-team-page__textarea"
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  placeholder="Опишите обязанности и зону ответственности."
+                />
+              </label>
+              {error ? (
+                <p className="theater-team-page__error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+              <div className="theater-team-page__actions">
                 <Button
                   type="button"
-                  variant="primary"
                   disabled={
                     savingRole ||
                     !titleDraft.trim() ||
@@ -172,7 +219,7 @@ export function TeamRolePage() {
                 </Button>
                 <Button
                   type="button"
-                  className="danger"
+                  variant="danger"
                   disabled={removingRole}
                   onClick={() => {
                     void handleRemoveRole();
@@ -180,86 +227,77 @@ export function TeamRolePage() {
                 >
                   {removingRole ? "Удаление…" : "Удалить должность"}
                 </Button>
-              </FormInlineRow>
-              <label className="troupe-role-page__instruction">
-                <span className="troupe-card__field-label">
-                  Должностная инструкция
-                </span>
-                <textarea
-                  className="troupe-role-page__textarea"
-                  value={descriptionDraft}
-                  onChange={(e) => setDescriptionDraft(e.target.value)}
-                  placeholder="Опишите обязанности, зону ответственности и правила работы этой должности."
-                />
-              </label>
-              {error ? <div className="troupe-error">{error}</div> : null}
+              </div>
             </div>
+          </section>
 
-            <div className="troupe-card troupe-role-page-card">
-              <div className="troupe-team-title">Назначенные люди</div>
-              <FormInlineRow className="troupe-form-row troupe-form-row--invite-email">
+          <section className="theater-team-page__section">
+            <header className="theater-team-page__header">
+              <h2>Назначенные люди</h2>
+            </header>
+            <div className="theater-team-page__fields">
+              <div className="theater-team-page__actions">
                 <InlineTextField
-                  className="troupe-invite-email-field"
                   placeholder="person@example.com"
                   value={emailDraft}
                   onChange={(e) => setEmailDraft(e.target.value)}
                   inputMode="email"
                   autoComplete="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
                 />
-                <button
+                <Button
                   type="button"
-                  className="troupe-form-row__btn troupe-invite-card__submit"
                   disabled={addingAssignment || !emailDraft.trim()}
                   onClick={() => {
                     void handleAddAssignment();
                   }}
                 >
                   {addingAssignment ? "Назначение…" : "Прикрепить"}
-                </button>
-              </FormInlineRow>
-
+                </Button>
+              </div>
               {role.assignments.length === 0 ? (
-                <div className="troupe-team-empty">
-                  На эту должность пока никто не назначен.
-                </div>
+                <p>На эту должность пока никто не назначен.</p>
               ) : (
-                <div className="troupe-role-assignment-list">
+                <ul className="theater-team-page__assignees">
                   {role.assignments.map((assignment) => {
                     const member = assignment.teamMember;
                     const label = memberLabel(member);
                     return (
-                      <div key={assignment.id} className="troupe-role-assignment">
-                        <div className="troupe-actor-row">
-                          <MiniAvatar
-                            src={String(member.profile?.avatarUrl ?? "").trim() || null}
-                            label={label || member.email}
-                            size={24}
-                          />
-                          <div className="troupe-actor-meta">
-                            <div className="troupe-actor-name">{label}</div>
-                            <div className="troupe-actor-email">{member.email}</div>
+                      <li
+                        key={assignment.id}
+                        className="theater-team-page__assignee"
+                      >
+                        <MiniAvatar
+                          src={
+                            String(member.profile?.avatarUrl ?? "").trim() ||
+                            null
+                          }
+                          label={label || member.email}
+                          size={24}
+                        />
+                        <div className="theater-team-page__assignee-meta">
+                          <div className="theater-team-page__assignee-name">
+                            {label}
+                          </div>
+                          <div className="theater-team-page__assignee-email">
+                            {member.email}
                           </div>
                         </div>
                         <button
                           type="button"
-                          className="troupe-mini-btn danger"
+                          className="theater-team-page__assignee-remove"
                           onClick={() => {
                             void handleRemoveAssignment(assignment.id);
                           }}
                         >
                           Снять
                         </button>
-                      </div>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               )}
             </div>
-            </AdminSectionChrome>
-          </div>
+          </section>
         </main>
       </div>
     </div>

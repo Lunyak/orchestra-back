@@ -1,3 +1,5 @@
+export type CollectionScope = "troupe" | "studio";
+
 export type TroupeCollectionStatus = "draft" | "active" | "closed";
 
 export interface CollectionTariffItem {
@@ -36,8 +38,12 @@ export interface CollectionContributionItem {
 
 export interface CollectionSummary {
   id: string;
+  scope: CollectionScope;
   troupeId: string;
   troupeTitle: string;
+  studioId: string | null;
+  studioTitle: string | null;
+  theaterId: string | null;
   title: string;
   description: string | null;
   status: TroupeCollectionStatus;
@@ -72,10 +78,35 @@ export interface AccountingMemberOption {
   displayName: string;
 }
 
+export interface AccountingScopeTheater {
+  id: string;
+  title: string;
+  troupes: Array<{ id: string; title: string }>;
+}
+
+export interface AccountingScopeStudio {
+  id: string;
+  title: string;
+}
+
+export interface AccountingScopeProject {
+  id: string;
+  slug: string;
+  name: string;
+  troupeIds: string[];
+}
+
+export interface AccountingScopes {
+  theaters: AccountingScopeTheater[];
+  studios: AccountingScopeStudio[];
+  projects: AccountingScopeProject[];
+}
+
 export interface CollectionsListResponse {
   collections: CollectionSummary[];
   canCreateCollections: boolean;
   createMemberOptions: AccountingMemberOption[];
+  scopes: AccountingScopes;
   smtpConfigured: boolean;
 }
 
@@ -101,6 +132,8 @@ export interface CreateCollectionPayload {
   description?: string;
   dueAt?: string;
   premiseId?: string;
+  troupeId?: string;
+  studioId?: string;
   tariffs: CreateCollectionTariffPayload[];
   participants: CreateCollectionParticipantPayload[];
 }
@@ -135,4 +168,11 @@ export function collectionStatusLabel(status: TroupeCollectionStatus): string {
   if (status === "draft") return "Черновик";
   if (status === "closed") return "Закрыт";
   return "Активен";
+}
+
+export function collectionOwnerLabel(collection: CollectionSummary): string {
+  if (collection.scope === "studio") {
+    return collection.studioTitle || "Студия";
+  }
+  return collection.troupeTitle || "Труппа";
 }

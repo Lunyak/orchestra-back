@@ -19,7 +19,7 @@ import {
 } from "../../features/accounting";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
-import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
+import { accountingPath } from "../../app/router/paths";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "./style.css";
 
@@ -129,9 +129,7 @@ export function CollectionDetailPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="accounting-page">
-              <AdminSectionChrome activeSection="accounting">
                 <p>Загрузка…</p>
-              </AdminSectionChrome>
             </div>
           </main>
         </div>
@@ -145,12 +143,13 @@ export function CollectionDetailPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="accounting-page">
-              <AdminSectionChrome activeSection="accounting">
-                <Link className="accounting-page__back" to="/accounting">
+                <Link
+                  className="accounting-page__back"
+                  to={accountingPath()}
+                >
                   ← Бухгалтерия
                 </Link>
                 <p className="accounting-page__error">Сбор не найден</p>
-              </AdminSectionChrome>
             </div>
           </main>
         </div>
@@ -186,8 +185,10 @@ export function CollectionDetailPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="accounting-page">
-            <AdminSectionChrome activeSection="accounting">
-      <Link className="accounting-page__back" to="/accounting">
+      <Link
+        className="accounting-page__back"
+        to={accountingPath()}
+      >
         ← Бухгалтерия
       </Link>
       <h1 className="accounting-page__title">{collection.title}</h1>
@@ -353,25 +354,30 @@ export function CollectionDetailPage() {
         </div>
       ) : null}
 
-      <Modal isOpen={modal != null} onClose={closeModal} title="Зафиксировать взнос">
+      <Modal isOpen={modal != null} onClose={closeModal}>
         {modal ? (
           <>
+            <h2 className="accounting-form-section__title">Зафиксировать взнос</h2>
             <p>{modal.label}</p>
             {formError ? <p className="accounting-page__error">{formError}</p> : null}
             <FormInlineRow className="accounting-form-row">
-              <InlineTextField
-                label="Сумма, ₽"
-                value={amountRub}
-                onChange={setAmountRub}
-              />
+              <label className="accounting-scope-row__field">
+                <span>Сумма, ₽</span>
+                <InlineTextField
+                  value={amountRub}
+                  onChange={(event) => setAmountRub(event.target.value)}
+                />
+              </label>
             </FormInlineRow>
             <FormInlineRow className="accounting-form-row">
-              <InlineTextField
-                label="Комментарий"
-                value={note}
-                onChange={setNote}
-                placeholder="Сбер, наличные…"
-              />
+              <label className="accounting-scope-row__field">
+                <span>Комментарий</span>
+                <InlineTextField
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  placeholder="Сбер, наличные…"
+                />
+              </label>
             </FormInlineRow>
             <div className="accounting-actions">
               <Button type="button" onClick={handleSubmitContribution} disabled={adding}>
@@ -384,7 +390,6 @@ export function CollectionDetailPage() {
           </>
         ) : null}
       </Modal>
-            </AdminSectionChrome>
           </div>
         </main>
       </div>

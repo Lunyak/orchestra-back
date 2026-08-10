@@ -55,6 +55,15 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
+.theater-editor-menubar__menu-title--active {
+  color: var(--color-active-ascent);
+}
+
+.theater-editor-menubar__menu:hover .theater-editor-menubar__menu-title--active,
+.theater-editor-menubar__menu--open .theater-editor-menubar__menu-title--active {
+  color: var(--color-active-ascent);
+}
+
 .theater-editor-menubar__options {
   position: absolute;
   top: 100%;
@@ -89,6 +98,7 @@
   text-align: left;
   cursor: pointer;
   outline: none;
+  text-decoration: none;
 }
 
 .theater-editor-menubar__option:hover {
@@ -107,8 +117,8 @@
 }
 
 .theater-editor-menubar__option--active {
-  color: #ccc;
-  background: rgba(21, 60, 94, 0.85);
+  color: var(--color-text-secondary);
+  background: var(--color-active-ascent);
 }
 
 .theater-editor-menubar__option--meta {

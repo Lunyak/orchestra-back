@@ -22,6 +22,7 @@ import {
   useProjectRolesQuery,
 } from "../../project/api/project-api";
 import { useProject } from "../../project";
+import { projectSessionPath } from "../../../app/router/paths";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
 import { extractRolesSmart } from "../../rehearsals/model/rehearsals-page-utils";
 import type { ScriptScene } from "../../../shared/types/script";
@@ -56,7 +57,7 @@ dayjs.locale("ru");
 
 export function DirectorSessionSlotPage() {
   const { accessToken } = useAuth();
-  const { projects, projectItems } = useProject();
+  const { projectName, projects, projectItems } = useProject();
   const navigate = useNavigate();
 
   const { sessionId, slotId } = useParams();
@@ -191,10 +192,23 @@ export function DirectorSessionSlotPage() {
 
   const persistSessions = async (next: DirectorRehearsalSession[]) => {
     if (!accessToken) return;
+    const previousSessions = sessions;
+    const previousSession = session;
+    const previousSlot = slot;
+    const nextSession = next.find((item) => item.id === sid) ?? null;
+    const nextSlot =
+      nextSession?.slots.find((item) => item.id === slId) ?? null;
+
     setSessions(next);
+    setSession(nextSession);
+    setSlot(nextSlot);
+    setError(null);
     try {
       await replaceSessions({ sessions: next }).unwrap();
     } catch (e: unknown) {
+      setSessions(previousSessions);
+      setSession(previousSession);
+      setSlot(previousSlot);
       const err = e as { message?: string; data?: { message?: string } };
       setError(
         err?.data?.message ?? err?.message ?? "Не удалось сохранить сессию",
@@ -485,7 +499,7 @@ export function DirectorSessionSlotPage() {
     <div className="director-session-slot-page">
       <div className="director-session-slot-page__header">
         <Link
-          to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
+          to={`${projectSessionPath(projectName)}?sessionId=${encodeURIComponent(sid)}`}
           className="director-session-slot-page__back-link"
         >
           ← К сессии
@@ -518,7 +532,7 @@ export function DirectorSessionSlotPage() {
                     </b>
                   </div>
                   <div>
-                    Сцена: <b>#{slot.ref.sceneId}</b>
+                    Картина / сцена: <b>#{slot.ref.sceneId}</b>
                   </div>
                 </>
               ) : (
@@ -592,7 +606,9 @@ export function DirectorSessionSlotPage() {
                 type="button"
                 className="director-session-slot-page__action-btn"
                 onClick={() =>
-                  navigate(`/sessions?sessionId=${encodeURIComponent(sid)}`)
+                  navigate(
+                    `${projectSessionPath(projectName)}?sessionId=${encodeURIComponent(sid)}`,
+                  )
                 }
               >
                 Готово
@@ -689,6 +705,8 @@ export function DirectorSessionSlotPage() {
                     )}
                     onClick={() =>
                       void updateSlot({
+                        title:
+                          String(s.title ?? "").trim() || `Сцена #${s.id}`,
                         ref: { projectSlug: projectFilter, sceneId: s.id },
                         durationMin:
                           s.durationMin == null

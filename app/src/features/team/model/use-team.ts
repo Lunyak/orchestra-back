@@ -1,21 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import type { ProjectMemberInfo } from "../../../sync/api/projects";
 import {
   useInviteProjectMemberMutation,
+  useProjectAccessQuery,
   useProjectMembersQuery,
   useRemoveProjectMemberMutation,
+  useTransferProjectOwnershipMutation,
   useUpdateProjectMemberRoleMutation,
 } from "../../project/api/project-api";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
-import type { OrchestraQueryError } from "../../../shared/api/rtk/axios-base-query";
 import { shouldLoadProjectMembers } from "./team-page-utils";
-
-function membersQueryStatus(error: unknown): number | undefined {
-  const e = error as OrchestraQueryError | undefined;
-  return typeof e?.status === "number" ? e.status : undefined;
-}
 
 export function useTeam() {
   const location = useLocation();
@@ -28,39 +24,32 @@ export function useTeam() {
 
   const {
     data: membersData,
-    error: membersError,
     isFetching: membersFetching,
     refetch: refetchMembers,
   } = useProjectMembersQuery(projectName, {
     skip: !accessToken || !projectName || !fetchMembers,
   });
+  const { data: projectAccess, refetch: refetchAccess } = useProjectAccessQuery(
+    projectName,
+    {
+      skip: !accessToken || !projectName || !fetchMembers,
+    },
+  );
 
   const [inviteProjectMember] = useInviteProjectMemberMutation();
   const [updateProjectMemberRoleMut] = useUpdateProjectMemberRoleMutation();
   const [removeProjectMemberMut] = useRemoveProjectMemberMutation();
+  const [transferOwnershipMut] = useTransferProjectOwnershipMutation();
 
-  const [isProjectOwner, setIsProjectOwner] = useState<boolean | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteError, setInviteError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!fetchMembers) return;
-    if (membersFetching) return;
-    if (membersData) {
-      setIsProjectOwner(true);
-      return;
-    }
-    if (membersQueryStatus(membersError) === 403) {
-      setIsProjectOwner(false);
-      return;
-    }
-    if (membersError) {
-      setIsProjectOwner(true);
-    }
-  }, [fetchMembers, membersData, membersError, membersFetching]);
-
   const projectMembers: ProjectMemberInfo[] = membersData?.members ?? [];
   const projectOwner = membersData?.owner ?? null;
+  const isProjectOwner = projectAccess?.capabilities.owner ?? null;
+  const canWriteProject = projectAccess?.capabilities.write ?? null;
+  const canManageProjectMembers =
+    projectAccess?.capabilities.manageMembers ?? null;
 
   const refreshMembers = useCallback(async () => {
     if (!accessToken || !projectName || !fetchMembers) return;
@@ -82,9 +71,9 @@ export function useTeam() {
       };
       setInviteError(
         e?.data?.message ??
-          (e?.status === 404
-            ? "Пользователь с таким email не найден"
-            : "Не удалось пригласить"),
+          (e?.status === 409
+            ? "Приглашение уже отправлено"
+            : "Не удалось отправить приглашение"),
       );
     }
   }, [accessToken, inviteEmail, inviteProjectMember, projectName]);
@@ -126,11 +115,44 @@ export function useTeam() {
     [accessToken, projectName, removeProjectMemberMut],
   );
 
+  const transferOwnership = useCallback(
+    async (userId: string) => {
+      if (!accessToken || !projectName || !userId) return;
+      if (
+        !confirm(
+          "Передать владение проектом выбранному участнику? Вы потеряете права владельца.",
+        )
+      )
+        return;
+      try {
+        await transferOwnershipMut({
+          projectSlug: projectName,
+          userId,
+        }).unwrap();
+        await Promise.all([refetchMembers(), refetchAccess()]);
+      } catch (err: unknown) {
+        const e = err as { data?: { message?: string }; message?: string };
+        alert(
+          e?.data?.message ?? e?.message ?? "Не удалось передать владение",
+        );
+      }
+    },
+    [
+      accessToken,
+      projectName,
+      refetchAccess,
+      refetchMembers,
+      transferOwnershipMut,
+    ],
+  );
+
   return {
     projectMembers,
     projectMembersLoading: membersFetching,
     projectOwner,
     isProjectOwner,
+    canWriteProject,
+    canManageProjectMembers,
     inviteEmail,
     setInviteEmail,
     inviteError,
@@ -139,5 +161,6 @@ export function useTeam() {
     refreshMembers,
     updateMemberRole,
     removeMember,
+    transferOwnership,
   };
 }

@@ -6,7 +6,8 @@ export type SpectacleActiveView =
   | "board"
   | "script"
   | "sessions"
-  | "tasks";
+  | "tasks"
+  | "team";
 
 export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   SpectacleActiveView,
@@ -20,4 +21,5 @@ export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   script: "show-script",
   sessions: "main-content-sessions",
   tasks: "main-content-sessions",
+  team: "main-content-sessions",
 };

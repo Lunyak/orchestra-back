@@ -1,4 +1,5 @@
 export const CHAT_DOCK_VISIBILITY_EVENT = "orchestra:chat-dock-visibility";
+export const CHAT_DOCK_OPEN_EVENT = "orchestra:chat-dock-open";
 export const CHAT_DOCK_HIDDEN_STORAGE_KEY = "orchestra:chat-dock-hidden";
 
 export function readChatDockHidden(): boolean {
@@ -30,4 +31,9 @@ export function toggleChatDockHidden(): boolean {
   const nextHidden = !readChatDockHidden();
   setChatDockHidden(nextHidden);
   return nextHidden;
+}
+
+export function openChatDock() {
+  setChatDockHidden(false);
+  window.dispatchEvent(new CustomEvent(CHAT_DOCK_OPEN_EVENT));
 }

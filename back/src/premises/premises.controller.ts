@@ -25,8 +25,17 @@ export class PremisesController {
   constructor(private readonly premises: PremisesService) {}
 
   @Get()
-  list(@Req() req: any) {
-    return this.premises.listPremises(req.user.userId, req.user.email);
+  list(
+    @Req() req: any,
+    @Query('theaterId') theaterId?: string,
+    @Query('studioId') studioId?: string,
+  ) {
+    return this.premises.listPremises(
+      req.user.userId,
+      req.user.email,
+      theaterId,
+      studioId,
+    );
   }
 
   @Get('my')

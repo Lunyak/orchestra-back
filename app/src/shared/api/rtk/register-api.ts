@@ -13,4 +13,5 @@ import "../../../features/actor/api/actor-notes-api";
 import "../../../features/chat/api/chat-api";
 import "../../../features/accounting/api/accounting-api";
 import "../../../features/studio/api/studio-api";
+import "../../../features/global-dashboard/api/dashboard-api";
 import "./sync-api";

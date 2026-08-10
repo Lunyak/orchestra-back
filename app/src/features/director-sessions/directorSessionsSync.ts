@@ -21,8 +21,10 @@ export type DirectorSessionSlot = {
   id: string;
   offsetMin: number;
   durationMin: number;
+  title?: string;
   ref?: DirectorSlotRef;
   notes?: string;
+  participantEmails?: string[];
   /** Кто репетирует роли в слоте; в план вызова попадают только checked=true. */
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
@@ -31,6 +33,8 @@ export type DirectorRehearsalSession = {
   id: string;
   title: string;
   startsAt: string; // ISO
+  theaterId?: string;
+  projectSlugs?: string[];
   comment?: string | null;
   slots: DirectorSessionSlot[];
   plannedEmails?: string[];

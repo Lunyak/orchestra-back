@@ -1,12 +1,19 @@
+import {
+  getProjectSectionFromPath,
+  isTheaterTeamPath,
+  isTheaterTroupePath,
+} from "../../../app/router/paths";
+
 /** Маршруты, на которых нужен список участников проекта (кэш RTK). */
 export function shouldLoadProjectMembers(pathname: string): boolean {
+  if (isTheaterTeamPath(pathname) || isTheaterTroupePath(pathname)) return true;
+  const section = getProjectSectionFromPath(pathname);
   return (
-    pathname === "/settings" ||
-    pathname === "/board" ||
-    pathname === "/tasks" ||
-    pathname.startsWith("/tasks/") ||
-    pathname === "/troupe" ||
-    pathname === "/sessions" ||
-    pathname.startsWith("/sessions/")
+    section === "settings" ||
+    section === "board" ||
+    section === "roles" ||
+    section === "cast" ||
+    section === "tasks" ||
+    section === "sessions"
   );
 }

@@ -1,0 +1,87 @@
+.team-role-mindmap {
+  --mindmap-line: var(--sessions-border, var(--troupe-border, #222));
+  --mindmap-line-active: color-mix(
+    in srgb,
+    var(--color-active-ascent) 55%,
+    var(--sessions-border, var(--troupe-border, #222))
+  );
+  padding-top: 4px;
+  padding-bottom: 8px;
+}
+
+.team-role-mindmap .project-nav-mindmap__branches {
+  gap: 22px;
+}
+
+.team-role-mindmap .project-nav-mindmap__leaves {
+  gap: 16px;
+}
+
+.team-role-mindmap .project-nav-mindmap__branches::before,
+.team-role-mindmap .project-nav-mindmap__leaves::before {
+  top: 95px;
+  bottom: 95px;
+}
+
+.team-role-mindmap__item {
+  min-height: 190px;
+}
+
+.team-role-mindmap__card-link,
+.team-role-mindmap__card-wrap {
+  display: block;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+.team-role-mindmap__card-link:hover .role-playing-card,
+.team-role-mindmap__card-link:focus-visible .role-playing-card {
+  border-color: var(--color-active-ascent);
+  outline: none;
+}
+
+.team-role-mindmap__add-col {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-left: 28px;
+  position: relative;
+}
+
+.team-role-mindmap__add-col::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 28px;
+  height: 1px;
+  background: var(--mindmap-line);
+  transform: translateY(-50%);
+}
+
+.team-role-mindmap__add {
+  width: 136px;
+  height: 190px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--color-border-subtle, var(--sessions-border, #333));
+  background: transparent;
+  color: var(--color-text-muted, var(--sessions-text-muted, #666));
+  cursor: pointer;
+  padding: 0;
+}
+
+.team-role-mindmap__add:hover,
+.team-role-mindmap__add:focus-visible {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+  outline: none;
+}
+
+.team-role-mindmap__add-plus {
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 1;
+}

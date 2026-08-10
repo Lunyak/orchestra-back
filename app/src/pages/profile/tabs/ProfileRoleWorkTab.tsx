@@ -6,6 +6,7 @@ import { useProject } from "../../../features/project";
 import { useMyProfileQuery } from "../../../features/profile/api/profile-api";
 import { useProjectRolesQuery } from "../../../features/project/api/project-api";
 import { RolePlayingCard } from "../../../features/role-card/RolePlayingCard";
+import { projectPath } from "../../../app/router/paths";
 
 function normalizeEmail(v: unknown): string {
   return String(v ?? "").trim().toLowerCase();
@@ -57,7 +58,12 @@ export function ProfileRoleWorkTab() {
         </p>
 
         <div className="profile-toolbar">
-          <Button className="secondary" type="button" onClick={() => navigate("/board")}>
+          <Button
+            className="secondary"
+            type="button"
+            onClick={() => navigate(projectPath(projectName, "board"))}
+            disabled={!projectName}
+          >
             Открыть доску
           </Button>
         </div>

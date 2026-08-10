@@ -208,10 +208,11 @@ export function DirectorSessionSlotsPanel({
       offsetMin: nextOffset,
       durationMin: 30,
     };
-    await updateActiveSession({
+    const saveSlot = updateActiveSession({
       slots: [...(session.slots ?? []), slot],
     });
     onSelectSlot(slot.id);
+    await saveSlot;
   };
 
   const removeSlot = async (slotId: string) => {
@@ -301,10 +302,11 @@ export function DirectorSessionSlotsPanel({
       durationMin,
       ref: { projectSlug: payload.projectSlug, sceneId: payload.sceneId },
     };
-    await updateActiveSession({
+    const saveSlot = updateActiveSession({
       slots: [...(session.slots ?? []), slot],
     });
     onSelectSlot(slot.id);
+    await saveSlot;
   };
 
   useEffect(() => {
@@ -363,15 +365,19 @@ export function DirectorSessionSlotsPanel({
     (sl: DirectorSessionSlot): DirectorSessionSlotDisplay => {
       const display = slotDisplayById?.get(sl.id);
       if (display) return display;
+      const customTitle = String(sl.title ?? "").trim();
       if (!sl.ref) {
         return {
-          projectLabel: "Материал не выбран",
-          materialLabel: "",
+          projectLabel: customTitle || "Слот без названия",
+          materialLabel: customTitle ? "Без проекта и сцены" : "",
         };
       }
       return {
-        projectLabel: String(sl.ref.projectSlug ?? "").trim() || "Проект",
-        materialLabel: "Материал загружается",
+        projectLabel:
+          customTitle || String(sl.ref.projectSlug ?? "").trim() || "Проект",
+        materialLabel: customTitle
+          ? `${String(sl.ref.projectSlug ?? "").trim()} · Материал загружается`
+          : "Материал загружается",
       };
     },
     [slotDisplayById],
@@ -499,11 +505,11 @@ export function DirectorSessionSlotsPanel({
           e.preventDefault();
           void addSlotFromDroppedScene(payload);
         }}
-        title="Сюда можно перетащить сцену сценария — появится новый слот с материалом"
+        title="Сюда можно перетащить картину или сцену — появится новый слот с материалом"
       >
         {sortedSlots.length === 0 && (
           <div className="sessions-slots-empty rehearsals-muted">
-            Слотов нет — нажми «+» или перетащи сцену сюда.
+            Слотов нет — нажми «+» или перетащи картину/сцену сюда.
           </div>
         )}
         {sortedSlots.map((sl) => {

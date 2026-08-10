@@ -3,6 +3,7 @@ import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { studioVideoPath } from "../../app/router/paths";
 import type { StudioDetail } from "../../features/studio";
 import { useCreateStudioVideoMutation } from "../../features/studio";
 import "./style.css";
@@ -49,7 +50,7 @@ export function StudioVideosPanel({ studio }: StudioVideosPanelProps) {
       setUrl("");
       setDescription("");
       setShowCreate(false);
-      navigate(`/studio/${studio.id}/videos/${video.id}`);
+      navigate(studioVideoPath(studio.id, video.id));
     } catch (e) {
       setFormError(e instanceof Error ? e.message : "Не удалось добавить видео");
     }
@@ -71,7 +72,7 @@ export function StudioVideosPanel({ studio }: StudioVideosPanelProps) {
           {videos.map((video) => (
             <li key={video.id}>
               <Link
-                to={`/studio/${studio.id}/videos/${video.id}`}
+                to={studioVideoPath(studio.id, video.id)}
                 className="studio-video-item"
               >
                 <div className="studio-video-item__row">

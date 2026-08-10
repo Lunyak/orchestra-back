@@ -43,8 +43,9 @@ export class ChatService {
 
   async resolveAccessibleTroupeIds(userId: string, userEmail: string) {
     const email = this.normalizeEmail(userEmail);
-    const owned = await this.prisma.troupe.findUnique({
+    const owned = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
       select: { id: true },
     });
     const memberRows = await this.prisma.troupeMember.findMany({

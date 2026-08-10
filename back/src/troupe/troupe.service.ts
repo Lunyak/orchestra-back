@@ -5,8 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  Prisma,
+  TroupeMemberKind,
+  WorkspaceRole,
+  WorkspaceType,
+} from '@prisma/client';
+import crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectAccessService } from '../project-access/project-access.service';
 
 function normalizeEmail(v: unknown): string {
   const email = String(v ?? '')
@@ -14,6 +21,10 @@ function normalizeEmail(v: unknown): string {
     .toLowerCase();
   if (!email) throw new BadRequestException('email is required');
   return email;
+}
+
+function sha256Base64Url(input: string): string {
+  return crypto.createHash('sha256').update(input).digest('base64url');
 }
 
 const TEAM_MEMBER_ROLES = new Set([
@@ -148,33 +159,58 @@ function filterAvailabilityByMonth<T extends Record<string, unknown>>(
 
 @Injectable()
 export class TroupeService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  /** Добавление/удаление в труппу с экрана «по проекту» — только владелец этого проекта. */
-  private async assertUserOwnsProject(userId: string, projectSlugRaw: unknown) {
-    const slug =
-      typeof projectSlugRaw === 'string' ? projectSlugRaw.trim() : '';
-    if (!slug) {
-      throw new BadRequestException('query "project" (slug) is required');
-    }
-    const project = await this.prisma.project.findFirst({
-      where: { slug, deletedAt: null, ownerId: userId },
-      select: { id: true },
-    });
-    if (!project) {
-      throw new ForbiddenException(
-        'Только владелец проекта может добавлять или удалять участников труппы',
-      );
-    }
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
   private async getOrCreateMyTroupe(userId: string) {
-    const existing = await this.prisma.troupe.findUnique({
+    const existing = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
     });
     if (existing) return existing;
-    return await this.prisma.troupe.create({
-      data: { ownerUserId: userId, title: 'Моя труппа' },
+
+    const theater = await this.prisma.theater.findFirst({
+      where: {
+        workspace: {
+          memberships: {
+            some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, title: true },
+    });
+    if (!theater) {
+      throw new BadRequestException(
+        'Сначала создайте театр — труппа существует только внутри театра',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const troupe = await tx.troupe.create({
+        data: {
+          title: 'Основная труппа',
+          theater: { connect: { id: theater.id } },
+          owner: { connect: { id: userId } },
+          workspace: {
+            create: {
+              type: WorkspaceType.TROUPE,
+              name: `${theater.title} — Основная труппа`,
+              memberships: { create: { userId, role: WorkspaceRole.OWNER } },
+            },
+          },
+        },
+      });
+      await tx.theaterTroupe.create({
+        data: {
+          theaterId: theater.id,
+          troupeId: troupe.id,
+          participationType: 'HOME',
+        },
+      });
+      return troupe;
     });
   }
 
@@ -231,8 +267,9 @@ export class TroupeService {
         availabilityTimeRanges: true,
       },
     });
-    const troupe = await this.prisma.troupe.findUnique({
+    const troupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: row.ownerUserId },
+      orderBy: { createdAt: 'asc' },
       select: { id: true },
     });
     const troupeMember = troupe
@@ -290,7 +327,11 @@ export class TroupeService {
   }
 
   private async buildProfileMap(emails: string[]) {
-    const uniqueEmails = [...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean))];
+    const uniqueEmails = [
+      ...new Set(
+        emails.map((email) => email.trim().toLowerCase()).filter(Boolean),
+      ),
+    ];
     if (uniqueEmails.length === 0) return new Map<string, any>();
     const profiles = await this.prisma.userProfile.findMany({
       where: { email: { in: uniqueEmails } },
@@ -305,7 +346,9 @@ export class TroupeService {
         availabilityTimeRanges: true,
       },
     });
-    return new Map(profiles.map((profile) => [profile.email.trim().toLowerCase(), profile]));
+    return new Map(
+      profiles.map((profile) => [profile.email.trim().toLowerCase(), profile]),
+    );
   }
 
   private formatTeamRoleAssignment(
@@ -350,6 +393,7 @@ export class TroupeService {
       parentId: string | null;
       sortOrder: number;
       description: string;
+      avatarKey: string | null;
       createdAt: Date;
       updatedAt: Date;
       assignments: Array<{
@@ -384,6 +428,7 @@ export class TroupeService {
         parentId: role.parentId,
         sortOrder: role.sortOrder,
         description: role.description,
+        avatarKey: role.avatarKey,
         createdAt: role.createdAt.toISOString(),
         updatedAt: role.updatedAt.toISOString(),
         assignmentCount: assignments.length,
@@ -416,15 +461,47 @@ export class TroupeService {
     };
   }
 
-  async getTeamRoles(userId: string) {
-    const troupe = await this.getOrCreateMyTroupe(userId);
-    await this.ensureDefaultTeamRoles(troupe.id);
+  async listTeamRolesForTroupe(troupeId: string) {
+    await this.ensureDefaultTeamRoles(troupeId);
     const roles = await this.prisma.teamRoleDefinition.findMany({
-      where: { troupeId: troupe.id },
+      where: { troupeId },
       include: this.teamRoleInclude(),
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
     return this.formatTeamRoles(roles);
+  }
+
+  async getTeamRoles(userId: string) {
+    const troupe = await this.getOrCreateMyTroupe(userId);
+    return this.listTeamRolesForTroupe(troupe.id);
+  }
+
+  /** Штат home-труппы театра (для базы команды постановки). */
+  async getTheaterHomeTeamRoles(theaterIdRaw: unknown) {
+    const theaterId = String(theaterIdRaw ?? '').trim();
+    if (!theaterId) throw new BadRequestException('theaterId is required');
+    const theater = await this.prisma.theater.findFirst({
+      where: { id: theaterId },
+      select: {
+        id: true,
+        title: true,
+        homeTroupes: {
+          select: { id: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
+    if (!theater) throw new NotFoundException('Theater not found');
+    const troupeId = theater.homeTroupes[0]?.id;
+    if (!troupeId) {
+      return { theater: { id: theater.id, title: theater.title }, roles: [] };
+    }
+    const roles = await this.listTeamRolesForTroupe(troupeId);
+    return {
+      theater: { id: theater.id, title: theater.title },
+      roles,
+    };
   }
 
   async getTeamRole(userId: string, roleId: string) {
@@ -448,7 +525,9 @@ export class TroupeService {
       sortOrder?: unknown;
       description?: unknown;
     };
-    const title = String(dto.title ?? '').trim().replace(/\s+/g, ' ');
+    const title = String(dto.title ?? '')
+      .trim()
+      .replace(/\s+/g, ' ');
     if (!title) throw new BadRequestException('title is required');
     const parentId =
       typeof dto.parentId === 'string' && dto.parentId.trim()
@@ -505,6 +584,7 @@ export class TroupeService {
       parentId?: unknown;
       sortOrder?: unknown;
       description?: unknown;
+      avatarKey?: unknown;
     };
     const nextParentId =
       typeof dto.parentId === 'string'
@@ -550,6 +630,11 @@ export class TroupeService {
     }
     if (typeof dto.description === 'string') {
       data.description = dto.description.trim();
+    }
+    if (dto.avatarKey === null) {
+      data.avatarKey = null;
+    } else if (typeof dto.avatarKey === 'string') {
+      data.avatarKey = dto.avatarKey.trim() || null;
     }
     const role = await this.prisma.teamRoleDefinition.update({
       where: { id },
@@ -632,31 +717,173 @@ export class TroupeService {
     return { ok: true };
   }
 
-  async getMyTroupeWithMembers(
+  async getMyTroupeWithMembers(userId: string, month?: unknown) {
+    const troupe = await this.prisma.troupe.findFirst({
+      where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, title: true, createdAt: true, updatedAt: true },
+    });
+    return this.buildTroupeMembersPayload(userId, troupe, month);
+  }
+
+  async getTheaterHomeTroupeWithMembers(
     userId: string,
+    theaterIdRaw: unknown,
     month?: unknown,
-    projectSlugRaw?: unknown,
   ) {
-    const projectSlug =
-      typeof projectSlugRaw === 'string' ? projectSlugRaw.trim() : '';
+    const theaterId = String(theaterIdRaw ?? '').trim();
+    if (!theaterId) throw new BadRequestException('theaterId is required');
+
+    const theater = await this.prisma.theater.findFirst({
+      where: {
+        id: theaterId,
+        workspace: {
+          memberships: {
+            some: { userId, role: { in: ['OWNER', 'ADMIN', 'MEMBER'] } },
+          },
+        },
+      },
+      select: {
+        id: true,
+        homeTroupes: {
+          select: { id: true, title: true, createdAt: true, updatedAt: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
+    if (!theater) throw new ForbiddenException('Cannot access this theater');
+
+    const troupe = theater.homeTroupes[0] ?? null;
+    return this.buildTroupeMembersPayload(userId, troupe, month);
+  }
+
+  private async buildTroupeMembersPayload(
+    userId: string,
+    troupe: {
+      id: string;
+      title: string;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null,
+    month?: unknown,
+  ) {
+    const troupeRows = troupe
+      ? await this.prisma.troupeMember.findMany({
+          where: { troupeId: troupe.id },
+          select: {
+            id: true,
+            troupeId: true,
+            userId: true,
+            email: true,
+            kind: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
+    for (const member of troupeRows) {
+      await this.ensureTeamMemberWithRoles(
+        userId,
+        member.email.trim().toLowerCase(),
+        ['actor'],
+        member.userId,
+      );
+    }
+    const teamRows = await this.prisma.teamMember.findMany({
+      where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    const emails = [
+      ...new Set(
+        [...troupeRows, ...teamRows]
+          .map((member) => member.email.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
+    const profileByEmail = await this.buildProfileMap(emails);
+    const monthRange = parseMonthFilter(month);
+    const buildProfile = (email: string) => {
+      const profile = profileByEmail.get(email) ?? null;
+      if (!profile || !monthRange) return profile;
+      return {
+        ...profile,
+        availabilityCalendar: filterAvailabilityByMonth(
+          profile.availabilityCalendar,
+          monthRange.first,
+          monthRange.last,
+        ),
+        availabilityTimeRanges: filterAvailabilityByMonth(
+          profile.availabilityTimeRanges,
+          monthRange.first,
+          monthRange.last,
+        ),
+      };
+    };
+    const troupeMemberIdByEmail = new Map(
+      troupeRows.map((member) => [
+        member.email.trim().toLowerCase(),
+        member.id,
+      ]),
+    );
+    const members = troupeRows.map((member) => {
+      const email = member.email.trim().toLowerCase();
+      return {
+        id: member.id,
+        troupeId: member.troupeId,
+        email,
+        kind: normalizeTroupeMemberKind(member.kind),
+        createdAt: member.createdAt.toISOString(),
+        profile: buildProfile(email),
+        troupeMemberId: member.id,
+      };
+    });
+    const teamMembers = teamRows.map((member) => {
+      const email = member.email.trim().toLowerCase();
+      return {
+        id: member.id,
+        ownerUserId: member.ownerUserId,
+        userId: member.userId,
+        email,
+        roles: normalizeTeamRoles(member.roles),
+        createdAt: member.createdAt.toISOString(),
+        updatedAt: member.updatedAt.toISOString(),
+        profile: buildProfile(email),
+        troupeMemberId: troupeMemberIdByEmail.get(email) ?? null,
+      };
+    });
+    return { troupe, members, teamMembers };
+  }
+
+  async getProjectMembers(
+    userId: string,
+    projectSlugRaw: unknown,
+    month?: unknown,
+  ) {
+    const projectSlug = String(projectSlugRaw ?? '').trim();
     if (!projectSlug) {
       throw new BadRequestException('query "project" (slug) is required');
     }
-
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug: projectSlug,
-        deletedAt: null,
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
+    const access = await this.projectAccess.assertBySlug(
+      userId,
+      projectSlug,
+      'read',
+    );
+    const project = await this.prisma.project.findUnique({
+      where: { id: access.project.id },
       select: {
         id: true,
         slug: true,
         name: true,
         createdAt: true,
-        updatedAt: true,
-        ownerId: true,
-        owner: { select: { id: true, email: true } },
+        workspace: {
+          select: {
+            memberships: {
+              where: { role: 'OWNER' },
+              select: { user: { select: { email: true } } },
+            },
+          },
+        },
         members: {
           select: {
             id: true,
@@ -669,238 +896,268 @@ export class TroupeService {
     if (!project) {
       throw new NotFoundException('Project not found or access denied');
     }
-
-    const ownTroupe = await this.prisma.troupe.findUnique({
+    const ownTroupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
-      select: { id: true, title: true, createdAt: true, updatedAt: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
     });
-
-    const ownerEmail = project.owner?.email?.trim().toLowerCase() ?? '';
-
-    const troupeMemberIdByEmail = new Map<string, string>();
     const troupeRows = ownTroupe
       ? await this.prisma.troupeMember.findMany({
           where: { troupeId: ownTroupe.id },
-          select: {
-            id: true,
-            troupeId: true,
-            userId: true,
-            email: true,
-            kind: true,
-            createdAt: true,
-          },
-          orderBy: { createdAt: 'asc' },
+          select: { id: true, email: true, kind: true },
         })
       : [];
-
-    for (const tm of troupeRows) {
-      const e = tm.email.trim().toLowerCase();
-      if (!e) continue;
-      troupeMemberIdByEmail.set(e, tm.id);
-      await this.ensureTeamMemberWithRoles(userId, e, ['actor'], tm.userId);
-    }
-    const troupeMemberKindByEmail = new Map(
-      troupeRows.map((tm) => [
-        tm.email.trim().toLowerCase(),
-        normalizeTroupeMemberKind(tm.kind),
+    const troupeMemberByEmail = new Map(
+      troupeRows.map((member) => [member.email.trim().toLowerCase(), member]),
+    );
+    const ownerEmails = project.workspace.memberships.map(({ user }) =>
+      user.email.trim().toLowerCase(),
+    );
+    const projectEmails = Array.from(
+      new Set([
+        ...ownerEmails,
+        ...project.members.map((member) =>
+          member.user.email.trim().toLowerCase(),
+        ),
       ]),
     );
-
-    const teamRows = await this.prisma.teamMember.findMany({
-      where: { ownerUserId: userId },
-      select: {
-        id: true,
-        ownerUserId: true,
-        userId: true,
-        email: true,
-        roles: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    const projectCastEmails: string[] = [];
-    if (ownerEmail) projectCastEmails.push(ownerEmail);
-    for (const m of project.members) {
-      const e = m.user.email?.trim().toLowerCase();
-      if (e && e !== ownerEmail) projectCastEmails.push(e);
-    }
-
-    const emailSet = new Set<string>([
-      ...teamRows.map((tm) => tm.email.trim().toLowerCase()).filter(Boolean),
-      ...troupeRows.map((tm) => tm.email.trim().toLowerCase()).filter(Boolean),
-      ...projectCastEmails,
-    ]);
-    const emails = [...emailSet];
-
-    const profiles = emails.length
-      ? await this.prisma.userProfile.findMany({
-          where: { email: { in: emails } },
-          select: {
-            email: true,
-            displayName: true,
-            firstName: true,
-            lastName: true,
-            telegramId: true,
-            avatarUrl: true,
-            availabilityCalendar: true,
-            availabilityTimeRanges: true,
-          },
-        })
-      : [];
-
-    const profileByEmail = new Map(
-      profiles.map((p) => [p.email.trim().toLowerCase(), p]),
-    );
+    const profileByEmail = await this.buildProfileMap(projectEmails);
     const monthRange = parseMonthFilter(month);
-
-    const buildProfile = (email: string) => {
-      const raw = profileByEmail.get(email) ?? null;
-      return raw && monthRange
-        ? {
-            ...raw,
-            availabilityCalendar: filterAvailabilityByMonth(
-              raw.availabilityCalendar,
-              monthRange.first,
-              monthRange.last,
-            ),
-            availabilityTimeRanges: filterAvailabilityByMonth(
-              raw.availabilityTimeRanges,
-              monthRange.first,
-              monthRange.last,
-            ),
-          }
-        : raw;
-    };
-
-    const troupeMembers = troupeRows.map((tm) => {
-      const email = tm.email.trim().toLowerCase();
-      const profile = buildProfile(email);
-      return {
-        id: tm.id,
-        troupeId: tm.troupeId,
-        email,
-        kind: normalizeTroupeMemberKind(tm.kind),
-        createdAt: tm.createdAt.toISOString(),
-        profile,
-        troupeMemberId: tm.id,
-      };
-    });
-    const teamMemberIdByEmail = new Map(
-      teamRows.map((tm) => [tm.email.trim().toLowerCase(), tm.id]),
-    );
-    const teamMembers = teamRows.map((tm) => {
-      const email = tm.email.trim().toLowerCase();
-      const profile = buildProfile(email);
-      return {
-        id: tm.id,
-        ownerUserId: tm.ownerUserId,
-        userId: tm.userId,
-        email,
-        roles: normalizeTeamRoles(tm.roles),
-        createdAt: tm.createdAt.toISOString(),
-        updatedAt: tm.updatedAt.toISOString(),
-        profile,
-        troupeMemberId: troupeMemberIdByEmail.get(email) ?? null,
-      };
-    });
-
-    const projectCastMembers = projectCastEmails.map((email) => {
+    const members = projectEmails.map((email) => {
       const projectMember = project.members.find(
-        (m) => m.user.email?.trim().toLowerCase() === email,
+        (member) => member.user.email.trim().toLowerCase() === email,
       );
-      const troupeMemberId = troupeMemberIdByEmail.get(email) ?? null;
-      const stableId = projectMember?.id ?? `powner:${project.id}:${email}`;
-      const profile = buildProfile(email);
+      const troupeMember = troupeMemberByEmail.get(email);
+      const rawProfile = profileByEmail.get(email) ?? null;
+      const profile =
+        rawProfile && monthRange
+          ? {
+              ...rawProfile,
+              availabilityCalendar: filterAvailabilityByMonth(
+                rawProfile.availabilityCalendar,
+                monthRange.first,
+                monthRange.last,
+              ),
+              availabilityTimeRanges: filterAvailabilityByMonth(
+                rawProfile.availabilityTimeRanges,
+                monthRange.first,
+                monthRange.last,
+              ),
+            }
+          : rawProfile;
       return {
-        id: stableId,
-        troupeId: ownTroupe?.id ?? project.id,
+        id: projectMember?.id ?? `powner:${project.id}:${email}`,
         email,
-        kind: troupeMemberKindByEmail.get(email) ?? 'regular',
         createdAt: project.createdAt.toISOString(),
         profile,
-        troupeMemberId,
         projectMemberId: projectMember?.id ?? null,
         projectRole: projectMember?.role ?? 'owner',
-        isProjectOwner: email === ownerEmail,
-        inTroupe: Boolean(troupeMemberId),
-        teamMemberId: teamMemberIdByEmail.get(email) ?? null,
+        isProjectOwner: ownerEmails.includes(email),
+        inTroupe: Boolean(troupeMember),
+        troupeMemberId: troupeMember?.id ?? null,
+        troupeId: ownTroupe?.id ?? '',
+        kind: normalizeTroupeMemberKind(troupeMember?.kind),
       };
     });
-
     return {
-      troupe: ownTroupe
-        ? {
-            id: ownTroupe.id,
-            title: ownTroupe.title,
-            createdAt: ownTroupe.createdAt,
-            updatedAt: ownTroupe.updatedAt,
-          }
-        : null,
-      members: troupeMembers,
-      troupeMembers,
-      teamMembers,
-      projectCastMembers,
+      project: { id: project.id, slug: project.slug, name: project.name },
+      members,
     };
   }
 
-  async addMember(userId: string, rawEmail: unknown, projectSlug?: unknown) {
-    await this.assertUserOwnsProject(userId, projectSlug);
+  async addMember(userId: string, rawEmail: unknown) {
     const troupe = await this.getOrCreateMyTroupe(userId);
     const email = normalizeEmail(rawEmail);
+    const now = new Date();
 
-    try {
-      const user = await this.prisma.user.findUnique({
-        where: { email },
-        select: { id: true },
-      });
-      const created = await this.prisma.troupeMember.create({
-        data: { troupeId: troupe.id, email, userId: user?.id ?? null },
-        select: {
-          id: true,
-          troupeId: true,
-          userId: true,
-          email: true,
-          kind: true,
-          createdAt: true,
-        },
-      });
-
-      const profile = await this.prisma.userProfile.findUnique({
-        where: { email },
-        select: {
-          email: true,
-          displayName: true,
-          firstName: true,
-          lastName: true,
-          telegramId: true,
-          avatarUrl: true,
-          availabilityCalendar: true,
-          availabilityTimeRanges: true,
-        },
-      });
-      await this.ensureTeamMemberWithRoles(userId, email, ['actor'], user?.id ?? null);
-
-      return { ...created, profile: profile ?? null };
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException('Участник с таким email уже есть в труппе');
-      }
-      throw error;
+    const existingMember = await this.prisma.troupeMember.findUnique({
+      where: { troupeId_email: { troupeId: troupe.id, email } },
+    });
+    if (existingMember) {
+      throw new ConflictException('Участник с таким email уже есть в труппе');
     }
+
+    const activeInvite = await this.prisma.troupeInvite.findFirst({
+      where: {
+        troupeId: troupe.id,
+        email,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+    });
+    if (activeInvite) {
+      throw new ConflictException(
+        'Активное приглашение для этого email уже есть',
+      );
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('base64url');
+    const tokenHash = sha256Base64Url(rawToken);
+    const invite = await this.prisma.troupeInvite.create({
+      data: {
+        troupeId: troupe.id,
+        tokenHash,
+        email,
+        kind: TroupeMemberKind.regular,
+        createdByUserId: userId,
+      },
+    });
+
+    return {
+      id: invite.id,
+      token: rawToken,
+      invitePath: `/troupe/invite/${rawToken}`,
+      email: invite.email,
+      kind: invite.kind,
+      expiresAt: invite.expiresAt,
+      troupe: { id: troupe.id, title: troupe.title },
+      pending: true as const,
+    };
+  }
+
+  async previewAddressedInvite(
+    userId: string,
+    userEmail: string,
+    inviteId: string,
+  ) {
+    const myEmail = normalizeEmail(userEmail);
+    const now = new Date();
+    const invite = await this.prisma.troupeInvite.findFirst({
+      where: {
+        id: inviteId,
+        email: myEmail,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      include: {
+        troupe: { select: { id: true, title: true } },
+        createdBy: { select: { email: true } },
+      },
+    });
+    if (!invite) {
+      throw new NotFoundException('Active addressed invite not found');
+    }
+    return {
+      kind: 'troupe_invite' as const,
+      id: invite.id,
+      troupe: invite.troupe,
+      memberKind: invite.kind,
+      email: invite.email,
+      invitedByEmail: invite.createdBy.email,
+      isActive: true,
+      expiresAt: invite.expiresAt,
+      createdAt: invite.createdAt,
+    };
+  }
+
+  async acceptAddressedInvite(
+    userId: string,
+    userEmail: string,
+    inviteId: string,
+  ) {
+    const myEmail = normalizeEmail(userEmail);
+    const now = new Date();
+    const invite = await this.prisma.troupeInvite.findFirst({
+      where: {
+        id: inviteId,
+        email: myEmail,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      include: {
+        troupe: { select: { id: true, title: true, ownerUserId: true } },
+      },
+    });
+    if (!invite) {
+      throw new NotFoundException('Active addressed invite not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const accepted = await tx.troupeInvite.updateMany({
+        where: {
+          id: invite.id,
+          email: myEmail,
+          acceptedAt: null,
+          declinedAt: null,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        data: { acceptedAt: now },
+      });
+      if (accepted.count !== 1) {
+        throw new BadRequestException('Invite is no longer active');
+      }
+
+      const existing = await tx.troupeMember.findUnique({
+        where: {
+          troupeId_email: { troupeId: invite.troupeId, email: myEmail },
+        },
+      });
+      if (existing) {
+        await tx.troupeMember.update({
+          where: { id: existing.id },
+          data: { userId, kind: invite.kind },
+        });
+      } else {
+        await tx.troupeMember.create({
+          data: {
+            troupeId: invite.troupeId,
+            email: myEmail,
+            userId,
+            kind: invite.kind,
+          },
+        });
+      }
+    });
+
+    await this.ensureTeamMemberWithRoles(
+      invite.troupe.ownerUserId,
+      myEmail,
+      ['actor'],
+      userId,
+    );
+
+    return {
+      ok: true,
+      troupe: { id: invite.troupe.id, title: invite.troupe.title },
+    };
+  }
+
+  async declineAddressedInvite(
+    userId: string,
+    userEmail: string,
+    inviteId: string,
+  ) {
+    const myEmail = normalizeEmail(userEmail);
+    const now = new Date();
+    const declined = await this.prisma.troupeInvite.updateMany({
+      where: {
+        id: inviteId,
+        email: myEmail,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      data: { declinedAt: now },
+    });
+    if (declined.count !== 1) {
+      throw new NotFoundException('Active addressed invite not found');
+    }
+    return { ok: true };
   }
 
   async updateTroupeMemberKind(
     userId: string,
     memberId: string,
     rawKind: unknown,
-    projectSlug?: unknown,
   ) {
-    await this.assertUserOwnsProject(userId, projectSlug);
     const id = String(memberId ?? '').trim();
     if (!id) throw new BadRequestException('memberId is required');
     const kind = normalizeTroupeMemberKind(rawKind);
@@ -967,7 +1224,9 @@ export class TroupeService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Участник с таким email уже есть в команде');
+        throw new ConflictException(
+          'Участник с таким email уже есть в команде',
+        );
       }
       throw error;
     }
@@ -981,8 +1240,9 @@ export class TroupeService {
       select: { email: true },
     });
     if (!existing) throw new NotFoundException('Team member not found');
-    const troupe = await this.prisma.troupe.findUnique({
+    const troupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
       select: { id: true },
     });
     const troupeMember = troupe
@@ -1018,8 +1278,9 @@ export class TroupeService {
       select: { email: true },
     });
     if (!existing) throw new NotFoundException('Team member not found');
-    const troupe = await this.prisma.troupe.findUnique({
+    const troupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
       select: { id: true },
     });
     const troupeMember = troupe
@@ -1052,8 +1313,9 @@ export class TroupeService {
     if (!title) throw new BadRequestException('title is required');
     if (title.length > 120) throw new BadRequestException('title is too long');
 
-    const troupe = await this.prisma.troupe.findUnique({
+    const troupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
     });
     if (!troupe) {
       throw new NotFoundException(
@@ -1073,10 +1335,10 @@ export class TroupeService {
     return updated;
   }
 
-  async removeMember(userId: string, memberId: string, projectSlug?: unknown) {
-    await this.assertUserOwnsProject(userId, projectSlug);
-    const troupe = await this.prisma.troupe.findUnique({
+  async removeMember(userId: string, memberId: string) {
+    const troupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
     });
     if (!troupe) throw new NotFoundException('Troupe not found');
     const id = String(memberId ?? '').trim();

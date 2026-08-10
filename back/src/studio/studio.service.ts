@@ -434,10 +434,12 @@ export class StudioService {
   private isInviteActive(invite: {
     revokedAt: Date | null;
     acceptedAt: Date | null;
+    declinedAt: Date | null;
     expiresAt: Date | null;
   }): boolean {
     if (invite.revokedAt) return false;
     if (invite.acceptedAt) return false;
+    if (invite.declinedAt) return false;
     if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) {
       return false;
     }
@@ -746,7 +748,7 @@ export class StudioService {
     return {
       id: invite.id,
       token: rawToken,
-      invitePath: `/studio/invite/${rawToken}`,
+      invitePath: `/studios/invite/${rawToken}`,
       role: invite.role,
       email: invite.email,
       expiresAt: invite.expiresAt,
@@ -763,6 +765,7 @@ export class StudioService {
         studioId,
         revokedAt: null,
         acceptedAt: null,
+        declinedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
       },
       orderBy: { createdAt: 'desc' },
@@ -828,6 +831,9 @@ export class StudioService {
     if (invite.acceptedAt) {
       throw new BadRequestException('Invite already accepted');
     }
+    if (invite.declinedAt) {
+      throw new BadRequestException('Invite declined');
+    }
     if (invite.expiresAt && invite.expiresAt.getTime() <= Date.now()) {
       throw new BadRequestException('Invite expired');
     }
@@ -873,6 +879,129 @@ export class StudioService {
     });
 
     return this.getStudio(userId, userEmail, invite.studioId);
+  }
+
+  async acceptAddressedInvite(
+    userId: string,
+    userEmail: string,
+    inviteId: string,
+  ) {
+    const myEmail = normalizeEmail(userEmail);
+    const now = new Date();
+    const invite = await this.prisma.studioInvite.findFirst({
+      where: {
+        id: inviteId,
+        email: myEmail,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+    });
+    if (!invite) {
+      throw new NotFoundException('Active addressed invite not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const accepted = await tx.studioInvite.updateMany({
+        where: {
+          id: invite.id,
+          email: myEmail,
+          acceptedAt: null,
+          declinedAt: null,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        data: { acceptedAt: now },
+      });
+      if (accepted.count !== 1) {
+        throw new BadRequestException('Invite is no longer active');
+      }
+
+      const existing = await tx.studioMember.findUnique({
+        where: {
+          studioId_email: { studioId: invite.studioId, email: myEmail },
+        },
+      });
+      if (existing) {
+        await tx.studioMember.update({
+          where: { id: existing.id },
+          data: {
+            userId,
+            role: existing.role === 'owner' ? 'owner' : invite.role,
+          },
+        });
+      } else {
+        await tx.studioMember.create({
+          data: {
+            studioId: invite.studioId,
+            email: myEmail,
+            userId,
+            role: invite.role,
+          },
+        });
+      }
+    });
+
+    return this.getStudio(userId, userEmail, invite.studioId);
+  }
+
+  async declineAddressedInvite(userId: string, userEmail: string, inviteId: string) {
+    const myEmail = normalizeEmail(userEmail);
+    const now = new Date();
+    const declined = await this.prisma.studioInvite.updateMany({
+      where: {
+        id: inviteId,
+        email: myEmail,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      data: { declinedAt: now },
+    });
+    if (declined.count !== 1) {
+      throw new NotFoundException('Active addressed invite not found');
+    }
+    return { ok: true };
+  }
+
+  async previewAddressedInvite(
+    userId: string,
+    userEmail: string,
+    inviteId: string,
+  ) {
+    const myEmail = normalizeEmail(userEmail);
+    const now = new Date();
+    const invite = await this.prisma.studioInvite.findFirst({
+      where: {
+        id: inviteId,
+        email: myEmail,
+        acceptedAt: null,
+        declinedAt: null,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+      },
+      include: {
+        studio: { select: { id: true, title: true } },
+        createdBy: { select: { email: true } },
+      },
+    });
+    if (!invite) {
+      throw new NotFoundException('Active addressed invite not found');
+    }
+    return {
+      kind: 'studio_invite' as const,
+      id: invite.id,
+      studioId: invite.studio.id,
+      studioTitle: invite.studio.title,
+      role: invite.role,
+      email: invite.email,
+      invitedByEmail: invite.createdBy.email,
+      isActive: true,
+      expiresAt: invite.expiresAt,
+      createdAt: invite.createdAt,
+    };
   }
 
   async createModule(

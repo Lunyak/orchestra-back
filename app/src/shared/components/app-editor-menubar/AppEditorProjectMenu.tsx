@@ -1,7 +1,12 @@
+import cn from "classnames";
 import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { projectPath } from "../../../app/router/paths";
+import { PROJECTS_ROUTE_PATH } from "../../../app/router/routeMeta";
 import { useProject } from "../../../features/project";
 
 export function AppEditorProjectMenu() {
+  const navigate = useNavigate();
   const {
     projects,
     projectItems,
@@ -66,22 +71,35 @@ export function AppEditorProjectMenu() {
 
   const handleProjectChange = (slug: string) => {
     onProjectChange(slug);
+    navigate(projectPath(slug));
     setIsMenuCollapsed(true);
   };
 
   return (
     <>
       <div
-        className={[
+        className={cn(
           "theater-editor-menubar__menu",
-          isMenuCollapsed ? "app-editor-project-menu--collapsed" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
+          isMenuCollapsed && "app-editor-project-menu--collapsed",
+        )}
         onMouseLeave={() => setIsMenuCollapsed(false)}
       >
-        <span className="theater-editor-menubar__menu-title">Проект</span>
+        <span className="theater-editor-menubar__menu-title" aria-label="Действия с проектом">
+          ···
+        </span>
         <div className="theater-editor-menubar__options" role="menu">
+          <Link
+            to={PROJECTS_ROUTE_PATH}
+            role="menuitem"
+            className="theater-editor-menubar__option"
+            onClick={() => setIsMenuCollapsed(true)}
+          >
+            Мои проекты
+          </Link>
+          <div
+            className="theater-editor-menubar__option theater-editor-menubar__option--separator"
+            role="separator"
+          />
           {projectsLoading ? (
             <span
               className="theater-editor-menubar__option theater-editor-menubar__option--meta"
@@ -149,12 +167,10 @@ export function AppEditorProjectMenu() {
                         type="button"
                         role="menuitemradio"
                         aria-checked={isActive}
-                        className={[
+                        className={cn(
                           "theater-editor-menubar__option",
-                          isActive ? "theater-editor-menubar__option--active" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
+                          isActive && "theater-editor-menubar__option--active",
+                        )}
                         onClick={() => handleProjectChange(project.slug)}
                       >
                         {project.name || project.slug}

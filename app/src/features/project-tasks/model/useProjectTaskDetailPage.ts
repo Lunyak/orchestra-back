@@ -45,7 +45,7 @@ export function useProjectTaskDetailPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { accessToken } = useAuth();
-  const { projectName, setProjectName } = useProject();
+  const { projectName } = useProject();
 
   const {
     data,
@@ -57,27 +57,21 @@ export function useProjectTaskDetailPage() {
 
   const task = data?.task ?? null;
   const project = data?.project ?? null;
-  const projectSlug = project?.slug ?? projectName ?? "";
-
-  useEffect(() => {
-    if (!project?.slug) return;
-    if (projectName === project.slug) return;
-    setProjectName(project.slug);
-  }, [project?.slug, projectName, setProjectName]);
+  const projectSlug = projectName;
 
   useEffect(() => {
     if (!task) return;
-    const canonicalPath = buildTaskPath(task.id, task.title);
+    const canonicalPath = buildTaskPath(projectSlug, task.id, task.title);
     if (location.pathname === canonicalPath) return;
     navigate(canonicalPath, { replace: true });
-  }, [task, location.pathname, navigate]);
+  }, [location.pathname, navigate, projectSlug, task]);
 
   const { data: projectMembersData } = useProjectMembersQuery(projectSlug, {
     skip: !accessToken || !projectSlug,
   });
   const { data: troupeData } = useMyTroupeQuery(
-    { project: projectSlug },
-    { skip: !accessToken || !projectSlug },
+    {},
+    { skip: !accessToken },
   );
 
   const [updateTask, { isLoading: saving }] = useUpdateProjectTaskMutation();
@@ -230,7 +224,7 @@ export function useProjectTaskDetailPage() {
     setActionError(null);
     try {
       await deleteTask({ id: task.id, projectSlug }).unwrap();
-      navigate("/tasks");
+      navigate(buildTaskPath(projectSlug, ""));
     } catch (error: unknown) {
       const err = error as { data?: { message?: string }; message?: string };
       setActionError(
@@ -241,7 +235,7 @@ export function useProjectTaskDetailPage() {
 
   const handleCopyLink = async () => {
     if (!task) return;
-    const url = `${window.location.origin}${buildTaskPath(task.id, task.title)}`;
+    const url = `${window.location.origin}${buildTaskPath(projectSlug, task.id, task.title)}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopyStatus("Ссылка скопирована");

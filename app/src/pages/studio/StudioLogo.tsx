@@ -33,7 +33,8 @@ function extractStudioImageStorageKey(value: string): string | null {
 type StudioLogoProps = {
   imageUrl?: string | null;
   title: string;
-  size?: "sm" | "lg" | "cover";
+  size?: "sm" | "lg" | "cover" | "tile";
+  fallbackSrc?: string;
   className?: string;
 };
 
@@ -41,6 +42,7 @@ export function StudioLogo({
   imageUrl,
   title,
   size = "sm",
+  fallbackSrc,
   className,
 }: StudioLogoProps) {
   const { accessToken } = useAuth();
@@ -81,10 +83,12 @@ export function StudioLogo({
     "studio-logo",
     size === "lg" && "studio-logo--lg",
     size === "cover" && "studio-logo--cover",
+    size === "tile" && "studio-logo--tile",
     className,
   );
 
   const showImage = Boolean(src) && !broken;
+  const showFallback = Boolean(fallbackSrc) && !showImage;
 
   return (
     <div className={logoClassName}>
@@ -95,6 +99,8 @@ export function StudioLogo({
           className="studio-logo__img"
           onError={() => setBroken(true)}
         />
+      ) : showFallback ? (
+        <img src={fallbackSrc} alt="" className="studio-logo__img" />
       ) : (
         <span className="studio-logo__placeholder">{initial}</span>
       )}

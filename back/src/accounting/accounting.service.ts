@@ -6,7 +6,13 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { TroupeCollectionStatus } from '@prisma/client';
+import {
+  StudioCollectionStatus,
+  StudioMemberRole,
+  TroupeCollectionStatus,
+  WorkspaceRole,
+  WorkspaceType,
+} from '@prisma/client';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCollectionDto } from './dto/create-collection.dto';
@@ -39,14 +45,55 @@ function parseOptionalDate(raw: unknown): Date | null {
   return d;
 }
 
+type CollectionScope = 'troupe' | 'studio';
+
 type CollectionAccess = {
-  collection: {
-    id: string;
-    troupeId: string;
-    troupe: { ownerUserId: string; title: string };
-  };
+  scope: CollectionScope;
+  collectionId: string;
+  troupeId: string | null;
+  studioId: string | null;
+  theaterId: string | null;
+  ownerTitle: string;
   canView: boolean;
   canManage: boolean;
+};
+
+type CollectionDetailRow = {
+  scope: CollectionScope;
+  id: string;
+  troupeId: string;
+  studioId: string;
+  theaterId: string | null;
+  title: string;
+  description: string | null;
+  status: TroupeCollectionStatus | StudioCollectionStatus;
+  dueAt: Date | null;
+  premiseId: string | null;
+  createdByEmail: string;
+  createdAt: Date;
+  updatedAt: Date;
+  troupeTitle: string;
+  studioTitle: string;
+  tariffs: Array<{
+    id: string;
+    title: string;
+    amountKopecks: number;
+    sortOrder: number;
+  }>;
+  participants: Array<{
+    id: string;
+    email: string;
+    tariff: { id: string; title: string; amountKopecks: number };
+  }>;
+  contributions: Array<{
+    id: string;
+    email: string;
+    amountKopecks: number;
+    paidAt: Date;
+    recordedByEmail: string;
+    note: string | null;
+    createdAt: Date;
+  }>;
 };
 
 @Injectable()
@@ -59,7 +106,14 @@ export class AccountingService {
 
   private formatRecipientName(
     email: string,
-    profileByEmail: Map<string, { displayName: string | null; firstName: string | null; lastName: string | null }>,
+    profileByEmail: Map<
+      string,
+      {
+        displayName: string | null;
+        firstName: string | null;
+        lastName: string | null;
+      }
+    >,
   ): string {
     const profile = profileByEmail.get(email);
     const display = String(profile?.displayName ?? '').trim();
@@ -73,7 +127,9 @@ export class AccountingService {
 
   private async buildProfileMap(emails: string[]) {
     const uniqueEmails = [
-      ...new Set(emails.map((email) => email.trim().toLowerCase()).filter(Boolean)),
+      ...new Set(
+        emails.map((email) => email.trim().toLowerCase()).filter(Boolean),
+      ),
     ];
     if (uniqueEmails.length === 0) {
       return new Map<
@@ -122,33 +178,229 @@ export class AccountingService {
     return String(legacy).trim().replace(/\/+$/, '');
   }
 
-  private async buildCreateContext(userId: string, userEmail: string) {
-    const troupe = await this.getOrCreateMyTroupe(userId);
-    const memberRows = await this.prisma.troupeMember.findMany({
-      where: { troupeId: troupe.id },
-      select: { email: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    const profileByEmail = await this.buildProfileMap(
-      memberRows.map((row) => row.email),
-    );
-    const createMemberOptions = memberRows.map((row) => {
-      const email = row.email.trim().toLowerCase();
+  private async buildMemberOptions(emails: string[]) {
+    const profileByEmail = await this.buildProfileMap(emails);
+    return emails.map((raw) => {
+      const email = raw.trim().toLowerCase();
       return {
         email,
         displayName: this.formatRecipientName(email, profileByEmail),
       };
     });
+  }
 
-    const canCreateCollections = await this.isAccountantForTroupe(
-      troupe.ownerUserId,
+  private async buildScopes(userId: string, userEmail: string) {
+    const email = normalizeEmail(userEmail);
+    const accessibleTroupeIds = await this.resolveAccessibleTroupeIds(
       userId,
       userEmail,
     );
 
+    const theaterWhere =
+      accessibleTroupeIds.length > 0
+        ? {
+            OR: [
+              { workspace: { memberships: { some: { userId } } } },
+              { homeTroupes: { some: { id: { in: accessibleTroupeIds } } } },
+            ],
+          }
+        : { workspace: { memberships: { some: { userId } } } };
+
+    const theaterRows = await this.prisma.theater.findMany({
+      where: theaterWhere,
+      select: {
+        id: true,
+        title: true,
+        workspace: {
+          select: {
+            memberships: {
+              where: { userId },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
+        homeTroupes: {
+          select: { id: true, title: true },
+          orderBy: { title: 'asc' },
+        },
+      },
+      orderBy: { title: 'asc' },
+    });
+
+    const accessibleTroupeIdSet = new Set(accessibleTroupeIds);
+    const theaters = theaterRows.map((theater) => {
+      const isWorkspaceMember = theater.workspace.memberships.length > 0;
+      const troupes = isWorkspaceMember
+        ? theater.homeTroupes
+        : theater.homeTroupes.filter((troupe) =>
+            accessibleTroupeIdSet.has(troupe.id),
+          );
+      return {
+        id: theater.id,
+        title: theater.title,
+        homeTroupes: troupes,
+      };
+    });
+
+    const studios = await this.prisma.studio.findMany({
+      where: {
+        OR: [
+          { ownerUserId: userId },
+          { members: { some: { OR: [{ userId }, { email }] } } },
+        ],
+      },
+      select: { id: true, title: true },
+      orderBy: { title: 'asc' },
+    });
+
+    const projects = await this.prisma.project.findMany({
+      where: {
+        deletedAt: null,
+        theaters: { some: {} },
+        OR: [
+          { ownerId: userId },
+          { members: { some: { userId } } },
+          { workspace: { memberships: { some: { userId } } } },
+        ],
+      },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        theaters: {
+          select: {
+            theater: {
+              select: {
+                homeTroupes: { select: { id: true } },
+                troupes: { select: { troupeId: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return {
+      theaters: theaters.map((theater) => ({
+        id: theater.id,
+        title: theater.title,
+        troupes: theater.homeTroupes.map((troupe) => ({
+          id: troupe.id,
+          title: troupe.title,
+        })),
+      })),
+      studios: studios.map((studio) => ({
+        id: studio.id,
+        title: studio.title,
+      })),
+      projects: projects.map((project) => {
+        const troupeIds = new Set<string>();
+        for (const link of project.theaters) {
+          for (const troupe of link.theater.homeTroupes) {
+            troupeIds.add(troupe.id);
+          }
+          for (const theaterTroupe of link.theater.troupes) {
+            troupeIds.add(theaterTroupe.troupeId);
+          }
+        }
+        return {
+          id: project.id,
+          slug: project.slug,
+          name: project.name,
+          troupeIds: Array.from(troupeIds),
+        };
+      }),
+    };
+  }
+
+  private async loadStudioMemberOptions(studioId: string) {
+    const memberRows = await this.prisma.studioMember.findMany({
+      where: { studioId },
+      select: { email: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return this.buildMemberOptions(memberRows.map((row) => row.email));
+  }
+
+  private async buildCreateContext(userId: string, userEmail: string) {
+    const scopes = await this.buildScopes(userId, userEmail);
+    let createMemberOptions: Array<{ email: string; displayName: string }> =
+      [];
+    let canCreateCollections = false;
+
+    const ownedTroupe = await this.prisma.troupe.findFirst({
+      where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (ownedTroupe) {
+      const memberRows = await this.prisma.troupeMember.findMany({
+        where: { troupeId: ownedTroupe.id },
+        select: { email: true },
+        orderBy: { createdAt: 'asc' },
+      });
+      createMemberOptions = await this.buildMemberOptions(
+        memberRows.map((row) => row.email),
+      );
+      canCreateCollections = await this.isAccountantForTroupe(
+        ownedTroupe.ownerUserId,
+        userId,
+        userEmail,
+      );
+    }
+
+    if (!canCreateCollections) {
+      const accessibleTroupeIds = await this.resolveAccessibleTroupeIds(
+        userId,
+        userEmail,
+      );
+      if (accessibleTroupeIds.length > 0) {
+        const troupes = await this.prisma.troupe.findMany({
+          where: { id: { in: accessibleTroupeIds } },
+          select: { id: true, ownerUserId: true },
+        });
+        for (const troupe of troupes) {
+          const canManage = await this.isAccountantForTroupe(
+            troupe.ownerUserId,
+            userId,
+            userEmail,
+          );
+          if (!canManage) continue;
+          canCreateCollections = true;
+          if (createMemberOptions.length === 0) {
+            const memberRows = await this.prisma.troupeMember.findMany({
+              where: { troupeId: troupe.id },
+              select: { email: true },
+              orderBy: { createdAt: 'asc' },
+            });
+            createMemberOptions = await this.buildMemberOptions(
+              memberRows.map((row) => row.email),
+            );
+          }
+          break;
+        }
+      }
+    }
+
+    for (const studio of scopes.studios) {
+      const canManageStudio = await this.canManageStudio(
+        userId,
+        userEmail,
+        studio.id,
+      );
+      if (!canManageStudio) continue;
+      canCreateCollections = true;
+      if (createMemberOptions.length === 0) {
+        createMemberOptions = await this.loadStudioMemberOptions(studio.id);
+      }
+      break;
+    }
+
     return {
       canCreateCollections,
       createMemberOptions,
+      scopes,
       smtpConfigured: this.mailService.isSmtpConfigured(),
     };
   }
@@ -163,18 +415,60 @@ export class AccountingService {
   }
 
   private async getOrCreateMyTroupe(userId: string) {
-    const existing = await this.prisma.troupe.findUnique({
+    const existing = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
+      orderBy: { createdAt: 'asc' },
     });
     if (existing) return existing;
-    return await this.prisma.troupe.create({
-      data: { ownerUserId: userId, title: 'Моя труппа' },
+
+    const theater = await this.prisma.theater.findFirst({
+      where: {
+        workspace: {
+          memberships: {
+            some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, title: true },
+    });
+    if (!theater) {
+      throw new BadRequestException(
+        'Сначала создайте театр — труппа существует только внутри театра',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const troupe = await tx.troupe.create({
+        data: {
+          title: 'Основная труппа',
+          theater: { connect: { id: theater.id } },
+          owner: { connect: { id: userId } },
+          workspace: {
+            create: {
+              type: WorkspaceType.TROUPE,
+              name: `${theater.title} — Основная труппа`,
+              memberships: {
+                create: { userId, role: WorkspaceRole.OWNER },
+              },
+            },
+          },
+        },
+      });
+      await tx.theaterTroupe.create({
+        data: {
+          theaterId: theater.id,
+          troupeId: troupe.id,
+          participationType: 'HOME',
+        },
+      });
+      return troupe;
     });
   }
 
   async resolveAccessibleTroupeIds(userId: string, userEmail: string) {
     const email = normalizeEmail(userEmail);
-    const owned = await this.prisma.troupe.findUnique({
+    const owned = await this.prisma.troupe.findMany({
       where: { ownerUserId: userId },
       select: { id: true },
     });
@@ -185,8 +479,26 @@ export class AccountingService {
       select: { troupeId: true },
     });
     const ids = new Set<string>();
+    for (const row of owned) ids.add(row.id);
     for (const row of memberRows) ids.add(row.troupeId);
-    if (owned) ids.add(owned.id);
+    return [...ids];
+  }
+
+  private async resolveAccessibleStudioIds(userId: string, userEmail: string) {
+    const email = normalizeEmail(userEmail);
+    const owned = await this.prisma.studio.findMany({
+      where: { ownerUserId: userId },
+      select: { id: true },
+    });
+    const memberRows = await this.prisma.studioMember.findMany({
+      where: {
+        OR: [{ userId }, { email }],
+      },
+      select: { studioId: true },
+    });
+    const ids = new Set<string>();
+    for (const row of owned) ids.add(row.id);
+    for (const row of memberRows) ids.add(row.studioId);
     return [...ids];
   }
 
@@ -235,6 +547,34 @@ export class AccountingService {
     return assignment != null;
   }
 
+  private canManageStudioRole(role: StudioMemberRole): boolean {
+    return role === 'owner' || role === 'teacher';
+  }
+
+  private async canManageStudio(
+    userId: string,
+    userEmail: string,
+    studioId: string,
+  ): Promise<boolean> {
+    const studio = await this.prisma.studio.findUnique({
+      where: { id: studioId },
+      select: { ownerUserId: true },
+    });
+    if (!studio) return false;
+    if (studio.ownerUserId === userId) return true;
+
+    const email = normalizeEmail(userEmail);
+    const member = await this.prisma.studioMember.findFirst({
+      where: {
+        studioId,
+        OR: [{ userId }, { email }],
+      },
+      select: { role: true },
+    });
+    if (!member) return false;
+    return this.canManageStudioRole(member.role);
+  }
+
   private async assertUserInTroupe(
     userId: string,
     userEmail: string,
@@ -243,7 +583,7 @@ export class AccountingService {
     const email = normalizeEmail(userEmail);
     const troupe = await this.prisma.troupe.findUnique({
       where: { id: troupeId },
-      select: { id: true, ownerUserId: true },
+      select: { id: true, ownerUserId: true, theaterId: true, title: true },
     });
     if (!troupe) throw new NotFoundException('Troupe not found');
     if (troupe.ownerUserId === userId) return troupe;
@@ -258,35 +598,97 @@ export class AccountingService {
     return troupe;
   }
 
+  private async assertUserInStudio(
+    userId: string,
+    userEmail: string,
+    studioId: string,
+  ) {
+    const email = normalizeEmail(userEmail);
+    const studio = await this.prisma.studio.findUnique({
+      where: { id: studioId },
+      select: { id: true, ownerUserId: true, title: true },
+    });
+    if (!studio) throw new NotFoundException('Studio not found');
+    if (studio.ownerUserId === userId) return studio;
+    const member = await this.prisma.studioMember.findFirst({
+      where: {
+        studioId,
+        OR: [{ userId }, { email }],
+      },
+      select: { id: true },
+    });
+    if (!member) throw new ForbiddenException('Not a studio member');
+    return studio;
+  }
+
   private async resolveCollectionAccess(
     userId: string,
     userEmail: string,
     collectionId: string,
   ): Promise<CollectionAccess> {
-    const collection = await this.prisma.troupeCollection.findUnique({
+    const troupeCollection = await this.prisma.troupeCollection.findUnique({
       where: { id: collectionId },
       select: {
         id: true,
         troupeId: true,
-        troupe: { select: { ownerUserId: true, title: true } },
+        troupe: {
+          select: { ownerUserId: true, title: true, theaterId: true },
+        },
       },
     });
-    if (!collection) throw new NotFoundException('Collection not found');
+    if (troupeCollection) {
+      const troupe = await this.assertUserInTroupe(
+        userId,
+        userEmail,
+        troupeCollection.troupeId,
+      );
+      const canManage = await this.isAccountantForTroupe(
+        troupe.ownerUserId,
+        userId,
+        userEmail,
+      );
+      return {
+        scope: 'troupe',
+        collectionId: troupeCollection.id,
+        troupeId: troupeCollection.troupeId,
+        studioId: null,
+        theaterId: troupeCollection.troupe.theaterId,
+        ownerTitle: troupeCollection.troupe.title,
+        canView: true,
+        canManage,
+      };
+    }
 
-    const troupe = await this.assertUserInTroupe(
+    const studioCollection = await this.prisma.studioCollection.findUnique({
+      where: { id: collectionId },
+      select: {
+        id: true,
+        studioId: true,
+        studio: { select: { ownerUserId: true, title: true } },
+      },
+    });
+    if (!studioCollection) {
+      throw new NotFoundException('Collection not found');
+    }
+
+    await this.assertUserInStudio(
       userId,
       userEmail,
-      collection.troupeId,
+      studioCollection.studioId,
     );
-
-    const canManage = await this.isAccountantForTroupe(
-      troupe.ownerUserId,
+    const canManage = await this.canManageStudio(
       userId,
       userEmail,
+      studioCollection.studioId,
     );
 
     return {
-      collection,
+      scope: 'studio',
+      collectionId: studioCollection.id,
+      troupeId: null,
+      studioId: studioCollection.studioId,
+      theaterId: null,
+      ownerTitle: studioCollection.studio.title,
       canView: true,
       canManage,
     };
@@ -374,11 +776,15 @@ export class AccountingService {
     };
   }
 
-  private async loadCollectionDetail(collectionId: string) {
-    const row = await this.prisma.troupeCollection.findUnique({
+  private async loadCollectionDetail(
+    collectionId: string,
+  ): Promise<CollectionDetailRow> {
+    const troupeRow = await this.prisma.troupeCollection.findUnique({
       where: { id: collectionId },
       include: {
-        troupe: { select: { id: true, title: true, ownerUserId: true } },
+        troupe: {
+          select: { id: true, title: true, ownerUserId: true, theaterId: true },
+        },
         tariffs: { orderBy: { sortOrder: 'asc' } },
         participants: {
           include: { tariff: true },
@@ -387,23 +793,82 @@ export class AccountingService {
         contributions: { orderBy: { paidAt: 'desc' } },
       },
     });
-    if (!row) throw new NotFoundException('Collection not found');
-    return row;
+    if (troupeRow) {
+      return {
+        scope: 'troupe',
+        id: troupeRow.id,
+        troupeId: troupeRow.troupeId,
+        studioId: '',
+        theaterId: troupeRow.troupe.theaterId,
+        title: troupeRow.title,
+        description: troupeRow.description,
+        status: troupeRow.status,
+        dueAt: troupeRow.dueAt,
+        premiseId: troupeRow.premiseId,
+        createdByEmail: troupeRow.createdByEmail,
+        createdAt: troupeRow.createdAt,
+        updatedAt: troupeRow.updatedAt,
+        troupeTitle: troupeRow.troupe.title,
+        studioTitle: '',
+        tariffs: troupeRow.tariffs,
+        participants: troupeRow.participants,
+        contributions: troupeRow.contributions,
+      };
+    }
+
+    const studioRow = await this.prisma.studioCollection.findUnique({
+      where: { id: collectionId },
+      include: {
+        studio: { select: { id: true, title: true, ownerUserId: true } },
+        tariffs: { orderBy: { sortOrder: 'asc' } },
+        participants: {
+          include: { tariff: true },
+          orderBy: { email: 'asc' },
+        },
+        contributions: { orderBy: { paidAt: 'desc' } },
+      },
+    });
+    if (!studioRow) throw new NotFoundException('Collection not found');
+
+    return {
+      scope: 'studio',
+      id: studioRow.id,
+      troupeId: '',
+      studioId: studioRow.studioId,
+      theaterId: null,
+      title: studioRow.title,
+      description: studioRow.description,
+      status: studioRow.status,
+      dueAt: studioRow.dueAt,
+      premiseId: null,
+      createdByEmail: studioRow.createdByEmail,
+      createdAt: studioRow.createdAt,
+      updatedAt: studioRow.updatedAt,
+      troupeTitle: '',
+      studioTitle: studioRow.studio.title,
+      tariffs: studioRow.tariffs,
+      participants: studioRow.participants,
+      contributions: studioRow.contributions,
+    };
   }
 
   private serializeCollectionSummary(
     row: {
+      scope: CollectionScope;
       id: string;
       troupeId: string;
+      studioId: string;
+      theaterId: string | null;
       title: string;
       description: string | null;
-      status: TroupeCollectionStatus;
+      status: TroupeCollectionStatus | StudioCollectionStatus;
       dueAt: Date | null;
       premiseId: string | null;
       createdByEmail: string;
       createdAt: Date;
       updatedAt: Date;
-      troupe: { id: string; title: string };
+      troupeTitle: string;
+      studioTitle: string;
       tariffs: Array<{ amountKopecks: number }>;
       participants: Array<{
         email: string;
@@ -428,10 +893,16 @@ export class AccountingService {
       return paid >= p.tariff.amountKopecks;
     }).length;
 
+    const isStudio = row.scope === 'studio';
+
     return {
       id: row.id,
-      troupeId: row.troupeId,
-      troupeTitle: row.troupe.title,
+      scope: row.scope,
+      troupeId: isStudio ? '' : row.troupeId,
+      troupeTitle: isStudio ? '' : row.troupeTitle,
+      studioId: isStudio ? row.studioId : null,
+      studioTitle: isStudio ? row.studioTitle : null,
+      theaterId: row.theaterId,
       title: row.title,
       description: row.description,
       status: row.status,
@@ -452,7 +923,7 @@ export class AccountingService {
   }
 
   private async serializeCollectionDetail(
-    row: Awaited<ReturnType<AccountingService['loadCollectionDetail']>>,
+    row: CollectionDetailRow,
     canManage: boolean,
     userEmail: string,
   ) {
@@ -487,32 +958,119 @@ export class AccountingService {
   async listCollections(userId: string, userEmail: string) {
     const createContext = await this.buildCreateContext(userId, userEmail);
     const troupeIds = await this.resolveAccessibleTroupeIds(userId, userEmail);
-    if (troupeIds.length === 0) {
-      return { collections: [], ...createContext };
-    }
+    const studioIds = await this.resolveAccessibleStudioIds(userId, userEmail);
 
-    const rows = await this.prisma.troupeCollection.findMany({
-      where: { troupeId: { in: troupeIds } },
-      include: {
-        troupe: { select: { id: true, title: true, ownerUserId: true } },
-        tariffs: { select: { amountKopecks: true } },
-        participants: {
-          include: { tariff: { select: { amountKopecks: true } } },
-        },
-        contributions: { select: { email: true, amountKopecks: true } },
-      },
-      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-    });
+    const [troupeRows, studioRows] = await Promise.all([
+      troupeIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.troupeCollection.findMany({
+            where: { troupeId: { in: troupeIds } },
+            include: {
+              troupe: {
+                select: {
+                  id: true,
+                  title: true,
+                  ownerUserId: true,
+                  theaterId: true,
+                },
+              },
+              tariffs: { select: { amountKopecks: true } },
+              participants: {
+                include: { tariff: { select: { amountKopecks: true } } },
+              },
+              contributions: { select: { email: true, amountKopecks: true } },
+            },
+            orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+          }),
+      studioIds.length === 0
+        ? Promise.resolve([])
+        : this.prisma.studioCollection.findMany({
+            where: { studioId: { in: studioIds } },
+            include: {
+              studio: { select: { id: true, title: true, ownerUserId: true } },
+              tariffs: { select: { amountKopecks: true } },
+              participants: {
+                include: { tariff: { select: { amountKopecks: true } } },
+              },
+              contributions: { select: { email: true, amountKopecks: true } },
+            },
+            orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+          }),
+    ]);
 
-    const collections = await Promise.all(
-      rows.map(async (row) => {
+    const troupeCollections = await Promise.all(
+      troupeRows.map(async (row) => {
         const canManage = await this.isAccountantForTroupe(
           row.troupe.ownerUserId,
           userId,
           userEmail,
         );
-        return this.serializeCollectionSummary(row, canManage);
+        return this.serializeCollectionSummary(
+          {
+            scope: 'troupe',
+            id: row.id,
+            troupeId: row.troupeId,
+            studioId: '',
+            theaterId: row.troupe.theaterId,
+            title: row.title,
+            description: row.description,
+            status: row.status,
+            dueAt: row.dueAt,
+            premiseId: row.premiseId,
+            createdByEmail: row.createdByEmail,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            troupeTitle: row.troupe.title,
+            studioTitle: '',
+            tariffs: row.tariffs,
+            participants: row.participants,
+            contributions: row.contributions,
+          },
+          canManage,
+        );
       }),
+    );
+
+    const studioCollections = await Promise.all(
+      studioRows.map(async (row) => {
+        const canManage = await this.canManageStudio(
+          userId,
+          userEmail,
+          row.studioId,
+        );
+        return this.serializeCollectionSummary(
+          {
+            scope: 'studio',
+            id: row.id,
+            troupeId: '',
+            studioId: row.studioId,
+            theaterId: null,
+            title: row.title,
+            description: row.description,
+            status: row.status,
+            dueAt: row.dueAt,
+            premiseId: null,
+            createdByEmail: row.createdByEmail,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            troupeTitle: '',
+            studioTitle: row.studio.title,
+            tariffs: row.tariffs,
+            participants: row.participants,
+            contributions: row.contributions,
+          },
+          canManage,
+        );
+      }),
+    );
+
+    const collections = [...troupeCollections, ...studioCollections].sort(
+      (a, b) => {
+        if (a.status !== b.status) {
+          return a.status < b.status ? -1 : 1;
+        }
+        return b.createdAt.localeCompare(a.createdAt);
+      },
     );
 
     return { collections, ...createContext };
@@ -524,16 +1082,21 @@ export class AccountingService {
       userEmail,
       collectionId,
     );
-    const row = await this.loadCollectionDetail(access.collection.id);
-    return await this.serializeCollectionDetail(row, access.canManage, userEmail);
+    const row = await this.loadCollectionDetail(access.collectionId);
+    return await this.serializeCollectionDetail(
+      row,
+      access.canManage,
+      userEmail,
+    );
   }
 
-  async createCollection(
+  private async createTroupeCollection(
     userId: string,
     userEmail: string,
+    troupeId: string,
     body: CreateCollectionDto,
   ) {
-    const troupe = await this.getOrCreateMyTroupe(userId);
+    const troupe = await this.assertUserInTroupe(userId, userEmail, troupeId);
     const canManage = await this.isAccountantForTroupe(
       troupe.ownerUserId,
       userId,
@@ -616,6 +1179,111 @@ export class AccountingService {
     return this.getCollection(userId, userEmail, collectionId);
   }
 
+  private async createStudioCollection(
+    userId: string,
+    userEmail: string,
+    studioId: string,
+    body: CreateCollectionDto,
+  ) {
+    await this.assertUserInStudio(userId, userEmail, studioId);
+    const canManage = await this.canManageStudio(userId, userEmail, studioId);
+    if (!canManage) {
+      throw new ForbiddenException('Недостаточно прав для создания сбора');
+    }
+
+    if (body.premiseId) {
+      throw new BadRequestException('premiseId is not supported for studio collections');
+    }
+
+    const title = String(body.title ?? '').trim();
+    if (!title) throw new BadRequestException('title is required');
+
+    const tariffs = body.tariffs ?? [];
+    if (tariffs.length === 0) {
+      throw new BadRequestException('At least one tariff is required');
+    }
+
+    const participants = body.participants ?? [];
+    if (participants.length === 0) {
+      throw new BadRequestException('At least one participant is required');
+    }
+
+    const dueAt = parseOptionalDate(body.dueAt);
+    const createdByEmail = normalizeEmail(userEmail);
+
+    const collectionId = await this.prisma.$transaction(async (tx) => {
+      const collection = await tx.studioCollection.create({
+        data: {
+          studioId,
+          title,
+          description: body.description?.trim() || null,
+          dueAt,
+          createdByEmail,
+        },
+      });
+
+      const tariffRows = await Promise.all(
+        tariffs.map((tariff, index) =>
+          tx.studioCollectionTariff.create({
+            data: {
+              collectionId: collection.id,
+              title: String(tariff.title ?? '').trim(),
+              amountKopecks: rubToKopecks(tariff.amountRub),
+              sortOrder: index * 10,
+            },
+          }),
+        ),
+      );
+
+      const participantData = participants.map((p) => {
+        const email = normalizeEmail(p.email);
+        const tariff = tariffRows[p.tariffIndex];
+        if (!tariff) {
+          throw new BadRequestException(`Invalid tariffIndex for ${email}`);
+        }
+        return {
+          collectionId: collection.id,
+          email,
+          tariffId: tariff.id,
+        };
+      });
+
+      await tx.studioCollectionParticipant.createMany({
+        data: participantData,
+        skipDuplicates: true,
+      });
+
+      return collection.id;
+    });
+
+    return this.getCollection(userId, userEmail, collectionId);
+  }
+
+  async createCollection(
+    userId: string,
+    userEmail: string,
+    body: CreateCollectionDto,
+  ) {
+    const troupeId = body.troupeId?.trim() || '';
+    const studioId = body.studioId?.trim() || '';
+    if (troupeId && studioId) {
+      throw new BadRequestException('Pass either troupeId or studioId, not both');
+    }
+
+    if (studioId) {
+      return this.createStudioCollection(userId, userEmail, studioId, body);
+    }
+
+    const resolvedTroupeId =
+      troupeId || (await this.getOrCreateMyTroupe(userId)).id;
+    return this.createTroupeCollection(
+      userId,
+      userEmail,
+      resolvedTroupeId,
+      body,
+    );
+  }
+
   async updateCollection(
     userId: string,
     userEmail: string,
@@ -632,7 +1300,7 @@ export class AccountingService {
     const data: {
       title?: string;
       description?: string | null;
-      status?: TroupeCollectionStatus;
+      status?: TroupeCollectionStatus | StudioCollectionStatus;
       dueAt?: Date | null;
       premiseId?: string | null;
     } = {};
@@ -651,26 +1319,41 @@ export class AccountingService {
     if (body.dueAt !== undefined) {
       data.dueAt = parseOptionalDate(body.dueAt);
     }
-    if (body.premiseId !== undefined) {
-      if (body.premiseId) {
-        const premise = await this.prisma.premise.findFirst({
-          where: {
-            id: body.premiseId,
-            troupeId: access.collection.troupeId,
-          },
-          select: { id: true },
-        });
-        if (!premise) throw new BadRequestException('Invalid premiseId');
-        data.premiseId = body.premiseId;
-      } else {
-        data.premiseId = null;
-      }
-    }
 
-    await this.prisma.troupeCollection.update({
-      where: { id: collectionId },
-      data,
-    });
+    if (access.scope === 'troupe') {
+      if (body.premiseId !== undefined) {
+        if (body.premiseId) {
+          const premise = await this.prisma.premise.findFirst({
+            where: {
+              id: body.premiseId,
+              troupeId: access.troupeId ?? undefined,
+            },
+            select: { id: true },
+          });
+          if (!premise) throw new BadRequestException('Invalid premiseId');
+          data.premiseId = body.premiseId;
+        } else {
+          data.premiseId = null;
+        }
+      }
+
+      await this.prisma.troupeCollection.update({
+        where: { id: collectionId },
+        data,
+      });
+    } else {
+      if (body.premiseId) {
+        throw new BadRequestException(
+          'premiseId is not supported for studio collections',
+        );
+      }
+      const { premiseId: _premiseId, ...studioData } = data;
+      void _premiseId;
+      await this.prisma.studioCollection.update({
+        where: { id: collectionId },
+        data: studioData,
+      });
+    }
 
     return this.getCollection(userId, userEmail, collectionId);
   }
@@ -686,7 +1369,11 @@ export class AccountingService {
       collectionId,
     );
     this.assertCanManage(access);
-    await this.prisma.troupeCollection.delete({ where: { id: collectionId } });
+    if (access.scope === 'troupe') {
+      await this.prisma.troupeCollection.delete({ where: { id: collectionId } });
+    } else {
+      await this.prisma.studioCollection.delete({ where: { id: collectionId } });
+    }
     return { ok: true };
   }
 
@@ -708,52 +1395,101 @@ export class AccountingService {
       throw new BadRequestException('At least one tariff is required');
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.troupeCollectionTariff.findMany({
-        where: { collectionId },
-        select: { id: true },
-      });
-      const keepIds = new Set(
-        tariffs.map((t) => t.id).filter((id): id is string => Boolean(id)),
-      );
-      const removeIds = existing
-        .map((t) => t.id)
-        .filter((id) => !keepIds.has(id));
-      if (removeIds.length > 0) {
-        const used = await tx.troupeCollectionParticipant.count({
-          where: { tariffId: { in: removeIds } },
+    if (access.scope === 'troupe') {
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.troupeCollectionTariff.findMany({
+          where: { collectionId },
+          select: { id: true },
         });
-        if (used > 0) {
-          throw new BadRequestException(
-            'Нельзя удалить тариф, назначенный участникам',
-          );
+        const keepIds = new Set(
+          tariffs.map((t) => t.id).filter((id): id is string => Boolean(id)),
+        );
+        const removeIds = existing
+          .map((t) => t.id)
+          .filter((id) => !keepIds.has(id));
+        if (removeIds.length > 0) {
+          const used = await tx.troupeCollectionParticipant.count({
+            where: { tariffId: { in: removeIds } },
+          });
+          if (used > 0) {
+            throw new BadRequestException(
+              'Нельзя удалить тариф, назначенный участникам',
+            );
+          }
+          await tx.troupeCollectionTariff.deleteMany({
+            where: { id: { in: removeIds } },
+          });
         }
-        await tx.troupeCollectionTariff.deleteMany({
-          where: { id: { in: removeIds } },
-        });
-      }
 
-      for (let index = 0; index < tariffs.length; index++) {
-        const tariff = tariffs[index];
-        const title = String(tariff.title ?? '').trim();
-        const amountKopecks = rubToKopecks(tariff.amountRub);
-        if (tariff.id) {
-          await tx.troupeCollectionTariff.update({
-            where: { id: tariff.id },
-            data: { title, amountKopecks, sortOrder: index * 10 },
+        for (let index = 0; index < tariffs.length; index++) {
+          const tariff = tariffs[index];
+          const title = String(tariff.title ?? '').trim();
+          const amountKopecks = rubToKopecks(tariff.amountRub);
+          if (tariff.id) {
+            await tx.troupeCollectionTariff.update({
+              where: { id: tariff.id },
+              data: { title, amountKopecks, sortOrder: index * 10 },
+            });
+          } else {
+            await tx.troupeCollectionTariff.create({
+              data: {
+                collectionId,
+                title,
+                amountKopecks,
+                sortOrder: index * 10,
+              },
+            });
+          }
+        }
+      });
+    } else {
+      await this.prisma.$transaction(async (tx) => {
+        const existing = await tx.studioCollectionTariff.findMany({
+          where: { collectionId },
+          select: { id: true },
+        });
+        const keepIds = new Set(
+          tariffs.map((t) => t.id).filter((id): id is string => Boolean(id)),
+        );
+        const removeIds = existing
+          .map((t) => t.id)
+          .filter((id) => !keepIds.has(id));
+        if (removeIds.length > 0) {
+          const used = await tx.studioCollectionParticipant.count({
+            where: { tariffId: { in: removeIds } },
           });
-        } else {
-          await tx.troupeCollectionTariff.create({
-            data: {
-              collectionId,
-              title,
-              amountKopecks,
-              sortOrder: index * 10,
-            },
+          if (used > 0) {
+            throw new BadRequestException(
+              'Нельзя удалить тариф, назначенный участникам',
+            );
+          }
+          await tx.studioCollectionTariff.deleteMany({
+            where: { id: { in: removeIds } },
           });
         }
-      }
-    });
+
+        for (let index = 0; index < tariffs.length; index++) {
+          const tariff = tariffs[index];
+          const title = String(tariff.title ?? '').trim();
+          const amountKopecks = rubToKopecks(tariff.amountRub);
+          if (tariff.id) {
+            await tx.studioCollectionTariff.update({
+              where: { id: tariff.id },
+              data: { title, amountKopecks, sortOrder: index * 10 },
+            });
+          } else {
+            await tx.studioCollectionTariff.create({
+              data: {
+                collectionId,
+                title,
+                amountKopecks,
+                sortOrder: index * 10,
+              },
+            });
+          }
+        }
+      });
+    }
 
     return this.getCollection(userId, userEmail, collectionId);
   }
@@ -772,35 +1508,72 @@ export class AccountingService {
     this.assertCanManage(access);
 
     const participants = body.participants ?? [];
-    const tariffIds = new Set(
-      (
-        await this.prisma.troupeCollectionTariff.findMany({
+
+    if (access.scope === 'troupe') {
+      const tariffIds = new Set(
+        (
+          await this.prisma.troupeCollectionTariff.findMany({
+            where: { collectionId },
+            select: { id: true },
+          })
+        ).map((t) => t.id),
+      );
+
+      const normalized = participants.map((p) => {
+        const email = normalizeEmail(p.email);
+        if (!tariffIds.has(p.tariffId)) {
+          throw new BadRequestException(`Invalid tariffId for ${email}`);
+        }
+        return { email, tariffId: p.tariffId };
+      });
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.troupeCollectionParticipant.deleteMany({
           where: { collectionId },
-          select: { id: true },
-        })
-      ).map((t) => t.id),
-    );
-
-    const normalized = participants.map((p) => {
-      const email = normalizeEmail(p.email);
-      if (!tariffIds.has(p.tariffId)) {
-        throw new BadRequestException(`Invalid tariffId for ${email}`);
-      }
-      return { email, tariffId: p.tariffId };
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.troupeCollectionParticipant.deleteMany({ where: { collectionId } });
-      if (normalized.length > 0) {
-        await tx.troupeCollectionParticipant.createMany({
-          data: normalized.map((p) => ({
-            collectionId,
-            email: p.email,
-            tariffId: p.tariffId,
-          })),
         });
-      }
-    });
+        if (normalized.length > 0) {
+          await tx.troupeCollectionParticipant.createMany({
+            data: normalized.map((p) => ({
+              collectionId,
+              email: p.email,
+              tariffId: p.tariffId,
+            })),
+          });
+        }
+      });
+    } else {
+      const tariffIds = new Set(
+        (
+          await this.prisma.studioCollectionTariff.findMany({
+            where: { collectionId },
+            select: { id: true },
+          })
+        ).map((t) => t.id),
+      );
+
+      const normalized = participants.map((p) => {
+        const email = normalizeEmail(p.email);
+        if (!tariffIds.has(p.tariffId)) {
+          throw new BadRequestException(`Invalid tariffId for ${email}`);
+        }
+        return { email, tariffId: p.tariffId };
+      });
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.studioCollectionParticipant.deleteMany({
+          where: { collectionId },
+        });
+        if (normalized.length > 0) {
+          await tx.studioCollectionParticipant.createMany({
+            data: normalized.map((p) => ({
+              collectionId,
+              email: p.email,
+              tariffId: p.tariffId,
+            })),
+          });
+        }
+      });
+    }
 
     return this.getCollection(userId, userEmail, collectionId);
   }
@@ -822,19 +1595,45 @@ export class AccountingService {
     const isSelf = payerEmail === actorEmail;
 
     if (!access.canManage && !isSelf) {
-      throw new ForbiddenException(
-        'Можно фиксировать только свой взнос',
-      );
+      throw new ForbiddenException('Можно фиксировать только свой взнос');
     }
 
-    const participant = await this.prisma.troupeCollectionParticipant.findUnique(
-      {
+    if (access.scope === 'troupe') {
+      const participant =
+        await this.prisma.troupeCollectionParticipant.findUnique({
+          where: {
+            collectionId_email: { collectionId, email: payerEmail },
+          },
+          select: { id: true },
+        });
+      if (!participant) {
+        throw new BadRequestException('Участник не включён в этот сбор');
+      }
+
+      const paidAt = parseOptionalDate(body.paidAt) ?? new Date();
+      const amountKopecks = rubToKopecks(body.amountRub);
+
+      const contribution = await this.prisma.troupeContribution.create({
+        data: {
+          collectionId,
+          email: payerEmail,
+          amountKopecks,
+          paidAt,
+          recordedByEmail: actorEmail,
+          note: body.note?.trim() || null,
+        },
+      });
+
+      return this.serializeContribution(contribution);
+    }
+
+    const participant =
+      await this.prisma.studioCollectionParticipant.findUnique({
         where: {
           collectionId_email: { collectionId, email: payerEmail },
         },
         select: { id: true },
-      },
-    );
+      });
     if (!participant) {
       throw new BadRequestException('Участник не включён в этот сбор');
     }
@@ -842,7 +1641,7 @@ export class AccountingService {
     const paidAt = parseOptionalDate(body.paidAt) ?? new Date();
     const amountKopecks = rubToKopecks(body.amountRub);
 
-    const contribution = await this.prisma.troupeContribution.create({
+    const contribution = await this.prisma.studioContribution.create({
       data: {
         collectionId,
         email: payerEmail,
@@ -869,21 +1668,30 @@ export class AccountingService {
     );
     this.assertCanManage(access);
 
-    const row = await this.prisma.troupeContribution.findFirst({
+    if (access.scope === 'troupe') {
+      const row = await this.prisma.troupeContribution.findFirst({
+        where: { id: contributionId, collectionId },
+        select: { id: true },
+      });
+      if (!row) throw new NotFoundException('Contribution not found');
+      await this.prisma.troupeContribution.delete({
+        where: { id: contributionId },
+      });
+      return { ok: true };
+    }
+
+    const row = await this.prisma.studioContribution.findFirst({
       where: { id: contributionId, collectionId },
       select: { id: true },
     });
     if (!row) throw new NotFoundException('Contribution not found');
-
-    await this.prisma.troupeContribution.delete({ where: { id: contributionId } });
+    await this.prisma.studioContribution.delete({
+      where: { id: contributionId },
+    });
     return { ok: true };
   }
 
-  async remindDebtors(
-    userId: string,
-    userEmail: string,
-    collectionId: string,
-  ) {
+  async remindDebtors(userId: string, userEmail: string, collectionId: string) {
     const access = await this.resolveCollectionAccess(
       userId,
       userEmail,
@@ -910,6 +1718,8 @@ export class AccountingService {
       ? `${appBase}/accounting/${collectionId}`
       : `/accounting/${collectionId}`;
     const dueAtLabel = this.formatDueAtLabel(row.dueAt);
+    const ownerTitle =
+      row.scope === 'studio' ? row.studioTitle : row.troupeTitle;
 
     const debtors = row.participants
       .map((participant) =>
@@ -934,7 +1744,7 @@ export class AccountingService {
         await this.mailService.sendCollectionDebtReminder(debtor.email, {
           recipientName: debtor.displayName,
           collectionTitle: row.title,
-          troupeTitle: row.troupe.title,
+          troupeTitle: ownerTitle,
           amountRub: debtor.remainingRub,
           dueAt: dueAtLabel,
           collectionUrl,
@@ -943,7 +1753,9 @@ export class AccountingService {
       } catch (error) {
         failed += 1;
         const message =
-          error instanceof Error ? error.message : 'Не удалось отправить письмо';
+          error instanceof Error
+            ? error.message
+            : 'Не удалось отправить письмо';
         errors.push(`${debtor.email}: ${message}`);
       }
     }

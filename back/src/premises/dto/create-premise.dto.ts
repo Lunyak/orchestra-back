@@ -3,6 +3,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -12,6 +13,14 @@ export class CreatePremiseDto {
   @IsString()
   @MaxLength(120)
   name: string;
+
+  @IsOptional()
+  @IsString()
+  theaterId?: string;
+
+  @IsOptional()
+  @IsString()
+  studioId?: string;
 
   @IsOptional()
   @IsEnum(PremiseKind)
@@ -26,6 +35,12 @@ export class CreatePremiseDto {
   @IsInt()
   @Min(1)
   capacity?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(31)
+  paymentDueDay?: number;
 
   @IsOptional()
   @IsString()

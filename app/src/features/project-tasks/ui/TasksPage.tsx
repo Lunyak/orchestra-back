@@ -57,8 +57,7 @@ function nextStatus(status: ProjectTaskStatus): ProjectTaskStatus {
 function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
   const {
     accessToken,
-    filter,
-    setFilter,
+    projectSlug,
     newTitle,
     setNewTitle,
     newDescription,
@@ -72,9 +71,6 @@ function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
     assigneeMemberByEmail,
     assigneeSelectOptions,
     tasks,
-    totalTasksCount,
-    openTasksCount,
-    myOpenTasksCount,
     requisiteImportCount,
     loading,
     creating,
@@ -155,56 +151,8 @@ function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
     <div className="tasks-page">
       <RehearsalPlanSectionChrome activeTab="tasks">
         <div className="tasks-page__content">
-          <div className="tasks-page__toolbar">
-            <div
-              className="tasks-page__filters"
-              role="tablist"
-              aria-label="Фильтр задач"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={filter === "open"}
-                className={cn(
-                  "tasks-page__filter",
-                  filter === "open" && "tasks-page__filter--active",
-                )}
-                onClick={() => setFilter("open")}
-              >
-                Открытые
-                <span className="tasks-page__filter-count">{openTasksCount}</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={filter === "mine"}
-                className={cn(
-                  "tasks-page__filter",
-                  filter === "mine" && "tasks-page__filter--active",
-                )}
-                onClick={() => setFilter("mine")}
-              >
-                Мои
-                <span className="tasks-page__filter-count">
-                  {myOpenTasksCount}
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={filter === "all"}
-                className={cn(
-                  "tasks-page__filter",
-                  filter === "all" && "tasks-page__filter--active",
-                )}
-                onClick={() => setFilter("all")}
-              >
-                Все
-                <span className="tasks-page__filter-count">{totalTasksCount}</span>
-              </button>
-            </div>
-
-            {showImport ? (
+          {showImport ? (
+            <div className="tasks-page__toolbar">
               <Button
                 type="button"
                 variant="secondary"
@@ -216,8 +164,8 @@ function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
                   ? "Импорт…"
                   : `Из реквизита (${requisiteImportCount})`}
               </Button>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           <form className="tasks-page__compose" onSubmit={handleCreateSubmit}>
             <div className="tasks-page__compose-main">
@@ -305,6 +253,7 @@ function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
               {tasks.map((task) => (
                 <TaskRow
                   key={task.id}
+                  projectSlug={projectSlug}
                   task={task}
                   assigneeOptions={assigneeOptionsWithEmpty}
                   renderAssigneePerson={renderAssigneePerson}
@@ -323,6 +272,7 @@ function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
 
 type TaskRowProps = {
   task: ProjectTaskItem;
+  projectSlug: string;
   assigneeOptions: Array<{ value: string; label: string; searchText?: string }>;
   renderAssigneePerson: (
     email: string | null | undefined,
@@ -336,6 +286,7 @@ type TaskRowProps = {
 
 function TaskRow({
   task,
+  projectSlug,
   assigneeOptions,
   renderAssigneePerson,
   onStatusChange,
@@ -384,7 +335,7 @@ function TaskRow({
       <div className="tasks-page__item-primary">
         <Link
           className="tasks-page__item-title"
-          to={buildTaskPath(task.id, task.title)}
+          to={buildTaskPath(projectSlug, task.id, task.title)}
         >
           {task.title}
         </Link>

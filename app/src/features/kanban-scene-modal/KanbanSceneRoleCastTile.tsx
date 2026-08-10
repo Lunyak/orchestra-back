@@ -3,6 +3,7 @@ import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
 import type { ProjectRoleInfo } from "../../sync/api/projects";
 import type { KanbanSceneRolesAdminMember } from "./KanbanSceneRolesAdminPanel";
 import { actorDisplay, findAssignmentMember } from "./KanbanSceneCastDisplay";
+import "./KanbanSceneCastTile.css";
 
 export type KanbanSceneRoleCastTileProps = {
   roleKey: string;
@@ -12,7 +13,7 @@ export type KanbanSceneRoleCastTileProps = {
   members: KanbanSceneRolesAdminMember[];
   accessToken?: string | null;
   onOpenRole: (roleId: string) => void;
-  onOpenRolesAdmin: () => void;
+  onOpenRolesAdmin?: () => void;
 };
 
 export function KanbanSceneRoleCastTile({
@@ -34,7 +35,7 @@ export function KanbanSceneRoleCastTile({
       onOpenRole(roleInfo.id);
       return;
     }
-    onOpenRolesAdmin();
+    onOpenRolesAdmin?.();
   };
 
   return (

@@ -19,5 +19,5 @@ RUN npx prisma generate
 # Expose ports
 EXPOSE 3000 9229
 
-# Hot reload через nodemon/nest start:dev
-CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:dev"]
+# Dev runner: polling для TypeScript + перезапуск после изменений Prisma.
+CMD ["npm", "run", "start:dev"]

@@ -1,5 +1,4 @@
-import { SPECTACLE_HUB_ROUTE_PATH } from "../../../app/router/routeMeta";
-import { ADMIN_NAV_PATH } from "../../../shared/components/header/header-nav-items";
+import { globalPaths } from "../../../app/router/paths";
 import spectacleImageUrl from "../assets/app-hub-spectacle.png";
 import adminImageUrl from "../assets/app-hub-admin.png";
 import trainersImageUrl from "../assets/app-hub-trainers.png";
@@ -18,18 +17,18 @@ export type AppHubDestination = {
 
 export const APP_HUB_DESTINATIONS: AppHubDestination[] = [
   {
-    id: "spectacle",
-    path: SPECTACLE_HUB_ROUTE_PATH,
-    label: "Спектакль",
-    description: "Сценарий, свет, прогон, 3D",
+    id: "projects",
+    path: globalPaths.projects,
+    label: "Проекты",
+    description: "Спектакли и рабочие разделы",
     imageSrc: spectacleImageUrl,
     imageAlt: "Пустая сцена и красный занавес",
   },
   {
-    id: "admin",
-    path: ADMIN_NAV_PATH,
-    label: "Администрирование",
-    description: "Репетиции, команда, задачи",
+    id: "organizations",
+    path: globalPaths.organizations,
+    label: "Организации",
+    description: "Театры, коллективы и студии",
     imageSrc: adminImageUrl,
     imageAlt: "Стол с бумагами и печатью",
   },
@@ -43,25 +42,25 @@ export const APP_HUB_DESTINATIONS: AppHubDestination[] = [
   },
   {
     id: "studio",
-    path: "/studio",
-    label: "Студия",
+    path: globalPaths.studios,
+    label: "Студии",
     description: "Программы и уроки",
     imageSrc: studioImageUrl,
     imageAlt: "Студийный микрофон и хлопушка",
   },
   {
     id: "profile",
-    path: "/profile",
+    path: globalPaths.profile,
     label: "Профиль",
     description: "Данные и роли",
     imageSrc: profileImageUrl,
     imageAlt: "Театральная маска",
   },
   {
-    id: "settings",
-    path: "/settings",
-    label: "Настройки",
-    description: "Параметры приложения",
+    id: "projects-settings",
+    path: globalPaths.projects,
+    label: "Настройки проектов",
+    description: "Открываются внутри проекта",
     imageSrc: settingsImageUrl,
     imageAlt: "Винтажная панель управления",
   },

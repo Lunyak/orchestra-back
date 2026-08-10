@@ -5,6 +5,7 @@ import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import cn from "classnames";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link, useParams } from "react-router-dom";
+import { studioProgramPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import {
@@ -260,7 +261,7 @@ export function StudioLessonPage() {
             <div className="studio-page">
               <Link
                 className="studio-page__back"
-                to={`/studio/${studioId}/programs/${programId}`}
+                to={studioProgramPath(studioId, programId)}
               >
                 ← Программа
               </Link>
@@ -286,7 +287,7 @@ export function StudioLessonPage() {
           <div className="studio-page">
             <Link
               className="studio-page__back"
-              to={`/studio/${studioId}/programs/${programId}`}
+              to={studioProgramPath(studioId, programId)}
             >
               ← {backTitle}
             </Link>

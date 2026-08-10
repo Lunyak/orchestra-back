@@ -1,4 +1,9 @@
 import { resolveRehearsalPlanEntryPath } from "./rehearsalPlanTab";
+import {
+  getProjectSectionFromPath,
+  globalPaths,
+  isTheaterTeamPath,
+} from "../../app/router/paths";
 
 export type AdminSection =
   | "plan"
@@ -40,19 +45,18 @@ export function writeAdminSection(section: AdminSection): void {
 }
 
 export function adminSectionFromPath(pathname: string): AdminSection | null {
-  if (pathname === "/tasks" || pathname.startsWith("/tasks/")) return "tasks";
+  const section = getProjectSectionFromPath(pathname);
+  if (section === "tasks") return "tasks";
+  if (section === "board" || section === "sessions") return "plan";
   if (
-    pathname === "/board" ||
-    pathname === "/sessions" ||
-    pathname.startsWith("/sessions/")
+    section === "accounting" ||
+    pathname === globalPaths.accounting ||
+    pathname.startsWith(`${globalPaths.accounting}/`)
   ) {
-    return "plan";
+    return "accounting";
   }
-  if (pathname.startsWith("/accounting")) return "accounting";
-  if (pathname.startsWith("/premises")) return "premises";
-  if (pathname === "/troupe" || pathname.startsWith("/troupe/")) {
-    return "team";
-  }
+  if (section === "premises") return "premises";
+  if (isTheaterTeamPath(pathname) || section === "team") return "team";
   return null;
 }
 
@@ -62,7 +66,7 @@ export function resolveAdminPlanEntryPath(): string {
 
 export function resolveAdminEntryPath(): string {
   const section = readAdminSection();
-  if (section === "team") return "/troupe";
+  if (section === "team") return globalPaths.organizations;
   if (section === "tasks") return "/tasks";
   if (section === "accounting") return "/accounting";
   if (section === "premises") return "/premises";
@@ -70,25 +74,26 @@ export function resolveAdminEntryPath(): string {
 }
 
 export function isAdminPlanPath(pathname: string): boolean {
-  return (
-    pathname === "/board" ||
-    pathname === "/sessions" ||
-    pathname.startsWith("/sessions/")
-  );
+  const section = getProjectSectionFromPath(pathname);
+  return section === "board" || section === "sessions";
 }
 
 export function isAdminTeamPath(pathname: string): boolean {
-  return pathname === "/troupe" || pathname.startsWith("/troupe/");
+  return isTheaterTeamPath(pathname);
 }
 
 export function isAdminTasksPath(pathname: string): boolean {
-  return pathname === "/tasks" || pathname.startsWith("/tasks/");
+  return getProjectSectionFromPath(pathname) === "tasks";
 }
 
 export function isAdminAccountingPath(pathname: string): boolean {
-  return pathname.startsWith("/accounting");
+  return (
+    pathname === globalPaths.accounting ||
+    pathname.startsWith(`${globalPaths.accounting}/`) ||
+    getProjectSectionFromPath(pathname) === "accounting"
+  );
 }
 
 export function isAdminPremisesPath(pathname: string): boolean {
-  return pathname.startsWith("/premises");
+  return getProjectSectionFromPath(pathname) === "premises";
 }

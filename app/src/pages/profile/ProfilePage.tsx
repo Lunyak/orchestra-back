@@ -58,7 +58,6 @@ export function ProfilePage() {
       <div className="app-content">
         <main className="main-content main-content-profile">
           <div className="profile-view">
-            <h1 className="profile-page-title">Профиль</h1>
             {isLimitedProductionMode ? (
               <div className="profile-tabs-disabled-note">
                 Некоторые разделы профиля временно недоступны в production. Страница в стадии разработки.

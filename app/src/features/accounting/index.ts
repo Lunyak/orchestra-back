@@ -18,7 +18,7 @@ export {
   collectionProgressPercent,
 } from "./model/format-rub";
 
-export { collectionStatusLabel } from "../../sync/api/accounting";
+export { collectionStatusLabel, collectionOwnerLabel } from "../../sync/api/accounting";
 
 export type {
   CollectionDetail,
@@ -28,4 +28,6 @@ export type {
   CollectionContributionItem,
   CreateCollectionPayload,
   TroupeCollectionStatus,
+  CollectionScope,
+  AccountingScopes,
 } from "../../sync/api/accounting";

@@ -19,15 +19,19 @@ export function buildSessionSlotInsights(
     .map((sl) => {
       const ref = sl.ref;
       if (!ref) {
+        const customTitle = String(sl.title ?? "").trim();
+        const participantEmails = (sl.participantEmails ?? [])
+          .map((email) => normalizeEmail(String(email ?? "")))
+          .filter(Boolean);
         return {
           slotId: sl.id,
           time: formatSlotTime(session.startsAt, sl.offsetMin),
           projectLabel: "",
-          sceneLabel: "Материал не выбран",
-          title: "Материал не выбран",
-          ready: false,
+          sceneLabel: customTitle || "Слот без названия",
+          title: customTitle || "Слот без названия",
+          ready: Boolean(customTitle),
           missingRoles: [] as string[],
-          actors: [] as string[],
+          actors: Array.from(new Set(participantEmails)),
         };
       }
 
@@ -73,7 +77,9 @@ export function computeSlotGatherStatus(
   insight: SlotInsight,
   slot: DirectorSessionSlot | null | undefined,
 ): SlotGatherStatus {
-  if (!slot?.ref) return "none";
+  if (!slot) return "none";
+  const isCustomSlot = !slot.ref && Boolean(String(slot.title ?? "").trim());
+  if (!slot.ref && !isCustomSlot) return "none";
   if (!insight.ready) return "bad";
 
   const actors = insight.actors ?? [];

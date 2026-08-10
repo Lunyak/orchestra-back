@@ -10,7 +10,9 @@ export type NotesRunCardV1 = {
   id: string;
   cardNo: number;
   title: string;
-  /** Произвольная метка сцены сценария (текст, не id). */
+  /** Id сцены сценария (ScriptScene.id), если карточка привязана. */
+  sceneId: number | null;
+  /** Подпись сцены для отображения (кэш title; при наличии sceneId синхронизируется). */
   sceneLabel: string;
   lightLines: NotesRunLightLineV1[];
   /** Доп. текст по свету — если не хватает таблицы строк. */
@@ -29,6 +31,7 @@ export type NotesRunDataV1 = {
 
 export type NotesRunCardDraft = {
   title: string;
+  sceneId: number | null;
   sceneLabel: string;
   lightLines: NotesRunLightLineV1[];
   lightNotes: string;
@@ -37,4 +40,12 @@ export type NotesRunCardDraft = {
   projectorCue: KadrProjectorCue | null;
   transitionText: string;
   commentText: string;
+};
+
+export type NotesRunSceneGroup = {
+  sceneIndex: number;
+  sceneId: number | null;
+  sceneOrdinal: number;
+  sceneTitle: string;
+  items: Array<{ cardIndex: number; card: NotesRunCardV1 }>;
 };

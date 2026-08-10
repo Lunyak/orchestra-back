@@ -56,6 +56,39 @@ export class StudioController {
     return this.studio.acceptInvite(req.user.userId, req.user.email, token);
   }
 
+  @Get('invites/by-id/:inviteId')
+  previewAddressedInvite(
+    @Req() req: any,
+    @Param('inviteId') inviteId: string,
+  ) {
+    return this.studio.previewAddressedInvite(
+      req.user.userId,
+      req.user.email,
+      inviteId,
+    );
+  }
+
+  @Post('invites/by-id/:inviteId/accept')
+  acceptAddressedInvite(@Req() req: any, @Param('inviteId') inviteId: string) {
+    return this.studio.acceptAddressedInvite(
+      req.user.userId,
+      req.user.email,
+      inviteId,
+    );
+  }
+
+  @Post('invites/by-id/:inviteId/decline')
+  declineAddressedInvite(
+    @Req() req: any,
+    @Param('inviteId') inviteId: string,
+  ) {
+    return this.studio.declineAddressedInvite(
+      req.user.userId,
+      req.user.email,
+      inviteId,
+    );
+  }
+
   @Get(':id')
   get(@Req() req: any, @Param('id') id: string) {
     return this.studio.getStudio(req.user.userId, req.user.email, id);

@@ -19,6 +19,7 @@ export type RolePlayingCardProps = {
   /** Override resolved image URL (e.g. cache). */
   imageUrl?: string | null;
   size?: "sm" | "md" | "lg";
+  variant?: "default" | "plain";
   className?: string;
   onClick?: () => void;
   title?: string;
@@ -68,9 +69,7 @@ export function RolePlayingCard({
           <div className="role-playing-card__placeholder">{initials}</div>
         )}
       </div>
-      <div className="role-playing-card__footer">
-        <div className="role-playing-card__title">{label}</div>
-      </div>
+      <div className="role-playing-card__caption">{label}</div>
     </div>
   );
 }

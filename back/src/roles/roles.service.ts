@@ -1,10 +1,8 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ProjectAccessService } from '../project-access/project-access.service';
+import { touchProjectActivity } from '../projects/project-activity';
 
 function normalizeRoleKey(v: unknown): string {
   return String(v ?? '')
@@ -57,28 +55,16 @@ function extractRolesFromText(text?: string | null): string[] {
 
 @Injectable()
 export class RolesService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private async assertUserHasProjectAccessBySlug(userId: string, slug: string) {
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        OR: [
-          { ownerId: userId },
-          { members: { some: { userId, role: 'editor' } } },
-        ],
-      },
-      select: { id: true, slug: true, ownerId: true },
-    });
-    if (!project) throw new ForbiddenException('No access to project');
-    return project;
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly projectAccess: ProjectAccessService,
+  ) {}
 
   async listRoles(userId: string, projectSlug: string) {
-    const project = await this.assertUserHasProjectAccessBySlug(
+    const { project } = await this.projectAccess.assertBySlug(
       userId,
       projectSlug,
+      'read',
     );
     const roles = await this.prisma.projectRole.findMany({
       where: { projectId: project.id },
@@ -113,9 +99,10 @@ export class RolesService {
       avatarKey?: string | null;
     },
   ) {
-    const project = await this.assertUserHasProjectAccessBySlug(
+    const { project } = await this.projectAccess.assertBySlug(
       userId,
       projectSlug,
+      'write',
     );
 
     const existing = roleId
@@ -191,6 +178,7 @@ export class RolesService {
       }
     }
 
+    await touchProjectActivity(this.prisma, project.id);
     return { ok: true, roleId: role.id };
   }
 
@@ -200,7 +188,11 @@ export class RolesService {
     roleId: string,
     body: { emails?: string[] },
   ) {
-    await this.assertUserHasProjectAccessBySlug(userId, projectSlug);
+    const { project } = await this.projectAccess.assertBySlug(
+      userId,
+      projectSlug,
+      'write',
+    );
     const emails = Array.isArray(body?.emails) ? body.emails : [];
     const normalized = emails
       .map((e) => normalizeEmail(e))
@@ -217,26 +209,30 @@ export class RolesService {
       }
     });
 
+    await touchProjectActivity(this.prisma, project.id);
     return { ok: true };
   }
 
   async deleteRole(userId: string, projectSlug: string, roleId: string) {
-    const project = await this.assertUserHasProjectAccessBySlug(
+    const { project } = await this.projectAccess.assertBySlug(
       userId,
       projectSlug,
+      'write',
     );
     const rid = String(roleId ?? '').trim();
     if (!rid) throw new BadRequestException('roleId is required');
     const res = await this.prisma.projectRole.deleteMany({
       where: { id: rid, projectId: project.id },
     });
+    await touchProjectActivity(this.prisma, project.id);
     return { ok: true, deleted: res.count };
   }
 
   async listRoleNotes(userId: string, projectSlug: string, roleId: string) {
-    const project = await this.assertUserHasProjectAccessBySlug(
+    const { project } = await this.projectAccess.assertBySlug(
       userId,
       projectSlug,
+      'read',
     );
     const role = await this.prisma.projectRole.findFirst({
       where: { id: roleId, projectId: project.id },
@@ -275,9 +271,10 @@ export class RolesService {
     roleId: string,
     body: { content: string },
   ) {
-    const project = await this.assertUserHasProjectAccessBySlug(
+    const { project } = await this.projectAccess.assertBySlug(
       userId,
       projectSlug,
+      'write',
     );
     const role = await this.prisma.projectRole.findFirst({
       where: { id: roleId, projectId: project.id },
@@ -304,6 +301,7 @@ export class RolesService {
       },
       select: { id: true },
     });
+    await touchProjectActivity(this.prisma, project.id);
     return { ok: true, noteId: created.id };
   }
 
@@ -344,6 +342,7 @@ export class RolesService {
         });
       }
     });
+    await touchProjectActivity(this.prisma, projectId);
     return { ok: true, seeded: true };
   }
 

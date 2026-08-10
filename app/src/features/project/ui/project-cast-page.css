@@ -1,0 +1,134 @@
+.project-cast-page {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  padding: 18px 18px 28px;
+  box-sizing: border-box;
+  min-height: 100%;
+  color: var(--sessions-text);
+  background: var(--sessions-bg);
+}
+
+.project-cast-page__content {
+  display: grid;
+  gap: 18px;
+}
+
+.project-cast-page__header {
+  display: grid;
+  gap: 6px;
+}
+
+.project-cast-page__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sessions-text-strong);
+}
+
+.project-cast-page__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sessions-text-muted);
+}
+
+.project-cast-page__panel {
+  padding: 24px 16px;
+  border: 1px dashed var(--sessions-border);
+  background: var(--sessions-panel);
+}
+
+.project-cast-page__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sessions-text-muted);
+  text-align: center;
+}
+
+.project-cast-page__error {
+  font-size: 13px;
+  color: var(--color-danger, #c44);
+}
+
+.project-cast-page__link,
+.project-cast-page__role-link {
+  color: var(--color-active-ascent);
+  text-decoration: none;
+}
+
+.project-cast-page__link:hover,
+.project-cast-page__role-link:hover {
+  text-decoration: underline;
+}
+
+.project-cast-page__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  justify-content: center;
+  gap: 16px;
+}
+
+.project-cast-page__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--color-active-ascent);
+  background: var(--sessions-panel);
+  min-width: 0;
+}
+
+.project-cast-page__person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.project-cast-page__person-text {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.project-cast-page__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sessions-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-cast-page__email {
+  font-size: 12px;
+  color: var(--sessions-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-cast-page__roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-cast-page__role-link {
+  font-size: 13px;
+}

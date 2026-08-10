@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../features/auth";
+import { useProject } from "../../features/project";
+import { projectSettingsPath } from "../../app/router/paths";
 import {
   type BotVariableItem,
   type TelegramBotIntegrationSummary,
@@ -25,6 +27,7 @@ function looksLikeTelegramBotToken(token: string): boolean {
 
 export function SettingsBotPage() {
   const navigate = useNavigate();
+  const { projectName } = useProject();
   const { accessToken } = useAuth();
 
   const [bots, setBots] = useState<TelegramBotIntegrationSummary[]>([]);
@@ -275,7 +278,10 @@ export function SettingsBotPage() {
         <main className="main-content main-content-settings">
           <div className="settings-view">
             <div className="settings-bot-topbar">
-              <button type="button" onClick={() => navigate("/settings")}>
+              <button
+                type="button"
+                onClick={() => navigate(projectSettingsPath(projectName))}
+              >
                 ← Назад
               </button>
               <h2>Настройки бота (Telegram)</h2>

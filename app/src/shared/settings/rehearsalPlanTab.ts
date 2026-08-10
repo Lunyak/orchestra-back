@@ -1,3 +1,5 @@
+import { getProjectSectionFromPath } from "../../app/router/paths";
+
 export type RehearsalPlanTab = "sessions" | "board" | "tasks";
 
 const KEY = "orchestra:rehearsal-plan-tab";
@@ -33,9 +35,10 @@ export function writeRehearsalPlanTab(tab: RehearsalPlanTab): void {
 }
 
 export function rehearsalPlanTabFromPath(pathname: string): RehearsalPlanTab | null {
-  if (pathname === "/board") return "board";
-  if (pathname === "/tasks" || pathname.startsWith("/tasks/")) return "tasks";
-  if (pathname === "/sessions" || pathname.startsWith("/sessions/")) return "sessions";
+  const section = getProjectSectionFromPath(pathname);
+  if (section === "board") return "board";
+  if (section === "tasks") return "tasks";
+  if (section === "sessions") return "sessions";
   return null;
 }
 

@@ -12,10 +12,19 @@ import { StudioMembersPanel } from "./StudioMembersPanel";
 import { StudioProgramPanel } from "./StudioProgramPanel";
 import { StudioSettingsPanel } from "./StudioSettingsPanel";
 import { StudioVideosPanel } from "./StudioVideosPanel";
+import { PremisesIndexPanel } from "../premises/PremisesIndexPanel";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "./style.css";
+import { studioPath, studioPremisesPath } from "../../app/router/paths";
+import "../premises/style.css";
 
-type StudioTab = "members" | "invites" | "program" | "assignments" | "videos";
+type StudioTab =
+  | "members"
+  | "invites"
+  | "program"
+  | "assignments"
+  | "videos"
+  | "premises";
 
 const STUDIO_TABS: { id: StudioTab; label: string }[] = [
   { id: "members", label: "Участники" },
@@ -23,6 +32,7 @@ const STUDIO_TABS: { id: StudioTab; label: string }[] = [
   { id: "program", label: "Программа" },
   { id: "assignments", label: "Задания" },
   { id: "videos", label: "Видео" },
+  { id: "premises", label: "Помещения" },
 ];
 
 export function StudioDetailPage() {
@@ -55,7 +65,7 @@ export function StudioDetailPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to="/studio">
+              <Link className="studio-page__back" to={studioPath()}>
                 ← Студии
               </Link>
               <p className="studio-page__error">Студия не найдена или нет доступа.</p>
@@ -79,7 +89,7 @@ export function StudioDetailPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to="/studio">
+            <Link className="studio-page__back" to={studioPath()}>
               ← Студии
             </Link>
 
@@ -158,6 +168,19 @@ export function StudioDetailPage() {
               ) : null}
               {activeTabVisible === "videos" ? (
                 <StudioVideosPanel studio={studio} />
+              ) : null}
+              {activeTabVisible === "premises" ? (
+                <div className="premises-layout">
+                  <div className="sessions-page">
+                    <PremisesIndexPanel
+                      organization={{ type: "studio", id: studio.id }}
+                      detailPath={(premiseId) =>
+                        studioPremisesPath(studio.id, premiseId)
+                      }
+                      canCreate={canManage}
+                    />
+                  </div>
+                </div>
               ) : null}
             </RehearsalsCard>
           </div>

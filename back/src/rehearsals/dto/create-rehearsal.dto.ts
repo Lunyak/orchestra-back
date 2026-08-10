@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsInt,
   IsISO8601,
   IsOptional,
@@ -26,4 +27,9 @@ export class CreateRehearsalDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  calendarWorkspaceIds?: string[];
 }

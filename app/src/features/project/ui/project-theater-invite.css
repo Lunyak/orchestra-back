@@ -1,0 +1,28 @@
+.project-theater-invite-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  max-width: 40rem;
+  margin: var(--spacing-8) auto;
+  padding: var(--spacing-6);
+}
+
+.project-theater-invite-page__title {
+  margin: 0;
+  font-size: var(--font-size-xl, 1.5rem);
+}
+
+.project-theater-invite-page__hint {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.project-theater-invite-page__error {
+  margin: 0;
+  color: var(--color-danger, #c44);
+}
+
+.project-theater-invite-page .native-text-input {
+  border: 1px solid var(--color-border-input);
+  padding: var(--spacing-4) var(--spacing-6);
+}

@@ -81,44 +81,8 @@
   letter-spacing: 0.02em;
 }
 
-.troupe-tabs {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--troupe-border);
-  background: var(--troupe-panel);
-  padding: 4px;
-}
-
-.troupe-tab {
-  min-height: 32px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--troupe-text);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.troupe-tab:hover {
-  background: var(--troupe-panel-hover);
-  color: var(--troupe-text-strong);
-}
-
-.troupe-tab--active,
-.troupe-tab[aria-selected="true"] {
-  background: var(--troupe-accent-bg);
-  color: var(--color-active-ascent);
-}
-
-.troupe-tab__count {
+.troupe-mode-count {
+  margin-left: 6px;
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
@@ -1317,17 +1281,6 @@ button.troupe-role-pill {
 
   .troupe-view {
     gap: 12px;
-  }
-
-  .troupe-tabs {
-    align-items: stretch;
-  }
-
-  .troupe-tab {
-    flex: 1 1 0;
-    justify-content: center;
-    padding: 8px 10px;
-    text-align: center;
   }
 
   .troupe-card {

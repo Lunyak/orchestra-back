@@ -1,28 +1,23 @@
-.event-page {
+.event-page.site-bands-page {
   --event-accent: var(--color-accent);
+  --site-bands-accent: var(--event-accent);
   --event-bg-url: none;
-  --event-glass-blur: 16px;
-  --event-glass-sat: 155%;
-  min-height: 100dvh;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  padding: clamp(16px, 2.5dvh, 28px) 24px clamp(28px, 5dvh, 72px);
+}
+
+.event-page.site-bands-page {
   background:
-    radial-gradient(900px 520px at 20% 10%, color-mix(in oklab, var(--event-accent) 28%, transparent), transparent 60%),
-    radial-gradient(820px 520px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%),
-    radial-gradient(1000px 700px at 50% 95%, rgba(0, 0, 0, 0.55), transparent 65%),
+    radial-gradient(900px 520px at 20% 10%, color-mix(in oklab, var(--event-accent) 20%, transparent), transparent 60%),
     var(--event-bg-url),
     var(--color-bg);
-  background-size: auto, auto, auto, cover, auto;
-  background-position: center, center, center, center, center;
+  background-size: auto, cover, auto;
+  background-position: center, center, center;
   background-repeat: no-repeat;
 }
 
 .event-page__particles {
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: 1;
   pointer-events: none;
   opacity: 0.95;
   mix-blend-mode: screen;
@@ -33,54 +28,6 @@
   height: 100%;
 }
 
-/* Frosted glass overlay for EventPage (all events except Zaklyatie) */
-.event-page__glass {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(900px 520px at 20% 12%, rgba(255, 255, 255, 0.06), transparent 62%),
-    radial-gradient(900px 640px at 70% 10%, rgba(120, 170, 255, 0.06), transparent 60%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.64));
-}
-
-@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .event-page__glass {
-    backdrop-filter: blur(var(--event-glass-blur)) saturate(var(--event-glass-sat));
-    -webkit-backdrop-filter: blur(var(--event-glass-blur)) saturate(var(--event-glass-sat));
-  }
-}
-
-/* =========================================================
-   Zaklyatie — separate atmosphere styles (glass + village bg)
-   ========================================================= */
-.event-page--zaklyatie {
-  --zak-glass-blur: 18px;
-  --zak-glass-sat: 180%;
-  --zak-glass-bg: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.05) 55%,
-      rgba(255, 255, 255, 0.09) 100%
-    );
-  --zak-glass-border: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.32) 0%,
-      rgba(255, 255, 255, 0.06) 50%,
-      rgba(255, 255, 255, 0.14) 100%
-    );
-
-  background:
-    radial-gradient(980px 560px at 18% 8%, rgba(120, 170, 255, 0.10), transparent 60%),
-    radial-gradient(920px 600px at 86% 24%, rgba(255, 255, 255, 0.06), transparent 65%),
-    radial-gradient(1100px 760px at 50% 95%, rgba(0, 0, 0, 0.62), transparent 70%),
-    linear-gradient(180deg, rgba(8, 10, 14, 0.92), rgba(8, 10, 14, 0.88)),
-    var(--color-bg);
-}
-
-/* Background glass/rain overlay for the whole page (not UI cards) */
 .zaklyatie-atmosphere {
   position: absolute;
   inset: 0;
@@ -112,360 +59,252 @@
 .zaklyatie-atmosphere__glass {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(900px 520px at 20% 12%, rgba(255, 255, 255, 0.06), transparent 62%),
-    radial-gradient(900px 640px at 70% 10%, rgba(120, 170, 255, 0.06), transparent 60%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.70));
-  backdrop-filter: blur(var(--zak-glass-blur)) saturate(var(--zak-glass-sat));
-  -webkit-backdrop-filter: blur(var(--zak-glass-blur)) saturate(var(--zak-glass-sat));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.7));
 }
 
-.event-page__content {
-  width: min(1170px, 92vw);
-  margin: 0 auto;
-
-  position: relative;
+.event-page .site-bands-page__content {
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Back link shared with /events (duplicated here so it works on direct visit) */
-.events-page__back {
-  align-self: flex-start;
-  font-family: "Russo One", sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.04em;
-  color: var(--color-accent);
-  transition: color var(--transition), transform var(--transition);
-  z-index: 10;
-}
-
-.events-page__back:hover {
-  color: var(--color-accent-hover);
-  transform: translateX(-1px);
-}
-
-.event-page__header {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.event-page__hero {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.event-page__title {
-  margin: 0;
-  font-family: "Russo One", sans-serif;
-  font-weight: 400;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  font-size: clamp(26px, 4vw, 44px);
-  color: var(--color-text);
-}
-
-.event-page__subtitle {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 16px;
-  letter-spacing: 0.02em;
 }
 
 .event-page__meta {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
-  margin-top: 2px;
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 100;
+  margin-top: 16px;
 }
 
 .event-page__chip {
   display: inline-flex;
   align-items: center;
   padding: 7px 12px;
-  /* border-radius: 999px; */
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
   color: rgba(245, 240, 232, 0.92);
   font-family: "Russo One", sans-serif;
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  /* box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28); */
+}
+
+.event-page__rainCorner {
+  position: absolute;
+  top: 18px;
+  right: clamp(12px, 2.5vw, 24px);
+  z-index: 12;
 }
 
 .zaklyatie-rain-toggle {
   cursor: pointer;
   user-select: none;
-}
-
-.zaklyatie-rain-toggle:hover {
-  /* transform: translateY(-1px); */
+  background: rgba(10, 8, 10, 0.72);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .zaklyatie-rain-toggle.is-on {
-  /* color: rgba(210, 235, 255, 0.96); */
+  color: var(--color-active-ascent);
+  border-color: color-mix(in oklab, var(--color-active-ascent) 55%, rgba(255, 255, 255, 0.12));
 }
 
-.event-page__main {
-  display: grid;
-  grid-template-columns: minmax(0, 600px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
+.event-page__heroStage {
   position: relative;
-  z-index: 10;
+  width: 100%;
 }
 
-.event-page__gallery {
-  position: relative;
-  border-radius: 1rem;
-  overflow: hidden;
-  box-shadow:
-    0 26px 70px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.event-page__gallery::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 1;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-    inset 0 0 0 2px color-mix(in oklab, var(--event-accent) 55%, transparent);
-  opacity: 0.55;
-}
-
-.event-page__gallery::after {
-  content: "";
-  position: absolute;
-  inset: -18px;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
-  background: radial-gradient(closest-side, color-mix(in oklab, var(--event-accent) 30%, transparent), transparent 70%);
-  filter: blur(18px);
-  opacity: 0.45;
-}
-
-.event-page__text {
+.event-page__heroMain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   min-width: 0;
 }
 
+/* strip hero — title center, meta on sides */
+.event-page[data-hero-variant="strip"] .event-page__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 16px;
+  text-align: center;
+  padding-top: clamp(8px, 1.2dvh, 14px);
+  padding-bottom: clamp(8px, 1.2dvh, 14px);
+  padding-left: clamp(16px, 4vw, 48px);
+  padding-right: clamp(16px, 4vw, 48px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 5, 7, 0.45);
+}
+
+.event-page[data-hero-variant="strip"] .event-page__heroMain {
+  grid-column: 2;
+  width: auto;
+  max-width: min(70vw, 900px);
+  min-width: 0;
+  align-items: center;
+  justify-self: center;
+}
+
+.event-page[data-hero-variant="strip"] .event-page__meta {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.event-page[data-hero-variant="strip"] .event-page__meta--left {
+  grid-column: 1;
+  justify-content: flex-start;
+  justify-self: start;
+}
+
+.event-page[data-hero-variant="strip"] .event-page__meta--right {
+  grid-column: 3;
+  justify-content: flex-end;
+  justify-self: end;
+}
+
+.event-page[data-hero-variant="strip"] .home-page__glitch-hero--page {
+  width: 100%;
+  max-width: 100%;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.event-page[data-hero-variant="strip"] .home-page__glitch-hero--page .home-glitch__text {
+  margin: 0 auto;
+  font-size: clamp(52px, min(11dvh, 13vw), 120px);
+  letter-spacing: clamp(1px, 0.35vw, 5px);
+  line-height: 0.82;
+  transform: scaleY(1.06);
+  transform-origin: center center;
+}
+
+@media (max-width: 768px) {
+  .event-page__rainCorner {
+    top: 12px;
+    right: 12px;
+  }
+
+  .event-page[data-hero-variant="strip"] .event-page__hero {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding-top: clamp(10px, 1.5dvh, 16px);
+    padding-bottom: clamp(10px, 1.5dvh, 16px);
+  }
+
+  .event-page[data-hero-variant="strip"] .event-page__meta--left,
+  .event-page[data-hero-variant="strip"] .event-page__meta--right,
+  .event-page[data-hero-variant="strip"] .event-page__heroMain {
+    grid-column: 1;
+    justify-self: center;
+  }
+
+  .event-page[data-hero-variant="strip"] .event-page__meta--left,
+  .event-page[data-hero-variant="strip"] .event-page__meta--right {
+    justify-content: center;
+  }
+
+  .event-page[data-hero-variant="strip"] .home-page__glitch-hero--page .home-glitch__text {
+    font-size: clamp(42px, 14vw, 72px);
+  }
+}
+
+/* Full-bleed photo block */
+.event-page__photo {
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: #050405;
+}
+
+.event-page__about {
+  display: block;
+  width: 100%;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
 .event-page__description {
-  font-family: inherit;
-  font-size: 16px;
+  margin: 0;
+  max-width: 72ch;
+  font-size: clamp(15px, 1.1vw + 12px, 18px);
   line-height: 1.65;
   color: var(--color-text);
-  text-align: left;
   white-space: pre-line;
-  background: rgba(22, 18, 24, 0.85);
-  padding: 22px 22px;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.event-page__description {
-  position: relative;
-  overflow: hidden;
-}
-
-.event-page__description::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0.55;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-    inset 0 0 0 2px color-mix(in oklab, var(--event-accent) 40%, transparent);
-}
-
-.event-page__description::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0.18;
-  background:
-    radial-gradient(700px 260px at 20% 15%, color-mix(in oklab, var(--event-accent) 28%, transparent), transparent 60%),
-    radial-gradient(600px 240px at 80% 30%, rgba(255, 255, 255, 0.08), transparent 60%);
-  mix-blend-mode: screen;
-}
-
-.event-page__sectionTitle {
-  margin: 0 0 12px;
-  font-family: "Russo One", sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.04em;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.event-page__cast {
-  margin-top: 18px;
-  padding: 18px;
-  border-radius: var(--radius-lg);
-  background: rgba(22, 18, 24, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: var(--shadow);
-  position: relative;
-  overflow: hidden;
-}
-
-.event-page__cast::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0.16;
-  background:
-    radial-gradient(700px 260px at 20% 15%, color-mix(in oklab, var(--event-accent) 24%, transparent), transparent 60%),
-    radial-gradient(600px 240px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%);
-  mix-blend-mode: screen;
-}
-
-.event-page__cast > * {
-  position: relative;
-  z-index: 1;
-}
-
-.event-page__tickets {
-  display: flex;
-  justify-content: center;
-  margin-top: 18px;
+.event-page .site-bands-list {
+  margin-top: 0;
 }
 
 .event-page__ticketsButton {
   font-family: "Russo One", sans-serif;
-  font-size: 16px;
-  letter-spacing: 0.04em;
-  padding: 12px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.92);
-  background:
-    radial-gradient(240px 120px at 30% 25%, color-mix(in oklab, var(--event-accent) 38%, transparent), transparent 70%),
-    rgba(18, 14, 20, 0.78);
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  transition: transform var(--transition), border-color var(--transition), filter var(--transition);
-}
-
-.event-page__ticketsButton:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--event-accent) 65%, rgba(255, 255, 255, 0.16));
-  filter: saturate(1.08);
-}
-
-.event-page__ticketsButton:active {
-  transform: translateY(0);
-}
-
-.event-page__ticketsHint {
-  max-width: 720px;
-  text-align: center;
   font-size: 14px;
-  line-height: 1.4;
-  color: rgba(255, 255, 255, 0.72);
-  background: rgba(22, 18, 24, 0.6);
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  padding: 12px 14px;
-}
-
-.event-page__howtofind {
-  margin-top: 12px;
-  display: flex;
-  justify-content: center;
-}
-
-.event-page__howtofind a {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(22, 18, 24, 0.55);
-  color: rgba(245, 240, 232, 0.92);
-  font-family: "Russo One", sans-serif;
-  font-size: 12px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: border-color var(--transition), transform var(--transition), filter var(--transition);
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0;
+  color: rgba(245, 240, 232, 0.92);
+  background: color-mix(in oklab, var(--event-accent) 28%, rgba(8, 5, 7, 0.7));
+  cursor: pointer;
+  transition: color var(--transition), background-color var(--transition), border-color var(--transition);
 }
 
-.event-page__howtofind a:hover {
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--event-accent) 55%, rgba(255, 255, 255, 0.12));
-  filter: saturate(1.08);
+.event-page__ticketsButton:hover,
+.event-page__ticketsButton:focus-visible {
+  color: var(--color-active-ascent);
+  border-color: color-mix(in oklab, var(--color-active-ascent) 55%, rgba(255, 255, 255, 0.16));
 }
 
-.event-page__reviews {
-  margin-top: 18px;
-  padding: 18px;
-  border-radius: var(--radius-lg);
-  background: rgba(22, 18, 24, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: var(--shadow);
-  position: relative;
-  overflow: hidden;
+.event-page__section {
+  width: 100%;
 }
 
-.event-page__reviews::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
-  opacity: 0.16;
-  background:
-    radial-gradient(700px 260px at 20% 15%, color-mix(in oklab, var(--event-accent) 24%, transparent), transparent 60%),
-    radial-gradient(600px 240px at 80% 30%, rgba(255, 255, 255, 0.06), transparent 60%);
-  mix-blend-mode: screen;
+.event-page__sectionTitle {
+  margin: 0;
+  padding: clamp(18px, 3dvh, 28px) clamp(16px, 4vw, 48px) 12px;
+  font-family: "Russo One", sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245, 240, 232, 0.72);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 5, 7, 0.2);
 }
 
-.event-page__reviews > * {
-  position: relative;
-  z-index: 1;
+.event-page__section .site-bands-list {
+  border-top: none;
+}
+
+.event-page__bandBlock {
+  padding: 0 clamp(16px, 4vw, 48px) 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 5, 7, 0.35);
+}
+
+.event-page__section:has(.reviews-slider) .event-page__sectionTitle {
+  padding-top: 14px;
+  padding-bottom: 8px;
+  font-size: 12px;
 }
 
 .reviews-slider {
   --swiper-theme-color: rgba(255, 255, 255, 0.78);
   --swiper-navigation-color: rgba(255, 255, 255, 0.78);
-  --swiper-navigation-size: 14px;
+  --swiper-navigation-size: 12px;
   position: relative;
+  max-width: 560px;
 }
 
 .reviews-slider__counter {
   position: absolute;
-  right: 10px;
-  top: 10px;
+  right: 0;
+  top: 6px;
   z-index: 5;
-  padding: 6px 10px;
-  border-radius: 999px;
+  padding: 4px 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0;
   background: rgba(18, 14, 20, 0.55);
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
   color: rgba(255, 255, 255, 0.85);
   font-family: "Russo One", sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   pointer-events: none;
@@ -473,43 +312,51 @@
 
 .reviews-slider__card {
   margin: 0;
-  padding: 16px 16px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
   background: rgba(18, 14, 20, 0.55);
 }
 
 .reviews-slider__text {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.55;
-  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.88);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .reviews-slider__author {
-  margin-top: 10px;
+  margin-top: 6px;
   font-family: "Russo One", sans-serif;
-  font-size: 12px;
+  font-size: 10px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .reviews-slider__imgCard {
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
   background: rgba(18, 14, 20, 0.55);
   overflow: hidden;
+  max-width: 280px;
+  max-height: 180px;
 }
 
 .reviews-slider__imgWrap {
   width: 100%;
+  height: 100%;
+  max-height: 180px;
 }
 
 .reviews-slider__img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 180px;
   object-fit: contain;
   background: rgba(0, 0, 0, 0.2);
 }
@@ -519,18 +366,17 @@
 }
 
 .reviews-slider__swiper .swiper-pagination-bullet-active {
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--color-active-ascent);
 }
 
 .event-page__reviewsHint {
-  margin-top: 12px;
-  font-size: 14px;
+  margin: 0;
+  padding: 12px clamp(16px, 4vw, 48px);
+  font-size: 12px;
   line-height: 1.4;
-  color: rgba(255, 255, 255, 0.78);
-  background: rgba(22, 18, 24, 0.6);
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  padding: 12px 14px;
+  color: rgba(255, 255, 255, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 5, 7, 0.35);
 }
 
 .event-page__reviewsHint a {
@@ -541,16 +387,15 @@
   color: var(--color-accent-hover);
 }
 
-/* === Carousel === */
+/* === Full-bleed carousel === */
 .event-carousel {
   width: 100%;
-  padding: 12px;
+  box-sizing: border-box;
 }
 
 .event-carousel__main {
   width: 100%;
-  height: clamp(260px, 48dvh, 640px);
-  /* Swiper defaults are blue; override locally */
+  height: clamp(320px, 62dvh, 780px);
   --swiper-theme-color: rgba(255, 255, 255, 0.78);
   --swiper-navigation-color: rgba(255, 255, 255, 0.78);
   --swiper-navigation-size: 16px;
@@ -564,102 +409,66 @@
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
-  background: rgba(0, 0, 0, 0.25);
+  background: #050405;
 }
 
 .event-carousel__frame::before {
   content: "";
   position: absolute;
-  inset: -24px;
+  inset: 0;
   background-image: var(--carousel-bg);
   background-size: cover;
   background-position: center;
-  filter: blur(20px) saturate(1.1);
-  transform: scale(1.08);
-  opacity: 0.55;
+  filter: blur(28px) saturate(1.05) brightness(0.45);
+  transform: scale(1.12);
+  opacity: 0.85;
 }
 
 .event-carousel__frame::after {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(650px 420px at 50% 30%, rgba(255, 255, 255, 0.09), transparent 65%),
-    linear-gradient(to bottom, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.5));
-  opacity: 0.95;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.45));
+  opacity: 1;
 }
 
-/* Swiper navigation: make arrows subtle and consistent with page style */
 .event-carousel__main .swiper-button-prev,
 .event-carousel__main .swiper-button-next {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-  background: rgba(18, 14, 20, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 10px 22px rgba(0, 0, 0, 0.28),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(10px) saturate(150%);
-  -webkit-backdrop-filter: blur(10px) saturate(150%);
-  transition: transform var(--transition), opacity var(--transition), border-color var(--transition), background var(--transition);
-  opacity: 0.65;
+  width: 42px;
+  height: 42px;
+  border-radius: 0;
+  background: rgba(10, 8, 10, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  opacity: 0.75;
   color: rgba(255, 255, 255, 0.78);
+  transition: opacity var(--transition), border-color var(--transition), color var(--transition);
 }
 
 .event-carousel__main .swiper-button-prev:hover,
 .event-carousel__main .swiper-button-next:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  border-color: color-mix(in oklab, var(--event-accent) 55%, rgba(255, 255, 255, 0.12));
-  background: rgba(18, 14, 20, 0.6);
-}
-
-.event-carousel__main .swiper-button-prev:active,
-.event-carousel__main .swiper-button-next:active {
-  transform: translateY(0);
+  opacity: 1;
+  color: var(--color-active-ascent);
+  border-color: color-mix(in oklab, var(--color-active-ascent) 55%, rgba(255, 255, 255, 0.16));
 }
 
 .event-carousel__main .swiper-button-prev::after,
 .event-carousel__main .swiper-button-next::after {
   font-size: var(--swiper-navigation-size);
   font-weight: 900;
-  text-shadow: 0 0 18px color-mix(in oklab, var(--event-accent) 50%, transparent);
-}
-
-.event-carousel__main .swiper-button-disabled {
-  opacity: 0.28;
 }
 
 .event-carousel__main .swiper-button-prev {
-  left: 10px;
+  left: clamp(10px, 2vw, 24px);
 }
 
 .event-carousel__main .swiper-button-next {
-  right: 10px;
+  right: clamp(10px, 2vw, 24px);
 }
 
 .event-carousel__imgWrap .img-with-preloader__spinner {
   z-index: 2;
-}
-
-.event-carousel__imgWrap .img-with-preloader__spinner .loader {
-  --preloader-glow: color-mix(in oklab, var(--event-accent) 55%, #7aa8ff);
-}
-
-.event-carousel__thumbWrap {
-  width: 100%;
-  height: 100%;
-}
-
-.event-carousel__thumbWrap .img-with-preloader__spinner {
-  z-index: 2;
-}
-
-.event-carousel__thumbWrap .img-with-preloader__spinner .loader {
-  --preloader-glow: color-mix(in oklab, var(--event-accent) 55%, #7aa8ff);
 }
 
 .event-carousel__img {
@@ -668,15 +477,17 @@
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
   background: transparent;
 }
 
 .event-carousel__thumbs {
   width: 100%;
-  height: 104px;
-  margin-top: 12px;
-  /* Thumbs swiper also has navigation enabled */
+  height: 96px;
+  padding: 10px clamp(16px, 4vw, 48px) 14px;
+  box-sizing: border-box;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 5, 7, 0.55);
   --swiper-theme-color: rgba(255, 255, 255, 0.68);
   --swiper-navigation-color: rgba(255, 255, 255, 0.68);
   --swiper-navigation-size: 14px;
@@ -684,117 +495,73 @@
 
 .event-carousel__thumbs .swiper-button-prev,
 .event-carousel__thumbs .swiper-button-next {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  background: rgba(18, 14, 20, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(10px) saturate(150%);
-  -webkit-backdrop-filter: blur(10px) saturate(150%);
-  opacity: 0.45;
-  transition: opacity var(--transition), border-color var(--transition), background var(--transition);
-  color: rgba(255, 255, 255, 0.68);
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  background: rgba(10, 8, 10, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  opacity: 0.5;
 }
 
 .event-carousel__thumbs .swiper-button-prev:hover,
 .event-carousel__thumbs .swiper-button-next:hover {
-  opacity: 0.85;
-  border-color: color-mix(in oklab, var(--event-accent) 45%, rgba(255, 255, 255, 0.10));
-  background: rgba(18, 14, 20, 0.55);
+  opacity: 0.9;
+  border-color: color-mix(in oklab, var(--color-active-ascent) 45%, rgba(255, 255, 255, 0.12));
 }
 
 .event-carousel__thumbs .swiper-button-prev::after,
 .event-carousel__thumbs .swiper-button-next::after {
   font-size: var(--swiper-navigation-size);
   font-weight: 900;
-  text-shadow: 0 0 14px color-mix(in oklab, var(--event-accent) 45%, transparent);
 }
 
 .event-carousel__thumbSlide {
   cursor: pointer;
 }
 
+.event-carousel__thumbWrap {
+  width: 100%;
+  height: 100%;
+}
+
 .event-carousel__thumbImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 0;
   border: 2px solid transparent;
   box-sizing: border-box;
-  opacity: 0.85;
-  transition: opacity var(--transition), border-color var(--transition), transform var(--transition);
+  opacity: 0.7;
+  transition: opacity var(--transition), border-color var(--transition);
 }
 
 .event-carousel__thumbImg:hover {
   opacity: 1;
-  transform: translateY(-1px);
 }
 
 .event-carousel__thumbImg--active {
   opacity: 1;
-  border-color: var(--event-accent);
+  border-color: var(--color-active-ascent);
 }
 
-/* Responsive */
-@media (max-width: 980px) {
-  .event-page__main {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 520px) {
-  .event-page {
-    padding: 22px 16px 56px;
-  }
-
-  .event-carousel {
-    padding: 10px;
+@media (max-width: 768px) {
+  .event-page .site-bands-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 
   .event-carousel__main {
-    height: clamp(240px, 42dvh, 440px);
-  }
-
-  .event-carousel__main .swiper-button-prev,
-  .event-carousel__main .swiper-button-next {
-    width: 34px;
-    height: 34px;
-    opacity: 0.55;
-  }
-
-  .event-carousel__main .swiper-button-prev {
-    left: 6px;
-  }
-
-  .event-carousel__main .swiper-button-next {
-    right: 6px;
-  }
-
-  .event-carousel__main .swiper-button-prev::after,
-  .event-carousel__main .swiper-button-next::after {
-    font-size: 14px;
+    height: clamp(260px, 48dvh, 520px);
   }
 
   .event-carousel__thumbs {
-    height: 92px;
-  }
-
-  /* On mobile thumbs navigation is visually noisy; swipe is enough */
-  .event-carousel__thumbs .swiper-button-prev,
-  .event-carousel__thumbs .swiper-button-next {
-    width: 26px;
-    height: 26px;
-    opacity: 0.28;
-  }
-
-  .event-page__cast {
-    padding: 14px;
+    height: 84px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .event-page__back,
+  .event-page__ticketsButton,
   .event-carousel__thumbImg {
     transition: none;
   }

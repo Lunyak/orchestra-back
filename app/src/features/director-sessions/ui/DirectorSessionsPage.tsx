@@ -17,6 +17,7 @@ import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { RehearsalPlanSectionChrome } from "../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
 import "../../rehearsals/ui/rehearsals.css";
 import "./director-sessions.css";
+import { projectSessionPath } from "../../../app/router/paths";
 import {
   useDirectorSessionsPage,
   type DirectorSessionsPageViewModel,
@@ -176,6 +177,7 @@ function SlotCalledActors({
 
 export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewModel }) {
   const {
+    projectName,
     activeSessionId,
     setActiveSessionId,
     navigateToSessionPage,
@@ -201,6 +203,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
     slotGatherStatusBySlotId,
     daySessionPreviewsById,
     publishError,
+    saveError,
     sendingAvailabilityReminders,
     availabilityReminderMessage,
     sessionCommentDraft,
@@ -251,13 +254,13 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
   };
 
   const handleCreateSession = async () => {
-    await createSessionForSelectedDate();
-    setBrowseStage("session");
+    const createdSession = await createSessionForSelectedDate();
+    if (createdSession) setBrowseStage("session");
   };
 
   const handleCalendarDoubleClick = async (dateKey: string) => {
-    await createSessionAtDate(dateKey);
-    setBrowseStage("session");
+    const createdSession = await createSessionAtDate(dateKey);
+    if (createdSession) setBrowseStage("session");
   };
 
   const toggleSlot = (slotId: string) => {
@@ -306,6 +309,9 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                 Создать сессию
               </Button>
             </div>
+            {saveError ? (
+              <div className="rehearsals-error">{saveError}</div>
+            ) : null}
 
             <div className="sessions-day-list">
               {sessionsForSelectedDay.length === 0 ? (
@@ -484,7 +490,7 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                   type="button"
                   onClick={() =>
                     navigate(
-                      `/sessions/${encodeURIComponent(activeSession.id)}`,
+                      projectSessionPath(projectName, activeSession.id),
                     )
                   }
                   title="Создавать, наполнять и менять порядок слотов"
@@ -586,6 +592,9 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
               {publishError ? (
                 <div className="rehearsals-error">{publishError}</div>
               ) : null}
+              {saveError ? (
+                <div className="rehearsals-error">{saveError}</div>
+              ) : null}
               {availabilityReminderMessage ? (
                 <div className="rehearsals-muted">
                   {availabilityReminderMessage}
@@ -641,8 +650,16 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
   );
 }
 
-export function DirectorSessionsPage() {
-  const vm = useDirectorSessionsPage();
+type DirectorSessionsPageProps = {
+  projectSlug?: string;
+  filterByProject?: boolean;
+};
+
+export function DirectorSessionsPage({
+  projectSlug,
+  filterByProject = true,
+}: DirectorSessionsPageProps) {
+  const vm = useDirectorSessionsPage({ projectSlug, filterByProject });
   if (vm.needsAuth) {
     return (
       <div className="rehearsals-page sessions-page">

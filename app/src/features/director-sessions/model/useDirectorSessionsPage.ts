@@ -13,6 +13,7 @@ import {
   formatTimeHHMM,
   getSessionStartLocalMinutes,
   getLocalDateTimeParts,
+  isDirectorSessionsSlug,
   isDirectorSessionPublished,
   looksLikeEmail,
   normalizeEmail,
@@ -45,10 +46,26 @@ import {
 } from "./session-slot-insights";
 import type { DaySessionPreview, SlotGatherStatus } from "./session-page-types";
 import type { SessionsSideCalledStatusTone } from "./session-page-types";
+import { projectSessionPath } from "../../../app/router/paths";
 
 export type DirectorSessionsPageViewModel = ReturnType<typeof useDirectorSessionsPage>;
 
-export function useDirectorSessionsPage() {
+type DirectorSessionsPageOptions = {
+  projectSlug?: string;
+  filterByProject?: boolean;
+};
+
+function sessionUsesProject(
+  session: DirectorRehearsalSession,
+  projectSlug: string,
+) {
+  if (session.projectSlugs?.includes(projectSlug)) return true;
+  return session.slots.some((slot) => slot.ref?.projectSlug === projectSlug);
+}
+
+export function useDirectorSessionsPage(
+  options: DirectorSessionsPageOptions = {},
+) {
   const sessionFormFieldId = useId();
   const sessionDateInputId = `${sessionFormFieldId}-date`;
   const sessionTimeInputId = `${sessionFormFieldId}-time`;
@@ -58,7 +75,9 @@ export function useDirectorSessionsPage() {
     () => parseEmailFromAccessToken(accessToken),
     [accessToken],
   );
-  const { projects, projectItems } = useProject();
+  const projectContext = useProject();
+  const projectName = options.projectSlug || projectContext.projectName;
+  const { projects, projectItems } = projectContext;
   const location = useLocation();
   const navigate = useNavigate();
   const { sessionId: paramSessionId, slotId: paramSlotId } = useParams<{
@@ -87,6 +106,7 @@ export function useDirectorSessionsPage() {
     isLoading: loading,
     isError: bundleIsError,
     error: bundleError,
+    refetch: refetchSessionsBundle,
   } = useDirectorSessionsBundleQuery(undefined, { skip: !accessToken });
 
   const error = bundleIsError
@@ -98,6 +118,7 @@ export function useDirectorSessionsPage() {
   const [remindAvailabilityMut] = useRemindDirectorSessionMissingAvailabilityMutation();
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [sendingAvailabilityReminders, setSendingAvailabilityReminders] =
     useState(false);
   const [availabilityReminderMessage, setAvailabilityReminderMessage] = useState<
@@ -105,6 +126,10 @@ export function useDirectorSessionsPage() {
   >(null);
 
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
+  const visibleSessions = useMemo(() => {
+    if (!options.filterByProject || !projectName) return sessions;
+    return sessions.filter((session) => sessionUsesProject(session, projectName));
+  }, [options.filterByProject, projectName, sessions]);
   const [calendarState, setCalendarState] = useState<CalendarSectionState>(() => {
     const today = toDateKey(new Date());
     const d = new Date(`${today}T12:00:00`);
@@ -158,9 +183,9 @@ export function useDirectorSessionsPage() {
   const navigateToSessionPage = useCallback(
     (sessionId: string) => {
       setActiveSessionId(sessionId);
-      navigate(`/sessions/${encodeURIComponent(sessionId)}`);
+      navigate(projectSessionPath(projectName, sessionId));
     },
-    [navigate],
+    [navigate, projectName],
   );
 
   const sessionRowLongPressRef = useRef<{
@@ -220,13 +245,13 @@ export function useDirectorSessionsPage() {
   );
 
   const activeSession = useMemo(
-    () => sessions.find((s) => s.id === activeSessionId) ?? null,
-    [activeSessionId, sessions],
+    () => visibleSessions.find((s) => s.id === activeSessionId) ?? null,
+    [activeSessionId, visibleSessions],
   );
 
   const sessionsByDate = useMemo(() => {
     const grouped = new Map<string, DirectorRehearsalSession[]>();
-    for (const session of sessions ?? []) {
+    for (const session of visibleSessions) {
       const d = new Date(session.startsAt);
       if (!Number.isFinite(d.getTime())) continue;
       const key = toDateKey(d);
@@ -241,7 +266,7 @@ export function useDirectorSessionsPage() {
       );
     }
     return grouped;
-  }, [sessions]);
+  }, [visibleSessions]);
 
   const dotsByDate = useMemo(() => {
     const out: Record<string, number> = {};
@@ -326,19 +351,30 @@ export function useDirectorSessionsPage() {
     if (!sessionsBundle?.sessions) return;
     const list = attachKnownPublishedAt(sessionsBundle.sessions);
     setSessions(list);
-    const ids = new Set(list.map((s) => String(s?.id ?? "")).filter(Boolean));
+    const visibleList =
+      options.filterByProject && projectName
+        ? list.filter((session) => sessionUsesProject(session, projectName))
+        : list;
+    const ids = new Set(
+      visibleList.map((s) => String(s?.id ?? "")).filter(Boolean),
+    );
     setActiveSessionId((prev) => {
       if (sessionIdFromUrl && ids.has(sessionIdFromUrl)) return sessionIdFromUrl;
       if (prev && ids.has(prev)) return prev;
       return null;
     });
-  }, [sessionsBundle?.sessions, sessionIdFromUrl]);
+  }, [
+    options.filterByProject,
+    projectName,
+    sessionsBundle?.sessions,
+    sessionIdFromUrl,
+  ]);
 
   // Диплинк /sessions/:id/slots/:slotId — та же страница списка сессий; индекс /sessions — ?sessionId=
   useEffect(() => {
     if (!activeSessionId) return;
 
-    const deepMatch = /^\/sessions\/([^/]+)\/slots\/([^/]+)\/?$/.exec(
+    const deepMatch = /\/sessions\/([^/]+)\/slots\/([^/]+)\/?$/.exec(
       location.pathname,
     );
 
@@ -347,17 +383,17 @@ export function useDirectorSessionsPage() {
       const urlSlot = deepMatch[2];
 
       if (urlSid !== activeSessionId) {
-        const sess = sessions.find((s) => s.id === activeSessionId);
+        const sess = visibleSessions.find((s) => s.id === activeSessionId);
         const first = sess?.slots?.[0]?.id ?? null;
         if (first) {
           navigate(
-            `/sessions/${encodeURIComponent(activeSessionId)}/slots/${encodeURIComponent(first)}`,
+            projectSessionPath(projectName, activeSessionId, first),
             { replace: true },
           );
         } else {
           navigate(
             {
-              pathname: "/sessions",
+              pathname: projectSessionPath(projectName),
               search: `?sessionId=${encodeURIComponent(activeSessionId)}`,
             },
             { replace: true },
@@ -366,12 +402,12 @@ export function useDirectorSessionsPage() {
         return;
       }
 
-      const sess = sessions.find((s) => s.id === activeSessionId);
+      const sess = visibleSessions.find((s) => s.id === activeSessionId);
       const slots = sess?.slots ?? [];
       if (slots.length === 0) {
         navigate(
           {
-            pathname: "/sessions",
+            pathname: projectSessionPath(projectName),
             search: `?sessionId=${encodeURIComponent(activeSessionId)}`,
           },
           { replace: true },
@@ -384,34 +420,52 @@ export function useDirectorSessionsPage() {
         urlSlot !== activeSlotId
       ) {
         navigate(
-          `/sessions/${encodeURIComponent(activeSessionId)}/slots/${encodeURIComponent(activeSlotId)}`,
+          projectSessionPath(projectName, activeSessionId, activeSlotId),
           { replace: true },
         );
       }
       return;
     }
 
-    if (location.pathname !== "/sessions") return;
+    if (location.pathname !== projectSessionPath(projectName)) return;
     if (sessionIdFromQuery === activeSessionId) return;
     const search = `?sessionId=${encodeURIComponent(activeSessionId)}`;
-    navigate({ pathname: "/sessions", search }, { replace: true });
+    navigate({ pathname: projectSessionPath(projectName), search }, { replace: true });
   }, [
     activeSessionId,
     activeSlotId,
     location.pathname,
     navigate,
+    projectName,
     sessionIdFromQuery,
-    sessions,
+    visibleSessions,
   ]);
 
   const persist = async (next: DirectorRehearsalSession[]) => {
-    if (!accessToken) return;
+    if (!accessToken) return false;
+    const previous = sessions;
     const merged = attachKnownPublishedAt(next);
     setSessions(merged);
+    setSaveError(null);
     try {
       await replaceDirectorSessionsMut({ sessions: merged }).unwrap();
+      await refetchSessionsBundle().unwrap();
+      return true;
     } catch (e) {
       console.error("saveDirectorSessions failed:", e);
+      setSessions(previous);
+      const message =
+        (e as {
+          data?: { message?: string };
+          response?: { data?: { message?: string } };
+          message?: string;
+        })?.data?.message ||
+        (e as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        (e as { message?: string })?.message ||
+        "Не удалось сохранить сессию";
+      setSaveError(message);
+      return false;
     }
   };
 
@@ -422,7 +476,9 @@ export function useDirectorSessionsPage() {
     sessions,
     activeSession,
     sessionsForSelectedDay,
-    persist,
+    persist: async (next) => {
+      await persist(next);
+    },
   });
 
   const moveSessionBefore = async (dragId: string, beforeId: string) => {
@@ -473,25 +529,32 @@ export function useDirectorSessionsPage() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) return;
     const nowIso = new Date().toISOString();
     const startsAt = new Date(`${dk}T${timeLocal}:00`).toISOString();
+    const projectSlugs =
+      projectName && !isDirectorSessionsSlug(projectName)
+        ? [projectName]
+        : undefined;
     const next: DirectorRehearsalSession = {
       id: createId(),
       title: `Сессия ${dayjs(dk).format("D MMM")}`,
       startsAt,
+      projectSlugs,
       slots: [{ id: createId(), offsetMin: 0, durationMin: 30 }],
       updatedAt: nowIso,
     };
     const merged = [next, ...sessions];
+    const saved = await persist(merged);
+    if (!saved) return null;
     setActiveSessionId(next.id);
     setCalendarState((prev) => ({ ...prev, selectedDate: dk }));
-    await persist(merged);
+    return next;
   };
 
   const createSession = async () => {
-    await createSessionAtDate(calendarState.selectedDate);
+    return createSessionAtDate(calendarState.selectedDate);
   };
 
   const createSessionForSelectedDate = async () => {
-    await createSessionAtDate(calendarState.selectedDate);
+    return createSessionAtDate(calendarState.selectedDate);
   };
 
   const updateSessionById = async (
@@ -872,12 +935,13 @@ export function useDirectorSessionsPage() {
     }
   };
 
-  const sessionsCount = sessions?.length ?? 0;
-  const activeIndex = (sessions ?? []).findIndex(
+  const sessionsCount = visibleSessions.length;
+  const activeIndex = visibleSessions.findIndex(
     (s) => s.id === activeSessionId,
   );
 
   return {
+    projectName,
     needsAuth: !accessToken,
     loading,
     error,
@@ -885,7 +949,7 @@ export function useDirectorSessionsPage() {
     activeIndex,
     sessionDateInputId,
     sessionTimeInputId,
-    sessions,
+    sessions: visibleSessions,
     activeSessionId,
     setActiveSessionId,
     draggedSessionId,
@@ -901,6 +965,7 @@ export function useDirectorSessionsPage() {
     setActiveSlotId,
     publishing,
     publishError,
+    saveError,
     sendingAvailabilityReminders,
     availabilityReminderMessage,
     moveSessionDelta,

@@ -8,7 +8,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { PremiseSlotStatus } from '@prisma/client';
+import { PremiseSlotPaymentStatus, PremiseSlotStatus } from '@prisma/client';
 
 export class UpdatePremiseSlotDto {
   @IsOptional()
@@ -36,6 +36,15 @@ export class UpdatePremiseSlotDto {
   rentalNotes?: string | null;
 
   @IsOptional()
+  @IsInt()
+  @Min(0)
+  rentalAmountRub?: number | null;
+
+  @IsOptional()
+  @IsEnum(PremiseSlotPaymentStatus)
+  paymentStatus?: PremiseSlotPaymentStatus;
+
+  @IsOptional()
   @IsEmail()
   contactEmail?: string | null;
 
@@ -43,6 +52,11 @@ export class UpdatePremiseSlotDto {
   @IsString()
   @MaxLength(120)
   contactName?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  contactPhone?: string | null;
 
   @IsOptional()
   @IsEnum(PremiseSlotStatus)

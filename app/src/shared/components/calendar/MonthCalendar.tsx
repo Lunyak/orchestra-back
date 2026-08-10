@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import cn from "classnames";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -17,12 +17,20 @@ export type MonthCalendarEvent = {
   published?: boolean;
 };
 
+const MONTH_SHORT_LABELS = Array.from({ length: 12 }, (_, monthIndex) =>
+  dayjs().month(monthIndex).format("MMM"),
+);
+
 function isoYmd(d: Date): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
 
 function addMonths(base: Date, months: number): Date {
   return dayjs(base).add(months, "month").toDate();
+}
+
+function startOfMonthDate(year: number, monthIndex: number): Date {
+  return dayjs().year(year).month(monthIndex).startOf("month").toDate();
 }
 
 function getMonthCalendarDays(date: Date): Date[] {
@@ -82,6 +90,48 @@ export function MonthCalendar({
     [currentMonth],
   );
 
+  const currentMonthDayjs = dayjs(currentMonth);
+  const currentYear = currentMonthDayjs.year();
+  const currentMonthIndex = currentMonthDayjs.month();
+  const monthLabel = currentMonthDayjs.format("MMMM YYYY");
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(currentYear);
+  const monthPickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    setPickerYear(currentYear);
+  }, [pickerOpen, currentYear]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      const clickedInside = Boolean(
+        target && monthPickerRef.current?.contains(target),
+      );
+      if (!clickedInside) setPickerOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPickerOpen(false);
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [pickerOpen]);
+
+  const handleSelectMonth = (monthIndex: number) => {
+    onChangeMonth(startOfMonthDate(pickerYear, monthIndex));
+    setPickerOpen(false);
+  };
+
   return (
     <div className="month-cal">
       {(title || subtitle) && (
@@ -99,7 +149,70 @@ export function MonthCalendar({
         >
           ← Назад
         </button>
-        <div className="month-cal__month-label">{dayjs(currentMonth).format("MMMM YYYY")}</div>
+        <div className="month-cal__month-wrap" ref={monthPickerRef}>
+          <button
+            type="button"
+            className={cn(
+              "month-cal__month-label",
+              pickerOpen && "month-cal__month-label--open",
+            )}
+            aria-expanded={pickerOpen}
+            aria-haspopup="dialog"
+            title="Выбрать месяц и год"
+            onClick={() => setPickerOpen((open) => !open)}
+          >
+            {monthLabel}
+          </button>
+          {pickerOpen ? (
+            <div
+              className="month-cal__month-picker"
+              role="dialog"
+              aria-label="Выбор месяца и года"
+            >
+              <div className="month-cal__year-nav">
+                <button
+                  type="button"
+                  className="month-cal__year-btn"
+                  aria-label="Предыдущий год"
+                  onClick={() => setPickerYear((year) => year - 1)}
+                >
+                  ←
+                </button>
+                <div className="month-cal__year-label">{pickerYear}</div>
+                <button
+                  type="button"
+                  className="month-cal__year-btn"
+                  aria-label="Следующий год"
+                  onClick={() => setPickerYear((year) => year + 1)}
+                >
+                  →
+                </button>
+              </div>
+              <div className="month-cal__months-grid">
+                {MONTH_SHORT_LABELS.map((label, monthIndex) => {
+                  const isActive =
+                    pickerYear === currentYear &&
+                    monthIndex === currentMonthIndex;
+
+                  return (
+                    <button
+                      key={monthIndex}
+                      type="button"
+                      className={cn(
+                        "month-cal__month-option",
+                        isActive && "month-cal__month-option--active",
+                      )}
+                      aria-pressed={isActive}
+                      onClick={() => handleSelectMonth(monthIndex)}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </div>
         <button
           type="button"
           className="month-cal__nav-btn"

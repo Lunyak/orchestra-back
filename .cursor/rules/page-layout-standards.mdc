@@ -1,0 +1,98 @@
+---
+description: Единый стандарт layout страниц app — shell, ширина, токены sessions (образец Tasks / Organizations)
+globs: app/src/**/*.{tsx,css}
+alwaysApply: false
+---
+
+# Page layout standard (образец: Tasks / Organizations)
+
+Эталон структуры: [`TasksPage.tsx`](app/src/features/project-tasks/ui/TasksPage.tsx) + [`tasks.css`](app/src/features/project-tasks/ui/tasks.css) + токены в [`director-sessions.css`](app/src/features/director-sessions/ui/director-sessions.css).
+
+Эталон **контраста контентной пластины**: [`organizations.css`](app/src/features/organizations/ui/organizations.css) (`.organizations-page` с `background: var(--sessions-bg)`).
+
+При создании/правке **страниц** (не модалок) копируй этот каркас. Не изобретай новую сетку «с нуля».
+
+## Shell
+
+```tsx
+<div className="tasks-page"> {/* или sessions-page / organizations-page / свой *-page с теми же правилами */}
+  <RehearsalPlanSectionChrome activeTab="…"> {/* если секция plan/tasks; иначе AdminSectionChrome */}
+    <div className="tasks-page__content">
+      {/* контент */}
+    </div>
+  </RehearsalPlanSectionChrome>
+</div>
+```
+
+Корневой контейнер страницы (`*-page`):
+
+- `margin: 0 auto`
+- `max-width: var(--width-content-page)` (1440px)
+- `width: 100%`
+- `padding: 18px 18px 28px` (на узких — через admin chrome: 12px)
+- `box-sizing: border-box`
+- фон/текст из **sessions**-токенов (не произвольный light theme)
+- **обязательно** `background: var(--sessions-bg)` — контентная пластина визуально отделена от фона приложения
+
+Если страница под `AdminSectionChrome` / `RehearsalPlanSectionChrome` — корень должен попадать в селектор в [`admin/style.css`](app/src/shared/components/admin/style.css) (`*:has(> .admin-chrome-layout)`), либо явно повторять те же max-width / margin / padding.
+
+## Контентная пластина (обязательно)
+
+Фон **chrome / layout** приложения (`--color-bg-primary`, сейчас ≈ `#282828`) и фон **корня страницы** (`--sessions-bg`, `#111`) — **разные**.
+
+- Корень `*-page` всегда красится в `var(--sessions-bg)`, чтобы колонка контента читалась как отдельная поверхность (как на Organizations).
+- Не оставляй страницу с прозрачным фоном «в цвет layout» — пластина должна отличаться.
+- Внутренние панели/карточки — на ступень светлее: `var(--sessions-panel)` / `var(--sessions-bg-deep)`, не тем же цветом, что корень страницы.
+- Не подменяй `--sessions-bg` на `--color-bg-primary` у корня страницы.
+
+Иерархия поверхностей:
+
+1. App chrome / вокруг shell → `--color-bg-primary`
+2. Корень страницы (контентная пластина) → `--sessions-bg`
+3. Панели, хедеры секций, списки → `--sessions-panel`
+4. Inputs / глубокие колодцы → `--sessions-bg-deep`
+
+## Цвета и поверхности
+
+Подключай/наследуй переменные (объявление — на корне `*-page` или через импорт `director-sessions.css`):
+
+- `--sessions-bg`, `--sessions-bg-deep`, `--sessions-panel`, `--sessions-panel-hover`
+- `--sessions-border`, `--sessions-text`, `--sessions-text-muted`, `--sessions-text-strong`
+- акцент активных состояний: `var(--color-active-ascent)` (не хардкодить `#e78a4e`)
+
+Панели/списки:
+
+- `border: 1px solid var(--sessions-border)`
+- `background: var(--sessions-panel)`
+- **без** `border-radius` (острые углы)
+- без тяжёлых теней и «карточного» UI
+
+Пустые/hint-состояния (как `tasks-page__panel`):
+
+- dashed border, приглушённый panel
+- hint: `font-size: 13px`, `color: var(--sessions-text-muted)`, `text-align: center` только для empty/hint-блоков — не для всей страницы
+
+## Контент
+
+- Основная колонка на всю ширину chrome (`max-width: none` под admin chrome — как у tasks).
+- Не центрируй весь layout через `text-align: center` / `justify-items: center` на корне.
+- Горизонтальное выравнивание страницы = **центрирование shell** (`margin: 0 auto` + `--width-content-page`), контент внутри — обычный flow слева направо.
+- Ссылки в тексте: цвет `var(--color-active-ascent)`, без pill/button, если это не CTA.
+
+## Запрещено для новых страниц
+
+- Полноширинный layout без `max-width: var(--width-content-page)` и без центрирования shell
+- Прозрачный / совпадающий с app chrome фон у корня `*-page` (нет контраста пластины)
+- Свой палитровый набор вместо `--sessions-*` / design tokens
+- `border-radius` по умолчанию
+- Inline styles
+- Дублировать admin padding вручную вразрез с chrome
+
+## Чеклист перед сдачей страницы
+
+1. Корень: centered shell `max-width: var(--width-content-page)`
+2. Корень: `background: var(--sessions-bg)` — пластина отличается от app chrome
+3. Токены `--sessions-*` + `--color-active-ascent` для active/links
+4. Chrome: `AdminSectionChrome` / `RehearsalPlanSectionChrome` где уместно
+5. CSS в отдельном файле, className через `cn` / `classnames`
+6. Empty/notice — по образцу `tasks-page__panel` / `tasks-page__hint`, не уникальный hero-card

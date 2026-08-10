@@ -16,6 +16,8 @@ import { MiniAvatar } from "../../shared/core/mini-avatar/MiniAvatar";
 import { Button } from "@shared/core/button/Button";
 import { normalizeEmail } from "../director-sessions/model/session-page-utils";
 import { useDirectorSessionDetail } from "./useDirectorSessionDetail";
+import { useProject } from "../project";
+import { projectSessionPath } from "../../app/router/paths";
 
 import "../rehearsals/ui/rehearsals.css";
 import "./director-session-detail.css";
@@ -111,6 +113,7 @@ export function DirectorSessionDetailPanel({
   onClose,
 }: DirectorSessionDetailPanelProps) {
   const id = String(sessionId ?? "").trim();
+  const { projectName } = useProject();
 
   const {
     session,
@@ -226,7 +229,7 @@ export function DirectorSessionDetailPanel({
         <div className="director-session-page__subhead">
           {!onClose ? (
             <Link
-              to={`/sessions?sessionId=${encodeURIComponent(id)}`}
+              to={`${projectSessionPath(projectName)}?sessionId=${encodeURIComponent(id)}`}
               title="К списку сессий"
             >
               ← К списку
@@ -464,7 +467,7 @@ export function DirectorSessionDetailPanel({
                       </div>
                       <Link
                         className="director-session-page__slot-link"
-                        to={`/sessions/${encodeURIComponent(session.id)}/slots/${encodeURIComponent(sl.id)}`}
+                        to={projectSessionPath(projectName, session.id, sl.id)}
                         title="Открыть слот и выбрать материал"
                       >
                         Открыть слот

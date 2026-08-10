@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useAuth } from "../../auth";
 import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { useProject } from "../../project";
@@ -16,9 +16,12 @@ import {
 import { buildRequisiteTaskImports, countRequisiteTaskImports } from "./build-requisite-task-imports";
 import { mergeTaskAssigneeMembers } from "./merge-task-assignee-members";
 import {
-  isProjectTaskOpen,
-  type ProjectTaskFilter,
-} from "./project-task-labels";
+  getProjectTaskFilter,
+  setProjectTaskFilter,
+  setProjectTaskFilterCounts,
+  subscribeProjectTaskFilter,
+} from "./project-task-filter";
+import { isProjectTaskOpen } from "./project-task-labels";
 import type {
   ProjectTaskCategory,
   ProjectTaskItem,
@@ -38,7 +41,11 @@ export function useProjectTasksPage() {
   });
   const { projectName } = useProject();
   const { scenes } = usePlaybook();
-  const [filter, setFilter] = useState<ProjectTaskFilter>("open");
+  const filter = useSyncExternalStore(
+    subscribeProjectTaskFilter,
+    getProjectTaskFilter,
+    getProjectTaskFilter,
+  );
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newAssigneeEmail, setNewAssigneeEmail] = useState("");
@@ -68,8 +75,8 @@ export function useProjectTasksPage() {
     useImportRequisiteProjectTasksMutation();
 
   const { data: troupeData } = useMyTroupeQuery(
-    { project: projectSlug },
-    { skip: !accessToken || !projectSlug },
+    {},
+    { skip: !accessToken },
   );
 
   const assigneeMembers = useMemo(
@@ -140,6 +147,14 @@ export function useProjectTasksPage() {
       ).length,
     [myEmail, tasks],
   );
+
+  useEffect(() => {
+    setProjectTaskFilterCounts({
+      open: openTasksCount,
+      mine: myOpenTasksCount,
+      all: tasks.length,
+    });
+  }, [myOpenTasksCount, openTasksCount, tasks.length]);
 
   const handleCreateTask = async () => {
     const title = newTitle.trim();
@@ -253,7 +268,7 @@ export function useProjectTasksPage() {
     accessToken,
     projectSlug,
     filter,
-    setFilter,
+    setFilter: setProjectTaskFilter,
     newTitle,
     setNewTitle,
     newDescription,

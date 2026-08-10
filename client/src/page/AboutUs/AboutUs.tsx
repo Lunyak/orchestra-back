@@ -8,19 +8,26 @@ import { GlitchHero } from "../HomePage/GlitchHero";
 import "../../shared/styles/site-bands-page.css";
 import "./style.css";
 
-const items = [
-  { id: 1, name: "Анастасия Рябых", img: "/actors/nastya.JPG" },
-  { id: 2, name: "Виктория Юркова", img: "/actors/vica-2.JPG" },
-  { id: 3, name: "Алексей Филатов", img: "/actors/lesha.jpg" },
-  { id: 4, name: "Антон Васильев", img: "/actors/anton.jpg" },
-  { id: 5, name: "Ксения", img: "/actors/ksysha-2.JPG" },
-  { id: 6, name: "Григорий Найдёнов", img: "/actors/grisha.jpg" },
-  { id: 7, name: "Алена Паршина", img: "/actors/alena.JPG" },
-  { id: 8, name: "Екатерина Слыххановская", img: "/actors/katya.JPG" },
-  { id: 9, name: "Полина Смолкина", img: "/actors/polina.jpg" },
-  { id: 10, name: "Вероника Атушева", img: "/actors/nika.JPG" },
-  { id: 11, name: "Сергей Луняка", img: "/actors/ya.JPG" },
-  { id: 12, name: "Лера Буракова", img: "/actors/lera.jpg" },
+type TeamMember = {
+  id: number;
+  name: string;
+  img: string;
+  role: "актер" | "актриса" | "худ. рук";
+};
+
+const items: TeamMember[] = [
+  { id: 1, name: "Анастасия Рябых", img: "/actors/nastya.JPG", role: "актриса" },
+  { id: 2, name: "Виктория Юркова", img: "/actors/vica-2.JPG", role: "актриса" },
+  { id: 3, name: "Алексей Филатов", img: "/actors/lesha.jpg", role: "актер" },
+  { id: 4, name: "Антон Васильев", img: "/actors/anton.jpg", role: "актер" },
+  { id: 5, name: "Ксения", img: "/actors/ksysha-2.JPG", role: "актриса" },
+  { id: 6, name: "Григорий Найдёнов", img: "/actors/grisha.jpg", role: "актер" },
+  { id: 7, name: "Алена Паршина", img: "/actors/alena.JPG", role: "актриса" },
+  { id: 8, name: "Екатерина Слыххановская", img: "/actors/katya.JPG", role: "актриса" },
+  { id: 9, name: "Полина Смолкина", img: "/actors/polina.jpg", role: "актриса" },
+  { id: 10, name: "Вероника Атушева", img: "/actors/nika.JPG", role: "актриса" },
+  { id: 11, name: "Сергей Луняка", img: "/actors/ya.JPG", role: "худ. рук" },
+  { id: 12, name: "Лера Буракова", img: "/actors/lera.jpg", role: "актриса" },
 ];
 
 const AboutUs: FC = () => {
@@ -44,12 +51,17 @@ const AboutUs: FC = () => {
             text="Команда"
             className="home-page__glitch-hero--page"
           />
-          <p className="site-bands-page__tagline">актёры и команда</p>
+          <p className="site-bands-page__tagline">актеры и худ. рук</p>
         </header>
 
         <div className="site-bands-list" role="list" aria-label="Команда">
           {items.map((data) => (
-            <TeamRow key={data.id} name={data.name} img={data.img} />
+            <TeamRow
+              key={data.id}
+              name={data.name}
+              img={data.img}
+              role={data.role}
+            />
           ))}
         </div>
       </div>
@@ -59,7 +71,15 @@ const AboutUs: FC = () => {
 
 export const Component = AboutUs;
 
-function TeamRow({ name, img }: { name: string; img: string }) {
+function TeamRow({
+  name,
+  img,
+  role,
+}: {
+  name: string;
+  img: string;
+  role: TeamMember["role"];
+}) {
   const [isLoaded, setIsLoaded] = useState(false);
   const title = name.trim();
 
@@ -83,7 +103,10 @@ function TeamRow({ name, img }: { name: string; img: string }) {
             onError={() => setIsLoaded(true)}
           />
         </div>
-        <span className="site-bands-row__title">{title}</span>
+        <div className="aboutus-row__text">
+          <span className="site-bands-row__title">{title}</span>
+          <span className="aboutus-row__role">{role}</span>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,72 @@
+.project-roles-page {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  padding: 18px 18px 28px;
+  box-sizing: border-box;
+  min-height: 100%;
+  color: var(--sessions-text);
+  background: var(--sessions-bg);
+}
+
+.project-roles-page__content {
+  display: grid;
+  gap: 18px;
+}
+
+.project-roles-page__header {
+  display: grid;
+  gap: 6px;
+}
+
+.project-roles-page__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sessions-text-strong);
+}
+
+.project-roles-page__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sessions-text-muted);
+}
+
+.project-roles-page__create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.project-roles-page__create-input {
+  flex: 1 1 180px;
+  min-width: 140px;
+}
+
+.project-roles-page__panel {
+  padding: 24px 16px;
+  border: 1px dashed var(--sessions-border);
+  background: var(--sessions-panel);
+}
+
+.project-roles-page__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sessions-text-muted);
+  text-align: center;
+}
+
+.project-roles-page__error {
+  font-size: 13px;
+  color: var(--color-danger, #c44);
+}

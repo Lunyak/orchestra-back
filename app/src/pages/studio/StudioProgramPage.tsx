@@ -12,6 +12,10 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { Link, useParams } from "react-router-dom";
+import {
+  studioLessonPath,
+  studioPath,
+} from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import type { StudioLessonTaskType, StudioProgramModule } from "../../features/studio";
@@ -248,7 +252,7 @@ export function StudioProgramPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to={`/studio/${studioId}`}>
+              <Link className="studio-page__back" to={studioPath(studioId)}>
                 ← Студия
               </Link>
               <p className="studio-page__error">Программа не найдена.</p>
@@ -264,7 +268,7 @@ export function StudioProgramPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to={`/studio/${studioId}`}>
+            <Link className="studio-page__back" to={studioPath(studioId)}>
               ← {studio.title}
             </Link>
 
@@ -304,7 +308,11 @@ export function StudioProgramPage() {
                 ) : (
                   <ul className="studio-lesson-list studio-lesson-list--page">
                     {module.lessons.map((lesson) => {
-                      const lessonPath = `/studio/${studioId}/programs/${module.id}/lessons/${lesson.id}`;
+                      const lessonPath = studioLessonPath(
+                        studioId,
+                        module.id,
+                        lesson.id,
+                      );
                       const taskType = lesson.taskType ?? "complete";
                       return (
                         <li key={lesson.id} className="studio-lesson-item">

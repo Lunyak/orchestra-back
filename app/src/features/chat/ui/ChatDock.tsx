@@ -15,6 +15,7 @@ import { useMyProfileQuery } from "../../profile/api/profile-api";
 import { ChatDockMessagesContent } from "./ChatDockMessagesContent";
 import "./ChatDock.css";
 import {
+  CHAT_DOCK_OPEN_EVENT,
   CHAT_DOCK_VISIBILITY_EVENT,
   persistChatDockHidden,
   readChatDockHidden,
@@ -34,8 +35,8 @@ export function ChatDock() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
   const { data: troupeData } = useMyTroupeQuery(
-    { project: projectName || "fools" },
-    { skip: !accessToken || !projectName },
+    {},
+    { skip: !accessToken },
   );
   const myTroupe = troupeData?.troupe ?? null;
   const [open, setOpen] = useState(false);
@@ -104,6 +105,12 @@ export function ChatDock() {
 
     window.addEventListener(CHAT_DOCK_VISIBILITY_EVENT, onVisibilityChange);
     return () => window.removeEventListener(CHAT_DOCK_VISIBILITY_EVENT, onVisibilityChange);
+  }, []);
+
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener(CHAT_DOCK_OPEN_EVENT, onOpen);
+    return () => window.removeEventListener(CHAT_DOCK_OPEN_EVENT, onOpen);
   }, []);
 
   useEffect(() => {

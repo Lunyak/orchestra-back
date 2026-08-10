@@ -2,6 +2,13 @@
 
 /* Spectacle page: empty state, mobile overlay, desktop panel toggles, theater host */
 
+.spectacle-project-workspace {
+  width: min(1080px, 100%);
+  margin: 0 auto;
+  padding: var(--spacing-12) var(--spacing-10);
+  box-sizing: border-box;
+}
+
 .empty-project {
   max-width: 560px;
   width: 100%;

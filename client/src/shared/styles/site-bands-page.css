@@ -78,7 +78,7 @@
   align-items: center;
   width: 100%;
   text-align: center;
-  padding: clamp(56px, 10dvh, 120px) clamp(16px, 4vw, 48px) clamp(24px, 4dvh, 40px);
+  padding: clamp(20px, 2.5dvh, 32px) clamp(16px, 4vw, 48px) clamp(14px, 2dvh, 22px);
   box-sizing: border-box;
 }
 
@@ -175,7 +175,7 @@ a.site-bands-row:hover .site-bands-row__avatar,
   }
 
   .site-bands-page__hero {
-    padding-top: clamp(64px, 12dvh, 100px);
+    padding-top: clamp(28px, 4dvh, 40px);
   }
 
   .site-bands-row {

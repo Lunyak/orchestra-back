@@ -2,11 +2,13 @@ import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import React, { Suspense } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
+import { projectPath } from "../../../app/router/paths";
 import "./style.css";
 import { HeaderPlayer } from "../../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptScenesSidebar } from "../../../shared/components/script-scenes-sidebar/ScriptScenesSidebar";
 import { OfflinePackStatus } from "../../../shared/components/offline/OfflinePackStatus";
+import { ProjectWorkspace } from "../../project/ui/ProjectWorkspace";
 import { MAIN_CONTENT_VIEW_MODIFIERS } from "../model/spectacle-page-types";
 import {
   useSpectaclePage,
@@ -66,7 +68,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     mobilePlaylistOpen,
     mobileScenesOpen,
     projectName,
-    projects,
     pushPlaybookAfterSoundsSave,
     registerPlaylistPlay,
     registerSoundToggle,
@@ -111,20 +112,10 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       <div className="app-layout">
         <div className="app-content">
           <main className="main-content">
-            <div className="empty-project">
-              <h2>Проект не выбран</h2>
-              <p>
-                {projects.length > 0
-                  ? "Выберите проект в меню «Проект» в верхней панели или в настройках."
-                  : "Создайте проект в настройках или дождитесь загрузки списка."}
-              </p>
-              <button
-                type="button"
-                className="empty-project-btn"
-                onClick={() => navigate("/settings")}
-              >
-                Перейти в настройки
-              </button>
+            <div className="spectacle-project-workspace">
+              <ProjectWorkspace
+                onProjectOpen={(slug) => navigate(projectPath(slug, "spectacle"))}
+              />
             </div>
           </main>
         </div>
@@ -221,7 +212,12 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     ((isMobile && mobileScenesOpen) || (!isMobile && !isScenesCollapsed));
 
   const showModeSwitch =
-    activeView === "script" || activeView === "light-plot";
+    activeView === "script" ||
+    activeView === "light-plot" ||
+    activeView === "sufer" ||
+    activeView === "board" ||
+    activeView === "sessions" ||
+    activeView === "tasks";
 
   const stepsSidebarNode = stepsSidebarVisible ? (
       <div
@@ -311,7 +307,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
             </Suspense>
           )}
           {activeView === "sufer" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка прогона…" />}>
+            <Suspense fallback={<PageLoader variant="view" label="Загрузка суфлера…" />}>
               <NotesRunPageSection />
             </Suspense>
           )}
@@ -340,6 +336,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
             </Suspense>
           )}
           {activeView === "sessions" && <Outlet />}
+          {activeView === "team" && <Outlet />}
         </main>
         </SpectacleTechChromeSlotsProvider>
       </div>

@@ -23,8 +23,8 @@ export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[]
   const projectSlug = run.projectName;
 
   const { data: troupeData } = useMyTroupeQuery(
-    { project: projectSlug },
-    { skip: !projectSlug },
+    {},
+    { skip: !accessToken },
   );
   const { data: projectMembersData } = useProjectMembersQuery(projectSlug, {
     skip: !accessToken || !projectSlug,

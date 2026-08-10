@@ -3,6 +3,7 @@ import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { studioProgramPath } from "../../app/router/paths";
 import type { StudioDetail } from "../../features/studio";
 import { useCreateStudioModuleMutation } from "../../features/studio";
 import { StudioLogo } from "./StudioLogo";
@@ -11,6 +12,14 @@ import "./style.css";
 type StudioProgramPanelProps = {
   studio: StudioDetail;
 };
+
+function formatUpdatedAt(value: string): string {
+  return new Date(value).toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
 
 export function StudioProgramPanel({ studio }: StudioProgramPanelProps) {
   const canManage = studio.canManage;
@@ -60,38 +69,41 @@ export function StudioProgramPanel({ studio }: StudioProgramPanelProps) {
         <ul className="studio-program-card-list">
           {modules.map((module) => {
             const lessonCount = module.lessons.length;
-            const lessonLabel =
-              lessonCount === 1
-                ? "1 урок"
-                : lessonCount > 1 && lessonCount < 5
-                  ? `${lessonCount} урока`
-                  : `${lessonCount} уроков`;
+            const updatedLabel = formatUpdatedAt(module.updatedAt);
+            const description = module.description?.trim() ?? "";
+            const hasDescription = description.length > 0;
+            const programHref = studioProgramPath(studio.id, module.id);
 
             return (
-              <li key={module.id}>
-                <Link
-                  to={`/studio/${studio.id}/programs/${module.id}`}
-                  className="studio-program-card"
-                >
-                  <StudioLogo
-                    imageUrl={module.imageUrl}
-                    title={module.title}
-                    size="cover"
-                  />
+              <li key={module.id} className="studio-program-card-item">
+                <Link to={programHref} className="studio-program-card">
+                  <div className="studio-program-card__preview">
+                    <StudioLogo
+                      imageUrl={module.imageUrl}
+                      title={module.title}
+                      size="tile"
+                    />
+                    <span className="studio-program-card__badge">
+                      Программа
+                    </span>
+                  </div>
                   <div className="studio-program-card__body">
                     <div className="studio-program-card__title">
                       {module.title}
                     </div>
-                    {module.description ? (
-                      <p className="studio-program-card__description">
-                        {module.description}
+                    <div className="studio-program-card__properties">
+                      <p className="studio-program-card__text">
+                        Уроки: {lessonCount}
                       </p>
-                    ) : (
-                      <p className="studio-program-card__description studio-program-card__description--empty">
-                        Без описания
+                      {hasDescription ? (
+                        <p className="studio-program-card__text studio-program-card__text--clamp">
+                          Описание: {description}
+                        </p>
+                      ) : null}
+                      <p className="studio-program-card__text">
+                        Обновлено: {updatedLabel}
                       </p>
-                    )}
-                    <div className="studio-program-card__meta">{lessonLabel}</div>
+                    </div>
                   </div>
                 </Link>
               </li>

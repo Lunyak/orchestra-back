@@ -10,7 +10,7 @@ import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { useIsMobile } from "../../../shared/hooks/useIsMobile";
 import { patchTheaterViewPrefs, readTheaterViewPrefs } from "../../theater/model/theater-view-prefs-storage";
 import { writeRehearsalPlanTab } from "../../../shared/settings/rehearsalPlanTab";
-import { PROJECT_MEDIA_ROUTE_PATH, SUFER_ROUTE_PATH } from "../../../app/router/routeMeta";
+import { getProjectSectionFromPath } from "../../../app/router/paths";
 import type { SpectacleActiveView } from "./spectacle-page-types";
 
 export type SpectaclePageViewModel = ReturnType<typeof useSpectaclePage>;
@@ -97,24 +97,25 @@ export function useSpectaclePage() {
 
   const isMobile = useIsMobile();
 
+  const projectSection = getProjectSectionFromPath(location.pathname);
   const activeView: SpectacleActiveView =
-    ENABLE_3D_THEATER && location.pathname === "/theater"
+    ENABLE_3D_THEATER && projectSection === "theater"
       ? "theater"
-      : location.pathname === "/light-plot"
+      : projectSection === "light-plot"
         ? "light-plot"
-        : location.pathname === SUFER_ROUTE_PATH || location.pathname === "/notes-run"
+        : projectSection === "sufer"
           ? "sufer"
-          : location.pathname === PROJECT_MEDIA_ROUTE_PATH
+          : projectSection === "media"
             ? "media"
-            : location.pathname === "/board"
+            : projectSection === "board"
             ? "board"
-            : location.pathname === "/tasks" ||
-                location.pathname.startsWith("/tasks/")
+            : projectSection === "tasks"
               ? "tasks"
-              : location.pathname === "/sessions" ||
-                  location.pathname.startsWith("/sessions/")
+              : projectSection === "sessions"
                 ? "sessions"
-                : "script";
+                : projectSection === "team"
+                  ? "team"
+                  : "script";
   const isTheaterView = activeView === "theater";
 
   const [theaterImmersiveMode, setTheaterImmersiveModeState] = useState(false);
@@ -215,6 +216,7 @@ export function useSpectaclePage() {
     activeView === "board" ||
     activeView === "sessions" ||
     activeView === "tasks" ||
+    activeView === "team" ||
     activeView === "media";
 
   const kanbanMembers = useMemo(

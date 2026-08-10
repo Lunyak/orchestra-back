@@ -9,50 +9,100 @@ datasource db {
 }
 
 model User {
-  id               String             @id @default(cuid())
-  email            String             @unique
-  passwordHash     String
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  subscriptionId   String?
-  subscription     SubscriptionPlan?  @relation(fields: [subscriptionId], references: [id])
+  id             String            @id @default(cuid())
+  email          String            @unique
+  passwordHash   String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  subscriptionId String?
+  subscription   SubscriptionPlan? @relation(fields: [subscriptionId], references: [id])
 
-  projectsOwned      Project[]        @relation("ProjectOwner")
-  projectMemberships ProjectMember[]
-  actorNotes         ActorNote[]
-  actorAnnotations   ActorAnnotation[]
-  telegramBots       TelegramBotIntegration[]
+  projectsOwned                 Project[]                      @relation("ProjectOwner")
+  projectMemberships            ProjectMember[]
+  actorNotes                    ActorNote[]
+  actorAnnotations              ActorAnnotation[]
+  telegramBots                  TelegramBotIntegration[]
   projectTelegramBotPreferences ProjectTelegramBotPreference[]
-  directorSessions   DirectorSession[]
-  roleNotes          ProjectRoleNote[]
-  rehearsalComments  RehearsalComment[]
-  directorSessionComments DirectorSessionComment[]
-  projectTasksCreated ProjectTask[] @relation("ProjectTaskCreator")
-  troupeMemberships  TroupeMember[]
-  teamMemberships    TeamMember[]      @relation("TeamMemberUser")
-  teamMembersOwned   TeamMember[]      @relation("TeamOwner")
-  troupeOwned        Troupe?
-  passwordResetTokens PasswordResetToken[]
-  chatMessages       ChatMessage[]
-  chatReadStates     ChatConversationReadState[]
-  studiosOwned       Studio[]          @relation("StudioOwner")
-  studioMemberships  StudioMember[]
-  studioInvitesCreated StudioInvite[]  @relation("StudioInviteCreator")
-  studioAssignmentsCreated StudioAssignment[] @relation("StudioAssignmentCreator")
-  studioSubmissionsGraded StudioSubmission[] @relation("StudioSubmissionGrader")
-  studioLessonProgressReviewed StudioLessonProgress[] @relation("StudioLessonProgressReviewer")
+  directorSessions              DirectorSession[]
+  roleNotes                     ProjectRoleNote[]
+  rehearsalComments             RehearsalComment[]
+  directorSessionComments       DirectorSessionComment[]
+  projectTasksCreated           ProjectTask[]                  @relation("ProjectTaskCreator")
+  troupeMemberships             TroupeMember[]
+  teamMemberships               TeamMember[]                   @relation("TeamMemberUser")
+  teamMembersOwned              TeamMember[]                   @relation("TeamOwner")
+  troupesOwned                  Troupe[]
+  passwordResetTokens           PasswordResetToken[]
+  chatMessages                  ChatMessage[]
+  chatReadStates                ChatConversationReadState[]
+  studiosOwned                  Studio[]                       @relation("StudioOwner")
+  studioMemberships             StudioMember[]
+  studioInvitesCreated          StudioInvite[]                 @relation("StudioInviteCreator")
+  projectInvitesCreated         ProjectInvite[]                @relation("ProjectInviteCreator")
+  projectTheaterInvitesCreated  ProjectTheaterInvite[]         @relation("ProjectTheaterInviteCreator")
+  troupeInvitesCreated          TroupeInvite[]                 @relation("TroupeInviteCreator")
+  studioAssignmentsCreated      StudioAssignment[]             @relation("StudioAssignmentCreator")
+  studioSubmissionsGraded       StudioSubmission[]             @relation("StudioSubmissionGrader")
+  studioLessonProgressReviewed  StudioLessonProgress[]         @relation("StudioLessonProgressReviewer")
+  personalWorkspace             Workspace?                     @relation("PersonalWorkspaceOwner")
+  workspaceMemberships          WorkspaceMember[]
+}
+
+enum WorkspaceType {
+  PERSONAL
+  THEATER
+  TROUPE
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Workspace {
+  id              String        @id @default(cuid())
+  type            WorkspaceType
+  name            String
+  personalOwnerId String?       @unique
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  personalOwner User?                @relation("PersonalWorkspaceOwner", fields: [personalOwnerId], references: [id], onDelete: Cascade)
+  memberships   WorkspaceMember[]
+  projects      Project[]
+  theater       Theater?
+  troupe        Troupe?
+  rehearsals    RehearsalWorkspace[]
+
+  @@index([type])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
 }
 
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
   /// SHA-256(token) в base64url
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -62,59 +112,153 @@ model UserProfile {
   /// Профиль по email.
   /// ВАЖНО: не привязываем FK к User, чтобы бот мог заливать профили
   /// даже для тех, кто ещё не зарегистрирован в сервисе.
-  email            String   @id
-  displayName      String?
-  firstName        String?
-  lastName         String?
-  telegramUsername String?
-  telegramId       String?  @unique
-  avatarUrl        String?
-  availabilityCalendar Json?
+  email                  String   @id
+  displayName            String?
+  firstName              String?
+  lastName               String?
+  telegramUsername       String?
+  telegramId             String?  @unique
+  avatarUrl              String?
+  availabilityCalendar   Json?
   /// Доступность по времени на конкретные даты:
   /// { "YYYY-MM-DD": [ { from: "HH:mm", to: "HH:mm" }, ... ] }
   availabilityTimeRanges Json?
-  sex              String?
+  sex                    String?
   /// Роль в театре (актер, режиссер, и т.д.)
-  role             String?
-  phone            String?
-  birthday         String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  role                   String?
+  phone                  String?
+  birthday               String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 model SubscriptionPlan {
-  id                         String   @id @default(cuid())
-  name                       String   @unique
+  id                         String @id @default(cuid())
+  name                       String @unique
   maxProjects                Int?
   maxCollaboratorsPerProject Int?
   features                   Json
 
-  users                      User[]
+  users User[]
 }
 
 model Project {
-  id          String          @id @default(cuid())
-  slug        String          @unique
+  id          String    @id @default(cuid())
+  slug        String    @unique
   name        String
   description String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
   ownerId     String
-  owner       User            @relation("ProjectOwner", fields: [ownerId], references: [id])
+  owner       User      @relation("ProjectOwner", fields: [ownerId], references: [id])
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
 
-  playbooks   Playbook[]
-  members     ProjectMember[]
+  playbooks              Playbook[]
+  members                ProjectMember[]
+  invites                ProjectInvite[]
+  theaterInvites         ProjectTheaterInvite[]
   telegramBotPreferences ProjectTelegramBotPreference[]
-  modelFiles  ProjectModelFile[]
-  rehearsals  Rehearsal[]
-  actorNotes       ActorNote[]
-  actorAnnotations ActorAnnotation[]
-  directorSessions DirectorSession[]
-  roles            ProjectRole[]
-  tasks            ProjectTask[]
+  modelFiles             ProjectModelFile[]
+  rehearsals             Rehearsal[]
+  rehearsalMaterials     RehearsalProject[]
+  actorNotes             ActorNote[]
+  actorAnnotations       ActorAnnotation[]
+  directorSessions       DirectorSession[]
+  roles                  ProjectRole[]
+  teamRoles              ProjectTeamRole[]
+  tasks                  ProjectTask[]
+  theaters               ProjectTheater[]
 
   @@index([ownerId])
+  @@index([workspaceId])
+}
+
+/// Приглашение в проект (token хранится как SHA-256).
+model ProjectInvite {
+  id              String    @id @default(cuid())
+  projectId       String
+  tokenHash       String    @unique
+  role            String    @default("editor")
+  /// Принять может только этот email.
+  email           String
+  createdByUserId String
+  expiresAt       DateTime?
+  acceptedAt      DateTime?
+  declinedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("ProjectInviteCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([email])
+}
+
+/// Ссылка для партнёрской привязки проекта к театру (token = SHA-256).
+model ProjectTheaterInvite {
+  id                String    @id @default(cuid())
+  projectId         String
+  tokenHash         String    @unique
+  createdByUserId   String
+  expiresAt         DateTime?
+  acceptedAt        DateTime?
+  revokedAt         DateTime?
+  acceptedTheaterId String?
+  createdAt         DateTime  @default(now())
+
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy       User     @relation("ProjectTheaterInviteCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  acceptedTheater Theater? @relation(fields: [acceptedTheaterId], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+}
+
+model ProjectTheater {
+  id                String   @id @default(cuid())
+  projectId         String
+  theaterId         String
+  participationType String   @default("PARTNER")
+  createdAt         DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  theater Theater @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, theaterId])
+  @@index([projectId])
+  @@index([theaterId])
+}
+
+model Theater {
+  id          String   @id @default(cuid())
+  workspaceId String   @unique
+  title       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace      Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  premises       Premise[]
+  projects       ProjectTheater[]
+  theaterInvites ProjectTheaterInvite[]
+  troupes        TheaterTroupe[]
+  homeTroupes    Troupe[]
+}
+
+model TheaterTroupe {
+  id                String   @id @default(cuid())
+  theaterId         String
+  troupeId          String
+  participationType String   @default("PARTNER")
+  createdAt         DateTime @default(now())
+
+  theater Theater @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+  troupe  Troupe  @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+
+  @@unique([theaterId, troupeId])
+  @@index([theaterId])
+  @@index([troupeId])
 }
 
 enum ProjectTaskStatus {
@@ -140,27 +284,27 @@ enum ProjectTaskSource {
 }
 
 model ProjectTask {
-  id              String              @id @default(cuid())
-  projectId       String
-  title           String
-  description     String?
-  status          ProjectTaskStatus   @default(todo)
-  category        ProjectTaskCategory @default(other)
-  source          ProjectTaskSource   @default(manual)
+  id             String              @id @default(cuid())
+  projectId      String
+  title          String
+  description    String?
+  status         ProjectTaskStatus   @default(todo)
+  category       ProjectTaskCategory @default(other)
+  source         ProjectTaskSource   @default(manual)
   /// Уникальный ключ для импорта (например requisite:12:3:setup:email)
-  sourceKey       String?
-  assigneeEmail   String?
-  dueAt           DateTime?
-  refSceneId      Int?
-  refRequisiteId  Int?
-  refAction       String?
-  sortOrder       Int                 @default(0)
-  createdById     String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  sourceKey      String?
+  assigneeEmail  String?
+  dueAt          DateTime?
+  refSceneId     Int?
+  refRequisiteId Int?
+  refAction      String?
+  sortOrder      Int                 @default(0)
+  createdById    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
-  project         Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy       User?               @relation("ProjectTaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("ProjectTaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@unique([projectId, sourceKey])
   @@index([projectId, status])
@@ -176,44 +320,71 @@ enum RehearsalParticipantStatus {
 }
 
 model Rehearsal {
-  id            String   @id @default(cuid())
-  projectId     String
-  title         String
-  startsAt      DateTime
-  durationMin   Int?
-  notes         String?
-  place         String?  // Место проведения репетиции
+  id                  String    @id @default(cuid())
+  projectId           String
+  title               String
+  startsAt            DateTime
+  durationMin         Int?
+  notes               String?
+  place               String? // Место проведения репетиции
   /// Выбранные playbook-модули на репетицию (массив id). Если null/пусто — «не выбрано».
   selectedPlaybookIds Json?
   /// Выбранные сцены спектакля: [{ playbookId, sceneId }]
-  selectedScenes Json?
-  telegramChatId       String?  // ID группы в Telegram
-  telegramMessageId    String?  // ID сообщения опроса в Telegram
-  telegramThreadId     String?  // ID топика в группе
-  publishedAt   DateTime? // Когда репетиция была опубликована в чат
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdBy     String?
-  createdVia    String?  // "web" | "bot" и т.п.
+  selectedScenes      Json?
+  telegramChatId      String? // ID группы в Telegram
+  telegramMessageId   String? // ID сообщения опроса в Telegram
+  telegramThreadId    String? // ID топика в группе
+  publishedAt         DateTime? // Когда репетиция была опубликована в чат
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  createdBy           String?
+  createdVia          String? // "web" | "bot" и т.п.
 
-  project       Project  @relation(fields: [projectId], references: [id])
-  participants  RehearsalParticipant[]
-  comments      RehearsalComment[]
+  project         Project                @relation(fields: [projectId], references: [id])
+  participants    RehearsalParticipant[]
+  comments        RehearsalComment[]
+  workspaces      RehearsalWorkspace[]
+  projects        RehearsalProject[]
+  directorSession DirectorSession?
 
   @@index([projectId, startsAt])
 }
 
-model RehearsalComment {
-  id            String   @id @default(cuid())
-  rehearsalId   String
-  authorUserId  String
-  authorEmail   String
-  content       String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model RehearsalProject {
+  rehearsalId String
+  projectId   String
+  createdAt   DateTime @default(now())
 
-  rehearsal     Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
-  authorUser    User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  rehearsal Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([rehearsalId, projectId])
+  @@index([projectId])
+}
+
+model RehearsalWorkspace {
+  rehearsalId String
+  workspaceId String
+  createdAt   DateTime @default(now())
+
+  rehearsal Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([rehearsalId, workspaceId])
+  @@index([workspaceId])
+}
+
+model RehearsalComment {
+  id           String   @id @default(cuid())
+  rehearsalId  String
+  authorUserId String
+  authorEmail  String
+  content      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  rehearsal  Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  authorUser User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
 
   @@unique([rehearsalId, authorUserId])
   @@index([rehearsalId])
@@ -222,19 +393,19 @@ model RehearsalComment {
 }
 
 model RehearsalParticipant {
-  id           String                     @id @default(cuid())
-  rehearsalId  String
-  email        String
-  telegramId   String?
-  userName     String?  // Имя пользователя для отображения
-  status       RehearsalParticipantStatus @default(unknown)
-  roles        Json?
-  lateTime     String?  // Время когда придет (для опаздывающих)
-  respondedAt  DateTime? // Когда участник последний раз отметился по этой репетиции
-  createdAt    DateTime                   @default(now())
-  updatedAt    DateTime                   @updatedAt
+  id          String                     @id @default(cuid())
+  rehearsalId String
+  email       String
+  telegramId  String?
+  userName    String? // Имя пользователя для отображения
+  status      RehearsalParticipantStatus @default(unknown)
+  roles       Json?
+  lateTime    String? // Время когда придет (для опаздывающих)
+  respondedAt DateTime? // Когда участник последний раз отметился по этой репетиции
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
 
-  rehearsal    Rehearsal                  @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
+  rehearsal Rehearsal @relation(fields: [rehearsalId], references: [id], onDelete: Cascade)
 
   @@unique([rehearsalId, email])
   @@index([email])
@@ -242,30 +413,30 @@ model RehearsalParticipant {
 }
 
 model ProjectMember {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   projectId String
   userId    String
   role      String
 
-  project   Project  @relation(fields: [projectId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
 
   @@unique([projectId, userId])
 }
 
 /// Per-user per-project preference: which connected Telegram bot to use for publishing.
 model ProjectTelegramBotPreference {
-  id               String               @id @default(cuid())
+  id               String @id @default(cuid())
   projectId        String
   userId           String
   botIntegrationId String
 
-  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bot              TelegramBotIntegration @relation(fields: [botIntegrationId], references: [id], onDelete: Cascade)
+  project Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bot     TelegramBotIntegration @relation(fields: [botIntegrationId], references: [id], onDelete: Cascade)
 
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([projectId, userId])
   @@index([userId])
@@ -274,32 +445,32 @@ model ProjectTelegramBotPreference {
 }
 
 model Playbook {
-  id        String   @id @default(cuid())
-  projectId String
-  name      String
+  id                String    @id @default(cuid())
+  projectId         String
+  name              String
   /// Привязки ролей к сценам спектакля (sceneRoles v1)
-  sceneRoles Json?
+  sceneRoles        Json?
   /// Настройка пульта света: фейдеры, количество фейдеров и привязки
-  lightFaders Json?
+  lightFaders       Json?
   /// Программы света: сохранённые состояния фейдеров
-  lightPrograms Json?
+  lightPrograms     Json?
   /// Какие K отмечены для записи в картину (toggles над схемой)
   lightChannelRoles Json?
   /// Видео проектора и заставка (v1: videos + projector)
-  projectorMedia Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  projectorMedia    Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
 
-  project   Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 
-  playlist       PlaylistItem[]
-  sounds         Sound[]
-  scenes         Scene[]
-  lightChannels  GlobalLightChannel[]
-  lightPlot      GlobalLightPlot[]
-  theaterLayout  TheaterLayout?
-  actorNotes     ActorNote[]
+  playlist         PlaylistItem[]
+  sounds           Sound[]
+  scenes           Scene[]
+  lightChannels    GlobalLightChannel[]
+  lightPlot        GlobalLightPlot[]
+  theaterLayout    TheaterLayout?
+  actorNotes       ActorNote[]
   actorAnnotations ActorAnnotation[]
 }
 
@@ -315,8 +486,9 @@ model DirectorSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project                  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rehearsal Rehearsal                @relation(fields: [id], references: [id], onDelete: Cascade)
   comments  DirectorSessionComment[]
 
   @@index([projectId])
@@ -325,16 +497,16 @@ model DirectorSession {
 }
 
 model DirectorSessionComment {
-  id            String   @id @default(cuid())
-  sessionId     String
-  authorUserId  String
-  authorEmail   String
-  content       String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  sessionId    String
+  authorUserId String
+  authorEmail  String
+  content      String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  session       DirectorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  authorUser    User            @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  session    DirectorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  authorUser User            @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
 
   @@unique([sessionId, authorUserId])
   @@index([sessionId])
@@ -355,7 +527,7 @@ model ProjectRole {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project     Project                 @relation(fields: [projectId], references: [id], onDelete: Cascade)
   aliases     ProjectRoleAlias[]
   assignments ProjectRoleAssignment[]
   notes       ProjectRoleNote[]
@@ -365,14 +537,14 @@ model ProjectRole {
 }
 
 model ProjectRoleAlias {
-  id      String @id @default(cuid())
-  roleId  String
+  id     String @id @default(cuid())
+  roleId String
   /// Нормализованный ключ алиаса
-  key     String
+  key    String
   /// Оригинальная строка алиаса
-  title   String
+  title  String
 
-  role    ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, key])
   @@index([key])
@@ -386,15 +558,15 @@ model ProjectRoleAssignment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  role      ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, email])
   @@index([email])
 }
 
 model ProjectRoleNote {
-  id          String   @id @default(cuid())
-  roleId      String
+  id           String   @id @default(cuid())
+  roleId       String
   /// Кто написал (userId если автор залогинен), иначе null.
   authorUserId String?
   authorEmail  String?
@@ -402,66 +574,66 @@ model ProjectRoleNote {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  role        ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  authorUser  User?       @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  role       ProjectRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  authorUser User?       @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
 
   @@index([roleId])
   @@index([authorUserId])
 }
 
 model PlaylistItem {
-  id        String @id @default(cuid())
+  id         String  @id @default(cuid())
   playbookId String
-  order     Int
-  sourceId  Int
-  title     String
-  file      String
-  remoteUrl String?
-  remoteKey String?
-  fadeMs    Int
-  loop      Boolean
+  order      Int
+  sourceId   Int
+  title      String
+  file       String
+  remoteUrl  String?
+  remoteKey  String?
+  fadeMs     Int
+  loop       Boolean
 
-  playbook  Playbook  @relation(fields: [playbookId], references: [id])
+  playbook Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model Sound {
-  id        String @id @default(cuid())
-  playbookId String
-  sourceId  Int
-  title     String
-  file      String
-  icon      String?
-  remoteUrl String?
-  remoteKey String?
+  id            String  @id @default(cuid())
+  playbookId    String
+  sourceId      Int
+  title         String
+  file          String
+  icon          String?
+  remoteUrl     String?
+  remoteKey     String?
   iconRemoteUrl String?
   iconRemoteKey String?
-  volume    Float
-  fadeMs    Int
-  loop      Boolean
+  volume        Float
+  fadeMs        Int
+  loop          Boolean
 
-  playbook  Playbook  @relation(fields: [playbookId], references: [id])
+  playbook Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model Scene {
-  id           String   @id @default(cuid())
-  playbookId   String
-  sourceId     Int
-  title        String
-  markdown     String?
-  playMarkdown String?
+  id                  String    @id @default(cuid())
+  playbookId          String
+  sourceId            Int
+  title               String
+  markdown            String?
+  playMarkdown        String?
   explicationMarkdown String?
-  durationMin  Int?
-  kanbanStatus String?
-  kanbanOrder  Int?
-  cast         Json?
+  durationMin         Int?
+  kanbanStatus        String?
+  kanbanOrder         Int?
+  cast                Json?
   /// Снимки картин света (фейдеры по K+F). Источник истины для прогона — JSON.
-  lightKadrs   Json?
-  order        Int
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  deletedAt    DateTime?
+  lightKadrs          Json?
+  order               Int
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
 
-  playbook     Playbook @relation(fields: [playbookId], references: [id])
+  playbook Playbook @relation(fields: [playbookId], references: [id])
 
   requisites        SceneRequisite[]
   lightPlot         SceneLightPlot[]
@@ -488,11 +660,11 @@ model SceneRequisite {
   /// Что сделать (duty=use)
   actionNote     String?
 
-  scene    Scene  @relation(fields: [sceneId], references: [id])
+  scene Scene @relation(fields: [sceneId], references: [id])
 }
 
 model SceneLightPlot {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   sceneId  String
   sourceId Int
   label    String
@@ -502,67 +674,67 @@ model SceneLightPlot {
   angle    Int
   length   Int
 
-  scene    Scene  @relation(fields: [sceneId], references: [id])
+  scene Scene @relation(fields: [sceneId], references: [id])
 }
 
 model TheaterModel {
-  id              String   @id @default(cuid())
-  sceneId         String
-  sourceId        Int
-  name            String
-  type            String
-  builtin         String?
-  file            String?
-  kind            String   @default("prop")
-  allowOutOfBounds Boolean @default(false)
-  ignoreCollisions Boolean @default(false)
-  modelLowDetail   Boolean @default(false)
-  isRequisite      Boolean @default(false)
-  position        Json
-  rotation        Json
-  scale           Json
-  decorSize         Json?
-  decorColor        String?
-  decorTexture      String?
+  id                 String  @id @default(cuid())
+  sceneId            String
+  sourceId           Int
+  name               String
+  type               String
+  builtin            String?
+  file               String?
+  kind               String  @default("prop")
+  allowOutOfBounds   Boolean @default(false)
+  ignoreCollisions   Boolean @default(false)
+  modelLowDetail     Boolean @default(false)
+  isRequisite        Boolean @default(false)
+  position           Json
+  rotation           Json
+  scale              Json
+  decorSize          Json?
+  decorColor         String?
+  decorTexture       String?
   decorTextureRepeat Float?
   decorTextureMode   String?
   decorTextureFaces  Json?
 
-  scene           Scene   @relation(fields: [sceneId], references: [id])
+  scene Scene @relation(fields: [sceneId], references: [id])
 }
 
 model TheaterSpotlight {
-  id        String  @id @default(cuid())
-  sceneId   String
-  sourceId  Int
-  label     String
-  position  Json
-  target    Json
-  angleDeg  Int
-  intensity Float
-  color     String
-  enabled   Boolean
-  channel   Int
-  isRgb     Boolean
+  id             String  @id @default(cuid())
+  sceneId        String
+  sourceId       Int
+  label          String
+  position       Json
+  target         Json
+  angleDeg       Int
+  intensity      Float
+  color          String
+  enabled        Boolean
+  channel        Int
+  isRgb          Boolean
   modelLowDetail Boolean @default(false)
-  mountModelId Int?
-  mountPointId String?
+  mountModelId   Int?
+  mountPointId   String?
   /// Номер фейдера пульта, к которому привязан софит.
-  faderId   Int?
-  hidden    Boolean @default(false)
-  gridCol   Int?
-  gridRow   Int?
+  faderId        Int?
+  hidden         Boolean @default(false)
+  gridCol        Int?
+  gridRow        Int?
 
-  scene     Scene   @relation(fields: [sceneId], references: [id])
+  scene Scene @relation(fields: [sceneId], references: [id])
 }
 
 model GlobalLightChannel {
-  id         String  @id @default(cuid())
+  id         String @id @default(cuid())
   playbookId String
   raw        String
   index      Int
 
-  playbook   Playbook @relation(fields: [playbookId], references: [id])
+  playbook Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model GlobalLightPlot {
@@ -576,7 +748,7 @@ model GlobalLightPlot {
   angle      Int
   length     Int
 
-  playbook   Playbook @relation(fields: [playbookId], references: [id])
+  playbook Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model TheaterLayout {
@@ -603,55 +775,55 @@ model TheaterLayout {
   doors          Json?
   extras         Json?
 
-  playbook       Playbook @relation(fields: [playbookId], references: [id])
+  playbook Playbook @relation(fields: [playbookId], references: [id])
 }
 
 model ProjectModelFile {
-  id         String  @id @default(cuid())
+  id         String   @id @default(cuid())
   projectId  String
   fileName   String
   path       String
   uploadedAt DateTime @default(now())
 
-  project    Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 }
 
 model BotSettings {
-  id                String   @id @default("singleton")
-  groupChatId       String?  // ID группы Telegram для опросов
-  attendanceThreadId String? // ID топика для опросов о явке
+  id                    String   @id @default("singleton")
+  groupChatId           String? // ID группы Telegram для опросов
+  attendanceThreadId    String? // ID топика для опросов о явке
   announcementsThreadId String? // ID топика для объявлений
-  projectSlug       String?  // Slug проекта по умолчанию для бота
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  projectSlug           String? // Slug проекта по умолчанию для бота
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model TelegramBotIntegration {
-  id                    String   @id @default(cuid())
-  ownerUserId           String
-  owner                 User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  id          String @id @default(cuid())
+  ownerUserId String
+  owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
 
   /// Шифрованный токен Telegram бота (никогда не отдаём на frontend).
-  tokenEncrypted        String
+  tokenEncrypted String
 
   /// getMe.username
-  botUsername           String?
+  botUsername       String?
   /// getMe.id
-  botTelegramUserId     String?
+  botTelegramUserId String?
 
   /// Telegram ID владельца (аналог OWNER_TELEGRAM_ID из env, но пер-бот)
-  ownerTelegramId       String?
+  ownerTelegramId String?
   /// Telegram ID администратора (аналог ADMIN_ID из env, но пер-бот)
-  adminTelegramId       String?
+  adminTelegramId String?
 
   /// Произвольное имя для отображения в UI
-  title                 String?
+  title String?
 
   /// connected | disabled | error
-  status                String   @default("connected")
+  status String @default("connected")
 
   /// Секрет для валидации webhook запросов (header X-Telegram-Bot-Api-Secret-Token)
-  webhookSecret         String
+  webhookSecret String
 
   // Настройки публикации/проекта — пер-бот
   groupChatId           String?
@@ -660,27 +832,27 @@ model TelegramBotIntegration {
   defaultProjectSlug    String?
 
   /// Квиз/игры (аналог QUIZ_GROUP_CHAT_ID / QUIZ_THREAD_ID из env, но пер-бот)
-  quizGroupChatId       String?
-  quizThreadId          String?
+  quizGroupChatId String?
+  quizThreadId    String?
 
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  variables             BotVariable[]
-  projectPreferences    ProjectTelegramBotPreference[]
+  variables          BotVariable[]
+  projectPreferences ProjectTelegramBotPreference[]
 
-  @@index([ownerUserId])
   @@unique([botTelegramUserId])
+  @@index([ownerUserId])
 }
 
 model BotVariable {
-  id        String  @id @default(cuid())
-  botId     String
-  bot       TelegramBotIntegration @relation(fields: [botId], references: [id], onDelete: Cascade)
+  id    String                 @id @default(cuid())
+  botId String
+  bot   TelegramBotIntegration @relation(fields: [botId], references: [id], onDelete: Cascade)
 
-  key       String
-  value     String
-  isSecret  Boolean @default(false)
+  key      String
+  value    String
+  isSecret Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -738,20 +910,50 @@ model ActorAnnotation {
 }
 
 model Troupe {
-  id          String   @id @default(cuid())
-  ownerUserId String   @unique
-  owner       User     @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  title       String   @default("Моя труппа")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String    @id @default(cuid())
+  ownerUserId String
+  owner       User      @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  /// Необязательный домашний театр. Независимая труппа может существовать без него.
+  theaterId   String?
+  theater     Theater?  @relation(fields: [theaterId], references: [id], onDelete: SetNull)
+  title       String    @default("Моя труппа")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
 
-  members            TroupeMember[]
-  roleDefinitions    TeamRoleDefinition[]
-  chatConversations  ChatConversation[]
-  premises           Premise[]
-  collections        TroupeCollection[]
+  members           TroupeMember[]
+  invites           TroupeInvite[]
+  roleDefinitions   TeamRoleDefinition[]
+  chatConversations ChatConversation[]
+  premises          Premise[]
+  collections       TroupeCollection[]
+  theaters          TheaterTroupe[]
 
   @@index([ownerUserId])
+  @@index([theaterId])
+}
+
+/// Приглашение в труппу (token хранится как SHA-256).
+model TroupeInvite {
+  id              String           @id @default(cuid())
+  troupeId        String
+  tokenHash       String           @unique
+  kind            TroupeMemberKind @default(regular)
+  /// Принять может только этот email.
+  email           String
+  createdByUserId String
+  expiresAt       DateTime?
+  acceptedAt      DateTime?
+  declinedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime         @default(now())
+
+  troupe    Troupe @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  createdBy User   @relation("TroupeInviteCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+
+  @@index([troupeId])
+  @@index([email])
 }
 
 enum TroupeCollectionStatus {
@@ -852,24 +1054,37 @@ enum PremiseSlotStatus {
   cancelled
 }
 
+enum PremiseSlotPaymentStatus {
+  unpaid
+  paid
+  waived
+}
+
 /// Физическое помещение труппы (своё или снимаемое).
 model Premise {
-  id        String      @id @default(cuid())
-  troupeId  String
-  name      String
-  kind      PremiseKind @default(OWNED)
-  address   String?
-  capacity  Int?
-  notes     String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id            String      @id @default(cuid())
+  troupeId      String?
+  theaterId     String?
+  studioId      String?
+  name          String
+  kind          PremiseKind @default(OWNED)
+  address       String?
+  capacity      Int?
+  paymentDueDay Int?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  troupe      Troupe             @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  troupe      Troupe?            @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  theater     Theater?           @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+  studio      Studio?            @relation(fields: [studioId], references: [id], onDelete: Cascade)
   members     PremiseMember[]
   slots       PremiseSlot[]
   collections TroupeCollection[]
 
   @@index([troupeId])
+  @@index([theaterId])
+  @@index([studioId])
 }
 
 /// Участник помещения (любой email, не обязательно из труппы).
@@ -891,19 +1106,22 @@ model PremiseMember {
 
 /// Слот занятости помещения.
 model PremiseSlot {
-  id             String            @id @default(cuid())
-  premiseId      String
-  startsAt       DateTime
-  durationMin    Int
-  title          String
-  purpose        String?
-  rentalNotes    String?
-  contactEmail   String?
-  contactName    String?
-  status         PremiseSlotStatus @default(confirmed)
-  createdByEmail String
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id                  String                   @id @default(cuid())
+  premiseId           String
+  startsAt            DateTime
+  durationMin         Int
+  title               String
+  purpose             String?
+  rentalNotes         String?
+  rentalAmountKopecks Int?
+  paymentStatus       PremiseSlotPaymentStatus @default(unpaid)
+  contactEmail        String?
+  contactName         String?
+  contactPhone        String?
+  status              PremiseSlotStatus        @default(confirmed)
+  createdByEmail      String
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 
   premise Premise @relation(fields: [premiseId], references: [id], onDelete: Cascade)
 
@@ -923,8 +1141,8 @@ model ChatConversation {
   createdAt DateTime             @default(now())
   updatedAt DateTime             @updatedAt
 
-  troupe   Troupe?       @relation(fields: [troupeId], references: [id], onDelete: Cascade)
-  messages ChatMessage[]
+  troupe     Troupe?                     @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  messages   ChatMessage[]
   readStates ChatConversationReadState[]
 
   @@unique([troupeId, kind])
@@ -938,8 +1156,8 @@ model ChatConversationReadState {
   conversationId String
   lastReadAt     DateTime
 
-  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  conversation ChatConversation   @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, conversationId])
   @@index([userId])
@@ -948,7 +1166,7 @@ model ChatConversationReadState {
 
 model ChatMessage {
   id              String   @id @default(cuid())
-  conversationId String
+  conversationId  String
   authorUserId    String
   body            String
   clientMessageId String?
@@ -963,15 +1181,15 @@ model ChatMessage {
 }
 
 model TroupeMember {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   troupeId  String
-  troupe    Troupe   @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  troupe    Troupe           @relation(fields: [troupeId], references: [id], onDelete: Cascade)
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   /// Email участника труппы. Храним в lower-case.
   email     String
   kind      TroupeMemberKind @default(regular)
-  createdAt DateTime @default(now())
+  createdAt DateTime         @default(now())
 
   @@unique([troupeId, email])
   @@index([email])
@@ -1005,19 +1223,58 @@ model TeamMember {
   @@index([userId])
 }
 
+/// Должность команды постановки (только проект; не штат театра).
+model ProjectTeamRole {
+  id          String            @id @default(cuid())
+  projectId   String
+  project     Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  slug        String
+  title       String
+  parentId    String?
+  parent      ProjectTeamRole?  @relation("ProjectTeamRoleTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ProjectTeamRole[] @relation("ProjectTeamRoleTree")
+  sortOrder   Int               @default(0)
+  description String            @default("")
+  /// Ключ изображения в хранилище проекта (projectId/image/...).
+  avatarKey   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  assignments ProjectTeamRoleAssignment[]
+
+  @@unique([projectId, slug])
+  @@index([projectId])
+  @@index([parentId])
+}
+
+model ProjectTeamRoleAssignment {
+  id        String          @id @default(cuid())
+  roleId    String
+  role      ProjectTeamRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  /// Email участника (lower-case).
+  email     String
+  createdAt DateTime        @default(now())
+
+  @@unique([roleId, email])
+  @@index([roleId])
+  @@index([email])
+}
+
 model TeamRoleDefinition {
-  id          String   @id @default(cuid())
+  id          String               @id @default(cuid())
   troupeId    String
-  troupe      Troupe   @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  troupe      Troupe               @relation(fields: [troupeId], references: [id], onDelete: Cascade)
   slug        String
   title       String
   parentId    String?
   parent      TeamRoleDefinition?  @relation("TeamRoleTree", fields: [parentId], references: [id], onDelete: SetNull)
   children    TeamRoleDefinition[] @relation("TeamRoleTree")
-  sortOrder   Int      @default(0)
-  description String   @default("")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  sortOrder   Int                  @default(0)
+  description String               @default("")
+  /// Ключ изображения должности (если загружено в контексте проекта / файлового API).
+  avatarKey   String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
   assignments TeamRoleAssignment[]
 
@@ -1027,12 +1284,12 @@ model TeamRoleDefinition {
 }
 
 model TeamRoleAssignment {
-  id           String   @id @default(cuid())
+  id           String             @id @default(cuid())
   roleId       String
   role         TeamRoleDefinition @relation(fields: [roleId], references: [id], onDelete: Cascade)
   teamMemberId String
-  teamMember   TeamMember @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
-  createdAt    DateTime @default(now())
+  teamMember   TeamMember         @relation(fields: [teamMemberId], references: [id], onDelete: Cascade)
+  createdAt    DateTime           @default(now())
 
   @@unique([roleId, teamMemberId])
   @@index([roleId])
@@ -1056,14 +1313,90 @@ model Studio {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner      User                   @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
-  members    StudioMember[]
-  invites    StudioInvite[]
-  modules    StudioProgramModule[]
+  owner       User                  @relation("StudioOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members     StudioMember[]
+  invites     StudioInvite[]
+  modules     StudioProgramModule[]
   assignments StudioAssignment[]
-  videos     StudioVideo[]
+  videos      StudioVideo[]
+  collections StudioCollection[]
+  premises    Premise[]
 
   @@index([ownerUserId])
+}
+
+enum StudioCollectionStatus {
+  draft
+  active
+  closed
+}
+
+/// Сбор средств студии (взносы, оплата курса и т.п.).
+model StudioCollection {
+  id             String                 @id @default(cuid())
+  studioId       String
+  title          String
+  description    String?
+  status         StudioCollectionStatus @default(active)
+  dueAt          DateTime?
+  createdByEmail String
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  studio        Studio                        @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  tariffs       StudioCollectionTariff[]
+  participants  StudioCollectionParticipant[]
+  contributions StudioContribution[]
+
+  @@index([studioId])
+}
+
+model StudioCollectionTariff {
+  id            String   @id @default(cuid())
+  collectionId  String
+  title         String
+  /// Сумма в копейках (₽ × 100).
+  amountKopecks Int
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  collection   StudioCollection              @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  participants StudioCollectionParticipant[]
+
+  @@index([collectionId])
+}
+
+model StudioCollectionParticipant {
+  id           String   @id @default(cuid())
+  collectionId String
+  email        String
+  tariffId     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  collection StudioCollection       @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tariff     StudioCollectionTariff @relation(fields: [tariffId], references: [id], onDelete: Restrict)
+
+  @@unique([collectionId, email])
+  @@index([collectionId])
+  @@index([email])
+}
+
+model StudioContribution {
+  id              String   @id @default(cuid())
+  collectionId    String
+  email           String
+  amountKopecks   Int
+  paidAt          DateTime @default(now())
+  recordedByEmail String
+  note            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  collection StudioCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId, email])
 }
 
 model StudioMember {
@@ -1095,6 +1428,7 @@ model StudioInvite {
   createdByUserId String
   expiresAt       DateTime?
   acceptedAt      DateTime?
+  declinedAt      DateTime?
   revokedAt       DateTime?
   createdAt       DateTime         @default(now())
 
@@ -1116,7 +1450,7 @@ model StudioProgramModule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  studio  Studio                 @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  studio  Studio                @relation(fields: [studioId], references: [id], onDelete: Cascade)
   lessons StudioProgramLesson[]
 
   @@index([studioId, sortOrder])
@@ -1135,17 +1469,17 @@ enum StudioLessonProgressStatus {
 }
 
 model StudioProgramLesson {
-  id          String               @id @default(cuid())
-  moduleId    String
-  title       String
-  body        String?
+  id         String               @id @default(cuid())
+  moduleId   String
+  title      String
+  body       String?
   /// Тип задания: отметить выполненным или сдать видео.
-  taskType    StudioLessonTaskType @default(complete)
+  taskType   StudioLessonTaskType @default(complete)
   /// Текст задания для студийца (дополнительно к body).
-  taskPrompt  String?
-  sortOrder   Int                  @default(0)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  taskPrompt String?
+  sortOrder  Int                  @default(0)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
 
   module      StudioProgramModule    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   assignments StudioAssignment[]
@@ -1190,12 +1524,12 @@ model StudioAssignment {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  studio    Studio                    @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  createdBy User                      @relation("StudioAssignmentCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
-  lesson    StudioProgramLesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
-  targets   StudioAssignmentTarget[]
+  studio      Studio                   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  createdBy   User                     @relation("StudioAssignmentCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  lesson      StudioProgramLesson?     @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  targets     StudioAssignmentTarget[]
   submissions StudioSubmission[]
-  videos    StudioVideo[]
+  videos      StudioVideo[]
 
   @@index([studioId])
   @@index([createdByUserId])

@@ -23,57 +23,9 @@
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   width: 100%;
   margin-bottom: 12px;
-}
-
-.tasks-page__filters {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid var(--sessions-border);
-  background: var(--sessions-panel);
-  padding: 2px;
-}
-
-.tasks-page__filter {
-  min-height: 30px;
-  padding: 5px 10px;
-  border: 0;
-  background: transparent;
-  color: var(--sessions-text);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tasks-page__filter:hover {
-  background: var(--sessions-panel-hover);
-  color: var(--sessions-text-strong);
-}
-
-.tasks-page__filter--active,
-.tasks-page__filter[aria-selected="true"] {
-  background: color-mix(in srgb, var(--color-active-ascent) 14%, transparent);
-  color: var(--color-active-ascent);
-}
-
-.tasks-page__filter-count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--sessions-bg-deep);
-  color: inherit;
-  font-size: 10px;
 }
 
 .tasks-page__compose {

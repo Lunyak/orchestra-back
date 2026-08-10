@@ -3,15 +3,15 @@ import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { studioPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
-import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
+import orgPosterStudiosUrl from "../../features/organizations/assets/org-poster-studios.jpg";
 import {
   studioRoleLabel,
   useCreateStudioMutation,
   useListStudiosQuery,
 } from "../../features/studio";
 import { StudioLogo } from "./StudioLogo";
-import "../../features/rehearsals/ui/rehearsals.css";
 import "./style.css";
 
 function studioListErrorMessage(error: unknown): string {
@@ -37,6 +37,7 @@ export function StudiosPage() {
 
   const studios = data?.studios ?? [];
   const errorMessage = isError ? studioListErrorMessage(error) : null;
+  const hasStudios = studios.length > 0;
 
   const handleToggleCreate = () => {
     setShowCreate((value) => !value);
@@ -59,9 +60,11 @@ export function StudiosPage() {
       setTitle("");
       setDescription("");
       setShowCreate(false);
-      navigate(`/studio/${studio.id}`);
+      navigate(studioPath(studio.id));
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : "Не удалось создать студию");
+      setFormError(
+        e instanceof Error ? e.message : "Не удалось создать студию",
+      );
     }
   };
 
@@ -70,30 +73,31 @@ export function StudiosPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <div className="studio-page__header">
-              <div>
-                <h1 className="studio-page__title">Студия</h1>
-                <p className="studio-page__subtitle">
-                  Онлайн-студии: участники, программа, задания и видео с метками.
-                </p>
+            <div className="studio-page__content">
+              <div className="studio-page__header">
+                <div>
+                  <h1 className="studio-page__title">Студия</h1>
+                  <p className="studio-page__subtitle">
+                    Онлайн-студии: участники, программа, задания и видео с
+                    метками.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleToggleCreate}
+                  disabled={!accessToken}
+                >
+                  {showCreate ? "Отмена" : "Новая студия"}
+                </Button>
               </div>
-              <Button
-                type="button"
-                onClick={handleToggleCreate}
-                disabled={!accessToken}
-              >
-                {showCreate ? "Отмена" : "Новая студия"}
-              </Button>
-            </div>
 
-            {errorMessage ? (
-              <p className="studio-page__error">{errorMessage}</p>
-            ) : null}
+              {errorMessage ? (
+                <p className="studio-page__error">{errorMessage}</p>
+              ) : null}
 
-            <RehearsalsCard fluid>
               {isLoading ? (
-                <p>Загрузка…</p>
-              ) : studios.length === 0 ? (
+                <p className="studio-page__status">Загрузка…</p>
+              ) : !hasStudios ? (
                 <div className="studio-empty">
                   <p>Студий пока нет.</p>
                   {accessToken ? (
@@ -103,64 +107,71 @@ export function StudiosPage() {
                   ) : null}
                 </div>
               ) : (
-                <ul className="studio-list">
-                  {studios.map((studio) => (
-                    <li key={studio.id}>
-                      <Link
-                        to={`/studio/${studio.id}`}
-                        className="studio-list-item"
-                      >
-                        <div className="studio-list-item__row">
-                          <StudioLogo
-                            imageUrl={studio.imageUrl}
-                            title={studio.title}
-                          />
-                          <div>
-                            <div className="studio-list-item__title">
-                              {studio.title}
-                            </div>
-                            <div className="studio-list-item__meta">
-                              {studioRoleLabel(studio.myRole)}
-                              {studio.description
-                                ? ` · ${studio.description}`
-                                : ""}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
+                <ul className="studio-poster-list">
+                  {studios.map((studio) => {
+                    const roleLabel = studioRoleLabel(studio.myRole);
+                    const descriptionText = studio.description?.trim();
+                    const metaParts = [roleLabel];
+                    if (descriptionText) metaParts.push(descriptionText);
+                    const metaText = metaParts.join(" · ");
+
+                    return (
+                      <li key={studio.id}>
+                        <Link
+                          to={studioPath(studio.id)}
+                          className="studio-poster"
+                        >
+                          <span className="studio-poster__frame">
+                            <StudioLogo
+                              imageUrl={studio.imageUrl}
+                              title={studio.title}
+                              size="tile"
+                              fallbackSrc={orgPosterStudiosUrl}
+                            />
+                          </span>
+                          <span className="studio-poster__name">
+                            {studio.title}
+                          </span>
+                          <span className="studio-poster__meta">{metaText}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
-            </RehearsalsCard>
 
-            {showCreate ? (
-              <div className="studio-form-section">
-                <h2 className="studio-form-section__title">Новая студия</h2>
-                {formError ? (
-                  <p className="studio-page__error">{formError}</p>
-                ) : null}
-                <FormInlineRow className="studio-form-row">
-                  <InlineTextField
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Название"
-                  />
-                </FormInlineRow>
-                <FormInlineRow className="studio-form-row">
-                  <InlineTextField
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Описание"
-                  />
-                </FormInlineRow>
-                <div className="studio-actions">
-                  <Button type="button" onClick={handleCreate} disabled={creating}>
-                    {creating ? "Создание…" : "Создать"}
-                  </Button>
+              {showCreate ? (
+                <div className="studio-form-section">
+                  <h2 className="studio-form-section__title">Новая студия</h2>
+                  {formError ? (
+                    <p className="studio-page__error">{formError}</p>
+                  ) : null}
+                  <FormInlineRow className="studio-form-row">
+                    <InlineTextField
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="Название"
+                    />
+                  </FormInlineRow>
+                  <FormInlineRow className="studio-form-row">
+                    <InlineTextField
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Описание"
+                    />
+                  </FormInlineRow>
+                  <div className="studio-actions">
+                    <Button
+                      type="button"
+                      onClick={handleCreate}
+                      disabled={creating}
+                    >
+                      {creating ? "Создание…" : "Создать"}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
         </main>
       </div>

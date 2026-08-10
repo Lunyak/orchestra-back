@@ -40,6 +40,11 @@ export class UpdateRehearsalDto {
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
+  calendarWorkspaceIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   selectedPlaybookIds?: string[];
 
   @IsOptional()

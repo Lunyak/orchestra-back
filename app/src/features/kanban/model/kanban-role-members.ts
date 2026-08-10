@@ -1,13 +1,13 @@
 import type { KanbanSceneRolesAdminMember } from "../../kanban-scene-modal/KanbanSceneRolesAdminPanel";
 import type { ProjectMembersResponse } from "../../project/api/project-api";
-import type { MyTroupeResponse } from "../../troupe/api/troupe-api";
+import type { TroupeResponse } from "../../troupe/api/troupe-api";
 
 export function normalizeEmail(v: string): string {
   return String(v ?? "").trim().toLowerCase();
 }
 
 export function mergeKanbanRoleAssignmentMembers(
-  troupeRes: MyTroupeResponse | undefined,
+  troupeRes: TroupeResponse | undefined,
   projectMembersRes: ProjectMembersResponse | undefined,
 ): KanbanSceneRolesAdminMember[] {
   const membersFromTroupe = (troupeRes?.members ?? [])

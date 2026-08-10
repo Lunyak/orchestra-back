@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -13,6 +12,8 @@ import { CreateRehearsalDto } from './dto/create-rehearsal.dto';
 import { SetParticipantsDto } from './dto/set-participants.dto';
 import { UpdateRehearsalDto } from './dto/update-rehearsal.dto';
 import { UpsertMyRehearsalCommentDto } from './dto/upsert-my-rehearsal-comment.dto';
+import { ProjectAccessService } from '../project-access/project-access.service';
+import { touchProjectActivity } from '../projects/project-activity';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/ru';
@@ -202,6 +203,7 @@ export class RehearsalsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly roles: RolesService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private async assertUserHasProjectAccess(
@@ -210,35 +212,61 @@ export class RehearsalsService {
     write: boolean,
   ) {
     if (userId === 'bot') return;
+    await this.projectAccess.assertById(
+      userId,
+      projectId,
+      write ? 'write' : 'read',
+    );
+  }
+
+  private async resolveCalendarWorkspaceIds(
+    projectId: string,
+    requestedWorkspaceIds?: string[],
+  ) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       select: {
-        ownerId: true,
-        members: { where: { userId }, select: { role: true } },
+        workspaceId: true,
+        theaters: {
+          select: {
+            theater: { select: { workspaceId: true } },
+          },
+        },
       },
     });
     if (!project) throw new NotFoundException('Project not found');
-    if (project.ownerId === userId) return;
-    if (!project.members.length)
-      throw new ForbiddenException('No access to project');
-    if (write && project.members[0]?.role !== 'editor') {
-      throw new ForbiddenException('No write access to project');
+
+    const availableWorkspaceIds = new Set([
+      project.workspaceId,
+      ...project.theaters.map(({ theater }) => theater.workspaceId),
+    ]);
+    const normalizedWorkspaceIds = Array.from(
+      new Set(
+        (requestedWorkspaceIds ?? Array.from(availableWorkspaceIds))
+          .map((workspaceId) => workspaceId.trim())
+          .filter(Boolean),
+      ),
+    );
+    const hasDisconnectedWorkspace = normalizedWorkspaceIds.some(
+      (workspaceId) => !availableWorkspaceIds.has(workspaceId),
+    );
+    if (hasDisconnectedWorkspace) {
+      throw new BadRequestException(
+        'Rehearsal calendar must be connected to the project',
+      );
     }
+    return normalizedWorkspaceIds;
   }
 
   async list(userId: string, projectSlug: string, from?: string, to?: string) {
     const slug = String(projectSlug ?? '').trim();
     if (!slug) throw new BadRequestException('projectSlug is required');
 
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      select: { id: true, slug: true, name: true },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    const { project } = await this.projectAccess.assertBySlug(
+      userId,
+      slug,
+      'read',
+    );
 
     const where: any = { projectId: project.id };
     if (from || to) {
@@ -250,7 +278,7 @@ export class RehearsalsService {
     const rehearsals = await this.prisma.rehearsal.findMany({
       where,
       orderBy: { startsAt: 'asc' },
-      include: { participants: true },
+      include: { participants: true, workspaces: true },
     });
 
     return { project, rehearsals };
@@ -259,13 +287,7 @@ export class RehearsalsService {
   async create(userId: string, dto: CreateRehearsalDto, createdVia: string) {
     const slug = dto.projectSlug.trim();
     const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        ...(userId === 'bot'
-          ? {}
-          : { OR: [{ ownerId: userId }, { members: { some: { userId } } }] }),
-      },
+      where: { slug, deletedAt: null },
       select: { id: true },
     });
     if (!project) throw new NotFoundException('Project not found');
@@ -274,8 +296,12 @@ export class RehearsalsService {
     const startsAt = parseIsoDate(dto.startsAt);
     const title = String(dto.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
+    const calendarWorkspaceIds = await this.resolveCalendarWorkspaceIds(
+      project.id,
+      dto.calendarWorkspaceIds,
+    );
 
-    return this.prisma.rehearsal.create({
+    const created = await this.prisma.rehearsal.create({
       data: {
         projectId: project.id,
         title,
@@ -284,9 +310,15 @@ export class RehearsalsService {
         notes: dto.notes?.trim() || null,
         createdBy: userId,
         createdVia,
+        workspaces: {
+          create: calendarWorkspaceIds.map((workspaceId) => ({ workspaceId })),
+        },
+        projects: { create: { projectId: project.id } },
       },
-      include: { participants: true },
+      include: { participants: true, workspaces: true },
     });
+    await touchProjectActivity(this.prisma, project.id);
+    return created;
   }
 
   async get(userId: string, id: string) {
@@ -295,6 +327,7 @@ export class RehearsalsService {
       include: {
         project: { select: { id: true, slug: true, name: true } },
         participants: true,
+        workspaces: true,
       },
     });
     if (!reh) throw new NotFoundException('Rehearsal not found');
@@ -355,8 +388,15 @@ export class RehearsalsService {
     const reh = await this.prisma.rehearsal.findUnique({ where: { id } });
     if (!reh) throw new NotFoundException('Rehearsal not found');
     await this.assertUserHasProjectAccess(userId, reh.projectId, true);
+    const calendarWorkspaceIds =
+      dto.calendarWorkspaceIds != null
+        ? await this.resolveCalendarWorkspaceIds(
+            reh.projectId,
+            dto.calendarWorkspaceIds,
+          )
+        : null;
 
-    return this.prisma.rehearsal.update({
+    const updated = await this.prisma.rehearsal.update({
       where: { id },
       data: {
         title: dto.title != null ? dto.title.trim() : undefined,
@@ -373,9 +413,20 @@ export class RehearsalsService {
           dto.selectedScenes != null
             ? parseSelectedScenesJson(dto.selectedScenes as any)
             : undefined,
+        workspaces:
+          calendarWorkspaceIds != null
+            ? {
+                deleteMany: {},
+                create: calendarWorkspaceIds.map((workspaceId) => ({
+                  workspaceId,
+                })),
+              }
+            : undefined,
       },
-      include: { participants: true },
+      include: { participants: true, workspaces: true },
     });
+    await touchProjectActivity(this.prisma, reh.projectId);
+    return updated;
   }
 
   async getScenesForRehearsal(userId: string, rehearsalId: string) {
@@ -466,6 +517,36 @@ export class RehearsalsService {
     return this.prisma.rehearsal.findUnique({
       where: { id: rehearsalId },
       include: { participants: true },
+    });
+  }
+
+  async setMyAttendance(
+    userId: string,
+    userEmail: string,
+    rehearsalId: string,
+    status: 'present' | 'absent' | undefined,
+  ) {
+    if (status !== 'present' && status !== 'absent') {
+      throw new BadRequestException('status must be present or absent');
+    }
+    const email = normEmail(userEmail);
+    const participant = await this.prisma.rehearsalParticipant.findFirst({
+      where: {
+        rehearsalId,
+        email,
+        rehearsal: {
+          publishedAt: { not: null },
+          project: { is: this.projectAccess.readWhere(userId) },
+        },
+      },
+      select: { id: true },
+    });
+    if (!participant) {
+      throw new NotFoundException('Rehearsal invitation not found');
+    }
+    return this.prisma.rehearsalParticipant.update({
+      where: { id: participant.id },
+      data: { status, respondedAt: new Date() },
     });
   }
 
@@ -1116,6 +1197,7 @@ export class RehearsalsService {
     }
 
     // Бот сам пометит published через /bot/rehearsals/:id/published.
+    await touchProjectActivity(this.prisma, reh.projectId);
     return { ok: true };
   }
 

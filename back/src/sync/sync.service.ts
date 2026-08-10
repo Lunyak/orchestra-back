@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -20,6 +20,11 @@ import {
   syncNormalizeVec3,
   syncProjectIdFromCompoundId,
 } from './sync-value-normalize';
+import { ProjectAccessService } from '../project-access/project-access.service';
+import {
+  touchProjectActivity,
+  touchProjectsActivity,
+} from '../projects/project-activity';
 
 @Injectable()
 export class SyncService {
@@ -27,13 +32,15 @@ export class SyncService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsGateway,
     private readonly changeApplier: SyncChangeApplierService,
+    private readonly projectAccess: ProjectAccessService,
   ) {}
 
   private async syncScenesFromLegacyPlaybookSnapshot(
     playbookId: string,
     legacyPlaybookSnapshot: any,
   ) {
-    const scenesValue = legacyPlaybookSnapshot?.scenes ?? legacyPlaybookSnapshot?.steps;
+    const scenesValue =
+      legacyPlaybookSnapshot?.scenes ?? legacyPlaybookSnapshot?.steps;
     if (!Array.isArray(scenesValue)) return;
     const parsed = scenesValue
       .map((st: any, idx: number) => {
@@ -112,7 +119,9 @@ export class SyncService {
       (st.requisites ?? [])
         .map((r: unknown) => syncMapSceneRequisiteRow(st.id, r))
         .filter(
-          (row): row is NonNullable<ReturnType<typeof syncMapSceneRequisiteRow>> =>
+          (
+            row,
+          ): row is NonNullable<ReturnType<typeof syncMapSceneRequisiteRow>> =>
             row != null,
         ),
     );
@@ -255,6 +264,11 @@ export class SyncService {
           ]
         : []),
     ]);
+
+    await touchProjectActivity(
+      this.prisma,
+      syncProjectIdFromCompoundId(playbookId),
+    );
   }
 
   private playbookIdFromEntityId(entityId?: string | null): string | null {
@@ -305,11 +319,16 @@ export class SyncService {
       ['sceneRoles', payload?.sceneRoles, existing.sceneRoles],
       ['lightFaders', payload?.lightFaders, existing.lightFaders],
       ['lightPrograms', payload?.lightPrograms, existing.lightPrograms],
-      ['lightChannelRoles', payload?.lightChannelRoles, existing.lightChannelRoles],
+      [
+        'lightChannelRoles',
+        payload?.lightChannelRoles,
+        existing.lightChannelRoles,
+      ],
       ['projectorMedia', payload?.projectorMedia, existing.projectorMedia],
     ];
     return pairs.some(([key, next, current]) => {
-      if (!Object.prototype.hasOwnProperty.call(payload ?? {}, key)) return false;
+      if (!Object.prototype.hasOwnProperty.call(payload ?? {}, key))
+        return false;
       return next == null && this.hasJsonValue(current);
     });
   }
@@ -325,8 +344,9 @@ export class SyncService {
         destructive.add(change);
       }
       const playbookId =
-        String(change.payload?.playbookId ?? change.payload?.sceneId ?? '').trim() ||
-        this.playbookIdFromEntityId(change.entityId);
+        String(
+          change.payload?.playbookId ?? change.payload?.sceneId ?? '',
+        ).trim() || this.playbookIdFromEntityId(change.entityId);
       if (playbookId) playbookIds.add(playbookId);
     }
 
@@ -336,7 +356,10 @@ export class SyncService {
           this.prisma.scene.count({ where: { playbookId, deletedAt: null } }),
           this.prisma.playlistItem.count({ where: { playbookId } }),
           this.prisma.sound.count({ where: { playbookId } }),
-          this.prisma.playbook.findUnique({ where: { id: playbookId }, select: { sceneRoles: true,
+          this.prisma.playbook.findUnique({
+            where: { id: playbookId },
+            select: {
+              sceneRoles: true,
               lightFaders: true,
               lightPrograms: true,
               lightChannelRoles: true,
@@ -360,10 +383,17 @@ export class SyncService {
         (c) =>
           c.entityType === 'PlaylistItem' &&
           c.operation === 'delete' &&
-          String(c.payload?.playbookId ?? c.payload?.sceneId ?? '') === playbookId,
+          String(c.payload?.playbookId ?? c.payload?.sceneId ?? '') ===
+            playbookId,
       );
-      const playlistDeleteThreshold = Math.max(3, Math.ceil(activePlaylist * 0.4));
-      if (activePlaylist > 0 && playlistDeletes.length >= playlistDeleteThreshold) {
+      const playlistDeleteThreshold = Math.max(
+        3,
+        Math.ceil(activePlaylist * 0.4),
+      );
+      if (
+        activePlaylist > 0 &&
+        playlistDeletes.length >= playlistDeleteThreshold
+      ) {
         playlistDeletes.forEach((c) => destructive.add(c));
       }
 
@@ -371,7 +401,8 @@ export class SyncService {
         (c) =>
           c.entityType === 'Sound' &&
           c.operation === 'delete' &&
-          String(c.payload?.playbookId ?? c.payload?.sceneId ?? '') === playbookId,
+          String(c.payload?.playbookId ?? c.payload?.sceneId ?? '') ===
+            playbookId,
       );
       const soundDeleteThreshold = Math.max(2, Math.ceil(activeSounds * 0.4));
       if (activeSounds > 0 && soundDeletes.length >= soundDeleteThreshold) {
@@ -451,13 +482,16 @@ export class SyncService {
         continue;
       }
       blockedCount += 1;
-      console.warn('[sync] blocked destructive change without project confirm', {
-        entityType: change.entityType,
-        operation: change.operation,
-        entityId: change.entityId,
-        projectId,
-        destructiveConfirm: destructiveConfirm ? '[provided]' : null,
-      });
+      console.warn(
+        '[sync] blocked destructive change without project confirm',
+        {
+          entityType: change.entityType,
+          operation: change.operation,
+          entityId: change.entityId,
+          projectId,
+          destructiveConfirm: destructiveConfirm ? '[provided]' : null,
+        },
+      );
     }
 
     return { allowed, confirmedProjectIds, blockedCount };
@@ -484,6 +518,8 @@ export class SyncService {
       })),
     });
 
+    const touchedProjectIds = new Set<string>();
+
     for (const change of allowed) {
       const entityType =
         change.entityType === 'Step' ? 'Scene' : change.entityType;
@@ -496,15 +532,25 @@ export class SyncService {
       });
 
       const projectId = await this.getProjectIdForChange(entityType, payload);
-      if (projectId && !(await this.canUserWriteToProject(userId, projectId))) {
-        throw new ForbiddenException(
-          'Только владелец или участник с правом редактирования может вносить изменения',
+      if (projectId) {
+        const requiredCapability =
+          entityType === 'Project' && operation === 'delete'
+            ? 'admin'
+            : 'write';
+        await this.projectAccess.assertById(
+          userId,
+          projectId,
+          requiredCapability,
         );
       }
 
       try {
         if (entityType === 'Project') {
-          await this.changeApplier.applyProjectChange(userId, operation, payload);
+          await this.changeApplier.applyProjectChange(
+            userId,
+            operation,
+            payload,
+          );
         }
         if (entityType === 'Playbook') {
           const allowNullWipe =
@@ -546,17 +592,34 @@ export class SyncService {
           }
         }
         if (entityType === 'PlaylistItem') {
-          await this.changeApplier.applyPlaylistItemChange(operation, payload, sourceClientId);
+          await this.changeApplier.applyPlaylistItemChange(
+            operation,
+            payload,
+            sourceClientId,
+          );
         }
         if (entityType === 'Sound') {
-          await this.changeApplier.applySoundChange(operation, payload, sourceClientId);
+          await this.changeApplier.applySoundChange(
+            operation,
+            payload,
+            sourceClientId,
+          );
         }
         if (entityType === 'GlobalLightChannel') {
-          await this.changeApplier.applyGlobalLightChannelChange(operation, payload, sourceClientId);
+          await this.changeApplier.applyGlobalLightChannelChange(
+            operation,
+            payload,
+            sourceClientId,
+          );
         }
         if (entityType === 'TheaterLayout') {
-          await this.changeApplier.applyTheaterLayoutChange(operation, payload, sourceClientId);
+          await this.changeApplier.applyTheaterLayoutChange(
+            operation,
+            payload,
+            sourceClientId,
+          );
         }
+        if (projectId) touchedProjectIds.add(projectId);
       } catch (error) {
         // Временно логируем ошибки синка, чтобы понимать, почему данные не попадают в БД
 
@@ -575,26 +638,9 @@ export class SyncService {
         // НЕ пробрасываем ошибку, чтобы увидеть все проблемы за один раз
       }
     }
+
+    await touchProjectsActivity(this.prisma, touchedProjectIds);
     return { ok: true };
-  }
-
-
-  /** Проверка: пользователь — владелец или участник с ролью editor. */
-  private async canUserWriteToProject(
-    userId: string,
-    projectId: string,
-  ): Promise<boolean> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: {
-        ownerId: true,
-        members: { where: { userId }, select: { role: true } },
-      },
-    });
-    if (!project) return false;
-    if (project.ownerId === userId) return true;
-    const membership = project.members[0];
-    return membership?.role === 'editor';
   }
 
   /** Из change извлекаем projectId для проверки прав. */
@@ -603,7 +649,16 @@ export class SyncService {
     payload: any,
   ): Promise<string | null> {
     if (entityType === 'Project' && payload?.id) return payload.id;
-    if (entityType === 'Playbook' && payload?.projectId) return payload.projectId;
+    if (entityType === 'Playbook') {
+      if (payload?.projectId) return payload.projectId;
+      if (payload?.id) {
+        const playbook = await this.prisma.playbook.findUnique({
+          where: { id: String(payload.id) },
+          select: { projectId: true },
+        });
+        return playbook?.projectId ?? null;
+      }
+    }
     if (
       (entityType === 'Scene' ||
         entityType === 'PlaylistItem' ||
@@ -622,6 +677,13 @@ export class SyncService {
       });
       return playbook?.projectId ?? null;
     }
+    if (entityType === 'Scene' && payload?.id) {
+      const scene = await this.prisma.scene.findUnique({
+        where: { id: String(payload.id) },
+        select: { playbook: { select: { projectId: true } } },
+      });
+      return scene?.playbook.projectId ?? null;
+    }
     return null;
   }
 
@@ -639,9 +701,7 @@ export class SyncService {
       theaterLayout?: boolean;
     },
   ) {
-    const projectAccessWhere = {
-      OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-    };
+    const projectAccessWhere = this.projectAccess.readWhere(userId);
 
     const projectWhere = projectSlug
       ? { ...projectAccessWhere, slug: projectSlug }
@@ -658,7 +718,8 @@ export class SyncService {
 
     const projectIds = projects.map((p) => p.id);
 
-    const playbooks = await this.prisma.playbook.findMany({ where: { projectId: { in: projectIds } },
+    const playbooks = await this.prisma.playbook.findMany({
+      where: { projectId: { in: projectIds } },
     });
 
     const playbookIds = playbooks.map((s) => s.id);
@@ -697,7 +758,8 @@ export class SyncService {
       if (st.updatedAt > prev.updatedAt) scenesByComposite.set(k, st);
     }
     const scenes = Array.from(scenesByComposite.values()).sort((a, b) => {
-      if (a.playbookId !== b.playbookId) return a.playbookId < b.playbookId ? -1 : 1;
+      if (a.playbookId !== b.playbookId)
+        return a.playbookId < b.playbookId ? -1 : 1;
       return a.order - b.order;
     });
 
@@ -768,18 +830,15 @@ export class SyncService {
     if (!slug) throw new NotFoundException('Project not found');
     if (!name) throw new NotFoundException('Playbook not found');
 
-    const project = await this.prisma.project.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        OR: [{ ownerId: userId }, { members: { some: { userId } } }],
-      },
-      select: { id: true, slug: true },
-    });
-    if (!project) throw new NotFoundException('Project not found');
+    const { project } = await this.projectAccess.assertBySlug(
+      userId,
+      slug,
+      'read',
+    );
 
     const playbookId = `${project.id}:${name}`;
-    const playbook = await this.prisma.playbook.findUnique({ where: { id: playbookId },
+    const playbook = await this.prisma.playbook.findUnique({
+      where: { id: playbookId },
     });
     if (!playbook) throw new NotFoundException('Playbook not found');
 

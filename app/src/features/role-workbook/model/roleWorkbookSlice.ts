@@ -205,10 +205,10 @@ export const loadRoleWorkbookThunk = createAsyncThunk<
           .catch(() => null);
 
     const troupeFromState =
-      troupeApi.endpoints.myTroupe.select({ project: projectSlug })(state)?.data?.members ?? null;
+      troupeApi.endpoints.myTroupe.select({})(state)?.data?.members ?? null;
     const troupePromise = troupeFromState
       ? null
-      : dispatch(troupeApi.endpoints.myTroupe.initiate({ project: projectSlug }))
+      : dispatch(troupeApi.endpoints.myTroupe.initiate({}))
           .unwrap()
           .catch(() => null);
 

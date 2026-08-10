@@ -4,6 +4,7 @@ export {
   isoDate,
   memberLabel,
   monthKey,
+  monthLabel,
   getTroupeNarrowLayoutSnapshot,
   subscribeTroupeNarrowLayout,
 } from "./model/troupe-page-utils";

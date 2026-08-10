@@ -5,5 +5,6 @@ import { TroupeService } from './troupe.service';
 @Module({
   controllers: [TroupeController],
   providers: [TroupeService],
+  exports: [TroupeService],
 })
 export class TroupeModule {}

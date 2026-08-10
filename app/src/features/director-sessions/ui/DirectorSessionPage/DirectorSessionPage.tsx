@@ -1,4 +1,5 @@
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
+import { Button } from "@shared/core/button/Button";
 import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import cn from "classnames";
@@ -14,6 +15,7 @@ import type {
 import {
   useDirectorSessionsBundleQuery,
   useLazyProjectMaterialQuery,
+  usePublishDirectorSessionMutation,
   useReplaceDirectorSessionsMutation,
 } from "../../api/director-sessions-api";
 import { projectMaterialToDirectorSessionCache } from "../../model/build-project-data-cache";
@@ -50,34 +52,67 @@ import {
 import { DirectorSessionSlotsPanel } from "../DirectorSessionSlotsPanel";
 import { SlotRoleRehearsalPicker } from "../SlotRoleRehearsalPicker";
 import { TroupeSchedulePreview } from "../TroupeSchedulePreview";
+import { projectSessionPath, theaterRehearsalsPath, theaterRehearsalSessionPath } from "../../../../app/router/paths";
+import { TheaterSectionNav } from "../../../organizations/ui/TheaterSectionNav";
+import { fetchTheaterRehearsals } from "../../../../sync/api/workspaces";
+import { useTheaterHomeTroupeQuery } from "../../../troupe/api/troupe-api";
+import type { TroupeMemberItem } from "../../../../sync/api/troupe";
 
 dayjs.locale("ru");
+
+function getTroupeMemberLabel(member: TroupeMemberItem) {
+  const profileName =
+    String(member.profile?.displayName ?? "").trim() ||
+    [member.profile?.firstName, member.profile?.lastName]
+      .map((part) => String(part ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+  return profileName || member.email;
+}
 
 export function DirectorSessionPage() {
   const dispatch = useAppDispatch();
   const { accessToken } = useAuth();
-  const { projects, projectItems } = useProject();
+  const { projectName, projects, projectItems } = useProject();
   const navigate = useNavigate();
 
-  const { sessionId, slotId } = useParams();
+  const { sessionId, slotId, theaterId: theaterIdParam } = useParams();
   const sid = String(sessionId ?? "").trim();
   const slId =
     slotId != null && String(slotId).trim() !== "" ? String(slotId).trim() : "";
+  const theaterId = String(theaterIdParam ?? "").trim();
+  const isTheaterContext = Boolean(theaterId);
+
+  const sessionHref = (nextSlotId?: string) =>
+    isTheaterContext
+      ? theaterRehearsalSessionPath(theaterId, sid, nextSlotId)
+      : projectSessionPath(projectName, sid, nextSlotId);
+
+  const sessionsListHref = isTheaterContext
+    ? theaterRehearsalsPath(theaterId)
+    : `${projectSessionPath(projectName)}?sessionId=${encodeURIComponent(sid)}`;
 
   const [sessions, setSessions] = useState<DirectorRehearsalSession[]>([]);
   const [session, setSession] = useState<DirectorRehearsalSession | null>(null);
   const [slot, setSlot] = useState<DirectorSessionSlot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
 
   const {
     data: sessionsBundle,
     isLoading: bundleLoading,
     error: bundleQueryError,
+    refetch: refetchSessionsBundle,
   } = useDirectorSessionsBundleQuery(undefined, {
     skip: !accessToken || !sid,
   });
   const [replaceSessions] = useReplaceDirectorSessionsMutation();
+  const [publishSession] = usePublishDirectorSessionMutation();
   const [fetchProjectMaterial] = useLazyProjectMaterialQuery();
+  const { data: theaterTroupe } = useTheaterHomeTroupeQuery(
+    { theaterId },
+    { skip: !accessToken || !isTheaterContext },
+  );
 
   const [dataCache, setDataCache] = useState<DirectorSessionProjectDataCache>({});
   const [scenesLoading, setScenesLoading] = useState(false);
@@ -86,24 +121,58 @@ export function DirectorSessionPage() {
   const [roleEmailsByProjectSlug, setRoleEmailsByProjectSlug] = useState<
     Record<string, Record<string, string[]>>
   >({});
+  const [theaterProjects, setTheaterProjects] = useState<
+    Array<{ slug: string; name: string }> | null
+  >(null);
 
-  const visibleProjects = useMemo(
-    () =>
-      (Array.isArray(projects) ? projects : [])
+  useEffect(() => {
+    if (!isTheaterContext || !accessToken || !theaterId) {
+      setTheaterProjects(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchTheaterRehearsals(accessToken, theaterId)
+      .then((response) => {
+        if (cancelled) return;
+        setTheaterProjects(
+          response.projects.map((project) => ({
+            slug: project.slug,
+            name: project.name || project.slug,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setTheaterProjects([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, isTheaterContext, theaterId]);
+
+  const visibleProjects = useMemo(() => {
+    if (isTheaterContext) {
+      if (!theaterProjects) return [];
+      return theaterProjects
+        .map((project) => project.slug)
         .filter(Boolean)
-        .sort((a, b) => a.localeCompare(b, "ru")),
-    [projects],
-  );
-  const projectLabelBySlug = useMemo(
-    () =>
-      new Map(
-        projectItems.map((project) => [
-          project.slug,
-          project.name || project.slug,
-        ]),
-      ),
-    [projectItems],
-  );
+        .sort((a, b) => a.localeCompare(b, "ru"));
+    }
+    return (Array.isArray(projects) ? projects : [])
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b, "ru"));
+  }, [isTheaterContext, projects, theaterProjects]);
+  const projectLabelBySlug = useMemo(() => {
+    const labels = new Map(
+      projectItems.map((project) => [
+        project.slug,
+        project.name || project.slug,
+      ]),
+    );
+    for (const project of theaterProjects ?? []) {
+      labels.set(project.slug, project.name || project.slug);
+    }
+    return labels;
+  }, [projectItems, theaterProjects]);
 
   const projectFilterStorageKey = useMemo(
     () => `directorSessions:session:${sid}:${slId || "all"}:project`,
@@ -199,15 +268,23 @@ export function DirectorSessionPage() {
       return;
     }
     setSession(s);
+    setError(null);
+  }, [accessToken, sid, sessionsBundle, bundleLoading, bundleQueryError]);
+
+  useEffect(() => {
+    if (!session) {
+      setSlot(null);
+      return;
+    }
     if (!slId) {
       setSlot(null);
       setError(null);
       return;
     }
-    const sl = (s.slots ?? []).find((x) => x.id === slId) ?? null;
+    const sl = session.slots.find((item) => item.id === slId) ?? null;
     setSlot(sl);
     if (!sl) {
-      const n = (s.slots ?? []).length;
+      const n = session.slots.length;
       setError(
         n === 0
           ? "Слотов пока нет — добавь первый в блоке «Слоты» слева."
@@ -216,7 +293,7 @@ export function DirectorSessionPage() {
     } else {
       setError(null);
     }
-  }, [accessToken, sid, slId, sessionsBundle, bundleLoading, bundleQueryError]);
+  }, [session, slId]);
 
   const loading = bundleLoading;
 
@@ -251,26 +328,31 @@ export function DirectorSessionPage() {
 
   const persistSessions = async (next: DirectorRehearsalSession[]) => {
     if (!accessToken) return;
+    const previousSessions = sessions;
+    const previousSession = session;
+    const previousSlot = slot;
+    const nextSession = next.find((item) => item.id === sid) ?? null;
+    const nextSlot =
+      nextSession && slId
+        ? nextSession.slots.find((item) => item.id === slId) ?? null
+        : null;
+
     setSessions(next);
+    setSession(nextSession);
+    setSlot(nextSlot);
+    setError(null);
     try {
       await replaceSessions({ sessions: next }).unwrap();
+      void refetchSessionsBundle();
     } catch (e: unknown) {
+      setSessions(previousSessions);
+      setSession(previousSession);
+      setSlot(previousSlot);
       const err = e as { message?: string; data?: { message?: string } };
       setError(
         err?.data?.message ?? err?.message ?? "Не удалось сохранить сессию",
       );
       throw e;
-    }
-    const s = next.find((x) => x.id === sid) ?? null;
-    setSession(s);
-    if (!s) {
-      setSlot(null);
-      return;
-    }
-    if (slId) {
-      setSlot((s.slots ?? []).find((x) => x.id === slId) ?? null);
-    } else {
-      setSlot(null);
     }
   };
 
@@ -315,11 +397,69 @@ export function DirectorSessionPage() {
     [updateSlotById],
   );
 
+  const persistSlotTitle = useCallback(
+    (targetSlotId: string, title: string) => {
+      void updateSlotById(targetSlotId, { title: title.trim() || undefined });
+    },
+    [updateSlotById],
+  );
+
+  const {
+    draft: slotTitleDraft,
+    onChange: onSlotTitleChange,
+    onBlur: onSlotTitleBlur,
+  } = useDebouncedSyncedText(slot?.id, slot?.title, persistSlotTitle);
+
   const {
     draft: slotNotesDraft,
     onChange: onSlotNotesChange,
     onBlur: onSlotNotesBlur,
   } = useDebouncedSyncedText(slot?.id, slot?.notes, persistSlotNotes);
+
+  const theaterMembers = useMemo(
+    () => theaterTroupe?.members ?? [],
+    [theaterTroupe?.members],
+  );
+
+  const selectedParticipantEmails = useMemo(
+    () =>
+      new Set(
+        (slot?.participantEmails ?? []).map((email) =>
+          normalizeEmail(String(email ?? "")),
+        ),
+      ),
+    [slot?.participantEmails],
+  );
+
+  const toggleSlotParticipant = (email: string, checked: boolean) => {
+    if (!slot) return;
+    const normalizedEmail = normalizeEmail(email);
+    const nextEmails = new Set(selectedParticipantEmails);
+    if (checked) nextEmails.add(normalizedEmail);
+    else nextEmails.delete(normalizedEmail);
+    void updateSlot({ participantEmails: Array.from(nextEmails).filter(Boolean) });
+  };
+
+  const theaterMemberEmails = useMemo(
+    () =>
+      theaterMembers
+        .map((member) => normalizeEmail(member.email))
+        .filter(Boolean),
+    [theaterMembers],
+  );
+
+  const allTheaterParticipantsSelected =
+    theaterMemberEmails.length > 0 &&
+    theaterMemberEmails.every((email) => selectedParticipantEmails.has(email));
+
+  const toggleAllTheaterParticipants = () => {
+    if (!slot) return;
+    void updateSlot({
+      participantEmails: allTheaterParticipantsSelected
+        ? []
+        : theaterMemberEmails,
+    });
+  };
 
   const loadProjectData = async (slug: string) => {
     if (!accessToken) return;
@@ -656,19 +796,24 @@ export function DirectorSessionPage() {
     >();
     for (const sl of session?.slots ?? []) {
       const ref = sl.ref;
+      const customTitle = String(sl.title ?? "").trim();
       if (!ref?.projectSlug || ref.sceneId == null) {
         map.set(sl.id, {
-          projectLabel: "Материал не выбран",
-          materialLabel: "",
+          projectLabel: customTitle || "Слот без названия",
+          materialLabel: customTitle ? "Без проекта и сцены" : "",
         });
         continue;
       }
       const slug = String(ref.projectSlug).trim();
       const scene = dataCache[slug]?.scenes?.find((s) => s.id === ref.sceneId);
+      const projectLabel = projectLabelBySlug.get(slug) ?? slug;
+      const sceneLabel =
+        String(scene?.title ?? "").trim() || "Материал загружается";
       map.set(sl.id, {
-        projectLabel: projectLabelBySlug.get(slug) ?? slug,
-        materialLabel:
-          String(scene?.title ?? "").trim() || "Материал загружается",
+        projectLabel: customTitle || projectLabel,
+        materialLabel: customTitle
+          ? [projectLabel, sceneLabel].filter(Boolean).join(" · ")
+          : sceneLabel,
       });
     }
     return map;
@@ -707,6 +852,46 @@ export function DirectorSessionPage() {
     return new Set(list);
   }, [slot?.ref, slotPlannedInput]);
 
+  const publishCurrentSession = async () => {
+    if (!session) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      if (slot) {
+        await updateSlotById(slot.id, {
+          title: slotTitleDraft.trim() || undefined,
+          notes: slotNotesDraft,
+        });
+      }
+      const response = await publishSession({
+        sessionId: session.id,
+        comment: session.comment ?? null,
+      }).unwrap();
+      if (response.session) {
+        const publishedSession = response.session as DirectorRehearsalSession;
+        setSession(publishedSession);
+        setSessions((current) =>
+          current.map((item) =>
+            item.id === publishedSession.id ? publishedSession : item,
+          ),
+        );
+      }
+      void refetchSessionsBundle();
+    } catch (publishError: unknown) {
+      const apiError = publishError as {
+        message?: string;
+        data?: { message?: string };
+      };
+      setError(
+        apiError.data?.message ??
+          apiError.message ??
+          "Не удалось опубликовать сессию",
+      );
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   if (!accessToken) {
     return (
       <div className="director-session-page__message">
@@ -720,16 +905,25 @@ export function DirectorSessionPage() {
     );
   }
 
-  return (
-    <div className="director-session-page">
-      <RehearsalPlanSectionChrome activeTab="sessions">
+  const pageBody = (
+    <>
       <div className="director-session-page__header">
-        <Link
-          to={`/sessions?sessionId=${encodeURIComponent(sid)}`}
-          className="director-session-page__back"
-        >
-          ← К списку сессий
+        <Link to={sessionsListHref} className="director-session-page__back">
+          {isTheaterContext ? "← К репетициям театра" : "← К списку сессий"}
         </Link>
+        {isTheaterContext && session ? (
+          <Button
+            type="button"
+            disabled={publishing}
+            onClick={() => void publishCurrentSession()}
+          >
+            {publishing
+              ? "Публикация…"
+              : session.publishedAt
+                ? "Обновить публикацию"
+                : "Опубликовать"}
+          </Button>
+        ) : null}
       </div>
 
       {loading ? (
@@ -746,7 +940,9 @@ export function DirectorSessionPage() {
           <div className="director-session-page__title">{session.title}</div>
         </>
       ) : (
-        <div className="director-session-page__title">Сессия</div>
+        <div className="director-session-page__title">
+          {isTheaterContext ? "Репетиция" : "Сессия"}
+        </div>
       )}
       {session && !loading && (
         <div className="director-session-page__grid">
@@ -756,16 +952,10 @@ export function DirectorSessionPage() {
             slotToneClassById={slotRehearsalToneClassById}
             slotDisplayById={slotDisplayById}
             selectedSlotId={slId || null}
-            onSelectSlot={(id) =>
-              navigate(
-                `/sessions/${encodeURIComponent(sid)}/slots/${encodeURIComponent(id)}`,
-              )
-            }
-            onRequestCloseSlot={() =>
-              navigate(`/sessions/${encodeURIComponent(sid)}`)
-            }
+            onSelectSlot={(id) => navigate(sessionHref(id))}
+            onRequestCloseSlot={() => navigate(sessionHref())}
             onNoSlotsLeft={() =>
-              navigate(`/sessions/${encodeURIComponent(sid)}`, {
+              navigate(sessionHref(), {
                 replace: true,
               })
             }
@@ -778,6 +968,21 @@ export function DirectorSessionPage() {
                     title=""
                     className="director-session-page__preview"
                   >
+                    <label className="director-session-page__slot-field">
+                      <span className="form-textarea__label">
+                        Название слота
+                      </span>
+                      <input
+                        className="native-text-input"
+                        value={slotTitleDraft}
+                        onChange={(event) =>
+                          onSlotTitleChange(event.target.value)
+                        }
+                        onBlur={onSlotTitleBlur}
+                        placeholder="Разминка, обсуждение, примерка…"
+                      />
+                    </label>
+
                     {selectedScene && (
                       <div className="session__selected-scene">
                         <PreviewSlot selectedScene={selectedScene} />
@@ -800,6 +1005,50 @@ export function DirectorSessionPage() {
                         />
                       </div>
                     )}
+
+                    {isTheaterContext && !slot.ref ? (
+                      <div className="director-session-page__slot-field">
+                        <div className="director-session-page__slot-field-head">
+                          <span className="form-textarea__label">
+                            Участники
+                          </span>
+                          {theaterMembers.length ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="director-session-page__select-all"
+                              onClick={toggleAllTheaterParticipants}
+                            >
+                              {allTheaterParticipantsSelected
+                                ? "Снять всех"
+                                : "Выбрать всех"}
+                            </Button>
+                          ) : null}
+                        </div>
+                        {theaterMembers.length ? (
+                          <div className="director-session-page__participant-list">
+                            {theaterMembers.map((member) => {
+                              const email = normalizeEmail(member.email);
+                              return (
+                                <LabeledCheckbox
+                                  key={member.id}
+                                  checked={selectedParticipantEmails.has(email)}
+                                  onChange={(checked) =>
+                                    toggleSlotParticipant(email, checked)
+                                  }
+                                >
+                                  {getTroupeMemberLabel(member)}
+                                </LabeledCheckbox>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rehearsals-muted">
+                            В труппе театра пока нет участников.
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
 
                     <FormTextarea
                       rootClassName="form-textarea--section"
@@ -920,6 +1169,9 @@ export function DirectorSessionPage() {
                             type="button"
                             onClick={() =>
                               void updateSlot({
+                                title:
+                                  String(s.title ?? "").trim() ||
+                                  `Сцена #${s.id}`,
                                 ref: {
                                   projectSlug: projectFilter,
                                   sceneId: s.id,
@@ -992,7 +1244,21 @@ export function DirectorSessionPage() {
           />
         </div>
       )}
-      </RehearsalPlanSectionChrome>
+    </>
+  );
+
+  return (
+    <div className="director-session-page">
+      {isTheaterContext ? (
+        <TheaterSectionNav theaterId={theaterId} active="rehearsals" />
+      ) : null}
+      {isTheaterContext ? (
+        pageBody
+      ) : (
+        <RehearsalPlanSectionChrome activeTab="sessions">
+          {pageBody}
+        </RehearsalPlanSectionChrome>
+      )}
     </div>
   );
 }

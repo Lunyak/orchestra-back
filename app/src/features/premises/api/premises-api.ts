@@ -16,8 +16,14 @@ import type {
 
 export const premisesApi = orchestraApi.injectEndpoints({
   endpoints: (build) => ({
-    listPremises: build.query<PremisesListResponse, void>({
-      query: () => ({ url: "/premises" }),
+    listPremises: build.query<
+      PremisesListResponse,
+      { theaterId?: string; studioId?: string } | void
+    >({
+      query: (organization) => ({
+        url: "/premises",
+        params: organization ?? undefined,
+      }),
       providesTags: ["Premises"],
     }),
 

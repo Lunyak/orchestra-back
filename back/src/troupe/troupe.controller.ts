@@ -30,12 +30,53 @@ export class TroupeController {
   getMyTroupe(
     @Req() req: any,
     @Query('month') month?: string,
-    @Query('project') project?: string,
   ) {
-    return this.troupeService.getMyTroupeWithMembers(
+    return this.troupeService.getMyTroupeWithMembers(req.user.userId, month);
+  }
+
+  @Get('invites/by-id/:inviteId')
+  previewAddressedInvite(
+    @Req() req: any,
+    @Param('inviteId') inviteId: string,
+  ) {
+    return this.troupeService.previewAddressedInvite(
       req.user.userId,
-      month,
+      req.user.email,
+      inviteId,
+    );
+  }
+
+  @Post('invites/by-id/:inviteId/accept')
+  acceptAddressedInvite(@Req() req: any, @Param('inviteId') inviteId: string) {
+    return this.troupeService.acceptAddressedInvite(
+      req.user.userId,
+      req.user.email,
+      inviteId,
+    );
+  }
+
+  @Post('invites/by-id/:inviteId/decline')
+  declineAddressedInvite(
+    @Req() req: any,
+    @Param('inviteId') inviteId: string,
+  ) {
+    return this.troupeService.declineAddressedInvite(
+      req.user.userId,
+      req.user.email,
+      inviteId,
+    );
+  }
+
+  @Get('project-members')
+  getProjectMembers(
+    @Req() req: any,
+    @Query('project') project?: string,
+    @Query('month') month?: string,
+  ) {
+    return this.troupeService.getProjectMembers(
+      req.user.userId,
       project,
+      month,
     );
   }
 
@@ -103,9 +144,8 @@ export class TroupeController {
   addMember(
     @Req() req: any,
     @Body() body: AddTroupeMemberDto,
-    @Query('project') project?: string,
   ) {
-    return this.troupeService.addMember(req.user.userId, body?.email, project);
+    return this.troupeService.addMember(req.user.userId, body?.email);
   }
 
   @Post('team-members')
@@ -122,13 +162,11 @@ export class TroupeController {
     @Req() req: any,
     @Param('memberId') memberId: string,
     @Body() body: PatchTroupeMemberDto,
-    @Query('project') project?: string,
   ) {
     return this.troupeService.updateTroupeMemberKind(
       req.user.userId,
       memberId,
       body?.kind,
-      project,
     );
   }
 
@@ -154,8 +192,7 @@ export class TroupeController {
   removeMember(
     @Req() req: any,
     @Param('memberId') memberId: string,
-    @Query('project') project?: string,
   ) {
-    return this.troupeService.removeMember(req.user.userId, memberId, project);
+    return this.troupeService.removeMember(req.user.userId, memberId);
   }
 }

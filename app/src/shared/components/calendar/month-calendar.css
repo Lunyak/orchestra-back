@@ -52,11 +52,108 @@
   border-color: var(--color-border-accent, var(--color-muted-bg-soft));
 }
 
+.month-cal__month-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
 .month-cal__month-label {
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
   text-transform: capitalize;
   letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.month-cal__month-label:hover {
+  background: var(--month-cal-surface-hover);
+  border-color: var(--color-border-strong, var(--color-bg-transparent-5));
+}
+
+.month-cal__month-label--open {
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+}
+
+.month-cal__month-picker {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  width: min(240px, 70vw);
+  padding: 10px;
+  border: 1px solid var(--color-border-strong, var(--color-bg-transparent-5));
+  border-radius: 0;
+  background: var(--color-bg-secondary, #1d2021);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.month-cal__year-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.month-cal__year-btn {
+  padding: 4px 10px;
+  border-radius: 0;
+  border: 1px solid var(--color-border-strong, var(--color-bg-transparent-5));
+  background: var(--month-cal-surface);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.month-cal__year-btn:hover {
+  background: var(--month-cal-surface-hover);
+}
+
+.month-cal__year-label {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-cal__months-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.month-cal__month-option {
+  padding: 8px 4px;
+  border-radius: 0;
+  border: 1px solid transparent;
+  background: var(--month-cal-surface);
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.month-cal__month-option:hover {
+  background: var(--month-cal-surface-hover);
+  border-color: var(--color-border-strong, var(--color-bg-transparent-5));
+}
+
+.month-cal__month-option--active,
+.month-cal__month-option[aria-pressed="true"] {
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
 }
 
 .month-cal__weekdays {

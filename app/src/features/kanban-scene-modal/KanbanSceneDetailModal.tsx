@@ -243,7 +243,7 @@ export function KanbanSceneDetailModal({
                   ).
                 </div>
               ) : (
-                <div className="kanban-scene-modal__cast-grid">
+                <div className="kanban-scene-cast-grid">
                   {openedRoles.map((role) => (
                     <KanbanSceneRoleCastTile
                       key={role}
