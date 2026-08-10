@@ -2,7 +2,10 @@ import cn from "classnames";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Buttons } from "../../../shared/components/buttons/Buttons";
 import type { ScriptScene } from "../../../shared/types/script";
+import type { ProjectRoleInfo } from "../../../sync/api/projects";
+import { RolePlayingCard } from "../../role-card/RolePlayingCard";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
+import { findProjectRoleForScriptKey } from "../model/voice-trainer-partner";
 import {
   shuffle,
   stripLeadingPunctuationTokens,
@@ -10,6 +13,18 @@ import {
   type WordToken,
 } from "../model/wordTokens";
 import "./dialogue-style.css";
+
+const dialogueIconProps = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
 
 function readDoneSet(storageKey?: string): Set<string> {
   if (!storageKey) return new Set<string>();
@@ -52,6 +67,42 @@ type Exercise = {
   target: WordToken[];
   shuffled: WordToken[];
 };
+
+type DialogueContextCardProps = {
+  accessToken?: string | null;
+  line: DialogueLine | null;
+  projectRoles: ProjectRoleInfo[];
+};
+
+function DialogueContextCard({
+  accessToken,
+  line,
+  projectRoles,
+}: DialogueContextCardProps) {
+  const roleTitle = String(line?.role ?? "Партнёр");
+  const roleInfo = findProjectRoleForScriptKey(roleTitle, projectRoles) ?? {
+    title: roleTitle,
+    avatarKey: null,
+  };
+
+  return (
+    <section className="dialogue-context-card">
+      <RolePlayingCard
+        role={roleInfo}
+        accessToken={accessToken}
+        size="md"
+        className="dialogue-context-card__portrait"
+      />
+      <div className="dialogue-context-card__body">
+        <div className="dialogue-context-card__label">Реплика перед вами</div>
+        <div className="dialogue-context-card__role">{roleTitle}</div>
+        <div className="dialogue-context-card__text">
+          {line?.text ?? "В сценарии нет реплики перед вами"}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function findNextUndone(exercises: Exercise[], done: Set<string>, fromIndex: number): number {
   if (exercises.length === 0) return 0;
@@ -108,6 +159,37 @@ function answerTokensForDisplay(answer: WordToken[]): WordToken[] {
   return stripLeadingPunctuationTokens(answer);
 }
 
+type PoolWordLabel = {
+  trailing: WordToken[];
+};
+
+function buildPoolWordLabels(target: WordToken[]): Map<string, PoolWordLabel> {
+  const labels = new Map<string, PoolWordLabel>();
+  let index = 0;
+
+  while (index < target.length && isAutoToken(target[index]!)) {
+    index += 1;
+  }
+
+  while (index < target.length) {
+    const head = target[index]!;
+    if (isAutoToken(head)) {
+      index += 1;
+      continue;
+    }
+
+    index += 1;
+    const trailing: WordToken[] = [];
+    while (index < target.length && isAutoToken(target[index]!)) {
+      trailing.push(target[index]!);
+      index += 1;
+    }
+    labels.set(head.id, { trailing });
+  }
+
+  return labels;
+}
+
 function RoleLinePuzzle({
   ex,
   done,
@@ -155,8 +237,6 @@ function RoleLinePuzzle({
   useEffect(() => {
     answerRef.current = answer;
   }, [answer]);
-
-  const expected = ex.target[answer.length] ?? null;
 
   const pick = (token: WordToken) => {
     const poolNow = poolRef.current;
@@ -211,12 +291,30 @@ function RoleLinePuzzle({
     );
   }
 
+  if (!active) {
+    return (
+      <>
+        <div className="dialogue-role">{ex.role}</div>
+        <div className="dialogue-text dialogue-text--upcoming">
+          <span className="dialogue-upcoming-mark" aria-hidden="true">
+            ···
+          </span>
+          <span className="dialogue-muted">ваша реплика дальше</span>
+        </div>
+      </>
+    );
+  }
+
+  const visibleAnswer = answerTokensForDisplay(answer);
+  const hasAnswer = visibleAnswer.length > 0;
+  const poolWordLabels = buildPoolWordLabels(ex.target);
+
   return (
     <div className="dialogue-my-line" data-done="false" data-mistake={mistake ? "true" : "false"}>
       <div className="dialogue-my-line-head">
         <div className="dialogue-my-line-role-row">
           <div className="dialogue-my-line-role">{ex.role}</div>
-          {active ? <span className="dialogue-now-badge">Сейчас</span> : null}
+          <span className="dialogue-now-badge">Сейчас</span>
         </div>
         <div className="dialogue-my-line-actions">
           <Buttons.TextButton
@@ -231,32 +329,44 @@ function RoleLinePuzzle({
         </div>
       </div>
 
-      <div className="dialogue-answer">
-        {(() => {
-          const visible = answerTokensForDisplay(answer);
-          if (visible.length === 0) {
-            return <span className="dialogue-muted">кликай слова по порядку…</span>;
-          }
-          return <span>{visible.map((t) => t.text).join(" ")}</span>;
-        })()}
+      <div className={cn("dialogue-answer", !hasAnswer && "dialogue-answer--empty")}>
+        {hasAnswer ? (
+          <span>{visibleAnswer.map((t) => t.text).join(" ")}</span>
+        ) : (
+          <span className="dialogue-muted">Соберите реплику по словам</span>
+        )}
       </div>
 
-      <div className="dialogue-pool">
-        {pool.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={cn("dialogue-token", t.kind === "punct" && "dialogue-token--punct")}
-            onClick={() => pick(t)}
-          >
-            {t.text}
-          </button>
-        ))}
+      <div className="dialogue-pool" aria-label="Слова реплики">
+        {pool.map((t) => {
+          const trailing = poolWordLabels.get(t.id)?.trailing ?? [];
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={cn("dialogue-token", t.kind === "punct" && "dialogue-token--punct")}
+              onClick={() => pick(t)}
+            >
+              <span className="dialogue-token__head">{t.text}</span>
+              {trailing.map((autoToken) => (
+                <span
+                  key={autoToken.id}
+                  className={cn(
+                    "dialogue-token__auto",
+                    autoToken.kind === "punct" && "dialogue-token__auto--punct",
+                  )}
+                >
+                  {autoToken.text}
+                </span>
+              ))}
+            </button>
+          );
+        })}
       </div>
 
       {mistake ? (
-        <div className="dialogue-mistake">
-          Неверно. Следующее слово: <b>{expected?.text}</b>
+        <div className="dialogue-mistake" role="status">
+          Не то слово — попробуйте ещё
         </div>
       ) : null}
     </div>
@@ -267,12 +377,18 @@ export function DialogueSceneTrainer({
   scenes,
   role,
   roleKeys,
+  roleInfo,
+  projectRoles,
+  accessToken,
   selectedPlaybookIds,
   storageKey,
 }: {
   scenes: ScriptScene[];
   role: string;
   roleKeys?: string[];
+  roleInfo: ProjectRoleInfo | null;
+  projectRoles: ProjectRoleInfo[];
+  accessToken?: string | null;
   selectedPlaybookIds: number[];
   storageKey?: string;
 }) {
@@ -352,17 +468,38 @@ export function DialogueSceneTrainer({
   }, [activeExerciseIndex, allDone, doneIds, exercises]);
 
   const activeExercise = exercises[activeExerciseIndexResolved] ?? null;
+  const lineBeforeActive = useMemo(() => {
+    if (!activeExercise) return null;
 
-  const lineRefs = useRef(new Map<string, HTMLDivElement>());
-  const setLineRef = (id: string, el: HTMLDivElement | null) => {
-    if (!el) return;
-    lineRefs.current.set(id, el);
-  };
+    const activeLineIndex = allLines.findIndex((line) => line.id === activeExercise.lineId);
+    if (activeLineIndex < 0) return null;
+
+    return (
+      allLines
+        .slice(0, activeLineIndex)
+        .reverse()
+        .find(
+          (line) =>
+            line.kind === "utterance" && line.sceneId === activeExercise.sceneId,
+        ) ?? null
+    );
+  }, [activeExercise, allLines]);
+
+  const exerciseByLineId = useMemo(() => {
+    const map = new Map<string, Exercise>();
+    for (const exercise of exercises) {
+      map.set(exercise.lineId, exercise);
+    }
+    return map;
+  }, [exercises]);
+
+  const scriptLineRefs = useRef(new Map<string, HTMLDivElement>());
 
   useEffect(() => {
     if (!activeExercise) return;
-    const el = lineRefs.current.get(activeExercise.lineId);
-    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const lineEl = scriptLineRefs.current.get(activeExercise.lineId);
+    if (!lineEl) return;
+    lineEl.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [activeExercise?.lineId]);
 
   const markDone = (id: string) => {
@@ -396,64 +533,204 @@ export function DialogueSceneTrainer({
     setActiveExerciseIndex((i) => findNextUndone(exercises, doneIds, i + 1));
   };
 
-  const renderLine = (line: DialogueLine) => {
-    if (line.kind === "stage") {
-      return (
-        <div className="dialogue-stage">
-          <span>{line.text}</span>
-        </div>
-      );
-    }
-
-    const roleLabel = line.role ? String(line.role) : "—";
-    const isMine = line.role && desiredRoleKeySet.has(normalizeRoleKey(line.role));
-    if (!isMine) {
-      return (
-        <div className="dialogue-line dialogue-line--other">
-          <div className="dialogue-role">{roleLabel}</div>
-          <div className="dialogue-text">{line.text}</div>
-        </div>
-      );
-    }
-
-    const ex = exercises.find((e) => e.lineId === line.id) ?? null;
-    if (!ex) {
-      return (
-        <div className="dialogue-line dialogue-line--mine">
-          <div className="dialogue-role">{roleLabel}</div>
-          <div className="dialogue-text">{line.text}</div>
-        </div>
-      );
-    }
-
-    const done = doneIds.has(ex.id);
-    const isActive = !allDone && !done && activeExercise?.lineId === line.id;
-
-    return (
-      <div
-        className={cn(
-          "dialogue-line",
-          "dialogue-line--mine",
-          done && "dialogue-line--done",
-          isActive && "dialogue-line--active",
-        )}
-      >
-        <RoleLinePuzzle
-          ex={ex}
-          done={done}
-          active={isActive}
-          onDone={() => {
-            markDone(ex.id);
-          }}
-          onResetDone={() => markUndone(ex.id)}
-        />
-      </div>
-    );
+  const jumpToExercise = (lineId: string) => {
+    const exerciseIndex = exercises.findIndex((exercise) => exercise.lineId === lineId);
+    if (exerciseIndex < 0) return;
+    setActiveExerciseIndex(exerciseIndex);
   };
+
+  const showLearningStage = !allDone && Boolean(activeExercise);
+  const showScriptStrip = allLines.length > 0;
+  const activeScriptLineIndex = activeExercise
+    ? allLines.findIndex((line) => line.id === activeExercise.lineId)
+    : -1;
 
   return (
     <div className="dialogue-trainer" data-all-done={allDone ? "true" : "false"}>
       <div className="dialogue-toolbar">
+        <div className="dialogue-toolbar-actions">
+          <button
+            type="button"
+            className="dialogue-icon-btn"
+            onClick={goPrevMyLine}
+            disabled={activeExerciseIndex <= 0}
+            aria-label="Предыдущая моя реплика"
+            title="Предыдущая моя реплика"
+          >
+            <svg {...dialogueIconProps}>
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="dialogue-icon-btn"
+            onClick={goNextMyLine}
+            disabled={activeExerciseIndex >= exercises.length - 1}
+            aria-label="Следующая моя реплика"
+            title="Следующая моя реплика"
+          >
+            <svg {...dialogueIconProps}>
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="dialogue-icon-btn dialogue-icon-btn--primary"
+            onClick={goNextUndone}
+            disabled={left === 0}
+            aria-label="Следующая непройденная"
+            title="Следующая непройденная"
+          >
+            <svg {...dialogueIconProps}>
+              <path d="M5 12h10" />
+              <path d="M13 6l6 6-6 6" />
+              <path d="M5 6v12" />
+            </svg>
+          </button>
+          {storageKey ? (
+            <button
+              type="button"
+              className="dialogue-icon-btn dialogue-icon-btn--danger"
+              onClick={() => {
+                const confirmed = window.confirm("Сбросить прогресс диалогового тренажёра для этой роли?");
+                if (!confirmed) return;
+                const next = new Set<string>();
+                setDoneIds(next);
+                persistDoneSet(storageKey, next);
+                setActiveExerciseIndex(0);
+              }}
+              aria-label="Сброс прогресса"
+              title="Сброс прогресса"
+            >
+              <svg {...dialogueIconProps}>
+                <path d="M3 12a9 9 0 1 0 3-6.7" />
+                <path d="M3 4v5h5" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="dialogue-scroll">
+        {allDone ? (
+          <div className="dialogue-finished" role="status">
+            <div className="dialogue-finished-title">Все реплики пройдены</div>
+            <div className="dialogue-finished-meta">
+              Вы успешно собрали все фразы выбранных сцен. Можно пройти ещё раз или сбросить прогресс.
+            </div>
+          </div>
+        ) : null}
+        {allLines.length === 0 ? (
+          <div className="dialogue-empty">
+            {selectedPlaybookIds.length === 0
+              ? "Выберите сцены в настройках. Если список пуст, выберите роль, у которой есть реплики в тексте."
+              : "Нет текста в выбранных сценах (проверьте поле «Текст» в сценах)."}
+          </div>
+        ) : showLearningStage && activeExercise ? (
+          <div className="dialogue-learning-stage">
+            <section className="dialogue-self-card">
+              <div className="dialogue-self-card__identity">
+                <RolePlayingCard
+                  role={
+                    roleInfo ?? {
+                      title: role || activeExercise.role || "Моя роль",
+                      avatarKey: null,
+                    }
+                  }
+                  accessToken={accessToken}
+                  size="md"
+                  className="dialogue-self-card__portrait"
+                />
+              </div>
+
+              <div className="dialogue-self-card__exercise">
+                <RoleLinePuzzle
+                  ex={activeExercise}
+                  done={false}
+                  active
+                  onDone={() => markDone(activeExercise.id)}
+                  onResetDone={() => markUndone(activeExercise.id)}
+                />
+              </div>
+            </section>
+
+            <aside className="dialogue-context-stack" aria-label="Реплика перед вами">
+              <DialogueContextCard
+                accessToken={accessToken}
+                line={lineBeforeActive}
+                projectRoles={projectRoles}
+              />
+            </aside>
+          </div>
+        ) : null}
+      </div>
+
+      {showScriptStrip ? (
+        <section className="dialogue-script-strip" aria-label="Полный сценарий">
+          <div className="dialogue-script-strip__head">
+            <span className="dialogue-script-strip__title">Сценарий</span>
+            <span className="dialogue-script-strip__hint">текущая фраза подсвечена</span>
+          </div>
+          <div className="dialogue-script-strip__scroll">
+            {allLines.map((line, lineIndex) => {
+              const isStage = line.kind === "stage";
+              const exercise = exerciseByLineId.get(line.id) ?? null;
+              const isMine = Boolean(exercise);
+              const isActive = Boolean(activeExercise && activeExercise.lineId === line.id);
+              const isPassedByPosition =
+                allDone || (activeScriptLineIndex >= 0 && lineIndex < activeScriptLineIndex);
+              const isMineDone = Boolean(exercise && doneIds.has(exercise.id));
+              const isDone = !isActive && (isPassedByPosition || isMineDone);
+              const roleLabel = line.role ? String(line.role) : "Ремарка";
+              const canJump = isMine && !allDone;
+
+              return (
+                <div
+                  key={line.id}
+                  ref={(el) => {
+                    if (!el) {
+                      scriptLineRefs.current.delete(line.id);
+                      return;
+                    }
+                    scriptLineRefs.current.set(line.id, el);
+                  }}
+                  className={cn(
+                    "dialogue-script-strip__line",
+                    isStage && "dialogue-script-strip__line--stage",
+                    isMine && "dialogue-script-strip__line--mine",
+                    isActive && "dialogue-script-strip__line--active",
+                    isDone && "dialogue-script-strip__line--done",
+                    canJump && "dialogue-script-strip__line--jumpable",
+                  )}
+                  onClick={canJump ? () => jumpToExercise(line.id) : undefined}
+                  role={canJump ? "button" : undefined}
+                  tabIndex={canJump ? 0 : undefined}
+                  onKeyDown={
+                    canJump
+                      ? (event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          jumpToExercise(line.id);
+                        }
+                      : undefined
+                  }
+                >
+                  {isStage ? (
+                    <span className="dialogue-script-strip__stage">{line.text}</span>
+                  ) : (
+                    <>
+                      <span className="dialogue-script-strip__role">{roleLabel}</span>
+                      <span className="dialogue-script-strip__text">{line.text}</span>
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <footer className="dialogue-footer">
         <div className="dialogue-toolbar-main">
           <div className="dialogue-toolbar-title">
             Роль <b>{role || "—"}</b>
@@ -475,64 +752,13 @@ export function DialogueSceneTrainer({
               </>
             )}
           </div>
-        </div>
-        <div className="dialogue-toolbar-actions">
-          <button type="button" className="dialogue-btn" onClick={goPrevMyLine} disabled={activeExerciseIndex <= 0}>
-            ← моя реплика
-          </button>
-          <button type="button" className="dialogue-btn" onClick={goNextMyLine} disabled={activeExerciseIndex >= exercises.length - 1}>
-            моя реплика →
-          </button>
-          <button type="button" className="dialogue-btn dialogue-btn--primary" onClick={goNextUndone} disabled={left === 0}>
-            следующая непройденная
-          </button>
-          {storageKey ? (
-            <button
-              type="button"
-              className="dialogue-btn"
-              onClick={() => {
-                const confirmed = window.confirm("Сбросить прогресс диалогового тренажёра для этой роли?");
-                if (!confirmed) return;
-                const next = new Set<string>();
-                setDoneIds(next);
-                persistDoneSet(storageKey, next);
-                setActiveExerciseIndex(0);
-              }}
-            >
-              сброс прогресса
-            </button>
+          {activeExercise?.sceneTitle ? (
+            <div className="dialogue-toolbar-scene">
+              Сцена <b>{activeExercise.sceneTitle}</b>
+            </div>
           ) : null}
         </div>
-      </div>
-
-      <div className="dialogue-scroll">
-        {allDone ? (
-          <div className="dialogue-finished" role="status">
-            <div className="dialogue-finished-title">Все реплики пройдены</div>
-            <div className="dialogue-finished-meta">
-              Вы успешно собрали все фразы выбранных сцен. Можно пройти ещё раз или сбросить прогресс.
-            </div>
-          </div>
-        ) : null}
-        {allLines.length === 0 ? (
-          <div className="dialogue-empty">
-            {selectedPlaybookIds.length === 0
-              ? "Выберите сцены для тренировки в настройках выше."
-              : "Нет текста в выбранных сценах (проверьте поле «Текст» в сценах)."}
-          </div>
-        ) : (
-          allLines.map((line) => (
-            <div
-              key={line.id}
-              ref={(el) => setLineRef(line.id, el)}
-              className="dialogue-trainer__line"
-              data-scene-id={String(line.sceneId)}
-            >
-              {renderLine(line)}
-            </div>
-          ))
-        )}
-      </div>
+      </footer>
     </div>
   );
 }

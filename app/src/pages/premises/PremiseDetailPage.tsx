@@ -33,26 +33,37 @@ import {
   slotStatusLabel,
   toDatetimeLocalValue,
   useAddPremiseMemberMutation,
-  useCreatePremiseSlotMutation,
+  useCreatePremiseRentalMutation,
   useDeletePremiseMutation,
   useDeletePremiseSlotMutation,
   useGetPremiseQuery,
+  useGeneratePremiseRentalAgreementMutation,
+  useListPremiseRentalsQuery,
   useListPremiseMembersQuery,
   useListPremiseSlotsQuery,
   useRemovePremiseMemberMutation,
   useUpdatePremiseMutation,
   useUpdatePremiseMemberMutation,
+  useUpdatePremiseRentalPaymentMutation,
+  useUpdatePremiseRentalStatusMutation,
   useUpdatePremiseSlotMutation,
+  useUploadPremiseRentalAgreementMutation,
 } from "../../features/premises";
 import type {
   CreatePremiseSlotPayload,
+  CreatePremiseRentalPayload,
+  PremiseAvailabilityDay,
   PremiseKind,
   PremiseMemberRole,
   PremiseSlotPaymentStatus,
   PremiseSlotItem,
   PremiseSlotStatus,
+  PremiseRecurrenceType,
+  PremiseRentalItem,
+  PremiseUsageType,
   UpdatePremiseSlotPayload,
 } from "../../sync/api/premises";
+import { api } from "../../sync/api/client";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "../../features/director-sessions/ui/director-sessions.css";
 import "./style.css";
@@ -86,16 +97,118 @@ const premiseKindOptions: { value: PremiseKind; label: string }[] = [
   { value: "RENTED", label: premiseKindLabel("RENTED") },
 ];
 
-type PremiseTab = "overview" | "schedule" | "members" | "settings";
+const usageTypeOptions: { value: PremiseUsageType; label: string }[] = [
+  { value: "internal", label: "Своя репетиция / мероприятие" },
+  { value: "friendly", label: "Бесплатная бронь" },
+  { value: "commercial", label: "Коммерческая аренда" },
+];
+
+const recurrenceTypeOptions: {
+  value: PremiseRecurrenceType;
+  label: string;
+}[] = [
+  { value: "once", label: "Разовая" },
+  { value: "weekly", label: "Регулярная" },
+];
+
+type PremiseTab = "overview" | "schedule" | "rentals" | "members" | "settings";
+
+type AvailabilityFormDay = PremiseAvailabilityDay & {
+  label: string;
+  enabled: boolean;
+};
+
+type RentalScheduleFormDay = {
+  weekday: number;
+  label: string;
+  enabled: boolean;
+  startsAt: string;
+  endsAt: string;
+};
+
+type FreePremiseInterval = {
+  startsAt: dayjs.Dayjs;
+  endsAt: dayjs.Dayjs;
+  durationMin: number;
+};
+
+const weekDays: { weekday: number; label: string }[] = [
+  { weekday: 1, label: "Понедельник" },
+  { weekday: 2, label: "Вторник" },
+  { weekday: 3, label: "Среда" },
+  { weekday: 4, label: "Четверг" },
+  { weekday: 5, label: "Пятница" },
+  { weekday: 6, label: "Суббота" },
+  { weekday: 0, label: "Воскресенье" },
+];
+
+function minutesToTime(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(remainingMinutes).padStart(2, "0")}`;
+}
+
+function timeToMinutes(time: string): number {
+  const [hours = "0", minutes = "0"] = time.split(":");
+  return Number(hours) * 60 + Number(minutes);
+}
+
+function formatDuration(durationMin: number): string {
+  const hours = Math.floor(durationMin / 60);
+  const minutes = durationMin % 60;
+  const parts = [
+    hours ? `${hours} ч` : "",
+    minutes ? `${minutes} мин` : "",
+  ].filter(Boolean);
+  return parts.join(" ");
+}
+
+function createAvailabilityForm(
+  availability: PremiseAvailabilityDay[] = [],
+): AvailabilityFormDay[] {
+  return weekDays.map((day) => {
+    const configuredDay = availability.find(
+      (item) => item.weekday === day.weekday,
+    );
+    return {
+      ...day,
+      enabled: configuredDay != null,
+      startsAtMin: configuredDay?.startsAtMin ?? 9 * 60,
+      endsAtMin: configuredDay?.endsAtMin ?? 22 * 60,
+    };
+  });
+}
+
+function createRentalScheduleForm(dayIso: string): RentalScheduleFormDay[] {
+  const selectedWeekday = dayjs(dayIso).day();
+  return weekDays.map((day) => ({
+    ...day,
+    enabled: day.weekday === selectedWeekday,
+    startsAt: "10:00",
+    endsAt: "12:00",
+  }));
+}
 
 type SlotFormState = {
+  usageType: PremiseUsageType;
+  recurrenceType: PremiseRecurrenceType;
   startsAtLocal: string;
+  periodStartsOn: string;
+  periodEndsOn: string;
+  indefinite: boolean;
+  schedules: RentalScheduleFormDay[];
   durationMin: string;
   title: string;
   purpose: string;
   rentalNotes: string;
   rentalAmountRub: string;
+  paymentDueDay: string;
   paymentStatus: PremiseSlotPaymentStatus;
+  agreementRequested: boolean;
+  landlordName: string;
+  landlordDetails: string;
+  tenantName: string;
+  tenantDetails: string;
   contactEmail: string;
   contactName: string;
   contactPhone: string;
@@ -105,13 +218,25 @@ type SlotFormState = {
 function emptySlotForm(dayIso: string): SlotFormState {
   const base = dayjs(dayIso).hour(10).minute(0).second(0).millisecond(0);
   return {
+    usageType: "internal",
+    recurrenceType: "once",
     startsAtLocal: base.format("YYYY-MM-DDTHH:mm"),
+    periodStartsOn: dayIso,
+    periodEndsOn: dayjs(dayIso).add(1, "month").format("YYYY-MM-DD"),
+    indefinite: false,
+    schedules: createRentalScheduleForm(dayIso),
     durationMin: "120",
     title: "",
     purpose: "",
     rentalNotes: "",
     rentalAmountRub: "",
+    paymentDueDay: "",
     paymentStatus: "unpaid",
+    agreementRequested: false,
+    landlordName: "",
+    landlordDetails: "",
+    tenantName: "",
+    tenantDetails: "",
     contactEmail: "",
     contactName: "",
     contactPhone: "",
@@ -120,15 +245,30 @@ function emptySlotForm(dayIso: string): SlotFormState {
 }
 
 function slotToForm(slot: PremiseSlotItem): SlotFormState {
+  const startsOn = dayjs(slot.startsAt).format("YYYY-MM-DD");
   return {
+    usageType:
+      slot.rental?.usageType ??
+      (slot.rentalAmountRub != null ? "commercial" : "internal"),
+    recurrenceType: "once",
     startsAtLocal: toDatetimeLocalValue(slot.startsAt),
+    periodStartsOn: startsOn,
+    periodEndsOn: startsOn,
+    indefinite: false,
+    schedules: createRentalScheduleForm(startsOn),
     durationMin: String(slot.durationMin),
     title: slot.title,
     purpose: slot.purpose ?? "",
     rentalNotes: slot.rentalNotes ?? "",
     rentalAmountRub:
       slot.rentalAmountRub == null ? "" : String(slot.rentalAmountRub),
+    paymentDueDay: "",
     paymentStatus: slot.paymentStatus,
+    agreementRequested: slot.rental?.agreementRequested ?? false,
+    landlordName: "",
+    landlordDetails: "",
+    tenantName: slot.contactName ?? "",
+    tenantDetails: "",
     contactEmail: slot.contactEmail ?? "",
     contactName: slot.contactName ?? "",
     contactPhone: slot.contactPhone ?? "",
@@ -141,6 +281,127 @@ function paymentStatusLabel(status: PremiseSlotPaymentStatus): string {
     paymentStatusOptions.find((option) => option.value === status)?.label ??
     status
   );
+}
+
+function usageTypeLabel(usageType: PremiseUsageType): string {
+  return (
+    usageTypeOptions.find((option) => option.value === usageType)?.label ??
+    usageType
+  );
+}
+
+function rentalStatusLabel(status: PremiseRentalItem["status"]): string {
+  const labels: Record<PremiseRentalItem["status"], string> = {
+    pending: "Ожидает подтверждения",
+    active: "Действует",
+    cancelled: "Отменена",
+    completed: "Завершена",
+  };
+  return labels[status];
+}
+
+function agreementStatusLabel(
+  status: NonNullable<PremiseRentalItem["agreement"]>["status"],
+): string {
+  const labels: Record<
+    NonNullable<PremiseRentalItem["agreement"]>["status"],
+    string
+  > = {
+    draft: "Черновик",
+    awaiting_signature: "Ожидает подписания",
+    active: "Подписан",
+    terminated: "Расторгнут",
+    expired: "Завершён",
+  };
+  return labels[status];
+}
+
+function rentalContactLabel(rental: PremiseRentalItem): string {
+  return [rental.contactName, rental.contactPhone, rental.contactEmail]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function formatRentalDate(value: string): string {
+  return dayjs(value.slice(0, 10)).format("D MMM YYYY");
+}
+
+type UpcomingSlotGroup = {
+  id: string;
+  label: string;
+  slots: PremiseSlotItem[];
+};
+
+function groupUpcomingSlots(slots: PremiseSlotItem[]): UpcomingSlotGroup[] {
+  const today = dayjs().startOf("day");
+  const tomorrow = today.add(1, "day");
+  const dayAfter = today.add(2, "day");
+  const weekEnd = today.add(7, "day");
+  const monthEnd = today.add(1, "month");
+
+  const groups: UpcomingSlotGroup[] = [
+    { id: "today", label: "Сегодня", slots: [] },
+    { id: "tomorrow", label: "Завтра", slots: [] },
+    { id: "day-after", label: "Послезавтра", slots: [] },
+    { id: "week", label: "Через неделю", slots: [] },
+    { id: "month", label: "Через месяц", slots: [] },
+  ];
+
+  slots
+    .filter((slot) => !dayjs(slot.startsAt).isBefore(today))
+    .sort(
+      (left, right) =>
+        dayjs(left.startsAt).valueOf() - dayjs(right.startsAt).valueOf(),
+    )
+    .forEach((slot) => {
+      const day = dayjs(slot.startsAt).startOf("day");
+      if (day.isSame(today)) {
+        groups[0].slots.push(slot);
+        return;
+      }
+      if (day.isSame(tomorrow)) {
+        groups[1].slots.push(slot);
+        return;
+      }
+      if (day.isSame(dayAfter)) {
+        groups[2].slots.push(slot);
+        return;
+      }
+      if (!day.isAfter(weekEnd)) {
+        groups[3].slots.push(slot);
+        return;
+      }
+      if (!day.isAfter(monthEnd)) {
+        groups[4].slots.push(slot);
+      }
+    });
+
+  return groups.filter((group) => group.slots.length > 0);
+}
+
+function buildCancelRentalWarning(rental: PremiseRentalItem): string {
+  const unpaidPayments = rental.payments.filter(
+    (payment) => payment.status === "unpaid",
+  ).length;
+  const warnings = [
+    `Отменить аренду «${rental.title}»?`,
+    "",
+    rental.recurrenceType === "weekly"
+      ? "Будут отменены все слоты этой регулярной серии."
+      : "Будет отменён связанный слот бронирования.",
+  ];
+  if (rental.agreement) {
+    warnings.push(
+      `Договор ${rental.agreement.number} останется в статусе «${agreementStatusLabel(rental.agreement.status)}» — отмена аренды его не подписывает и не удаляет.`,
+    );
+  }
+  if (unpaidPayments > 0) {
+    warnings.push(
+      `Останется ${unpaidPayments} неоплаченных платежей по этой аренде.`,
+    );
+  }
+  warnings.push("", "Это действие нельзя отменить из списка аренд.");
+  return warnings.join("\n");
 }
 
 function formatRubles(amountRub: number): string {
@@ -192,6 +453,87 @@ function PremiseSlotContact({ slot }: { slot: PremiseSlotItem }) {
   );
 }
 
+function MapPinIcon() {
+  return (
+    <svg
+      className="premises-page__address-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
+
+function getOrganizationInitials(title: string): string {
+  return title
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toLocaleUpperCase("ru-RU");
+}
+
+function calculateFreeIntervals(
+  selectedDate: string,
+  workingDay: PremiseAvailabilityDay | undefined,
+  slots: PremiseSlotItem[],
+): FreePremiseInterval[] {
+  if (!workingDay) return [];
+
+  const dayStart = dayjs(selectedDate).startOf("day");
+  const workingStart = dayStart.add(workingDay.startsAtMin, "minute");
+  const workingEnd = dayStart.add(workingDay.endsAtMin, "minute");
+  const occupiedIntervals = slots
+    .filter((slot) => slot.status !== "cancelled")
+    .map((slot) => {
+      const startsAt = dayjs(slot.startsAt);
+      return {
+        startsAt,
+        endsAt: startsAt.add(slot.durationMin, "minute"),
+      };
+    })
+    .sort((left, right) => left.startsAt.valueOf() - right.startsAt.valueOf());
+  const freeIntervals: FreePremiseInterval[] = [];
+  let cursor = workingStart;
+
+  occupiedIntervals.forEach((occupied) => {
+    if (!occupied.endsAt.isAfter(cursor)) return;
+    if (occupied.startsAt.isAfter(cursor)) {
+      const freeEnd = occupied.startsAt.isBefore(workingEnd)
+        ? occupied.startsAt
+        : workingEnd;
+      if (freeEnd.isAfter(cursor)) {
+        freeIntervals.push({
+          startsAt: cursor,
+          endsAt: freeEnd,
+          durationMin: freeEnd.diff(cursor, "minute"),
+        });
+      }
+    }
+    if (occupied.endsAt.isAfter(cursor)) {
+      cursor = occupied.endsAt;
+    }
+  });
+
+  if (cursor.isBefore(workingEnd)) {
+    freeIntervals.push({
+      startsAt: cursor,
+      endsAt: workingEnd,
+      durationMin: workingEnd.diff(cursor, "minute"),
+    });
+  }
+
+  return freeIntervals;
+}
+
 function extractError(e: unknown, fallback: string): string {
   if (e && typeof e === "object" && "data" in e) {
     const msg = (e as { data?: { message?: string } }).data?.message;
@@ -240,17 +582,30 @@ export function PremiseDetailPage() {
   const [settingsKind, setSettingsKind] = useState<PremiseKind>("OWNED");
   const [settingsAddress, setSettingsAddress] = useState("");
   const [settingsCapacity, setSettingsCapacity] = useState("");
-  const [settingsPaymentDueDay, setSettingsPaymentDueDay] = useState("");
+  const [settingsAvailability, setSettingsAvailability] = useState<
+    AvailabilityFormDay[]
+  >(() => createAvailabilityForm());
   const [settingsNotes, setSettingsNotes] = useState("");
   const [settingsError, setSettingsError] = useState<string | null>(null);
-
-  const range = useMemo(
-    () =>
-      calendarState
-        ? { from: calendarState.fromIso, to: calendarState.toIso }
-        : monthRangeIso(new Date()),
-    [calendarState],
+  const [rentalActionId, setRentalActionId] = useState<string | null>(null);
+  const [rentalActionError, setRentalActionError] = useState<string | null>(
+    null,
   );
+
+  const range = useMemo(() => {
+    const calendarRange = calendarState
+      ? { from: calendarState.fromIso, to: calendarState.toIso }
+      : monthRangeIso(new Date());
+    const overviewFrom = dayjs().startOf("day");
+    const overviewTo = dayjs().add(1, "month").endOf("day");
+    const from = dayjs(calendarRange.from).isBefore(overviewFrom)
+      ? calendarRange.from
+      : overviewFrom.toISOString();
+    const to = dayjs(calendarRange.to).isAfter(overviewTo)
+      ? calendarRange.to
+      : overviewTo.toISOString();
+    return { from, to };
+  }, [calendarState]);
   const selectedDate = calendarState?.selectedDate ?? isoDate(new Date());
   const calendarSelectedDateLabel = dayjs(selectedDate).format("D MMMM YYYY");
 
@@ -269,9 +624,16 @@ export function PremiseDetailPage() {
   const { data: membersData } = useListPremiseMembersQuery(premiseId, {
     skip: !accessToken || !premiseId || !premise?.canManage,
   });
+  const { data: rentalsData } = useListPremiseRentalsQuery(premiseId, {
+    skip: !accessToken || !premiseId,
+  });
 
-  const [createSlot, { isLoading: creatingSlot }] =
-    useCreatePremiseSlotMutation();
+  const [createRental, { isLoading: creatingRental }] =
+    useCreatePremiseRentalMutation();
+  const [generateAgreement] = useGeneratePremiseRentalAgreementMutation();
+  const [updateRentalPayment] = useUpdatePremiseRentalPaymentMutation();
+  const [updateRentalStatus] = useUpdatePremiseRentalStatusMutation();
+  const [uploadAgreement] = useUploadPremiseRentalAgreementMutation();
   const [updateSlot, { isLoading: updatingSlot }] =
     useUpdatePremiseSlotMutation();
   const [deleteSlot] = useDeletePremiseSlotMutation();
@@ -289,6 +651,13 @@ export function PremiseDetailPage() {
     () => slotsForDay(slots, selectedDate),
     [slots, selectedDate],
   );
+  const selectedWorkingDay = premise?.weeklyAvailability?.find(
+    (day) => day.weekday === dayjs(selectedDate).day(),
+  );
+  const freeIntervals = useMemo(
+    () => calculateFreeIntervals(selectedDate, selectedWorkingDay, daySlots),
+    [daySlots, selectedDate, selectedWorkingDay],
+  );
   const dots = useMemo(() => slotDotsByDate(slots), [slots]);
   const activeSlots = useMemo(
     () => slots.filter((slot) => slot.status !== "cancelled"),
@@ -298,12 +667,11 @@ export function PremiseDetailPage() {
     () => slots.filter((slot) => slot.status === "pending"),
     [slots],
   );
-  const trackedSlots = useMemo(() => {
-    const todayStart = dayjs().startOf("day");
-    return activeSlots
-      .filter((slot) => !dayjs(slot.startsAt).isBefore(todayStart))
-      .slice(0, 5);
-  }, [activeSlots]);
+  const trackedSlotGroups = useMemo(
+    () => groupUpcomingSlots(activeSlots),
+    [activeSlots],
+  );
+  const hasTrackedSlots = trackedSlotGroups.length > 0;
   const todaySlots = useMemo(
     () =>
       activeSlots.filter((slot) => dayjs(slot.startsAt).isSame(dayjs(), "day")),
@@ -333,9 +701,7 @@ export function PremiseDetailPage() {
     setSettingsCapacity(
       premise.capacity == null ? "" : String(premise.capacity),
     );
-    setSettingsPaymentDueDay(
-      premise.paymentDueDay == null ? "" : String(premise.paymentDueDay),
-    );
+    setSettingsAvailability(createAvailabilityForm(premise.weeklyAvailability));
     setSettingsNotes(premise.notes ?? "");
   }, [premise]);
 
@@ -393,6 +759,54 @@ export function PremiseDetailPage() {
     setSlotModalOpen(true);
   }
 
+  function openCreateSlotForInterval(interval: FreePremiseInterval) {
+    setEditingSlot(null);
+    const form = emptySlotForm(selectedDate);
+    const schedules = form.schedules.map((day) =>
+      day.weekday === interval.startsAt.day()
+        ? {
+            ...day,
+            enabled: true,
+            startsAt: interval.startsAt.format("HH:mm"),
+            endsAt: interval.endsAt.format("HH:mm"),
+          }
+        : { ...day, enabled: false },
+    );
+    setSlotForm({
+      ...form,
+      startsAtLocal: interval.startsAt.format("YYYY-MM-DDTHH:mm"),
+      durationMin: String(interval.durationMin),
+      schedules,
+    });
+    setSlotError(null);
+    setSlotModalOpen(true);
+  }
+
+  function updateAvailabilityDay(
+    weekday: number,
+    patch: Partial<
+      Pick<AvailabilityFormDay, "enabled" | "startsAtMin" | "endsAtMin">
+    >,
+  ) {
+    setSettingsAvailability((days) =>
+      days.map((day) => (day.weekday === weekday ? { ...day, ...patch } : day)),
+    );
+  }
+
+  function updateRentalScheduleDay(
+    weekday: number,
+    patch: Partial<
+      Pick<RentalScheduleFormDay, "enabled" | "startsAt" | "endsAt">
+    >,
+  ) {
+    setSlotForm((state) => ({
+      ...state,
+      schedules: state.schedules.map((day) =>
+        day.weekday === weekday ? { ...day, ...patch } : day,
+      ),
+    }));
+  }
+
   function openEditSlot(slot: PremiseSlotItem) {
     setEditingSlot(slot);
     setSlotForm(slotToForm(slot));
@@ -405,18 +819,61 @@ export function PremiseDetailPage() {
     const rentalAmountRub = slotForm.rentalAmountRub
       ? Number(slotForm.rentalAmountRub)
       : null;
+    const paymentDueDay = slotForm.paymentDueDay
+      ? Number(slotForm.paymentDueDay)
+      : null;
+    const enabledSchedules = slotForm.schedules
+      .filter((day) => day.enabled)
+      .map((day) => ({
+        weekday: day.weekday,
+        startsAtMin: timeToMinutes(day.startsAt),
+        durationMin: timeToMinutes(day.endsAt) - timeToMinutes(day.startsAt),
+      }));
+    const hasInvalidSchedule = enabledSchedules.some(
+      (schedule) =>
+        !Number.isInteger(schedule.durationMin) ||
+        schedule.durationMin < 1 ||
+        schedule.startsAtMin + schedule.durationMin > 1440,
+    );
+    const isRecurring = slotForm.recurrenceType === "weekly";
+    const isCommercial = slotForm.usageType === "commercial";
+    const needsOneTimeDuration = editingSlot != null || !isRecurring;
+    const hasInvalidAmount =
+      rentalAmountRub != null &&
+      (!Number.isInteger(rentalAmountRub) || rentalAmountRub < 0);
+    const hasInvalidPaymentDay =
+      paymentDueDay != null &&
+      (!Number.isInteger(paymentDueDay) ||
+        paymentDueDay < 1 ||
+        paymentDueDay > 31);
+    const hasInvalidPeriod =
+      isRecurring &&
+      (!slotForm.periodStartsOn ||
+        (!slotForm.indefinite &&
+          (!slotForm.periodEndsOn ||
+            dayjs(slotForm.periodEndsOn).isBefore(
+              dayjs(slotForm.periodStartsOn),
+            ))));
+    const hasMissingAgreementParties =
+      slotForm.agreementRequested &&
+      (!slotForm.landlordName.trim() || !slotForm.tenantName.trim());
     if (
       !slotForm.title.trim() ||
-      !Number.isFinite(durationMin) ||
-      durationMin < 1 ||
-      (rentalAmountRub != null &&
-        (!Number.isInteger(rentalAmountRub) || rentalAmountRub < 0))
+      (needsOneTimeDuration &&
+        (!Number.isFinite(durationMin) || durationMin < 1)) ||
+      hasInvalidAmount ||
+      hasInvalidPaymentDay ||
+      hasInvalidPeriod ||
+      (isRecurring && (enabledSchedules.length === 0 || hasInvalidSchedule)) ||
+      (isCommercial && rentalAmountRub == null) ||
+      (isCommercial && isRecurring && paymentDueDay == null) ||
+      hasMissingAgreementParties
     ) {
-      setSlotError("Проверьте название, длительность и сумму аренды");
+      setSlotError("Проверьте обязательные поля аренды и расписание");
       return;
     }
     setSlotError(null);
-    const body: CreatePremiseSlotPayload = {
+    const slotBody: CreatePremiseSlotPayload = {
       startsAt: fromDatetimeLocalValue(slotForm.startsAtLocal),
       durationMin,
       title: slotForm.title.trim(),
@@ -436,7 +893,7 @@ export function PremiseDetailPage() {
     try {
       if (editingSlot) {
         const updateBody: UpdatePremiseSlotPayload = {
-          ...body,
+          ...slotBody,
           ...(canManagePremise
             ? {
                 rentalAmountRub,
@@ -449,7 +906,53 @@ export function PremiseDetailPage() {
           body: updateBody,
         }).unwrap();
       } else {
-        await createSlot({ premiseId, body }).unwrap();
+        const startsOn = isRecurring
+          ? slotForm.periodStartsOn
+          : slotForm.startsAtLocal.slice(0, 10);
+        const rentalBody: CreatePremiseRentalPayload = {
+          usageType: slotForm.usageType,
+          recurrenceType: slotForm.recurrenceType,
+          title: slotForm.title.trim(),
+          purpose: slotForm.purpose.trim() || undefined,
+          rentalNotes: slotForm.rentalNotes.trim() || undefined,
+          contactEmail: slotForm.contactEmail.trim() || undefined,
+          contactName: slotForm.contactName.trim() || undefined,
+          contactPhone: slotForm.contactPhone.trim() || undefined,
+          startsOn: `${startsOn}T00:00:00.000Z`,
+          timezoneOffsetMin: new Date().getTimezoneOffset(),
+          ...(isRecurring
+            ? {
+                indefinite: slotForm.indefinite,
+                ...(!slotForm.indefinite
+                  ? {
+                      endsOn: `${slotForm.periodEndsOn}T23:59:59.999Z`,
+                    }
+                  : {}),
+                schedules: enabledSchedules,
+              }
+            : {
+                startsAt: fromDatetimeLocalValue(slotForm.startsAtLocal),
+                durationMin,
+              }),
+          ...(isCommercial
+            ? isRecurring
+              ? {
+                  monthlyAmountRub: rentalAmountRub ?? undefined,
+                  paymentDueDay: paymentDueDay ?? undefined,
+                }
+              : { amountRub: rentalAmountRub ?? undefined }
+            : {}),
+          agreementRequested: slotForm.agreementRequested,
+          ...(slotForm.agreementRequested
+            ? {
+                landlordName: slotForm.landlordName.trim(),
+                landlordDetails: slotForm.landlordDetails.trim() || undefined,
+                tenantName: slotForm.tenantName.trim(),
+                tenantDetails: slotForm.tenantDetails.trim() || undefined,
+              }
+            : {}),
+        };
+        await createRental({ premiseId, body: rentalBody }).unwrap();
       }
       setSlotModalOpen(false);
     } catch (e: unknown) {
@@ -484,18 +987,22 @@ export function PremiseDetailPage() {
   async function handleSaveSettings() {
     const name = settingsName.trim();
     const capacity = settingsCapacity ? Number(settingsCapacity) : null;
-    const paymentDueDay = settingsPaymentDueDay
-      ? Number(settingsPaymentDueDay)
-      : null;
+    const weeklyAvailability = settingsAvailability
+      .filter((day) => day.enabled)
+      .map(({ weekday, startsAtMin, endsAtMin }) => ({
+        weekday,
+        startsAtMin,
+        endsAtMin,
+      }));
+    const hasInvalidWorkingHours = weeklyAvailability.some(
+      (day) => day.startsAtMin >= day.endsAtMin,
+    );
     if (
       !name ||
       (capacity != null && (!Number.isInteger(capacity) || capacity < 1)) ||
-      (paymentDueDay != null &&
-        (!Number.isInteger(paymentDueDay) ||
-          paymentDueDay < 1 ||
-          paymentDueDay > 31))
+      hasInvalidWorkingHours
     ) {
-      setSettingsError("Проверьте название, вместимость и день оплаты");
+      setSettingsError("Проверьте название, вместимость и рабочее время");
       return;
     }
     setSettingsError(null);
@@ -507,7 +1014,7 @@ export function PremiseDetailPage() {
           kind: settingsKind,
           address: settingsAddress.trim() || null,
           capacity,
-          paymentDueDay,
+          weeklyAvailability,
           notes: settingsNotes.trim() || null,
         },
       }).unwrap();
@@ -526,6 +1033,108 @@ export function PremiseDetailPage() {
       navigate(premisesPath);
     } catch (e: unknown) {
       setSettingsError(extractError(e, "Не удалось удалить помещение"));
+    }
+  }
+
+  async function handleGenerateAgreement(rentalId: string) {
+    setRentalActionId(rentalId);
+    setRentalActionError(null);
+    try {
+      await generateAgreement({ premiseId, rentalId }).unwrap();
+    } catch (error: unknown) {
+      setRentalActionError(
+        extractError(error, "Не удалось сформировать договор"),
+      );
+    } finally {
+      setRentalActionId(null);
+    }
+  }
+
+  async function handleRentalStatus(
+    rental: PremiseRentalItem,
+    status: "active" | "cancelled",
+  ) {
+    if (
+      status === "cancelled" &&
+      !confirm(buildCancelRentalWarning(rental))
+    ) {
+      return;
+    }
+    setRentalActionId(rental.id);
+    setRentalActionError(null);
+    try {
+      await updateRentalStatus({
+        premiseId,
+        rentalId: rental.id,
+        status,
+      }).unwrap();
+    } catch (error: unknown) {
+      setRentalActionError(
+        extractError(error, "Не удалось изменить статус аренды"),
+      );
+    } finally {
+      setRentalActionId(null);
+    }
+  }
+
+  async function handleRentalPayment(
+    rentalId: string,
+    paymentId: string,
+    status: PremiseSlotPaymentStatus,
+  ) {
+    setRentalActionId(rentalId);
+    setRentalActionError(null);
+    try {
+      await updateRentalPayment({
+        premiseId,
+        rentalId,
+        paymentId,
+        status,
+      }).unwrap();
+    } catch (error: unknown) {
+      setRentalActionError(
+        extractError(error, "Не удалось изменить статус платежа"),
+      );
+    } finally {
+      setRentalActionId(null);
+    }
+  }
+
+  async function handleUploadAgreement(
+    rentalId: string,
+    kind: "uploaded" | "signed",
+    file: File,
+  ) {
+    setRentalActionId(rentalId);
+    setRentalActionError(null);
+    try {
+      await uploadAgreement({ premiseId, rentalId, kind, file }).unwrap();
+    } catch (error: unknown) {
+      setRentalActionError(extractError(error, "Не удалось загрузить договор"));
+    } finally {
+      setRentalActionId(null);
+    }
+  }
+
+  async function handleDownloadAgreement(
+    rentalId: string,
+    documentId: string,
+    fileName: string,
+  ) {
+    setRentalActionError(null);
+    try {
+      const response = await api.get(
+        `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}/agreement/documents/${encodeURIComponent(documentId)}`,
+        { responseType: "blob" },
+      );
+      const objectUrl = URL.createObjectURL(response.data);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = fileName;
+      anchor.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error: unknown) {
+      setRentalActionError(extractError(error, "Не удалось скачать документ"));
     }
   }
 
@@ -549,6 +1158,12 @@ export function PremiseDetailPage() {
               <div className="rehearsals-head premises-page__header">
                 <div className="premises-page__header-main">
                   <div className="premises-page__title-row">
+                    <span
+                      className="premises-page__organization-logo"
+                      aria-hidden
+                    >
+                      {getOrganizationInitials(premise.ownerTitle)}
+                    </span>
                     <div className="rehearsals-meta">{premise.name}</div>
                     <span
                       className={cn(
@@ -561,13 +1176,17 @@ export function PremiseDetailPage() {
                       {premiseKindLabel(premise.kind)}
                     </span>
                   </div>
-                  {(premise.address || premise.notes) && (
-                    <p className="rehearsals-muted premises-page__subtitle">
-                      {[premise.address, premise.notes]
-                        .filter(Boolean)
-                        .join(" · ")}
+                  {premise.address ? (
+                    <p className="rehearsals-muted premises-page__address">
+                      <MapPinIcon />
+                      <span>{premise.address}</span>
                     </p>
-                  )}
+                  ) : null}
+                  {premise.notes ? (
+                    <p className="rehearsals-muted premises-page__subtitle">
+                      {premise.notes}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="premises-page__header-actions">
                   <Link
@@ -588,6 +1207,7 @@ export function PremiseDetailPage() {
                   [
                     ["overview", "Обзор"],
                     ["schedule", "Расписание"],
+                    ["rentals", "Аренды"],
                     ["members", "Участники"],
                     ["settings", "Настройки"],
                   ] as const
@@ -665,47 +1285,64 @@ export function PremiseDetailPage() {
                         {formatRubles(unpaidAmountRub)}
                       </strong>
                       <span className="premises-metric__detail">
-                        {premise.paymentDueDay
-                          ? `оплата до ${premise.paymentDueDay}-го числа`
-                          : "день оплаты не задан"}
+                        по неоплаченным броням
                       </span>
                     </RehearsalsCard>
                   </div>
 
                   <div className="premises-overview__columns">
-                    <RehearsalsCard fluid>
+                    <RehearsalsCard fluid className="premises-upcoming-card">
                       <div className="rehearsals-card-title">
-                        Сегодня и ближайшие брони
+                        Ближайшие брони
                       </div>
-                      {trackedSlots.length ? (
-                        <ul className="premises-tracking-list">
-                          {trackedSlots.map((slot) => (
-                            <li
-                              key={slot.id}
-                              className="premises-tracking-item"
+                      {hasTrackedSlots ? (
+                        <div className="premises-upcoming-groups">
+                          {trackedSlotGroups.map((group) => (
+                            <section
+                              key={group.id}
+                              className="premises-upcoming-group"
                             >
-                              <button
-                                type="button"
-                                className="premises-tracking-item__main"
-                                onClick={() => {
-                                  setActiveTab("schedule");
-                                  openEditSlot(slot);
-                                }}
-                              >
-                                <span className="premises-tracking-item__time">
-                                  {dayjs(slot.startsAt).format("D MMM, HH:mm")}
+                              <div className="premises-upcoming-group__header">
+                                <h3 className="premises-upcoming-group__title">
+                                  {group.label}
+                                </h3>
+                                <span className="premises-upcoming-group__count">
+                                  {group.slots.length}
                                 </span>
-                                <strong>{slot.title}</strong>
-                                <span className="rehearsals-muted">
-                                  {formatSlotTime(slot)}
-                                </span>
-                              </button>
-                            </li>
+                              </div>
+                              <ul className="premises-tracking-list">
+                                {group.slots.map((slot) => (
+                                  <li
+                                    key={slot.id}
+                                    className="premises-tracking-item"
+                                  >
+                                    <button
+                                      type="button"
+                                      className="premises-tracking-item__main"
+                                      onClick={() => {
+                                        setActiveTab("schedule");
+                                        openEditSlot(slot);
+                                      }}
+                                    >
+                                      <span className="premises-tracking-item__time">
+                                        {dayjs(slot.startsAt).format(
+                                          "D MMM, HH:mm",
+                                        )}
+                                      </span>
+                                      <strong>{slot.title}</strong>
+                                      <span className="rehearsals-muted">
+                                        {formatSlotTime(slot)}
+                                      </span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </section>
                           ))}
-                        </ul>
+                        </div>
                       ) : (
                         <div className="premises-overview__empty rehearsals-muted">
-                          На сегодня и ближайшие дни броней нет.
+                          На ближайший месяц броней нет.
                         </div>
                       )}
                     </RehearsalsCard>
@@ -784,8 +1421,59 @@ export function PremiseDetailPage() {
                     </RehearsalsCard>
                   </aside>
 
-                  <div className="sessions-main">
-                    <RehearsalsCard fluid>
+                  <div className="sessions-main premises-day-panels">
+                    <RehearsalsCard fluid className="premises-day-panel">
+                      <div className="sessions-slots-readonly__header">
+                        <span className="rehearsals-section-title">
+                          Свободное время
+                        </span>
+                        {selectedWorkingDay ? (
+                          <span className="rehearsals-muted">
+                            {minutesToTime(selectedWorkingDay.startsAtMin)} —{" "}
+                            {minutesToTime(selectedWorkingDay.endsAtMin)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="premises-day-panel__scroll">
+                        {!selectedWorkingDay ? (
+                          <div className="premises-free-slots__empty rehearsals-muted">
+                            На этот день рабочее время не задано.
+                          </div>
+                        ) : freeIntervals.length ? (
+                          <div className="premises-free-slots">
+                            {freeIntervals.map((interval) => (
+                              <button
+                                key={interval.startsAt.toISOString()}
+                                type="button"
+                                className="premises-free-slot"
+                                disabled={!premise.canBook}
+                                onClick={() =>
+                                  openCreateSlotForInterval(interval)
+                                }
+                                title={
+                                  premise.canBook
+                                    ? "Забронировать этот интервал"
+                                    : "Нет права бронирования"
+                                }
+                              >
+                                <strong>
+                                  {interval.startsAt.format("HH:mm")} —{" "}
+                                  {interval.endsAt.format("HH:mm")}
+                                </strong>
+                                <span>
+                                  {formatDuration(interval.durationMin)}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="premises-free-slots__empty rehearsals-muted">
+                            Свободных интервалов нет.
+                          </div>
+                        )}
+                      </div>
+                    </RehearsalsCard>
+                    <RehearsalsCard fluid className="premises-day-panel">
                       <div className="sessions-slots-readonly">
                         <div className="sessions-slots-readonly__header">
                           <span className="rehearsals-section-title">
@@ -798,66 +1486,337 @@ export function PremiseDetailPage() {
                           ) : null}
                         </div>
 
-                        {daySlots.length === 0 ? (
-                          <div className="sessions-slots-empty rehearsals-muted">
-                            На этот день броней нет
-                          </div>
-                        ) : (
-                          daySlots.map((slot) => (
-                            <div
-                              key={slot.id}
-                              className="sessions-slots-readonly__row"
-                            >
-                              <div className="sessions-slots-readonly__time">
-                                {formatSlotTime(slot)}
-                              </div>
-                              <div className="sessions-slots-readonly__meta">
-                                <strong>{slot.title}</strong>
-                                {" · "}
-                                {slotStatusLabel(slot.status)}
-                              </div>
-                              {slot.purpose ? (
-                                <div className="sessions-slots-readonly__notes">
-                                  <b>Для чего:</b> {slot.purpose}
-                                </div>
-                              ) : null}
-                              {slot.rentalNotes ? (
-                                <div className="sessions-slots-readonly__notes">
-                                  <b>Аренда:</b> {slot.rentalNotes}
-                                </div>
-                              ) : null}
-                              {slot.rentalAmountRub != null ? (
-                                <div className="sessions-slots-readonly__notes">
-                                  <b>Оплата:</b>{" "}
-                                  {formatRubles(slot.rentalAmountRub)}
-                                  {" · "}
-                                  {paymentStatusLabel(slot.paymentStatus)}
-                                </div>
-                              ) : null}
-                              <PremiseSlotContact slot={slot} />
-                              {canEditSlot(slot) ? (
-                                <div className="premises-slot-row__actions">
-                                  <Button
-                                    type="button"
-                                    onClick={() => openEditSlot(slot)}
-                                  >
-                                    Изменить
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    className="danger"
-                                    onClick={() => void handleDeleteSlot(slot)}
-                                  >
-                                    Удалить
-                                  </Button>
-                                </div>
-                              ) : null}
+                        <div className="premises-day-panel__scroll">
+                          {daySlots.length === 0 ? (
+                            <div className="sessions-slots-empty rehearsals-muted">
+                              На этот день броней нет
                             </div>
-                          ))
-                        )}
+                          ) : (
+                            <div className="premises-day-slots">
+                              {daySlots.map((slot) => (
+                                <div
+                                  key={slot.id}
+                                  className="sessions-slots-readonly__row"
+                                >
+                                  <div className="sessions-slots-readonly__time">
+                                    {formatSlotTime(slot)}
+                                  </div>
+                                  <div className="sessions-slots-readonly__meta">
+                                    <strong>{slot.title}</strong>
+                                    {" · "}
+                                    {slotStatusLabel(slot.status)}
+                                    {slot.rental ? (
+                                      <span className="premises-slot-rental-meta">
+                                        {" · "}
+                                        {usageTypeLabel(slot.rental.usageType)}
+                                        {slot.rental.recurrenceType === "weekly"
+                                          ? " · Регулярная"
+                                          : ""}
+                                        {slot.rental.agreement
+                                          ? ` · Договор ${slot.rental.agreement.number}`
+                                          : ""}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {slot.purpose ? (
+                                    <div className="sessions-slots-readonly__notes">
+                                      <b>Для чего:</b> {slot.purpose}
+                                    </div>
+                                  ) : null}
+                                  {slot.rentalNotes ? (
+                                    <div className="sessions-slots-readonly__notes">
+                                      <b>Аренда:</b> {slot.rentalNotes}
+                                    </div>
+                                  ) : null}
+                                  {slot.rentalAmountRub != null ? (
+                                    <div className="sessions-slots-readonly__notes">
+                                      <b>Оплата:</b>{" "}
+                                      {formatRubles(slot.rentalAmountRub)}
+                                      {" · "}
+                                      {paymentStatusLabel(slot.paymentStatus)}
+                                    </div>
+                                  ) : null}
+                                  <PremiseSlotContact slot={slot} />
+                                  {canEditSlot(slot) ? (
+                                    <div className="premises-slot-row__actions">
+                                      <Button
+                                        type="button"
+                                        onClick={() => openEditSlot(slot)}
+                                      >
+                                        Изменить
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        className="danger"
+                                        onClick={() =>
+                                          void handleDeleteSlot(slot)
+                                        }
+                                      >
+                                        Удалить
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </RehearsalsCard>
                   </div>
+                </div>
+              ) : null}
+
+              {activeTab === "rentals" ? (
+                <div className="premises-rentals">
+                  <div className="premises-rentals__header">
+                    <div>
+                      <div className="rehearsals-card-title">Аренды</div>
+                      <p className="rehearsals-muted">
+                        Разовые и регулярные серии, платежи и документы.
+                      </p>
+                    </div>
+                    {premise.canBook ? (
+                      <Button type="button" onClick={openCreateSlot}>
+                        Новая аренда
+                      </Button>
+                    ) : null}
+                  </div>
+                  {rentalActionError ? (
+                    <div className="rehearsals-error">{rentalActionError}</div>
+                  ) : null}
+                  {(rentalsData?.rentals ?? []).length ? (
+                    <div className="premises-rentals__list">
+                      {(rentalsData?.rentals ?? []).map((rental) => {
+                        const normalizedUserEmail = userEmail
+                          .trim()
+                          .toLowerCase();
+                        const canManageRental =
+                          premise.canManage ||
+                          rental.createdByEmail.trim().toLowerCase() ===
+                            normalizedUserEmail ||
+                          rental.contactEmail?.trim().toLowerCase() ===
+                            normalizedUserEmail;
+                        const rentalPeriod =
+                          rental.recurrenceType === "weekly"
+                            ? rental.endsOn
+                              ? `${formatRentalDate(rental.startsOn)} — ${formatRentalDate(rental.endsOn)}`
+                              : `с ${formatRentalDate(rental.startsOn)} · бессрочно`
+                            : formatRentalDate(rental.startsOn);
+                        const rentalPrice =
+                          rental.monthlyAmountRub != null
+                            ? `${formatRubles(rental.monthlyAmountRub)} в месяц`
+                            : null;
+                        return (
+                          <RehearsalsCard
+                            key={rental.id}
+                            fluid
+                            className="premises-rental-card"
+                          >
+                            <div className="premises-rental-card__header">
+                              <div>
+                                <strong>{rental.title}</strong>
+                                <div className="rehearsals-muted">
+                                  {usageTypeLabel(rental.usageType)}
+                                  {" · "}
+                                  {rental.recurrenceType === "weekly"
+                                    ? "Регулярная"
+                                    : "Разовая"}
+                                  {" · "}
+                                  {rentalPeriod}
+                                </div>
+                              </div>
+                              <span
+                                className={cn(
+                                  "premises-rental-card__status",
+                                  rental.status === "active" &&
+                                    "premises-rental-card__status--active",
+                                )}
+                              >
+                                {rentalStatusLabel(rental.status)}
+                              </span>
+                            </div>
+                            {rentalPrice ? (
+                              <div className="premises-rental-card__price">
+                                {rentalPrice}
+                                {rental.paymentDueDay
+                                  ? ` · до ${rental.paymentDueDay}-го числа`
+                                  : ""}
+                              </div>
+                            ) : null}
+                            {rental.payments.length ? (
+                              <div className="premises-rental-payments">
+                                {rental.payments.map((payment) => (
+                                  <div
+                                    key={payment.id}
+                                    className="premises-rental-payment"
+                                  >
+                                    <span>
+                                      {formatRentalDate(payment.periodStart)}
+                                      {" · "}
+                                      {formatRubles(payment.amountRub)}
+                                      {" · до "}
+                                      {formatRentalDate(payment.dueAt)}
+                                    </span>
+                                    {premise.canManage ? (
+                                      <CustomSelect
+                                        value={payment.status}
+                                        options={paymentStatusOptions}
+                                        onChange={(value) =>
+                                          void handleRentalPayment(
+                                            rental.id,
+                                            payment.id,
+                                            value as PremiseSlotPaymentStatus,
+                                          )
+                                        }
+                                        aria-label={`Статус платежа за ${formatRentalDate(payment.periodStart)}`}
+                                      />
+                                    ) : (
+                                      <span>
+                                        {paymentStatusLabel(payment.status)}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {rental.contactName ||
+                            rental.contactPhone ||
+                            rental.contactEmail ? (
+                              <div className="rehearsals-muted">
+                                Контакт: {rentalContactLabel(rental)}
+                              </div>
+                            ) : null}
+                            {premise.canManage &&
+                            rental.status !== "cancelled" ? (
+                              <div className="premises-rental-card__actions">
+                                {rental.status === "pending" &&
+                                !rental.agreementRequested ? (
+                                  <Button
+                                    type="button"
+                                    disabled={rentalActionId === rental.id}
+                                    onClick={() =>
+                                      void handleRentalStatus(rental, "active")
+                                    }
+                                  >
+                                    Подтвердить аренду
+                                  </Button>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  className="danger"
+                                  disabled={rentalActionId === rental.id}
+                                  onClick={() =>
+                                    void handleRentalStatus(
+                                      rental,
+                                      "cancelled",
+                                    )
+                                  }
+                                >
+                                  Отменить аренду
+                                </Button>
+                              </div>
+                            ) : null}
+                            {rental.agreement ? (
+                              <div className="premises-rental-contract">
+                                <div className="premises-rental-contract__header">
+                                  <strong>
+                                    Договор {rental.agreement.number}
+                                  </strong>
+                                  <span>
+                                    {agreementStatusLabel(
+                                      rental.agreement.status,
+                                    )}
+                                  </span>
+                                </div>
+                                {rental.agreement.documents.length ? (
+                                  <div className="premises-rental-contract__documents">
+                                    {rental.agreement.documents.map(
+                                      (documentItem) => (
+                                        <button
+                                          key={documentItem.id}
+                                          type="button"
+                                          onClick={() =>
+                                            void handleDownloadAgreement(
+                                              rental.id,
+                                              documentItem.id,
+                                              documentItem.fileName,
+                                            )
+                                          }
+                                        >
+                                          {documentItem.kind === "signed"
+                                            ? "Подписанный"
+                                            : documentItem.kind === "generated"
+                                              ? "Сформированный"
+                                              : "Загруженный"}
+                                          : {documentItem.fileName}
+                                        </button>
+                                      ),
+                                    )}
+                                  </div>
+                                ) : null}
+                                {canManageRental ? (
+                                  <div className="premises-rental-contract__actions">
+                                    <Button
+                                      type="button"
+                                      disabled={rentalActionId === rental.id}
+                                      onClick={() =>
+                                        void handleGenerateAgreement(rental.id)
+                                      }
+                                    >
+                                      Сформировать PDF
+                                    </Button>
+                                    <label className="premises-rental-contract__upload">
+                                      Загрузить свой PDF
+                                      <input
+                                        type="file"
+                                        accept="application/pdf,.pdf"
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0];
+                                          if (!file) return;
+                                          void handleUploadAgreement(
+                                            rental.id,
+                                            "uploaded",
+                                            file,
+                                          );
+                                          event.target.value = "";
+                                        }}
+                                      />
+                                    </label>
+                                    <label className="premises-rental-contract__upload premises-rental-contract__upload--signed">
+                                      Загрузить подписанный
+                                      <input
+                                        type="file"
+                                        accept="application/pdf,.pdf"
+                                        onChange={(event) => {
+                                          const file = event.target.files?.[0];
+                                          if (!file) return;
+                                          void handleUploadAgreement(
+                                            rental.id,
+                                            "signed",
+                                            file,
+                                          );
+                                          event.target.value = "";
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <div className="rehearsals-muted">
+                                Без договора
+                              </div>
+                            )}
+                          </RehearsalsCard>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="premises-overview__empty rehearsals-muted">
+                      Аренд пока нет.
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -959,10 +1918,10 @@ export function PremiseDetailPage() {
 
               {activeTab === "settings" && premise.canManage ? (
                 <div className="premises-settings">
-                  <RehearsalsCard fluid>
+                  <RehearsalsCard fluid className="premises-settings__main">
                     <div className="rehearsals-card-title">Основные данные</div>
                     <div className="premises-settings__form">
-                      <label className="premises-field">
+                      <label className="premises-settings__field premises-settings__field--wide">
                         <span>Название</span>
                         <InlineTextField
                           value={settingsName}
@@ -971,7 +1930,7 @@ export function PremiseDetailPage() {
                           aria-label="Название помещения"
                         />
                       </label>
-                      <label className="premises-field">
+                      <label className="premises-settings__field premises-settings__field--wide">
                         <span>Тип помещения</span>
                         <CustomSelect
                           value={settingsKind}
@@ -982,7 +1941,7 @@ export function PremiseDetailPage() {
                           aria-label="Тип помещения"
                         />
                       </label>
-                      <label className="premises-field">
+                      <label className="premises-settings__field premises-settings__field--wide">
                         <span>Адрес</span>
                         <InlineTextField
                           value={settingsAddress}
@@ -991,7 +1950,7 @@ export function PremiseDetailPage() {
                           aria-label="Адрес помещения"
                         />
                       </label>
-                      <label className="premises-field">
+                      <label className="premises-settings__field premises-settings__field--wide">
                         <span>Вместимость</span>
                         <InlineTextField
                           value={settingsCapacity}
@@ -1000,18 +1959,72 @@ export function PremiseDetailPage() {
                           aria-label="Вместимость помещения"
                         />
                       </label>
-                      <label className="premises-field">
-                        <span>Оплата аренды до числа месяца</span>
-                        <InlineTextField
-                          value={settingsPaymentDueDay}
-                          onChange={(e) =>
-                            setSettingsPaymentDueDay(e.target.value)
-                          }
-                          inputMode="numeric"
-                          placeholder="Например, 10"
-                          aria-label="День месяца для оплаты аренды"
-                        />
-                      </label>
+                      <div className="premises-availability-settings">
+                        <div className="premises-availability-settings__header">
+                          <strong>Рабочее время</strong>
+                          <span className="rehearsals-muted">
+                            По нему рассчитываются свободные интервалы
+                          </span>
+                        </div>
+                        <div className="premises-availability-settings__days">
+                          {settingsAvailability.map((day) => (
+                            <div
+                              key={day.weekday}
+                              className={cn(
+                                "premises-availability-day",
+                                !day.enabled &&
+                                  "premises-availability-day--disabled",
+                              )}
+                            >
+                              <label className="premises-checkbox premises-availability-day__toggle">
+                                <input
+                                  type="checkbox"
+                                  checked={day.enabled}
+                                  onChange={(event) =>
+                                    updateAvailabilityDay(day.weekday, {
+                                      enabled: event.target.checked,
+                                    })
+                                  }
+                                />
+                                {day.label}
+                              </label>
+                              {day.enabled ? (
+                                <div className="premises-availability-day__time">
+                                  <input
+                                    type="time"
+                                    value={minutesToTime(day.startsAtMin)}
+                                    onChange={(event) =>
+                                      updateAvailabilityDay(day.weekday, {
+                                        startsAtMin: timeToMinutes(
+                                          event.target.value,
+                                        ),
+                                      })
+                                    }
+                                    aria-label={`Начало работы, ${day.label}`}
+                                  />
+                                  <span>—</span>
+                                  <input
+                                    type="time"
+                                    value={minutesToTime(day.endsAtMin)}
+                                    onChange={(event) =>
+                                      updateAvailabilityDay(day.weekday, {
+                                        endsAtMin: timeToMinutes(
+                                          event.target.value,
+                                        ),
+                                      })
+                                    }
+                                    aria-label={`Окончание работы, ${day.label}`}
+                                  />
+                                </div>
+                              ) : (
+                                <span className="rehearsals-muted">
+                                  Выходной
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <FormTextarea
                         label="Заметки"
                         value={settingsNotes}
@@ -1021,15 +2034,6 @@ export function PremiseDetailPage() {
                       {settingsError ? (
                         <div className="rehearsals-error">{settingsError}</div>
                       ) : null}
-                      <div className="premises-settings__actions">
-                        <Button
-                          type="button"
-                          disabled={updatingPremise || !settingsName.trim()}
-                          onClick={() => void handleSaveSettings()}
-                        >
-                          {updatingPremise ? "Сохранение…" : "Сохранить"}
-                        </Button>
-                      </div>
                     </div>
                   </RehearsalsCard>
                   <RehearsalsCard fluid className="premises-settings__danger">
@@ -1037,7 +2041,8 @@ export function PremiseDetailPage() {
                       Удаление помещения
                     </div>
                     <p className="rehearsals-muted">
-                      Будут удалены расписание и права участников помещения.
+                      Удаление необратимо. Будут удалены расписание, настройки и
+                      права участников помещения.
                     </p>
                     <Button
                       type="button"
@@ -1048,6 +2053,15 @@ export function PremiseDetailPage() {
                       {deletingPremise ? "Удаление…" : "Удалить помещение"}
                     </Button>
                   </RehearsalsCard>
+                  <div className="premises-settings__footer">
+                    <Button
+                      type="button"
+                      disabled={updatingPremise || !settingsName.trim()}
+                      onClick={() => void handleSaveSettings()}
+                    >
+                      {updatingPremise ? "Сохранение…" : "Сохранить ✓"}
+                    </Button>
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -1065,27 +2079,158 @@ export function PremiseDetailPage() {
           <h3 id="premise-slot-modal-title">
             {editingSlot ? "Редактировать слот" : "Новый слот"}
           </h3>
-          <FormInlineRow className="premises-form-row">
-            <label className="premises-field">
-              <span>Начало</span>
-              <input
-                type="datetime-local"
-                value={slotForm.startsAtLocal}
-                onChange={(e) =>
-                  setSlotForm((s) => ({ ...s, startsAtLocal: e.target.value }))
+          {!editingSlot ? (
+            <FormInlineRow className="premises-form-row">
+              <CustomSelect
+                value={slotForm.usageType}
+                options={usageTypeOptions}
+                onChange={(value) =>
+                  setSlotForm((state) => ({
+                    ...state,
+                    usageType: value as PremiseUsageType,
+                  }))
                 }
+                aria-label="Тип использования помещения"
               />
-            </label>
-            <InlineTextField
-              value={slotForm.durationMin}
-              onChange={(e) =>
-                setSlotForm((s) => ({ ...s, durationMin: e.target.value }))
-              }
-              inputMode="numeric"
-              placeholder="Минут"
-              aria-label="Длительность в минутах"
-            />
-          </FormInlineRow>
+              <CustomSelect
+                value={slotForm.recurrenceType}
+                options={recurrenceTypeOptions}
+                onChange={(value) =>
+                  setSlotForm((state) => ({
+                    ...state,
+                    recurrenceType: value as PremiseRecurrenceType,
+                  }))
+                }
+                aria-label="Периодичность"
+              />
+            </FormInlineRow>
+          ) : null}
+          {editingSlot || slotForm.recurrenceType === "once" ? (
+            <FormInlineRow className="premises-form-row">
+              <label className="premises-field">
+                <span>Начало</span>
+                <input
+                  type="datetime-local"
+                  value={slotForm.startsAtLocal}
+                  onChange={(e) =>
+                    setSlotForm((state) => ({
+                      ...state,
+                      startsAtLocal: e.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <InlineTextField
+                value={slotForm.durationMin}
+                onChange={(e) =>
+                  setSlotForm((state) => ({
+                    ...state,
+                    durationMin: e.target.value,
+                  }))
+                }
+                inputMode="numeric"
+                placeholder="Минут"
+                aria-label="Длительность в минутах"
+              />
+            </FormInlineRow>
+          ) : (
+            <div className="premises-rental-schedule">
+              <FormInlineRow className="premises-form-row">
+                <label className="premises-field">
+                  <span>Начало аренды</span>
+                  <InlineTextField
+                    type="date"
+                    className="premises-date-input"
+                    value={slotForm.periodStartsOn}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        periodStartsOn: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label className="premises-field">
+                  <span>Окончание аренды</span>
+                  <InlineTextField
+                    type="date"
+                    className="premises-date-input"
+                    value={slotForm.periodEndsOn}
+                    disabled={slotForm.indefinite}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        periodEndsOn: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              </FormInlineRow>
+              <label className="premises-checkbox premises-rental-schedule__indefinite">
+                <input
+                  type="checkbox"
+                  checked={slotForm.indefinite}
+                  onChange={(event) =>
+                    setSlotForm((state) => ({
+                      ...state,
+                      indefinite: event.target.checked,
+                    }))
+                  }
+                />
+                Бессрочная аренда
+              </label>
+              <div className="premises-rental-schedule__days">
+                {slotForm.schedules.map((day) => (
+                  <div
+                    key={day.weekday}
+                    className={cn(
+                      "premises-rental-schedule__day",
+                      !day.enabled && "premises-rental-schedule__day--disabled",
+                    )}
+                  >
+                    <label className="premises-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={day.enabled}
+                        onChange={(event) =>
+                          updateRentalScheduleDay(day.weekday, {
+                            enabled: event.target.checked,
+                          })
+                        }
+                      />
+                      {day.label}
+                    </label>
+                    {day.enabled ? (
+                      <div className="premises-rental-schedule__time">
+                        <input
+                          type="time"
+                          value={day.startsAt}
+                          onChange={(event) =>
+                            updateRentalScheduleDay(day.weekday, {
+                              startsAt: event.target.value,
+                            })
+                          }
+                          aria-label={`Начало, ${day.label}`}
+                        />
+                        <input
+                          type="time"
+                          value={day.endsAt}
+                          onChange={(event) =>
+                            updateRentalScheduleDay(day.weekday, {
+                              endsAt: event.target.value,
+                            })
+                          }
+                          aria-label={`Окончание, ${day.label}`}
+                        />
+                      </div>
+                    ) : (
+                      <span className="rehearsals-muted">Не арендуется</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <InlineTextField
             value={slotForm.title}
             onChange={(e) =>
@@ -1111,7 +2256,7 @@ export function PremiseDetailPage() {
             }
             rows={3}
           />
-          {premise.canManage ? (
+          {slotForm.usageType === "commercial" || editingSlot ? (
             <div className="premises-slot-payment">
               <div className="premises-slot-payment__title">Оплата аренды</div>
               <FormInlineRow className="premises-form-row">
@@ -1124,20 +2269,40 @@ export function PremiseDetailPage() {
                     }))
                   }
                   inputMode="numeric"
-                  placeholder="Сумма, ₽"
+                  placeholder={
+                    slotForm.recurrenceType === "weekly"
+                      ? "Сумма в месяц, ₽"
+                      : "Сумма, ₽"
+                  }
                   aria-label="Сумма аренды в рублях"
                 />
-                <CustomSelect
-                  value={slotForm.paymentStatus}
-                  options={paymentStatusOptions}
-                  onChange={(value) =>
-                    setSlotForm((state) => ({
-                      ...state,
-                      paymentStatus: value as PremiseSlotPaymentStatus,
-                    }))
-                  }
-                  aria-label="Статус оплаты"
-                />
+                {slotForm.recurrenceType === "weekly" && !editingSlot ? (
+                  <InlineTextField
+                    value={slotForm.paymentDueDay}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        paymentDueDay: event.target.value,
+                      }))
+                    }
+                    inputMode="numeric"
+                    placeholder="Оплата до числа"
+                    aria-label="День ежемесячной оплаты"
+                  />
+                ) : null}
+                {premise.canManage && editingSlot ? (
+                  <CustomSelect
+                    value={slotForm.paymentStatus}
+                    options={paymentStatusOptions}
+                    onChange={(value) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        paymentStatus: value as PremiseSlotPaymentStatus,
+                      }))
+                    }
+                    aria-label="Статус оплаты"
+                  />
+                ) : null}
               </FormInlineRow>
             </div>
           ) : null}
@@ -1174,7 +2339,85 @@ export function PremiseDetailPage() {
               aria-label="Телефон контакта"
             />
           </FormInlineRow>
-          {premise.canManage ? (
+          {!editingSlot ? (
+            <div className="premises-rental-agreement">
+              <label className="premises-checkbox">
+                <input
+                  type="checkbox"
+                  checked={slotForm.agreementRequested}
+                  onChange={(event) =>
+                    setSlotForm((state) => ({
+                      ...state,
+                      agreementRequested: event.target.checked,
+                      landlordName:
+                        state.landlordName ||
+                        premise.ownerTitle ||
+                        premise.name,
+                      tenantName:
+                        state.tenantName ||
+                        state.contactName ||
+                        state.contactEmail,
+                    }))
+                  }
+                />
+                Оформить договор
+              </label>
+              {slotForm.agreementRequested ? (
+                <div className="premises-rental-agreement__fields">
+                  <InlineTextField
+                    value={slotForm.landlordName}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        landlordName: event.target.value,
+                      }))
+                    }
+                    placeholder="Арендодатель"
+                    aria-label="Наименование арендодателя"
+                  />
+                  <InlineTextField
+                    value={slotForm.tenantName}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        tenantName: event.target.value,
+                      }))
+                    }
+                    placeholder="Арендатор"
+                    aria-label="Наименование арендатора"
+                  />
+                  <FormTextarea
+                    label="Реквизиты арендодателя"
+                    value={slotForm.landlordDetails}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        landlordDetails: event.target.value,
+                      }))
+                    }
+                    rows={2}
+                  />
+                  <FormTextarea
+                    label="Реквизиты арендатора"
+                    value={slotForm.tenantDetails}
+                    onChange={(event) =>
+                      setSlotForm((state) => ({
+                        ...state,
+                        tenantDetails: event.target.value,
+                      }))
+                    }
+                    rows={2}
+                  />
+                  <p className="rehearsals-muted premises-rental-agreement__hint">
+                    После создания аренды появится черновик договора. Слоты
+                    останутся предварительными до загрузки подписанного
+                    документа.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          {premise.canManage && editingSlot ? (
             <CustomSelect
               value={slotForm.status}
               options={statusOptions}
@@ -1191,10 +2434,10 @@ export function PremiseDetailPage() {
             </Button>
             <Button
               type="button"
-              disabled={creatingSlot || updatingSlot}
+              disabled={creatingRental || updatingSlot}
               onClick={() => void saveSlot()}
             >
-              {creatingSlot || updatingSlot ? "Сохранение…" : "Сохранить"}
+              {creatingRental || updatingSlot ? "Сохранение…" : "Сохранить"}
             </Button>
           </div>
         </div>

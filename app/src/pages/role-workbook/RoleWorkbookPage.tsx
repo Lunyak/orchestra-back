@@ -2,9 +2,14 @@ import cn from "classnames";
 import { Button } from "@shared/core/button/Button";
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { projectPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { useProject } from "../../features/project";
-import { useProjectRolesQuery, useUpdateProjectRoleMutation } from "../../features/project/api/project-api";
+import {
+  useDeleteProjectRoleMutation,
+  useProjectRolesQuery,
+  useUpdateProjectRoleMutation,
+} from "../../features/project/api/project-api";
 import { RoleAvatarEditor } from "../../features/role-card/RoleAvatarEditor";
 import { RolePlayingCard } from "../../features/role-card/RolePlayingCard";
 import { WorkbookDirectorQuestionsSection } from "../../features/role-workbook/ui/WorkbookDirectorQuestionsSection";
@@ -47,8 +52,10 @@ export function RoleWorkbookPage() {
   const { data: rolesRes } = useProjectRolesQuery(projectSlug!, { skip: !projectSlug });
   const projectRoles = rolesRes?.roles ?? [];
   const [updateProjectRole, { isLoading: updatingRoleAvatar }] = useUpdateProjectRoleMutation();
+  const [deleteProjectRole, { isLoading: deletingRole }] = useDeleteProjectRoleMutation();
   const [isActorWorkbookOpen, setIsActorWorkbookOpen] = useState(false);
   const [activeWorkbookSection, setActiveWorkbookSection] = useState<WorkbookSectionId | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const effectiveRoleId = String(roleId ?? "").trim();
 
@@ -150,6 +157,7 @@ export function RoleWorkbookPage() {
   }, [effectiveRoleId, s.roleInfo?.key, s.roleInfo?.title]);
 
   const canEditRoleAvatar = Boolean(s.isProjectOwner);
+  const canDeleteRole = Boolean(s.isProjectOwner && s.roleInfo?.id);
 
   const saveRoleAvatarKey = useCallback(
     async (avatarKey: string | null) => {
@@ -178,6 +186,35 @@ export function RoleWorkbookPage() {
       updateProjectRole,
     ],
   );
+
+  const deleteRole = useCallback(async () => {
+    if (!accessToken || !projectSlug || !s.roleInfo?.id || !canDeleteRole) return;
+    const roleTitle = String(s.roleInfo.title ?? roleLabel).trim() || "роль";
+    const confirmed =
+      typeof window !== "undefined"
+        ? window.confirm(`Удалить роль «${roleTitle}»?`)
+        : true;
+    if (!confirmed) return;
+    setDeleteError(null);
+    try {
+      await deleteProjectRole({
+        projectSlug,
+        roleId: s.roleInfo.id,
+      }).unwrap();
+      navigate(projectPath(projectSlug, "roles"));
+    } catch {
+      setDeleteError("Не удалось удалить роль");
+    }
+  }, [
+    accessToken,
+    canDeleteRole,
+    deleteProjectRole,
+    navigate,
+    projectSlug,
+    roleLabel,
+    s.roleInfo?.id,
+    s.roleInfo?.title,
+  ]);
 
   const roleKeyCandidates = useMemo(() => {
     return Array.from(
@@ -448,6 +485,22 @@ export function RoleWorkbookPage() {
                       ) : null}
 
                       {s.error ? <div className="settings-invite-error">{s.error}</div> : null}
+                      {deleteError ? (
+                        <div className="settings-invite-error">{deleteError}</div>
+                      ) : null}
+
+                      {canDeleteRole ? (
+                        <div className="rolewb-overview-danger">
+                          <Button
+                            className="danger"
+                            type="button"
+                            disabled={deletingRole}
+                            onClick={() => void deleteRole()}
+                          >
+                            Удалить роль
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>

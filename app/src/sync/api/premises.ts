@@ -4,6 +4,18 @@ export type PremiseMemberRole = "owner" | "manager" | "tenant" | "viewer";
 
 export type PremiseSlotStatus = "confirmed" | "pending" | "cancelled";
 export type PremiseSlotPaymentStatus = "unpaid" | "paid" | "waived";
+export type PremiseUsageType = "internal" | "friendly" | "commercial";
+export type PremiseRecurrenceType = "once" | "weekly";
+export type PremiseRentalStatus =
+  "pending" | "active" | "cancelled" | "completed";
+export type PremiseAgreementStatus =
+  "draft" | "awaiting_signature" | "active" | "terminated" | "expired";
+
+export type PremiseAvailabilityDay = {
+  weekday: number;
+  startsAtMin: number;
+  endsAtMin: number;
+};
 
 export type PremiseSummary = {
   id: string;
@@ -14,7 +26,7 @@ export type PremiseSummary = {
   kind: PremiseKind;
   address: string | null;
   capacity: number | null;
-  paymentDueDay: number | null;
+  weeklyAvailability: PremiseAvailabilityDay[];
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +49,7 @@ export type PremiseMemberItem = {
 export type PremiseSlotItem = {
   id: string;
   premiseId: string;
+  rentalId: string | null;
   startsAt: string;
   durationMin: number;
   title: string;
@@ -52,6 +65,77 @@ export type PremiseSlotItem = {
   createdByEmail: string;
   createdAt: string;
   updatedAt: string;
+  rental: {
+    id: string;
+    usageType: PremiseUsageType;
+    recurrenceType: PremiseRecurrenceType;
+    agreementRequested: boolean;
+    status: PremiseRentalStatus;
+    agreement: {
+      id: string;
+      number: string;
+      status: PremiseAgreementStatus;
+    } | null;
+  } | null;
+};
+
+export type PremiseRentalItem = {
+  id: string;
+  premiseId: string;
+  usageType: PremiseUsageType;
+  recurrenceType: PremiseRecurrenceType;
+  title: string;
+  purpose: string | null;
+  rentalNotes: string | null;
+  contactEmail: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  startsOn: string;
+  endsOn: string | null;
+  timezoneOffsetMin: number;
+  monthlyAmountKopecks: number | null;
+  monthlyAmountRub: number | null;
+  paymentDueDay: number | null;
+  agreementRequested: boolean;
+  status: PremiseRentalStatus;
+  createdByEmail: string;
+  createdAt: string;
+  updatedAt: string;
+  schedules: {
+    id: string;
+    weekday: number;
+    startsAtMin: number;
+    durationMin: number;
+  }[];
+  agreement: {
+    id: string;
+    number: string;
+    status: PremiseAgreementStatus;
+    landlordName: string;
+    landlordDetails: string | null;
+    tenantName: string;
+    tenantDetails: string | null;
+    signedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    documents: {
+      id: string;
+      kind: "generated" | "uploaded" | "signed";
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      createdAt: string;
+    }[];
+  } | null;
+  payments: {
+    id: string;
+    periodStart: string;
+    dueAt: string;
+    amountKopecks: number;
+    amountRub: number;
+    status: "unpaid" | "paid" | "waived";
+    paidAt: string | null;
+  }[];
 };
 
 export type PremisesListResponse = {
@@ -66,6 +150,10 @@ export type PremiseMembersResponse = {
   members: PremiseMemberItem[];
 };
 
+export type PremiseRentalsResponse = {
+  rentals: PremiseRentalItem[];
+};
+
 export type CreatePremisePayload = {
   name: string;
   theaterId?: string;
@@ -73,7 +161,7 @@ export type CreatePremisePayload = {
   kind?: PremiseKind;
   address?: string;
   capacity?: number;
-  paymentDueDay?: number;
+  weeklyAvailability?: PremiseAvailabilityDay[];
   notes?: string;
 };
 
@@ -82,7 +170,7 @@ export type UpdatePremisePayload = Partial<{
   kind: PremiseKind;
   address: string | null;
   capacity: number | null;
-  paymentDueDay: number | null;
+  weeklyAvailability: PremiseAvailabilityDay[];
   notes: string | null;
 }>;
 
@@ -113,6 +201,36 @@ export type UpdatePremiseSlotPayload = Partial<{
   contactPhone: string | null;
   status: PremiseSlotStatus;
 }>;
+
+export type CreatePremiseRentalPayload = {
+  usageType: PremiseUsageType;
+  recurrenceType: PremiseRecurrenceType;
+  title: string;
+  purpose?: string;
+  rentalNotes?: string;
+  contactEmail?: string;
+  contactName?: string;
+  contactPhone?: string;
+  startsOn: string;
+  endsOn?: string;
+  indefinite?: boolean;
+  startsAt?: string;
+  timezoneOffsetMin?: number;
+  durationMin?: number;
+  schedules?: {
+    weekday: number;
+    startsAtMin: number;
+    durationMin: number;
+  }[];
+  amountRub?: number;
+  monthlyAmountRub?: number;
+  paymentDueDay?: number;
+  agreementRequested?: boolean;
+  landlordName?: string;
+  landlordDetails?: string;
+  tenantName?: string;
+  tenantDetails?: string;
+};
 
 export type AddPremiseMemberPayload = {
   email: string;

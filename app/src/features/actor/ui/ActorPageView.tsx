@@ -9,6 +9,7 @@ import { useAppEditorMenubarActionsRender, useAppEditorViewMenuRender } from "..
 import { AppEditorActorTrainerMenu } from "../../../shared/components/app-editor-menubar/AppEditorActorTrainerMenu";
 import { Modal } from "../../../shared/core/modal/Modal";
 import { useActorPage } from "../model/useActorPage";
+import "../../director-sessions/ui/director-sessions.css";
 import "./style.css";
 
 export function ActorPageView() {
@@ -16,6 +17,7 @@ export function ActorPageView() {
   const [scenePickerOpen, setScenePickerOpen] = useState(false);
   const [expandedSceneIds, setExpandedSceneIds] = useState<Set<number>>(() => new Set());
   const {
+    accessToken,
     projects,
     projectName,
     onProjectChange,
@@ -24,6 +26,7 @@ export function ActorPageView() {
     myEmail,
     canPickAnyRole,
     rolesLoading,
+    projectRoles,
     rolesForActor,
     rolesError,
     setRoleId,
@@ -121,238 +124,237 @@ export function ActorPageView() {
   ));
 
   return (
-    <div className="app-layout actor-layout">
-      <div className="app-content">
-        <main className="main-content actor-main">
-          <div className="actor-view">
-            <Modal
-              isOpen={settingsOpen}
-              onClose={() => setSettingsOpen(false)}
-              panelClassName="actor-settings-modal"
-              ariaLabel="Настройки актёра"
-            >
-              <div className="actor-settings-modal__header">
-                <div>
-                  <div className="actor-label">Настройки</div>
-                  <div className="actor-settings-modal__title">Актёрский тренажёр</div>
+    <main className="actor-page">
+      <div className="actor-page__content">
+        <Modal
+          isOpen={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          panelClassName="actor-settings-modal"
+          ariaLabel="Настройки актёра"
+        >
+          <div className="actor-settings-modal__header">
+            <div>
+              <div className="actor-label">Настройки</div>
+              <div className="actor-settings-modal__title">Актёрский тренажёр</div>
+            </div>
+          </div>
+          <div className="actor-controls actor-controls--modal">
+            <label className="actor-field">
+              <div className="actor-label">Проект</div>
+              <CustomSelect
+                value={projects.length > 0 ? projectName : ""}
+                options={projectSelectOptions}
+                onChange={onProjectChange}
+                placeholder="Выберите проект"
+                noOptionsLabel="Проектов нет"
+                disabled={projects.length === 0}
+                triggerClassName="actor-select"
+                dropdownClassName="actor-select-dropdown"
+                aria-label="Проект"
+              />
+            </label>
+
+            <label className="actor-field">
+              <div className="actor-label">Роль</div>
+              <CustomSelect
+                value={effectiveRoleInfo?.id != null ? String(effectiveRoleInfo.id) : ""}
+                options={roleSelectOptions}
+                onChange={setRoleId}
+                placeholder={roleSelectPlaceholder}
+                noOptionsLabel={roleSelectPlaceholder}
+                disabled={!myEmail || rolesLoading || rolesForActor.length === 0}
+                triggerClassName="actor-select"
+                dropdownClassName="actor-select-dropdown"
+                aria-label="Роль"
+              />
+              {profileLoading ? <div className="actor-hint">Загрузка профиля…</div> : null}
+              {!canPickAnyRole && myEmail && rolesForActor.length === 0 && !rolesLoading ? (
+                <div className="actor-hint">
+                  Похоже, роли не назначены на ваш email. Назначьте себя на роль в карточке сцены на доске{" "}
+                  <b>готовности</b>.
                 </div>
-              </div>
-              <div className="actor-controls actor-controls--modal">
-                <label className="actor-field">
-                  <div className="actor-label">Проект</div>
-                  <CustomSelect
-                    value={projects.length > 0 ? projectName : ""}
-                    options={projectSelectOptions}
-                    onChange={onProjectChange}
-                    placeholder="Выберите проект"
-                    noOptionsLabel="Проектов нет"
-                    disabled={projects.length === 0}
-                    triggerClassName="actor-select"
-                    dropdownClassName="actor-select-dropdown"
-                    aria-label="Проект"
-                  />
-                </label>
+              ) : null}
+              {rolesError ? (
+                <div className="actor-hint">Ошибка загрузки ролей: {rolesError}</div>
+              ) : null}
+            </label>
 
-                <label className="actor-field">
-                  <div className="actor-label">Роль</div>
-                  <CustomSelect
-                    value={effectiveRoleInfo?.id != null ? String(effectiveRoleInfo.id) : ""}
-                    options={roleSelectOptions}
-                    onChange={setRoleId}
-                    placeholder={roleSelectPlaceholder}
-                    noOptionsLabel={roleSelectPlaceholder}
-                    disabled={!myEmail || rolesLoading || rolesForActor.length === 0}
-                    triggerClassName="actor-select"
-                    dropdownClassName="actor-select-dropdown"
-                    aria-label="Роль"
-                  />
-                  {profileLoading ? <div className="actor-hint">Загрузка профиля…</div> : null}
-                  {!canPickAnyRole && myEmail && rolesForActor.length === 0 && !rolesLoading ? (
-                    <div className="actor-hint">
-                      Похоже, роли не назначены на ваш email. Назначьте себя на роль в карточке сцены на доске{" "}
-                      <b>готовности</b>.
-                    </div>
-                  ) : null}
-                  {rolesError ? (
-                    <div className="actor-hint">Ошибка загрузки ролей: {rolesError}</div>
-                  ) : null}
-                </label>
-
-                <div className="actor-field">
-                  <div className="actor-label">Сцены для тренировки</div>
-                  <div className="actor-scene-picker">
-                    <div className="actor-scene-picker-actions">
-                      <Button
-                        className="actor-scene-btn secondary"
-                        type="button"
-                        onClick={() => setScenePickerOpen(true)}
-                        disabled={!effectiveRoleInfo}
-                      >
-                        {selectedScenesButtonText}
-                      </Button>
-                    </div>
-                    {phraseScenes.length === 0 ? (
-                      <div className="actor-hint">
-                        {phraseScenesEmptyHint ?? "Нет сцен с репликами выбранной роли."}
-                      </div>
-                    ) : null}
-                  </div>
+            <div className="actor-field">
+              <div className="actor-label">Сцены для тренировки</div>
+              <div className="actor-scene-picker">
+                <div className="actor-scene-picker-actions">
+                  <Button
+                    className="actor-scene-btn secondary"
+                    type="button"
+                    onClick={() => setScenePickerOpen(true)}
+                    disabled={!effectiveRoleInfo}
+                  >
+                    {selectedScenesButtonText}
+                  </Button>
                 </div>
-              </div>
-            </Modal>
-
-            <Modal
-              isOpen={scenePickerOpen}
-              onClose={() => {
-                setScenePickerOpen(false);
-              }}
-              panelClassName="actor-scene-picker-modal"
-              ariaLabel="Выбор сцен для тренировки"
-            >
-              <div className="actor-scene-picker-modal__header">
-                <div>
-                  <div className="actor-label">Сцены для тренировки</div>
-                  <div className="actor-scene-picker-meta">
-                    Выбрано: <b>{selectedScenesText}</b>
-                  </div>
-                </div>
-                <Button
-                  className="actor-scene-btn secondary"
-                  type="button"
-                  onClick={() => {
-                    setScenePickerOpen(false);
-                  }}
-                >
-                  Закрыть
-                </Button>
-              </div>
-
-              <div className="actor-scene-picker-modal__toolbar">
-                <Button
-                  className="actor-scene-btn secondary"
-                  type="button"
-                  onClick={() => setSelectedSceneIds("all")}
-                  disabled={scenePickerDisabled}
-                >
-                  Все ({totalInAllScenes})
-                </Button>
-                <Button
-                  className="actor-scene-btn secondary"
-                  type="button"
-                  onClick={() => setSelectedSceneIds([])}
-                  disabled={scenePickerDisabled}
-                >
-                  Очистить
-                </Button>
-              </div>
-
-              <div className="actor-scene-picker-list actor-scene-picker-modal__list" aria-label="Список сцен">
                 {phraseScenes.length === 0 ? (
                   <div className="actor-hint">
                     {phraseScenesEmptyHint ?? "Нет сцен с репликами выбранной роли."}
                   </div>
-                ) : (
-                  phraseScenes.map((s) => {
-                    const checked =
-                      normalizedSelectedSceneIds === "all" ? true : normalizedSelectedSceneIds.includes(s.sceneId);
-                    const examples = (phrasesByScene.get(s.sceneId) ?? []).slice(0, 2);
-                    const sceneSource = scenes.find((scene) => Number(scene.id) === s.sceneId) ?? null;
-                    const sceneText = String(sceneSource?.playMarkdown || sceneSource?.markdown || "").trim();
-                    const expanded = expandedSceneIds.has(s.sceneId);
-
-                    return (
-                      <div
-                        key={s.sceneId}
-                        className={cn("actor-scene-item", checked && "actor-scene-item--selected")}
-                        role="checkbox"
-                        aria-checked={checked}
-                        tabIndex={0}
-                        onClick={() => toggleSceneSelection(s.sceneId, !checked)}
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter" && e.key !== " ") return;
-                          e.preventDefault();
-                          toggleSceneSelection(s.sceneId, !checked);
-                        }}
-                      >
-                        <input
-                          className="actor-scene-hidden-checkbox"
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => toggleSceneSelection(s.sceneId, e.target.checked)}
-                          tabIndex={-1}
-                        />
-                        <span className="actor-scene-id actor-scene-id--corner">#{s.sceneId}</span>
-                        <span className="actor-scene-main">
-                          <span className="actor-scene-title">{s.sceneTitle}</span>
-                          {examples.length > 0 ? (
-                            <span className="actor-scene-examples">
-                              {examples.map((ex, idx) => (
-                                <span key={`${s.sceneId}-ex-${idx}`} className="actor-scene-example">
-                                  “{String(ex.text).slice(0, 90)}
-                                  {ex.text.length > 90 ? "…" : ""}”
-                                </span>
-                              ))}
-                            </span>
-                          ) : null}
-                        </span>
-                        {sceneText ? (
-                          <button
-                            className="actor-scene-disclosure"
-                            type="button"
-                            aria-expanded={expanded}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleSceneExpanded(s.sceneId);
-                            }}
-                            onKeyDown={(e) => e.stopPropagation()}
-                          >
-                            {expanded ? "Скрыть текст сцены" : "Показать текст сцены"}
-                          </button>
-                        ) : null}
-                        {expanded && sceneText ? (
-                          <div className="actor-scene-full-text" onClick={(e) => e.stopPropagation()}>
-                            {sceneText}
-                          </div>
-                        ) : null}
-                      </div>
-                    );
-                  })
-                )}
+                ) : null}
               </div>
-            </Modal>
-
-            <div className="actor-section">
-              {trainerMode === "dialogue" ? (
-                <DialogueSceneTrainer
-                  scenes={scenes}
-                  role={effectiveRoleTitle}
-                  roleKeys={effectiveRoleKeys}
-                  selectedPlaybookIds={selectedPlaybookIdsForTraining}
-                  storageKey={dialogueStorageKey || undefined}
-                />
-              ) : trainerMode === "voice" ? (
-                <VoiceDialogueTrainer
-                  scenes={scenes}
-                  role={effectiveRoleTitle}
-                  roleKeys={effectiveRoleKeys}
-                  selectedPlaybookIds={selectedPlaybookIdsForTraining}
-                  storageKey={voiceStorageKey || undefined}
-                  performerId={myEmail}
-                  performerLabel={myEmail || undefined}
-                />
-              ) : (
-                <PhraseWriteTrainer
-                  scenes={scenes}
-                  role={effectiveRoleTitle}
-                  roleKeys={effectiveRoleKeys}
-                  selectedPlaybookIds={selectedPlaybookIdsForTraining}
-                  storageKey={trainerStorageKey || undefined}
-                />
-              )}
             </div>
           </div>
-        </main>
+        </Modal>
+
+        <Modal
+          isOpen={scenePickerOpen}
+          onClose={() => {
+            setScenePickerOpen(false);
+          }}
+          panelClassName="actor-scene-picker-modal"
+          ariaLabel="Выбор сцен для тренировки"
+        >
+          <div className="actor-scene-picker-modal__header">
+            <div>
+              <div className="actor-label">Сцены для тренировки</div>
+              <div className="actor-scene-picker-meta">
+                Выбрано: <b>{selectedScenesText}</b>
+              </div>
+            </div>
+            <Button
+              className="actor-scene-btn secondary"
+              type="button"
+              onClick={() => {
+                setScenePickerOpen(false);
+              }}
+            >
+              Закрыть
+            </Button>
+          </div>
+
+          <div className="actor-scene-picker-modal__toolbar">
+            <Button
+              className="actor-scene-btn secondary"
+              type="button"
+              onClick={() => setSelectedSceneIds("all")}
+              disabled={scenePickerDisabled}
+            >
+              Все ({totalInAllScenes})
+            </Button>
+            <Button
+              className="actor-scene-btn secondary"
+              type="button"
+              onClick={() => setSelectedSceneIds([])}
+              disabled={scenePickerDisabled}
+            >
+              Очистить
+            </Button>
+          </div>
+
+          <div className="actor-scene-picker-list actor-scene-picker-modal__list" aria-label="Список сцен">
+            {phraseScenes.length === 0 ? (
+              <div className="actor-hint">
+                {phraseScenesEmptyHint ?? "Нет сцен с репликами выбранной роли."}
+              </div>
+            ) : (
+              phraseScenes.map((s) => {
+                const checked =
+                  normalizedSelectedSceneIds === "all" ? true : normalizedSelectedSceneIds.includes(s.sceneId);
+                const examples = (phrasesByScene.get(s.sceneId) ?? []).slice(0, 2);
+                const sceneSource = scenes.find((scene) => Number(scene.id) === s.sceneId) ?? null;
+                const sceneText = String(sceneSource?.playMarkdown || sceneSource?.markdown || "").trim();
+                const expanded = expandedSceneIds.has(s.sceneId);
+
+                return (
+                  <div
+                    key={s.sceneId}
+                    className={cn("actor-scene-item", checked && "actor-scene-item--selected")}
+                    role="checkbox"
+                    aria-checked={checked}
+                    tabIndex={0}
+                    onClick={() => toggleSceneSelection(s.sceneId, !checked)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault();
+                      toggleSceneSelection(s.sceneId, !checked);
+                    }}
+                  >
+                    <input
+                      className="actor-scene-hidden-checkbox"
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => toggleSceneSelection(s.sceneId, e.target.checked)}
+                      tabIndex={-1}
+                    />
+                    <span className="actor-scene-id actor-scene-id--corner">#{s.sceneId}</span>
+                    <span className="actor-scene-main">
+                      <span className="actor-scene-title">{s.sceneTitle}</span>
+                      {examples.length > 0 ? (
+                        <span className="actor-scene-examples">
+                          {examples.map((ex, idx) => (
+                            <span key={`${s.sceneId}-ex-${idx}`} className="actor-scene-example">
+                              “{String(ex.text).slice(0, 90)}
+                              {ex.text.length > 90 ? "…" : ""}”
+                            </span>
+                          ))}
+                        </span>
+                      ) : null}
+                    </span>
+                    {sceneText ? (
+                      <button
+                        className="actor-scene-disclosure"
+                        type="button"
+                        aria-expanded={expanded}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSceneExpanded(s.sceneId);
+                        }}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
+                        {expanded ? "Скрыть текст сцены" : "Показать текст сцены"}
+                      </button>
+                    ) : null}
+                    {expanded && sceneText ? (
+                      <div className="actor-scene-full-text" onClick={(e) => e.stopPropagation()}>
+                        {sceneText}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </Modal>
+
+        <div className="actor-section">
+          {trainerMode === "dialogue" ? (
+            <DialogueSceneTrainer
+              scenes={scenes}
+              role={effectiveRoleTitle}
+              roleKeys={effectiveRoleKeys}
+              roleInfo={effectiveRoleInfo}
+              projectRoles={projectRoles}
+              accessToken={accessToken}
+              selectedPlaybookIds={selectedPlaybookIdsForTraining}
+              storageKey={dialogueStorageKey || undefined}
+            />
+          ) : trainerMode === "voice" ? (
+            <VoiceDialogueTrainer
+              scenes={scenes}
+              role={effectiveRoleTitle}
+              roleKeys={effectiveRoleKeys}
+              selectedPlaybookIds={selectedPlaybookIdsForTraining}
+              storageKey={voiceStorageKey || undefined}
+              performerId={myEmail}
+              performerLabel={myEmail || undefined}
+            />
+          ) : (
+            <PhraseWriteTrainer
+              scenes={scenes}
+              role={effectiveRoleTitle}
+              roleKeys={effectiveRoleKeys}
+              selectedPlaybookIds={selectedPlaybookIdsForTraining}
+              storageKey={trainerStorageKey || undefined}
+            />
+          )}
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

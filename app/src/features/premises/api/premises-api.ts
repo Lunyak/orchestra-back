@@ -2,8 +2,11 @@ import { orchestraApi } from "../../../shared/api/rtk/orchestra-api";
 import type {
   AddPremiseMemberPayload,
   CreatePremisePayload,
+  CreatePremiseRentalPayload,
   CreatePremiseSlotPayload,
   PremiseMembersResponse,
+  PremiseRentalItem,
+  PremiseRentalsResponse,
   PremiseSlotsResponse,
   PremiseSummary,
   PremisesListResponse,
@@ -62,6 +65,115 @@ export const premisesApi = orchestraApi.injectEndpoints({
         method: "DELETE",
       }),
       invalidatesTags: ["Premises"],
+    }),
+
+    listPremiseRentals: build.query<PremiseRentalsResponse, string>({
+      query: (premiseId) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals`,
+      }),
+      providesTags: (_r, _e, premiseId) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    getPremiseRental: build.query<
+      PremiseRentalItem,
+      { premiseId: string; rentalId: string }
+    >({
+      query: ({ premiseId, rentalId }) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}`,
+      }),
+      providesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    createPremiseRental: build.mutation<
+      PremiseRentalItem,
+      { premiseId: string; body: CreatePremiseRentalPayload }
+    >({
+      query: ({ premiseId, body }) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals`,
+        method: "POST",
+        data: body,
+      }),
+      invalidatesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    generatePremiseRentalAgreement: build.mutation<
+      PremiseRentalItem,
+      { premiseId: string; rentalId: string }
+    >({
+      query: ({ premiseId, rentalId }) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}/agreement/generate`,
+        method: "POST",
+      }),
+      invalidatesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    updatePremiseRentalStatus: build.mutation<
+      PremiseRentalItem,
+      {
+        premiseId: string;
+        rentalId: string;
+        status: "active" | "cancelled";
+      }
+    >({
+      query: ({ premiseId, rentalId, status }) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}/status`,
+        method: "PATCH",
+        data: { status },
+      }),
+      invalidatesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    updatePremiseRentalPayment: build.mutation<
+      PremiseRentalItem,
+      {
+        premiseId: string;
+        rentalId: string;
+        paymentId: string;
+        status: "unpaid" | "paid" | "waived";
+      }
+    >({
+      query: ({ premiseId, rentalId, paymentId, status }) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}/payments/${encodeURIComponent(paymentId)}`,
+        method: "PATCH",
+        data: { status },
+      }),
+      invalidatesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    uploadPremiseRentalAgreement: build.mutation<
+      PremiseRentalItem,
+      {
+        premiseId: string;
+        rentalId: string;
+        kind: "uploaded" | "signed";
+        file: File;
+      }
+    >({
+      query: ({ premiseId, rentalId, kind, file }) => {
+        const data = new FormData();
+        data.append("file", file);
+        return {
+          url: `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}/agreement/upload`,
+          method: "POST",
+          params: { kind },
+          data,
+        };
+      },
+      invalidatesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
     }),
 
     listPremiseSlots: build.query<
@@ -193,6 +305,13 @@ export const {
   useCreatePremiseMutation,
   useUpdatePremiseMutation,
   useDeletePremiseMutation,
+  useListPremiseRentalsQuery,
+  useGetPremiseRentalQuery,
+  useCreatePremiseRentalMutation,
+  useGeneratePremiseRentalAgreementMutation,
+  useUpdatePremiseRentalPaymentMutation,
+  useUpdatePremiseRentalStatusMutation,
+  useUploadPremiseRentalAgreementMutation,
   useListPremiseSlotsQuery,
   useCreatePremiseSlotMutation,
   useUpdatePremiseSlotMutation,

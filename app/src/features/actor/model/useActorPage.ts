@@ -414,6 +414,7 @@ export function useActorPage() {
   );
 
   return {
+    accessToken,
     projects,
     projectItems,
     projectName,
@@ -426,6 +427,7 @@ export function useActorPage() {
     myEmail,
     canPickAnyRole,
     rolesLoading,
+    projectRoles,
     rolesForActor,
     rolesError,
     roleId,

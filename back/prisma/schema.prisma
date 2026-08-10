@@ -1060,31 +1060,180 @@ enum PremiseSlotPaymentStatus {
   waived
 }
 
+enum PremiseUsageType {
+  internal
+  friendly
+  commercial
+}
+
+enum PremiseRecurrenceType {
+  once
+  weekly
+}
+
+enum PremiseRentalStatus {
+  pending
+  active
+  cancelled
+  completed
+}
+
+enum PremiseAgreementStatus {
+  draft
+  awaiting_signature
+  active
+  terminated
+  expired
+}
+
+enum PremiseAgreementDocumentKind {
+  generated
+  uploaded
+  signed
+}
+
+enum PremiseRentalPaymentStatus {
+  unpaid
+  paid
+  waived
+}
+
 /// Физическое помещение труппы (своё или снимаемое).
 model Premise {
-  id            String      @id @default(cuid())
-  troupeId      String?
-  theaterId     String?
-  studioId      String?
-  name          String
-  kind          PremiseKind @default(OWNED)
-  address       String?
-  capacity      Int?
-  paymentDueDay Int?
-  notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  troupeId  String?
+  theaterId String?
+  studioId  String?
+  name      String
+  kind      PremiseKind @default(OWNED)
+  address   String?
+  capacity  Int?
+  notes     String?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  troupe      Troupe?            @relation(fields: [troupeId], references: [id], onDelete: Cascade)
-  theater     Theater?           @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-  studio      Studio?            @relation(fields: [studioId], references: [id], onDelete: Cascade)
-  members     PremiseMember[]
-  slots       PremiseSlot[]
-  collections TroupeCollection[]
+  troupe       Troupe?               @relation(fields: [troupeId], references: [id], onDelete: Cascade)
+  theater      Theater?              @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+  studio       Studio?               @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  members      PremiseMember[]
+  slots        PremiseSlot[]
+  rentals      PremiseRental[]
+  availability PremiseAvailability[]
+  collections  TroupeCollection[]
 
   @@index([troupeId])
   @@index([theaterId])
   @@index([studioId])
+}
+
+model PremiseRental {
+  id                   String                @id @default(cuid())
+  premiseId            String
+  usageType            PremiseUsageType
+  recurrenceType       PremiseRecurrenceType
+  title                String
+  purpose              String?
+  rentalNotes          String?
+  contactEmail         String?
+  contactName          String?
+  contactPhone         String?
+  startsOn             DateTime
+  endsOn               DateTime?
+  timezoneOffsetMin    Int                   @default(0)
+  monthlyAmountKopecks Int?
+  paymentDueDay        Int?
+  agreementRequested   Boolean               @default(false)
+  status               PremiseRentalStatus   @default(pending)
+  createdByEmail       String
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  premise   Premise                 @relation(fields: [premiseId], references: [id], onDelete: Cascade)
+  schedules PremiseRentalSchedule[]
+  slots     PremiseSlot[]
+  agreement PremiseRentalAgreement?
+  payments  PremiseRentalPayment[]
+
+  @@index([premiseId, startsOn])
+  @@index([status])
+}
+
+model PremiseRentalSchedule {
+  id          String @id @default(cuid())
+  rentalId    String
+  weekday     Int
+  startsAtMin Int
+  durationMin Int
+
+  rental PremiseRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  @@unique([rentalId, weekday])
+  @@index([rentalId])
+}
+
+model PremiseRentalAgreement {
+  id              String                 @id @default(cuid())
+  rentalId        String                 @unique
+  number          String
+  status          PremiseAgreementStatus @default(draft)
+  landlordName    String
+  landlordDetails String?
+  tenantName      String
+  tenantDetails   String?
+  termsSnapshot   Json
+  signedAt        DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  rental    PremiseRental                    @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  documents PremiseRentalAgreementDocument[]
+
+  @@index([status])
+}
+
+model PremiseRentalAgreementDocument {
+  id          String                       @id @default(cuid())
+  agreementId String
+  kind        PremiseAgreementDocumentKind
+  fileName    String
+  storageKey  String
+  mimeType    String
+  sizeBytes   Int
+  createdAt   DateTime                     @default(now())
+
+  agreement PremiseRentalAgreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  @@index([agreementId, kind])
+}
+
+model PremiseRentalPayment {
+  id            String                     @id @default(cuid())
+  rentalId      String
+  periodStart   DateTime
+  dueAt         DateTime
+  amountKopecks Int
+  status        PremiseRentalPaymentStatus @default(unpaid)
+  paidAt        DateTime?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  rental PremiseRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  @@unique([rentalId, periodStart])
+  @@index([rentalId, dueAt])
+}
+
+model PremiseAvailability {
+  id          String @id @default(cuid())
+  premiseId   String
+  weekday     Int
+  startsAtMin Int
+  endsAtMin   Int
+
+  premise Premise @relation(fields: [premiseId], references: [id], onDelete: Cascade)
+
+  @@unique([premiseId, weekday])
+  @@index([premiseId])
 }
 
 /// Участник помещения (любой email, не обязательно из труппы).
@@ -1108,6 +1257,7 @@ model PremiseMember {
 model PremiseSlot {
   id                  String                   @id @default(cuid())
   premiseId           String
+  rentalId            String?
   startsAt            DateTime
   durationMin         Int
   title               String
@@ -1123,9 +1273,11 @@ model PremiseSlot {
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
 
-  premise Premise @relation(fields: [premiseId], references: [id], onDelete: Cascade)
+  premise Premise        @relation(fields: [premiseId], references: [id], onDelete: Cascade)
+  rental  PremiseRental? @relation(fields: [rentalId], references: [id], onDelete: Cascade)
 
   @@index([premiseId, startsAt])
+  @@index([rentalId])
 }
 
 enum ChatConversationKind {

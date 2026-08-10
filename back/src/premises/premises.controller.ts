@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,14 +9,25 @@ import {
   Post,
   Query,
   Req,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+import { memoryStorage } from 'multer';
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AddPremiseMemberDto } from './dto/add-premise-member.dto';
 import { CreatePremiseDto } from './dto/create-premise.dto';
+import { CreatePremiseRentalDto } from './dto/create-premise-rental.dto';
 import { CreatePremiseSlotDto } from './dto/create-premise-slot.dto';
 import { UpdatePremiseDto } from './dto/update-premise.dto';
 import { UpdatePremiseMemberDto } from './dto/update-premise-member.dto';
+import { UpdatePremiseRentalPaymentDto } from './dto/update-premise-rental-payment.dto';
+import { UpdatePremiseRentalStatusDto } from './dto/update-premise-rental-status.dto';
 import { UpdatePremiseSlotDto } from './dto/update-premise-slot.dto';
 import { PremisesService } from './premises.service';
 
@@ -72,6 +84,146 @@ export class PremisesController {
     return this.premises.deletePremise(req.user.userId, req.user.email, id);
   }
 
+  @Get(':id/rentals')
+  listRentals(@Req() req: any, @Param('id') id: string) {
+    return this.premises.listRentals(req.user.userId, req.user.email, id);
+  }
+
+  @Get(':id/rentals/:rentalId')
+  getRental(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+  ) {
+    return this.premises.getRental(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
+    );
+  }
+
+  @Post(':id/rentals')
+  createRental(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: CreatePremiseRentalDto,
+  ) {
+    return this.premises.createRental(
+      req.user.userId,
+      req.user.email,
+      id,
+      body,
+    );
+  }
+
+  @Patch(':id/rentals/:rentalId/status')
+  updateRentalStatus(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+    @Body() body: UpdatePremiseRentalStatusDto,
+  ) {
+    return this.premises.updateRentalStatus(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
+      body,
+    );
+  }
+
+  @Patch(':id/rentals/:rentalId/payments/:paymentId')
+  updateRentalPayment(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+    @Param('paymentId') paymentId: string,
+    @Body() body: UpdatePremiseRentalPaymentDto,
+  ) {
+    return this.premises.updateRentalPayment(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
+      paymentId,
+      body,
+    );
+  }
+
+  @Post(':id/rentals/:rentalId/agreement/generate')
+  generateRentalAgreement(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+  ) {
+    return this.premises.generateRentalAgreement(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
+    );
+  }
+
+  @Post(':id/rentals/:rentalId/agreement/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  uploadRentalAgreement(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+    @Query('kind') kind: 'uploaded' | 'signed',
+    @UploadedFile() file: any,
+  ) {
+    if (!file) throw new BadRequestException('Файл не передан');
+    if (kind !== 'uploaded' && kind !== 'signed') {
+      throw new BadRequestException('Некорректный тип документа');
+    }
+    return this.premises.uploadRentalAgreementDocument(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
+      kind,
+      file,
+    );
+  }
+
+  @Get(':id/rentals/:rentalId/agreement/documents/:documentId')
+  async downloadRentalAgreement(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+    @Param('documentId') documentId: string,
+    @Res() res: Response,
+  ) {
+    const { document, object } = await this.premises.getRentalAgreementDocument(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
+      documentId,
+    );
+    res.setHeader('Content-Type', document.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename*=UTF-8''${encodeURIComponent(document.fileName)}`,
+    );
+    if ('localPath' in object) {
+      const fileStat = await stat(object.localPath);
+      res.setHeader('Content-Length', String(fileStat.size));
+      return createReadStream(object.localPath).pipe(res);
+    }
+    if (object.contentLength != null) {
+      res.setHeader('Content-Length', String(object.contentLength));
+    }
+    return object.body.pipe(res);
+  }
+
   @Get(':id/slots')
   listSlots(
     @Req() req: any,
@@ -94,12 +246,7 @@ export class PremisesController {
     @Param('id') id: string,
     @Body() body: CreatePremiseSlotDto,
   ) {
-    return this.premises.createSlot(
-      req.user.userId,
-      req.user.email,
-      id,
-      body,
-    );
+    return this.premises.createSlot(req.user.userId, req.user.email, id, body);
   }
 
   @Patch(':id/slots/:slotId')
@@ -143,12 +290,7 @@ export class PremisesController {
     @Param('id') id: string,
     @Body() body: AddPremiseMemberDto,
   ) {
-    return this.premises.addMember(
-      req.user.userId,
-      req.user.email,
-      id,
-      body,
-    );
+    return this.premises.addMember(req.user.userId, req.user.email, id, body);
   }
 
   @Patch(':id/members/:memberId')

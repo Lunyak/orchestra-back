@@ -6,8 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  PremiseAgreementStatus,
   PremiseMemberRole,
+  PremiseRecurrenceType,
+  PremiseRentalStatus,
   PremiseSlotStatus,
+  PremiseUsageType,
   Prisma,
   WorkspaceRole,
   WorkspaceType,
@@ -15,10 +19,17 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AddPremiseMemberDto } from './dto/add-premise-member.dto';
 import { CreatePremiseDto } from './dto/create-premise.dto';
+import {
+  CreatePremiseRentalDto,
+  PremiseRentalScheduleDto,
+} from './dto/create-premise-rental.dto';
 import { CreatePremiseSlotDto } from './dto/create-premise-slot.dto';
 import { UpdatePremiseDto } from './dto/update-premise.dto';
 import { UpdatePremiseMemberDto } from './dto/update-premise-member.dto';
+import { UpdatePremiseRentalPaymentDto } from './dto/update-premise-rental-payment.dto';
+import { UpdatePremiseRentalStatusDto } from './dto/update-premise-rental-status.dto';
 import { UpdatePremiseSlotDto } from './dto/update-premise-slot.dto';
+import { PremiseAgreementDocumentsService } from './premise-agreement-documents.service';
 
 function normalizeEmail(v: unknown): string {
   const email = String(v ?? '')
@@ -35,6 +46,155 @@ function rubToKopecks(rub: number): number {
     );
   }
   return rub * 100;
+}
+
+type WeeklyAvailabilityDay = {
+  weekday: number;
+  startsAtMin: number;
+  endsAtMin: number;
+};
+
+function normalizeWeeklyAvailability(
+  days: WeeklyAvailabilityDay[],
+): WeeklyAvailabilityDay[] {
+  const weekdays = new Set<number>();
+  const normalizedDays = days.map((day) => {
+    if (weekdays.has(day.weekday)) {
+      throw new BadRequestException('День недели указан несколько раз');
+    }
+    if (day.startsAtMin >= day.endsAtMin) {
+      throw new BadRequestException(
+        'Начало рабочего времени должно быть раньше окончания',
+      );
+    }
+    weekdays.add(day.weekday);
+    return {
+      weekday: day.weekday,
+      startsAtMin: day.startsAtMin,
+      endsAtMin: day.endsAtMin,
+    };
+  });
+
+  return normalizedDays.sort((left, right) => left.weekday - right.weekday);
+}
+
+type RentalOccurrence = {
+  startsAt: Date;
+  durationMin: number;
+};
+
+function parseIsoDateOnly(raw: string, fieldName: string): Date {
+  const datePart = String(raw ?? '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    throw new BadRequestException(`Invalid ${fieldName}`);
+  }
+  const parsed = new Date(`${datePart}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException(`Invalid ${fieldName}`);
+  }
+  return parsed;
+}
+
+function localDateAtMinutes(
+  date: Date,
+  startsAtMin: number,
+  timezoneOffsetMin: number,
+): Date {
+  const localMidnightUtc = Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+  );
+  return new Date(
+    localMidnightUtc + startsAtMin * 60 * 1000 + timezoneOffsetMin * 60 * 1000,
+  );
+}
+
+function generateWeeklyOccurrences(
+  startsOn: Date,
+  endsOn: Date,
+  schedules: PremiseRentalScheduleDto[],
+  timezoneOffsetMin: number,
+): RentalOccurrence[] {
+  const schedulesByWeekday = new Map(
+    schedules.map((schedule) => [schedule.weekday, schedule]),
+  );
+  if (schedulesByWeekday.size !== schedules.length) {
+    throw new BadRequestException('День недели указан несколько раз');
+  }
+
+  const occurrences: RentalOccurrence[] = [];
+  const cursor = new Date(
+    Date.UTC(
+      startsOn.getUTCFullYear(),
+      startsOn.getUTCMonth(),
+      startsOn.getUTCDate(),
+    ),
+  );
+  const lastDate = Date.UTC(
+    endsOn.getUTCFullYear(),
+    endsOn.getUTCMonth(),
+    endsOn.getUTCDate(),
+  );
+
+  while (cursor.getTime() <= lastDate) {
+    const schedule = schedulesByWeekday.get(cursor.getUTCDay());
+    if (schedule) {
+      if (schedule.startsAtMin + schedule.durationMin > 1440) {
+        throw new BadRequestException(
+          'Регулярная бронь не должна выходить за пределы дня',
+        );
+      }
+      occurrences.push({
+        startsAt: localDateAtMinutes(
+          cursor,
+          schedule.startsAtMin,
+          timezoneOffsetMin,
+        ),
+        durationMin: schedule.durationMin,
+      });
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  if (occurrences.length === 0) {
+    throw new BadRequestException('В выбранном периоде нет посещений');
+  }
+  if (occurrences.length > 370) {
+    throw new BadRequestException('Серия не может содержать больше 370 броней');
+  }
+  return occurrences;
+}
+
+function generateMonthlyPayments(
+  startsOn: Date,
+  endsOn: Date,
+  monthlyAmountRub: number,
+  paymentDueDay: number,
+) {
+  const payments: {
+    periodStart: Date;
+    dueAt: Date;
+    amountKopecks: number;
+  }[] = [];
+  const cursor = new Date(
+    Date.UTC(startsOn.getUTCFullYear(), startsOn.getUTCMonth(), 1),
+  );
+  const lastMonth = Date.UTC(endsOn.getUTCFullYear(), endsOn.getUTCMonth(), 1);
+
+  while (cursor.getTime() <= lastMonth) {
+    const year = cursor.getUTCFullYear();
+    const month = cursor.getUTCMonth();
+    const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const dueDay = Math.min(paymentDueDay, daysInMonth);
+    payments.push({
+      periodStart: new Date(Date.UTC(year, month, 1)),
+      dueAt: new Date(Date.UTC(year, month, dueDay, 23, 59, 59, 999)),
+      amountKopecks: rubToKopecks(monthlyAmountRub),
+    });
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return payments;
 }
 
 type PremiseAccess = {
@@ -73,8 +233,15 @@ const premiseSelect = {
   kind: true,
   address: true,
   capacity: true,
-  paymentDueDay: true,
   notes: true,
+  availability: {
+    select: {
+      weekday: true,
+      startsAtMin: true,
+      endsAtMin: true,
+    },
+    orderBy: { weekday: 'asc' as const },
+  },
   createdAt: true,
   updatedAt: true,
   troupe: { select: { ownerUserId: true, title: true } },
@@ -82,9 +249,19 @@ const premiseSelect = {
   studio: { select: { ownerUserId: true, title: true } },
 } as const;
 
+const rentalSummarySelect = {
+  id: true,
+  usageType: true,
+  recurrenceType: true,
+  agreementRequested: true,
+  status: true,
+  agreement: { select: { id: true, number: true, status: true } },
+} as const;
+
 const slotSelect = {
   id: true,
   premiseId: true,
+  rentalId: true,
   startsAt: true,
   durationMin: true,
   title: true,
@@ -99,6 +276,75 @@ const slotSelect = {
   createdByEmail: true,
   createdAt: true,
   updatedAt: true,
+  rental: { select: rentalSummarySelect },
+} as const;
+
+const rentalSelect = {
+  id: true,
+  premiseId: true,
+  usageType: true,
+  recurrenceType: true,
+  title: true,
+  purpose: true,
+  rentalNotes: true,
+  contactEmail: true,
+  contactName: true,
+  contactPhone: true,
+  startsOn: true,
+  endsOn: true,
+  timezoneOffsetMin: true,
+  monthlyAmountKopecks: true,
+  paymentDueDay: true,
+  agreementRequested: true,
+  status: true,
+  createdByEmail: true,
+  createdAt: true,
+  updatedAt: true,
+  schedules: {
+    select: {
+      id: true,
+      weekday: true,
+      startsAtMin: true,
+      durationMin: true,
+    },
+    orderBy: { weekday: 'asc' as const },
+  },
+  agreement: {
+    select: {
+      id: true,
+      number: true,
+      status: true,
+      landlordName: true,
+      landlordDetails: true,
+      tenantName: true,
+      tenantDetails: true,
+      signedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      documents: {
+        select: {
+          id: true,
+          kind: true,
+          fileName: true,
+          mimeType: true,
+          sizeBytes: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' as const },
+      },
+    },
+  },
+  payments: {
+    select: {
+      id: true,
+      periodStart: true,
+      dueAt: true,
+      amountKopecks: true,
+      status: true,
+      paidAt: true,
+    },
+    orderBy: { periodStart: 'asc' as const },
+  },
 } as const;
 
 const memberSelect = {
@@ -115,8 +361,10 @@ function serializePremise(
   row: Prisma.PremiseGetPayload<{ select: typeof premiseSelect }>,
   access: Omit<PremiseAccess, 'premise'>,
 ) {
+  const { availability, ...premise } = row;
   return {
-    ...row,
+    ...premise,
+    weeklyAvailability: availability,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     ownerTitle:
@@ -142,6 +390,39 @@ function serializeSlot(
   };
 }
 
+function serializeRental(
+  row: Prisma.PremiseRentalGetPayload<{ select: typeof rentalSelect }>,
+) {
+  return {
+    ...row,
+    startsOn: row.startsOn.toISOString(),
+    endsOn: row.endsOn?.toISOString() ?? null,
+    monthlyAmountRub:
+      row.monthlyAmountKopecks == null ? null : row.monthlyAmountKopecks / 100,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    agreement: row.agreement
+      ? {
+          ...row.agreement,
+          signedAt: row.agreement.signedAt?.toISOString() ?? null,
+          createdAt: row.agreement.createdAt.toISOString(),
+          updatedAt: row.agreement.updatedAt.toISOString(),
+          documents: row.agreement.documents.map((document) => ({
+            ...document,
+            createdAt: document.createdAt.toISOString(),
+          })),
+        }
+      : null,
+    payments: row.payments.map((payment) => ({
+      ...payment,
+      amountRub: payment.amountKopecks / 100,
+      periodStart: payment.periodStart.toISOString(),
+      dueAt: payment.dueAt.toISOString(),
+      paidAt: payment.paidAt?.toISOString() ?? null,
+    })),
+  };
+}
+
 function serializeMember(
   row: Prisma.PremiseMemberGetPayload<{ select: typeof memberSelect }>,
 ) {
@@ -158,7 +439,10 @@ function isManagerRole(role: PremiseMemberRole): boolean {
 
 @Injectable()
 export class PremisesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly agreementDocuments: PremiseAgreementDocumentsService,
+  ) {}
 
   private async getOrCreateMyTroupe(userId: string) {
     const existing = await this.prisma.troupe.findFirst({
@@ -330,6 +614,19 @@ export class PremisesService {
     return createdBy === email || contact === email;
   }
 
+  private canEditRental(
+    access: PremiseAccess,
+    userEmail: string,
+    rental: { createdByEmail: string; contactEmail: string | null },
+  ): boolean {
+    if (access.canManage) return true;
+    if (!access.canBook) return false;
+    const email = normalizeEmail(userEmail);
+    const createdBy = rental.createdByEmail.trim().toLowerCase();
+    const contact = rental.contactEmail?.trim().toLowerCase() ?? '';
+    return createdBy === email || contact === email;
+  }
+
   private async findConflictingSlots(
     premiseId: string,
     startsAt: Date,
@@ -352,6 +649,30 @@ export class PremisesService {
       const start = s.startsAt.getTime();
       const end = start + s.durationMin * 60 * 1000;
       return start < newEnd && end > newStart;
+    });
+  }
+
+  private async findRentalConflicts(
+    premiseId: string,
+    occurrences: RentalOccurrence[],
+  ) {
+    const slots = await this.prisma.premiseSlot.findMany({
+      where: {
+        premiseId,
+        status: { not: PremiseSlotStatus.cancelled },
+      },
+      select: slotSelect,
+    });
+
+    return occurrences.flatMap((occurrence) => {
+      const occurrenceStart = occurrence.startsAt.getTime();
+      const occurrenceEnd =
+        occurrenceStart + occurrence.durationMin * 60 * 1000;
+      return slots.filter((slot) => {
+        const slotStart = slot.startsAt.getTime();
+        const slotEnd = slotStart + slot.durationMin * 60 * 1000;
+        return slotStart < occurrenceEnd && slotEnd > occurrenceStart;
+      });
     });
   }
 
@@ -498,7 +819,11 @@ export class PremisesService {
         kind: body.kind ?? 'OWNED',
         address: body.address?.trim() || null,
         capacity: body.capacity ?? null,
-        paymentDueDay: body.paymentDueDay ?? null,
+        availability: body.weeklyAvailability
+          ? {
+              create: normalizeWeeklyAvailability(body.weeklyAvailability),
+            }
+          : undefined,
         notes: body.notes?.trim() || null,
       },
       select: premiseSelect,
@@ -534,8 +859,11 @@ export class PremisesService {
         body.address == null ? null : String(body.address).trim() || null;
     }
     if (body.capacity !== undefined) data.capacity = body.capacity;
-    if (body.paymentDueDay !== undefined) {
-      data.paymentDueDay = body.paymentDueDay;
+    if (body.weeklyAvailability !== undefined) {
+      data.availability = {
+        deleteMany: {},
+        create: normalizeWeeklyAvailability(body.weeklyAvailability),
+      };
     }
     if (body.notes !== undefined) {
       data.notes =
@@ -555,6 +883,537 @@ export class PremisesService {
     this.assertCanManage(access);
     await this.prisma.premise.delete({ where: { id: premiseId } });
     return { ok: true };
+  }
+
+  async listRentals(userId: string, userEmail: string, premiseId: string) {
+    await this.resolveAccess(userId, userEmail, premiseId);
+    const rentals = await this.prisma.premiseRental.findMany({
+      where: { premiseId },
+      select: rentalSelect,
+      orderBy: [{ startsOn: 'desc' }, { createdAt: 'desc' }],
+    });
+    return { rentals: rentals.map(serializeRental) };
+  }
+
+  async getRental(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+  ) {
+    await this.resolveAccess(userId, userEmail, premiseId);
+    const rental = await this.prisma.premiseRental.findFirst({
+      where: { id: rentalId, premiseId },
+      select: rentalSelect,
+    });
+    if (!rental) throw new NotFoundException('Rental not found');
+    return serializeRental(rental);
+  }
+
+  async createRental(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    body: CreatePremiseRentalDto,
+  ) {
+    const access = await this.resolveAccess(userId, userEmail, premiseId);
+    this.assertCanBook(access);
+
+    const email = normalizeEmail(userEmail);
+    const title = String(body.title ?? '').trim();
+    if (!title) throw new BadRequestException('title is required');
+    const timezoneOffsetMin = body.timezoneOffsetMin ?? 0;
+    const requestedAgreement = body.agreementRequested === true;
+    const contactEmail = body.contactEmail
+      ? normalizeEmail(body.contactEmail)
+      : email;
+    const startsOn = parseIsoDateOnly(body.startsOn, 'startsOn');
+
+    let endsOn: Date | null = null;
+    let occurrenceEndsOn: Date | null = null;
+    let schedules: PremiseRentalScheduleDto[] = [];
+    let occurrences: RentalOccurrence[] = [];
+
+    if (body.recurrenceType === PremiseRecurrenceType.once) {
+      if (!body.startsAt || !body.durationMin) {
+        throw new BadRequestException(
+          'Для разовой брони укажите начало и длительность',
+        );
+      }
+      const startsAt = new Date(body.startsAt);
+      if (Number.isNaN(startsAt.getTime())) {
+        throw new BadRequestException('Invalid startsAt');
+      }
+      occurrences = [{ startsAt, durationMin: body.durationMin }];
+    } else {
+      const isIndefinite = body.indefinite === true;
+      if ((!isIndefinite && !body.endsOn) || !body.schedules?.length) {
+        throw new BadRequestException(
+          'Для регулярной аренды укажите период и расписание',
+        );
+      }
+      occurrenceEndsOn = isIndefinite
+        ? new Date(
+            Date.UTC(
+              startsOn.getUTCFullYear() + 1,
+              startsOn.getUTCMonth(),
+              startsOn.getUTCDate(),
+            ),
+          )
+        : parseIsoDateOnly(body.endsOn!, 'endsOn');
+      endsOn = isIndefinite ? null : occurrenceEndsOn;
+      if (occurrenceEndsOn < startsOn) {
+        throw new BadRequestException('Некорректный период аренды');
+      }
+      schedules = body.schedules;
+      occurrences = generateWeeklyOccurrences(
+        startsOn,
+        occurrenceEndsOn,
+        schedules,
+        timezoneOffsetMin,
+      );
+    }
+
+    const isCommercial = body.usageType === PremiseUsageType.commercial;
+    if (
+      isCommercial &&
+      body.recurrenceType === PremiseRecurrenceType.weekly &&
+      (body.monthlyAmountRub === undefined || body.paymentDueDay === undefined)
+    ) {
+      throw new BadRequestException(
+        'Для регулярной аренды укажите месячную сумму и день оплаты',
+      );
+    }
+    if (
+      isCommercial &&
+      body.recurrenceType === PremiseRecurrenceType.once &&
+      body.amountRub === undefined
+    ) {
+      throw new BadRequestException('Укажите стоимость разовой аренды');
+    }
+    if (
+      requestedAgreement &&
+      (!body.landlordName?.trim() || !body.tenantName?.trim())
+    ) {
+      throw new BadRequestException(
+        'Для договора укажите арендодателя и арендатора',
+      );
+    }
+
+    const conflicts = await this.findRentalConflicts(premiseId, occurrences);
+    if (conflicts.length > 0) {
+      const conflict = conflicts[0];
+      throw new ConflictException(
+        `Бронь пересекается со слотом «${conflict.title}»`,
+      );
+    }
+
+    const rentalStatus = requestedAgreement
+      ? PremiseRentalStatus.pending
+      : access.canManage
+        ? PremiseRentalStatus.active
+        : PremiseRentalStatus.pending;
+    const slotStatus =
+      rentalStatus === PremiseRentalStatus.active
+        ? PremiseSlotStatus.confirmed
+        : PremiseSlotStatus.pending;
+    const monthlyPayments =
+      isCommercial &&
+      body.recurrenceType === PremiseRecurrenceType.weekly &&
+      occurrenceEndsOn &&
+      body.monthlyAmountRub !== undefined &&
+      body.paymentDueDay !== undefined
+        ? generateMonthlyPayments(
+            startsOn,
+            occurrenceEndsOn,
+            body.monthlyAmountRub,
+            body.paymentDueDay,
+          )
+        : [];
+    const agreementNumber = `П-${new Date().getUTCFullYear()}-${Date.now()
+      .toString(36)
+      .toUpperCase()}`;
+    const termsSnapshot = {
+      premiseId,
+      usageType: body.usageType,
+      recurrenceType: body.recurrenceType,
+      title,
+      purpose: body.purpose?.trim() || null,
+      startsOn: startsOn.toISOString(),
+      endsOn: endsOn?.toISOString() ?? null,
+      indefinite: body.indefinite === true,
+      schedules,
+      amountRub: body.amountRub ?? null,
+      monthlyAmountRub: body.monthlyAmountRub ?? null,
+      paymentDueDay: body.paymentDueDay ?? null,
+      contactEmail,
+      contactName: body.contactName?.trim() || null,
+      contactPhone: body.contactPhone?.trim() || null,
+    };
+    const agreementTerms = JSON.parse(
+      JSON.stringify(termsSnapshot),
+    ) as Prisma.InputJsonValue;
+
+    const rental = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.premiseRental.create({
+        data: {
+          premiseId,
+          usageType: body.usageType,
+          recurrenceType: body.recurrenceType,
+          title,
+          purpose: body.purpose?.trim() || null,
+          rentalNotes: body.rentalNotes?.trim() || null,
+          contactEmail,
+          contactName: body.contactName?.trim() || null,
+          contactPhone: body.contactPhone?.trim() || null,
+          startsOn,
+          endsOn,
+          timezoneOffsetMin,
+          monthlyAmountKopecks:
+            body.monthlyAmountRub === undefined
+              ? null
+              : rubToKopecks(body.monthlyAmountRub),
+          paymentDueDay: body.paymentDueDay ?? null,
+          agreementRequested: requestedAgreement,
+          status: rentalStatus,
+          createdByEmail: email,
+          schedules: schedules.length ? { create: schedules } : undefined,
+          payments: monthlyPayments.length
+            ? { create: monthlyPayments }
+            : undefined,
+          agreement: requestedAgreement
+            ? {
+                create: {
+                  number: agreementNumber,
+                  status: PremiseAgreementStatus.draft,
+                  landlordName: body.landlordName!.trim(),
+                  landlordDetails: body.landlordDetails?.trim() || null,
+                  tenantName: body.tenantName!.trim(),
+                  tenantDetails: body.tenantDetails?.trim() || null,
+                  termsSnapshot: agreementTerms,
+                },
+              }
+            : undefined,
+        },
+      });
+
+      await tx.premiseSlot.createMany({
+        data: occurrences.map((occurrence) => ({
+          premiseId,
+          rentalId: created.id,
+          startsAt: occurrence.startsAt,
+          durationMin: occurrence.durationMin,
+          title,
+          purpose: body.purpose?.trim() || null,
+          rentalNotes: body.rentalNotes?.trim() || null,
+          rentalAmountKopecks:
+            body.recurrenceType === PremiseRecurrenceType.once &&
+            body.amountRub !== undefined
+              ? rubToKopecks(body.amountRub)
+              : null,
+          contactEmail,
+          contactName: body.contactName?.trim() || null,
+          contactPhone: body.contactPhone?.trim() || null,
+          status: slotStatus,
+          createdByEmail: email,
+        })),
+      });
+
+      return tx.premiseRental.findUniqueOrThrow({
+        where: { id: created.id },
+        select: rentalSelect,
+      });
+    });
+
+    return serializeRental(rental);
+  }
+
+  async updateRentalStatus(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+    body: UpdatePremiseRentalStatusDto,
+  ) {
+    const access = await this.resolveAccess(userId, userEmail, premiseId);
+    this.assertCanManage(access);
+    const rental = await this.prisma.premiseRental.findFirst({
+      where: { id: rentalId, premiseId },
+      select: {
+        id: true,
+        agreementRequested: true,
+        agreement: { select: { status: true } },
+      },
+    });
+    if (!rental) throw new NotFoundException('Rental not found');
+    if (
+      body.status === 'active' &&
+      rental.agreementRequested &&
+      rental.agreement?.status !== PremiseAgreementStatus.active
+    ) {
+      throw new BadRequestException('Сначала загрузите подписанный договор');
+    }
+    const rentalStatus =
+      body.status === 'active'
+        ? PremiseRentalStatus.active
+        : PremiseRentalStatus.cancelled;
+    const slotStatus =
+      body.status === 'active'
+        ? PremiseSlotStatus.confirmed
+        : PremiseSlotStatus.cancelled;
+    await this.prisma.$transaction([
+      this.prisma.premiseRental.update({
+        where: { id: rentalId },
+        data: { status: rentalStatus },
+      }),
+      this.prisma.premiseSlot.updateMany({
+        where: { rentalId },
+        data: { status: slotStatus },
+      }),
+    ]);
+    return this.getRental(userId, userEmail, premiseId, rentalId);
+  }
+
+  async updateRentalPayment(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+    paymentId: string,
+    body: UpdatePremiseRentalPaymentDto,
+  ) {
+    const access = await this.resolveAccess(userId, userEmail, premiseId);
+    this.assertCanManage(access);
+    const payment = await this.prisma.premiseRentalPayment.findFirst({
+      where: {
+        id: paymentId,
+        rentalId,
+        rental: { premiseId },
+      },
+      select: { id: true },
+    });
+    if (!payment) throw new NotFoundException('Payment not found');
+    await this.prisma.premiseRentalPayment.update({
+      where: { id: paymentId },
+      data: {
+        status: body.status,
+        paidAt: body.status === 'paid' ? new Date() : null,
+      },
+    });
+    return this.getRental(userId, userEmail, premiseId, rentalId);
+  }
+
+  async generateRentalAgreement(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+  ) {
+    const access = await this.resolveAccess(userId, userEmail, premiseId);
+    const rental = await this.prisma.premiseRental.findFirst({
+      where: { id: rentalId, premiseId },
+      include: {
+        premise: { select: { name: true, address: true } },
+        schedules: { orderBy: { weekday: 'asc' } },
+        slots: { orderBy: { startsAt: 'asc' }, take: 1 },
+        agreement: true,
+      },
+    });
+    if (!rental?.agreement) {
+      throw new NotFoundException('Agreement not found');
+    }
+    if (!this.canEditRental(access, userEmail, rental)) {
+      throw new ForbiddenException('Недостаточно прав для договора');
+    }
+
+    const weekdayLabels = [
+      'Воскресенье',
+      'Понедельник',
+      'Вторник',
+      'Среда',
+      'Четверг',
+      'Пятница',
+      'Суббота',
+    ];
+    const scheduleLines =
+      rental.recurrenceType === PremiseRecurrenceType.weekly
+        ? rental.schedules.map((schedule) => {
+            const startHours = Math.floor(schedule.startsAtMin / 60);
+            const startMinutes = schedule.startsAtMin % 60;
+            const endMinutes = schedule.startsAtMin + schedule.durationMin;
+            const endHoursValue = Math.floor(endMinutes / 60);
+            const endMinutesValue = endMinutes % 60;
+            const startLabel = `${String(startHours).padStart(2, '0')}:${String(
+              startMinutes,
+            ).padStart(2, '0')}`;
+            const endLabel = `${String(endHoursValue).padStart(2, '0')}:${String(
+              endMinutesValue,
+            ).padStart(2, '0')}`;
+            return `${weekdayLabels[schedule.weekday]}: ${startLabel}–${endLabel}`;
+          })
+        : rental.slots[0]
+          ? [
+              `Дата и время: ${rental.slots[0].startsAt.toLocaleString(
+                'ru-RU',
+                {
+                  timeZone: 'UTC',
+                },
+              )}, ${rental.slots[0].durationMin} мин.`,
+            ]
+          : [];
+    const amountLabel =
+      rental.monthlyAmountKopecks != null
+        ? `${(rental.monthlyAmountKopecks / 100).toLocaleString('ru-RU')} ₽ в месяц`
+        : rental.slots[0]?.rentalAmountKopecks != null
+          ? `${(rental.slots[0].rentalAmountKopecks / 100).toLocaleString('ru-RU')} ₽`
+          : null;
+    const buffer = await this.agreementDocuments.generatePdf({
+      agreementNumber: rental.agreement.number,
+      premiseName: rental.premise.name,
+      premiseAddress: rental.premise.address,
+      landlordName: rental.agreement.landlordName,
+      landlordDetails: rental.agreement.landlordDetails,
+      tenantName: rental.agreement.tenantName,
+      tenantDetails: rental.agreement.tenantDetails,
+      title: rental.title,
+      startsOn: rental.startsOn,
+      endsOn: rental.endsOn,
+      recurrenceLabel:
+        rental.recurrenceType === PremiseRecurrenceType.weekly
+          ? rental.endsOn
+            ? 'регулярная'
+            : 'регулярная бессрочная'
+          : 'разовая',
+      scheduleLines,
+      amountLabel,
+      paymentDueDay: rental.paymentDueDay,
+    });
+    const fileName = `agreement-${rental.agreement.number}.pdf`;
+    const stored = await this.agreementDocuments.storePdf({
+      agreementId: rental.agreement.id,
+      kind: 'generated',
+      fileName,
+      buffer,
+    });
+    await this.prisma.$transaction([
+      this.prisma.premiseRentalAgreementDocument.create({
+        data: {
+          agreementId: rental.agreement.id,
+          kind: 'generated',
+          fileName,
+          storageKey: stored.key,
+          mimeType: 'application/pdf',
+          sizeBytes: buffer.length,
+        },
+      }),
+      this.prisma.premiseRentalAgreement.update({
+        where: { id: rental.agreement.id },
+        data: { status: PremiseAgreementStatus.awaiting_signature },
+      }),
+    ]);
+    return this.getRental(userId, userEmail, premiseId, rentalId);
+  }
+
+  async uploadRentalAgreementDocument(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+    kind: 'uploaded' | 'signed',
+    file: {
+      originalname: string;
+      mimetype: string;
+      size: number;
+      buffer: Buffer;
+    },
+  ) {
+    const access = await this.resolveAccess(userId, userEmail, premiseId);
+    const rental = await this.prisma.premiseRental.findFirst({
+      where: { id: rentalId, premiseId },
+      select: {
+        id: true,
+        createdByEmail: true,
+        contactEmail: true,
+        agreement: { select: { id: true } },
+      },
+    });
+    if (!rental?.agreement) {
+      throw new NotFoundException('Agreement not found');
+    }
+    if (!this.canEditRental(access, userEmail, rental)) {
+      throw new ForbiddenException('Недостаточно прав для договора');
+    }
+    const isPdf =
+      file.mimetype === 'application/pdf' ||
+      file.originalname.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      throw new BadRequestException('Разрешены только PDF-документы');
+    }
+    const stored = await this.agreementDocuments.storePdf({
+      agreementId: rental.agreement.id,
+      kind,
+      fileName: file.originalname,
+      buffer: file.buffer,
+    });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.premiseRentalAgreementDocument.create({
+        data: {
+          agreementId: rental.agreement!.id,
+          kind,
+          fileName: file.originalname,
+          storageKey: stored.key,
+          mimeType: 'application/pdf',
+          sizeBytes: file.size,
+        },
+      });
+      if (kind === 'signed') {
+        await tx.premiseRentalAgreement.update({
+          where: { id: rental.agreement!.id },
+          data: {
+            status: PremiseAgreementStatus.active,
+            signedAt: new Date(),
+          },
+        });
+        await tx.premiseRental.update({
+          where: { id: rental.id },
+          data: { status: PremiseRentalStatus.active },
+        });
+        await tx.premiseSlot.updateMany({
+          where: { rentalId: rental.id, status: PremiseSlotStatus.pending },
+          data: { status: PremiseSlotStatus.confirmed },
+        });
+      } else {
+        await tx.premiseRentalAgreement.update({
+          where: { id: rental.agreement!.id },
+          data: { status: PremiseAgreementStatus.awaiting_signature },
+        });
+      }
+    });
+    return this.getRental(userId, userEmail, premiseId, rentalId);
+  }
+
+  async getRentalAgreementDocument(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+    documentId: string,
+  ) {
+    await this.resolveAccess(userId, userEmail, premiseId);
+    const document = await this.prisma.premiseRentalAgreementDocument.findFirst(
+      {
+        where: {
+          id: documentId,
+          agreement: { rentalId, rental: { premiseId } },
+        },
+      },
+    );
+    if (!document) throw new NotFoundException('Document not found');
+    const object = await this.agreementDocuments.getObjectStream(
+      document.storageKey,
+    );
+    return { document, object };
   }
 
   async listSlots(

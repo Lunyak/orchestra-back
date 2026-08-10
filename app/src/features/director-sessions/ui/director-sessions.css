@@ -6,7 +6,11 @@
 .organizations-page,
 .project-overview,
 .theater-overview,
-.global-dashboard {
+.global-dashboard,
+.actor-page,
+.actor-settings-modal,
+.actor-scene-picker-modal,
+.voice-settings-modal {
   --sessions-bg: #111;
   --sessions-bg-deep: #0a0a0a;
   --sessions-panel: #1b1b1b;

@@ -7,7 +7,7 @@ import type {
 } from "../../../sync/api/premises";
 
 export function premiseKindLabel(kind: PremiseKind): string {
-  return kind === "OWNED" ? "Своё (сдаём)" : "Снимаем";
+  return kind === "OWNED" ? "Своё" : "Снимаем";
 }
 
 export function premiseMemberRoleLabel(role: PremiseMemberRole): string {

@@ -1,13 +1,17 @@
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
-  Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { PremiseKind } from '@prisma/client';
+import { PremiseAvailabilityDayDto } from './premise-availability-day.dto';
 
 export class CreatePremiseDto {
   @IsString()
@@ -37,10 +41,11 @@ export class CreatePremiseDto {
   capacity?: number;
 
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(31)
-  paymentDueDay?: number;
+  @IsArray()
+  @ArrayMaxSize(7)
+  @ValidateNested({ each: true })
+  @Type(() => PremiseAvailabilityDayDto)
+  weeklyAvailability?: PremiseAvailabilityDayDto[];
 
   @IsOptional()
   @IsString()
