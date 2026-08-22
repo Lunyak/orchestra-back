@@ -173,6 +173,14 @@ export async function scanProjectMediaFolder(projectSlug: string): Promise<Proje
   if (stored.path) {
     const dev = await fetchDevScannedMedia(stored.path);
     if (dev.ok) return toScanResult(dev, "vite");
+    // Explicit folder is set — don't fire a second scan-media against the default root.
+    return {
+      ok: false,
+      source: "vite",
+      videos: [],
+      holdImages: [],
+      error: dev.error ?? "Не удалось прочитать папку с медиа",
+    };
   }
 
   const devDefault = await fetchDevScannedMedia();

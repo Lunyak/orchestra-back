@@ -1,6 +1,8 @@
 export {
   premiseKindLabel,
   premiseMemberRoleLabel,
+  premiseBookedAsKindLabel,
+  slotBookedAs,
   slotStatusLabel,
   isoDate,
   monthKey,
@@ -10,7 +12,11 @@ export {
   monthRangeIso,
   toDatetimeLocalValue,
   fromDatetimeLocalValue,
+  decodeUploadedFileName,
+  agreementDocumentKindLabel,
 } from "./model/premise-utils";
+
+export { BookedAsBadge } from "./ui/BookedAsBadge";
 
 export {
   useListPremisesQuery,
@@ -21,6 +27,7 @@ export {
   useListPremiseRentalsQuery,
   useGetPremiseRentalQuery,
   useCreatePremiseRentalMutation,
+  useCreatePremiseRentalAgreementMutation,
   useGeneratePremiseRentalAgreementMutation,
   useUpdatePremiseRentalPaymentMutation,
   useUpdatePremiseRentalStatusMutation,

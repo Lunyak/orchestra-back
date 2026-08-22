@@ -1,0 +1,88 @@
+.home-chalk-game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.home-chalk-game__status {
+  margin: 0 0 12px;
+  min-height: 1.2em;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(205, 198, 182, 0.82);
+  text-align: center;
+}
+
+.home-chalk-game__board {
+  position: relative;
+  width: min(72vw, 300px);
+  aspect-ratio: 1;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.home-chalk-game__surface {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.home-chalk-game__hits {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.home-chalk-game__cell {
+  position: relative;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.home-chalk-game__cell:disabled {
+  cursor: default;
+}
+
+.home-chalk-game__cell--win::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  z-index: -1;
+  background: radial-gradient(circle at 50% 50%, rgba(0, 251, 255, 0.1), transparent 72%);
+  pointer-events: none;
+}
+
+.home-chalk-game__reset {
+  margin-top: 14px;
+  border: 1px solid rgba(245, 238, 220, 0.35);
+  border-radius: 0;
+  background: transparent;
+  color: var(--chalk-dim);
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition), text-shadow var(--transition);
+}
+
+.home-chalk-game__reset:hover,
+.home-chalk-game__reset:focus-visible {
+  color: var(--chalk-neon);
+  border-color: var(--chalk-neon);
+  text-shadow: 0 0 10px rgba(0, 251, 255, 0.4);
+}

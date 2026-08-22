@@ -64,7 +64,7 @@ function createFloorGridTexture() {
     ctx.lineTo(size, i);
     ctx.stroke();
   }
-  ctx.strokeStyle = "rgba(184,53,74,0.35)";
+  ctx.strokeStyle = "rgba(0,251,255,0.35)";
   ctx.strokeRect(2, 2, size - 4, size - 4);
 
   const texture = new CanvasTexture(canvas);
@@ -113,11 +113,11 @@ function ProceduralHall() {
       {/* Orientation strips on walls */}
       <mesh position={[-ROOM_W / 2 + 0.01, 0.2, 0]} rotation={[0, Math.PI / 2, 0]}>
         <planeGeometry args={[ROOM_D, 0.12]} />
-        <meshStandardMaterial color="#b8354a" roughness={0.7} />
+        <meshStandardMaterial color="#00fbff" roughness={0.7} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[ROOM.spawnX, 0.02, ROOM.spawnZ]}>
         <circleGeometry args={[0.4, 28]} />
-        <meshStandardMaterial color="#b8354a" roughness={0.8} transparent opacity={0.7} />
+        <meshStandardMaterial color="#00fbff" roughness={0.8} transparent opacity={0.7} />
       </mesh>
     </group>
   );

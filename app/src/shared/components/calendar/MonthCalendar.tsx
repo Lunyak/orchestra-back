@@ -147,7 +147,7 @@ export function MonthCalendar({
           className="month-cal__nav-btn"
           onClick={() => onChangeMonth(addMonths(currentMonth, -1))}
         >
-          ← Назад
+          ←
         </button>
         <div className="month-cal__month-wrap" ref={monthPickerRef}>
           <button
@@ -218,7 +218,7 @@ export function MonthCalendar({
           className="month-cal__nav-btn"
           onClick={() => onChangeMonth(addMonths(currentMonth, 1))}
         >
-          Вперед →
+          →
         </button>
       </div>
 

@@ -26,6 +26,11 @@ import { useShowScriptKadrLayout } from "../hooks/useShowScriptKadrLayout";
 import { useShowScriptMarkdownAnnotations } from "../hooks/useShowScriptMarkdownAnnotations";
 import { useShowScriptMarkdownInsert } from "../hooks/useShowScriptMarkdownInsert";
 import { useShowScriptSceneComment } from "../hooks/useShowScriptSceneComment";
+import { AppEditorScriptAnnotationsToggle, AppEditorScriptModeToggle, AppEditorScriptPlayOriginalToggle, AppEditorScriptSceneTitle } from "../../app-editor-menubar";
+import {
+  SpectacleTechChromePortal,
+  useSpectacleTechChromeCenterTarget,
+} from "../../../../features/spectacle/ui/spectacle-tech-chrome-slots";
 
 const ScriptMarkdownCodemirrorLazy = lazy(() =>
   import("./ScriptMarkdownCodemirror").then((m) => ({ default: m.ScriptMarkdownCodemirror })),
@@ -96,6 +101,7 @@ export function ShowScriptMarkdownSection({
   const lightChannels = ui.lightChannels;
 
   const { isEditing, toggleEditing } = useScriptUI();
+  const directionSwitchCenter = useSpectacleTechChromeCenterTarget();
 
   const { currentScene, activeMarkdownField, activeMarkdown, activeField } = useAppSelector(
     (s) => selectActiveSceneMarkdownContext(s, projectSlug, sceneName),
@@ -246,11 +252,6 @@ export function ShowScriptMarkdownSection({
         onRoleLabelClick: handleRoleLabelClick,
         onChange: (next: string) => updateSceneField(currentScene.id, activeMarkdownField, next),
         onClipboardImagePaste: handleClipboardImagePaste,
-        sceneTitle: currentScene.title ?? "",
-        sceneTitleEditing: isEditing,
-        onSceneTitleChange: handleSceneTitleChange,
-        isModeEditing: isEditing,
-        onToggleModeEditing: toggleEditing,
         placeholder:
           markdownMode === "play"
             ? "Текст пьесы для этой сцены"
@@ -264,14 +265,90 @@ export function ShowScriptMarkdownSection({
     ? `md-${currentScene.id}-${String(activeMarkdownField)}`
     : null;
 
+  const titleInDirectionSwitch = Boolean(directionSwitchCenter);
+
+  const toggleAnnotationsMode = useCallback(() => {
+    if (isEditing) return;
+    dispatch(
+      showScriptMarkdownActions.setAnnotationsMode({
+        projectSlug,
+        sceneName,
+        enabled: !annotationsMode,
+      }),
+    );
+  }, [annotationsMode, dispatch, isEditing, projectSlug, sceneName]);
+
+  const annotationsToggle =
+    currentScene && markdownMode !== "comments" ? (
+      <AppEditorScriptAnnotationsToggle
+        className="script-annotations-toggle--dock"
+        annotationsMode={annotationsMode}
+        onToggle={toggleAnnotationsMode}
+        disabled={isEditing}
+      />
+    ) : null;
+
+  const playOriginalToggle =
+    currentScene && markdownMode === "play" ? (
+      <AppEditorScriptPlayOriginalToggle
+        className="script-play-original-toggle--dock"
+        playOriginalMode={ui.playOriginalMode}
+        onToggle={togglePlayOriginalMode}
+      />
+    ) : null;
+
+  const belowModeStack =
+    !titleInDirectionSwitch && (annotationsToggle || playOriginalToggle) ? (
+      <div className="script-scene-title-below-mode">
+        {annotationsToggle}
+        {playOriginalToggle}
+      </div>
+    ) : null;
+
+  const sceneTitleNode =
+    currentScene && markdownMode !== "comments" ? (
+      <AppEditorScriptSceneTitle
+        title={currentScene.title ?? ""}
+        titleEditable={isEditing}
+        onTitleChange={handleSceneTitleChange}
+        isModeEditing={isEditing}
+        onToggleModeEditing={toggleEditing}
+        showModeToggle={!titleInDirectionSwitch}
+        belowModeToggle={belowModeStack}
+      />
+    ) : null;
+
+  const sceneTitleInline =
+    sceneTitleNode && !titleInDirectionSwitch ? (
+      <div className="script-scene-title-mount">{sceneTitleNode}</div>
+    ) : null;
+
+  const editModeToggleDock =
+    currentScene && markdownMode !== "comments" && titleInDirectionSwitch ? (
+      <AppEditorScriptModeToggle
+        className="script-scene-title-mode-btn--in-dock"
+        isModeEditing={isEditing}
+        onToggleModeEditing={toggleEditing}
+      />
+    ) : null;
+
+  const scriptChromeDock =
+    titleInDirectionSwitch &&
+    (editModeToggleDock || annotationsToggle || playOriginalToggle) ? (
+      <div className="script-scene-chrome-dock">
+        {editModeToggleDock}
+        {annotationsToggle}
+        {playOriginalToggle}
+      </div>
+    ) : null;
+
   const markdownPane = currentScene ? (
     <div className="script-markdown-pane" data-markdown-mode={markdownMode}>
+      {scriptChromeDock}
       {inlineMarkdownTabs ? (
         <ScriptMarkdownToolbar
           markdownMode={markdownMode}
           showTabs={inlineMarkdownTabs}
-          playOriginalMode={ui.playOriginalMode}
-          onTogglePlayOriginal={togglePlayOriginalMode}
           onSetMarkdownMode={(mode) => {
             try {
               if (typeof window !== "undefined") {
@@ -293,6 +370,8 @@ export function ShowScriptMarkdownSection({
           }}
         />
       ) : null}
+
+      {sceneTitleInline}
 
       {markdownMode === "comments" ? (
         <div className="script-scene-comment-pane">
@@ -340,10 +419,7 @@ export function ShowScriptMarkdownSection({
                 Текст сцены
               </label>
               {lazyScriptBody ? (
-                <Suspense
-                  key={`${markdownMode}-ed`}
-                  fallback={<div className="script-markdown-body-fallback">Загрузка редактора…</div>}
-                >
+                <Suspense key={`${markdownMode}-ed`} fallback={null}>
                   {markdownEditorProps && markdownEditorKey ? (
                     <ScriptMarkdownCodemirrorLazy key={markdownEditorKey} {...markdownEditorProps} />
                   ) : null}
@@ -364,16 +440,11 @@ export function ShowScriptMarkdownSection({
             .join(" ")}
         >
           {lazyScriptBody ? (
-            <Suspense
-              key={`${markdownMode}-ro`}
-              fallback={<div className="script-markdown-body-fallback">Загрузка превью…</div>}
-            >
+            <Suspense key={`${markdownMode}-ro`} fallback={null}>
               <ScriptMarkdownPreviewLazy
                 projectName={projectSlug}
                 sceneName={sceneName}
-                showSceneTitle
-                isModeEditing={isEditing}
-                onToggleModeEditing={toggleEditing}
+                showSceneTitle={false}
                 onTrackLinkClick={onTrackLinkClick}
                 onSoundLinkClick={onSoundLinkClick}
                 newAnnotation={newAnnotation}
@@ -389,9 +460,7 @@ export function ShowScriptMarkdownSection({
             <ScriptMarkdownPreview
               projectName={projectSlug}
               sceneName={sceneName}
-              showSceneTitle
-              isModeEditing={isEditing}
-              onToggleModeEditing={toggleEditing}
+              showSceneTitle={false}
               onTrackLinkClick={onTrackLinkClick}
               onSoundLinkClick={onSoundLinkClick}
               newAnnotation={newAnnotation}
@@ -410,6 +479,7 @@ export function ShowScriptMarkdownSection({
 
   return (
     <>
+      <SpectacleTechChromePortal center={sceneTitleNode} />
       {renderBody ? renderBody({ markdownPane, currentScene }) : markdownPane}
       <ScriptEditorInsertContextMenu
         open={insertMenu != null}

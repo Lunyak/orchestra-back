@@ -1,10 +1,9 @@
-import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import { usePageBootBlock } from "@shared/components/page-loader/page-boot";
 import cn from "classnames";
-import React, { Suspense } from "react";
+import React, { Suspense, useLayoutEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { projectPath } from "../../../app/router/paths";
 import "./style.css";
-import { HeaderPlayer } from "../../../shared/components/header/HeaderPlayer";
 import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/PlaylistSidebar";
 import { ScriptScenesSidebar } from "../../../shared/components/script-scenes-sidebar/ScriptScenesSidebar";
 import { OfflinePackStatus } from "../../../shared/components/offline/OfflinePackStatus";
@@ -17,34 +16,54 @@ import {
 import { SpectacleDirectionSwitch } from "./SpectacleDirectionSwitch";
 import { SpectacleTechChromeSlotsProvider } from "./spectacle-tech-chrome-slots";
 
-const LightPlotPage = React.lazy(() =>
+const loadLightPlotPage = () =>
   import("../../../shared/components/light-plot/LightPlotPage").then((m) => ({
     default: m.LightPlotPage,
-  })),
-);
-const NotesRunPageSection = React.lazy(() =>
+  }));
+const loadNotesRunPageSection = () =>
   import("../../notes-run/ui/NotesRunPageSection").then((m) => ({
     default: m.NotesRunPageSection,
-  })),
-);
-const ProjectMediaPageSection = React.lazy(() =>
+  }));
+const loadProjectMediaPageSection = () =>
   import("../../project-media/ui/ProjectMediaPageSection").then((m) => ({
     default: m.ProjectMediaPageSection,
-  })),
-);
-const ShowScript = React.lazy(() =>
+  }));
+const loadShowScript = () =>
   import("../../../shared/components/show-script/ShowScript").then((m) => ({
     default: m.ShowScript,
-  })),
-);
-const TheaterScene = React.lazy(() =>
-  import("../../theater").then((m) => ({ default: m.TheaterScene })),
-);
-const KanbanBoardPage = React.lazy(() =>
+  }));
+const loadTheaterScene = () =>
+  import("../../theater").then((m) => ({ default: m.TheaterScene }));
+const loadKanbanBoardPage = () =>
   import("../../../shared/components/kanban/KanbanBoardPage").then((m) => ({
     default: m.KanbanBoardPage,
-  })),
-);
+  }));
+
+const LightPlotPage = React.lazy(loadLightPlotPage);
+const NotesRunPageSection = React.lazy(loadNotesRunPageSection);
+const ProjectMediaPageSection = React.lazy(loadProjectMediaPageSection);
+const ShowScript = React.lazy(loadShowScript);
+const TheaterScene = React.lazy(loadTheaterScene);
+const KanbanBoardPage = React.lazy(loadKanbanBoardPage);
+
+const LAZY_VIEW_PRELOADERS: Record<string, () => Promise<unknown>> = {
+  theater: loadTheaterScene,
+  "light-plot": loadLightPlotPage,
+  sufer: loadNotesRunPageSection,
+  media: loadProjectMediaPageSection,
+  script: loadShowScript,
+  board: loadKanbanBoardPage,
+};
+
+const LAZY_BOOT_LABELS: Record<string, string> = {
+  theater: "Загрузка 3D театра…",
+  "light-plot": "Загрузка спектакля…",
+  sufer: "Загрузка суфлера…",
+  media: "Загрузка медиа…",
+  script: "Загрузка сценария…",
+  board: "Загрузка репетиций…",
+  tasks: "Загрузка задач…",
+};
 
 export type { SpectaclePageViewModel } from "../model/useSpectaclePage";
 export { useSpectaclePage } from "../model/useSpectaclePage";
@@ -68,11 +87,8 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     mobilePlaylistOpen,
     mobileScenesOpen,
     projectName,
-    pushPlaybookAfterSoundsSave,
     registerPlaylistPlay,
-    registerSoundToggle,
     reorderScenes,
-    playbookData,
     setCurrentPage,
     setIsEditing,
     setIsScenesCollapsed,
@@ -83,7 +99,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     setTheaterLayout,
     shouldShowScenesSidebar,
     shouldSwapPanels,
-    showHeaderSounds,
     showPlaylistSidebar,
     showTheaterControls,
     scenes,
@@ -95,16 +110,59 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     togglePlaylist,
   } = vm;
 
-  if (!isProjectsLoaded) {
-    return (
-      <PageLoader
-        variant="spectacle"
-        showLeftSidebar
-        showRightSidebar
-        showTopBar
-        label="Загрузка проектов…"
-      />
+  const [lazyViewReady, setLazyViewReady] = useState(false);
+  const lazyViewKey = `${projectName}:${activeView}`;
+  const lazyPreloader = LAZY_VIEW_PRELOADERS[activeView];
+  const lazyViewNeedsBoot = Boolean(lazyPreloader) || activeView === "tasks";
+
+  useLayoutEffect(() => {
+    if (!projectName || !lazyViewNeedsBoot) {
+      setLazyViewReady(true);
+      return;
+    }
+
+    if (!isPlaybookReady) {
+      setLazyViewReady(false);
+      return;
+    }
+
+    setLazyViewReady(false);
+    let cancelled = false;
+
+    const preload =
+      lazyPreloader != null ? lazyPreloader() : Promise.resolve();
+
+    void preload.then(
+      () => {
+        if (!cancelled) setLazyViewReady(true);
+      },
+      () => {
+        if (!cancelled) setLazyViewReady(true);
+      },
     );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPlaybookReady, lazyPreloader, lazyViewKey, lazyViewNeedsBoot, projectName]);
+
+  const bootLabel = !isProjectsLoaded
+    ? "Загрузка проектов…"
+    : !projectName
+      ? "Загрузка…"
+      : !isPlaybookReady
+        ? "Загрузка сцены…"
+        : (LAZY_BOOT_LABELS[activeView] ?? "Загрузка страницы…");
+
+  const pageBooting =
+    !isProjectsLoaded ||
+    (Boolean(projectName) && !isPlaybookReady) ||
+    (Boolean(projectName) && isPlaybookReady && lazyViewNeedsBoot && !lazyViewReady);
+
+  usePageBootBlock(pageBooting, bootLabel);
+
+  if (!isProjectsLoaded) {
+    return null;
   }
 
   if (!projectName) {
@@ -126,15 +184,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   const projectDisplay = projectName;
 
   if (!isPlaybookReady) {
-    return (
-      <PageLoader
-        variant="spectacle"
-        showLeftSidebar={isMobile ? mobilePlaylistOpen : showPlaylistSidebar}
-        showRightSidebar={isMobile ? mobileScenesOpen : !isScenesCollapsed}
-        showTopBar={showHeaderSounds}
-        label="Загрузка сцены…"
-      />
-    );
+    return null;
   }
 
   const forceHidePlaylistPanel =
@@ -164,7 +214,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
       <PlaylistSidebar
         projectName={projectDisplay}
         sceneName="script"
-        mode="list"
+        mode="full"
         onRegisterPlayHandler={registerPlaylistPlay}
       />
     </div>
@@ -254,38 +304,25 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     ) : null;
 
   return (
-    <div className="app-layout">
-      {isTheaterView ? (
-        <>
-          {playlistNode}
-        </>
-      ) : (
-        playlistNode
+    <div
+      className={cn(
+        "app-layout",
+        !isMobile &&
+          activeView === "script" &&
+          !compactMainChrome &&
+          "app-layout--docks-cluster",
       )}
+    >
+      {isTheaterView ? <>{playlistNode}</> : playlistNode}
       <div className="app-content">
         <SpectacleTechChromeSlotsProvider>
         {showModeSwitch ? <SpectacleDirectionSwitch /> : null}
         <OfflinePackStatus />
-        {showHeaderSounds && !compactMainChrome && !isMobile && (
-          <div className="sounds-bar">
-            <HeaderPlayer
-              projectName={projectDisplay}
-              sceneName="script"
-              sounds={playbookData?.sounds || []}
-              onSoundsSaved={pushPlaybookAfterSoundsSave}
-              onRegisterToggleHandler={registerSoundToggle}
-            />
-          </div>
-        )}
         <main
           className={cn("main-content", MAIN_CONTENT_VIEW_MODIFIERS[activeView])}
         >
           {activeView === "theater" && (
-            <Suspense
-              fallback={
-                <PageLoader variant="view" label="Загрузка 3D театра…" />
-              }
-            >
+            <Suspense fallback={null}>
               <TheaterScene
                 projectName={projectDisplay}
                 theaterLayout={theaterLayout}
@@ -300,38 +337,32 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
             </Suspense>
           )}
           {activeView === "light-plot" && (
-            <Suspense
-              fallback={<PageLoader variant="view" label="Загрузка спектакля…" />}
-            >
+            <Suspense fallback={null}>
               <LightPlotPage />
             </Suspense>
           )}
           {activeView === "sufer" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка суфлера…" />}>
+            <Suspense fallback={null}>
               <NotesRunPageSection />
             </Suspense>
           )}
           {activeView === "media" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка медиа…" />}>
+            <Suspense fallback={null}>
               <ProjectMediaPageSection />
             </Suspense>
           )}
           {activeView === "script" && (
-            <Suspense
-              fallback={
-                <PageLoader variant="view" label="Загрузка сценария…" />
-              }
-            >
+            <Suspense fallback={null}>
               <ShowScript />
             </Suspense>
           )}
           {activeView === "board" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка репетиций…" />}>
+            <Suspense fallback={null}>
               <KanbanBoardPage members={kanbanMembers} />
             </Suspense>
           )}
           {activeView === "tasks" && (
-            <Suspense fallback={<PageLoader variant="view" label="Загрузка задач…" />}>
+            <Suspense fallback={null}>
               <Outlet />
             </Suspense>
           )}

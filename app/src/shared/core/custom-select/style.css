@@ -52,6 +52,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
+
+  position: relative;
+  top: 2px;
 }
 
 .custom-select__chevron {
@@ -82,7 +85,7 @@
 .custom-select__dropdown-container--portal {
   position: fixed;
   right: auto;
-  z-index: 1200;
+  z-index: calc(var(--z-index-modal, 1200) + 20);
 }
 
 .custom-select__search-container {

@@ -23,7 +23,6 @@ import {
   projectPath,
 } from "../../../app/router/paths";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
-import { SpectacleScriptFormattingHost } from "./SpectacleScriptFormattingHost";
 import {
   SpectacleTechChromeCenterSlot,
   SpectacleTechChromeLeftSlot,
@@ -252,6 +251,7 @@ export function SpectacleDirectionSwitch() {
   const showTasksModes = activeSection === "tasks";
   const showSuferChrome = activeSection === "sufer";
   const showTechChrome = showTechModes || showSuferChrome;
+  const showCenterChrome = showTechChrome || showScriptModes;
 
   if (!showScriptModes && !showTechChrome && !showPlanModes) {
     return null;
@@ -265,16 +265,15 @@ export function SpectacleDirectionSwitch() {
     <nav
       className={cn(
         "spectacle-direction-switch",
-        showTechChrome && "spectacle-direction-switch--tech",
+        showCenterChrome && "spectacle-direction-switch--centered",
       )}
       aria-label={ariaLabel}
     >
       <div className="spectacle-direction-switch__left">
-        {showScriptModes ? <SpectacleScriptFormattingHost /> : null}
         {showTechChrome ? <SpectacleTechChromeLeftSlot /> : null}
         {showTasksModes ? <SpectacleTasksModeSwitchList /> : null}
       </div>
-      {showTechChrome ? <SpectacleTechChromeCenterSlot /> : null}
+      {showCenterChrome ? <SpectacleTechChromeCenterSlot /> : null}
       <div className="spectacle-direction-switch__right">
         {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
         {showTechModes ? <SpectacleTechModeSwitchList /> : null}

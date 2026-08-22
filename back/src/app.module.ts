@@ -17,6 +17,7 @@ import { SyncModule } from './sync/sync.module';
 import { UsersModule } from './users/users.module';
 import { TtsModule } from './tts/tts.module';
 import { TelegramBotsModule } from './telegram-bots/telegram-bots.module';
+import { MessengerBotsModule } from './messenger-bots/messenger-bots.module';
 import { TroupeModule } from './troupe/troupe.module';
 import { RolesModule } from './roles/roles.module';
 import { SiteAnalyticsModule } from './site-analytics/site-analytics.module';
@@ -47,6 +48,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     BotModule,
     TtsModule,
     TelegramBotsModule,
+    MessengerBotsModule,
     TroupeModule,
     RolesModule,
     SiteAnalyticsModule,

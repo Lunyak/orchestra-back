@@ -1,12 +1,9 @@
 import { MenubarPanelIcon } from "./MenubarPanelIcon";
-import { AppEditorScriptPlayOriginalToggle } from "./AppEditorScriptPlayOriginalToggle";
 
 export type AppEditorScriptModeNavProps = {
   isEditing: boolean;
   annotationsMode: boolean;
   onToggleAnnotations: () => void;
-  playOriginalMode?: boolean;
-  onTogglePlayOriginal?: () => void;
 };
 
 const icons = {
@@ -22,12 +19,7 @@ export function AppEditorScriptModeNav({
   isEditing,
   annotationsMode,
   onToggleAnnotations,
-  playOriginalMode,
-  onTogglePlayOriginal,
 }: AppEditorScriptModeNavProps) {
-  const showPlayOriginalToggle =
-    onTogglePlayOriginal != null && playOriginalMode != null;
-
   return (
     <nav className="app-editor-menubar__mode-nav" aria-label="Режим сценария">
       <button
@@ -58,12 +50,6 @@ export function AppEditorScriptModeNav({
       >
         <MenubarPanelIcon active={annotationsMode}>{icons.annotations}</MenubarPanelIcon>
       </button>
-      {showPlayOriginalToggle ? (
-        <AppEditorScriptPlayOriginalToggle
-          playOriginalMode={playOriginalMode}
-          onToggle={onTogglePlayOriginal}
-        />
-      ) : null}
     </nav>
   );
 }

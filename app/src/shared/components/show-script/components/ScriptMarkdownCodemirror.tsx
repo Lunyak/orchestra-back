@@ -15,10 +15,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
-  useState,
 } from "react";
-import { createPortal } from "react-dom";
-import { AppEditorScriptSceneTitle } from "../../app-editor-menubar";
 import { subscribeScriptFormatSearchHighlight } from "../../app-editor-menubar/script-tokenize-formatting";
 import { markdownHeadingSectionBlocks } from "./markdownHeadingSectionBlocks";
 import { markdownHideKadrAnchors } from "./markdownHideKadrAnchors";
@@ -60,12 +57,6 @@ type Props = {
   kadrSectionBlocks?: boolean;
   /** Вкладка «Текст»: лейблы [[РОЛЬ]] с настройками из settings. */
   playTextMode?: boolean;
-  /** Название сцены — внутри области прокрутки редактора. */
-  sceneTitle?: string;
-  sceneTitleEditing?: boolean;
-  onSceneTitleChange?: (title: string) => void;
-  isModeEditing?: boolean;
-  onToggleModeEditing?: () => void;
 };
 
 export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, Props>(
@@ -84,17 +75,11 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       onRoleLabelClick,
       kadrSectionBlocks = false,
       playTextMode = false,
-      sceneTitle,
-      sceneTitleEditing = false,
-      onSceneTitleChange,
-      isModeEditing = false,
-      onToggleModeEditing,
     },
     ref,
   ) {
     const hostRef = useRef<HTMLDivElement | null>(null);
     const viewRef = useRef<EditorView | null>(null);
-    const [sceneTitleMount, setSceneTitleMount] = useState<HTMLDivElement | null>(null);
     const lightChannelsRef = useRef(lightChannels);
     lightChannelsRef.current = lightChannels;
     const onTrackLinkClickRef = useRef(onTrackLinkClick);
@@ -152,6 +137,7 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
         } finally {
           suppressOnChangeRef.current = false;
         }
+        onChangeRef.current(text);
       },
     }));
 
@@ -211,15 +197,8 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
         dispatchFormatSearchQuery(view, query);
       });
 
-      const sceneTitleEl = document.createElement("div");
-      sceneTitleEl.className = "script-scene-title-mount";
-      view.scrollDOM.insertBefore(sceneTitleEl, view.contentDOM);
-      setSceneTitleMount(sceneTitleEl);
-
       return () => {
         unsubscribeFormatSearch();
-        sceneTitleEl.remove();
-        setSceneTitleMount(null);
         view.destroy();
         viewRef.current = null;
       };
@@ -264,35 +243,12 @@ export const ScriptMarkdownCodemirror = forwardRef<ScriptMarkdownEditorHandle, P
       view.dispatch({ selection: sel });
     }, [imageCtxKey]);
 
-    const showSceneTitle =
-      onToggleModeEditing != null ||
-      sceneTitleEditing ||
-      Boolean(String(sceneTitle ?? "").trim());
-
     return (
-      <>
-        <div
-          ref={hostRef}
-          id={id}
-          className={cn(
-            "script-markdown-cm",
-            className,
-            showSceneTitle && "script-markdown-cm--with-scene-title",
-          )}
-        />
-        {sceneTitleMount && showSceneTitle && onToggleModeEditing
-          ? createPortal(
-              <AppEditorScriptSceneTitle
-                title={String(sceneTitle ?? "")}
-                titleEditable={sceneTitleEditing}
-                onTitleChange={onSceneTitleChange ?? (() => {})}
-                isModeEditing={isModeEditing}
-                onToggleModeEditing={onToggleModeEditing}
-              />,
-              sceneTitleMount,
-            )
-          : null}
-      </>
+      <div
+        ref={hostRef}
+        id={id}
+        className={cn("script-markdown-cm", className)}
+      />
     );
   },
 );

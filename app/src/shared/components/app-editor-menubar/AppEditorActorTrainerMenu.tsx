@@ -1,4 +1,6 @@
+import cn from "classnames";
 import type { ActorTrainerMode } from "../../../features/actor-trainers/model/actorTrainerUiSlice";
+import "../../../features/spectacle/ui/spectacle-direction-switch.css";
 
 const ACTOR_TRAINER_MODE_ITEMS: ReadonlyArray<{
   mode: ActorTrainerMode;
@@ -6,7 +8,7 @@ const ACTOR_TRAINER_MODE_ITEMS: ReadonlyArray<{
 }> = [
   { mode: "dialogue", label: "Диалог" },
   { mode: "write", label: "Напиши фразу" },
-  { mode: "voice", label: "АУДИО" },
+  { mode: "voice", label: "Аудио" },
 ];
 
 export type AppEditorActorTrainerMenuProps = {
@@ -18,34 +20,28 @@ export function AppEditorActorTrainerMenu({
   trainerMode,
   onSetTrainerMode,
 }: AppEditorActorTrainerMenuProps) {
-  const activeLabel =
-    ACTOR_TRAINER_MODE_ITEMS.find((item) => item.mode === trainerMode)?.label ?? "Диалог";
-
   return (
-    <div className="theater-editor-menubar__menu">
-      <span className="theater-editor-menubar__menu-title">{activeLabel}</span>
-      <div className="theater-editor-menubar__options" role="menu" aria-label="Режим тренировки">
+    <nav className="spectacle-direction-switch" aria-label="Режим тренировки">
+      <ul className="spectacle-direction-switch__modes">
         {ACTOR_TRAINER_MODE_ITEMS.map(({ mode, label }) => {
           const isActive = trainerMode === mode;
           return (
-            <button
-              key={mode}
-              type="button"
-              role="menuitemradio"
-              aria-checked={isActive}
-              className={[
-                "theater-editor-menubar__option",
-                isActive ? "theater-editor-menubar__option--active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => onSetTrainerMode(mode)}
-            >
-              {label}
-            </button>
+            <li key={mode}>
+              <button
+                type="button"
+                className={cn(
+                  "spectacle-direction-switch__item",
+                  isActive && "spectacle-direction-switch__item--active",
+                )}
+                aria-pressed={isActive}
+                onClick={() => onSetTrainerMode(mode)}
+              >
+                {label}
+              </button>
+            </li>
           );
         })}
-      </div>
-    </div>
+      </ul>
+    </nav>
   );
 }

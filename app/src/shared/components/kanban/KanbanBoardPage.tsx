@@ -1,5 +1,6 @@
 import cn from "classnames";
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../features/auth";
 import { mergeKanbanRoleAssignmentMembers } from "../../../features/kanban/model/kanban-role-members";
 import { KanbanSceneDetailModal } from "../../../features/kanban-scene-modal/KanbanSceneDetailModal";
@@ -194,6 +195,7 @@ export function KanbanBoardPage({
   const dispatch = useAppDispatch();
   const { accessToken } = useAuth();
   const { projectName } = useProject();
+  const [searchParams] = useSearchParams();
   const { playbookData, scenes, setScenes } = usePlaybook();
   const actorNoteSceneName = String(playbookData?.name ?? "script").trim() || "script";
   const [draggedId, setDraggedId] = useState<number | null>(null);
@@ -227,6 +229,14 @@ export function KanbanBoardPage({
   useEffect(() => {
     if (normalizedScenes !== scenes) setScenes(normalizedScenes);
   }, [normalizedScenes, setScenes, scenes]);
+
+  useEffect(() => {
+    const rawSceneId = searchParams.get("scene") ?? searchParams.get("sceneId");
+    if (!rawSceneId) return;
+    const sceneId = Number(rawSceneId);
+    if (!Number.isFinite(sceneId)) return;
+    setOpenedSceneId(sceneId);
+  }, [searchParams]);
 
   const effectiveRoleAssignmentsFallback = (playbookData?.roleAssignments ?? {}) as Record<
     string,

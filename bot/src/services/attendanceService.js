@@ -136,13 +136,25 @@ class AttendanceService {
   }
 
   /**
-   * Топик для director-sessions. По умолчанию публикуем в основной чат,
-   * чтобы публикация была "видимой" без дополнительных настроек топиков.
-   *
-   * Если нужно публиковать в конкретный топик — задайте DIRECTOR_SESSIONS_THREAD_ID.
+   * Топик для director-sessions. message_thread_id — только положительное число.
+   * Нельзя подставлять chat_id (например -1494331205) — Telegram отклонит отправку.
    */
   getEffectiveDirectorSessionsThreadId() {
-    return process.env.DIRECTOR_SESSIONS_THREAD_ID || null;
+    return (
+      this._normalizeTopicThreadId(process.env.DIRECTOR_SESSIONS_THREAD_ID) ||
+      this._normalizeTopicThreadId(process.env.ANNOUNCEMENTS_THREAD_ID) ||
+      null
+    );
+  }
+
+  /** Forum topic id: только целое > 0. */
+  _normalizeTopicThreadId(raw) {
+    const s = String(raw ?? "").trim();
+    if (!s) return null;
+    if (!/^\d+$/.test(s)) return null;
+    const n = parseInt(s, 10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return String(n);
   }
 
   isOwner(userId) {
@@ -679,66 +691,15 @@ class AttendanceService {
   }
 
   /**
-   * Обработка ввода времени для "Свое время" (backend rehearsal): сохраняем lateTime и обновляем сообщение в группе.
+   * @deprecated «Свое время» отключено — оставляем no-op на случай старых userStates.
    */
   async handleBackendLateMessage(ctx) {
     if (ctx.chat?.type !== "private") return false;
     const userId = ctx.from?.id;
     const state = this.userStates.get(userId);
     if (!state || state.step !== "backend_attendance_late") return false;
-
-    const text = (ctx.message?.text || "").trim();
-    if (/^\/cancel$/i.test(text)) {
-      this.userStates.delete(userId);
-      await ctx.reply("Ок, отменил ввод времени.");
-      return true;
-    }
-    if (!text) {
-      await ctx.reply("Напишите, к которому времени вы придёте (например: 20:00).");
-      return true;
-    }
-
-    const { rehearsalId } = state.data || {};
     this.userStates.delete(userId);
-    if (!rehearsalId) return true;
-
-    const userName =
-      (ctx.from?.username && String(ctx.from.username).trim()) ||
-      [ctx.from?.first_name, ctx.from?.last_name]
-        .map((x) => String(x || "").trim())
-        .filter(Boolean)
-        .join(" ")
-        .trim() ||
-      undefined;
-
-    const extracted = this._extractTimeLike(text);
-    const lateTime = extracted || text;
-
-    try {
-      await orchestraBotApi.setRehearsalAttendance(rehearsalId, {
-        telegramId: String(userId),
-        status: "late",
-        userName,
-        lateTime,
-      });
-      await ctx.reply(`Отметил: вы будете к ${lateTime}.`);
-    } catch (e) {
-      console.error("Ошибка сохранения lateTime (backend):", e?.message || e);
-      await ctx.reply("Не удалось сохранить время. Попробуйте ещё раз позже.");
-      return true;
-    }
-
-    // Обновляем опубликованное сообщение в группе (если оно уже опубликовано)
-    try {
-      await this._updateBackendRehearsalMessage(rehearsalId);
-    } catch (e) {
-      // Не критично: время уже сохранено
-      console.warn(
-        "Не удалось обновить сообщение репетиции в группе (backend):",
-        e?.message || e,
-      );
-    }
-
+    await ctx.reply("Вариант «Свое время» больше не используется. Отметьтесь «Буду» или «Не буду» в сообщении репетиции.");
     return true;
   }
 
@@ -1183,7 +1144,6 @@ class AttendanceService {
       [
         Markup.button.callback("Буду", `reh:${rehearsalId}:present`),
         Markup.button.callback("Не буду", `reh:${rehearsalId}:absent`),
-        Markup.button.callback("Свое время", `reh:${rehearsalId}:late`),
       ],
     ]);
   }
@@ -1197,14 +1157,22 @@ class AttendanceService {
     }
     const lines = participants.map((p) => {
       const status = String(p?.status || "unknown");
-      const email = escapeHtml(String(p?.email || "").trim() || "—");
-      const name = escapeHtml(String(p?.userName || "").trim());
-      const label = name ? `${name} · ${email}` : email;
-      const lateTime = String(p?.lateTime || "").trim();
-      const extra = status === "late" && lateTime ? ` (${escapeHtml(lateTime)})` : "";
-      return `${statusIcon(status)} ${label}${extra}`;
+      const label = this._formatTelegramPersonLabel(p);
+      return `${statusIcon(status)} ${label}`;
     });
     return lines.join("\n");
+  }
+
+  /** Имя с кликабельным mention по telegramId; email не показываем. */
+  _formatTelegramPersonLabel(person) {
+    const name = escapeHtml(
+      String(person?.userName || "").trim() || "Участник",
+    );
+    const telegramId = String(person?.telegramId ?? "").trim();
+    if (telegramId && /^\d+$/.test(telegramId)) {
+      return `<a href="tg://user?id=${telegramId}">${name}</a>`;
+    }
+    return name;
   }
 
   /**
@@ -1233,10 +1201,11 @@ class AttendanceService {
     const text = this._buildDirectorSessionText(session);
 
     const opts = { parse_mode: "HTML" };
-    const tid =
-      threadId != null && String(threadId).trim() !== "" ? parseInt(threadId, 10) : null;
-    if (tid && !Number.isNaN(tid)) {
-      opts.message_thread_id = tid;
+    const resolvedThreadId =
+      this._normalizeTopicThreadId(threadId) ||
+      this.getEffectiveDirectorSessionsThreadId();
+    if (resolvedThreadId) {
+      opts.message_thread_id = parseInt(resolvedThreadId, 10);
     }
 
     console.log(
@@ -1249,46 +1218,41 @@ class AttendanceService {
       groupChatId,
       "threadId=",
       opts.message_thread_id ?? null,
+      "rawThreadId=",
+      threadId ?? null,
     );
 
-    // If already published, try to update existing message.
-    const chatId = session?.telegramChatId != null ? String(session.telegramChatId).trim() : "";
-    const messageIdRaw =
-      session?.telegramMessageId != null ? String(session.telegramMessageId).trim() : "";
-    const messageId = messageIdRaw && /^\d+$/.test(messageIdRaw) ? parseInt(messageIdRaw, 10) : null;
-    if (chatId && messageId) {
-      try {
-        await this.bot.telegram.editMessageText(chatId, messageId, undefined, text, {
-          parse_mode: "HTML",
-          ...this._directorKeyboard(projectId, sessionId),
-        });
-        return { ok: true, updated: true };
-      } catch (e) {
-        const desc = e?.response?.description || "";
-        if (
-          e?.response?.error_code === 400 &&
-          /message to edit not found|message identifier is not specified|message can't be edited/i.test(
-            desc,
-          )
-        ) {
-          // continue to send new message
-        } else if (
-          e?.response?.error_code === 400 &&
-          /message is not modified/i.test(desc)
-        ) {
-          return { ok: true, updated: true };
-        } else {
-          console.error("publishDirectorSessionFromBackend edit failed:", e?.message || e);
-          // continue to send new message as fallback
-        }
-      }
+    // Always send a new message so «Обновить публикацию» видно в чате.
+    // Old message (if any) is removed afterwards when possible.
+    const prevChatId =
+      session?.telegramChatId != null ? String(session.telegramChatId).trim() : "";
+    const prevMessageIdRaw =
+      session?.telegramMessageId != null
+        ? String(session.telegramMessageId).trim()
+        : "";
+    const prevMessageId =
+      prevMessageIdRaw && /^\d+$/.test(prevMessageIdRaw)
+        ? parseInt(prevMessageIdRaw, 10)
+        : null;
+
+    let sent;
+    try {
+      sent = await this.bot.telegram.sendMessage(
+        groupChatId,
+        text,
+        Object.assign({}, opts, this._directorKeyboard(projectId, sessionId)),
+      );
+    } catch (e) {
+      console.error(
+        "[director-session] sendMessage failed",
+        "chatId=",
+        groupChatId,
+        "threadId=",
+        opts.message_thread_id ?? null,
+        e?.response?.description || e?.message || e,
+      );
+      throw e;
     }
-
-    const sent = await this.bot.telegram.sendMessage(
-      groupChatId,
-      text,
-      Object.assign({}, opts, this._directorKeyboard(projectId, sessionId)),
-    );
 
     await orchestraBotApi.markDirectorSessionPublished(projectId, sessionId, {
       chatId: String(sent.chat?.id),
@@ -1296,6 +1260,14 @@ class AttendanceService {
       threadId:
         opts.message_thread_id != null ? String(opts.message_thread_id) : undefined,
     });
+
+    if (prevChatId && prevMessageId) {
+      try {
+        await this.bot.telegram.deleteMessage(prevChatId, prevMessageId);
+      } catch (e) {
+        // ignore: message may already be gone or too old to delete
+      }
+    }
 
     return sent;
   }
@@ -1349,7 +1321,6 @@ class AttendanceService {
 
   _buildDirectorSessionText(session) {
     const title = escapeHtml(session?.title || "Сессия");
-    const startsAt = session?.startsAt ? formatRuDateTime(session.startsAt) : "";
     const commentRaw = String(session?.comment || "").trim();
     const comment =
       commentRaw.length > 0
@@ -1359,10 +1330,17 @@ class AttendanceService {
         : "";
     const commentBlock = comment ? `\n\nКомментарий\n${escapeHtml(comment)}` : "";
     const schedule = this._formatDirectorSchedule(session);
-    const selected = this._formatDirectorSelectedMaterials(session);
     const invite = this._formatDirectorInviteList(session);
     const listText = this._formatBackendAttendanceList(session);
-    return `<b>${title}</b>\n${escapeHtml(startsAt)}${commentBlock}\n\nПлан репетиции\n${schedule}\n\nВыбрано на сегодня\n${selected}\n\nКого зовём\n${invite}\n\nПодтверждение присутствия\n\n${listText}`;
+    const sessionLink = this._formatDirectorSessionLink(session);
+    return `<b>${title}</b>${commentBlock}\n\nПлан репетиции\n${schedule}\n\nВызываются\n${invite}\n\nПодтверждение присутствия\n\n${listText}${sessionLink}`;
+  }
+
+  _formatDirectorSessionLink(session) {
+    const sessionUrl = String(session?.sessionUrl ?? "").trim();
+    if (!sessionUrl) return "";
+    const label = escapeHtml(String(session?.title ?? "").trim() || "Репетиция");
+    return `\n\nОткрыть репетицию\n<a href="${sessionUrl}">${label}</a>`;
   }
 
   _directorKeyboard(projectId, sessionId) {
@@ -1373,7 +1351,6 @@ class AttendanceService {
       [
         Markup.button.callback("Буду", `ds:${projectId}:${sid}:${DS_STATUS_COMPACT.present}`),
         Markup.button.callback("Не буду", `ds:${projectId}:${sid}:${DS_STATUS_COMPACT.absent}`),
-        Markup.button.callback("Свое время", `ds:${projectId}:${sid}:${DS_STATUS_COMPACT.late}`),
       ],
     ]);
   }
@@ -1386,34 +1363,31 @@ class AttendanceService {
       const t1 = escapeHtml(String(s.timeStart ?? "").trim() || "");
       const t2 = escapeHtml(String(s.timeEnd ?? "").trim() || "");
       const t = t1 && t2 ? `${t1}–${t2}` : t1 || t2 || "";
-      const p = escapeHtml(String(s.projectSlug ?? "").trim() || "");
-      const id = s.stepId != null ? `#${escapeHtml(String(s.stepId))}` : "";
-      const title = escapeHtml(String(s.stepTitle ?? "").trim());
+      const sceneTitleRaw = String(s.stepTitle ?? "").trim();
+      const sceneTitle = escapeHtml(sceneTitleRaw);
+      const sceneUrl = String(s.sceneUrl ?? "").trim();
+      const sceneLabel =
+        sceneTitleRaw && sceneUrl
+          ? `<a href="${sceneUrl}">${sceneTitle}</a>`
+          : sceneTitle;
+      const projectLabel = escapeHtml(
+        String(s.projectName ?? "").trim() ||
+          String(s.projectSlug ?? "").trim() ||
+          "",
+      );
       const notes = escapeHtml(String(s.notes ?? "").trim());
-      const tail = [p, id, title].filter(Boolean).join(" ");
-      const line = t ? `• ${t} — ${tail || "Материал"}` : `• ${tail || "Материал"}`;
+      let material = "Материал";
+      if (sceneLabel && projectLabel) {
+        material = `${sceneLabel} [${projectLabel}]`;
+      } else if (sceneLabel) {
+        material = sceneLabel;
+      } else if (projectLabel) {
+        material = `[${projectLabel}]`;
+      }
+      const line = t ? `• ${t} — ${material}` : `• ${material}`;
       return notes ? `${line}\n  ↳ ${notes}` : line;
     });
     return lines.join("\n");
-  }
-
-  _formatDirectorSelectedMaterials(session) {
-    const slots = Array.isArray(session?.slots) ? session.slots : [];
-    if (slots.length === 0) return "—";
-    const sorted = [...slots].sort((a, b) => (a.offsetMin ?? 0) - (b.offsetMin ?? 0));
-    const uniq = new Set();
-    const lines = [];
-    for (const s of sorted) {
-      const p = String(s.projectSlug ?? "").trim();
-      const stepId = s.stepId != null ? String(s.stepId) : "";
-      const title = String(s.stepTitle ?? "").trim();
-      const key = `${p}:${stepId}:${title}`;
-      if (!p || !stepId) continue;
-      if (uniq.has(key)) continue;
-      uniq.add(key);
-      lines.push(`• ${escapeHtml([p, `#${stepId}`, title].filter(Boolean).join(" "))}`);
-    }
-    return lines.length ? lines.join("\n") : "—";
   }
 
   _formatDirectorInviteList(session) {
@@ -1421,11 +1395,20 @@ class AttendanceService {
       ? session.participants
       : [];
     if (participants.length === 0) return "—";
-    const lines = participants.slice(0, 120).map((p) => {
-      const email = escapeHtml(String(p?.email || "").trim() || "—");
-      const name = escapeHtml(String(p?.userName || "").trim());
-      const label = name ? `${name} · ${email}` : email;
-      return `• ${label}`;
+    const sorted = [...participants].sort((a, b) => {
+      const ta = String(a?.callTime ?? "").trim();
+      const tb = String(b?.callTime ?? "").trim();
+      if (ta && tb) return ta.localeCompare(tb);
+      if (ta) return -1;
+      if (tb) return 1;
+      const nameA = String(a?.userName ?? a?.firstName ?? a?.email ?? "").trim();
+      const nameB = String(b?.userName ?? b?.firstName ?? b?.email ?? "").trim();
+      return nameA.localeCompare(nameB, "ru");
+    });
+    const lines = sorted.slice(0, 120).map((p) => {
+      const label = this._formatTelegramPersonLabel(p);
+      const callTime = escapeHtml(String(p?.callTime ?? "").trim());
+      return callTime ? `• ${callTime} — ${label}` : `• ${label}`;
     });
     return lines.join("\n");
   }
@@ -1436,7 +1419,17 @@ class AttendanceService {
       const m = data.match(/^reh:([a-z0-9]+):(present|absent|late)$/i);
       if (!m) return;
       const rehearsalId = m[1];
-      const status = m[2];
+      const status = m[2].toLowerCase();
+
+      if (status === "late") {
+        try {
+          await ctx.answerCbQuery(
+            "Вариант «Свое время» больше не используется. Выберите «Буду» или «Не буду».",
+            { show_alert: true },
+          );
+        } catch {}
+        return;
+      }
 
       const userName =
         (ctx.from?.username && String(ctx.from.username).trim()) ||
@@ -1452,33 +1445,6 @@ class AttendanceService {
         status,
         userName,
       });
-
-      if (status === "late") {
-        // Попросим время в личке и после ввода сохраним lateTime
-        try {
-          await this.bot.telegram.sendMessage(
-            String(ctx.from.id),
-            "Вы выбрали «Свое время». Напишите, к которому времени вы придёте (например: 20:00).\n\nОтмена: /cancel",
-          );
-          this.userStates.set(ctx.from.id, {
-            step: "backend_attendance_late",
-            data: { rehearsalId },
-          });
-        } catch (e) {
-          const desc = e?.response?.description || "";
-          const code = e?.response?.error_code;
-          if (code === 403 && /can't initiate conversation with a user/i.test(desc)) {
-            try {
-              await ctx.answerCbQuery(
-                "Я не могу написать вам в личку. Откройте чат со мной, нажмите /start и потом ещё раз нажмите «Свое время».",
-                { show_alert: true },
-              );
-            } catch {}
-          } else {
-            console.error("Ошибка отправки ЛС для lateTime (backend):", e);
-          }
-        }
-      }
 
       const rehearsal = await orchestraBotApi.getRehearsal(rehearsalId);
       const title = escapeHtml(rehearsal?.title || "Репетиция");
@@ -1525,6 +1491,16 @@ class AttendanceService {
       const projectId = m[1];
       const sessionId = expandUuid(m[2]); // restore UUID hyphens if needed
       const status = DS_STATUS_EXPAND[m[3].toLowerCase()] || m[3];
+
+      if (status === "late") {
+        try {
+          await ctx.answerCbQuery(
+            "Вариант «Свое время» больше не используется. Выберите «Буду» или «Не буду».",
+            { show_alert: true },
+          );
+        } catch (_) {}
+        return;
+      }
 
       const userName =
         (ctx.from?.username && String(ctx.from.username).trim()) ||

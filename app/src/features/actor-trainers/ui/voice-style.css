@@ -1,7 +1,42 @@
 ﻿.voice-trainer {
-  display: grid;
-  gap: var(--spacing-5);
   color: var(--sessions-text);
+}
+
+.voice-trainer.dialogue-trainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+.voice-controls-dock .voice-panel--dock {
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
+  padding: 12px;
+}
+
+.voice-self-line[data-listening="true"] {
+  outline: 1px solid color-mix(in srgb, var(--color-active-ascent) 55%, transparent);
+  outline-offset: 4px;
+}
+
+.voice-self-line .voice-text--live {
+  min-height: 1.45em;
+  color: var(--sessions-text-strong);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.voice-self-line .dialogue-my-line-head {
+  margin-bottom: 8px;
+}
+
+.dialogue-finished .voice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .voice-head {
@@ -352,6 +387,7 @@
 }
 
 .voice-line-result--bad {
+  margin-top: auto;
   color: var(--color-danger-light);
 }
 

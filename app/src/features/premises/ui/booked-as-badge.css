@@ -1,0 +1,32 @@
+.premises-booked-as {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--sessions-text, #888);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.premises-booked-as__icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--color-active-ascent);
+}
+
+.premises-booked-as__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.premises-booked-as__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sessions-text-strong, #ccc);
+  font-weight: 600;
+}

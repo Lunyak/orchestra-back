@@ -1,4 +1,4 @@
-import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import { PageBootLoader } from "@shared/components/page-loader/page-boot";
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useProject } from "../../features/project";
@@ -27,13 +27,13 @@ export function ProjectRouteBoundary() {
   }, [decodedProjectSlug, onProjectChange, projectExists, projectName]);
 
   if (!isProjectsLoaded || projectsLoading) {
-    return <PageLoader variant="simple" label="Загрузка проекта…" />;
+    return <PageBootLoader label="Загрузка проекта…" />;
   }
   if (!projectExists) {
     return <Navigate to={globalPaths.projects} replace />;
   }
   if (projectName !== decodedProjectSlug) {
-    return <PageLoader variant="simple" label="Открытие проекта…" />;
+    return <PageBootLoader label="Открытие проекта…" />;
   }
   return <Outlet />;
 }
@@ -47,7 +47,7 @@ export function LegacyProjectRedirect() {
   const { isProjectsLoaded, projectName, projectsLoading } = useProject();
   const location = useLocation();
   if (!isProjectsLoaded || projectsLoading) {
-    return <PageLoader variant="simple" label="Открытие проекта…" />;
+    return <PageBootLoader label="Открытие проекта…" />;
   }
   const target = resolveLegacyProjectPath(location.pathname, projectName);
   return <Navigate to={`${target}${location.search}${location.hash}`} replace />;

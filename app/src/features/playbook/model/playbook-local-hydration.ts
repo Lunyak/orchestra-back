@@ -1,7 +1,6 @@
 import type { ScriptScene, TheaterLayout } from "../../../shared/types/script";
 import { prepareSceneLightBindings } from "../../theater/model/theater-light-fader-bindings";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
-import { fetchDevLocalProjectJson } from "../../../shared/platform/local-project-dev";
 import { readProjectFolderJson } from "../../../shared/platform/project-media-folder";
 import { desktopReadProjectPlaybook } from "../../../shared/platform/desktop-methods";
 import type { AppDispatch } from "../../../shared/store/store";
@@ -24,9 +23,8 @@ async function readLocalProjectScript(
     const fresh = await desktopReadProjectPlaybook(api, projectSlug, "script");
     return fresh && typeof fresh === "object" ? (fresh as Record<string, unknown>) : null;
   }
-  const fromFolder = await readProjectFolderJson(projectSlug, "script");
-  if (fromFolder) return fromFolder;
-  return fetchDevLocalProjectJson(projectSlug, "script");
+  // Web: only an explicitly picked media folder — never probe Vite/Electron disk packs.
+  return readProjectFolderJson(projectSlug, "script");
 }
 
 function applyLocalScenePayload(

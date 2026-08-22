@@ -10,6 +10,7 @@ import {
   ScriptScene,
 } from "../../types/script";
 import { ShowScriptMarkdownSection } from "./components/ShowScriptMarkdownSection";
+import { SpectacleScriptToolsDock } from "../../../features/spectacle/ui/SpectacleScriptToolsDock";
 import './style.css';
 
 
@@ -128,6 +129,10 @@ export const ShowScript: React.FC = () => {
                 <div className="script-scene-body">
                   <div className="script-scene-main">
                     {markdownPane}
+                    <SpectacleScriptToolsDock
+                      projectSlug={projectSlug}
+                      sceneName={sceneName}
+                    />
                   </div>
                 </div>
               </div>

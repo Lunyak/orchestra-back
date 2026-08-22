@@ -45,9 +45,9 @@ restart: ## Перезапустить все контейнеры (production)
 restart-back: ## Перезапустить только бэкенд
 	@docker compose restart back
 
-rebuild: ## Пересобрать и перезапустить (production)
+rebuild: ## Пересобрать и перезапустить (production, без local override)
 	@echo "$(YELLOW)Пересборка контейнеров...$(NC)"
-	@docker compose up -d --build
+	@docker compose -f docker-compose.yml up -d --build
 	@echo "$(GREEN)✅ Контейнеры пересобраны и запущены$(NC)"
 
 https-up: ## Запустить production с HTTPS (Caddy + Let's Encrypt)

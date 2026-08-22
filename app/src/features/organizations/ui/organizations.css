@@ -311,16 +311,25 @@
   border: 1px solid var(--sessions-border);
   background: var(--sessions-bg-deep);
   box-sizing: border-box;
-  padding: 12px 10px;
 }
 
 .organizations-page__theater-poster-frame--placeholder {
+  padding: 12px 10px;
   background:
     linear-gradient(
       165deg,
       color-mix(in srgb, var(--sessions-panel-hover) 80%, transparent) 0%,
       var(--sessions-bg-deep) 100%
     );
+}
+
+.organizations-page__theater-poster-image {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .organizations-page__theater-poster:hover .organizations-page__theater-poster-frame,

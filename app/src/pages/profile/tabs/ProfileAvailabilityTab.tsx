@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { Modal } from "@shared/core/modal/Modal";
@@ -261,7 +262,9 @@ export function ProfileAvailabilityTab() {
       {flags.error ? (
         <div className="settings-invite-error profile-availability-load-error">{flags.error}</div>
       ) : null}
-      {flags.loading ? <div className="profile-save-hint">Загрузка сессий…</div> : null}
+      {flags.loading ? (
+        <PageLoader variant="view" label="Загрузка сессий…" />
+      ) : null}
 
       <section className="profile-availability-range">
         <div className="profile-availability-section-label">Диапазон дней</div>

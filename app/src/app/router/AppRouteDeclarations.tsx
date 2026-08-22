@@ -57,6 +57,11 @@ const ProjectOverviewPage = lazy(() =>
     default: m.ProjectOverviewPage,
   })),
 );
+const ProjectPlaybookDocksLayout = lazy(() =>
+  import("../../features/project/ui/ProjectPlaybookDocksLayout").then((m) => ({
+    default: m.ProjectPlaybookDocksLayout,
+  })),
+);
 
 const OrganizationsPage = lazy(() =>
   import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
@@ -103,6 +108,48 @@ const TroupeOrganizationPage = lazy(() =>
 const StudioOrganizationPage = lazy(() =>
   import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
     default: m.StudioOrganizationPage,
+  })),
+);
+
+const StudiosIndexPage = lazy(() =>
+  import("../../features/organizations/ui/OrganizationsPages").then((m) => ({
+    default: m.StudiosIndexPage,
+  })),
+);
+
+const StudioOverviewPage = lazy(() =>
+  import("../../features/organizations/ui/StudioOverviewPage").then((m) => ({
+    default: m.StudioOverviewPage,
+  })),
+);
+
+const StudioMembersPage = lazy(() =>
+  import("../../features/organizations/ui/StudioOrgSectionPage").then((m) => ({
+    default: m.StudioMembersPage,
+  })),
+);
+
+const StudioInvitesPage = lazy(() =>
+  import("../../features/organizations/ui/StudioOrgSectionPage").then((m) => ({
+    default: m.StudioInvitesPage,
+  })),
+);
+
+const StudioProgramSectionPage = lazy(() =>
+  import("../../features/organizations/ui/StudioOrgSectionPage").then((m) => ({
+    default: m.StudioProgramSectionPage,
+  })),
+);
+
+const StudioAssignmentsSectionPage = lazy(() =>
+  import("../../features/organizations/ui/StudioOrgSectionPage").then((m) => ({
+    default: m.StudioAssignmentsSectionPage,
+  })),
+);
+
+const StudioVideosSectionPage = lazy(() =>
+  import("../../features/organizations/ui/StudioOrgSectionPage").then((m) => ({
+    default: m.StudioVideosSectionPage,
   })),
 );
 
@@ -396,15 +443,55 @@ export function AppRouteDeclarations() {
         element={<TroupeOrganizationPage />}
       />
       <Route
+        path={`${globalPaths.organizations}/studios`}
+        element={<StudiosIndexPage />}
+      />
+      <Route
         path={`${globalPaths.organizations}/studios/:studioId`}
         element={<StudioOrganizationPage />}
       />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/overview`}
+        element={<StudioOverviewPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/members`}
+        element={<StudioMembersPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/invites`}
+        element={<StudioInvitesPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/program`}
+        element={<StudioProgramSectionPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/assignments`}
+        element={<StudioAssignmentsSectionPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/videos`}
+        element={<StudioVideosSectionPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/premises`}
+        element={<PremisesPage />}
+      />
+      <Route
+        path={`${globalPaths.organizations}/studios/:studioId/premises/:premiseId`}
+        element={<PremiseDetailPage />}
+      />
       <Route path="/projects/:projectSlug" element={<ProjectRouteBoundary />}>
         <Route index element={<ProjectIndexRedirect />} />
-        <Route path="overview" element={<ProjectOverviewPage />} />
-        <Route path="roles" element={<ProjectRolesPage />} />
-        <Route path="cast" element={<ProjectCastPage />} />
-        <Route path="spectacle" element={<SpectacleHubPage />} />
+        <Route element={<ProjectPlaybookDocksLayout />}>
+          <Route path="overview" element={<ProjectOverviewPage />} />
+          <Route path="roles" element={<ProjectRolesPage />} />
+          <Route path="cast" element={<ProjectCastPage />} />
+          <Route path="spectacle" element={<SpectacleHubPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/bot" element={<SettingsBotPage />} />
+        </Route>
         <Route path="script" element={<SpectaclePage />} />
         <Route path="light-plot" element={<SpectaclePage />} />
         <Route path="sufer" element={<SpectaclePage />} />
@@ -448,8 +535,6 @@ export function AppRouteDeclarations() {
           path="accounting/:collectionId"
           element={<ProjectAccountingRedirect />}
         />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="settings/bot" element={<SettingsBotPage />} />
       </Route>
       <Route
         path="/actor"

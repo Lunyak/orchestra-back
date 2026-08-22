@@ -64,7 +64,14 @@ export const ADMIN_NAV_CHILDREN: HeaderNavSubItem[] = [
 ];
 
 export function isStudioPath(pathname: string) {
-  return pathname === "/studio" || pathname.startsWith("/studio/");
+  return (
+    pathname === "/studio" ||
+    pathname.startsWith("/studio/") ||
+    pathname === "/studios" ||
+    pathname.startsWith("/studios/") ||
+    pathname === "/organizations/studios" ||
+    pathname.startsWith("/organizations/studios/")
+  );
 }
 
 export function isSpectacleScriptPath(pathname: string) {
@@ -154,7 +161,7 @@ export const HEADER_NAV_ITEMS: HeaderNavItem[] = [
     ),
   },
   {
-    path: "/studio",
+    path: "/organizations/studios",
     label: "Студия",
     navClass: "header-nav-btn--studio",
     icon: (
@@ -205,7 +212,7 @@ export function isHeaderNavItemActive(path: string, currentPath: string) {
       isAdminPremisesPath(currentPath)
     );
   }
-  if (path === "/studio") {
+  if (path === "/organizations/studios" || path === "/studio") {
     return isStudioPath(currentPath);
   }
   return currentPath === path || (path !== "/" && currentPath.startsWith(path));

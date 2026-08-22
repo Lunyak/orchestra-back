@@ -33,6 +33,7 @@ export function memberLabel(m: {
     firstName?: string | null;
     lastName?: string | null;
     avatarUrl?: string | null;
+    avatarSmallUrl?: string | null;
   } | null;
 }): string {
   const p = m.profile;

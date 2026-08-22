@@ -146,6 +146,8 @@ function normalizePatchFromForm(form: Partial<MyProfile>): Partial<MyProfile> {
     telegramUsername: t((form as any).telegramUsername),
     telegramId: t((form as any).telegramId),
     avatarUrl: t((form as any).avatarUrl),
+    avatarSmallUrl: t((form as any).avatarSmallUrl),
+    phone: t((form as any).phone),
     availabilityCalendar: cleanCalendar as any,
     availabilityTimeRanges: cleanRanges as any,
   } as Partial<MyProfile>;
@@ -201,11 +203,13 @@ export const saveMyProfileThunk = createAsyncThunk<MyProfile, { accessToken: str
 
 export const uploadAvatarThunk = createAsyncThunk<
   MyProfile,
-  { accessToken: string; file: File },
+  { accessToken: string; file: File; variant?: "full" | "small" },
   { rejectValue: string }
->("profileData/uploadAvatar", async ({ file }, { dispatch, rejectWithValue }) => {
+>("profileData/uploadAvatar", async ({ file, variant = "full" }, { dispatch, rejectWithValue }) => {
   try {
-    const result = await dispatch(profileApi.endpoints.uploadMyAvatar.initiate(file));
+    const result = await dispatch(
+      profileApi.endpoints.uploadMyAvatar.initiate({ file, variant }),
+    );
     if (result.error) {
       return rejectWithValue(rtkErrorMessage(result.error, "Не удалось загрузить аватар"));
     }
@@ -258,6 +262,8 @@ export const profileDataSlice = createSlice({
         telegramUsername: p?.telegramUsername ?? "",
         telegramId: p?.telegramId ?? "",
         avatarUrl: p?.avatarUrl ?? "",
+        avatarSmallUrl: p?.avatarSmallUrl ?? "",
+        phone: p?.phone ?? "",
         availabilityCalendar: (p as any)?.availabilityCalendar ?? {},
         availabilityTimeRanges: (p as any)?.availabilityTimeRanges ?? {},
       } as any;
@@ -380,6 +386,8 @@ export const profileDataSlice = createSlice({
         telegramUsername: action.payload?.telegramUsername ?? "",
         telegramId: action.payload?.telegramId ?? "",
         avatarUrl: action.payload?.avatarUrl ?? "",
+        avatarSmallUrl: action.payload?.avatarSmallUrl ?? "",
+        phone: action.payload?.phone ?? "",
         availabilityCalendar: (action.payload as any)?.availabilityCalendar ?? {},
         availabilityTimeRanges: (action.payload as any)?.availabilityTimeRanges ?? {},
       } as any;
@@ -407,6 +415,8 @@ export const profileDataSlice = createSlice({
         telegramUsername: action.payload?.telegramUsername ?? "",
         telegramId: action.payload?.telegramId ?? "",
         avatarUrl: action.payload?.avatarUrl ?? "",
+        avatarSmallUrl: action.payload?.avatarSmallUrl ?? "",
+        phone: action.payload?.phone ?? "",
         availabilityCalendar: (action.payload as any)?.availabilityCalendar ?? {},
         availabilityTimeRanges: (action.payload as any)?.availabilityTimeRanges ?? {},
       } as any;
@@ -425,6 +435,7 @@ export const profileDataSlice = createSlice({
       state.avatarUploading = false;
       state.profile = action.payload ?? null;
       (state.form as any).avatarUrl = action.payload?.avatarUrl ?? "";
+      (state.form as any).avatarSmallUrl = action.payload?.avatarSmallUrl ?? "";
       state.ok = "Аватар загружен";
     });
     b.addCase(uploadAvatarThunk.rejected, (state, action) => {
@@ -448,6 +459,8 @@ export const profileDataSlice = createSlice({
         telegramUsername: action.payload?.telegramUsername ?? "",
         telegramId: action.payload?.telegramId ?? "",
         avatarUrl: action.payload?.avatarUrl ?? "",
+        avatarSmallUrl: action.payload?.avatarSmallUrl ?? "",
+        phone: action.payload?.phone ?? "",
         availabilityCalendar: (action.payload as any)?.availabilityCalendar ?? {},
         availabilityTimeRanges: (action.payload as any)?.availabilityTimeRanges ?? {},
       } as any;

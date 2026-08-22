@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { useAuth } from "../../auth";
 import { useProject } from "../../project";
@@ -135,7 +136,7 @@ export function RehearsalDetailsPage() {
         <div className="rehearsal-details-page__meta">{headerTimeLabel}</div>
       </div>
 
-      {loading ? <div className="rehearsal-details-page__loading">Загрузка…</div> : null}
+      {loading ? <PageLoader variant="view" label="Загрузка…" /> : null}
       {error ? (
         <div className="settings-invite-error rehearsal-details-page__error">
           {error}
@@ -173,7 +174,7 @@ export function RehearsalDetailsPage() {
             </div>
             <div className="rehearsal-details-page__comment-status">
               {commentLoading ? (
-                <div className="rehearsal-details-page__status-hint">Загрузка…</div>
+                <PageLoader variant="view" label="Загрузка…" />
               ) : null}
               {commentSaving ? (
                 <div className="rehearsal-details-page__status-hint">Сохранение…</div>

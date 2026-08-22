@@ -7,48 +7,65 @@
   max-width: min(320px, calc(100vw - 16px));
   max-height: min(420px, calc(100vh - 16px));
   overflow: auto;
-  padding: 6px 0;
-  border: 1px solid var(--color-border-muted);
-  background: var(--color-bg-primary, var(--color-surface-1));
-  box-shadow: 0 12px 40px var(--color-shadow-menu);
+  padding: var(--spacing-2) 0;
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  box-shadow: none;
 }
 
 .script-editor-insert-menu__title {
-  padding: 4px 12px 8px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  padding: var(--spacing-2) var(--spacing-4) var(--spacing-3);
+  font-size: var(--font-size-xs);
+  font-weight: 800;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--color-text-muted-bright);
+  color: var(--color-active-ascent);
 }
 
 .script-editor-insert-menu__sep {
   height: 1px;
-  margin: 6px 8px;
-  background: var(--color-border-panel);
+  margin: var(--spacing-2) var(--spacing-4);
+  background: var(--color-border-faint);
 }
 
 .script-editor-insert-menu__item {
   display: flex;
-  width: calc(100% - 8px);
-  margin: 0 4px;
-  padding: 8px 10px;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: var(--spacing-3) var(--spacing-4);
   border: none;
-
+  border-left: 2px solid transparent;
   background: transparent;
-  color: var(--color-text-primary, var(--color-text-ui));
-  font: inherit;
-  font-size: 13px;
+  color: var(--color-text-medium);
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-snug);
   text-align: left;
   cursor: pointer;
+  box-sizing: border-box;
+  transition: var(--transition-colors);
 }
 
 .script-editor-insert-menu__item:hover:not(:disabled) {
-  background: var(--color-bg-tertiary)
+  background: color-mix(in srgb, var(--color-bg-quaternary) 72%, transparent);
+  border-left-color: var(--color-border-emphasis);
+  color: var(--color-text-primary);
+}
+
+.script-editor-insert-menu__item--open,
+.script-editor-insert-menu__item--open:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-active-ascent) 32%, var(--color-bg-secondary));
+  border-left-color: var(--color-active-ascent);
+  color: var(--color-text-primary);
 }
 
 .script-editor-insert-menu__item:disabled {
   cursor: not-allowed;
-  color: var(--color-text-muted-alpha);
+  opacity: 0.4;
+  color: var(--color-text-muted);
 }
 
 .script-editor-insert-menu--sub {
@@ -58,10 +75,8 @@
 }
 
 .script-editor-insert-menu__item--submenu {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--spacing-5);
 }
 
 .script-editor-insert-menu__item-label {
@@ -74,8 +89,14 @@
 
 .script-editor-insert-menu__chevron {
   flex-shrink: 0;
-  opacity: 0.75;
-  font-size: 14px;
+  color: var(--color-text-dim);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.script-editor-insert-menu__item--open .script-editor-insert-menu__chevron,
+.script-editor-insert-menu__item:hover:not(:disabled) .script-editor-insert-menu__chevron {
+  color: var(--color-active-ascent);
 }
 
 .script-editor-insert-menu__backdrop {

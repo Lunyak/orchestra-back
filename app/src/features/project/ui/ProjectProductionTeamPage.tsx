@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -78,7 +79,7 @@ export function ProjectProductionTeamPage() {
             <div className="troupe-error">Не удалось загрузить команду</div>
           ) : null}
           {isLoading ? (
-            <div className="troupe-team-empty">Загружаем команду…</div>
+            <PageLoader variant="view" label="Загружаем команду…" />
           ) : (
             <>
               <section

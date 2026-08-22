@@ -9,6 +9,15 @@ import {
 } from "../director-sessions/api/director-sessions-api";
 import type { DirectorRehearsalSession } from "../director-sessions/directorSessionsSync";
 import { normalizeEmail } from "../director-sessions/model/session-page-utils";
+import {
+  computeActorArrivalByEmail,
+  type ActorCallArrival,
+} from "../director-sessions/model/session-actor-call-times";
+import {
+  getEmailsPlannedForDirectorSlot,
+  type DirectorSlotPlannedData,
+} from "../director-sessions/model/session-slot-planned";
+import type { ProjectDataCache } from "../director-sessions/model/session-page-types";
 import { useAppDispatch } from "../../shared/store/hooks";
 
 function directorSessionErrorMessage(error: unknown): string {
@@ -67,38 +76,78 @@ export function useDirectorSessionDetail(accessToken: string | null | undefined,
   const [sceneTitleBySlugAndId, setSceneTitleBySlugAndId] = useState<
     Record<string, Record<number, string>>
   >({});
+  const [projectDataCache, setProjectDataCache] = useState<ProjectDataCache>({});
 
   useEffect(() => {
     if (!accessToken || projectSlugs.length === 0) {
       setSceneTitleBySlugAndId({});
+      setProjectDataCache({});
       return;
     }
     let cancelled = false;
     void (async () => {
-      const merged: Record<string, Record<number, string>> = {};
+      const mergedTitles: Record<string, Record<number, string>> = {};
+      const mergedCache: ProjectDataCache = {};
       await Promise.all(
         projectSlugs.map(async (slug) => {
           try {
             const data = await dispatch(
               directorSessionsApi.endpoints.projectMaterial.initiate(slug),
             ).unwrap();
+            mergedCache[slug] = data;
             const byId: Record<number, string> = {};
             for (const st of data.scenes ?? []) {
               const title = String(st.title ?? "").trim();
               if (title) byId[st.id] = title;
             }
-            merged[slug] = byId;
+            mergedTitles[slug] = byId;
           } catch {
-            merged[slug] = {};
+            mergedTitles[slug] = {};
           }
         }),
       );
-      if (!cancelled) setSceneTitleBySlugAndId(merged);
+      if (!cancelled) {
+        setSceneTitleBySlugAndId(mergedTitles);
+        setProjectDataCache(mergedCache);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [accessToken, dispatch, projectSlugsKey, projectSlugs]);
+
+  const emailsBySlotId = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    if (!session) return out;
+    for (const sl of session.slots ?? []) {
+      const ref = sl.ref;
+      if (!ref?.projectSlug || ref.sceneId == null) continue;
+      const slug = String(ref.projectSlug).trim();
+      const cached = projectDataCache[slug];
+      if (!cached?.scenes?.length) continue;
+      const plannedData: DirectorSlotPlannedData = {
+        scenes: cached.scenes,
+        sceneRoles: cached.sceneRoles ?? null,
+        roleEmailsByKey: cached.roleEmailsByKey ?? {},
+      };
+      out[sl.id] = getEmailsPlannedForDirectorSlot(
+        slug,
+        ref.sceneId,
+        plannedData,
+        sl.roleRehearsalPicks ?? null,
+      );
+    }
+    return out;
+  }, [session, projectDataCache]);
+
+  const actorArrivalByEmail = useMemo(() => {
+    if (!session?.startsAt) return new Map<string, ActorCallArrival>();
+    return computeActorArrivalByEmail(
+      session.startsAt,
+      session.slots ?? [],
+      emailsBySlotId,
+    );
+  }, [session?.startsAt, session?.slots, emailsBySlotId]);
 
   const [confirmAttendance, confirmState] = useConfirmDirectorSessionAttendanceMutation();
   const [declineAttendance, declineState] = useDeclineDirectorSessionAttendanceMutation();
@@ -147,6 +196,7 @@ export function useDirectorSessionDetail(accessToken: string | null | undefined,
     loading,
     error,
     sceneTitleBySlugAndId,
+    actorArrivalByEmail,
     resolvedProfiles: resolvedProfiles as TeamProfile[],
     myEmail,
     attendanceBusy,

@@ -1,16 +1,12 @@
 export const PLAYER_PREFS_STORAGE_KEY = "orchestra:player-prefs";
-const PLAYER_DOCK_HIDDEN_LEGACY_KEY = "orchestra:player-dock-hidden";
 
-export const PLAYER_DOCK_VISIBILITY_EVENT = "orchestra:player-dock-visibility";
 export const PLAYER_VOLUME_CHANGE_EVENT = "orchestra:player-volume-change";
 
 export type PlayerPrefs = {
-  dockHidden: boolean;
   volume: number;
 };
 
 const DEFAULT_PREFS: PlayerPrefs = {
-  dockHidden: false,
   volume: 0.8,
 };
 
@@ -25,7 +21,6 @@ function parsePrefs(raw: string | null): PlayerPrefs | null {
   try {
     const parsed = JSON.parse(raw) as Partial<PlayerPrefs>;
     return {
-      dockHidden: parsed.dockHidden === true,
       volume: clampVolume(parsed.volume),
     };
   } catch {
@@ -40,15 +35,7 @@ export function readPlayerPrefs(): PlayerPrefs {
     const stored = parsePrefs(localStorage.getItem(PLAYER_PREFS_STORAGE_KEY));
     if (stored) return stored;
 
-    const legacyHidden =
-      localStorage.getItem(PLAYER_DOCK_HIDDEN_LEGACY_KEY) === "true";
-    const migrated: PlayerPrefs = {
-      ...DEFAULT_PREFS,
-      dockHidden: legacyHidden,
-    };
-    persistPlayerPrefs(migrated);
-    localStorage.removeItem(PLAYER_DOCK_HIDDEN_LEGACY_KEY);
-    return migrated;
+    return { ...DEFAULT_PREFS };
   } catch {
     return { ...DEFAULT_PREFS };
   }
@@ -63,21 +50,8 @@ export function persistPlayerPrefs(prefs: PlayerPrefs) {
   }
 }
 
-export function readPlayerDockHidden(): boolean {
-  return readPlayerPrefs().dockHidden;
-}
-
 export function readPlayerVolume(): number {
   return readPlayerPrefs().volume;
-}
-
-export function setPlayerDockHidden(hidden: boolean) {
-  const prefs = readPlayerPrefs();
-  const next = { ...prefs, dockHidden: hidden };
-  persistPlayerPrefs(next);
-  window.dispatchEvent(
-    new CustomEvent(PLAYER_DOCK_VISIBILITY_EVENT, { detail: { hidden } }),
-  );
 }
 
 export function setPlayerVolume(volume: number) {
@@ -88,10 +62,4 @@ export function setPlayerVolume(volume: number) {
   window.dispatchEvent(
     new CustomEvent(PLAYER_VOLUME_CHANGE_EVENT, { detail: { volume: nextVolume } }),
   );
-}
-
-export function togglePlayerDockHidden(): boolean {
-  const nextHidden = !readPlayerDockHidden();
-  setPlayerDockHidden(nextHidden);
-  return nextHidden;
 }

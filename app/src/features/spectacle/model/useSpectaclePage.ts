@@ -45,7 +45,6 @@ export function useSpectaclePage() {
   const {
     showPlaylistSidebar,
     togglePlaylist,
-    showHeaderSounds,
     isScenesCollapsed,
     setIsScenesCollapsed,
     mobilePlaylistOpen,
@@ -211,13 +210,12 @@ export function useSpectaclePage() {
     activeView === "script" ||
     activeView === "light-plot" ||
     activeView === "sufer" ||
-    activeView === "theater";
-  const compactMainChrome =
+    activeView === "theater" ||
     activeView === "board" ||
     activeView === "sessions" ||
     activeView === "tasks" ||
-    activeView === "team" ||
-    activeView === "media";
+    activeView === "team";
+  const compactMainChrome = activeView === "media";
 
   const kanbanMembers = useMemo(
     () =>
@@ -281,7 +279,6 @@ export function useSpectaclePage() {
     setTheaterLayout,
     shouldShowScenesSidebar,
     shouldSwapPanels,
-    showHeaderSounds,
     showPlaylistSidebar,
     showTheaterControls,
     scenes,

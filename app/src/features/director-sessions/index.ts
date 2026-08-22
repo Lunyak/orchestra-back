@@ -14,6 +14,8 @@ export type {
 export * from "./model/session-page-utils";
 export type * from "./model/session-page-types";
 export * from "./model/session-slot-planned";
+export * from "./model/session-slot-idle-order";
+export * from "./model/session-actor-call-times";
 export {
   DirectorSessionsPage,
   DirectorSessionsPageView,
@@ -26,6 +28,7 @@ export {
   useDirectorSessionQuery,
   useLazyProjectMaterialQuery,
   useProjectMaterialQuery,
+  usePublishDirectorSessionMutation,
   useReplaceDirectorSessionsMutation,
 } from "./api/director-sessions-api";
 

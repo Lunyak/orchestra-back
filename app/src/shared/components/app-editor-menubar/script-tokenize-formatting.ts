@@ -188,3 +188,68 @@ export function subscribeScriptFormatSearchHighlight(
   window.addEventListener(SCRIPT_FORMAT_SEARCH_EVENT, listener);
   return () => window.removeEventListener(SCRIPT_FORMAT_SEARCH_EVENT, listener);
 }
+
+export type CollapseBlankLinesResult = {
+  value: string;
+  removed: number;
+  changed: boolean;
+};
+
+/**
+ * Убирает пустые строки и хвостовые пробелы, оставляя одиночные переносы между непустыми строками.
+ */
+export function collapseExtraBlankLines(value: string): CollapseBlankLinesResult {
+  const normalized = String(value ?? "").replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
+  const kept: string[] = [];
+  let removed = 0;
+
+  for (const line of lines) {
+    const cleaned = line.replace(/[ \t]+$/g, "");
+    if (cleaned.trim().length === 0) {
+      removed += 1;
+      continue;
+    }
+    kept.push(cleaned);
+  }
+
+  const nextValue = kept.join("\n");
+  const changed = nextValue !== normalized;
+
+  return {
+    value: nextValue,
+    removed: changed ? removed : 0,
+    changed,
+  };
+}
+
+const SCRIPT_COLLAPSE_BLANK_LINES_EVENT = "orchestra:script-collapse-blank-lines";
+
+type ScriptCollapseBlankLinesDetail = {
+  result: CollapseBlankLinesResult | null;
+};
+
+export function requestScriptCollapseBlankLines(): CollapseBlankLinesResult | null {
+  if (typeof window === "undefined") return null;
+
+  const detail: ScriptCollapseBlankLinesDetail = { result: null };
+  window.dispatchEvent(
+    new CustomEvent(SCRIPT_COLLAPSE_BLANK_LINES_EVENT, { detail }),
+  );
+  return detail.result;
+}
+
+export function subscribeScriptCollapseBlankLines(
+  handler: () => CollapseBlankLinesResult,
+) {
+  if (typeof window === "undefined") return () => undefined;
+
+  const listener = (event: Event) => {
+    const detail = (event as CustomEvent<ScriptCollapseBlankLinesDetail>).detail;
+    if (!detail) return;
+    detail.result = handler();
+  };
+
+  window.addEventListener(SCRIPT_COLLAPSE_BLANK_LINES_EVENT, listener);
+  return () => window.removeEventListener(SCRIPT_COLLAPSE_BLANK_LINES_EVENT, listener);
+}

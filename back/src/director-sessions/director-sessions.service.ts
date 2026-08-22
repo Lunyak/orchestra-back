@@ -13,6 +13,7 @@ import { extractRoleKeysFromSceneRoles } from '../playbook/scene-roles-data';
 import { UpsertMyDirectorSessionCommentDto } from './dto/upsert-my-director-session-comment.dto';
 import { ProjectAccessService } from '../project-access/project-access.service';
 import { touchProjectActivity } from '../projects/project-activity';
+import { MessengerBridgeService } from '../messenger-bots/messenger-bridge.service';
 
 type DirectorSlotRef = { projectSlug: string; sceneId: number };
 type DirectorSlotRoleRehearsalPick = {
@@ -45,6 +46,8 @@ type DirectorSessionParticipant = {
   avatarUrl?: string | null;
   lateTime?: string | null;
   respondedAt?: string | null;
+  /** HH:MM — время подхода (первый слот актёра). */
+  callTime?: string | null;
 };
 type DirectorRehearsalSession = {
   id: string;
@@ -71,6 +74,36 @@ type RawSceneLike = {
 };
 
 const DEFAULT_TZ = 'Europe/Moscow';
+
+function originFromWebDomain(raw: string): string {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) {
+    return s.replace(/\/+$/, '');
+  }
+  const isLocalHostish =
+    s === 'localhost' ||
+    s.startsWith('127.0.0.1') ||
+    s.startsWith('192.168.') ||
+    s.startsWith('10.');
+  const scheme = isLocalHostish ? 'http' : 'https';
+  return `${scheme}://${s}`.replace(/\/+$/, '');
+}
+
+function normalizeAppBasePath(raw: string): string {
+  const s = String(raw ?? '').trim() || '/orkestr';
+  const withLead = s.startsWith('/') ? s : `/${s}`;
+  return withLead.replace(/\/+$/, '') || '/orkestr';
+}
+
+function buildOrchestraAppUrl(base: string, path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${normalizedPath}`;
+}
+
+function encodePathSegment(value: string): string {
+  return encodeURIComponent(String(value ?? '').trim());
+}
 
 function slugifyEmail(email: string): string {
   return String(email ?? '')
@@ -214,6 +247,12 @@ function profileHasSpecifiedAvailabilityForDate(
   return false;
 }
 
+/** Для строгого вызова: только день «свободен». */
+function profileIsFreeForCall(profile: any, dateKey: string): boolean {
+  if (!profile || !dateKey) return false;
+  return profile?.availabilityCalendar?.[dateKey] === 'present';
+}
+
 function normalizeRoleKey(v: string): string {
   return String(v ?? '')
     .trim()
@@ -291,7 +330,81 @@ export class DirectorSessionsService {
     private readonly config: ConfigService,
     private readonly roles: RolesService,
     private readonly projectAccess: ProjectAccessService,
+    private readonly messengerBridge: MessengerBridgeService,
   ) {}
+
+  private orchestraAppBase(): string {
+    const webDomain = String(this.config.get<string>('WEB_DOMAIN') ?? '').trim();
+    const origin = webDomain
+      ? originFromWebDomain(webDomain)
+      : 'http://localhost:5173';
+    const basePath = normalizeAppBasePath(
+      String(this.config.get<string>('APP_BASE_PATH') ?? '/orkestr'),
+    );
+    return `${origin}${basePath}`;
+  }
+
+  private buildProjectSceneBoardUrl(
+    appBase: string,
+    projectSlug: string,
+    sceneId: number,
+  ): string {
+    const slug = String(projectSlug ?? '').trim();
+    if (!slug || !Number.isFinite(sceneId)) return '';
+    return buildOrchestraAppUrl(
+      appBase,
+      `/projects/${encodePathSegment(slug)}/board?scene=${Math.floor(sceneId)}`,
+    );
+  }
+
+  private async resolvePrimaryProjectSlugForSession(
+    session: DirectorRehearsalSession,
+    slotSlugs: string[],
+    directorProjectId: string,
+  ): Promise<string | null> {
+    for (const slug of slotSlugs) {
+      const value = String(slug ?? '').trim();
+      if (value) return value;
+    }
+    for (const slug of session.projectSlugs ?? []) {
+      const value = String(slug ?? '').trim();
+      if (value) return value;
+    }
+    const project = await this.prisma.project.findFirst({
+      where: { id: directorProjectId, deletedAt: null },
+      select: { slug: true },
+    });
+    const slug = String(project?.slug ?? '').trim();
+    return slug || null;
+  }
+
+  private async buildDirectorSessionAppUrl(
+    appBase: string,
+    session: DirectorRehearsalSession,
+    sessionId: string,
+    slotSlugs: string[],
+    directorProjectId: string,
+  ): Promise<string | null> {
+    const theaterId = String(session.theaterId ?? '').trim();
+    const sid = String(sessionId ?? '').trim();
+    if (!sid) return null;
+    if (theaterId) {
+      return buildOrchestraAppUrl(
+        appBase,
+        `/organizations/theaters/${encodePathSegment(theaterId)}/rehearsals/${encodePathSegment(sid)}`,
+      );
+    }
+    const primarySlug = await this.resolvePrimaryProjectSlugForSession(
+      session,
+      slotSlugs,
+      directorProjectId,
+    );
+    if (!primarySlug) return null;
+    return buildOrchestraAppUrl(
+      appBase,
+      `/projects/${encodePathSegment(primarySlug)}/sessions/${encodePathSegment(sid)}`,
+    );
+  }
 
   private async getDirectorProjectForUser(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -953,14 +1066,16 @@ export class DirectorSessionsService {
     };
   }
 
-  /** Сформировать участников (neededEmails -> present profiles) по слотам сессии */
+  /** Сформировать участников по слотам сессии. */
   private async buildParticipantsForSession(
     userId: string,
     session: DirectorRehearsalSession,
+    opts?: { includeUnavailable?: boolean },
   ): Promise<{
     participants: DirectorSessionParticipant[];
     neededEmails: string[];
   }> {
+    const includeUnavailable = Boolean(opts?.includeUnavailable);
     const needed = await this.collectNeededEmailsForSession(userId, session);
     const dateKey = getDateKey(session.startsAt);
     if (!dateKey) throw new BadRequestException('Invalid session startsAt');
@@ -969,44 +1084,47 @@ export class DirectorSessionsService {
       where: { email: { in: needed } },
       select: {
         email: true,
-        availabilityCalendar: true,
         displayName: true,
         firstName: true,
         lastName: true,
         avatarUrl: true,
         telegramId: true,
+        availabilityCalendar: true,
       },
     });
-
-    const present = profiles
-      .map((p) => {
-        const email = normEmail(p.email);
-        const calendar = p.availabilityCalendar ?? {};
-        const st = calendar?.[dateKey];
-        if (st !== 'present') return null;
-        const firstName = String(p.firstName ?? '').trim() || null;
-        const lastName = String(p.lastName ?? '').trim() || null;
-        const userName =
-          String(p.displayName ?? '').trim() ||
-          [firstName, lastName].filter(Boolean).join(' ') ||
-          null;
-        return {
-          email,
-          status: 'unknown' as const,
-          userName,
-          firstName,
-          lastName,
-          avatarUrl: String(p.avatarUrl ?? '').trim() || null,
-          telegramId: p.telegramId ? String(p.telegramId).trim() || null : null,
-        };
-      })
-      .filter(Boolean) as DirectorSessionParticipant[];
+    const profileByEmail = new Map(
+      profiles.map((p) => [normEmail(p.email), p] as const),
+    );
 
     const directorSelf = await this.buildDirectorSelfParticipant(userId);
+    const directorEmail = directorSelf ? normEmail(directorSelf.email) : '';
+
     const mergedByEmail = new Map<string, DirectorSessionParticipant>();
-    for (const row of present) {
-      mergedByEmail.set(normEmail(row.email), row);
+    for (const rawEmail of needed) {
+      const email = normEmail(rawEmail);
+      if (!email || !looksLikeEmail(email)) continue;
+      const p = profileByEmail.get(email);
+      if (!includeUnavailable) {
+        const isDirector = Boolean(directorEmail && email === directorEmail);
+        if (!isDirector && !profileIsFreeForCall(p, dateKey)) continue;
+      }
+      const firstName = String(p?.firstName ?? '').trim() || null;
+      const lastName = String(p?.lastName ?? '').trim() || null;
+      const userName =
+        String(p?.displayName ?? '').trim() ||
+        [firstName, lastName].filter(Boolean).join(' ') ||
+        null;
+      mergedByEmail.set(email, {
+        email,
+        status: 'unknown',
+        userName,
+        firstName,
+        lastName,
+        avatarUrl: String(p?.avatarUrl ?? '').trim() || null,
+        telegramId: p?.telegramId ? String(p.telegramId).trim() || null : null,
+      });
     }
+
     if (directorSelf) {
       const prev = mergedByEmail.get(directorSelf.email);
       mergedByEmail.set(directorSelf.email, {
@@ -1017,10 +1135,28 @@ export class DirectorSessionsService {
       });
     }
 
-    const merged = Array.from(mergedByEmail.values());
+    const callTimeByEmail = await this.computeActorCallTimeByEmail(
+      userId,
+      session,
+    );
+    const merged = Array.from(mergedByEmail.values()).map((p) => {
+      const email = normEmail(p.email);
+      const callTime = callTimeByEmail.get(email) ?? null;
+      return { ...p, callTime };
+    });
+    merged.sort((a, b) => {
+      const ta = String(a.callTime ?? '').trim();
+      const tb = String(b.callTime ?? '').trim();
+      if (ta && tb) return ta.localeCompare(tb) || a.email.localeCompare(b.email);
+      if (ta) return -1;
+      if (tb) return 1;
+      return a.email.localeCompare(b.email);
+    });
     if (merged.length === 0) {
       throw new BadRequestException(
-        `Нельзя опубликовать сессию: среди нужных по слотам никто не отметил присутствие в профиле на ${dateKey}`,
+        includeUnavailable
+          ? `Нельзя опубликовать сессию: по слотам не нашлось актёров на ${dateKey}`
+          : `Нельзя опубликовать сессию: никто из нужных актёров не отметил «свободен» на ${dateKey}. Включите тогл «звать без занятости» или попросите отметить день.`,
       );
     }
     return { participants: merged, neededEmails: needed };
@@ -1046,48 +1182,6 @@ export class DirectorSessionsService {
     }
 
     const neededEmails = new Set<string>();
-    const allowedEmails = new Set<string>();
-    const explicitlySelectedEmails = new Set<string>();
-
-    const troupeIds = new Set<string>();
-    if (session.theaterId) {
-      const theater = await this.prisma.theater.findFirst({
-        where: {
-          id: session.theaterId,
-          workspace: {
-            memberships: {
-              some: { userId, role: { in: ['OWNER', 'ADMIN'] } },
-            },
-          },
-        },
-        select: {
-          homeTroupes: { select: { id: true } },
-          troupes: { select: { troupeId: true } },
-        },
-      });
-      if (!theater) {
-        throw new ForbiddenException('Cannot manage this theater');
-      }
-      theater.homeTroupes.forEach(({ id }) => troupeIds.add(id));
-      theater.troupes.forEach(({ troupeId }) => troupeIds.add(troupeId));
-    } else {
-      const troupe = await this.prisma.troupe.findFirst({
-        where: { ownerUserId: userId },
-        orderBy: { createdAt: 'asc' },
-        select: { id: true },
-      });
-      if (troupe?.id) troupeIds.add(troupe.id);
-    }
-    if (troupeIds.size > 0) {
-      const troupeMembers = await this.prisma.troupeMember.findMany({
-        where: { troupeId: { in: Array.from(troupeIds) } },
-        select: { email: true },
-      });
-      troupeMembers
-        .map((m) => normEmail(m.email))
-        .filter(Boolean)
-        .forEach((e) => allowedEmails.add(e));
-    }
 
     for (const slot of customSlots) {
       const participantEmails = Array.isArray(slot.participantEmails)
@@ -1096,7 +1190,6 @@ export class DirectorSessionsService {
       for (const value of participantEmails) {
         const email = normEmail(String(value ?? ''));
         if (!email || !looksLikeEmail(email)) continue;
-        explicitlySelectedEmails.add(email);
         neededEmails.add(email);
       }
     }
@@ -1144,29 +1237,207 @@ export class DirectorSessionsService {
 
     for (const sl of session.slots ?? []) {
       const picks = (sl as DirectorSessionSlot).roleRehearsalPicks;
-      if (!Array.isArray(picks)) continue;
-      for (const p of picks) {
-        if (!isRoleRehearsalPickChecked(p)) continue;
-        const em = normEmail(String(p.email ?? ''));
+      if (Array.isArray(picks)) {
+        for (const p of picks) {
+          if (!isRoleRehearsalPickChecked(p)) continue;
+          const em = normEmail(String(p.email ?? ''));
+          if (em && looksLikeEmail(em)) neededEmails.add(em);
+        }
+      }
+      for (const value of sl.participantEmails ?? []) {
+        const em = normEmail(String(value ?? ''));
         if (em && looksLikeEmail(em)) neededEmails.add(em);
       }
     }
 
-    const filtered = Array.from(neededEmails).filter((email) =>
-      allowedEmails.size > 0 ? allowedEmails.has(normEmail(email)) : true,
-    );
-    if (explicitlySelectedEmails.size > 0 && filtered.length === 0) {
-      throw new BadRequestException(
-        'Выбранные участники не входят в труппу театра',
-      );
+    for (const value of session.plannedEmails ?? []) {
+      const em = normEmail(String(value ?? ''));
+      if (em && looksLikeEmail(em)) neededEmails.add(em);
     }
-    if (filtered.length === 0) {
+
+    // В вызов идут все назначенные на роли / выбранные в слотах.
+    // Фильтр труппы больше не отрезает актёров (из‑за него в Telegram
+    // часто оставался только режиссёр).
+    const result = Array.from(neededEmails).filter(Boolean);
+    if (result.length === 0) {
       if (customSlots.length > 0) return [];
       throw new BadRequestException(
         `Нельзя опубликовать сессию: не нашли emails актёров по roleAssignments (или нет доступа к ним)`,
       );
     }
-    return filtered;
+    return result;
+  }
+
+  private collectEmailsOnSlotFromPayload(slot: DirectorSessionSlot): string[] {
+    const emails = new Set<string>();
+    for (const value of slot.participantEmails ?? []) {
+      const email = normEmail(String(value ?? ''));
+      if (email && looksLikeEmail(email)) emails.add(email);
+    }
+    for (const pick of slot.roleRehearsalPicks ?? []) {
+      if (!isRoleRehearsalPickChecked(pick)) continue;
+      const email = normEmail(String(pick.email ?? ''));
+      if (email && looksLikeEmail(email)) emails.add(email);
+    }
+    return Array.from(emails);
+  }
+
+  private async collectEmailsForDirectorSlot(
+    userId: string,
+    slot: DirectorSessionSlot,
+    scriptCache: Map<
+      string,
+      {
+        projectId: string;
+        sceneRoles: unknown;
+        sceneById: Map<number, RawSceneLike>;
+      }
+    >,
+    assignmentCache: Map<string, Map<string, string[]>>,
+  ): Promise<string[]> {
+    const emails = new Set<string>(this.collectEmailsOnSlotFromPayload(slot));
+    const ref = slot.ref;
+    if (!ref?.projectSlug || ref.sceneId == null) {
+      return Array.from(emails);
+    }
+
+    const slug = String(ref.projectSlug).trim();
+    let cached = scriptCache.get(slug);
+    if (!cached) {
+      try {
+        const { project } = await this.projectAccess.assertBySlug(
+          userId,
+          slug,
+          'read',
+        );
+        const { scenes, sceneRoles } = await this.loadProjectScriptData(
+          project.id,
+        );
+        const sceneById = new Map<number, RawSceneLike>();
+        scenes.forEach((st) => {
+          if (typeof st?.id === 'number') sceneById.set(st.id, st);
+        });
+        cached = { projectId: project.id, sceneRoles, sceneById };
+        scriptCache.set(slug, cached);
+      } catch {
+        return Array.from(emails);
+      }
+    }
+
+    const scene = cached.sceneById.get(ref.sceneId);
+    const attachedKeys = extractRoleKeysFromSceneRoles(
+      cached.sceneRoles as any,
+      ref.sceneId,
+      normalizeRoleKey,
+    );
+    const roleKeys =
+      attachedKeys.length > 0
+        ? attachedKeys
+        : extractRolesSmart(
+            String(scene?.playMarkdown ?? scene?.markdown ?? ''),
+          )
+            .map((r) => normalizeRoleKey(r))
+            .filter(Boolean);
+
+    let assignmentMap = assignmentCache.get(cached.projectId);
+    if (!assignmentMap) {
+      assignmentMap = new Map<string, string[]>();
+      assignmentCache.set(cached.projectId, assignmentMap);
+    }
+
+    const picks = slot.roleRehearsalPicks ?? [];
+    for (const key of roleKeys) {
+      if (!key) continue;
+      const rolePicks = picks.filter(
+        (p) => normalizeRoleKey(String(p.roleKey ?? '')) === key,
+      );
+      if (rolePicks.length > 0) {
+        for (const p of rolePicks) {
+          if (!isRoleRehearsalPickChecked(p)) continue;
+          const em = normEmail(String(p.email ?? ''));
+          if (em && looksLikeEmail(em)) emails.add(em);
+        }
+        // Если пики есть, но ни один не отмечен — берём назначения ролей.
+        const hadChecked = rolePicks.some((p) => isRoleRehearsalPickChecked(p));
+        if (!hadChecked) {
+          if (!assignmentMap.has(key)) {
+            const resolved = await this.roles.resolveAssignmentsByRoleKeys(
+              cached.projectId,
+              [key],
+            );
+            assignmentMap.set(key, resolved.get(key) ?? []);
+          }
+          for (const raw of assignmentMap.get(key) ?? []) {
+            const em = normEmail(String(raw ?? ''));
+            if (em && looksLikeEmail(em)) emails.add(em);
+          }
+        }
+      } else {
+        if (!assignmentMap.has(key)) {
+          const resolved = await this.roles.resolveAssignmentsByRoleKeys(
+            cached.projectId,
+            [key],
+          );
+          assignmentMap.set(key, resolved.get(key) ?? []);
+        }
+        for (const raw of assignmentMap.get(key) ?? []) {
+          const em = normEmail(String(raw ?? ''));
+          if (em && looksLikeEmail(em)) emails.add(em);
+        }
+      }
+    }
+
+    return Array.from(emails);
+  }
+
+  private async computeActorCallTimeByEmail(
+    userId: string,
+    session: DirectorRehearsalSession,
+  ): Promise<Map<string, string>> {
+    const offsetByEmail = new Map<string, number>();
+    const scriptCache = new Map<
+      string,
+      {
+        projectId: string;
+        sceneRoles: unknown;
+        sceneById: Map<number, RawSceneLike>;
+      }
+    >();
+    const assignmentCache = new Map<string, Map<string, string[]>>();
+
+    for (const sl of session.slots ?? []) {
+      const offset = Math.max(0, Math.floor((sl as DirectorSessionSlot).offsetMin ?? 0));
+      const slotEmails = await this.collectEmailsForDirectorSlot(
+        userId,
+        sl as DirectorSessionSlot,
+        scriptCache,
+        assignmentCache,
+      );
+      for (const raw of slotEmails) {
+        const email = normEmail(raw);
+        if (!email) continue;
+        const prev = offsetByEmail.get(email);
+        if (prev == null || offset < prev) offsetByEmail.set(email, offset);
+      }
+    }
+
+    const baseParts = getDatePartsInTimeZone(session.startsAt);
+    const baseMin =
+      baseParts && /^\d{2}$/.test(baseParts.hh) && /^\d{2}$/.test(baseParts.min)
+        ? Number(baseParts.hh) * 60 + Number(baseParts.min)
+        : 0;
+    const toHHMM = (min: number) => {
+      const m = ((Math.floor(min) % (24 * 60)) + 24 * 60) % (24 * 60);
+      const hh = String(Math.floor(m / 60)).padStart(2, '0');
+      const mm = String(m % 60).padStart(2, '0');
+      return `${hh}:${mm}`;
+    };
+
+    const result = new Map<string, string>();
+    for (const [email, offset] of offsetByEmail) {
+      result.set(email, toHHMM(baseMin + offset));
+    }
+    return result;
   }
 
   async remindMissingAvailability(userId: string, sessionId: string) {
@@ -1290,7 +1561,7 @@ export class DirectorSessionsService {
   async publish(
     userId: string,
     sessionId: string,
-    body?: { comment?: string },
+    body?: { comment?: string; includeUnavailable?: boolean },
   ) {
     const sessId = String(sessionId ?? '').trim();
     if (!sessId) throw new BadRequestException('session id is required');
@@ -1310,8 +1581,14 @@ export class DirectorSessionsService {
             .slice(0, 4000) || null
         : (session.comment ?? null);
 
+    const includeUnavailable = Boolean(
+      (body as { includeUnavailable?: unknown } | undefined)?.includeUnavailable,
+    );
+
     const { participants, neededEmails } =
-      await this.buildParticipantsForSession(userId, session);
+      await this.buildParticipantsForSession(userId, session, {
+        includeUnavailable,
+      });
     const plannedSet = new Set<string>();
     for (const e of normalizePlannedEmails(session.plannedEmails) ?? []) {
       plannedSet.add(normEmail(e));
@@ -1396,15 +1673,38 @@ export class DirectorSessionsService {
         if (lastErr) {
           console.warn(
             '[director-sessions] bot publish failed (сессия всё равно опубликована в приложении)',
-            lastErr,
+            lastErr?.response?.status,
+            lastErr?.response?.data ?? lastErr?.message ?? lastErr,
           );
         }
       } catch (e: any) {
         console.warn(
           '[director-sessions] bot publish error (сессия опубликована в приложении)',
-          e,
+          e?.response?.status,
+          e?.response?.data ?? e?.message ?? e,
         );
       }
+    } else {
+      console.warn('[director-sessions] publish skipped: missing secret or botIntegrationId', {
+        hasSecret: Boolean(secret),
+        hasBotIntegrationId: Boolean(botIntegrationId),
+      });
+    }
+
+    try {
+      const title = String((updated as any)?.title ?? 'Сессия').trim();
+      const when = String((updated as any)?.startsAt ?? '').trim();
+      const announce = [`Orchestra: ${title}`, when ? `Когда: ${when}` : '']
+        .filter(Boolean)
+        .join('\n');
+      if (announce) {
+        await this.messengerBridge.publishText(userId, { text: announce });
+      }
+    } catch (e: any) {
+      console.warn(
+        '[director-sessions] messenger fan-out skipped',
+        e?.message || e,
+      );
     }
 
     return { ok: true, telegramSent, session: updated };
@@ -1420,20 +1720,22 @@ export class DirectorSessionsService {
     const session = row?.payload as any as DirectorRehearsalSession | undefined;
     if (!session) throw new NotFoundException('Session not found');
 
-    // resolve slot titles
     const refs = (session.slots ?? [])
       .map((s) => s.ref)
       .filter(Boolean) as DirectorSlotRef[];
     const slugs = Array.from(new Set(refs.map((r) => r.projectSlug))).filter(
       Boolean,
     );
-    const projectBySlug = new Map<string, { id: string; slug: string }>();
+    const projectBySlug = new Map<
+      string,
+      { id: string; slug: string; name: string }
+    >();
     const scenesBySlug = new Map<string, Map<number, RawSceneLike>>();
 
     for (const slug of slugs) {
       const project = await this.prisma.project.findFirst({
         where: { slug, deletedAt: null },
-        select: { id: true, slug: true },
+        select: { id: true, slug: true, name: true },
       });
       if (!project) continue;
       projectBySlug.set(slug, project);
@@ -1445,7 +1747,6 @@ export class DirectorSessionsService {
       scenesBySlug.set(slug, map);
     }
 
-    // local time labels (HH:MM) based on session.startsAt + offsetMin
     const baseParts = getDatePartsInTimeZone(session.startsAt);
     const baseMin =
       baseParts && /^\d{2}$/.test(baseParts.hh) && /^\d{2}$/.test(baseParts.min)
@@ -1457,6 +1758,20 @@ export class DirectorSessionsService {
       const mm = String(m % 60).padStart(2, '0');
       return `${hh}:${mm}`;
     };
+
+    const appBase = this.orchestraAppBase();
+    const primarySlug = await this.resolvePrimaryProjectSlugForSession(
+      session,
+      slugs,
+      pid,
+    );
+    const sessionUrl = await this.buildDirectorSessionAppUrl(
+      appBase,
+      session,
+      sid,
+      slugs,
+      pid,
+    );
 
     const resolvedSlots = (session.slots ?? []).map((sl) => {
       const offset = Math.max(0, Math.floor((sl as any)?.offsetMin ?? 0));
@@ -1470,25 +1785,55 @@ export class DirectorSessionsService {
           timeStart,
           timeEnd,
           projectSlug: null,
+          projectName: null,
           sceneId: null,
           sceneTitle: String(sl.title ?? '').trim() || null,
           stepTitle: String(sl.title ?? '').trim() || null,
+          sceneUrl: null,
         };
       const scene = scenesBySlug.get(ref.projectSlug)?.get(ref.sceneId);
       const slotTitle =
         String(sl.title ?? '').trim() || String(scene?.title ?? '').trim() || null;
+      const projectName =
+        String(projectBySlug.get(ref.projectSlug)?.name ?? '').trim() || null;
+      const sceneUrl =
+        this.buildProjectSceneBoardUrl(appBase, ref.projectSlug, ref.sceneId) ||
+        null;
       return {
         ...sl,
         timeStart,
         timeEnd,
         projectSlug: ref.projectSlug,
+        projectName,
         sceneId: ref.sceneId,
         sceneTitle: slotTitle,
         stepTitle: slotTitle,
+        sceneUrl,
       };
     });
 
-    return { ...session, projectId: pid, slots: resolvedSlots };
+    const userId = String(row?.userId ?? '').trim();
+    let enrichedParticipants = session.participants ?? [];
+    if (userId) {
+      const callTimeByEmail = await this.computeActorCallTimeByEmail(
+        userId,
+        session,
+      );
+      enrichedParticipants = (session.participants ?? []).map((p) => {
+        const email = normEmail(String(p.email ?? ''));
+        const callTime = callTimeByEmail.get(email) ?? null;
+        return callTime ? { ...p, callTime } : { ...p, callTime: null };
+      });
+    }
+
+    return {
+      ...session,
+      projectId: pid,
+      primaryProjectSlug: primarySlug ?? null,
+      sessionUrl: sessionUrl ?? null,
+      slots: resolvedSlots,
+      participants: enrichedParticipants,
+    };
   }
 
   async markTelegramPublished(

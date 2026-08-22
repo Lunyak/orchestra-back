@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import cn from "classnames";
 import { useAuth } from "../../auth/model/auth-context";
 import { usePlaybook } from "../../playbook";
 import { useProject } from "../../project/model/project-context";
@@ -173,56 +172,33 @@ export function ProjectMediaSourceBar({
   const anyBusy = syncBusy || folderBusy || uploadBusy;
 
   return (
-    <section className="project-media-source" aria-label="Источники медиа">
-      <p className="project-media-source__lead">
-        Все файлы проекта хранятся здесь. Суфлер, сценарий и проектор берут медиа из этой
-        библиотеки — отдельно по проекту ничего качать не нужно.
-      </p>
-
-      <div className="project-media-source__cards">
-        <article className="project-media-source__card">
-          <h2 className="project-media-source__card-title">С сервера</h2>
-          <p className="project-media-source__card-text">
-            Подтянуть список и файлы из облака, если проект уже ведётся онлайн.
-          </p>
+    <section className="project-media-source" aria-label="Хранилище проекта">
+      <div className="project-media-source__row">
+        <span className="project-media-source__label">Хранилище</span>
+        <div className="project-media-source__actions">
           <button
             type="button"
             className="project-media-source__btn project-media-source__btn--primary"
             disabled={anyBusy}
             onClick={() => void handleSyncFromServer()}
           >
-            {syncBusy ? "Синхронизация…" : "Синхронизировать"}
+            {syncBusy ? "Синхронизация…" : "С сервера"}
           </button>
-        </article>
-
-        <article className="project-media-source__card">
-          <h2 className="project-media-source__card-title">Из папки</h2>
-          <p className="project-media-source__card-text">
-            Указать папку на диске (например на рабочем столе): mp4, mp3, jpg, script.json.
-            Файлы читаются напрямую, без копирования в браузер.
-          </p>
           <button
             type="button"
             className="project-media-source__btn project-media-source__btn--primary"
             disabled={anyBusy}
             onClick={() => void handleImportFromFolder()}
           >
-            {folderBusy ? "Импорт…" : "Выбрать папку…"}
+            {folderBusy ? "Импорт…" : "Из папки"}
           </button>
-        </article>
-
-        <article className="project-media-source__card">
-          <h2 className="project-media-source__card-title">Загрузить</h2>
-          <p className="project-media-source__card-text">
-            Добавить файлы с компьютера в библиотеку проекта (музыка, видео, заставки).
-          </p>
           <button
             type="button"
             className="project-media-source__btn"
             disabled={anyBusy}
             onClick={() => uploadInputRef.current?.click()}
           >
-            {uploadBusy ? "Загрузка…" : "Выбрать файлы…"}
+            {uploadBusy ? "Загрузка…" : "Файлы…"}
           </button>
           <input
             ref={uploadInputRef}
@@ -232,14 +208,16 @@ export function ProjectMediaSourceBar({
             accept="audio/*,video/*,image/*"
             onChange={(e) => void handleUploadFiles(e.target.files)}
           />
-        </article>
+        </div>
+        {folderLabel ? (
+          <span className="project-media-source__folder-badge">
+            Папка:{" "}
+            <strong className="project-media-source__folder-label">
+              {folderLabel}
+            </strong>
+          </span>
+        ) : null}
       </div>
-
-      {folderLabel ? (
-        <p className={cn("project-media-source__folder-badge")}>
-          Локальная папка: <strong className="project-media-source__folder-label">{folderLabel}</strong>
-        </p>
-      ) : null}
     </section>
   );
 }

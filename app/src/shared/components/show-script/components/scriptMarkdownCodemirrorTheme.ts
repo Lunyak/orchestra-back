@@ -8,19 +8,28 @@ export const scriptMarkdownCodemirrorTheme = EditorView.theme(
       color: "var(--color-text-primary)",
     },
     ".cm-scroller": {
-      fontFamily: "var(--font-family-script-body)",
-      fontSize: "14px",
-      lineHeight: "1.5",
+      fontFamily: "var(--script-play-font-family, var(--font-family-script-body))",
+      fontSize: "var(--script-font-size-body, 14px)",
+      lineHeight: "var(--script-play-line-height, var(--script-markdown-line-height, 1.5))",
       minHeight: "280px",
     },
     ".cm-content": {
       caretColor: "var(--color-text-primary)",
+      fontFamily: "inherit",
+      fontSize: "inherit",
+      lineHeight: "inherit",
       whiteSpace: "pre-wrap",
       wordBreak: "break-word",
       overflowWrap: "break-word",
     },
     ".cm-line": {
-      padding: 0,
+      padding: "0",
+      fontFamily: "inherit",
+      fontSize: "inherit",
+      lineHeight: "inherit",
+    },
+    ".cm-line.cm-line-para-gap": {
+      paddingTop: "var(--script-play-paragraph-gap, var(--script-markdown-paragraph-gap))",
     },
     ".cm-line:hover": {
       backgroundColor: "rgba(255, 255, 255, 0.04)",

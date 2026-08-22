@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ScriptEditorInsertMenuPick, ScriptEditorInsertMenuRow } from "../model/types";
 import "./ScriptEditorInsertContextMenu.css";
@@ -116,7 +117,11 @@ export function ScriptEditorInsertContextMenu({
                 role="menuitem"
                 aria-haspopup="menu"
                 aria-expanded={expanded}
-                className="script-editor-insert-menu__item script-editor-insert-menu__item--submenu"
+                className={cn(
+                  "script-editor-insert-menu__item",
+                  "script-editor-insert-menu__item--submenu",
+                  expanded && "script-editor-insert-menu__item--open",
+                )}
                 disabled={row.disabled || row.children.length === 0}
                 title={row.title}
                 onClick={(e) => {

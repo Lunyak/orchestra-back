@@ -1,77 +1,73 @@
-.project-connections-settings,
-.project-connections-settings__fields,
-.project-connections-settings__premise {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-}
-
-.project-connections-settings__fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.project-connections-settings__organization {
-  display: grid;
-  grid-template-columns: minmax(140px, 0.4fr) minmax(0, 1fr) auto;
-  gap: var(--spacing-4);
-}
-
-.project-connections-settings .native-text-input {
-  border: 1px solid var(--color-border-input);
-  padding: var(--spacing-4) var(--spacing-6);
-}
-
-.project-connections-settings__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-4);
-}
-
-.project-connections-settings__premise {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.project-connections-settings__status {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.project-connections-settings__links {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-3);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.project-connections-settings__link-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-4);
-}
-
-.project-connections-settings__link-meta {
-  color: var(--color-text-muted);
-}
-
-.project-connections-settings__share {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-}
-
+.project-connections-settings .settings-invite-row + .settings-invite-input,
 .project-connections-settings__share-url {
+  display: block;
   width: 100%;
+  max-width: none;
+  margin-top: 8px;
+  box-sizing: border-box;
 }
 
-@media (max-width: 560px) {
-  .project-connections-settings__organization,
-  .project-connections-settings__fields,
-  .project-connections-settings__premise {
-    grid-template-columns: 1fr;
-  }
+.project-connections-settings .settings-project-field {
+  flex: none;
+  width: 100%;
+  max-width: 280px;
+}
+
+.project-connections-settings__partner,
+.project-connections-settings .settings-member-row {
+  flex-wrap: nowrap;
+  width: 100%;
+  max-width: 280px;
+  box-sizing: border-box;
+}
+
+.project-connections-settings .settings-members {
+  max-width: 280px;
+}
+
+.project-connections-settings .settings-member-email {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-connections-settings .settings-member-email__inner {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.project-connections-settings .settings-member-email__inner > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-connections-settings .settings-member-actions {
+  margin-left: 0;
+  flex: 0 0 auto;
+}
+
+.project-connections-settings__theater-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.project-connections-settings__theater-link:hover,
+.project-connections-settings__theater-link:focus-visible {
+  color: var(--color-active-ascent);
+  outline: none;
+}
+
+.project-connections-settings .settings-member-remove {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
+}
+
+.project-connections-settings .settings-sync-hint {
+  margin-top: 10px;
+  margin-bottom: 0;
 }

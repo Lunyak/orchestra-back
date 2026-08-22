@@ -1,11 +1,13 @@
 import cn from "classnames";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { PlaylistPlayOptions } from "../../../features/playbook/model/playbook-playback-bridge";
+import { usePlaybook } from "../../../features/playbook";
 import { usePlayerVolume } from "../../player/usePlayerVolume";
 import { useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
+import { HeaderPlayer } from "../header/HeaderPlayer";
 import { PlaylistBottomControls } from "./PlaylistBottomControls";
-import { PlaylistEditToolbar } from "./PlaylistEditToolbar";
+import { PlaylistSidebarFooter } from "./PlaylistSidebarFooter";
 import { formatPlaylistTime } from "./playlist-format-time";
 import { PlaylistTrackList } from "./PlaylistTrackList";
 import { usePlaylistPlayback } from "./usePlaylistPlayback";
@@ -34,6 +36,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const isEditMode = useAppSelector((s) => s.scriptUi.playlistEditMode);
   const crossfadeEnabled = useAppSelector((s) => s.scriptUi.playlistCrossfadeEnabled);
+  const { playbookData, pushPlaybookAfterSoundsSave, registerSoundToggle } = usePlaybook();
 
   const { volume, setVolume } = usePlayerVolume();
   const [uiMessage, setUiMessage] = useState<string | null>(null);
@@ -67,6 +70,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const showPlayer = mode !== "list";
   const showSidebar = mode !== "player";
   const mountAudioHost = showPlayer || Boolean(onRegisterPlayHandler);
+  const showSoundsPanel = Boolean(projectName);
 
   const playback = usePlaylistPlayback({
     projectName,
@@ -96,6 +100,27 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
     void playback.preparePlaylist();
   };
 
+  const playerControls = showPlayer ? (
+    <PlaylistBottomControls
+      projectName={projectName}
+      currentTrack={playback.currentTrack}
+      isPlaying={playback.isPlaying}
+      progress={playback.progress}
+      duration={playback.duration}
+      volume={volume}
+      progressPercent={playback.progressPercent}
+      volumePercent={playback.volumePercent}
+      canGoPrev={playback.canGoPrevTrack}
+      canGoNext={playback.canGoNextTrack}
+      onPrevTrack={playback.playPreviousTrack}
+      onNextTrack={playback.playNextTrack}
+      onTogglePlayback={playback.togglePlayback}
+      onSeek={playback.seekPlayer}
+      onVolumeChange={playback.setPlayerVolume}
+      formatTime={formatPlaylistTime}
+    />
+  ) : null;
+
   return (
     <>
       {mountAudioHost ? (
@@ -106,7 +131,11 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
       ) : null}
       {showSidebar ? (
         <aside
-          className={cn("playlist-sidebar", trackActions.isDragOver && "playlist-sidebar--drag-over")}
+          className={cn(
+            "playlist-sidebar",
+            trackActions.isDragOver && "playlist-sidebar--drag-over",
+            showSoundsPanel && "playlist-sidebar--with-sounds",
+          )}
           onDragOver={trackActions.handleDragOver}
           onDragLeave={trackActions.handleDragLeave}
           onDrop={trackActions.handleDrop}
@@ -119,7 +148,49 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
             className="native-file-input--hidden"
             onChange={trackActions.handleWebFileInputChange}
           />
-          <PlaylistEditToolbar
+          <div className="playlist-sidebar__tracks">
+            <PlaylistTrackList
+              playlist={playlist}
+              highlightedTrack={playback.highlightedTrack}
+              isEditMode={isEditMode}
+              showPlayer={showPlayer}
+              playlistUploading={playlistUpload.uploading}
+              addButtonTitle={trackActions.addButtonTitle}
+              desktopAvailable={trackActions.desktopAvailable}
+              editingId={trackActions.editingId}
+              editingTitle={trackActions.editingTitle}
+              dragOverTrackId={trackActions.dragOverTrackId}
+              preloadStatusById={playback.preloadStatusById}
+              onPlayTrack={(track) => void playback.playTrack(track)}
+              onAddTracks={() => void trackActions.addTracks()}
+              onSetEditingTitle={trackActions.setEditingTitle}
+              onStartRename={trackActions.startRename}
+              onCancelRename={trackActions.cancelRename}
+              onApplyRename={trackActions.applyRename}
+              onUpdateFade={trackActions.updateFade}
+              onUpdateLoop={trackActions.updateLoop}
+              onDeleteTrack={trackActions.deleteTrack}
+              onSetDragOverTrackId={trackActions.setDragOverTrackId}
+              onReorderTrack={trackActions.reorderTrack}
+            />
+          </div>
+          {showSoundsPanel ? (
+            <div className="playlist-sidebar__sounds" aria-label="Звуки сцены">
+              <HeaderPlayer
+                projectName={projectName}
+                sceneName="script"
+                sounds={playbookData?.sounds || []}
+                onSoundsSaved={pushPlaybookAfterSoundsSave}
+                onRegisterToggleHandler={registerSoundToggle}
+                settingsOpen={isEditMode}
+                showSettingsToggle={false}
+              />
+            </div>
+          ) : null}
+          {playerControls ? (
+            <div className="playlist-sidebar__player">{playerControls}</div>
+          ) : null}
+          <PlaylistSidebarFooter
             isEditMode={isEditMode}
             uiMessage={uiMessage}
             crossfadeEnabled={crossfadeEnabled}
@@ -129,51 +200,9 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
             onPreparePlaylist={handlePreparePlaylist}
             onCancelPrepare={playback.cancelPrepare}
           />
-          <PlaylistTrackList
-            playlist={playlist}
-            highlightedTrack={playback.highlightedTrack}
-            isEditMode={isEditMode}
-            showPlayer={showPlayer}
-            playlistUploading={playlistUpload.uploading}
-            addButtonTitle={trackActions.addButtonTitle}
-            desktopAvailable={trackActions.desktopAvailable}
-            editingId={trackActions.editingId}
-            editingTitle={trackActions.editingTitle}
-            dragOverTrackId={trackActions.dragOverTrackId}
-            preloadStatusById={playback.preloadStatusById}
-            onPlayTrack={(track) => void playback.playTrack(track)}
-            onAddTracks={() => void trackActions.addTracks()}
-            onSetEditingTitle={trackActions.setEditingTitle}
-            onStartRename={trackActions.startRename}
-            onCancelRename={trackActions.cancelRename}
-            onApplyRename={trackActions.applyRename}
-            onUpdateFade={trackActions.updateFade}
-            onUpdateLoop={trackActions.updateLoop}
-            onDeleteTrack={trackActions.deleteTrack}
-            onSetDragOverTrackId={trackActions.setDragOverTrackId}
-            onReorderTrack={trackActions.reorderTrack}
-          />
         </aside>
       ) : null}
-      {showPlayer ? (
-        <PlaylistBottomControls
-          currentTrack={playback.currentTrack}
-          isPlaying={playback.isPlaying}
-          progress={playback.progress}
-          duration={playback.duration}
-          volume={volume}
-          progressPercent={playback.progressPercent}
-          volumePercent={playback.volumePercent}
-          canGoPrev={playback.canGoPrevTrack}
-          canGoNext={playback.canGoNextTrack}
-          onPrevTrack={playback.playPreviousTrack}
-          onNextTrack={playback.playNextTrack}
-          onTogglePlayback={playback.togglePlayback}
-          onSeek={playback.seekPlayer}
-          onVolumeChange={playback.setPlayerVolume}
-          formatTime={formatPlaylistTime}
-        />
-      ) : null}
+      {!showSidebar ? playerControls : null}
     </>
   );
 };

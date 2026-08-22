@@ -8,6 +8,7 @@ import {
 } from "../../../app/router/paths";
 import { useAuth } from "../../../features/auth";
 import { useMyProfileQuery } from "../../../features/profile/api/profile-api";
+import { profileListAvatarSrc } from "../../../sync/api/profile";
 import { MiniAvatar } from "../../core/mini-avatar/MiniAvatar";
 
 function resolveProfileLabel(profile: {
@@ -39,7 +40,7 @@ export function AppEditorUserMenu() {
     ? projectPath(projectSlug, "settings")
     : null;
   const profileLabel = resolveProfileLabel(profile);
-  const avatarUrl = String(profile?.avatarUrl ?? "").trim() || null;
+  const avatarUrl = profileListAvatarSrc(profile);
   const profileEmail = String(profile?.email ?? "").trim();
   const isProfileActive =
     pathname === globalPaths.profile ||

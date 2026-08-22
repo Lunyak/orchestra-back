@@ -2,19 +2,45 @@ export type PremiseKind = "OWNED" | "RENTED";
 
 export type PremiseMemberRole = "owner" | "manager" | "tenant" | "viewer";
 
+export type PremiseBookedAsKind =
+  | "user"
+  | "troupe"
+  | "theater"
+  | "studio"
+  | "external";
+
 export type PremiseSlotStatus = "confirmed" | "pending" | "cancelled";
 export type PremiseSlotPaymentStatus = "unpaid" | "paid" | "waived";
 export type PremiseUsageType = "internal" | "friendly" | "commercial";
 export type PremiseRecurrenceType = "once" | "weekly";
 export type PremiseRentalStatus =
-  "pending" | "active" | "cancelled" | "completed";
+  | "pending"
+  | "active"
+  | "cancelled"
+  | "completed";
 export type PremiseAgreementStatus =
-  "draft" | "awaiting_signature" | "active" | "terminated" | "expired";
+  | "draft"
+  | "awaiting_signature"
+  | "active"
+  | "terminated"
+  | "expired";
 
 export type PremiseAvailabilityDay = {
   weekday: number;
   startsAtMin: number;
   endsAtMin: number;
+};
+
+export type PremiseBookingActor = {
+  kind: PremiseBookedAsKind;
+  id: string | null;
+  title: string;
+};
+
+export type PremiseBookedAs = {
+  kind: PremiseBookedAsKind;
+  id: string | null;
+  title: string;
 };
 
 export type PremiseSummary = {
@@ -34,6 +60,7 @@ export type PremiseSummary = {
   canManage: boolean;
   canBook: boolean;
   myRole: PremiseMemberRole | "organization_admin" | null;
+  bookingActors?: PremiseBookingActor[];
 };
 
 export type PremiseMemberItem = {
@@ -71,6 +98,12 @@ export type PremiseSlotItem = {
     recurrenceType: PremiseRecurrenceType;
     agreementRequested: boolean;
     status: PremiseRentalStatus;
+    bookedAsKind: PremiseBookedAsKind;
+    bookedAsId: string | null;
+    bookedAsTitle: string;
+    createdByEmail: string;
+    confirmedByEmail: string | null;
+    confirmedAt: string | null;
     agreement: {
       id: string;
       number: string;
@@ -90,6 +123,9 @@ export type PremiseRentalItem = {
   contactEmail: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  bookedAsKind: PremiseBookedAsKind;
+  bookedAsId: string | null;
+  bookedAsTitle: string;
   startsOn: string;
   endsOn: string | null;
   timezoneOffsetMin: number;
@@ -99,6 +135,8 @@ export type PremiseRentalItem = {
   agreementRequested: boolean;
   status: PremiseRentalStatus;
   createdByEmail: string;
+  confirmedByEmail: string | null;
+  confirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
   schedules: {
@@ -202,6 +240,13 @@ export type UpdatePremiseSlotPayload = Partial<{
   status: PremiseSlotStatus;
 }>;
 
+export type CreatePremiseRentalAgreementPayload = {
+  landlordName?: string;
+  landlordDetails?: string;
+  tenantName?: string;
+  tenantDetails?: string;
+};
+
 export type CreatePremiseRentalPayload = {
   usageType: PremiseUsageType;
   recurrenceType: PremiseRecurrenceType;
@@ -211,6 +256,9 @@ export type CreatePremiseRentalPayload = {
   contactEmail?: string;
   contactName?: string;
   contactPhone?: string;
+  bookedAsKind?: PremiseBookedAsKind;
+  bookedAsId?: string;
+  bookedAsTitle?: string;
   startsOn: string;
   endsOn?: string;
   indefinite?: boolean;

@@ -75,6 +75,7 @@ export function PlaylistTrackList({
           const fadeMs = track.fadeMs ?? 500;
           const fadeFillPercent = Math.min(100, Math.max(0, (fadeMs / 3000) * 100));
           const loopEnabled = track.loop ?? false;
+          const trackLabel = `${index + 1}. ${track.title}`;
 
           return (
             <ListItem
@@ -125,7 +126,7 @@ export function PlaylistTrackList({
               }}
               onDragEnd={() => onSetDragOverTrackId(null)}
             >
-              <div className="playlist-track-row-top">
+              <div className="playlist-track-row-main">
                 <button
                   className="playlist-track-btn"
                   onClick={() => {
@@ -171,16 +172,25 @@ export function PlaylistTrackList({
                       }}
                       title={isEditMode ? "Переименовать" : track.title}
                     >
-                      {track.title}
+                      {trackLabel}
                     </span>
                   )}
+                </button>
+                <div className="playlist-track-row-meta">
                   <span
                     className="playlist-preload-dot"
                     data-state={preloadState}
                     aria-hidden="true"
                     title={preloadTitle}
                   />
-                </button>
+                  <Buttons.DeleteButton
+                    className="playlist-track-btn-delete"
+                    variant="scene"
+                    onClick={() => void onDeleteTrack(track)}
+                    title="Удалить трек"
+                    aria-label="Удалить трек"
+                  />
+                </div>
               </div>
 
               {isEditMode ? (
@@ -204,13 +214,15 @@ export function PlaylistTrackList({
                   </button>
 
                   <div className="playlist-track-fade">
-                    <span>Fade</span>
                     <input
+                      className="playlist-top-player__range"
                       type="range"
                       min={0}
                       max={3000}
                       step={100}
                       value={fadeMs}
+                      title={`Fade: ${fadeMs}мс`}
+                      aria-label={`Fade ${fadeMs} миллисекунд`}
                       style={
                         {
                           ["--range-fill" as unknown as string]: `${fadeFillPercent}%`,
@@ -219,13 +231,6 @@ export function PlaylistTrackList({
                       onChange={(event) => void onUpdateFade(track, Number(event.target.value))}
                     />
                   </div>
-
-                  <Buttons.DeleteButton
-                    variant="playlist"
-                    onClick={() => void onDeleteTrack(track)}
-                    title="Удалить трек"
-                    aria-label="Удалить трек"
-                  />
                 </div>
               ) : null}
             </ListItem>

@@ -1,25 +1,20 @@
 /* eslint-disable no-useless-escape */
-import { CSSProperties, FC, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { CSSProperties, FC, useEffect, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { Controller, Navigation, Pagination } from "swiper/modules";
 import { Swiper, SwiperClass, SwiperSlide } from "swiper/react";
+import { ChalkPageShell } from "../../shared/component/ChalkPageShell/ChalkPageShell";
 import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/ImageWithPreloader";
 import { Seo } from "../../shared/component/Seo/Seo";
-import { cn } from "../../shared/lib/cn";
 import { ROUTES } from "../../shared/model/routes";
 import type { SiteEvent } from "../../shared/model/siteContent";
 import { fetchSiteEvents } from "../../shared/model/siteContent";
 import { isAbsoluteUrl, siteAsset } from "../../shared/model/siteAssets";
 import { hitSiteEventView } from "../../shared/model/siteViews";
-import { GlitchHero } from "../HomePage/GlitchHero";
-import "../../shared/styles/site-bands-page.css";
 import "./style.css";
-import Particles, { initParticlesEngine } from "@tsparticles/react";
-import type { ISourceOptions } from "@tsparticles/engine";
-import { loadFirePreset } from "@tsparticles/preset-fire";
 
 const FALLBACK_EVENTS: SiteEvent[] = [
   {
@@ -122,28 +117,8 @@ const FALLBACK_EVENTS: SiteEvent[] = [
 
 const EventPage: FC = () => {
   const { eventSlug } = useParams();
-  const [effectsEnabled, setEffectsEnabled] = useState(false);
-  const fireInitRef = useRef(false);
-  const [fireReady, setFireReady] = useState(false);
-
   const [events, setEvents] = useState<SiteEvent[]>(FALLBACK_EVENTS);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setEffectsEnabled(!reduceMotion.matches);
-    update();
-    reduceMotion.addEventListener("change", update);
-    return () => reduceMotion.removeEventListener("change", update);
-  }, []);
-
-  const normalizedSlug = (eventSlug ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[.\s]+$/g, "");
-
-  const isZaklyatie = normalizedSlug === "заклятие";
-  const isZheleznova = normalizedSlug === "железнова";
+  const eventsPath = ROUTES.EVENTS.startsWith("/") ? ROUTES.EVENTS : `/${ROUTES.EVENTS}`;
 
   useEffect(() => {
     let alive = true;
@@ -173,30 +148,20 @@ const EventPage: FC = () => {
     void hitSiteEventView(slug);
   }, [eventSlug]);
 
-  useEffect(() => {
-    if (!effectsEnabled) return;
-    if (!isZheleznova) return;
-    if (fireInitRef.current) return;
-    fireInitRef.current = true;
-    initParticlesEngine(async (engine) => {
-      await loadFirePreset(engine);
-    })
-      .then(() => setFireReady(true))
-      .catch(() => setFireReady(false));
-  }, [effectsEnabled, isZheleznova]);
-
-  const fireOptions: ISourceOptions = useMemo(() => {
-    return {
-      preset: "fire",
-      fullScreen: { enable: false },
-      background: { color: { value: "transparent" } },
-    };
-  }, []);
-
   const curentEvent = events.find((E) => E.slug === eventSlug);
 
   if (!curentEvent) {
-    return <div>Событие не найдено</div>;
+    return (
+      <ChalkPageShell
+        mainClassName="chalk-page__main--event"
+        scrollable
+        showHomeBack
+        homeBackTo={eventsPath}
+        homeBackLabel="На афишу"
+      >
+        <p className="chalk-event__status" role="status">Спектакль не найден</p>
+      </ChalkPageShell>
+    );
   }
 
   const title = curentEvent.name?.trim() || "Спектакль";
@@ -219,29 +184,6 @@ const EventPage: FC = () => {
       : rainAudioUrlRaw
         ? siteAsset(rainAudioUrlRaw)
         : "";
-
-  const eventAccent =
-    typeof curentEvent.colorBackground === "number"
-      ? `#${curentEvent.colorBackground.toString(16).padStart(6, "0")}`
-      : undefined;
-
-  const style = {
-    ...(eventAccent ? ({ ["--event-accent" as any]: eventAccent } satisfies CSSProperties) : null),
-    ...(isZaklyatie
-      ? ({
-        // Позже просто положи файл в public/bg/zaklyatie-village.jpg
-        ["--zaklyatie-bg-url" as any]: 'url("/bg/zaklyatie-village.jpg")',
-      } satisfies CSSProperties)
-      : null),
-  } as CSSProperties;
-
-  const bgUrl = curentEvent.eventPageBg ? siteAsset(curentEvent.eventPageBg) : "";
-  const styleWithBg = {
-    ...style,
-    ...(bgUrl ? ({ ["--event-bg-url" as any]: `url("${bgUrl}")` } satisfies CSSProperties) : null),
-  } as CSSProperties;
-
-  const eventsPath = ROUTES.EVENTS.startsWith("/") ? ROUTES.EVENTS : `/${ROUTES.EVENTS}`;
 
   const ogImageCandidate = curentEvent.cardImage?.trim()
     ? curentEvent.cardImage.trim()
@@ -350,26 +292,24 @@ const EventPage: FC = () => {
   };
 
   const photos = (curentEvent.photos ?? []).map(siteAsset);
-  const pageClassName = cn(
-    "event-page",
-    "site-bands-page",
-    isZaklyatie && "event-page--zaklyatie"
-  );
+  const hasMetaChips =
+    curentEvent.soon ||
+    Boolean(curentEvent.old?.trim()) ||
+    Boolean(curentEvent.type?.trim()) ||
+    Boolean(curentEvent.date?.trim());
 
   return (
-    <div className={pageClassName} style={styleWithBg} data-hero-variant="strip">
-      <div className="site-bands-page__grain" aria-hidden />
-
-      {effectsEnabled && isZheleznova && fireReady && (
-        <div className="event-page__particles event-page__particles--fire" aria-hidden>
-          <Particles id="eventFireParticles" options={fireOptions} />
+    <ChalkPageShell
+      mainClassName="chalk-page__main--event"
+      scrollable
+      showHomeBack
+      homeBackTo={eventsPath}
+      homeBackLabel="На афишу"
+    >
+      {showRainToggle && (
+        <div className="chalk-event__rain">
+          <RainAmbienceToggle url={rainAudioUrl} label={rainButtonLabel} />
         </div>
-      )}
-
-      {isZaklyatie && (
-        <ZaklyatieAtmosphere
-          fallbackSrc={photos[0]}
-        />
       )}
 
       <Seo
@@ -380,139 +320,117 @@ const EventPage: FC = () => {
         jsonLd={[breadcrumbLd, eventLd]}
       />
 
-      <Link to={eventsPath} className="site-bands-page__back">
-        Назад
-      </Link>
-
-      {showRainToggle && (
-        <div className="event-page__rainCorner">
-          <RainAmbienceToggle url={rainAudioUrl} label={rainButtonLabel} />
+      {hasMetaChips && (
+        <div className="chalk-event__chips" aria-label="Характеристики спектакля">
+          {curentEvent.soon && <span className="chalk-event__chip">скоро</span>}
+          {curentEvent.old?.trim() && (
+            <span className="chalk-event__chip">{curentEvent.old.trim()}</span>
+          )}
+          {curentEvent.type?.trim() && (
+            <span className="chalk-event__chip">{curentEvent.type.trim()}</span>
+          )}
+          {curentEvent.date?.trim() && (
+            <span className="chalk-event__chip">{curentEvent.date.trim()}</span>
+          )}
         </div>
       )}
 
-      <div className="site-bands-page__content">
-        <div className="event-page__heroStage">
-          <header className="site-bands-page__hero event-page__hero">
-            <div className="event-page__meta event-page__meta--left" aria-label="Характеристики спектакля">
-              {curentEvent.soon && <span className="event-page__chip">скоро</span>}
-              {curentEvent.old?.trim() && (
-                <span className="event-page__chip">{curentEvent.old.trim()}</span>
-              )}
-              {curentEvent.type?.trim() && (
-                <span className="event-page__chip">{curentEvent.type.trim()}</span>
-              )}
-            </div>
-            <div className="event-page__heroMain">
-              <GlitchHero as="h1" text={title} className="home-page__glitch-hero--page" />
-            </div>
-            <div className="event-page__meta event-page__meta--right" aria-label="Дата спектакля">
-              {curentEvent.date?.trim() && (
-                <span className="event-page__chip">{curentEvent.date.trim()}</span>
-              )}
-            </div>
-          </header>
+      <h1 className="chalk-page__title chalk-event__title">{title}</h1>
+      <div className="chalk-page__rule" aria-hidden />
 
-          {photos.length > 0 && (
-            <section className="event-page__photo" aria-label="Фотографии спектакля">
-              <PhotoCarousel images={photos} title={title} />
-            </section>
-          )}
-        </div>
+      {photos.length > 0 && (
+        <section className="chalk-event__photo" aria-label="Фотографии спектакля">
+          <PhotoCarousel images={photos} title={title} />
+        </section>
+      )}
 
-        {curentEvent.anonse?.trim() && (
-          <section className="event-page__about site-bands-row" aria-label="Описание спектакля">
-            <p className="event-page__description">{curentEvent.anonse}</p>
-          </section>
+      {curentEvent.anonse?.trim() && (
+        <section className="chalk-event__about" aria-label="Описание спектакля">
+          <p className="chalk-event__description">{curentEvent.anonse}</p>
+        </section>
+      )}
+
+      <div className="chalk-event__list" role="list" aria-label="Действия">
+        {hasTicketsCloud && (
+          <div className="chalk-event__row" role="listitem">
+            <span className="chalk-event__row-title">Билеты</span>
+            {ticketsCloudEventId && ticketsCloudToken ? (
+              <button
+                type="button"
+                className="chalk-event__tickets-btn"
+                data-tc-event={ticketsCloudEventId}
+                data-tc-token={ticketsCloudToken}
+              >
+                Купить билет
+              </button>
+            ) : (
+              <span className="chalk-event__row-meta">скоро в продаже</span>
+            )}
+          </div>
         )}
 
-        <div className="site-bands-list" role="list" aria-label="Действия">
-          {hasTicketsCloud && (
-            <div className="site-bands-row" role="listitem">
-              <div className="site-bands-row__main">
-                <span className="site-bands-row__title">Билеты</span>
-              </div>
-              {ticketsCloudEventId && ticketsCloudToken ? (
-                <button
-                  type="button"
-                  className="event-page__ticketsButton"
-                  data-tc-event={ticketsCloudEventId}
-                  data-tc-token={ticketsCloudToken}
-                >
-                  Купить билет
-                </button>
-              ) : (
-                <span className="site-bands-row__meta">скоро в продаже</span>
-              )}
-            </div>
-          )}
-
-          <a
-            className="site-bands-row"
-            href={howToFindVideoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            role="listitem"
-          >
-            <div className="site-bands-row__main">
-              <span className="site-bands-row__title">Как нас найти</span>
-            </div>
-            <span className="site-bands-row__meta">видео</span>
-          </a>
-        </div>
-
-        {cast && cast.length > 0 && (
-          <section className="event-page__section" aria-label="Состав">
-            <h2 className="event-page__sectionTitle">Состав</h2>
-            <div className="site-bands-list" role="list">
-              {cast.map((item) => {
-                const role = (item.role || "").trim() || "роль";
-                const actor = (item.actor || "").trim() || "—";
-                return (
-                  <div key={`${role}-${actor}`} className="site-bands-row" role="listitem">
-                    <div className="site-bands-row__main">
-                      <span className="site-bands-row__title">{actor}</span>
-                    </div>
-                    <span className="site-bands-row__meta">{role}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
-
-        {reviews.length > 0 && (
-          <section className="event-page__section" aria-label="Отзывы">
-            <h2 className="event-page__sectionTitle">Отзывы</h2>
-            <div className="event-page__bandBlock">
-              <ReviewsSlider reviews={reviews} />
-            </div>
-          </section>
-        )}
-
-        {reviewImages.length > 0 && (
-          <section className="event-page__section" aria-label="Отзывы (фото)">
-            <h2 className="event-page__sectionTitle">Отзывы (фото)</h2>
-            <div className="event-page__bandBlock">
-              <ReviewImagesSlider images={reviewImages.map((p) => siteAsset(p))} />
-            </div>
-          </section>
-        )}
-
-        {(reviews.length > 0 || reviewImages.length > 0) && (
-          <p className="event-page__reviewsHint" aria-label="Где оставить отзыв">
-            Вы можете оставить свой комментарий на наших ресурсах:{" "}
-            <a href="https://t.me/dofamintheatre" target="_blank" rel="noopener noreferrer">
-              @dofamintheatre
-            </a>{" "}
-            и{" "}
-            <a href="https://vk.com/dofaminspb" target="_blank" rel="noopener noreferrer">
-              vk.com/dofaminspb
-            </a>
-            .
-          </p>
-        )}
+        <a
+          className="chalk-event__row chalk-event__row--link"
+          href={howToFindVideoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          role="listitem"
+        >
+          <span className="chalk-event__row-title">Как нас найти</span>
+          <span className="chalk-event__row-meta">видео</span>
+        </a>
       </div>
-    </div>
+
+      {cast && cast.length > 0 && (
+        <section className="chalk-event__section" aria-label="Состав">
+          <h2 className="chalk-event__section-title">Состав</h2>
+          <div className="chalk-event__list" role="list">
+            {cast.map((item) => {
+              const roleName = (item.role || "").trim() || "роль";
+              const actorName = (item.actor || "").trim() || "—";
+              return (
+                <div key={`${roleName}-${actorName}`} className="chalk-event__row" role="listitem">
+                  <span className="chalk-event__row-title">{actorName}</span>
+                  <span className="chalk-event__row-meta">{roleName}</span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {reviews.length > 0 && (
+        <section className="chalk-event__section" aria-label="Отзывы">
+          <h2 className="chalk-event__section-title">Отзывы</h2>
+          <div className="chalk-event__band">
+            <ReviewsSlider reviews={reviews} />
+          </div>
+        </section>
+      )}
+
+      {reviewImages.length > 0 && (
+        <section className="chalk-event__section" aria-label="Отзывы (фото)">
+          <h2 className="chalk-event__section-title">Отзывы (фото)</h2>
+          <div className="chalk-event__band">
+            <ReviewImagesSlider images={reviewImages.map((p) => siteAsset(p))} />
+          </div>
+        </section>
+      )}
+
+      {(reviews.length > 0 || reviewImages.length > 0) && (
+        <p className="chalk-event__reviews-hint" aria-label="Где оставить отзыв">
+          Вы можете оставить свой комментарий на наших ресурсах:{" "}
+          <a href="https://t.me/dofamintheatre" target="_blank" rel="noopener noreferrer">
+            @dofamintheatre
+          </a>{" "}
+          и{" "}
+          <a href="https://vk.com/dofaminspb" target="_blank" rel="noopener noreferrer">
+            vk.com/dofaminspb
+          </a>
+          .
+        </p>
+      )}
+    </ChalkPageShell>
   );
 };
 
@@ -684,172 +602,6 @@ function PhotoCarousel({ images, title }: PhotoCarouselProps) {
 
 export default PhotoCarousel;
 
-type ZaklyatieAtmosphereProps = {
-  fallbackSrc?: string;
-};
-
-type RainDrop = {
-  x: number;
-  y: number;
-  r: number;
-  vx: number;
-  vy: number;
-  trail: number;
-  wobble: number;
-};
-
-function ZaklyatieAtmosphere({ fallbackSrc }: ZaklyatieAtmosphereProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const lastTRef = useRef<number>(0);
-  const dropsRef = useRef<RainDrop[]>([]);
-  // const [bgSrc, setBgSrc] = useState("https://i.pinimg.com/1200x/71/33/2e/71332e5fb4a472fa9dc27598f33855c5.jpg");
-  const [bgSrc, setBgSrc] = useState("https://i.pinimg.com/1200x/f1/35/9b/f1359b0d0d57d5b89e1134113ebe8fd1.jpg");
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-
-    const prefersReduced =
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const createDrop = (w: number, h: number): RainDrop => {
-      const r = 1.6 + Math.random() * 4.8;
-      return {
-        x: Math.random() * w,
-        y: Math.random() * h,
-        r,
-        vx: (-0.2 + Math.random() * 0.4) * 30,
-        vy: (0.6 + Math.random() * 1.8) * (70 + r * 22),
-        trail: 18 + Math.random() * 70,
-        wobble: Math.random() * Math.PI * 2,
-      };
-    };
-
-    const setSize = () => {
-      const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-      const w = Math.floor(window.innerWidth * dpr);
-      const h = Math.floor(window.innerHeight * dpr);
-      canvas.width = w;
-      canvas.height = h;
-      canvas.style.width = "100%";
-      canvas.style.height = "100%";
-
-      // Re-init drops for new size (keep density stable)
-      const area = (w * h) / (dpr * dpr);
-      const count = Math.max(70, Math.min(260, Math.floor(area / 9000)));
-      dropsRef.current = Array.from({ length: count }, () => createDrop(w, h));
-    };
-
-    const draw = (t: number) => {
-      const w = canvas.width;
-      const h = canvas.height;
-      const dt = Math.min(0.033, lastTRef.current ? (t - lastTRef.current) / 1000 : 0.016);
-      lastTRef.current = t;
-
-      ctx.clearRect(0, 0, w, h);
-      ctx.globalCompositeOperation = "lighter";
-
-      const drops = dropsRef.current;
-      for (let i = 0; i < drops.length; i++) {
-        const d = drops[i];
-
-        // Motion: gravity + slight wobble (wind)
-        d.wobble += dt * (0.8 + d.r * 0.2);
-        const wind = Math.sin(d.wobble) * 10;
-        d.x += (d.vx + wind) * dt;
-        d.y += d.vy * dt;
-
-        // Wrap/reset
-        if (d.y - d.trail > h + 30) {
-          d.y = -20 - Math.random() * 120;
-          d.x = Math.random() * w;
-          d.r = 1.6 + Math.random() * 4.8;
-          d.vx = (-0.2 + Math.random() * 0.4) * 30;
-          d.vy = (0.6 + Math.random() * 1.8) * (70 + d.r * 22);
-          d.trail = 18 + Math.random() * 70;
-          d.wobble = Math.random() * Math.PI * 2;
-        }
-        if (d.x < -40) d.x = w + 40;
-        if (d.x > w + 40) d.x = -40;
-
-        // Trail
-        const trailLen = d.trail * (0.75 + d.r * 0.06);
-        const gx = ctx.createLinearGradient(d.x, d.y - trailLen, d.x, d.y);
-        gx.addColorStop(0, "rgba(255,255,255,0)");
-        gx.addColorStop(0.6, "rgba(255,255,255,0.08)");
-        gx.addColorStop(1, "rgba(255,255,255,0.18)");
-        ctx.strokeStyle = gx;
-        ctx.lineWidth = Math.max(0.8, d.r * 0.55);
-        ctx.beginPath();
-        ctx.moveTo(d.x, d.y - trailLen);
-        ctx.lineTo(d.x, d.y + d.r * 1.5);
-        ctx.stroke();
-
-        // Drop head
-        const r = d.r * 2.1;
-        const rg = ctx.createRadialGradient(d.x, d.y, 0, d.x, d.y, r);
-        rg.addColorStop(0, "rgba(255,255,255,0.36)");
-        rg.addColorStop(0.35, "rgba(255,255,255,0.16)");
-        rg.addColorStop(1, "rgba(255,255,255,0)");
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.ellipse(d.x, d.y, r * 0.62, r, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      rafRef.current = window.requestAnimationFrame(draw);
-    };
-
-    setSize();
-    window.addEventListener("resize", setSize);
-
-    if (!prefersReduced) {
-      rafRef.current = window.requestAnimationFrame(draw);
-    } else {
-      // One static frame (reduced motion)
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 80; i++) {
-        const x = Math.random() * canvas.width;
-        const y = Math.random() * canvas.height;
-        const r = 2 + Math.random() * 5;
-        const rg = ctx.createRadialGradient(x, y, 0, x, y, r * 2);
-        rg.addColorStop(0, "rgba(255,255,255,0.22)");
-        rg.addColorStop(1, "rgba(255,255,255,0)");
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    return () => {
-      window.removeEventListener("resize", setSize);
-      if (rafRef.current) window.cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    };
-  }, []);
-
-  return (
-    <div className="zaklyatie-atmosphere" aria-hidden="true">
-      <img
-        className="zaklyatie-atmosphere__bg"
-        src={bgSrc}
-        alt=""
-        onError={() => {
-          if (fallbackSrc && bgSrc !== fallbackSrc) setBgSrc(fallbackSrc);
-        }}
-      />
-      <canvas ref={canvasRef} className="zaklyatie-atmosphere__canvas" />
-      <div className="zaklyatie-atmosphere__glass" />
-    </div>
-  );
-}
-
 function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const gainRef = useRef<GainNode | null>(null);
@@ -978,7 +730,11 @@ function RainAmbienceToggle({ url, label }: { url: string; label: string }) {
   return (
     <button
       type="button"
-      className={isOn ? "event-page__chip zaklyatie-rain-toggle is-on" : "event-page__chip zaklyatie-rain-toggle"}
+      className={
+        isOn
+          ? "chalk-event__chip chalk-event__rain-toggle is-on"
+          : "chalk-event__chip chalk-event__rain-toggle"
+      }
       aria-pressed={isOn}
       disabled={isLoading}
       aria-busy={isLoading}

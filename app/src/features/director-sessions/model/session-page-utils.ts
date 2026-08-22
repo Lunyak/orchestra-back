@@ -21,6 +21,13 @@ import type {
 export const SESSION_ROW_LONG_PRESS_MS = 520;
 export const SESSION_ROW_LONG_PRESS_MOVE_PX = 12;
 
+/** Выбор «без проекта» в пикере сцены — слот с произвольным названием. */
+export const SLOT_SCENE_PICKER_CUSTOM_SLUG = "__custom__";
+
+export function isSlotScenePickerCustomSlug(slug: string): boolean {
+  return String(slug ?? "").trim() === SLOT_SCENE_PICKER_CUSTOM_SLUG;
+}
+
 export function parseTimeHHMM(src: string): number | null {
   const s = String(src ?? "").trim();
   const m = s.match(/^(\d{1,2}):(\d{2})$/);
@@ -337,4 +344,135 @@ export function calledStatusToGatherMark(
   if (tone === "warn") return "warn";
   if (tone === "bad") return "bad";
   return "none";
+}
+
+const FALLBACK_SESSION_BUSY_MIN = 30;
+
+export type DirectorSessionBusyRange = {
+  sessionId: string;
+  dateKey: string;
+  startMin: number;
+  endMin: number;
+  title: string;
+};
+
+export function directorSessionBusySpanMin(
+  session: Pick<DirectorRehearsalSession, "slots">,
+): number {
+  const slots = session.slots ?? [];
+  if (!slots.length) return FALLBACK_SESSION_BUSY_MIN;
+  let maxEnd = 0;
+  for (const slot of slots) {
+    const offset = Math.max(0, Math.floor(Number(slot.offsetMin) || 0));
+    const duration = Math.max(1, Math.floor(Number(slot.durationMin) || 1));
+    maxEnd = Math.max(maxEnd, offset + duration);
+  }
+  return Math.max(maxEnd, FALLBACK_SESSION_BUSY_MIN);
+}
+
+export function absoluteMinuteRangesOverlap(
+  startA: number,
+  endA: number,
+  startB: number,
+  endB: number,
+): boolean {
+  return startA < endB && startB < endA;
+}
+
+export function getDirectorSessionBusyRange(
+  session: DirectorRehearsalSession,
+): DirectorSessionBusyRange | null {
+  const startsAt = String(session.startsAt ?? "").trim();
+  if (!startsAt) return null;
+  const date = new Date(startsAt);
+  if (!Number.isFinite(date.getTime())) return null;
+  const startMin = getSessionStartLocalMinutes(startsAt);
+  const span = directorSessionBusySpanMin(session);
+  const title = String(session.title ?? "").trim() || "Репетиция";
+  return {
+    sessionId: session.id,
+    dateKey: toDateKey(date),
+    startMin,
+    endMin: startMin + span,
+    title,
+  };
+}
+
+/** Пересечение интервала занятости с другой сессией того же театра/дня. */
+export function findDirectorSessionBusyConflict(
+  candidate: DirectorRehearsalSession,
+  allSessions: DirectorRehearsalSession[],
+): DirectorSessionBusyRange | null {
+  const candidateRange = getDirectorSessionBusyRange(candidate);
+  if (!candidateRange) return null;
+  const candidateTheater = String(candidate.theaterId ?? "").trim();
+
+  for (const other of allSessions) {
+    if (other.id === candidate.id) continue;
+    const otherTheater = String(other.theaterId ?? "").trim();
+    if (candidateTheater && otherTheater && candidateTheater !== otherTheater) {
+      continue;
+    }
+    const otherRange = getDirectorSessionBusyRange(other);
+    if (!otherRange) continue;
+    if (otherRange.dateKey !== candidateRange.dateKey) continue;
+    if (
+      absoluteMinuteRangesOverlap(
+        candidateRange.startMin,
+        candidateRange.endMin,
+        otherRange.startMin,
+        otherRange.endMin,
+      )
+    ) {
+      return otherRange;
+    }
+  }
+  return null;
+}
+
+export function formatDirectorSessionBusyConflictMessage(
+  conflict: DirectorSessionBusyRange,
+): string {
+  return `Нельзя сохранить слот: время пересекается с «${conflict.title}» (${formatTimeHHMM(conflict.startMin)}–${formatTimeHHMM(conflict.endMin)})`;
+}
+
+export function findFirstBusyConflictInSessions(
+  sessions: DirectorRehearsalSession[],
+): DirectorSessionBusyRange | null {
+  for (const session of sessions) {
+    const conflict = findDirectorSessionBusyConflict(session, sessions);
+    if (conflict) return conflict;
+  }
+  return null;
+}
+
+function sessionBusySignature(session: DirectorRehearsalSession): string {
+  const range = getDirectorSessionBusyRange(session);
+  if (!range) return "";
+  return `${range.dateKey}:${range.startMin}:${range.endMin}:${String(session.theaterId ?? "").trim()}`;
+}
+
+/** Конфликт только у сессий, у которых сменился интервал занятости. */
+export function findBusyConflictForChangedSessions(
+  previousSessions: DirectorRehearsalSession[],
+  nextSessions: DirectorRehearsalSession[],
+): DirectorSessionBusyRange | null {
+  const previousById = new Map(
+    previousSessions.map((session) => [session.id, session] as const),
+  );
+  for (const nextSession of nextSessions) {
+    const previous = previousById.get(nextSession.id);
+    if (
+      previous &&
+      sessionBusySignature(previous) === sessionBusySignature(nextSession)
+    ) {
+      continue;
+    }
+    const conflict = findDirectorSessionBusyConflict(
+      nextSession,
+      nextSessions,
+    );
+    if (conflict) return conflict;
+  }
+  return null;
 }

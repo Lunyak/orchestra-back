@@ -4,12 +4,10 @@ import { useLocation } from "react-router-dom";
 import { isProjectPath } from "../../../app/router/paths";
 import { useProject } from "../../../features/project";
 import { AppEditorChatToggle } from "./AppEditorChatToggle";
-import { AppEditorPlaylistEditToggle } from "./AppEditorPlaylistEditToggle";
-import { AppEditorPlayerToggle } from "./AppEditorPlayerToggle";
 import { AppEditorHomeLink } from "./AppEditorHomeLink";
+import { AppEditorMenubarMiniPlayer } from "./AppEditorMenubarMiniPlayer";
 import { AppEditorMenubarProjectSelect } from "./AppEditorMenubarProjectSelect";
 import { AppEditorProjectDirectionsNav } from "./AppEditorProjectDirectionsNav";
-import { AppEditorProjectMenu } from "./AppEditorProjectMenu";
 import { AppEditorUserMenu } from "./AppEditorUserMenu";
 import { useAppEditorMenubarCenter, useAppEditorMenubarToolbarActions, useAppEditorMenubarViewMenu } from "./AppEditorMenubarContext";
 import "./style.css";
@@ -72,14 +70,12 @@ export function AppEditorMenubar() {
           <div className="app-editor-menubar__center">
             {centerContent}
             {projectName && isProjectRoute ? <AppEditorMenubarProjectSelect /> : null}
-            {projectName && isProjectRoute ? <AppEditorProjectMenu /> : null}
           </div>
         ) : null}
         <div className="app-editor-menubar__end">
+          <AppEditorMenubarMiniPlayer />
           <div className="app-editor-menubar__actions">
             {toolbarActions}
-            <AppEditorPlayerToggle />
-            <AppEditorPlaylistEditToggle />
             <AppEditorChatToggle />
           </div>
           <AppEditorUserMenu />

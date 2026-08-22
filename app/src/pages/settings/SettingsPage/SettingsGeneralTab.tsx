@@ -1,19 +1,14 @@
-import { Buttons } from "@shared/components/buttons/Buttons";
 import { Button } from "@shared/core/button/Button";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  globalPaths,
-  projectPath,
   projectSettingsPath,
 } from "../../../app/router/paths";
-import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { ProjectConnectionsSettings } from "../../../features/project/ui/ProjectConnectionsSettings";
 import { useTeam } from "../../../features/team";
 import { usePlatform } from "../../../PlatformContext";
-import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import { isOrchestraWebAppSubpath } from "../../../shared/settings/orchestraWebHost";
 import {
   getSpectaclePageLockEnabled,
@@ -25,34 +20,24 @@ import {
   setConfirmBeforeRemoteScenePull,
   setPauseRemoteSceneUpdates,
 } from "../../../shared/settings/syncPreferences";
-import { getProfilesBatch, type TeamProfile } from "../../../sync/api/profile";
 
 export function SettingsGeneralTab() {
   const navigate = useNavigate();
-  const { accessToken } = useAuth();
   const { onPushAllLocal, onResyncProject } = usePlatform();
-  const { projectName, currentProjectDisplayName, updateProjectDisplayName } =
-    useProject();
   const {
-    projectMembers,
-    projectOwner,
-    isProjectOwner,
-    canWriteProject,
-    canManageProjectMembers,
-    inviteEmail,
-    setInviteEmail,
-    inviteError,
-    setInviteError,
-    invite,
-    updateMemberRole,
-    removeMember,
-    transferOwnership,
-  } = useTeam();
+    projectName,
+    currentProjectDisplayName,
+    updateProjectDisplayName,
+    updateProjectSlug,
+  } = useProject();
+  const { canWriteProject } = useTeam();
 
   const [projectNameDraft, setProjectNameDraft] = useState("");
   const [projectNameSaving, setProjectNameSaving] = useState(false);
   const [projectNameError, setProjectNameError] = useState<string | null>(null);
-  const [transferUserId, setTransferUserId] = useState("");
+  const [projectSlugDraft, setProjectSlugDraft] = useState("");
+  const [projectSlugSaving, setProjectSlugSaving] = useState(false);
+  const [projectSlugError, setProjectSlugError] = useState<string | null>(null);
   const [pauseRemoteSceneUpdates, setPauseRemoteSceneUpdatesState] = useState(
     () => getPauseRemoteSceneUpdates(),
   );
@@ -64,53 +49,12 @@ export function SettingsGeneralTab() {
   );
   const showOrchestraWebPageLock = isOrchestraWebAppSubpath();
 
-  const [profileByEmail, setProfileByEmail] = useState<
-    Map<string, TeamProfile>
-  >(() => new Map());
-  const memberEmails = useMemo(() => {
-    const out: string[] = [];
-    if (projectOwner?.email)
-      out.push(String(projectOwner.email).trim().toLowerCase());
-    for (const m of projectMembers ?? []) {
-      const em = String(m?.user?.email ?? "")
-        .trim()
-        .toLowerCase();
-      if (em) out.push(em);
-    }
-    return Array.from(new Set(out)).filter(Boolean);
-  }, [projectMembers, projectOwner?.email]);
-
   useEffect(() => {
     setProjectNameDraft(currentProjectDisplayName || "");
     setProjectNameError(null);
+    setProjectSlugDraft(projectName || "");
+    setProjectSlugError(null);
   }, [currentProjectDisplayName, projectName]);
-
-  useEffect(() => {
-    if (!accessToken || memberEmails.length === 0) {
-      setProfileByEmail(new Map());
-      return;
-    }
-    let cancelled = false;
-    getProfilesBatch(accessToken, memberEmails)
-      .then((list) => {
-        if (cancelled) return;
-        const map = new Map<string, TeamProfile>();
-        for (const p of list ?? []) {
-          const em = String(p?.email ?? "")
-            .trim()
-            .toLowerCase();
-          if (!em) continue;
-          map.set(em, p);
-        }
-        setProfileByEmail(map);
-      })
-      .catch(() => {
-        if (!cancelled) setProfileByEmail(new Map());
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, memberEmails.join("|")]);
 
   const handleRenameProject = async () => {
     const value = projectNameDraft.trim();
@@ -134,6 +78,29 @@ export function SettingsGeneralTab() {
     }
   };
 
+  const handleRenameSlug = async () => {
+    const value = projectSlugDraft.trim();
+    if (!projectName || !value) return;
+    setProjectSlugSaving(true);
+    setProjectSlugError(null);
+    try {
+      const nextSlug = await updateProjectSlug(value);
+      navigate(projectSettingsPath(nextSlug), { replace: true });
+    } catch (error: unknown) {
+      const e = error as {
+        response?: { data?: { message?: string } };
+        message?: string;
+      };
+      setProjectSlugError(
+        e?.response?.data?.message ??
+          e?.message ??
+          "Не удалось сохранить slug проекта",
+      );
+    } finally {
+      setProjectSlugSaving(false);
+    }
+  };
+
   const handlePushAllLocal = () => {
     if (!onPushAllLocal) return;
     const confirmed = window.confirm(
@@ -151,18 +118,109 @@ export function SettingsGeneralTab() {
     if (!projectName) return;
     const confirmed = window.confirm(
       "Подтянуть отличающиеся данные проекта с сервера в локальные файлы?\n\n" +
-        "Перед подтяжкой приложение попробует отправить локальные несинхронизированные изменения (outbox), чтобы не потерять их.",
+        "Локальные отличия могут быть перезаписаны.",
     );
     if (!confirmed) return;
-    void onResyncProject(projectName).then((r) => {
-      alert(
-        `Resync завершён: обновлено сцен ${r.updatedScenes}/${r.totalScenes}.`,
-      );
+    void onResyncProject(projectName).then(() => {
+      alert("Resync завершён.");
     });
   };
 
   return (
     <div className="settings-tab-page">
+      <section className="settings-card">
+        <div className="settings-project-fields">
+          <div className="settings-project-field">
+            <label className="settings-project-field__label" htmlFor="settings-project-name">
+              Название
+            </label>
+            <div className="settings-project-create">
+              <input
+                id="settings-project-name"
+                type="text"
+                value={projectNameDraft}
+                onChange={(event) => {
+                  setProjectNameDraft(event.target.value);
+                  setProjectNameError(null);
+                }}
+                placeholder="Название проекта"
+                disabled={
+                  !projectName || projectNameSaving || canWriteProject === false
+                }
+              />
+              <Button
+                type="button"
+                className="primary"
+                onClick={handleRenameProject}
+                disabled={
+                  !projectName ||
+                  projectNameSaving ||
+                  !projectNameDraft.trim() ||
+                  projectNameDraft.trim() === currentProjectDisplayName.trim() ||
+                  canWriteProject === false
+                }
+              >
+                {projectNameSaving ? "Сохранение…" : "Сохранить"}
+              </Button>
+            </div>
+            <p className="settings-sync-hint">Видимое имя в интерфейсе и в меню проектов.</p>
+            {projectNameError ? (
+              <div className="settings-invite-error">{projectNameError}</div>
+            ) : null}
+          </div>
+
+          <div className="settings-project-field">
+            <label className="settings-project-field__label" htmlFor="settings-project-slug">
+              Slug
+            </label>
+            <div className="settings-project-create">
+              <input
+                id="settings-project-slug"
+                type="text"
+                value={projectSlugDraft}
+                onChange={(event) => {
+                  setProjectSlugDraft(event.target.value);
+                  setProjectSlugError(null);
+                }}
+                placeholder="slug-proekta"
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                disabled={
+                  !projectName || projectSlugSaving || canWriteProject === false
+                }
+              />
+              <Button
+                type="button"
+                className="primary"
+                onClick={handleRenameSlug}
+                disabled={
+                  !projectName ||
+                  projectSlugSaving ||
+                  !projectSlugDraft.trim() ||
+                  projectSlugDraft.trim() === projectName ||
+                  canWriteProject === false
+                }
+              >
+                {projectSlugSaving ? "Сохранение…" : "Сохранить"}
+              </Button>
+            </div>
+            <p className="settings-sync-hint">
+              Часть URL: <b>/projects/{projectName || "—"}/…</b>
+            </p>
+            {projectSlugError ? (
+              <div className="settings-invite-error">{projectSlugError}</div>
+            ) : null}
+          </div>
+        </div>
+
+        {canWriteProject === false ? (
+          <div className="settings-invite-forbidden">
+            У вас нет права изменять проект.
+          </div>
+        ) : null}
+      </section>
+
       <section className="settings-card settings-sync-live">
         <h3 className="settings-card__title">
           Синхронизация с сервером в прогоне
@@ -232,68 +290,7 @@ export function SettingsGeneralTab() {
         </section>
       ) : null}
 
-      <section className="settings-card">
-        <h3 className="settings-card__title">Название проекта</h3>
-        <div className="settings-project-create">
-          <input
-            type="text"
-            value={projectNameDraft}
-            onChange={(event) => {
-              setProjectNameDraft(event.target.value);
-              setProjectNameError(null);
-            }}
-            placeholder="Название проекта"
-            disabled={
-              !projectName || projectNameSaving || canWriteProject === false
-            }
-          />
-          <Button
-            type="button"
-            className="primary"
-            onClick={handleRenameProject}
-            disabled={
-              !projectName ||
-              projectNameSaving ||
-              !projectNameDraft.trim() ||
-              projectNameDraft.trim() === currentProjectDisplayName.trim() ||
-              canWriteProject === false
-            }
-          >
-            {projectNameSaving ? "Сохранение…" : "Сохранить"}
-          </Button>
-        </div>
-        <p className="settings-sync-hint">
-          Меняется только видимое имя. Технический slug проекта остаётся:{" "}
-          <b>{projectName || "—"}</b>
-        </p>
-        {canWriteProject === false ? (
-          <div className="settings-invite-forbidden">
-            У вас нет права изменять проект.
-          </div>
-        ) : null}
-        {projectNameError ? (
-          <div className="settings-invite-error">{projectNameError}</div>
-        ) : null}
-        <Button type="button" onClick={() => navigate(globalPaths.projects)}>
-          Открыть мои проекты
-        </Button>
-      </section>
-
       <ProjectConnectionsSettings />
-
-      <section className="settings-card">
-        <h3 className="settings-card__title">Библиотека медиа</h3>
-        <p className="settings-sync-hint">
-          Единое хранилище музыки, звуков, видео и заставок проекта. Заполнение
-          с сервера, из папки на диске или загрузкой файлов.
-        </p>
-        <Button
-          type="button"
-          onClick={() => navigate(projectPath(projectName, "media"))}
-        >
-          Открыть библиотеку
-        </Button>
-      </section>
 
       {(onPushAllLocal || onResyncProject) && (
         <section className="settings-card settings-sync">
@@ -322,148 +319,6 @@ export function SettingsGeneralTab() {
           )}
         </section>
       )}
-
-      <section className="settings-card">
-        <h3 className="settings-card__title">Бот</h3>
-        <p>
-          Подключите Telegram-бота (своим токеном) и управляйте переменными для
-          шаблонов сообщений.
-        </p>
-        <Button
-          type="button"
-          className="primary"
-          onClick={() => navigate(projectSettingsPath(projectName, true))}
-        >
-          Настройки бота
-        </Button>
-      </section>
-
-      <section className="settings-card settings-invite">
-        {canManageProjectMembers === false ? (
-          <p className="settings-invite-forbidden">
-            Управлять участниками могут владелец и администраторы пространства.
-          </p>
-        ) : (
-          <>
-            <h3 className="settings-card__title settings-privet-title">
-              Права участников в проекте
-            </h3>
-            {projectOwner ? (
-              <p className="settings-sync-hint">
-                Владелец проекта:{" "}
-                {projectOwner.displayName
-                  ? `${projectOwner.displayName} (${projectOwner.email})`
-                  : projectOwner.email}
-              </p>
-            ) : null}
-            {isProjectOwner === true && projectMembers.length > 0 ? (
-              <div className="settings-invite-row">
-                <select
-                  className="settings-invite-input"
-                  value={transferUserId}
-                  onChange={(event) => setTransferUserId(event.target.value)}
-                  aria-label="Новый владелец"
-                >
-                  <option value="">Передать владение…</option>
-                  {projectMembers.map((member) => (
-                    <option key={member.id} value={member.user.id}>
-                      {member.user.displayName
-                        ? `${member.user.displayName} (${member.user.email})`
-                        : member.user.email}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    void transferOwnership(transferUserId);
-                  }}
-                  disabled={!transferUserId}
-                >
-                  Передать
-                </Button>
-              </div>
-            ) : null}
-            <div className="settings-invite-row">
-              <input
-                type="email"
-                value={inviteEmail}
-                onChange={(e) => {
-                  setInviteEmail(e.target.value);
-                  setInviteError(null);
-                }}
-                placeholder="email@example.com"
-                className="settings-invite-input"
-              />
-              <Button
-                type="button"
-                className="primary"
-                onClick={invite}
-                disabled={!inviteEmail.trim()}
-              >
-                Пригласить
-              </Button>
-            </div>
-            {inviteError && (
-              <div className="settings-invite-error">{inviteError}</div>
-            )}
-            {projectMembers.length > 0 && (
-              <div className="settings-members">
-                <ul className="settings-members-list">
-                  {projectMembers.map((m) => (
-                    <li key={m.id} className="settings-member-row">
-                      <span className="settings-member-email">
-                        {(() => {
-                          const email = String(m.user.email ?? "")
-                            .trim()
-                            .toLowerCase();
-                          const prof = email ? profileByEmail.get(email) : null;
-                          const label = m.user.displayName
-                            ? `${m.user.displayName} (${m.user.email})`
-                            : m.user.email;
-                          return (
-                            <span className="settings-member-email__inner">
-                              <MiniAvatar
-                                src={
-                                  String(prof?.avatarUrl ?? "").trim() || null
-                                }
-                                label={label}
-                                size={20}
-                              />
-                              <span>{label}</span>
-                            </span>
-                          );
-                        })()}
-                      </span>
-                      <div className="settings-member-actions">
-                        <LabeledCheckbox
-                          className="settings-member-role"
-                          checked={m.role === "editor"}
-                          onChange={(checked) =>
-                            updateMemberRole(
-                              m.id,
-                              checked ? "editor" : "viewer",
-                            )
-                          }
-                        >
-                          {m.role === "editor"
-                            ? "Редактирование"
-                            : "Только просмотр"}
-                        </LabeledCheckbox>
-                        <Buttons.DeleteButton
-                          type="button"
-                          className="settings-member-remove"
-                          onClick={() => removeMember(m.id)}
-                        ></Buttons.DeleteButton>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </>
-        )}
-      </section>
     </div>
   );
 }

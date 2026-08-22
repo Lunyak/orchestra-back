@@ -21,11 +21,12 @@ export const profileApi = orchestraApi.injectEndpoints({
       query: (patch) => ({ url: "/profile", method: "PATCH", data: patch }),
       invalidatesTags: [{ type: "Profile", id: "ME" }],
     }),
-    uploadMyAvatar: build.mutation<MyProfile, File>({
-      query: (file) => {
+    uploadMyAvatar: build.mutation<MyProfile, { file: File; variant?: "full" | "small" }>({
+      query: ({ file, variant = "full" }) => {
         const form = new FormData();
         form.append("file", file, file.name);
-        return { url: "/profile/avatar", method: "POST", data: form };
+        const query = variant === "small" ? "?variant=small" : "";
+        return { url: `/profile/avatar${query}`, method: "POST", data: form };
       },
       invalidatesTags: [{ type: "Profile", id: "ME" }],
     }),

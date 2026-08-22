@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../auth/model/auth-context";
@@ -173,7 +174,7 @@ export function KanbanSceneDetailModal({
         className={cn("kanban-scene-modal__body", isSubNavPage && "kanban-scene-modal__body--subnav")}
       >
         {isRoleDetailPage && selectedRoleId && !selectedRole ? (
-          <div className="kanban-muted">Загрузка роли…</div>
+          <PageLoader variant="view" label="Загрузка роли…" />
         ) : isRoleDetailPage && selectedRole && projectName ? (
           <KanbanSceneRoleDetailPanel
             projectName={projectName}
@@ -232,9 +233,7 @@ export function KanbanSceneDetailModal({
             <div className="kanban-section">
               <div className="kanban-section__title">Роли и кто играет</div>
               {rolesLoading && (
-                <div className="kanban-muted kanban-scene-modal__roles-loading">
-                  Загрузка ролей…
-                </div>
+                <PageLoader variant="view" label="Загрузка ролей…" />
               )}
               {openedRoles.length === 0 ? (
                 <div className="kanban-muted">
@@ -264,9 +263,7 @@ export function KanbanSceneDetailModal({
         ) : (
           <Suspense
             fallback={
-              <div className="kanban-scene-modal__lazy-fallback">
-                Загрузка редактора…
-              </div>
+              <PageLoader variant="view" label="Загрузка редактора…" />
             }
           >
             <KanbanSceneMarkdownPanel sceneId={scene.id} />

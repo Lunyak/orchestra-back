@@ -1,5 +1,5 @@
 import cn from "classnames";
-import { MenubarPanelIcon } from "./MenubarPanelIcon";
+import type { ReactNode } from "react";
 
 export type AppEditorScriptSceneTitleProps = {
   title: string;
@@ -8,12 +8,16 @@ export type AppEditorScriptSceneTitleProps = {
   onTitleChange: (title: string) => void;
   isModeEditing: boolean;
   onToggleModeEditing: () => void;
+  /** Кнопка карандаша рядом с названием. По умолчанию true. */
+  showModeToggle?: boolean;
+  /** Доп. кнопка под переключателем режима (например оригинал/правка). */
+  belowModeToggle?: ReactNode;
 };
 
 const editIcon = (
   <svg
-    width="18"
-    height="18"
+    width="16"
+    height="16"
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -27,15 +31,65 @@ const editIcon = (
   </svg>
 );
 
+const bookIcon = (
+  <svg
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  </svg>
+);
+
+export type AppEditorScriptModeToggleProps = {
+  isModeEditing: boolean;
+  onToggleModeEditing: () => void;
+  className?: string;
+};
+
+export function AppEditorScriptModeToggle({
+  isModeEditing,
+  onToggleModeEditing,
+  className,
+}: AppEditorScriptModeToggleProps) {
+  const modeLabel = isModeEditing ? "Перейти в режим чтения" : "Перейти в режим редактирования";
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "script-chrome-dock-btn",
+        "script-scene-title-mode-btn",
+        isModeEditing && "script-chrome-dock-btn--active",
+        isModeEditing && "script-scene-title-mode-btn--active",
+        className,
+      )}
+      onClick={onToggleModeEditing}
+      title={modeLabel}
+      aria-label={modeLabel}
+      aria-pressed={isModeEditing}
+    >
+      {isModeEditing ? bookIcon : editIcon}
+    </button>
+  );
+}
+
 export function AppEditorScriptSceneTitle({
   title,
   titleEditable,
   onTitleChange,
   isModeEditing,
   onToggleModeEditing,
+  showModeToggle = true,
+  belowModeToggle = null,
 }: AppEditorScriptSceneTitleProps) {
-  const modeLabel = isModeEditing ? "Режим редактирования" : "Режим чтения";
-
   return (
     <div className="script-scene-title-block">
       {titleEditable ? (
@@ -54,19 +108,13 @@ export function AppEditorScriptSceneTitle({
           {"\u00a0"}
         </div>
       )}
-      <button
-        type="button"
-        className={cn(
-          "script-scene-title-mode-btn",
-          isModeEditing && "script-scene-title-mode-btn--active",
-        )}
-        onClick={onToggleModeEditing}
-        title={modeLabel}
-        aria-label={modeLabel}
-        aria-pressed={isModeEditing}
-      >
-        <MenubarPanelIcon active={isModeEditing}>{editIcon}</MenubarPanelIcon>
-      </button>
+      {showModeToggle ? (
+        <AppEditorScriptModeToggle
+          isModeEditing={isModeEditing}
+          onToggleModeEditing={onToggleModeEditing}
+        />
+      ) : null}
+      {belowModeToggle}
     </div>
   );
 }

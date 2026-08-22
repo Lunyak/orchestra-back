@@ -1,4 +1,5 @@
 import React from "react";
+import "./app-error-boundary.css";
 
 interface AppErrorBoundaryState {
   error: Error | null;
@@ -15,6 +16,22 @@ function isBenignResizeObserverError(error: unknown, message?: string): boolean 
     .join(" ")
     .toLowerCase();
   return /resizeobserver loop/.test(text);
+}
+
+/** Сетевые/API сбои не должны валить всё приложение (рестарт бэка, 5xx, offline). */
+function isBenignNetworkRejection(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const name = "name" in error ? String(error.name) : "";
+  const message = "message" in error ? String(error.message) : "";
+  const code =
+    "code" in error && error.code != null ? String(error.code) : "";
+  if (name === "AxiosError") return true;
+  if (/^ERR_NETWORK$|^ECONNABORTED$|^ERR_CANCELED$|^ECONNREFUSED$/i.test(code)) {
+    return true;
+  }
+  return /request failed with status code|network error|failed to fetch/i.test(
+    message,
+  );
 }
 
 export class AppErrorBoundary extends React.Component<
@@ -43,7 +60,6 @@ export class AppErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Keep full details in console for production debugging.
     console.error("[web] Unhandled render error", error, errorInfo);
   }
 
@@ -64,6 +80,11 @@ export class AppErrorBoundary extends React.Component<
     const reason = event.reason;
     if (isBenignResizeObserverError(reason)) {
       event.preventDefault();
+      return;
+    }
+    if (isBenignNetworkRejection(reason)) {
+      event.preventDefault();
+      console.warn("[web] Ignored network rejection", reason);
       return;
     }
     const nextError =
@@ -93,66 +114,29 @@ export class AppErrorBoundary extends React.Component<
     const maybeChunkLoad =
       /chunk|import|loading|fetch/i.test(message) ||
       /chunk|import|loading|fetch/i.test(error.name);
+    const lead = maybeChunkLoad
+      ? "Похоже, не удалось загрузить часть веб-приложения после обновления."
+      : "Произошла непредвиденная ошибка во время рендера.";
+    const details = `${error.name}: ${message}`;
 
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          background: "#0f1115",
-          color: "#f3f5f7",
-          fontFamily:
-            'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 640,
-            width: "100%",
-            background: "#e78a4e",
-            padding: 20,
-            boxSizing: "border-box",
-          }}
-        >
-          <h1 style={{ margin: "0 0 8px 0", fontSize: 22 }}>Приложение упало</h1>
-          <p style={{ margin: "0 0 10px 0", opacity: 0.92 }}>
-            {maybeChunkLoad
-              ? "Похоже, не удалось загрузить часть веб-приложения после обновления."
-              : "Произошла непредвиденная ошибка во время рендера."}
-          </p>
-          <pre
-            style={{
-              margin: "0 0 14px 0",
-              padding: 12,
-              overflowX: "auto",
-              background: "#0f1115",
-              border: "1px solid #2a303d",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-word",
-            }}
-          >
-            {`${error.name}: ${message}`}
-          </pre>
-          <button
-            type="button"
-            onClick={this.handleReload}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid #3a4252",
-              background: "#2d6cdf",
-              color: "#fff",
-              cursor: "pointer",
-              fontSize: 14,
-            }}
-          >
-            Обновить страницу
-          </button>
+      <div className="app-error-boundary" role="alert">
+        <div className="app-error-boundary__card">
+          <p className="app-error-boundary__eyebrow">Orchestra</p>
+          <h1 className="app-error-boundary__title">Приложение упало</h1>
+          <p className="app-error-boundary__lead">{lead}</p>
+          <pre className="app-error-boundary__details">{details}</pre>
+          <div className="app-error-boundary__actions">
+            <button
+              type="button"
+              className="app-error-boundary__reload"
+              onClick={this.handleReload}
+            >
+              Обновить страницу
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 }
-

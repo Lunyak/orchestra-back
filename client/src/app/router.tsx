@@ -38,7 +38,7 @@ export const router = createBrowserRouter([
       },
       {
         path: ROUTES.THEATER_WALK,
-        lazy: () => import("../page/TheaterWalk/TheaterWalkPage"),
+        lazy: () => import("../page/TheaterWalk/TheaterWalkBlocked"),
       },
       {
         path: ROUTES.CONTACTS,

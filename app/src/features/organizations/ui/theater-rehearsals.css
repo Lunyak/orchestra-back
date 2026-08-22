@@ -1,8 +1,11 @@
 .app-content:has(> .theater-rehearsals-page) > .theater-rehearsals-page {
-  align-self: center;
+  align-self: stretch;
 }
 
 .theater-rehearsals-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-left: auto;
   margin-right: auto;
   width: 100%;
@@ -11,34 +14,97 @@
 }
 
 .theater-rehearsals-page__head {
-  margin: 0 auto 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0 0 14px;
   width: 100%;
+  max-width: 1214px;
 }
 
-.theater-rehearsals-page__head .rehearsals-title {
+.theater-rehearsals-page__title-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 32px;
+}
+
+.theater-rehearsals-page__title-row .theater-section-nav--inline {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: auto;
   margin: 0;
+  z-index: 1;
+}
+
+.theater-rehearsals-page__title-row .rehearsals-title {
+  margin: 0;
+  text-align: center;
 }
 
 .theater-rehearsals-page__head .rehearsals-muted {
   margin: 6px 0 0;
+  text-align: center;
 }
 
 .theater-rehearsals-page__layout {
   margin: 0 auto;
   width: 100%;
+  max-width: 1214px;
+}
+
+.theater-rehearsals-page__layout.sessions-layout {
+  grid-template-columns: minmax(280px, 400px) minmax(0, 600px);
+  justify-content: center;
+  justify-items: stretch;
 }
 
 .theater-rehearsals-page .sessions-flow {
   margin: 0;
   max-width: none;
+  width: 100%;
+}
+
+.theater-rehearsals-page .sessions-day-stage {
+  max-width: 600px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .theater-rehearsals-page .sessions-day-stage .sessions-day-list {
   max-height: none;
 }
 
+.theater-rehearsals-page .sessions-day-item--active {
+  box-shadow: 0 0 0 1px var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 12%, transparent);
+}
+
+.theater-rehearsals-page__call-footer {
+  margin-top: 12px;
+}
+
+.theater-rehearsals-page__call-hint {
+  margin: 0;
+}
+
+.theater-rehearsals-page > .rehearsals-error {
+  width: 100%;
+  max-width: 1214px;
+}
+
 @media (max-width: 960px) {
+  .theater-rehearsals-page__head,
+  .theater-rehearsals-page__layout,
+  .theater-rehearsals-page > .rehearsals-error {
+    max-width: 800px;
+  }
+
   .theater-rehearsals-page__layout.sessions-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 600px);
   }
 }

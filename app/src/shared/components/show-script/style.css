@@ -61,7 +61,7 @@
   font-weight: 700;
   text-align: center;
   text-transform: uppercase;
-  color: var(--color-script-accent, var(--color-text-primary));
+  color: var(--color-text-primary);
   line-height: 1.35;
   word-break: break-word;
 }
@@ -158,7 +158,7 @@
   }
 
   .script-scene-title {
-    color: var(--color-script-accent);
+    color: var(--color-text-primary);
   }
 }
 
@@ -190,9 +190,10 @@
 .script-markdown-pane {
   --script-markdown-line-height: 1.5;
   --script-markdown-paragraph-gap: 0.75em;
-  --script-markdown-content-padding-x: 10px;
-  --script-markdown-content-padding-top: 8px;
-  --script-markdown-content-padding-bottom: 10px;
+  --script-markdown-content-padding-x: 16px;
+  --script-markdown-content-padding-top: 12px;
+  --script-markdown-content-padding-bottom: 16px;
+  position: relative;
   flex: 1;
   min-width: 0;
   min-height: 0;
@@ -207,18 +208,8 @@
 }
 
 @media (max-width: 980px) {
-  .script-markdown-pane {
-    --script-markdown-content-padding-bottom: 170px;
-  }
-
   .script-scene-body {
     flex-direction: column;
-  }
-}
-
-@media (max-width: 480px) {
-  .script-markdown-pane {
-    --script-markdown-content-padding-bottom: 200px;
   }
 }
 
@@ -288,30 +279,48 @@
   border-color: var(--color-accent-blue);
 }
 
-.script-play-original-toggle {
+.script-chrome-dock-btn {
   flex: 0 0 auto;
-  margin: 0 0 0 6px;
-  padding: 6px 10px;
-  border: 1px solid var(--color-border-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
   border-radius: 0;
-  background: var(--color-bg-primary);
-  color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.1;
-  white-space: nowrap;
+  background: transparent;
+  color: var(--color-text-ui-medium, rgba(255, 255, 255, 0.72));
   cursor: pointer;
+  line-height: 0;
 }
 
-.script-play-original-toggle:hover {
-  border-color: var(--color-accent-blue);
-  color: var(--color-text-primary);
+.script-chrome-dock-btn svg {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
-.script-play-original-toggle--active {
-  border-color: var(--color-accent-blue);
-  background: rgba(0, 136, 255, 0.12);
-  color: var(--color-accent-blue);
+.script-chrome-dock-btn:hover:not(:disabled) {
+  color: var(--color-text-primary, #fff);
+}
+
+.script-chrome-dock-btn--active,
+.script-chrome-dock-btn[aria-pressed="true"] {
+  color: var(--color-active-ascent);
+}
+
+.script-chrome-dock-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.script-play-original-toggle--active,
+.script-play-original-toggle[aria-pressed="true"],
+.script-annotations-toggle--active,
+.script-annotations-toggle[aria-pressed="true"] {
+  color: var(--color-active-ascent);
 }
 
 .script-markdown-tab[data-active="true"],
@@ -998,21 +1007,29 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  color: var(--color-text-primary);
-  font-family: var(--font-family-script-body);
+  color: var(--script-play-text-color, var(--color-text-primary));
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  font-size: var(--script-font-size-body, 14px);
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
   max-width: var(--width-content-page);
   margin: 0 auto;
+  box-sizing: border-box;
+  padding:
+    var(--script-markdown-content-padding-top)
+    var(--script-markdown-content-padding-x)
+    var(--script-markdown-content-padding-bottom);
   --dialog-label-slot-width: clamp(72px, 12ch, 220px);
 
   p {
     margin: 0;
-    font-size: 14px;
-    line-height: var(--script-markdown-line-height);
+    font-size: inherit;
+    line-height: inherit;
+    font-family: inherit;
   }
 
   /* Два абзаца по `\n\n` в md — два <p>; отступ заметнее, чем одиночный <br> внутри абзаца. */
   p + p {
-    margin-top: var(--script-markdown-paragraph-gap);
+    margin-top: var(--script-play-paragraph-gap, var(--script-markdown-paragraph-gap));
   }
 
   /* p:nth-child(2n) {
@@ -1021,21 +1038,23 @@
 }
 
 .markdown-preview.markdown-preview--kadr {
-  padding: 0 0 var(--script-markdown-content-padding-bottom);
   background: var(--color-bg-secondary);
-  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
 }
 
 .markdown-preview.markdown-preview--kadr.markdown-preview--with-scene-title {
   gap: 0;
 }
 
+.markdown-preview--with-scene-title {
+  padding-top: 0;
+}
+
 .markdown-preview.markdown-preview--kadr .markdown-kadr {
   margin: 0;
-  padding: 14px 12px 18px;
+  padding: 6px 0 8px;
   border: none;
   background: var(--color-bg-secondary);
   box-sizing: border-box;
@@ -1683,83 +1702,151 @@
   position: fixed;
   top: var(--actor-annotations-popover-top, 0);
   left: var(--actor-annotations-popover-left, 0);
-  z-index: 1000;
-  width: min(320px, calc(100vw - 24px));
+  z-index: var(--z-index-modal, 1200);
+  width: min(360px, calc(100vw - 24px));
   max-height: min(70vh, 520px);
   overflow: auto;
-  filter: drop-shadow(0 14px 22px var(--color-shadow-panel));
+  background: var(--color-bg-modal);
+  box-shadow: var(--shadow-modal);
+  color: var(--color-text-primary);
 }
 
 .actor-annotations-card {
-
-  border-radius: 10px;
-  background: var(--color-highlight-gold);
-  padding: 0;
-  display: grid;
-  gap: 2px;
-  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .actor-annotations-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-default);
 }
 
 .actor-annotations-card-title {
-  font-size: 12px;
-  font-weight: 700;
-
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-bright);
 }
 
 .actor-annotations-x {
-  background: transparent;
-  color: var(--color-purple-deep);
-  width: 26px;
-  height: 26px;
+  flex-shrink: 0;
+  min-width: 32px;
+  min-height: 32px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-text-muted);
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
-  margin-left: auto;
-  border: none;
-  position: absolute;
-  top: 0;
-  right: 0;
-  cursor: pointer;
-  z-index: 2;
+}
+
+.actor-annotations-x:hover {
+  color: var(--color-text-lighter);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.actor-annotations-body {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.actor-annotations-field {
+  display: grid;
+  gap: 6px;
+}
+
+.actor-annotations-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted-bright);
 }
 
 .actor-annotations-quote {
-  font-size: 11px;
-  color: var(--color-purple-deep);
-  opacity: 0.9;
-  padding-left: 4px;
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--color-active-ascent);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  word-break: break-word;
 }
 
 .actor-annotations-input {
   width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
   resize: vertical;
-  background: var(--color-text-secondary);
-  color: var(--color-text-ui);
+  padding: 8px 10px;
   border: 1px solid var(--color-border-default);
-  padding: 0 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-text-bright);
+  font-size: 13px;
   line-height: 1.35;
+}
+
+.actor-annotations-input:focus {
+  outline: none;
+  border-color: var(--color-active-ascent);
+}
+
+.actor-annotations-input::placeholder {
+  color: var(--color-text-muted);
 }
 
 .actor-annotations-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  padding: 12px 14px;
+  border-top: 1px solid var(--color-border-default);
+}
 
-  button {
-    border: none;
-    background: none;
-    padding: 4px;
-    font-size: 11px;
-    color: var(--color-text-secondary);
-    cursor: pointer;
+.actor-annotations-btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--color-text-lighter);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
 
+.actor-annotations-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.35);
+}
 
-  }
+.actor-annotations-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.actor-annotations-btn--primary {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.actor-annotations-btn--primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-active-ascent) 12%, transparent);
+}
+
+.actor-annotations-btn--danger {
+  border-color: var(--color-danger-border-medium);
+  color: var(--color-danger-text-soft);
+  margin-right: auto;
+}
+
+.actor-annotations-btn--danger:hover:not(:disabled) {
+  background: var(--color-danger-bg-medium);
 }
 
 .actor-annotations-error {
@@ -1890,8 +1977,16 @@
 }
 
 /* Вертикальный ритм как у превью между абзацами (p + p) и между «сценическими» строками без \n\n в исходнике. */
+.script-markdown-cm .cm-content {
+  box-sizing: border-box;
+  padding:
+    var(--script-markdown-content-padding-top)
+    var(--script-markdown-content-padding-x)
+    var(--script-markdown-content-padding-bottom);
+}
+
 .script-markdown-cm .cm-content > .cm-line:first-child {
-  padding-top: 4px;
+  padding-top: 0;
 }
 
 .script-markdown-cm--with-scene-title .cm-scroller,
@@ -1917,11 +2012,19 @@
 
 .script-scene-title-block {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   min-height: 28px;
   box-sizing: border-box;
-  margin: 0 0 12px;
+  margin: 0 0 6px;
   padding-right: 40px;
+}
+
+.script-scene-title-block:has(.script-scene-title-below-mode) {
+  min-height: 72px;
+  margin-bottom: 10px;
 }
 
 .script-scene-title-mode-btn {
@@ -1929,27 +2032,60 @@
   top: 50%;
   right: 0;
   transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  margin: 0;
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  color: var(--color-text-secondary, inherit);
-  cursor: pointer;
 }
 
-.script-scene-title-mode-btn:hover {
-  color: var(--color-text-primary, inherit);
+.script-scene-title-mode-btn:hover:not(:disabled) {
+  color: var(--color-text-primary, #fff);
 }
 
 .script-scene-title-mode-btn--active,
 .script-scene-title-mode-btn[aria-pressed="true"] {
   color: var(--color-active-ascent);
+}
+
+.script-scene-chrome-dock {
+  position: absolute;
+  top: var(--script-markdown-content-padding-top);
+  right: calc(var(--script-markdown-content-padding-x) - 10px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  width: 28px;
+}
+
+.script-scene-chrome-dock .script-chrome-dock-btn,
+.script-scene-chrome-dock .script-scene-title-mode-btn,
+.script-scene-chrome-dock .script-play-original-toggle,
+.script-scene-chrome-dock .script-annotations-toggle {
+  position: static;
+  top: auto;
+  right: auto;
+  transform: none;
+}
+
+.script-scene-title-below-mode {
+  position: absolute;
+  top: calc(50% + 16px);
+  right: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 28px;
+}
+
+.script-scene-title-block .script-play-original-toggle--dock,
+.script-scene-title-block .script-annotations-toggle--dock {
+  position: static;
+}
+
+.script-scene-title-mode-btn--dock,
+.script-scene-title-mode-btn--in-dock {
+  position: static;
 }
 
 .script-markdown-cm--with-scene-title .cm-content,
@@ -1968,11 +2104,17 @@
     var(--script-markdown-content-padding-bottom);
 }
 
+.markdown-preview--with-scene-title:not(.markdown-preview--kadr) {
+  padding-left: 0;
+  padding-right: 0;
+  padding-bottom: 0;
+}
+
 .script-markdown-cm.script-markdown-cm--kadr-layout.script-markdown-cm--with-scene-title .cm-content {
   padding-top: 0;
 }
 
-.script-markdown-cm--with-scene-title .cm-content > .cm-line:first-child {
+.script-markdown-cm--with-scene-title .cm-content {
   padding-top: 0;
 }
 
@@ -1995,7 +2137,7 @@
   word-break: break-word;
   text-transform: uppercase;
   text-align: center;
-  color: var(--color-script-accent, var(--color-text-primary));
+  color: var(--color-text-primary);
 }
 
 .script-scene-title-mount > .script-scene-title {
@@ -2007,25 +2149,17 @@
   min-height: 28px;
 }
 
-.markdown-preview:not(.markdown-preview--with-scene-title):not(.markdown-preview--kadr) {
-  padding:
-    var(--script-markdown-content-padding-top)
-    var(--script-markdown-content-padding-x)
-    var(--script-markdown-content-padding-bottom);
-  box-sizing: border-box;
-}
-
 .form-group-grow > .markdown-preview,
 .form-group-grow > .script-markdown-body-fallback {
   flex: 1;
   min-height: 0;
 }
 
-.script-markdown-cm .cm-line.cm-line-para-gap {
+.script-markdown-cm .cm-editor .cm-line.cm-line-para-gap {
   padding-top: var(--script-markdown-paragraph-gap);
 }
 
-.script-markdown-editor-main--play .script-markdown-cm .cm-line.cm-line-para-gap {
+.script-markdown-editor-main--play .script-markdown-cm .cm-editor .cm-line.cm-line-para-gap {
   padding-top: var(--script-play-paragraph-gap, var(--script-markdown-paragraph-gap));
 }
 
@@ -2056,18 +2190,18 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: auto;
   background-color: transparent !important;
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  font-size: var(--script-font-size-body, 14px);
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-content {
-  color: var(--color-text-primary);
-  font-family: var(--font-family-script-body);
-  padding:
-    var(--script-markdown-content-padding-top)
-    var(--script-markdown-content-padding-x)
-    var(--script-markdown-content-padding-bottom);
-  box-sizing: border-box;
+  color: var(--script-play-text-color, var(--color-text-primary));
+  font-family: var(--script-play-font-family, var(--font-family-script-body));
+  font-size: var(--script-font-size-body, 14px);
+  line-height: var(--script-play-line-height, var(--script-markdown-line-height, 1.5));
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-activeLine {
@@ -2075,12 +2209,12 @@
 }
 
 .script-markdown-cm .cm-line:hover {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: color-mix(in srgb, var(--color-active-ascent) 32%, var(--color-bg-secondary));
 }
 
 .markdown-preview p:hover,
 .markdown-preview .markdown-dialog-line:hover {
-  background-color: rgba(255, 255, 255, 0.04);
+  background-color: color-mix(in srgb, var(--color-active-ascent) 32%, var(--color-bg-secondary));
 }
 
 /* Служебная строка <!-- lk:uuid --> — в файле есть, в UI скрыта */
@@ -2090,24 +2224,24 @@
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line {
   background: var(--color-bg-secondary);
-  padding-left: 12px;
-  padding-right: 12px;
+  padding-left: 0;
+  padding-right: 0;
   box-sizing: border-box;
   border-left: 1px solid var(--color-border-faint-muted);
   border-right: 1px solid var(--color-border-faint-muted);
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line--first {
-  margin-top: 10px;
-  padding-top: 14px;
+  margin-top: 4px;
+  padding-top: 6px;
   border-top: 1px solid var(--color-border-faint-muted);
   border-top-left-radius: 10px;
   border-top-right-radius: 10px;
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-kadr-section-line--last {
-  margin-bottom: 10px;
-  padding-bottom: 16px;
+  margin-bottom: 4px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--color-border-faint-muted);
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
@@ -2125,8 +2259,9 @@
 }
 
 .script-markdown-cm.script-markdown-cm--kadr-layout .cm-line {
-  font-size: 14px;
-  line-height: var(--script-markdown-line-height);
+  font-size: inherit;
+  line-height: inherit;
+  font-family: inherit;
 }
 
 .script-markdown-cm .cm-md-parenthetical-remark {
@@ -2226,10 +2361,20 @@
   object-position: center;
 }
 
-/* Только скрыть служебный буфер CM; его размеры нужны самому редактору для корректной каретки. */
+/* Служебный буфер CM у виджетов: не должен выглядеть как лишний пробел после [[РОЛЬ]]. */
 .script-markdown-cm .cm-widgetBuffer {
+  display: inline-block;
+  width: 0;
+  min-width: 0;
+  max-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   opacity: 0;
   pointer-events: none;
+  font-size: 0;
+  line-height: 0;
+  letter-spacing: 0;
 }
 
 .script-markdown-cm .cm-md-orchestra-image-preview__ph {
@@ -2761,10 +2906,10 @@
   }
 }
 
-/* Главная (/): компактнее кадры, симметричные отступы (scrollbar-gutter с обеих сторон). */
+/* Главная (/): компактнее кадры. */
 .main-content.show-script {
-  padding: 8px;
-  scrollbar-gutter: stable both-edges;
+  padding: 0;
+  scrollbar-gutter: auto;
 }
 
 .main-content.show-script .show-script {
@@ -2784,7 +2929,8 @@
 }
 
 .main-content.show-script .markdown-preview {
-  max-width: min(100%, var(--width-content-page));
+  max-width: 100%;
+  margin: 0;
 }
 
 .main-content.show-script .markdown-preview.markdown-preview--kadr .markdown-kadr {
@@ -2796,7 +2942,16 @@
 }
 
 .main-content.show-script .script-markdown-edit--kadr .script-markdown-editor-split {
-  max-width: min(100%, var(--width-content-page));
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.main-content.show-script .script-scene-comment-pane,
+.main-content.show-script .script-scene-requisites-pane {
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .main-content.show-script .script-markdown-cm.script-markdown-cm--kadr-layout .cm-md-heading-section {

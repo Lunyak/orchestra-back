@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
@@ -124,17 +125,7 @@ export function CollectionDetailPage() {
       : 0;
 
   if (isLoading) {
-    return (
-      <div className="app-layout accounting-layout">
-        <div className="app-content">
-          <main className="main-content">
-            <div className="accounting-page">
-                <p>Загрузка…</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Загрузка…" />;
   }
 
   if (error || !collection) {

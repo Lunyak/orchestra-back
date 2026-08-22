@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../auth";
@@ -524,7 +525,7 @@ export function ChatDock() {
 
           <div className="chat-dock-messages" ref={messagesScrollRef}>
             {loadingList || loadingMsgs ? (
-              <div className="chat-dock-muted">Загрузка…</div>
+              <PageLoader variant="view" label="Загрузка…" />
             ) : !conversations.length ? (
               <div className="chat-dock-muted">Нет доступных чатов труппы</div>
             ) : !activeId ? (
@@ -535,7 +536,7 @@ export function ChatDock() {
                   <div className="chat-dock-history-top" aria-busy={loadingOlder}>
                     <div ref={topSentinelRef} className="chat-dock-history-sentinel" aria-hidden />
                     {loadingOlder ? (
-                      <div className="chat-dock-history-loading">Загрузка истории…</div>
+                      <PageLoader variant="view" label="Загрузка истории…" />
                     ) : null}
                   </div>
                 ) : null}

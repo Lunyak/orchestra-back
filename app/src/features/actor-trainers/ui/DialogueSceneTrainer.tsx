@@ -1,17 +1,18 @@
 import cn from "classnames";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Buttons } from "../../../shared/components/buttons/Buttons";
 import type { ScriptScene } from "../../../shared/types/script";
 import type { ProjectRoleInfo } from "../../../sync/api/projects";
 import { RolePlayingCard } from "../../role-card/RolePlayingCard";
 import { buildDialogueLines, normalizeRoleKey, type DialogueLine } from "../model/dialogue";
-import { findProjectRoleForScriptKey } from "../model/voice-trainer-partner";
 import {
   shuffle,
   stripLeadingPunctuationTokens,
   tokenizeText,
   type WordToken,
 } from "../model/wordTokens";
+import { TrainerContextCard } from "./TrainerContextCard";
 import "./dialogue-style.css";
 
 const dialogueIconProps = {
@@ -68,42 +69,6 @@ type Exercise = {
   shuffled: WordToken[];
 };
 
-type DialogueContextCardProps = {
-  accessToken?: string | null;
-  line: DialogueLine | null;
-  projectRoles: ProjectRoleInfo[];
-};
-
-function DialogueContextCard({
-  accessToken,
-  line,
-  projectRoles,
-}: DialogueContextCardProps) {
-  const roleTitle = String(line?.role ?? "Партнёр");
-  const roleInfo = findProjectRoleForScriptKey(roleTitle, projectRoles) ?? {
-    title: roleTitle,
-    avatarKey: null,
-  };
-
-  return (
-    <section className="dialogue-context-card">
-      <RolePlayingCard
-        role={roleInfo}
-        accessToken={accessToken}
-        size="md"
-        className="dialogue-context-card__portrait"
-      />
-      <div className="dialogue-context-card__body">
-        <div className="dialogue-context-card__label">Реплика перед вами</div>
-        <div className="dialogue-context-card__role">{roleTitle}</div>
-        <div className="dialogue-context-card__text">
-          {line?.text ?? "В сценарии нет реплики перед вами"}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function findNextUndone(exercises: Exercise[], done: Set<string>, fromIndex: number): number {
   if (exercises.length === 0) return 0;
   const start = Math.max(0, Math.min(fromIndex, exercises.length - 1));
@@ -159,18 +124,38 @@ function answerTokensForDisplay(answer: WordToken[]): WordToken[] {
   return stripLeadingPunctuationTokens(answer);
 }
 
+function joinAnswerTokens(tokens: WordToken[]): string {
+  let out = "";
+  for (const token of tokens) {
+    if (!out) {
+      out = token.text;
+      continue;
+    }
+    if (token.kind === "punct") {
+      out += token.text;
+      continue;
+    }
+    out += ` ${token.text}`;
+  }
+  return out;
+}
+
 type PoolWordLabel = {
+  leading: WordToken[];
   trailing: WordToken[];
 };
 
 function buildPoolWordLabels(target: WordToken[]): Map<string, PoolWordLabel> {
   const labels = new Map<string, PoolWordLabel>();
   let index = 0;
+  const initialLeading: WordToken[] = [];
 
   while (index < target.length && isAutoToken(target[index]!)) {
+    initialLeading.push(target[index]!);
     index += 1;
   }
 
+  let isFirstContentWord = true;
   while (index < target.length) {
     const head = target[index]!;
     if (isAutoToken(head)) {
@@ -184,7 +169,11 @@ function buildPoolWordLabels(target: WordToken[]): Map<string, PoolWordLabel> {
       trailing.push(target[index]!);
       index += 1;
     }
-    labels.set(head.id, { trailing });
+    labels.set(head.id, {
+      leading: isFirstContentWord ? initialLeading : [],
+      trailing,
+    });
+    isFirstContentWord = false;
   }
 
   return labels;
@@ -196,31 +185,28 @@ function RoleLinePuzzle({
   active,
   onDone,
   onResetDone,
+  wordPoolHost,
 }: {
   ex: Exercise;
   done: boolean;
   active: boolean;
   onDone: () => void;
   onResetDone: () => void;
+  wordPoolHost: HTMLElement | null;
 }) {
   const [pool, setPool] = useState<WordToken[]>(ex.shuffled);
   const [answer, setAnswer] = useState<WordToken[]>([]);
   const [mistake, setMistake] = useState(false);
+  const [mistakeStreak, setMistakeStreak] = useState(0);
   const completedFiredRef = useRef(false);
   const poolRef = useRef<WordToken[]>(pool);
   const answerRef = useRef<WordToken[]>(answer);
 
   const resetState = () => {
-    const target = ex.target ?? [];
-    const autoPrefix: WordToken[] = [];
-    let i = 0;
-    while (i < target.length && isAutoToken(target[i]!)) {
-      autoPrefix.push(target[i]!);
-      i += 1;
-    }
-    setAnswer(autoPrefix);
+    setAnswer([]);
     setPool((ex.shuffled ?? []).filter((t) => !isAutoToken(t)));
     setMistake(false);
+    setMistakeStreak(0);
     completedFiredRef.current = false;
   };
 
@@ -238,35 +224,50 @@ function RoleLinePuzzle({
     answerRef.current = answer;
   }, [answer]);
 
+  const nextExpectedToken = (() => {
+    let idx = answer.length;
+    while (idx < ex.target.length && isAutoToken(ex.target[idx]!)) {
+      idx += 1;
+    }
+    return ex.target[idx] ?? null;
+  })();
+
+  const showHint = mistakeStreak >= 3 && nextExpectedToken != null;
+
   const pick = (token: WordToken) => {
     const poolNow = poolRef.current;
     const answerNow = answerRef.current;
-    const expected = ex.target[answerNow.length] ?? null;
-    if (!expected) return;
-    // Ошибка должна "висеть" до следующего клика — сбрасываем на новом клике.
     setMistake(false);
+
+    let idx = answerNow.length;
+    const leadingAutos: WordToken[] = [];
+    while (idx < ex.target.length && isAutoToken(ex.target[idx]!)) {
+      leadingAutos.push(ex.target[idx]!);
+      idx += 1;
+    }
+
+    const expected = ex.target[idx] ?? null;
+    if (!expected || isAutoToken(expected)) return;
+
     const ok = token.norm === expected.norm;
     if (!ok) {
       setMistake(true);
+      setMistakeStreak((count) => count + 1);
       return;
     }
 
-    let nextPool = poolNow.filter((t) => t.id !== token.id);
-    const nextAnswer: WordToken[] = [...answerNow, token];
+    const nextPool = poolNow.filter((t) => t.id !== token.id);
+    const nextAnswer: WordToken[] = [...answerNow, ...leadingAutos, token];
+    idx += 1;
 
-    // Автоподстановка: после верного слова автоматически добавляем
-    // идущие подряд частицы/союзы/предлоги и (опционально) пунктуацию.
-    let idx = nextAnswer.length;
-    while (idx < ex.target.length) {
-      const want = ex.target[idx];
-      if (!want) break;
-      if (!isAutoToken(want)) break;
-      nextAnswer.push(want);
+    while (idx < ex.target.length && isAutoToken(ex.target[idx]!)) {
+      nextAnswer.push(ex.target[idx]!);
       idx += 1;
     }
 
     setPool(nextPool);
     setAnswer(nextAnswer);
+    setMistakeStreak(0);
   };
 
   useEffect(() => {
@@ -308,68 +309,97 @@ function RoleLinePuzzle({
   const visibleAnswer = answerTokensForDisplay(answer);
   const hasAnswer = visibleAnswer.length > 0;
   const poolWordLabels = buildPoolWordLabels(ex.target);
+  const hintTokenId = showHint
+    ? pool.find((token) => token.id === nextExpectedToken?.id)?.id ??
+      pool.find((token) => token.norm === nextExpectedToken?.norm)?.id ??
+      null
+    : null;
+
+  const wordPool = (
+    <div className="dialogue-pool" aria-label="Слова реплики">
+      {pool.map((t) => {
+        const label = poolWordLabels.get(t.id);
+        const leading = label?.leading ?? [];
+        const trailing = label?.trailing ?? [];
+        const isHint = hintTokenId != null && t.id === hintTokenId;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            className={cn(
+              "dialogue-token",
+              t.kind === "punct" && "dialogue-token--punct",
+              isHint && "dialogue-token--hint",
+            )}
+            onClick={() => pick(t)}
+          >
+            {leading.map((autoToken) => (
+              <span
+                key={autoToken.id}
+                className={cn(
+                  "dialogue-token__auto",
+                  "dialogue-token__auto--leading",
+                  autoToken.kind === "punct" && "dialogue-token__auto--punct",
+                )}
+              >
+                {autoToken.text}
+              </span>
+            ))}
+            <span className="dialogue-token__head">{t.text}</span>
+            {trailing.map((autoToken) => (
+              <span
+                key={autoToken.id}
+                className={cn(
+                  "dialogue-token__auto",
+                  autoToken.kind === "punct" && "dialogue-token__auto--punct",
+                )}
+              >
+                {autoToken.text}
+              </span>
+            ))}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div className="dialogue-my-line" data-done="false" data-mistake={mistake ? "true" : "false"}>
-      <div className="dialogue-my-line-head">
-        <div className="dialogue-my-line-role-row">
-          <div className="dialogue-my-line-role">{ex.role}</div>
-          <span className="dialogue-now-badge">Сейчас</span>
-        </div>
-        <div className="dialogue-my-line-actions">
-          <Buttons.TextButton
-            type="button"
-            className="dialogue-reset-btn"
-            onClick={() => {
-              resetState();
-            }}
-          >
-            сбросить
-          </Buttons.TextButton>
-        </div>
-      </div>
-
-      <div className={cn("dialogue-answer", !hasAnswer && "dialogue-answer--empty")}>
-        {hasAnswer ? (
-          <span>{visibleAnswer.map((t) => t.text).join(" ")}</span>
-        ) : (
-          <span className="dialogue-muted">Соберите реплику по словам</span>
-        )}
-      </div>
-
-      <div className="dialogue-pool" aria-label="Слова реплики">
-        {pool.map((t) => {
-          const trailing = poolWordLabels.get(t.id)?.trailing ?? [];
-          return (
-            <button
-              key={t.id}
+    <>
+      <div className="dialogue-my-line" data-done="false" data-mistake={mistake ? "true" : "false"}>
+        <div className="dialogue-my-line-head">
+          <div className="dialogue-my-line-role-row">
+            <div className="dialogue-my-line-role">{ex.role}</div>
+            <span className="dialogue-now-badge">Сейчас</span>
+          </div>
+          <div className="dialogue-my-line-actions">
+            <Buttons.TextButton
               type="button"
-              className={cn("dialogue-token", t.kind === "punct" && "dialogue-token--punct")}
-              onClick={() => pick(t)}
+              className="dialogue-reset-btn"
+              onClick={() => {
+                resetState();
+              }}
             >
-              <span className="dialogue-token__head">{t.text}</span>
-              {trailing.map((autoToken) => (
-                <span
-                  key={autoToken.id}
-                  className={cn(
-                    "dialogue-token__auto",
-                    autoToken.kind === "punct" && "dialogue-token__auto--punct",
-                  )}
-                >
-                  {autoToken.text}
-                </span>
-              ))}
-            </button>
-          );
-        })}
-      </div>
-
-      {mistake ? (
-        <div className="dialogue-mistake" role="status">
-          Не то слово — попробуйте ещё
+              сбросить
+            </Buttons.TextButton>
+          </div>
         </div>
-      ) : null}
-    </div>
+
+        <div className={cn("dialogue-answer", !hasAnswer && "dialogue-answer--empty")}>
+          {hasAnswer ? (
+            <span>{joinAnswerTokens(visibleAnswer)}</span>
+          ) : (
+            <span className="dialogue-muted">Соберите реплику по словам</span>
+          )}
+        </div>
+
+        {mistake ? (
+          <div className="dialogue-mistake" role="status">
+            Не то слово — попробуйте ещё
+          </div>
+        ) : null}
+      </div>
+      {wordPoolHost ? createPortal(wordPool, wordPoolHost) : null}
+    </>
   );
 }
 
@@ -431,6 +461,8 @@ export function DialogueSceneTrainer({
   }, [allLines, desiredRoleKeySet]);
 
   const [doneIds, setDoneIds] = useState<Set<string>>(() => readDoneSet(storageKey));
+  const [hideUnspokenText, setHideUnspokenText] = useState(true);
+  const [wordPoolHost, setWordPoolHost] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     setDoneIds(readDoneSet(storageKey));
   }, [storageKey]);
@@ -551,6 +583,36 @@ export function DialogueSceneTrainer({
         <div className="dialogue-toolbar-actions">
           <button
             type="button"
+            className={cn("dialogue-icon-btn", hideUnspokenText && "dialogue-icon-btn--primary")}
+            onClick={() => setHideUnspokenText((value) => !value)}
+            aria-label={
+              hideUnspokenText
+                ? "Показать непройденный текст"
+                : "Скрыть непройденный текст"
+            }
+            title={
+              hideUnspokenText
+                ? "Показать непройденный текст"
+                : "Скрыть непройденный текст"
+            }
+            aria-pressed={hideUnspokenText}
+          >
+            {hideUnspokenText ? (
+              <svg {...dialogueIconProps}>
+                <path d="M17.9 17.9A10.9 10.9 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.2-5.7" />
+                <path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c7 0 11 8 11 8a18.6 18.6 0 0 1-2.7 3.8" />
+                <path d="M14.1 9.9a3 3 0 0 1-4.2 4.2" />
+                <path d="M1 1l22 22" />
+              </svg>
+            ) : (
+              <svg {...dialogueIconProps}>
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
             className="dialogue-icon-btn"
             onClick={goPrevMyLine}
             disabled={activeExerciseIndex <= 0}
@@ -628,6 +690,14 @@ export function DialogueSceneTrainer({
           </div>
         ) : showLearningStage && activeExercise ? (
           <div className="dialogue-learning-stage">
+            <aside className="dialogue-context-stack" aria-label="Реплика перед вами">
+              <TrainerContextCard
+                accessToken={accessToken}
+                line={lineBeforeActive}
+                projectRoles={projectRoles}
+              />
+            </aside>
+
             <section className="dialogue-self-card">
               <div className="dialogue-self-card__identity">
                 <RolePlayingCard
@@ -648,28 +718,31 @@ export function DialogueSceneTrainer({
                   ex={activeExercise}
                   done={false}
                   active
+                  wordPoolHost={wordPoolHost}
                   onDone={() => markDone(activeExercise.id)}
                   onResetDone={() => markUndone(activeExercise.id)}
                 />
               </div>
             </section>
-
-            <aside className="dialogue-context-stack" aria-label="Реплика перед вами">
-              <DialogueContextCard
-                accessToken={accessToken}
-                line={lineBeforeActive}
-                projectRoles={projectRoles}
-              />
-            </aside>
           </div>
         ) : null}
       </div>
+
+      {showLearningStage ? (
+        <div
+          ref={setWordPoolHost}
+          className="dialogue-word-dock"
+          aria-label="Слова для текущей реплики"
+        />
+      ) : null}
 
       {showScriptStrip ? (
         <section className="dialogue-script-strip" aria-label="Полный сценарий">
           <div className="dialogue-script-strip__head">
             <span className="dialogue-script-strip__title">Сценарий</span>
-            <span className="dialogue-script-strip__hint">текущая фраза подсвечена</span>
+            <span className="dialogue-script-strip__hint">
+              {hideUnspokenText ? "непройденный текст скрыт" : "текущая фраза подсвечена"}
+            </span>
           </div>
           <div className="dialogue-script-strip__scroll">
             {allLines.map((line, lineIndex) => {
@@ -681,8 +754,10 @@ export function DialogueSceneTrainer({
                 allDone || (activeScriptLineIndex >= 0 && lineIndex < activeScriptLineIndex);
               const isMineDone = Boolean(exercise && doneIds.has(exercise.id));
               const isDone = !isActive && (isPassedByPosition || isMineDone);
+              const hideText = hideUnspokenText && !isDone;
               const roleLabel = line.role ? String(line.role) : "Ремарка";
               const canJump = isMine && !allDone;
+              const visibleText = hideText ? "···" : line.text;
 
               return (
                 <div
@@ -700,6 +775,7 @@ export function DialogueSceneTrainer({
                     isMine && "dialogue-script-strip__line--mine",
                     isActive && "dialogue-script-strip__line--active",
                     isDone && "dialogue-script-strip__line--done",
+                    hideText && "dialogue-script-strip__line--hidden-text",
                     canJump && "dialogue-script-strip__line--jumpable",
                   )}
                   onClick={canJump ? () => jumpToExercise(line.id) : undefined}
@@ -716,11 +792,11 @@ export function DialogueSceneTrainer({
                   }
                 >
                   {isStage ? (
-                    <span className="dialogue-script-strip__stage">{line.text}</span>
+                    <span className="dialogue-script-strip__stage">{visibleText}</span>
                   ) : (
                     <>
                       <span className="dialogue-script-strip__role">{roleLabel}</span>
-                      <span className="dialogue-script-strip__text">{line.text}</span>
+                      <span className="dialogue-script-strip__text">{visibleText}</span>
                     </>
                   )}
                 </div>

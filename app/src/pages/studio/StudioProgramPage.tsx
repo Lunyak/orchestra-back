@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
@@ -14,7 +15,7 @@ import {
 import { Link, useParams } from "react-router-dom";
 import {
   studioLessonPath,
-  studioPath,
+  studioProgramSectionPath,
 } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
@@ -233,17 +234,7 @@ export function StudioProgramPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="app-layout studio-layout">
-        <div className="app-content">
-          <main className="main-content">
-            <div className="studio-page">
-              <p>Загрузка…</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Загрузка…" />;
   }
 
   if (error || !studio || !module) {
@@ -252,7 +243,7 @@ export function StudioProgramPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to={studioPath(studioId)}>
+              <Link className="studio-page__back" to={studioProgramSectionPath(studioId)}>
                 ← Студия
               </Link>
               <p className="studio-page__error">Программа не найдена.</p>
@@ -268,7 +259,7 @@ export function StudioProgramPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to={studioPath(studioId)}>
+            <Link className="studio-page__back" to={studioProgramSectionPath(studioId)}>
               ← {studio.title}
             </Link>
 

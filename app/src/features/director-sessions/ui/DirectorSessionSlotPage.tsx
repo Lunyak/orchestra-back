@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
 import cn from "classnames";
@@ -510,7 +511,7 @@ export function DirectorSessionSlotPage() {
       </div>
 
       {loading ? (
-        <div className="director-session-slot-page__loading">Загрузка…</div>
+        <PageLoader variant="view" label="Загрузка…" />
       ) : null}
       {error ? (
         <div className="settings-invite-error director-session-slot-page__error">

@@ -1,14 +1,18 @@
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import {
+  PageBootLoader,
+  PageBootProvider,
+  usePageBoot,
+} from "@shared/components/page-loader/page-boot";
+import {
   AppEditorMenubar,
   AppEditorMenubarProvider,
-  AppEditorScriptModeNav,
   AppEditorScriptPanelsNav,
   useAppEditorMenubarActionsRender,
 } from "@shared/components/app-editor-menubar";
 import { useIsMobile } from "@shared/hooks/useIsMobile";
-import { PlaylistSidebar } from "@shared/components/playlist-sidebar/PlaylistSidebar";
 import { useAppDispatch, useAppSelector } from "@shared/store/hooks";
+import cn from "classnames";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { FormatPlayTextModal } from "../../features/play-format/ui/FormatPlayTextModal";
 import { subscribeOpenFormatPlay } from "../../features/spectacle/model/format-play-request";
@@ -18,14 +22,12 @@ import { usePlaybook } from "../../features/playbook";
 import { playbookActions } from "../../features/playbook/model/playbook-slice";
 import {
   selectActiveSceneMarkdownContext,
-  selectShowScriptMarkdownUi,
-  showScriptMarkdownActions,
 } from "../../features/show-script-markdown/model/show-script-markdown-slice";
 import { useScriptUI } from "../../features/script-ui";
 import { scriptUiActions } from "../../features/script-ui/model/script-ui-slice";
 import { RecentOrganizationsTracker } from "../../features/global-dashboard/ui/RecentOrganizationsTracker";
 import { AppRouteDeclarations } from "./AppRouteDeclarations";
-import { getRouteMeta, isScriptMarkdownRoute } from "./routeMeta";
+import { getRouteMeta } from "./routeMeta";
 import {
   getProjectSectionFromPath,
   isProjectPath,
@@ -37,12 +39,10 @@ function AppRoutesContent() {
   const location = useLocation();
   const dispatch = useAppDispatch();
   const { projectName } = useProject();
-  const { registerPlaylistPlay, updateScene } = usePlaybook();
+  const { updateScene } = usePlaybook();
   const {
     showPlaylistSidebar,
     togglePlaylist,
-    showHeaderSounds,
-    toggleHeaderSounds,
     isScenesCollapsed,
     setIsScenesCollapsed,
     toggleScenesCollapsed,
@@ -52,7 +52,6 @@ function AppRoutesContent() {
     mobileScenesOpen,
     setMobileScenesOpen,
     toggleMobileScenes,
-    isEditing,
   } = useScriptUI();
 
   const isMobile = useIsMobile();
@@ -62,67 +61,17 @@ function AppRoutesContent() {
     location.pathname,
   );
   const projectSection = getProjectSectionFromPath(location.pathname);
-  const isProjectRoute = isProjectPath(location.pathname);
   const isLightPlotRoute = projectSection === "light-plot";
   const spectacleRunTextHidden = useAppSelector(
     (state) => state.scriptUi.spectacleRunTextHidden,
   );
-  const showScriptMainChrome = isScriptMarkdownRoute(location.pathname);
   const { currentScene, activeMarkdown, activeMarkdownField } = useAppSelector((state) =>
     projectName
       ? selectActiveSceneMarkdownContext(state, projectName, SCRIPT_SCENE_NAME)
       : { currentScene: undefined, activeMarkdown: "", activeMarkdownField: "markdown" as const },
   );
-  const markdownMode = useAppSelector((state) =>
-    projectName
-      ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).markdownMode
-      : "play",
-  );
-  const playOriginalMode = useAppSelector((state) =>
-    projectName
-      ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).playOriginalMode
-      : false,
-  );
-  const annotationsMode = useAppSelector((state) =>
-    projectName
-      ? selectShowScriptMarkdownUi(state, projectName, SCRIPT_SCENE_NAME).annotationsMode
-      : true,
-  );
-
-  const toggleAnnotations = useCallback(() => {
-    if (!projectName || isEditing) return;
-    dispatch(
-      showScriptMarkdownActions.setAnnotationsMode({
-        projectSlug: projectName,
-        sceneName: SCRIPT_SCENE_NAME,
-        enabled: !annotationsMode,
-      }),
-    );
-  }, [annotationsMode, dispatch, isEditing, projectName]);
 
   useEffect(() => subscribeOpenFormatPlay(() => setFormatPlayModalOpen(true)), []);
-
-  const handleTogglePlayOriginal = useCallback(() => {
-    if (!projectName) return;
-    const next = !playOriginalMode;
-    try {
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          `showScript:playOriginalMode:${projectName}:${SCRIPT_SCENE_NAME}`,
-          String(next),
-        );
-      }
-    } catch {
-      // ignore
-    }
-    dispatch(
-      showScriptMarkdownActions.setPlayOriginalMode({
-        projectSlug: projectName,
-        sceneName: SCRIPT_SCENE_NAME,
-        enabled: next,
-      }),
-    );
-  }, [dispatch, playOriginalMode, projectName]);
 
   const formatPlaySourceText = String(activeMarkdown ?? "");
 
@@ -137,16 +86,10 @@ function AppRoutesContent() {
   const fallbackLabel = isRehearsalPlanRoute
     ? "Загрузка репетиций…"
     : "Загрузка страницы…";
-  const suspenseFallback = isSpectacleLayoutRoute ? (
-    <PageLoader
-      variant="spectacle"
-      showLeftSidebar={isPlaylistVisible}
-      showRightSidebar={isScenesVisible}
-      showTopBar={showHeaderSounds}
-      label="Загрузка страницы…"
+  const suspenseFallback = (
+    <PageBootLoader
+      label={isSpectacleLayoutRoute ? "Загрузка страницы…" : fallbackLabel}
     />
-  ) : (
-    <PageLoader variant="simple" label={fallbackLabel} />
   );
 
   const handleTogglePlaylist = useCallback(() => {
@@ -182,23 +125,6 @@ function AppRoutesContent() {
   ]);
 
   useAppEditorMenubarActionsRender(
-    "script-mode-nav",
-    10,
-    () =>
-      showScriptMainChrome ? (
-        <AppEditorScriptModeNav
-          isEditing={isEditing}
-          annotationsMode={annotationsMode}
-          onToggleAnnotations={toggleAnnotations}
-          playOriginalMode={markdownMode === "play" ? playOriginalMode : undefined}
-          onTogglePlayOriginal={
-            markdownMode === "play" ? handleTogglePlayOriginal : undefined
-          }
-        />
-      ) : null,
-  );
-
-  useAppEditorMenubarActionsRender(
     "script-panels-nav",
     0,
     () =>
@@ -206,8 +132,6 @@ function AppRoutesContent() {
         <AppEditorScriptPanelsNav
           showPlaylist={isPlaylistVisible}
           onTogglePlaylist={handleTogglePlaylist}
-          showHeaderSounds={showHeaderSounds}
-          onToggleHeaderSounds={toggleHeaderSounds}
           isScenesCollapsed={isHeaderScenesCollapsed}
           onToggleScenesCollapsed={handleToggleScenes}
           showSpectacleRunTextToggle={isLightPlotRoute}
@@ -247,14 +171,6 @@ function AppRoutesContent() {
       <Suspense fallback={suspenseFallback}>
         <AppRouteDeclarations />
       </Suspense>
-      {projectName && isProjectRoute ? (
-        <PlaylistSidebar
-          projectName={projectName}
-          sceneName={SCRIPT_SCENE_NAME}
-          mode="player"
-          onRegisterPlayHandler={registerPlaylistPlay}
-        />
-      ) : null}
       <FormatPlayTextModal
         isOpen={formatPlayModalOpen}
         sourceText={formatPlaySourceText}
@@ -285,12 +201,57 @@ export function AppRoutes() {
   return (
     <AppEditorMenubarProvider>
       <RecentOrganizationsTracker />
-      <div className="app-shell-with-menubar">
-        <AppEditorMenubar />
-        <div className="app-shell-body">
+      <PageBootProvider>
+        <AppShellFrame />
+      </PageBootProvider>
+    </AppEditorMenubarProvider>
+  );
+}
+
+function AppShellFrame() {
+  const location = useLocation();
+  const { isProjectsLoaded, projectName } = useProject();
+  const isPlaybookReady = useAppSelector((state) => state.playbook.isPlaybookReady);
+  const { blocking, label } = usePageBoot();
+  const isMobile = useIsMobile();
+  const { showPlaylistSidebar, isScenesCollapsed } = useScriptUI();
+  const isProjectRoute = isProjectPath(location.pathname);
+
+  const projectsBlocked = !isProjectsLoaded;
+  const playbookBlocked =
+    isProjectRoute && Boolean(projectName) && !isPlaybookReady;
+  const chromeHidden = projectsBlocked || playbookBlocked || blocking;
+
+  const loaderLabel = projectsBlocked
+    ? "Загрузка проектов…"
+    : playbookBlocked
+      ? "Загрузка сцены…"
+      : label;
+
+  const dockPlaylist = !chromeHidden && !isMobile && showPlaylistSidebar;
+  const dockScenes = !chromeHidden && !isMobile && !isScenesCollapsed;
+
+  return (
+    <div
+      className={cn(
+        "app-shell-with-menubar",
+        chromeHidden && "app-shell-with-menubar--booting",
+      )}
+      data-dock-playlist={dockPlaylist ? "true" : "false"}
+      data-dock-scenes={dockScenes ? "true" : "false"}
+    >
+      {!chromeHidden ? <AppEditorMenubar /> : null}
+      <div className="app-shell-body">
+        {chromeHidden ? <PageLoader label={loaderLabel} /> : null}
+        <div
+          className={cn(
+            "app-shell-boot-mount",
+            chromeHidden && "app-shell-boot-mount--pending",
+          )}
+        >
           <AppRoutesContent />
         </div>
       </div>
-    </AppEditorMenubarProvider>
+    </div>
   );
 }

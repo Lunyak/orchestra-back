@@ -22,7 +22,6 @@ import {
 } from "../../playbook/model/playbook-slice";
 import { Modal } from "../../../shared/core/modal/Modal";
 import { useAppEditorMenubarActionsRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
-import { useIsMobile } from "@shared/hooks/useIsMobile";
 import { useAudioInputDevices } from "@shared/media/useAudioInputDevices";
 import { VoiceTrainerSettingsPanel } from "./VoiceTrainerSettingsPanel";
 import {
@@ -58,13 +57,27 @@ import {
   type SpeakErrorInfo,
 } from "../model/voice-trainer-speech";
 import type { VoiceExercise } from "../model/voice-trainer-types";
+import { RolePlayingCard } from "../../role-card/RolePlayingCard";
 import {
   renderVoiceLineBody,
   VoiceLineControlsPanel,
   type VoiceLineControlsPanelProps,
-  VoiceLineSheet,
 } from "./VoiceLineControlsPanel";
+import { TrainerContextCard } from "./TrainerContextCard";
+import "./dialogue-style.css";
 import "./voice-style.css";
+
+const voiceTrainerIconProps = {
+  width: 18,
+  height: 18,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  "aria-hidden": true,
+};
 export function VoiceDialogueTrainer({
   scenes,
   role,
@@ -189,19 +202,31 @@ export function VoiceDialogueTrainer({
   }, [exercises.length]);
 
   const current = exercises[index] ?? null;
-  const isMobile = useIsMobile();
-  const [lineSheetOpen, setLineSheetOpen] = useState(true);
-  const activeLineRef = useRef<HTMLDivElement | null>(null);
+  const [hideUnspokenText, setHideUnspokenText] = useState(true);
+  const scriptLineRefs = useRef(new Map<string, HTMLDivElement>());
   useEffect(() => {
-    if (isMobile && lineSheetOpen) return;
-    const el = activeLineRef.current;
-    if (!el) return;
-    try {
-      el.scrollIntoView({ block: "center", behavior: "smooth" });
-    } catch {
-      // ignore
-    }
-  }, [current?.lineId, isMobile, lineSheetOpen]);
+    if (!current) return;
+    const lineEl = scriptLineRefs.current.get(current.lineId);
+    if (!lineEl) return;
+    lineEl.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [current?.lineId]);
+
+  const roleInfo = useMemo(
+    () => findProjectRoleForScriptKey(role, projectRoles),
+    [projectRoles, role],
+  );
+
+  const lineBeforeActive = useMemo((): DialogueLine | null => {
+    if (!current?.prev) return null;
+    return {
+      id: current.prev.lineId,
+      sceneId: current.sceneId,
+      sceneTitle: current.sceneTitle,
+      kind: "utterance",
+      role: current.prev.role,
+      text: current.prev.text,
+    };
+  }, [current]);
 
   const doneCount = useMemo(() => {
     let c = 0;
@@ -1170,14 +1195,10 @@ export function VoiceDialogueTrainer({
     [],
   );
 
-  if (!current) {
-    return <div className="voice-empty">Нет реплик для голосового режима.</div>;
-  }
-
-  const prevText = current.prev?.text ? stripParentheses(current.prev.text) : "";
-  const myTextNoRemarks = stripParentheses(current.textRaw);
-  const prevLineId = current.prev?.lineId ?? "";
-  const prevRoleKey = normalizeRoleKey(current.prev?.role ?? "");
+  const prevText = current?.prev?.text ? stripParentheses(current.prev.text) : "";
+  const myTextNoRemarks = current ? stripParentheses(current.textRaw) : "";
+  const prevLineId = current?.prev?.lineId ?? "";
+  const prevRoleKey = normalizeRoleKey(current?.prev?.role ?? "");
 
   const speakPrev = (opts?: { onEnd?: () => void; onError?: () => void }) => {
     if (!prevText || !prevRoleKey || !prevLineId) {
@@ -1188,7 +1209,7 @@ export function VoiceDialogueTrainer({
   };
 
   const saveLastTakeAsPreferred = async () => {
-    if (!lastTake || !projectName) return;
+    if (!current || !lastTake || !projectName) return;
     const perf = String(performerId ?? "").trim();
     if (!perf) return;
     const rk = normalizeRoleKey(current.role);
@@ -1259,6 +1280,16 @@ export function VoiceDialogueTrainer({
     setCurrentTarget(t);
   }, [sentenceIndex, sentenceParts]);
 
+  const skipPrevTtsForExerciseIdRef = useRef<string | null>(null);
+
+  if (!current) {
+    return (
+      <div className={cn("dialogue-trainer", "voice-trainer")}>
+        <div className="dialogue-empty">Нет реплик для голосового режима.</div>
+      </div>
+    );
+  }
+
   const beginListeningSession = (opts: { resetTranscript: boolean }) => {
     if (!supported.stt) return;
     void (async () => {
@@ -1301,8 +1332,6 @@ export function VoiceDialogueTrainer({
     pttActiveRef.current = false;
     stopAndEvaluate(100);
   };
-
-  const skipPrevTtsForExerciseIdRef = useRef<string | null>(null);
 
   const autoCycleBusy =
     listening || ttsDiag.lastEvent === "request" || ttsDiag.lastEvent === "start";
@@ -1348,7 +1377,7 @@ export function VoiceDialogueTrainer({
   };
 
   const toggleRevealCurrentLine = () => {
-    if (!current.lineId) return;
+    if (!current?.lineId) return;
     setRevealedLineIds((prev) => {
       const next = new Set(prev);
       if (next.has(current.lineId)) next.delete(current.lineId);
@@ -1357,37 +1386,74 @@ export function VoiceDialogueTrainer({
     });
   };
 
-  const lineControlsProps: VoiceLineControlsPanelProps = {
-    current,
-    sentenceTokens,
-    sentenceIndex,
-    showText,
-    revealedLineIds,
-    onToggleRevealLine: toggleRevealCurrentLine,
-    currentTarget,
-    lastAccepted,
-    supported,
-    listening,
-    left,
-    total,
-    pttStart,
-    pttStop,
-    beginListeningSession,
-    autoFlow,
-    autoCycleBusy,
-    runAuto,
-    lastTake,
-    playUrl,
-    voiceUpload,
-    projectName,
-    performerId,
-    saveLastTakeAsPreferred,
-    index,
-    exercisesCount: exercises.length,
-    onPrev: () => setIndex((i) => Math.max(0, i - 1)),
-    onNext: () => setIndex((i) => Math.min(exercises.length - 1, i + 1)),
-    myTextNoRemarks,
+  const allDone = total > 0 && left === 0;
+  const showLearningStage = !allDone && Boolean(current);
+  const showScriptStrip = allLines.length > 0;
+  const activeScriptLineIndex = current
+    ? allLines.findIndex((line) => line.id === current.lineId)
+    : -1;
+
+  const lineControlsProps: VoiceLineControlsPanelProps | null = current
+    ? {
+        current,
+        sentenceTokens,
+        sentenceIndex,
+        showText,
+        revealedLineIds,
+        onToggleRevealLine: toggleRevealCurrentLine,
+        currentTarget,
+        lastAccepted,
+        supported,
+        listening,
+        left,
+        total,
+        pttStart,
+        pttStop,
+        beginListeningSession,
+        autoFlow,
+        autoCycleBusy,
+        runAuto,
+        lastTake,
+        playUrl,
+        voiceUpload,
+        projectName,
+        performerId,
+        saveLastTakeAsPreferred,
+        index,
+        exercisesCount: exercises.length,
+        onPrev: () => setIndex((i) => Math.max(0, i - 1)),
+        onNext: () => setIndex((i) => Math.min(exercises.length - 1, i + 1)),
+        myTextNoRemarks,
+      }
+    : null;
+
+  const goPrevMyLine = () => setIndex((i) => Math.max(0, i - 1));
+  const goNextMyLine = () => setIndex((i) => Math.min(exercises.length - 1, i + 1));
+  const goNextUndone = () => {
+    const next = findNextUndoneIndex(exercises, doneIds, index);
+    if (next == null) {
+      setAllDoneDialog(true);
+      return;
+    }
+    setIndex(next);
   };
+
+  const jumpToExercise = (lineId: string) => {
+    const exerciseIndex = exerciseIndexByLineId.get(lineId);
+    if (typeof exerciseIndex !== "number") return;
+    setIndex(exerciseIndex);
+  };
+
+  const activeLineForBody: DialogueLine | null = current
+    ? {
+        id: current.lineId,
+        sceneId: current.sceneId,
+        sceneTitle: current.sceneTitle,
+        kind: "utterance",
+        role: current.role,
+        text: current.textRaw,
+      }
+    : null;
 
   const settingsPanelProps = {
     micError,
@@ -1446,116 +1512,182 @@ export function VoiceDialogueTrainer({
 
   return (
     <>
-    <div
-      className={cn(
-        "voice-trainer",
-        isMobile && lineSheetOpen && "voice-trainer--sheet-open",
-        isMobile && !lineSheetOpen && "voice-trainer--sheet-collapsed",
-      )}
-    >
-      <div className="voice-head">
-        <div className="voice-title">
-          <b>{role || "—"}</b>
-          {current?.sceneTitle ? (
-            <>
-              <span className="voice-title__sep" aria-hidden="true">
-                |
-              </span>
-              <span className="voice-scene">{current.sceneTitle}</span>
-            </>
-          ) : null}
-        </div>
-        <div className="voice-meta">
-          Пройдено <b>{doneCount}</b> / {total} (осталось {left})
-        </div>
-      </div>
-
-      {!supported.stt ? (
-        <div className="voice-warn">
-          На этой платформе нет поддержки распознавания речи (SpeechRecognition). Попробуйте Chrome
-          или Edge.
-        </div>
-      ) : null}
-      {supported.stt && micError && !settingsOpen ? (
-        <div className="voice-warn">{micError}</div>
-      ) : null}
-
-      <div className="voice-card">
-        {allDoneDialog && total > 0 ? (
-          <div className="voice-finished">
-            <div className="voice-finished-title">Вы повторили весь текст.</div>
-            <div className="voice-actions">
+      <div className={cn("dialogue-trainer", "voice-trainer")} data-all-done={allDone ? "true" : "false"}>
+        <div className="dialogue-toolbar">
+          <div className="dialogue-toolbar-actions">
+            <button
+              type="button"
+              className={cn("dialogue-icon-btn", hideUnspokenText && "dialogue-icon-btn--primary")}
+              onClick={() => setHideUnspokenText((value) => !value)}
+              aria-label={
+                hideUnspokenText
+                  ? "Показать непройденный текст"
+                  : "Скрыть непройденный текст"
+              }
+              title={
+                hideUnspokenText
+                  ? "Показать непройденный текст"
+                  : "Скрыть непройденный текст"
+              }
+              aria-pressed={hideUnspokenText}
+            >
+              {hideUnspokenText ? (
+                <svg {...voiceTrainerIconProps}>
+                  <path d="M17.9 17.9A10.9 10.9 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.2-5.7" />
+                  <path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c7 0 11 8 11 8a18.6 18.6 0 0 1-2.7 3.8" />
+                  <path d="M14.1 9.9a3 3 0 0 1-4.2 4.2" />
+                  <path d="M1 1l22 22" />
+                </svg>
+              ) : (
+                <svg {...voiceTrainerIconProps}>
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
+              className="dialogue-icon-btn"
+              onClick={goPrevMyLine}
+              disabled={index <= 0}
+              aria-label="Предыдущая моя реплика"
+              title="Предыдущая моя реплика"
+            >
+              <svg {...voiceTrainerIconProps}>
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="dialogue-icon-btn"
+              onClick={goNextMyLine}
+              disabled={index >= exercises.length - 1}
+              aria-label="Следующая моя реплика"
+              title="Следующая моя реплика"
+            >
+              <svg {...voiceTrainerIconProps}>
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="dialogue-icon-btn dialogue-icon-btn--primary"
+              onClick={goNextUndone}
+              disabled={left === 0}
+              aria-label="Следующая непройденная"
+              title="Следующая непройденная"
+            >
+              <svg {...voiceTrainerIconProps}>
+                <path d="M5 12h10" />
+                <path d="M13 6l6 6-6 6" />
+                <path d="M5 6v12" />
+              </svg>
+            </button>
+            {storageKey ? (
               <button
                 type="button"
-                className="voice-btn"
-                onClick={() => {
-                  stopListening();
-                  cancelSpeech();
-                  setAllDoneDialog(false);
-                }}
+                className="dialogue-icon-btn dialogue-icon-btn--danger"
+                onClick={resetProgressAll}
+                aria-label="Сброс прогресса"
+                title="Сброс прогресса"
               >
-                Закончить
+                <svg {...voiceTrainerIconProps}>
+                  <path d="M3 12a9 9 0 1 0 3-6.7" />
+                  <path d="M3 4v5h5" />
+                </svg>
               </button>
-              <button
-                type="button"
-                className="voice-btn voice-btn--primary"
-                onClick={() => {
-                  resetProgressAll();
-                  setAllDoneDialog(false);
-                }}
-              >
-                Начать заново
-              </button>
-            </div>
+            ) : null}
+          </div>
+        </div>
+
+        {!supported.stt ? (
+          <div className="voice-warn">
+            На этой платформе нет поддержки распознавания речи (SpeechRecognition). Попробуйте Chrome
+            или Edge.
           </div>
         ) : null}
+        {supported.stt && micError && !settingsOpen ? (
+          <div className="voice-warn">{micError}</div>
+        ) : null}
 
-        <div className="voice-script">
-          {(() =>
-            allLines.map((line) => {
-              if (line.kind === "stage") {
-                return (
-                  <div key={line.id} className="voice-line voice-line--stage">
-                    <div className="voice-text">{line.text}</div>
-                  </div>
-                );
-              }
+        <div className="dialogue-scroll">
+          {allDoneDialog && total > 0 ? (
+            <div className="dialogue-finished" role="status">
+              <div className="dialogue-finished-title">Вы повторили весь текст.</div>
+              <div className="dialogue-finished-meta">
+                Можно закончить или пройти блок ещё раз.
+              </div>
+              <div className="voice-actions">
+                <button
+                  type="button"
+                  className="voice-btn"
+                  onClick={() => {
+                    stopListening();
+                    cancelSpeech();
+                    setAllDoneDialog(false);
+                  }}
+                >
+                  Закончить
+                </button>
+                <button
+                  type="button"
+                  className="voice-btn voice-btn--primary"
+                  onClick={() => {
+                    resetProgressAll();
+                    setAllDoneDialog(false);
+                  }}
+                >
+                  Начать заново
+                </button>
+              </div>
+            </div>
+          ) : null}
 
-              const lineRole = line.role ?? "—";
-              const isMine = desiredRoleKeySet.has(normalizeRoleKey(lineRole));
-              const exIdx = exerciseIndexByLineId.get(line.id);
-              const ex = typeof exIdx === "number" ? exercises[exIdx] : null;
-              const isDone = ex ? doneIds.has(ex.id) : false;
-              const isActive = current?.lineId === line.id;
+          {allLines.length === 0 ? (
+            <div className="dialogue-empty">
+              {selectedPlaybookIds.length === 0
+                ? "Выберите сцены в настройках. Если список пуст, выберите роль, у которой есть реплики в тексте."
+                : "Нет текста в выбранных сценах (проверьте поле «Текст» в сценах)."}
+            </div>
+          ) : showLearningStage && current && activeLineForBody ? (
+            <div className="dialogue-learning-stage">
+              <aside className="dialogue-context-stack" aria-label="Реплика перед вами">
+                <TrainerContextCard
+                  accessToken={accessToken}
+                  line={lineBeforeActive}
+                  projectRoles={projectRoles}
+                />
+              </aside>
 
-              return (
-                <React.Fragment key={line.id}>
-                  <div
-                    ref={
-                      isActive
-                        ? (el) => {
-                            activeLineRef.current = el;
-                          }
-                        : undefined
+              <section className="dialogue-self-card">
+                <div className="dialogue-self-card__identity">
+                  <RolePlayingCard
+                    role={
+                      roleInfo ?? {
+                        title: role || current.role || "Моя роль",
+                        avatarKey: null,
+                      }
                     }
-                    className={cn(
-                      "voice-line",
-                      isMine ? "voice-line--mine" : "voice-line--other",
-                      isDone && "voice-line--done",
-                      isActive && "voice-line--active",
-                      isActive && isMine && listening && "voice-line--listening",
-                      isMine && ex && "voice-line--clickable",
-                    )}
-                    onClick={() => {
-                      if (!isMine || !ex) return;
-                      setIndex(exIdx!);
-                    }}
-                    title={isMine && ex ? "Перейти к реплике" : undefined}
+                    accessToken={accessToken}
+                    size="md"
+                    className="dialogue-self-card__portrait"
+                  />
+                </div>
+
+                <div className="dialogue-self-card__exercise">
+                  <div
+                    className="dialogue-my-line voice-self-line"
+                    data-listening={listening ? "true" : "false"}
                   >
-                    <div className="voice-role">{lineRole}</div>
-                    {renderVoiceLineBody(line, {
-                      isActive,
-                      isMine,
+                    <div className="dialogue-my-line-head">
+                      <div className="dialogue-my-line-role-row">
+                        <div className="dialogue-my-line-role">{current.role}</div>
+                        <span className="dialogue-now-badge">Сейчас</span>
+                      </div>
+                    </div>
+                    {renderVoiceLineBody(activeLineForBody, {
+                      isActive: true,
+                      isMine: true,
                       showText,
                       revealedLineIds,
                       listening,
@@ -1565,38 +1697,134 @@ export function VoiceDialogueTrainer({
                       passRatioPercent,
                     })}
                   </div>
+                </div>
+              </section>
+            </div>
+          ) : null}
+        </div>
 
-                  {isActive && !isMobile ? (
-                    <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--inline" />
+        {showLearningStage && lineControlsProps ? (
+          <div className="dialogue-word-dock voice-controls-dock" aria-label="Управление репликой">
+            <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--dock" />
+          </div>
+        ) : null}
+
+        {showScriptStrip ? (
+          <section className="dialogue-script-strip" aria-label="Полный сценарий">
+            <div className="dialogue-script-strip__head">
+              <span className="dialogue-script-strip__title">Сценарий</span>
+              <span className="dialogue-script-strip__hint">
+                {hideUnspokenText ? "непройденный текст скрыт" : "текущая фраза подсвечена"}
+              </span>
+            </div>
+            <div className="dialogue-script-strip__scroll">
+              {allLines.map((line, lineIndex) => {
+                const isStage = line.kind === "stage";
+                const exerciseIndex = exerciseIndexByLineId.get(line.id);
+                const isMine = typeof exerciseIndex === "number";
+                const exercise = isMine ? exercises[exerciseIndex]! : null;
+                const isActive = Boolean(current && current.lineId === line.id);
+                const isPassedByPosition =
+                  allDone || (activeScriptLineIndex >= 0 && lineIndex < activeScriptLineIndex);
+                const isMineDone = Boolean(exercise && doneIds.has(exercise.id));
+                const isDone = !isActive && (isPassedByPosition || isMineDone);
+                const hideText = hideUnspokenText && !isDone;
+                const roleLabel = line.role ? String(line.role) : "Ремарка";
+                const canJump = isMine && !allDone;
+                const visibleText = hideText ? "···" : line.text;
+
+                return (
+                  <div
+                    key={line.id}
+                    ref={(el) => {
+                      if (!el) {
+                        scriptLineRefs.current.delete(line.id);
+                        return;
+                      }
+                      scriptLineRefs.current.set(line.id, el);
+                    }}
+                    className={cn(
+                      "dialogue-script-strip__line",
+                      isStage && "dialogue-script-strip__line--stage",
+                      isMine && "dialogue-script-strip__line--mine",
+                      isActive && "dialogue-script-strip__line--active",
+                      isDone && "dialogue-script-strip__line--done",
+                      hideText && "dialogue-script-strip__line--hidden-text",
+                      canJump && "dialogue-script-strip__line--jumpable",
+                    )}
+                    onClick={canJump ? () => jumpToExercise(line.id) : undefined}
+                    role={canJump ? "button" : undefined}
+                    tabIndex={canJump ? 0 : undefined}
+                    onKeyDown={
+                      canJump
+                        ? (event) => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            jumpToExercise(line.id);
+                          }
+                        : undefined
+                    }
+                  >
+                    {isStage ? (
+                      <span className="dialogue-script-strip__stage">{visibleText}</span>
+                    ) : (
+                      <>
+                        <span className="dialogue-script-strip__role">{roleLabel}</span>
+                        <span className="dialogue-script-strip__text">{visibleText}</span>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ) : null}
+
+        <footer className="dialogue-footer">
+          <div className="dialogue-toolbar-main">
+            <div className="dialogue-toolbar-title">
+              Роль <b>{role || "—"}</b>
+            </div>
+            <div className="dialogue-toolbar-meta">
+              {allDone ? (
+                <>
+                  Пройдено <b>{doneCount}</b> / {total} — <b>весь блок завершён</b>
+                </>
+              ) : (
+                <>
+                  Пройдено <b>{doneCount}</b> / {total} (осталось {left})
+                  {current ? (
+                    <>
+                      {" "}
+                      · сейчас реплика <b>{index + 1}</b>
+                    </>
                   ) : null}
-                </React.Fragment>
-              );
-            })
-          )()}
-        </div>
+                </>
+              )}
+            </div>
+            {current?.sceneTitle ? (
+              <div className="dialogue-toolbar-scene">
+                Сцена <b>{current.sceneTitle}</b>
+              </div>
+            ) : null}
+          </div>
+        </footer>
       </div>
 
-      {isMobile ? (
-        <VoiceLineSheet expanded={lineSheetOpen} onExpandedChange={setLineSheetOpen}>
-          <VoiceLineControlsPanel {...lineControlsProps} className="voice-panel--sheet" />
-        </VoiceLineSheet>
-      ) : null}
-    </div>
-
-    <Modal
-      isOpen={settingsOpen}
-      onClose={() => setSettingsOpen(false)}
-      panelClassName="voice-settings-modal"
-      ariaLabel="Настройки голосового тренажёра"
-    >
-      <div className="voice-settings-modal__header">
-        <div>
-          <div className="voice-settings-modal__label">Настройки</div>
-          <div className="voice-settings-modal__title">Голосовой тренажёр</div>
+      <Modal
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        panelClassName="voice-settings-modal"
+        ariaLabel="Настройки голосового тренажёра"
+      >
+        <div className="voice-settings-modal__header">
+          <div>
+            <div className="voice-settings-modal__label">Настройки</div>
+            <div className="voice-settings-modal__title">Голосовой тренажёр</div>
+          </div>
         </div>
-      </div>
-      <VoiceTrainerSettingsPanel {...settingsPanelProps} className="voice-controls--modal" />
-    </Modal>
+        <VoiceTrainerSettingsPanel {...settingsPanelProps} className="voice-controls--modal" />
+      </Modal>
     </>
   );
 }

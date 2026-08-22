@@ -17,10 +17,12 @@ export type DeleteButtonProps = IconActionButtonProps & {
 };
 
 function DeleteButton({ className, variant = "playlist", type = "button", children = "×", ...rest }: DeleteButtonProps) {
+  const variantClass =
+    variant === "scene" ? "icon-action-delete--scene" : "icon-action-delete--playlist";
   return (
     <button
       type={type}
-      className={cn("icon-action-delete", className)}
+      className={cn("icon-action-delete", variantClass, className)}
       {...rest}
     >
       {children}

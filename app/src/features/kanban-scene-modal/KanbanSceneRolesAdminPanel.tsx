@@ -15,6 +15,7 @@ export type KanbanSceneRolesAdminMember = {
     firstName?: string | null;
     lastName?: string | null;
     avatarUrl?: string | null;
+    avatarSmallUrl?: string | null;
   } | null;
 };
 

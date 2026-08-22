@@ -69,12 +69,9 @@ export function TheaterOverviewPage() {
             to={theaterOrganizationPath()}
             className="theater-overview__back"
           >
-            ← Театры
+            ← 
           </Link>
           <p className="theater-overview__eyebrow">Театр</p>
-          <h1 className="theater-overview__title">
-            {loading ? "Загрузка…" : displayTitle}
-          </h1>
         </header>
 
         {!loading ? (
@@ -82,12 +79,6 @@ export function TheaterOverviewPage() {
             className="theater-overview__map"
             aria-labelledby="theater-nav-map-title"
           >
-            <h2
-              id="theater-nav-map-title"
-              className="theater-overview__section-title"
-            >
-              Карта разделов
-            </h2>
             <TheaterNavMindmap
               theaterId={theaterId}
               rootLabel={displayTitle}

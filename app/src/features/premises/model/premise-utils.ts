@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import type {
+  PremiseBookedAsKind,
   PremiseKind,
   PremiseMemberRole,
   PremiseSlotItem,
@@ -25,12 +26,41 @@ export function premiseMemberRoleLabel(role: PremiseMemberRole): string {
   }
 }
 
+export function premiseBookedAsKindLabel(kind: PremiseBookedAsKind): string {
+  switch (kind) {
+    case "user":
+      return "Пользователь";
+    case "troupe":
+      return "Коллектив";
+    case "theater":
+      return "Театр";
+    case "studio":
+      return "Студия";
+    case "external":
+      return "Внешний";
+    default:
+      return kind;
+  }
+}
+
+export function slotBookedAs(slot: PremiseSlotItem): {
+  kind: PremiseBookedAsKind;
+  title: string;
+} | null {
+  if (!slot.rental) return null;
+  const kind = slot.rental.bookedAsKind ?? "user";
+  if (kind === "user") return null;
+  const title = String(slot.rental.bookedAsTitle ?? "").trim();
+  if (!title) return null;
+  return { kind, title };
+}
+
 export function slotStatusLabel(status: PremiseSlotStatus): string {
   switch (status) {
     case "confirmed":
       return "Подтверждено";
     case "pending":
-      return "Ожидает";
+      return "Ожидает подтверждения";
     case "cancelled":
       return "Отменено";
     default:
@@ -84,4 +114,35 @@ export function toDatetimeLocalValue(iso: string): string {
 
 export function fromDatetimeLocalValue(value: string): string {
   return dayjs(value).toISOString();
+}
+
+export function decodeUploadedFileName(fileName: string): string {
+  const raw = String(fileName ?? "").trim();
+  if (!raw) return raw;
+  const looksMojibake = /[ÐÑÃÂ]/.test(raw);
+  if (!looksMojibake) return raw;
+  try {
+    const decoded = new TextDecoder("utf-8").decode(
+      Uint8Array.from(raw, (char) => char.charCodeAt(0) & 0xff),
+    );
+    if (!decoded || decoded.includes("\uFFFD")) return raw;
+    return decoded;
+  } catch {
+    return raw;
+  }
+}
+
+export function agreementDocumentKindLabel(
+  kind: "generated" | "uploaded" | "signed" | string,
+): string {
+  switch (kind) {
+    case "signed":
+      return "Подписанный";
+    case "generated":
+      return "Сформированный";
+    case "uploaded":
+      return "Загруженный";
+    default:
+      return kind;
+  }
 }

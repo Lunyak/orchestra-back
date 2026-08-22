@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import cn from "classnames";
@@ -95,7 +96,7 @@ function TaskDetailPageView({ vm }: { vm: ProjectTaskDetailPageViewModel }) {
         <RehearsalPlanSectionChrome activeTab="tasks">
           <div className="tasks-page__content">
             <div className="tasks-page__panel">
-              <p className="tasks-page__hint">Загрузка задачи…</p>
+              <PageLoader variant="view" label="Загрузка задачи…" />
             </div>
           </div>
         </RehearsalPlanSectionChrome>

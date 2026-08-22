@@ -1,7 +1,7 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
-import { Button } from "@shared/core/button/Button";
 import { useDebouncedSyncedText } from "@shared/hooks/useDebouncedSyncedText";
-import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
+import { MiniAvatar } from "@shared/components/mini-avatar/MiniAvatar";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
@@ -15,7 +15,6 @@ import type {
 import {
   useDirectorSessionsBundleQuery,
   useLazyProjectMaterialQuery,
-  usePublishDirectorSessionMutation,
   useReplaceDirectorSessionsMutation,
 } from "../../api/director-sessions-api";
 import { projectMaterialToDirectorSessionCache } from "../../model/build-project-data-cache";
@@ -27,6 +26,7 @@ import { RehearsalsCard } from "../../../rehearsals-card/RehearsalsCard";
 import type { ScriptScene } from "../../../../shared/types/script";
 import { markdownToPlainText } from "../../../../shared/utils/textPreview";
 import type { TeamProfile } from "../../../../sync/api/profile";
+import { profileListAvatarSrc } from "../../../../sync/api/profile";
 import { RehearsalPlanSectionChrome } from "../../../../shared/components/rehearsal-plan/RehearsalPlanSectionChrome";
 import "../director-sessions.css";
 import "./style.css";
@@ -35,25 +35,31 @@ import {
   directorSlotRefKey,
   formatSlotTime,
   getSessionStartLocalMinutes,
+  findBusyConflictForChangedSessions,
+  formatDirectorSessionBusyConflictMessage,
   isReadyScene,
+  isSlotScenePickerCustomSlug,
   looksLikeEmail,
   memberEmailsFromProjectMembers,
   normalizeEmail,
   roleMapsFromProjectRoles,
+  SLOT_SCENE_PICKER_CUSTOM_SLUG,
   toDateKey,
 } from "../../model/session-page-utils";
-import type { DirectorSessionProjectDataCache } from "../../model/session-page-types";
 import {
   getAllAssigneeEmailsForDirectorSlotChart,
+  getEmailsPlannedForDirectorSlot,
   getNormalizedRoleKeysForSlotScene,
   getRolePlannedEmailsForDirectorSlot,
   type DirectorSlotPlannedData,
 } from "../../model/session-slot-planned";
+import type { DirectorSessionProjectDataCache } from "../../model/session-page-types";
 import { DirectorSessionSlotsPanel } from "../DirectorSessionSlotsPanel";
+import { SlotParticipantsPickerModal } from "../SlotParticipantsPickerModal";
+import { SlotScenePickerModal } from "../SlotScenePickerModal";
 import { SlotRoleRehearsalPicker } from "../SlotRoleRehearsalPicker";
 import { TroupeSchedulePreview } from "../TroupeSchedulePreview";
 import { projectSessionPath, theaterRehearsalsPath, theaterRehearsalSessionPath } from "../../../../app/router/paths";
-import { TheaterSectionNav } from "../../../organizations/ui/TheaterSectionNav";
 import { fetchTheaterRehearsals } from "../../../../sync/api/workspaces";
 import { useTheaterHomeTroupeQuery } from "../../../troupe/api/troupe-api";
 import type { TroupeMemberItem } from "../../../../sync/api/troupe";
@@ -96,7 +102,11 @@ export function DirectorSessionPage() {
   const [session, setSession] = useState<DirectorRehearsalSession | null>(null);
   const [slot, setSlot] = useState<DirectorSessionSlot | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [publishing, setPublishing] = useState(false);
+  const [busyConflictError, setBusyConflictError] = useState<string | null>(
+    null,
+  );
+  const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
+  const [sceneModalOpen, setSceneModalOpen] = useState(false);
 
   const {
     data: sessionsBundle,
@@ -107,7 +117,6 @@ export function DirectorSessionPage() {
     skip: !accessToken || !sid,
   });
   const [replaceSessions] = useReplaceDirectorSessionsMutation();
-  const [publishSession] = usePublishDirectorSessionMutation();
   const [fetchProjectMaterial] = useLazyProjectMaterialQuery();
   const { data: theaterTroupe } = useTheaterHomeTroupeQuery(
     { theaterId },
@@ -193,12 +202,12 @@ export function DirectorSessionPage() {
       return "";
     }
   });
-  const [query, setQuery] = useState("");
-  const [onlySelectable, setOnlySelectable] = useState(false);
 
   const rolesSlug = useMemo(() => {
     const fromSlot = (slot?.ref?.projectSlug ?? "").trim();
-    return fromSlot || projectFilter;
+    if (fromSlot) return fromSlot;
+    if (isSlotScenePickerCustomSlug(projectFilter)) return "";
+    return projectFilter;
   }, [slot?.ref?.projectSlug, projectFilter]);
 
   const {
@@ -232,6 +241,24 @@ export function DirectorSessionPage() {
     error: profilesQueryError,
   } = useProfilesBatchQuery(projectMemberEmails, {
     skip: !accessToken || projectMemberEmails.length === 0,
+  });
+
+  const theaterMemberEmails = useMemo(
+    () =>
+      (theaterTroupe?.members ?? [])
+        .map((member) => normalizeEmail(String(member.email ?? "")))
+        .filter(Boolean),
+    [theaterTroupe?.members],
+  );
+
+  const {
+    data: theaterScheduleProfiles = [],
+    isLoading: theaterScheduleProfilesLoading,
+  } = useProfilesBatchQuery(theaterMemberEmails, {
+    skip:
+      !accessToken ||
+      !isTheaterContext ||
+      theaterMemberEmails.length === 0,
   });
 
   const availabilityError = useMemo(() => {
@@ -300,6 +327,7 @@ export function DirectorSessionPage() {
   useEffect(() => {
     if (!visibleProjects.length) return;
     setProjectFilter((prev) => {
+      if (isSlotScenePickerCustomSlug(prev)) return prev;
       const chosen = prev && visibleProjects.includes(prev) ? prev : "";
       return chosen || visibleProjects[0] || "";
     });
@@ -307,7 +335,7 @@ export function DirectorSessionPage() {
 
   useEffect(() => {
     try {
-      if (projectFilter)
+      if (projectFilter && !isSlotScenePickerCustomSlug(projectFilter))
         localStorage.setItem(projectFilterStorageKey, projectFilter);
     } catch (_) {}
   }, [projectFilter, projectFilterStorageKey]);
@@ -326,8 +354,17 @@ export function DirectorSessionPage() {
     return { startMin, endMin };
   }, [session, slot]);
 
-  const persistSessions = async (next: DirectorRehearsalSession[]) => {
-    if (!accessToken) return;
+  const persistSessions = async (
+    next: DirectorRehearsalSession[],
+  ): Promise<boolean> => {
+    if (!accessToken) return false;
+    const busyConflict = findBusyConflictForChangedSessions(sessions, next);
+    if (busyConflict) {
+      setBusyConflictError(
+        formatDirectorSessionBusyConflictMessage(busyConflict),
+      );
+      return false;
+    }
     const previousSessions = sessions;
     const previousSession = session;
     const previousSlot = slot;
@@ -340,10 +377,12 @@ export function DirectorSessionPage() {
     setSessions(next);
     setSession(nextSession);
     setSlot(nextSlot);
+    setBusyConflictError(null);
     setError(null);
     try {
       await replaceSessions({ sessions: next }).unwrap();
       void refetchSessionsBundle();
+      return true;
     } catch (e: unknown) {
       setSessions(previousSessions);
       setSession(previousSession);
@@ -397,19 +436,6 @@ export function DirectorSessionPage() {
     [updateSlotById],
   );
 
-  const persistSlotTitle = useCallback(
-    (targetSlotId: string, title: string) => {
-      void updateSlotById(targetSlotId, { title: title.trim() || undefined });
-    },
-    [updateSlotById],
-  );
-
-  const {
-    draft: slotTitleDraft,
-    onChange: onSlotTitleChange,
-    onBlur: onSlotTitleBlur,
-  } = useDebouncedSyncedText(slot?.id, slot?.title, persistSlotTitle);
-
   const {
     draft: slotNotesDraft,
     onChange: onSlotNotesChange,
@@ -431,39 +457,45 @@ export function DirectorSessionPage() {
     [slot?.participantEmails],
   );
 
-  const toggleSlotParticipant = (email: string, checked: boolean) => {
-    if (!slot) return;
-    const normalizedEmail = normalizeEmail(email);
-    const nextEmails = new Set(selectedParticipantEmails);
-    if (checked) nextEmails.add(normalizedEmail);
-    else nextEmails.delete(normalizedEmail);
-    void updateSlot({ participantEmails: Array.from(nextEmails).filter(Boolean) });
-  };
-
-  const theaterMemberEmails = useMemo(
-    () =>
-      theaterMembers
-        .map((member) => normalizeEmail(member.email))
-        .filter(Boolean),
-    [theaterMembers],
+  const selectedParticipantEmailsList = useMemo(
+    () => Array.from(selectedParticipantEmails).filter(Boolean),
+    [selectedParticipantEmails],
   );
 
-  const allTheaterParticipantsSelected =
-    theaterMemberEmails.length > 0 &&
-    theaterMemberEmails.every((email) => selectedParticipantEmails.has(email));
+  const selectedTheaterMembers = useMemo(
+    () =>
+      theaterMembers.filter((member) =>
+        selectedParticipantEmails.has(normalizeEmail(member.email)),
+      ),
+    [theaterMembers, selectedParticipantEmails],
+  );
 
-  const toggleAllTheaterParticipants = () => {
+  const applySlotParticipants = (emails: string[]) => {
     if (!slot) return;
     void updateSlot({
-      participantEmails: allTheaterParticipantsSelected
-        ? []
-        : theaterMemberEmails,
+      participantEmails: emails.map((email) => normalizeEmail(email)).filter(Boolean),
     });
   };
 
+  useEffect(() => {
+    if (!slot) {
+      setParticipantsModalOpen(false);
+      setSceneModalOpen(false);
+    }
+  }, [slot]);
+
+  const scenePickerProjects = useMemo(
+    () =>
+      visibleProjects.map((slug) => ({
+        slug,
+        label: projectLabelBySlug.get(slug) ?? slug,
+      })),
+    [visibleProjects, projectLabelBySlug],
+  );
+
   const loadProjectData = async (slug: string) => {
     if (!accessToken) return;
-    if (!slug) return;
+    if (!slug || isSlotScenePickerCustomSlug(slug)) return;
     if (dataCache[slug]) return;
     setScenesLoading(true);
     setScenesError(null);
@@ -662,14 +694,40 @@ export function DirectorSessionPage() {
     profilesForSlotTones,
   ]);
 
+  const emailsBySlotId = useMemo(() => {
+    const out: Record<string, string[]> = {};
+    if (!session) return out;
+    for (const sl of session.slots ?? []) {
+      const ref = sl.ref;
+      if (!ref?.projectSlug || ref.sceneId == null) continue;
+      const slug = String(ref.projectSlug).trim();
+      const cached = dataCache[slug];
+      const rem = roleEmailsByProjectSlug[slug];
+      if (!cached?.scenes?.length || !rem) continue;
+      const plannedData: DirectorSlotPlannedData = {
+        scenes: cached.scenes,
+        sceneRoles: cached.sceneRoles ?? null,
+        roleEmailsByKey: rem,
+      };
+      out[sl.id] = getEmailsPlannedForDirectorSlot(
+        slug,
+        ref.sceneId,
+        plannedData,
+        sl.roleRehearsalPicks ?? null,
+      );
+    }
+    return out;
+  }, [session, session?.slots, dataCache, roleEmailsByProjectSlug]);
+
   useEffect(() => {
-    if (!projectFilter) return;
+    if (!projectFilter || isSlotScenePickerCustomSlug(projectFilter)) return;
     void loadProjectData(projectFilter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectFilter]);
 
   useEffect(() => {
     if (!rolesSlug || rolesSlug === projectFilter) return;
+    if (isSlotScenePickerCustomSlug(rolesSlug)) return;
     void loadProjectData(rolesSlug);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesSlug, projectFilter]);
@@ -709,23 +767,11 @@ export function DirectorSessionPage() {
     return `${formatSlotTime(session.startsAt, slot.offsetMin)} · ${slot.durationMin} мин`;
   }, [session, slot]);
 
-  const filteredScenes = useMemo(() => {
-    const src = projectFilter ? (dataCache[projectFilter]?.scenes ?? []) : [];
-    const base = src.filter((s) => !isReadyScene(s));
-    const q = query.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter((s) => {
-      const inTitle = String(s.title ?? "")
-        .toLowerCase()
-        .includes(q);
-      const inText = markdownToPlainText(
-        String((s as any).playMarkdown ?? (s as any).markdown ?? ""),
-      )
-        .toLowerCase()
-        .includes(q);
-      return inTitle || inText;
-    });
-  }, [dataCache, projectFilter, query]);
+  const projectScenes = useMemo(() => {
+    if (!projectFilter || isSlotScenePickerCustomSlug(projectFilter)) return [];
+    const src = dataCache[projectFilter]?.scenes ?? [];
+    return src.filter((s) => !isReadyScene(s));
+  }, [dataCache, projectFilter]);
 
   const selectableScenes = useMemo(() => {
     const out: Array<{
@@ -734,12 +780,12 @@ export function DirectorSessionPage() {
       missing: string[];
       roles: string[];
     }> = [];
-    const list = filteredScenes;
+    if (!projectFilter || isSlotScenePickerCustomSlug(projectFilter)) return out;
     const freeSet = freeRolesNormSet;
-    const pack = projectFilter ? dataCache[projectFilter] : null;
+    const pack = dataCache[projectFilter] ?? null;
     const sceneRoles = pack?.sceneRoles ?? null;
 
-    for (const s of list) {
+    for (const s of projectScenes) {
       const roleKeysNorm = getNormalizedRoleKeysForSlotScene(
         s,
         sceneRoles,
@@ -757,12 +803,7 @@ export function DirectorSessionPage() {
       out.push({ scene: s, ok: missing.length === 0, missing, roles });
     }
     return out;
-  }, [freeRolesNormSet, filteredScenes, dataCache, projectFilter, roleTitleByKey]);
-
-  const scenesForList = useMemo(() => {
-    if (!onlySelectable) return selectableScenes;
-    return selectableScenes.filter((x) => x.ok);
-  }, [onlySelectable, selectableScenes]);
+  }, [freeRolesNormSet, projectScenes, dataCache, projectFilter, roleTitleByKey]);
 
   /** Сцены (project + sceneId), которые уже привязаны к какому-либо слоту этой сессии */
   const slotsBySceneRefInSession = useMemo(() => {
@@ -789,6 +830,51 @@ export function DirectorSessionPage() {
     return data?.scenes?.find((s) => s.id === id) ?? null;
   }, [dataCache, slot?.ref]);
 
+  const selectedSceneLabel = useMemo(() => {
+    if (selectedScene) {
+      const title = String(selectedScene.title ?? "").trim();
+      return title ? title : `Сцена #${selectedScene.id}`;
+    }
+    const customTitle = String(slot?.title ?? "").trim();
+    return customTitle;
+  }, [selectedScene, slot?.title]);
+
+  const selectedSceneProjectLabel = useMemo(() => {
+    const slug = String(slot?.ref?.projectSlug ?? "").trim();
+    if (slug) return projectLabelBySlug.get(slug) ?? slug;
+    if (String(slot?.title ?? "").trim()) return "Без проекта";
+    return "";
+  }, [slot?.ref?.projectSlug, slot?.title, projectLabelBySlug]);
+
+  const assignSceneToSlot = (scene: ScriptScene) => {
+    if (!slot || !projectFilter || isSlotScenePickerCustomSlug(projectFilter))
+      return;
+    const sceneTitle =
+      String(scene.title ?? "").trim() || `Сцена #${scene.id}`;
+    void updateSlot({
+      title: sceneTitle,
+      ref: {
+        projectSlug: projectFilter,
+        sceneId: scene.id,
+      },
+      durationMin:
+        scene.durationMin == null
+          ? slot.durationMin
+          : Math.max(1, Math.floor(Number(scene.durationMin) || 1)),
+      roleRehearsalPicks: undefined,
+    });
+  };
+
+  const assignCustomSlotTitle = (title: string) => {
+    if (!slot) return;
+    const nextTitle = title.trim() || "Без названия";
+    void updateSlot({
+      title: nextTitle,
+      ref: undefined,
+      roleRehearsalPicks: undefined,
+    });
+  };
+
   const slotDisplayById = useMemo(() => {
     const map = new Map<
       string,
@@ -800,7 +886,7 @@ export function DirectorSessionPage() {
       if (!ref?.projectSlug || ref.sceneId == null) {
         map.set(sl.id, {
           projectLabel: customTitle || "Слот без названия",
-          materialLabel: customTitle ? "Без проекта и сцены" : "",
+          materialLabel: "Без проекта",
         });
         continue;
       }
@@ -808,12 +894,12 @@ export function DirectorSessionPage() {
       const scene = dataCache[slug]?.scenes?.find((s) => s.id === ref.sceneId);
       const projectLabel = projectLabelBySlug.get(slug) ?? slug;
       const sceneLabel =
-        String(scene?.title ?? "").trim() || "Материал загружается";
+        String(scene?.title ?? "").trim() ||
+        customTitle ||
+        `Сцена #${ref.sceneId}`;
       map.set(sl.id, {
-        projectLabel: customTitle || projectLabel,
-        materialLabel: customTitle
-          ? [projectLabel, sceneLabel].filter(Boolean).join(" · ")
-          : sceneLabel,
+        projectLabel: sceneLabel,
+        materialLabel: projectLabel,
       });
     }
     return map;
@@ -842,55 +928,42 @@ export function DirectorSessionPage() {
   }, [slot?.ref, slotPlannedInput]);
 
   const slotChartEmailSet = useMemo(() => {
-    if (!slot?.ref || !slotPlannedInput) return undefined;
-    const slug = String(slot.ref.projectSlug ?? "").trim();
-    const list = getAllAssigneeEmailsForDirectorSlotChart(
-      slug,
-      slot.ref.sceneId,
-      slotPlannedInput,
-    );
-    return new Set(list);
-  }, [slot?.ref, slotPlannedInput]);
-
-  const publishCurrentSession = async () => {
-    if (!session) return;
-    setPublishing(true);
-    setError(null);
-    try {
-      if (slot) {
-        await updateSlotById(slot.id, {
-          title: slotTitleDraft.trim() || undefined,
-          notes: slotNotesDraft,
-        });
-      }
-      const response = await publishSession({
-        sessionId: session.id,
-        comment: session.comment ?? null,
-      }).unwrap();
-      if (response.session) {
-        const publishedSession = response.session as DirectorRehearsalSession;
-        setSession(publishedSession);
-        setSessions((current) =>
-          current.map((item) =>
-            item.id === publishedSession.id ? publishedSession : item,
-          ),
-        );
-      }
-      void refetchSessionsBundle();
-    } catch (publishError: unknown) {
-      const apiError = publishError as {
-        message?: string;
-        data?: { message?: string };
-      };
-      setError(
-        apiError.data?.message ??
-          apiError.message ??
-          "Не удалось опубликовать сессию",
+    if (slot?.ref && slotPlannedInput) {
+      const slug = String(slot.ref.projectSlug ?? "").trim();
+      const list = getAllAssigneeEmailsForDirectorSlotChart(
+        slug,
+        slot.ref.sceneId,
+        slotPlannedInput,
       );
-    } finally {
-      setPublishing(false);
+      return new Set(list);
     }
-  };
+    if (!slot?.ref) {
+      if (selectedParticipantEmailsList.length > 0) {
+        return new Set(selectedParticipantEmailsList);
+      }
+      return undefined;
+    }
+    return undefined;
+  }, [slot?.ref, slotPlannedInput, selectedParticipantEmailsList]);
+
+  const scheduleProfiles = useMemo(() => {
+    if (slot?.ref) return teamProfiles;
+    if (isTheaterContext) return theaterScheduleProfiles;
+    return teamProfiles;
+  }, [
+    slot?.ref,
+    isTheaterContext,
+    teamProfiles,
+    theaterScheduleProfiles,
+  ]);
+
+  const scheduleMembersLoading = Boolean(
+    slot?.ref
+      ? membersLoading
+      : isTheaterContext
+        ? theaterScheduleProfilesLoading
+        : membersLoading,
+  );
 
   if (!accessToken) {
     return (
@@ -907,27 +980,19 @@ export function DirectorSessionPage() {
 
   const pageBody = (
     <>
-      <div className="director-session-page__header">
-        <Link to={sessionsListHref} className="director-session-page__back">
-          {isTheaterContext ? "← К репетициям театра" : "← К списку сессий"}
-        </Link>
-        {isTheaterContext && session ? (
-          <Button
-            type="button"
-            disabled={publishing}
-            onClick={() => void publishCurrentSession()}
-          >
-            {publishing
-              ? "Публикация…"
-              : session.publishedAt
-                ? "Обновить публикацию"
-                : "Опубликовать"}
-          </Button>
-        ) : null}
+      <div className="director-session-page__head">
+        <div className="director-session-page__title-row">
+          <Link to={sessionsListHref} className="director-session-page__back">
+            {isTheaterContext ? "← Репетиции" : "← К списку сессий"}
+          </Link>
+          <h1 className="director-session-page__title">
+            {session?.title ?? (isTheaterContext ? "Репетиция" : "Сессия")}
+          </h1>
+        </div>
       </div>
 
       {loading ? (
-        <div className="director-session-page__loading">Загрузка…</div>
+        <PageLoader variant="view" label="Загрузка…" />
       ) : null}
       {error ? (
         <div className="settings-invite-error director-session-page__error">
@@ -935,15 +1000,6 @@ export function DirectorSessionPage() {
         </div>
       ) : null}
 
-      {session ? (
-        <>
-          <div className="director-session-page__title">{session.title}</div>
-        </>
-      ) : (
-        <div className="director-session-page__title">
-          {isTheaterContext ? "Репетиция" : "Сессия"}
-        </div>
-      )}
       {session && !loading && (
         <div className="director-session-page__grid">
           <DirectorSessionSlotsPanel
@@ -951,6 +1007,9 @@ export function DirectorSessionPage() {
             sessions={sessions}
             slotToneClassById={slotRehearsalToneClassById}
             slotDisplayById={slotDisplayById}
+            emailsBySlotId={emailsBySlotId}
+            profilesByEmail={profilesForSlotTones}
+            sessionDateKey={sessionDateKey}
             selectedSlotId={slId || null}
             onSelectSlot={(id) => navigate(sessionHref(id))}
             onRequestCloseSlot={() => navigate(sessionHref())}
@@ -960,6 +1019,8 @@ export function DirectorSessionPage() {
               })
             }
             persistSessions={persistSessions}
+            busyConflictError={busyConflictError}
+            onDismissBusyConflictError={() => setBusyConflictError(null)}
             slotSettings={
               slot ? (
                 <div className="director-session-page__detail-grid">
@@ -968,29 +1029,70 @@ export function DirectorSessionPage() {
                     title=""
                     className="director-session-page__preview"
                   >
-                    <label className="director-session-page__slot-field">
-                      <span className="form-textarea__label">
-                        Название слота
-                      </span>
-                      <input
-                        className="native-text-input"
-                        value={slotTitleDraft}
-                        onChange={(event) =>
-                          onSlotTitleChange(event.target.value)
+                    <div className="director-session-page__slot-field">
+                      <button
+                        type="button"
+                        className="director-session-page__participants-trigger"
+                        onClick={() => {
+                          if (slot?.ref?.projectSlug) {
+                            setProjectFilter(slot.ref.projectSlug);
+                          } else if (String(slot?.title ?? "").trim()) {
+                            setProjectFilter(SLOT_SCENE_PICKER_CUSTOM_SLUG);
+                          } else if (
+                            !projectFilter ||
+                            isSlotScenePickerCustomSlug(projectFilter)
+                          ) {
+                            if (visibleProjects[0]) {
+                              setProjectFilter(visibleProjects[0]);
+                            }
+                          }
+                          setSceneModalOpen(true);
+                        }}
+                        aria-label="Сцена или название"
+                      >
+                        <span className="director-session-page__participants-label">
+                          {selectedSceneLabel || "Выбрать сцену или название"}
+                        </span>
+                        {selectedSceneProjectLabel ? (
+                          <span className="director-session-page__scene-project">
+                            {selectedSceneProjectLabel}
+                          </span>
+                        ) : null}
+                      </button>
+                      <SlotScenePickerModal
+                        isOpen={sceneModalOpen}
+                        onClose={() => setSceneModalOpen(false)}
+                        projects={scenePickerProjects}
+                        projectSlug={
+                          projectFilter || SLOT_SCENE_PICKER_CUSTOM_SLUG
                         }
-                        onBlur={onSlotTitleBlur}
-                        placeholder="Разминка, обсуждение, примерка…"
+                        onProjectChange={setProjectFilter}
+                        scenes={selectableScenes}
+                        scenesLoading={scenesLoading}
+                        scenesError={scenesError}
+                        availabilityError={availabilityError}
+                        selectedSceneId={
+                          slot.ref?.projectSlug === projectFilter
+                            ? Number(slot.ref.sceneId) || null
+                            : null
+                        }
+                        currentSlotId={slot.id}
+                        sessionStartsAt={session?.startsAt ?? null}
+                        slotsBySceneRefInSession={slotsBySceneRefInSession}
+                        onSelectScene={assignSceneToSlot}
+                        initialCustomTitle={
+                          !slot.ref ? String(slot.title ?? "").trim() : ""
+                        }
+                        onSelectCustom={assignCustomSlotTitle}
                       />
-                    </label>
+                    </div>
 
-                    {selectedScene && (
+                    {selectedScene ? (
                       <div className="session__selected-scene">
-                        <PreviewSlot selectedScene={selectedScene} />
-
                         <TroupeSchedulePreview
                           sessionDateKey={sessionDateKey}
-                          profiles={teamProfiles}
-                          membersLoading={membersLoading}
+                          profiles={scheduleProfiles}
+                          membersLoading={scheduleMembersLoading}
                           participantEmailSet={slotChartEmailSet}
                         />
                         <SlotRoleRehearsalPicker
@@ -1004,49 +1106,67 @@ export function DirectorSessionPage() {
                           }
                         />
                       </div>
-                    )}
+                    ) : null}
 
                     {isTheaterContext && !slot.ref ? (
                       <div className="director-session-page__slot-field">
-                        <div className="director-session-page__slot-field-head">
-                          <span className="form-textarea__label">
-                            Участники
-                          </span>
-                          {theaterMembers.length ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="director-session-page__select-all"
-                              onClick={toggleAllTheaterParticipants}
-                            >
-                              {allTheaterParticipantsSelected
-                                ? "Снять всех"
-                                : "Выбрать всех"}
-                            </Button>
-                          ) : null}
-                        </div>
+                        <span className="form-textarea__label">Участники</span>
                         {theaterMembers.length ? (
-                          <div className="director-session-page__participant-list">
-                            {theaterMembers.map((member) => {
-                              const email = normalizeEmail(member.email);
-                              return (
-                                <LabeledCheckbox
-                                  key={member.id}
-                                  checked={selectedParticipantEmails.has(email)}
-                                  onChange={(checked) =>
-                                    toggleSlotParticipant(email, checked)
-                                  }
-                                >
-                                  {getTroupeMemberLabel(member)}
-                                </LabeledCheckbox>
-                              );
-                            })}
-                          </div>
+                          <>
+                            <button
+                              type="button"
+                              className="director-session-page__participants-trigger"
+                              onClick={() => setParticipantsModalOpen(true)}
+                            >
+                              <span className="director-session-page__participants-avatars">
+                                {selectedTheaterMembers.slice(0, 5).map((member) => {
+                                  const label = getTroupeMemberLabel(member);
+                                  return (
+                                    <MiniAvatar
+                                      key={member.id}
+                                      src={profileListAvatarSrc(member.profile)}
+                                      label={label}
+                                      size={28}
+                                      title={label}
+                                    />
+                                  );
+                                })}
+                                {selectedTheaterMembers.length > 5 ? (
+                                  <span className="director-session-page__participants-more">
+                                    +{selectedTheaterMembers.length - 5}
+                                  </span>
+                                ) : null}
+                              </span>
+                              <span className="director-session-page__participants-label">
+                                {selectedParticipantEmailsList.length
+                                  ? `Выбрано: ${selectedParticipantEmailsList.length}`
+                                  : "Выбрать актёров"}
+                              </span>
+                            </button>
+                            <SlotParticipantsPickerModal
+                              isOpen={participantsModalOpen}
+                              members={theaterMembers}
+                              selectedEmails={selectedParticipantEmailsList}
+                              onClose={() => setParticipantsModalOpen(false)}
+                              onApply={applySlotParticipants}
+                            />
+                          </>
                         ) : (
                           <div className="rehearsals-muted">
                             В труппе театра пока нет участников.
                           </div>
                         )}
+                      </div>
+                    ) : null}
+
+                    {!selectedScene && !slot.ref ? (
+                      <div className="session__selected-scene">
+                        <TroupeSchedulePreview
+                          sessionDateKey={sessionDateKey}
+                          profiles={scheduleProfiles}
+                          membersLoading={scheduleMembersLoading}
+                          participantEmailSet={slotChartEmailSet}
+                        />
                       </div>
                     ) : null}
 
@@ -1060,184 +1180,12 @@ export function DirectorSessionPage() {
                       rows={4}
                     />
 
+                    {selectedScene ? (
+                      <PreviewSlot selectedScene={selectedScene} />
+                    ) : null}
+
                   </RehearsalsCard>
 
-                  <RehearsalsCard fluid title="">
-                    <div className="session__scenes-filters">
-                      <select
-                        className="native-select"
-                        value={projectFilter}
-                        onChange={(e) => setProjectFilter(e.target.value)}
-                      >
-                        {visibleProjects.map((p) => (
-                          <option key={p} value={p}>
-                            {projectLabelBySlug.get(p) ?? p}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        className={cn(
-                          "native-text-input",
-                          "session__scenes-search-input",
-                        )}
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="поиск по названию/тексту"
-                      />
-                    </div>
-                    <div className="session__scenes-checkbox">
-                      <LabeledCheckbox
-                        checked={onlySelectable}
-                        onChange={(e) => setOnlySelectable(e)}
-                      >
-                        <span className="">по доступности актёров</span>
-                      </LabeledCheckbox>
-                    </div>
-
-                    {scenesLoading ? (
-                      <div className="session__scenes-list">Загружаю сцены…</div>
-                    ) : null}
-                    {scenesError ? (
-                      <div className="settings-invite-error director-session-page__error">
-                        {scenesError}
-                      </div>
-                    ) : null}
-                    {availabilityError ? (
-                      <div className="settings-invite-error director-session-page__error">
-                        {availabilityError}
-                      </div>
-                    ) : null}
-
-                    <div className="session__scenes-list">
-                      {scenesForList.slice(0, 250).map((sceneData) => {
-                        const s = sceneData.scene;
-                        const isSelected = Boolean(
-                          slot.ref &&
-                          slot.ref.projectSlug === projectFilter &&
-                          slot.ref.sceneId === s.id,
-                        );
-                        const ok = sceneData.ok;
-                        const refKey = directorSlotRefKey(projectFilter, s.id);
-                        const slotsWithSameRef =
-                          slotsBySceneRefInSession.get(refKey) ?? [];
-                        const otherSlotsWithRef = slotsWithSameRef.filter(
-                          (sl) => sl.id !== slot.id,
-                        );
-                        const bookedInOtherSlots = otherSlotsWithRef.length > 0;
-                        const otherSlotsTimesLabel =
-                          bookedInOtherSlots && session
-                            ? (() => {
-                                const sorted = [...otherSlotsWithRef].sort(
-                                  (a, b) => a.offsetMin - b.offsetMin,
-                                );
-                                if (sorted.length === 1) {
-                                  return formatSlotTime(
-                                    session.startsAt,
-                                    sorted[0].offsetMin,
-                                  );
-                                }
-                                if (sorted.length === 2) {
-                                  return `${formatSlotTime(session.startsAt, sorted[0].offsetMin)} · ${formatSlotTime(session.startsAt, sorted[1].offsetMin)}`;
-                                }
-                                return `${formatSlotTime(session.startsAt, sorted[0].offsetMin)} +${sorted.length - 1}`;
-                              })()
-                            : "";
-                        const assignTitle =
-                          bookedInOtherSlots && session
-                            ? `Назначить в этот слот. Уже в сессии: ${[
-                                ...otherSlotsWithRef,
-                              ]
-                                .sort((a, b) => a.offsetMin - b.offsetMin)
-                                .map((sl) =>
-                                  formatSlotTime(
-                                    session.startsAt,
-                                    sl.offsetMin,
-                                  ),
-                                )
-                                .join(", ")}`
-                            : "Назначить в этот слот";
-                        return (
-                          <button
-                            className={cn("session__scene-item", {
-                              "session__scene-item--selected": isSelected,
-                              "session__scene-item--ok": !isSelected && ok,
-                              "session__scene-item--bad": !isSelected && !ok,
-                              "session__scene-item--booked":
-                                bookedInOtherSlots && !isSelected,
-                            })}
-                            key={`${projectFilter}:${s.id}`}
-                            type="button"
-                            onClick={() =>
-                              void updateSlot({
-                                title:
-                                  String(s.title ?? "").trim() ||
-                                  `Сцена #${s.id}`,
-                                ref: {
-                                  projectSlug: projectFilter,
-                                  sceneId: s.id,
-                                },
-                                durationMin:
-                                  s.durationMin == null
-                                    ? slot.durationMin
-                                    : Math.max(
-                                        1,
-                                        Math.floor(Number(s.durationMin) || 1),
-                                      ),
-                                roleRehearsalPicks: undefined,
-                              })
-                            }
-                            title={assignTitle}
-                          >
-                            <div className="session__scene-item__title">
-                              <span className="session__scene-item__title-text">
-                                #{s.id} {s.title || "\u00a0"}
-                              </span>
-                              {bookedInOtherSlots ? (
-                                <span
-                                  className="session__scene-item__badge session__scene-item__badge--in-session"
-                                  aria-hidden
-                                >
-                                  в сессии
-                                  {otherSlotsTimesLabel ? (
-                                    <span className="session__scene-item__badge-detail">
-                                      {" "}
-                                      · {otherSlotsTimesLabel}
-                                    </span>
-                                  ) : null}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div
-                              className={cn(
-                                "session__scene-item__missing",
-                                !(!ok && sceneData.missing.length > 0) &&
-                                  "session__scene-item__missing--empty",
-                              )}
-                            >
-                              {!ok && sceneData.missing.length > 0 ? (
-                                <>
-                                  не хватает:{" "}
-                                  <b>
-                                    {sceneData.missing.slice(0, 6).join(", ")}
-                                  </b>
-                                  {sceneData.missing.length > 6
-                                    ? ` +${sceneData.missing.length - 6}`
-                                    : ""}
-                                </>
-                              ) : (
-                                "\u00a0"
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
-                      {scenesForList.length === 0 && !scenesLoading && (
-                        <div className="session__scenes-list__empty">
-                          Нет сцен (или сценарий не найден).
-                        </div>
-                      )}
-                    </div>
-                  </RehearsalsCard>
                 </div>
               ) : undefined
             }
@@ -1248,10 +1196,12 @@ export function DirectorSessionPage() {
   );
 
   return (
-    <div className="director-session-page">
-      {isTheaterContext ? (
-        <TheaterSectionNav theaterId={theaterId} active="rehearsals" />
-      ) : null}
+    <div
+      className={cn(
+        "director-session-page",
+        isTheaterContext && "director-session-page--theater",
+      )}
+    >
       {isTheaterContext ? (
         pageBody
       ) : (
@@ -1264,19 +1214,24 @@ export function DirectorSessionPage() {
 }
 
 const PreviewSlot = ({ selectedScene }: { selectedScene: any }) => {
+  const text = String(
+    (selectedScene as any).playMarkdown ??
+      (selectedScene as any).markdown ??
+      "",
+  );
+  const plain = markdownToPlainText(text);
+  const previewText =
+    plain.slice(0, 1600) + (plain.length > 1600 ? "\n\n… (обрезано)" : "");
+  const hasPreview = Boolean(plain.trim());
+
+  if (!hasPreview) return null;
+
   return (
-    <pre className="director-session-page__preview-pre">
-      {(() => {
-        const text = String(
-          (selectedScene as any).playMarkdown ??
-            (selectedScene as any).markdown ??
-            "",
-        );
-        const plain = markdownToPlainText(text);
-        return (
-          plain.slice(0, 1600) + (plain.length > 1600 ? "\n\n… (обрезано)" : "")
-        );
-      })()}
-    </pre>
+    <details className="director-session-page__preview-fold">
+      <summary className="director-session-page__preview-fold-summary">
+        Превью текста сцены
+      </summary>
+      <pre className="director-session-page__preview-pre">{previewText}</pre>
+    </details>
   );
 };

@@ -1,0 +1,435 @@
+@font-face {
+  font-family: "Chalkduster";
+  src: url("../assets/fonts/Chalkduster.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+.chalk-page {
+  --chalk: rgb(245, 238, 220);
+  --chalk-dim: rgb(205, 198, 182);
+  --chalk-neon: #00fbff;
+  --chalk-art-ratio: 9 / 16;
+
+  position: relative;
+  min-height: 100dvh;
+  background: #050505;
+  color: var(--chalk);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.chalk-page__stage {
+  position: relative;
+  margin: 0 auto;
+  width: 100%;
+  min-height: 100dvh;
+}
+
+.chalk-page__wear {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-color: #050505;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 35%, rgba(0, 251, 255, 0.04), transparent 60%),
+    url("../assets/brand/chalk-home-board-plain.png");
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.chalk-page__filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.chalk-page__title {
+  margin: 0;
+  padding: 0;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(2rem, 8.5vw, 3.4rem);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  text-align: center;
+  color: rgba(245, 238, 220, 0.92);
+  filter: url("#chalk-page-text-rough");
+  text-shadow:
+    0 0 1px rgba(245, 238, 220, 0.35),
+    1px 1px 0 rgba(245, 238, 220, 0.08),
+    -1px 0 0 rgba(205, 198, 182, 0.12);
+}
+
+.chalk-page__subtitle {
+  margin: 10px 0 0;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.85rem, 3.2vw, 1.05rem);
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: rgba(205, 198, 182, 0.72);
+  filter: url("#chalk-page-text-rough");
+}
+
+.chalk-page__rule {
+  width: 100%;
+  height: 2px;
+  margin: 18px 0 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(205, 198, 182, 0.35) 8%,
+    rgba(245, 238, 220, 0.28) 50%,
+    rgba(205, 198, 182, 0.35) 92%,
+    transparent
+  );
+  opacity: 0.85;
+}
+
+.chalk-page__nav-block {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.chalk-page__nav-block--left {
+  top: clamp(14px, 3.5dvh, 28px);
+  left: clamp(12px, 4vw, 28px);
+}
+
+.chalk-page__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.chalk-page__nav--board-right {
+  position: absolute;
+  z-index: 4;
+  top: clamp(14px, 3.5dvh, 28px);
+  right: clamp(12px, 4vw, 28px);
+}
+
+.chalk-page__nav-link {
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: rgba(205, 198, 182, 0.72);
+  transition: color var(--transition), text-shadow var(--transition);
+}
+
+.chalk-page__nav-link:hover,
+.chalk-page__nav-link:focus-visible {
+  color: var(--chalk-neon);
+  text-shadow: 0 0 10px rgba(0, 251, 255, 0.45);
+}
+
+.chalk-page__nav-link--blocked {
+  opacity: 0.42;
+  cursor: default;
+  pointer-events: none;
+}
+
+.chalk-page__home-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 2px;
+  text-decoration: none;
+  color: rgba(205, 198, 182, 0.72);
+  transition: color var(--transition), text-shadow var(--transition), transform var(--transition);
+}
+
+.chalk-page__home-back-mark {
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 20px;
+  line-height: 1;
+  filter: url("#chalk-page-text-rough");
+}
+
+.chalk-page__home-back:hover,
+.chalk-page__home-back:focus-visible {
+  color: var(--chalk-neon);
+  text-shadow: 0 0 10px rgba(0, 251, 255, 0.45);
+  transform: translateX(-2px);
+}
+
+.chalk-page__home-back:focus-visible {
+  outline: 1px solid var(--chalk-neon);
+  outline-offset: 3px;
+}
+
+.chalk-page__main {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(92vw, 420px);
+  margin: 0 auto;
+  padding: clamp(72px, 14dvh, 120px) 16px clamp(32px, 6dvh, 64px);
+  box-sizing: border-box;
+}
+
+.chalk-page__main--afisha,
+.chalk-page__main--team {
+  width: min(86vw, 460px);
+  align-items: stretch;
+  padding-top: clamp(64px, 11dvh, 96px);
+  padding-left: clamp(14px, 4vw, 20px);
+  padding-right: clamp(14px, 4vw, 20px);
+}
+
+.chalk-page__main--contacts {
+  width: min(92vw, 520px);
+  align-items: stretch;
+  padding-top: clamp(64px, 11dvh, 96px);
+  padding-left: clamp(12px, 3.5vw, 18px);
+  padding-right: clamp(12px, 3.5vw, 18px);
+}
+
+.chalk-page__main--event {
+  width: min(94vw, 540px);
+  align-items: stretch;
+  padding-top: clamp(64px, 11dvh, 96px);
+  padding-left: clamp(10px, 3vw, 16px);
+  padding-right: clamp(10px, 3vw, 16px);
+}
+
+.chalk-page__main--afisha .chalk-page__title,
+.chalk-page__main--team .chalk-page__title,
+.chalk-page__main--contacts .chalk-page__title,
+.chalk-page__main--event .chalk-page__title {
+  font-size: clamp(1.85rem, 7.5vw, 2.8rem);
+}
+
+.chalk-page__main--event .chalk-page__title {
+  font-size: clamp(1.55rem, 6.5vw, 2.35rem);
+  text-transform: none;
+}
+
+.chalk-page__main--afisha .chalk-page__title,
+.chalk-page__main--afisha .chalk-page__subtitle,
+.chalk-page__main--team .chalk-page__title,
+.chalk-page__main--team .chalk-page__subtitle,
+.chalk-page__main--contacts .chalk-page__title,
+.chalk-page__main--contacts .chalk-page__subtitle,
+.chalk-page__main--event .chalk-page__title {
+  align-self: center;
+}
+
+.chalk-page__stage--scroll {
+  height: auto;
+  min-height: 100dvh;
+}
+
+.chalk-page__afisha {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  margin-top: clamp(28px, 6dvh, 56px);
+  min-width: min(72vw, 280px);
+  padding: 14px 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(245, 238, 220, 0.9);
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(1rem, 4vw, 1.25rem);
+  letter-spacing: 0.22em;
+  text-decoration: none;
+  text-transform: uppercase;
+  filter: url("#chalk-page-text-rough");
+  box-shadow:
+    inset 0 0 0 2px rgba(205, 198, 182, 0.55),
+    inset 1px 1px 0 rgba(245, 238, 220, 0.06);
+  text-shadow:
+    0 0 1px rgba(245, 238, 220, 0.3),
+    1px 1px 0 rgba(205, 198, 182, 0.1);
+  transition:
+    color var(--transition),
+    box-shadow var(--transition),
+    text-shadow var(--transition);
+}
+
+.chalk-page__afisha:hover,
+.chalk-page__afisha:focus-visible {
+  color: var(--chalk-neon);
+  text-shadow: 0 0 12px rgba(0, 251, 255, 0.5);
+  box-shadow:
+    inset 0 0 0 2px var(--chalk-neon),
+    0 0 20px rgba(0, 251, 255, 0.15);
+}
+
+.chalk-page__afisha:focus-visible {
+  outline: 1px solid var(--chalk-neon);
+  outline-offset: 4px;
+}
+
+.chalk-page__home-title {
+  margin: clamp(28px, 6dvh, 48px) 0 0;
+}
+
+.chalk-playbill {
+  width: 100%;
+}
+
+.chalk-playbill__status {
+  margin: 24px 0 0;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  color: rgba(205, 198, 182, 0.82);
+}
+
+.chalk-playbill__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.chalk-playbill__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(205, 198, 182, 0.18);
+  text-decoration: none;
+  color: inherit;
+  max-width: 100%;
+  box-sizing: border-box;
+  transition: color var(--transition), text-shadow var(--transition);
+}
+
+.chalk-playbill__row:last-child {
+  border-bottom: 0;
+}
+
+.chalk-playbill__row:hover,
+.chalk-playbill__row:focus-visible {
+  color: var(--chalk-neon);
+  text-shadow: 0 0 10px rgba(0, 251, 255, 0.35);
+}
+
+.chalk-playbill__row--soon {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+.chalk-playbill__main {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chalk-playbill__badge {
+  flex-shrink: 0;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(205, 198, 182, 0.68);
+}
+
+.chalk-playbill__title {
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.9rem, 3.5vw, 1.1rem);
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.chalk-playbill__date {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 42%;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.7rem, 2.6vw, 0.88rem);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: rgba(205, 198, 182, 0.78);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.chalk-playbill__hint {
+  margin: 20px 0 0;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: rgba(205, 198, 182, 0.55);
+}
+
+@media (max-width: 360px) {
+  .chalk-playbill__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 3px;
+  }
+
+  .chalk-playbill__date {
+    max-width: none;
+    text-align: left;
+    font-size: 0.72rem;
+  }
+}
+
+@media (min-width: 520px) {
+  .chalk-page__stage {
+    width: min(100vw, calc(100dvh * var(--chalk-art-ratio)));
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .chalk-page__stage--scroll {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .chalk-page__main--afisha,
+  .chalk-page__main--team {
+    width: min(80%, 420px);
+  }
+
+  .chalk-page__main--contacts {
+    width: min(88%, 480px);
+  }
+
+  .chalk-page__main--event {
+    width: min(90%, 500px);
+  }
+
+  .chalk-page__wear {
+    background-size: contain;
+  }
+}
+
+@media (min-width: 900px) {
+  .chalk-page__stage {
+    width: calc(100dvh * var(--chalk-art-ratio));
+  }
+
+  .chalk-page__wear {
+    background-size: auto 100%;
+  }
+}

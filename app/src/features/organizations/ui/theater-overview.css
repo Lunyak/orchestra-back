@@ -11,6 +11,14 @@
     sans-serif;
 }
 
+.app-shell-body > .theater-overview {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+}
+
 .theater-overview__content {
   width: 100%;
   max-width: none;
@@ -20,12 +28,18 @@
 }
 
 .theater-overview__header {
+  position: relative;
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .theater-overview__back {
-  display: inline-block;
-  margin: 0 0 10px;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--color-active-ascent);
   text-decoration: none;
   font-size: 13px;
@@ -43,14 +57,6 @@
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.theater-overview__title {
-  margin: 8px 0 0;
-  color: var(--sessions-text-strong);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.25;
 }
 
 .theater-overview__section-title {

@@ -26,6 +26,7 @@ export interface CreateProjectDto {
 export interface UpdateProjectDto {
   name?: string;
   description?: string | null;
+  slug?: string;
 }
 
 export interface AddMemberDto {
@@ -361,6 +362,30 @@ export class ProjectsService {
       const description =
         dto.description == null ? null : String(dto.description).trim();
       data.description = description || null;
+    }
+    if (dto.slug !== undefined) {
+      const nextSlug = String(dto.slug)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      if (!nextSlug) {
+        throw new BadRequestException('slug is required');
+      }
+      if (nextSlug.length > 80) {
+        throw new BadRequestException('slug is too long');
+      }
+      if (nextSlug !== project.slug) {
+        const taken = await this.prisma.project.findUnique({
+          where: { slug: nextSlug },
+          select: { id: true },
+        });
+        if (taken && taken.id !== project.id) {
+          throw new ConflictException('Project with this slug already exists');
+        }
+        data.slug = nextSlug;
+      }
     }
     if (Object.keys(data).length === 0) {
       throw new BadRequestException('No project fields to update');

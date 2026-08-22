@@ -34,14 +34,7 @@ export function isSpectacleCreativePath(pathname: string) {
 }
 
 function isScriptStateRoute(pathname: string) {
-  const section = getProjectSectionFromPath(pathname);
-  return (
-    section === "script" ||
-    section === "light-plot" ||
-    section === "sufer" ||
-    section === "media" ||
-    isTheaterRoute(pathname)
-  );
+  return isProjectPath(pathname);
 }
 
 /** Главная страница сценария (markdown). */
@@ -49,26 +42,19 @@ export function isScriptMarkdownRoute(pathname: string) {
   return getProjectSectionFromPath(pathname) === "script";
 }
 
-function isBoardRoute(pathname: string) {
-  return getProjectSectionFromPath(pathname) === "board";
-}
-
-function isSessionsRoute(pathname: string) {
-  return getProjectSectionFromPath(pathname) === "sessions";
-}
-
-function isTasksRoute(pathname: string) {
-  return getProjectSectionFromPath(pathname) === "tasks";
-}
-
-function isRehearsalPlanRoute(pathname: string) {
-  return isBoardRoute(pathname) || isSessionsRoute(pathname) || isTasksRoute(pathname);
-}
-
 export function isSpectacleRoute(pathname: string) {
+  if (!isProjectPath(pathname)) return false;
+  const section = getProjectSectionFromPath(pathname);
   return (
-    isProjectPath(pathname) &&
-    (isScriptStateRoute(pathname) || isRehearsalPlanRoute(pathname))
+    section === "script" ||
+    section === "light-plot" ||
+    section === "sufer" ||
+    section === "media" ||
+    section === "board" ||
+    section === "sessions" ||
+    section === "tasks" ||
+    section === "team" ||
+    isTheaterRoute(pathname)
   );
 }
 

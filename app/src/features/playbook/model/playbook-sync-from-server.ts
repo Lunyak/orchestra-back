@@ -8,7 +8,7 @@ import { stableStringify } from "../../../shared/utils/stableStringify";
 import { dispatchSyncPull } from "../../../shared/api/rtk/sync-dispatch";
 import { prefetchDesktopOfflineAfterSync } from "../../../sync/desktopPrefetchOffline";
 import { downloadPlaylistTracksOffline } from "../../../shared/media/web-media-cache";
-import { mergeScannedMediaIntoScene, scanProjectMediaFolder } from "../../../shared/platform/project-media-folder";
+import { mergeScannedMediaIntoScene, readStoredProjectMediaFolder, scanProjectMediaFolder } from "../../../shared/platform/project-media-folder";
 import type { AppDispatch } from "../../../shared/store/store";
 import { store } from "../../../shared/store/store";
 import {
@@ -221,25 +221,28 @@ export async function syncPlaybookFromServer(
       }),
     );
     if (!getDesktopApi()) {
-      void scanProjectMediaFolder(effectiveProject).then((scanned) => {
-        if (!scanned.ok) return;
-        const state = store.getState().playbook;
-        const merged = mergeScannedMediaIntoScene(
-          state.playbookData?.videos ?? [],
-          state.playbookData?.holdImages ?? [],
-          state.playbookData?.playlist ?? [],
-          scanned,
-        );
-        dispatch(
-          playbookActions.setProjectorMediaLibrary({
-            videos: merged.videos,
-            holdImages: merged.holdImages,
-          }),
-        );
-        if (merged.playlist.length !== (state.playbookData?.playlist?.length ?? 0)) {
-          dispatch(playbookActions.setPlaylist(merged.playlist));
-        }
-      });
+      const storedMediaFolder = readStoredProjectMediaFolder(effectiveProject);
+      if (storedMediaFolder.path) {
+        void scanProjectMediaFolder(effectiveProject).then((scanned) => {
+          if (!scanned.ok) return;
+          const state = store.getState().playbook;
+          const merged = mergeScannedMediaIntoScene(
+            state.playbookData?.videos ?? [],
+            state.playbookData?.holdImages ?? [],
+            state.playbookData?.playlist ?? [],
+            scanned,
+          );
+          dispatch(
+            playbookActions.setProjectorMediaLibrary({
+              videos: merged.videos,
+              holdImages: merged.holdImages,
+            }),
+          );
+          if (merged.playlist.length !== (state.playbookData?.playlist?.length ?? 0)) {
+            dispatch(playbookActions.setPlaylist(merged.playlist));
+          }
+        });
+      }
       const playlist = Array.isArray(minimalPlaybookData.playlist) ? minimalPlaybookData.playlist : [];
       if (
         typeof navigator !== "undefined" &&

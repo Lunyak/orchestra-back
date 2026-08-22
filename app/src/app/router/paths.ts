@@ -144,8 +144,38 @@ export function troupeOrganizationPath(troupeId?: string) {
   return troupeId ? `${root}/${encodeSegment(troupeId)}` : root;
 }
 
-export function studioOrganizationPath(studioId: string) {
-  return `${globalPaths.organizations}/studios/${encodeSegment(studioId)}`;
+export function studioOrganizationPath(studioId?: string) {
+  const root = `${globalPaths.organizations}/studios`;
+  return studioId ? `${root}/${encodeSegment(studioId)}` : root;
+}
+
+export function studioOverviewPath(studioId: string) {
+  return `${studioOrganizationPath(studioId)}/overview`;
+}
+
+export function studioMembersPath(studioId: string) {
+  return `${studioOrganizationPath(studioId)}/members`;
+}
+
+export function studioInvitesPath(studioId: string) {
+  return `${studioOrganizationPath(studioId)}/invites`;
+}
+
+export function studioProgramSectionPath(studioId: string) {
+  return `${studioOrganizationPath(studioId)}/program`;
+}
+
+export function studioAssignmentsPath(studioId: string) {
+  return `${studioOrganizationPath(studioId)}/assignments`;
+}
+
+export function studioVideosSectionPath(studioId: string) {
+  return `${studioOrganizationPath(studioId)}/videos`;
+}
+
+export function studioOrgPremisesPath(studioId: string, premiseId?: string) {
+  const root = `${studioOrganizationPath(studioId)}/premises`;
+  return premiseId ? `${root}/${encodeSegment(premiseId)}` : root;
 }
 
 function decodePathSegment(value: string) {
@@ -197,8 +227,7 @@ export function studioPath(studioId?: string) {
 }
 
 export function studioPremisesPath(studioId: string, premiseId?: string) {
-  const root = `${studioPath(studioId)}/premises`;
-  return premiseId ? `${root}/${encodeSegment(premiseId)}` : root;
+  return studioOrgPremisesPath(studioId, premiseId);
 }
 
 export function studioProgramPath(studioId: string, programId: string) {

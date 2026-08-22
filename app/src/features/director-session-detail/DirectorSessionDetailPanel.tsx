@@ -1,9 +1,12 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import { Button } from "@shared/core/button/Button";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { calledStatusToGatherMark } from "../director-sessions/model/session-page-utils";
+import { compareActorArrivalEmails } from "../director-sessions/model/session-actor-call-times";
 import {
   type DirectorSessionSlot,
 } from "../director-sessions/directorSessionsSync";
@@ -13,7 +16,6 @@ import {
 } from "../../sync/api/director-sessions";
 import type { TeamProfile } from "../../sync/api/profile";
 import { MiniAvatar } from "../../shared/core/mini-avatar/MiniAvatar";
-import { Button } from "@shared/core/button/Button";
 import { normalizeEmail } from "../director-sessions/model/session-page-utils";
 import { useDirectorSessionDetail } from "./useDirectorSessionDetail";
 import { useProject } from "../project";
@@ -120,6 +122,7 @@ export function DirectorSessionDetailPanel({
     loading,
     error,
     sceneTitleBySlugAndId,
+    actorArrivalByEmail,
     resolvedProfiles,
     myEmail,
     attendanceBusy,
@@ -167,27 +170,41 @@ export function DirectorSessionDetailPanel({
       const v = normalizeEmail(String(e));
       if (v) uniq.add(v);
     }
-    const emails = Array.from(uniq).sort((a, b) => a.localeCompare(b, "ru"));
+    const emails = Array.from(uniq).sort((a, b) =>
+      compareActorArrivalEmails(a, b, actorArrivalByEmail),
+    );
     if (emails.length > 0) {
       return emails.map((email) => {
         const p = participantByEmail[email];
         const disp = calledPersonDisplay(email, p, profileByEmail[email]);
         const rowStatus = callConfirmationLabel(p, published);
         const respondedShort = formatRespondedShort(p?.respondedAt);
-        return { key: email, ...disp, ...rowStatus, respondedShort };
+        const callTimeLabel =
+          actorArrivalByEmail.get(email)?.timeLabel ??
+          (typeof p?.callTime === "string" && p.callTime.trim() ? p.callTime.trim() : null);
+        return { key: email, ...disp, ...rowStatus, respondedShort, callTimeLabel };
       });
     }
     const parts = [...(session?.participants ?? [])] as DirectorSessionParticipant[];
-    const sortKey = (p: DirectorSessionParticipant) =>
-      calledPersonDisplay(String(p.email), p, profileByEmail[normalizeEmail(String(p.email))])
-        .name.toLowerCase();
-    parts.sort((a, b) => sortKey(a).localeCompare(sortKey(b), "ru"));
+    parts.sort((a, b) => {
+      const emailA = normalizeEmail(String(a.email));
+      const emailB = normalizeEmail(String(b.email));
+      const byArrival = compareActorArrivalEmails(emailA, emailB, actorArrivalByEmail);
+      if (byArrival !== 0) return byArrival;
+      return calledPersonDisplay(emailA, a, profileByEmail[emailA]).name.localeCompare(
+        calledPersonDisplay(emailB, b, profileByEmail[emailB]).name,
+        "ru",
+      );
+    });
     return parts.map((p) => {
       const email = normalizeEmail(String(p.email));
       const disp = calledPersonDisplay(String(p.email), p, profileByEmail[email]);
       const rowStatus = callConfirmationLabel(p, published);
       const respondedShort = formatRespondedShort(p.respondedAt);
-      return { key: email || disp.name, ...disp, ...rowStatus, respondedShort };
+      const callTimeLabel =
+        actorArrivalByEmail.get(email)?.timeLabel ??
+        (typeof p.callTime === "string" && p.callTime.trim() ? p.callTime.trim() : null);
+      return { key: email || disp.name, ...disp, ...rowStatus, respondedShort, callTimeLabel };
     });
   }, [
     session?.plannedEmails,
@@ -195,6 +212,7 @@ export function DirectorSessionDetailPanel({
     session?.publishedAt,
     participantByEmail,
     profileByEmail,
+    actorArrivalByEmail,
   ]);
 
   const myParticipant = useMemo(() => {
@@ -242,9 +260,7 @@ export function DirectorSessionDetailPanel({
       </div>
 
       {loading ? (
-        <div className="rehearsals-muted rehearsals-muted--top">
-          Загрузка…
-        </div>
+        <PageLoader variant="view" label="Загрузка…" />
       ) : null}
       {error ? (
         <div className="settings-invite-error rehearsals-muted--top">
@@ -412,6 +428,11 @@ export function DirectorSessionDetailPanel({
                             aria-label={statusHint || undefined}
                           />
                           <span className="director-session-page__called-name" title={row.email}>
+                            {row.callTimeLabel ? (
+                              <span className="director-session-page__called-time">
+                                {row.callTimeLabel}
+                              </span>
+                            ) : null}
                             {row.name}
                           </span>
                         </li>

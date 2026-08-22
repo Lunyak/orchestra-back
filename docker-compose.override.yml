@@ -1,0 +1,39 @@
+# Локальный override: Compose подхватывает этот файл автоматически
+# при `docker compose up` без явных `-f`.
+# На VPS деплой всегда с `-f docker-compose.yml` — без hot-reload.
+
+services:
+  back:
+    build:
+      context: ./back
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./back/src:/app/src
+      - ./back/prisma:/app/prisma
+      - ./back/scripts:/app/scripts
+      - ./back/test:/app/test
+      - ./back/tsconfig.json:/app/tsconfig.json
+      - ./back/tsconfig.build.json:/app/tsconfig.build.json
+      - ./back/nest-cli.json:/app/nest-cli.json
+      - ./back/prisma.config.ts:/app/prisma.config.ts
+      - ./back/package.json:/app/package.json
+      - ./back/package-lock.json:/app/package-lock.json
+      - /app/node_modules
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_URL: http://localhost:9000
+    ports:
+      - "3000:3000"
+      - "9229:9229"
+    command: sh -c "npm install --no-audit --fund=false && npm run start:dev"
+
+  bot:
+    volumes:
+      - ./bot/src:/app/src
+    environment:
+      NODE_ENV: development
+      CHOKIDAR_USEPOLLING: "true"
+    command: sh -c "npm install --no-audit --fund=false && npx nodemon --watch src --ext js,json runner.js"

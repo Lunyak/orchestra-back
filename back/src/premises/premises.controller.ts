@@ -23,6 +23,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AddPremiseMemberDto } from './dto/add-premise-member.dto';
 import { CreatePremiseDto } from './dto/create-premise.dto';
 import { CreatePremiseRentalDto } from './dto/create-premise-rental.dto';
+import { CreatePremiseRentalAgreementDto } from './dto/create-premise-rental-agreement.dto';
 import { CreatePremiseSlotDto } from './dto/create-premise-slot.dto';
 import { UpdatePremiseDto } from './dto/update-premise.dto';
 import { UpdatePremiseMemberDto } from './dto/update-premise-member.dto';
@@ -147,6 +148,22 @@ export class PremisesController {
       id,
       rentalId,
       paymentId,
+      body,
+    );
+  }
+
+  @Post(':id/rentals/:rentalId/agreement')
+  createRentalAgreement(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Param('rentalId') rentalId: string,
+    @Body() body: CreatePremiseRentalAgreementDto,
+  ) {
+    return this.premises.createRentalAgreement(
+      req.user.userId,
+      req.user.email,
+      id,
+      rentalId,
       body,
     );
   }

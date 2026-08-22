@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -82,7 +83,7 @@ export function ProjectTheaterInvitePage() {
   if (loading) {
     return (
       <div className="project-theater-invite-page">
-        <p>Загрузка…</p>
+        <PageLoader label="Загрузка…" />
       </div>
     );
   }

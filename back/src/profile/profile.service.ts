@@ -120,7 +120,11 @@ export class ProfileService {
     return `profile-${h}`;
   }
 
-  async uploadAvatarByEmail(email: string, file: any) {
+  async uploadAvatarByEmail(
+    email: string,
+    file: any,
+    variant: 'full' | 'small' = 'full',
+  ) {
     const norm = String(email ?? '')
       .trim()
       .toLowerCase();
@@ -150,18 +154,23 @@ export class ProfileService {
             ? '.gif'
             : '.jpg';
 
+    const isSmall = variant === 'small';
     const result = await storage.uploadObject({
       projectId: this.profileBucketId(norm),
       type: 'image',
-      fileName: `avatar${ext}`,
+      fileName: isSmall ? `avatar-small${ext}` : `avatar${ext}`,
       buffer: file.buffer,
       contentType: mimetype,
     });
 
     return await this.prisma.userProfile.upsert({
       where: { email: norm },
-      update: { avatarUrl: result.url },
-      create: { email: norm, avatarUrl: result.url },
+      update: isSmall
+        ? { avatarSmallUrl: result.url }
+        : { avatarUrl: result.url },
+      create: isSmall
+        ? { email: norm, avatarSmallUrl: result.url }
+        : { email: norm, avatarUrl: result.url },
     });
   }
 
@@ -189,6 +198,8 @@ export class ProfileService {
         lastName: true,
         telegramId: true,
         avatarUrl: true,
+        avatarSmallUrl: true,
+        phone: true,
         availabilityCalendar: true,
         availabilityTimeRanges: true,
       },
@@ -222,6 +233,7 @@ export class ProfileService {
         lastName: clean(dto.lastName),
         telegramUsername: clean(dto.telegramUsername),
         avatarUrl: clean(dto.avatarUrl),
+        avatarSmallUrl: clean(dto.avatarSmallUrl),
         sex: clean(dto.sex),
         role: clean(dto.role),
         phone: clean(dto.phone),
@@ -255,6 +267,7 @@ export class ProfileService {
         lastName: cleanOptional(dto.lastName),
         telegramUsername: cleanOptional(dto.telegramUsername),
         avatarUrl: cleanOptional(dto.avatarUrl),
+        avatarSmallUrl: cleanOptional(dto.avatarSmallUrl),
         sex: cleanOptional(dto.sex),
         role: cleanOptional(dto.role),
         phone: cleanOptional(dto.phone),
@@ -281,6 +294,7 @@ export class ProfileService {
         telegramId:
           dto.telegramId !== undefined ? clean(dto.telegramId) : undefined,
         avatarUrl: cleanOptional(dto.avatarUrl),
+        avatarSmallUrl: cleanOptional(dto.avatarSmallUrl),
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),
@@ -300,6 +314,7 @@ export class ProfileService {
         telegramUsername: clean(dto.telegramUsername),
         telegramId: clean(dto.telegramId),
         avatarUrl: clean(dto.avatarUrl),
+        avatarSmallUrl: clean(dto.avatarSmallUrl),
         availabilityCalendar: sanitizeAvailabilityCalendar(
           dto.availabilityCalendar,
         ),

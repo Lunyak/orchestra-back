@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
   UploadedFile,
@@ -64,12 +65,20 @@ export class ProfileController {
   async uploadMyAvatar(
     @Req() req: { user: { email: string } },
     @UploadedFile() file: any,
+    @Query('variant') variantRaw?: string,
   ) {
     if (!file) throw new BadRequestException('Файл не передан');
+    const variant =
+      String(variantRaw ?? '')
+        .trim()
+        .toLowerCase() === 'small'
+        ? 'small'
+        : 'full';
     try {
       return await this.profileService.uploadAvatarByEmail(
         req.user.email,
         file,
+        variant,
       );
     } catch (e: any) {
       const msg = String(e?.message ?? '');

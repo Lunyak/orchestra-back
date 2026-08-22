@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
@@ -132,7 +133,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                 </div>
                 <div className="rehearsals-list">
                   {loading ? (
-                    <div className="rehearsals-muted">Загрузка…</div>
+                    <PageLoader variant="view" label="Загрузка…" />
                   ) : rehearsalsForSelectedDay.length === 0 ? (
                     <div className="rehearsals-muted">На этот день репетиций нет.</div>
                   ) : (
@@ -212,7 +213,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                     {!activeRehearsal ? (
                       <div className="rehearsals-muted">Выбери (или создай) репетицию, чтобы загрузить список сцен.</div>
                     ) : scenesLoading ? (
-                      <div className="rehearsals-muted">Загрузка сцен…</div>
+                      <PageLoader variant="view" label="Загрузка сцен…" />
                     ) : scenesError ? (
                       <div className="rehearsals-error">{scenesError}</div>
                     ) : sceneOptions.length === 0 ? (
@@ -380,7 +381,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                     <div className="rehearsals-section">
                       <div className="rehearsals-section-title">Сцены на репетицию</div>
                       {scenesLoading ? (
-                        <div className="rehearsals-muted">Загрузка…</div>
+                        <PageLoader variant="view" label="Загрузка…" />
                       ) : scenesError ? (
                         <div className="rehearsals-error">{scenesError}</div>
                       ) : sceneOptions.length === 0 ? (

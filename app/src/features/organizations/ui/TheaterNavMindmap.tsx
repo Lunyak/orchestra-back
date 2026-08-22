@@ -1,4 +1,5 @@
 import cn from "classnames";
+import { MotionConfig } from "motion/react";
 import { useId, useState, type ChangeEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
@@ -11,6 +12,11 @@ import {
   removeTheaterPoster,
   storeTheaterPoster,
 } from "../model/theater-poster-storage";
+import {
+  MindmapExpandPresence,
+  MindmapMotionItem,
+  useMindmapBranchExpand,
+} from "../../project/ui/mindmap-expand";
 import posterPlaceholderUrl from "../assets/org-poster-theaters.jpg";
 import "../../project/ui/project-nav-mindmap.css";
 
@@ -178,6 +184,63 @@ function MindmapNode({
   return <span className={className}>{node.label}</span>;
 }
 
+function MindmapBranch({
+  node,
+  pathname,
+  depth,
+  staggerIndex,
+}: {
+  node: TheaterNavNode;
+  pathname: string;
+  depth: number;
+  staggerIndex: number;
+}) {
+  const isLit = nodeHasActiveDescendant(node, pathname);
+  const hasChildren = Boolean(node.children?.length);
+  const { isOpen, expandProps } = useMindmapBranchExpand(isLit, hasChildren);
+  const isNested = depth > 0;
+  const resolvedVariant = (() => {
+    if (!node.href && hasChildren) {
+      return depth === 0 ? "group" : "section";
+    }
+    if (hasChildren) return "group";
+    return "mode";
+  })();
+
+  return (
+    <MindmapMotionItem
+      animated={isNested}
+      staggerIndex={staggerIndex}
+      className={cn(
+        "project-nav-mindmap__item",
+        depth === 0 && "project-nav-mindmap__branch",
+        depth === 0 && !hasChildren && "project-nav-mindmap__branch--solo",
+        depth > 0 && "project-nav-mindmap__leaf-item",
+        isLit && "project-nav-mindmap__item--active",
+        depth === 0 && isLit && "project-nav-mindmap__branch--active",
+      )}
+      {...expandProps}
+    >
+      <div className="project-nav-mindmap__cluster">
+        <MindmapNode
+          node={node}
+          pathname={pathname}
+          variant={resolvedVariant}
+        />
+        <MindmapExpandPresence open={hasChildren && isOpen}>
+          {node.children?.length ? (
+            <MindmapSubtree
+              nodes={node.children}
+              pathname={pathname}
+              depth={depth + 1}
+            />
+          ) : null}
+        </MindmapExpandPresence>
+      </div>
+    </MindmapMotionItem>
+  );
+}
+
 function MindmapSubtree({
   nodes,
   pathname,
@@ -195,46 +258,15 @@ function MindmapSubtree({
         depth > 0 && "project-nav-mindmap__leaves",
       )}
     >
-      {nodes.map((node) => {
-        const isLit = nodeHasActiveDescendant(node, pathname);
-        const hasChildren = Boolean(node.children?.length);
-        const resolvedVariant = (() => {
-          if (!node.href && hasChildren) {
-            return depth === 0 ? "group" : "section";
-          }
-          if (hasChildren) return "group";
-          return "mode";
-        })();
-
-        return (
-          <li
-            key={node.id}
-            className={cn(
-              "project-nav-mindmap__item",
-              depth === 0 && "project-nav-mindmap__branch",
-              depth === 0 && !hasChildren && "project-nav-mindmap__branch--solo",
-              depth > 0 && "project-nav-mindmap__leaf-item",
-              isLit && "project-nav-mindmap__item--active",
-              depth === 0 && isLit && "project-nav-mindmap__branch--active",
-            )}
-          >
-            <div className="project-nav-mindmap__cluster">
-              <MindmapNode
-                node={node}
-                pathname={pathname}
-                variant={resolvedVariant}
-              />
-              {node.children?.length ? (
-                <MindmapSubtree
-                  nodes={node.children}
-                  pathname={pathname}
-                  depth={depth + 1}
-                />
-              ) : null}
-            </div>
-          </li>
-        );
-      })}
+      {nodes.map((node, index) => (
+        <MindmapBranch
+          key={node.id}
+          node={node}
+          pathname={pathname}
+          depth={depth}
+          staggerIndex={index}
+        />
+      ))}
     </ul>
   );
 }
@@ -248,23 +280,25 @@ export function TheaterNavMindmap({
   const rootHref = navMap.root.href ?? "";
 
   return (
-    <nav className="project-nav-mindmap" aria-label="Карта разделов театра">
-      <div className="project-nav-mindmap__canvas">
-        <div className="project-nav-mindmap__root-col">
-          <MindmapPosterRoot
-            key={theaterId}
-            theaterId={theaterId}
-            rootLabel={rootLabel}
-            href={rootHref}
+    <MotionConfig reducedMotion="user">
+      <nav className="project-nav-mindmap" aria-label="Карта разделов театра">
+        <div className="project-nav-mindmap__canvas">
+          <div className="project-nav-mindmap__root-col">
+            <MindmapPosterRoot
+              key={theaterId}
+              theaterId={theaterId}
+              rootLabel={rootLabel}
+              href={rootHref}
+              pathname={pathname}
+            />
+          </div>
+          <MindmapSubtree
+            nodes={navMap.branches}
             pathname={pathname}
+            depth={0}
           />
         </div>
-        <MindmapSubtree
-          nodes={navMap.branches}
-          pathname={pathname}
-          depth={0}
-        />
-      </div>
-    </nav>
+      </nav>
+    </MotionConfig>
   );
 }

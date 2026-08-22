@@ -181,12 +181,22 @@ export function getEmailsPlannedForDirectorSlot(
     if (!key) continue;
     const rolePicks = (picks ?? []).filter((p) => normalizeRoleKey(p.roleKey) === key);
     if (rolePicks.length > 0) {
+      let hadChecked = false;
       for (const p of rolePicks) {
         if (!p.checked) continue;
+        hadChecked = true;
         const norm = normalizeEmail(String(p.email ?? ""));
         if (!norm || !looksLikeEmail(norm)) continue;
         out.add(norm);
         if (out.size >= 500) break;
+      }
+      if (!hadChecked) {
+        for (const e of roleEmails[key] ?? []) {
+          const norm = normalizeEmail(String(e ?? ""));
+          if (!norm || !looksLikeEmail(norm)) continue;
+          out.add(norm);
+          if (out.size >= 500) break;
+        }
       }
     } else {
       for (const e of roleEmails[key] ?? []) {

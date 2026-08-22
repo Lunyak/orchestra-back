@@ -311,7 +311,7 @@ html:not([data-theme]) {
   --color-checkbox-disabled-border: rgba(231, 138, 78, 0.35);
   --color-accent-orange-hover: rgba(243, 170, 112, 0.95);
   --color-accent-orange-grid: rgba(231, 138, 78, 0.26);
-  --color-list-item-hover: #3a4b61;
+  --color-list-item-hover: color-mix(in srgb, var(--color-bg-quaternary) 78%, white);
   --color-header-bg: #2c3e50;
   --color-header-surface: rgba(15, 23, 42, 0.82);
   --color-header-surface-soft: rgba(15, 23, 42, 0.78);
@@ -475,6 +475,7 @@ html:not([data-theme]) {
   --width-sidebar-min: 200px;
   --width-sidebar: 240px;
   --width-sidebar-max: 280px;
+  --width-docks-cluster: calc(var(--width-sidebar-max) * 2 + var(--width-content-page));
   --width-panel: 320px;
   --width-card: 380px;
   --width-form: 420px;
@@ -543,9 +544,9 @@ html:not([data-theme]) {
   /* Скроллбар */
   --scrollbar-size: 10px;
   --scrollbar-radius: 999px;
-  --scrollbar-thumb: rgba(148, 163, 184, 0.45);
-  --scrollbar-thumb-hover: rgba(203, 213, 225, 0.65);
-  --scrollbar-track: rgba(2, 6, 23, 0.2);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.38);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.55);
+  --scrollbar-track: transparent;
 
   /* Kanban-колонки */
   --kanban-col-raw: rgba(71, 85, 105, 0.55);

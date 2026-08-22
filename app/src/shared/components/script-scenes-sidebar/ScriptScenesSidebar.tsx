@@ -87,76 +87,104 @@ export const ScriptScenesSidebar = ({
 
   return (
     <aside className="script-sidebar">
-      <div className="script-sidebar-content">
-        <div className="scenes-mini-list">
-          {scenes.length === 0 ? (
-            <p className="script-sidebar-empty">Добавьте материал в сценарий</p>
-          ) : null}
-          {          scenes.map((scene, index) => {
-            const isActive = index === currentIndex;
-            return (
-              <ListItem
-                key={`${scene.id}:${index}`}
-                className={cn(
-                  "scene-mini-item",
-                  isActive && "list-item--active",
-                  isActive && "scene-mini-item--active",
-                  dragOverIndex === index && "scene-mini-item--drag-over",
-                  dragIndex === index && "scene-mini-item--dragging",
-                )}
-                draggable
-                onDragStart={handleDragStart(index)}
-                onDragOver={handleDragOver}
-                onDragEnter={() => setDragOverIndex(index)}
-                onDragLeave={() => setDragOverIndex(null)}
-                onDrop={handleDrop(index)}
-                onDragEnd={handleDragEnd}
+      <div className="scenes-mini-list">
+        {scenes.length === 0 ? (
+          <p className="script-sidebar-empty">Добавьте материал в сценарий</p>
+        ) : null}
+        {scenes.map((scene, index) => {
+          const isActive = index === currentIndex;
+          return (
+            <ListItem
+              key={`${scene.id}:${index}`}
+              className={cn(
+                "scene-mini-item",
+                isActive && "list-item--active",
+                isActive && "scene-mini-item--active",
+                dragOverIndex === index && "scene-mini-item--drag-over",
+                dragIndex === index && "scene-mini-item--dragging",
+              )}
+              draggable
+              onDragStart={handleDragStart(index)}
+              onDragOver={handleDragOver}
+              onDragEnter={() => setDragOverIndex(index)}
+              onDragLeave={() => setDragOverIndex(null)}
+              onDrop={handleDrop(index)}
+              onDragEnd={handleDragEnd}
+            >
+              <button
+                className="scene-mini-btn"
+                onClick={() => onSelect(index)}
               >
-                <button
-                  className="scene-mini-btn"
-                  onClick={() => onSelect(index)}
-                >
-                  {index + 1}. {scene.title}
-                </button>
-                {isActive && (
-                  <Buttons.DeleteButton
-                    className="scene-mini-btn-delete"
-                    variant="scene"
-                    onClick={handleDeleteClick(scene, index)}
-                    title="Удалить сцену"
-                    aria-label="Удалить сцену"
-                  />
-                )}
-              </ListItem>
-            );
-          })}
-          <Buttons.AddButton
-            onClick={onAddScene}
-            title="Добавить сцену"
-            aria-label="Добавить сцену"
-          />
-        </div>
-        <div className="script-navigation">
-          <button
-            className="script-nav-btn"
-            onClick={onPrev}
-            disabled={currentIndex === 0 || scenes.length === 0}
+                {index + 1}. {scene.title}
+              </button>
+              {isActive && (
+                <Buttons.DeleteButton
+                  className="scene-mini-btn-delete"
+                  variant="scene"
+                  onClick={handleDeleteClick(scene, index)}
+                  title="Удалить сцену"
+                  aria-label="Удалить сцену"
+                />
+              )}
+            </ListItem>
+          );
+        })}
+        <Buttons.AddButton
+          onClick={onAddScene}
+          title="Добавить сцену"
+          aria-label="Добавить сцену"
+        />
+      </div>
+      <div className="script-navigation">
+        <button
+          type="button"
+          className="script-nav-btn"
+          onClick={onPrev}
+          disabled={currentIndex === 0 || scenes.length === 0}
+          title="Предыдущая сцена"
+          aria-label="Предыдущая сцена"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
           >
-            ←
-          </button>
-          <span className="page-indicator">
-            {scenes.length === 0
-              ? "Нет сцен"
-              : `Сцена ${currentIndex + 1} из ${scenes.length}`}
-          </span>
-          <button
-            className="script-nav-btn"
-            onClick={onNext}
-            disabled={currentIndex === scenes.length - 1 || scenes.length === 0}
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+        <span className="page-indicator">
+          {scenes.length === 0
+            ? "Нет сцен"
+            : `Сцена ${currentIndex + 1} из ${scenes.length}`}
+        </span>
+        <button
+          type="button"
+          className="script-nav-btn"
+          onClick={onNext}
+          disabled={currentIndex === scenes.length - 1 || scenes.length === 0}
+          title="Следующая сцена"
+          aria-label="Следующая сцена"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
           >
-            →
-          </button>
-        </div>
+            <path d="M9 6l6 6-6 6" />
+          </svg>
+        </button>
       </div>
     </aside>
   );

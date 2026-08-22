@@ -36,11 +36,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* background-color: var(--color-primary-dark); */
+  opacity: 0.45;
+  transition: var(--transition-colors), opacity var(--transition-normal);
 }
 
 .icon-action-add:hover:not(:disabled) {
   background: var(--color-primary-hover-alpha);
+  opacity: 0.85;
 }
 
 .icon-action-add:disabled {
@@ -49,6 +51,7 @@
 }
 
 .icon-action-delete {
+  position: absolute;
   border: none;
   color: var(--color-text-primary);
   cursor: pointer;
@@ -57,10 +60,6 @@
   justify-content: center;
   line-height: 1;
   padding: 0;
-
-  /* position: absolute; */
-  /* right: 8px; */
-  /* top: 7px; */
   width: 16px;
   height: 16px;
   border: 1px solid var(--color-danger-border-soft);
@@ -68,41 +67,24 @@
   font-size: 16px;
 }
 
-/* Playlist track row */
-.icon-action-delete--playlist {
-  position: absolute;
-  right: 8px;
-  top: 7px;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--color-danger-border-soft);
-  background: var(--color-danger-bg-strong);
-  font-size: 16px;
-}
-
-.icon-action-delete--playlist:hover {
-  background: var(--color-danger-bg-hover-strong);
-}
-
-/* Script scene row */
+/* Shared row delete (scenes + playlist) */
+.icon-action-delete--playlist,
 .icon-action-delete--scene {
   position: absolute;
   right: 4px;
   top: 50%;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: var(--color-danger);
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--color-danger-border-soft);
+  background: var(--color-danger-bg-strong);
   font-size: 14px;
-  line-height: 22px;
+  line-height: 16px;
   transform: translateY(-50%);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
 }
 
+.icon-action-delete--playlist:hover,
 .icon-action-delete--scene:hover {
-  background: var(--color-danger-hover);
+  background: var(--color-danger-bg-hover-strong);
 }
 
 .icon-action-close {

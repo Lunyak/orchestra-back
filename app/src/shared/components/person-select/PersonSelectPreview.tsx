@@ -1,5 +1,6 @@
 import cn from "classnames";
 import { memberLabel } from "../../../features/troupe/model/troupe-page-utils";
+import { profileListAvatarSrc } from "../../../sync/api/profile";
 import { MiniAvatar } from "../mini-avatar/MiniAvatar";
 import "./style.css";
 
@@ -10,6 +11,7 @@ export type PersonSelectProfile = {
     firstName?: string | null;
     lastName?: string | null;
     avatarUrl?: string | null;
+    avatarSmallUrl?: string | null;
   } | null;
 };
 
@@ -38,7 +40,7 @@ export function PersonSelectPreview({
   }
 
   const label = memberLabel(person);
-  const avatarUrl = String(person.profile?.avatarUrl ?? "").trim() || null;
+  const avatarUrl = profileListAvatarSrc(person.profile);
 
   return (
     <span

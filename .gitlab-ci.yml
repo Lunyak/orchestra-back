@@ -83,7 +83,7 @@ build:back:
   script:
     - |
       ssh ${SSH_OPTS} root@${DEPLOY_HOST} \
-        "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose build back bot"
+        "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd && docker compose -f docker-compose.yml build back bot"
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
@@ -102,8 +102,8 @@ deploy:
       git reset --hard "origin/${BRANCH}"
       git clean -fd
       # --no-wait: не держим SSH, пока compose ждёт healthcheck (миграции + Nest)
-      docker compose up -d --no-wait postgres back bot dozzle 2>/dev/null \
-        || docker compose up -d postgres back bot dozzle
+      docker compose -f docker-compose.yml up -d --no-wait postgres back bot dozzle 2>/dev/null \
+        || docker compose -f docker-compose.yml up -d postgres back bot dozzle
       echo "Waiting for orkestr-back health (up to 3 min)..."
       deadline=$(( $(date +%s) + 180 ))
       while [ "$(date +%s)" -lt "$deadline" ]; do

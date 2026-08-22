@@ -112,6 +112,18 @@ const WORK_CHILDREN: ReadonlyArray<NavNodeDef> = [
 
 
 
+const PEOPLE_BRANCH_DEFS: ReadonlyArray<NavNodeDef> = [
+
+  { id: "team", label: "Команда", section: "team" },
+
+  { id: "roles", label: "Роли", section: "roles" },
+
+  { id: "cast", label: "Каст", section: "cast" },
+
+];
+
+
+
 const NAV_BRANCH_DEFS: ReadonlyArray<NavNodeDef> = [
 
   {
@@ -134,17 +146,15 @@ const NAV_BRANCH_DEFS: ReadonlyArray<NavNodeDef> = [
 
   },
 
-];
+  {
 
+    id: "people",
 
+    label: "Люди",
 
-const PEOPLE_BRANCH_DEFS: ReadonlyArray<NavNodeDef> = [
+    children: PEOPLE_BRANCH_DEFS,
 
-  { id: "team", label: "Команда", section: "team" },
-
-  { id: "roles", label: "Роли", section: "roles" },
-
-  { id: "cast", label: "Каст", section: "cast" },
+  },
 
 ];
 
@@ -227,26 +237,6 @@ export function getProjectNavMap(
       toNode(projectSlug, def),
 
     ),
-
-  };
-
-}
-
-
-
-export function getProjectPeopleNavMap(projectSlug: string): ProjectNavMap {
-
-  return {
-
-    root: {
-
-      id: "people",
-
-      label: "Люди",
-
-    },
-
-    branches: PEOPLE_BRANCH_DEFS.map((def) => toNode(projectSlug, def)),
 
   };
 

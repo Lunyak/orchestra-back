@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
@@ -69,7 +70,9 @@ export function ProfileRoleWorkTab() {
         </div>
 
         {rolesError ? <div className="settings-invite-error">{rolesError}</div> : null}
-        {rolesLoading ? <div className="profile-save-hint">Загрузка ролей…</div> : null}
+        {rolesLoading ? (
+          <PageLoader variant="view" label="Загрузка ролей…" />
+        ) : null}
 
         <div className="profile-panel profile-role-work-panel">
           <div className="profile-role-work-grid">

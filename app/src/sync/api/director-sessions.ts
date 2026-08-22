@@ -31,6 +31,7 @@ export type DirectorSessionParticipant = {
   avatarUrl?: string | null;
   lateTime?: string | null;
   respondedAt?: string | null;
+  callTime?: string | null;
 };
 
 export type DirectorSession = {
@@ -59,7 +60,7 @@ export type DirectorSessionMyComment = {
 export async function publishDirectorSession(
   accessToken: string,
   sessionId: string,
-  body?: { comment?: string | null },
+  body?: { comment?: string | null; includeUnavailable?: boolean },
 ): Promise<{ ok: boolean; telegramSent?: boolean; session?: DirectorSession }> {
   const { data } = await api.post(
     `/director-sessions/${encodeURIComponent(sessionId)}/publish`,

@@ -8,6 +8,8 @@ export interface MyProfile {
   telegramUsername?: string | null;
   telegramId?: string | null;
   avatarUrl?: string | null;
+  avatarSmallUrl?: string | null;
+  phone?: string | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
   availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
 }
@@ -19,8 +21,20 @@ export interface TeamProfile {
   lastName?: string | null;
   telegramId?: string | null;
   avatarUrl?: string | null;
+  avatarSmallUrl?: string | null;
+  phone?: string | null;
   availabilityCalendar?: Record<string, "present" | "absent"> | null;
   availabilityTimeRanges?: Record<string, Array<{ from: string; to: string }>> | null;
+}
+
+/** Для списков и мини-чипов: маленький аватар, иначе полный. */
+export function profileListAvatarSrc(
+  profile?: { avatarUrl?: string | null; avatarSmallUrl?: string | null } | null,
+): string | null {
+  const small = String(profile?.avatarSmallUrl ?? "").trim();
+  if (small) return small;
+  const full = String(profile?.avatarUrl ?? "").trim();
+  return full || null;
 }
 
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {
@@ -59,13 +73,17 @@ export async function updateMyProfile(
   return data;
 }
 
+export type ProfileAvatarVariant = "full" | "small";
+
 export async function uploadMyAvatar(
   accessToken: string,
   file: File,
+  variant: ProfileAvatarVariant = "full",
 ): Promise<MyProfile> {
   const form = new FormData();
   form.append("file", file, file.name);
-  const { data } = await api.post<MyProfile>("/profile/avatar", form, {
+  const query = variant === "small" ? "?variant=small" : "";
+  const { data } = await api.post<MyProfile>(`/profile/avatar${query}`, form, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   return data;

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   PremiseAgreementStatus,
+  PremiseBookedAsKind,
   PremiseMemberRole,
   PremiseRecurrenceType,
   PremiseRentalStatus,
@@ -23,6 +24,7 @@ import {
   CreatePremiseRentalDto,
   PremiseRentalScheduleDto,
 } from './dto/create-premise-rental.dto';
+import { CreatePremiseRentalAgreementDto } from './dto/create-premise-rental-agreement.dto';
 import { CreatePremiseSlotDto } from './dto/create-premise-slot.dto';
 import { UpdatePremiseDto } from './dto/update-premise.dto';
 import { UpdatePremiseMemberDto } from './dto/update-premise-member.dto';
@@ -37,6 +39,20 @@ function normalizeEmail(v: unknown): string {
     .toLowerCase();
   if (!email) throw new BadRequestException('email is required');
   return email;
+}
+
+function decodeMulterFileName(fileName: string): string {
+  const raw = String(fileName ?? '').trim();
+  if (!raw) return 'document.pdf';
+  const looksMojibake = /[ÐÑÃÂ]/.test(raw);
+  if (!looksMojibake) return raw;
+  try {
+    const decoded = Buffer.from(raw, 'latin1').toString('utf8');
+    if (!decoded || decoded.includes('\uFFFD')) return raw;
+    return decoded;
+  } catch {
+    return raw;
+  }
 }
 
 function rubToKopecks(rub: number): number {
@@ -224,6 +240,18 @@ type PremiseAccess = {
   canBook: boolean;
 };
 
+type PremiseBookingActor = {
+  kind: PremiseBookedAsKind;
+  id: string | null;
+  title: string;
+};
+
+type ResolvedBookedAs = {
+  kind: PremiseBookedAsKind;
+  id: string | null;
+  title: string;
+};
+
 const premiseSelect = {
   id: true,
   troupeId: true,
@@ -255,6 +283,12 @@ const rentalSummarySelect = {
   recurrenceType: true,
   agreementRequested: true,
   status: true,
+  bookedAsKind: true,
+  bookedAsId: true,
+  bookedAsTitle: true,
+  createdByEmail: true,
+  confirmedByEmail: true,
+  confirmedAt: true,
   agreement: { select: { id: true, number: true, status: true } },
 } as const;
 
@@ -290,6 +324,9 @@ const rentalSelect = {
   contactEmail: true,
   contactName: true,
   contactPhone: true,
+  bookedAsKind: true,
+  bookedAsId: true,
+  bookedAsTitle: true,
   startsOn: true,
   endsOn: true,
   timezoneOffsetMin: true,
@@ -298,6 +335,8 @@ const rentalSelect = {
   agreementRequested: true,
   status: true,
   createdByEmail: true,
+  confirmedByEmail: true,
+  confirmedAt: true,
   createdAt: true,
   updatedAt: true,
   schedules: {
@@ -387,6 +426,12 @@ function serializeSlot(
       row.rentalAmountKopecks == null ? null : row.rentalAmountKopecks / 100,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    rental: row.rental
+      ? {
+          ...row.rental,
+          confirmedAt: row.rental.confirmedAt?.toISOString() ?? null,
+        }
+      : null,
   };
 }
 
@@ -399,6 +444,7 @@ function serializeRental(
     endsOn: row.endsOn?.toISOString() ?? null,
     monthlyAmountRub:
       row.monthlyAmountKopecks == null ? null : row.monthlyAmountKopecks / 100,
+    confirmedAt: row.confirmedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     agreement: row.agreement
@@ -435,6 +481,46 @@ function serializeMember(
 
 function isManagerRole(role: PremiseMemberRole): boolean {
   return role === PremiseMemberRole.owner || role === PremiseMemberRole.manager;
+}
+
+function profileDisplayTitle(profile: {
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+} | null, email: string): string {
+  const displayName = String(profile?.displayName ?? '').trim();
+  if (displayName) return displayName;
+  const fullName = [profile?.firstName, profile?.lastName]
+    .map((part) => String(part ?? '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return fullName || email;
+}
+
+function buildManagerOrgActors(access: PremiseAccess): PremiseBookingActor[] {
+  const actors: PremiseBookingActor[] = [];
+  if (access.premise.theaterId && access.premise.theater?.title) {
+    actors.push({
+      kind: PremiseBookedAsKind.theater,
+      id: access.premise.theaterId,
+      title: access.premise.theater.title,
+    });
+  }
+  if (access.premise.troupeId && access.premise.troupe?.title) {
+    actors.push({
+      kind: PremiseBookedAsKind.troupe,
+      id: access.premise.troupeId,
+      title: access.premise.troupe.title,
+    });
+  }
+  if (access.premise.studioId && access.premise.studio?.title) {
+    actors.push({
+      kind: PremiseBookedAsKind.studio,
+      id: access.premise.studioId,
+      title: access.premise.studio.title,
+    });
+  }
+  return actors;
 }
 
 @Injectable()
@@ -751,7 +837,181 @@ export class PremisesService {
       select: premiseSelect,
     });
     if (!row) throw new NotFoundException('Premise not found');
-    return serializePremise(row, access);
+    const bookingActors = await this.buildBookingActors(
+      access,
+      userId,
+      userEmail,
+    );
+    return {
+      ...serializePremise(row, access),
+      bookingActors,
+    };
+  }
+
+  private async listRepresentableOrgActors(
+    userId: string,
+    userEmailRaw: string,
+  ): Promise<PremiseBookingActor[]> {
+    const userEmail = normalizeEmail(userEmailRaw);
+    const [theaters, studios, troupes] = await Promise.all([
+      this.prisma.theater.findMany({
+        where: {
+          workspace: {
+            memberships: {
+              some: {
+                userId,
+                role: { in: [WorkspaceRole.OWNER, WorkspaceRole.ADMIN] },
+              },
+            },
+          },
+        },
+        select: { id: true, title: true },
+        orderBy: { title: 'asc' },
+      }),
+      this.prisma.studio.findMany({
+        where: {
+          OR: [
+            { ownerUserId: userId },
+            {
+              members: {
+                some: {
+                  role: { in: ['owner', 'teacher'] },
+                  OR: [{ userId }, { email: userEmail }],
+                },
+              },
+            },
+          ],
+        },
+        select: { id: true, title: true },
+        orderBy: { title: 'asc' },
+      }),
+      this.prisma.troupe.findMany({
+        where: {
+          OR: [
+            { ownerUserId: userId },
+            {
+              workspace: {
+                memberships: {
+                  some: {
+                    userId,
+                    role: { in: [WorkspaceRole.OWNER, WorkspaceRole.ADMIN] },
+                  },
+                },
+              },
+            },
+          ],
+        },
+        select: { id: true, title: true },
+        orderBy: { title: 'asc' },
+      }),
+    ]);
+
+    return [
+      ...theaters.map((theater) => ({
+        kind: PremiseBookedAsKind.theater,
+        id: theater.id,
+        title: theater.title,
+      })),
+      ...studios.map((studio) => ({
+        kind: PremiseBookedAsKind.studio,
+        id: studio.id,
+        title: studio.title,
+      })),
+      ...troupes.map((troupe) => ({
+        kind: PremiseBookedAsKind.troupe,
+        id: troupe.id,
+        title: troupe.title,
+      })),
+    ];
+  }
+
+  private async buildBookingActors(
+    access: PremiseAccess,
+    userId: string,
+    userEmailRaw: string,
+  ): Promise<PremiseBookingActor[]> {
+    const userEmail = normalizeEmail(userEmailRaw);
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { email: userEmail },
+      select: { displayName: true, firstName: true, lastName: true },
+    });
+    const actors: PremiseBookingActor[] = [
+      {
+        kind: PremiseBookedAsKind.user,
+        id: userId,
+        title: profileDisplayTitle(profile, userEmail),
+      },
+    ];
+    if (access.canManage) {
+      actors.push(...buildManagerOrgActors(access));
+      actors.push({
+        kind: PremiseBookedAsKind.external,
+        id: null,
+        title: 'Внешний арендатор',
+      });
+    }
+
+    const representable = await this.listRepresentableOrgActors(
+      userId,
+      userEmail,
+    );
+    const seen = new Set(
+      actors
+        .filter((actor) => actor.id)
+        .map((actor) => `${actor.kind}:${actor.id}`),
+    );
+    for (const actor of representable) {
+      if (!actor.id) continue;
+      const key = `${actor.kind}:${actor.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      actors.push(actor);
+    }
+
+    return actors;
+  }
+
+  private async resolveBookedAs(
+    access: PremiseAccess,
+    userId: string,
+    userEmailRaw: string,
+    body: Pick<
+      CreatePremiseRentalDto,
+      'bookedAsKind' | 'bookedAsId' | 'bookedAsTitle' | 'contactName'
+    >,
+  ): Promise<ResolvedBookedAs> {
+    const actors = await this.buildBookingActors(access, userId, userEmailRaw);
+    const requestedKind = body.bookedAsKind ?? actors[0]?.kind;
+    if (!requestedKind) {
+      throw new BadRequestException('Не удалось определить арендатора');
+    }
+    const matched = actors.find((actor) => {
+      if (actor.kind !== requestedKind) return false;
+      if (requestedKind === PremiseBookedAsKind.external) return true;
+      if (body.bookedAsId == null || body.bookedAsId === '') return true;
+      return actor.id === body.bookedAsId;
+    });
+    if (!matched) {
+      throw new ForbiddenException(
+        'Нельзя бронировать от имени выбранной сущности',
+      );
+    }
+    if (matched.kind === PremiseBookedAsKind.external) {
+      const externalTitle =
+        String(body.bookedAsTitle ?? '').trim() ||
+        String(body.contactName ?? '').trim() ||
+        matched.title;
+      return {
+        kind: PremiseBookedAsKind.external,
+        id: null,
+        title: externalTitle,
+      };
+    }
+    return {
+      kind: matched.kind,
+      id: matched.id,
+      title: matched.title,
+    };
   }
 
   async createPremise(userId: string, body: CreatePremiseDto) {
@@ -922,6 +1182,7 @@ export class PremisesService {
     const email = normalizeEmail(userEmail);
     const title = String(body.title ?? '').trim();
     if (!title) throw new BadRequestException('title is required');
+    const bookedAs = await this.resolveBookedAs(access, userId, email, body);
     const timezoneOffsetMin = body.timezoneOffsetMin ?? 0;
     const requestedAgreement = body.agreementRequested === true;
     const contactEmail = body.contactEmail
@@ -1008,11 +1269,10 @@ export class PremisesService {
       );
     }
 
-    const rentalStatus = requestedAgreement
-      ? PremiseRentalStatus.pending
-      : access.canManage
-        ? PremiseRentalStatus.active
-        : PremiseRentalStatus.pending;
+    const rentalStatus =
+      requestedAgreement || !access.canManage
+        ? PremiseRentalStatus.pending
+        : PremiseRentalStatus.active;
     const slotStatus =
       rentalStatus === PremiseRentalStatus.active
         ? PremiseSlotStatus.confirmed
@@ -1066,6 +1326,9 @@ export class PremisesService {
           contactEmail,
           contactName: body.contactName?.trim() || null,
           contactPhone: body.contactPhone?.trim() || null,
+          bookedAsKind: bookedAs.kind,
+          bookedAsId: bookedAs.id,
+          bookedAsTitle: bookedAs.title,
           startsOn,
           endsOn,
           timezoneOffsetMin,
@@ -1077,6 +1340,9 @@ export class PremisesService {
           agreementRequested: requestedAgreement,
           status: rentalStatus,
           createdByEmail: email,
+          ...(rentalStatus === PremiseRentalStatus.active
+            ? { confirmedByEmail: email, confirmedAt: new Date() }
+            : {}),
           schedules: schedules.length ? { create: schedules } : undefined,
           payments: monthlyPayments.length
             ? { create: monthlyPayments }
@@ -1141,18 +1407,9 @@ export class PremisesService {
       where: { id: rentalId, premiseId },
       select: {
         id: true,
-        agreementRequested: true,
-        agreement: { select: { status: true } },
       },
     });
     if (!rental) throw new NotFoundException('Rental not found');
-    if (
-      body.status === 'active' &&
-      rental.agreementRequested &&
-      rental.agreement?.status !== PremiseAgreementStatus.active
-    ) {
-      throw new BadRequestException('Сначала загрузите подписанный договор');
-    }
     const rentalStatus =
       body.status === 'active'
         ? PremiseRentalStatus.active
@@ -1161,10 +1418,20 @@ export class PremisesService {
       body.status === 'active'
         ? PremiseSlotStatus.confirmed
         : PremiseSlotStatus.cancelled;
+    const reviewerEmail = normalizeEmail(userEmail);
+    const confirmedAt = new Date();
     await this.prisma.$transaction([
       this.prisma.premiseRental.update({
         where: { id: rentalId },
-        data: { status: rentalStatus },
+        data: {
+          status: rentalStatus,
+          ...(body.status === 'active'
+            ? {
+                confirmedByEmail: reviewerEmail,
+                confirmedAt,
+              }
+            : {}),
+        },
       }),
       this.prisma.premiseSlot.updateMany({
         where: { rentalId },
@@ -1200,6 +1467,123 @@ export class PremisesService {
         paidAt: body.status === 'paid' ? new Date() : null,
       },
     });
+    return this.getRental(userId, userEmail, premiseId, rentalId);
+  }
+
+  async createRentalAgreement(
+    userId: string,
+    userEmail: string,
+    premiseId: string,
+    rentalId: string,
+    body: CreatePremiseRentalAgreementDto = {},
+  ) {
+    const access = await this.resolveAccess(userId, userEmail, premiseId);
+    const rental = await this.prisma.premiseRental.findFirst({
+      where: { id: rentalId, premiseId },
+      select: {
+        id: true,
+        title: true,
+        usageType: true,
+        recurrenceType: true,
+        purpose: true,
+        startsOn: true,
+        endsOn: true,
+        timezoneOffsetMin: true,
+        monthlyAmountKopecks: true,
+        paymentDueDay: true,
+        contactEmail: true,
+        contactName: true,
+        contactPhone: true,
+        bookedAsTitle: true,
+        createdByEmail: true,
+        agreement: { select: { id: true } },
+        premise: {
+          select: {
+            name: true,
+            theater: { select: { title: true } },
+            studio: { select: { title: true } },
+            troupe: { select: { title: true } },
+          },
+        },
+        schedules: {
+          select: { weekday: true, startsAtMin: true, durationMin: true },
+          orderBy: { weekday: 'asc' },
+        },
+        slots: {
+          select: { rentalAmountKopecks: true },
+          orderBy: { startsAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
+    if (!rental) throw new NotFoundException('Rental not found');
+    if (!this.canEditRental(access, userEmail, rental)) {
+      throw new ForbiddenException('Недостаточно прав для договора');
+    }
+    if (rental.agreement) {
+      return this.getRental(userId, userEmail, premiseId, rentalId);
+    }
+
+    const landlordName =
+      String(body.landlordName ?? '').trim() ||
+      rental.premise.theater?.title ||
+      rental.premise.studio?.title ||
+      rental.premise.troupe?.title ||
+      rental.premise.name;
+    const tenantName =
+      String(body.tenantName ?? '').trim() ||
+      rental.bookedAsTitle ||
+      rental.contactName ||
+      rental.contactEmail ||
+      'Арендатор';
+    const agreementNumber = `П-${new Date().getUTCFullYear()}-${Date.now()
+      .toString(36)
+      .toUpperCase()}`;
+    const termsSnapshot = {
+      premiseId,
+      usageType: rental.usageType,
+      recurrenceType: rental.recurrenceType,
+      title: rental.title,
+      purpose: rental.purpose,
+      startsOn: rental.startsOn.toISOString(),
+      endsOn: rental.endsOn?.toISOString() ?? null,
+      indefinite: rental.endsOn == null,
+      schedules: rental.schedules,
+      amountRub:
+        rental.slots[0]?.rentalAmountKopecks != null
+          ? rental.slots[0].rentalAmountKopecks / 100
+          : null,
+      monthlyAmountRub:
+        rental.monthlyAmountKopecks == null
+          ? null
+          : rental.monthlyAmountKopecks / 100,
+      paymentDueDay: rental.paymentDueDay,
+      contactEmail: rental.contactEmail,
+      contactName: rental.contactName,
+      contactPhone: rental.contactPhone,
+    };
+
+    await this.prisma.$transaction([
+      this.prisma.premiseRental.update({
+        where: { id: rentalId },
+        data: { agreementRequested: true },
+      }),
+      this.prisma.premiseRentalAgreement.create({
+        data: {
+          rentalId,
+          number: agreementNumber,
+          status: PremiseAgreementStatus.draft,
+          landlordName,
+          landlordDetails: body.landlordDetails?.trim() || null,
+          tenantName,
+          tenantDetails: body.tenantDetails?.trim() || null,
+          termsSnapshot: JSON.parse(
+            JSON.stringify(termsSnapshot),
+          ) as Prisma.InputJsonValue,
+        },
+      }),
+    ]);
+
     return this.getRental(userId, userEmail, premiseId, rentalId);
   }
 
@@ -1343,16 +1727,17 @@ export class PremisesService {
     if (!this.canEditRental(access, userEmail, rental)) {
       throw new ForbiddenException('Недостаточно прав для договора');
     }
+    const originalFileName = decodeMulterFileName(file.originalname);
     const isPdf =
       file.mimetype === 'application/pdf' ||
-      file.originalname.toLowerCase().endsWith('.pdf');
+      originalFileName.toLowerCase().endsWith('.pdf');
     if (!isPdf) {
       throw new BadRequestException('Разрешены только PDF-документы');
     }
     const stored = await this.agreementDocuments.storePdf({
       agreementId: rental.agreement.id,
       kind,
-      fileName: file.originalname,
+      fileName: originalFileName,
       buffer: file.buffer,
     });
 
@@ -1361,7 +1746,7 @@ export class PremisesService {
         data: {
           agreementId: rental.agreement!.id,
           kind,
-          fileName: file.originalname,
+          fileName: originalFileName,
           storageKey: stored.key,
           mimeType: 'application/pdf',
           sizeBytes: file.size,
@@ -1377,7 +1762,11 @@ export class PremisesService {
         });
         await tx.premiseRental.update({
           where: { id: rental.id },
-          data: { status: PremiseRentalStatus.active },
+          data: {
+            status: PremiseRentalStatus.active,
+            confirmedByEmail: normalizeEmail(userEmail),
+            confirmedAt: new Date(),
+          },
         });
         await tx.premiseSlot.updateMany({
           where: { rentalId: rental.id, status: PremiseSlotStatus.pending },
@@ -1493,7 +1882,9 @@ export class PremisesService {
           : email,
         contactName: body.contactName?.trim() || null,
         contactPhone: body.contactPhone?.trim() || null,
-        status: body.status ?? PremiseSlotStatus.confirmed,
+        status: access.canManage
+          ? (body.status ?? PremiseSlotStatus.confirmed)
+          : PremiseSlotStatus.pending,
         createdByEmail: email,
       },
       select: slotSelect,
@@ -1583,7 +1974,14 @@ export class PremisesService {
           ? null
           : String(body.contactPhone).trim() || null;
     }
-    if (body.status !== undefined) data.status = body.status;
+    if (body.status !== undefined) {
+      if (!access.canManage) {
+        throw new ForbiddenException(
+          'Статус брони может менять только хозяин или администратор',
+        );
+      }
+      data.status = body.status;
+    }
 
     const updated = await this.prisma.premiseSlot.update({
       where: { id: slotId },

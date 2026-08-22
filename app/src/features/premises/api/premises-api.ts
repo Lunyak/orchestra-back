@@ -2,6 +2,7 @@ import { orchestraApi } from "../../../shared/api/rtk/orchestra-api";
 import type {
   AddPremiseMemberPayload,
   CreatePremisePayload,
+  CreatePremiseRentalAgreementPayload,
   CreatePremiseRentalPayload,
   CreatePremiseSlotPayload,
   PremiseMembersResponse,
@@ -96,6 +97,24 @@ export const premisesApi = orchestraApi.injectEndpoints({
         url: `/premises/${encodeURIComponent(premiseId)}/rentals`,
         method: "POST",
         data: body,
+      }),
+      invalidatesTags: (_r, _e, { premiseId }) => [
+        { type: "PremiseSlots", id: premiseId },
+      ],
+    }),
+
+    createPremiseRentalAgreement: build.mutation<
+      PremiseRentalItem,
+      {
+        premiseId: string;
+        rentalId: string;
+        body?: CreatePremiseRentalAgreementPayload;
+      }
+    >({
+      query: ({ premiseId, rentalId, body }) => ({
+        url: `/premises/${encodeURIComponent(premiseId)}/rentals/${encodeURIComponent(rentalId)}/agreement`,
+        method: "POST",
+        data: body ?? {},
       }),
       invalidatesTags: (_r, _e, { premiseId }) => [
         { type: "PremiseSlots", id: premiseId },
@@ -308,6 +327,7 @@ export const {
   useListPremiseRentalsQuery,
   useGetPremiseRentalQuery,
   useCreatePremiseRentalMutation,
+  useCreatePremiseRentalAgreementMutation,
   useGeneratePremiseRentalAgreementMutation,
   useUpdatePremiseRentalPaymentMutation,
   useUpdatePremiseRentalStatusMutation,

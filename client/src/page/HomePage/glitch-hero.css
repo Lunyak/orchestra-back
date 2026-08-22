@@ -34,16 +34,19 @@
 .home-glitch__container::before {
   content: "";
   position: absolute;
-  top: -20px;
-  left: -20px;
-  right: -20px;
-  bottom: -20px;
-  /* background: radial-gradient(circle at 30% 50%,
-      rgba(255, 255, 255, 0.2) 0%,
-      transparent 50%); */
-  filter: blur(40px);
-  /* animation: home-glitch-glowPulse 3s infinite; */
+  top: -28%;
+  left: -12%;
+  right: -12%;
+  bottom: -28%;
+  background: radial-gradient(
+    ellipse 55% 50% at 50% 48%,
+    rgba(0, 251, 255, 0.28) 0%,
+    rgba(0, 180, 200, 0.1) 42%,
+    transparent 72%
+  );
+  filter: blur(28px);
   z-index: -1;
+  pointer-events: none;
 }
 
 .home-glitch__container::after {
@@ -54,24 +57,39 @@
 }
 
 .home-glitch__text {
+  font-family: var(--font-brand);
   font-size: clamp(32px, 12vw, 190px);
-  font-weight: 900;
-  color: #fff;
-  text-shadow:
-    2px 2px 4px rgba(253, 253, 253, 0.3),
-    0 0 20px rgba(152, 152, 152, 0.5);
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  text-shadow: var(--glow-strong);
   position: relative;
-  display: inline-block;
-  animation: home-glitch-skew 2s infinite;
-  letter-spacing: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  letter-spacing: 0.08em;
   max-width: 100%;
   text-align: center;
   line-height: 0.95;
-  white-space: normal;
-  overflow-wrap: normal;
-  word-break: normal;
-  hyphens: none;
-  margin: 0px auto 0;
+  white-space: nowrap;
+  margin: 0 auto;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+.home-page__glitch-hero--home .home-glitch__text {
+  animation: none;
+}
+
+.home-glitch__text--with-mark {
+  gap: 0.22em;
+}
+
+.home-glitch__letters {
+  position: relative;
+  display: inline-block;
+  letter-spacing: inherit;
 }
 
 .home-glitch__textBase {
@@ -79,29 +97,43 @@
   z-index: 1;
 }
 
-/* Scanlines: visible only inside glyphs */
+.home-glitch__triangle {
+  display: block;
+  width: 0.88em;
+  height: 0.76em;
+  flex-shrink: 0;
+  color: inherit;
+  filter: drop-shadow(0 0 6px rgba(0, 251, 255, 0.75)) drop-shadow(0 0 16px rgba(0, 251, 255, 0.35));
+  transform: translateY(0.03em);
+  shape-rendering: geometricPrecision;
+}
+
 .home-glitch__textScan {
+  display: none;
+}
+
+.home-page__glitch-hero--page .home-glitch__textScan,
+.home-page__glitch-hero--bands:not(.home-page__glitch-hero--home) .home-glitch__textScan {
+  display: block;
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   user-select: none;
-
   color: transparent;
   -webkit-text-fill-color: transparent;
   background: repeating-linear-gradient(
     to bottom,
     transparent 0,
     transparent 2px,
-    rgb(0 0 0 / 0.3) 1px,
-    rgb(0 0 0 / 0.3) 3px
+    rgb(0 0 0 / 0.22) 1px,
+    rgb(0 0 0 / 0.22) 3px
   );
   background-size: 100% 4px;
-  background-position: 0 0;
   -webkit-background-clip: text;
   background-clip: text;
   mix-blend-mode: multiply;
-  opacity: 0.9;
+  opacity: 0.45;
 }
 
 /* Prefer container units when supported (prevents mid-word wrapping like "ЖЕЛЕЗНОВ" + "А") */
@@ -149,13 +181,68 @@
 
 .home-page__glitch-hero--bands .home-glitch__text {
   margin: 0 auto;
-  font-family: "HouseBroken", "Russo One", sans-serif;
-  font-weight: 500;
+  font-family: var(--font-brand);
+  font-weight: 700;
   font-size: clamp(52px, 12vw, 160px);
-  letter-spacing: 0.06em;
-  text-shadow:
-    2px 2px 0 rgba(184, 53, 74, 0.35),
-    0 0 28px rgba(152, 152, 152, 0.35);
+  letter-spacing: 0.08em;
+  text-shadow: var(--glow-strong);
+  animation: home-spotlight-glow 6s ease-in-out infinite;
+}
+
+.home-page__glitch-hero--bands .home-glitch__text--with-mark {
+  gap: 0.22em;
+}
+
+.home-page__glitch-hero--bands .home-glitch__triangle {
+  filter:
+    drop-shadow(0 0 8px rgba(0, 251, 255, 0.8))
+    drop-shadow(0 0 22px rgba(0, 251, 255, 0.4));
+}
+
+.home-page__glitch-hero--home.home-page__glitch-hero--bands .home-glitch__text {
+  animation: home-spotlight-glow 6s ease-in-out infinite;
+}
+
+.home-page__glitch-hero--home.home-page__glitch-hero--bands .home-glitch__letters::before,
+.home-page__glitch-hero--home.home-page__glitch-hero--bands .home-glitch__letters::after {
+  display: none;
+}
+
+.home-page__glitch-hero--home.home-page__glitch-hero--bands .home-glitch__textScan {
+  display: none;
+}
+
+.home-page__glitch-hero--home .home-glitch__container::before {
+  background: radial-gradient(
+    ellipse 60% 48% at 50% 50%,
+    rgba(0, 251, 255, 0.16) 0%,
+    transparent 70%
+  );
+  filter: blur(20px);
+}
+
+@keyframes home-spotlight-glow {
+  0%,
+  100% {
+    text-shadow:
+      0 0 2px rgba(0, 251, 255, 0.95),
+      0 0 18px rgba(0, 251, 255, 0.5),
+      0 0 40px rgba(0, 251, 255, 0.25);
+  }
+
+  50% {
+    text-shadow:
+      0 0 2px rgba(0, 251, 255, 1),
+      0 0 22px rgba(0, 251, 255, 0.6),
+      0 0 52px rgba(0, 251, 255, 0.32);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-page__glitch-hero--bands .home-glitch__text,
+  .home-page__glitch-hero--home.home-page__glitch-hero--bands .home-glitch__text {
+    animation: none;
+  }
 }
 
 @supports (font-size: 1cqw) {
@@ -175,8 +262,8 @@
   letter-spacing: clamp(2px, 0.7cqw, 8px);
 }
 
-.home-glitch__text::before,
-.home-glitch__text::after {
+.home-glitch__letters::before,
+.home-glitch__letters::after {
   content: attr(data-text);
   position: absolute;
   top: 0;
@@ -186,17 +273,16 @@
   background: #fff0;
 }
 
-.home-glitch__text::before {
+.home-glitch__letters::before {
   animation: home-glitch-1 0.8s infinite linear alternate-reverse;
-  color: #e94560;
-  text-shadow: 2px 0 0 #4e9eff, -2px 0 0 lime;
+  color: #7dfeff;
+  text-shadow: 2px 0 0 #00fbff, -2px 0 0 #0099aa;
   z-index: -1;
 }
 
-.home-glitch__text::after {
-  /* animation: home-glitch-2 0.8s infinite linear alternate-reverse; */
-  color: #4e9eff;
-  text-shadow: 2px 0 0 #e94560, -2px 0 0 #ff0;
+.home-glitch__letters::after {
+  color: #00c8d4;
+  text-shadow: 2px 0 0 #00fbff, -2px 0 0 #004a55;
   z-index: -2;
 }
 
@@ -220,8 +306,8 @@
   animation: home-glitch-skew 1s infinite;
 }
 
-.home-glitch__text:hover::before,
-.home-glitch__text:hover::after {
+.home-glitch__text:hover .home-glitch__letters::before,
+.home-glitch__text:hover .home-glitch__letters::after {
   animation-duration: 0.3s;
 }
 
@@ -229,14 +315,14 @@
 .home-page[data-effects="on"] .home-page__glitch-hero::before,
 .home-page[data-effects="on"] .home-glitch__container::before,
 .home-page[data-effects="on"] .home-glitch__text,
-.home-page[data-effects="on"] .home-glitch__text::before {
+.home-page[data-effects="on"] .home-glitch__letters::before {
   animation-play-state: paused;
 }
 
 .home-page[data-effects="on"] .home-page__glitch-hero:hover::before,
 .home-page[data-effects="on"] .home-page__glitch-hero:hover .home-glitch__container::before,
 .home-page[data-effects="on"] .home-page__glitch-hero:hover .home-glitch__text,
-.home-page[data-effects="on"] .home-page__glitch-hero:hover .home-glitch__text::before {
+.home-page[data-effects="on"] .home-page__glitch-hero:hover .home-glitch__letters::before {
   animation-play-state: running;
 }
 
@@ -250,8 +336,8 @@
   .home-page__glitch-hero::before,
   .home-glitch__container::before,
   .home-glitch__text,
-  .home-glitch__text::before,
-  .home-glitch__text::after {
+  .home-glitch__letters::before,
+  .home-glitch__letters::after {
     animation: none !important;
   }
 
@@ -264,13 +350,13 @@
       -2px 0 0 rgb(78 158 255 / 0.85);
   } */
 
-  .home-glitch__text::before {
+  .home-glitch__letters::before {
     clip-path: inset(0 0 55% 0);
     transform: translate(-2px, -1px);
     opacity: 0.95;
   }
 
-  .home-glitch__text::after {
+  .home-glitch__letters::after {
     clip-path: inset(45% 0 0 0);
     transform: translate(2px, 1px);
     opacity: 0.9;

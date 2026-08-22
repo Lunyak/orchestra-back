@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
@@ -107,7 +108,7 @@ export function PremisesIndexPanel({
       ) : null}
 
       {isLoading ? (
-        <p className="premises-index__status">Загрузка помещений…</p>
+        <PageLoader variant="view" label="Загрузка помещений…" />
       ) : error ? (
         <p className="premises-index__error" role="alert">
           Не удалось загрузить помещения

@@ -2,11 +2,14 @@ import {
   CalendarSection,
   type CalendarSectionState,
 } from "@shared/components/calendar/CalendarSection";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
+import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
+import { MiniAvatar } from "@shared/core/mini-avatar/MiniAvatar";
 import { Modal } from "@shared/core/modal/Modal";
 import cn from "classnames";
 import dayjs from "dayjs";
@@ -20,12 +23,19 @@ import {
 } from "../../app/router/paths";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import { useAuth } from "../../features/auth";
-import { useMyProfileQuery } from "../../features/profile/api/profile-api";
 import {
-  formatSlotTime,
+  useMyProfileQuery,
+  useProfilesBatchQuery,
+} from "../../features/profile/api/profile-api";
+import type { TeamProfile } from "../../sync/api/profile";
+import { BookedAsGlyph } from "../../features/premises/ui/BookedAsBadge";
+import {
+  agreementDocumentKindLabel,
+  decodeUploadedFileName,
   fromDatetimeLocalValue,
   isoDate,
   monthRangeIso,
+  premiseBookedAsKindLabel,
   premiseKindLabel,
   premiseMemberRoleLabel,
   slotDotsByDate,
@@ -34,6 +44,7 @@ import {
   toDatetimeLocalValue,
   useAddPremiseMemberMutation,
   useCreatePremiseRentalMutation,
+  useCreatePremiseRentalAgreementMutation,
   useDeletePremiseMutation,
   useDeletePremiseSlotMutation,
   useGetPremiseQuery,
@@ -53,6 +64,8 @@ import type {
   CreatePremiseSlotPayload,
   CreatePremiseRentalPayload,
   PremiseAvailabilityDay,
+  PremiseBookedAsKind,
+  PremiseBookingActor,
   PremiseKind,
   PremiseMemberRole,
   PremiseSlotPaymentStatus,
@@ -204,19 +217,83 @@ type SlotFormState = {
   rentalAmountRub: string;
   paymentDueDay: string;
   paymentStatus: PremiseSlotPaymentStatus;
-  agreementRequested: boolean;
-  landlordName: string;
-  landlordDetails: string;
-  tenantName: string;
-  tenantDetails: string;
   contactEmail: string;
   contactName: string;
   contactPhone: string;
+  bookedAsKind: PremiseBookedAsKind;
+  bookedAsId: string;
+  bookedAsTitle: string;
   status: PremiseSlotStatus;
 };
 
-function emptySlotForm(dayIso: string): SlotFormState {
+function pickDefaultBookingActor(
+  actors: PremiseBookingActor[],
+): PremiseBookingActor | null {
+  if (actors.length === 0) return null;
+  const preferred =
+    actors.find((actor) => actor.kind === "theater") ??
+    actors.find((actor) => actor.kind === "studio") ??
+    actors.find((actor) => actor.kind === "troupe") ??
+    actors.find((actor) => actor.kind === "user") ??
+    actors[0];
+  return preferred ?? null;
+}
+
+function bookingActorValue(actor: PremiseBookingActor): string {
+  return `${actor.kind}:${actor.id ?? ""}`;
+}
+
+function parseBookingActorValue(value: string): {
+  kind: PremiseBookedAsKind;
+  id: string;
+} {
+  const separatorIndex = value.indexOf(":");
+  if (separatorIndex < 0) {
+    return { kind: "user", id: "" };
+  }
+  const kind = value.slice(0, separatorIndex) as PremiseBookedAsKind;
+  const id = value.slice(separatorIndex + 1);
+  return { kind, id };
+}
+
+function creatorContactDefaults(profile: {
+  email?: string | null;
+  displayName?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+} | null | undefined): {
+  contactName: string;
+  contactEmail: string;
+  contactPhone: string;
+} {
+  const email = String(profile?.email ?? "").trim();
+  const displayName = String(profile?.displayName ?? "").trim();
+  const fullName = [profile?.firstName, profile?.lastName]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+  return {
+    contactName: displayName || fullName,
+    contactEmail: email,
+    contactPhone: String(profile?.phone ?? "").trim(),
+  };
+}
+
+function emptySlotForm(
+  dayIso: string,
+  actors: PremiseBookingActor[] = [],
+  creator?: {
+    email?: string | null;
+    displayName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string | null;
+  } | null,
+): SlotFormState {
   const base = dayjs(dayIso).hour(10).minute(0).second(0).millisecond(0);
+  const defaultActor = pickDefaultBookingActor(actors);
+  const contact = creatorContactDefaults(creator);
   return {
     usageType: "internal",
     recurrenceType: "once",
@@ -232,14 +309,12 @@ function emptySlotForm(dayIso: string): SlotFormState {
     rentalAmountRub: "",
     paymentDueDay: "",
     paymentStatus: "unpaid",
-    agreementRequested: false,
-    landlordName: "",
-    landlordDetails: "",
-    tenantName: "",
-    tenantDetails: "",
-    contactEmail: "",
-    contactName: "",
-    contactPhone: "",
+    contactEmail: contact.contactEmail,
+    contactName: contact.contactName,
+    contactPhone: contact.contactPhone,
+    bookedAsKind: defaultActor?.kind ?? "user",
+    bookedAsId: defaultActor?.id ?? "",
+    bookedAsTitle: defaultActor?.title ?? "",
     status: "confirmed",
   };
 }
@@ -264,14 +339,12 @@ function slotToForm(slot: PremiseSlotItem): SlotFormState {
       slot.rentalAmountRub == null ? "" : String(slot.rentalAmountRub),
     paymentDueDay: "",
     paymentStatus: slot.paymentStatus,
-    agreementRequested: slot.rental?.agreementRequested ?? false,
-    landlordName: "",
-    landlordDetails: "",
-    tenantName: slot.contactName ?? "",
-    tenantDetails: "",
     contactEmail: slot.contactEmail ?? "",
     contactName: slot.contactName ?? "",
     contactPhone: slot.contactPhone ?? "",
+    bookedAsKind: slot.rental?.bookedAsKind ?? "user",
+    bookedAsId: slot.rental?.bookedAsId ?? "",
+    bookedAsTitle: slot.rental?.bookedAsTitle ?? "",
     status: slot.status,
   };
 }
@@ -281,6 +354,10 @@ function paymentStatusLabel(status: PremiseSlotPaymentStatus): string {
     paymentStatusOptions.find((option) => option.value === status)?.label ??
     status
   );
+}
+
+function slotBookingRentalId(slot: PremiseSlotItem): string | null {
+  return slot.rentalId ?? slot.rental?.id ?? null;
 }
 
 function usageTypeLabel(usageType: PremiseUsageType): string {
@@ -408,47 +485,199 @@ function formatRubles(amountRub: number): string {
   return `${amountRub.toLocaleString("ru-RU")} ₽`;
 }
 
-type SlotContactItem = {
-  type: "name" | "phone" | "email";
-  value: string;
-};
-
-function getSlotContactItems(slot: PremiseSlotItem): SlotContactItem[] {
-  const candidates: SlotContactItem[] = [
-    { type: "name", value: slot.contactName?.trim() ?? "" },
-    { type: "phone", value: slot.contactPhone?.trim() ?? "" },
-    { type: "email", value: slot.contactEmail?.trim() ?? "" },
-  ];
-  const seenValues = new Set<string>();
-
-  return candidates.filter((item) => {
-    const normalizedValue = item.value.toLocaleLowerCase("ru-RU");
-    if (!normalizedValue || seenValues.has(normalizedValue)) return false;
-    seenValues.add(normalizedValue);
-    return true;
-  });
-}
-
-function PremiseSlotContact({ slot }: { slot: PremiseSlotItem }) {
-  const contactItems = getSlotContactItems(slot);
-  if (contactItems.length === 0) return null;
+function PremiseSlotActorMark({
+  kind,
+  title,
+  avatarUrl,
+  size = 26,
+}: {
+  kind: PremiseBookedAsKind;
+  title: string;
+  avatarUrl: string | null;
+  size?: number;
+}) {
+  if (kind === "user") {
+    return <MiniAvatar src={avatarUrl} label={title} size={size} />;
+  }
 
   return (
-    <div className="sessions-slots-readonly__notes">
-      <b>Контакт:</b>
-      <span className="premises-slot-contact">
-        {contactItems.map((item) => (
-          <span
-            key={`${item.type}-${item.value}`}
-            className={cn(
-              "premises-slot-contact__item",
-              item.type === "phone" && "premises-slot-contact__item--phone",
-            )}
-          >
-            {item.value}
-          </span>
-        ))}
-      </span>
+    <span
+      className={cn(
+        "premises-slot-row__actor-mark",
+        kind === "theater" && "premises-slot-row__actor-mark--theater",
+        kind === "troupe" && "premises-slot-row__actor-mark--troupe",
+        kind === "studio" && "premises-slot-row__actor-mark--studio",
+        kind === "external" && "premises-slot-row__actor-mark--external",
+      )}
+      aria-hidden
+    >
+      <BookedAsGlyph kind={kind} />
+    </span>
+  );
+}
+
+function getPremiseSlotActorLabel(
+  slot: PremiseSlotItem,
+  profileByEmail: Map<string, TeamProfile>,
+): string {
+  const rental = slot.rental;
+  const bookedTitle = String(rental?.bookedAsTitle ?? "").trim();
+  const bookedKind = rental?.bookedAsKind ?? "user";
+  const isOrgBooking = bookedKind !== "user" && Boolean(bookedTitle);
+  if (isOrgBooking) return bookedTitle;
+
+  const createdByEmail =
+    rental?.createdByEmail?.trim() || slot.createdByEmail.trim();
+  if (!createdByEmail) return bookedTitle;
+
+  const profile = profileByEmail.get(normalizeMemberEmail(createdByEmail));
+  const { name } = resolvePremiseMemberLabel(createdByEmail, profile);
+  return bookedTitle || name;
+}
+
+function PremiseSlotActor({
+  slot,
+  profileByEmail,
+  compact = false,
+  hideName = false,
+}: {
+  slot: PremiseSlotItem;
+  profileByEmail: Map<string, TeamProfile>;
+  compact?: boolean;
+  hideName?: boolean;
+}) {
+  const rental = slot.rental;
+  const bookedKind = rental?.bookedAsKind ?? "user";
+  const bookedTitle = String(rental?.bookedAsTitle ?? "").trim();
+  const isOrgBooking = bookedKind !== "user" && Boolean(bookedTitle);
+  const markSize = compact ? 26 : 52;
+  const actorClassName = cn(
+    "premises-slot-row__actor",
+    compact && "premises-slot-row__actor--compact",
+    hideName && "premises-slot-row__actor--avatar-only",
+  );
+
+  if (isOrgBooking) {
+    return (
+      <div className={actorClassName} title={bookedTitle}>
+        <PremiseSlotActorMark
+          kind={bookedKind}
+          title={bookedTitle}
+          avatarUrl={null}
+          size={markSize}
+        />
+        {hideName ? null : (
+          <span className="premises-slot-row__actor-name">{bookedTitle}</span>
+        )}
+      </div>
+    );
+  }
+
+  const createdByEmail =
+    rental?.createdByEmail?.trim() || slot.createdByEmail.trim();
+  if (!createdByEmail) return null;
+
+  const profile = profileByEmail.get(normalizeMemberEmail(createdByEmail));
+  const { name } = resolvePremiseMemberLabel(createdByEmail, profile);
+  const avatarUrl = String(profile?.avatarUrl ?? "").trim() || null;
+  const displayName = bookedTitle || name;
+
+  return (
+    <div className={actorClassName} title={displayName}>
+      <PremiseSlotActorMark
+        kind="user"
+        title={displayName}
+        avatarUrl={avatarUrl}
+        size={markSize}
+      />
+      {hideName ? null : (
+        <span className="premises-slot-row__actor-name">{displayName}</span>
+      )}
+    </div>
+  );
+}
+
+function PremiseSlotPeople({
+  slot,
+  profileByEmail,
+}: {
+  slot: PremiseSlotItem;
+  profileByEmail: Map<string, TeamProfile>;
+}) {
+  const confirmedByEmail = slot.rental?.confirmedByEmail?.trim() || "";
+  const confirmedByLabel = confirmedByEmail
+    ? resolvePremiseMemberLabel(
+        confirmedByEmail,
+        profileByEmail.get(normalizeMemberEmail(confirmedByEmail)),
+      ).name
+    : "";
+  const showConfirmed =
+    Boolean(confirmedByLabel) &&
+    (slot.status === "confirmed" || slot.rental?.status === "active");
+
+  if (!showConfirmed) return null;
+
+  return (
+    <div className="premises-slot-row__people">
+      <div className="sessions-slots-readonly__notes">
+        <b>Подтвердил:</b> {confirmedByLabel}
+      </div>
+    </div>
+  );
+}
+
+function PremiseRentalPeople({
+  rental,
+  profileByEmail,
+}: {
+  rental: PremiseRentalItem;
+  profileByEmail: Map<string, TeamProfile>;
+}) {
+  const bookedKind = rental.bookedAsKind ?? "user";
+  const bookedTitle = String(rental.bookedAsTitle ?? "").trim();
+  const isOrgBooking = bookedKind !== "user" && Boolean(bookedTitle);
+
+  const createdByEmail = rental.createdByEmail.trim();
+  const creatorProfile = createdByEmail
+    ? profileByEmail.get(normalizeMemberEmail(createdByEmail))
+    : undefined;
+  const creatorName = createdByEmail
+    ? resolvePremiseMemberLabel(createdByEmail, creatorProfile).name
+    : "";
+  const actorTitle = isOrgBooking ? bookedTitle : bookedTitle || creatorName;
+  const actorAvatarUrl = isOrgBooking
+    ? null
+    : String(creatorProfile?.avatarUrl ?? "").trim() || null;
+
+  const confirmedByEmail = rental.confirmedByEmail?.trim() || "";
+  const confirmedByLabel = confirmedByEmail
+    ? resolvePremiseMemberLabel(
+        confirmedByEmail,
+        profileByEmail.get(normalizeMemberEmail(confirmedByEmail)),
+      ).name
+    : "";
+  const showConfirmed =
+    Boolean(confirmedByLabel) && rental.status === "active";
+
+  if (!actorTitle && !showConfirmed) return null;
+
+  const actorKind = isOrgBooking ? bookedKind : "user";
+
+  return (
+    <div className="premises-slot-row__people">
+      {actorTitle ? (
+        <div className="premises-slot-row__actor" title={actorTitle}>
+          <PremiseSlotActorMark
+            kind={actorKind}
+            title={actorTitle}
+            avatarUrl={actorAvatarUrl}
+          />
+          <span className="premises-slot-row__actor-name">{actorTitle}</span>
+        </div>
+      ) : null}
+      {showConfirmed ? (
+        <div className="rehearsals-muted">Подтвердил: {confirmedByLabel}</div>
+      ) : null}
     </div>
   );
 }
@@ -479,6 +708,28 @@ function getOrganizationInitials(title: string): string {
     .map((word) => word[0])
     .join("")
     .toLocaleUpperCase("ru-RU");
+}
+
+function normalizeMemberEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function resolvePremiseMemberLabel(
+  email: string,
+  profile: TeamProfile | undefined,
+): { name: string; secondary: string | null } {
+  const displayName = String(profile?.displayName ?? "").trim();
+  if (displayName) {
+    return { name: displayName, secondary: email };
+  }
+  const fullName = [profile?.firstName, profile?.lastName]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ");
+  if (fullName) {
+    return { name: fullName, secondary: email };
+  }
+  return { name: email, secondary: null };
 }
 
 function calculateFreeIntervals(
@@ -591,6 +842,18 @@ export function PremiseDetailPage() {
   const [rentalActionError, setRentalActionError] = useState<string | null>(
     null,
   );
+  const [expandedSlotIds, setExpandedSlotIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+
+  function toggleSlotExpanded(slotId: string) {
+    setExpandedSlotIds((current) => {
+      const next = new Set(current);
+      if (next.has(slotId)) next.delete(slotId);
+      else next.add(slotId);
+      return next;
+    });
+  }
 
   const range = useMemo(() => {
     const calendarRange = calendarState
@@ -627,9 +890,50 @@ export function PremiseDetailPage() {
   const { data: rentalsData } = useListPremiseRentalsQuery(premiseId, {
     skip: !accessToken || !premiseId,
   });
+  const memberEmails = useMemo(() => {
+    const unique = new Set<string>();
+    for (const member of membersData?.members ?? []) {
+      const email = normalizeMemberEmail(member.email);
+      if (email) unique.add(email);
+    }
+    return Array.from(unique).sort();
+  }, [membersData?.members]);
+  const slotPeopleEmails = useMemo(() => {
+    const unique = new Set<string>();
+    for (const slot of slotsData?.slots ?? []) {
+      const createdBy =
+        slot.rental?.createdByEmail?.trim() || slot.createdByEmail.trim();
+      if (createdBy) unique.add(normalizeMemberEmail(createdBy));
+      const confirmedBy = slot.rental?.confirmedByEmail?.trim();
+      if (confirmedBy) unique.add(normalizeMemberEmail(confirmedBy));
+    }
+    for (const rental of rentalsData?.rentals ?? []) {
+      const createdBy = rental.createdByEmail.trim();
+      if (createdBy) unique.add(normalizeMemberEmail(createdBy));
+      const confirmedBy = rental.confirmedByEmail?.trim();
+      if (confirmedBy) unique.add(normalizeMemberEmail(confirmedBy));
+    }
+    return Array.from(unique).sort();
+  }, [rentalsData?.rentals, slotsData?.slots]);
+  const profileEmails = useMemo(() => {
+    const unique = new Set<string>([...memberEmails, ...slotPeopleEmails]);
+    return Array.from(unique).sort();
+  }, [memberEmails, slotPeopleEmails]);
+  const { data: memberProfiles = [] } = useProfilesBatchQuery(profileEmails, {
+    skip: !accessToken || profileEmails.length === 0,
+  });
+  const memberProfileByEmail = useMemo(() => {
+    const map = new Map<string, TeamProfile>();
+    for (const profile of memberProfiles) {
+      const email = normalizeMemberEmail(profile.email);
+      if (email) map.set(email, profile);
+    }
+    return map;
+  }, [memberProfiles]);
 
   const [createRental, { isLoading: creatingRental }] =
     useCreatePremiseRentalMutation();
+  const [createAgreement] = useCreatePremiseRentalAgreementMutation();
   const [generateAgreement] = useGeneratePremiseRentalAgreementMutation();
   const [updateRentalPayment] = useUpdatePremiseRentalPaymentMutation();
   const [updateRentalStatus] = useUpdatePremiseRentalStatusMutation();
@@ -692,6 +996,20 @@ export function PremiseDetailPage() {
     0,
   );
   const canManagePremise = premise?.canManage ?? false;
+  const bookingActors = premise?.bookingActors ?? [];
+  const bookingActorOptions = useMemo(
+    () =>
+      bookingActors.map((actor) => ({
+        value: bookingActorValue(actor),
+        label: `${premiseBookedAsKindLabel(actor.kind)} · ${actor.title}`,
+      })),
+    [bookingActors],
+  );
+  const selectedBookingActorValue = bookingActorValue({
+    kind: slotForm.bookedAsKind,
+    id: slotForm.bookedAsId || null,
+    title: slotForm.bookedAsTitle,
+  });
 
   useEffect(() => {
     if (!premise) return;
@@ -720,17 +1038,7 @@ export function PremiseDetailPage() {
   }
 
   if (premiseLoading) {
-    return (
-      <div className="app-layout premises-layout">
-        <div className="app-content">
-          <main className="main-content main-content-premises">
-            <div className="premises-view">
-              <div className="rehearsals-muted">Загрузка…</div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Загрузка…" />;
   }
 
   if (premiseError || !premise) {
@@ -754,14 +1062,14 @@ export function PremiseDetailPage() {
 
   function openCreateSlot() {
     setEditingSlot(null);
-    setSlotForm(emptySlotForm(selectedDate));
+    setSlotForm(emptySlotForm(selectedDate, bookingActors, myProfile));
     setSlotError(null);
     setSlotModalOpen(true);
   }
 
   function openCreateSlotForInterval(interval: FreePremiseInterval) {
     setEditingSlot(null);
-    const form = emptySlotForm(selectedDate);
+    const form = emptySlotForm(selectedDate, bookingActors, myProfile);
     const schedules = form.schedules.map((day) =>
       day.weekday === interval.startsAt.day()
         ? {
@@ -854,9 +1162,6 @@ export function PremiseDetailPage() {
             dayjs(slotForm.periodEndsOn).isBefore(
               dayjs(slotForm.periodStartsOn),
             ))));
-    const hasMissingAgreementParties =
-      slotForm.agreementRequested &&
-      (!slotForm.landlordName.trim() || !slotForm.tenantName.trim());
     if (
       !slotForm.title.trim() ||
       (needsOneTimeDuration &&
@@ -866,8 +1171,7 @@ export function PremiseDetailPage() {
       hasInvalidPeriod ||
       (isRecurring && (enabledSchedules.length === 0 || hasInvalidSchedule)) ||
       (isCommercial && rentalAmountRub == null) ||
-      (isCommercial && isRecurring && paymentDueDay == null) ||
-      hasMissingAgreementParties
+      (isCommercial && isRecurring && paymentDueDay == null)
     ) {
       setSlotError("Проверьте обязательные поля аренды и расписание");
       return;
@@ -918,6 +1222,18 @@ export function PremiseDetailPage() {
           contactEmail: slotForm.contactEmail.trim() || undefined,
           contactName: slotForm.contactName.trim() || undefined,
           contactPhone: slotForm.contactPhone.trim() || undefined,
+          bookedAsKind: slotForm.bookedAsKind,
+          ...(slotForm.bookedAsId
+            ? { bookedAsId: slotForm.bookedAsId }
+            : {}),
+          ...(slotForm.bookedAsKind === "external"
+            ? {
+                bookedAsTitle:
+                  slotForm.bookedAsTitle.trim() ||
+                  slotForm.contactName.trim() ||
+                  undefined,
+              }
+            : {}),
           startsOn: `${startsOn}T00:00:00.000Z`,
           timezoneOffsetMin: new Date().getTimezoneOffset(),
           ...(isRecurring
@@ -941,15 +1257,6 @@ export function PremiseDetailPage() {
                   paymentDueDay: paymentDueDay ?? undefined,
                 }
               : { amountRub: rentalAmountRub ?? undefined }
-            : {}),
-          agreementRequested: slotForm.agreementRequested,
-          ...(slotForm.agreementRequested
-            ? {
-                landlordName: slotForm.landlordName.trim(),
-                landlordDetails: slotForm.landlordDetails.trim() || undefined,
-                tenantName: slotForm.tenantName.trim(),
-                tenantDetails: slotForm.tenantDetails.trim() || undefined,
-              }
             : {}),
         };
         await createRental({ premiseId, body: rentalBody }).unwrap();
@@ -1036,6 +1343,31 @@ export function PremiseDetailPage() {
     }
   }
 
+  async function handleCreateAgreement(rental: PremiseRentalItem) {
+    setRentalActionId(rental.id);
+    setRentalActionError(null);
+    try {
+      await createAgreement({
+        premiseId,
+        rentalId: rental.id,
+        body: {
+          landlordName: premise?.ownerTitle || premise?.name,
+          tenantName:
+            rental.bookedAsTitle ||
+            rental.contactName ||
+            rental.contactEmail ||
+            undefined,
+        },
+      }).unwrap();
+    } catch (error: unknown) {
+      setRentalActionError(
+        extractError(error, "Не удалось оформить договор"),
+      );
+    } finally {
+      setRentalActionId(null);
+    }
+  }
+
   async function handleGenerateAgreement(rentalId: string) {
     setRentalActionId(rentalId);
     setRentalActionError(null);
@@ -1071,6 +1403,39 @@ export function PremiseDetailPage() {
     } catch (error: unknown) {
       setRentalActionError(
         extractError(error, "Не удалось изменить статус аренды"),
+      );
+    } finally {
+      setRentalActionId(null);
+    }
+  }
+
+  async function handleBookingRequestReview(
+    rentalId: string,
+    status: "active" | "cancelled",
+    title: string,
+  ) {
+    if (
+      status === "cancelled" &&
+      !confirm(`Отклонить заявку «${title}»?`)
+    ) {
+      return;
+    }
+    setRentalActionId(rentalId);
+    setRentalActionError(null);
+    try {
+      await updateRentalStatus({
+        premiseId,
+        rentalId,
+        status,
+      }).unwrap();
+    } catch (error: unknown) {
+      setRentalActionError(
+        extractError(
+          error,
+          status === "active"
+            ? "Не удалось подтвердить заявку"
+            : "Не удалось отклонить заявку",
+        ),
       );
     } finally {
       setRentalActionId(null);
@@ -1130,7 +1495,7 @@ export function PremiseDetailPage() {
       const objectUrl = URL.createObjectURL(response.data);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
-      anchor.download = fileName;
+      anchor.download = decodeUploadedFileName(fileName);
       anchor.click();
       URL.revokeObjectURL(objectUrl);
     } catch (error: unknown) {
@@ -1311,31 +1676,55 @@ export function PremiseDetailPage() {
                                 </span>
                               </div>
                               <ul className="premises-tracking-list">
-                                {group.slots.map((slot) => (
-                                  <li
-                                    key={slot.id}
-                                    className="premises-tracking-item"
-                                  >
-                                    <button
-                                      type="button"
-                                      className="premises-tracking-item__main"
-                                      onClick={() => {
-                                        setActiveTab("schedule");
-                                        openEditSlot(slot);
-                                      }}
+                                {group.slots.map((slot) => {
+                                  const slotStart = dayjs(slot.startsAt);
+                                  const slotEnd = slotStart.add(
+                                    slot.durationMin,
+                                    "minute",
+                                  );
+                                  const showDateInItem =
+                                    group.id === "week" || group.id === "month";
+                                  const dateLabel = showDateInItem
+                                    ? slotStart.format("D MMM").replace(/\.$/, "")
+                                    : "";
+                                  const timeLabel = `${slotStart.format("HH:mm")} – ${slotEnd.format("HH:mm")}`;
+
+                                  return (
+                                    <li
+                                      key={slot.id}
+                                      className="premises-tracking-item"
                                     >
-                                      <span className="premises-tracking-item__time">
-                                        {dayjs(slot.startsAt).format(
-                                          "D MMM, HH:mm",
-                                        )}
-                                      </span>
-                                      <strong>{slot.title}</strong>
-                                      <span className="rehearsals-muted">
-                                        {formatSlotTime(slot)}
-                                      </span>
-                                    </button>
-                                  </li>
-                                ))}
+                                      <button
+                                        type="button"
+                                        className="premises-tracking-item__main"
+                                        onClick={() => {
+                                          setActiveTab("schedule");
+                                          openEditSlot(slot);
+                                        }}
+                                      >
+                                        <span className="premises-tracking-item__when">
+                                          {dateLabel ? (
+                                            <>
+                                              <span className="premises-tracking-item__date">
+                                                {dateLabel}
+                                              </span>
+                                              <span
+                                                className="premises-tracking-item__divider"
+                                                aria-hidden="true"
+                                              />
+                                            </>
+                                          ) : null}
+                                          <span className="premises-tracking-item__time">
+                                            {timeLabel}
+                                          </span>
+                                        </span>
+                                        <strong className="premises-tracking-item__title">
+                                          {slot.title}
+                                        </strong>
+                                      </button>
+                                    </li>
+                                  );
+                                })}
                               </ul>
                             </section>
                           ))}
@@ -1351,34 +1740,132 @@ export function PremiseDetailPage() {
                       <div className="rehearsals-card-title">
                         Требуют внимания
                       </div>
-                      {pendingSlots.length ? (
-                        <ul className="premises-tracking-list">
-                          {pendingSlots.map((slot) => (
-                            <li
-                              key={slot.id}
-                              className="premises-tracking-item"
-                            >
-                              <button
-                                type="button"
-                                className="premises-tracking-item__main"
-                                onClick={() => openEditSlot(slot)}
-                              >
-                                <span className="premises-tracking-item__time">
-                                  {dayjs(slot.startsAt).format("D MMM, HH:mm")}
-                                </span>
-                                <strong>{slot.title}</strong>
-                                <span className="premises-tracking-item__status">
-                                  Ожидает подтверждения
-                                </span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="premises-overview__empty rehearsals-muted">
-                          Нет заявок, ожидающих подтверждения.
+                      <section className="premises-attention-section">
+                        <div className="premises-attention-section__title">
+                          Заявки на бронь
+                          {pendingSlots.length ? (
+                            <span className="premises-attention-section__count">
+                              {pendingSlots.length}
+                            </span>
+                          ) : null}
                         </div>
-                      )}
+                        {pendingSlots.length ? (
+                          <ul className="premises-tracking-list">
+                            {pendingSlots.map((slot) => {
+                              const bookingRentalId = slotBookingRentalId(slot);
+                              const slotStart = dayjs(slot.startsAt);
+                              const slotEnd = slotStart.add(
+                                slot.durationMin,
+                                "minute",
+                              );
+                              const dateLabel = slotStart
+                                .format("D MMM")
+                                .replace(/\.$/, "");
+                              const timeLabel = `${slotStart.format("HH:mm")} – ${slotEnd.format("HH:mm")}`;
+                              const contactPhone =
+                                slot.contactPhone?.trim() || "";
+                              const actorLabel = getPremiseSlotActorLabel(
+                                slot,
+                                memberProfileByEmail,
+                              );
+
+                              return (
+                                <li
+                                  key={slot.id}
+                                  className="premises-tracking-item premises-tracking-item--request"
+                                >
+                                  <button
+                                    type="button"
+                                    className="premises-tracking-item__main"
+                                    onClick={() => {
+                                      setActiveTab("schedule");
+                                      openEditSlot(slot);
+                                    }}
+                                  >
+                                    <PremiseSlotActor
+                                      slot={slot}
+                                      profileByEmail={memberProfileByEmail}
+                                      hideName
+                                    />
+                                    <span className="premises-tracking-item__body">
+                                      <span className="premises-tracking-item__range">
+                                        <span className="premises-tracking-item__date">
+                                          {dateLabel}
+                                        </span>
+                                        <span
+                                          className="premises-tracking-item__divider"
+                                          aria-hidden="true"
+                                        />
+                                        <span className="premises-tracking-item__time">
+                                          {timeLabel}
+                                        </span>
+                                        {contactPhone ? (
+                                          <>
+                                            <span
+                                              className="premises-tracking-item__divider"
+                                              aria-hidden="true"
+                                            />
+                                            <span className="premises-tracking-item__phone">
+                                              {contactPhone}
+                                            </span>
+                                          </>
+                                        ) : null}
+                                      </span>
+                                      {actorLabel ? (
+                                        <span className="premises-tracking-item__name">
+                                          {actorLabel}
+                                        </span>
+                                      ) : null}
+                                      <strong className="premises-tracking-item__title">
+                                        {slot.title}
+                                      </strong>
+                                    </span>
+                                  </button>
+                                  {canManagePremise && bookingRentalId ? (
+                                    <div className="premises-tracking-item__review">
+                                      <Button
+                                        type="button"
+                                        disabled={
+                                          rentalActionId === bookingRentalId
+                                        }
+                                        onClick={() =>
+                                          void handleBookingRequestReview(
+                                            bookingRentalId,
+                                            "active",
+                                            slot.title,
+                                          )
+                                        }
+                                      >
+                                        Подтвердить
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        className="danger"
+                                        disabled={
+                                          rentalActionId === bookingRentalId
+                                        }
+                                        onClick={() =>
+                                          void handleBookingRequestReview(
+                                            bookingRentalId,
+                                            "cancelled",
+                                            slot.title,
+                                          )
+                                        }
+                                      >
+                                        Отклонить
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <div className="premises-overview__empty rehearsals-muted">
+                            Нет заявок, ожидающих подтверждения.
+                          </div>
+                        )}
+                      </section>
                     </RehearsalsCard>
                   </div>
                 </div>
@@ -1408,8 +1895,6 @@ export function PremiseDetailPage() {
                         onDayDoubleClick={() => {
                           if (premise.canBook) openCreateSlot();
                         }}
-                        title="Занятость"
-                        subtitle="Клик — выбрать день · двойной клик — новый слот"
                         showStatusMarks={false}
                       />
 
@@ -1493,71 +1978,187 @@ export function PremiseDetailPage() {
                             </div>
                           ) : (
                             <div className="premises-day-slots">
-                              {daySlots.map((slot) => (
-                                <div
-                                  key={slot.id}
-                                  className="sessions-slots-readonly__row"
-                                >
-                                  <div className="sessions-slots-readonly__time">
-                                    {formatSlotTime(slot)}
-                                  </div>
-                                  <div className="sessions-slots-readonly__meta">
-                                    <strong>{slot.title}</strong>
-                                    {" · "}
-                                    {slotStatusLabel(slot.status)}
-                                    {slot.rental ? (
-                                      <span className="premises-slot-rental-meta">
-                                        {" · "}
-                                        {usageTypeLabel(slot.rental.usageType)}
-                                        {slot.rental.recurrenceType === "weekly"
-                                          ? " · Регулярная"
-                                          : ""}
-                                        {slot.rental.agreement
-                                          ? ` · Договор ${slot.rental.agreement.number}`
-                                          : ""}
-                                      </span>
+                              {daySlots.map((slot) => {
+                                const slotStart = dayjs(slot.startsAt);
+                                const slotEnd = slotStart.add(
+                                  slot.durationMin,
+                                  "minute",
+                                );
+                                const slotRangeLabel = `${slotStart.format("HH:mm")} – ${slotEnd.format("HH:mm")}`;
+                                const bookingRentalId = slotBookingRentalId(slot);
+                                const contactPhone =
+                                  slot.contactPhone?.trim() || "";
+                                const actorLabel = getPremiseSlotActorLabel(
+                                  slot,
+                                  memberProfileByEmail,
+                                );
+
+                                const isExpanded = expandedSlotIds.has(slot.id);
+
+                                return (
+                                  <div
+                                    key={slot.id}
+                                    className={cn(
+                                      "sessions-slots-readonly__row premises-slot-row",
+                                      isExpanded && "premises-slot-row--open",
+                                    )}
+                                  >
+                                    <div className="premises-slot-row__content">
+                                      <PremiseSlotActor
+                                        slot={slot}
+                                        profileByEmail={memberProfileByEmail}
+                                        hideName
+                                      />
+                                      <div className="premises-slot-row__body">
+                                        <div className="premises-slot-row__range">
+                                          <div className="premises-slot-row__range-main">
+                                            <span className="premises-slot-row__range-time">
+                                              {slotRangeLabel}
+                                            </span>
+                                            {contactPhone ? (
+                                              <>
+                                                <span
+                                                  className="premises-slot-row__range-divider"
+                                                  aria-hidden="true"
+                                                />
+                                                <span className="premises-slot-row__range-phone">
+                                                  {contactPhone}
+                                                </span>
+                                              </>
+                                            ) : null}
+                                          </div>
+                                          {canEditSlot(slot) ? (
+                                            <div className="premises-slot-row__actions">
+                                              <Button
+                                                type="button"
+                                                onClick={() =>
+                                                  openEditSlot(slot)
+                                                }
+                                              >
+                                                Изменить
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                className="danger"
+                                                onClick={() =>
+                                                  void handleDeleteSlot(slot)
+                                                }
+                                              >
+                                                Удалить
+                                              </Button>
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                        {actorLabel ? (
+                                          <div className="premises-slot-row__name">
+                                            {actorLabel}
+                                          </div>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                    {isExpanded ? (
+                                      <div className="premises-slot-row__details">
+                                        <div className="sessions-slots-readonly__meta">
+                                          <strong>{slot.title}</strong>
+                                          {" · "}
+                                          {slotStatusLabel(slot.status)}
+                                          {slot.rental ? (
+                                            <span className="premises-slot-rental-meta">
+                                              {" · "}
+                                              {usageTypeLabel(
+                                                slot.rental.usageType,
+                                              )}
+                                              {slot.rental.recurrenceType ===
+                                              "weekly"
+                                                ? " · Регулярная"
+                                                : ""}
+                                              {slot.rental.agreement
+                                                ? ` · Договор ${slot.rental.agreement.number}`
+                                                : ""}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                        <PremiseSlotPeople
+                                          slot={slot}
+                                          profileByEmail={memberProfileByEmail}
+                                        />
+                                        {slot.purpose ? (
+                                          <div className="sessions-slots-readonly__notes">
+                                            <b>Для чего:</b> {slot.purpose}
+                                          </div>
+                                        ) : null}
+                                        {slot.rentalNotes ? (
+                                          <div className="sessions-slots-readonly__notes">
+                                            <b>Аренда:</b> {slot.rentalNotes}
+                                          </div>
+                                        ) : null}
+                                        {slot.rentalAmountRub != null ? (
+                                          <div className="sessions-slots-readonly__notes">
+                                            <b>Оплата:</b>{" "}
+                                            {formatRubles(slot.rentalAmountRub)}
+                                            {" · "}
+                                            {paymentStatusLabel(
+                                              slot.paymentStatus,
+                                            )}
+                                          </div>
+                                        ) : null}
+                                        {canManagePremise &&
+                                        slot.status === "pending" &&
+                                        bookingRentalId ? (
+                                          <div className="premises-slot-row__review">
+                                            <Button
+                                              type="button"
+                                              disabled={
+                                                rentalActionId ===
+                                                bookingRentalId
+                                              }
+                                              onClick={() =>
+                                                void handleBookingRequestReview(
+                                                  bookingRentalId,
+                                                  "active",
+                                                  slot.title,
+                                                )
+                                              }
+                                            >
+                                              Подтвердить
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              className="danger"
+                                              disabled={
+                                                rentalActionId ===
+                                                bookingRentalId
+                                              }
+                                              onClick={() =>
+                                                void handleBookingRequestReview(
+                                                  bookingRentalId,
+                                                  "cancelled",
+                                                  slot.title,
+                                                )
+                                              }
+                                            >
+                                              Отклонить
+                                            </Button>
+                                          </div>
+                                        ) : null}
+                                      </div>
                                     ) : null}
+                                    <button
+                                      type="button"
+                                      className="premises-slot-row__chevron"
+                                      aria-expanded={isExpanded}
+                                      aria-label={
+                                        isExpanded
+                                          ? "Свернуть слот"
+                                          : "Раскрыть слот"
+                                      }
+                                      onClick={() =>
+                                        toggleSlotExpanded(slot.id)
+                                      }
+                                    />
                                   </div>
-                                  {slot.purpose ? (
-                                    <div className="sessions-slots-readonly__notes">
-                                      <b>Для чего:</b> {slot.purpose}
-                                    </div>
-                                  ) : null}
-                                  {slot.rentalNotes ? (
-                                    <div className="sessions-slots-readonly__notes">
-                                      <b>Аренда:</b> {slot.rentalNotes}
-                                    </div>
-                                  ) : null}
-                                  {slot.rentalAmountRub != null ? (
-                                    <div className="sessions-slots-readonly__notes">
-                                      <b>Оплата:</b>{" "}
-                                      {formatRubles(slot.rentalAmountRub)}
-                                      {" · "}
-                                      {paymentStatusLabel(slot.paymentStatus)}
-                                    </div>
-                                  ) : null}
-                                  <PremiseSlotContact slot={slot} />
-                                  {canEditSlot(slot) ? (
-                                    <div className="premises-slot-row__actions">
-                                      <Button
-                                        type="button"
-                                        onClick={() => openEditSlot(slot)}
-                                      >
-                                        Изменить
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        className="danger"
-                                        onClick={() =>
-                                          void handleDeleteSlot(slot)
-                                        }
-                                      >
-                                        Удалить
-                                      </Button>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -1636,6 +2237,10 @@ export function PremiseDetailPage() {
                                 {rentalStatusLabel(rental.status)}
                               </span>
                             </div>
+                            <PremiseRentalPeople
+                              rental={rental}
+                              profileByEmail={memberProfileByEmail}
+                            />
                             {rentalPrice ? (
                               <div className="premises-rental-card__price">
                                 {rentalPrice}
@@ -1690,8 +2295,7 @@ export function PremiseDetailPage() {
                             {premise.canManage &&
                             rental.status !== "cancelled" ? (
                               <div className="premises-rental-card__actions">
-                                {rental.status === "pending" &&
-                                !rental.agreementRequested ? (
+                                {rental.status === "pending" ? (
                                   <Button
                                     type="button"
                                     disabled={rentalActionId === rental.id}
@@ -1720,41 +2324,83 @@ export function PremiseDetailPage() {
                             {rental.agreement ? (
                               <div className="premises-rental-contract">
                                 <div className="premises-rental-contract__header">
-                                  <strong>
-                                    Договор {rental.agreement.number}
-                                  </strong>
-                                  <span>
+                                  <div className="premises-rental-contract__title">
+                                    <span className="premises-rental-contract__eyebrow">
+                                      Договор
+                                    </span>
+                                    <strong className="premises-rental-contract__number">
+                                      {rental.agreement.number}
+                                    </strong>
+                                  </div>
+                                  <span
+                                    className={cn(
+                                      "premises-rental-contract__status",
+                                      rental.agreement.status === "active" &&
+                                        "premises-rental-contract__status--active",
+                                      rental.agreement.status ===
+                                        "awaiting_signature" &&
+                                        "premises-rental-contract__status--awaiting",
+                                    )}
+                                  >
                                     {agreementStatusLabel(
                                       rental.agreement.status,
                                     )}
                                   </span>
                                 </div>
                                 {rental.agreement.documents.length ? (
-                                  <div className="premises-rental-contract__documents">
+                                  <ul className="premises-rental-contract__documents">
                                     {rental.agreement.documents.map(
-                                      (documentItem) => (
-                                        <button
-                                          key={documentItem.id}
-                                          type="button"
-                                          onClick={() =>
-                                            void handleDownloadAgreement(
-                                              rental.id,
-                                              documentItem.id,
-                                              documentItem.fileName,
-                                            )
-                                          }
-                                        >
-                                          {documentItem.kind === "signed"
-                                            ? "Подписанный"
-                                            : documentItem.kind === "generated"
-                                              ? "Сформированный"
-                                              : "Загруженный"}
-                                          : {documentItem.fileName}
-                                        </button>
-                                      ),
+                                      (documentItem) => {
+                                        const documentLabel =
+                                          agreementDocumentKindLabel(
+                                            documentItem.kind,
+                                          );
+                                        const documentName =
+                                          decodeUploadedFileName(
+                                            documentItem.fileName,
+                                          );
+                                        return (
+                                          <li key={documentItem.id}>
+                                            <button
+                                              type="button"
+                                              className={cn(
+                                                "premises-rental-contract__doc",
+                                                documentItem.kind ===
+                                                  "signed" &&
+                                                  "premises-rental-contract__doc--signed",
+                                              )}
+                                              onClick={() =>
+                                                void handleDownloadAgreement(
+                                                  rental.id,
+                                                  documentItem.id,
+                                                  documentItem.fileName,
+                                                )
+                                              }
+                                            >
+                                              <span className="premises-rental-contract__doc-kind">
+                                                {documentLabel}
+                                              </span>
+                                              <span
+                                                className="premises-rental-contract__doc-name"
+                                                title={documentName}
+                                              >
+                                                {documentName}
+                                              </span>
+                                              <span className="premises-rental-contract__doc-action">
+                                                Скачать
+                                              </span>
+                                            </button>
+                                          </li>
+                                        );
+                                      },
                                     )}
-                                  </div>
-                                ) : null}
+                                  </ul>
+                                ) : (
+                                  <p className="premises-rental-contract__empty rehearsals-muted">
+                                    Документов пока нет — сформируйте или
+                                    загрузите PDF
+                                  </p>
+                                )}
                                 {canManageRental ? (
                                   <div className="premises-rental-contract__actions">
                                     <Button
@@ -1803,6 +2449,18 @@ export function PremiseDetailPage() {
                                   </div>
                                 ) : null}
                               </div>
+                            ) : canManageRental ? (
+                              <div className="premises-rental-card__actions">
+                                <Button
+                                  type="button"
+                                  disabled={rentalActionId === rental.id}
+                                  onClick={() =>
+                                    void handleCreateAgreement(rental)
+                                  }
+                                >
+                                  Оформить договор
+                                </Button>
+                              </div>
                             ) : (
                               <div className="rehearsals-muted">
                                 Без договора
@@ -1828,7 +2486,7 @@ export function PremiseDetailPage() {
                   <p className="rehearsals-muted">
                     Добавляйте арендаторов и назначайте права на бронирование.
                   </p>
-                  <FormInlineRow className="premises-form-row">
+                  <FormInlineRow className="premises-form-row premises-members-form">
                     <InlineTextField
                       value={memberEmail}
                       onChange={(e) => setMemberEmail(e.target.value)}
@@ -1845,14 +2503,13 @@ export function PremiseDetailPage() {
                       }
                       aria-label="Роль"
                     />
-                    <label className="premises-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={memberCanBook}
-                        onChange={(e) => setMemberCanBook(e.target.checked)}
-                      />
+                    <LabeledCheckbox
+                      className="premises-members-can-book"
+                      checked={memberCanBook}
+                      onChange={setMemberCanBook}
+                    >
                       Может бронировать
-                    </label>
+                    </LabeledCheckbox>
                     <Button
                       type="button"
                       disabled={addingMember || !memberEmail.trim()}
@@ -1866,52 +2523,85 @@ export function PremiseDetailPage() {
                   ) : null}
 
                   <ul className="premises-members-list">
-                    {(membersData?.members ?? []).map((member) => (
-                      <li key={member.id} className="premises-member-item">
-                        <div className="premises-member-item__email">
-                          {member.email}
-                        </div>
-                        <CustomSelect
-                          value={member.role}
-                          options={roleOptions}
-                          onChange={(value) =>
-                            void updateMember({
-                              premiseId,
-                              memberId: member.id,
-                              body: { role: value as PremiseMemberRole },
-                            })
-                          }
-                          aria-label={`Роль ${member.email}`}
-                        />
-                        <label className="premises-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={member.canBook}
-                            onChange={(e) =>
-                              void updateMember({
-                                premiseId,
-                                memberId: member.id,
-                                body: { canBook: e.target.checked },
-                              })
-                            }
-                          />
-                          Бронь
-                        </label>
-                        <Button
-                          type="button"
-                          className="danger"
-                          onClick={() => {
-                            if (!confirm(`Удалить ${member.email}?`)) return;
-                            void removeMember({
-                              premiseId,
-                              memberId: member.id,
-                            });
-                          }}
-                        >
-                          Удалить
-                        </Button>
-                      </li>
-                    ))}
+                    {(membersData?.members ?? []).map((member) => {
+                      const normalizedEmail = normalizeMemberEmail(
+                        member.email,
+                      );
+                      const profile =
+                        memberProfileByEmail.get(normalizedEmail);
+                      const { name, secondary } = resolvePremiseMemberLabel(
+                        member.email,
+                        profile,
+                      );
+                      const avatarUrl =
+                        String(profile?.avatarUrl ?? "").trim() || null;
+                      const removeLabel = secondary
+                        ? `${name} (${member.email})`
+                        : member.email;
+
+                      return (
+                        <li key={member.id} className="premises-member-item">
+                          <div className="premises-member-item__person">
+                            <MiniAvatar
+                              src={avatarUrl}
+                              label={name}
+                              size={32}
+                            />
+                            <div className="premises-member-item__meta">
+                              <span className="premises-member-item__name">
+                                {name}
+                              </span>
+                              {secondary ? (
+                                <span className="premises-member-item__email">
+                                  {secondary}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="premises-member-item__actions">
+                            <CustomSelect
+                              value={member.role}
+                              options={roleOptions}
+                              onChange={(value) =>
+                                void updateMember({
+                                  premiseId,
+                                  memberId: member.id,
+                                  body: { role: value as PremiseMemberRole },
+                                })
+                              }
+                              aria-label={`Роль ${member.email}`}
+                            />
+                            <LabeledCheckbox
+                              className="premises-members-can-book"
+                              checked={member.canBook}
+                              onChange={(checked) =>
+                                void updateMember({
+                                  premiseId,
+                                  memberId: member.id,
+                                  body: { canBook: checked },
+                                })
+                              }
+                            >
+                              Может бронировать
+                            </LabeledCheckbox>
+                            <Button
+                              type="button"
+                              className="danger"
+                              onClick={() => {
+                                if (!confirm(`Удалить ${removeLabel}?`))
+                                  return;
+                                void removeMember({
+                                  premiseId,
+                                  memberId: member.id,
+                                });
+                              }}
+                            >
+                              Удалить
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </RehearsalsCard>
               ) : null}
@@ -1976,21 +2666,21 @@ export function PremiseDetailPage() {
                                   "premises-availability-day--disabled",
                               )}
                             >
-                              <label className="premises-checkbox premises-availability-day__toggle">
-                                <input
-                                  type="checkbox"
-                                  checked={day.enabled}
-                                  onChange={(event) =>
-                                    updateAvailabilityDay(day.weekday, {
-                                      enabled: event.target.checked,
-                                    })
-                                  }
-                                />
+                              <LabeledCheckbox
+                                className="premises-availability-day__toggle"
+                                checked={day.enabled}
+                                onChange={(checked) =>
+                                  updateAvailabilityDay(day.weekday, {
+                                    enabled: checked,
+                                  })
+                                }
+                              >
                                 {day.label}
-                              </label>
+                              </LabeledCheckbox>
                               {day.enabled ? (
                                 <div className="premises-availability-day__time">
-                                  <input
+                                  <InlineTextField
+                                    className="premises-availability-day__time-input"
                                     type="time"
                                     value={minutesToTime(day.startsAtMin)}
                                     onChange={(event) =>
@@ -2002,8 +2692,11 @@ export function PremiseDetailPage() {
                                     }
                                     aria-label={`Начало работы, ${day.label}`}
                                   />
-                                  <span>—</span>
-                                  <input
+                                  <span className="premises-availability-day__time-sep">
+                                    —
+                                  </span>
+                                  <InlineTextField
+                                    className="premises-availability-day__time-input"
                                     type="time"
                                     value={minutesToTime(day.endsAtMin)}
                                     onChange={(event) =>
@@ -2077,7 +2770,11 @@ export function PremiseDetailPage() {
       >
         <div className="premises-slot-modal__inner">
           <h3 id="premise-slot-modal-title">
-            {editingSlot ? "Редактировать слот" : "Новый слот"}
+            {editingSlot
+              ? "Редактировать слот"
+              : canManagePremise
+                ? "Новый слот"
+                : "Заявка на бронь"}
           </h3>
           {!editingSlot ? (
             <FormInlineRow className="premises-form-row">
@@ -2104,6 +2801,50 @@ export function PremiseDetailPage() {
                 aria-label="Периодичность"
               />
             </FormInlineRow>
+          ) : null}
+          {!editingSlot && bookingActorOptions.length > 1 ? (
+            <FormInlineRow className="premises-form-row">
+              <CustomSelect
+                value={selectedBookingActorValue}
+                options={bookingActorOptions}
+                onChange={(value) => {
+                  const parsed = parseBookingActorValue(value);
+                  const matched =
+                    bookingActors.find(
+                      (actor) =>
+                        actor.kind === parsed.kind &&
+                        (actor.id ?? "") === parsed.id,
+                    ) ?? null;
+                  setSlotForm((state) => ({
+                    ...state,
+                    bookedAsKind: parsed.kind,
+                    bookedAsId: parsed.id,
+                    bookedAsTitle: matched?.title ?? state.bookedAsTitle,
+                  }));
+                }}
+                aria-label="От чьего имени бронь"
+              />
+              {slotForm.bookedAsKind === "external" ? (
+                <InlineTextField
+                  value={slotForm.bookedAsTitle}
+                  onChange={(event) =>
+                    setSlotForm((state) => ({
+                      ...state,
+                      bookedAsTitle: event.target.value,
+                    }))
+                  }
+                  placeholder="Название арендатора"
+                  aria-label="Название внешнего арендатора"
+                />
+              ) : null}
+            </FormInlineRow>
+          ) : null}
+          {!editingSlot && !canManagePremise ? (
+            <p className="rehearsals-muted premises-slot-modal__hint">
+              {bookingActorOptions.length > 1
+                ? "Заявку можно подать от своего имени или от организации, которой вы владеете или администрируете. Она уйдёт на подтверждение хозяину помещения."
+                : "Заявка уйдёт на подтверждение хозяину или администратору помещения."}
+            </p>
           ) : null}
           {editingSlot || slotForm.recurrenceType === "once" ? (
             <FormInlineRow className="premises-form-row">
@@ -2339,84 +3080,6 @@ export function PremiseDetailPage() {
               aria-label="Телефон контакта"
             />
           </FormInlineRow>
-          {!editingSlot ? (
-            <div className="premises-rental-agreement">
-              <label className="premises-checkbox">
-                <input
-                  type="checkbox"
-                  checked={slotForm.agreementRequested}
-                  onChange={(event) =>
-                    setSlotForm((state) => ({
-                      ...state,
-                      agreementRequested: event.target.checked,
-                      landlordName:
-                        state.landlordName ||
-                        premise.ownerTitle ||
-                        premise.name,
-                      tenantName:
-                        state.tenantName ||
-                        state.contactName ||
-                        state.contactEmail,
-                    }))
-                  }
-                />
-                Оформить договор
-              </label>
-              {slotForm.agreementRequested ? (
-                <div className="premises-rental-agreement__fields">
-                  <InlineTextField
-                    value={slotForm.landlordName}
-                    onChange={(event) =>
-                      setSlotForm((state) => ({
-                        ...state,
-                        landlordName: event.target.value,
-                      }))
-                    }
-                    placeholder="Арендодатель"
-                    aria-label="Наименование арендодателя"
-                  />
-                  <InlineTextField
-                    value={slotForm.tenantName}
-                    onChange={(event) =>
-                      setSlotForm((state) => ({
-                        ...state,
-                        tenantName: event.target.value,
-                      }))
-                    }
-                    placeholder="Арендатор"
-                    aria-label="Наименование арендатора"
-                  />
-                  <FormTextarea
-                    label="Реквизиты арендодателя"
-                    value={slotForm.landlordDetails}
-                    onChange={(event) =>
-                      setSlotForm((state) => ({
-                        ...state,
-                        landlordDetails: event.target.value,
-                      }))
-                    }
-                    rows={2}
-                  />
-                  <FormTextarea
-                    label="Реквизиты арендатора"
-                    value={slotForm.tenantDetails}
-                    onChange={(event) =>
-                      setSlotForm((state) => ({
-                        ...state,
-                        tenantDetails: event.target.value,
-                      }))
-                    }
-                    rows={2}
-                  />
-                  <p className="rehearsals-muted premises-rental-agreement__hint">
-                    После создания аренды появится черновик договора. Слоты
-                    останутся предварительными до загрузки подписанного
-                    документа.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
           {premise.canManage && editingSlot ? (
             <CustomSelect
               value={slotForm.status}
@@ -2437,7 +3100,13 @@ export function PremiseDetailPage() {
               disabled={creatingRental || updatingSlot}
               onClick={() => void saveSlot()}
             >
-              {creatingRental || updatingSlot ? "Сохранение…" : "Сохранить"}
+              {creatingRental || updatingSlot
+                ? "Сохранение…"
+                : editingSlot
+                  ? "Сохранить"
+                  : canManagePremise
+                    ? "Сохранить"
+                    : "Отправить заявку"}
             </Button>
           </div>
         </div>

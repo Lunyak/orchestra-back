@@ -63,6 +63,10 @@ function useSpectacleTechChromeSlots() {
   return useContext(SpectacleTechChromeSlotsContext);
 }
 
+export function useSpectacleTechChromeCenterTarget(): HTMLElement | null {
+  return useSpectacleTechChromeSlots()?.centerTarget ?? null;
+}
+
 export function SpectacleTechChromeLeftSlot() {
   const ctx = useSpectacleTechChromeSlots();
   return (

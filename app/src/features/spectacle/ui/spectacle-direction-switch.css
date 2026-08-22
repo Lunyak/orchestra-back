@@ -12,7 +12,7 @@
   box-sizing: border-box;
 }
 
-.spectacle-direction-switch--tech {
+.spectacle-direction-switch--centered {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -28,7 +28,7 @@
   min-width: 0;
 }
 
-.spectacle-direction-switch--tech .spectacle-direction-switch__left {
+.spectacle-direction-switch--centered .spectacle-direction-switch__left {
   grid-column: 1;
   justify-self: start;
 }
@@ -48,12 +48,47 @@
   align-items: center;
   justify-content: center;
   min-width: 0;
-  max-width: min(420px, 46vw);
+  max-width: min(480px, 50vw);
+  width: 100%;
 }
 
 .spectacle-direction-switch__tech-center .spectacle-run__meta {
   justify-content: center;
   text-align: center;
+}
+
+.spectacle-direction-switch__tech-center .script-scene-title-block {
+  width: 100%;
+  height: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding-right: 0;
+}
+
+.spectacle-direction-switch__tech-center .script-scene-title,
+.spectacle-direction-switch__tech-center .app-editor-menubar__scene-title.script-scene-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 32px;
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+}
+
+.spectacle-direction-switch__tech-center .app-editor-menubar__scene-title-input.script-scene-title {
+  display: block;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  line-height: 32px;
 }
 
 .spectacle-direction-switch__right {
@@ -65,51 +100,10 @@
   min-width: 0;
 }
 
-.spectacle-direction-switch--tech .spectacle-direction-switch__right {
+.spectacle-direction-switch--centered .spectacle-direction-switch__right {
   grid-column: 3;
   margin-left: 0;
   justify-self: end;
-}
-
-.spectacle-direction-switch__formatting {
-  display: flex;
-  align-items: stretch;
-  flex-shrink: 0;
-}
-
-.spectacle-direction-switch__formatting .theater-editor-menubar__menu {
-  position: relative;
-  display: flex;
-  align-items: stretch;
-}
-
-.spectacle-direction-switch__formatting .theater-editor-menubar__menu-title {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 4px 8px;
-  border: 0;
-  background: transparent;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-
-.spectacle-direction-switch__formatting .theater-editor-menubar__menu-title:hover {
-  color: var(--color-text-primary);
-  background: var(--color-surface-5);
-}
-
-.spectacle-direction-switch__formatting .theater-editor-menubar__options {
-  top: 100%;
-  left: 0;
-  right: auto;
-  min-width: 260px;
-  z-index: 40;
 }
 
 .spectacle-direction-switch__modes {
@@ -131,7 +125,7 @@
   padding: 4px 8px;
   border: 0;
   background: transparent;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.2;
@@ -172,8 +166,7 @@
     min-height: 28px;
   }
 
-  .spectacle-direction-switch__item,
-  .spectacle-direction-switch__formatting .theater-editor-menubar__menu-title {
+  .spectacle-direction-switch__item {
     min-height: 22px;
     padding: 3px 6px;
     font-size: var(--font-size-xs);

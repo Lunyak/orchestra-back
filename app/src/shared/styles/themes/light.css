@@ -52,7 +52,8 @@ html[data-theme="light"] {
   --color-theater-sidebar-bg: #e4e4e7;
   --color-bg-playlist: var(--color-bg-quaternary);
   --color-bg-steps: var(--color-bg-quaternary);
-  --scrollbar-track: rgba(0, 0, 0, 0.06);
-  --scrollbar-thumb: rgba(113, 113, 122, 0.45);
-  --scrollbar-thumb-hover: rgba(82, 82, 91, 0.65);
+  --color-list-item-hover: color-mix(in srgb, var(--color-bg-quaternary) 82%, black);
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(24, 24, 27, 0.28);
+  --scrollbar-thumb-hover: rgba(24, 24, 27, 0.42);
 }

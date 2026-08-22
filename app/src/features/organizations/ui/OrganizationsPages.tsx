@@ -1,10 +1,13 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
+import cn from "classnames";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   globalPaths,
   projectPath,
-  studioPath,
+  studioOrganizationPath,
+  studioOverviewPath,
   theaterOrganizationPath,
   theaterOverviewPath,
   troupeOrganizationPath,
@@ -20,10 +23,13 @@ import {
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project";
 import {
-  studioRoleLabel,
+  useCreateStudioMutation,
   useListStudiosQuery,
-  type StudioSummary,
 } from "../../studio";
+import {
+  readTheaterPoster,
+  THEATER_POSTER_CHANGE_EVENT,
+} from "../model/theater-poster-storage";
 import "../../app-hub/ui/app-hub.css";
 import "../../director-sessions/ui/director-sessions.css";
 import "./organizations.css";
@@ -109,7 +115,7 @@ export function OrganizationsPage() {
       title: "Студии",
       description: "Учебные пространства и программа",
       meta: loading ? "…" : `${studios.length}`,
-      path: studioPath(),
+      path: studioOrganizationPath(),
     },
   ];
 
@@ -162,7 +168,18 @@ export function TheatersIndexPage() {
   const [title, setTitle] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [posterTick, setPosterTick] = useState(0);
   const hasTheaters = theaters.length > 0;
+
+  useEffect(() => {
+    const refreshPosters = () => setPosterTick((value) => value + 1);
+    window.addEventListener(THEATER_POSTER_CHANGE_EVENT, refreshPosters);
+    window.addEventListener("storage", refreshPosters);
+    return () => {
+      window.removeEventListener(THEATER_POSTER_CHANGE_EVENT, refreshPosters);
+      window.removeEventListener("storage", refreshPosters);
+    };
+  }, []);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -244,9 +261,7 @@ export function TheatersIndexPage() {
             ) : null}
 
             {loading ? (
-              <p className="organizations-page__workspace-status">
-                Загрузка театров…
-              </p>
+              <PageLoader variant="view" label="Загрузка театров…" />
             ) : hasTheaters ? (
               <ul className="organizations-page__theater-list">
                 {theaters.map((theater) => {
@@ -255,6 +270,9 @@ export function TheatersIndexPage() {
                     premisesCount === 0
                       ? "Без площадок"
                       : `${premisesCount} площадок`;
+                  void posterTick;
+                  const posterSrc = readTheaterPoster(theater.id);
+                  const hasPoster = Boolean(posterSrc);
 
                   return (
                     <li key={theater.id}>
@@ -265,10 +283,24 @@ export function TheatersIndexPage() {
                           navigate(theaterOverviewPath(theater.id))
                         }
                       >
-                        <span className="organizations-page__theater-poster-frame organizations-page__theater-poster-frame--placeholder">
-                          <span className="organizations-page__theater-poster-hint">
-                            Театр
-                          </span>
+                        <span
+                          className={cn(
+                            "organizations-page__theater-poster-frame",
+                            !hasPoster &&
+                              "organizations-page__theater-poster-frame--placeholder",
+                          )}
+                        >
+                          {hasPoster ? (
+                            <img
+                              className="organizations-page__theater-poster-image"
+                              src={posterSrc!}
+                              alt=""
+                            />
+                          ) : (
+                            <span className="organizations-page__theater-poster-hint">
+                              Театр
+                            </span>
+                          )}
                         </span>
                         <span className="organizations-page__theater-poster-name">
                           {theater.title}
@@ -367,7 +399,7 @@ export function TroupesIndexPage() {
         </header>
 
         {loading ? (
-          <p className="organizations-page__status">Загрузка коллективов…</p>
+          <PageLoader variant="view" label="Загрузка коллективов…" />
         ) : null}
         {error ? (
           <p className="organizations-page__alert" role="alert">
@@ -398,6 +430,141 @@ export function TroupesIndexPage() {
         ) : null}
       </div>
     </main>
+  );
+}
+
+export function StudiosIndexPage() {
+  const navigate = useNavigate();
+  const { accessToken } = useAuth();
+  const { studios, loading, error } = useOrganizations();
+  const [createStudio, { isLoading: creating }] = useCreateStudioMutation();
+  const [title, setTitle] = useState("");
+  const [createError, setCreateError] = useState("");
+  const hasStudios = studios.length > 0;
+
+  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextTitle = title.trim();
+    if (!nextTitle) {
+      setCreateError("Введите название студии");
+      return;
+    }
+    if (!accessToken || creating) return;
+
+    setCreateError("");
+    try {
+      const studio = await createStudio({ title: nextTitle }).unwrap();
+      setTitle("");
+      navigate(studioOverviewPath(studio.id));
+    } catch {
+      setCreateError("Не удалось создать студию");
+    }
+  };
+
+  return (
+    <div className="app-layout app-hub-layout app-hub-layout--projects">
+      <div className="app-content">
+        <main className="main-content">
+          <section
+            className="organizations-page organizations-page--theaters"
+            aria-labelledby="studios-workspace-title"
+          >
+            <header className="organizations-page__workspace-header">
+              <div>
+                <h1 id="studios-workspace-title">Мои студии</h1>
+                <p className="organizations-page__workspace-description">
+                  Выберите студию или создайте новую.
+                </p>
+              </div>
+              <form
+                className="organizations-page__workspace-create"
+                onSubmit={(event) => {
+                  void handleCreate(event);
+                }}
+              >
+                <label htmlFor="new-studio-title">Новая студия</label>
+                <div className="organizations-page__workspace-create-row">
+                  <input
+                    id="new-studio-title"
+                    className="organizations-page__workspace-input"
+                    value={title}
+                    onChange={(event) => {
+                      setTitle(event.target.value);
+                      if (createError) setCreateError("");
+                    }}
+                    placeholder="Название студии"
+                    maxLength={120}
+                    disabled={creating}
+                  />
+                  <button
+                    type="submit"
+                    className="organizations-page__workspace-create-button"
+                    disabled={!title.trim() || creating}
+                  >
+                    {creating ? "Создание…" : "Создать"}
+                  </button>
+                </div>
+                {createError ? (
+                  <p className="organizations-page__workspace-error" role="alert">
+                    {createError}
+                  </p>
+                ) : null}
+              </form>
+            </header>
+
+            {error ? (
+              <p className="organizations-page__workspace-error" role="alert">
+                {error}
+              </p>
+            ) : null}
+
+            {loading ? (
+              <PageLoader variant="view" label="Загрузка студий…" />
+            ) : hasStudios ? (
+              <ul className="organizations-page__theater-list">
+                {studios.map((studio) => {
+                  const roleLabel =
+                    studio.myRole === "owner"
+                      ? "Владелец"
+                      : studio.myRole === "teacher"
+                        ? "Преподаватель"
+                        : "Ученик";
+
+                  return (
+                    <li key={studio.id}>
+                      <button
+                        type="button"
+                        className="organizations-page__theater-poster"
+                        onClick={() =>
+                          navigate(studioOverviewPath(studio.id))
+                        }
+                      >
+                        <span className="organizations-page__theater-poster-frame organizations-page__theater-poster-frame--placeholder">
+                          <span className="organizations-page__theater-poster-hint">
+                            Студия
+                          </span>
+                        </span>
+                        <span className="organizations-page__theater-poster-name">
+                          {studio.title}
+                        </span>
+                        <span className="organizations-page__theater-poster-meta">
+                          {roleLabel}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="organizations-page__workspace-empty">
+                <h2>Здесь пока нет студий</h2>
+                <p>Введите название и создайте первую студию.</p>
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
+    </div>
   );
 }
 
@@ -438,51 +605,10 @@ export function TroupeOrganizationPage() {
 
 export function StudioOrganizationPage() {
   const { studioId = "" } = useParams();
-  const { studios, loading, error } = useOrganizations();
-  const studio = studios.find((item) => item.id === studioId);
-
-  if (!loading && !studio) {
-    return <Navigate to={globalPaths.organizations} replace />;
+  if (!studioId) {
+    return <Navigate to={studioOrganizationPath()} replace />;
   }
-
-  return (
-    <OrganizationDetail title={studio?.title} loading={loading} error={error}>
-      {studio ? <StudioOrganizationBody studio={studio} /> : null}
-    </OrganizationDetail>
-  );
-}
-
-function StudioOrganizationBody({ studio }: { studio: StudioSummary }) {
-  const roleLabel = studioRoleLabel(studio.myRole);
-  const description = studio.description?.trim();
-
-  return (
-    <section>
-      <h2>Студия</h2>
-      <p>{description || "Учебная студия: участники, программа и задания."}</p>
-      <p>Ваша роль: {roleLabel}</p>
-      <nav className="spectacle-direction-switch" aria-label="Студия">
-        <ul className="spectacle-direction-switch__modes">
-          <li>
-            <Link
-              to={studioPath(studio.id)}
-              className="spectacle-direction-switch__item"
-            >
-              Открыть студию
-            </Link>
-          </li>
-          <li>
-            <Link
-              to={studioPath()}
-              className="spectacle-direction-switch__item"
-            >
-              Все студии
-            </Link>
-          </li>
-        </ul>
-      </nav>
-    </section>
-  );
+  return <Navigate to={studioOverviewPath(studioId)} replace />;
 }
 
 type OrganizationDetailProps = {
@@ -509,7 +635,7 @@ function OrganizationDetail({
           {backLabel}
         </Link>
         {loading ? (
-          <p className="organizations-page__status">Загрузка организации…</p>
+          <PageLoader variant="view" label="Загрузка организации…" />
         ) : null}
         {error ? (
           <p className="organizations-page__alert" role="alert">

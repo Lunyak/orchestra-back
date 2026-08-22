@@ -5,7 +5,7 @@
   width: 100%;
   height: 100dvh;
   overflow: hidden;
-  background: #050405;
+  background: #000000;
   color: var(--color-text);
 }
 
@@ -48,7 +48,7 @@
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.85);
+  color: rgba(232, 255, 255, 0.85);
   text-align: center;
 }
 
@@ -60,7 +60,7 @@
   border-radius: 0;
   background: rgba(10, 8, 10, 0.72);
   backdrop-filter: blur(10px);
-  color: rgba(245, 240, 232, 0.82);
+  color: rgba(232, 255, 255, 0.82);
   font-family: "Russo One", sans-serif;
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -104,7 +104,7 @@
   margin: 0;
   font-size: 14px;
   line-height: 1.55;
-  color: rgba(245, 240, 232, 0.75);
+  color: rgba(232, 255, 255, 0.75);
 }
 
 .theater-walk__help-text strong {
@@ -127,7 +127,7 @@
   text-transform: uppercase;
   text-align: center;
   line-height: 1.45;
-  color: rgba(245, 240, 232, 0.78);
+  color: rgba(232, 255, 255, 0.78);
 }
 
 .theater-walk__hint strong {

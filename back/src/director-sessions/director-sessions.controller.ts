@@ -55,7 +55,8 @@ export class DirectorSessionsController {
   publish(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { comment?: string } | undefined,
+    @Body()
+    body: { comment?: string; includeUnavailable?: boolean } | undefined,
   ) {
     return this.sessions.publish(req.user.userId, id, body);
   }

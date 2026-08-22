@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/model/auth-context";
@@ -16,6 +17,7 @@ import { useAppDispatch } from "../../shared/store/hooks";
 import type { ProjectRoleInfo } from "../../sync/api/projects";
 import type { KanbanSceneRolesAdminMember } from "./KanbanSceneRolesAdminPanel";
 import { normalizeActorEmail } from "./KanbanSceneCastDisplay";
+import { profileListAvatarSrc } from "../../sync/api/profile";
 import "./KanbanSceneRoleDetailPanel.css";
 
 function memberLabel(m: KanbanSceneRolesAdminMember): {
@@ -194,7 +196,7 @@ export function KanbanSceneRoleDetailPanel({
               }}
             />
           ) : (
-            <div className="kanban-role-detail__muted">Загрузка редактора портрета…</div>
+            <PageLoader variant="view" label="Загрузка редактора портрета…" />
           )}
         </section>
 
@@ -238,7 +240,7 @@ export function KanbanSceneRoleDetailPanel({
                 title={label.title}
               >
                 <MiniAvatar
-                  src={String(m.profile?.avatarUrl ?? "").trim() || null}
+                  src={profileListAvatarSrc(m.profile)}
                   label={label.title}
                   size={42}
                 />

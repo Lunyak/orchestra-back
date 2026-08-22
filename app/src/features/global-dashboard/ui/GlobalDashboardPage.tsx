@@ -1,3 +1,4 @@
+import { PageBootLoader } from "@shared/components/page-loader/page-boot";
 import { Button } from "@shared/core/button/Button";
 import { Modal } from "@shared/core/modal/Modal";
 import cn from "classnames";
@@ -10,7 +11,7 @@ import {
   projectPath,
   projectTaskPath,
   studioAssignmentPath,
-  studioPath,
+  studioOverviewPath,
   theaterOverviewPath,
 } from "../../../app/router/paths";
 import {
@@ -284,7 +285,7 @@ export function GlobalDashboardPage() {
         key: `studio:${studio.id}`,
         title: studio.title,
         typeLabel: "Студия",
-        path: studioPath(studio.id),
+        path: studioOverviewPath(studio.id),
         openedAt: ref.openedAt,
       },
     ];
@@ -344,12 +345,8 @@ export function GlobalDashboardPage() {
     }
   };
 
-  if (viewState === "loading") {
-    return (
-      <main className="global-dashboard global-dashboard--state" aria-busy="true">
-        Загрузка обзора…
-      </main>
-    );
+  if (viewState === "loading" || organizationsLoading || projectsLoading) {
+    return <PageBootLoader label="Загрузка обзора…" />;
   }
 
   if (viewState === "error" || !data) {
@@ -395,9 +392,7 @@ export function GlobalDashboardPage() {
               Все
             </Link>
           </div>
-          {organizationsLoading ? (
-            <p className="global-dashboard__muted">Загрузка организаций…</p>
-          ) : recentOrganizations.length ? (
+          {recentOrganizations.length ? (
             <ul className="global-dashboard__list">
               {recentOrganizations.map((organization) => (
                 <li key={organization.key}>
@@ -438,9 +433,7 @@ export function GlobalDashboardPage() {
 
         <section className="global-dashboard__panel">
           <h2>Недавние проекты</h2>
-          {projectsLoading ? (
-            <p className="global-dashboard__muted">Загрузка проектов…</p>
-          ) : recentProjects.length ? (
+          {recentProjects.length ? (
             <ul className="global-dashboard__list">
               {recentProjects.map((project) => {
                 const workspaceLabel = project.workspace?.name ?? "Проект";

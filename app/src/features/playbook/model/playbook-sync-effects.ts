@@ -23,7 +23,6 @@ import { sceneHasTheaterLayoutContent } from "../../theater/model/copy-scene-the
 import { playbookActions, DEFAULT_THEATER_LAYOUT, type PlaybookLightFadersDataV1 } from "./playbook-slice";
 import { loadSceneRolesFromStorage, saveSceneRolesToStorage } from "./playbook-roles-storage";
 import { normalizeLightChannelsLoose, normalizePlaybookJsonPayload, readPlaybookScenes } from "./playbook-normalize";
-import { hydratePlaybookFromLocalPack } from "./playbook-local-hydration";
 import {
   readSelectedScenePage,
   writeSelectedScenePage,
@@ -31,9 +30,7 @@ import {
 import { usePlaybookOperations } from "./playbook-operations";
 import {
   getProjectMediaFolderInfo,
-  mergeScannedMediaIntoScene,
   readStoredProjectMediaFolder,
-  scanProjectMediaFolder,
 } from "../../../shared/platform/project-media-folder";
 import { setBrowserPickedMediaProject } from "../../../shared/platform/browser-picked-media";
 import { registerDevProjectMediaRoot } from "../../../shared/platform/local-project-dev";
@@ -41,11 +38,22 @@ import { store } from "../../../shared/store/store";
 import { downloadDesktopProjectorMediaOffline } from "../../../sync/desktopProjectorMediaOffline";
 import { unpackProjectorMedia } from "../../projector/model/playbook-projector-persist";
 
+type PlaybookLocalBoot = {
+  projectName: string;
+  promise: Promise<void>;
+};
+
+let playbookLocalBoot: PlaybookLocalBoot | null = null;
+let lastCompletedPlaybookBootProject: string | null = null;
+const syncedPlaybookKeys = new Set<string>();
+
 export function usePlaybookSyncEffects() {
   const dispatch = useAppDispatch();
   const { accessToken } = useAuth();
   const { projectName, ensureRemoteProject } = useProject();
   const { syncFromServer, saveScenesForLightPlot } = usePlaybookOperations();
+  const accessTokenRef = useRef(accessToken);
+  accessTokenRef.current = accessToken;
 
   const {
     scenes,
@@ -67,7 +75,6 @@ export function usePlaybookSyncEffects() {
   const lastProjectForSceneRolesSaveRef = useRef<string | null>(null);
   const lastProjectForSelectedSceneSaveRef = useRef<string | null>(null);
   const lightPlotSaveTimerRef = useRef<number | null>(null);
-  const lastSyncedKeyRef = useRef<string | null>(null);
   const lastSavedLightChannelsKeyRef = useRef<string | null>(null);
   const joinedProjectIdRef = useRef<string | null>(null);
   const realtimePullTimerRef = useRef<number | null>(null);
@@ -81,180 +88,192 @@ export function usePlaybookSyncEffects() {
 
   useEffect(() => {
     if (!projectName) return;
-    dispatch(playbookActions.resetForProject());
-    selectedSceneIdRef.current = null;
-    restoredProjectRef.current = null;
-    desktopLocalSceneLoadedRef.current = false;
-    desktopTheaterRecoveryRef.current = null;
 
-    let cancelled = false;
-    const loadScene = async () => {
-      setBrowserPickedMediaProject(projectName);
-      const storedFolder = readStoredProjectMediaFolder(projectName);
-      if (storedFolder.path) {
-        void registerDevProjectMediaRoot(projectName, storedFolder.path);
+    const reuseBoot =
+      playbookLocalBoot?.projectName === projectName
+        ? playbookLocalBoot.promise
+        : null;
+
+    const alreadyBooted =
+      !reuseBoot &&
+      lastCompletedPlaybookBootProject === projectName &&
+      (store.getState().playbook.isPlaybookReady ||
+        // Web: boot finishes before first /sync/pull; keep awaiting sync without reset.
+        !getDesktopApi());
+
+    if (alreadyBooted) return;
+
+    if (!reuseBoot) {
+      dispatch(playbookActions.resetForProject());
+      selectedSceneIdRef.current = null;
+      restoredProjectRef.current = null;
+      desktopLocalSceneLoadedRef.current = false;
+      desktopTheaterRecoveryRef.current = null;
+      lastCompletedPlaybookBootProject = null;
+      const syncKeySuffix = `:${projectName}`;
+      for (const key of [...syncedPlaybookKeys]) {
+        if (key.endsWith(syncKeySuffix)) syncedPlaybookKeys.delete(key);
       }
-      void getProjectMediaFolderInfo(projectName);
+    }
 
-      const desktopApi = getDesktopApi();
-      if (!desktopApi) {
-        const loadedLocal = await hydratePlaybookFromLocalPack(projectName, dispatch);
-        if (cancelled) return;
-        if (loadedLocal) {
-          desktopLocalSceneLoadedRef.current = true;
-        }
-        if (!getDesktopApi()) {
-          const scanned = await scanProjectMediaFolder(projectName);
-          if (
-            !cancelled &&
-            scanned.ok &&
-            (scanned.videos.length > 0 ||
-              scanned.holdImages.length > 0 ||
-              (scanned.sounds?.length ?? 0) > 0)
-          ) {
-            const prev = store.getState().playbook.playbookData;
-            const merged = mergeScannedMediaIntoScene(
-              prev?.videos ?? [],
-              prev?.holdImages ?? [],
-              prev?.playlist ?? [],
-              scanned,
-            );
-            dispatch(
-              playbookActions.setProjectorMediaLibrary({
-                videos: merged.videos,
-                holdImages: merged.holdImages,
-              }),
-            );
-            if (merged.playlist.length !== (prev?.playlist?.length ?? 0)) {
-              dispatch(playbookActions.setPlaylist(merged.playlist));
-            }
-            console.info(
-              `[sync] imported media from ${scanned.mediaRoot ?? scanned.folderName ?? "local"}`,
-            );
-          }
-        }
-        if (loadedLocal) {
-          if (!store.getState().playbook.isPlaybookReady) {
-            dispatch(playbookActions.setPlaybookReady(true));
-          }
-          return;
-        }
-        const hasImportedMedia =
-          (store.getState().playbook.playbookData?.videos?.length ?? 0) > 0 ||
-          (store.getState().playbook.playbookData?.holdImages?.length ?? 0) > 0;
-        if (hasImportedMedia) {
-          if (!store.getState().playbook.isPlaybookReady) {
-            dispatch(playbookActions.setPlaybookReady(true));
-          }
-          return;
-        }
-        dispatch(
-          playbookActions.hydratePlaybook({
-            playbookData: null,
-            theaterLayout: DEFAULT_THEATER_LAYOUT,
-            scenes: [],
-            currentPage: 0,
-            isPlaybookReady: true,
-          }),
-        );
+    const bootProject = projectName;
+    const isCurrentBoot = () =>
+      playbookLocalBoot?.projectName === bootProject ||
+      lastCompletedPlaybookBootProject === bootProject;
+
+    const loadScene = async () => {
+      if (reuseBoot) {
+        await reuseBoot;
         return;
       }
-      try {
-        const scene = await desktopReadProjectPlaybook(desktopApi, projectName, "script");
-        if (cancelled) return;
-        const normalizedScene =
-          scene && typeof scene === "object"
-            ? normalizePlaybookJsonPayload(scene as Record<string, unknown>)
-            : null;
-        const localRoles = loadSceneRolesFromStorage(projectName);
-        const mergedScene =
-          normalizedScene
-            ? { ...normalizedScene, sceneRoles: normalizedScene.sceneRoles ?? localRoles ?? undefined }
-            : null;
-        const localPlaybookData = mergedScene || null;
-        const lc = normalizeLightChannelsLoose((localPlaybookData as any)?.lightChannels);
-        const theaterLayout = resolveInitialTheaterLayout(
-          projectName,
-          (mergedScene as any)?.theaterLayout
-            ? normalizePersistedTheaterLayout((mergedScene as any).theaterLayout)
-            : undefined,
-          DEFAULT_THEATER_LAYOUT,
-        );
-        const prepared = prepareSceneLightBindings(
-          readPlaybookScenes(localPlaybookData as Record<string, unknown>),
-          (localPlaybookData as Record<string, unknown>)?.lightFaders as PlaybookLightFadersDataV1 | undefined,
-        );
-        const playbookDataForHydrate =
-          localPlaybookData && prepared.lightFaders
-            ? { ...(localPlaybookData as any), lightFaders: prepared.lightFaders }
-            : localPlaybookData;
-        dispatch(
-          playbookActions.hydratePlaybook({
-            playbookData: playbookDataForHydrate,
-            theaterLayout,
-            scenes: prepared.scenes,
-            currentPage: 0,
-            isPlaybookReady: true,
-            serverShadow: {
-              playbookData: playbookDataForHydrate,
-              scenes: prepared.scenes,
-              theaterLayout,
-              lightChannels: lc,
-            },
-          }),
-        );
-        desktopLocalSceneLoadedRef.current = Array.isArray(prepared.scenes) && prepared.scenes.length > 0;
-        void (async () => {
-          const pid =
-            typeof window !== "undefined"
-              ? localStorage.getItem(`projectId:${projectName}`)
-              : null;
-          const offline = await downloadDesktopProjectorMediaOffline({
-            projectSlug: projectName,
-            accessToken,
-            projectId: pid,
-          });
-          if (cancelled || !offline.changed) return;
-          const bag = unpackProjectorMedia((localPlaybookData as any)?.projectorMedia);
-          const nextPlaybookData = {
-            ...(localPlaybookData as object),
-            videos: offline.videos.length > 0 ? offline.videos : bag.videos,
-            holdImages: offline.holdImages.length > 0 ? offline.holdImages : bag.holdImages,
-          };
-          dispatch(
-            playbookActions.hydratePlaybook({
-              playbookData: nextPlaybookData,
-              theaterLayout,
-              scenes: prepared.scenes,
-              currentPage: 0,
-              isPlaybookReady: true,
-            }),
-          );
-        })();
-        if (!isTheaterLayoutDraftDirty(projectName)) {
-          commitTheaterLayoutBaseline(projectName, theaterLayout);
+
+      let finishBoot!: () => void;
+      const bootPromise = new Promise<void>((resolve) => {
+        finishBoot = resolve;
+      });
+      // Register before async body so sync web path's isCurrentBoot() is true.
+      playbookLocalBoot = { projectName: bootProject, promise: bootPromise };
+
+      void (async () => {
+        try {
+          setBrowserPickedMediaProject(bootProject);
+          const storedFolder = readStoredProjectMediaFolder(bootProject);
+          if (storedFolder.path) {
+            void registerDevProjectMediaRoot(bootProject, storedFolder.path);
+          }
+          void getProjectMediaFolderInfo(bootProject);
+
+          const desktopApi = getDesktopApi();
+          if (!desktopApi) {
+            // Web: source of truth is /sync/pull. Do not mark ready with empty scenes —
+            // that flashes «Добавьте материал» before the first pull lands.
+            if (!isCurrentBoot()) return;
+            const token = accessTokenRef.current;
+            if (!token) {
+              dispatch(
+                playbookActions.hydratePlaybook({
+                  playbookData: null,
+                  theaterLayout: DEFAULT_THEATER_LAYOUT,
+                  scenes: [],
+                  currentPage: 0,
+                  isPlaybookReady: true,
+                }),
+              );
+            }
+            return;
+          }
+          try {
+            const scene = await desktopReadProjectPlaybook(desktopApi, bootProject, "script");
+            if (!isCurrentBoot()) return;
+            const normalizedScene =
+              scene && typeof scene === "object"
+                ? normalizePlaybookJsonPayload(scene as Record<string, unknown>)
+                : null;
+            const localRoles = loadSceneRolesFromStorage(bootProject);
+            const mergedScene =
+              normalizedScene
+                ? {
+                    ...normalizedScene,
+                    sceneRoles: normalizedScene.sceneRoles ?? localRoles ?? undefined,
+                  }
+                : null;
+            const localPlaybookData = mergedScene || null;
+            const lc = normalizeLightChannelsLoose((localPlaybookData as any)?.lightChannels);
+            const theaterLayout = resolveInitialTheaterLayout(
+              bootProject,
+              (mergedScene as any)?.theaterLayout
+                ? normalizePersistedTheaterLayout((mergedScene as any).theaterLayout)
+                : undefined,
+              DEFAULT_THEATER_LAYOUT,
+            );
+            const prepared = prepareSceneLightBindings(
+              readPlaybookScenes(localPlaybookData as Record<string, unknown>),
+              (localPlaybookData as Record<string, unknown>)?.lightFaders as
+                | PlaybookLightFadersDataV1
+                | undefined,
+            );
+            const playbookDataForHydrate =
+              localPlaybookData && prepared.lightFaders
+                ? { ...(localPlaybookData as any), lightFaders: prepared.lightFaders }
+                : localPlaybookData;
+            dispatch(
+              playbookActions.hydratePlaybook({
+                playbookData: playbookDataForHydrate,
+                theaterLayout,
+                scenes: prepared.scenes,
+                currentPage: 0,
+                isPlaybookReady: true,
+                serverShadow: {
+                  playbookData: playbookDataForHydrate,
+                  scenes: prepared.scenes,
+                  theaterLayout,
+                  lightChannels: lc,
+                },
+              }),
+            );
+            desktopLocalSceneLoadedRef.current =
+              Array.isArray(prepared.scenes) && prepared.scenes.length > 0;
+            void (async () => {
+              const pid =
+                typeof window !== "undefined"
+                  ? localStorage.getItem(`projectId:${bootProject}`)
+                  : null;
+              const offline = await downloadDesktopProjectorMediaOffline({
+                projectSlug: bootProject,
+                accessToken: accessTokenRef.current,
+                projectId: pid,
+              });
+              if (!isCurrentBoot() || !offline.changed) return;
+              const bag = unpackProjectorMedia((localPlaybookData as any)?.projectorMedia);
+              const nextPlaybookData = {
+                ...(localPlaybookData as object),
+                videos: offline.videos.length > 0 ? offline.videos : bag.videos,
+                holdImages:
+                  offline.holdImages.length > 0 ? offline.holdImages : bag.holdImages,
+              };
+              dispatch(
+                playbookActions.hydratePlaybook({
+                  playbookData: nextPlaybookData,
+                  theaterLayout,
+                  scenes: prepared.scenes,
+                  currentPage: 0,
+                  isPlaybookReady: true,
+                }),
+              );
+            })();
+            if (!isTheaterLayoutDraftDirty(bootProject)) {
+              commitTheaterLayoutBaseline(bootProject, theaterLayout);
+            }
+            selectedSceneIdRef.current = null;
+            restoredProjectRef.current = null;
+          } catch {
+            if (isCurrentBoot()) {
+              dispatch(
+                playbookActions.hydratePlaybook({
+                  playbookData: null,
+                  theaterLayout: DEFAULT_THEATER_LAYOUT,
+                  scenes: [],
+                  currentPage: 0,
+                  isPlaybookReady: false,
+                }),
+              );
+            }
+          }
+        } finally {
+          if (isCurrentBoot()) {
+            lastCompletedPlaybookBootProject = bootProject;
+          }
+          if (playbookLocalBoot?.promise === bootPromise) {
+            playbookLocalBoot = null;
+          }
+          finishBoot();
         }
-        selectedSceneIdRef.current = null;
-        restoredProjectRef.current = null;
-      } catch (error) {
-        if (!cancelled) {
-          dispatch(
-            playbookActions.hydratePlaybook({
-              playbookData: null,
-              theaterLayout: DEFAULT_THEATER_LAYOUT,
-              scenes: [],
-              currentPage: 0,
-              isPlaybookReady: false,
-            }),
-          );
-        }
-      }
+      })();
+
+      await bootPromise;
     };
     void loadScene();
-    return () => {
-      cancelled = true;
-    };
-  }, [projectName, dispatch, accessToken]);
+  }, [projectName, dispatch]);
 
   // Persist per-scene role links locally as well (helps web-only mode too).
   useEffect(() => {
@@ -271,12 +290,24 @@ export function usePlaybookSyncEffects() {
   useEffect(() => {
     if (!accessToken || !projectName) return;
     if (getDesktopApi()) return;
-    if (!isPlaybookReady) return;
     const key = `${accessToken}:${projectName}`;
-    if (lastSyncedKeyRef.current === key) return;
-    lastSyncedKeyRef.current = key;
-    void syncFromServer(accessToken, projectName);
-  }, [accessToken, projectName, syncFromServer, isPlaybookReady]);
+    if (syncedPlaybookKeys.has(key)) return;
+    syncedPlaybookKeys.add(key);
+    void syncFromServer(accessToken, projectName).catch(() => {
+      syncedPlaybookKeys.delete(key);
+      const playbook = store.getState().playbook;
+      if (playbook.isPlaybookReady) return;
+      dispatch(
+        playbookActions.hydratePlaybook({
+          playbookData: playbook.playbookData,
+          theaterLayout: playbook.theaterLayout,
+          scenes: playbook.scenes,
+          currentPage: playbook.currentPage,
+          isPlaybookReady: true,
+        }),
+      );
+    });
+  }, [accessToken, projectName, syncFromServer, dispatch]);
 
   // Desktop: локальный script.json мог устареть/обнулить 3D — подтягиваем театр с сервера.
   useEffect(() => {

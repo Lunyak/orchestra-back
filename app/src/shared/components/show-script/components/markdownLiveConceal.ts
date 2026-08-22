@@ -100,7 +100,18 @@ const concealPlugin = ViewPlugin.fromClass(
 
 const concealTheme = EditorView.baseTheme({
   ".cm-md-concealed": {
-    opacity: "0.22",
+    /* Не opacity: маркеры (`*`) иначе оставляют ширину — «лишний пробел» после лейбла. */
+    display: "inline-block",
+    width: "0",
+    minWidth: "0",
+    maxWidth: "0",
+    margin: "0",
+    padding: "0",
+    overflow: "hidden",
+    opacity: "0",
+    fontSize: "0",
+    lineHeight: "0",
+    letterSpacing: "0",
     caretColor: "var(--color-text-primary)",
   },
 });

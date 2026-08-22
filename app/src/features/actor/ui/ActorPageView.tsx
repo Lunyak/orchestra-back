@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
 import { useMemo, useState } from "react";
 import { DialogueSceneTrainer } from "../../actor-trainers/ui/DialogueSceneTrainer";
@@ -5,7 +6,7 @@ import { VoiceDialogueTrainer } from "../../actor-trainers/ui/VoiceDialogueTrain
 import { PhraseWriteTrainer } from "../../actor-trainers/ui/PhraseWriteTrainer";
 import { Button } from "../../../shared/core/button/Button";
 import { CustomSelect } from "../../../shared/core/custom-select/CustomSelect";
-import { useAppEditorMenubarActionsRender, useAppEditorViewMenuRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
+import { useAppEditorMenubarActionsRender } from "../../../shared/components/app-editor-menubar/AppEditorMenubarContext";
 import { AppEditorActorTrainerMenu } from "../../../shared/components/app-editor-menubar/AppEditorActorTrainerMenu";
 import { Modal } from "../../../shared/core/modal/Modal";
 import { useActorPage } from "../model/useActorPage";
@@ -102,14 +103,6 @@ export function ActorPageView() {
     });
   };
 
-  useAppEditorViewMenuRender(
-    "actor-trainer-menu",
-    10,
-    () => (
-      <AppEditorActorTrainerMenu trainerMode={trainerMode} onSetTrainerMode={setTrainerMode} />
-    ),
-  );
-
   useAppEditorMenubarActionsRender("actor-settings", 20, () => (
     <button
       type="button"
@@ -125,6 +118,7 @@ export function ActorPageView() {
 
   return (
     <main className="actor-page">
+      <AppEditorActorTrainerMenu trainerMode={trainerMode} onSetTrainerMode={setTrainerMode} />
       <div className="actor-page__content">
         <Modal
           isOpen={settingsOpen}
@@ -167,7 +161,9 @@ export function ActorPageView() {
                 dropdownClassName="actor-select-dropdown"
                 aria-label="Роль"
               />
-              {profileLoading ? <div className="actor-hint">Загрузка профиля…</div> : null}
+              {profileLoading ? (
+                <PageLoader variant="view" label="Загрузка профиля…" />
+              ) : null}
               {!canPickAnyRole && myEmail && rolesForActor.length === 0 && !rolesLoading ? (
                 <div className="actor-hint">
                   Похоже, роли не назначены на ваш email. Назначьте себя на роль в карточке сцены на доске{" "}

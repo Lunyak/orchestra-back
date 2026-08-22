@@ -1,9 +1,9 @@
 import cn from "classnames";
+import { MotionConfig } from "motion/react";
 import { useId, useState, type ChangeEvent } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   getProjectNavMap,
-  getProjectPeopleNavMap,
   type ProjectNavNode,
 } from "../model/project-nav-map";
 import {
@@ -13,12 +13,16 @@ import {
   storeProjectPoster,
 } from "../model/project-poster-storage";
 import posterPlaceholderUrl from "../assets/project-poster-placeholder.png";
+import {
+  MindmapExpandPresence,
+  MindmapMotionItem,
+  useMindmapBranchExpand,
+} from "./mindmap-expand";
 import "./project-nav-mindmap.css";
 
 type ProjectNavMindmapProps = {
   projectSlug: string;
   rootLabel?: string;
-  kind?: "project" | "people";
 };
 
 function isPathActive(pathname: string, href: string) {
@@ -86,7 +90,6 @@ function MindmapPosterRoot({
         hasPoster && "project-nav-mindmap__poster--filled",
       )}
     >
-      <p className="project-nav-mindmap__poster-name">{rootLabel}</p>
       <div className="project-nav-mindmap__poster-frame">
         <Link
           to={href}
@@ -95,7 +98,7 @@ function MindmapPosterRoot({
             !hasPoster && "project-nav-mindmap__poster-link--placeholder",
           )}
           aria-current={isActive ? "page" : undefined}
-          aria-label={rootLabel}
+          aria-label={rootLabel || "Обзор проекта"}
         >
           <img
             className="project-nav-mindmap__poster-image"
@@ -183,6 +186,72 @@ function MindmapNode({
   return <span className={className}>{node.label}</span>;
 }
 
+function MindmapBranch({
+  node,
+  pathname,
+  depth,
+  staggerIndex,
+  siblingNodes,
+}: {
+  node: ProjectNavNode;
+  pathname: string;
+  depth: number;
+  staggerIndex: number;
+  siblingNodes: ReadonlyArray<ProjectNavNode>;
+}) {
+  const isLit = nodeHasActiveDescendant(node, pathname);
+  const hasChildren = Boolean(node.children?.length);
+  const { isOpen, expandProps } = useMindmapBranchExpand(isLit, hasChildren);
+  const isNested = depth > 0;
+  const shareHrefWithSibling = Boolean(
+    node.href &&
+      siblingNodes.some(
+        (other) => other.id !== node.id && other.href === node.href,
+      ),
+  );
+  const resolvedVariant = (() => {
+    if (!node.href && hasChildren) {
+      return depth === 0 ? "group" : "section";
+    }
+    if (hasChildren) return "group";
+    return "mode";
+  })();
+
+  return (
+    <MindmapMotionItem
+      animated={isNested}
+      staggerIndex={staggerIndex}
+      className={cn(
+        "project-nav-mindmap__item",
+        depth === 0 && "project-nav-mindmap__branch",
+        depth === 0 && !hasChildren && "project-nav-mindmap__branch--solo",
+        depth > 0 && "project-nav-mindmap__leaf-item",
+        isLit && "project-nav-mindmap__item--active",
+        depth === 0 && isLit && "project-nav-mindmap__branch--active",
+      )}
+      {...expandProps}
+    >
+      <div className="project-nav-mindmap__cluster">
+        <MindmapNode
+          node={node}
+          pathname={pathname}
+          variant={resolvedVariant}
+          shareHrefWithSibling={shareHrefWithSibling}
+        />
+        <MindmapExpandPresence open={hasChildren && isOpen}>
+          {node.children?.length ? (
+            <MindmapSubtree
+              nodes={node.children}
+              pathname={pathname}
+              depth={depth + 1}
+            />
+          ) : null}
+        </MindmapExpandPresence>
+      </div>
+    </MindmapMotionItem>
+  );
+}
+
 function MindmapSubtree({
   nodes,
   pathname,
@@ -200,53 +269,16 @@ function MindmapSubtree({
         depth > 0 && "project-nav-mindmap__leaves",
       )}
     >
-      {nodes.map((node) => {
-        const isLit = nodeHasActiveDescendant(node, pathname);
-        const hasChildren = Boolean(node.children?.length);
-        const shareHrefWithSibling = Boolean(
-          node.href &&
-            nodes.some(
-              (other) => other.id !== node.id && other.href === node.href,
-            ),
-        );
-        const resolvedVariant = (() => {
-          if (!node.href && hasChildren) {
-            return depth === 0 ? "group" : "section";
-          }
-          if (hasChildren) return "group";
-          return "mode";
-        })();
-
-        return (
-          <li
-            key={node.id}
-            className={cn(
-              "project-nav-mindmap__item",
-              depth === 0 && "project-nav-mindmap__branch",
-              depth === 0 && !hasChildren && "project-nav-mindmap__branch--solo",
-              depth > 0 && "project-nav-mindmap__leaf-item",
-              isLit && "project-nav-mindmap__item--active",
-              depth === 0 && isLit && "project-nav-mindmap__branch--active",
-            )}
-          >
-            <div className="project-nav-mindmap__cluster">
-              <MindmapNode
-                node={node}
-                pathname={pathname}
-                variant={resolvedVariant}
-                shareHrefWithSibling={shareHrefWithSibling}
-              />
-              {node.children?.length ? (
-                <MindmapSubtree
-                  nodes={node.children}
-                  pathname={pathname}
-                  depth={depth + 1}
-                />
-              ) : null}
-            </div>
-          </li>
-        );
-      })}
+      {nodes.map((node, index) => (
+        <MindmapBranch
+          key={node.id}
+          node={node}
+          pathname={pathname}
+          depth={depth}
+          staggerIndex={index}
+          siblingNodes={nodes}
+        />
+      ))}
     </ul>
   );
 }
@@ -254,32 +286,16 @@ function MindmapSubtree({
 export function ProjectNavMindmap({
   projectSlug,
   rootLabel = "",
-  kind = "project",
 }: ProjectNavMindmapProps) {
   const { pathname } = useLocation();
-  const isPeople = kind === "people";
-  const navMap = isPeople
-    ? getProjectPeopleNavMap(projectSlug)
-    : getProjectNavMap(projectSlug, rootLabel);
+  const navMap = getProjectNavMap(projectSlug, rootLabel);
   const rootHref = navMap.root.href ?? "";
-  const ariaLabel = isPeople
-    ? "Карта команды проекта"
-    : "Карта разделов проекта";
 
   return (
-    <nav className="project-nav-mindmap" aria-label={ariaLabel}>
-      <div className="project-nav-mindmap__canvas">
-        <div
-          className={cn(
-            "project-nav-mindmap__root-col",
-            isPeople && "project-nav-mindmap__root-col--label",
-          )}
-        >
-          {isPeople ? (
-            <span className="project-nav-mindmap__node project-nav-mindmap__node--group project-nav-mindmap__people-root">
-              {navMap.root.label}
-            </span>
-          ) : (
+    <MotionConfig reducedMotion="user">
+      <nav className="project-nav-mindmap" aria-label="Карта разделов проекта">
+        <div className="project-nav-mindmap__canvas">
+          <div className="project-nav-mindmap__root-col">
             <MindmapPosterRoot
               key={projectSlug}
               projectSlug={projectSlug}
@@ -287,14 +303,14 @@ export function ProjectNavMindmap({
               href={rootHref}
               pathname={pathname}
             />
-          )}
+          </div>
+          <MindmapSubtree
+            nodes={navMap.branches}
+            pathname={pathname}
+            depth={0}
+          />
         </div>
-        <MindmapSubtree
-          nodes={navMap.branches}
-          pathname={pathname}
-          depth={0}
-        />
-      </div>
-    </nav>
+      </nav>
+    </MotionConfig>
   );
 }

@@ -4,6 +4,7 @@ html[data-theme="midnight"] {
   --color-bg-tertiary: #38bdf8;
   --color-active-ascent: #38bdf8;
   --color-bg-quaternary: #1e293b;
+  --color-list-item-hover: color-mix(in srgb, var(--color-bg-quaternary) 78%, white);
   --color-text-tertiary: #7dd3fc;
   --color-text-label: #93c5fd;
   --color-button-primary: #0284c7;

@@ -36,6 +36,17 @@ function isStageDirectionLine(line: string): boolean {
   return false;
 }
 
+function normalizeDialogueSpacing(text: string): string {
+  return String(text ?? "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,!?;:…]+)/g, "$1")
+    .replace(/([«„“])\s+/g, "$1")
+    .replace(/\s+([»”])/g, "$1")
+    .replace(/\s+([)\]])/g, "$1")
+    .replace(/([(\[])\s+/g, "$1")
+    .trim();
+}
+
 function cleanText(raw: string): string {
   let s = String(raw ?? "");
   // remove light/script tokens like {{light:1}} or {{blackout}}
@@ -45,7 +56,7 @@ function cleanText(raw: string): string {
   // Parentheses in this project are stage remarks the actor doesn't speak.
   // Nested parentheses are rare; simple removal is sufficient.
   s = s.replace(/\([^)]*\)/g, " ");
-  return stripLeadingPunctuation(s.replace(/\s+/g, " ").trim());
+  return stripLeadingPunctuation(normalizeDialogueSpacing(s));
 }
 
 function parseLineSpeaker(line: string): { role: string; rest: string } | null {

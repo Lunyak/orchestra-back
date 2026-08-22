@@ -17,9 +17,9 @@ fi
 echo "📦 Останавливаем development контейнеры..."
 docker compose -f docker-compose.yml -f docker-compose.dev.yml down 2>/dev/null || true
 
-# Запускаем production
+# Запускаем production (без docker-compose.override.yml — только -f)
 echo "🔧 Запуск production контейнеров..."
-docker compose up -d --build
+docker compose -f docker-compose.yml up -d --build
 
 echo "✅ Production окружение запущено!"
 echo "🌐 Web: http://localhost"
@@ -28,4 +28,4 @@ echo "⚙️  Admin: http://localhost:8081"
 echo "📊 MinIO: http://localhost:9001"
 echo "📋 Logs: http://localhost:9999"
 echo ""
-echo "💡 Для просмотра логов: docker compose logs -f"
+echo "💡 Для просмотра логов: docker compose -f docker-compose.yml logs -f"

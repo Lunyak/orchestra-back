@@ -25,6 +25,7 @@ import type {
   TroupeMemberKind,
 } from "../../features/troupe/api/troupe-api";
 import { MiniAvatar } from "../../shared/components/mini-avatar/MiniAvatar";
+import { profileListAvatarSrc } from "../../sync/api/profile";
 import { AdminSectionChrome } from "../../shared/components/admin/AdminSectionChrome";
 import "../../features/rehearsals/ui/rehearsals.css";
 import "../../features/director-sessions/ui/director-sessions.css";
@@ -207,7 +208,7 @@ export function TroupePage() {
                 >
                   <div className="troupe-actor-row">
                     <MiniAvatar
-                      src={String(m.profile?.avatarUrl ?? "").trim() || null}
+                      src={profileListAvatarSrc(m.profile)}
                       label={label || m.email}
                       size={22}
                     />

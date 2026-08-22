@@ -1,0 +1,48 @@
+---
+description: Единый лоадер Orchestra — PageLoader вместо скелетонов и текстовых заглушек
+alwaysApply: true
+---
+
+# Orchestra PageLoader
+
+Для любых состояний загрузки UI используй общий прелоудер.
+
+## Компоненты
+
+- `PageLoader` — иконка cue-light (`orchestra-preloader`)
+- `PageBootLoader` / `usePageBootBlock` — **полноэкранный boot**: прячет menubar, пока страница не готова
+
+```tsx
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import { PageBootLoader, usePageBootBlock } from "@shared/components/page-loader/page-boot";
+
+// Route / page ещё грузится — без меню навигации
+return <PageBootLoader label="Загрузка обзора…" />;
+// или:
+usePageBootBlock(isLoading, "Загрузка обзора…");
+if (isLoading) return null;
+
+// Секция внутри уже готового layout
+<PageLoader variant="view" label="Загрузка…" />
+
+// Suspense fallback маршрута — тоже PageBootLoader (не сырой PageLoader)
+<Suspense fallback={<PageBootLoader label="Загрузка страницы…" />}>
+```
+
+## Обязательно
+
+- Boot страницы / lazy route → `PageBootLoader` (menubar скрыт)
+- Вложенная секция → `PageLoader variant="view"`
+- Не рендерить menubar/shell поверх незавершённой загрузки
+
+## Запрещено
+
+- Скелетоны, самодельные спиннеры
+- Полноэкранный `<PageLoader />` внутри страницы при видимом menubar — используй `PageBootLoader`
+- `<p>Загрузка…</p>` как заглушка контента
+
+## Исключения
+
+- Текст на кнопке upload/submit
+- Плейсхолдер в заголовке
+- Three.js `SkeletonUtils`

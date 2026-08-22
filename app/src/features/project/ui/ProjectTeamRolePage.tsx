@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
@@ -125,7 +126,7 @@ export function ProjectTeamRolePage() {
   }
 
   if (isLoading) {
-    return <div className="troupe-team-empty">Загружаем должность…</div>;
+    return <PageLoader variant="view" label="Загружаем должность…" />;
   }
 
   if (!role) {

@@ -1,0 +1,53 @@
+.chalk-contacts__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.chalk-contacts__row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 13px 0;
+  border-bottom: 1px solid rgba(205, 198, 182, 0.18);
+  text-decoration: none;
+  color: inherit;
+  max-width: 100%;
+  box-sizing: border-box;
+  transition: color var(--transition), text-shadow var(--transition);
+}
+
+.chalk-contacts__row:last-child {
+  border-bottom: 0;
+}
+
+.chalk-contacts__row:hover,
+.chalk-contacts__row:focus-visible {
+  color: var(--chalk-neon);
+  text-shadow: 0 0 10px rgba(0, 251, 255, 0.35);
+}
+
+.chalk-contacts__row:focus-visible {
+  outline: 1px solid var(--chalk-neon);
+  outline-offset: 4px;
+}
+
+.chalk-contacts__title {
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.9rem, 3.5vw, 1.05rem);
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+}
+
+.chalk-contacts__meta {
+  width: 100%;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.72rem, 2.8vw, 0.9rem);
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+  text-transform: lowercase;
+  color: rgba(205, 198, 182, 0.78);
+  overflow-wrap: break-word;
+}

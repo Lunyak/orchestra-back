@@ -1,5 +1,5 @@
 .preloader {
-  --preloader-glow: #7aa8ff;
+  --preloader-glow: #00fbff;
 
   position: relative;
   display: grid;
@@ -11,9 +11,9 @@
   inset: 0;
   z-index: 9999;
   background:
-    radial-gradient(900px 520px at 20% 10%, rgba(184, 53, 74, 0.12), transparent 60%),
-    radial-gradient(820px 520px at 80% 30%, rgba(255, 255, 255, 0.05), transparent 60%),
-    rgba(13, 10, 12, 0.92);
+    radial-gradient(900px 520px at 20% 10%, rgba(0, 251, 255, 0.12), transparent 60%),
+    radial-gradient(820px 520px at 80% 30%, rgba(0, 251, 255, 0.05), transparent 60%),
+    rgba(0, 0, 0, 0.92);
   backdrop-filter: blur(8px);
 }
 

@@ -1,13 +1,18 @@
+import { createSingleflight } from "../../shared/utils/singleflight";
 import { api } from "./client";
 import type { ProjectSummary } from "./types/project";
+
+const projectsSingleflight = createSingleflight<[string], ProjectSummary[]>();
 
 export async function fetchProjects(
   accessToken: string,
 ): Promise<ProjectSummary[]> {
-  const { data } = await api.get<ProjectSummary[]>("/projects", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  return data;
+  return projectsSingleflight(accessToken, async (token) => {
+    const { data } = await api.get<ProjectSummary[]>("/projects", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return data;
+  }, accessToken);
 }
 
 export type ProjectLinks = {
@@ -67,7 +72,7 @@ export async function ensureProject(
 export async function updateProject(
   accessToken: string,
   slug: string,
-  body: { name?: string; description?: string | null },
+  body: { name?: string; description?: string | null; slug?: string },
 ): Promise<ProjectSummary> {
   const { data } = await api.patch<ProjectSummary>(
     `/projects/${encodeURIComponent(slug)}`,

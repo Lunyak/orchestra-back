@@ -5,7 +5,11 @@ import {
   type ScriptEditorInsertMenuPick,
 } from "../../../../features/script-editor-insert-menu";
 import {
+  collapseExtraBlankLines,
+  subscribeScriptCollapseBlankLines,
+  subscribeScriptMarkdownStyle,
   subscribeScriptTokenizeRequests,
+  applyMarkdownStyle,
   wrapMarkdownMatchesAsTokens,
   wrapNextMarkdownMatchAsToken,
 } from "../../app-editor-menubar";
@@ -104,6 +108,58 @@ export function useShowScriptMarkdownInsert(args: UseShowScriptMarkdownInsertArg
         if (result.selection) {
           ed.setSelection(result.selection.from, result.selection.to);
         }
+      } else {
+        updateSceneField(currentScene.id, activeMarkdownField, result.value);
+      }
+
+      return result;
+    });
+  }, [activeMarkdown, activeMarkdownField, currentScene, markdownRef, updateSceneField]);
+
+  useEffect(() => {
+    return subscribeScriptCollapseBlankLines(() => {
+      if (!currentScene) {
+        return collapseExtraBlankLines(String(activeMarkdown ?? ""));
+      }
+
+      const ed = markdownRef.current;
+      const currentValue = ed?.getDoc() ?? String(activeMarkdown ?? "");
+      const result = collapseExtraBlankLines(currentValue);
+
+      if (result.value === currentValue) return result;
+
+      if (ed) {
+        const selection = ed.getSelection();
+        const cursor = Math.min(selection?.to ?? result.value.length, result.value.length);
+        ed.applyDocument(result.value, cursor);
+      } else {
+        updateSceneField(currentScene.id, activeMarkdownField, result.value);
+      }
+
+      return result;
+    });
+  }, [activeMarkdown, activeMarkdownField, currentScene, markdownRef, updateSceneField]);
+
+  useEffect(() => {
+    return subscribeScriptMarkdownStyle((action) => {
+      const ed = markdownRef.current;
+      const currentValue = ed?.getDoc() ?? String(activeMarkdown ?? "");
+      const selection = ed?.getSelection() ?? {
+        from: currentValue.length,
+        to: currentValue.length,
+      };
+      const result = applyMarkdownStyle(
+        currentValue,
+        selection.from,
+        selection.to,
+        action,
+      );
+
+      if (!currentScene) return result;
+
+      if (ed) {
+        ed.applyDocument(result.value, result.selection.to);
+        ed.setSelection(result.selection.from, result.selection.to);
       } else {
         updateSceneField(currentScene.id, activeMarkdownField, result.value);
       }

@@ -8,7 +8,10 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth";
 import {
   computePlannedEmailsForSession,
+  findBusyConflictForChangedSessions,
+  findDirectorSessionBusyConflict,
   findDirectorSessionParticipant,
+  formatDirectorSessionBusyConflictMessage,
   formatSlotTime,
   formatTimeHHMM,
   getSessionStartLocalMinutes,
@@ -118,6 +121,8 @@ export function useDirectorSessionsPage(
   const [remindAvailabilityMut] = useRemindDirectorSessionMissingAvailabilityMutation();
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [includeUnavailableInCall, setIncludeUnavailableInCall] =
+    useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [sendingAvailabilityReminders, setSendingAvailabilityReminders] =
     useState(false);
@@ -443,6 +448,11 @@ export function useDirectorSessionsPage(
 
   const persist = async (next: DirectorRehearsalSession[]) => {
     if (!accessToken) return false;
+    const busyConflict = findBusyConflictForChangedSessions(sessions, next);
+    if (busyConflict) {
+      setSaveError(formatDirectorSessionBusyConflictMessage(busyConflict));
+      return false;
+    }
     const previous = sessions;
     const merged = attachKnownPublishedAt(next);
     setSessions(merged);
@@ -527,8 +537,47 @@ export function useDirectorSessionsPage(
   const createSessionAtDate = async (dateKey: string, timeLocal = "20:00") => {
     const dk = String(dateKey ?? "").trim();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) return;
+    const preferred = String(timeLocal ?? "").trim() || "20:00";
+    const preferredMatch = preferred.match(/^(\d{1,2}):(\d{2})$/);
+    const preferredMin = preferredMatch
+      ? Number(preferredMatch[1]) * 60 + Number(preferredMatch[2])
+      : 20 * 60;
+    const createDurationMin = 30;
+    const buildProbe = (startMin: number): DirectorRehearsalSession => ({
+      id: "__create-probe__",
+      title: "",
+      startsAt: new Date(
+        `${dk}T${formatTimeHHMM(startMin)}:00`,
+      ).toISOString(),
+      projectSlugs:
+        projectName && !isDirectorSessionsSlug(projectName)
+          ? [projectName]
+          : undefined,
+      slots: [{ id: "probe", offsetMin: 0, durationMin: createDurationMin }],
+      updatedAt: new Date().toISOString(),
+    });
+    let time = preferred;
+    if (findDirectorSessionBusyConflict(buildProbe(preferredMin), sessions)) {
+      let found: string | null = null;
+      for (let step = 1; step < 48; step += 1) {
+        const candidateMin = (preferredMin + step * 30) % (24 * 60);
+        if (
+          !findDirectorSessionBusyConflict(buildProbe(candidateMin), sessions)
+        ) {
+          found = formatTimeHHMM(candidateMin);
+          break;
+        }
+      }
+      if (!found) {
+        setSaveError(
+          "Нет свободного интервала на этот день — все слоты пересекаются с другими сессиями",
+        );
+        return null;
+      }
+      time = found;
+    }
     const nowIso = new Date().toISOString();
-    const startsAt = new Date(`${dk}T${timeLocal}:00`).toISOString();
+    const startsAt = new Date(`${dk}T${time}:00`).toISOString();
     const projectSlugs =
       projectName && !isDirectorSessionsSlug(projectName)
         ? [projectName]
@@ -538,7 +587,7 @@ export function useDirectorSessionsPage(
       title: `Сессия ${dayjs(dk).format("D MMM")}`,
       startsAt,
       projectSlugs,
-      slots: [{ id: createId(), offsetMin: 0, durationMin: 30 }],
+      slots: [{ id: createId(), offsetMin: 0, durationMin: createDurationMin }],
       updatedAt: nowIso,
     };
     const merged = [next, ...sessions];
@@ -609,6 +658,7 @@ export function useDirectorSessionsPage(
       const pub = await publishDirectorSessionMut({
         sessionId: activeSession.id,
         comment: sessionCommentDraft ?? "",
+        includeUnavailable: includeUnavailableInCall,
       }).unwrap();
       if (pub?.session && String(pub.session.id ?? "") === activeSession.id) {
         setSessions((prev) =>
@@ -617,6 +667,11 @@ export function useDirectorSessionsPage(
               ? ({ ...s, ...pub.session } as DirectorRehearsalSession)
               : s,
           ),
+        );
+      }
+      if (pub?.telegramSent === false) {
+        setPublishError(
+          "Сессия сохранена, но сообщение в Telegram не отправилось. Проверьте бота и настройки группы.",
         );
       }
     } catch (e: any) {
@@ -965,6 +1020,8 @@ export function useDirectorSessionsPage(
     setActiveSlotId,
     publishing,
     publishError,
+    includeUnavailableInCall,
+    setIncludeUnavailableInCall,
     saveError,
     sendingAvailabilityReminders,
     availabilityReminderMessage,

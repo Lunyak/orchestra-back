@@ -49,58 +49,42 @@
 .project-media-source {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-secondary);
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
-.project-media-source__lead {
-  margin: 0;
-  max-width: 720px;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  color: var(--color-text-muted);
-}
-
-.project-media-source__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.project-media-source__card {
+.project-media-source__row {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--color-border-faint);
-  background: var(--field-control-bg);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
 }
 
-.project-media-source__card-title {
-  margin: 0;
-  font-size: 1rem;
+.project-media-source__label {
+  font-size: 11px;
   font-weight: 600;
-  color: var(--color-text-lighter);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
-.project-media-source__card-text {
-  margin: 0;
-  flex: 1;
-  font-size: 0.85rem;
-  line-height: 1.45;
-  color: var(--color-text-muted);
+.project-media-source__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
 }
 
 .project-media-source__btn {
-  align-self: flex-start;
   margin: 0;
-  padding: 8px 14px;
+  padding: 6px 10px;
   border: 1px solid var(--color-border-visible);
   background: transparent;
   color: var(--color-text-lighter);
   font: inherit;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -121,12 +105,13 @@
 
 .project-media-source__folder-badge {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 
 .project-media-source__folder-label {
   color: var(--color-active-ascent);
+  font-weight: 600;
 }
 
 .project-media-page__library {
@@ -137,7 +122,7 @@
 
 .project-media-page__audio-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, var(--width-panel)) minmax(0, 1fr);
   gap: 16px;
   align-items: stretch;
 }
@@ -153,6 +138,10 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+}
+
+.project-media-library-section--playlist {
+  max-width: var(--width-panel);
 }
 
 .project-media-library-section--playlist,
@@ -191,13 +180,15 @@
 }
 
 .project-media-page__playlist-container {
+  width: 100%;
+  max-width: var(--width-panel);
   min-height: 280px;
   height: 100%;
 }
 
 .project-media-page__playlist-container .playlist-sidebar {
   width: 100%;
-  max-width: none;
+  max-width: var(--width-panel);
   height: 100%;
   min-height: 280px;
   border: 1px solid var(--color-border-subtle);

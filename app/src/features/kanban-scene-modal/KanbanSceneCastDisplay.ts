@@ -1,4 +1,5 @@
 import type { KanbanSceneRolesAdminMember } from "./KanbanSceneRolesAdminPanel";
+import { profileListAvatarSrc } from "../../sync/api/profile";
 
 export function normalizeActorEmail(v: unknown): string {
   return String(v ?? "")
@@ -25,12 +26,13 @@ export function actorDisplay(
     return { label: email || "?", avatarUrl: null, title: email };
   }
   const p = member.profile;
+  const avatarUrl = profileListAvatarSrc(p);
   const full =
     `${String(p.firstName ?? "").trim()} ${String(p.lastName ?? "").trim()}`.trim();
   if (full) {
     return {
       label: full,
-      avatarUrl: String(p.avatarUrl ?? "").trim() || null,
+      avatarUrl,
       title: email ? `${full} (${email})` : full,
     };
   }
@@ -38,13 +40,13 @@ export function actorDisplay(
   if (display) {
     return {
       label: display,
-      avatarUrl: String(p.avatarUrl ?? "").trim() || null,
+      avatarUrl,
       title: email ? `${display} (${email})` : display,
     };
   }
   return {
     label: email || "?",
-    avatarUrl: String(p.avatarUrl ?? "").trim() || null,
+    avatarUrl,
     title: email,
   };
 }

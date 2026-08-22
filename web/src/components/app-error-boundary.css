@@ -1,0 +1,115 @@
+.app-error-boundary {
+  --app-error-bg: var(--color-bg-primary, #282828);
+  --app-error-panel: var(--color-bg-secondary, #1d2021);
+  --app-error-text: var(--color-text-primary, #fff);
+  --app-error-muted: var(--color-text-ui-medium, rgba(255, 255, 255, 0.72));
+  --app-error-border: var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+  --app-error-accent: var(--color-active-ascent, #e78a4e);
+  --app-error-code-bg: var(--color-surface-3, #111827);
+
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--app-error-bg);
+  color: var(--app-error-text);
+  font-family: inherit;
+}
+
+.app-error-boundary *,
+.app-error-boundary *::before,
+.app-error-boundary *::after {
+  box-sizing: border-box;
+}
+
+.app-error-boundary__card {
+  width: min(100%, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 20px;
+  border: 1px solid var(--app-error-border);
+  border-left: 3px solid var(--app-error-accent);
+  background: var(--app-error-panel);
+}
+
+.app-error-boundary__eyebrow {
+  margin: 0;
+  color: var(--app-error-accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.app-error-boundary__title {
+  margin: 0;
+  color: var(--app-error-text);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.app-error-boundary__lead {
+  margin: 0;
+  color: var(--app-error-muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.app-error-boundary__details {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--app-error-border);
+  background: var(--app-error-code-bg);
+  color: var(--app-error-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.app-error-boundary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.app-error-boundary__reload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 10px 16px;
+  border: 1px solid var(--app-error-accent);
+  background: var(--app-error-accent);
+  color: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: filter 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.app-error-boundary__reload:hover {
+  filter: brightness(1.06);
+}
+
+.app-error-boundary__reload:active {
+  filter: brightness(0.96);
+}
+
+.app-error-boundary__reload:focus-visible {
+  outline: 2px solid var(--app-error-accent);
+  outline-offset: 2px;
+}

@@ -8,33 +8,6 @@
   overflow-x: hidden;
 }
 
-.site-bands-page__grain {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.35;
-  background-image:
-    repeating-linear-gradient(
-      to bottom,
-      transparent 0,
-      transparent 2px,
-      rgba(255, 255, 255, 0.03) 2px,
-      rgba(255, 255, 255, 0.03) 3px
-    ),
-    radial-gradient(circle at 20% 20%, rgba(184, 53, 74, 0.18), transparent 42%),
-    radial-gradient(circle at 80% 70%, rgba(78, 158, 255, 0.1), transparent 40%);
-}
-
-.site-bands-page__grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.22;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  mix-blend-mode: soft-light;
-}
-
 .site-bands-page__back {
   position: absolute;
   top: 18px;
@@ -43,24 +16,26 @@
   display: inline-flex;
   align-items: center;
   padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--color-border);
   border-radius: 0;
-  background: rgba(10, 8, 10, 0.72);
+  background: rgba(0, 0, 0, 0.72);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  color: rgba(245, 240, 232, 0.78);
-  font-family: "Russo One", sans-serif;
+  color: rgba(232, 255, 255, 0.72);
+  font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   text-decoration: none;
-  transition: color var(--transition), background-color var(--transition);
+  transition: color var(--transition), background-color var(--transition), text-shadow var(--transition);
+  box-shadow: var(--shadow);
 }
 
 .site-bands-page__back:hover,
 .site-bands-page__back:focus-visible {
   color: var(--site-bands-accent);
-  background: color-mix(in oklab, var(--site-bands-accent) 14%, transparent);
+  background: var(--color-accent-soft);
+  text-shadow: var(--glow-text);
 }
 
 .site-bands-page__content {
@@ -84,18 +59,18 @@
 
 .site-bands-page__tagline {
   margin: 8px 0 0;
-  font-family: "Russo One", sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(13px, 1.5vw, 18px);
-  letter-spacing: 0.14em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(245, 240, 232, 0.72);
+  color: var(--color-text-soft);
 }
 
 .site-bands-list {
   display: flex;
   flex-direction: column;
   width: 100%;
-  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-top: 1px solid var(--color-border-soft);
   margin-top: auto;
 }
 
@@ -107,19 +82,20 @@
   gap: clamp(16px, 3vw, 40px);
   width: 100%;
   padding: clamp(18px, 3.2dvh, 34px) clamp(16px, 4vw, 48px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(8, 5, 7, 0.35);
+  border-bottom: 1px solid var(--color-border-soft);
+  background: rgba(0, 8, 10, 0.45);
   box-sizing: border-box;
   color: var(--color-text);
   text-decoration: none;
   border-radius: 0;
-  transition: color var(--transition), background-color var(--transition);
+  transition: color var(--transition), background-color var(--transition), text-shadow var(--transition);
 }
 
 a.site-bands-row:hover,
 a.site-bands-row:focus-visible {
   color: var(--site-bands-accent);
-  background: color-mix(in oklab, var(--site-bands-accent) 14%, rgba(8, 5, 7, 0.55));
+  background: color-mix(in oklab, var(--site-bands-accent) 12%, rgba(0, 8, 10, 0.7));
+  text-shadow: var(--glow-text);
 }
 
 a.site-bands-row:focus-visible {
@@ -136,14 +112,14 @@ a.site-bands-row:focus-visible {
 }
 
 .site-bands-row__title {
-  font-family: "HouseBroken", "Russo One", sans-serif;
+  font-family: "HouseBroken", var(--font-display), sans-serif;
   font-size: clamp(1.4rem, 2.6vw + 0.4rem, 2.4rem);
   letter-spacing: 0.04em;
   line-height: 1.1;
 }
 
 .site-bands-row__meta {
-  font-family: "Russo One", sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(0.85rem, 1vw + 0.35rem, 1rem);
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -157,15 +133,16 @@ a.site-bands-row:focus-visible {
   height: 56px;
   flex-shrink: 0;
   object-fit: cover;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--color-border);
   border-radius: 0;
   filter: grayscale(100%) contrast(1.05) brightness(0.92);
-  transition: filter var(--transition);
+  transition: filter var(--transition), box-shadow var(--transition);
 }
 
 a.site-bands-row:hover .site-bands-row__avatar,
 .site-bands-row:hover .site-bands-row__avatar {
   filter: grayscale(0%) contrast(1.05) brightness(1);
+  box-shadow: 0 0 16px rgba(0, 251, 255, 0.25);
 }
 
 @media (max-width: 768px) {

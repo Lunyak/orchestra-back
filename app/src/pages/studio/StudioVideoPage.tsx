@@ -1,9 +1,10 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { FormInlineRow } from "@shared/core/form-inline-row/FormInlineRow";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
 import { useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { studioPath } from "../../app/router/paths";
+import { studioVideosSectionPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import {
@@ -105,17 +106,7 @@ export function StudioVideoPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="app-layout studio-layout">
-        <div className="app-content">
-          <main className="main-content">
-            <div className="studio-page">
-              <p>Загрузка…</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Загрузка…" />;
   }
 
   if (error || !video || !embed) {
@@ -124,7 +115,7 @@ export function StudioVideoPage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to={studioPath(studioId)}>
+              <Link className="studio-page__back" to={studioVideosSectionPath(studioId)}>
                 ← Студия
               </Link>
               <p className="studio-page__error">Видео не найдено.</p>
@@ -140,7 +131,7 @@ export function StudioVideoPage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to={studioPath(studioId)}>
+            <Link className="studio-page__back" to={studioVideosSectionPath(studioId)}>
               ← Студия
             </Link>
 

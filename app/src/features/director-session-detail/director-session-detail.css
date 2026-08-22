@@ -137,6 +137,12 @@
   text-overflow: ellipsis;
 }
 
+.director-session-page__called-time {
+  margin-right: 6px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .director-session-page__called-item .sessions-slot-gather-mark {
   flex-shrink: 0;
   width: 6px;

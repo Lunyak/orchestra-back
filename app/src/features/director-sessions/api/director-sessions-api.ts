@@ -64,12 +64,19 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
 
     publishDirectorSession: build.mutation<
       { ok: boolean; telegramSent?: boolean; session?: DirectorSession },
-      { sessionId: string; comment?: string | null }
+      {
+        sessionId: string;
+        comment?: string | null;
+        includeUnavailable?: boolean;
+      }
     >({
-      query: ({ sessionId, comment }) => ({
+      query: ({ sessionId, comment, includeUnavailable }) => ({
         url: `/director-sessions/${encodeURIComponent(sessionId)}/publish`,
         method: "POST",
-        data: comment != null ? { comment } : null,
+        data: {
+          ...(comment != null ? { comment } : {}),
+          ...(includeUnavailable ? { includeUnavailable: true } : {}),
+        },
       }),
       invalidatesTags: [{ type: "DirectorSessions", id: "BUNDLE" }],
     }),

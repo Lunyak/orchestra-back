@@ -1,6 +1,22 @@
 /** Dev-сервер (npm run dev): чтение проектов и медиа с локального диска без Electron. */
 
 import { normalizePlaybookJsonPayload, playbookSceneCount } from "../../features/playbook/model/playbook-normalize";
+import { createSingleflight } from "../utils/singleflight";
+
+export type DevScannedMedia = {
+  ok: boolean;
+  mediaRoot?: string;
+  videos: Array<{ id: number; title: string; file: string }>;
+  holdImages: Array<{ id: number; title: string; file: string }>;
+  sounds: Array<{ id: number; title: string; file: string }>;
+  error?: string;
+};
+
+const localJsonSingleflight = createSingleflight<
+  [string, "script" | "notes-run"],
+  Record<string, unknown> | null
+>();
+const scanMediaSingleflight = createSingleflight<[string], DevScannedMedia>();
 
 export function isDevLocalProjectsEnabled(): boolean {
   return Boolean(import.meta.env.DEV);
@@ -49,30 +65,36 @@ export async function fetchDevLocalProjectJson(
   kind: "script" | "notes-run",
 ): Promise<Record<string, unknown> | null> {
   if (!isDevLocalProjectsEnabled() || !projectSlug) return null;
-  const file = kind === "notes-run" ? "notes-run.json" : "script.json";
-  const paths = [
-    `/local-project-scenesModules/${encodeURIComponent(projectSlug)}/${file}`,
-    `/local-project-scenes/${encodeURIComponent(projectSlug)}/${file}`,
-  ];
-  let best: Record<string, unknown> | null = null;
-  let bestCount = -1;
-  for (const url of paths) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const data = (await res.json()) as Record<string, unknown>;
-      if (!data || typeof data !== "object") continue;
-      const normalized = kind === "script" ? normalizePlaybookJsonPayload(data) : data;
-      const count = kind === "script" ? playbookSceneCount(normalized) : 1;
-      if (count > bestCount) {
-        best = normalized;
-        bestCount = count;
+  return localJsonSingleflight(`${projectSlug}:${kind}`, async (slug, fileKind) => {
+    const file = fileKind === "notes-run" ? "notes-run.json" : "script.json";
+    const paths = [
+      `/local-project-scenesModules/${encodeURIComponent(slug)}/${file}`,
+      `/local-project-scenes/${encodeURIComponent(slug)}/${file}`,
+    ];
+    let best: Record<string, unknown> | null = null;
+    let bestCount = -1;
+    for (const url of paths) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const data = (await res.json()) as Record<string, unknown>;
+        if (!data || typeof data !== "object") continue;
+        const normalized =
+          fileKind === "script" ? normalizePlaybookJsonPayload(data) : data;
+        const count = fileKind === "script" ? playbookSceneCount(normalized) : 1;
+        if (count > bestCount) {
+          best = normalized;
+          bestCount = count;
+        }
+        // Prefer scenesModules when it already has content — skip second 404.
+        if (fileKind === "script" && count > 0) return best;
+        if (fileKind === "notes-run") return best;
+      } catch {
+        /* try next path */
       }
-    } catch {
-      /* try next path */
     }
-  }
-  return best;
+    return best;
+  }, projectSlug, kind);
 }
 
 export async function fetchDevMediaRootProjectJson(
@@ -109,15 +131,6 @@ export async function pingDevLocalProjects(): Promise<{
     return { ok: false };
   }
 }
-
-export type DevScannedMedia = {
-  ok: boolean;
-  mediaRoot?: string;
-  videos: Array<{ id: number; title: string; file: string }>;
-  holdImages: Array<{ id: number; title: string; file: string }>;
-  sounds: Array<{ id: number; title: string; file: string }>;
-  error?: string;
-};
 
 type ScannedItem = { id: number; title: string; file: string; filePath?: string };
 
@@ -219,38 +232,41 @@ export async function fetchDevScannedMedia(mediaRootOverride?: string | null): P
   if (!isDevLocalProjectsEnabled()) {
     return { ok: false, videos: [], holdImages: [], sounds: [], error: "Not in dev mode" };
   }
-  try {
-    const query =
-      mediaRootOverride != null && String(mediaRootOverride).trim()
-        ? `?root=${encodeURIComponent(String(mediaRootOverride).trim())}`
-        : "";
-    const res = await fetch(`/local-project-dev/scan-media${query}`);
-    const data = (await res.json()) as DevScannedMedia;
-    if (!res.ok || !data?.ok) {
+  const rootKey =
+    mediaRootOverride != null && String(mediaRootOverride).trim()
+      ? String(mediaRootOverride).trim()
+      : "";
+  return scanMediaSingleflight(rootKey || "__default__", async (root) => {
+    try {
+      const query = root ? `?root=${encodeURIComponent(root)}` : "";
+      const res = await fetch(`/local-project-dev/scan-media${query}`);
+      const data = (await res.json()) as DevScannedMedia;
+      if (!res.ok || !data?.ok) {
+        return {
+          ok: false,
+          videos: [],
+          holdImages: [],
+          sounds: [],
+          error: data?.error ?? "scan-media failed",
+        };
+      }
+      return {
+        ok: true,
+        mediaRoot: data.mediaRoot,
+        videos: Array.isArray(data.videos) ? data.videos : [],
+        holdImages: Array.isArray(data.holdImages) ? data.holdImages : [],
+        sounds: Array.isArray(data.sounds) ? data.sounds : [],
+      };
+    } catch (err) {
       return {
         ok: false,
         videos: [],
         holdImages: [],
         sounds: [],
-        error: data?.error ?? "scan-media failed",
+        error: String((err as Error)?.message ?? err),
       };
     }
-    return {
-      ok: true,
-      mediaRoot: data.mediaRoot,
-      videos: Array.isArray(data.videos) ? data.videos : [],
-      holdImages: Array.isArray(data.holdImages) ? data.holdImages : [],
-      sounds: Array.isArray(data.sounds) ? data.sounds : [],
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      videos: [],
-      holdImages: [],
-      sounds: [],
-      error: String((err as Error)?.message ?? err),
-    };
-  }
+  }, rootKey);
 }
 
 export async function registerDevProjectMediaRoot(

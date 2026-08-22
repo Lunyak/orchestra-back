@@ -9,6 +9,16 @@ import type {
   DirectorRehearsalSession,
   DirectorSessionSlot,
 } from "../directorSessionsSync";
+import {
+  packedOffsetsForOrder,
+  suggestIdleMinimizingSlotOrder,
+  type IdleOrderSuggestion,
+} from "../model/session-slot-idle-order";
+import {
+  classifyActorSlotAvailability,
+  normalizeEmail,
+} from "../model/session-page-utils";
+import type { TeamProfile } from "../../../sync/api/profile";
 import { createId } from "../../../shared/utils/createId";
 import "./director-sessions.css";
 
@@ -111,13 +121,19 @@ export type DirectorSessionSlotsPanelProps = {
   onSelectSlot: (slotId: string) => void;
   /** Если удалили последний выбранный слот и слотов не осталось */
   onNoSlotsLeft?: () => void;
-  persistSessions: (next: DirectorRehearsalSession[]) => Promise<void>;
+  persistSessions: (next: DirectorRehearsalSession[]) => Promise<boolean | void>;
+  busyConflictError?: string | null;
+  onDismissBusyConflictError?: () => void;
   /** Блок настроек слота (проект, сцена, превью, заметки) — в модалке по выбранному слоту */
   slotSettings?: React.ReactNode;
   onRequestCloseSlot: () => void;
   /** Доп. класс на карточке слота (напр. доступность по ролям на странице одной сессии) */
   slotToneClassById?: Map<string, string> | null;
   slotDisplayById?: Map<string, DirectorSessionSlotDisplay> | null;
+  /** Emails актёров по слоту (для упорядочивания без простоя) */
+  emailsBySlotId?: Record<string, string[]> | null;
+  profilesByEmail?: Map<string, TeamProfile> | null;
+  sessionDateKey?: string | null;
 };
 
 export function DirectorSessionSlotsPanel({
@@ -127,10 +143,15 @@ export function DirectorSessionSlotsPanel({
   onSelectSlot,
   onNoSlotsLeft,
   persistSessions,
+  busyConflictError = null,
+  onDismissBusyConflictError,
   slotSettings,
   onRequestCloseSlot,
   slotToneClassById,
   slotDisplayById,
+  emailsBySlotId = null,
+  profilesByEmail = null,
+  sessionDateKey = null,
 }: DirectorSessionSlotsPanelProps) {
   const [autoShiftFollowing, setAutoShiftFollowing] = useState(true);
   const [timelineDragOver, setTimelineDragOver] = useState(false);
@@ -145,6 +166,9 @@ export function DirectorSessionSlotsPanel({
   const touchDragPointRef = useRef<{ x: number; y: number } | null>(null);
   const [materialDragPayload, setMaterialDragPayload] =
     useState<DragSceneRefPayload | null>(null);
+  const [idleOrderPreview, setIdleOrderPreview] =
+    useState<IdleOrderSuggestion | null>(null);
+  const [idleOrderBusyEmails, setIdleOrderBusyEmails] = useState<string[]>([]);
 
   const [slotDraft, setSlotDraft] = useState<
     Record<string, { time: string; duration: string }>
@@ -164,7 +188,8 @@ export function DirectorSessionSlotsPanel({
         ...patch,
         updatedAt: nowIso,
       };
-      await persistSessions(mergeSession(nextSession));
+      const saved = await persistSessions(mergeSession(nextSession));
+      return saved !== false;
     },
     [mergeSession, persistSessions, session],
   );
@@ -208,11 +233,10 @@ export function DirectorSessionSlotsPanel({
       offsetMin: nextOffset,
       durationMin: 30,
     };
-    const saveSlot = updateActiveSession({
+    const saved = await updateActiveSession({
       slots: [...(session.slots ?? []), slot],
     });
-    onSelectSlot(slot.id);
-    await saveSlot;
+    if (saved) onSelectSlot(slot.id);
   };
 
   const removeSlot = async (slotId: string) => {
@@ -230,6 +254,89 @@ export function DirectorSessionSlotsPanel({
       (a, b) => a.offsetMin - b.offsetMin,
     );
     await updateActiveSession({ slots: packSlotsSequentialInOrder(sorted) });
+  };
+
+  const slotsWithScenes = useMemo(() => {
+    return (session.slots ?? []).filter(
+      (sl) =>
+        Boolean(String(sl.ref?.projectSlug ?? "").trim()) &&
+        sl.ref?.sceneId != null,
+    );
+  }, [session.slots]);
+
+  const canSuggestIdleOrder = slotsWithScenes.length >= 2;
+
+  const openIdleOrderPreview = () => {
+    if (!canSuggestIdleOrder) return;
+    const currentOrder = [...slotsWithScenes]
+      .sort((a, b) => a.offsetMin - b.offsetMin)
+      .map((s) => s.id);
+    const actorsBySlotId: Record<string, string[]> = {};
+    const durationBySlotId: Record<string, number> = {};
+    for (const sl of slotsWithScenes) {
+      actorsBySlotId[sl.id] = (emailsBySlotId?.[sl.id] ?? []).map((e) =>
+        normalizeEmail(e),
+      );
+      durationBySlotId[sl.id] = Math.max(
+        1,
+        Math.floor(Number(sl.durationMin) || 1),
+      );
+    }
+    const suggestion = suggestIdleMinimizingSlotOrder(
+      currentOrder,
+      actorsBySlotId,
+      durationBySlotId,
+    );
+    if (!suggestion) return;
+
+    const offsets = packedOffsetsForOrder(
+      suggestion.order,
+      durationBySlotId,
+    );
+    const sessionBase = getSessionStartLocalMinutes(session.startsAt);
+    const busy = new Set<string>();
+    if (sessionDateKey && profilesByEmail) {
+      for (const id of suggestion.order) {
+        const startMin =
+          sessionBase + Math.max(0, Math.floor(offsets[id] ?? 0));
+        const endMin = startMin + durationBySlotId[id]!;
+        for (const email of actorsBySlotId[id] ?? []) {
+          const prof = profilesByEmail.get(email);
+          if (
+            classifyActorSlotAvailability(
+              prof,
+              sessionDateKey,
+              startMin,
+              endMin,
+            ) === "busy"
+          ) {
+            busy.add(email);
+          }
+        }
+      }
+    }
+    setIdleOrderBusyEmails(Array.from(busy).sort());
+    setIdleOrderPreview(suggestion);
+  };
+
+  const applyIdleOrderPreview = async () => {
+    if (!idleOrderPreview) return;
+    const byId = new Map((session.slots ?? []).map((s) => [s.id, s]));
+    const orderedWithScenes: DirectorSessionSlot[] = [];
+    for (const id of idleOrderPreview.order) {
+      const sl = byId.get(id);
+      if (sl) orderedWithScenes.push(sl);
+    }
+    const rest = (session.slots ?? []).filter(
+      (sl) => !idleOrderPreview.order.includes(sl.id),
+    );
+    const nextSlots = packSlotsSequentialInOrder([
+      ...orderedWithScenes,
+      ...rest.sort((a, b) => a.offsetMin - b.offsetMin),
+    ]);
+    setIdleOrderPreview(null);
+    setIdleOrderBusyEmails([]);
+    await updateActiveSession({ slots: nextSlots });
   };
 
   const moveSlotToTarget = useCallback(
@@ -302,11 +409,10 @@ export function DirectorSessionSlotsPanel({
       durationMin,
       ref: { projectSlug: payload.projectSlug, sceneId: payload.sceneId },
     };
-    const saveSlot = updateActiveSession({
+    const saved = await updateActiveSession({
       slots: [...(session.slots ?? []), slot],
     });
-    onSelectSlot(slot.id);
-    await saveSlot;
+    if (saved) onSelectSlot(slot.id);
   };
 
   useEffect(() => {
@@ -369,15 +475,13 @@ export function DirectorSessionSlotsPanel({
       if (!sl.ref) {
         return {
           projectLabel: customTitle || "Слот без названия",
-          materialLabel: customTitle ? "Без проекта и сцены" : "",
+          materialLabel: "Без проекта",
         };
       }
       return {
         projectLabel:
           customTitle || String(sl.ref.projectSlug ?? "").trim() || "Проект",
-        materialLabel: customTitle
-          ? `${String(sl.ref.projectSlug ?? "").trim()} · Материал загружается`
-          : "Материал загружается",
+        materialLabel: String(sl.ref.projectSlug ?? "").trim() || "Проект",
       };
     },
     [slotDisplayById],
@@ -587,35 +691,44 @@ export function DirectorSessionSlotsPanel({
                   onClick={() => onSelectSlot(sl.id)}
                 >
                   <div className="sessions-slot-head">
-                    <div className="sessions-slot-title" title={slotTime}>
-                      <span
-                        className="director-session-slots-panel__status-dot"
-                        aria-hidden="true"
+                    <div className="sessions-slot-head__left">
+                      <div className="sessions-slot-title" title={slotTime}>
+                        <span
+                          className="director-session-slots-panel__status-dot"
+                          aria-hidden="true"
+                        />
+                        <span className="sessions-slot-title__text">
+                          {slotTime}
+                        </span>
+                      </div>
+                      {display.projectLabel ? (
+                        <div
+                          className="sessions-slot-meta"
+                          title={display.projectLabel}
+                        >
+                          {display.projectLabel}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="sessions-slot-head__right">
+                      {display.materialLabel ? (
+                        <div
+                          className="sessions-slot-project"
+                          title={display.materialLabel}
+                        >
+                          {display.materialLabel}
+                        </div>
+                      ) : null}
+                      <Buttons.DeleteButton
+                        type="button"
+                        className="sessions-slot-title__btn-delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeSlot(sl.id);
+                        }}
                       />
-                      <span className="sessions-slot-title__text">
-                        {slotTime}
-                      </span>
                     </div>
-                    <Buttons.DeleteButton
-                      type="button"
-                      className="sessions-slot-title__btn-delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void removeSlot(sl.id);
-                      }}
-                    />
                   </div>
-                  <div
-                    className="sessions-slot-project"
-                    title={display.projectLabel}
-                  >
-                    {display.projectLabel}
-                  </div>
-                  {display.materialLabel ? (
-                    <div className="sessions-slot-meta" title={display.materialLabel}>
-                      {display.materialLabel}
-                    </div>
-                  ) : null}
                   {String(sl.notes ?? "").trim() ? (
                     <div
                       className="sessions-slot-notes"
@@ -649,40 +762,176 @@ export function DirectorSessionSlotsPanel({
           </span>
           <div className="director-session-slots-panel__touch-preview-main">
             <div className="sessions-slot-head">
-              <div
-                className="sessions-slot-title"
-                title={formatSlotTime(
-                  session.startsAt,
-                  draggedSlotForTouchPreview.offsetMin,
-                )}
-              >
-                <span className="director-session-slots-panel__status-dot" />
-                <span className="sessions-slot-title__text">
-                  {formatSlotTime(
+              <div className="sessions-slot-head__left">
+                <div
+                  className="sessions-slot-title"
+                  title={formatSlotTime(
                     session.startsAt,
                     draggedSlotForTouchPreview.offsetMin,
                   )}
-                </span>
+                >
+                  <span className="director-session-slots-panel__status-dot" />
+                  <span className="sessions-slot-title__text">
+                    {formatSlotTime(
+                      session.startsAt,
+                      draggedSlotForTouchPreview.offsetMin,
+                    )}
+                  </span>
+                </div>
+                {draggedSlotDisplay?.projectLabel ? (
+                  <div
+                    className="sessions-slot-meta"
+                    title={draggedSlotDisplay.projectLabel}
+                  >
+                    {draggedSlotDisplay.projectLabel}
+                  </div>
+                ) : null}
               </div>
+              {draggedSlotDisplay?.materialLabel ? (
+                <div className="sessions-slot-head__right">
+                  <div
+                    className="sessions-slot-project"
+                    title={draggedSlotDisplay.materialLabel}
+                  >
+                    {draggedSlotDisplay.materialLabel}
+                  </div>
+                </div>
+              ) : null}
             </div>
-            <div
-              className="sessions-slot-project"
-              title={draggedSlotDisplay?.projectLabel}
-            >
-              {draggedSlotDisplay?.projectLabel ?? "Проект"}
-            </div>
-            {draggedSlotDisplay?.materialLabel ? (
-              <div
-                className="sessions-slot-meta"
-                title={draggedSlotDisplay.materialLabel}
-              >
-                {draggedSlotDisplay.materialLabel}
-              </div>
-            ) : null}
           </div>
         </div>
       ) : null}
-      <Buttons.AddButton type="button" onClick={() => void addSlot()} title="Новый слот" />
+      {busyConflictError ? (
+        <div
+          className="director-session-slots-panel__busy-error"
+          role="alert"
+        >
+          <p className="director-session-slots-panel__busy-error-text">
+            {busyConflictError}
+          </p>
+          {onDismissBusyConflictError ? (
+            <button
+              type="button"
+              className="director-session-slots-panel__busy-error-dismiss"
+              onClick={onDismissBusyConflictError}
+            >
+              Понятно
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="director-session-slots-panel__footer-actions">
+        <Button
+          type="button"
+          disabled={!canSuggestIdleOrder}
+          title={
+            canSuggestIdleOrder
+              ? "Переставить сцены так, чтобы актёры меньше простаивали"
+              : "Нужно минимум 2 слота со сценами"
+          }
+          onClick={openIdleOrderPreview}
+        >
+          Собрать без простоя
+        </Button>
+        <Buttons.AddButton
+          type="button"
+          onClick={() => void addSlot()}
+          title="Новый слот"
+        />
+      </div>
+      {idleOrderPreview ? (
+        <Modal
+          isOpen
+          onClose={() => {
+            setIdleOrderPreview(null);
+            setIdleOrderBusyEmails([]);
+          }}
+          panelClassName="director-session-idle-order-modal"
+          ariaLabel="Порядок без простоя"
+        >
+          <div className="director-session-idle-order-modal__body">
+            <div className="director-session-idle-order-modal__content">
+              <h2 className="director-session-idle-order-modal__title">
+                Собрать без простоя
+              </h2>
+              <p className="director-session-idle-order-modal__metric">
+                Простой актёров: {idleOrderPreview.before.totalIdleMin} →{" "}
+                {idleOrderPreview.after.totalIdleMin} мин
+                {idleOrderPreview.before.actorsWithIdle !==
+                idleOrderPreview.after.actorsWithIdle
+                  ? ` · с простоем: ${idleOrderPreview.before.actorsWithIdle} → ${idleOrderPreview.after.actorsWithIdle}`
+                  : null}
+              </p>
+              <ol className="director-session-idle-order-modal__list">
+                {(() => {
+                  const durationBySlotId: Record<string, number> = {};
+                  for (const item of slotsWithScenes) {
+                    durationBySlotId[item.id] = Math.max(
+                      1,
+                      Math.floor(Number(item.durationMin) || 1),
+                    );
+                  }
+                  const offsets = packedOffsetsForOrder(
+                    idleOrderPreview.order,
+                    durationBySlotId,
+                  );
+                  return idleOrderPreview.order.map((id, index) => {
+                    const sl = (session.slots ?? []).find((s) => s.id === id);
+                    if (!sl) return null;
+                    const display = getSlotDisplay(sl);
+                    const sceneTitle = display.projectLabel;
+                    const projectTitle = display.materialLabel;
+                    const timeLabel = formatSlotTime(
+                      session.startsAt,
+                      offsets[id] ?? 0,
+                    );
+                    const durationMin = durationBySlotId[id] ?? sl.durationMin;
+                    return (
+                      <li key={id}>
+                        <span className="director-session-idle-order-modal__item-title">
+                          {index + 1}. {timeLabel} · {sceneTitle}
+                        </span>
+                        <span className="director-session-idle-order-modal__item-meta">
+                          {projectTitle}
+                          {durationMin
+                            ? ` · ${Math.max(1, Math.floor(Number(durationMin) || 1))} мин`
+                            : null}
+                        </span>
+                      </li>
+                    );
+                  });
+                })()}
+              </ol>
+              {idleOrderBusyEmails.length > 0 ? (
+                <p
+                  className="director-session-idle-order-modal__warn"
+                  role="status"
+                >
+                  После нового порядка занятость конфликтует у:{" "}
+                  {idleOrderBusyEmails.join(", ")}
+                </p>
+              ) : null}
+            </div>
+            <div className="director-session-idle-order-modal__actions">
+              <Button
+                type="button"
+                onClick={() => {
+                  setIdleOrderPreview(null);
+                  setIdleOrderBusyEmails([]);
+                }}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void applyIdleOrderPreview()}
+              >
+                Применить
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
       {selectedSlotForModal ? (
         <Modal
           isOpen
@@ -690,15 +939,17 @@ export function DirectorSessionSlotsPanel({
           panelClassName="director-session-slot-modal"
           ariaLabel="Параметры слота"
         >
-          <Buttons.CloseButton
-            type="button"
-            className="director-session-slot-modal__close"
-            onClick={onRequestCloseSlot}
-            aria-label="Закрыть"
-          >
-            ×
-          </Buttons.CloseButton>
           <div className="director-session-slot-modal__body">
+            {busyConflictError ? (
+              <div
+                className="director-session-slots-panel__busy-error director-session-slots-panel__busy-error--modal"
+                role="alert"
+              >
+                <p className="director-session-slots-panel__busy-error-text">
+                  {busyConflictError}
+                </p>
+              </div>
+            ) : null}
             <div
               className={cn(
                 "sessions-slot-controls",
@@ -763,6 +1014,14 @@ export function DirectorSessionSlotsPanel({
                   мин
                 </span>
               </span>
+              <button
+                type="button"
+                className="director-session-slot-modal__close"
+                onClick={onRequestCloseSlot}
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
             </div>
             {slotSettings ? (
               <div className="director-session-slots-panel__slot-settings">

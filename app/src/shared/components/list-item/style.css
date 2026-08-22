@@ -1,32 +1,36 @@
 .list-item {
-    display: flex;
-    flex-direction: column;
-    /* gap: 6px; */
-    padding: 4px 8px;
-
-    text-align: left;
-    background: var(--color-bg-quaternary);
-    color: var(--color-text-primary);
-    border: none;
-    cursor: pointer;
-    width: 100%;
-    font-size: 12px;
-    color: var(--color-text-white);
-    box-sizing: border-box;
-    position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-3) var(--spacing-4);
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  border: none;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--color-bg-quaternary) 42%, transparent);
+  color: var(--color-text-medium);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-snug);
+  transition: var(--transition-colors);
 }
 
-.list-item--active {
-    background: var(--color-bg-tertiary);
-    color: var(--color-text);
+.list-item + .list-item {
+  margin-top: var(--spacing-1);
 }
 
 .list-item:hover {
-    background: var(--color-list-item-hover);
+  background: color-mix(in srgb, var(--color-bg-quaternary) 72%, transparent);
+  color: var(--color-text-primary);
 }
 
-/* Не затирать оранжевый active серым hover — чуть темнее tertiary */
+.list-item--active {
+  background: color-mix(in srgb, var(--color-active-ascent) 32%, var(--color-bg-secondary));
+  color: var(--color-text-primary);
+}
+
 .list-item--active:hover {
-    background: color-mix(in srgb, var(--color-bg-tertiary) 88%, black);
-    color: var(--color-text-dark);
+  background: color-mix(in srgb, var(--color-active-ascent) 42%, var(--color-bg-secondary));
+  color: var(--color-text-primary);
 }

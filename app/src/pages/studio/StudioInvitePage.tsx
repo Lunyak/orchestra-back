@@ -1,7 +1,8 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { studioPath } from "../../app/router/paths";
+import { studioOrganizationPath, studioOverviewPath } from "../../app/router/paths";
 import { useAuth } from "../../features/auth";
 import { RehearsalsCard } from "../../features/rehearsals-card/RehearsalsCard";
 import {
@@ -28,7 +29,7 @@ export function StudioInvitePage() {
     setFormError(null);
     try {
       const studio = await acceptInvite(token).unwrap();
-      navigate(studioPath(studio.id), { replace: true });
+      navigate(studioOverviewPath(studio.id), { replace: true });
     } catch (e) {
       setFormError(
         e instanceof Error ? e.message : "Не удалось принять приглашение",
@@ -51,17 +52,7 @@ export function StudioInvitePage() {
   }
 
   if (isLoading) {
-    return (
-      <div className="app-layout studio-layout">
-        <div className="app-content">
-          <main className="main-content">
-            <div className="studio-page">
-              <p>Загрузка…</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+    return <PageLoader label="Загрузка…" />;
   }
 
   if (error || !preview) {
@@ -70,7 +61,7 @@ export function StudioInvitePage() {
         <div className="app-content">
           <main className="main-content">
             <div className="studio-page">
-              <Link className="studio-page__back" to={studioPath()}>
+              <Link className="studio-page__back" to={studioOrganizationPath()}>
                 ← Студии
               </Link>
               <p className="studio-page__error">Приглашение не найдено или истекло.</p>
@@ -89,7 +80,7 @@ export function StudioInvitePage() {
       <div className="app-content">
         <main className="main-content">
           <div className="studio-page">
-            <Link className="studio-page__back" to={studioPath()}>
+            <Link className="studio-page__back" to={studioOrganizationPath()}>
               ← Студии
             </Link>
 

@@ -1,5 +1,6 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import cn from "classnames";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import {
   fetchWorkspaces,
   type WorkspaceSummary,
@@ -80,22 +81,25 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
   const hasProjects = projectItems.length > 0;
 
   const loadWorkspaces = useCallback(async () => {
-    if (!accessToken) return;
-    const workspaceItems = await fetchWorkspaces(accessToken);
-    setWorkspaces(workspaceItems);
-    setWorkspaceId((current) => {
-      if (workspaceItems.some((workspace) => workspace.id === current))
-        return current;
-      return (
+    if (!accessToken) return "";
+    try {
+      const workspaceItems = await fetchWorkspaces(accessToken);
+      setWorkspaces(workspaceItems);
+      const personalWorkspaceId =
         workspaceItems.find((workspace) => workspace.type === "PERSONAL")?.id ??
-        ""
-      );
-    });
+        "";
+      setWorkspaceId((current) => {
+        if (workspaceItems.some((workspace) => workspace.id === current))
+          return current;
+        return personalWorkspaceId;
+      });
+      return personalWorkspaceId;
+    } catch {
+      setWorkspaces([]);
+      setWorkspaceId("");
+      return "";
+    }
   }, [accessToken]);
-
-  useEffect(() => {
-    void loadWorkspaces();
-  }, [loadWorkspaces]);
 
   const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,7 +112,11 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
     setIsCreating(true);
     setCreateError("");
     try {
-      await createProject(title, workspaceId || undefined);
+      let workspaceForCreate = workspaceId;
+      if (workspaces.length === 0) {
+        workspaceForCreate = (await loadWorkspaces()) || workspaceId;
+      }
+      await createProject(title, workspaceForCreate || undefined);
       setProjectTitle("");
     } catch {
       setCreateError("Не удалось создать проект");
@@ -148,6 +156,9 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
                 setProjectTitle(event.target.value);
                 if (createError) setCreateError("");
               }}
+              onFocus={() => {
+                if (workspaces.length === 0) void loadWorkspaces();
+              }}
               placeholder="Название проекта"
               disabled={isCreating}
             />
@@ -182,7 +193,7 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
       </header>
 
       {projectsLoading ? (
-        <p className="project-workspace__status">Загрузка проектов…</p>
+        <PageLoader variant="view" label="Загрузка проектов…" />
       ) : hasProjects ? (
         <ul className="project-workspace__list">
           {projectItems.map((project) => {

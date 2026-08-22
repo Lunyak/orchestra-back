@@ -1,3 +1,4 @@
+import cn from "classnames";
 import { useEffect, useState } from "react";
 import type { ActorAnnotation } from "../../../../sync/api/actor-notes";
 
@@ -15,6 +16,7 @@ export function ActorAnnotationDetails({
   const [text, setText] = useState(annotation?.noteText ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const canSave = Boolean(text.trim());
 
   useEffect(() => {
     setText(annotation?.noteText ?? "");
@@ -26,27 +28,59 @@ export function ActorAnnotationDetails({
 
   return (
     <div className="actor-annotations-card">
-      <div className="actor-annotations-card-head">
-        <button type="button" className="actor-annotations-x" onClick={onClose}>
-          ×
-        </button>
-      </div>
-      {annotation.selectedText ? (
-        <div className="actor-annotations-quote">
-          “{String(annotation.selectedText).slice(0, 240)}”
-        </div>
-      ) : null}
-      <textarea
-        className="actor-annotations-input"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={2}
-      />
-      {error ? <div className="actor-annotations-error">{error}</div> : null}
-      <div className="actor-annotations-actions">
+      <header className="actor-annotations-card-head">
+        <h2 className="actor-annotations-card-title">Метка</h2>
         <button
           type="button"
+          className="actor-annotations-x"
+          onClick={onClose}
+          aria-label="Закрыть"
+        >
+          ×
+        </button>
+      </header>
+
+      <div className="actor-annotations-body">
+        {annotation.selectedText ? (
+          <p className="actor-annotations-quote">
+            “{String(annotation.selectedText).slice(0, 240)}”
+          </p>
+        ) : null}
+        <label className="actor-annotations-field">
+          <span className="actor-annotations-label">Заметка</span>
+          <textarea
+            className="actor-annotations-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+          />
+        </label>
+        {error ? <div className="actor-annotations-error">{error}</div> : null}
+      </div>
+
+      <footer className="actor-annotations-actions">
+        <button
+          type="button"
+          className={cn("actor-annotations-btn", "actor-annotations-btn--danger")}
           disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            setError(null);
+            try {
+              await onDelete(annotation.id);
+            } catch {
+              setError("Не удалось удалить");
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          Удалить
+        </button>
+        <button
+          type="button"
+          className={cn("actor-annotations-btn", "actor-annotations-btn--primary")}
+          disabled={saving || !canSave}
           onClick={async () => {
             const next = text.trim();
             if (!next) return;
@@ -61,28 +95,9 @@ export function ActorAnnotationDetails({
             }
           }}
         >
-          {saving ? "💾 cохраняю…" : "💾 cохранить"}
+          {saving ? "Сохранение…" : "Сохранить"}
         </button>
-        <button
-          type="button"
-          className="actor-annotations-btn-danger"
-          disabled={saving}
-          onClick={async () => {
-            setSaving(true);
-            setError(null);
-            try {
-              await onDelete(annotation.id);
-            } catch {
-              setError("Не удалось удалить");
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          🗑 Удалить
-        </button>
-      </div>
+      </footer>
     </div>
   );
 }
-

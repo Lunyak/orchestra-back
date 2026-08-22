@@ -14,12 +14,32 @@ import {
   desktopSaveProjectPlaybook,
 } from "../../platform/desktop-methods";
 import { createAudioFadeController } from "../../media/audio-fade";
-import { resolveOfflineMediaUrl } from "../../platform/media-url";
 import { registerSoundPlayHandler } from "../../../features/playbook/model/playbook-playback-bridge";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { soundTrackHasIcon } from "../../platform/resolve-sound-icon-url";
+import { Buttons } from "../buttons/Buttons";
+import { resolveSoundPlaybackCandidates } from "./resolve-sound-playback-src";
 import { SoundTrackIcon } from "./SoundTrackIcon";
 import "./style.css";
+
+function audioSrcMatches(audio: HTMLAudioElement, src: string): boolean {
+  if (!src) return false;
+  const attr = audio.getAttribute("src") ?? "";
+  if (attr === src) return true;
+  try {
+    return audio.src === new URL(src, window.location.href).href;
+  } catch {
+    return audio.src === src;
+  }
+}
+
+async function playAudioWithSrc(audio: HTMLAudioElement, src: string): Promise<void> {
+  if (!audioSrcMatches(audio, src)) {
+    audio.src = src;
+    audio.load();
+  }
+  await audio.play();
+}
 
 export interface HeaderSound {
   id: number;
@@ -69,6 +89,10 @@ interface HeaderPlayerProps {
   onSoundsSaved?: () => void;
   /** Регистрирует внешний обработчик toggle звука по id (для кликов из show-script markdown). */
   onRegisterToggleHandler?: (handler: (soundId: number) => void) => void;
+  /** Внешний режим настроек (например, общий с плеером). */
+  settingsOpen?: boolean;
+  /** Показать локальную кнопку настроек. По умолчанию true. */
+  showSettingsToggle?: boolean;
 }
 
 export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
@@ -77,8 +101,11 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   sounds = [],
   onSoundsSaved,
   onRegisterToggleHandler,
+  settingsOpen,
+  showSettingsToggle = true,
 }) => {
   const dispatch = useAppDispatch();
+  const accessToken = useAppSelector((s) => s.auth.accessToken);
   const soundsUpload = useAppSelector((s) => s.playbook.soundsUpload);
   const [tracks, setTracks] = useState<LoadedTrack[]>(
     sounds.map((sound) => ({
@@ -99,7 +126,9 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       remoteUrl: sound.remoteUrl,
     })),
   );
-  const [showSettings, setShowSettings] = useState(false);
+  const [internalSettingsOpen, setInternalSettingsOpen] = useState(false);
+  const isSettingsControlled = settingsOpen !== undefined;
+  const showSettings = isSettingsControlled ? Boolean(settingsOpen) : internalSettingsOpen;
   const [uiMessage, setUiMessage] = useState<string | null>(null);
   const audioRefs = useRef<Record<number, HTMLAudioElement | null>>({});
   const audioFade = useMemo(() => createAudioFadeController(), []);
@@ -108,6 +137,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
   const iconInputRef = useRef<HTMLInputElement | null>(null);
   const iconTargetIdRef = useRef<number | null>(null);
   const tracksRef = useRef<LoadedTrack[]>(tracks);
+  const tracksListRef = useRef<HTMLDivElement | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string>("");
   const renameInputRef = useRef<HTMLInputElement | null>(null);
@@ -399,35 +429,52 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     audioFade.run(audio, trackId, from, to, duration, onDone);
   };
 
-  /** URL для воспроизведения: локальный filePath (офлайн) или remoteUrl. */
-  const getPlaybackSrc = (track: LoadedTrack) => {
-    const fileName =
-      track.file ??
-      (track.filePath ? track.filePath.replace(/^.*[/\\]/, "") : "") ??
-      track.url;
-    return resolveOfflineMediaUrl({
-      projectSlug: projectName,
-      kind: "sound",
-      fileName,
-      filePath: track.filePath,
-      remoteUrl: track.remoteUrl ?? track.url,
-    });
-  };
-
-  const toggleTrack = (track: LoadedTrack) => {
+  const toggleTrack = async (track: LoadedTrack) => {
     const audio = audioRefs.current[track.id];
     if (!audio) return;
     if (audio.paused) {
-      const src = getPlaybackSrc(track);
-      if (audio.src !== src) {
-        audio.src = src;
+      const candidates = await resolveSoundPlaybackCandidates(
+        projectName,
+        track,
+        accessToken,
+      );
+      if (candidates.length === 0) {
+        showMessage("Нет файла звука");
+        return;
       }
+
       audio.loop = track.loop;
       audio.volume = 0;
-      audio.play().catch((error) => {
-        console.error("Ошибка воспроизведения:", error);
-      });
-      runFade(track.id, 0, track.volume, track.fadeMs);
+
+      let played = false;
+      let lastError: unknown = null;
+      for (const src of candidates) {
+        try {
+          await playAudioWithSrc(audio, src);
+          played = true;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+
+      if (!played) {
+        console.error("Ошибка воспроизведения:", lastError);
+        showMessage("Не удалось воспроизвести звук");
+        setTracks((prev) =>
+          prev.map((item) =>
+            item.id === track.id ? { ...item, isPlaying: false } : item,
+          ),
+        );
+        return;
+      }
+
+      const rawVolume = Number(track.volume);
+      const playbackVolume =
+        Number.isFinite(rawVolume) && rawVolume > 0
+          ? Math.min(1, rawVolume)
+          : 0.8;
+      runFade(track.id, 0, playbackVolume, track.fadeMs);
       setTracks((prev) =>
         prev.map((item) =>
           item.id === track.id ? { ...item, isPlaying: true } : item,
@@ -459,7 +506,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       const id = Number(soundId);
       if (!Number.isFinite(id)) return;
       const target = tracksRef.current.find((t) => Number(t.id) === id) ?? null;
-      if (target) toggleTrack(target);
+      if (target) void toggleTrack(target);
     };
     onRegisterToggleHandler(handler);
   }, [onRegisterToggleHandler]);
@@ -470,7 +517,7 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
       if (!Number.isFinite(id)) return;
       const target = tracksRef.current.find((t) => Number(t.id) === id) ?? null;
       if (!target || target.isPlaying) return;
-      toggleTrack(target);
+      void toggleTrack(target);
     });
     return () => registerSoundPlayHandler(undefined);
   }, []);
@@ -480,13 +527,44 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
     if (audio) {
       audio.volume = value;
     }
-    setTracks((prev) =>
-      prev.map((item) =>
+    setTracks((prev) => {
+      const next = prev.map((item) =>
         item.id === track.id ? { ...item, volume: value } : item,
-      ),
-    );
+      );
+      tracksRef.current = next;
+      return next;
+    });
     dispatch(playbookActions.updateSound({ id: track.id, changes: { volume: value } }));
   };
+
+  const handleVolumeChangeRef = useRef(handleVolumeChange);
+  handleVolumeChangeRef.current = handleVolumeChange;
+
+  useEffect(() => {
+    const list = tracksListRef.current;
+    if (!list) return;
+
+    const onWheel = (event: WheelEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const row = target.closest<HTMLElement>("[data-sound-id]");
+      if (!row || row.dataset.renaming === "true") return;
+      const soundId = Number(row.dataset.soundId);
+      if (!Number.isFinite(soundId)) return;
+      const track = tracksRef.current.find((item) => item.id === soundId);
+      if (!track) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const step = event.deltaY > 0 ? -0.05 : 0.05;
+      const nextVolume = Math.min(1, Math.max(0, Math.round((track.volume + step) * 100) / 100));
+      if (nextVolume === track.volume) return;
+      handleVolumeChangeRef.current(track, nextVolume);
+    };
+
+    list.addEventListener("wheel", onWheel, { passive: false });
+    return () => list.removeEventListener("wheel", onWheel);
+  }, []);
 
   const handleFadeChange = (track: LoadedTrack, value: number) => {
     setTracks((prev) =>
@@ -607,33 +685,37 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           })();
         }}
       />
-      <button
-        className="header-player-settings-toggle"
-        onClick={() => setShowSettings((prev) => !prev)}
-        type="button"
-        aria-pressed={showSettings}
-        aria-label={showSettings ? "Скрыть настройки звуков" : "Показать настройки звуков"}
-        title={showSettings ? "Скрыть настройки звуков" : "Настройки звуков"}
-      >
-        <svg
-          className="header-player-settings-icon"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-          focusable="false"
+      {showSettingsToggle ? (
+        <button
+          className="header-player-settings-toggle"
+          onClick={() => setInternalSettingsOpen((prev) => !prev)}
+          type="button"
+          aria-pressed={showSettings}
+          aria-label={showSettings ? "Скрыть настройки звуков" : "Показать настройки звуков"}
+          title={showSettings ? "Скрыть настройки звуков" : "Настройки звуков"}
         >
-          <path
-            fill="currentColor"
-            d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.14 7.14 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.51.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
-          />
-        </svg>
-      </button>
+          <svg
+            className="header-player-settings-icon"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <path
+              fill="currentColor"
+              d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.14 7.14 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 1h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 7.48a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94L2.83 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.6.22l2.39-.96c.51.4 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.8c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z"
+            />
+          </svg>
+        </button>
+      ) : null}
 
-      <div className="header-player-list">
+      <div className="header-player-list" ref={tracksListRef}>
         {tracks.map((track) => {
           const isRenaming = editingId === track.id;
           return (
             <div
               key={track.id}
+              data-sound-id={track.id}
+              data-renaming={isRenaming ? "true" : undefined}
               className={cn(
                 "header-player-track-row",
                 track.isPlaying && "header-player-track-row--playing",
@@ -642,17 +724,18 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
               )}
               onClick={() => {
                 if (isRenaming) return;
-                toggleTrack(track);
+                void toggleTrack(track);
               }}
+              title={`${track.name} · громкость ${Math.round(track.volume * 100)}% (колесо)`}
               role="button"
               tabIndex={0}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   if (isRenaming) return;
-                  toggleTrack(track);
+                  void toggleTrack(track);
                 }
-              } }
+              }}
             >
               <audio
                 ref={(el) => {
@@ -738,20 +821,17 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                   {track.name}
                 </div>
               )}
-              <button
+              <Buttons.DeleteButton
                 className="header-player-remove"
+                title="Удалить звук"
+                aria-label="Удалить звук"
                 onClick={(event) => {
                   event.stopPropagation();
                   removeTrack(track);
-                } }
-              >
-                ×
-              </button>
+                }}
+              />
               {showSettings && !isRenaming && (
-                <div
-                  className="header-player-settings"
-                  onClick={(event) => event.stopPropagation()}
-                >
+                <div className="header-player-settings">
                   <button
                     className="header-player-mini-toggle"
                     type="button"
@@ -762,7 +842,20 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                       startRename(track);
                     }}
                   >
-                    ✎
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
                   </button>
                   <button
                     className="header-player-mini-toggle"
@@ -774,9 +867,22 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                     onClick={(event) => {
                       event.stopPropagation();
                       handleRestartOnStopChange(track, !track.restartOnStop);
-                    } }
+                    }}
                   >
-                    ↺
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                      <path d="M3 3v5h5" />
+                    </svg>
                   </button>
                   <button
                     className="header-player-mini-toggle"
@@ -788,21 +894,50 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
                     onClick={(event) => {
                       event.stopPropagation();
                       void handleLoopChange(track, !track.loop);
-                    } }
+                    }}
                   >
-                    ∞
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="m17 2 4 4-4 4" />
+                      <path d="M3 11v-1a4 4 0 0 1 4-4h14" />
+                      <path d="m7 22-4-4 4-4" />
+                      <path d="M21 13v1a4 4 0 0 1-4 4H3" />
+                    </svg>
                   </button>
                   <button
-                    className="header-player-icon-btn"
+                    className="header-player-mini-toggle"
                     onClick={(event) => {
                       event.stopPropagation();
                       addIcon(track);
-                    } }
+                    }}
                     type="button"
                     title="Иконка"
                     aria-label="Иконка"
                   >
-                    🏞️
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <rect width="18" height="18" x="3" y="3" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
                   </button>
                 </div>
               )}
@@ -810,7 +945,11 @@ export const HeaderPlayer: React.FC<HeaderPlayerProps> = ({
           );
         })}
         <div
-          className="header-player-track-row header-player-load-tile"
+          className={cn(
+            "header-player-track-row",
+            "header-player-load-tile",
+            soundsUpload.uploading && "header-player-load-tile--uploading",
+          )}
           onClick={addTracks}
           role="button"
           tabIndex={0}

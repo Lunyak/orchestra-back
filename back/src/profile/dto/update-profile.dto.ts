@@ -43,6 +43,11 @@ export class UpdateProfileDto {
   avatarUrl?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  avatarSmallUrl?: string;
+
+  @IsOptional()
   @IsObject()
   availabilityCalendar?: Record<string, unknown>;
 
@@ -62,7 +67,7 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
-  @MaxLength(20)
+  @MaxLength(40)
   phone?: string;
 
   @IsOptional()

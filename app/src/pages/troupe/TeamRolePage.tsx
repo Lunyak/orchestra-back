@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
@@ -131,7 +132,7 @@ export function TeamRolePage() {
         <div className="app-content">
           <TheaterSectionNav theaterId={theaterId} active="team" />
           <main className="organizations-page organizations-page--detail">
-            <p>Загружаем должность…</p>
+            <PageLoader label="Загружаем должность…" />
           </main>
         </div>
       </div>

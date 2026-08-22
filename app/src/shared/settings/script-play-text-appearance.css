@@ -1,0 +1,366 @@
+/* Форма стилей отображения текста пьесы (настройки + dock сценария) */
+
+.script-play-text-appearance {
+  --settings-form-border: var(--stage-brutal-border, var(--settings-chrome-border, var(--color-border-faint)));
+  --settings-form-panel-bg: color-mix(in srgb, var(--settings-chrome-panel, var(--color-bg-secondary)) 92%, #000);
+  --settings-form-inset-bg: color-mix(in srgb, #000 42%, transparent);
+  --settings-form-focus-ring: var(--field-control-focus-ring, rgba(231, 138, 78, 0.28));
+  --settings-form-focus-border: var(--field-control-border-focus, rgba(231, 138, 78, 0.72));
+  --settings-chrome-text-muted: var(--color-text-medium);
+  --settings-chrome-text-strong: var(--color-text-primary);
+  --settings-chrome-panel: var(--color-bg-secondary);
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.script-play-text-appearance .settings-card__title {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-active-ascent);
+}
+
+.script-play-text-appearance .settings-script-text-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--settings-form-border);
+  background: color-mix(in srgb, var(--settings-chrome-panel) 88%, #000);
+}
+
+.script-play-text-appearance .settings-script-text-head__hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--settings-chrome-text-muted);
+}
+
+.script-play-text-appearance .settings-script-text-preview {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--settings-form-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 42%),
+    var(--settings-form-inset-bg);
+}
+
+.script-play-text-appearance .settings-script-text-preview__title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--settings-chrome-text-muted);
+}
+
+.script-play-text-appearance .settings-script-text-preview__body {
+  margin: 0;
+  max-width: none;
+  overflow: visible;
+  padding: 12px 14px;
+  border: 1px solid var(--settings-form-border);
+  background: color-mix(in srgb, var(--color-bg-primary, #0a0a0a) 88%, transparent);
+}
+
+.script-play-text-appearance .settings-script-text-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+}
+
+.script-play-text-appearance .settings-script-text-panel {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.script-play-text-appearance .settings-script-text-panel + .settings-script-text-panel {
+  border-left: 1px solid var(--settings-form-border);
+}
+
+.script-play-text-appearance .settings-script-text-panel__title {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--settings-form-border) 80%, transparent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--settings-chrome-text-strong);
+}
+
+.script-play-text-appearance .settings-script-text-field {
+  display: grid;
+  grid-template-columns: minmax(76px, 92px) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.script-play-text-appearance .settings-script-text-field__label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--settings-chrome-text-muted);
+}
+
+.script-play-text-appearance .settings-script-text-field__control {
+  min-width: 0;
+}
+
+.script-play-text-appearance .settings-script-text-field__control--range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.script-play-text-appearance .settings-script-text-field__range {
+  --range-fill: 0%;
+  --range-height: 8px;
+  --range-track: color-mix(in srgb, var(--field-control-bg, #1d2021) 90%, transparent);
+  --range-track-border: var(--field-control-border, rgba(255, 255, 255, 0.11));
+  --range-thumb: var(--color-range-thumb, #e8e8e8);
+  --range-thumb-border: var(--color-active-ascent);
+  --range-fill-color: var(--color-active-ascent);
+
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.script-play-text-appearance .settings-script-text-field__range:focus {
+  outline: none;
+}
+
+.script-play-text-appearance .settings-script-text-field__range::-webkit-slider-runnable-track {
+  height: var(--range-height);
+  border: 1px solid var(--range-track-border);
+  background-color: var(--range-track);
+  background-image: linear-gradient(
+    to right,
+    var(--range-fill-color),
+    var(--range-fill-color)
+  );
+  background-repeat: no-repeat;
+  background-size: var(--range-fill) 100%;
+  background-position: left center;
+}
+
+.script-play-text-appearance .settings-script-text-field__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: calc((var(--range-height) - 14px) / 2);
+  border: 2px solid var(--range-thumb-border);
+  background: var(--range-thumb);
+  box-shadow: none;
+}
+
+.script-play-text-appearance .settings-script-text-field__range:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--settings-form-focus-ring, color-mix(in srgb, var(--color-active-ascent) 35%, transparent));
+}
+
+.script-play-text-appearance .settings-script-text-field__range::-moz-range-track {
+  height: var(--range-height);
+  border: 1px solid var(--range-track-border);
+  background-color: var(--range-track);
+}
+
+.script-play-text-appearance .settings-script-text-field__range::-moz-range-progress {
+  height: var(--range-height);
+  background-color: var(--range-fill-color);
+}
+
+.script-play-text-appearance .settings-script-text-field__range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--range-thumb-border);
+  background: var(--range-thumb);
+  box-shadow: none;
+}
+
+.script-play-text-appearance .settings-script-text-field__range-value {
+  flex: 0 0 auto;
+  min-width: 36px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--settings-chrome-text-strong);
+  text-align: right;
+}
+
+.script-play-text-appearance .settings-script-text-field__input,
+.script-play-text-appearance .settings-script-text-field__select {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--field-control-border, rgba(255, 255, 255, 0.11));
+  background: color-mix(in srgb, var(--field-control-bg, #1d2021) 90%, transparent);
+  box-shadow: var(--field-control-inset, inset 0 1px 0 rgba(255, 255, 255, 0.06));
+  color: var(--field-control-text, var(--settings-chrome-text-strong));
+  font-size: 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.script-play-text-appearance .settings-script-text-field__input[type="number"] {
+  max-width: 88px;
+  font-variant-numeric: tabular-nums;
+}
+
+.script-play-text-appearance .settings-script-text-field__select {
+  cursor: pointer;
+  appearance: none;
+  padding-right: 28px;
+  background-image: var(--field-control-chevron);
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  color-scheme: dark;
+}
+
+.script-play-text-appearance .settings-script-text-field__select option {
+  background-color: var(--color-bg-primary, #141618);
+  color: var(--color-text-lighter, #e8eaed);
+}
+
+.script-play-text-appearance .settings-script-text-field__select option:checked {
+  background-color: var(--color-bg-quaternary, #2a2e32);
+  color: var(--color-text-lighter, #e8eaed);
+}
+
+.script-play-text-appearance .settings-script-text-field__input:focus,
+.script-play-text-appearance .settings-script-text-field__select:focus {
+  outline: none;
+  border-color: var(--settings-form-focus-border);
+  box-shadow: 0 0 0 1px var(--settings-form-focus-ring);
+}
+
+.script-play-text-appearance .settings-script-text-field__input::placeholder {
+  color: var(--settings-chrome-text-muted);
+}
+
+.script-play-text-appearance .settings-form-color-row {
+  display: flex;
+  align-items: stretch;
+  min-height: 32px;
+  border: 1px solid var(--field-control-border, rgba(255, 255, 255, 0.11));
+  background: color-mix(in srgb, var(--field-control-bg, #1d2021) 90%, transparent);
+  box-shadow: var(--field-control-inset, inset 0 1px 0 rgba(255, 255, 255, 0.06));
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.script-play-text-appearance .settings-form-color-row:focus-within {
+  border-color: var(--settings-form-focus-border);
+  box-shadow: 0 0 0 1px var(--settings-form-focus-ring);
+}
+
+.script-play-text-appearance .settings-form-color-row .settings-script-text-color__picker {
+  flex: 0 0 36px;
+  width: 36px;
+  height: auto;
+  min-height: 30px;
+  padding: 4px;
+  border: 0;
+  border-right: 1px solid var(--settings-form-border);
+  background: color-mix(in srgb, #000 24%, transparent);
+  cursor: pointer;
+}
+
+.script-play-text-appearance .settings-form-color-row .settings-script-text-color__hex {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+
+.script-play-text-appearance .settings-form-color-row .settings-script-text-color__hex:focus {
+  box-shadow: none;
+}
+
+.script-play-text-appearance .settings-form-color-row .settings-form-color-row__reset {
+  flex: 0 0 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-left: 1px solid var(--settings-form-border);
+  background: transparent;
+  color: var(--settings-chrome-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.script-play-text-appearance .settings-form-color-row .settings-form-color-row__reset:hover:not(:disabled) {
+  color: var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 8%, transparent);
+}
+
+.script-play-text-appearance .settings-form-color-row .settings-form-color-row__reset:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.script-play-text-appearance .settings-script-text-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+.script-play-text-appearance .settings-script-text-field-row .settings-script-text-field {
+  grid-template-columns: minmax(58px, 72px) minmax(0, 1fr);
+}
+
+.script-play-text-appearance--compact {
+  background: var(--settings-form-panel-bg);
+}
+
+.script-play-text-appearance--compact .settings-script-text-head {
+  padding: 10px 12px;
+}
+
+.script-play-text-appearance--compact .settings-script-text-preview,
+.script-play-text-appearance--compact .settings-script-text-panel {
+  padding: 10px 12px;
+}
+
+@media (max-width: 720px) {
+  .script-play-text-appearance .settings-script-text-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .script-play-text-appearance .settings-script-text-panel + .settings-script-text-panel {
+    border-left: 0;
+    border-top: 1px solid var(--settings-form-border);
+  }
+
+  .script-play-text-appearance .settings-script-text-field-row {
+    grid-template-columns: 1fr;
+  }
+}

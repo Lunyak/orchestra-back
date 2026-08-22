@@ -1,3 +1,4 @@
+import cn from "classnames";
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import type { ActorAnnotation } from "../../../../sync/api/actor-notes";
@@ -36,6 +37,7 @@ export function ActorAnnotationsPopover({
   onRequestClose: () => void;
 }) {
   const newAnnotationTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const canSave = Boolean(newAnnotation?.noteText.trim());
 
   useEffect(() => {
     if (!newAnnotation) return;
@@ -46,6 +48,11 @@ export function ActorAnnotationsPopover({
   if (typeof document === "undefined") return null;
   if (!position) return null;
   if (!newAnnotation && !activeAnnotationId) return null;
+
+  const closeNew = () => {
+    setNewAnnotation(null);
+    onRequestClose();
+  };
 
   return createPortal(
     <div
@@ -59,38 +66,59 @@ export function ActorAnnotationsPopover({
           "--actor-annotations-popover-left": `${position.left}px`,
         } as React.CSSProperties
       }
+      role="dialog"
+      aria-modal="true"
+      aria-label={newAnnotation ? "Новая метка" : "Метка"}
       onMouseDown={(e) => e.stopPropagation()}
     >
       {newAnnotation ? (
         <div className="actor-annotations-card">
-          <div className="actor-annotations-card-head">
+          <header className="actor-annotations-card-head">
+            <h2 className="actor-annotations-card-title">Новая метка</h2>
             <button
               type="button"
               className="actor-annotations-x"
-              onClick={() => {
-                setNewAnnotation(null);
-                onRequestClose();
-              }}
+              onClick={closeNew}
+              aria-label="Закрыть"
             >
               ×
             </button>
+          </header>
+
+          <div className="actor-annotations-body">
+            <p className="actor-annotations-quote">
+              “{newAnnotation.selectedText.slice(0, 240)}”
+            </p>
+            <label className="actor-annotations-field">
+              <span className="actor-annotations-label">Заметка</span>
+              <textarea
+                className="actor-annotations-input"
+                ref={newAnnotationTextareaRef}
+                value={newAnnotation.noteText}
+                onChange={(e) =>
+                  setNewAnnotation((p) => (p ? { ...p, noteText: e.target.value } : p))
+                }
+                placeholder="Текст метки…"
+                rows={3}
+              />
+            </label>
           </div>
-          <div className="actor-annotations-quote">
-            “{newAnnotation.selectedText.slice(0, 240)}”
-          </div>
-          <textarea
-            className="actor-annotations-input"
-            ref={newAnnotationTextareaRef}
-            value={newAnnotation.noteText}
-            onChange={(e) =>
-              setNewAnnotation((p) => (p ? { ...p, noteText: e.target.value } : p))
-            }
-            placeholder="Напиши заметку…"
-            rows={3}
-          />
-          <div className="actor-annotations-actions">
+
+          <footer className="actor-annotations-actions">
             <button
               type="button"
+              className="actor-annotations-btn"
+              onClick={closeNew}
+            >
+              Отмена
+            </button>
+            <button
+              type="button"
+              className={cn(
+                "actor-annotations-btn",
+                "actor-annotations-btn--primary",
+              )}
+              disabled={!canSave}
               onClick={async () => {
                 const noteText = newAnnotation.noteText.trim();
                 if (!noteText) return;
@@ -99,19 +127,9 @@ export function ActorAnnotationsPopover({
                 onRequestClose();
               }}
             >
-              Сохранить пометку
+              Сохранить
             </button>
-            <button
-              type="button"
-              className="actor-annotations-btn-secondary"
-              onClick={() => {
-                setNewAnnotation(null);
-                onRequestClose();
-              }}
-            >
-              Отмена
-            </button>
-          </div>
+          </footer>
         </div>
       ) : null}
 
@@ -134,4 +152,3 @@ export function ActorAnnotationsPopover({
     document.body,
   );
 }
-

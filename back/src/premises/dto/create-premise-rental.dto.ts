@@ -14,7 +14,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { PremiseRecurrenceType, PremiseUsageType } from '@prisma/client';
+import { PremiseRecurrenceType, PremiseUsageType, PremiseBookedAsKind } from '@prisma/client';
 
 export class PremiseRentalScheduleDto {
   @IsInt()
@@ -67,6 +67,20 @@ export class CreatePremiseRentalDto {
   @IsString()
   @MaxLength(40)
   contactPhone?: string;
+
+  @IsOptional()
+  @IsEnum(PremiseBookedAsKind)
+  bookedAsKind?: PremiseBookedAsKind;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  bookedAsId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  bookedAsTitle?: string;
 
   @IsISO8601()
   startsOn: string;

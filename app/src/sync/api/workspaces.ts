@@ -1,3 +1,4 @@
+import { createSingleflight } from "../../shared/utils/singleflight";
 import { api } from "./client";
 import type { TroupeResponse } from "./troupe";
 
@@ -72,11 +73,15 @@ function authHeaders(accessToken: string) {
   return { Authorization: `Bearer ${accessToken}` };
 }
 
+const workspacesSingleflight = createSingleflight<[string], WorkspaceSummary[]>();
+
 export async function fetchWorkspaces(accessToken: string) {
-  const { data } = await api.get<WorkspaceSummary[]>("/workspaces", {
-    headers: authHeaders(accessToken),
-  });
-  return data;
+  return workspacesSingleflight(accessToken, async (token) => {
+    const { data } = await api.get<WorkspaceSummary[]>("/workspaces", {
+      headers: authHeaders(token),
+    });
+    return data;
+  }, accessToken);
 }
 
 export async function fetchTheaters(accessToken: string) {

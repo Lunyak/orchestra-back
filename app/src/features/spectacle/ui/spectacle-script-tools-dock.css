@@ -1,0 +1,135 @@
+.script-scene-main:has(> .script-tools-dock) {
+  gap: 0;
+}
+
+.script-tools-dock {
+  flex: 0 0 auto;
+  margin-top: auto;
+  width: 100%;
+  box-sizing: border-box;
+  border-top: 1px solid var(--color-border-faint);
+  background: var(--color-bg-secondary);
+}
+
+.script-tools-dock__inner {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
+  min-height: 32px;
+}
+
+.script-tools-dock__menus {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+}
+
+.script-tools-dock__chip {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.script-tools-dock__chip-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 32px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-medium);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.script-tools-dock__chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.script-tools-dock__chip-icon svg {
+  display: block;
+}
+
+.script-tools-dock__chip-btn:hover {
+  color: var(--color-text-ui-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.script-tools-dock__chip.is-open .script-tools-dock__chip-btn {
+  color: var(--color-active-ascent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.script-tools-dock__chip-panel {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  z-index: 30;
+  min-width: 260px;
+  padding: 5px 0;
+  border: 1px solid var(--color-border-faint);
+  background: var(--color-bg-secondary);
+  box-shadow: none;
+}
+
+.script-tools-dock__chip-panel:has(.app-editor-script-styles-menu) {
+  left: 0;
+  right: auto;
+  min-width: min(560px, calc(100vw - 24px));
+  max-width: min(640px, calc(100vw - 24px));
+  max-height: min(70vh, 680px);
+  padding: 0;
+  overflow: auto;
+}
+
+.app-editor-script-styles-menu {
+  min-width: 0;
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__option {
+  color: var(--color-text-medium);
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__option:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__field-label,
+.script-tools-dock__chip-panel .theater-editor-menubar__field-meta {
+  color: var(--color-text-medium);
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__field-input.native-text-input {
+  border-color: var(--color-border-subtle);
+  background: var(--color-bg-quaternary);
+  color: var(--color-text-primary);
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__field-input.native-text-input:focus {
+  border-color: var(--color-border-subtle);
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__field-action {
+  background: var(--color-bg-quaternary);
+  color: var(--color-text-ui-strong);
+}
+
+.script-tools-dock__chip-panel .theater-editor-menubar__field-action:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-editor-format-menu__panel {
+  min-width: 260px;
+}

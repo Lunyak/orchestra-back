@@ -1,8 +1,7 @@
-import { Link } from "react-router-dom";
+import { FC } from "react";
+import { ChalkPageShell } from "../../shared/component/ChalkPageShell/ChalkPageShell";
 import { Seo } from "../../shared/component/Seo/Seo";
-import { ROUTES } from "../../shared/model/routes";
-import { GlitchHero } from "../HomePage/GlitchHero";
-import "../../shared/styles/site-bands-page.css";
+import "./style.css";
 
 const VK_GROUP_URL = "https://vk.com/dofaminspb";
 const VK_HOW_TO_FIND_VIDEO_URL = "https://vk.com/video-81928625_456239136";
@@ -45,50 +44,35 @@ const CONTACT_ROWS: ContactRow[] = [
   },
 ];
 
-const ContactsPage = () => {
+const ContactsPage: FC = () => {
   return (
-    <div className="contacts-page site-bands-page">
-      <div className="site-bands-page__grain" aria-hidden />
+    <ChalkPageShell mainClassName="chalk-page__main--contacts" scrollable showHomeBack>
       <Seo
         title="Контакты — Театр «Дофамин»"
         description="Контакты театра «Дофамин»: почта, Telegram, ВКонтакте и как нас найти."
         canonicalPath="/контакты"
       />
 
-      <Link to={ROUTES.HOME} className="site-bands-page__back">
-        Назад
-      </Link>
+      <h1 className="chalk-page__title">КОНТАКТЫ</h1>
+      <p className="chalk-page__subtitle">связь и как нас найти</p>
+      <div className="chalk-page__rule" aria-hidden />
 
-      <div className="site-bands-page__content">
-        <header className="site-bands-page__hero">
-          <GlitchHero
-            as="h1"
-            text="Контакты"
-            className="home-page__glitch-hero--page"
-          />
-          <p className="site-bands-page__tagline">связь и как нас найти</p>
-        </header>
-
-        <div className="site-bands-list" role="list" aria-label="Контакты">
-          {CONTACT_ROWS.map((row) => (
-            <a
-              key={row.key}
-              className="site-bands-row"
-              href={row.href}
-              role="listitem"
-              {...(row.external
-                ? { target: "_blank", rel: "noopener noreferrer" }
-                : {})}
-            >
-              <div className="site-bands-row__main">
-                <span className="site-bands-row__title">{row.title}</span>
-              </div>
-              <span className="site-bands-row__meta">{row.meta}</span>
-            </a>
-          ))}
-        </div>
+      <div className="chalk-contacts__list" role="list" aria-label="Контакты">
+        {CONTACT_ROWS.map((row) => (
+          <a
+            key={row.key}
+            className="chalk-contacts__row"
+            href={row.href}
+            role="listitem"
+            aria-label={`${row.title}: ${row.meta}`}
+            {...(row.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          >
+            <span className="chalk-contacts__title">{row.title}</span>
+            <span className="chalk-contacts__meta">{row.meta}</span>
+          </a>
+        ))}
       </div>
-    </div>
+    </ChalkPageShell>
   );
 };
 

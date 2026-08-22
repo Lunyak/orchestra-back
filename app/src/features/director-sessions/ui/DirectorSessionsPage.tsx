@@ -1,6 +1,8 @@
 import { CalendarSection } from "@shared/components/calendar/CalendarSection";
 import { Buttons } from "@shared/components/buttons/Buttons";
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
+import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import { FormTextarea } from "@shared/core/form-textarea/FormTextarea";
 import cn from "classnames";
 import dayjs from "dayjs";
@@ -211,6 +213,8 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
     onSessionCommentBlur,
     publishActiveSession,
     publishing,
+    includeUnavailableInCall,
+    setIncludeUnavailableInCall,
     activeSessionPublished,
     sendAvailabilityReminders,
     sessionMissingAvailabilityEmails,
@@ -351,15 +355,6 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                             <span className="sessions-day-item__title">
                               {s.title}
                             </span>
-                            {published ? (
-                              <span className="sessions-day-item__badge sessions-day-item__badge--published">
-                                опубликована
-                              </span>
-                            ) : (
-                              <span className="sessions-day-item__badge">
-                                черновик
-                              </span>
-                            )}
                           </span>
                           {gatherSummary ? (
                             <span
@@ -369,6 +364,15 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                               {gatherSummary}
                             </span>
                           ) : null}
+                          {published ? (
+                            <span className="sessions-day-item__badge sessions-day-item__badge--published">
+                              опубликована
+                            </span>
+                          ) : (
+                            <span className="sessions-day-item__badge">
+                              черновик
+                            </span>
+                          )}
                         </span>
 
                         {preview && preview.slots.length > 0 ? (
@@ -602,6 +606,14 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
               ) : null}
 
               <div className="sessions-slots__container-btns sessions-session-footer__btns">
+
+                <LabeledCheckbox
+                  className="sessions-session-footer__call-toggle"
+                  checked={includeUnavailableInCall}
+                  onChange={setIncludeUnavailableInCall}
+                >
+                  Звать без занятости / с отрицательной
+                </LabeledCheckbox>
                 <Button
                   type="button"
                   onClick={() => void publishActiveSession()}
@@ -668,11 +680,7 @@ export function DirectorSessionsPage({
     );
   }
   if (vm.loading) {
-    return (
-      <div className="rehearsals-page sessions-page">
-        <div className="rehearsals-muted">Загрузка сессий…</div>
-      </div>
-    );
+    return <PageLoader label="Загрузка сессий…" />;
   }
   if (vm.error) {
     return (

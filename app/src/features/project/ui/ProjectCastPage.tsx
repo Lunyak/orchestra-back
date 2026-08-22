@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Link } from "react-router-dom";
 import { projectPath } from "../../../app/router/paths";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
@@ -107,7 +108,7 @@ export function ProjectCastPage() {
         ) : null}
 
         {rolesLoading ? (
-          <div className="project-cast-page__hint">Загрузка каста…</div>
+          <PageLoader variant="view" label="Загрузка каста…" />
         ) : castActors.length === 0 ? (
           <div className="project-cast-page__panel">
             <p className="project-cast-page__hint">

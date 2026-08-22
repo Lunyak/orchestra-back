@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../../shared/core/button/Button";
@@ -119,7 +120,7 @@ export function ProjectRolesPage() {
         </div>
 
         {rolesLoading ? (
-          <div className="project-roles-page__hint">Загрузка ролей…</div>
+          <PageLoader variant="view" label="Загрузка ролей…" />
         ) : projectRoles.length === 0 ? (
           <div className="project-roles-page__panel">
             <p className="project-roles-page__hint">

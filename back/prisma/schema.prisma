@@ -22,6 +22,8 @@ model User {
   actorNotes                    ActorNote[]
   actorAnnotations              ActorAnnotation[]
   telegramBots                  TelegramBotIntegration[]
+  messengerChannels             MessengerChannel[]
+  messengerBridges              MessengerBridge[]
   projectTelegramBotPreferences ProjectTelegramBotPreference[]
   directorSessions              DirectorSession[]
   roleNotes                     ProjectRoleNote[]
@@ -119,6 +121,8 @@ model UserProfile {
   telegramUsername       String?
   telegramId             String?  @unique
   avatarUrl              String?
+  /// Компактный аватар для списков / мини-чипов (опционально).
+  avatarSmallUrl         String?
   availabilityCalendar   Json?
   /// Доступность по времени на конкретные даты:
   /// { "YYYY-MM-DD": [ { from: "HH:mm", to: "HH:mm" }, ... ] }
@@ -861,6 +865,109 @@ model BotVariable {
   @@index([botId])
 }
 
+/// Max / VK (и др.) каналы. Telegram остаётся в TelegramBotIntegration.
+model MessengerChannel {
+  id          String @id @default(cuid())
+  ownerUserId String
+  owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  /// max | vk
+  platform String
+
+  title  String?
+  /// connected | disabled | error
+  status String @default("connected")
+
+  tokenEncrypted String
+  webhookSecret  String
+
+  /// Max: bot user id; VK: group id
+  externalBotId    String?
+  externalUsername String?
+
+  /// Чат/peer по умолчанию для публикаций и зеркала
+  chatId String?
+
+  /// VK: строка confirmation для Callback API
+  vkConfirmation String?
+  /// VK: numeric group id
+  vkGroupId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bridgeMembers MessengerBridgeMember[]
+
+  @@index([ownerUserId])
+  @@index([platform])
+  @@unique([platform, externalBotId])
+}
+
+/// Группа синхронизации: один primary → несколько mirror.
+model MessengerBridge {
+  id          String @id @default(cuid())
+  ownerUserId String
+  owner       User   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  title   String?
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members  MessengerBridgeMember[]
+  mirrors  MirroredMessage[]
+
+  @@index([ownerUserId])
+}
+
+model MessengerBridgeMember {
+  id       String          @id @default(cuid())
+  bridgeId String
+  bridge   MessengerBridge @relation(fields: [bridgeId], references: [id], onDelete: Cascade)
+
+  /// primary | mirror
+  role String
+  /// telegram | max | vk
+  platform String
+
+  /// Для platform=telegram
+  telegramBotId String?
+  /// Для platform=max|vk
+  channelId String?
+  channel   MessengerChannel? @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  /// Переопределение чата назначения (иначе chatId канала / groupChatId бота)
+  chatId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([bridgeId])
+  @@index([telegramBotId])
+  @@index([channelId])
+}
+
+model MirroredMessage {
+  id       String          @id @default(cuid())
+  bridgeId String
+  bridge   MessengerBridge @relation(fields: [bridgeId], references: [id], onDelete: Cascade)
+
+  sourcePlatform  String
+  sourceMessageId String
+  sourceRef       String
+
+  targetPlatform  String
+  targetMessageId String
+  targetRef       String
+
+  createdAt DateTime @default(now())
+
+  @@unique([bridgeId, sourcePlatform, sourceMessageId, targetRef])
+  @@index([bridgeId])
+  @@index([sourcePlatform, sourceMessageId])
+}
+
 model ActorNote {
   id            String   @id @default(cuid())
   userId        String
@@ -1048,6 +1155,14 @@ enum PremiseMemberRole {
   viewer
 }
 
+enum PremiseBookedAsKind {
+  user
+  troupe
+  theater
+  studio
+  external
+}
+
 enum PremiseSlotStatus {
   confirmed
   pending
@@ -1137,6 +1252,9 @@ model PremiseRental {
   contactEmail         String?
   contactName          String?
   contactPhone         String?
+  bookedAsKind         PremiseBookedAsKind   @default(user)
+  bookedAsId           String?
+  bookedAsTitle        String                @default("")
   startsOn             DateTime
   endsOn               DateTime?
   timezoneOffsetMin    Int                   @default(0)
@@ -1145,6 +1263,8 @@ model PremiseRental {
   agreementRequested   Boolean               @default(false)
   status               PremiseRentalStatus   @default(pending)
   createdByEmail       String
+  confirmedByEmail     String?
+  confirmedAt          DateTime?
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
@@ -1156,6 +1276,7 @@ model PremiseRental {
 
   @@index([premiseId, startsOn])
   @@index([status])
+  @@index([bookedAsKind, bookedAsId])
 }
 
 model PremiseRentalSchedule {

@@ -11,6 +11,72 @@
   min-height: 0;
 }
 
+/* Большой экран: плейлист + контент + сцены.
+   Ширина рельса совпадает с menubar (--app-shell-rail-max). */
+.app-layout--docks-cluster {
+  display: grid;
+  grid-template-columns: minmax(0, var(--width-content-page));
+  width: min(100%, var(--app-shell-rail-max, var(--width-content-page)));
+  margin-inline: auto;
+  box-sizing: border-box;
+  justify-content: center;
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="true"] .app-layout--docks-cluster {
+  grid-template-columns:
+    minmax(0, var(--width-sidebar-max))
+    minmax(0, var(--width-content-page))
+    minmax(0, var(--width-sidebar-max));
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="false"] .app-layout--docks-cluster {
+  grid-template-columns:
+    minmax(0, var(--width-sidebar-max))
+    minmax(0, var(--width-content-page));
+}
+
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="true"] .app-layout--docks-cluster {
+  grid-template-columns:
+    minmax(0, var(--width-content-page))
+    minmax(0, var(--width-sidebar-max));
+}
+
+.app-layout--docks-cluster > .playlist-sidebar-container {
+  grid-column: 1;
+  width: 100%;
+  max-width: none;
+}
+
+.app-layout--docks-cluster > .app-content {
+  grid-column: 1;
+  flex: unset;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"] .app-layout--docks-cluster > .app-content {
+  grid-column: 2;
+}
+
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="true"] .app-layout--docks-cluster > .app-content {
+  grid-column: 1;
+}
+
+.app-layout--docks-cluster > .scenes-sidebar-container {
+  grid-column: 2;
+  width: 100%;
+  max-width: none;
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="true"] .app-layout--docks-cluster > .scenes-sidebar-container {
+  grid-column: 3;
+}
+
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="true"] .app-layout--docks-cluster > .scenes-sidebar-container {
+  grid-column: 2;
+}
+
 .app-content {
   flex: 1;
   display: flex;
@@ -29,6 +95,11 @@
   overflow: auto;
   scrollbar-gutter: stable;
   background: var(--color-bg-primary);
+}
+
+.main-content.show-script {
+  padding: 0;
+  scrollbar-gutter: auto;
 }
 
 .main-content-theater {
@@ -55,14 +126,14 @@
   }
 
   .main-content {
-    padding: 12px 12px 160px;
+    padding: 12px;
   }
 
   .main-content-sessions,
   .main-content-kanban,
   .main-content-project-media,
   .main-content-premises {
-    padding: 0 0 160px;
+    padding: 0;
   }
 
   .main-content-theater {
@@ -73,7 +144,7 @@
 
 @media (max-width: 480px) {
   .main-content {
-    padding: 8px 8px 190px;
+    padding: 8px;
   }
 
   .main-content-sessions,
@@ -90,14 +161,14 @@
 
 @media (max-width: 320px) {
   .main-content {
-    padding: 6px 6px 200px;
+    padding: 6px;
   }
 
   .main-content-sessions,
   .main-content-kanban,
   .main-content-project-media,
   .main-content-premises {
-    padding: 0 0 200px;
+    padding: 0;
   }
 
   .main-content-theater {

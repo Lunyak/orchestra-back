@@ -1,3 +1,4 @@
+import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
 import cn from "classnames";
@@ -235,7 +236,7 @@ function TasksPageView({ vm }: { vm: ProjectTasksPageViewModel }) {
 
           {loading ? (
             <div className="tasks-page__panel">
-              <p className="tasks-page__hint">Загрузка задач…</p>
+              <PageLoader variant="view" label="Загрузка задач…" />
             </div>
           ) : null}
 

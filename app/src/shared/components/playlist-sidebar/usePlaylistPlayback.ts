@@ -2,9 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import {
   invokePlaylistPlay,
   getPlaylistActiveTrackId,
+  registerPlaylistNextHandler,
   registerPlaylistPauseHandler,
+  registerPlaylistPrevHandler,
+  registerPlaylistSeekHandler,
   registerPlaylistSnapshotProvider,
+  registerPlaylistToggleHandler,
   subscribePlaylistActiveTrack,
+  updatePlaylistProgress,
   updatePlaylistVisualPlayback,
   type PlaylistPlayOptions,
 } from "../../../features/playbook/model/playbook-playback-bridge";
@@ -141,16 +146,23 @@ export function usePlaylistPlayback({
     const audio = activeAudioKey === "a" ? audioRefA.current : audioRefB.current;
     if (!audio) return;
     const handleTimeUpdate = () => {
-      setProgress(audio.currentTime || 0);
-      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
+      const nextProgress = audio.currentTime || 0;
+      const nextDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      setProgress(nextProgress);
+      setDuration(nextDuration);
+      updatePlaylistProgress(nextProgress, nextDuration);
     };
     const handleLoaded = () => {
-      setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
-      setProgress(audio.currentTime || 0);
+      const nextDuration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      const nextProgress = audio.currentTime || 0;
+      setDuration(nextDuration);
+      setProgress(nextProgress);
+      updatePlaylistProgress(nextProgress, nextDuration);
     };
     const handleEnded = () => {
       setProgress(0);
       setIsPlaying(false);
+      updatePlaylistProgress(0, durationRef.current);
     };
     const handlePlay = () => {
       setIsPlaying(true);
@@ -720,24 +732,31 @@ export function usePlaylistPlayback({
     return () => registerPlaylistPauseHandler(undefined);
   }, [pausePlayback]);
 
+  const togglePlayback = useCallback(() => {
+    if (!currentTrackRef.current) return;
+    if (isPlaying) {
+      pausePlayback();
+      return;
+    }
+    void playTrack(currentTrackRef.current);
+  }, [isPlaying, pausePlayback, playTrack]);
+
+  useEffect(() => {
+    registerPlaylistToggleHandler(togglePlayback);
+    return () => registerPlaylistToggleHandler(undefined);
+  }, [togglePlayback]);
+
   useEffect(() => {
     registerPlaylistSnapshotProvider(() => ({
       trackId: currentTrack?.id ?? null,
       trackTitle: currentTrack?.title,
       fadeMs: currentTrack?.fadeMs,
       volume: volumeRef.current,
+      progress: progressRef.current,
+      duration: durationRef.current,
     }));
     return () => registerPlaylistSnapshotProvider(undefined);
   }, [currentTrack]);
-
-  const togglePlayback = () => {
-    if (!currentTrack) return;
-    if (isPlaying) {
-      pausePlayback();
-      return;
-    }
-    void playTrack(currentTrack);
-  };
 
   const setPlayerVolume = (nextValue: number) => {
     setVolume(nextValue);
@@ -752,7 +771,16 @@ export function usePlaylistPlayback({
     if (!audio || !Number.isFinite(nextValue)) return;
     audio.currentTime = nextValue;
     setProgress(nextValue);
+    updatePlaylistProgress(nextValue, durationRef.current);
   };
+
+  const seekPlayerRef = useRef(seekPlayer);
+  seekPlayerRef.current = seekPlayer;
+
+  useEffect(() => {
+    registerPlaylistSeekHandler((value) => seekPlayerRef.current(value));
+    return () => registerPlaylistSeekHandler(undefined);
+  }, []);
 
   const sharedActiveTrackId = useSyncExternalStore(
     subscribePlaylistActiveTrack,
@@ -800,6 +828,20 @@ export function usePlaylistPlayback({
     if (!canGoNextTrack) return;
     playTrackAt(currentTrackIndex + 1);
   };
+
+  const playPreviousTrackRef = useRef(playPreviousTrack);
+  playPreviousTrackRef.current = playPreviousTrack;
+  const playNextTrackRef = useRef(playNextTrack);
+  playNextTrackRef.current = playNextTrack;
+
+  useEffect(() => {
+    registerPlaylistPrevHandler(() => playPreviousTrackRef.current());
+    registerPlaylistNextHandler(() => playNextTrackRef.current());
+    return () => {
+      registerPlaylistPrevHandler(undefined);
+      registerPlaylistNextHandler(undefined);
+    };
+  }, []);
 
   const stopAudioForTrack = useCallback((trackId: number) => {
     if (currentTrackRef.current?.id !== trackId) return;

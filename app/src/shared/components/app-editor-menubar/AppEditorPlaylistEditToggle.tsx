@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import cn from "classnames";
 import { scriptUiActions } from "../../../features/script-ui/model/script-ui-slice";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 
@@ -10,24 +11,21 @@ export function AppEditorPlaylistEditToggle() {
     [dispatch],
   );
 
+  const isActive = playlistEditMode;
+  const label = isActive ? "Закрыть настройки" : "Настройки";
+
   return (
     <button
       type="button"
-      className={[
+      className={cn(
         "app-editor-menubar__panel-btn",
         "app-editor-menubar__panel-btn--playlist-edit",
-        playlistEditMode ? "app-editor-menubar__panel-btn--active" : "app-editor-menubar__panel-btn--muted",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        isActive ? "app-editor-menubar__panel-btn--active" : "app-editor-menubar__panel-btn--muted",
+      )}
       onClick={toggle}
-      title={
-        playlistEditMode ? "Закрыть настройки плейлиста" : "Настройки плейлиста"
-      }
-      aria-label={
-        playlistEditMode ? "Закрыть настройки плейлиста" : "Настройки плейлиста"
-      }
-      aria-pressed={playlistEditMode}
+      title={label}
+      aria-label={label}
+      aria-pressed={isActive}
     >
       <span className="app-editor-menubar__panel-icon">
         <svg

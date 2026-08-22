@@ -1,56 +1,271 @@
-.aboutus-row__avatar-wrap {
-  position: relative;
-  width: clamp(200px, 32vw, 340px);
-  height: clamp(200px, 32vw, 340px);
-  flex-shrink: 0;
+.chalk-team__list {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-top: 8px;
 }
 
-.aboutus-row__loader {
+.chalk-team__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(205, 198, 182, 0.18);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.chalk-team__row:last-child {
+  border-bottom: 0;
+}
+
+.chalk-team__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chalk-team__avatar-btn {
+  flex-shrink: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 0;
+}
+
+.chalk-team__avatar-btn:disabled {
+  cursor: default;
+}
+
+.chalk-team__avatar-btn:focus-visible {
+  outline: 1px solid var(--chalk-neon);
+  outline-offset: 3px;
+}
+
+.chalk-team__avatar-wrap {
+  position: relative;
+  display: block;
+  width: 52px;
+  height: 52px;
+}
+
+.chalk-team__avatar-ph {
   position: absolute;
   inset: 0;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  background: rgba(8, 5, 7, 0.55);
+  background: rgba(205, 198, 182, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(205, 198, 182, 0.22);
 }
 
-.aboutus-row .site-bands-row__avatar[data-loading="true"] {
+.chalk-team__avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px rgba(205, 198, 182, 0.35);
+  filter: grayscale(35%) contrast(1.02) brightness(0.94);
+  transition: filter var(--transition), box-shadow var(--transition);
+}
+
+.chalk-team__avatar[data-loading="true"] {
   opacity: 0;
 }
 
-.aboutus-row .site-bands-row__avatar {
-  width: 100%;
-  height: 100%;
-  transition: opacity 0.25s ease, filter var(--transition);
+.chalk-team__row:hover .chalk-team__avatar,
+.chalk-team__avatar-btn:hover .chalk-team__avatar,
+.chalk-team__avatar-btn:focus-visible .chalk-team__avatar {
+  filter: grayscale(0%) contrast(1.05) brightness(1);
+  box-shadow:
+    inset 0 0 0 1px rgba(245, 238, 220, 0.45),
+    0 0 12px rgba(0, 251, 255, 0.12);
 }
 
-.aboutus-row .site-bands-row__main {
-  gap: 28px;
+.chalk-team__name {
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.82rem, 3.2vw, 1rem);
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.aboutus-row__text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+.chalk-team__role {
+  flex-shrink: 1;
   min-width: 0;
+  max-width: 34%;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: clamp(0.65rem, 2.4vw, 0.8rem);
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  color: rgba(205, 198, 182, 0.78);
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
-.aboutus-row__role {
-  font-family: "Russo One", sans-serif;
-  font-size: clamp(0.85rem, 1vw + 0.35rem, 1.05rem);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
+@media (max-width: 360px) {
+  .chalk-team__row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
 
-.aboutus-row.site-bands-row {
-  padding-top: clamp(22px, 3.5dvh, 40px);
-  padding-bottom: clamp(22px, 3.5dvh, 40px);
+  .chalk-team__role {
+    max-width: none;
+    text-align: left;
+    padding-left: 64px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aboutus-row .site-bands-row__avatar {
+  .chalk-team__avatar {
     transition: none;
+  }
+
+  .chalk-team-lightbox__figure {
+    animation: none;
+  }
+
+  .chalk-team-lightbox__nav {
+    transition: none;
+  }
+}
+
+.chalk-team-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 4vw, 32px);
+  box-sizing: border-box;
+}
+
+.chalk-team-lightbox__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: rgba(5, 5, 5, 0.88);
+  cursor: pointer;
+}
+
+.chalk-team-lightbox__figure {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 520px);
+  margin: 0;
+  animation: chalk-team-lightbox-in 0.22s ease;
+  touch-action: pan-y;
+}
+
+.chalk-team-lightbox__nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(205, 198, 182, 0.72);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color var(--transition), text-shadow var(--transition), transform var(--transition);
+}
+
+.chalk-team-lightbox__nav--prev {
+  left: clamp(6px, 2vw, 14px);
+}
+
+.chalk-team-lightbox__nav--next {
+  right: clamp(6px, 2vw, 14px);
+}
+
+.chalk-team-lightbox__nav-mark {
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  font-size: 24px;
+  line-height: 1;
+  filter: url("#chalk-page-text-rough");
+}
+
+.chalk-team-lightbox__nav:hover,
+.chalk-team-lightbox__nav:focus-visible {
+  color: var(--chalk-neon);
+  text-shadow: 0 0 10px rgba(0, 251, 255, 0.45);
+}
+
+.chalk-team-lightbox__nav--prev:hover,
+.chalk-team-lightbox__nav--prev:focus-visible {
+  transform: translateY(-50%) translateX(-2px);
+}
+
+.chalk-team-lightbox__nav--next:hover,
+.chalk-team-lightbox__nav--next:focus-visible {
+  transform: translateY(-50%) translateX(2px);
+}
+
+.chalk-team-lightbox__nav:focus-visible {
+  outline: 1px solid var(--chalk-neon);
+  outline-offset: 3px;
+}
+
+.chalk-team-lightbox__img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(72vh, 640px);
+  object-fit: contain;
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 2px rgba(205, 198, 182, 0.45),
+    0 0 28px rgba(0, 251, 255, 0.12);
+}
+
+.chalk-team-lightbox__caption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: "Chalkduster", "Segoe UI", sans-serif;
+  text-align: center;
+  filter: url("#chalk-page-text-rough");
+}
+
+.chalk-team-lightbox__caption-name {
+  font-size: clamp(0.85rem, 3vw, 1rem);
+  letter-spacing: 0.04em;
+  color: rgba(245, 238, 220, 0.9);
+}
+
+.chalk-team-lightbox__caption-role {
+  font-size: clamp(0.7rem, 2.5vw, 0.85rem);
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  color: rgba(205, 198, 182, 0.72);
+}
+
+@keyframes chalk-team-lightbox-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }

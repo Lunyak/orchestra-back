@@ -27,6 +27,7 @@ export interface ProjectContextValue {
   onProjectChange: (name: string) => void;
   createProject: (name: string, workspaceId?: string) => Promise<void>;
   updateProjectDisplayName: (name: string) => Promise<void>;
+  updateProjectSlug: (slug: string) => Promise<string>;
   deleteProject: (name: string) => Promise<void>;
   ensureRemoteProject: (token?: string | null) => Promise<string | null>;
 }
@@ -186,6 +187,25 @@ function makeUniqueProjectSlug(name: string, usedSlugs: string[]): string {
   return `${base}-${Date.now().toString(36)}`;
 }
 
+function migrateProjectLocalKeys(fromSlug: string, toSlug: string) {
+  if (typeof window === "undefined" || fromSlug === toSlug) return;
+  const keyPairs = [
+    [`${PROJECT_DISPLAY_NAME_KEY_PREFIX}${fromSlug}`, `${PROJECT_DISPLAY_NAME_KEY_PREFIX}${toSlug}`],
+    [`${PROJECT_LAST_OPENED_KEY_PREFIX}${fromSlug}`, `${PROJECT_LAST_OPENED_KEY_PREFIX}${toSlug}`],
+    [`projectId:${fromSlug}`, `projectId:${toSlug}`],
+    [`projectPoster:${fromSlug}`, `projectPoster:${toSlug}`],
+  ] as const;
+  for (const [fromKey, toKey] of keyPairs) {
+    const value = localStorage.getItem(fromKey);
+    if (value == null) continue;
+    localStorage.setItem(toKey, value);
+    localStorage.removeItem(fromKey);
+  }
+  if (localStorage.getItem("selectedProject") === fromSlug) {
+    localStorage.setItem("selectedProject", toSlug);
+  }
+}
+
 function desktopProjectSummary(slug: string): ProjectSummary {
   return {
     id: slug,
@@ -205,6 +225,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const ensureRemoteInFlightRef = React.useRef<
     Record<string, Promise<string | null> | undefined>
   >({});
+  const loadProjectsInFlightRef = React.useRef<Promise<void> | null>(null);
 
   const currentProject = React.useMemo(
     () => projectItems.find((project) => project.slug === projectName) ?? null,
@@ -233,58 +254,75 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
   const loadProjects = useCallback(
     async (prefer?: string) => {
-      setProjectsLoading(true);
-      try {
-        const desktopApi = getDesktopApi();
-        let listRaw: ProjectSummary[] = desktopApi
-          ? (await desktopApi.listProjects()).map(desktopProjectSummary)
-          : accessToken
-            ? await fetchProjects(accessToken)
-            : [];
-        if (listRaw.length === 0 && import.meta.env.DEV) {
-          try {
-            const res = await fetch("/local-project-dev/projects");
-            if (res.ok) {
-              const data = (await res.json()) as { projects?: string[] };
-              listRaw = (Array.isArray(data.projects) ? data.projects : []).map(
-                (slug) => desktopProjectSummary(slug),
-              );
+      const inFlight = loadProjectsInFlightRef.current;
+      if (inFlight && prefer == null) {
+        await inFlight;
+        return;
+      }
+
+      const run = (async () => {
+        setProjectsLoading(true);
+        try {
+          const desktopApi = getDesktopApi();
+          let listRaw: ProjectSummary[] = desktopApi
+            ? (await desktopApi.listProjects()).map(desktopProjectSummary)
+            : accessToken
+              ? await fetchProjects(accessToken)
+              : [];
+          if (listRaw.length === 0 && import.meta.env.DEV) {
+            try {
+              const res = await fetch("/local-project-dev/projects");
+              if (res.ok) {
+                const data = (await res.json()) as { projects?: string[] };
+                listRaw = (Array.isArray(data.projects) ? data.projects : []).map(
+                  (slug) => desktopProjectSummary(slug),
+                );
+              }
+            } catch {
+              /* dev local list unavailable */
             }
-          } catch {
-            /* dev local list unavailable */
           }
-        }
-        const visibleItems = listRaw.filter(
-          (project) => !isDirectorSessionsSlug(project.slug),
-        );
-        const items = sortProjectsByLastOpened(visibleItems);
-        const list = items.map((project) => project.slug);
-        setProjectItems(items);
-        setProjects(list);
-        const stored = localStorage.getItem("selectedProject") || "";
-        // Не затирать выбранный проект при каждом loadProjects (смена токена, повторный mount):
-        // иначе при несовпадении stored со списком на мгновение или при сортировке list[0] — «прыжок»
-        // на другой slug (часто первый по алфавиту).
-        setProjectName((prev) => {
-          if (prefer && list.includes(prefer)) return prefer;
-          if (prev && list.includes(prev)) return prev;
-          if (stored && list.includes(stored)) return stored;
-          return list[0] || "";
-        });
-      } catch (error: any) {
-        console.error("[projects] failed to load:", error);
+          const visibleItems = listRaw.filter(
+            (project) => !isDirectorSessionsSlug(project.slug),
+          );
+          const items = sortProjectsByLastOpened(visibleItems);
+          const list = items.map((project) => project.slug);
+          setProjectItems(items);
+          setProjects(list);
+          const stored = localStorage.getItem("selectedProject") || "";
+          // Не затирать выбранный проект при каждом loadProjects (смена токена, повторный mount):
+          // иначе при несовпадении stored со списком на мгновение или при сортировке list[0] — «прыжок»
+          // на другой slug (часто первый по алфавиту).
+          setProjectName((prev) => {
+            if (prefer && list.includes(prefer)) return prefer;
+            if (prev && list.includes(prev)) return prev;
+            if (stored && list.includes(stored)) return stored;
+            return list[0] || "";
+          });
+        } catch (error: any) {
+          console.error("[projects] failed to load:", error);
 
-        // При 401 — токен невалидный, нужен повторный логин
-        if (error?.response?.status === 401) {
-          console.warn("[projects] Unauthorized (401) — logging out");
-          logout();
-        }
+          // При 401 — токен невалидный, нужен повторный логин
+          if (error?.response?.status === 401) {
+            console.warn("[projects] Unauthorized (401) — logging out");
+            logout();
+          }
 
-        setProjects([]);
-        setProjectItems([]);
+          setProjects([]);
+          setProjectItems([]);
+        } finally {
+          setProjectsLoading(false);
+          setIsProjectsLoaded(true);
+        }
+      })();
+
+      loadProjectsInFlightRef.current = run;
+      try {
+        await run;
       } finally {
-        setProjectsLoading(false);
-        setIsProjectsLoaded(true);
+        if (loadProjectsInFlightRef.current === run) {
+          loadProjectsInFlightRef.current = null;
+        }
       }
     },
     [accessToken, getDesktopApi, logout],
@@ -415,6 +453,49 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     [accessToken, getDesktopApi, loadProjects, projectName],
   );
 
+  const updateProjectSlug = useCallback(
+    async (slug: string) => {
+      const nextSlug = slugifyProjectName(slug);
+      if (!projectName || !nextSlug) {
+        throw new Error("Укажите корректный slug");
+      }
+      if (nextSlug === projectName) return nextSlug;
+
+      const collision = projectItems.some(
+        (project) =>
+          project.slug === nextSlug && project.slug !== projectName,
+      );
+      if (collision) {
+        throw new Error("Проект с таким slug уже есть");
+      }
+
+      if (!accessToken || getDesktopApi()) {
+        throw new Error("Смена slug доступна в веб-версии при входе в аккаунт");
+      }
+
+      const updated = await updateProject(accessToken, projectName, {
+        slug: nextSlug,
+      });
+      const resolvedSlug = updated.slug || nextSlug;
+
+      migrateProjectLocalKeys(projectName, resolvedSlug);
+      setProjects((prev) =>
+        prev.map((item) => (item === projectName ? resolvedSlug : item)),
+      );
+      setProjectItems((prev) =>
+        prev.map((project) =>
+          project.slug === projectName
+            ? { ...project, ...updated, slug: resolvedSlug }
+            : project,
+        ),
+      );
+      setProjectName(resolvedSlug);
+      localStorage.setItem("selectedProject", resolvedSlug);
+      return resolvedSlug;
+    },
+    [accessToken, getDesktopApi, projectItems, projectName],
+  );
+
   const deleteProject = useCallback(
     async (name: string) => {
       if (!name) return;
@@ -504,6 +585,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     onProjectChange,
     createProject,
     updateProjectDisplayName,
+    updateProjectSlug,
     deleteProject,
     ensureRemoteProject,
   };

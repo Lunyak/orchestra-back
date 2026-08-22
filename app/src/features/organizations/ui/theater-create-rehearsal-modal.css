@@ -1,0 +1,51 @@
+.theater-create-rehearsal-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 360px);
+  color: var(--sessions-text, var(--color-text-muted));
+  background: var(--color-bg-modal, var(--sessions-bg, #111));
+}
+
+.theater-create-rehearsal-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.theater-create-rehearsal-modal__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--sessions-text-strong, var(--color-text));
+}
+
+.theater-create-rehearsal-modal__date {
+  margin: 0;
+}
+
+.theater-create-rehearsal-modal__time {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theater-create-rehearsal-modal__time-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted, var(--color-text-muted));
+}
+
+.theater-create-rehearsal-modal__time-input {
+  width: 120px;
+  min-height: 32px;
+}
+
+.theater-create-rehearsal-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
