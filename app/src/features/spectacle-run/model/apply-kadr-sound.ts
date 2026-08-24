@@ -16,10 +16,14 @@ export function applyKadrSound(
   if (primaryTrack != null && primaryTrack > 0) {
     const playOptions: {
       volume?: number;
+      fadeMs?: number;
       continueIfPlaying: boolean;
     } = { continueIfPlaying: true };
     if (cue.volume != null && Number.isFinite(cue.volume)) {
       playOptions.volume = cue.volume;
+    }
+    if (cue.fadeMs != null && Number.isFinite(cue.fadeMs) && cue.fadeMs > 0) {
+      playOptions.fadeMs = cue.fadeMs;
     }
     invokePlaylistPlay(primaryTrack, playOptions);
   }

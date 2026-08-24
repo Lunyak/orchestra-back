@@ -75,7 +75,7 @@ SHARED UTILITIES:
 2. Открыл `app/src/shared/styles/variables.css` и `CHEATSHEET.md`?
 3. CSS в отдельном файле, токены `var(--…)`, className через `cn`
 4. Острые углы по умолчанию (см. ниже)
-5. Страницы: корень `*-page` с `background: var(--sessions-bg)` — контентная пластина отличается от app chrome (см. `page-layout-standards.mdc`, эталон Organizations)
+5. Страницы: корень `*-page` с `background: var(--sessions-bg)` и `min-height: 100%` — контентная пластина отличается от app chrome и тянется на всю высоту (см. `page-layout-standards.mdc`, эталон Organizations)
 6. Загрузка UI — `PageLoader` / для boot страницы без menubar — `PageBootLoader` (см. `page-loader.mdc`). Без скелетонов.
 
 Когда создаёшь новые UI-элементы (кнопки, карточки, инпуты, модальные окна, dropdowns, табы, меню и любые контейнеры):

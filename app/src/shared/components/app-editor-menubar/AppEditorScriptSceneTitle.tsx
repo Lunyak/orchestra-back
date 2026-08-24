@@ -12,6 +12,8 @@ export type AppEditorScriptSceneTitleProps = {
   showModeToggle?: boolean;
   /** Доп. кнопка под переключателем режима (например оригинал/правка). */
   belowModeToggle?: ReactNode;
+  /** Кнопка/меню справа от названия (mobile chrome). */
+  trailingActions?: ReactNode;
 };
 
 const editIcon = (
@@ -89,25 +91,43 @@ export function AppEditorScriptSceneTitle({
   onToggleModeEditing,
   showModeToggle = true,
   belowModeToggle = null,
+  trailingActions = null,
 }: AppEditorScriptSceneTitleProps) {
+  const titleNode = titleEditable ? (
+    <input
+      type="text"
+      className="script-scene-title app-editor-menubar__scene-title app-editor-menubar__scene-title-input"
+      value={title}
+      onChange={(event) => onTitleChange(event.target.value)}
+      placeholder="Название сцены"
+      aria-label="Название сцены"
+    />
+  ) : title.trim() ? (
+    <div className="script-scene-title app-editor-menubar__scene-title">{title}</div>
+  ) : (
+    <div className="script-scene-title script-scene-title--placeholder" aria-hidden>
+      {"\u00a0"}
+    </div>
+  );
+
+  const titleContent =
+    trailingActions != null ? (
+      <div className="script-scene-title-row">
+        {titleNode}
+        {trailingActions}
+      </div>
+    ) : (
+      titleNode
+    );
+
   return (
-    <div className="script-scene-title-block">
-      {titleEditable ? (
-        <input
-          type="text"
-          className="script-scene-title app-editor-menubar__scene-title app-editor-menubar__scene-title-input"
-          value={title}
-          onChange={(event) => onTitleChange(event.target.value)}
-          placeholder="Название сцены"
-          aria-label="Название сцены"
-        />
-      ) : title.trim() ? (
-        <div className="script-scene-title app-editor-menubar__scene-title">{title}</div>
-      ) : (
-        <div className="script-scene-title script-scene-title--placeholder" aria-hidden>
-          {"\u00a0"}
-        </div>
+    <div
+      className={cn(
+        "script-scene-title-block",
+        trailingActions != null && "script-scene-title-block--with-trailing",
       )}
+    >
+      {titleContent}
       {showModeToggle ? (
         <AppEditorScriptModeToggle
           isModeEditing={isModeEditing}

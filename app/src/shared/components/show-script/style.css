@@ -586,6 +586,26 @@
   gap: 6px;
 }
 
+.requisites-add--mobile {
+  display: flex;
+}
+
+.requisites-add__open-btn {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--stage-brutal-border, var(--color-border-light));
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--color-active-ascent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.requisites-add__open-btn:hover {
+  background: color-mix(in srgb, var(--color-active-ascent) 14%, transparent);
+}
+
 .requisites-add input {
   flex: 1;
   background: rgba(0, 0, 0, 0.18);

@@ -2,6 +2,8 @@
   margin: 0 auto;
   max-width: var(--width-content-page);
   width: 100%;
+  min-height: 100%;
+  height: auto;
   padding: 18px 18px 28px;
   box-sizing: border-box;
   color: var(--sessions-text);
@@ -489,6 +491,21 @@ a.tasks-page__item-title:hover {
 
   .tasks-page__item-actions {
     opacity: 1;
+  }
+
+  .tasks-page__compose {
+    gap: 6px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+  }
+
+  .tasks-page__compose-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .tasks-page__toolbar {
+    gap: 6px;
+    margin-bottom: 8px;
   }
 }
 

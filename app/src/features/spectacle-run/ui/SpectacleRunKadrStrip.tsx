@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -31,11 +32,12 @@ import {
 
 import { buildLightConsoleSplitModel } from "../../../shared/components/light-console/light-console-split";
 
-import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
+import { resolveLightFaders, resolveLightPrograms } from "../../../shared/components/light-console/light-console-data";
+import { LightConsoleView } from "../../../shared/components/light-console/LightConsoleView";
 
 import { resolveLightColor } from "../../../shared/components/show-script/utils/lightTokens";
 
-import type { ScriptScene } from "../../../shared/types/script";
+import type { ScriptScene, SceneLightKadrV1, TheaterSpotlight } from "../../../shared/types/script";
 
 import {
 
@@ -48,7 +50,7 @@ import {
 import { parseKadrTitleFromHeading } from "../model/create-kadr-from-draft";
 import { findFirstMarkdownImageHref } from "../../../shared/utils/markdownImages";
 
-import { formatKadrRunLabelText } from "../model/kadr-section-labels";
+import { formatKadrRunLabelText, type KadrRunLabel } from "../model/kadr-section-labels";
 
 import {
 
@@ -76,21 +78,91 @@ import { useKadrStripImageSrc } from "../model/useKadrStripImageSrc";
 
 import { useProgRunKadrChipHeight } from "../model/useProgRunKadrChipHeight";
 
+import {
+  centerKadrStripChip,
+  findNearestKadrStripChipIndex,
+} from "../model/kadr-strip-carousel";
+
 const PRIMARY_PROG_RUN_ROW_LABELS = new Set([
   "Свет",
-  "Звук",
+  "Трек",
   "Видео",
   "Переход",
   "Комментарий",
 ]);
 
+const LIVE_PROG_RUN_ROW_LABELS = ["Свет", "Трек", "Видео"] as const;
+
+const COVER_OVERLAY_LIVE_ROW_LABELS = ["Свет", "Трек"] as const;
+
+const NOTES_PROG_RUN_ROW_LABELS = ["Комментарий", "Переход"] as const;
+
+const LIVE_PROG_RUN_ROW_LABEL_SET = new Set<string>(LIVE_PROG_RUN_ROW_LABELS);
+
+const NOTES_PROG_RUN_ROW_LABEL_SET = new Set<string>(NOTES_PROG_RUN_ROW_LABELS);
+
+const PROG_RUN_CAROUSEL_STACK_RADIUS = 2;
+
+const PROG_RUN_FLOW_STACK_RADIUS = 3;
+
+const PROG_RUN_TRIO_STACK_RADIUS = 1;
+
+function isCarouselStackedOffset(
+  offset: number,
+  mode: "carousel" | "flow" | "trio" = "carousel",
+): boolean {
+  const radius =
+    mode === "flow"
+      ? PROG_RUN_FLOW_STACK_RADIUS
+      : mode === "trio"
+        ? PROG_RUN_TRIO_STACK_RADIUS
+        : PROG_RUN_CAROUSEL_STACK_RADIUS;
+  return Math.abs(offset) <= radius;
+}
+
+function isFilledTechRow(row: KadrStripTechRow): boolean {
+  return row.value.trim().length > 0;
+}
+
+function orderTechRowsByLabels(
+  rows: KadrStripTechRow[],
+  labels: readonly string[],
+): KadrStripTechRow[] {
+  const byLabel = new Map(rows.map((row) => [row.label, row]));
+  return labels.flatMap((label) => {
+    const row = byLabel.get(label);
+    return row ? [row] : [];
+  });
+}
+
+import type { ProgRunKadrStripLayout } from "../model/prog-run-prefs-storage";
+
+export type SpectacleRunKadrStripLayout = ProgRunKadrStripLayout;
+
 export type SpectacleRunKadrStripVariant = "rehearsal" | "prog-run";
 
 
 
+export type ProgRunChipLiveConsoleProps = {
+  lightChannels: string[];
+  selectedLightSlot: number;
+  faders: PlaybookLightFadersDataV1;
+  programs: PlaybookLightProgramsDataV1;
+};
+
 export type SpectacleRunKadrStripProps = {
 
   variant?: SpectacleRunKadrStripVariant;
+
+  layout?: SpectacleRunKadrStripLayout;
+
+  notesOverlay?: boolean;
+
+  plainCover?: boolean;
+
+  lightConsoleOpen?: boolean;
+
+  lightConsoleChannelColumns?: number;
 
   projectName: string;
 
@@ -168,6 +240,82 @@ function kadrProgramColor(
 
 
 
+function resolveTapeItemKadr(
+
+  item: SpectacleTapeItem,
+
+  scene: ScriptScene | undefined,
+
+): SceneLightKadrV1 | undefined {
+
+  if (!scene || item.isPlaceholder) return undefined;
+
+  const kadrs = readSceneLightKadrs(scene);
+
+  return (
+
+    (item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined) ??
+
+    kadrs.kadrs.find((k) => k.kadrNo === item.kadrNo)
+
+  );
+
+}
+
+
+
+function buildProgRunChipLightConsole(
+
+  kadr: SceneLightKadrV1 | undefined,
+
+  lightChannels: string[],
+
+  baseFaders: PlaybookLightFadersDataV1,
+
+  lightPrograms: PlaybookLightProgramsDataV1 | null,
+
+): ProgRunChipLiveConsoleProps | null {
+
+  if (!kadr || kadr.blackout || kadr.programId <= 0) return null;
+
+  const channelCount = Math.max(1, lightChannels.length);
+
+  const selectedLightSlot = Math.max(
+
+    1,
+
+    Math.min(channelCount, kadr.recordChannels?.[0] ?? 1),
+
+  );
+
+  const programId = Math.max(1, Math.trunc(kadr.programId) || 1);
+
+  const programs = resolveLightPrograms(
+
+    lightPrograms ?? undefined,
+
+    undefined,
+
+    channelCount,
+
+  );
+
+  return {
+
+    lightChannels,
+
+    selectedLightSlot,
+
+    faders: fadersForKadrDisplay(kadr, baseFaders),
+
+    programs: { ...programs, activeProgramId: programId },
+
+  };
+
+}
+
+
+
 type KadrStripChipBaseProps = {
 
   projectName: string;
@@ -185,6 +333,8 @@ type KadrStripChipBaseProps = {
   onSelect: () => void;
 
   chipRef?: Ref<HTMLElement>;
+
+  tapeIndex: number;
 
 };
 
@@ -208,6 +358,27 @@ function useKadrStripChipImage(projectName: string, imageHref: string | null, pr
 
   return { imageSrc, onImageError, hasThumb, fallbackColor, chipAccentStyle };
 
+}
+
+
+
+function KadrStripVideoMutedIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+      <line x1="3" y1="3" x2="21" y2="21" />
+    </svg>
+  );
 }
 
 
@@ -272,31 +443,55 @@ function SpectacleRunKadrStripChipFieldValue({
 
 
 
+  const previewTitle = preview.title.trim() || row.value.trim();
+  const showVideoMutedIcon = preview.mode === "video" && preview.videoMuted === true;
+
   return (
 
     <span className="spectacle-run-kadr-strip__chip-field-media">
 
-      <ProjectorMediaPreview
+      <span className="spectacle-run-kadr-strip__chip-field-preview-wrap">
 
-        ctx={projectorCtx}
+        <ProjectorMediaPreview
 
-        mode={preview.mode}
+          ctx={projectorCtx}
 
-        videoId={preview.videoId}
+          mode={preview.mode}
 
-        holdId={holdId}
+          videoId={preview.videoId}
 
-        title={preview.title}
+          holdId={holdId}
 
-        className="spectacle-run-kadr-strip__chip-field-preview"
+          title={preview.title}
 
-        fallbackClassName="spectacle-run-kadr-strip__chip-field-preview-fallback"
+          className="spectacle-run-kadr-strip__chip-field-preview"
 
-      />
+          fallbackClassName="spectacle-run-kadr-strip__chip-field-preview-fallback"
 
-      <span className="spectacle-run-kadr-strip__chip-field-value" title={row.value}>
+          hideFallbackLabel
 
-        {row.value}
+        />
+
+        {previewTitle ? (
+          <span className="spectacle-run-kadr-strip__chip-field-preview-label">
+            <span
+              className="spectacle-run-kadr-strip__chip-field-preview-label-text"
+              title={previewTitle}
+            >
+              {previewTitle}
+            </span>
+          </span>
+        ) : null}
+
+        {showVideoMutedIcon ? (
+          <span
+            className="spectacle-run-kadr-strip__chip-field-preview-muted-icon"
+            title="Без звука"
+            aria-label="Без звука"
+          >
+            <KadrStripVideoMutedIcon />
+          </span>
+        ) : null}
 
       </span>
 
@@ -328,6 +523,8 @@ function SpectacleRunKadrStripRehearsalChip({
 
   chipRef,
 
+  tapeIndex,
+
 }: KadrStripChipBaseProps & { label: string }) {
 
   const { imageSrc, onImageError, hasThumb, fallbackColor, chipAccentStyle } = useKadrStripChipImage(
@@ -353,6 +550,8 @@ function SpectacleRunKadrStripRehearsalChip({
       className="spectacle-run-kadr-strip__chip"
 
       data-active={active}
+
+      data-tape-index={tapeIndex}
 
       data-placeholder={item.isPlaceholder ? "true" : undefined}
 
@@ -422,6 +621,24 @@ function SpectacleRunKadrStripProgRunChip({
 
   chipRef,
 
+  tapeIndex,
+
+  carouselOffset,
+
+  carouselStacked,
+
+  notesOverlay = false,
+
+  plainCover = false,
+
+  lightConsoleOpen = false,
+
+  chipLightConsole = null,
+
+  lightConsoleChannelColumns,
+
+  sceneSpotlights = [],
+
 }: KadrStripChipBaseProps & {
 
   summary: KadrStripTechSummary;
@@ -429,6 +646,22 @@ function SpectacleRunKadrStripProgRunChip({
   projectorCtx: ProjectorMediaContext | null;
 
   chipNo: string;
+
+  carouselOffset: number;
+
+  carouselStacked: boolean;
+
+  notesOverlay?: boolean;
+
+  plainCover?: boolean;
+
+  lightConsoleOpen?: boolean;
+
+  chipLightConsole?: ProgRunChipLiveConsoleProps | null;
+
+  lightConsoleChannelColumns?: number;
+
+  sceneSpotlights?: TheaterSpotlight[];
 
 }) {
 
@@ -438,34 +671,79 @@ function SpectacleRunKadrStripProgRunChip({
 
     projectName,
 
-    imageHref,
+    plainCover ? null : imageHref,
 
-    programColor,
+    plainCover ? null : programColor,
 
   );
 
-  const preferredRows = summary.rows.filter((row) =>
+  const filledRows = summary.rows.filter(isFilledTechRow);
+
+  const preferredRows = filledRows.filter((row) =>
     PRIMARY_PROG_RUN_ROW_LABELS.has(row.label),
   );
 
   const unorderedPrimary =
-    preferredRows.length > 0 ? preferredRows : summary.rows.slice(0, 5);
+    preferredRows.length > 0 ? preferredRows : filledRows.slice(0, 5);
 
-  const rowsBeforeTransition = unorderedPrimary.filter((row) => row.label !== "Переход");
+  const liveRows = orderTechRowsByLabels(
+    unorderedPrimary.filter((row) => LIVE_PROG_RUN_ROW_LABEL_SET.has(row.label)),
+    LIVE_PROG_RUN_ROW_LABELS,
+  );
 
-  const transitionRows = unorderedPrimary.filter((row) => row.label === "Переход");
+  const coverLiveRows = orderTechRowsByLabels(
+    liveRows.filter((row) => row.label === "Свет" || row.label === "Трек"),
+    COVER_OVERLAY_LIVE_ROW_LABELS,
+  );
+
+  const coverLightRow = coverLiveRows.find((row) => row.label === "Свет") ?? null;
+
+  const coverTrackRow = coverLiveRows.find((row) => row.label === "Трек") ?? null;
+
+  const bodyLiveRows = notesOverlay
+    ? liveRows.filter((row) => row.label === "Видео")
+    : liveRows;
+
+  const notesRows = orderTechRowsByLabels(
+    unorderedPrimary.filter((row) => NOTES_PROG_RUN_ROW_LABEL_SET.has(row.label)),
+    NOTES_PROG_RUN_ROW_LABELS,
+  );
 
   const primaryLabelSet = new Set(unorderedPrimary.map((row) => row.label));
 
-  const hiddenRowCount = summary.rows.filter((row) => !primaryLabelSet.has(row.label)).length;
+  const hiddenRowCount = filledRows.filter((row) => !primaryLabelSet.has(row.label)).length;
 
   const requisiteItems = summary.requisites;
 
   const hasRequisites = requisiteItems.length > 0;
 
+  const hasCoverLiveRows = coverLiveRows.length > 0;
+
+  const hasBodyLiveRows = bodyLiveRows.length > 0;
+
+  const commentRows = notesRows.filter((row) => row.label === "Комментарий");
+
+  const transitionRow = notesRows.find((row) => row.label === "Переход");
+
+  const hasCommentRows = commentRows.length > 0;
+
+  const hasTransition = transitionRow != null;
+
+  const showConsoleSlot =
+    lightConsoleOpen && (chipLightConsole != null || summary.blackout);
+
+  const showChipConsole = chipLightConsole != null;
+
+  const showLiveInBody = hasBodyLiveRows;
+
+  const showLiveOnCover = notesOverlay && hasCoverLiveRows;
+
+  const showNotesDivider = hasCommentRows && (showLiveInBody || hasRequisites);
+
   const hasFields =
-    rowsBeforeTransition.length > 0 ||
-    transitionRows.length > 0 ||
+    showLiveInBody ||
+    hasCommentRows ||
+    hasTransition ||
     hasRequisites ||
     hiddenRowCount > 0;
 
@@ -483,9 +761,12 @@ function SpectacleRunKadrStripProgRunChip({
         (projectorCtx ? resolveDefaultHoldId(projectorCtx) : null)
       : null;
 
-  const showImageCover = hasThumb;
+  const showPlainCover = plainCover;
+
+  const showImageCover = !plainCover && hasThumb;
 
   const showProjectorCover =
+    !plainCover &&
     !showImageCover &&
     projectorPreview != null &&
     projectorCtx != null &&
@@ -505,9 +786,53 @@ function SpectacleRunKadrStripProgRunChip({
     setRequisitesOpen((prev) => !prev);
   };
 
+  const renderCornerLabel = (label: KadrRunLabel) => (
+    <span
+      key={label.type}
+      className={cn(
+        "spectacle-run-kadr-strip__chip-corner-label",
+        label.type === "blackout" && "spectacle-run-kadr-strip__chip-corner-label--blackout",
+        (label.type === "smoke" || label.type === "smoke-machine") &&
+          "spectacle-run-kadr-strip__chip-corner-label--smoke",
+      )}
+    >
+      {formatKadrRunLabelText(label)}
+    </span>
+  );
+
+  const renderCoverFieldRow = (row: KadrStripTechRow) => (
+    <span
+      key={row.label}
+      className={cn(
+        "spectacle-run-kadr-strip__chip-cover-field",
+        row.label === "Трек" && "spectacle-run-kadr-strip__chip-cover-field--track",
+      )}
+    >
+      <span className="spectacle-run-kadr-strip__chip-cover-field-label">{row.label}</span>
+      <span
+        className={cn(
+          "spectacle-run-kadr-strip__chip-cover-field-value",
+          row.multiline && "spectacle-run-kadr-strip__chip-cover-field-value--multiline",
+        )}
+        title={row.value}
+      >
+        {row.value}
+      </span>
+    </span>
+  );
+
   const renderFieldRow = (row: KadrStripTechRow) => (
-    <span key={row.label} className="spectacle-run-kadr-strip__chip-field">
-      <span className="spectacle-run-kadr-strip__chip-field-label">{row.label}</span>
+    <span
+      key={row.label}
+      className={cn(
+        "spectacle-run-kadr-strip__chip-field",
+        row.label === "Трек" && "spectacle-run-kadr-strip__chip-field--track",
+        row.label === "Видео" && "spectacle-run-kadr-strip__chip-field--video",
+      )}
+    >
+      {row.label !== "Видео" ? (
+        <span className="spectacle-run-kadr-strip__chip-field-label">{row.label}</span>
+      ) : null}
       <SpectacleRunKadrStripChipFieldValue
         row={row}
         projectorCtx={projectorCtx}
@@ -530,11 +855,19 @@ function SpectacleRunKadrStripProgRunChip({
 
       data-active={active}
 
+      data-tape-index={tapeIndex}
+
+      data-carousel-offset={carouselOffset}
+
+      data-carousel-stack={carouselStacked ? "true" : undefined}
+
       data-placeholder={item.isPlaceholder ? "true" : undefined}
 
       data-has-thumb={showImageCover || showProjectorCover ? "true" : undefined}
 
-      data-has-fallback-color={fallbackColor ? "true" : undefined}
+      data-plain-cover={showPlainCover ? "true" : undefined}
+
+      data-has-fallback-color={!showPlainCover && fallbackColor ? "true" : undefined}
 
       data-blackout={summary.blackout ? "true" : undefined}
 
@@ -550,33 +883,13 @@ function SpectacleRunKadrStripProgRunChip({
 
       <span className="spectacle-run-kadr-strip__chip-layout spectacle-run-kadr-strip__chip-layout--stack">
 
-        <span className="spectacle-run-kadr-strip__chip-header">
-
-          <span className="spectacle-run-kadr-strip__chip-number">{chipNo}</span>
-
-          {summary.headingTitle ? (
-
-            <span className="spectacle-run-kadr-strip__chip-title" title={summary.headingTitle}>
-
-              {summary.headingTitle}
-
-            </span>
-
-          ) : null}
-
-          {summary.blackout ? (
-
-            <span className="spectacle-run-kadr-strip__chip-badge">Блекаут</span>
-
-          ) : null}
-
-        </span>
-
         <span
 
           className={cn(
 
             "spectacle-run-kadr-strip__chip-cover",
+
+            showPlainCover && "spectacle-run-kadr-strip__chip-cover--plain",
 
             (showImageCover || showProjectorCover) && "spectacle-run-kadr-strip__chip-cover--thumb",
 
@@ -624,46 +937,89 @@ function SpectacleRunKadrStripProgRunChip({
 
           ) : null}
 
-          {cornerLabels.length > 0 ? (
+          <span className="spectacle-run-kadr-strip__chip-header">
 
-            <span className="spectacle-run-kadr-strip__chip-corner-labels">
+            <span className="spectacle-run-kadr-strip__chip-number">{chipNo}</span>
 
-              {cornerLabels.map((label) => (
+            {summary.headingTitle ? (
 
-                <span
+              <span className="spectacle-run-kadr-strip__chip-title" title={summary.headingTitle}>
 
-                  key={label.type}
+                {summary.headingTitle}
 
-                  className={cn(
+              </span>
 
-                    "spectacle-run-kadr-strip__chip-corner-label",
+            ) : null}
 
-                    label.type === "blackout" && "spectacle-run-kadr-strip__chip-corner-label--blackout",
-                    (label.type === "smoke" || label.type === "smoke-machine") &&
-                      "spectacle-run-kadr-strip__chip-corner-label--smoke",
-                  )}
+            {cornerLabels.length > 0 ? (
+              <span className="spectacle-run-kadr-strip__chip-header-labels">
+                {cornerLabels.map(renderCornerLabel)}
+              </span>
+            ) : null}
 
-                >
+          </span>
 
-                  {formatKadrRunLabelText(label)}
-
+          {showLiveOnCover ? (
+            <span className="spectacle-run-kadr-strip__chip-cover-fields">
+              {coverTrackRow ? (
+                <span className="spectacle-run-kadr-strip__chip-cover-fields-zone spectacle-run-kadr-strip__chip-cover-fields-zone--top">
+                  {renderCoverFieldRow(coverTrackRow)}
                 </span>
-
-              ))}
-
+              ) : null}
+              {coverLightRow ? (
+                <span className="spectacle-run-kadr-strip__chip-cover-fields-zone spectacle-run-kadr-strip__chip-cover-fields-zone--bottom">
+                  {renderCoverFieldRow(coverLightRow)}
+                </span>
+              ) : null}
             </span>
-
           ) : null}
 
         </span>
 
-        <span className="spectacle-run-kadr-strip__chip-body">
+        <span
+          className={cn(
+            "spectacle-run-kadr-strip__chip-body",
+            hasTransition && "spectacle-run-kadr-strip__chip-body--with-transition",
+            showConsoleSlot && "spectacle-run-kadr-strip__chip-body--with-console",
+          )}
+        >
+
+          {showConsoleSlot ? (
+            showChipConsole && chipLightConsole ? (
+              <span
+                className="spectacle-run-kadr-strip__chip-console"
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                <LightConsoleView
+                  mode="compact"
+                  readOnly
+                  lightChannels={chipLightConsole.lightChannels}
+                  selectedLightSlot={chipLightConsole.selectedLightSlot}
+                  faders={chipLightConsole.faders}
+                  programs={chipLightConsole.programs}
+                  spotlights={sceneSpotlights}
+                  consoleChannel={chipLightConsole.selectedLightSlot}
+                  channelColumns={lightConsoleChannelColumns}
+                  className="spectacle-run-kadr-strip__chip-console-view"
+                />
+              </span>
+            ) : (
+              <span className="spectacle-run-kadr-strip__chip-console spectacle-run-kadr-strip__chip-console--blackout">
+                <span className="spectacle-run-kadr-strip__chip-console-blackout">Blackout</span>
+              </span>
+            )
+          ) : null}
 
           {hasFields ? (
 
             <span className="spectacle-run-kadr-strip__chip-fields">
 
-              {rowsBeforeTransition.map(renderFieldRow)}
+              {showLiveInBody ? (
+                <span className="spectacle-run-kadr-strip__chip-fields-live">
+                  {bodyLiveRows.map(renderFieldRow)}
+                </span>
+              ) : null}
 
               {hasRequisites ? (
 
@@ -712,7 +1068,16 @@ function SpectacleRunKadrStripProgRunChip({
 
               ) : null}
 
-              {transitionRows.map(renderFieldRow)}
+              {hasCommentRows ? (
+                <span
+                  className={cn(
+                    "spectacle-run-kadr-strip__chip-fields-notes",
+                    showNotesDivider && "spectacle-run-kadr-strip__chip-fields-notes--divided",
+                  )}
+                >
+                  {commentRows.map(renderFieldRow)}
+                </span>
+              ) : null}
 
               {hiddenRowCount > 0 ? (
 
@@ -726,6 +1091,25 @@ function SpectacleRunKadrStripProgRunChip({
 
             <span className="spectacle-run-kadr-strip__chip-empty">нет картин в сцене</span>
 
+          ) : (
+
+            <span className="spectacle-run-kadr-strip__chip-empty">—</span>
+
+          )}
+
+          {hasTransition && transitionRow ? (
+            <span className="spectacle-run-kadr-strip__chip-transition">
+              <span
+                className={cn(
+                  "spectacle-run-kadr-strip__chip-transition-value",
+                  transitionRow.multiline &&
+                    "spectacle-run-kadr-strip__chip-transition-value--multiline",
+                )}
+                title={transitionRow.value}
+              >
+                {transitionRow.value}
+              </span>
+            </span>
           ) : null}
 
         </span>
@@ -743,6 +1127,16 @@ function SpectacleRunKadrStripProgRunChip({
 export function SpectacleRunKadrStrip({
 
   variant = "rehearsal",
+
+  layout = "carousel",
+
+  notesOverlay = false,
+
+  plainCover = false,
+
+  lightConsoleOpen = false,
+
+  lightConsoleChannelColumns,
 
   projectName,
 
@@ -774,6 +1168,17 @@ export function SpectacleRunKadrStrip({
 
   const isProgRun = variant === "prog-run";
 
+  const isFlowLayout = isProgRun && layout === "flow";
+
+  const isTrioLayout = isProgRun && layout === "trio";
+
+  const isFlatTapeLayout = isFlowLayout || isTrioLayout;
+
+  const isCarouselLikeLayout =
+    isProgRun && (layout === "carousel" || layout === "flow" || layout === "trio");
+
+  const activeSceneId = tape[tapeIndex]?.sceneId;
+
   const groups = useMemo(() => buildSpectacleTapeSceneGroups(tape), [tape]);
 
   const baseFaders = useMemo(
@@ -798,7 +1203,34 @@ export function SpectacleRunKadrStrip({
 
   const activeChipRef = useRef<HTMLElement | null>(null);
 
-  const { consumeDrag } = useKadrStripDragScroll(trackRef);
+  const carouselIgnoreUntilRef = useRef(0);
+
+  const selectNearestCarouselChip = useCallback((options?: { snapIfSame?: boolean }) => {
+    if (!isCarouselLikeLayout) return;
+    if (Date.now() < carouselIgnoreUntilRef.current) return;
+    const track = trackRef.current;
+    if (!track || track.dataset.dragging === "true") return;
+    const nearestIndex = findNearestKadrStripChipIndex(track);
+    if (nearestIndex != null && nearestIndex !== tapeIndex) {
+      onSelectIndex(nearestIndex);
+      return;
+    }
+    if (!options?.snapIfSame) return;
+    const chip = activeChipRef.current;
+    if (!chip) return;
+    carouselIgnoreUntilRef.current = Date.now() + 450;
+    centerKadrStripChip(track, chip, "smooth");
+  }, [isCarouselLikeLayout, onSelectIndex, tapeIndex]);
+
+  const { consumeDrag } = useKadrStripDragScroll(trackRef, {
+    onDragEnd: isCarouselLikeLayout
+      ? () => {
+          window.requestAnimationFrame(() => {
+            selectNearestCarouselChip({ snapIfSame: true });
+          });
+        }
+      : undefined,
+  });
 
   const chipHeightKey = useMemo(
     () =>
@@ -809,36 +1241,241 @@ export function SpectacleRunKadrStrip({
           return `${item.kadrId ?? "ph"}:${item.kadrNo}:${markdownLen}`;
         })
         .join("|"),
-    [scenes, tape],
+    [lightConsoleOpen, notesOverlay, plainCover, scenes, tape],
   );
 
   useProgRunKadrChipHeight(isProgRun, stripRef, chipHeightKey);
 
-
-
   useEffect(() => {
-
     const chip = activeChipRef.current;
-
     const track = trackRef.current;
-
     if (!chip || !track) return;
 
+    if (isCarouselLikeLayout) {
+      carouselIgnoreUntilRef.current = Date.now() + 450;
+      centerKadrStripChip(track, chip, "smooth");
+      return;
+    }
+
     const chipLeft = chip.offsetLeft;
-
     const chipRight = chipLeft + chip.offsetWidth;
-
     const viewLeft = track.scrollLeft;
-
     const viewRight = viewLeft + track.clientWidth;
 
     if (chipLeft < viewLeft + 8 || chipRight > viewRight - 8) {
-
       chip.scrollIntoView({ behavior: "instant", block: "nearest", inline: "center" });
+    }
+  }, [isCarouselLikeLayout, isProgRun, layout, tapeIndex]);
+
+  useEffect(() => {
+    if (!isCarouselLikeLayout) return;
+    const track = trackRef.current;
+    if (!track) return;
+
+    let settleTimer: number | null = null;
+
+    const settleFromScroll = () => {
+      selectNearestCarouselChip();
+    };
+
+    const scheduleSettle = () => {
+      if (settleTimer != null) window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => {
+        settleTimer = null;
+        settleFromScroll();
+      }, 140);
+    };
+
+    track.addEventListener("scroll", scheduleSettle, { passive: true });
+    track.addEventListener("scrollend", settleFromScroll);
+
+    return () => {
+      if (settleTimer != null) window.clearTimeout(settleTimer);
+      track.removeEventListener("scroll", scheduleSettle);
+      track.removeEventListener("scrollend", settleFromScroll);
+    };
+  }, [isCarouselLikeLayout, selectNearestCarouselChip]);
+
+
+
+  const renderTapeChip = (index: number, item: SpectacleTapeItem) => {
+
+    const active = index === tapeIndex;
+
+    const scene = scenes[item.sceneIndex];
+
+    const programColor = kadrProgramColor(
+
+      item,
+
+      scene,
+
+      lightChannels,
+
+      baseFaders,
+
+    );
+
+    const chipLabel = item.isPlaceholder ? "∅" : `К${item.kadrNo}`;
+
+    const displayKadrTitle = item.isPlaceholder
+      ? ""
+      : parseKadrTitleFromHeading(item.headingTitle ?? "", item.kadrNo);
+
+    const title = item.isPlaceholder
+      ? `${item.sceneTitle}: нет картин`
+      : displayKadrTitle
+        ? `${chipLabel} · ${displayKadrTitle}`
+        : chipLabel;
+
+    const kadrForChip = resolveTapeItemKadr(item, scene);
+
+    const imageHref = item.isPlaceholder
+      ? null
+      : findFirstMarkdownImageHref(kadrForChip?.imageMarkdown ?? "");
+
+    const chipKey = `${item.sceneId}-${item.kadrId ?? "ph"}-${item.kadrNo}-${index}`;
+
+    const chipRef = active ? activeChipRef : undefined;
+
+    const carouselOffset = index - tapeIndex;
+
+    const stackMode = isTrioLayout ? "trio" : isFlowLayout ? "flow" : "carousel";
+
+    const carouselStacked =
+      isCarouselLikeLayout &&
+      isCarouselStackedOffset(carouselOffset, stackMode) &&
+      (isFlatTapeLayout || item.sceneId === activeSceneId);
+
+    const onSelect = () => {
+
+      if (consumeDrag()) return;
+
+      onSelectIndex(index);
+
+    };
+
+
+
+    if (!isProgRun) {
+
+      return (
+
+        <SpectacleRunKadrStripRehearsalChip
+
+          key={chipKey}
+
+          projectName={projectName}
+
+          item={item}
+
+          imageHref={imageHref}
+
+          active={active}
+
+          programColor={programColor}
+
+          title={title}
+
+          label={chipLabel}
+
+          chipRef={chipRef}
+
+          tapeIndex={index}
+
+          onSelect={onSelect}
+
+        />
+
+      );
 
     }
 
-  }, [tapeIndex]);
+
+
+    const summary = buildKadrStripTechSummary({
+
+      item,
+
+      scene,
+
+      lightChannels,
+
+      lightFaders: baseFaders,
+
+      lightPrograms,
+
+      media,
+
+    });
+
+
+
+    const chipLightConsole = buildProgRunChipLightConsole(
+
+      kadrForChip,
+
+      lightChannels,
+
+      baseFaders,
+
+      lightPrograms,
+
+    );
+
+
+
+    return (
+
+      <SpectacleRunKadrStripProgRunChip
+
+        key={chipKey}
+
+        projectName={projectName}
+
+        item={item}
+
+        imageHref={imageHref}
+
+        summary={summary}
+
+        projectorCtx={projectorCtx}
+
+        active={active}
+
+        programColor={programColor}
+
+        title={title}
+
+        chipNo={chipLabel}
+
+        chipRef={chipRef}
+
+        tapeIndex={index}
+
+        carouselOffset={carouselOffset}
+
+        carouselStacked={carouselStacked}
+
+        notesOverlay={notesOverlay}
+
+        plainCover={plainCover}
+
+        lightConsoleOpen={lightConsoleOpen}
+
+        chipLightConsole={chipLightConsole}
+
+        lightConsoleChannelColumns={lightConsoleChannelColumns}
+
+        sceneSpotlights={scene?.theaterSpotlights ?? []}
+
+        onSelect={onSelect}
+
+      />
+
+    );
+
+  };
 
 
 
@@ -846,17 +1483,34 @@ export function SpectacleRunKadrStrip({
 
 
 
+  const stripAriaLabel = isFlatTapeLayout ? "Лента картин" : "Лента картин по сценам";
+
+
+
   return (
 
     <footer
       ref={stripRef}
-      className={cn("spectacle-run-kadr-strip", isProgRun && "spectacle-run-kadr-strip--prog-run")}
-      aria-label="Лента картин по сценам"
+      className={cn(
+        "spectacle-run-kadr-strip",
+        isProgRun && "spectacle-run-kadr-strip--prog-run",
+        isProgRun && layout === "classic" && "spectacle-run-kadr-strip--prog-run-classic",
+        layout === "carousel" && "spectacle-run-kadr-strip--prog-run-carousel",
+        isFlowLayout && "spectacle-run-kadr-strip--prog-run-carousel",
+        isFlowLayout && "spectacle-run-kadr-strip--prog-run-flow",
+        isTrioLayout && "spectacle-run-kadr-strip--prog-run-trio",
+        isProgRun && notesOverlay && "spectacle-run-kadr-strip--prog-run-notes-overlay",
+        isProgRun && plainCover && "spectacle-run-kadr-strip--prog-run-plain-cover",
+      )}
+      aria-label={stripAriaLabel}
     >
 
       <div ref={trackRef} className="spectacle-run-kadr-strip__track">
 
-        {groups.map((group) => (
+        {isFlatTapeLayout ? (
+          tape.map((item, index) => renderTapeChip(index, item))
+        ) : (
+          groups.map((group) => (
 
           <section
 
@@ -878,150 +1532,14 @@ export function SpectacleRunKadrStrip({
 
             <div className="spectacle-run-kadr-strip__chips">
 
-              {group.items.map(({ tapeIndex: index, item }) => {
-
-                const active = index === tapeIndex;
-
-                const scene = scenes[item.sceneIndex];
-
-                const programColor = kadrProgramColor(
-
-                  item,
-
-                  scene,
-
-                  lightChannels,
-
-                  baseFaders,
-
-                );
-
-                const chipLabel = item.isPlaceholder ? "∅" : `К${item.kadrNo}`;
-
-                const displayKadrTitle = item.isPlaceholder
-                  ? ""
-                  : parseKadrTitleFromHeading(item.headingTitle ?? "", item.kadrNo);
-
-                const title = item.isPlaceholder
-                  ? `${item.sceneTitle}: нет картин`
-                  : displayKadrTitle
-                    ? `${chipLabel} · ${displayKadrTitle}`
-                    : chipLabel;
-
-                const kadrForImage =
-                  scene && item.kadrId
-                    ? findKadrById(readSceneLightKadrs(scene), item.kadrId)
-                    : undefined;
-
-                const imageHref = item.isPlaceholder
-                  ? null
-                  : findFirstMarkdownImageHref(kadrForImage?.imageMarkdown ?? "");
-
-                const chipKey = `${item.sceneId}-${item.kadrId ?? "ph"}-${item.kadrNo}-${index}`;
-
-                const chipRef = active ? activeChipRef : undefined;
-
-                const onSelect = () => {
-
-                  if (consumeDrag()) return;
-
-                  onSelectIndex(index);
-
-                };
-
-
-
-                if (!isProgRun) {
-
-                  return (
-
-                    <SpectacleRunKadrStripRehearsalChip
-
-                      key={chipKey}
-
-                      projectName={projectName}
-
-                      item={item}
-
-                      imageHref={imageHref}
-
-                      active={active}
-
-                      programColor={programColor}
-
-                      title={title}
-
-                      label={chipLabel}
-
-                      chipRef={chipRef}
-
-                      onSelect={onSelect}
-
-                    />
-
-                  );
-
-                }
-
-
-
-                const summary = buildKadrStripTechSummary({
-
-                  item,
-
-                  scene,
-
-                  lightChannels,
-
-                  lightFaders: baseFaders,
-
-                  lightPrograms,
-
-                  media,
-
-                });
-
-
-
-                return (
-
-                  <SpectacleRunKadrStripProgRunChip
-
-                    key={chipKey}
-
-                    projectName={projectName}
-
-                    item={item}
-
-                    imageHref={imageHref}
-
-                    summary={summary}
-
-                    projectorCtx={projectorCtx}
-
-                    active={active}
-
-                    programColor={programColor}
-
-                    title={title}
-
-                    chipNo={chipLabel}
-
-                    chipRef={chipRef}
-
-                    onSelect={onSelect}
-
-                  />
-
-                );
-
-              })}
+              {group.items.map(({ tapeIndex: index, item }) => renderTapeChip(index, item))}
 
             </div>
 
           </section>
 
-        ))}
+        ))
+        )}
 
       </div>
 

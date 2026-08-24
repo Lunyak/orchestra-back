@@ -16,7 +16,6 @@ import type {
 import type {
   SceneLightKadrRequisiteActionV1,
   ScriptRequisite,
-  TheaterModel,
   TheaterSpotlight,
 } from "../../../shared/types/script";
 import type { RequisiteAssigneeOption } from "../../../shared/components/show-script/components/RequisitesPanel";
@@ -59,7 +58,6 @@ export type CreateKadrModalProps = {
   holdImages: PlaybookHoldImage[];
   projector?: SceneProjectorSettingsV1 | null;
   sceneRequisites?: ScriptRequisite[];
-  theaterModels?: TheaterModel[];
   assigneeOptions?: RequisiteAssigneeOption[];
   accessToken?: string | null;
   onSceneRequisitesChange?: (next: ScriptRequisite[]) => void;
@@ -166,7 +164,6 @@ export function CreateKadrModal({
   holdImages,
   projector = null,
   sceneRequisites = [],
-  theaterModels = [],
   assigneeOptions = [],
   accessToken = null,
   onSceneRequisitesChange,
@@ -372,7 +369,10 @@ export function CreateKadrModal({
     });
   }, []);
 
-  const toggleRequisiteCue = useCallback((requisiteId: number) => {
+  const toggleRequisiteCue = useCallback((
+    requisiteId: number,
+    action: SceneLightKadrRequisiteActionV1 = "setup",
+  ) => {
     setDraft((prev) => {
       const exists = prev.requisites.some((cue) => cue.requisiteId === requisiteId);
       if (exists) {
@@ -383,7 +383,7 @@ export function CreateKadrModal({
       }
       return {
         ...prev,
-        requisites: [...prev.requisites, { requisiteId, action: "setup" }],
+        requisites: [...prev.requisites, { requisiteId, action }],
       };
     });
   }, []);
@@ -950,7 +950,6 @@ export function CreateKadrModal({
               requisites: prev.requisites.filter((cue) => ids.has(cue.requisiteId)),
             }));
           }}
-          theaterModels={theaterModels}
           draftCues={draft.requisites}
           onToggleCue={toggleRequisiteCue}
           onCueActionChange={setRequisiteAction}

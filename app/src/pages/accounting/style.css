@@ -329,3 +329,112 @@
   gap: 8px;
   margin-top: 16px;
 }
+
+@media (max-width: 979px) {
+  .accounting-layout .main-content {
+    padding: 8px 10px 20px;
+  }
+
+  .accounting-page__header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .accounting-page__title {
+    font-size: 1.25rem;
+  }
+
+  .accounting-scope-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .accounting-scope-row__field {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .accounting-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .accounting-tabs__item {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .accounting-list-item {
+    padding: 12px;
+  }
+
+  .accounting-list-item__row {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+  }
+}
+
+@media (max-width: 560px) {
+  .accounting-layout .main-content {
+    padding: 6px 8px calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .accounting-page__hint {
+    margin: 0 0 10px;
+    font-size: 0.8rem;
+  }
+
+  .accounting-page__title {
+    font-size: 1.1rem;
+  }
+
+  .accounting-page__subtitle {
+    font-size: 0.8rem;
+  }
+
+  .accounting-list-item__title {
+    font-size: 0.95rem;
+  }
+
+  .accounting-list-item__meta,
+  .accounting-status {
+    font-size: 0.75rem;
+  }
+
+  .accounting-detail-summary {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 12px 0 16px;
+  }
+
+  .accounting-detail-summary__value {
+    font-size: 1.05rem;
+  }
+
+  .accounting-contribution-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 8px 0;
+    font-size: 0.85rem;
+  }
+
+  .accounting-table th,
+  .accounting-table td {
+    padding: 8px;
+    font-size: 0.8rem;
+  }
+
+  .accounting-form-section {
+    margin-top: 16px;
+    padding-top: 16px;
+  }
+
+  .accounting-participant-item__label {
+    min-width: 0;
+    width: 100%;
+  }
+}

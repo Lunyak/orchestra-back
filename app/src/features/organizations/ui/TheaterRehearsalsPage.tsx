@@ -50,7 +50,7 @@ const REHEARSAL_HISTORY_DAYS = 30;
 const REHEARSAL_FUTURE_DAYS = 180;
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 const DEFAULT_REHEARSAL_TIME = "20:00";
-const CREATE_TIME_STEP_MIN = 30;
+const CREATE_TIME_STEP_MIN = 5;
 const CREATE_TIME_MIN = 8 * 60;
 const CREATE_TIME_MAX = 23 * 60 + 30;
 /** Длительность новой репетиции (первый слот). */
@@ -148,11 +148,14 @@ function collectBusyRanges(
   bundleSessions: DirectorRehearsalSession[],
   theaterId: string,
   selectedDate: string,
+  excludeSessionId?: string | null,
 ): BusyRange[] {
   const ranges: BusyRange[] = [];
   const seenSessionIds = new Set<string>();
+  const excludedId = String(excludeSessionId ?? "").trim();
 
   for (const rehearsal of dayRehearsals) {
+    if (excludedId && rehearsal.id === excludedId) continue;
     const startMin = getSessionStartLocalMinutes(rehearsal.startsAt);
     if (!Number.isFinite(startMin)) continue;
     const span = rehearsalSpanMin(rehearsal, bundleSessions);
@@ -163,6 +166,7 @@ function collectBusyRanges(
   }
 
   for (const session of bundleSessions) {
+    if (excludedId && session.id === excludedId) continue;
     if (String(session.theaterId ?? "").trim() !== theaterId) continue;
     if (dateKey(session.startsAt) !== selectedDate) continue;
     if (seenSessionIds.has(session.id)) continue;
@@ -284,6 +288,8 @@ export function TheaterRehearsalsPage() {
   const [createError, setCreateError] = useState("");
   const [creating, setCreating] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"create" | "edit">("create");
+  const [editTitle, setEditTitle] = useState("");
   const [createTime, setCreateTime] = useState(DEFAULT_REHEARSAL_TIME);
   const [calendarState, setCalendarState] =
     useState<CalendarSectionState | null>(null);
@@ -394,9 +400,17 @@ export function TheaterRehearsalsPage() {
         ) ?? null
       : null;
   const selectedCanPublish = selectedRehearsal?.source === "director-session";
+  const selectedCanManage =
+    canCreateRehearsal && selectedRehearsal?.source === "director-session";
   const selectedPublished = Boolean(
     String(selectedRehearsal?.publishedAt ?? "").trim(),
   );
+  const editingSessionId =
+    modalMode === "edit" && selectedCanManage ? selectedRehearsal?.id ?? null : null;
+  const modalDurationMin =
+    modalMode === "edit" && selectedDirectorSession
+      ? sessionSpanMin(selectedDirectorSession)
+      : DEFAULT_CREATE_DURATION_MIN;
 
   const busyRanges = useMemo(
     () =>
@@ -405,8 +419,15 @@ export function TheaterRehearsalsPage() {
         sessionsBundle?.sessions ?? [],
         theaterId,
         selectedDate,
+        editingSessionId,
       ),
-    [dayRehearsals, sessionsBundle?.sessions, theaterId, selectedDate],
+    [
+      dayRehearsals,
+      sessionsBundle?.sessions,
+      theaterId,
+      selectedDate,
+      editingSessionId,
+    ],
   );
   const suggestedCreateTime = useMemo(
     () =>
@@ -420,13 +441,13 @@ export function TheaterRehearsalsPage() {
   const createStartMin = parseTimeToMinutes(createTime);
   const createTimeTaken =
     createStartMin != null &&
-    isStartBlockedByRanges(
-      createStartMin,
-      DEFAULT_CREATE_DURATION_MIN,
-      busyRanges,
-    );
+    isStartBlockedByRanges(createStartMin, modalDurationMin, busyRanges);
   const canSubmitCreate =
-    canCreateRehearsal && !creating && createStartMin != null && !createTimeTaken;
+    canCreateRehearsal &&
+    !creating &&
+    createStartMin != null &&
+    !createTimeTaken &&
+    (modalMode === "create" || Boolean(editTitle.trim()));
 
   useEffect(() => {
     setCreateError("");
@@ -498,8 +519,139 @@ export function TheaterRehearsalsPage() {
     }
   };
 
+  const handleUpdateRehearsal = async () => {
+    if (!selectedCanManage || creating || !theaterId || !selectedRehearsal) return;
+    const base = selectedDirectorSession;
+    if (!base) {
+      setCreateError("Сессия репетиции не найдена");
+      return;
+    }
+    const nextTitle = editTitle.trim();
+    if (!nextTitle) {
+      setCreateError("Укажите название репетиции");
+      return;
+    }
+    const timeLocal = createTime.trim();
+    const startMin = parseTimeToMinutes(timeLocal);
+    const durationMin = sessionSpanMin(base);
+    if (
+      startMin == null ||
+      isStartBlockedByRanges(startMin, durationMin, busyRanges)
+    ) {
+      setCreateError(
+        `Время ${timeLocal} пересекается с уже запланированной репетицией. Выберите другое.`,
+      );
+      return;
+    }
+    setCreating(true);
+    setCreateError("");
+    const startsAt = new Date(`${selectedDate}T${timeLocal}:00`).toISOString();
+    const nowIso = new Date().toISOString();
+    const nextSession: DirectorRehearsalSession = {
+      ...base,
+      title: nextTitle,
+      startsAt,
+      theaterId,
+      updatedAt: nowIso,
+    };
+    try {
+      const existingSessions = sessionsBundle?.sessions ?? [];
+      const conflict = findDirectorSessionBusyConflict(
+        nextSession,
+        existingSessions,
+      );
+      if (conflict) {
+        setCreateError(formatDirectorSessionBusyConflictMessage(conflict));
+        return;
+      }
+      await replaceSessions({
+        sessions: existingSessions.map((session) =>
+          session.id === nextSession.id ? nextSession : session,
+        ),
+      }).unwrap();
+      dispatch(
+        directorSessionsApi.util.invalidateTags([
+          { type: "DirectorSessions", id: "BUNDLE" },
+        ]),
+      );
+      setData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          rehearsals: current.rehearsals.map((rehearsal) =>
+            rehearsal.id === nextSession.id
+              ? { ...rehearsal, title: nextTitle, startsAt }
+              : rehearsal,
+          ),
+        };
+      });
+      setCreateModalOpen(false);
+      void loadRehearsals();
+    } catch {
+      setCreateError("Не удалось сохранить репетицию");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteRehearsal = async () => {
+    if (!selectedCanManage || creating || !selectedRehearsal) return;
+    const title = selectedRehearsal.title.trim() || "Без названия";
+    const confirmed =
+      typeof window !== "undefined"
+        ? window.confirm(`Удалить репетицию «${title}»?`)
+        : true;
+    if (!confirmed) return;
+    setCreating(true);
+    setPublishError("");
+    try {
+      const existingSessions = sessionsBundle?.sessions ?? [];
+      await replaceSessions({
+        sessions: existingSessions.filter(
+          (session) => session.id !== selectedRehearsal.id,
+        ),
+      }).unwrap();
+      dispatch(
+        directorSessionsApi.util.invalidateTags([
+          { type: "DirectorSessions", id: "BUNDLE" },
+        ]),
+      );
+      setSelectedRehearsalId(null);
+      setData((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          rehearsals: current.rehearsals.filter(
+            (rehearsal) => rehearsal.id !== selectedRehearsal.id,
+          ),
+        };
+      });
+      void loadRehearsals();
+    } catch {
+      setPublishError("Не удалось удалить репетицию");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   const openCreateModal = () => {
+    setModalMode("create");
+    setEditTitle("");
     setCreateTime(suggestedCreateTime);
+    setCreateError("");
+    setCreateModalOpen(true);
+  };
+
+  const openEditModal = () => {
+    if (!selectedCanManage || !selectedRehearsal) return;
+    const startMin = getSessionStartLocalMinutes(selectedRehearsal.startsAt);
+    setModalMode("edit");
+    setEditTitle(selectedRehearsal.title);
+    setCreateTime(
+      Number.isFinite(startMin)
+        ? formatTimeHHMM(startMin)
+        : suggestedCreateTime,
+    );
     setCreateError("");
     setCreateModalOpen(true);
   };
@@ -508,6 +660,16 @@ export function TheaterRehearsalsPage() {
     if (creating) return;
     setCreateModalOpen(false);
     setCreateError("");
+    setModalMode("create");
+    setEditTitle("");
+  };
+
+  const confirmModal = () => {
+    if (modalMode === "edit") {
+      void handleUpdateRehearsal();
+      return;
+    }
+    void handleCreateRehearsal();
   };
 
   const publishSelectedRehearsal = async () => {
@@ -761,20 +923,46 @@ export function TheaterRehearsalsPage() {
                       {publishError}
                     </div>
                   ) : null}
-                  <div className="sessions-slots__container-btns sessions-session-footer__btns">
-                    {selectedCanPublish ? (
-                      <>
-                        <LabeledCheckbox
-                          className="sessions-session-footer__call-toggle"
-                          checked={includeUnavailableInCall}
-                          onChange={setIncludeUnavailableInCall}
+                  <div className="theater-rehearsals-page__footer-actions">
+                    {selectedCanManage ? (
+                      <div className="theater-rehearsals-page__footer-row">
+                        <Button
+                          type="button"
+                          onClick={openEditModal}
+                          disabled={creating}
+                          title="Изменить название и время"
                         >
-                          Звать без занятости / с отрицательной
-                        </LabeledCheckbox>
+                          Изменить
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void handleDeleteRehearsal()}
+                          disabled={creating}
+                          title="Удалить репетицию"
+                        >
+                          Удалить
+                        </Button>
+                      </div>
+                    ) : null}
+                    {selectedCanPublish ? (
+                      <LabeledCheckbox
+                        className="sessions-session-footer__call-toggle"
+                        checked={includeUnavailableInCall}
+                        onChange={setIncludeUnavailableInCall}
+                      >
+                        Звать без занятости / с отрицательной
+                      </LabeledCheckbox>
+                    ) : (
+                      <p className="rehearsals-muted theater-rehearsals-page__call-hint">
+                        Публикация вызова доступна для репетиций театра.
+                      </p>
+                    )}
+                    <div className="theater-rehearsals-page__footer-row">
+                      {selectedCanPublish ? (
                         <Button
                           type="button"
                           onClick={() => void publishSelectedRehearsal()}
-                          disabled={publishing}
+                          disabled={publishing || creating}
                           title={
                             selectedPublished
                               ? "Пересобрать список участников по календарю; при подключённом боте — обновить или отправить сообщение в Telegram"
@@ -787,22 +975,18 @@ export function TheaterRehearsalsPage() {
                               ? "Обновить публикацию"
                               : "Опубликовать"}
                         </Button>
-                      </>
-                    ) : (
-                      <p className="rehearsals-muted theater-rehearsals-page__call-hint">
-                        Публикация вызова доступна для репетиций театра.
-                      </p>
-                    )}
-                    <Button
-                      type="button"
-                      onClick={() =>
-                        navigate(
-                          rehearsalDetailsPath(theaterId, selectedRehearsal),
-                        )
-                      }
-                    >
-                      Открыть репетицию
-                    </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          navigate(
+                            rehearsalDetailsPath(theaterId, selectedRehearsal),
+                          )
+                        }
+                      >
+                        Открыть репетицию
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ) : null}
@@ -814,7 +998,13 @@ export function TheaterRehearsalsPage() {
       <TheaterCreateRehearsalModal
         isOpen={createModalOpen}
         onClose={closeCreateModal}
+        mode={modalMode}
         dateLabel={selectedDateLabel}
+        title={editTitle}
+        onTitleChange={(nextTitle) => {
+          setEditTitle(nextTitle);
+          setCreateError("");
+        }}
         createTime={createTime}
         timeStepMin={CREATE_TIME_STEP_MIN}
         onCreateTimeChange={(time) => {
@@ -825,7 +1015,7 @@ export function TheaterRehearsalsPage() {
         creating={creating}
         canSubmit={canSubmitCreate}
         createTimeTaken={createTimeTaken}
-        onConfirm={() => void handleCreateRehearsal()}
+        onConfirm={confirmModal}
       />
     </div>
   );

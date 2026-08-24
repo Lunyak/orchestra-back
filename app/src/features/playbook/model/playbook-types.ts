@@ -134,6 +134,8 @@ export interface PlaybookVideo {
   remoteUrl?: string;
   remoteKey?: string;
   filePath?: string;
+  /** Секунда кадра для превью в ленте (если первый кадр чёрный). */
+  previewTimeSec?: number;
 }
 
 export interface PlaybookHoldImage {
@@ -148,6 +150,8 @@ export interface PlaybookHoldImage {
 export type SceneProjectorSettingsV1 = {
   v: 1;
   defaultHoldId?: number;
+  /** Плавность смены картинки/видео между шагами прогона, мс (0 = жёсткий cut). */
+  transitionMs?: number;
   holdImageFile?: string;
   holdImageRemoteKey?: string;
   holdImageRemoteUrl?: string;

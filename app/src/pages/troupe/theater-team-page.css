@@ -128,3 +128,38 @@
   border-color: var(--color-active-ascent);
   outline: none;
 }
+
+@media (max-width: 720px) {
+  .theater-team-page__section {
+    padding: 12px;
+  }
+
+  .theater-team-page__actions {
+    gap: 6px;
+  }
+
+  .theater-team-page__actions .button {
+    flex: 1 1 calc(50% - 3px);
+    min-width: 0;
+  }
+
+  .theater-team-page__assignee {
+    flex-wrap: wrap;
+    padding: 10px;
+  }
+
+  .theater-team-page__assignee-remove {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .theater-team-page__section {
+    padding: 10px 8px;
+  }
+
+  .theater-team-page__actions .button {
+    flex: 1 1 100%;
+  }
+}

@@ -1,0 +1,93 @@
+.spectacle-script-mode-nav-modal__panel {
+  width: min(360px, calc(100vw - 24px));
+  padding: 0;
+}
+
+.spectacle-script-mode-nav-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.spectacle-script-mode-nav-modal__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-bright);
+}
+
+.spectacle-script-mode-nav-modal__list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spectacle-script-mode-nav-modal__item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--color-text-ui);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.spectacle-script-mode-nav-modal__item:hover {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.spectacle-script-mode-nav-modal__item--active,
+.spectacle-script-mode-nav-modal__item[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.spectacle-script-mode-nav-modal__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.spectacle-direction-switch__nav-btn {
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-active-ascent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.spectacle-direction-switch__nav-btn:hover:not(:disabled) {
+  border-color: var(--color-active-ascent);
+}
+
+.spectacle-direction-switch__nav-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .spectacle-direction-switch--centered:has(.spectacle-direction-switch__right:empty)
+    .spectacle-direction-switch__tech-center {
+    max-width: none;
+    padding: 0 8px;
+  }
+}

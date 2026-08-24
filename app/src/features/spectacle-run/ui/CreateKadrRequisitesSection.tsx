@@ -7,7 +7,7 @@ import {
 import {
   RequisitesPanel,
   type RequisiteAssigneeOption,
-  type TheaterRequisiteCandidate,
+  type RequisiteCreatePayload,
 } from "../../../shared/components/show-script/components/RequisitesPanel";
 import "../../../shared/components/show-script/style.css";
 import type {
@@ -15,12 +15,7 @@ import type {
   SceneLightKadrRequisiteCueV1,
   ScriptRequisite,
   ScriptRequisiteDuty,
-  TheaterModel,
 } from "../../../shared/types/script";
-import {
-  addRequisiteFromTheaterModel,
-  listTheaterRequisiteCandidates,
-} from "../../theater/model/theater-decor-inventory";
 
 const REQUISITE_ACTION_OPTIONS: CustomSelectOption[] = [
   { value: "setup", label: "вынести" },
@@ -41,7 +36,6 @@ function patchRequisiteAt(
 export function CreateKadrRequisitesSection({
   sceneRequisites,
   onSceneRequisitesChange,
-  theaterModels,
   draftCues,
   onToggleCue,
   onCueActionChange,
@@ -49,12 +43,12 @@ export function CreateKadrRequisitesSection({
   accessToken,
   projectSlug,
   defaultOpen = false,
+  layout = "collapsible",
 }: {
   sceneRequisites: ScriptRequisite[];
   onSceneRequisitesChange: (next: ScriptRequisite[]) => void;
-  theaterModels: TheaterModel[];
   draftCues: SceneLightKadrRequisiteCueV1[];
-  onToggleCue: (requisiteId: number) => void;
+  onToggleCue: (requisiteId: number, action?: SceneLightKadrRequisiteActionV1) => void;
   onCueActionChange: (
     requisiteId: number,
     action: SceneLightKadrRequisiteActionV1,
@@ -63,14 +57,14 @@ export function CreateKadrRequisitesSection({
   accessToken: string | null | undefined;
   projectSlug: string;
   defaultOpen?: boolean;
+  layout?: "collapsible" | "flat";
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const [theaterPickerOpen, setTheaterPickerOpen] = useState(false);
+  const isFlatLayout = layout === "flat";
+  const [open, setOpen] = useState(defaultOpen || isFlatLayout);
   const [newRequisite, setNewRequisite] = useState("");
-  const theaterCandidates: TheaterRequisiteCandidate[] =
-    listTheaterRequisiteCandidates(theaterModels, sceneRequisites);
   const requisitesCount = sceneRequisites.length;
   const cuesCount = draftCues.length;
+  const showRequisitesContent = isFlatLayout || open;
 
   const addRequisite = () => {
     const label = newRequisite.trim();
@@ -84,16 +78,35 @@ export function CreateKadrRequisitesSection({
     setNewRequisite("");
   };
 
-  const addFromTheater = (theaterModelId: number) => {
-    const model = theaterModels.find((item) => item.id === theaterModelId);
-    if (!model) return;
-    const next = addRequisiteFromTheaterModel(sceneRequisites, model);
-    if (next !== sceneRequisites) onSceneRequisitesChange(next);
-  };
+  const createRequisite = (payload: RequisiteCreatePayload) => {
+    const nextId =
+      sceneRequisites.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
+    const nextItem: ScriptRequisite = {
+      id: nextId,
+      label: payload.label,
+      checked: false,
+    };
+    if (payload.duty) nextItem.duty = payload.duty;
+    if (payload.assigneeEmail) {
+      nextItem.assigneeEmail = payload.assigneeEmail.trim().toLowerCase();
+    }
+    if (payload.duty === "setup" && payload.placeNote) {
+      nextItem.placeNote = payload.placeNote;
+    }
+    if (payload.duty === "use" && payload.actionNote) {
+      nextItem.actionNote = payload.actionNote;
+    }
+    if (payload.avatarKey) nextItem.avatarKey = payload.avatarKey;
 
-  const toggleTheaterPicker = () => {
-    setOpen(true);
-    setTheaterPickerOpen((prev) => !prev);
+    onSceneRequisitesChange([...sceneRequisites, nextItem]);
+
+    if (payload.includeInKadr) {
+      const cueAction =
+        payload.duty === "strike" || payload.duty === "use" || payload.duty === "setup"
+          ? payload.duty
+          : "setup";
+      onToggleCue(nextId, cueAction);
+    }
   };
 
   return (
@@ -101,61 +114,64 @@ export function CreateKadrRequisitesSection({
       className={cn(
         "create-kadr-modal__section",
         "create-kadr-modal__requisites",
-        open && "create-kadr-modal__requisites--open",
+        isFlatLayout && "create-kadr-modal__requisites--flat",
+        showRequisitesContent && "create-kadr-modal__requisites--open",
       )}
     >
       <div className="create-kadr-modal__requisites-head">
-        <button
-          type="button"
-          className="create-kadr-modal__requisites-toggle"
-          onClick={() => setOpen((prev) => !prev)}
-          aria-expanded={open}
-        >
-          <span className="create-kadr-modal__requisites-chevron" aria-hidden>
-            {open ? "▾" : "▸"}
-          </span>
-          <span className="create-kadr-modal__requisites-title">Реквизит</span>
-          {requisitesCount > 0 ? (
-            <span className="create-kadr-modal__requisites-count">
-              {requisitesCount}
+        {isFlatLayout ? (
+          <div className="create-kadr-modal__requisites-head-title">
+            <span className="create-kadr-modal__requisites-title">Реквизит</span>
+            {requisitesCount > 0 ? (
+              <span className="create-kadr-modal__requisites-count">
+                {requisitesCount}
+              </span>
+            ) : null}
+            {cuesCount > 0 ? (
+              <span className="create-kadr-modal__requisites-cues">
+                в картине: {cuesCount}
+              </span>
+            ) : null}
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="create-kadr-modal__requisites-toggle"
+            onClick={() => setOpen((prev) => !prev)}
+            aria-expanded={open}
+          >
+            <span className="create-kadr-modal__requisites-chevron" aria-hidden>
+              {open ? "▾" : "▸"}
             </span>
-          ) : null}
-          {cuesCount > 0 ? (
-            <span className="create-kadr-modal__requisites-cues">
-              в картине: {cuesCount}
-            </span>
-          ) : null}
-        </button>
-        <button
-          type="button"
-          className={cn(
-            "requisites-action-btn",
-            "requisites-action-btn--theater",
-            theaterPickerOpen && "requisites-action-btn--active",
-          )}
-          onClick={toggleTheaterPicker}
-          title="Добавить из 3D"
-        >
-          3D
-        </button>
+            <span className="create-kadr-modal__requisites-title">Реквизит</span>
+            {requisitesCount > 0 ? (
+              <span className="create-kadr-modal__requisites-count">
+                {requisitesCount}
+              </span>
+            ) : null}
+            {cuesCount > 0 ? (
+              <span className="create-kadr-modal__requisites-cues">
+                в картине: {cuesCount}
+              </span>
+            ) : null}
+          </button>
+        )}
       </div>
 
-      {open ? (
+      {showRequisitesContent ? (
         <RequisitesPanel
           show
           isEditing
           hideHeader
           hideBulkActions
           hideCheckedToggle
-          theaterPickerOpen={theaterPickerOpen}
-          onTheaterPickerOpenChange={setTheaterPickerOpen}
           requisites={sceneRequisites}
-          theaterCandidates={theaterCandidates}
           assigneeOptions={assigneeOptions}
           newRequisite={newRequisite}
           setNewRequisite={setNewRequisite}
           onAdd={addRequisite}
-          onAddFromTheater={addFromTheater}
+          onCreate={createRequisite}
+          showKadrCueOnCreate
           onRemove={(index) => {
             onSceneRequisitesChange(
               sceneRequisites.filter((_item, itemIndex) => itemIndex !== index),

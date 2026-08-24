@@ -106,9 +106,22 @@ export interface SceneLightKadrV1 {
   smokeDurationSec?: number;
   /** Markdown-фрагмент картинки для превью в ленте. */
   imageMarkdown?: string;
+  /**
+   * Снапшот мизансцены 3D на момент записи картины.
+   * При выборе картины в театре восстанавливает сет.
+   */
+  theaterSnapshot?: SceneLightKadrTheaterSnapshotV1;
   note?: string;
   updatedAt?: string;
 }
+
+/** Состояние 3D-сета, привязанное к картине. */
+export type SceneLightKadrTheaterSnapshotV1 = {
+  theaterModels?: TheaterModel[];
+  theaterDecor?: TheaterModel[];
+  theaterSpotlights?: TheaterSpotlight[];
+  theaterSmokeMachine?: boolean;
+};
 
 export type SceneLightKadrFaderStateV1 = {
   faderId: number;

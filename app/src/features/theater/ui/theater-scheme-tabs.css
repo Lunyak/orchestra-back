@@ -1,0 +1,22 @@
+.theater-scheme-tabs-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+.theater-scheme-tabs-shell > .spectacle-run-scheme__tabs {
+  flex: 0 0 auto;
+}
+
+.theater-scheme-tabs-shell > .theater-scene {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.theater-scheme-tabs-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+}

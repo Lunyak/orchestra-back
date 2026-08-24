@@ -1,11 +1,7 @@
 import cn from "classnames";
-import { useState } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import {
-  getProjectSlugFromPath,
-  globalPaths,
-  projectPath,
-} from "../../../app/router/paths";
+import { globalPaths } from "../../../app/router/paths";
 import { useAuth } from "../../../features/auth";
 import { useMyProfileQuery } from "../../../features/profile/api/profile-api";
 import { profileListAvatarSrc } from "../../../sync/api/profile";
@@ -29,28 +25,31 @@ function resolveProfileLabel(profile: {
   return "Профиль";
 }
 
-export function AppEditorUserMenu() {
+type AppEditorUserMenuProps = {
+  menubarActions?: ReactNode;
+};
+
+export function AppEditorUserMenu({ menubarActions = null }: AppEditorUserMenuProps) {
   const { pathname } = useLocation();
   const { accessToken, logout } = useAuth();
   const { data: profile } = useMyProfileQuery(undefined, { skip: !accessToken });
   const [isOpen, setIsOpen] = useState(false);
 
-  const projectSlug = getProjectSlugFromPath(pathname);
-  const settingsPath = projectSlug
-    ? projectPath(projectSlug, "settings")
-    : null;
   const profileLabel = resolveProfileLabel(profile);
   const avatarUrl = profileListAvatarSrc(profile);
   const profileEmail = String(profile?.email ?? "").trim();
   const isProfileActive =
     pathname === globalPaths.profile ||
     pathname.startsWith(`${globalPaths.profile}/`);
-  const isSettingsActive = Boolean(
-    settingsPath &&
-      (pathname === settingsPath || pathname.startsWith(`${settingsPath}/`)),
-  );
 
   const closeMenu = () => setIsOpen(false);
+
+  const handleToolbarActionsClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("button")) {
+      closeMenu();
+    }
+  };
 
   return (
     <div
@@ -85,6 +84,22 @@ export function AppEditorUserMenu() {
             <span className="app-editor-user-menu__meta-email">{profileEmail}</span>
           ) : null}
         </div>
+        {menubarActions ? (
+          <>
+            <div
+              className="theater-editor-menubar__option theater-editor-menubar__option--separator"
+              role="separator"
+            />
+            <div
+              className="app-editor-user-menu__toolbar-actions"
+              role="group"
+              aria-label="Панели и инструменты"
+              onClick={handleToolbarActionsClick}
+            >
+              {menubarActions}
+            </div>
+          </>
+        ) : null}
         <div
           className="theater-editor-menubar__option theater-editor-menubar__option--separator"
           role="separator"
@@ -100,19 +115,6 @@ export function AppEditorUserMenu() {
         >
           Профиль
         </Link>
-        {settingsPath ? (
-          <Link
-            to={settingsPath}
-            role="menuitem"
-            className={cn(
-              "theater-editor-menubar__option",
-              isSettingsActive && "theater-editor-menubar__option--active",
-            )}
-            onClick={closeMenu}
-          >
-            Настройки
-          </Link>
-        ) : null}
         <div
           className="theater-editor-menubar__option theater-editor-menubar__option--separator"
           role="separator"

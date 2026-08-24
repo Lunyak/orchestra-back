@@ -20,7 +20,80 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  align-items: center;
   flex: 0 0 auto;
+}
+
+.theater-kadr-tape__snapshot-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.theater-kadr-tape__groups {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.theater-kadr-tape__group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theater-kadr-tape__scene {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.theater-kadr-tape__scene:hover {
+  border-color: var(--color-border, #333);
+}
+
+.theater-kadr-tape__scene--active,
+.theater-kadr-tape__scene[aria-current="true"] {
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+}
+
+.theater-kadr-tape__scene-no {
+  font-weight: 700;
+}
+
+.theater-kadr-tape__scene-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theater-kadr-tape__group .theater-kadr-tape__list {
+  flex: 0 0 auto;
+  padding-left: 8px;
+}
+
+.theater-kadr-tape__group .theater-kadr-tape__empty {
+  padding-left: 16px;
 }
 
 .theater-kadr-tape__btn {

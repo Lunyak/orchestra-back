@@ -145,3 +145,50 @@
   line-height: 1.4;
   color: var(--color-text-muted);
 }
+
+@media (max-width: 979px) {
+  .spectacle-hub-layout .main-content {
+    padding: 14px 12px 24px;
+  }
+
+  .spectacle-hub__header {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .spectacle-hub-layout .main-content {
+    padding: 10px 8px 18px;
+  }
+
+  .spectacle-hub {
+    max-width: none;
+  }
+
+  .spectacle-hub__header {
+    margin-bottom: 12px;
+  }
+
+  .spectacle-hub__grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .spectacle-hub__tile {
+    max-width: none;
+    max-height: none;
+  }
+
+  .spectacle-hub__tile-body {
+    gap: 4px;
+    padding: 14px 12px 12px 16px;
+  }
+
+  .spectacle-hub__tile-label {
+    font-size: 1rem;
+  }
+
+  .spectacle-hub__tile-desc {
+    font-size: 0.75rem;
+  }
+}

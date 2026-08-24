@@ -19,6 +19,10 @@ const GRID_ANIM_MS = 800;
 const WIN_MORPH_MS = 900;
 const WIN_MORPH_DELAY_MS = 450;
 
+/** Стартовая «завершённая» партия: O выиграла диагональ 2–4–6, последняя клетка — треугольник. */
+const START_BOARD: TicBoard = [null, "X", "O", "X", "O", "O", "O", "X", "X"];
+const START_WIN_MORPH_INDEX = 2;
+
 function statusText(winner: ReturnType<typeof getWinner>, phase: GamePhase): string {
   if (phase === "thinking") return "Думаю…";
   if (winner === "X") return "Вы выиграли";
@@ -36,20 +40,21 @@ function findNewMarkIndex(prev: TicBoard, next: TicBoard): number | null {
 }
 
 export const HomeChalkTicTacToe: FC = () => {
-  const [board, setBoard] = useState<TicBoard>(EMPTY_BOARD);
-  const [phase, setPhase] = useState<GamePhase>("player");
-  const [winMorphIndex, setWinMorphIndex] = useState<number | null>(null);
+  const [board, setBoard] = useState<TicBoard>(START_BOARD);
+  const [phase, setPhase] = useState<GamePhase>("ended");
+  const [winMorphIndex, setWinMorphIndex] = useState<number | null>(START_WIN_MORPH_INDEX);
 
-  const boardRef = useRef<TicBoard>(EMPTY_BOARD);
-  const prevBoardRef = useRef<TicBoard>(EMPTY_BOARD);
+  const boardRef = useRef<TicBoard>(START_BOARD);
+  const prevBoardRef = useRef<TicBoard>(START_BOARD);
   const boardWrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timerRef = useRef<number | null>(null);
   const morphTimerRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const gridIntroDoneRef = useRef(false);
-  const winMorphIndexRef = useRef<number | null>(null);
-  const winMorphRef = useRef(0);
+  const winMorphIndexRef = useRef<number | null>(START_WIN_MORPH_INDEX);
+  const winMorphRef = useRef(1);
+  const skipFirstBoardPaintRef = useRef(true);
 
   boardRef.current = board;
 
@@ -90,6 +95,7 @@ export const HomeChalkTicTacToe: FC = () => {
   const scheduleWinMorph = () => {
     if (morphTimerRef.current !== null) return;
     if (winMorphIndexRef.current === null || getWinner(boardRef.current) === "draw") return;
+    if (winMorphRef.current >= 1) return;
 
     morphTimerRef.current = window.setTimeout(() => {
       morphTimerRef.current = null;
@@ -223,8 +229,16 @@ export const HomeChalkTicTacToe: FC = () => {
       return;
     }
 
-    winMorphIndexRef.current = lastMarkIndex;
-    setWinMorphIndex(lastMarkIndex);
+    const currentMorph = winMorphIndexRef.current;
+    const morphIndex =
+      lastMarkIndex !== null && line.includes(lastMarkIndex)
+        ? lastMarkIndex
+        : currentMorph !== null && line.includes(currentMorph)
+          ? currentMorph
+          : line[line.length - 1];
+
+    winMorphIndexRef.current = morphIndex;
+    setWinMorphIndex(morphIndex);
     setPhase("ended");
   };
 
@@ -237,6 +251,18 @@ export const HomeChalkTicTacToe: FC = () => {
   }, []);
 
   useEffect(() => {
+    if (skipFirstBoardPaintRef.current) {
+      skipFirstBoardPaintRef.current = false;
+      gridIntroDoneRef.current = true;
+      winMorphIndexRef.current = START_WIN_MORPH_INDEX;
+      winMorphRef.current = 1;
+      setWinMorphIndex(START_WIN_MORPH_INDEX);
+      setPhase("ended");
+      paintStatic(START_BOARD, 1);
+      prevBoardRef.current = START_BOARD;
+      return;
+    }
+
     const prev = prevBoardRef.current;
     const lastMarkIndex = findNewMarkIndex(prev, board);
     syncWinState(board, lastMarkIndex);
@@ -248,8 +274,18 @@ export const HomeChalkTicTacToe: FC = () => {
     const wrap = boardWrapRef.current;
     if (!wrap) return;
 
+    const paintFinishedStart = () => {
+      if (winMorphIndexRef.current === null && getWinner(boardRef.current) !== null) {
+        winMorphIndexRef.current = START_WIN_MORPH_INDEX;
+        winMorphRef.current = 1;
+      }
+      paintStatic(boardRef.current, gridIntroDoneRef.current ? 1 : 0);
+    };
+
+    paintFinishedStart();
+
     const observer = new ResizeObserver(() => {
-      paintStatic(boardRef.current, 1);
+      paintFinishedStart();
     });
 
     observer.observe(wrap);
@@ -262,9 +298,10 @@ export const HomeChalkTicTacToe: FC = () => {
     if (morphTimerRef.current !== null) window.clearTimeout(morphTimerRef.current);
     morphTimerRef.current = null;
     prevBoardRef.current = EMPTY_BOARD;
-    gridIntroDoneRef.current = true;
+    gridIntroDoneRef.current = false;
     winMorphRef.current = 0;
     winMorphIndexRef.current = null;
+    skipFirstBoardPaintRef.current = false;
     setBoard(EMPTY_BOARD);
     setWinMorphIndex(null);
     setPhase("player");

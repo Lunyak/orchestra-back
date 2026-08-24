@@ -151,6 +151,7 @@ export function useDirectorSessionsPage(
     return {
       currentMonth: d,
       selectedDate: today,
+      viewMode: "month",
       monthStartDate: monthStart,
       monthEndDate: monthEnd,
       fromIso: monthStart.toISOString(),

@@ -64,3 +64,4 @@ class MenubarSlot {
 export const appEditorViewMenuSlot = new MenubarSlot();
 export const appEditorToolbarActionsSlot = new MenubarSlot();
 export const appEditorCenterSlot = new MenubarSlot();
+export const appEditorEndToolsSlot = new MenubarSlot();

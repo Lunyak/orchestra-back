@@ -70,3 +70,42 @@
   font-size: 13px;
   color: var(--color-danger, #c44);
 }
+
+@media (max-width: 720px) {
+  .project-roles-page {
+    padding: 12px 12px 20px;
+  }
+
+  .project-roles-page__content {
+    gap: 12px;
+  }
+
+  .project-roles-page__title {
+    font-size: 18px;
+  }
+
+  .project-roles-page__subtitle {
+    font-size: 12px;
+  }
+
+  .project-roles-page__create {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .project-roles-page__create-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .project-roles-page__panel {
+    padding: 16px 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .project-roles-page {
+    padding: 10px 8px 16px;
+  }
+}

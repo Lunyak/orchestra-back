@@ -1,6 +1,7 @@
 import type {
   SceneLightKadrProjectorCueV1,
   SceneLightKadrSoundCueV1,
+  SceneLightKadrTheaterSnapshotV1,
   SceneLightKadrV1,
   SceneLightKadrsDataV1,
   ScriptScene,
@@ -25,6 +26,9 @@ export function insertKadrInSceneData(args: {
   scene: ScriptScene;
   afterKadrId?: string | null;
   kadrId?: string;
+  title?: string;
+  imageMarkdown?: string;
+  theaterSnapshot?: SceneLightKadrTheaterSnapshotV1 | null;
 }): { nextKadrs: SceneLightKadrsDataV1; kadrId: string; kadrNo: number } {
   const kadrId = args.kadrId ?? createLightKadrId();
   const prev = readSceneLightKadrs(args.scene);
@@ -43,6 +47,9 @@ export function insertKadrInSceneData(args: {
     programId: 1,
     faders: [],
     updatedAt: new Date().toISOString(),
+    ...(args.title ? { title: args.title } : {}),
+    ...(args.imageMarkdown ? { imageMarkdown: args.imageMarkdown } : {}),
+    ...(args.theaterSnapshot ? { theaterSnapshot: args.theaterSnapshot } : {}),
   };
   const withStub = [
     ...sorted.slice(0, insertIndex),

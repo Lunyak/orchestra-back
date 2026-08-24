@@ -163,6 +163,14 @@ export async function syncPlaybookFromServer(
     ) {
       minimalPlaybookData.lightChannelRoles = serverLightChannelRoles;
     }
+    const serverLightConsoleUi = (scene as any)?.lightConsoleUi ?? null;
+    if (
+      serverLightConsoleUi &&
+      typeof serverLightConsoleUi === "object" &&
+      (serverLightConsoleUi as any).v === 1
+    ) {
+      minimalPlaybookData.lightConsoleUi = serverLightConsoleUi;
+    }
     const projectorBag = unpackProjectorMedia((scene as any)?.projectorMedia);
     if (projectorBag.videos.length > 0) {
       minimalPlaybookData.videos = projectorBag.videos;

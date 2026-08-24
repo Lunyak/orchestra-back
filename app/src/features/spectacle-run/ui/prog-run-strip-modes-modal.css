@@ -1,0 +1,144 @@
+.prog-run-strip-modes-modal__panel {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  pointer-events: auto;
+}
+
+.modal-backdrop:has(.prog-run-strip-modes-modal__panel) {
+  align-items: center;
+  justify-content: center;
+  padding: clamp(12px, 3vw, 24px);
+  background: rgba(0, 0, 0, 0.08);
+  backdrop-filter: none;
+  pointer-events: none;
+}
+
+.prog-run-strip-modes-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+}
+
+.prog-run-strip-modes-modal__header {
+  margin: 0;
+}
+
+.prog-run-strip-modes-modal__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-bright);
+}
+
+.prog-run-strip-modes-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prog-run-strip-modes-modal__section-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.prog-run-strip-modes-modal__layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.prog-run-strip-modes-modal__layout-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 56px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-text-ui);
+  text-align: left;
+  cursor: pointer;
+}
+
+.prog-run-strip-modes-modal__layout-btn[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.prog-run-strip-modes-modal__layout-label {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.prog-run-strip-modes-modal__layout-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.prog-run-strip-modes-modal__layout-btn[aria-pressed="true"]
+  .prog-run-strip-modes-modal__layout-hint {
+  color: color-mix(in srgb, var(--color-active-ascent) 72%, var(--color-text-muted));
+}
+
+.prog-run-strip-modes-modal__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.prog-run-strip-modes-modal__toggle-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-default);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--color-text-ui);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prog-run-strip-modes-modal__toggle-btn[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.prog-run-strip-modes-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.prog-run-strip-modes-modal__btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border-default);
+  background: transparent;
+  color: var(--color-text-ui);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.prog-run-strip-modes-modal__btn--primary {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.prog-run-strip-modes-modal__btn--primary:hover,
+.prog-run-strip-modes-modal__btn--primary:focus-visible {
+  background: color-mix(in srgb, var(--color-active-ascent) 16%, transparent);
+}
+
+.spectacle-run__prog-run-modes-btn[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}

@@ -2,21 +2,23 @@ import cn from "classnames";
 import React from "react";
 import { CustomSelect, type CustomSelectOption } from "../../../core/custom-select/CustomSelect";
 import { MiniAvatar } from "../../mini-avatar/MiniAvatar";
+import { useCompactKadrStrip } from "../../../hooks/useCompactKadrStrip";
 import type { ScriptRequisite, ScriptRequisiteDuty } from "../../../types/script";
 import {
   PersonSelectPreview,
   type PersonSelectProfile,
 } from "../../person-select/PersonSelectPreview";
+import {
+  RequisiteCreateModal,
+  type RequisiteCreatePayload,
+} from "./RequisiteCreateModal";
 import { RequisitePropAvatar } from "./RequisitePropAvatar";
-
-export type TheaterRequisiteCandidate = {
-  id: number;
-  name: string;
-};
 
 export type RequisiteAssigneeOption = CustomSelectOption & {
   person?: PersonSelectProfile;
 };
+
+export type { RequisiteCreatePayload };
 
 const DUTY_OPTIONS: CustomSelectOption[] = [
   { value: "", label: "Не выбрано", searchText: "не выбрано" },
@@ -61,7 +63,6 @@ export function RequisitesPanel({
   show,
   isEditing,
   requisites,
-  theaterCandidates = [],
   assigneeOptions = [],
   hasCopiedRequisites = false,
   newRequisite,
@@ -70,7 +71,7 @@ export function RequisitesPanel({
   onPaste,
   onResetAll,
   onAdd,
-  onAddFromTheater,
+  onCreate,
   onToggle,
   onRemove,
   onAssigneeChange,
@@ -83,14 +84,12 @@ export function RequisitesPanel({
   hideBulkActions = false,
   hideCheckedToggle = false,
   hideHeader = false,
-  theaterPickerOpen: theaterPickerOpenProp,
-  onTheaterPickerOpenChange,
+  showKadrCueOnCreate = false,
   renderItemExtra,
 }: {
   show: boolean;
   isEditing: boolean;
   requisites: ScriptRequisite[];
-  theaterCandidates?: TheaterRequisiteCandidate[];
   assigneeOptions?: RequisiteAssigneeOption[];
   hasCopiedRequisites?: boolean;
   newRequisite: string;
@@ -99,7 +98,7 @@ export function RequisitesPanel({
   onPaste?: () => void;
   onResetAll?: () => void;
   onAdd: () => void;
-  onAddFromTheater?: (theaterModelId: number) => void;
+  onCreate?: (payload: RequisiteCreatePayload) => void;
   onToggle?: (index: number) => void;
   onRemove: (index: number) => void;
   onAssigneeChange: (index: number, email: string | null) => void;
@@ -113,22 +112,11 @@ export function RequisitesPanel({
   hideCheckedToggle?: boolean;
   /** Header rendered by parent (e.g. collapsible title + 3D). */
   hideHeader?: boolean;
-  theaterPickerOpen?: boolean;
-  onTheaterPickerOpenChange?: (open: boolean) => void;
+  showKadrCueOnCreate?: boolean;
   renderItemExtra?: (item: ScriptRequisite, index: number) => React.ReactNode;
 }) {
-  const [theaterPickerOpenState, setTheaterPickerOpenState] = React.useState(false);
-  const theaterPickerControlled = theaterPickerOpenProp !== undefined;
-  const theaterPickerOpen = theaterPickerControlled
-    ? theaterPickerOpenProp
-    : theaterPickerOpenState;
-  const setTheaterPickerOpen = (open: boolean) => {
-    if (!theaterPickerControlled) setTheaterPickerOpenState(open);
-    onTheaterPickerOpenChange?.(open);
-  };
-  const hasTheaterCandidates = theaterCandidates.length > 0;
-  const canOpenTheaterPicker = isEditing && onAddFromTheater != null;
-
+  const isCompact = useCompactKadrStrip();
+  const [createModalOpen, setCreateModalOpen] = React.useState(false);
   const assigneeOptionsWithEmpty = React.useMemo(
     () => [
       { value: "", label: "Не назначен", searchText: "не назначен" },
@@ -188,20 +176,6 @@ export function RequisitesPanel({
             <span className="requisites-count">{requisites.length}</span>
           </div>
           <div className="requisites-actions">
-            {canOpenTheaterPicker ? (
-              <button
-                type="button"
-                className={cn(
-                  "requisites-action-btn",
-                  "requisites-action-btn--theater",
-                  theaterPickerOpen && "requisites-action-btn--active",
-                )}
-                onClick={() => setTheaterPickerOpen(!theaterPickerOpen)}
-                title="Добавить из 3D"
-              >
-                3D
-              </button>
-            ) : null}
             {!hideBulkActions ? (
               <>
                 <button
@@ -237,50 +211,51 @@ export function RequisitesPanel({
         </div>
       ) : null}
 
-      {isEditing && theaterPickerOpen ? (
-        <div className="requisites-theater-picker">
-          <div className="requisites-theater-picker__title">Из 3D театра</div>
-          {!hasTheaterCandidates ? (
-            <div className="requisites-theater-picker__empty">
-              Нет помеченных моделей. В 3D включите «Реквизит» у объекта.
-            </div>
-          ) : (
-            <ul className="requisites-theater-picker__list">
-              {theaterCandidates.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    className="requisites-theater-picker__item"
-                    onClick={() => onAddFromTheater?.(item.id)}
-                  >
-                    <span>{item.name}</span>
-                    <span className="requisites-theater-picker__add">+</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      {isEditing ? (
+        isCompact && onCreate ? (
+          <div className="requisites-add requisites-add--mobile">
+            <button
+              type="button"
+              className="requisites-add__open-btn"
+              onClick={() => setCreateModalOpen(true)}
+            >
+              Добавить
+            </button>
+          </div>
+        ) : (
+          <div className="requisites-add">
+            <input
+              type="text"
+              value={newRequisite}
+              onChange={(event) => setNewRequisite(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  onAdd();
+                }
+              }}
+              placeholder="Добавить реквизит"
+            />
+            <button type="button" onClick={onAdd}>
+              +
+            </button>
+          </div>
+        )
       ) : null}
 
-      {isEditing ? (
-        <div className="requisites-add">
-          <input
-            type="text"
-            value={newRequisite}
-            onChange={(event) => setNewRequisite(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                onAdd();
-              }
-            }}
-            placeholder="Добавить реквизит"
-          />
-          <button type="button" onClick={onAdd}>
-            +
-          </button>
-        </div>
+      {onCreate ? (
+        <RequisiteCreateModal
+          isOpen={createModalOpen}
+          assigneeOptions={assigneeOptions}
+          accessToken={accessToken}
+          projectSlug={projectSlug}
+          showKadrCue={showKadrCueOnCreate}
+          onClose={() => setCreateModalOpen(false)}
+          onSubmit={(payload) => {
+            onCreate(payload);
+            setCreateModalOpen(false);
+          }}
+        />
       ) : null}
 
       <div className="requisites-list">

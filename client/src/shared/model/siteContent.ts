@@ -220,3 +220,42 @@ export async function fetchSiteEvents(opts?: {
   }
 }
 
+function pickText(primary?: string, fallback?: string) {
+  const trimmed = primary?.trim();
+  return trimmed ? primary : fallback;
+}
+
+/** Дополняет remote-афишу fallback-полями, если в JSON пустые строки. */
+export function mergeSiteEventsWithFallback(
+  remote: SiteEvent[],
+  fallback: SiteEvent[]
+): SiteEvent[] {
+  const fallbackBySlug = new Map(fallback.map((event) => [event.slug, event]));
+
+  return remote.map((event) => {
+    const fb = fallbackBySlug.get(event.slug);
+    if (!fb) return event;
+
+    return {
+      ...fb,
+      ...event,
+      subtitle: pickText(event.subtitle, fb.subtitle),
+      old: pickText(event.old, fb.old),
+      anonse: pickText(event.anonse, fb.anonse),
+      date: pickText(event.date, fb.date),
+      type: pickText(event.type, fb.type),
+      eventPageBg: pickText(event.eventPageBg, fb.eventPageBg),
+      rainAudioUrl: pickText(event.rainAudioUrl, fb.rainAudioUrl),
+      rainButtonLabel: pickText(event.rainButtonLabel, fb.rainButtonLabel),
+      ticketsCloudEventId: pickText(event.ticketsCloudEventId, fb.ticketsCloudEventId),
+      ticketsCloudToken: pickText(event.ticketsCloudToken, fb.ticketsCloudToken),
+      colorBackground: event.colorBackground ?? fb.colorBackground,
+      disableGlass: event.disableGlass ?? fb.disableGlass,
+      cast: event.cast?.length ? event.cast : fb.cast,
+      photos: event.photos?.length ? event.photos : fb.photos,
+      reviews: event.reviews?.length ? event.reviews : fb.reviews,
+      reviewImages: event.reviewImages?.length ? event.reviewImages : fb.reviewImages,
+    };
+  });
+}
+

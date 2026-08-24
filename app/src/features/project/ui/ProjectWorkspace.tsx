@@ -1,6 +1,15 @@
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
+import { Modal } from "@shared/core/modal/Modal";
 import cn from "classnames";
-import { useCallback, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   fetchWorkspaces,
   type WorkspaceSummary,
@@ -73,12 +82,26 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
     projectName,
     projectsLoading,
   } = useProject();
+  const createTitleId = useId();
+  const createInputRef = useRef<HTMLInputElement>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [projectTitle, setProjectTitle] = useState("");
   const [createError, setCreateError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
   const hasProjects = projectItems.length > 0;
+
+  const normalizedSearch = searchQuery.trim().toLocaleLowerCase("ru");
+  const filteredProjects = useMemo(() => {
+    if (!normalizedSearch) return projectItems;
+    return projectItems.filter((project) => {
+      const name = String(project.name ?? "").toLocaleLowerCase("ru");
+      const slug = String(project.slug ?? "").toLocaleLowerCase("ru");
+      return name.includes(normalizedSearch) || slug.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, projectItems]);
 
   const loadWorkspaces = useCallback(async () => {
     if (!accessToken) return "";
@@ -101,6 +124,27 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
     }
   }, [accessToken]);
 
+  const openCreateModal = () => {
+    setProjectTitle("");
+    setCreateError("");
+    setIsCreateOpen(true);
+    void loadWorkspaces();
+  };
+
+  const closeCreateModal = () => {
+    if (isCreating) return;
+    setIsCreateOpen(false);
+    setCreateError("");
+  };
+
+  useEffect(() => {
+    if (!isCreateOpen) return;
+    const timer = window.setTimeout(() => {
+      createInputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [isCreateOpen]);
+
   const handleCreateProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const title = projectTitle.trim();
@@ -118,6 +162,7 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
       }
       await createProject(title, workspaceForCreate || undefined);
       setProjectTitle("");
+      setIsCreateOpen(false);
     } catch {
       setCreateError("Не удалось создать проект");
     } finally {
@@ -130,73 +175,59 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
     onProjectOpen?.(slug);
   };
 
+  const emptyMessage = hasProjects
+    ? "Ничего не найдено по запросу."
+    : "Здесь пока нет проектов.";
+  const emptyHint = hasProjects
+    ? "Измените поиск или сбросьте фильтр."
+    : "Нажмите «Создать», чтобы добавить первый.";
+
   return (
     <section
       className="project-workspace"
       aria-labelledby="project-workspace-title"
     >
       <header className="project-workspace__header">
-        <div>
-          <h1 id="project-workspace-title">Мои проекты</h1>
-          <p className="project-workspace__description">
-            Выберите проект или создайте новый.
-          </p>
-        </div>
-        <form
-          className="project-workspace__create"
-          onSubmit={handleCreateProject}
-        >
-          <label htmlFor="project-workspace-name">Новый проект</label>
-          <div className="project-workspace__create-row">
-            <input
-              id="project-workspace-name"
-              className="project-workspace__input"
-              value={projectTitle}
-              onChange={(event) => {
-                setProjectTitle(event.target.value);
-                if (createError) setCreateError("");
-              }}
-              onFocus={() => {
-                if (workspaces.length === 0) void loadWorkspaces();
-              }}
-              placeholder="Название проекта"
-              disabled={isCreating}
-            />
-            <button
-              type="submit"
-              className="project-workspace__create-button"
-              disabled={isCreating || !projectTitle.trim()}
-            >
-              {isCreating ? "Создание…" : "Создать"}
-            </button>
-          </div>
-          {workspaces.length > 0 ? (
-            <select
-              className="project-workspace__select"
-              value={workspaceId}
-              onChange={(event) => setWorkspaceId(event.target.value)}
-              aria-label="Пространство проекта"
-            >
-              {workspaces.map((workspace) => (
-                <option key={workspace.id} value={workspace.id}>
-                  {workspace.name} · {workspaceTypeLabels[workspace.type]}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          {createError ? (
-            <p className="project-workspace__error" role="alert">
-              {createError}
+        <div className="project-workspace__title-row">
+          <div className="project-workspace__intro">
+            <h1 id="project-workspace-title">Мои проекты</h1>
+            <p className="project-workspace__description">
+              Найдите проект по названию или создайте новый.
             </p>
-          ) : null}
-        </form>
+          </div>
+          <button
+            type="button"
+            className="project-workspace__create-button"
+            onClick={openCreateModal}
+            aria-label="Создать проект"
+            title="Создать проект"
+          >
+            <span className="project-workspace__create-label">Создать</span>
+            <span className="project-workspace__create-icon" aria-hidden>+</span>
+          </button>
+        </div>
+
+        <div className="project-workspace__toolbar">
+          <label className="project-workspace__search" htmlFor="project-workspace-search">
+            <span className="project-workspace__search-label">Поиск</span>
+            <input
+              id="project-workspace-search"
+              className="project-workspace__input"
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Поиск по названию"
+              autoComplete="off"
+            />
+          </label>
+        </div>
       </header>
 
       {projectsLoading ? (
         <PageLoader variant="view" label="Загрузка проектов…" />
-      ) : hasProjects ? (
+      ) : filteredProjects.length > 0 ? (
         <ul className="project-workspace__list">
-          {projectItems.map((project) => {
+          {filteredProjects.map((project) => {
             const isActive = project.slug === projectName;
             const projectLabel = project.name || project.slug;
 
@@ -214,10 +245,89 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
         </ul>
       ) : (
         <div className="project-workspace__empty">
-          <h2>Здесь пока нет проектов</h2>
-          <p>Выберите пространство и введите название проекта.</p>
+          <h2>{emptyMessage}</h2>
+          <p>{emptyHint}</p>
         </div>
       )}
+
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={closeCreateModal}
+        panelClassName="project-workspace-create-modal"
+        ariaLabelledBy={createTitleId}
+      >
+        <form
+          className="project-workspace-create-modal__form"
+          onSubmit={(event) => {
+            void handleCreateProject(event);
+          }}
+        >
+          <header className="project-workspace-create-modal__header">
+            <h2 id={createTitleId} className="project-workspace-create-modal__title">
+              Новый проект
+            </h2>
+          </header>
+
+          <label className="project-workspace-create-modal__field" htmlFor="project-workspace-name">
+            <span className="project-workspace-create-modal__label">Название</span>
+            <input
+              ref={createInputRef}
+              id="project-workspace-name"
+              className="project-workspace__input"
+              value={projectTitle}
+              onChange={(event) => {
+                setProjectTitle(event.target.value);
+                if (createError) setCreateError("");
+              }}
+              placeholder="Название проекта"
+              disabled={isCreating}
+            />
+          </label>
+
+          {workspaces.length > 0 ? (
+            <label className="project-workspace-create-modal__field" htmlFor="project-workspace-space">
+              <span className="project-workspace-create-modal__label">Пространство</span>
+              <select
+                id="project-workspace-space"
+                className="project-workspace__select"
+                value={workspaceId}
+                onChange={(event) => setWorkspaceId(event.target.value)}
+                disabled={isCreating}
+              >
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {workspace.name} · {workspaceTypeLabels[workspace.type]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {createError ? (
+            <p className="project-workspace__error" role="alert">
+              {createError}
+            </p>
+          ) : null}
+
+          <div className="project-workspace-create-modal__actions">
+            <button
+              type="button"
+              className="project-workspace-create-modal__cancel"
+              onClick={closeCreateModal}
+              disabled={isCreating}
+            >
+              Отмена
+            </button>
+            <button
+              type="submit"
+              className="project-workspace__create-button"
+              disabled={isCreating || !projectTitle.trim()}
+            >
+              {isCreating ? "Создание…" : "Создать"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </section>
   );
 }

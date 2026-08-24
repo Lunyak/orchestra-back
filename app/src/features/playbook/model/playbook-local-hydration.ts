@@ -61,6 +61,7 @@ function applyLocalScenePayload(
     lightFaders: f.lightFaders as PlaybookData["lightFaders"],
     lightPrograms: f.lightPrograms as PlaybookData["lightPrograms"],
     lightChannelRoles: f.lightChannelRoles as PlaybookData["lightChannelRoles"],
+    lightConsoleUi: f.lightConsoleUi as PlaybookData["lightConsoleUi"],
     lightChannels: lc,
     images:
       f.images && typeof f.images === "object"

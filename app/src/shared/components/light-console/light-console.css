@@ -4,11 +4,13 @@
 
 .light-console__body {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 10px;
-  min-height: 132px;
+  min-height: 0;
+  height: auto;
   max-height: min(300px, 36vh);
   padding: 12px;
+  overflow: auto;
   border: 1px solid var(--stage-brutal-border, var(--color-border-default));
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.045), transparent 42%),
@@ -18,8 +20,10 @@
 }
 
 .light-console[data-mode="compact"] .light-console__body {
-  min-height: 120px;
+  min-height: 0;
   max-height: 180px;
+  grid-template-rows: auto;
+  gap: 0;
 }
 
 .light-console[data-read-only="true"] .light-console__body {
@@ -89,6 +93,10 @@
 
 .light-console[data-mode="compact"] .light-console__main {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.light-console[data-mode="compact"][data-show-channels="true"] .light-console__main {
+  grid-template-columns: auto minmax(0, 1fr);
 }
 
 .light-console__left {

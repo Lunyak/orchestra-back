@@ -1,68 +1,21 @@
+import type { MarkdownKadrSection } from "../../theater/model/light-kadrs";
+import { insertKadrInSceneData } from "../../theater/model/kadr-store";
 import {
-  type MarkdownKadrSection,
-  nextKadrNumberForScene,
-  readSceneLightKadrs,
-} from "../../theater/model/light-kadrs";
-import { insertKadrInSceneData, kadrDisplayTitle } from "../../theater/model/kadr-store";
+  buildSceneKadrTape,
+  type SceneKadrTapeItem,
+} from "../../theater/model/scene-kadr-tape";
 import type { ScriptScene, SceneLightKadrsDataV1 } from "../../../shared/types/script";
 
-export type SpectacleTapeItem = {
-  /** Индекс в scenes[] */
-  sceneIndex: number;
-  sceneId: number;
-  sceneTitle: string;
-  /** Порядковый номер сцены в спектакле (1-based) */
-  sceneOrdinal: number;
-  kadrNo: number;
-  kadrId: string | null;
-  headingTitle: string;
+export type SpectacleTapeItem = SceneKadrTapeItem & {
   /** @deprecated markdown-секции больше не SoT; всегда null для JSON-ленты */
   section: MarkdownKadrSection | null;
-  /** Сцена без картин — placeholder в ленте */
-  isPlaceholder?: boolean;
 };
 
 export function buildSpectacleKadrTape(scenes: ScriptScene[]): SpectacleTapeItem[] {
-  const items: SpectacleTapeItem[] = [];
-
-  scenes.forEach((scene, sceneIndex) => {
-    const sceneOrdinal = sceneIndex + 1;
-    const sceneTitle = String(scene.title ?? "").trim() || `Сцена ${sceneOrdinal}`;
-    const kadrs = readSceneLightKadrs(scene);
-    const sorted = [...kadrs.kadrs].sort(
-      (a, b) => a.kadrNo - b.kadrNo || a.id.localeCompare(b.id),
-    );
-
-    if (sorted.length > 0) {
-      for (const kadr of sorted) {
-        items.push({
-          sceneIndex,
-          sceneId: scene.id,
-          sceneTitle,
-          sceneOrdinal,
-          kadrNo: kadr.kadrNo,
-          kadrId: kadr.id,
-          headingTitle: kadrDisplayTitle(kadr),
-          section: null,
-        });
-      }
-      return;
-    }
-
-    items.push({
-      sceneIndex,
-      sceneId: scene.id,
-      sceneTitle,
-      sceneOrdinal,
-      kadrNo: 0,
-      kadrId: null,
-      headingTitle: "Без картин",
-      section: null,
-      isPlaceholder: true,
-    });
-  });
-
-  return items;
+  return buildSceneKadrTape(scenes).map((item) => ({
+    ...item,
+    section: null,
+  }));
 }
 
 export type SpectacleTapeSceneGroup = {
@@ -107,7 +60,7 @@ export function isLastTapeItemInScene(
   return !next || next.sceneId !== item.sceneId;
 }
 
-export { nextKadrNumberForScene };
+export { nextKadrNumberForScene } from "../../theater/model/light-kadrs";
 
 export type InsertKadrAfterTarget = {
   id?: string | null;

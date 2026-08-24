@@ -25,3 +25,14 @@
   font-size: 12px;
   opacity: 0.75;
 }
+
+@media (max-width: 560px) {
+  .rehearsals-card {
+    padding: 10px;
+    max-width: none;
+  }
+
+  .rehearsals-card-title {
+    font-size: 13px;
+  }
+}

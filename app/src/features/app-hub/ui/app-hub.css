@@ -12,6 +12,20 @@
   padding: 18px 18px 28px;
 }
 
+@media (max-width: 979px) {
+  .app-hub-layout .main-content,
+  .app-hub-layout--projects .main-content {
+    padding: 8px 6px 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-hub-layout .main-content,
+  .app-hub-layout--projects .main-content {
+    padding: 6px 4px 12px;
+  }
+}
+
 .app-hub {
   max-width: 1080px;
   width: 100%;

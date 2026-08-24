@@ -65,6 +65,7 @@ export function useRehearsalsPage() {
     return {
       currentMonth: now,
       selectedDate: isoDate(now),
+      viewMode: "month",
       monthStartDate,
       monthEndDate,
       fromIso: monthStartDate.toISOString(),

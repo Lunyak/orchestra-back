@@ -8,6 +8,36 @@
   cursor: none;
 }
 
+.projector-output__stage {
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  transition: opacity 0ms linear;
+}
+
+.projector-output[data-media-hidden="true"] .projector-output__stage {
+  opacity: 0;
+}
+
+.projector-output[data-fade-ms="50"] .projector-output__stage { transition-duration: 50ms; }
+.projector-output[data-fade-ms="100"] .projector-output__stage { transition-duration: 100ms; }
+.projector-output[data-fade-ms="150"] .projector-output__stage { transition-duration: 150ms; }
+.projector-output[data-fade-ms="200"] .projector-output__stage { transition-duration: 200ms; }
+.projector-output[data-fade-ms="250"] .projector-output__stage { transition-duration: 250ms; }
+.projector-output[data-fade-ms="300"] .projector-output__stage { transition-duration: 300ms; }
+.projector-output[data-fade-ms="350"] .projector-output__stage { transition-duration: 350ms; }
+.projector-output[data-fade-ms="400"] .projector-output__stage { transition-duration: 400ms; }
+.projector-output[data-fade-ms="450"] .projector-output__stage { transition-duration: 450ms; }
+.projector-output[data-fade-ms="500"] .projector-output__stage { transition-duration: 500ms; }
+.projector-output[data-fade-ms="600"] .projector-output__stage { transition-duration: 600ms; }
+.projector-output[data-fade-ms="700"] .projector-output__stage { transition-duration: 700ms; }
+.projector-output[data-fade-ms="750"] .projector-output__stage { transition-duration: 750ms; }
+.projector-output[data-fade-ms="800"] .projector-output__stage { transition-duration: 800ms; }
+.projector-output[data-fade-ms="900"] .projector-output__stage { transition-duration: 900ms; }
+.projector-output[data-fade-ms="1000"] .projector-output__stage { transition-duration: 1000ms; }
+.projector-output[data-fade-ms="1200"] .projector-output__stage { transition-duration: 1200ms; }
+.projector-output[data-fade-ms="1500"] .projector-output__stage { transition-duration: 1500ms; }
+
 .projector-output__media {
   display: block;
   width: 100%;
@@ -29,7 +59,6 @@
   transform: translate(-50%, -50%);
   max-width: min(90vw, 640px);
   padding: 16px 20px;
-  border-radius: 8px;
   background: rgba(20, 20, 20, 0.92);
   color: #f3b0b0;
   font-size: 14px;

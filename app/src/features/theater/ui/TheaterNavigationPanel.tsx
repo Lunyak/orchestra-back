@@ -21,7 +21,7 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
     tab === "scene"
       ? "Сцена"
       : tab === "kadrs"
-        ? "Картины"
+        ? "Сцены / картины"
         : tab === "view"
           ? "Вид"
           : "Справка";
@@ -37,7 +37,7 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
       <div
         className="theater-navigation-panel-tabs"
         role="tablist"
-        aria-label="Сцена, картины, вид и справка"
+        aria-label="Сцена, сцены и картины, вид и справка"
       >
         <button
           type="button"
@@ -61,7 +61,7 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
           )}
           onClick={() => setTab("kadrs")}
         >
-          Картины
+          Сцены / картины
         </button>
         <button
           type="button"

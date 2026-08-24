@@ -5,6 +5,7 @@ import {
   SPECTACLE_HUB_ROUTE_PATH,
   SUFER_ROUTE_PATH,
 } from "../../../app/router/routeMeta";
+import { ENABLE_ACCOUNTING } from "../../build-features";
 import {
   isAdminAccountingPath,
   isAdminPlanPath,
@@ -49,12 +50,16 @@ export const ADMIN_NAV_CHILDREN: HeaderNavSubItem[] = [
     label: "Задачи",
     isActive: isAdminTasksPath,
   },
-  {
-    id: "accounting",
-    path: "/accounting",
-    label: "Бухгалтерия · скоро",
-    isActive: isAdminAccountingPath,
-  },
+  ...(ENABLE_ACCOUNTING
+    ? [
+        {
+          id: "accounting",
+          path: "/accounting",
+          label: "Бухгалтерия",
+          isActive: isAdminAccountingPath,
+        } satisfies HeaderNavSubItem,
+      ]
+    : []),
   {
     id: "premises",
     path: "/premises",

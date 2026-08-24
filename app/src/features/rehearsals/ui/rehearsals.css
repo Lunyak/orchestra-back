@@ -1,6 +1,7 @@
 .rehearsals-page {
   padding: 18px 18px 28px;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   width: 100%;
   overflow: auto;
   margin: 0 auto;
@@ -405,5 +406,57 @@
 
   .rehearsals-panels {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .rehearsals-week {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .rehearsals-day {
+    padding: 6px 2px;
+    gap: 0;
+  }
+
+  .rehearsals-day-top {
+    font-size: 10px;
+  }
+
+  .rehearsals-day-bottom {
+    font-size: 10px;
+  }
+
+  .rehearsals-toolbar {
+    align-items: stretch;
+  }
+
+  .rehearsals-tool {
+    min-width: 0;
+    flex: 1 1 140px;
+  }
+}
+
+@media (max-width: 560px) {
+  .rehearsals-page {
+    padding: 10px 8px 16px;
+  }
+
+  .rehearsals-title {
+    font-size: 1.15rem;
+  }
+
+  .rehearsals-week {
+    display: flex;
+    overflow-x: auto;
+    gap: 6px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rehearsals-day {
+    flex: 0 0 52px;
+    min-width: 52px;
   }
 }

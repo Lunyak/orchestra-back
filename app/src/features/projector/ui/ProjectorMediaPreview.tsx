@@ -7,6 +7,7 @@ import {
   resolveProjectorVideoAsset,
   type ProjectorMediaContext,
 } from "../model/projector-media";
+import { resolveVideoPreviewSeekTime } from "../model/projector-video-preview";
 import { isLocalProjectMediaUrl } from "../../../shared/platform/media-url";
 import "./projector-media-preview.css";
 
@@ -22,6 +23,8 @@ export type ProjectorMediaPreviewProps = {
   hideFallbackLabel?: boolean;
   interactive?: boolean;
   onActivate?: () => void;
+  /** Явная секунда кадра превью (из PlaybookVideo.previewTimeSec). */
+  previewTimeSec?: number | null;
 };
 
 type PreviewResolveResult = {
@@ -82,12 +85,14 @@ export async function resolveProjectorPreviewSrc(
   };
 }
 
-function seekVideoPreviewFrame(video: HTMLVideoElement) {
-  if (!Number.isFinite(video.duration) || video.duration <= 0) {
-    if (video.currentTime < 0.05) video.currentTime = 0.1;
-    return;
-  }
-  const target = Math.min(0.25, Math.max(0.05, video.duration * 0.02));
+function seekVideoPreviewFrame(
+  video: HTMLVideoElement,
+  previewTimeSec?: number | null,
+) {
+  const target = resolveVideoPreviewSeekTime(
+    previewTimeSec,
+    Number.isFinite(video.duration) ? video.duration : undefined,
+  );
   if (Math.abs(video.currentTime - target) > 0.01) {
     video.currentTime = target;
   }
@@ -104,12 +109,21 @@ export function ProjectorMediaPreview({
   hideFallbackLabel = false,
   interactive = false,
   onActivate,
+  previewTimeSec = null,
 }: ProjectorMediaPreviewProps) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const blobRef = useRef<string | null>(null);
   const storageKeyRef = useRef<string | null>(null);
   const triedRemoteRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const resolvedPreviewTime =
+    previewTimeSec ??
+    (mode === "video" && videoId != null
+      ? (ctx.videos ?? []).find((video) => Number(video.id) === Number(videoId))
+          ?.previewTimeSec
+      : null);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,6 +154,12 @@ export function ProjectorMediaPreview({
       }
     };
   }, [ctx, mode, videoId, holdId]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || mode !== "video") return;
+    seekVideoPreviewFrame(video, resolvedPreviewTime);
+  }, [mode, resolvedPreviewTime, src]);
 
   const retryRemoteOrFail = () => {
     const key = storageKeyRef.current;
@@ -196,13 +216,18 @@ export function ProjectorMediaPreview({
       />
     ) : (
       <video
+        ref={videoRef}
         src={src}
         className="projector-media-preview__video"
         muted
         playsInline
         preload="metadata"
-        onLoadedMetadata={(event) => seekVideoPreviewFrame(event.currentTarget)}
-        onLoadedData={(event) => seekVideoPreviewFrame(event.currentTarget)}
+        onLoadedMetadata={(event) =>
+          seekVideoPreviewFrame(event.currentTarget, resolvedPreviewTime)
+        }
+        onLoadedData={(event) =>
+          seekVideoPreviewFrame(event.currentTarget, resolvedPreviewTime)
+        }
         onError={retryRemoteOrFail}
       />
     );

@@ -62,6 +62,7 @@ function AppRoutesContent() {
   );
   const projectSection = getProjectSectionFromPath(location.pathname);
   const isLightPlotRoute = projectSection === "light-plot";
+  const isSuferRoute = projectSection === "sufer";
   const spectacleRunTextHidden = useAppSelector(
     (state) => state.scriptUi.spectacleRunTextHidden,
   );
@@ -128,8 +129,9 @@ function AppRoutesContent() {
     "script-panels-nav",
     0,
     () =>
-      shouldShowScriptState ? (
+      shouldShowScriptState && !isSuferRoute ? (
         <AppEditorScriptPanelsNav
+          showScenesToggle={!isLightPlotRoute}
           showPlaylist={isPlaylistVisible}
           onTogglePlaylist={handleTogglePlaylist}
           isScenesCollapsed={isHeaderScenesCollapsed}
@@ -216,6 +218,10 @@ function AppShellFrame() {
   const isMobile = useIsMobile();
   const { showPlaylistSidebar, isScenesCollapsed } = useScriptUI();
   const isProjectRoute = isProjectPath(location.pathname);
+  const projectSection = getProjectSectionFromPath(location.pathname);
+  const hideScenesDock =
+    projectSection === "light-plot" || projectSection === "overview";
+  const hidePlaylistDock = projectSection === "overview";
 
   const projectsBlocked = !isProjectsLoaded;
   const playbookBlocked =
@@ -228,8 +234,10 @@ function AppShellFrame() {
       ? "Загрузка сцены…"
       : label;
 
-  const dockPlaylist = !chromeHidden && !isMobile && showPlaylistSidebar;
-  const dockScenes = !chromeHidden && !isMobile && !isScenesCollapsed;
+  const dockPlaylist =
+    !chromeHidden && !isMobile && showPlaylistSidebar && !hidePlaylistDock;
+  const dockScenes =
+    !chromeHidden && !isMobile && !isScenesCollapsed && !hideScenesDock;
 
   return (
     <div

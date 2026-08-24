@@ -133,6 +133,22 @@
   }
 }
 
+@media (max-width: 560px) {
+  .project-media-library-section--playlist,
+  .project-media-library-section--sounds {
+    min-height: 240px;
+  }
+
+  .project-media-library-section__title {
+    font-size: 1rem;
+  }
+
+  .project-media-page__playlist-container .playlist-sidebar,
+  .project-media-page__sounds-container {
+    min-height: 220px;
+  }
+}
+
 .project-media-library-section {
   display: flex;
   flex-direction: column;

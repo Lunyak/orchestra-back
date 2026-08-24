@@ -32,10 +32,40 @@ import {
   getProjectMediaFolderInfo,
   scanProjectMediaFolder,
 } from "../../../shared/platform/project-media-folder";
+import {
+  type ProgRunKadrStripLayout,
+  persistProgRunKadrStripLayout,
+  persistProgRunKadrStripNotesOverlay,
+  persistProgRunKadrStripPlainCover,
+  persistProgRunLightConsoleOpen,
+  persistProgRunWideLayout,
+  readProgRunKadrStripLayout,
+  readProgRunKadrStripNotesOverlay,
+  readProgRunKadrStripPlainCover,
+  readProgRunLightConsoleOpen,
+  readProgRunWideLayout,
+} from "../../spectacle-run/model/prog-run-prefs-storage";
+import { isCompactKadrStripViewport } from "@shared/hooks/useCompactKadrStrip";
 
 function isKeyboardTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
+function shouldShowProjectorLiveStatus(message: string): boolean {
+  if (!isCompactKadrStripViewport()) return true;
+  const normalized = message.toLowerCase();
+  if (normalized.includes("проектор открыт")) return false;
+  if (normalized.includes("проектор закрыт")) return false;
+  return true;
+}
+
+function setLiveStatusFiltered(
+  setLiveStatus: (value: string | null) => void,
+  message: string | null,
+) {
+  if (message != null && !shouldShowProjectorLiveStatus(message)) return;
+  setLiveStatus(message);
 }
 
 function resolvePlaylistTrack(
@@ -62,6 +92,21 @@ export function useNotesRun(projectName: string) {
   const [isProjectorOpen, setIsProjectorOpen] = useState(false);
   const [projectorVideoMuted, setProjectorVideoMuted] = useState<Record<number, boolean>>({});
   const [projectorVideoVolume, setProjectorVideoVolume] = useState<Record<number, number>>({});
+  const [stripLayout, setStripLayoutState] = useState<ProgRunKadrStripLayout>(() =>
+    readProgRunKadrStripLayout(projectName),
+  );
+  const [stripNotesOverlay, setStripNotesOverlayState] = useState(() =>
+    readProgRunKadrStripNotesOverlay(projectName),
+  );
+  const [stripPlainCover, setStripPlainCoverState] = useState(() =>
+    readProgRunKadrStripPlainCover(projectName),
+  );
+  const [stripLightConsoleOpen, setStripLightConsoleOpenState] = useState(() =>
+    readProgRunLightConsoleOpen(projectName),
+  );
+  const [stripWideLayout, setStripWideLayoutState] = useState(() =>
+    readProgRunWideLayout(projectName),
+  );
 
   const pausedRef = useRef(paused);
   const runActiveRef = useRef(runActive);
@@ -73,6 +118,74 @@ export function useNotesRun(projectName: string) {
   runActiveRef.current = runActive;
   cardIndexRef.current = cardIndex;
   notesRunRef.current = notesRun;
+
+  const publishLiveStatus = useCallback((message: string | null) => {
+    setLiveStatusFiltered(setLiveStatus, message);
+  }, []);
+
+  useEffect(() => {
+    setStripLayoutState(readProgRunKadrStripLayout(projectName));
+    setStripNotesOverlayState(readProgRunKadrStripNotesOverlay(projectName));
+    setStripPlainCoverState(readProgRunKadrStripPlainCover(projectName));
+    setStripLightConsoleOpenState(readProgRunLightConsoleOpen(projectName));
+    setStripWideLayoutState(readProgRunWideLayout(projectName));
+  }, [projectName]);
+
+  const setStripLayout = useCallback(
+    (layout: ProgRunKadrStripLayout) => {
+      setStripLayoutState(layout);
+      persistProgRunKadrStripLayout(projectName, layout);
+    },
+    [projectName],
+  );
+
+  const setStripNotesOverlay = useCallback(
+    (enabled: boolean) => {
+      setStripNotesOverlayState(enabled);
+      persistProgRunKadrStripNotesOverlay(projectName, enabled);
+    },
+    [projectName],
+  );
+
+  const toggleStripNotesOverlay = useCallback(() => {
+    setStripNotesOverlay(!stripNotesOverlay);
+  }, [setStripNotesOverlay, stripNotesOverlay]);
+
+  const setStripPlainCover = useCallback(
+    (enabled: boolean) => {
+      setStripPlainCoverState(enabled);
+      persistProgRunKadrStripPlainCover(projectName, enabled);
+    },
+    [projectName],
+  );
+
+  const toggleStripPlainCover = useCallback(() => {
+    setStripPlainCover(!stripPlainCover);
+  }, [setStripPlainCover, stripPlainCover]);
+
+  const setStripLightConsoleOpen = useCallback(
+    (open: boolean) => {
+      setStripLightConsoleOpenState(open);
+      persistProgRunLightConsoleOpen(projectName, open);
+    },
+    [projectName],
+  );
+
+  const toggleStripLightConsoleOpen = useCallback(() => {
+    setStripLightConsoleOpen(!stripLightConsoleOpen);
+  }, [setStripLightConsoleOpen, stripLightConsoleOpen]);
+
+  const setStripWideLayout = useCallback(
+    (enabled: boolean) => {
+      setStripWideLayoutState(enabled);
+      persistProgRunWideLayout(projectName, enabled);
+    },
+    [projectName],
+  );
+
+  const toggleStripWideLayout = useCallback(() => {
+    setStripWideLayout(!stripWideLayout);
+  }, [setStripWideLayout, stripWideLayout]);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,7 +268,7 @@ export function useNotesRun(projectName: string) {
         await saveNotesRun(projectName, nextData);
       } catch (err) {
         console.error("[notes-run] save failed:", err);
-        setLiveStatus(
+        publishLiveStatus(
           String((err as Error)?.message ?? "Не удалось сохранить карточки"),
         );
       }
@@ -186,7 +299,7 @@ export function useNotesRun(projectName: string) {
       if (card.playTrackId) {
         const track = resolvePlaylistTrack(playlist, card.playTrackId);
         if (!track) {
-          setLiveStatus(
+          publishLiveStatus(
             `Трек #${card.playTrackId} не найден в плейлисте (проверьте привязку в карточке)`,
           );
         } else {
@@ -274,7 +387,7 @@ export function useNotesRun(projectName: string) {
   useEffect(() => {
     const unsubReady = notifyProjectorReady();
     const unsubErrors = subscribeProjectorOutputErrors((error) => {
-      setLiveStatus(`Проектор: ${error.message}`);
+      publishLiveStatus(`Проектор: ${error.message}`);
     });
     void pingProjectorOutput().then((alive) => {
       if (alive) setIsProjectorOpen(true);
@@ -304,7 +417,7 @@ export function useNotesRun(projectName: string) {
 
   const startRun = useCallback(() => {
     if (cards.length === 0) {
-      setLiveStatus("Добавьте карточки для суфлера");
+      publishLiveStatus("Добавьте карточки для суфлера");
       return;
     }
     runActiveRef.current = true;
@@ -315,7 +428,7 @@ export function useNotesRun(projectName: string) {
     void applyCardPlayback(cards[clampedIndex]).finally(() => {
       applyingRef.current = false;
     });
-    setLiveStatus("Суфлер запущен");
+    publishLiveStatus("Суфлер запущен");
   }, [applyCardPlayback, cards, clampedIndex]);
 
   const togglePause = useCallback(() => {
@@ -324,25 +437,25 @@ export function useNotesRun(projectName: string) {
       pausedRef.current = false;
       setPaused(false);
       void applyCardPlayback(cards[cardIndexRef.current] ?? null);
-      setLiveStatus("Продолжаем");
+      publishLiveStatus("Продолжаем");
       return;
     }
     pausedRef.current = true;
     setPaused(true);
     invokePlaylistPause();
     pauseProjectorVideo();
-    setLiveStatus("Пауза");
+    publishLiveStatus("Пауза");
   }, [applyCardPlayback, cards]);
 
   const openProjector = useCallback(async () => {
     const open = await ensureProjectorOutputOpen({ focus: true });
     if (!open) {
-      setLiveStatus("Разрешите всплывающие окна для проектора");
+      publishLiveStatus("Разрешите всплывающие окна для проектора");
       return;
     }
     setIsProjectorOpen(true);
     showProjectorHold(projectorMediaCtx);
-    setLiveStatus("Проектор открыт — кликните по экрану, если видео не стартует");
+    publishLiveStatus("Проектор открыт — кликните по экрану, если видео не стартует");
   }, [projectorMediaCtx]);
 
   useEffect(() => {
@@ -361,7 +474,7 @@ export function useNotesRun(projectName: string) {
   const closeProjector = useCallback(() => {
     closeProjectorWindow();
     setIsProjectorOpen(false);
-    setLiveStatus("Проектор закрыт");
+    publishLiveStatus("Проектор закрыт");
   }, []);
 
   const openCreateModal = useCallback(() => {
@@ -403,7 +516,7 @@ export function useNotesRun(projectName: string) {
         if (created) setCardIndex(next.cards.findIndex((c) => c.id === created.id));
       }
       setModalOpen(false);
-      setLiveStatus(modalMode === "edit" ? "Карточка сохранена" : "Карточка создана");
+      publishLiveStatus(modalMode === "edit" ? "Карточка сохранена" : "Карточка создана");
     },
     [createInsertAfterIndex, editCardId, modalMode, persistCards],
   );
@@ -415,12 +528,12 @@ export function useNotesRun(projectName: string) {
     const next = renumberNotesRunCards(cards.filter((c) => c.id !== card.id));
     void persistCards(next);
     setCardIndex(Math.max(0, clampedIndex - 1));
-    setLiveStatus("Карточка удалена");
+    publishLiveStatus("Карточка удалена");
   }, [cards, clampedIndex, persistCards]);
 
   const initFromScenes = useCallback(() => {
     if (scenes.length === 0) {
-      setLiveStatus("В сценарии нет сцен");
+      publishLiveStatus("В сценарии нет сцен");
       return;
     }
     if (
@@ -432,7 +545,7 @@ export function useNotesRun(projectName: string) {
     const next = buildNotesRunCardsFromScenes(scenes);
     void persistCards(next.cards);
     setCardIndex(0);
-    setLiveStatus(`Создано ${next.cards.length} карточек по сценам`);
+    publishLiveStatus(`Создано ${next.cards.length} карточек по сценам`);
   }, [cards.length, persistCards, scenes]);
 
   const modalDraft = useMemo(() => {
@@ -496,7 +609,6 @@ export function useNotesRun(projectName: string) {
     runActive,
     paused,
     liveStatus,
-    setLiveStatus,
     isProjectorOpen,
     notesLoaded,
     createInsertAfterIndex,
@@ -524,6 +636,20 @@ export function useNotesRun(projectName: string) {
     reloadFromFolder,
     canGoPrev: clampedIndex > 0,
     canGoNext: clampedIndex < cards.length - 1,
+    stripLayout,
+    setStripLayout,
+    stripNotesOverlay,
+    setStripNotesOverlay,
+    toggleStripNotesOverlay,
+    stripPlainCover,
+    setStripPlainCover,
+    toggleStripPlainCover,
+    stripLightConsoleOpen,
+    setStripLightConsoleOpen,
+    toggleStripLightConsoleOpen,
+    stripWideLayout,
+    setStripWideLayout,
+    toggleStripWideLayout,
   };
 }
 

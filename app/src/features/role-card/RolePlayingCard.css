@@ -105,3 +105,19 @@
   border-color: var(--color-active-ascent);
   outline: none;
 }
+
+@media (max-width: 560px) {
+  .role-playing-card:not(.role-playing-card_sm):not(.role-playing-card_lg) {
+    --role-card-w: 112px;
+    --role-card-h: 160px;
+  }
+
+  .role-playing-card__caption {
+    padding: 22px 8px 8px;
+    font-size: 11px;
+  }
+
+  .role-playing-card__placeholder {
+    font-size: 28px;
+  }
+}

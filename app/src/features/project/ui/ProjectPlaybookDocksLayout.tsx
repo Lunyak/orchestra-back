@@ -3,7 +3,7 @@ import { ScriptScenesSidebar } from "@shared/components/script-scenes-sidebar/Sc
 import { useIsMobile } from "@shared/hooks/useIsMobile";
 import cn from "classnames";
 import { useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { projectPath } from "../../../app/router/paths";
 import { usePlaybook } from "../../playbook";
 import { useProject } from "../model/project-context";
@@ -16,6 +16,9 @@ const SCRIPT_SCENE_NAME = "script";
 export function ProjectPlaybookDocksLayout() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const isOverviewRoute = Boolean(
+    useMatch({ path: "/projects/:projectSlug/overview", end: true }),
+  );
   const { projectName } = useProject();
   const {
     scenes,
@@ -46,7 +49,7 @@ export function ProjectPlaybookDocksLayout() {
     navigate(projectPath(projectName, "script"));
   };
 
-  if (!projectName || !isPlaybookReady) {
+  if (!projectName || !isPlaybookReady || isOverviewRoute) {
     return <Outlet />;
   }
 

@@ -1,5 +1,6 @@
 import cn from "classnames";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SettingsBotTab } from "./SettingsBotTab";
 import { SettingsGeneralTab } from "./SettingsGeneralTab";
 import { SettingsMediaTab } from "./SettingsMediaTab";
@@ -65,13 +66,41 @@ function renderSettingsTab(tab: SettingsTabId) {
 }
 
 export function SettingsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
   const [activeTab, setActiveTabState] = useState<SettingsTabId>(() =>
-    readSettingsActiveTab(),
+    isSettingsTabId(tabFromUrl) ? tabFromUrl : readSettingsActiveTab(),
   );
+
+  useEffect(() => {
+    if (!isSettingsTabId(tabFromUrl)) return;
+    setActiveTabState(tabFromUrl);
+    writeSettingsActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
+
+  useEffect(() => {
+    if (isSettingsTabId(tabFromUrl)) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", activeTab);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [activeTab, setSearchParams, tabFromUrl]);
 
   const setActiveTab = (tab: SettingsTabId) => {
     setActiveTabState(tab);
     writeSettingsActiveTab(tab);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      },
+      { replace: true },
+    );
   };
 
   return (

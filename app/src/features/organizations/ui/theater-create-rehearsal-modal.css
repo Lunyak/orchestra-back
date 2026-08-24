@@ -1,7 +1,7 @@
 .theater-create-rehearsal-modal {
   display: flex;
   flex-direction: column;
-  width: min(100%, 360px);
+  width: min(100%, 400px);
   color: var(--sessions-text, var(--color-text-muted));
   background: var(--color-bg-modal, var(--sessions-bg, #111));
 }
@@ -9,13 +9,13 @@
 .theater-create-rehearsal-modal__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 18px;
 }
 
 .theater-create-rehearsal-modal__title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--sessions-text-strong, var(--color-text));
 }
@@ -24,10 +24,20 @@
   margin: 0;
 }
 
+.theater-create-rehearsal-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.theater-create-rehearsal-modal__title-input {
+  width: 100%;
+}
+
 .theater-create-rehearsal-modal__time {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .theater-create-rehearsal-modal__time-label {
@@ -38,9 +48,64 @@
   color: var(--sessions-text-muted, var(--color-text-muted));
 }
 
-.theater-create-rehearsal-modal__time-input {
-  width: 120px;
-  min-height: 32px;
+.theater-create-rehearsal-modal__time-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 72px;
+  border: 1px solid var(--sessions-border, var(--color-border-default));
+  background: var(--sessions-bg-deep, rgba(0, 0, 0, 0.35));
+  color: var(--sessions-text-strong, var(--color-text));
+  font-variant-numeric: tabular-nums;
+}
+
+.theater-create-rehearsal-modal__time-control:focus-within {
+  border-color: var(--color-active-ascent);
+}
+
+.theater-create-rehearsal-modal__time-control--conflict {
+  border-color: color-mix(in srgb, var(--color-danger, #c44) 70%, var(--sessions-border));
+  color: color-mix(in srgb, var(--color-danger, #c44) 80%, var(--sessions-text-strong));
+}
+
+.theater-create-rehearsal-modal__time-digits {
+  width: 2.2ch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  caret-color: var(--color-active-ascent);
+}
+
+.theater-create-rehearsal-modal__time-digits:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.theater-create-rehearsal-modal__time-digits::selection {
+  background: color-mix(in srgb, var(--color-active-ascent) 35%, transparent);
+  color: inherit;
+}
+
+.theater-create-rehearsal-modal__time-sep {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--sessions-text-muted, var(--color-text-muted));
+}
+
+.theater-create-rehearsal-modal__time-hint {
+  margin: 0;
+  font-size: 11px;
 }
 
 .theater-create-rehearsal-modal__actions {
@@ -48,4 +113,31 @@
   justify-content: flex-end;
   gap: 8px;
   margin-top: 4px;
+}
+
+@media (max-width: 420px) {
+  .theater-create-rehearsal-modal {
+    width: 100%;
+  }
+
+  .theater-create-rehearsal-modal__body {
+    padding: 14px 12px;
+    gap: 12px;
+  }
+
+  .theater-create-rehearsal-modal__time-digits {
+    font-size: 30px;
+  }
+
+  .theater-create-rehearsal-modal__time-sep {
+    font-size: 26px;
+  }
+
+  .theater-create-rehearsal-modal__actions {
+    flex-direction: column-reverse;
+  }
+
+  .theater-create-rehearsal-modal__actions .button {
+    width: 100%;
+  }
 }

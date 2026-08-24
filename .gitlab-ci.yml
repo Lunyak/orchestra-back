@@ -55,6 +55,17 @@ test:back:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
+# Критичные тесты проектора (заставка/видео во 2-м окне) — без БД
+test:app-projector:
+  stage: test
+  image: ${NODE_IMAGE}
+  script:
+    - cd app
+    - npm run test:projector
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # Общий SSH-доступ к VPS (runner без DinD — сборка и деплой на хосте с Docker).
 .deploy_ssh:
   image: alpine:latest

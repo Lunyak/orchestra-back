@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  fetchProjectorImageBlobUrl,
-  fetchProjectorVideoBlobUrl,
-} from "../model/projector-media";
-import { isLocalProjectMediaUrl } from "../../../shared/platform/media-url";
+import { resolveProjectorOutputMediaSrc } from "../model/resolve-projector-output-media";
+import { normalizeProjectorTransitionMs } from "../model/projector-video-preview";
 import {
   sendProjectorMessage,
   subscribeProjectorMessages,
@@ -12,6 +9,30 @@ import {
 import "./projector-output.css";
 
 type OutputMode = "black" | "hold" | "video";
+
+type PendingHold = {
+  storageKey: string | null;
+  fallbackSrc: string | null;
+  fileName: string | null;
+  projectSlug: string | null;
+};
+
+const FADE_BUCKETS_MS = [
+  50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 600, 700, 750, 800, 900, 1000,
+  1200, 1500,
+] as const;
+
+function toFadeBucketMs(fadeMs: number): number {
+  const normalized = normalizeProjectorTransitionMs(fadeMs);
+  if (normalized <= 0) return 0;
+  let best = FADE_BUCKETS_MS[0];
+  for (const bucket of FADE_BUCKETS_MS) {
+    if (Math.abs(bucket - normalized) < Math.abs(best - normalized)) {
+      best = bucket;
+    }
+  }
+  return best;
+}
 
 function reportPlayback(
   videoId: number | null,
@@ -46,20 +67,25 @@ export function ProjectorOutputPage() {
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
   const [outputHint, setOutputHint] = useState<string | null>(null);
+  const [mediaHidden, setMediaHidden] = useState(false);
+  const [fadeBucketMs, setFadeBucketMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const activeVideoIdRef = useRef<number | null>(null);
   const activeHoldIdRef = useRef<number | null>(null);
   const holdBlobRef = useRef<string | null>(null);
   const videoBlobRef = useRef<string | null>(null);
-  const pendingHoldRef = useRef<{ storageKey: string | null; fallbackSrc: string | null }>({
+  const pendingHoldRef = useRef<PendingHold>({
     storageKey: null,
     fallbackSrc: null,
+    fileName: null,
+    projectSlug: null,
   });
   const loadHoldSeqRef = useRef(0);
   const loadVideoSeqRef = useRef(0);
   const videoVolumeRef = useRef(1);
   const videoMutedRef = useRef(false);
+  const fadeTokenRef = useRef(0);
 
   const requestPresentationMode = useCallback(() => {
     const el = rootRef.current;
@@ -93,7 +119,7 @@ export function ProjectorOutputPage() {
   }, []);
 
   const loadHoldImage = useCallback(
-    async (storageKey: string | null, fallbackSrc: string | null) => {
+    async (pending: PendingHold) => {
       const seq = loadHoldSeqRef.current + 1;
       loadHoldSeqRef.current = seq;
       revokeHoldBlob();
@@ -102,26 +128,24 @@ export function ProjectorOutputPage() {
       setOutputHint(null);
 
       try {
-        if (fallbackSrc && isLocalProjectMediaUrl(fallbackSrc)) {
-          setHoldSrc(fallbackSrc);
-          return;
-        }
-        if (fallbackSrc) {
-          setHoldSrc(fallbackSrc);
-          return;
-        }
-        if (storageKey) {
-          const blobUrl = await fetchProjectorImageBlobUrl(storageKey);
-          if (loadHoldSeqRef.current !== seq) return;
-          if (blobUrl) {
-            holdBlobRef.current = blobUrl;
-            setHoldSrc(blobUrl);
-            return;
+        const resolved = await resolveProjectorOutputMediaSrc({
+          kind: "image",
+          storageKey: pending.storageKey,
+          src: pending.fallbackSrc,
+          fileName: pending.fileName,
+          projectSlug: pending.projectSlug,
+        });
+        if (loadHoldSeqRef.current !== seq) return;
+        if (resolved) {
+          if (resolved.from === "storageKey") {
+            holdBlobRef.current = resolved.src;
           }
+          setHoldSrc(resolved.src);
+          return;
         }
         reportOutputError(
           "hold",
-          "файл заставки не найден в хранилище — перезагрузите заставку в панели проектора",
+          "файл заставки не найден — перезагрузите заставку в панели проектора",
         );
         setOutputHint("Заставка не найдена — нажмите «Выбрать папку…» в Суфлере");
       } finally {
@@ -134,7 +158,7 @@ export function ProjectorOutputPage() {
   );
 
   const loadVideoSource = useCallback(
-    async (storageKey: string | null, fallbackSrc: string | null) => {
+    async (input: PendingHold) => {
       const seq = loadVideoSeqRef.current + 1;
       loadVideoSeqRef.current = seq;
       revokeVideoBlob();
@@ -143,26 +167,24 @@ export function ProjectorOutputPage() {
       setOutputHint(null);
 
       try {
-        if (fallbackSrc && isLocalProjectMediaUrl(fallbackSrc)) {
-          setVideoSrc(fallbackSrc);
-          return;
-        }
-        if (fallbackSrc) {
-          setVideoSrc(fallbackSrc);
-          return;
-        }
-        if (storageKey) {
-          const blobUrl = await fetchProjectorVideoBlobUrl(storageKey);
-          if (loadVideoSeqRef.current !== seq) return;
-          if (blobUrl) {
-            videoBlobRef.current = blobUrl;
-            setVideoSrc(blobUrl);
-            return;
+        const resolved = await resolveProjectorOutputMediaSrc({
+          kind: "video",
+          storageKey: input.storageKey,
+          src: input.fallbackSrc,
+          fileName: input.fileName,
+          projectSlug: input.projectSlug,
+        });
+        if (loadVideoSeqRef.current !== seq) return;
+        if (resolved) {
+          if (resolved.from === "storageKey") {
+            videoBlobRef.current = resolved.src;
           }
+          setVideoSrc(resolved.src);
+          return;
         }
         reportOutputError(
           "video",
-          "файл видео не найден в хранилище — перезагрузите видео в панели проектора",
+          "файл видео не найден — перезагрузите видео в панели проектора",
         );
         setOutputHint("Видео не найдено — нажмите «Выбрать папку…» в Суфлере");
       } finally {
@@ -179,6 +201,34 @@ export function ProjectorOutputPage() {
     video.volume = volume;
     video.muted = videoMutedRef.current || volume === 0;
   }, []);
+
+  const runWithFade = useCallback(
+    async (fadeMs: number | undefined, apply: () => void | Promise<void>) => {
+      const bucket = toFadeBucketMs(fadeMs ?? 0);
+      const token = fadeTokenRef.current + 1;
+      fadeTokenRef.current = token;
+
+      if (bucket <= 0) {
+        setFadeBucketMs(0);
+        setMediaHidden(false);
+        await apply();
+        return;
+      }
+
+      const half = Math.max(50, Math.round(bucket / 2));
+      setFadeBucketMs(half);
+      setMediaHidden(true);
+      await new Promise((resolve) => window.setTimeout(resolve, half));
+      if (fadeTokenRef.current !== token) return;
+      await apply();
+      if (fadeTokenRef.current !== token) return;
+      window.requestAnimationFrame(() => {
+        if (fadeTokenRef.current !== token) return;
+        setMediaHidden(false);
+      });
+    },
+    [],
+  );
 
   const applyMessage = useCallback(
     (msg: ProjectorMessage) => {
@@ -237,52 +287,68 @@ export function ProjectorOutputPage() {
         return;
       }
       if (msg.type === "black") {
-        activeVideoIdRef.current = null;
-        activeHoldIdRef.current = null;
-        setMode("black");
-        setVideoSrc(null);
-        setHoldSrc(null);
-        setHoldLoading(false);
-        setVideoLoading(false);
-        revokeHoldBlob();
-        revokeVideoBlob();
-        reportPlayback(null, null, false, "black");
+        void runWithFade(msg.fadeMs, () => {
+          activeVideoIdRef.current = null;
+          activeHoldIdRef.current = null;
+          setMode("black");
+          setVideoSrc(null);
+          setHoldSrc(null);
+          setHoldLoading(false);
+          setVideoLoading(false);
+          revokeHoldBlob();
+          revokeVideoBlob();
+          reportPlayback(null, null, false, "black");
+        });
         return;
       }
       if (msg.type === "show-hold") {
-        activeVideoIdRef.current = null;
-        activeHoldIdRef.current = msg.holdId;
-        pendingHoldRef.current = {
-          storageKey: msg.storageKey,
-          fallbackSrc: msg.src,
-        };
-        setMode("hold");
-        setVideoSrc(null);
-        revokeVideoBlob();
-        void loadHoldImage(msg.storageKey, msg.src);
-        reportPlayback(null, msg.holdId, false, "hold");
-        requestPresentationMode();
+        void runWithFade(msg.fadeMs, () => {
+          activeVideoIdRef.current = null;
+          activeHoldIdRef.current = msg.holdId;
+          const pending: PendingHold = {
+            storageKey: msg.storageKey,
+            fallbackSrc: msg.src,
+            fileName: msg.fileName ?? null,
+            projectSlug: msg.projectSlug ?? null,
+          };
+          pendingHoldRef.current = pending;
+          setMode("hold");
+          setVideoSrc(null);
+          revokeVideoBlob();
+          void loadHoldImage(pending);
+          reportPlayback(null, msg.holdId, false, "hold");
+          requestPresentationMode();
+        });
         return;
       }
       if (msg.type === "show-video") {
-        activeVideoIdRef.current = msg.videoId;
-        activeHoldIdRef.current = msg.holdId;
-        videoMutedRef.current = msg.muted ?? false;
-        videoVolumeRef.current =
-          msg.volume != null && Number.isFinite(msg.volume)
-            ? Math.max(0, Math.min(1, msg.volume))
-            : videoMutedRef.current
-              ? 0
-              : 1;
-        pendingHoldRef.current = {
-          storageKey: msg.holdStorageKey,
-          fallbackSrc: msg.holdSrc,
-        };
-        setMode("video");
-        setHoldSrc(null);
-        revokeHoldBlob();
-        void loadVideoSource(msg.storageKey, msg.src || null);
-        requestPresentationMode();
+        void runWithFade(msg.fadeMs, () => {
+          activeVideoIdRef.current = msg.videoId;
+          activeHoldIdRef.current = msg.holdId;
+          videoMutedRef.current = msg.muted ?? false;
+          videoVolumeRef.current =
+            msg.volume != null && Number.isFinite(msg.volume)
+              ? Math.max(0, Math.min(1, msg.volume))
+              : videoMutedRef.current
+                ? 0
+                : 1;
+          pendingHoldRef.current = {
+            storageKey: msg.holdStorageKey,
+            fallbackSrc: msg.holdSrc,
+            fileName: msg.holdFileName ?? null,
+            projectSlug: msg.projectSlug ?? null,
+          };
+          setMode("video");
+          setHoldSrc(null);
+          revokeHoldBlob();
+          void loadVideoSource({
+            storageKey: msg.storageKey,
+            fallbackSrc: msg.src || null,
+            fileName: msg.fileName ?? null,
+            projectSlug: msg.projectSlug ?? null,
+          });
+          requestPresentationMode();
+        });
       }
     },
     [
@@ -292,6 +358,7 @@ export function ProjectorOutputPage() {
       requestPresentationMode,
       revokeHoldBlob,
       revokeVideoBlob,
+      runWithFade,
     ],
   );
 
@@ -360,7 +427,7 @@ export function ProjectorOutputPage() {
     setVideoSrc(null);
     revokeVideoBlob();
     const pending = pendingHoldRef.current;
-    void loadHoldImage(pending.storageKey, pending.fallbackSrc);
+    void loadHoldImage(pending);
     reportPlayback(null, activeHoldIdRef.current, false, "hold");
   }, [loadHoldImage, revokeVideoBlob]);
 
@@ -392,33 +459,37 @@ export function ProjectorOutputPage() {
     <div
       ref={rootRef}
       className="projector-output"
+      data-media-hidden={mediaHidden ? "true" : undefined}
+      data-fade-ms={fadeBucketMs > 0 ? String(fadeBucketMs) : undefined}
       onClick={handleRootClick}
       role="presentation"
     >
-      {mode === "hold" && holdSrc ? (
-        <img
-          className="projector-output__media"
-          src={holdSrc}
-          alt=""
-          draggable={false}
-          onError={handleHoldError}
-        />
-      ) : null}
+      <div className="projector-output__stage">
+        {mode === "hold" && holdSrc ? (
+          <img
+            className="projector-output__media"
+            src={holdSrc}
+            alt=""
+            draggable={false}
+            onError={handleHoldError}
+          />
+        ) : null}
 
-      {mode === "video" && videoSrc ? (
-        <video
-          ref={videoRef}
-          className="projector-output__media"
-          src={videoSrc}
-          autoPlay
-          playsInline
-          onPlay={handleVideoPlay}
-          onPause={handleVideoPause}
-          onTimeUpdate={handleVideoTimeUpdate}
-          onEnded={handleVideoEnded}
-          onError={handleVideoError}
-        />
-      ) : null}
+        {mode === "video" && videoSrc ? (
+          <video
+            ref={videoRef}
+            className="projector-output__media"
+            src={videoSrc}
+            autoPlay
+            playsInline
+            onPlay={handleVideoPlay}
+            onPause={handleVideoPause}
+            onTimeUpdate={handleVideoTimeUpdate}
+            onEnded={handleVideoEnded}
+            onError={handleVideoError}
+          />
+        ) : null}
+      </div>
 
       {!holdLoading && !videoLoading && outputHint ? (
         <p className="projector-output__error">{outputHint}</p>

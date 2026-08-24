@@ -98,6 +98,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowScenesSidebar,
+    usePlaybookDocksLayout,
     shouldSwapPanels,
     showPlaylistSidebar,
     showTheaterControls,
@@ -261,6 +262,9 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     showScenesSidebar &&
     ((isMobile && mobileScenesOpen) || (!isMobile && !isScenesCollapsed));
 
+  const usePlaybookDocksCluster =
+    !isMobile && !compactMainChrome && usePlaybookDocksLayout;
+
   const showModeSwitch =
     activeView === "script" ||
     activeView === "light-plot" ||
@@ -307,10 +311,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     <div
       className={cn(
         "app-layout",
-        !isMobile &&
-          activeView === "script" &&
-          !compactMainChrome &&
-          "app-layout--docks-cluster",
+        usePlaybookDocksCluster && "app-layout--docks-cluster",
       )}
     >
       {isTheaterView ? <>{playlistNode}</> : playlistNode}

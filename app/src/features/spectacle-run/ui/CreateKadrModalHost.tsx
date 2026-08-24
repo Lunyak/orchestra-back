@@ -4,7 +4,6 @@ import { usePlaybook } from "../../playbook";
 import { mergeTaskAssigneeMembers } from "../../project-tasks/model/merge-task-assignee-members";
 import { useMyTroupeQuery } from "../../troupe/api/troupe-api";
 import { memberLabel } from "../../troupe/model/troupe-page-utils";
-import { readSceneTheaterModels } from "../../theater/model/theater-scene-models";
 import { useAppSelector } from "../../../shared/store/hooks";
 import type { ScriptRequisite } from "../../../shared/types/script";
 import {
@@ -42,11 +41,6 @@ export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[]
       };
     });
   }, [projectMembersData, troupeData]);
-
-  const theaterModels = useMemo(
-    () => (scene ? readSceneTheaterModels(scene) : []),
-    [scene],
-  );
 
   const editDraft = useMemo((): CreateKadrDraft | null => {
     if (run.kadrModalMode !== "edit" || !scene || !currentItem) return null;
@@ -94,7 +88,6 @@ export function CreateKadrModalHost({ lightChannels }: { lightChannels: string[]
       holdImages={run.holdImages}
       projector={playbookData?.projector ?? null}
       sceneRequisites={scene.requisites ?? []}
-      theaterModels={theaterModels}
       assigneeOptions={assigneeOptions}
       accessToken={accessToken}
       onSceneRequisitesChange={handleSceneRequisitesChange}

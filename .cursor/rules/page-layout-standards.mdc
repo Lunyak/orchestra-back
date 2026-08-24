@@ -1,7 +1,7 @@
 ---
-description: Единый стандарт layout страниц app — shell, ширина, токены sessions (образец Tasks / Organizations)
+description: Единый стандарт layout страниц app — shell, ширина, высота пластины, токены sessions (образец Tasks / Organizations)
 globs: app/src/**/*.{tsx,css}
-alwaysApply: false
+alwaysApply: true
 ---
 
 # Page layout standard (образец: Tasks / Organizations)
@@ -33,6 +33,29 @@ alwaysApply: false
 - `box-sizing: border-box`
 - фон/текст из **sessions**-токенов (не произвольный light theme)
 - **обязательно** `background: var(--sessions-bg)` — контентная пластина визуально отделена от фона приложения
+- **обязательно** `min-height: 100%` (+ при необходимости `flex: 1 1 auto` / `align-self: stretch` внутри `app-content` / `app-shell-body`) — пластина тянется на всю высоту viewport, а не обрывается по контенту
+
+```css
+.example-page {
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  padding: 18px 18px 28px;
+  box-sizing: border-box;
+  background: var(--sessions-bg);
+  color: var(--sessions-text);
+}
+
+/* если корень — прямой ребёнок app-content / app-shell-body */
+.app-content:has(> .example-page) > .example-page,
+.app-shell-body > .example-page {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 100%;
+}
+```
 
 Если страница под `AdminSectionChrome` / `RehearsalPlanSectionChrome` — корень должен попадать в селектор в [`admin/style.css`](app/src/shared/components/admin/style.css) (`*:has(> .admin-chrome-layout)`), либо явно повторять те же max-width / margin / padding.
 
@@ -44,6 +67,7 @@ alwaysApply: false
 - Не оставляй страницу с прозрачным фоном «в цвет layout» — пластина должна отличаться.
 - Внутренние панели/карточки — на ступень светлее: `var(--sessions-panel)` / `var(--sessions-bg-deep)`, не тем же цветом, что корень страницы.
 - Не подменяй `--sessions-bg` на `--color-bg-primary` у корня страницы.
+- **Высота пластины**: корень всегда `min-height: 100%`. Запрещено оставлять только `height: auto` без `min-height: 100%` — иначе под контентом торчит app chrome (дыра «не на весь экран»). Контент короче viewport — пластина всё равно заполняет высоту; контент длиннее — страница скроллится как обычно.
 
 Иерархия поверхностей:
 
@@ -83,6 +107,7 @@ alwaysApply: false
 
 - Полноширинный layout без `max-width: var(--width-content-page)` и без центрирования shell
 - Прозрачный / совпадающий с app chrome фон у корня `*-page` (нет контраста пластины)
+- Корень `*-page` без `min-height: 100%` (пластина обрывается по контенту, снизу виден app chrome)
 - Свой палитровый набор вместо `--sessions-*` / design tokens
 - `border-radius` по умолчанию
 - Inline styles
@@ -92,7 +117,8 @@ alwaysApply: false
 
 1. Корень: centered shell `max-width: var(--width-content-page)`
 2. Корень: `background: var(--sessions-bg)` — пластина отличается от app chrome
-3. Токены `--sessions-*` + `--color-active-ascent` для active/links
-4. Chrome: `AdminSectionChrome` / `RehearsalPlanSectionChrome` где уместно
-5. CSS в отдельном файле, className через `cn` / `classnames`
-6. Empty/notice — по образцу `tasks-page__panel` / `tasks-page__hint`, не уникальный hero-card
+3. Корень: `min-height: 100%` (+ stretch/flex в shell, если нужно) — на всю высоту viewport
+4. Токены `--sessions-*` + `--color-active-ascent` для active/links
+5. Chrome: `AdminSectionChrome` / `RehearsalPlanSectionChrome` где уместно
+6. CSS в отдельном файле, className через `cn` / `classnames`
+7. Empty/notice — по образцу `tasks-page__panel` / `tasks-page__hint`, не уникальный hero-card

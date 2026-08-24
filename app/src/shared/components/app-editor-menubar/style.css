@@ -24,6 +24,10 @@
   --app-shell-rail-max: var(--width-content-page);
 }
 
+.app-shell-with-menubar:has(.app-layout--docks-cluster[data-prog-run-wide="true"]) {
+  --app-shell-rail-max: 100%;
+}
+
 .app-shell-with-menubar .app-shell-body {
   position: relative;
   flex: 1 1 auto;
@@ -118,6 +122,12 @@
 
 .app-editor-menubar__home--soon:hover {
   color: var(--sessions-text, #888);
+}
+
+.app-editor-menubar__home--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .app-editor-menubar__home--soon.app-editor-menubar__home--active,
@@ -289,6 +299,26 @@
   height: 100%;
   position: relative;
   z-index: 1;
+}
+
+.app-editor-menubar__player {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  min-width: 0;
+  height: 100%;
+  margin-left: auto;
+}
+
+.app-editor-menubar__player:not(:has(.app-editor-menubar__mini-player)) {
+  display: none;
+}
+
+.app-editor-menubar__end-tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  height: 100%;
 }
 
 .app-editor-menubar__mini-player {
@@ -795,12 +825,51 @@
   font-weight: 600;
 }
 
-@media (max-width: 720px) {
-  .app-editor-menubar__mini-player {
-    max-width: min(220px, 52vw);
-    padding: 0 6px;
+@media (max-width: 1000px) {
+  .app-editor-menubar__track {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
   }
 
+  .app-editor-menubar__start {
+    flex: 0 0 auto;
+  }
+
+  .app-editor-menubar__center {
+    display: none;
+  }
+
+  .app-editor-menubar__project-select {
+    display: none;
+  }
+
+  .app-editor-menubar__player {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .app-editor-menubar__end {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .app-editor-menubar__mini-player {
+    max-width: none;
+    width: 100%;
+    padding: 0 6px 0 4px;
+    border-right: 0;
+  }
+
+  .app-editor-menubar__mini-player-meta {
+    min-width: 64px;
+    width: min(120px, 24vw);
+  }
+}
+
+@media (max-width: 720px) {
   .app-editor-menubar__mini-player-meta {
     min-width: 72px;
     width: min(140px, 34vw);
@@ -812,6 +881,10 @@
   }
 
   .app-editor-menubar__start {
+    flex: 0 0 auto;
+  }
+
+  .app-editor-menubar--mobile-back-only .app-editor-menubar__start {
     flex: 0 0 auto;
   }
 
@@ -929,11 +1002,59 @@
     box-shadow: none;
   }
 
-  .app-editor-menubar__center {
+  .app-editor-menubar--mobile-back-only .app-editor-menubar__start .theater-editor-menubar__menus {
+    position: static;
+    display: flex;
+    width: auto;
+    height: 100%;
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .app-editor-menubar--mobile-back-only .app-editor-menubar__start .app-editor-menubar__directions {
+    flex-direction: row;
+    height: 100%;
+  }
+
+  .app-editor-menubar--mobile-back-only .app-editor-menubar__start .app-editor-menubar__home {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-width: 40px;
+    padding: 0;
+    line-height: 36px;
+    border-bottom: 0;
+    background: transparent;
+    font-size: 18px;
+  }
+
+  .app-editor-menubar__actions {
     display: none;
   }
 
-  .app-editor-menubar__project-select {
-    display: none;
+  .app-editor-user-menu__toolbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+  }
+
+  .app-editor-user-menu__toolbar-actions .app-editor-menubar__panels-nav,
+  .app-editor-user-menu__toolbar-actions .app-editor-menubar__mode-nav {
+    height: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .app-editor-user-menu__toolbar-actions .app-editor-menubar__panel-btn {
+    width: 36px;
+    height: 36px;
   }
 }

@@ -31,6 +31,7 @@ const icons = {
 };
 
 export type AppEditorScriptPanelsNavProps = HeaderScriptStateProps & {
+  showScenesToggle?: boolean;
   showSpectacleRunTextToggle?: boolean;
   spectacleRunTextHidden?: boolean;
   onToggleSpectacleRunText?: () => void;
@@ -41,6 +42,7 @@ export function AppEditorScriptPanelsNav({
   onTogglePlaylist,
   isScenesCollapsed,
   onToggleScenesCollapsed,
+  showScenesToggle = true,
   showSpectacleRunTextToggle = false,
   spectacleRunTextHidden = false,
   onToggleSpectacleRunText,
@@ -51,21 +53,23 @@ export function AppEditorScriptPanelsNav({
 
   return (
     <nav className="app-editor-menubar__panels-nav" aria-label={navLabel}>
-      <button
-        type="button"
-        className={[
-          "app-editor-menubar__panel-btn",
-          scenesActive ? "app-editor-menubar__panel-btn--active" : "app-editor-menubar__panel-btn--muted",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        onClick={onToggleScenesCollapsed}
-        title={isScenesCollapsed ? "Показать сцены" : "Скрыть сцены"}
-        aria-label={isScenesCollapsed ? "Показать сцены" : "Скрыть сцены"}
-        aria-pressed={scenesActive}
-      >
-        <MenubarPanelIcon active={scenesActive}>{icons.scenes}</MenubarPanelIcon>
-      </button>
+      {showScenesToggle ? (
+        <button
+          type="button"
+          className={[
+            "app-editor-menubar__panel-btn",
+            scenesActive ? "app-editor-menubar__panel-btn--active" : "app-editor-menubar__panel-btn--muted",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onClick={onToggleScenesCollapsed}
+          title={isScenesCollapsed ? "Показать сцены" : "Скрыть сцены"}
+          aria-label={isScenesCollapsed ? "Показать сцены" : "Скрыть сцены"}
+          aria-pressed={scenesActive}
+        >
+          <MenubarPanelIcon active={scenesActive}>{icons.scenes}</MenubarPanelIcon>
+        </button>
+      ) : null}
       <button
         type="button"
         className={[

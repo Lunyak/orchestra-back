@@ -1,4 +1,5 @@
 import cn from "classnames";
+import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";
 import { useProject } from "../../project/model/project-context";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
@@ -15,6 +16,7 @@ export function SpectacleRunContent() {
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
   );
   const run = useSpectacleRunContext();
+  const compactAssembly = useCompactKadrStrip();
   const { tape, tapeIndex, currentItem, currentScene } = run;
 
   if (tape.length === 0) {
@@ -26,7 +28,13 @@ export function SpectacleRunContent() {
   }
 
   return (
-    <div className={cn("spectacle-run", run.textHidden && "spectacle-run--text-hidden")}>
+    <div
+      className={cn(
+        "spectacle-run",
+        compactAssembly && "spectacle-run--compact-assembly",
+        run.textHidden && "spectacle-run--text-hidden",
+      )}
+    >
       <div className="spectacle-run__split">
         <aside className="spectacle-run__text-pane">
           <SpectacleRunSceneText scene={currentScene} />

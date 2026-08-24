@@ -14,8 +14,8 @@ export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   string | readonly string[] | undefined
 > = {
   theater: "main-content-theater",
-  "light-plot": undefined,
-  sufer: undefined,
+  "light-plot": "main-content-light-plot",
+  sufer: "main-content-sufer",
   media: "main-content-project-media",
   board: "main-content-kanban",
   script: "show-script",

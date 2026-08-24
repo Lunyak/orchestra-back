@@ -1,0 +1,26 @@
+.theater-viewport-kadr-strip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  height: 132px;
+  pointer-events: none;
+}
+
+.theater-viewport-kadr-strip .spectacle-run-kadr-strip {
+  pointer-events: auto;
+  height: 100%;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.theater-scene-body:has(.theater-viewport-kadr-strip) .theater-light-console {
+  bottom: 146px;
+}
+
+.theater-scene-body:has(.theater-viewport-kadr-strip) .theater-canvas-history-actions {
+  bottom: 146px;
+}

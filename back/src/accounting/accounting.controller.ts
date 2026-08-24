@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AccountingEnabledGuard } from './accounting-enabled.guard';
 import { AccountingService } from './accounting.service';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { CreateContributionDto } from './dto/create-contribution.dto';
@@ -18,7 +19,7 @@ import { SetCollectionParticipantsDto } from './dto/set-collection-participants.
 import { SetCollectionTariffsDto } from './dto/set-collection-tariffs.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AccountingEnabledGuard)
 @Controller('accounting')
 export class AccountingController {
   constructor(private readonly accounting: AccountingService) {}

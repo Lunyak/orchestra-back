@@ -27,6 +27,7 @@ export type KadrStripProjectorPreview = {
   videoId: number | null;
   holdId: number | null;
   title: string;
+  videoMuted?: boolean;
 };
 
 export type KadrStripTechRow = {
@@ -161,7 +162,13 @@ function buildProjectorPreview(
     const title =
       media.videos?.find((video) => video.id === cue.videoId)?.title?.trim() ||
       `Видео ${cue.videoId}`;
-    return { mode: "video", videoId: cue.videoId, holdId: null, title };
+    return {
+      mode: "video",
+      videoId: cue.videoId,
+      holdId: null,
+      title,
+      videoMuted: cue.muted === true,
+    };
   }
 
   if (cue.mode === "hold") {
@@ -249,8 +256,7 @@ function formatVideoSummary(
   if (cue.mode === "video") {
     const title = media.videos?.find((v) => v.id === cue.videoId)?.title?.trim();
     const baseValue = title ? title : `Видео ${cue.videoId}`;
-    const value = cue.muted ? `${baseValue} · без звука` : baseValue;
-    return { value, projectorPreview };
+    return { value: baseValue, projectorPreview };
   }
 
   if (cue.holdId != null && cue.holdId > 0) {
@@ -334,7 +340,7 @@ export function buildKadrStripTechSummary(args: {
     }
 
     const sound = formatSoundSummary(kadr, media);
-    if (sound) rows.push({ label: "Звук", value: sound });
+    if (sound) rows.push({ label: "Трек", value: sound });
 
     const video = formatVideoSummary(kadr, media);
     if (video) {

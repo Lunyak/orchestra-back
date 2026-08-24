@@ -121,6 +121,7 @@ export async function savePlaybookScenesForLightPlot(
       videos: livePlaybookData?.videos ?? (current as any)?.videos ?? [],
       holdImages: livePlaybookData?.holdImages ?? (current as any)?.holdImages ?? [],
       projector: livePlaybookData?.projector ?? (current as any)?.projector,
+      lightConsoleUi: livePlaybookData?.lightConsoleUi ?? (current as any)?.lightConsoleUi,
       projectorMedia: packProjectorMedia({
         videos: livePlaybookData?.videos ?? (current as any)?.videos,
         holdImages: livePlaybookData?.holdImages ?? (current as any)?.holdImages,
@@ -141,6 +142,7 @@ export async function savePlaybookScenesForLightPlot(
             lightFaders: payloadForShadow.lightFaders,
             lightPrograms: payloadForShadow.lightPrograms,
             lightChannelRoles: payloadForShadow.lightChannelRoles,
+            lightConsoleUi: payloadForShadow.lightConsoleUi,
             videos: Array.isArray(payloadForShadow.videos) ? payloadForShadow.videos : [],
             holdImages: Array.isArray(payloadForShadow.holdImages)
               ? payloadForShadow.holdImages
@@ -236,6 +238,10 @@ export async function savePlaybookScenesForLightPlot(
         const nextLightChannelRoles = (payloadForServer as any)?.lightChannelRoles ?? null;
         const lightChannelRolesChanged =
           stableStringify(prevLightChannelRoles) !== stableStringify(nextLightChannelRoles);
+        const prevLightConsoleUi = (serverShadowForDiff?.playbookData as any)?.lightConsoleUi ?? null;
+        const nextLightConsoleUi = (payloadForServer as any)?.lightConsoleUi ?? null;
+        const lightConsoleUiChanged =
+          stableStringify(prevLightConsoleUi) !== stableStringify(nextLightConsoleUi);
         const prevProjectorMedia = packProjectorMedia({
           videos: (serverShadowForDiff?.playbookData as any)?.videos,
           holdImages: (serverShadowForDiff?.playbookData as any)?.holdImages,
@@ -256,6 +262,7 @@ export async function savePlaybookScenesForLightPlot(
           lightFadersChanged ||
           lightProgramsChanged ||
           lightChannelRolesChanged ||
+          lightConsoleUiChanged ||
           projectorMediaChanged
         ) {
           const scenePayload: any = {
@@ -282,6 +289,11 @@ export async function savePlaybookScenesForLightPlot(
           if (!serverShadowForDiff || lightChannelRolesChanged) {
             if (!(nextLightChannelRoles == null && prevLightChannelRoles != null)) {
               scenePayload.lightChannelRoles = nextLightChannelRoles;
+            }
+          }
+          if (!serverShadowForDiff || lightConsoleUiChanged) {
+            if (!(nextLightConsoleUi == null && prevLightConsoleUi != null)) {
+              scenePayload.lightConsoleUi = nextLightConsoleUi;
             }
           }
           if (!serverShadowForDiff || projectorMediaChanged) {

@@ -5,6 +5,7 @@ import { usePlaybook } from "../../playbook";
 import { SpectacleTechChromePortal } from "../../spectacle/ui/spectacle-tech-chrome-slots";
 import { useSpectacleRun } from "../model/useSpectacleRun";
 import { SpectacleRunProvider } from "../model/spectacle-run-context";
+import { SpectacleRunSchemeTabProvider } from "../model/spectacle-run-scheme-tab-context";
 import {
   SpectacleRunChromeControls,
   SpectacleRunMeta,
@@ -12,6 +13,7 @@ import {
 import { SpectacleRunContent } from "./SpectacleRunContent";
 import { SpectacleRunProgRunContent } from "./SpectacleRunProgRunContent";
 import { CreateKadrModalHost } from "./CreateKadrModalHost";
+import { ProgRunWideLayoutBridge } from "./ProgRunWideLayoutBridge";
 import { LightConsoleSettingsModal } from "../../../shared/components/light-console/LightConsoleSettingsModal";
 import "../../../shared/components/light-console/light-console.css";
 import "./style.css";
@@ -35,7 +37,9 @@ export function SpectacleRunPageSection() {
 
   return (
     <SpectacleRunProvider value={run}>
-      <div className="spectacle-run-page-section">
+      <SpectacleRunSchemeTabProvider>
+        <ProgRunWideLayoutBridge />
+        <div className="spectacle-run-page-section">
         <SpectacleTechChromePortal
           left={<SpectacleRunChromeControls mode={chromeMode} />}
           center={<SpectacleRunMeta />}
@@ -52,7 +56,8 @@ export function SpectacleRunPageSection() {
             onApply={run.consoleLayoutSettings.applyLayout}
           />
         ) : null}
-      </div>
+        </div>
+      </SpectacleRunSchemeTabProvider>
     </SpectacleRunProvider>
   );
 }

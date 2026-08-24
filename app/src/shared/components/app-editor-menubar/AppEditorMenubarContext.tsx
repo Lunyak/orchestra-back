@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   appEditorCenterSlot,
+  appEditorEndToolsSlot,
   appEditorToolbarActionsSlot,
   appEditorViewMenuSlot,
 } from "./app-editor-menubar-slots";
@@ -117,4 +118,32 @@ export function useAppEditorMenubarCenter() {
     appEditorCenterSlot.getRevision,
   );
   return appEditorCenterSlot.getContent();
+}
+
+export function useAppEditorMenubarEndToolsRender(
+  slotId: string,
+  priority: number,
+  render: () => ReactNode | null,
+) {
+  useAppEditorMenubarProvider();
+  const renderRef = useRef(render);
+  renderRef.current = render;
+
+  useLayoutEffect(() => {
+    appEditorEndToolsSlot.register(slotId, priority, () => renderRef.current());
+    return () => appEditorEndToolsSlot.unregister(slotId);
+  }, [slotId, priority]);
+
+  useLayoutEffect(() => {
+    appEditorEndToolsSlot.bump();
+  });
+}
+
+export function useAppEditorMenubarEndTools() {
+  useSyncExternalStore(
+    appEditorEndToolsSlot.subscribe,
+    appEditorEndToolsSlot.getRevision,
+    appEditorEndToolsSlot.getRevision,
+  );
+  return appEditorEndToolsSlot.getContent("merge");
 }

@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";
 import {
   defaultScriptEditorInsertDefinitions,
   mergeInsertDefinitions,
@@ -27,10 +28,13 @@ import { useShowScriptMarkdownAnnotations } from "../hooks/useShowScriptMarkdown
 import { useShowScriptMarkdownInsert } from "../hooks/useShowScriptMarkdownInsert";
 import { useShowScriptSceneComment } from "../hooks/useShowScriptSceneComment";
 import { AppEditorScriptAnnotationsToggle, AppEditorScriptModeToggle, AppEditorScriptPlayOriginalToggle, AppEditorScriptSceneTitle } from "../../app-editor-menubar";
+import { useAppEditorMenubarEndToolsRender } from "../../app-editor-menubar/AppEditorMenubarContext";
 import {
   SpectacleTechChromePortal,
   useSpectacleTechChromeCenterTarget,
 } from "../../../../features/spectacle/ui/spectacle-tech-chrome-slots";
+import { ScriptSceneChromeMenu } from "./ScriptSceneChromeMenu";
+import type { ShowScriptMarkdownMode } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 
 const ScriptMarkdownCodemirrorLazy = lazy(() =>
   import("./ScriptMarkdownCodemirror").then((m) => ({ default: m.ScriptMarkdownCodemirror })),
@@ -101,6 +105,7 @@ export function ShowScriptMarkdownSection({
   const lightChannels = ui.lightChannels;
 
   const { isEditing, toggleEditing } = useScriptUI();
+  const compactStrip = useCompactKadrStrip();
   const directionSwitchCenter = useSpectacleTechChromeCenterTarget();
 
   const { currentScene, activeMarkdownField, activeMarkdown, activeField } = useAppSelector(
@@ -210,6 +215,29 @@ export function ShowScriptMarkdownSection({
     }
   }, [annotationsMode, dispatch, isEditing, markdownMode, projectSlug, sceneName]);
 
+  const handleSetMarkdownMode = useCallback(
+    (mode: ShowScriptMarkdownMode) => {
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            `showScript:markdownMode:${projectSlug}:${sceneName}`,
+            mode,
+          );
+        }
+      } catch {
+        // ignore
+      }
+      dispatch(
+        showScriptMarkdownActions.setMarkdownMode({
+          projectSlug,
+          sceneName,
+          mode,
+        }),
+      );
+    },
+    [dispatch, projectSlug, sceneName],
+  );
+
   const handleSceneTitleChange = useCallback(
     (title: string) => {
       if (!currentScene) return;
@@ -305,16 +333,47 @@ export function ShowScriptMarkdownSection({
       </div>
     ) : null;
 
+  const sceneChromeMenu =
+    compactStrip && titleInDirectionSwitch && currentScene ? (
+      <ScriptSceneChromeMenu
+        variant="menubar"
+        markdownMode={markdownMode}
+        onSetMarkdownMode={handleSetMarkdownMode}
+        isModeEditing={isEditing}
+        onToggleModeEditing={toggleEditing}
+        showEditToggle={markdownMode !== "comments"}
+        annotationsMode={annotationsMode}
+        onToggleAnnotations={toggleAnnotationsMode}
+        annotationsDisabled={isEditing}
+        showAnnotations={markdownMode !== "comments"}
+        playOriginalMode={ui.playOriginalMode}
+        onTogglePlayOriginal={togglePlayOriginalMode}
+        showPlayOriginal={markdownMode === "play"}
+      />
+    ) : null;
+
+  useAppEditorMenubarEndToolsRender(
+    "script-scene-chrome-menu",
+    10,
+    () => sceneChromeMenu,
+  );
+
+  const showSceneTitleInChrome =
+    Boolean(currentScene) &&
+    (markdownMode !== "comments" || (compactStrip && titleInDirectionSwitch));
+
   const sceneTitleNode =
-    currentScene && markdownMode !== "comments" ? (
+    showSceneTitleInChrome && currentScene ? (
       <AppEditorScriptSceneTitle
         title={currentScene.title ?? ""}
         titleEditable={isEditing}
         onTitleChange={handleSceneTitleChange}
         isModeEditing={isEditing}
         onToggleModeEditing={toggleEditing}
-        showModeToggle={!titleInDirectionSwitch}
-        belowModeToggle={belowModeStack}
+        showModeToggle={!titleInDirectionSwitch && markdownMode !== "comments"}
+        belowModeToggle={
+          !titleInDirectionSwitch && markdownMode !== "comments" ? belowModeStack : null
+        }
       />
     ) : null;
 
@@ -333,6 +392,7 @@ export function ShowScriptMarkdownSection({
     ) : null;
 
   const scriptChromeDock =
+    !compactStrip &&
     titleInDirectionSwitch &&
     (editModeToggleDock || annotationsToggle || playOriginalToggle) ? (
       <div className="script-scene-chrome-dock">

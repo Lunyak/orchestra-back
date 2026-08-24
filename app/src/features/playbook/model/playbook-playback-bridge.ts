@@ -11,6 +11,8 @@ export type PlaylistPlaybackSnapshot = {
 export type PlaylistPlayOptions = {
   /** Целевая громкость 0…1 перед стартом трека. */
   volume?: number;
+  /** Длительность fade in/out для этого запуска, мс. */
+  fadeMs?: number;
   /**
    * Если тот же трек уже играет — не останавливать и не перезапускать с начала.
    * По умолчанию true для invokePlaylistPlay (прогон, markdown).

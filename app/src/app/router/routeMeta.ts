@@ -34,7 +34,8 @@ export function isSpectacleCreativePath(pathname: string) {
 }
 
 function isScriptStateRoute(pathname: string) {
-  return isProjectPath(pathname);
+  if (!isProjectPath(pathname)) return false;
+  return getProjectSectionFromPath(pathname) !== "overview";
 }
 
 /** Главная страница сценария (markdown). */

@@ -11,7 +11,9 @@ import {
 } from "../../playbook/model/playbook-slice";
 import { useSpectacleRunContext } from "../../spectacle-run/model/spectacle-run-context";
 import type { ProjectorMediaContext } from "../model/projector-media";
+import { normalizeProjectorTransitionMs } from "../model/projector-video-preview";
 import { ProjectorMediaPreview } from "./ProjectorMediaPreview";
+import { VideoPreviewFrameModal } from "./VideoPreviewFrameModal";
 import { DownloadProjectorMediaButton } from "../../../shared/components/offline/DownloadProjectorMediaButton";
 import "@shared/components/media-projector/media-projector.css";
 
@@ -99,9 +101,11 @@ type ProjectorTapeCardProps = {
   isPaused?: boolean;
   isMuted?: boolean;
   projectorCtx: ProjectorMediaContext;
+  previewTimeSec?: number | null;
   titleProps: Omit<ProjectorMediaTitleProps, "label" | "fallback" | "target">;
   onPrimary: () => void;
   onToggleMute?: () => void;
+  onPickPreviewFrame?: () => void;
   onDelete: () => void;
   primaryLabel: string;
   activePrimaryLabel: string;
@@ -116,9 +120,11 @@ function ProjectorTapeCard({
   isPaused = false,
   isMuted = false,
   projectorCtx,
+  previewTimeSec = null,
   titleProps,
   onPrimary,
   onToggleMute,
+  onPickPreviewFrame,
   onDelete,
   primaryLabel,
   activePrimaryLabel,
@@ -141,6 +147,7 @@ function ProjectorTapeCard({
           videoId={kind === "video" ? id : null}
           holdId={kind === "hold" ? id : null}
           title={title}
+          previewTimeSec={previewTimeSec}
           className="media-projector__card-media"
         />
       </div>
@@ -163,6 +170,16 @@ function ProjectorTapeCard({
                 title={isMuted ? "Включить звук" : "Выключить звук"}
               >
                 {isMuted ? "Без звука" : "Со звуком"}
+              </button>
+            ) : null}
+            {kind === "video" && onPickPreviewFrame ? (
+              <button
+                type="button"
+                className="media-projector__btn"
+                onClick={onPickPreviewFrame}
+                title="Выбрать кадр для превью в ленте"
+              >
+                Кадр
               </button>
             ) : null}
             <button
@@ -215,6 +232,9 @@ export function SpectacleRunProjectorPanel({
 
   const [editingTarget, setEditingTarget] = useState<RenameTarget | null>(null);
   const [editingName, setEditingName] = useState("");
+  const [previewFrameVideoId, setPreviewFrameVideoId] = useState<number | null>(
+    null,
+  );
   const renameInputRef = useRef<HTMLInputElement | null>(null);
 
   const videos = run.videos;
@@ -229,6 +249,13 @@ export function SpectacleRunProjectorPanel({
     : activeVideoId != null
       ? Math.round(run.resolveProjectorVideoVolume(activeVideoId) * 100)
       : 100;
+  const transitionMs = normalizeProjectorTransitionMs(
+    playbookData?.projector?.transitionMs,
+  );
+  const previewFrameVideo =
+    previewFrameVideoId != null
+      ? videos.find((video) => Number(video.id) === previewFrameVideoId) ?? null
+      : null;
 
   useEffect(() => {
     if (!editingTarget) return;
@@ -346,6 +373,37 @@ export function SpectacleRunProjectorPanel({
   const handleVolume = (raw: string) => {
     if (activeVideoId == null) return;
     run.setProjectorVideoVolumeLevel(activeVideoId, Number(raw) / 100);
+  };
+
+  const handleTransitionMs = (raw: string, persist = false) => {
+    const nextMs = normalizeProjectorTransitionMs(Number(raw));
+    dispatch(
+      playbookActions.setProjectorSettings({
+        v: 1,
+        ...(playbookData?.projector ?? {}),
+        transitionMs: nextMs,
+      }),
+    );
+    if (!persist) return;
+    void persistProjectorMedia();
+    run.setLiveStatus(
+      nextMs > 0
+        ? `Переход проектора: ${nextMs} мс`
+        : "Переход проектора: жёсткий cut",
+    );
+  };
+
+  const handleSavePreviewFrame = async (previewTimeSec: number) => {
+    if (previewFrameVideoId == null) return;
+    dispatch(
+      playbookActions.updatePlaybookVideo({
+        id: previewFrameVideoId,
+        changes: { previewTimeSec },
+      }),
+    );
+    await persistProjectorMedia();
+    run.setLiveStatus(`Кадр превью: ${formatPlaybackTime(previewTimeSec)}`);
+    setPreviewFrameVideoId(null);
   };
 
   const videoEmpty = videos.length === 0;
@@ -486,9 +544,11 @@ export function SpectacleRunProjectorPanel({
                     isPaused={isPausedSame}
                     isMuted={isMuted}
                     projectorCtx={projectorCtx}
+                    previewTimeSec={video.previewTimeSec}
                     titleProps={titleProps}
                     onPrimary={() => run.toggleProjectorVideo(video.id)}
                     onToggleMute={() => run.toggleProjectorVideoMute(video.id)}
+                    onPickPreviewFrame={() => setPreviewFrameVideoId(video.id)}
                     onDelete={() => void handleRemoveVideo(video)}
                     primaryLabel="Пуск"
                     activePrimaryLabel="Пауза"
@@ -538,7 +598,52 @@ export function SpectacleRunProjectorPanel({
               aria-label="Громкость видео"
             />
           </label>
+          <label className="media-projector__slider-field">
+            <span className="media-projector__slider-label">
+              Переход шагов
+              <span className="media-projector__slider-value">
+                {transitionMs > 0 ? `${transitionMs} мс` : "cut"}
+              </span>
+            </span>
+            <input
+              className="media-projector__slider"
+              type="range"
+              min={0}
+              max={1500}
+              step={50}
+              value={transitionMs}
+              onChange={(e) => handleTransitionMs(e.target.value)}
+              onMouseUp={(e) =>
+                handleTransitionMs(
+                  (e.target as HTMLInputElement).value,
+                  true,
+                )
+              }
+              onTouchEnd={(e) =>
+                handleTransitionMs(
+                  (e.target as HTMLInputElement).value,
+                  true,
+                )
+              }
+              aria-label="Плавность перехода между шагами на проекторе"
+              title="0 — жёсткий cut, больше — мягче fade через чёрный"
+            />
+          </label>
         </div>
+      ) : null}
+
+      {previewFrameVideo ? (
+        <VideoPreviewFrameModal
+          isOpen
+          onClose={() => setPreviewFrameVideoId(null)}
+          ctx={projectorCtx}
+          videoId={previewFrameVideo.id}
+          title={previewFrameVideo.title?.trim() || `Видео ${previewFrameVideo.id}`}
+          initialPreviewTimeSec={previewFrameVideo.previewTimeSec}
+          onConfirm={(previewTimeSec) => {
+            void handleSavePreviewFrame(previewTimeSec);
+          }}
+        />
       ) : null}
     </section>
   );

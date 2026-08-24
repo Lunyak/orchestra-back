@@ -75,3 +75,35 @@
   gap: 12px;
   min-width: 0;
 }
+
+@media (max-width: 720px) {
+  .studio-overview {
+    padding: 12px 12px 20px;
+  }
+
+  .studio-overview__content {
+    gap: 16px;
+  }
+
+  .studio-overview__header {
+    display: none;
+  }
+
+  .studio-overview__section-title {
+    margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .studio-overview {
+    padding: 10px 8px 16px;
+  }
+
+  .studio-overview__content {
+    gap: 12px;
+  }
+
+  .studio-overview__title {
+    font-size: 16px;
+  }
+}

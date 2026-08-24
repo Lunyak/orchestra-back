@@ -13,6 +13,8 @@ export type ModalProps = {
   ariaLabelledBy?: string;
   /** Краткое имя диалога для скринридеров. */
   ariaLabel?: string;
+  /** Блокировать прокрутку страницы, пока модалка открыта. */
+  lockScroll?: boolean;
 };
 
 export function Modal({
@@ -22,6 +24,7 @@ export function Modal({
   panelClassName,
   ariaLabelledBy,
   ariaLabel,
+  lockScroll = true,
 }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -31,13 +34,17 @@ export function Modal({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const prevOverflow = lockScroll ? document.body.style.overflow : null;
+    if (lockScroll) {
+      document.body.style.overflow = "hidden";
+    }
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
+      if (lockScroll && prevOverflow !== null) {
+        document.body.style.overflow = prevOverflow;
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, lockScroll, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;

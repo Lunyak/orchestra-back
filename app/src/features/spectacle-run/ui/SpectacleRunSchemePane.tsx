@@ -1,5 +1,12 @@
 import cn from "classnames";
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type {
   PlaybookLightChannelRolesV1,
   PlaybookLightFadersDataV1,
@@ -37,15 +44,8 @@ import {
   THEATER_LIVE_BLACKOUT_EVENT,
   type TheaterLiveBlackoutRequest,
 } from "../../theater/model/theater-live-blackout";
-
-type SchemeTabId = "light" | "requisites" | "video" | "projector";
-
-const SCHEME_TABS: ReadonlyArray<{ id: SchemeTabId; label: string }> = [
-  { id: "light", label: "Свет" },
-  { id: "requisites", label: "Реквизит" },
-  { id: "video", label: "Видео" },
-  { id: "projector", label: "Проектор" },
-];
+import { useSpectacleRunSchemeTab } from "../model/spectacle-run-scheme-tab-context";
+import { SPECTACLE_RUN_SCHEME_TABS } from "../model/spectacle-run-scheme-tab";
 
 export type SpectacleRunSchemePaneProps = {
   scene: ScriptScene | null;
@@ -79,7 +79,7 @@ export function SpectacleRunSchemePane({
   channelColumns,
 }: SpectacleRunSchemePaneProps) {
   const { projectName } = useProject();
-  const [activeTab, setActiveTab] = useState<SchemeTabId>("light");
+  const { activeTab, setActiveTab } = useSpectacleRunSchemeTab();
   const [dutyLightEnabled, setDutyLightEnabled] = useState(
     () => readTheaterViewPrefs(projectName).dutyLightEnabled,
   );
@@ -91,6 +91,97 @@ export function SpectacleRunSchemePane({
   const plotEmpty = theaterSpotlights.length === 0 && lightPlot.length === 0;
   const gridCols = 12;
   const gridRows = 20;
+
+  const stageRowRef = useRef<HTMLDivElement | null>(null);
+  const consoleWidthRef = useRef<number>(320);
+
+  const CONSOLE_WIDTH_VAR = "--spectacle-run-scheme-console-width";
+  const CONSOLE_MIN_WIDTH_PX = 260;
+  const CONSOLE_SPLITTER_PX = 12;
+  const STAGE_MIN_WIDTH_PX = 480;
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.max(min, Math.min(max, value));
+
+  const applyConsoleWidth = useCallback((px: number) => {
+    const el = stageRowRef.current;
+    if (!el) return;
+    const next = Math.round(px);
+    consoleWidthRef.current = next;
+    el.style.setProperty(CONSOLE_WIDTH_VAR, `${next}px`);
+  }, []);
+
+  useEffect(() => {
+    const el = stageRowRef.current;
+    if (!el) return;
+
+    const containerWidth = el.getBoundingClientRect().width;
+    const maxByStage = Math.max(
+      CONSOLE_MIN_WIDTH_PX,
+      containerWidth - STAGE_MIN_WIDTH_PX - CONSOLE_SPLITTER_PX,
+    );
+    const desired = containerWidth * 0.38;
+    const initial = clamp(desired, CONSOLE_MIN_WIDTH_PX, maxByStage);
+    applyConsoleWidth(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      const el = stageRowRef.current;
+      if (!el) return;
+      const containerWidth = el.getBoundingClientRect().width;
+      const maxByStage = Math.max(
+        CONSOLE_MIN_WIDTH_PX,
+        containerWidth - STAGE_MIN_WIDTH_PX - CONSOLE_SPLITTER_PX,
+      );
+      applyConsoleWidth(clamp(consoleWidthRef.current, CONSOLE_MIN_WIDTH_PX, maxByStage));
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => window.removeEventListener("resize", onResize);
+  }, [applyConsoleWidth]);
+
+  const onSplitterPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const el = stageRowRef.current;
+      if (!el) return;
+
+      event.preventDefault();
+      const containerWidth = el.getBoundingClientRect().width;
+      const startX = event.clientX;
+      const startConsole = consoleWidthRef.current;
+
+      const maxByStage = Math.max(
+        CONSOLE_MIN_WIDTH_PX,
+        containerWidth - STAGE_MIN_WIDTH_PX - CONSOLE_SPLITTER_PX,
+      );
+
+      el.dataset.dragging = "true";
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const deltaX = moveEvent.clientX - startX;
+        // Moving splitter to the right => console shrinks.
+        const next = startConsole - deltaX;
+        applyConsoleWidth(clamp(next, CONSOLE_MIN_WIDTH_PX, maxByStage));
+      };
+
+      const onUp = () => {
+        delete el.dataset.dragging;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+      };
+
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("pointerup", onUp, { once: true });
+      window.addEventListener("pointercancel", onUp, { once: true });
+    },
+    [applyConsoleWidth],
+  );
 
   useEffect(() => {
     setDutyLightEnabled(readTheaterViewPrefs(projectName).dutyLightEnabled);
@@ -172,7 +263,7 @@ export function SpectacleRunSchemePane({
         role="tablist"
         aria-label="Разделы спектакля"
       >
-        {SCHEME_TABS.map((tab) => {
+        {SPECTACLE_RUN_SCHEME_TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
@@ -207,7 +298,10 @@ export function SpectacleRunSchemePane({
               </div>
             ) : null}
 
-            <div className="light-scheme-layout spectacle-run-scheme__stage-row">
+            <div
+              ref={stageRowRef}
+              className="spectacle-run-scheme__stage-row spectacle-run-scheme__stage-row--resizable"
+            >
               {liveStatus ? (
                 <span
                   className="spectacle-run-scheme__live-dot"
@@ -216,47 +310,32 @@ export function SpectacleRunSchemePane({
                   aria-label={liveStatus}
                 />
               ) : null}
-              {ENABLE_3D_THEATER ? (
-                <SpectacleRunTheaterEmbed />
-              ) : (
-                <LightSchemeStageMap
-                  fixtures={lightPlot}
-                  gridCols={gridCols}
-                  gridRows={gridRows}
-                  lookModel={lookModel}
-                  selectedLightSlot={selectedLightSlot}
-                  highlightedChannel={null}
-                  editable={false}
-                  emptyPlotHint="Нет точек на плане. Расставьте софиты в 3D-театре."
-                />
-              )}
-              <div className="spectacle-run-scheme__console-col">
-                <LightConsoleView
-                  mode="live"
-                  lightChannels={liveConsole.lightChannels}
-                  selectedLightSlot={liveConsole.selectedLightSlot}
-                  faders={liveConsole.faders}
-                  programs={liveConsole.programs}
-                  spotlights={scene?.theaterSpotlights ?? []}
-                  consoleChannel={liveConsole.selectedLightSlot}
-                  onSelectChannel={liveConsole.selectChannel}
-                  onSelectProgram={liveConsole.selectProgram}
-                  onOpenSettings={onOpenConsoleSettings}
-                  channelColumns={channelColumns}
-                  onPatchFader={liveConsole.patchFader}
-                  onSaveActiveProgram={() => {
-                    const pid = Math.max(
-                      1,
-                      Math.trunc(liveConsole.programs.activeProgramId ?? 1) || 1,
-                    );
-                    const prog = liveConsole.programs.programs.find((p) => p.id === pid);
-                    liveConsole.saveProgramSnapshot();
-                    onLiveStatus?.(
-                      `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы).`,
-                    );
-                  }}
-                  className="spectacle-run-scheme__console"
-                />
+              <div className="spectacle-run-scheme__stage-col">
+                {ENABLE_3D_THEATER ? (
+                  <SpectacleRunTheaterEmbed />
+                ) : (
+                  <LightSchemeStageMap
+                    fixtures={lightPlot}
+                    gridCols={gridCols}
+                    gridRows={gridRows}
+                    lookModel={lookModel}
+                    selectedLightSlot={selectedLightSlot}
+                    highlightedChannel={null}
+                    editable={false}
+                    emptyPlotHint="Нет точек на плане. Расставьте софиты в 3D-театре."
+                  />
+                )}
+              </div>
+
+              <div
+                className="spectacle-run-scheme__splitter"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Ширина пульта"
+                onPointerDown={onSplitterPointerDown}
+              />
+
+              <div className="spectacle-run-scheme__console-col spectacle-run-scheme__console-col--resizable">
                 <div
                   className="spectacle-run-scheme__live-actions"
                   role="group"
@@ -309,6 +388,32 @@ export function SpectacleRunSchemePane({
                     Дежурка
                   </button>
                 </div>
+                <LightConsoleView
+                  mode="live"
+                  lightChannels={liveConsole.lightChannels}
+                  selectedLightSlot={liveConsole.selectedLightSlot}
+                  faders={liveConsole.faders}
+                  programs={liveConsole.programs}
+                  spotlights={scene?.theaterSpotlights ?? []}
+                  consoleChannel={liveConsole.selectedLightSlot}
+                  onSelectChannel={liveConsole.selectChannel}
+                  onSelectProgram={liveConsole.selectProgram}
+                  onOpenSettings={onOpenConsoleSettings}
+                  channelColumns={channelColumns}
+                  onPatchFader={liveConsole.patchFader}
+                  onSaveActiveProgram={() => {
+                    const pid = Math.max(
+                      1,
+                      Math.trunc(liveConsole.programs.activeProgramId ?? 1) || 1,
+                    );
+                    const prog = liveConsole.programs.programs.find((p) => p.id === pid);
+                    liveConsole.saveProgramSnapshot();
+                    onLiveStatus?.(
+                      `П${pid}${prog?.label?.trim() ? ` «${prog.label.trim()}»` : ""} сохранена в сцену (память программы).`,
+                    );
+                  }}
+                  className="spectacle-run-scheme__console"
+                />
               </div>
             </div>
           </>

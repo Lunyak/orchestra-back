@@ -13,6 +13,7 @@ import { useProject } from "../../project/model/project-context";
 import { resolveOfflineMediaUrl } from "../../../shared/platform/media-url";
 import { useAppDispatch } from "../../../shared/store/hooks";
 import type { PlaylistTrack } from "../../../shared/types/playlist";
+import { api } from "../../../sync/api/client";
 import { probeFileSizeBytes } from "../../../sync/api/files";
 import type {
   PlaybookHoldImage,
@@ -76,6 +77,16 @@ function displayTitle(title: string, file: string): string {
   const dotIndex = base.lastIndexOf(".");
   if (dotIndex > 0) return base.slice(0, dotIndex);
   return base;
+}
+
+function downloadFileName(item: MediaFileListItem): string {
+  const fromFile = basenameFromPath(item.file);
+  if (fromFile && fromFile.includes(".")) return fromFile;
+  const fromPath = basenameFromPath(item.filePath);
+  if (fromPath && fromPath.includes(".")) return fromPath;
+  const safeTitle = item.title.trim() || "file";
+  const ext = item.extension !== "—" ? item.extension : "";
+  return ext ? `${safeTitle}.${ext}` : safeTitle;
 }
 
 function toListItem(
@@ -180,6 +191,49 @@ function resolveProbeUrl(projectSlug: string, item: MediaFileListItem): string {
   });
 }
 
+function triggerBrowserDownload(blob: Blob, fileName: string) {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+}
+
+async function downloadMediaFile(args: {
+  accessToken: string | null;
+  projectSlug: string;
+  item: MediaFileListItem;
+}): Promise<void> {
+  const fileName = downloadFileName(args.item);
+  let blob: Blob | null = null;
+
+  if (args.item.remoteKey && args.accessToken) {
+    const { data } = await api.get<Blob>("/files/stream", {
+      params: { key: args.item.remoteKey },
+      responseType: "blob",
+      headers: { Authorization: `Bearer ${args.accessToken}` },
+    });
+    blob = data;
+  } else {
+    const url = resolveProbeUrl(args.projectSlug, args.item);
+    if (!url) throw new Error("Нет ссылки на файл");
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Не удалось скачать файл (${response.status})`);
+    }
+    blob = await response.blob();
+  }
+
+  if (!blob || blob.size === 0) {
+    throw new Error("Файл пустой или недоступен");
+  }
+  triggerBrowserDownload(blob, fileName);
+}
+
 function useMediaSizes(items: MediaFileListItem[], projectName: string | null) {
   const { accessToken } = useAuth();
   const [sizeById, setSizeById] = useState<Record<string, number | null>>({});
@@ -241,7 +295,9 @@ type MediaSectionProps = {
   addLabel: string;
   accept: string;
   busy: boolean;
+  downloadingId: string | null;
   onPickFiles: (files: File[]) => void;
+  onDownload: (item: MediaFileListItem) => void;
 };
 
 function MediaSection({
@@ -252,7 +308,9 @@ function MediaSection({
   addLabel,
   accept,
   busy,
+  downloadingId,
   onPickFiles,
+  onDownload,
 }: MediaSectionProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const total = items.length;
@@ -301,10 +359,7 @@ function MediaSection({
             <span className="project-media-file-list__col-index">№</span>
             <span className="project-media-file-list__col-ext">Тип</span>
             <span className="project-media-file-list__col-name">Файл</span>
-            <span className="project-media-file-list__col-size">Размер</span>
-            {showKind ? (
-              <span className="project-media-file-list__col-kind">Вид</span>
-            ) : null}
+            <span className="project-media-file-list__col-action"> </span>
           </div>
           <ul className="project-media-file-list__rows">
             {items.map((item, index) => {
@@ -317,6 +372,7 @@ function MediaSection({
                 : sizePending
                   ? "…"
                   : "—";
+              const isDownloading = downloadingId === item.id;
               return (
                 <li key={item.id} className="project-media-file-list__row">
                   <span className="project-media-file-list__col-index">
@@ -339,27 +395,41 @@ function MediaSection({
                     {item.extension}
                   </span>
                   <span
-                    className="project-media-file-list__name"
+                    className="project-media-file-list__col-name"
                     title={item.file || item.title}
                   >
-                    {item.title}
-                  </span>
-                  <span
-                    className={cn(
-                      "project-media-file-list__size",
-                      sizeKnown && "project-media-file-list__size--known",
-                    )}
-                    title={
-                      sizeKnown ? `${bytes} байт` : "Размер пока неизвестен"
-                    }
-                  >
-                    {sizeLabel}
-                  </span>
-                  {showKind ? (
-                    <span className="project-media-file-list__kind">
-                      {KIND_LABEL[item.kind]}
+                    <span className="project-media-file-list__name">
+                      {item.title}
                     </span>
-                  ) : null}
+                    <span
+                      className={cn(
+                        "project-media-file-list__size",
+                        sizeKnown && "project-media-file-list__size--known",
+                      )}
+                      title={
+                        sizeKnown ? `${bytes} байт` : "Размер пока неизвестен"
+                      }
+                    >
+                      {sizeLabel}
+                    </span>
+                    {showKind ? (
+                      <span className="project-media-file-list__kind">
+                        {KIND_LABEL[item.kind]}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="project-media-file-list__col-action">
+                    <button
+                      type="button"
+                      className="project-media-file-list__download"
+                      disabled={Boolean(downloadingId)}
+                      title="Скачать файл"
+                      aria-label={`Скачать «${item.title}»`}
+                      onClick={() => onDownload(item)}
+                    >
+                      {isDownloading ? "…" : "Скачать"}
+                    </button>
+                  </span>
                 </li>
               );
             })}
@@ -388,9 +458,11 @@ export function ProjectMediaFileList({
   className,
 }: ProjectMediaFileListProps) {
   const dispatch = useAppDispatch();
+  const { accessToken } = useAuth();
   const { projectName } = useProject();
   const { saveScenesForLightPlot, pushPlaybookAfterSoundsSave } = usePlaybook();
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MediaTabId>("playlist");
 
   const musicItems = mapPlaylist(playlist ?? []);
@@ -401,6 +473,23 @@ export function ProjectMediaFileList({
 
   const setStatus = (message: string) => {
     onStatus?.(message);
+  };
+
+  const handleDownload = async (item: MediaFileListItem) => {
+    if (!projectName || downloadingId) return;
+    setDownloadingId(item.id);
+    try {
+      await downloadMediaFile({
+        accessToken,
+        projectSlug: projectName,
+        item,
+      });
+      setStatus(`Скачан: ${downloadFileName(item)}`);
+    } catch (err) {
+      setStatus(String((err as Error)?.message ?? "Не удалось скачать файл"));
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   const uploadMusic = async (files: File[]) => {
@@ -531,6 +620,10 @@ export function ProjectMediaFileList({
             addLabel="Добавить"
             accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac"
             busy={busyKey === "music"}
+            downloadingId={downloadingId}
+            onDownload={(item) => {
+              void handleDownload(item);
+            }}
             onPickFiles={(files) => {
               void uploadMusic(files);
             }}
@@ -544,6 +637,10 @@ export function ProjectMediaFileList({
             addLabel="Добавить"
             accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac"
             busy={busyKey === "sound"}
+            downloadingId={downloadingId}
+            onDownload={(item) => {
+              void handleDownload(item);
+            }}
             onPickFiles={(files) => {
               void uploadSounds(files);
             }}
@@ -558,6 +655,10 @@ export function ProjectMediaFileList({
             addLabel="Добавить"
             accept="video/*,image/*,.mp4,.webm,.mov,.mkv,.jpg,.jpeg,.png,.gif,.webp"
             busy={busyKey === "video"}
+            downloadingId={downloadingId}
+            onDownload={(item) => {
+              void handleDownload(item);
+            }}
             onPickFiles={(files) => {
               void uploadVideoMaterials(files);
             }}

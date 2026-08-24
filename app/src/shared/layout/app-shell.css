@@ -77,6 +77,35 @@
   grid-column: 2;
 }
 
+.app-layout--docks-cluster[data-prog-run-wide="true"] {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="true"]
+  .app-layout--docks-cluster[data-prog-run-wide="true"] {
+  grid-template-columns:
+    minmax(0, var(--width-sidebar-max))
+    minmax(0, 1fr)
+    minmax(0, var(--width-sidebar-max));
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="false"]
+  .app-layout--docks-cluster[data-prog-run-wide="true"] {
+  grid-template-columns:
+    minmax(0, var(--width-sidebar-max))
+    minmax(0, 1fr);
+}
+
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="true"]
+  .app-layout--docks-cluster[data-prog-run-wide="true"] {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, var(--width-sidebar-max));
+}
+
 .app-content {
   flex: 1;
   display: flex;
@@ -99,6 +128,18 @@
 
 .main-content.show-script {
   padding: 0;
+  scrollbar-gutter: auto;
+}
+
+.main-content-light-plot {
+  padding: 0;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.main-content-sufer {
+  padding: 0;
+  overflow: hidden;
   scrollbar-gutter: auto;
 }
 
@@ -126,13 +167,15 @@
   }
 
   .main-content {
-    padding: 12px;
+    padding: 6px;
   }
 
   .main-content-sessions,
   .main-content-kanban,
   .main-content-project-media,
-  .main-content-premises {
+  .main-content-premises,
+  .main-content-light-plot,
+  .main-content-sufer {
     padding: 0;
   }
 
@@ -144,14 +187,14 @@
 
 @media (max-width: 480px) {
   .main-content {
-    padding: 8px;
+    padding: 4px;
   }
 
   .main-content-sessions,
   .main-content-kanban,
   .main-content-project-media,
   .main-content-premises {
-    padding: 0 6px 0;
+    padding: 0;
   }
 
   .main-content-theater {
@@ -161,13 +204,15 @@
 
 @media (max-width: 320px) {
   .main-content {
-    padding: 6px;
+    padding: 4px;
   }
 
   .main-content-sessions,
   .main-content-kanban,
   .main-content-project-media,
-  .main-content-premises {
+  .main-content-premises,
+  .main-content-light-plot,
+  .main-content-sufer {
     padding: 0;
   }
 

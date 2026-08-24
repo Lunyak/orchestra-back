@@ -875,12 +875,30 @@ label.labeled-checkbox.settings-sync-live-row {
     padding: 8px 8px 20px;
   }
 
+  .settings-view {
+    font-size: 13px;
+  }
+
   .settings-view-header {
     align-items: stretch;
+    gap: 8px;
   }
 
   .settings-view-header > button {
     width: 100%;
+  }
+
+  .settings-tabs {
+    gap: 0;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-tab-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   .settings-project-create input,
@@ -894,5 +912,24 @@ label.labeled-checkbox.settings-sync-live-row {
 
   .settings-bot-token {
     max-width: none;
+  }
+
+  .settings-card {
+    padding: 12px;
+  }
+
+  .settings-card__title {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .settings-layout .main-content-settings {
+    padding: 6px 6px 16px;
+  }
+
+  .settings-tab-btn {
+    padding: 7px 8px;
+    font-size: 11px;
   }
 }

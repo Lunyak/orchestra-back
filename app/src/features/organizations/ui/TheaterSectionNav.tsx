@@ -1,6 +1,4 @@
-import cn from "classnames";
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import {
   theaterOverviewPath,
   theaterPremisesPath,
@@ -10,8 +8,10 @@ import {
 } from "../../../app/router/paths";
 import { fetchTheaters } from "../../../sync/api/workspaces";
 import { useAuth } from "../../auth/model/auth-context";
-import "../../spectacle/ui/spectacle-direction-switch.css";
-import "./theater-section-nav.css";
+import {
+  WorkspaceSectionSwitch,
+  type WorkspaceSectionItem,
+} from "../../../shared/components/workspace-section-switch/WorkspaceSectionSwitch";
 
 type TheaterSectionNavProps = {
   theaterId: string;
@@ -38,7 +38,6 @@ export function TheaterSectionNav({
 }: TheaterSectionNavProps) {
   const { accessToken } = useAuth();
   const [theaterTitle, setTheaterTitle] = useState("");
-  const isInline = variant === "inline";
 
   useEffect(() => {
     if (!accessToken || !theaterId) return;
@@ -57,57 +56,24 @@ export function TheaterSectionNav({
     };
   }, [accessToken, theaterId]);
 
-  const backLabel = theaterTitle || "Театр";
-
-  const backLink = (
-    <Link
-      to={theaterOverviewPath(theaterId)}
-      className="spectacle-direction-switch__item"
-    >
-      ← {backLabel}
-    </Link>
+  const items = useMemo<WorkspaceSectionItem[]>(
+    () =>
+      ITEMS.map((item) => ({
+        id: item.id,
+        label: item.label,
+        to: item.path(theaterId),
+      })),
+    [theaterId],
   );
 
-  const modeLinks = ITEMS.map((item) => {
-    const isActive = active === item.id;
-    return (
-      <li key={item.id}>
-        <Link
-          to={item.path(theaterId)}
-          className={cn(
-            "spectacle-direction-switch__item",
-            isActive && "spectacle-direction-switch__item--active",
-          )}
-          aria-current={isActive ? "page" : undefined}
-        >
-          {item.label}
-        </Link>
-      </li>
-    );
-  });
-
-  if (isInline) {
-    return (
-      <nav
-        className="theater-section-nav theater-section-nav--inline"
-        aria-label="Разделы театра"
-      >
-        {backLink}
-      </nav>
-    );
-  }
-
   return (
-    <nav className="spectacle-direction-switch" aria-label="Разделы театра">
-      <div className="spectacle-direction-switch__left">{backLink}</div>
-      <div className="spectacle-direction-switch__right">
-        <ul
-          className="spectacle-direction-switch__modes"
-          aria-label="Режимы театра"
-        >
-          {modeLinks}
-        </ul>
-      </div>
-    </nav>
+    <WorkspaceSectionSwitch
+      ariaLabel="Разделы театра"
+      backTo={theaterOverviewPath(theaterId)}
+      backLabel={theaterTitle || "Театр"}
+      items={items}
+      activeId={active}
+      variant={variant}
+    />
   );
 }

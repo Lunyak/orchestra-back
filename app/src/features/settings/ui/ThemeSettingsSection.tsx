@@ -124,6 +124,7 @@ export function ThemeSettingsSection() {
             key={theme.id}
             type="button"
             className={cn("theme-card", activeThemeId === theme.id && "theme-card--active")}
+            aria-pressed={activeThemeId === theme.id}
             onClick={() => setTheme(theme.id)}
           >
             <div className="theme-card__swatches">

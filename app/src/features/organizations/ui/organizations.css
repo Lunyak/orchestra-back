@@ -205,18 +205,183 @@
   line-height: 1.45;
 }
 
+.organizations-page__workspace-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
 .organizations-page__workspace-create {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.organizations-page__workspace-create label {
+.organizations-page__workspace-create label,
+.organizations-page__workspace-create-label {
   color: var(--sessions-text-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.organizations-page__toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: end;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
+}
+
+.organizations-page__search {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.organizations-page__search-label {
+  color: var(--sessions-text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.organizations-page__search-input {
+  width: 100%;
+}
+
+.organizations-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.organizations-page__filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-bg-deep);
+  color: var(--sessions-text-ui, var(--sessions-text));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.organizations-page__filter-btn[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.organizations-page__filter-btn:hover:not([aria-pressed="true"]),
+.organizations-page__filter-btn:focus-visible:not([aria-pressed="true"]) {
+  border-color: var(--color-active-ascent);
+}
+
+.organizations-page__filter-count {
+  color: var(--sessions-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.organizations-page__filter-btn[aria-pressed="true"] .organizations-page__filter-count,
+.organizations-filter-modal__option--active .organizations-page__filter-count {
+  color: var(--color-active-ascent);
+}
+
+.organizations-page__filter-trigger {
+  display: none;
+}
+
+.organizations-filter-modal {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+}
+
+.organizations-filter-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.organizations-filter-modal__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sessions-text-strong);
+}
+
+.organizations-filter-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.organizations-filter-modal__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-bg-deep);
+  color: var(--sessions-text-ui, var(--sessions-text));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.organizations-filter-modal__option--active,
+.organizations-filter-modal__option[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.organizations-page__create-kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.organizations-page__create-kind-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-bg-deep);
+  color: var(--sessions-text-ui, var(--sessions-text));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.organizations-page__create-kind-btn[aria-pressed="true"] {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.organizations-page__org-type {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-active-ascent);
 }
 
 .organizations-page__workspace-create-row {
@@ -251,6 +416,10 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+}
+
+.organizations-page__workspace-create-icon {
+  display: none;
 }
 
 .organizations-page__workspace-create-button:hover:not(:disabled),
@@ -518,8 +687,80 @@
   outline: none;
 }
 
+@media (max-width: 979px) {
+  .organizations-page__toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+  }
+
+  .organizations-page__filters--desktop {
+    display: none;
+  }
+
+  .organizations-page__filter-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    padding: 0 12px;
+    border: 1px solid var(--sessions-border);
+    background: var(--sessions-bg-deep);
+    color: var(--sessions-text-ui, var(--sessions-text));
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .organizations-page__filter-trigger:hover,
+  .organizations-page__filter-trigger:focus-visible {
+    border-color: var(--color-active-ascent);
+    color: var(--color-active-ascent);
+    outline: none;
+  }
+
+  .organizations-page__workspace-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: start;
+    padding: 10px 12px;
+  }
+
+  .organizations-page__workspace-actions {
+    display: block;
+  }
+
+  .organizations-page__workspace-create-label {
+    display: none;
+  }
+
+  .organizations-page__workspace-create-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .organizations-page__workspace-create-button {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-sizing: border-box;
+  }
+}
+
 @media (max-width: 840px) {
-  .organizations-page__workspace-header,
   .organizations-page__theaters-header {
     grid-template-columns: 1fr;
   }
@@ -529,11 +770,95 @@
   .organizations-page {
     padding: 12px 12px 24px;
   }
+
+  .organizations-page--theaters {
+    padding: 0;
+  }
+
+  .organizations-page__workspace-header {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .organizations-page--theaters h1 {
+    font-size: 22px;
+  }
+
+  .organizations-page__workspace-description {
+    font-size: 12px;
+    margin-top: 4px;
+  }
+
+  .organizations-page__toolbar {
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px 12px;
+  }
+
+  .organizations-page__search {
+    gap: 4px;
+  }
+
+  .organizations-page__theater-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .organizations-page__workspace-status,
+  .organizations-page__workspace-empty {
+    margin-top: 8px;
+  }
+
+  .organizations-page__hub {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
 }
 
 @media (max-width: 560px) {
   .organizations-page__workspace-create-row,
   .organizations-page__theaters-create-row {
     flex-direction: column;
+  }
+
+  .organizations-page__search-label,
+  .organizations-page__workspace-create-label {
+    font-size: 10px;
+  }
+
+  .organizations-page__workspace-input,
+  .organizations-page__filter-btn {
+    font-size: 12px;
+  }
+
+  .organizations-page__theater-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .organizations-page__theater-poster-name {
+    font-size: 11px;
+  }
+
+  .organizations-page__theater-poster-meta,
+  .organizations-page__org-type {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .organizations-page__theater-list,
+  .organizations-page__hub {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .organizations-page__toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .organizations-page__filter-trigger {
+    width: 100%;
+    justify-content: space-between;
   }
 }

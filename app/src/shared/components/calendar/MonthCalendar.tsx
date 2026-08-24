@@ -17,11 +17,19 @@ export type MonthCalendarEvent = {
   published?: boolean;
 };
 
+export type CalendarViewMode = "month" | "week" | "day";
+
+const VIEW_MODE_OPTIONS: { id: CalendarViewMode; label: string }[] = [
+  { id: "month", label: "Месяц" },
+  { id: "week", label: "Неделя" },
+  { id: "day", label: "День" },
+];
+
 const MONTH_SHORT_LABELS = Array.from({ length: 12 }, (_, monthIndex) =>
   dayjs().month(monthIndex).format("MMM"),
 );
 
-function isoYmd(d: Date): string {
+function isoYmd(d: Date | string): string {
   return dayjs(d).format("YYYY-MM-DD");
 }
 
@@ -36,10 +44,7 @@ function startOfMonthDate(year: number, monthIndex: number): Date {
 function getMonthCalendarDays(date: Date): Date[] {
   const start = dayjs(date).startOf("month");
   const end = dayjs(date).endOf("month");
-
-  // Начинаем с понедельника недели, в которой начинается месяц
   const startDay = start.startOf("isoWeek");
-  // Заканчиваем воскресеньем недели, в которой заканчивается месяц
   const endDay = end.endOf("isoWeek");
 
   const days: Date[] = [];
@@ -53,11 +58,42 @@ function getMonthCalendarDays(date: Date): Date[] {
   return days;
 }
 
+function getWeekCalendarDays(selectedDate: string): Date[] {
+  const startDay = dayjs(selectedDate).startOf("isoWeek");
+  return Array.from({ length: 7 }, (_, index) =>
+    startDay.add(index, "day").toDate(),
+  );
+}
+
+function getDayCalendarDays(selectedDate: string): Date[] {
+  return [dayjs(selectedDate).toDate()];
+}
+
+function formatWeekRangeLabel(selectedDate: string): string {
+  const start = dayjs(selectedDate).startOf("isoWeek");
+  const end = start.add(6, "day");
+  if (start.month() === end.month() && start.year() === end.year()) {
+    return `${start.format("D")}–${end.format("D MMMM YYYY")}`;
+  }
+  if (start.year() === end.year()) {
+    return `${start.format("D MMM")} – ${end.format("D MMM YYYY")}`;
+  }
+  return `${start.format("D MMM YYYY")} – ${end.format("D MMM YYYY")}`;
+}
+
+function eventLimitForView(viewMode: CalendarViewMode): number {
+  if (viewMode === "day") return 24;
+  if (viewMode === "week") return 5;
+  return 2;
+}
+
 export function MonthCalendar({
   currentMonth,
   selectedDate,
+  viewMode = "month",
   onChangeMonth,
   onSelectDate,
+  onChangeViewMode,
   onDayClick,
   statusByDate,
   dotsByDate,
@@ -70,8 +106,10 @@ export function MonthCalendar({
 }: {
   currentMonth: Date;
   selectedDate: string;
+  viewMode?: CalendarViewMode;
   onChangeMonth: (next: Date) => void;
   onSelectDate: (isoYmd: string) => void;
+  onChangeViewMode?: (mode: CalendarViewMode) => void;
   onDayClick?: (isoYmd: string) => void;
   onDayDoubleClick?: (isoYmd: string) => void;
   statusByDate?: Record<string, MonthCalendarStatus | undefined>;
@@ -80,20 +118,28 @@ export function MonthCalendar({
   title?: string;
   subtitle?: string;
   weekDayLabels?: string[];
-  /** ✓/✗ в ячейке; для профиля занятости лучше выключить — фон ячейки уже показывает статус */
   showStatusMarks?: boolean;
 }) {
   const labels = weekDayLabels ?? ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
   const todayIso = useMemo(() => isoYmd(new Date()), []);
-  const calendarDays = useMemo(
-    () => getMonthCalendarDays(currentMonth),
-    [currentMonth],
-  );
+  const calendarDays = useMemo(() => {
+    if (viewMode === "week") return getWeekCalendarDays(selectedDate);
+    if (viewMode === "day") return getDayCalendarDays(selectedDate);
+    return getMonthCalendarDays(currentMonth);
+  }, [currentMonth, selectedDate, viewMode]);
 
   const currentMonthDayjs = dayjs(currentMonth);
   const currentYear = currentMonthDayjs.year();
   const currentMonthIndex = currentMonthDayjs.month();
-  const monthLabel = currentMonthDayjs.format("MMMM YYYY");
+  const eventLimit = eventLimitForView(viewMode);
+
+  const periodLabel = useMemo(() => {
+    if (viewMode === "week") return formatWeekRangeLabel(selectedDate);
+    if (viewMode === "day") {
+      return dayjs(selectedDate).format("D MMMM YYYY");
+    }
+    return currentMonthDayjs.format("MMMM YYYY");
+  }, [currentMonthDayjs, selectedDate, viewMode]);
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(currentYear);
@@ -127,13 +173,49 @@ export function MonthCalendar({
     };
   }, [pickerOpen]);
 
+  const syncMonthForDate = (iso: string) => {
+    const nextMonth = dayjs(iso).startOf("month").toDate();
+    if (!dayjs(nextMonth).isSame(currentMonth, "month")) {
+      onChangeMonth(nextMonth);
+    }
+  };
+
   const handleSelectMonth = (monthIndex: number) => {
-    onChangeMonth(startOfMonthDate(pickerYear, monthIndex));
+    const nextMonth = startOfMonthDate(pickerYear, monthIndex);
+    onChangeMonth(nextMonth);
+    const dayOfMonth = dayjs(selectedDate).date();
+    const clamped = dayjs(nextMonth)
+      .date(Math.min(dayOfMonth, dayjs(nextMonth).daysInMonth()))
+      .format("YYYY-MM-DD");
+    onSelectDate(clamped);
     setPickerOpen(false);
   };
 
+  const handleNavigate = (direction: -1 | 1) => {
+    if (viewMode === "week") {
+      const next = dayjs(selectedDate).add(direction * 7, "day").format("YYYY-MM-DD");
+      onSelectDate(next);
+      syncMonthForDate(next);
+      return;
+    }
+    if (viewMode === "day") {
+      const next = dayjs(selectedDate).add(direction, "day").format("YYYY-MM-DD");
+      onSelectDate(next);
+      syncMonthForDate(next);
+      return;
+    }
+    onChangeMonth(addMonths(currentMonth, direction));
+  };
+
+  const showWeekdayHeader = viewMode !== "day";
+
   return (
-    <div className="month-cal">
+    <div
+      className={cn("month-cal", {
+        "month-cal--week": viewMode === "week",
+        "month-cal--day": viewMode === "day",
+      })}
+    >
       {(title || subtitle) && (
         <div className="month-cal__heading">
           {title && <div className="month-cal__title">{title}</div>}
@@ -141,11 +223,37 @@ export function MonthCalendar({
         </div>
       )}
 
+      {onChangeViewMode ? (
+        <div
+          className="month-cal__view-switch"
+          role="group"
+          aria-label="Вид календаря"
+        >
+          {VIEW_MODE_OPTIONS.map((option) => {
+            const isActive = viewMode === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                className={cn(
+                  "month-cal__view-btn",
+                  isActive && "month-cal__view-btn--active",
+                )}
+                aria-pressed={isActive}
+                onClick={() => onChangeViewMode(option.id)}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="month-cal__nav">
         <button
           type="button"
           className="month-cal__nav-btn"
-          onClick={() => onChangeMonth(addMonths(currentMonth, -1))}
+          onClick={() => handleNavigate(-1)}
         >
           ←
         </button>
@@ -161,7 +269,7 @@ export function MonthCalendar({
             title="Выбрать месяц и год"
             onClick={() => setPickerOpen((open) => !open)}
           >
-            {monthLabel}
+            {periodLabel}
           </button>
           {pickerOpen ? (
             <div
@@ -216,21 +324,28 @@ export function MonthCalendar({
         <button
           type="button"
           className="month-cal__nav-btn"
-          onClick={() => onChangeMonth(addMonths(currentMonth, 1))}
+          onClick={() => handleNavigate(1)}
         >
           →
         </button>
       </div>
 
-      <div className="month-cal__weekdays">
-        {labels.map((day) => (
-          <div key={day} className="month-cal__weekday">
-            {day}
-          </div>
-        ))}
-      </div>
+      {showWeekdayHeader ? (
+        <div className="month-cal__weekdays">
+          {labels.map((day) => (
+            <div key={day} className="month-cal__weekday">
+              {day}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-      <div className="month-cal__grid">
+      <div
+        className={cn("month-cal__grid", {
+          "month-cal__grid--week": viewMode === "week",
+          "month-cal__grid--day": viewMode === "day",
+        })}
+      >
         {calendarDays.map((dateObj) => {
           const date = isoYmd(dateObj);
           const status = statusByDate?.[date];
@@ -240,8 +355,11 @@ export function MonthCalendar({
             Number(dotsByDate?.[date] ?? 0) || dayEvents.length || 0,
           );
           const active = date === selectedDate;
-          const isCurrentMonth = dayjs(dateObj).month() === dayjs(currentMonth).month();
+          const isCurrentMonth =
+            dayjs(dateObj).month() === dayjs(currentMonth).month();
           const isToday = date === todayIso;
+          const visibleEvents = dayEvents.slice(0, eventLimit);
+          const hiddenEventsCount = Math.max(0, dayEvents.length - eventLimit);
 
           return (
             <button
@@ -259,17 +377,22 @@ export function MonthCalendar({
               }}
               title={date}
               className={cn("month-cal__cell", {
-                "month-cal__cell--other-month": !isCurrentMonth,
+                "month-cal__cell--other-month":
+                  viewMode === "month" && !isCurrentMonth,
                 "month-cal__cell--selected": active,
                 "month-cal__cell--today": isToday,
                 "month-cal__cell--present": status === "present",
                 "month-cal__cell--absent": status === "absent",
               })}
             >
-              <span className="month-cal__cell-num">{dayjs(dateObj).date()}</span>
+              <span className="month-cal__cell-num">
+                {viewMode === "day"
+                  ? dayjs(dateObj).format("dddd, D MMMM")
+                  : dayjs(dateObj).date()}
+              </span>
               {dayEvents.length > 0 ? (
                 <span className="month-cal__events" aria-hidden>
-                  {dayEvents.slice(0, 2).map((ev) => (
+                  {visibleEvents.map((ev) => (
                     <span
                       key={ev.id}
                       className={cn("month-cal__event", {
@@ -281,9 +404,9 @@ export function MonthCalendar({
                       <span className="month-cal__event-title">{ev.title}</span>
                     </span>
                   ))}
-                  {dayEvents.length > 2 ? (
+                  {hiddenEventsCount > 0 ? (
                     <span className="month-cal__event-more">
-                      +{dayEvents.length - 2}
+                      +{hiddenEventsCount}
                     </span>
                   ) : null}
                 </span>
@@ -295,7 +418,9 @@ export function MonthCalendar({
                 </span>
               ) : null}
               {showStatusMarks && status ? (
-                <span className="month-cal__status-mark">{status === "present" ? "✓" : "✗"}</span>
+                <span className="month-cal__status-mark">
+                  {status === "present" ? "✓" : "✗"}
+                </span>
               ) : null}
             </button>
           );
@@ -304,4 +429,3 @@ export function MonthCalendar({
     </div>
   );
 }
-

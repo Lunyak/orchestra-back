@@ -8,6 +8,7 @@ import {
   fetchVideoStreamBlobUrl,
   getPlayUrl,
 } from "../../../sync/api/files";
+import { api } from "../../../sync/api/client";
 import type {
   PlaybookHoldImage,
   SceneProjectorSettingsV1,
@@ -30,6 +31,7 @@ export type ProjectorMediaContext = {
 export type ProjectorMediaAsset = {
   storageKey: string | null;
   fallbackSrc: string | null;
+  fileName: string | null;
 };
 
 function readAccessToken(): string | null {
@@ -99,7 +101,7 @@ function resolveProjectorMediaAsset(
 
   if (!getDesktopApi()) {
     const picked = resolveBrowserPickedMediaUrl(fileName || enriched.file, titleHint, ctx.projectSlug);
-    if (picked) return { storageKey, fallbackSrc: picked };
+    if (picked) return { storageKey, fallbackSrc: picked, fileName: fileName || null };
   }
 
   const devLocal = localProjectMediaDevUrl(
@@ -114,7 +116,7 @@ function resolveProjectorMediaAsset(
   // Браузер + npm run dev: всегда с диска (Desktop/xxx), не с сервера.
   // storageKey оставляем — если локальный файл не найден, превью уйдёт на remote.
   if (isBrowserDevLocalProjects() && localPlay) {
-    return { storageKey, fallbackSrc: localPlay };
+    return { storageKey, fallbackSrc: localPlay, fileName: fileName || null };
   }
 
   const offline = resolveOfflineMediaUrl({
@@ -132,21 +134,21 @@ function resolveProjectorMediaAsset(
 
   // Локальная копия на диске — без повторной загрузки с сервера.
   if (localSrc && (String(enriched.filePath ?? "").trim() || localPlayResolved)) {
-    return { storageKey, fallbackSrc: localSrc };
+    return { storageKey, fallbackSrc: localSrc, fileName: fileName || null };
   }
 
   if (localPlayResolved) {
-    return { storageKey, fallbackSrc: localPlayResolved };
+    return { storageKey, fallbackSrc: localPlayResolved, fileName: fileName || null };
   }
 
   const remote = String(enriched.remoteUrl ?? "").trim();
   if (/^https?:\/\//i.test(remote) && !isDirectObjectStorageUrl(remote)) {
     if (/localhost:3000\/files\//i.test(remote) || /\/files\/play\//i.test(remote)) {
-      return { storageKey, fallbackSrc: remote };
+      return { storageKey, fallbackSrc: remote, fileName: fileName || null };
     }
   }
 
-  return { storageKey, fallbackSrc: localSrc };
+  return { storageKey, fallbackSrc: localSrc, fileName: fileName || null };
 }
 
 export function resolveProjectorHoldAsset(
@@ -183,7 +185,33 @@ export async function fetchProjectorImageBlobUrl(storageKey: string): Promise<st
 }
 
 export async function fetchProjectorVideoBlobUrl(storageKey: string): Promise<string | null> {
-  return fetchVideoStreamBlobUrl(readAccessToken(), storageKey);
+  const token = readAccessToken();
+  try {
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const { data } = await api.get<Blob>("/files/stream", {
+      params: { key: storageKey },
+      responseType: "blob",
+      headers,
+    });
+    if (!data || !(data instanceof Blob) || data.size === 0) return null;
+    const type = (data.type || "").toLowerCase();
+    if (
+      type.startsWith("text/") ||
+      type.startsWith("application/json") ||
+      type.startsWith("application/xml")
+    ) {
+      return null;
+    }
+    // Без явного video/* <video> часто не отдаёт duration (чёрный экран в модалке).
+    const playable =
+      type.startsWith("video/") || type.startsWith("audio/")
+        ? data
+        : new Blob([data], { type: "video/mp4" });
+    return URL.createObjectURL(playable);
+  } catch {
+    return fetchVideoStreamBlobUrl(token, storageKey);
+  }
 }
 
 /** Для превью: signed play-url (без скачивания всего файла), иначе blob. */
@@ -203,4 +231,72 @@ export async function fetchProjectorVideoPreviewUrl(
   const blobUrl = await fetchVideoStreamBlobUrl(token, storageKey);
   if (!blobUrl) return null;
   return { src: blobUrl, blob: true };
+}
+
+/**
+ * Кандидаты для выбора кадра превью (по приоритету).
+ * Модалка пробует следующий, если текущий не отдаёт duration.
+ */
+export type ProjectorVideoFramePickerCandidate = {
+  src: string;
+  blob: boolean;
+  storageKey: string | null;
+  label: string;
+};
+
+export async function resolveProjectorVideoFramePickerCandidates(
+  ctx: ProjectorMediaContext,
+  videoId: number,
+): Promise<ProjectorVideoFramePickerCandidate[]> {
+  const asset = resolveProjectorVideoAsset(ctx, videoId);
+  if (!asset) return [];
+
+  const out: ProjectorVideoFramePickerCandidate[] = [];
+  const seen = new Set<string>();
+  const push = (src: string | null | undefined, blob: boolean, label: string) => {
+    const value = String(src ?? "").trim();
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    out.push({
+      src: value,
+      blob,
+      storageKey: asset.storageKey,
+      label,
+    });
+  };
+
+  const local = String(asset.fallbackSrc ?? "").trim();
+
+  // 1) Локальный blob из folder picker — обычно seekable
+  if (local.toLowerCase().startsWith("blob:")) {
+    push(local, true, "local-blob");
+  }
+
+  // 2) Полный stream blob с сервера — надёжный duration
+  if (asset.storageKey) {
+    const blobUrl = await fetchProjectorVideoBlobUrl(asset.storageKey);
+    if (blobUrl) push(blobUrl, true, "storage-blob");
+  }
+
+  // 3) Signed play-url
+  if (asset.storageKey) {
+    const remote = await fetchProjectorVideoPreviewUrl(asset.storageKey);
+    if (remote?.src) push(remote.src, remote.blob, "play-url");
+  }
+
+  // 4) Локальные пути (dev / desktop) — в конце, часто без metadata
+  if (local && !local.toLowerCase().startsWith("blob:")) {
+    push(local, false, "local-path");
+  }
+
+  return out;
+}
+
+/** @deprecated используйте resolveProjectorVideoFramePickerCandidates */
+export async function resolveProjectorVideoFramePickerSrc(
+  ctx: ProjectorMediaContext,
+  videoId: number,
+): Promise<ProjectorVideoFramePickerCandidate | null> {
+  const list = await resolveProjectorVideoFramePickerCandidates(ctx, videoId);
+  return list[0] ?? null;
 }

@@ -132,3 +132,49 @@
 .project-cast-page__role-link {
   font-size: 13px;
 }
+
+@media (max-width: 720px) {
+  .project-cast-page {
+    padding: 12px 12px 20px;
+  }
+
+  .project-cast-page__content {
+    gap: 12px;
+  }
+
+  .project-cast-page__title {
+    font-size: 18px;
+  }
+
+  .project-cast-page__subtitle {
+    font-size: 12px;
+  }
+
+  .project-cast-page__grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+    gap: 10px;
+  }
+
+  .project-cast-page__card {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .project-cast-page__name {
+    font-size: 13px;
+  }
+
+  .project-cast-page__email {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 420px) {
+  .project-cast-page {
+    padding: 10px 8px 16px;
+  }
+
+  .project-cast-page__grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,5 +1,7 @@
 .app-content:has(> .theater-rehearsals-page) > .theater-rehearsals-page {
+  flex: 1 1 auto;
   align-self: stretch;
+  min-height: 100%;
 }
 
 .theater-rehearsals-page {
@@ -11,6 +13,8 @@
   width: 100%;
   max-width: var(--width-content-page);
   box-sizing: border-box;
+  min-height: 100%;
+  height: auto;
 }
 
 .theater-rehearsals-page__head {
@@ -31,7 +35,7 @@
   min-height: 32px;
 }
 
-.theater-rehearsals-page__title-row .theater-section-nav--inline {
+.theater-rehearsals-page__title-row .workspace-section-switch--inline {
   position: absolute;
   left: 0;
   top: 50%;
@@ -88,6 +92,26 @@
   margin-top: 12px;
 }
 
+.theater-rehearsals-page__footer-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.theater-rehearsals-page__footer-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.theater-rehearsals-page__footer-row .button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
 .theater-rehearsals-page__call-hint {
   margin: 0;
 }
@@ -106,5 +130,51 @@
 
   .theater-rehearsals-page__layout.sessions-layout {
     grid-template-columns: minmax(0, 600px);
+  }
+}
+
+@media (max-width: 720px) {
+  .theater-rehearsals-page {
+    padding: 0 8px 16px;
+  }
+
+  .theater-rehearsals-page__head {
+    margin-bottom: 10px;
+  }
+
+  .theater-rehearsals-page__title-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    min-height: 0;
+  }
+
+  .theater-rehearsals-page__title-row .workspace-section-switch--inline {
+    position: static;
+    transform: none;
+  }
+
+  .theater-rehearsals-page__title-row .rehearsals-title {
+    text-align: left;
+    font-size: 1.15rem;
+  }
+
+  .theater-rehearsals-page__head .rehearsals-muted {
+    text-align: left;
+  }
+
+  .theater-rehearsals-page__footer-row .button {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .theater-rehearsals-page {
+    padding: 0 6px 12px;
+  }
+
+  .theater-rehearsals-page__footer-row .button {
+    flex: 1 1 100%;
   }
 }

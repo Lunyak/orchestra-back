@@ -280,3 +280,22 @@
 .director-session-page__slot-link:hover {
   background: var(--color-bg-quaternary);
 }
+
+@media (max-width: 640px) {
+  .director-session-detail-modal {
+    max-width: calc(100vw - 12px);
+    max-height: min(92vh, 820px);
+  }
+
+  .director-session-page__subhead {
+    gap: 8px;
+  }
+
+  .director-session-page__card {
+    padding: 10px;
+  }
+
+  .director-session-page__slot-link {
+    width: 100%;
+  }
+}

@@ -83,3 +83,21 @@
 .project-production-team__remove:hover {
   color: var(--color-active-ascent);
 }
+
+@media (max-width: 560px) {
+  .project-production-team__section {
+    margin-top: 14px;
+    gap: 8px;
+  }
+
+  .project-production-team__assignee {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .project-production-team__remove {
+    margin-left: 0;
+    width: 100%;
+    text-align: left;
+  }
+}

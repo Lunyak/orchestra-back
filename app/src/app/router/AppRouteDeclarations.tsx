@@ -3,6 +3,7 @@ import { lazy } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import {
   ENABLE_ACTOR_PAGE,
+  ENABLE_ACCOUNTING,
   ENABLE_ROLE_WORKBOOK_PAGE,
 } from "../../shared/build-features";
 import {
@@ -378,6 +379,24 @@ export function AppRouteDeclarations() {
     />
   );
 
+  const accountingPageElement = ENABLE_ACCOUNTING ? (
+    <AccountingPage />
+  ) : (
+    <UnderDevelopmentPage
+      title="Бухгалтерия"
+      description="Раздел бухгалтерии временно недоступен в production."
+    />
+  );
+
+  const collectionDetailPageElement = ENABLE_ACCOUNTING ? (
+    <CollectionDetailPage />
+  ) : (
+    <UnderDevelopmentPage
+      title="Бухгалтерия"
+      description="Раздел бухгалтерии временно недоступен в production."
+    />
+  );
+
   return (
     <Routes>
       <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -595,10 +614,10 @@ export function AppRouteDeclarations() {
       <Route path="/rehearsals/*" element={<LegacyProjectRedirect />} />
       <Route path="/troupe/*" element={<LegacyProjectRedirect />} />
       <Route path="/premises/*" element={<LegacyProjectRedirect />} />
-      <Route path={globalPaths.accounting} element={<AccountingPage />} />
+      <Route path={globalPaths.accounting} element={accountingPageElement} />
       <Route
         path={`${globalPaths.accounting}/:collectionId`}
-        element={<CollectionDetailPage />}
+        element={collectionDetailPageElement}
       />
       <Route path="/settings/*" element={<LegacyProjectRedirect />} />
       <Route path="/roles/*" element={<LegacyProjectRedirect />} />

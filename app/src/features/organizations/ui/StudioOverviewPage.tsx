@@ -1,5 +1,5 @@
 import { Link, Navigate, useParams } from "react-router-dom";
-import { studioOrganizationPath } from "../../../app/router/paths";
+import { globalPaths, studioOrganizationPath } from "../../../app/router/paths";
 import { useAuth } from "../../auth/model/auth-context";
 import { useGetStudioQuery } from "../../studio";
 import "../../director-sessions/ui/director-sessions.css";
@@ -28,10 +28,10 @@ export function StudioOverviewPage() {
       <div className="studio-overview__content">
         <header className="studio-overview__header">
           <Link
-            to={studioOrganizationPath()}
+            to={globalPaths.organizations}
             className="studio-overview__back"
           >
-            ← Студии
+            ← Организации
           </Link>
           <p className="studio-overview__eyebrow">Студия</p>
           <h1 className="studio-overview__title">

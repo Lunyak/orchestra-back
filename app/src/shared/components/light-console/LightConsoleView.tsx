@@ -44,6 +44,7 @@ export function LightConsoleView({
     programs.programs[0];
   const faderMatchOptions = consoleChannel != null ? { consoleChannel } : undefined;
   const compact = mode === "compact";
+  const showChannels = !compact || onSelectChannel != null || readOnly;
   const disabled = readOnly || !onPatchFader;
   const resolvedChannelColumns = clampLightChannelColumns(
     Number(channelColumns),
@@ -61,10 +62,12 @@ export function LightConsoleView({
       className={["light-console", className].filter(Boolean).join(" ")}
       data-mode={mode}
       data-read-only={readOnly ? "true" : "false"}
+      data-show-channels={showChannels ? "true" : "false"}
       aria-label="Пульт света"
       style={consoleStyle}
     >
       <div className="light-console__body">
+        {!compact ? (
         <div className="light-console__header">
         <div className="light-console__program-bar">
           {programs.programs.map((program) => (
@@ -82,7 +85,7 @@ export function LightConsoleView({
           ))}
         </div>
 
-        {!compact && mode === "live" && activeProgram && !readOnly ? (
+        {mode === "live" && activeProgram && !readOnly ? (
           <div className="light-console__program-note">
             {onSaveActiveProgram ? (
               <button
@@ -97,7 +100,7 @@ export function LightConsoleView({
           </div>
         ) : null}
 
-        {!compact && mode === "live" && !readOnly && onOpenSettings ? (
+        {mode === "live" && !readOnly && onOpenSettings ? (
           <button
             type="button"
             className="light-console__settings-btn"
@@ -117,14 +120,15 @@ export function LightConsoleView({
               aria-hidden
             >
               <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" />
-              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V20a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3 1.8 1.7 1.7 0 0 0-1.5-1H4a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V4a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H20a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
             </svg>
           </button>
         ) : null}
         </div>
+        ) : null}
 
         <div className="light-console__main">
-          {!compact ? (
+          {showChannels ? (
             <aside className="light-console__left">
               <div className="light-console__channels">
                 {lightChannels.map((raw, index) => {
@@ -137,7 +141,7 @@ export function LightConsoleView({
                       type="button"
                       className="light-console__channel"
                       data-active={selectedLightSlot === channel}
-                      disabled={readOnly && selectedLightSlot !== channel}
+                      disabled={!onSelectChannel}
                       title={`${channelHint} — свои уровни F1–F${faders.count ?? faders.faders.length} для этого канала`}
                       onClick={() => onSelectChannel?.(channel)}
                     >

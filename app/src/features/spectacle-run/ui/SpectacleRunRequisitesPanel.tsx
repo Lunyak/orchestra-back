@@ -10,7 +10,6 @@ import {
   readSceneLightKadrs,
   upsertKadrInScene,
 } from "../../theater/model/light-kadrs";
-import { readSceneTheaterModels } from "../../theater/model/theater-scene-models";
 import { useAppSelector } from "../../../shared/store/hooks";
 import type {
   SceneLightKadrRequisiteActionV1,
@@ -20,6 +19,7 @@ import type {
 } from "../../../shared/types/script";
 import type { SpectacleTapeItem } from "../model/spectacle-kadr-tape";
 import { CreateKadrRequisitesSection } from "./CreateKadrRequisitesSection";
+import "./spectacle-run-requisites.css";
 
 export function SpectacleRunRequisitesPanel({
   scene,
@@ -53,11 +53,6 @@ export function SpectacleRunRequisitesPanel({
       };
     });
   }, [projectMembersData, troupeData]);
-
-  const theaterModels = useMemo(
-    () => (scene ? readSceneTheaterModels(scene) : []),
-    [scene],
-  );
 
   const kadrs = useMemo(
     () => readSceneLightKadrs(scene),
@@ -95,13 +90,16 @@ export function SpectacleRunRequisitesPanel({
     }
   };
 
-  const toggleCue = (requisiteId: number) => {
+  const toggleCue = (
+    requisiteId: number,
+    action: SceneLightKadrRequisiteActionV1 = "setup",
+  ) => {
     const exists = draftCues.some((cue) => cue.requisiteId === requisiteId);
     if (exists) {
       persistKadrCues(draftCues.filter((cue) => cue.requisiteId !== requisiteId));
       return;
     }
-    persistKadrCues([...draftCues, { requisiteId, action: "setup" }]);
+    persistKadrCues([...draftCues, { requisiteId, action }]);
   };
 
   const setCueAction = (
@@ -121,9 +119,9 @@ export function SpectacleRunRequisitesPanel({
       aria-label="Реквизит картины"
     >
       <CreateKadrRequisitesSection
+        layout="flat"
         sceneRequisites={scene.requisites ?? []}
         onSceneRequisitesChange={handleSceneRequisitesChange}
-        theaterModels={theaterModels}
         draftCues={draftCues}
         onToggleCue={toggleCue}
         onCueActionChange={setCueAction}

@@ -208,13 +208,13 @@ export function useSpectaclePage() {
 
   const shouldShowScenesSidebar =
     activeView === "script" ||
-    activeView === "light-plot" ||
-    activeView === "sufer" ||
     activeView === "theater" ||
     activeView === "board" ||
     activeView === "sessions" ||
     activeView === "tasks" ||
     activeView === "team";
+  const usePlaybookDocksLayout =
+    shouldShowScenesSidebar || activeView === "light-plot";
   const compactMainChrome = activeView === "media";
 
   const kanbanMembers = useMemo(
@@ -278,6 +278,7 @@ export function useSpectaclePage() {
     setTheaterOutlinerHostRef,
     setTheaterLayout,
     shouldShowScenesSidebar,
+    usePlaybookDocksLayout,
     shouldSwapPanels,
     showPlaylistSidebar,
     showTheaterControls,

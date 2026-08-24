@@ -85,3 +85,45 @@
   font-weight: 300;
   line-height: 1;
 }
+
+@media (max-width: 720px) {
+  .team-role-mindmap .project-nav-mindmap__branches {
+    gap: 14px;
+  }
+
+  .team-role-mindmap .project-nav-mindmap__leaves {
+    gap: 10px;
+  }
+
+  .team-role-mindmap__item {
+    min-height: 160px;
+  }
+
+  .team-role-mindmap__add {
+    width: 112px;
+    height: 160px;
+  }
+
+  .team-role-mindmap__add-plus {
+    font-size: 48px;
+  }
+
+  .team-role-mindmap__add-col {
+    padding-left: 18px;
+  }
+
+  .team-role-mindmap__add-col::before {
+    width: 18px;
+  }
+}
+
+@media (max-width: 420px) {
+  .team-role-mindmap__add {
+    width: 96px;
+    height: 140px;
+  }
+
+  .team-role-mindmap__item {
+    min-height: 140px;
+  }
+}

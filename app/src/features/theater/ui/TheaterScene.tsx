@@ -57,6 +57,9 @@ import { TheaterLightConsolePanel } from "./TheaterLightConsolePanel";
 import { TheaterHallQuickStartModal } from "./TheaterHallQuickStartModal";
 import { TheaterCanvasShell } from "./canvas/TheaterCanvasShell";
 import { TheaterCanvasContent } from "./canvas/TheaterCanvasContent";
+import { TheaterViewportCaptureBridge } from "./canvas/TheaterViewportCaptureBridge";
+import { TheaterViewportKadrStrip } from "./TheaterViewportKadrStrip";
+import { TheaterSchemeTabs } from "./TheaterSchemeTabs";
 import { TheaterControlsLayoutTab } from "./controls/TheaterControlsLayoutTab";
 import "./style.css";
 import "./theater-editor-sidebar.css";
@@ -465,7 +468,7 @@ export const TheaterScene = ({
     vm.setHallQuickStartDone(true);
   };
 
-  return (
+  const sceneTree = (
     <div
       className={[
         "theater-scene",
@@ -624,6 +627,7 @@ export const TheaterScene = ({
         camera={initialCamera}
         backgroundColor={vm.sceneBackgroundColor}
       >
+        <TheaterViewportCaptureBridge />
         <TheaterCanvasContent
           projectName={vm.projectName}
           layout={vm.layout}
@@ -789,10 +793,14 @@ export const TheaterScene = ({
           onStageGridDragEnd={vm.endTheaterHistoryTransaction}
         />
       </TheaterCanvasShell>
+      {!embedLight ? <TheaterViewportKadrStrip vm={vm} /> : null}
         </div>
       </div>
     </div>
   );
+
+  if (embedLight) return sceneTree;
+  return <TheaterSchemeTabs>{sceneTree}</TheaterSchemeTabs>;
 };
 
 function useMobileTheaterLayout() {

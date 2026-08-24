@@ -11,9 +11,13 @@ import { ImageWithPreloader } from "../../shared/component/ImageWithPreloader/Im
 import { Seo } from "../../shared/component/Seo/Seo";
 import { ROUTES } from "../../shared/model/routes";
 import type { SiteEvent } from "../../shared/model/siteContent";
-import { fetchSiteEvents } from "../../shared/model/siteContent";
+import { fetchSiteEvents, mergeSiteEventsWithFallback } from "../../shared/model/siteContent";
 import { isAbsoluteUrl, siteAsset } from "../../shared/model/siteAssets";
 import { hitSiteEventView } from "../../shared/model/siteViews";
+import {
+  VASSA_ZHELEZNOVA_ANONSE,
+  VASSA_ZHELEZNOVA_REVIEWS,
+} from "./vassa-zheleznova-content";
 import "./style.css";
 
 const FALLBACK_EVENTS: SiteEvent[] = [
@@ -21,13 +25,12 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     slug: "железнова",
     soon: false,
     name: "Железнова",
-    subtitle: "",
-    old: "",
-    anonse:
-      'Это не просто история о прошлом. Это размышление о времени, идеологии и вечных вопросах: что важнее — семья, долг или личные убеждения? Наш спектакль поставлен по второй редакции пьесы — последней работе Горького. Это рассказ о схватке между старым и новым, где каждая сторона по-своему права и по-своему несчастна. Железнова — сильная, но одинокая женщина. Она продолжает жить "как положено", сохраняя семейное дело и защищая его от любых угроз. Её жизнь — как пароход: идёт вперёд, не жалея себя и других. Её философия проста: "Дети — руки мои, внуки — пальцы мои". Она верит, что её долг — сохранить груз прошлого, чтобы передать его в будущее. Но её дети — это уже другое время, другие идеи. Между ними разворачивается схватка за смысл жизни, за право на своё будущее. Символом этого будущего становится маленький Коля, сын Рахиль и внук Вассы. За него борются идеалы двух эпох.',
+    subtitle: "верёвка на дворе",
+    old: "16+",
+    type: "драма",
+    anonse: VASSA_ZHELEZNOVA_ANONSE,
     date: "",
     cardImage: "vassa-afisha.jpg",
-    type: "",
     colorBackground: 0x6b0f1a,
     photos: [
       "/photos/vassa/0.jpg",
@@ -47,6 +50,7 @@ const FALLBACK_EVENTS: SiteEvent[] = [
     ],
     eventPageBg: "/photos/vassa/0.jpg",
     disableGlass: true,
+    reviews: [...VASSA_ZHELEZNOVA_REVIEWS],
     cast: [],
   },
   {
@@ -125,7 +129,9 @@ const EventPage: FC = () => {
     fetchSiteEvents()
       .then((remote) => {
         if (!alive) return;
-        if (remote && remote.length) setEvents(remote);
+        if (remote && remote.length) {
+          setEvents(mergeSiteEventsWithFallback(remote, FALLBACK_EVENTS));
+        }
       })
       .catch(() => {
         // ignore: fallback is already shown
@@ -336,6 +342,9 @@ const EventPage: FC = () => {
       )}
 
       <h1 className="chalk-page__title chalk-event__title">{title}</h1>
+      {curentEvent.subtitle?.trim() && (
+        <p className="chalk-page__subtitle">{curentEvent.subtitle.trim()}</p>
+      )}
       <div className="chalk-page__rule" aria-hidden />
 
       {photos.length > 0 && (

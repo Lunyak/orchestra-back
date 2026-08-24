@@ -73,3 +73,31 @@
   gap: 12px;
   min-width: 0;
 }
+
+@media (max-width: 720px) {
+  .theater-overview {
+    padding: 12px 12px 20px;
+  }
+
+  .theater-overview__content {
+    gap: 16px;
+  }
+
+  .theater-overview__header {
+    display: none;
+  }
+
+  .theater-overview__section-title {
+    margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 420px) {
+  .theater-overview {
+    padding: 10px 8px 16px;
+  }
+
+  .theater-overview__content {
+    gap: 12px;
+  }
+}

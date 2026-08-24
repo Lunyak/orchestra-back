@@ -12,6 +12,12 @@ import {
   insertKadrInSceneData,
   kadrDisplayTitle,
 } from "../model/kadr-store";
+import {
+  buildTheaterSnapshotScenePatch,
+  captureSceneTheaterSnapshot,
+} from "../model/kadr-theater-snapshot";
+import { buildSceneKadrTapeGroupsFromScenes } from "../model/scene-kadr-tape";
+import { captureTheaterViewportDataUrl } from "../model/theater-viewport-capture";
 import { migrateSceneLightKadrsFromMarkdown } from "../../spectacle-run/model/migrate-kadrs-from-markdown";
 import { resolveLightFaders } from "../../../shared/components/light-console/light-console-data";
 import type { TheaterSceneViewModel } from "../model/use-theater-scene";
@@ -21,43 +27,58 @@ export type TheaterKadrTapeProps = {
   vm: TheaterSceneViewModel;
 };
 
-/** Лента картин текущей сцены в 3D-редакторе: выбор → look на пульт + 3D. */
+/** Лента «сцены → картины» в 3D-редакторе (общий store с прогоном). */
 export function TheaterKadrTape({ vm }: TheaterKadrTapeProps) {
-  const { playbookData, setPlaybookData, updateScene, saveScenesForLightPlot } = usePlaybook();
-  const scene = vm.currentScene;
+  const {
+    scenes,
+    playbookData,
+    setPlaybookData,
+    updateScene,
+    setCurrentPage,
+    saveScenesForLightPlot,
+  } = usePlaybook();
   const [activeKadrId, setActiveKadrId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [captureSnapshot, setCaptureSnapshot] = useState(true);
+
+  const currentPage = vm.currentPage;
+  const currentScene = vm.currentScene;
 
   useEffect(() => {
-    if (!scene) return;
-    const migrated = migrateSceneLightKadrsFromMarkdown(scene);
-    const prev = readSceneLightKadrs(scene);
+    if (!currentScene) return;
+    const migrated = migrateSceneLightKadrsFromMarkdown(currentScene);
+    const prev = readSceneLightKadrs(currentScene);
     if (JSON.stringify(prev) === JSON.stringify(migrated)) return;
-    updateScene(scene.id, { lightKadrs: migrated });
-  }, [scene?.id, scene?.markdown, scene?.lightKadrs, updateScene]);
+    updateScene(currentScene.id, { lightKadrs: migrated });
+  }, [currentScene, updateScene]);
 
-  const kadrs = useMemo(() => {
-    if (!scene) return [];
-    return [...readSceneLightKadrs(scene).kadrs].sort(
-      (a, b) => a.kadrNo - b.kadrNo || a.id.localeCompare(b.id),
-    );
-  }, [scene?.id, scene?.lightKadrs]);
+  const tapeGroups = useMemo(
+    () => buildSceneKadrTapeGroupsFromScenes(scenes),
+    [scenes],
+  );
 
   useEffect(() => {
-    if (kadrs.length === 0) {
-      setActiveKadrId(null);
-      return;
-    }
-    setActiveKadrId((prev) => {
-      if (prev && kadrs.some((kadr) => kadr.id === prev)) return prev;
-      return kadrs[0]?.id ?? null;
-    });
-  }, [kadrs]);
+    if (!currentScene || !activeKadrId) return;
+    const kadrs = readSceneLightKadrs(currentScene).kadrs;
+    if (kadrs.some((kadr) => kadr.id === activeKadrId)) return;
+    setActiveKadrId(kadrs[0]?.id ?? null);
+  }, [activeKadrId, currentScene]);
 
-  const applyKadrId = (kadrId: string) => {
-    if (!scene) return;
-    const kadr = findKadrById(readSceneLightKadrs(scene), kadrId);
+  const selectScene = (sceneIndex: number) => {
+    if (sceneIndex === currentPage) return;
+    setCurrentPage(sceneIndex);
+    setStatus(`Сцена ${sceneIndex + 1}`);
+  };
+
+  const applyKadrId = (sceneIndex: number, kadrId: string) => {
+    const targetScene = scenes[sceneIndex];
+    if (!targetScene) return;
+    const kadr = findKadrById(readSceneLightKadrs(targetScene), kadrId);
     if (!kadr) return;
+
+    if (sceneIndex !== currentPage) {
+      setCurrentPage(sceneIndex);
+    }
 
     setActiveKadrId(kadrId);
     const baseFaders = resolveLightFaders(playbookData?.lightFaders ?? undefined);
@@ -75,7 +96,9 @@ export function TheaterKadrTape({ vm }: TheaterKadrTapeProps) {
       };
     });
 
-    if (look.smokeMachine != null) {
+    if (kadr.theaterSnapshot) {
+      updateScene(targetScene.id, buildTheaterSnapshotScenePatch(kadr.theaterSnapshot));
+    } else if (look.smokeMachine != null) {
       vm.setSmokeMachineEnabled(look.smokeMachine);
     }
 
@@ -83,18 +106,30 @@ export function TheaterKadrTape({ vm }: TheaterKadrTapeProps) {
   };
 
   const createKadr = () => {
+    const scene = currentScene ?? scenes[currentPage];
     if (!scene) return;
+
+    const theaterSnapshot = captureSnapshot
+      ? captureSceneTheaterSnapshot(scene)
+      : null;
+    const coverDataUrl = captureSnapshot ? captureTheaterViewportDataUrl() : null;
+    const imageMarkdown = coverDataUrl ? `![](${coverDataUrl})` : undefined;
+
     const result = insertKadrInSceneData({
       scene,
       afterKadrId: activeKadrId,
+      theaterSnapshot,
+      imageMarkdown,
     });
     updateScene(scene.id, { lightKadrs: result.nextKadrs });
     setActiveKadrId(result.kadrId);
     void saveScenesForLightPlot({ force: true });
-    setStatus(`Картина ${result.kadrNo} создана`);
+    const snapshotNote = captureSnapshot ? " + мизансцена" : "";
+    setStatus(`Картина ${result.kadrNo} создана${snapshotNote}`);
   };
 
   const deleteActive = () => {
+    const scene = currentScene ?? scenes[currentPage];
     if (!scene || !activeKadrId) return;
     const kadr = findKadrById(readSceneLightKadrs(scene), activeKadrId);
     if (!kadr) return;
@@ -105,16 +140,16 @@ export function TheaterKadrTape({ vm }: TheaterKadrTapeProps) {
     setStatus(`«${kadrDisplayTitle(kadr)}» удалена`);
   };
 
-  if (!scene) {
+  if (scenes.length === 0) {
     return (
       <div className="theater-kadr-tape theater-kadr-tape--empty">
-        <p>Нет активной сцены</p>
+        <p>Нет сцен в playbook</p>
       </div>
     );
   }
 
   return (
-    <div className="theater-kadr-tape" aria-label="Картины сцены">
+    <div className="theater-kadr-tape" aria-label="Сцены и картины">
       <div className="theater-kadr-tape__toolbar">
         <button type="button" className="theater-kadr-tape__btn" onClick={createKadr}>
           + Картина
@@ -127,36 +162,78 @@ export function TheaterKadrTape({ vm }: TheaterKadrTapeProps) {
         >
           Удалить
         </button>
+        <label className="theater-kadr-tape__snapshot-toggle">
+          <input
+            type="checkbox"
+            checked={captureSnapshot}
+            onChange={(event) => setCaptureSnapshot(event.target.checked)}
+          />
+          Снапшот мизансцены
+        </label>
       </div>
 
-      {kadrs.length === 0 ? (
-        <p className="theater-kadr-tape__empty">Нет картин — создайте первую</p>
-      ) : (
-        <ul className="theater-kadr-tape__list" role="listbox" aria-label="Картины">
-          {kadrs.map((kadr) => {
-            const active = kadr.id === activeKadrId;
-            return (
-              <li key={kadr.id}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  className={cn("theater-kadr-tape__item", active && "theater-kadr-tape__item--active")}
-                  onClick={() => applyKadrId(kadr.id)}
+      <ul className="theater-kadr-tape__groups" role="list" aria-label="Сцены">
+        {tapeGroups.map((group) => {
+          const sceneActive = group.sceneIndex === currentPage;
+          const realKadrs = group.items.filter((entry) => !entry.item.isPlaceholder);
+
+          return (
+            <li
+              key={group.sceneId}
+              className={cn(
+                "theater-kadr-tape__group",
+                sceneActive && "theater-kadr-tape__group--active",
+              )}
+            >
+              <button
+                type="button"
+                className={cn(
+                  "theater-kadr-tape__scene",
+                  sceneActive && "theater-kadr-tape__scene--active",
+                )}
+                onClick={() => selectScene(group.sceneIndex)}
+                aria-current={sceneActive ? "true" : undefined}
+              >
+                <span className="theater-kadr-tape__scene-no">С{group.sceneOrdinal}</span>
+                <span className="theater-kadr-tape__scene-title">{group.sceneTitle}</span>
+              </button>
+
+              {realKadrs.length === 0 ? (
+                <p className="theater-kadr-tape__empty">Нет картин</p>
+              ) : (
+                <ul
+                  className="theater-kadr-tape__list"
+                  role="listbox"
+                  aria-label={`Картины сцены ${group.sceneOrdinal}`}
                 >
-                  <span className="theater-kadr-tape__no">К{kadr.kadrNo}</span>
-                  <span className="theater-kadr-tape__title">{kadrDisplayTitle(kadr)}</span>
-                  {kadr.blackout || kadr.programId <= 0 ? (
-                    <span className="theater-kadr-tape__meta">блекаут</span>
-                  ) : (
-                    <span className="theater-kadr-tape__meta">П{kadr.programId}</span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                  {realKadrs.map(({ item }) => {
+                    const kadrId = item.kadrId;
+                    if (!kadrId) return null;
+                    const active = kadrId === activeKadrId && sceneActive;
+                    return (
+                      <li key={kadrId}>
+                        <button
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          className={cn(
+                            "theater-kadr-tape__item",
+                            active && "theater-kadr-tape__item--active",
+                          )}
+                          onClick={() => applyKadrId(group.sceneIndex, kadrId)}
+                        >
+                          <span className="theater-kadr-tape__no">К{item.kadrNo}</span>
+                          <span className="theater-kadr-tape__title">{item.headingTitle}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </li>
+          );
+        })}
+      </ul>
 
       {status ? (
         <p className="theater-kadr-tape__status" role="status">

@@ -1,6 +1,7 @@
 import cn from "classnames";
 import { useSyncExternalStore } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";
 import { useProject } from "../../project";
 import {
   getProjectTaskFilterSnapshot,
@@ -27,18 +28,11 @@ import {
   SpectacleTechChromeCenterSlot,
   SpectacleTechChromeLeftSlot,
 } from "./spectacle-tech-chrome-slots";
+import {
+  SCRIPT_MODE_ITEMS,
+  SCRIPT_SCENE_NAME,
+} from "./SpectacleScriptModeNav";
 import "./spectacle-direction-switch.css";
-
-const SCRIPT_SCENE_NAME = "script";
-
-const SCRIPT_MODE_ITEMS: ReadonlyArray<{
-  mode: ShowScriptMarkdownMode;
-  label: string;
-}> = [
-  { mode: "play", label: "Текст" },
-  { mode: "explication", label: "Экспликация" },
-  { mode: "comments", label: "Комментарии" },
-];
 
 const TECH_MODE_ITEMS: ReadonlyArray<{
   id: LightPlotMode;
@@ -79,6 +73,7 @@ const TASK_MODE_ITEMS: ReadonlyArray<{
 function SpectacleScriptModeSwitchList() {
   const dispatch = useAppDispatch();
   const { projectName } = useProject();
+  const compactStrip = useCompactKadrStrip();
 
   const markdownMode = useAppSelector((state) =>
     projectName
@@ -107,6 +102,10 @@ function SpectacleScriptModeSwitchList() {
       }),
     );
   };
+
+  if (compactStrip) {
+    return null;
+  }
 
   return (
     <ul
@@ -241,6 +240,7 @@ function SpectacleTasksModeSwitchList() {
 
 export function SpectacleDirectionSwitch() {
   const { pathname } = useLocation();
+  const compactStrip = useCompactKadrStrip();
   const activeSection = getProjectSectionFromPath(pathname);
   const showScriptModes = activeSection === "script";
   const showTechModes = activeSection === "light-plot";
@@ -276,7 +276,7 @@ export function SpectacleDirectionSwitch() {
       {showCenterChrome ? <SpectacleTechChromeCenterSlot /> : null}
       <div className="spectacle-direction-switch__right">
         {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
-        {showTechModes ? <SpectacleTechModeSwitchList /> : null}
+        {showTechModes && !compactStrip ? <SpectacleTechModeSwitchList /> : null}
         {showPlanModes ? <SpectaclePlanModeSwitchList /> : null}
       </div>
     </nav>

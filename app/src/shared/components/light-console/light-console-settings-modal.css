@@ -2,6 +2,13 @@
   display: flex;
   flex-direction: column;
   max-width: min(420px, calc(100vw - 24px));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.light-console-settings-modal__header,
+.light-console-settings-modal__footer {
+  flex-shrink: 0;
 }
 
 .light-console-settings-modal__header {
@@ -33,8 +40,13 @@
 
 .light-console-settings-modal__body {
   display: grid;
+  flex: 1 1 auto;
   gap: 14px;
+  min-height: 0;
   padding: 14px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .light-console-settings-modal__intro {

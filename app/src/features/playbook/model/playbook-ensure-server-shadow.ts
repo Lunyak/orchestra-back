@@ -85,6 +85,10 @@ export async function ensurePlaybookServerShadowForPush(
       typeof (sceneRow as any).lightChannelRoles === "object"
         ? { lightChannelRoles: (sceneRow as any).lightChannelRoles }
         : {}),
+      ...((sceneRow as any)?.lightConsoleUi &&
+      typeof (sceneRow as any).lightConsoleUi === "object"
+        ? { lightConsoleUi: (sceneRow as any).lightConsoleUi }
+        : {}),
       ...(() => {
         const bag = unpackProjectorMedia((sceneRow as any)?.projectorMedia);
         return {

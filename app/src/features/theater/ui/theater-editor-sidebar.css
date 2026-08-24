@@ -229,6 +229,15 @@
   overflow-x: hidden;
 }
 
+.theater-navigation-panel-body:has(.theater-kadr-tape) {
+  overflow: hidden;
+}
+
+.theater-navigation-panel .theater-kadr-tape {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .theater-navigation-panel .theater-editor-scene-panel,
 .theater-navigation-panel .theater-editor-scene {
   flex: 1 1 auto;

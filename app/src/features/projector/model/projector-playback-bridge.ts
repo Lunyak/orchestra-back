@@ -2,24 +2,33 @@ const CHANNEL_NAME = "orchestra-projector-v1";
 
 export type ProjectorShowHold = {
   type: "show-hold";
-  /** Локальный/offline URL, если нет storageKey */
+  /** Локальный/offline URL, если нет storageKey (не blob: из другого окна). */
   src: string | null;
   /** Ключ в хранилище — окно проектора само грузит через /files/stream */
   storageKey: string | null;
   holdId: number | null;
+  /** Имя файла для локального кэша в окне проектора (folder picker). */
+  fileName?: string | null;
+  projectSlug?: string | null;
+  /** Fade через чёрный при смене, мс. */
+  fadeMs?: number;
 };
 export type ProjectorShowVideo = {
   type: "show-video";
   src: string;
   storageKey: string | null;
+  fileName?: string | null;
+  projectSlug?: string | null;
   holdSrc: string | null;
   holdStorageKey: string | null;
+  holdFileName?: string | null;
   holdId: number | null;
   videoId: number;
   muted?: boolean;
   volume?: number;
+  fadeMs?: number;
 };
-export type ProjectorBlack = { type: "black" };
+export type ProjectorBlack = { type: "black"; fadeMs?: number };
 export type ProjectorReady = { type: "ready" };
 export type ProjectorPing = { type: "ping" };
 export type ProjectorPong = { type: "pong" };

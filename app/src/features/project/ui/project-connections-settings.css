@@ -71,3 +71,12 @@
   margin-top: 10px;
   margin-bottom: 0;
 }
+
+@media (max-width: 560px) {
+  .project-connections-settings .settings-project-field,
+  .project-connections-settings__partner,
+  .project-connections-settings .settings-member-row,
+  .project-connections-settings .settings-members {
+    max-width: none;
+  }
+}

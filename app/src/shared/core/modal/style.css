@@ -16,8 +16,13 @@
   flex-direction: column;
   max-width: min(920px, calc(100vw - 24px));
   max-height: min(86vh, 900px);
+  max-height: min(86dvh, 900px);
   width: 100%;
-  overflow: hidden;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: var(--color-bg-modal);
   box-shadow: var(--shadow-modal, 20px 20px 20px);
   color: var(--color-text-primary, inherit);
@@ -30,4 +35,10 @@
 .modal-panel:focus-visible {
   /* outline: 2px solid var(--color-bg-tertiary); */
   outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .modal-panel {
+    max-height: min(calc(100dvh - 24px), 900px);
+  }
 }

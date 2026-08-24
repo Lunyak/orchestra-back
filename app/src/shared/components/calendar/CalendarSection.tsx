@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   MonthCalendar,
+  type CalendarViewMode,
   type MonthCalendarEvent,
   type MonthCalendarStatus,
 } from "./MonthCalendar";
@@ -18,14 +19,22 @@ function endOfMonth(date: Date): Date {
   return dayjs(date).endOf("month").toDate();
 }
 
+function parseViewMode(raw: string | null): CalendarViewMode {
+  if (raw === "week" || raw === "day" || raw === "month") return raw;
+  return "month";
+}
+
 export type CalendarSectionState = {
   currentMonth: Date;
   selectedDate: string;
+  viewMode: CalendarViewMode;
   monthStartDate: Date;
   monthEndDate: Date;
   fromIso: string;
   toIso: string;
 };
+
+export type { CalendarViewMode };
 
 export function CalendarSection({
   storageMonthKey,
@@ -56,6 +65,8 @@ export function CalendarSection({
   weekDayLabels?: string[];
   showStatusMarks?: boolean;
 }) {
+  const storageViewKey = `${storageMonthKey}:view`;
+
   const [currentMonth, setCurrentMonth] = useState(() => {
     const saved = sessionStorage.getItem(storageMonthKey);
     if (saved) {
@@ -74,9 +85,17 @@ export function CalendarSection({
     return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : isoDate(new Date());
   });
 
+  const [viewMode, setViewMode] = useState<CalendarViewMode>(() =>
+    parseViewMode(sessionStorage.getItem(storageViewKey)),
+  );
+
   useEffect(() => {
     sessionStorage.setItem(storageMonthKey, currentMonth.toISOString());
   }, [currentMonth, storageMonthKey]);
+
+  useEffect(() => {
+    sessionStorage.setItem(storageViewKey, viewMode);
+  }, [storageViewKey, viewMode]);
 
   const monthStartDate = useMemo(() => startOfMonth(currentMonth), [currentMonth]);
   const monthEndDate = useMemo(() => endOfMonth(currentMonth), [currentMonth]);
@@ -87,6 +106,7 @@ export function CalendarSection({
     onStateChange?.({
       currentMonth,
       selectedDate,
+      viewMode,
       monthStartDate,
       monthEndDate,
       fromIso,
@@ -100,15 +120,34 @@ export function CalendarSection({
     onStateChange,
     selectedDate,
     toIso,
+    viewMode,
   ]);
+
+  const handleChangeViewMode = (nextMode: CalendarViewMode) => {
+    setViewMode(nextMode);
+    const nextMonth = dayjs(selectedDate).startOf("month").toDate();
+    if (!dayjs(nextMonth).isSame(currentMonth, "month")) {
+      setCurrentMonth(nextMonth);
+    }
+  };
+
+  const handleSelectDate = (iso: string) => {
+    setSelectedDate(iso);
+    const nextMonth = dayjs(iso).startOf("month").toDate();
+    if (!dayjs(nextMonth).isSame(currentMonth, "month")) {
+      setCurrentMonth(nextMonth);
+    }
+  };
 
   return (
     <div className={className}>
       <MonthCalendar
         currentMonth={currentMonth}
         selectedDate={selectedDate}
+        viewMode={viewMode}
         onChangeMonth={setCurrentMonth}
-        onSelectDate={setSelectedDate}
+        onSelectDate={handleSelectDate}
+        onChangeViewMode={handleChangeViewMode}
         onDayClick={onDayClick}
         onDayDoubleClick={onDayDoubleClick}
         statusByDate={statusByDate}
@@ -122,4 +161,3 @@ export function CalendarSection({
     </div>
   );
 }
-

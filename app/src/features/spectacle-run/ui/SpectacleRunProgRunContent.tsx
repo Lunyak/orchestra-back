@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import cn from "classnames";
+import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";
 import { useProject } from "../../project/model/project-context";
 import { useAppSelector } from "../../../shared/store/hooks";
 import { selectShowScriptMarkdownUi } from "../../show-script-markdown/model/show-script-markdown-slice";
@@ -13,7 +15,9 @@ export function SpectacleRunProgRunContent() {
     selectShowScriptMarkdownUi(state, projectName ?? "", "script"),
   );
   const run = useSpectacleRunContext();
+  const compactStrip = useCompactKadrStrip();
   const { tape, tapeIndex } = run;
+  const stripLayout = compactStrip ? "classic" : run.progRunKadrStripLayout;
 
   const playlist = useMemo(
     () =>
@@ -41,10 +45,15 @@ export function SpectacleRunProgRunContent() {
   }
 
   return (
-    <div className="spectacle-run spectacle-run--prog-run-only">
+    <div className={cn("spectacle-run", "spectacle-run--prog-run-only", compactStrip && "spectacle-run--compact-strip")}>
       <div className="spectacle-run__prog-run-main">
         <KadrTape
           variant="prog-run"
+          layout={stripLayout}
+          notesOverlay={run.progRunKadrStripNotesOverlay}
+          plainCover={run.progRunKadrStripPlainCover}
+          lightConsoleOpen={run.progRunLightConsoleOpen}
+          lightConsoleChannelColumns={run.consoleLayoutSettings.layout.channelColumns}
           projectName={projectName ?? ""}
           tape={tape}
           tapeIndex={tapeIndex}

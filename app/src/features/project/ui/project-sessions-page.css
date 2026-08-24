@@ -45,3 +45,23 @@
 .project-sessions-page__theater-link:hover {
   color: var(--color-active-ascent);
 }
+
+@media (max-width: 720px) {
+  .project-sessions-page__panel {
+    padding: 20px 12px;
+  }
+
+  .project-sessions-page__title {
+    font-size: 1.1rem;
+  }
+
+  .project-sessions-page__hint {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  .project-sessions-page__panel {
+    padding: 16px 10px;
+  }
+}

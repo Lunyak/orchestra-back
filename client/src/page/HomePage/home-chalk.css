@@ -86,3 +86,34 @@
   border-color: var(--chalk-neon);
   text-shadow: 0 0 10px rgba(0, 251, 255, 0.4);
 }
+
+@media (min-width: 900px) {
+  .home-chalk-game__board {
+    width: min(48vw, 380px);
+  }
+
+  .home-chalk-game__status {
+    font-size: 15px;
+  }
+
+  .home-chalk-game__reset {
+    margin-top: 18px;
+    font-size: 14px;
+    padding: 10px 18px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .home-chalk-game__board {
+    width: min(42vw, 440px);
+  }
+
+  .home-chalk-game__status {
+    font-size: 16px;
+  }
+
+  .home-chalk-game__reset {
+    font-size: 15px;
+    padding: 11px 20px;
+  }
+}

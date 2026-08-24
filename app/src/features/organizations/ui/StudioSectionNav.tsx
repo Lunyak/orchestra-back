@@ -1,5 +1,4 @@
-import cn from "classnames";
-import { Link } from "react-router-dom";
+import { useMemo } from "react";
 import {
   studioAssignmentsPath,
   studioInvitesPath,
@@ -11,7 +10,10 @@ import {
 } from "../../../app/router/paths";
 import { useAuth } from "../../auth/model/auth-context";
 import { useGetStudioQuery } from "../../studio";
-import "../../spectacle/ui/spectacle-direction-switch.css";
+import {
+  WorkspaceSectionSwitch,
+  type WorkspaceSectionItem,
+} from "../../../shared/components/workspace-section-switch/WorkspaceSectionSwitch";
 
 type StudioSectionNavProps = {
   studioId: string;
@@ -47,44 +49,25 @@ export function StudioSectionNav({
   });
   const backLabel = studio?.title || "Студия";
   const canManage = studio?.canManage ?? false;
-  const visibleItems = canManage
-    ? ITEMS
-    : ITEMS.filter((item) => item.id !== "invites");
+
+  const items = useMemo<WorkspaceSectionItem[]>(() => {
+    const visible = canManage
+      ? ITEMS
+      : ITEMS.filter((item) => item.id !== "invites");
+    return visible.map((item) => ({
+      id: item.id,
+      label: item.label,
+      to: item.path(studioId),
+    }));
+  }, [canManage, studioId]);
 
   return (
-    <nav className="spectacle-direction-switch" aria-label="Разделы студии">
-      <div className="spectacle-direction-switch__left">
-        <Link
-          to={studioOverviewPath(studioId)}
-          className="spectacle-direction-switch__item"
-        >
-          ← {backLabel}
-        </Link>
-      </div>
-      <div className="spectacle-direction-switch__right">
-        <ul
-          className="spectacle-direction-switch__modes"
-          aria-label="Режимы студии"
-        >
-          {visibleItems.map((item) => {
-            const isActive = active === item.id;
-            return (
-              <li key={item.id}>
-                <Link
-                  to={item.path(studioId)}
-                  className={cn(
-                    "spectacle-direction-switch__item",
-                    isActive && "spectacle-direction-switch__item--active",
-                  )}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </nav>
+    <WorkspaceSectionSwitch
+      ariaLabel="Разделы студии"
+      backTo={studioOverviewPath(studioId)}
+      backLabel={backLabel}
+      items={items}
+      activeId={active}
+    />
   );
 }

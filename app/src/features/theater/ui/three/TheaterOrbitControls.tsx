@@ -47,13 +47,35 @@ const EMPTY_MOVE_KEYS: MoveKeys = {
   fast: false,
 };
 
+const ORBIT_MOUSE_ROTATE = {
+  LEFT: THREE.MOUSE.ROTATE,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT: THREE.MOUSE.PAN,
+} as const;
+
+const ORBIT_MOUSE_PAN = {
+  LEFT: THREE.MOUSE.PAN,
+  MIDDLE: THREE.MOUSE.PAN,
+  RIGHT: THREE.MOUSE.PAN,
+} as const;
+
+const ORBIT_TOUCH = {
+  ONE: THREE.TOUCH.ROTATE,
+  TWO: THREE.TOUCH.DOLLY_PAN,
+} as const;
+
+function isOrbitPanModifier(event: KeyboardEvent | MouseEvent | PointerEvent) {
+  return event.shiftKey || event.altKey;
+}
+
 export function TheaterOrbitControls({
   projectName,
   initialCamera,
   enabled,
 }: TheaterOrbitControlsProps) {
   const controlsRef = useRef<OrbitControlsImpl>(null);
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
+  const panModifierActiveRef = useRef(false);
   const restoredRef = useRef(false);
   const persistTimerRef = useRef<number | null>(null);
   const focusAnimRef = useRef<number | null>(null);
@@ -66,6 +88,52 @@ export function TheaterOrbitControls({
   useEffect(() => {
     restoredRef.current = false;
   }, [projectName, initialCamera]);
+
+  useLayoutEffect(() => {
+    const controls = controlsRef.current;
+    const canvas = gl.domElement;
+    if (!controls || !canvas) return;
+
+    const applyMouseButtons = () => {
+      controls.mouseButtons = panModifierActiveRef.current
+        ? { ...ORBIT_MOUSE_PAN }
+        : { ...ORBIT_MOUSE_ROTATE };
+    };
+
+    const syncPanModifier = (event: KeyboardEvent | MouseEvent | PointerEvent) => {
+      const next = isOrbitPanModifier(event);
+      if (next === panModifierActiveRef.current) return;
+      panModifierActiveRef.current = next;
+      applyMouseButtons();
+    };
+
+    const resetPanModifier = () => {
+      if (!panModifierActiveRef.current) return;
+      panModifierActiveRef.current = false;
+      applyMouseButtons();
+    };
+
+    controls.touches = { ...ORBIT_TOUCH };
+    applyMouseButtons();
+
+    const onKeyDown = (event: KeyboardEvent) => syncPanModifier(event);
+    const onKeyUp = (event: KeyboardEvent) => syncPanModifier(event);
+    const onPointerDown = (event: PointerEvent) => syncPanModifier(event);
+    const onWindowBlur = () => resetPanModifier();
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onWindowBlur);
+    canvas.addEventListener("pointerdown", onPointerDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onWindowBlur);
+      canvas.removeEventListener("pointerdown", onPointerDown);
+      panModifierActiveRef.current = false;
+    };
+  }, [gl]);
 
   useLayoutEffect(() => {
     const controls = controlsRef.current;
@@ -305,11 +373,8 @@ export function TheaterOrbitControls({
       minDistance={0.4}
       maxDistance={220}
       maxPolarAngle={Math.PI / 2 + 0.25}
-      mouseButtons={{
-        LEFT: THREE.MOUSE.ROTATE,
-        MIDDLE: THREE.MOUSE.PAN,
-        RIGHT: THREE.MOUSE.PAN,
-      }}
+      mouseButtons={ORBIT_MOUSE_ROTATE}
+      touches={ORBIT_TOUCH}
       enabled={enabled}
       onChange={schedulePersist}
       onEnd={persist}

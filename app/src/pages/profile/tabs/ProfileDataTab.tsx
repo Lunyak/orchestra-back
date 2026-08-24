@@ -3,6 +3,7 @@ import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField"
 import { MiniAvatar } from "@shared/core/mini-avatar/MiniAvatar";
 import { useEffect, useMemo, useRef } from "react";
 import { useAuth } from "../../../features/auth";
+import { ThemeSettingsSection } from "../../../features/settings/ui/ThemeSettingsSection";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
   deleteProfileDataThunk,
@@ -327,6 +328,8 @@ export function ProfileDataTab() {
 
           {flags.error ? <div className="settings-invite-error profile-data__error">{flags.error}</div> : null}
         </div>
+
+        <ThemeSettingsSection />
 
         <footer className="profile-data-footer">
           <div className="profile-legal-links">

@@ -519,7 +519,7 @@ export function usePlaylistPlayback({
     async (
       track: PlaylistTrack,
       playbackVolume?: number,
-      playOptions?: { continueIfPlaying?: boolean },
+      playOptions?: { continueIfPlaying?: boolean; fadeMs?: number },
     ) => {
       const fadeTarget =
         playbackVolume != null && Number.isFinite(playbackVolume)
@@ -535,23 +535,15 @@ export function usePlaylistPlayback({
       const isSameTrack = currentTrack?.id === track.id;
       const isAudioPlaying = !activeAudio.paused;
       const continueIfPlaying = playOptions?.continueIfPlaying === true;
-      const fadeInMs = track.fadeMs ?? 500;
+      const cueFadeMs =
+        playOptions?.fadeMs != null && Number.isFinite(playOptions.fadeMs) && playOptions.fadeMs > 0
+          ? playOptions.fadeMs
+          : undefined;
+      const fadeInMs = cueFadeMs ?? track.fadeMs ?? 500;
       const fadeOutMs =
-        !isSameTrack && currentTrack ? (currentTrack.fadeMs ?? 500) : fadeInMs;
-
-      if (!crossfadeEnabled && !isSameTrack) {
-        clearFadeTimer("a");
-        clearFadeTimer("b");
-        try {
-          activeAudio.pause();
-          inactiveAudio.pause();
-          activeAudio.volume = 0;
-          inactiveAudio.volume = 0;
-        } catch {
-          // ignore
-        }
-        setIsPlaying(false);
-      }
+        !isSameTrack && currentTrack
+          ? cueFadeMs ?? currentTrack.fadeMs ?? 500
+          : fadeInMs;
 
       if (!isSameTrack) {
         setCurrentTrack(track);
@@ -688,12 +680,18 @@ export function usePlaylistPlayback({
       const target = playlist.find((track) => Number(track.id) === Number(trackId));
       const continueIfPlaying = options?.continueIfPlaying !== false;
       if (target) {
-        void playTrack(target, playbackVolume, { continueIfPlaying });
+        void playTrack(target, playbackVolume, {
+          continueIfPlaying,
+          fadeMs: options?.fadeMs,
+        });
         return;
       }
       const byIndex = playlist[Number(trackId) - 1];
       if (byIndex) {
-        void playTrack(byIndex, playbackVolume, { continueIfPlaying });
+        void playTrack(byIndex, playbackVolume, {
+          continueIfPlaying,
+          fadeMs: options?.fadeMs,
+        });
         return;
       }
       console.warn("[playlist] track not found", {

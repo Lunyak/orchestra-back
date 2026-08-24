@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
-import { theaterOrganizationPath } from "../../../app/router/paths";
+import { globalPaths, theaterOrganizationPath } from "../../../app/router/paths";
 import { fetchTheaters } from "../../../sync/api/workspaces";
 import { useAuth } from "../../auth/model/auth-context";
 import "../../director-sessions/ui/director-sessions.css";
@@ -66,10 +66,10 @@ export function TheaterOverviewPage() {
       <div className="theater-overview__content">
         <header className="theater-overview__header">
           <Link
-            to={theaterOrganizationPath()}
+            to={globalPaths.organizations}
             className="theater-overview__back"
           >
-            ← 
+            ← Организации
           </Link>
           <p className="theater-overview__eyebrow">Театр</p>
         </header>

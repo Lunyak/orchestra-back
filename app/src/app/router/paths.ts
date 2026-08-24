@@ -64,7 +64,8 @@ export function projectSessionPath(
 
 export function theaterOrganizationPath(theaterId?: string) {
   const root = `${globalPaths.organizations}/theaters`;
-  return theaterId ? `${root}/${encodeSegment(theaterId)}` : root;
+  if (theaterId) return `${root}/${encodeSegment(theaterId)}`;
+  return globalPaths.organizations;
 }
 
 export function theaterOverviewPath(theaterId: string) {
@@ -141,12 +142,19 @@ export function projectSettingsPath(projectSlug: string, bot = false) {
 
 export function troupeOrganizationPath(troupeId?: string) {
   const root = `${globalPaths.organizations}/troupes`;
-  return troupeId ? `${root}/${encodeSegment(troupeId)}` : root;
+  if (troupeId) return `${root}/${encodeSegment(troupeId)}`;
+  return globalPaths.organizations;
+}
+
+export function organizationsPath(type?: "theater" | "troupe" | "studio") {
+  if (!type) return globalPaths.organizations;
+  return `${globalPaths.organizations}?type=${type}`;
 }
 
 export function studioOrganizationPath(studioId?: string) {
   const root = `${globalPaths.organizations}/studios`;
-  return studioId ? `${root}/${encodeSegment(studioId)}` : root;
+  if (studioId) return `${root}/${encodeSegment(studioId)}`;
+  return globalPaths.organizations;
 }
 
 export function studioOverviewPath(studioId: string) {
@@ -308,6 +316,15 @@ export function getProjectSlugFromPath(pathname: string) {
 
 export function isProjectPath(pathname: string) {
   return getProjectSlugFromPath(pathname) !== null;
+}
+
+/** Проект / театр / студия — scoped chrome (← назад вместо burger на mobile). */
+export function isScopedWorkspacePath(pathname: string) {
+  return (
+    isProjectPath(pathname) ||
+    isTheaterOrganizationPath(pathname) ||
+    getStudioIdFromPath(pathname) !== null
+  );
 }
 
 export function getProjectSectionFromPath(pathname: string) {
