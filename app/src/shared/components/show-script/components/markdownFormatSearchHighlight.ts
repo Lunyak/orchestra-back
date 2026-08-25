@@ -1,5 +1,5 @@
 import { type Extension, StateEffect, StateField } from "@codemirror/state";
-import { Decoration, type Decoration as DecorationSet, EditorView } from "@codemirror/view";
+import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { findMarkdownSearchMatches } from "../../app-editor-menubar/script-tokenize-formatting";
 
 export const setFormatSearchQueryEffect = StateEffect.define<string>();
@@ -29,7 +29,7 @@ const formatSearchQueryField = StateField.define<string>({
   },
 });
 
-const formatSearchDecorations = StateField.define<DecorationsSet>({
+const formatSearchDecorations = StateField.define<DecorationSet>({
   create() {
     return Decoration.none;
   },

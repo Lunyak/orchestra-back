@@ -25,7 +25,7 @@ const FADE_BUCKETS_MS = [
 function toFadeBucketMs(fadeMs: number): number {
   const normalized = normalizeProjectorTransitionMs(fadeMs);
   if (normalized <= 0) return 0;
-  let best = FADE_BUCKETS_MS[0];
+  let best: (typeof FADE_BUCKETS_MS)[number] = FADE_BUCKETS_MS[0];
   for (const bucket of FADE_BUCKETS_MS) {
     if (Math.abs(bucket - normalized) < Math.abs(best - normalized)) {
       best = bucket;

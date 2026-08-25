@@ -5,13 +5,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   globalPaths,
   theaterOrganizationPath,
-} from "../../app/router/paths";
-import { useAuth } from "../../features/auth";
+} from "../../../app/router/paths";
+import { useAuth } from "../../auth";
 import {
   acceptProjectTheaterInvite,
   previewProjectTheaterInvite,
   type ProjectTheaterInvitePreview,
-} from "../../sync/api/projects";
+} from "../../../sync/api/projects";
 import "./project-theater-invite.css";
 
 export function ProjectTheaterInvitePage() {

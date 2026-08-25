@@ -147,7 +147,7 @@ export function normalizeHydratedScenes(raw: ScriptScene[]): ScriptScene[] {
     return {
       ...scene,
       requisites,
-      ...(lightKadrs !== scene.lightKadrs ? { lightKadrs } : {}),
+      lightKadrs: lightKadrs ?? undefined,
     };
   });
 }

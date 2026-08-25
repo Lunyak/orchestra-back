@@ -118,7 +118,7 @@ type MindmapMotionItemProps = {
   staggerIndex?: number;
   className?: string;
   children: ReactNode;
-} & MindmapExpandHandlers;
+} & Partial<MindmapExpandHandlers>;
 
 export function MindmapMotionItem({
   animated,

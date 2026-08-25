@@ -394,7 +394,6 @@ export function useTheaterScene({
     ...spotlightsVm
   } = spotlightsApi;
   const {
-    updateModels: _updateModels,
     setPendingSnapModelId,
     ...modelsVm
   } = modelsApi;

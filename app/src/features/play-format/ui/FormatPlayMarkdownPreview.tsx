@@ -1,5 +1,5 @@
 import cn from "classnames";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import { MarkdownPreviewParagraph } from "../../../shared/components/show-script/components/markdown-preview-components";
@@ -77,7 +77,7 @@ export function FormatPlayMarkdownPreview({
         remarkPlugins={[remarkBreaks]}
         rehypePlugins={[rehypeScriptTokens]}
         components={{
-          p: ({ children }) => (
+          p: ({ children }: { children?: ReactNode }) => (
             <MarkdownPreviewParagraph {...paragraphProps}>
               {children}
             </MarkdownPreviewParagraph>

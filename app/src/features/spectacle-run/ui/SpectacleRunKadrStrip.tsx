@@ -543,7 +543,7 @@ function SpectacleRunKadrStripRehearsalChip({
 
     <button
 
-      ref={chipRef}
+      ref={chipRef as Ref<HTMLButtonElement> | undefined}
 
       type="button"
 
@@ -845,7 +845,7 @@ function SpectacleRunKadrStripProgRunChip({
 
     <div
 
-      ref={chipRef}
+      ref={chipRef as Ref<HTMLDivElement> | undefined}
 
       role="button"
 

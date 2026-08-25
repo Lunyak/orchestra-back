@@ -16,6 +16,7 @@ import {
   assignSequentialChannelsOrdered,
   buildLightPlotFromSpotlights,
 } from "../model/theater-light-channel-link";
+import { STAGE_AIM_TARGET } from "../model/spotlight-batch-layout";
 import {
   aimSpotlightsByIds,
   cloneSpotlightsByIds,
@@ -378,7 +379,7 @@ export function useTheaterSpotlights({
         id: nextId,
         label: isRgb ? `RGB ${nextId}` : `Софит ${nextId}`,
         position,
-        target: [...STAGE_AIM_TARGET],
+        target: STAGE_AIM_TARGET,
         angleDeg: isRgb ? 26 : 20,
         intensity: isRgb
           ? THEATER_SPOTLIGHT_RGB_DEFAULT_UI_INTENSITY
