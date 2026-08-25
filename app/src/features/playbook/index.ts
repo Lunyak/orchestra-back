@@ -2,7 +2,10 @@ export { readPlaybookScenes, playbookSceneCount, normalizePlaybookJsonPayload } 
 export {
   DEFAULT_THEATER_LAYOUT,
   PlaybookSyncRunner,
+  playbookScenesNavEqual,
   usePlaybook,
+  usePlaybookActions,
+  usePlaybookSceneNav,
 } from "./model/playbook-context";
 export type {
   PlaybookContextValue,

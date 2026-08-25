@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { setupApiInterceptors } from "../../../sync/api/client";
+import { setupApiInterceptors, AUTH_TOKEN_SYNC_EVENT } from "../../../sync/api/client";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
 import {
   authActions,
@@ -52,11 +52,13 @@ export function useAuthBootstrap() {
 
     syncTokenFromStorage();
     window.addEventListener("storage", syncTokenFromStorage);
-    const interval = setInterval(syncTokenFromStorage, 1000);
+    window.addEventListener(AUTH_TOKEN_SYNC_EVENT, syncTokenFromStorage);
+    window.addEventListener("focus", syncTokenFromStorage);
 
     return () => {
       window.removeEventListener("storage", syncTokenFromStorage);
-      clearInterval(interval);
+      window.removeEventListener(AUTH_TOKEN_SYNC_EVENT, syncTokenFromStorage);
+      window.removeEventListener("focus", syncTokenFromStorage);
     };
   }, [accessToken, dispatch]);
 }

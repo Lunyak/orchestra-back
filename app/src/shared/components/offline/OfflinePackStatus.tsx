@@ -2,7 +2,7 @@ import cn from "classnames";
 import { Capacitor } from "@capacitor/core";
 import { Network } from "@capacitor/network";
 import React, { useCallback, useEffect, useState } from "react";
-import { usePlaybook } from "../../../features/playbook";
+import { usePlaybookActions } from "../../../features/playbook";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { getDesktopApi } from "../../platform/desktop-api";
@@ -13,7 +13,7 @@ import "./OfflinePackStatus.css";
 export function OfflinePackStatus() {
   const { projectName } = useProject();
   const { accessToken } = useAuth();
-  const { syncFromServer } = usePlaybook();
+  const { syncFromServer } = usePlaybookActions();
   const [online, setOnline] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);

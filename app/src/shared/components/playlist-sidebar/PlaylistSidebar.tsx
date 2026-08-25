@@ -1,7 +1,7 @@
 import cn from "classnames";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type { PlaylistPlayOptions } from "../../../features/playbook/model/playbook-playback-bridge";
-import { usePlaybook } from "../../../features/playbook";
+import { usePlaybookActions } from "../../../features/playbook";
 import { usePlayerVolume } from "../../player/usePlayerVolume";
 import { useAppSelector } from "../../store/hooks";
 import type { PlaylistTrack } from "../../types/playlist";
@@ -22,6 +22,7 @@ interface PlaylistSidebarProps {
 }
 
 const EMPTY_PLAYLIST: PlaylistTrack[] = [];
+const EMPTY_SOUNDS: never[] = [];
 
 export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   projectName,
@@ -32,11 +33,12 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
   const playlist = useAppSelector(
     (s) => (s.playbook.playbookData?.playlist as PlaylistTrack[] | undefined) ?? EMPTY_PLAYLIST,
   );
+  const sounds = useAppSelector((s) => s.playbook.playbookData?.sounds ?? EMPTY_SOUNDS);
   const playlistUpload = useAppSelector((s) => s.playbook.playlistUpload);
   const accessToken = useAppSelector((s) => s.auth.accessToken);
   const isEditMode = useAppSelector((s) => s.scriptUi.playlistEditMode);
   const crossfadeEnabled = useAppSelector((s) => s.scriptUi.playlistCrossfadeEnabled);
-  const { playbookData, pushPlaybookAfterSoundsSave, registerSoundToggle } = usePlaybook();
+  const { pushPlaybookAfterSoundsSave, registerSoundToggle } = usePlaybookActions();
 
   const { volume, setVolume } = usePlayerVolume();
   const [uiMessage, setUiMessage] = useState<string | null>(null);
@@ -179,7 +181,7 @@ export const PlaylistSidebar: React.FC<PlaylistSidebarProps> = ({
               <HeaderPlayer
                 projectName={projectName}
                 sceneName="script"
-                sounds={playbookData?.sounds || []}
+                sounds={sounds}
                 onSoundsSaved={pushPlaybookAfterSoundsSave}
                 onRegisterToggleHandler={registerSoundToggle}
                 settingsOpen={isEditMode}

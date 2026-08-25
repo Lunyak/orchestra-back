@@ -451,9 +451,12 @@ export function usePlaybookSyncEffects() {
     };
   }, [accessToken, projectName, ensureRemoteProject, syncFromServer, hasLocalEdits]);
 
+  const selectedSceneId = scenes[currentPage]?.id ?? null;
+  const sceneIdsKey = scenes.map((scene) => scene.id).join(",");
+
   useEffect(() => {
-    selectedSceneIdRef.current = scenes[currentPage]?.id ?? null;
-  }, [projectName, scenes, currentPage]);
+    selectedSceneIdRef.current = selectedSceneId;
+  }, [projectName, selectedSceneId]);
 
   useEffect(() => {
     if (scenes.length === 0) {
@@ -495,7 +498,7 @@ export function usePlaybookSyncEffects() {
     if (currentPage > scenes.length - 1) {
       dispatch(playbookActions.setCurrentPage(scenes.length - 1));
     }
-  }, [projectName, scenes, currentPage, dispatch, isPlaybookReady]);
+  }, [projectName, sceneIdsKey, currentPage, dispatch, isPlaybookReady, scenes.length]);
 
   useEffect(() => {
     if (!projectName) return;
@@ -517,7 +520,7 @@ export function usePlaybookSyncEffects() {
     } catch {
       // ignore
     }
-  }, [projectName, scenes, currentPage, isPlaybookReady]);
+  }, [projectName, selectedSceneId, currentPage, isPlaybookReady, scenes.length]);
 
   const roleAssignmentsKey = useMemo(
     () => JSON.stringify((playbookData as any)?.roleAssignments ?? null),

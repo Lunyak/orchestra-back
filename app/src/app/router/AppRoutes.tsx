@@ -18,7 +18,6 @@ import { FormatPlayTextModal } from "../../features/play-format/ui/FormatPlayTex
 import { subscribeOpenFormatPlay } from "../../features/spectacle/model/format-play-request";
 import { useLocation } from "react-router-dom";
 import { useProject } from "../../features/project";
-import { usePlaybook } from "../../features/playbook";
 import { playbookActions } from "../../features/playbook/model/playbook-slice";
 import {
   selectActiveSceneMarkdownContext,
@@ -35,11 +34,63 @@ import {
 
 const SCRIPT_SCENE_NAME = "script";
 
+function FormatPlayModalHost() {
+  const dispatch = useAppDispatch();
+  const { projectName } = useProject();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => subscribeOpenFormatPlay(() => setOpen(true)), []);
+
+  const markdownContext = useAppSelector((state) =>
+    open && projectName
+      ? selectActiveSceneMarkdownContext(state, projectName, SCRIPT_SCENE_NAME)
+      : null,
+  );
+
+  const handleApplyFormattedPlayText = useCallback(
+    (text: string) => {
+      if (!markdownContext?.currentScene) return;
+      dispatch(
+        playbookActions.updateScene({
+          id: markdownContext.currentScene.id,
+          changes: { [markdownContext.activeMarkdownField]: text },
+        }),
+      );
+    },
+    [dispatch, markdownContext],
+  );
+
+  const handleApplyFormattedPlayTextSplit = useCallback(
+    (args: { chunks: string[]; chunkTitles: string[] }) => {
+      if (!markdownContext?.currentScene || args.chunks.length === 0) return;
+      dispatch(
+        playbookActions.splitSceneContentIntoScenes({
+          sourceSceneId: markdownContext.currentScene.id,
+          targetField: markdownContext.activeMarkdownField,
+          chunks: args.chunks,
+          chunkTitles: args.chunkTitles,
+        }),
+      );
+    },
+    [dispatch, markdownContext],
+  );
+
+  if (!open) return null;
+
+  return (
+    <FormatPlayTextModal
+      isOpen
+      sourceText={String(markdownContext?.activeMarkdown ?? "")}
+      onClose={() => setOpen(false)}
+      onApply={handleApplyFormattedPlayText}
+      onApplySplit={handleApplyFormattedPlayTextSplit}
+    />
+  );
+}
+
 function AppRoutesContent() {
   const location = useLocation();
   const dispatch = useAppDispatch();
-  const { projectName } = useProject();
-  const { updateScene } = usePlaybook();
   const {
     showPlaylistSidebar,
     togglePlaylist,
@@ -55,7 +106,6 @@ function AppRoutesContent() {
   } = useScriptUI();
 
   const isMobile = useIsMobile();
-  const [formatPlayModalOpen, setFormatPlayModalOpen] = useState(false);
 
   const { shouldShowScriptState, isSpectacleLayoutRoute } = getRouteMeta(
     location.pathname,
@@ -66,15 +116,6 @@ function AppRoutesContent() {
   const spectacleRunTextHidden = useAppSelector(
     (state) => state.scriptUi.spectacleRunTextHidden,
   );
-  const { currentScene, activeMarkdown, activeMarkdownField } = useAppSelector((state) =>
-    projectName
-      ? selectActiveSceneMarkdownContext(state, projectName, SCRIPT_SCENE_NAME)
-      : { currentScene: undefined, activeMarkdown: "", activeMarkdownField: "markdown" as const },
-  );
-
-  useEffect(() => subscribeOpenFormatPlay(() => setFormatPlayModalOpen(true)), []);
-
-  const formatPlaySourceText = String(activeMarkdown ?? "");
 
   const isRehearsalPlanRoute =
     projectSection === "board" ||
@@ -143,29 +184,17 @@ function AppRoutesContent() {
           }
         />
       ) : null,
-  );
-
-  const handleApplyFormattedPlayText = useCallback(
-    (text: string) => {
-      if (!currentScene) return;
-      updateScene(currentScene.id, { [activeMarkdownField]: text });
-    },
-    [activeMarkdownField, currentScene, updateScene],
-  );
-
-  const handleApplyFormattedPlayTextSplit = useCallback(
-    (args: { chunks: string[]; chunkTitles: string[] }) => {
-      if (!currentScene || args.chunks.length === 0) return;
-      dispatch(
-        playbookActions.splitSceneContentIntoScenes({
-          sourceSceneId: currentScene.id,
-          targetField: activeMarkdownField,
-          chunks: args.chunks,
-          chunkTitles: args.chunkTitles,
-        }),
-      );
-    },
-    [activeMarkdownField, currentScene, dispatch],
+    [
+      shouldShowScriptState,
+      isSuferRoute,
+      isLightPlotRoute,
+      isPlaylistVisible,
+      handleTogglePlaylist,
+      isHeaderScenesCollapsed,
+      handleToggleScenes,
+      spectacleRunTextHidden,
+      handleToggleSpectacleRunText,
+    ],
   );
 
   return (
@@ -173,13 +202,7 @@ function AppRoutesContent() {
       <Suspense fallback={suspenseFallback}>
         <AppRouteDeclarations />
       </Suspense>
-      <FormatPlayTextModal
-        isOpen={formatPlayModalOpen}
-        sourceText={formatPlaySourceText}
-        onClose={() => setFormatPlayModalOpen(false)}
-        onApply={handleApplyFormattedPlayText}
-        onApplySplit={handleApplyFormattedPlayTextSplit}
-      />
+      <FormatPlayModalHost />
     </>
   );
 }

@@ -356,6 +356,15 @@ export function ShowScriptMarkdownSection({
     "script-scene-chrome-menu",
     10,
     () => sceneChromeMenu,
+    [
+      compactStrip,
+      titleInDirectionSwitch,
+      currentScene?.id,
+      markdownMode,
+      isEditing,
+      annotationsMode,
+      ui.playOriginalMode,
+    ],
   );
 
   const showSceneTitleInChrome =

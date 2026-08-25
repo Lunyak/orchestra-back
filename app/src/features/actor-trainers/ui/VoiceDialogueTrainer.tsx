@@ -261,18 +261,23 @@ export function VoiceDialogueTrainer({
   const profileByEmailRef = useRef(profileByEmail);
   profileByEmailRef.current = profileByEmail;
 
-  useAppEditorMenubarActionsRender("voice-settings", 22, () => (
-    <button
-      type="button"
-      className={cn("app-editor-menubar__panel-btn", settingsOpen && "app-editor-menubar__panel-btn--active")}
-      onClick={() => setSettingsOpen((open) => !open)}
-      title="Настройки голосового тренажёра"
-      aria-label="Настройки голосового тренажёра"
-      aria-pressed={settingsOpen}
-    >
-      🎙
-    </button>
-  ));
+  useAppEditorMenubarActionsRender(
+    "voice-settings",
+    22,
+    () => (
+      <button
+        type="button"
+        className={cn("app-editor-menubar__panel-btn", settingsOpen && "app-editor-menubar__panel-btn--active")}
+        onClick={() => setSettingsOpen((open) => !open)}
+        title="Настройки голосового тренажёра"
+        aria-label="Настройки голосового тренажёра"
+        aria-pressed={settingsOpen}
+      >
+        🎙
+      </button>
+    ),
+    [settingsOpen],
+  );
 
   const voiceName = ui.ttsVoiceName;
   const [ttsDiag, setTtsDiag] = useState<{

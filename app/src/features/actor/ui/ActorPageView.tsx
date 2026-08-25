@@ -103,18 +103,23 @@ export function ActorPageView() {
     });
   };
 
-  useAppEditorMenubarActionsRender("actor-settings", 20, () => (
-    <button
-      type="button"
-      className={cn("app-editor-menubar__panel-btn", settingsOpen && "app-editor-menubar__panel-btn--active")}
-      onClick={() => setSettingsOpen((open) => !open)}
-      title="Настройки актёрского тренажёра"
-      aria-label="Настройки актёрского тренажёра"
-      aria-pressed={settingsOpen}
-    >
-      ⚙
-    </button>
-  ));
+  useAppEditorMenubarActionsRender(
+    "actor-settings",
+    20,
+    () => (
+      <button
+        type="button"
+        className={cn("app-editor-menubar__panel-btn", settingsOpen && "app-editor-menubar__panel-btn--active")}
+        onClick={() => setSettingsOpen((open) => !open)}
+        title="Настройки актёрского тренажёра"
+        aria-label="Настройки актёрского тренажёра"
+        aria-pressed={settingsOpen}
+      >
+        ⚙
+      </button>
+    ),
+    [settingsOpen],
+  );
 
   return (
     <main className="actor-page">

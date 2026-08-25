@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { usePlaybook } from "../../../features/playbook";
+import { usePlaybookActions } from "../../../features/playbook";
 import { isDesktopApp } from "../../platform/media-url";
 import "./DownloadProjectorMediaButton.css";
 
@@ -14,7 +14,7 @@ export function DownloadProjectorMediaButton({
   buttonClassName,
   onStatus,
 }: Props) {
-  const { downloadProjectorMediaForOffline } = usePlaybook();
+  const { downloadProjectorMediaForOffline } = usePlaybookActions();
   const [busy, setBusy] = useState(false);
   const [progressLabel, setProgressLabel] = useState<string | null>(null);
   const [lastMessage, setLastMessage] = useState<string | null>(null);

@@ -3,7 +3,8 @@ import { getDesktopApi } from "../../../shared/platform/desktop-api";
 import { flushDesktopOutbox } from "../../../sync/desktopOutbox";
 import type { ProjectMediaScan } from "../../../shared/platform/project-media-folder";
 import type { BrowserPickedScan } from "../../../shared/platform/browser-picked-media";
-import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { useAppDispatch } from "../../../shared/store/hooks";
+import { store } from "../../../shared/store/store";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../../project/model/project-context";
 import { downloadPlaybookProjectorMediaForOffline } from "./playbook-download-projector-offline";
@@ -16,20 +17,7 @@ export function usePlaybookOperations() {
   const { accessToken, setAccessToken } = useAuth();
   const { projectName, ensureRemoteProject } = useProject();
 
-  const { scenes } = useAppSelector((s) => s.playbook);
   const saveScenesRef = useRef<(opts?: { force?: boolean }) => Promise<void>>(async () => {});
-
-  const syncDeps = {
-    dispatch,
-    accessToken,
-    projectName,
-    scenes,
-    ensureRemoteProject,
-    setAccessToken,
-    onBindingsRepaired: () => {
-      void saveScenesRef.current({ force: true });
-    },
-  };
 
   const saveDeps = {
     projectName,
@@ -40,9 +28,23 @@ export function usePlaybookOperations() {
 
   const syncFromServer = useCallback(
     async (token?: string | null, projectOverride?: string) => {
-      await syncPlaybookFromServer(syncDeps, token, projectOverride);
+      await syncPlaybookFromServer(
+        {
+          dispatch,
+          accessToken,
+          projectName,
+          scenes: store.getState().playbook.scenes,
+          ensureRemoteProject,
+          setAccessToken,
+          onBindingsRepaired: () => {
+            void saveScenesRef.current({ force: true });
+          },
+        },
+        token,
+        projectOverride,
+      );
     },
-    [accessToken, projectName, ensureRemoteProject, setAccessToken, dispatch, scenes],
+    [accessToken, projectName, ensureRemoteProject, setAccessToken, dispatch],
   );
 
   const saveScenesForLightPlot = useCallback(

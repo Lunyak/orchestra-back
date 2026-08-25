@@ -21,7 +21,7 @@ export function TheaterCanvasShell({
     <Canvas
       className={className}
       camera={{ position: camera.position, fov: camera.fov }}
-      gl={{ preserveDrawingBuffer: true }}
+      gl={{ preserveDrawingBuffer: false }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = THEATER_SCENE_TONE_EXPOSURE;

@@ -6,6 +6,13 @@ import axios, {
 } from "axios";
 import { refreshToken } from "../auth";
 
+export const AUTH_TOKEN_SYNC_EVENT = "orchestra-auth-token-sync";
+
+export function notifyAccessTokenStorageChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_TOKEN_SYNC_EVENT));
+}
+
 const API_BASE =
   (import.meta as any).env?.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -129,6 +136,7 @@ api.interceptors.response.use(
       const tokens = await refreshToken(oldRefresh);
       localStorage.setItem("accessToken", tokens.accessToken);
       localStorage.setItem("refreshToken", tokens.refreshToken);
+      notifyAccessTokenStorageChanged();
       notifyTokenRefreshed(tokens.accessToken);
 
       originalConfig.headers = originalConfig.headers ?? {};
@@ -142,6 +150,7 @@ api.interceptors.response.use(
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
         localStorage.removeItem("lastSyncAt");
+        notifyAccessTokenStorageChanged();
         if (typeof window !== "undefined") {
           if (globalLogoutHandler) {
             globalLogoutHandler();

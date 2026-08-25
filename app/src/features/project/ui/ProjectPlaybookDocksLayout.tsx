@@ -5,9 +5,10 @@ import cn from "classnames";
 import { useState } from "react";
 import { Outlet, useMatch, useNavigate } from "react-router-dom";
 import { projectPath } from "../../../app/router/paths";
-import { usePlaybook } from "../../playbook";
+import { usePlaybookActions, usePlaybookSceneNav } from "../../playbook";
 import { useProject } from "../model/project-context";
 import { useScriptUI } from "../../script-ui";
+import { useAppSelector } from "../../../shared/store/hooks";
 import "@shared/layout/app-shell.css";
 import "@shared/components/mobile-drawer/mobile-drawer.css";
 
@@ -21,15 +22,15 @@ export function ProjectPlaybookDocksLayout() {
   );
   const { projectName } = useProject();
   const {
-    scenes,
-    currentPage,
     setCurrentPage,
     addScene,
     deleteScene,
     reorderScenes,
     registerPlaylistPlay,
-    isPlaybookReady,
-  } = usePlaybook();
+  } = usePlaybookActions();
+  const scenes = usePlaybookSceneNav();
+  const currentPage = useAppSelector((state) => state.playbook.currentPage);
+  const isPlaybookReady = useAppSelector((state) => state.playbook.isPlaybookReady);
   const {
     showPlaylistSidebar,
     isScenesCollapsed,

@@ -5,9 +5,10 @@ import {
   writeTheaterLayoutDraft,
 } from "../../theater/model/theater-layout-draft-storage";
 import { useProject } from "../../project/model/project-context";
+import { useSelector } from "react-redux";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
+import { store, type RootState } from "../../../shared/store/store";
 import { isProjectorOutputWindow } from "../../projector/model/projector-playback-bridge";
-import { store } from "../../../shared/store/store";
 import {
   playbookActions,
   type PlaybookData,
@@ -109,22 +110,31 @@ export function PlaybookSyncRunner({ children }: { children: React.ReactNode }) 
   return <PlaybookSyncRunnerActive>{children}</PlaybookSyncRunnerActive>;
 }
 
-export function usePlaybook(): PlaybookContextValue {
+export function playbookScenesNavEqual(left: ScriptScene[], right: ScriptScene[]): boolean {
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i].id !== right[i].id) return false;
+    if ((left[i].title ?? "") !== (right[i].title ?? "")) return false;
+  }
+  return true;
+}
+
+export function usePlaybookSceneNav(): ScriptScene[] {
+  return useSelector((state: RootState) => state.playbook.scenes, playbookScenesNavEqual);
+}
+
+export function usePlaybookActions() {
   const dispatch = useAppDispatch();
   const { projectName } = useProject();
   const {
-    playbookData,
-    scenes,
-    theaterLayout,
-    currentPage,
-    isPlaybookReady,
-    hasLocalEdits,
-    realtimePullDeferred,
-    realtimePullDeferredAt,
-    realtimePullDeferredReason,
-  } = useAppSelector((s) => s.playbook);
-  const { syncFromServer, saveScenesForLightPlot, pushPlaybookAfterSoundsSave, downloadProjectorMediaForOffline, syncAndDownloadProjectorMediaForOffline, importDevMediaFolder } =
-    usePlaybookOperations();
+    syncFromServer,
+    saveScenesForLightPlot,
+    pushPlaybookAfterSoundsSave,
+    downloadProjectorMediaForOffline,
+    syncAndDownloadProjectorMediaForOffline,
+    importDevMediaFolder,
+  } = usePlaybookOperations();
 
   const setPlaybookData = useCallback(
     (next: SetStateAction<PlaybookData | null>) => {
@@ -179,10 +189,13 @@ export function usePlaybook(): PlaybookContextValue {
 
   const setCurrentPage = useCallback(
     (next: SetStateAction<number>) => {
-      const resolved = typeof next === "function" ? (next as (prev: number) => number)(currentPage) : next;
+      const resolved =
+        typeof next === "function"
+          ? (next as (prev: number) => number)(store.getState().playbook.currentPage)
+          : next;
       dispatch(playbookActions.setCurrentPage(resolved));
     },
-    [dispatch, currentPage],
+    [dispatch],
   );
 
   const addScene = useCallback(() => dispatch(playbookActions.addScene()), [dispatch]);
@@ -231,23 +244,13 @@ export function usePlaybook(): PlaybookContextValue {
   }, [dispatch]);
 
   return {
-    playbookData,
     setPlaybookData,
     setRoleAssignments,
-    scenes,
     setScenes,
     updateScene,
     resetAllRequisites,
-    theaterLayout,
     setTheaterLayout,
-    currentPage,
     setCurrentPage,
-    isPlaybookReady,
-    hasLocalEdits,
-    realtimePullDeferred,
-    realtimePullDeferredAt,
-    realtimePullDeferredReason,
-    clearRealtimePullDeferred,
     addScene,
     seedScenarioFromPlayText,
     splitSceneFromSelection,
@@ -263,6 +266,35 @@ export function usePlaybook(): PlaybookContextValue {
     handleTrackLinkClick,
     registerSoundToggle,
     handleSoundLinkClick,
+    clearRealtimePullDeferred,
+  };
+}
+
+export function usePlaybook(): PlaybookContextValue {
+  const actions = usePlaybookActions();
+  const {
+    playbookData,
+    scenes,
+    theaterLayout,
+    currentPage,
+    isPlaybookReady,
+    hasLocalEdits,
+    realtimePullDeferred,
+    realtimePullDeferredAt,
+    realtimePullDeferredReason,
+  } = useAppSelector((s) => s.playbook);
+
+  return {
+    playbookData,
+    scenes,
+    theaterLayout,
+    currentPage,
+    isPlaybookReady,
+    hasLocalEdits,
+    realtimePullDeferred,
+    realtimePullDeferredAt,
+    realtimePullDeferredReason,
+    ...actions,
   };
 }
 

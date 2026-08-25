@@ -36,7 +36,10 @@ export const rootReducer = combineSlices(
 export const store = configureStore({
   reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(orchestraApi.middleware),
+    getDefaultMiddleware({
+      serializableCheck: { ignoredPaths: ["playbook"] },
+      immutableCheck: { ignoredPaths: ["playbook"] },
+    }).concat(orchestraApi.middleware),
 });
 
 setupListeners(store.dispatch);

@@ -145,6 +145,13 @@ export const TheaterScene = ({
           {panelsToggleLabel}
         </button>
       ) : null,
+    [
+      onTogglePanels,
+      embeddedLightRehearsal,
+      sceneSettingsActive,
+      panelsToggleLabel,
+      panelsToggleTitle,
+    ],
   );
 
   const sidebarRender =

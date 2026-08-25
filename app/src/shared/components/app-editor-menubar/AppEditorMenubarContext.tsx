@@ -32,23 +32,37 @@ function useAppEditorMenubarProvider() {
   }
 }
 
-export function useAppEditorViewMenuRender(
+const EMPTY_SLOT_DEPS: readonly unknown[] = [];
+
+function useMenubarSlotRender(
+  slot: typeof appEditorViewMenuSlot,
   slotId: string,
   priority: number,
   render: () => ReactNode | null,
+  deps: readonly unknown[] = EMPTY_SLOT_DEPS,
 ) {
   useAppEditorMenubarProvider();
   const renderRef = useRef(render);
   renderRef.current = render;
 
   useLayoutEffect(() => {
-    appEditorViewMenuSlot.register(slotId, priority, () => renderRef.current());
-    return () => appEditorViewMenuSlot.unregister(slotId);
-  }, [slotId, priority]);
+    slot.register(slotId, priority, () => renderRef.current());
+    return () => slot.unregister(slotId);
+  }, [slot, slotId, priority]);
 
   useLayoutEffect(() => {
-    appEditorViewMenuSlot.bump();
-  });
+    slot.bump();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- caller lists live-update inputs
+  }, deps);
+}
+
+export function useAppEditorViewMenuRender(
+  slotId: string,
+  priority: number,
+  render: () => ReactNode | null,
+  deps: readonly unknown[] = EMPTY_SLOT_DEPS,
+) {
+  useMenubarSlotRender(appEditorViewMenuSlot, slotId, priority, render, deps);
 }
 
 export function useAppEditorMenubarViewMenu() {
@@ -64,23 +78,13 @@ export function useAppEditorMenubarActionsRender(
   slotId: string,
   priority: number,
   render: () => ReactNode | null,
+  deps: readonly unknown[] = EMPTY_SLOT_DEPS,
 ) {
-  useAppEditorMenubarProvider();
-  const renderRef = useRef(render);
-  renderRef.current = render;
-
-  useLayoutEffect(() => {
-    appEditorToolbarActionsSlot.register(slotId, priority, () => renderRef.current());
-    return () => appEditorToolbarActionsSlot.unregister(slotId);
-  }, [slotId, priority]);
-
-  useLayoutEffect(() => {
-    appEditorToolbarActionsSlot.bump();
-  });
+  useMenubarSlotRender(appEditorToolbarActionsSlot, slotId, priority, render, deps);
 }
 
 export function useAppEditorMenubarActions(content: ReactNode | null) {
-  useAppEditorMenubarActionsRender("legacy-toolbar-actions", 0, () => content);
+  useAppEditorMenubarActionsRender("legacy-toolbar-actions", 0, () => content, [content]);
 }
 
 export function useAppEditorMenubarToolbarActions() {
@@ -96,19 +100,9 @@ export function useAppEditorMenubarCenterRender(
   slotId: string,
   priority: number,
   render: () => ReactNode | null,
+  deps: readonly unknown[] = EMPTY_SLOT_DEPS,
 ) {
-  useAppEditorMenubarProvider();
-  const renderRef = useRef(render);
-  renderRef.current = render;
-
-  useLayoutEffect(() => {
-    appEditorCenterSlot.register(slotId, priority, () => renderRef.current());
-    return () => appEditorCenterSlot.unregister(slotId);
-  }, [slotId, priority]);
-
-  useLayoutEffect(() => {
-    appEditorCenterSlot.bump();
-  });
+  useMenubarSlotRender(appEditorCenterSlot, slotId, priority, render, deps);
 }
 
 export function useAppEditorMenubarCenter() {
@@ -124,19 +118,9 @@ export function useAppEditorMenubarEndToolsRender(
   slotId: string,
   priority: number,
   render: () => ReactNode | null,
+  deps: readonly unknown[] = EMPTY_SLOT_DEPS,
 ) {
-  useAppEditorMenubarProvider();
-  const renderRef = useRef(render);
-  renderRef.current = render;
-
-  useLayoutEffect(() => {
-    appEditorEndToolsSlot.register(slotId, priority, () => renderRef.current());
-    return () => appEditorEndToolsSlot.unregister(slotId);
-  }, [slotId, priority]);
-
-  useLayoutEffect(() => {
-    appEditorEndToolsSlot.bump();
-  });
+  useMenubarSlotRender(appEditorEndToolsSlot, slotId, priority, render, deps);
 }
 
 export function useAppEditorMenubarEndTools() {

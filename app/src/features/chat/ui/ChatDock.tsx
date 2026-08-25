@@ -35,15 +35,16 @@ function conversationLabel(
 export function ChatDock() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
-  const { data: troupeData } = useMyTroupeQuery(
-    {},
-    { skip: !accessToken },
-  );
-  const myTroupe = troupeData?.troupe ?? null;
   const [open, setOpen] = useState(false);
   const [dockHidden, setDockHidden] = useState(readChatDockHidden);
+  const chatLive = Boolean(accessToken) && !dockHidden;
+  const { data: troupeData } = useMyTroupeQuery(
+    {},
+    { skip: !chatLive },
+  );
+  const myTroupe = troupeData?.troupe ?? null;
   const conversationsQuery = useChatConversationsQuery(undefined, {
-    skip: !open || !accessToken,
+    skip: !open || !chatLive,
   });
   const conversations = useMemo(
     () => conversationsQuery.data ?? [],
@@ -61,7 +62,7 @@ export function ChatDock() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [draft, setDraft] = useState("");
-  const { data: myProfile } = useMyProfileQuery(undefined, { skip: !accessToken });
+  const { data: myProfile } = useMyProfileQuery(undefined, { skip: !chatLive });
   const myEmail = useMemo(
     () => myProfile?.email?.trim().toLowerCase() ?? null,
     [myProfile?.email],
@@ -115,7 +116,7 @@ export function ChatDock() {
   }, []);
 
   useEffect(() => {
-    if (!accessToken) {
+    if (!accessToken || dockHidden) {
       disconnectChatSocket();
       return;
     }
@@ -153,7 +154,7 @@ export function ChatDock() {
     return () => {
       sock.off("chat-message", onMessage);
     };
-  }, [accessToken]);
+  }, [accessToken, dockHidden]);
 
   useEffect(() => {
     if (!open) setExpanded(false);
