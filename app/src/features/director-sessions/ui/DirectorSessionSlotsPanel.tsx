@@ -16,6 +16,8 @@ import {
 } from "../model/session-slot-idle-order";
 import {
   classifyActorSlotAvailability,
+  durationMinFromParts,
+  durationPartsFromMin,
   normalizeEmail,
 } from "../model/session-page-utils";
 import type { TeamProfile } from "../../../sync/api/profile";
@@ -36,6 +38,7 @@ type DragSceneRefPayload = {
 type DirectorSessionSlotDisplay = {
   projectLabel: string;
   materialLabel: string;
+  isProgRun?: boolean;
 };
 
 function parseDragSceneRef(dt: DataTransfer): DragSceneRefPayload | null {
@@ -171,7 +174,10 @@ export function DirectorSessionSlotsPanel({
   const [idleOrderBusyEmails, setIdleOrderBusyEmails] = useState<string[]>([]);
 
   const [slotDraft, setSlotDraft] = useState<
-    Record<string, { time: string; duration: string }>
+    Record<
+      string,
+      { time: string; durationHours: string; durationMinutes: string }
+    >
   >({});
 
   const mergeSession = useCallback(
@@ -382,14 +388,17 @@ export function DirectorSessionSlotsPanel({
       { shiftFollowing: autoShiftFollowing, deltaMin: delta },
     );
     onSelectSlot(slotId);
+    const parts = durationPartsFromMin(nextDur);
     setSlotDraft((p) => ({
       ...p,
       [slotId]: {
         ...(p[slotId] ?? {
           time: formatSlotTime(session.startsAt, current.offsetMin),
-          duration: "",
+          durationHours: "0",
+          durationMinutes: "30",
         }),
-        duration: String(nextDur),
+        durationHours: String(parts.hours),
+        durationMinutes: String(parts.minutes),
       },
     }));
   };
@@ -420,9 +429,11 @@ export function DirectorSessionSlotsPanel({
       const next = { ...prev };
       for (const sl of session.slots ?? []) {
         if (!next[sl.id]) {
+          const parts = durationPartsFromMin(sl.durationMin ?? 30);
           next[sl.id] = {
             time: formatSlotTime(session.startsAt, sl.offsetMin),
-            duration: String(sl.durationMin ?? 30),
+            durationHours: String(parts.hours),
+            durationMinutes: String(parts.minutes),
           };
         }
       }
@@ -439,11 +450,20 @@ export function DirectorSessionSlotsPanel({
     if (!d || !sl) return;
     const base = getSessionStartLocalMinutes(session.startsAt);
     const abs = parseTimeHHMM(d.time);
-    const durNum = Math.max(1, Math.min(480, Math.floor(Number(d.duration))));
+    const durNum = durationMinFromParts(d.durationHours, d.durationMinutes);
     const nextOffset =
       abs == null ? sl.offsetMin : Math.max(0, Math.floor(abs - base));
     const prevDur = Math.max(1, Math.floor(sl.durationMin || 1));
     const delta = durNum - prevDur;
+    const parts = durationPartsFromMin(durNum);
+    setSlotDraft((p) => ({
+      ...p,
+      [slotId]: {
+        ...d,
+        durationHours: String(parts.hours),
+        durationMinutes: String(parts.minutes),
+      },
+    }));
     await updateSlot(
       slotId,
       { offsetMin: nextOffset, durationMin: durNum },
@@ -471,6 +491,13 @@ export function DirectorSessionSlotsPanel({
     (sl: DirectorSessionSlot): DirectorSessionSlotDisplay => {
       const display = slotDisplayById?.get(sl.id);
       if (display) return display;
+      if (sl.isProgRun) {
+        return {
+          projectLabel: "ПРОГОН",
+          materialLabel: String(sl.ref?.projectSlug ?? "").trim() || "Проект",
+          isProgRun: true,
+        };
+      }
       const customTitle = String(sl.title ?? "").trim();
       if (!sl.ref) {
         return {
@@ -703,7 +730,10 @@ export function DirectorSessionSlotsPanel({
                       </div>
                       {display.projectLabel ? (
                         <div
-                          className="sessions-slot-meta"
+                          className={cn(
+                            "sessions-slot-meta",
+                            display.isProgRun && "sessions-slot-meta--prog-run",
+                          )}
                           title={display.projectLabel}
                         >
                           {display.projectLabel}
@@ -780,7 +810,11 @@ export function DirectorSessionSlotsPanel({
                 </div>
                 {draggedSlotDisplay?.projectLabel ? (
                   <div
-                    className="sessions-slot-meta"
+                    className={cn(
+                      "sessions-slot-meta",
+                      draggedSlotDisplay.isProgRun &&
+                        "sessions-slot-meta--prog-run",
+                    )}
                     title={draggedSlotDisplay.projectLabel}
                   >
                     {draggedSlotDisplay.projectLabel}
@@ -974,7 +1008,8 @@ export function DirectorSessionSlotsPanel({
                     [selectedSlotForModal.id]: {
                       ...(p[selectedSlotForModal.id] ?? {
                         time: "",
-                        duration: "",
+                        durationHours: "0",
+                        durationMinutes: "30",
                       }),
                       time: e.target.value,
                     },
@@ -985,16 +1020,21 @@ export function DirectorSessionSlotsPanel({
               <span className="director-session-slot-modal__duration-container">
                 <input
                   type="number"
-                  min={1}
-                  max={480}
+                  min={0}
+                  max={8}
                   className={cn(
                     "director-session-slot-modal__textlike",
                     "director-session-slot-modal__textlike--duration",
+                    "director-session-slot-modal__textlike--duration-hours",
                   )}
-                  aria-label="Длительность слота, минуты"
+                  aria-label="Длительность слота, часы"
                   value={
-                    slotDraft[selectedSlotForModal.id]?.duration ??
-                    String(selectedSlotForModal.durationMin ?? 30)
+                    slotDraft[selectedSlotForModal.id]?.durationHours ??
+                    String(
+                      durationPartsFromMin(
+                        selectedSlotForModal.durationMin ?? 30,
+                      ).hours,
+                    )
                   }
                   onChange={(e) =>
                     setSlotDraft((p) => ({
@@ -1002,9 +1042,46 @@ export function DirectorSessionSlotsPanel({
                       [selectedSlotForModal.id]: {
                         ...(p[selectedSlotForModal.id] ?? {
                           time: "",
-                          duration: "",
+                          durationHours: "0",
+                          durationMinutes: "30",
                         }),
-                        duration: e.target.value,
+                        durationHours: e.target.value,
+                      },
+                    }))
+                  }
+                  onBlur={() => void commitSlotDraft(selectedSlotForModal.id)}
+                />
+                <span className="director-session-slot-modal__duration-suffix">
+                  ч
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  className={cn(
+                    "director-session-slot-modal__textlike",
+                    "director-session-slot-modal__textlike--duration",
+                    "director-session-slot-modal__textlike--duration-minutes",
+                  )}
+                  aria-label="Длительность слота, минуты"
+                  value={
+                    slotDraft[selectedSlotForModal.id]?.durationMinutes ??
+                    String(
+                      durationPartsFromMin(
+                        selectedSlotForModal.durationMin ?? 30,
+                      ).minutes,
+                    )
+                  }
+                  onChange={(e) =>
+                    setSlotDraft((p) => ({
+                      ...p,
+                      [selectedSlotForModal.id]: {
+                        ...(p[selectedSlotForModal.id] ?? {
+                          time: "",
+                          durationHours: "0",
+                          durationMinutes: "30",
+                        }),
+                        durationMinutes: e.target.value,
                       },
                     }))
                   }

@@ -97,6 +97,42 @@ export function getNormalizedRoleKeysForSlotScene(
   return Array.from(new Set(roleKeys));
 }
 
+export function getNormalizedRoleKeysForAllScenes(
+  scenes: ScriptScene[] | null | undefined,
+  sceneRoles: PlaybookRolesDataV1 | null | undefined,
+): string[] {
+  const out = new Set<string>();
+  for (const scene of scenes ?? []) {
+    const sceneId = Math.floor(Number(scene?.id) || 0);
+    if (!Number.isFinite(sceneId) || sceneId <= 0) continue;
+    for (const key of getNormalizedRoleKeysForSlotScene(
+      scene,
+      sceneRoles,
+      sceneId,
+    )) {
+      if (key) out.add(key);
+    }
+  }
+  return Array.from(out);
+}
+
+export function materializeAllRoleRehearsalPicks(
+  roleKeys: string[],
+  roleEmailsByKey: Record<string, string[]>,
+): DirectorSlotRoleRehearsalPick[] {
+  const out: DirectorSlotRoleRehearsalPick[] = [];
+  for (const rk of roleKeys) {
+    for (const em of roleEmailsByKey[rk] ?? []) {
+      const email = normalizeEmail(String(em ?? ""));
+      if (!email) continue;
+      out.push({ roleKey: rk, email, checked: true });
+    }
+  }
+  return out;
+}
+
+export const SLOT_PROG_RUN_TITLE = "ПРОГОН";
+
 /** Все назначенные на роли слота — для графика занятости (без учёта roleRehearsalPicks). */
 export function getAllAssigneeEmailsForDirectorSlotChart(
   projectSlug: string,

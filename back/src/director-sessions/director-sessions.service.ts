@@ -29,6 +29,7 @@ type DirectorSessionSlot = {
   ref?: DirectorSlotRef;
   notes?: string;
   participantEmails?: string[];
+  isProgRun?: boolean;
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 type DirectorSessionParticipantStatus =
@@ -1792,8 +1793,11 @@ export class DirectorSessionsService {
           sceneUrl: null,
         };
       const scene = scenesBySlug.get(ref.projectSlug)?.get(ref.sceneId);
-      const slotTitle =
-        String(sl.title ?? '').trim() || String(scene?.title ?? '').trim() || null;
+      const slotTitle = sl.isProgRun
+        ? 'ПРОГОН'
+        : String(sl.title ?? '').trim() ||
+          String(scene?.title ?? '').trim() ||
+          null;
       const projectName =
         String(projectBySlug.get(ref.projectSlug)?.name ?? '').trim() || null;
       const sceneUrl =

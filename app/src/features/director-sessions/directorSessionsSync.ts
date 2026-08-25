@@ -25,6 +25,8 @@ export type DirectorSessionSlot = {
   ref?: DirectorSlotRef;
   notes?: string;
   participantEmails?: string[];
+  /** Прогон всего материала проекта: все сцены, актёры с возможностью открепить. */
+  isProgRun?: boolean;
   /** Кто репетирует роли в слоте; в план вызова попадают только checked=true. */
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };

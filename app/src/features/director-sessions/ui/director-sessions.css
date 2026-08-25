@@ -763,6 +763,16 @@
   white-space: nowrap;
 }
 
+.director-session-slots-panel .sessions-slot-meta--prog-run {
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--color-active-ascent);
+  opacity: 1;
+}
+
 .sessions-session-stage .sessions-slot-gather-mark {
   width: 7px;
   height: 7px;
@@ -999,8 +1009,10 @@
   flex: 1;
   min-width: 0;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
 }
 
 .sessions-day-item__gather-summary {
@@ -1046,6 +1058,8 @@
 }
 
 .sessions-day-item__title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   color: var(--sessions-text-strong, #ccc);
@@ -1081,6 +1095,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sessions-day-item__slots .sessions-slot-row__label--prog-run {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.15;
+  text-transform: uppercase;
+  color: var(--color-active-ascent);
 }
 
 .sessions-slot-gather-mark {
@@ -1128,9 +1151,11 @@
 }
 
 .sessions-day-item__meta {
+  flex-shrink: 0;
   font-size: 10px;
   line-height: 1.2;
   color: var(--sessions-text-muted, #666);
+  white-space: nowrap;
 }
 
 .sessions-day-item__delete {
@@ -1897,10 +1922,18 @@
 }
 
 .director-session-slot-modal__textlike--duration {
-  max-width: 4.2em;
+  max-width: 3.2em;
   text-align: right;
   -moz-appearance: textfield;
   appearance: textfield;
+}
+
+.director-session-slot-modal__textlike--duration-hours {
+  max-width: 2.4em;
+}
+
+.director-session-slot-modal__textlike--duration-minutes {
+  max-width: 3.2em;
 }
 
 .director-session-slot-modal__textlike--duration::-webkit-outer-spin-button,

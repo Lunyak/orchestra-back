@@ -57,6 +57,40 @@ export function formatSlotTime(startsAtIso: string, offsetMin: number): string {
   return formatTimeHHMM(base + Math.max(0, Math.floor(offsetMin)));
 }
 
+/** Макс. длительность слота (8 часов). */
+export const SLOT_DURATION_MIN_MAX = 480;
+
+export function clampSlotDurationMin(totalMin: number): number {
+  return Math.max(
+    1,
+    Math.min(SLOT_DURATION_MIN_MAX, Math.floor(Number(totalMin) || 0)),
+  );
+}
+
+export function durationPartsFromMin(totalMin: number): {
+  hours: number;
+  minutes: number;
+} {
+  const total = clampSlotDurationMin(totalMin);
+  return { hours: Math.floor(total / 60), minutes: total % 60 };
+}
+
+export function durationMinFromParts(
+  hoursRaw: string | number,
+  minutesRaw: string | number,
+): number {
+  const hours = Math.max(0, Math.floor(Number(hoursRaw) || 0));
+  const minutes = Math.max(0, Math.floor(Number(minutesRaw) || 0));
+  return clampSlotDurationMin(hours * 60 + minutes);
+}
+
+export function formatDurationMinLabel(totalMin: number): string {
+  const { hours, minutes } = durationPartsFromMin(totalMin);
+  if (hours > 0 && minutes > 0) return `${hours} ч ${minutes} мин`;
+  if (hours > 0) return `${hours} ч`;
+  return `${minutes} мин`;
+}
+
 export function toDateKey(d: Date): string {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");

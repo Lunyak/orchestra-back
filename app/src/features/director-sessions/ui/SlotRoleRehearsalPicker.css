@@ -2,13 +2,30 @@
   margin-top: 12px;
   display: flex;
   flex-direction: row;
+  flex-wrap: nowrap;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sessions-border, #444) transparent;
+}
+
+.slot-role-rehearsal::-webkit-scrollbar {
+  height: 6px;
+}
+
+.slot-role-rehearsal::-webkit-scrollbar-thumb {
+  background: var(--sessions-border, #444);
 }
 
 .slot-role-rehearsal__role {
   display: flex;
   flex-direction: column;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px 10px;
   background: var(--color-bg-transparent-dark-1);

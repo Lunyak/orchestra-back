@@ -6,7 +6,7 @@ import {
   normalizeEmail,
   projectDisplayLabel,
 } from "./session-page-utils";
-import { getEmailsPlannedForDirectorSlot, getNormalizedRoleKeysForSlotScene } from "./session-slot-planned";
+import { getEmailsPlannedForDirectorSlot, getNormalizedRoleKeysForAllScenes, getNormalizedRoleKeysForSlotScene } from "./session-slot-planned";
 import type { ProjectDataCache, SlotGatherStatus, SlotInsight } from "./session-page-types";
 
 export function buildSessionSlotInsights(
@@ -36,6 +36,46 @@ export function buildSessionSlotInsights(
       }
 
       const data = dataCache[ref.projectSlug];
+      const projectLabel = projectDisplayLabel(ref.projectSlug, projectLabelBySlug);
+
+      if (sl.isProgRun) {
+        const roleKeys = getNormalizedRoleKeysForAllScenes(
+          data?.scenes,
+          data?.sceneRoles,
+        );
+        const picks = (sl as DirectorSessionSlot).roleRehearsalPicks;
+        const actorsFromPicks = (picks ?? [])
+          .filter((pick) => pick.checked)
+          .map((pick) => normalizeEmail(String(pick.email ?? "")))
+          .filter(Boolean);
+        const actors =
+          actorsFromPicks.length > 0
+            ? actorsFromPicks
+            : getEmailsPlannedForDirectorSlot(
+                ref.projectSlug,
+                ref.sceneId,
+                data,
+                picks,
+              );
+        const missingRoles = roleKeys
+          .filter((key) => !key || !(data?.roleEmailsByKey ?? {})[key]?.length)
+          .map(
+            (key) =>
+              String(data?.roleTitleByKey?.[key ?? ""] ?? key ?? "").trim() ||
+              key,
+          );
+        return {
+          slotId: sl.id,
+          time: formatSlotTime(session.startsAt, sl.offsetMin),
+          projectLabel,
+          sceneLabel: "ПРОГОН",
+          title: `${projectLabel} · ПРОГОН`.trim(),
+          ready: roleKeys.length === 0 ? true : missingRoles.length === 0,
+          missingRoles,
+          actors: Array.from(new Set(actors)),
+        };
+      }
+
       const scene = data?.scenes?.find((x) => x.id === ref.sceneId) ?? null;
       const sceneLabel = String(scene?.title ?? "").trim() || `Сцена #${ref.sceneId}`;
       const roleKeys = getNormalizedRoleKeysForSlotScene(
@@ -55,7 +95,6 @@ export function buildSessionSlotInsights(
         data,
         (sl as DirectorSessionSlot).roleRehearsalPicks,
       );
-      const projectLabel = projectDisplayLabel(ref.projectSlug, projectLabelBySlug);
 
       return {
         slotId: sl.id,

@@ -565,7 +565,13 @@ export function DirectorSessionsPageView({ vm }: { vm: DirectorSessionsPageViewM
                             {slotProjectLabel}
                           </div>
                           {slotMeta ? (
-                            <div className="sessions-slot-meta" title={slotMeta}>
+                            <div
+                              className={cn(
+                                "sessions-slot-meta",
+                                sl.isProgRun && "sessions-slot-meta--prog-run",
+                              )}
+                              title={slotMeta}
+                            >
                               {slotMeta}
                             </div>
                           ) : null}

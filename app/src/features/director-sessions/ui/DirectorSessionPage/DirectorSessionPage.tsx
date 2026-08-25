@@ -33,6 +33,7 @@ import "./style.css";
 import {
   classifyActorSlotAvailability,
   directorSlotRefKey,
+  formatDurationMinLabel,
   formatSlotTime,
   getSessionStartLocalMinutes,
   findBusyConflictForChangedSessions,
@@ -49,8 +50,11 @@ import {
 import {
   getAllAssigneeEmailsForDirectorSlotChart,
   getEmailsPlannedForDirectorSlot,
+  getNormalizedRoleKeysForAllScenes,
   getNormalizedRoleKeysForSlotScene,
   getRolePlannedEmailsForDirectorSlot,
+  materializeAllRoleRehearsalPicks,
+  SLOT_PROG_RUN_TITLE,
   type DirectorSlotPlannedData,
 } from "../../model/session-slot-planned";
 import type { DirectorSessionProjectDataCache } from "../../model/session-page-types";
@@ -709,6 +713,32 @@ export function DirectorSessionPage() {
         sceneRoles: cached.sceneRoles ?? null,
         roleEmailsByKey: rem,
       };
+      if (sl.isProgRun) {
+        const picks = sl.roleRehearsalPicks ?? [];
+        if (picks.length > 0) {
+          const emails = new Set<string>();
+          for (const pick of picks) {
+            if (!pick.checked) continue;
+            const email = normalizeEmail(String(pick.email ?? ""));
+            if (email && looksLikeEmail(email)) emails.add(email);
+          }
+          out[sl.id] = Array.from(emails);
+          continue;
+        }
+        const roleKeys = getNormalizedRoleKeysForAllScenes(
+          cached.scenes,
+          cached.sceneRoles ?? null,
+        );
+        const emails = new Set<string>();
+        for (const key of roleKeys) {
+          for (const raw of rem[key] ?? []) {
+            const email = normalizeEmail(String(raw ?? ""));
+            if (email && looksLikeEmail(email)) emails.add(email);
+          }
+        }
+        out[sl.id] = Array.from(emails);
+        continue;
+      }
       out[sl.id] = getEmailsPlannedForDirectorSlot(
         slug,
         ref.sceneId,
@@ -764,7 +794,7 @@ export function DirectorSessionPage() {
 
   const slotTimeLabel = useMemo(() => {
     if (!session || !slot) return "";
-    return `${formatSlotTime(session.startsAt, slot.offsetMin)} · ${slot.durationMin} мин`;
+    return `${formatSlotTime(session.startsAt, slot.offsetMin)} · ${formatDurationMinLabel(slot.durationMin)}`;
   }, [session, slot]);
 
   const projectScenes = useMemo(() => {
@@ -831,13 +861,14 @@ export function DirectorSessionPage() {
   }, [dataCache, slot?.ref]);
 
   const selectedSceneLabel = useMemo(() => {
+    if (slot?.isProgRun) return SLOT_PROG_RUN_TITLE;
     if (selectedScene) {
       const title = String(selectedScene.title ?? "").trim();
       return title ? title : `Сцена #${selectedScene.id}`;
     }
     const customTitle = String(slot?.title ?? "").trim();
     return customTitle;
-  }, [selectedScene, slot?.title]);
+  }, [selectedScene, slot?.isProgRun, slot?.title]);
 
   const selectedSceneProjectLabel = useMemo(() => {
     const slug = String(slot?.ref?.projectSlug ?? "").trim();
@@ -861,7 +892,37 @@ export function DirectorSessionPage() {
         scene.durationMin == null
           ? slot.durationMin
           : Math.max(1, Math.floor(Number(scene.durationMin) || 1)),
+      isProgRun: false,
       roleRehearsalPicks: undefined,
+    });
+  };
+
+  const assignProgRunToSlot = () => {
+    if (!slot || !projectFilter || isSlotScenePickerCustomSlug(projectFilter))
+      return;
+    const pack = dataCache[projectFilter];
+    const scenes = pack?.scenes ?? [];
+    const firstScene = scenes[0];
+    if (!firstScene) return;
+    const roleEmails =
+      projectFilter === rolesSlug && Object.keys(roleEmailsByKey).length > 0
+        ? roleEmailsByKey
+        : (roleEmailsByProjectSlug[projectFilter] ?? {});
+    const roleKeys = getNormalizedRoleKeysForAllScenes(
+      scenes,
+      pack?.sceneRoles ?? null,
+    );
+    void updateSlot({
+      title: SLOT_PROG_RUN_TITLE,
+      ref: {
+        projectSlug: projectFilter,
+        sceneId: firstScene.id,
+      },
+      isProgRun: true,
+      roleRehearsalPicks: materializeAllRoleRehearsalPicks(
+        roleKeys,
+        roleEmails,
+      ),
     });
   };
 
@@ -871,6 +932,7 @@ export function DirectorSessionPage() {
     void updateSlot({
       title: nextTitle,
       ref: undefined,
+      isProgRun: false,
       roleRehearsalPicks: undefined,
     });
   };
@@ -878,9 +940,20 @@ export function DirectorSessionPage() {
   const slotDisplayById = useMemo(() => {
     const map = new Map<
       string,
-      { projectLabel: string; materialLabel: string }
+      { projectLabel: string; materialLabel: string; isProgRun?: boolean }
     >();
     for (const sl of session?.slots ?? []) {
+      if (sl.isProgRun) {
+        const slug = String(sl.ref?.projectSlug ?? "").trim();
+        map.set(sl.id, {
+          projectLabel: SLOT_PROG_RUN_TITLE,
+          materialLabel: slug
+            ? (projectLabelBySlug.get(slug) ?? slug)
+            : "Проект",
+          isProgRun: true,
+        });
+        continue;
+      }
       const ref = sl.ref;
       const customTitle = String(sl.title ?? "").trim();
       if (!ref?.projectSlug || ref.sceneId == null) {
@@ -918,6 +991,12 @@ export function DirectorSessionPage() {
 
   const slotRoleKeysForPicker = useMemo(() => {
     if (!slot?.ref || !slotPlannedInput) return [];
+    if (slot.isProgRun) {
+      return getNormalizedRoleKeysForAllScenes(
+        slotPlannedInput.scenes,
+        slotPlannedInput.sceneRoles,
+      );
+    }
     const sceneId = slot.ref.sceneId;
     const scene = slotPlannedInput.scenes.find((s) => s.id === sceneId) ?? null;
     return getNormalizedRoleKeysForSlotScene(
@@ -925,11 +1004,35 @@ export function DirectorSessionPage() {
       slotPlannedInput.sceneRoles,
       sceneId,
     );
-  }, [slot?.ref, slotPlannedInput]);
+  }, [slot?.ref, slot?.isProgRun, slotPlannedInput]);
 
   const slotChartEmailSet = useMemo(() => {
     if (slot?.ref && slotPlannedInput) {
       const slug = String(slot.ref.projectSlug ?? "").trim();
+      if (slot.isProgRun) {
+        const picks = slot.roleRehearsalPicks ?? [];
+        if (picks.length > 0) {
+          const emails = new Set<string>();
+          for (const pick of picks) {
+            if (!pick.checked) continue;
+            const email = normalizeEmail(String(pick.email ?? ""));
+            if (email && looksLikeEmail(email)) emails.add(email);
+          }
+          return emails;
+        }
+        const roleKeys = getNormalizedRoleKeysForAllScenes(
+          slotPlannedInput.scenes,
+          slotPlannedInput.sceneRoles,
+        );
+        const emails = new Set<string>();
+        for (const key of roleKeys) {
+          for (const raw of slotPlannedInput.roleEmailsByKey[key] ?? []) {
+            const email = normalizeEmail(String(raw ?? ""));
+            if (email && looksLikeEmail(email)) emails.add(email);
+          }
+        }
+        return emails;
+      }
       const list = getAllAssigneeEmailsForDirectorSlotChart(
         slug,
         slot.ref.sceneId,
@@ -944,7 +1047,13 @@ export function DirectorSessionPage() {
       return undefined;
     }
     return undefined;
-  }, [slot?.ref, slotPlannedInput, selectedParticipantEmailsList]);
+  }, [
+    slot?.ref,
+    slot?.isProgRun,
+    slot?.roleRehearsalPicks,
+    slotPlannedInput,
+    selectedParticipantEmailsList,
+  ]);
 
   const scheduleProfiles = useMemo(() => {
     if (slot?.ref) return teamProfiles;
@@ -1072,14 +1181,20 @@ export function DirectorSessionPage() {
                         scenesError={scenesError}
                         availabilityError={availabilityError}
                         selectedSceneId={
+                          !slot.isProgRun &&
                           slot.ref?.projectSlug === projectFilter
                             ? Number(slot.ref.sceneId) || null
                             : null
+                        }
+                        isProgRunSelected={
+                          Boolean(slot.isProgRun) &&
+                          slot.ref?.projectSlug === projectFilter
                         }
                         currentSlotId={slot.id}
                         sessionStartsAt={session?.startsAt ?? null}
                         slotsBySceneRefInSession={slotsBySceneRefInSession}
                         onSelectScene={assignSceneToSlot}
+                        onSelectProgRun={assignProgRunToSlot}
                         initialCustomTitle={
                           !slot.ref ? String(slot.title ?? "").trim() : ""
                         }
@@ -1087,7 +1202,7 @@ export function DirectorSessionPage() {
                       />
                     </div>
 
-                    {selectedScene ? (
+                    {selectedScene || slot.isProgRun ? (
                       <div className="session__selected-scene">
                         <TroupeSchedulePreview
                           sessionDateKey={sessionDateKey}

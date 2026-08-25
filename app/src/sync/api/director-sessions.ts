@@ -18,6 +18,7 @@ export type DirectorSessionSlot = {
   ref?: DirectorSessionSlotRef;
   notes?: string;
   participantEmails?: string[];
+  isProgRun?: boolean;
   roleRehearsalPicks?: DirectorSlotRoleRehearsalPick[];
 };
 

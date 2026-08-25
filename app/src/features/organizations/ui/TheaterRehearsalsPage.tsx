@@ -239,9 +239,11 @@ type RehearsalSlotPreview = {
   id: string;
   time: string;
   label: string;
+  isProgRun?: boolean;
 };
 
 function slotPreviewLabel(slot: DirectorSessionSlot): string {
+  if (slot.isProgRun) return "ПРОГОН";
   const customTitle = String(slot.title ?? "").trim();
   if (customTitle) return customTitle;
   const projectSlug = String(slot.ref?.projectSlug ?? "").trim();
@@ -273,6 +275,7 @@ function rehearsalSlotPreviews(
         id: slot.id,
         time: formatTimeHHMM(baseMin + offset),
         label: slotPreviewLabel(slot),
+        isProgRun: Boolean(slot.isProgRun),
       };
     });
 }
@@ -889,7 +892,11 @@ export function TheaterRehearsalsPage() {
                                     {slot.time}
                                   </span>
                                   <span
-                                    className="sessions-slot-row__label"
+                                    className={cn(
+                                      "sessions-slot-row__label",
+                                      slot.isProgRun &&
+                                        "sessions-slot-row__label--prog-run",
+                                    )}
                                     title={slot.label}
                                   >
                                     {slot.label}

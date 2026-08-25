@@ -10,6 +10,7 @@ import {
   isSlotScenePickerCustomSlug,
   SLOT_SCENE_PICKER_CUSTOM_SLUG,
 } from "../model/session-page-utils";
+import { SLOT_PROG_RUN_TITLE } from "../model/session-slot-planned";
 import "./slot-scene-picker-modal.css";
 
 export type SlotSceneListItem = {
@@ -29,10 +30,12 @@ export type SlotScenePickerModalProps = {
   scenesError: string | null;
   availabilityError: string | null;
   selectedSceneId: number | null;
+  isProgRunSelected?: boolean;
   currentSlotId: string;
   sessionStartsAt: string | null;
   slotsBySceneRefInSession: Map<string, DirectorSessionSlot[]>;
   onSelectScene: (scene: ScriptScene) => void;
+  onSelectProgRun?: () => void;
   initialCustomTitle?: string;
   onSelectCustom: (title: string) => void;
 };
@@ -48,10 +51,12 @@ export function SlotScenePickerModal({
   scenesError,
   availabilityError,
   selectedSceneId,
+  isProgRunSelected = false,
   currentSlotId,
   sessionStartsAt,
   slotsBySceneRefInSession,
   onSelectScene,
+  onSelectProgRun,
   initialCustomTitle = "",
   onSelectCustom,
 }: SlotScenePickerModalProps) {
@@ -59,6 +64,7 @@ export function SlotScenePickerModal({
   const [onlySelectable, setOnlySelectable] = useState(false);
   const [customTitleDraft, setCustomTitleDraft] = useState("");
   const isCustom = isSlotScenePickerCustomSlug(projectSlug);
+  const canProgRun = Boolean(onSelectProgRun) && !isCustom;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -82,6 +88,7 @@ export function SlotScenePickerModal({
 
   const customTitleTrimmed = customTitleDraft.trim();
   const canApplyCustom = Boolean(customTitleTrimmed);
+  const scenesCount = scenes.length;
 
   return (
     <Modal
@@ -120,6 +127,20 @@ export function SlotScenePickerModal({
             ))}
           </select>
         </label>
+        {canProgRun ? (
+          <div className="slot-scene-picker-modal__filter">
+            <LabeledCheckbox
+              checked={isProgRunSelected}
+              onChange={(checked) => {
+                if (!checked || !onSelectProgRun) return;
+                onSelectProgRun();
+                onClose();
+              }}
+            >
+              Прогон
+            </LabeledCheckbox>
+          </div>
+        ) : null}
         {!isCustom ? (
           <>
             <label className="slot-scene-picker-modal__field slot-scene-picker-modal__field--grow">
@@ -178,6 +199,19 @@ export function SlotScenePickerModal({
           </div>
         ) : (
           <>
+            {isProgRunSelected ? (
+              <div className="slot-scene-picker-modal__prog-run">
+                <p className="slot-scene-picker-modal__prog-run-title">
+                  {SLOT_PROG_RUN_TITLE}
+                </p>
+                <p className="slot-scene-picker-modal__empty">
+                  Все сцены проекта
+                  {scenesCount > 0 ? ` (${scenesCount})` : ""}. Актёры — все, с
+                  возможностью открепить в слоте. Выберите сцену ниже, чтобы
+                  снять прогон.
+                </p>
+              </div>
+            ) : null}
             {scenesLoading ? (
               <p className="slot-scene-picker-modal__empty">Загружаю сцены…</p>
             ) : null}
@@ -197,7 +231,8 @@ export function SlotScenePickerModal({
             <div className="slot-scene-picker-modal__list">
               {filtered.slice(0, 250).map((sceneData) => {
                 const scene = sceneData.scene;
-                const isSelected = selectedSceneId === scene.id;
+                const isSelected =
+                  !isProgRunSelected && selectedSceneId === scene.id;
                 const refKey = directorSlotRefKey(projectSlug, scene.id);
                 const slotsWithSameRef =
                   slotsBySceneRefInSession.get(refKey) ?? [];
