@@ -1,5 +1,15 @@
+-- Enum used by TroupeInvite.kind and TroupeMember.kind (was missing from earlier migrations).
+DO $$ BEGIN
+  CREATE TYPE "TroupeMemberKind" AS ENUM ('regular', 'guest');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "TroupeMember"
+  ADD COLUMN IF NOT EXISTS "kind" "TroupeMemberKind" NOT NULL DEFAULT 'regular';
+
 -- AlterTable
-ALTER TABLE "StudioInvite" ADD COLUMN "declinedAt" TIMESTAMP(3);
+ALTER TABLE "StudioInvite" ADD COLUMN IF NOT EXISTS "declinedAt" TIMESTAMP(3);
 
 -- CreateTable
 CREATE TABLE "ProjectInvite" (
