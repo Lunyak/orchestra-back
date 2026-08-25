@@ -55,6 +55,29 @@ test:back:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
 
+# Все миграции с нуля на чистой Postgres — гейт до build/deploy на master.
+# Ловит битые SQL (нет enum/таблицы), которые иначе падают уже на хосте.
+test:migrations:
+  stage: test
+  image: ${NODE_IMAGE}
+  services:
+    - name: ${POSTGRES_IMAGE}
+      alias: postgres
+  variables:
+    POSTGRES_DB: dophamin_orkestr
+    POSTGRES_USER: orkestr
+    POSTGRES_PASSWORD: orkestr_secret
+    DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
+  script:
+    - cd back
+    - npm ci
+    - npx prisma generate
+    - npx prisma migrate deploy
+    - npx prisma migrate status
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
 # Критичные тесты проектора (заставка/видео во 2-м окне) — без БД
 test:app-projector:
   stage: test
@@ -91,6 +114,8 @@ test:app-projector:
 build:back:
   extends: .deploy_ssh
   stage: build
+  needs:
+    - test:migrations
   script:
     - |
       ssh ${SSH_OPTS} root@${DEPLOY_HOST} \
@@ -112,28 +137,50 @@ deploy:
       git fetch --all --prune
       git reset --hard "origin/${BRANCH}"
       git clean -fd
-      # --no-wait: не держим SSH, пока compose ждёт healthcheck (миграции + Nest)
-      docker compose -f docker-compose.yml up -d --no-wait postgres back bot dozzle 2>/dev/null \
-        || docker compose -f docker-compose.yml up -d postgres back bot dozzle
+
+      dump_back_logs() {
+        echo "——— orkestr-back logs (tail 120) ———"
+        docker logs --tail 120 orkestr-back 2>&1 || true
+        echo "——— end logs ———"
+      }
+
+      # want_health=1 → только healthy; иначе healthy|running
+      wait_container() {
+        name="$1"
+        want_health="$2"
+        deadline=$(( $(date +%s) + 180 ))
+        while [ "$(date +%s)" -lt "$deadline" ]; do
+          status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$name" 2>/dev/null || echo missing)"
+          echo "  ${name}: ${status}"
+          if [ "$want_health" = "1" ]; then
+            [ "$status" = healthy ] && return 0
+          else
+            [ "$status" = healthy ] || [ "$status" = running ] && return 0
+          fi
+          if [ "$status" = unhealthy ]; then
+            echo "${name} is unhealthy"
+            return 1
+          fi
+          sleep 5
+        done
+        echo "Timeout waiting for ${name}"
+        return 1
+      }
+
+      # Не ждём health через compose (тихий SSH + обрезанные логи). Поднимаем по шагам.
+      docker compose -f docker-compose.yml up -d postgres
+      echo "Waiting for orkestr-postgres..."
+      wait_container orkestr-postgres 1 || exit 1
+
+      docker compose -f docker-compose.yml up -d --no-deps back
       echo "Waiting for orkestr-back health (up to 3 min)..."
-      deadline=$(( $(date +%s) + 180 ))
-      while [ "$(date +%s)" -lt "$deadline" ]; do
-        status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' orkestr-back 2>/dev/null || echo missing)"
-        echo "  orkestr-back: ${status}"
-        if [ "$status" = healthy ]; then
-          echo "Deploy OK: back is healthy"
-          exit 0
-        fi
-        if [ "$status" = unhealthy ]; then
-          echo "orkestr-back is unhealthy — recent logs:"
-          docker logs --tail 80 orkestr-back 2>&1 || true
-          exit 1
-        fi
-        sleep 5
-      done
-      echo "Timeout waiting for orkestr-back — recent logs:"
-      docker logs --tail 80 orkestr-back 2>&1 || true
-      exit 1
+      if ! wait_container orkestr-back 1; then
+        dump_back_logs
+        exit 1
+      fi
+      echo "Deploy OK: back is healthy"
+
+      docker compose -f docker-compose.yml up -d --no-deps bot dozzle
       EOS
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
