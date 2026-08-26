@@ -13,6 +13,8 @@ variables:
   POSTGRES_IMAGE: "${CI_DEPENDENCY_PROXY_GROUP_IMAGE_PREFIX}/postgres:16-alpine"
   DEPLOY_HOST: "213.226.126.196"
   DEPLOY_REPO_SYNC: "cd /opt/orchestra-back && git fetch --all --prune && git reset --hard origin/${CI_DEFAULT_BRANCH} && git clean -fd"
+  # Иначе job/service часто в разных сетях: health-check timeout + Prisma P1001 на postgres:5432
+  FF_NETWORK_PER_BUILD: "true"
 
 # Кэш node_modules
 default:
@@ -22,6 +24,40 @@ default:
     key: ${CI_COMMIT_REF_SLUG}
     paths:
       - back/node_modules/
+
+# Ждём TCP postgres:5432 (node alpine без pg_isready).
+.wait_for_postgres: &wait_for_postgres |
+  echo "Waiting for postgres:5432..."
+  node <<'NODE'
+  const net = require('net');
+  const host = 'postgres';
+  const port = 5432;
+  const deadline = Date.now() + 90_000;
+  function tryOnce() {
+    return new Promise((resolve) => {
+      const socket = net.connect({ host, port }, () => {
+        socket.end();
+        resolve(true);
+      });
+      socket.on('error', () => resolve(false));
+      socket.setTimeout(2000, () => {
+        socket.destroy();
+        resolve(false);
+      });
+    });
+  }
+  (async () => {
+    while (Date.now() < deadline) {
+      if (await tryOnce()) {
+        console.log('postgres is accepting connections');
+        process.exit(0);
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+    console.error('Timed out waiting for postgres:5432');
+    process.exit(1);
+  })();
+  NODE
 
 # Линт бэкенда
 lint:back:
@@ -45,10 +81,12 @@ test:back:
     POSTGRES_DB: dophamin_orkestr
     POSTGRES_USER: orkestr
     POSTGRES_PASSWORD: orkestr_secret
+    POSTGRES_HOST_AUTH_METHOD: trust
     DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
   script:
     - cd back
     - npm ci
+    - *wait_for_postgres
     - npx prisma generate
     - npx prisma migrate deploy
     - npm run test
@@ -67,10 +105,12 @@ test:migrations:
     POSTGRES_DB: dophamin_orkestr
     POSTGRES_USER: orkestr
     POSTGRES_PASSWORD: orkestr_secret
+    POSTGRES_HOST_AUTH_METHOD: trust
     DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
   script:
     - cd back
     - npm ci
+    - *wait_for_postgres
     - npx prisma generate
     - npx prisma migrate deploy
     - npx prisma migrate status
