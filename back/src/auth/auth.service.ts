@@ -26,6 +26,7 @@ function originFromWebDomain(raw: string): string {
   }
   const isLocalHostish =
     s === 'localhost' ||
+    s.startsWith('localhost:') ||
     s.startsWith('127.0.0.1') ||
     s.startsWith('192.168.') ||
     s.startsWith('10.');

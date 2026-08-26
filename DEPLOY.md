@@ -128,6 +128,15 @@ ssh root@213.226.126.196 "cd /opt/orchestra-back && git pull && docker compose u
 WEB_DOMAIN=orchestra.ваш-домен.ru
 ADMIN_DOMAIN=admin.orchestra.ваш-домен.ru
 ACME_EMAIL=you@example.com
+
+# SMTP Яндекс (письма сброса пароля)
+# Пароль приложения: https://id.yandex.ru/security/app-passwords
+SMTP_HOST=smtp.yandex.ru
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your@yandex.ru
+SMTP_PASS=your-app-password
+MAIL_FROM="Orchestra <your@yandex.ru>"
 ```
 
 2) Поднимите приложение с HTTPS-оверлеем:
