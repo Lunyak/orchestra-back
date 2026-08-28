@@ -358,15 +358,7 @@ class AttendanceService {
     }
 
     if (!rehearsal) {
-      try {
-        await this.bot.telegram.sendMessage(
-          groupChatId,
-          "Репетиция не запланирована. Используйте /setrehearsal в личке с ботом.",
-          { message_thread_id: parseInt(threadId, 10) },
-        );
-      } catch (e) {
-        console.error("Ошибка отправки в группу:", e);
-      }
+      await this.sendScheduledOrchestraCalls();
       return;
     }
 
@@ -558,9 +550,9 @@ class AttendanceService {
    */
   async manualSendAttendanceMessage(ctx) {
     try {
-      await this.sendAttendanceMessage();
+      await this.sendScheduledOrchestraCalls();
       await ctx.reply(
-        "Опрос отправлен в группу (или сообщение о том, что репетиция не задана).",
+        "Проверил сессии и репетиции Orchestra и отправил положенные вызовы.",
       );
     } catch (error) {
       console.error("Ошибка при ручной отправке опроса:", error);
@@ -1222,8 +1214,7 @@ class AttendanceService {
       threadId ?? null,
     );
 
-    // Always send a new message so «Обновить публикацию» видно в чате.
-    // Old message (if any) is removed afterwards when possible.
+    // If already published, try to update existing message instead of a new ping.
     const prevChatId =
       session?.telegramChatId != null ? String(session.telegramChatId).trim() : "";
     const prevMessageIdRaw =
@@ -1234,6 +1225,34 @@ class AttendanceService {
       prevMessageIdRaw && /^\d+$/.test(prevMessageIdRaw)
         ? parseInt(prevMessageIdRaw, 10)
         : null;
+
+    if (prevChatId && prevMessageId) {
+      try {
+        await this.bot.telegram.editMessageText(
+          prevChatId,
+          prevMessageId,
+          undefined,
+          text,
+          {
+            parse_mode: "HTML",
+            ...this._directorKeyboard(projectId, sessionId),
+          },
+        );
+        return { ok: true, updated: true };
+      } catch (e) {
+        const desc = e?.response?.description || "";
+        if (
+          e?.response?.error_code === 400 &&
+          /message is not modified/i.test(desc)
+        ) {
+          return { ok: true, updated: true };
+        }
+        console.error(
+          "[director-session] edit failed, sending new message",
+          e?.message || e,
+        );
+      }
+    }
 
     let sent;
     try {
@@ -1270,6 +1289,80 @@ class AttendanceService {
     }
 
     return sent;
+  }
+
+  async sendScheduledOrchestraCalls() {
+    const data = await orchestraBotApi.listUpcomingCalls().catch((e) => {
+      console.error("listUpcomingCalls failed:", e?.message || e);
+      return null;
+    });
+    const items = Array.isArray(data?.items) ? data.items : [];
+    for (const item of items) {
+      const kind = String(item?.kind || "").trim();
+      const id = String(item?.id || "").trim();
+      if (!id) continue;
+      try {
+        if (kind === "director-session") {
+          const projectId = String(item?.projectId || "").trim();
+          if (!projectId) continue;
+          await this.publishDirectorSessionFromBackend(projectId, id);
+        } else if (kind === "rehearsal") {
+          await this.publishRehearsalFromBackend(id);
+        }
+      } catch (e) {
+        console.error("sendScheduledOrchestraCalls item failed:", kind, id, e?.message || e);
+      }
+    }
+    return { ok: true, count: items.length };
+  }
+
+  async sendMonthAvailabilityReminders(force = false) {
+    const data = await orchestraBotApi.listAvailabilityGaps().catch((e) => {
+      console.error("listAvailabilityGaps failed:", e?.message || e);
+      return null;
+    });
+    if (!force && !data?.enabled) return { ok: true, sentCount: 0, skipped: true };
+    const recipients = Array.isArray(data?.items) ? data.items : [];
+    return this.remindMonthAvailabilityFromBackend(recipients);
+  }
+
+  async remindMonthAvailabilityFromBackend(recipients) {
+    const list = Array.isArray(recipients) ? recipients.slice(0, 500) : [];
+    if (list.length === 0) {
+      return { ok: true, sentCount: 0, failedCount: 0 };
+    }
+    let sentCount = 0;
+    let failedCount = 0;
+    for (const item of list) {
+      const telegramId = String(item?.telegramId || "").trim();
+      if (!telegramId) {
+        failedCount += 1;
+        continue;
+      }
+      const missingDays = Number(item?.missingDays || 0) || 0;
+      const name = String(item?.name || "").trim();
+      const hello = name ? `${name}, ` : "";
+      const text = [
+        `${hello}на ближайший месяц занятость заполнена не полностью.`,
+        missingDays > 0 ? `Нет отметки на ${missingDays} дн.` : "",
+        "Отметьте свободные и занятые дни в профиле Orchestra, чтобы вызов не приходил вслепую.",
+        "Команда: /profile",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      try {
+        await this.bot.telegram.sendMessage(telegramId, text);
+        sentCount += 1;
+      } catch (e) {
+        failedCount += 1;
+        console.error(
+          "remindMonthAvailabilityFromBackend failed:",
+          telegramId,
+          e?.message || e,
+        );
+      }
+    }
+    return { ok: true, sentCount, failedCount };
   }
 
   async remindDirectorSessionMissingAvailabilityFromBackend(
@@ -1565,10 +1658,27 @@ class AttendanceService {
       },
     );
 
-    // Автоотправка опроса по вторникам и пятницам в 12:00
-    cron.schedule("0 12 * * 2,5", () => this.sendAttendanceMessage(), {
-      timezone: "Europe/Moscow",
-    });
+    // Автоотправка вызовов по расписанию бота (сессии и репетиции Orchestra)
+    cron.schedule(
+      "5 * * * *",
+      () => {
+        this.sendScheduledOrchestraCalls().catch((e) => {
+          console.error("Scheduled orchestra calls error:", e);
+        });
+      },
+      { timezone: "Europe/Moscow" },
+    );
+
+    // Напоминания в личку, если занятость на месяц не заполнена
+    cron.schedule(
+      "0 10 * * 1",
+      () => {
+        this.sendMonthAvailabilityReminders().catch((e) => {
+          console.error("Month availability reminders error:", e);
+        });
+      },
+      { timezone: "Europe/Moscow" },
+    );
 
     // Ежедневные напоминания в 10:00 тем, кто ещё не отметил явку
     cron.schedule(

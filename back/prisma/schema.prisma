@@ -839,6 +839,15 @@ model TelegramBotIntegration {
   quizGroupChatId String?
   quizThreadId    String?
 
+  /// Как слать вызов в Telegram: on_publish | same_day | advance
+  callNotifyMode String @default("on_publish")
+  /// За сколько дней слать, если mode = advance (1–14)
+  callNotifyAdvanceDays Int @default(1)
+  /// Час Москвы, когда слать по расписанию (0–23)
+  callNotifyHour Int @default(12)
+  /// Личка тем, у кого не заполнена занятость на ближайший месяц
+  availabilityRemindEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

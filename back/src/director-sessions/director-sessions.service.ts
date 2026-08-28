@@ -14,6 +14,10 @@ import { UpsertMyDirectorSessionCommentDto } from './dto/upsert-my-director-sess
 import { ProjectAccessService } from '../project-access/project-access.service';
 import { touchProjectActivity } from '../projects/project-activity';
 import { MessengerBridgeService } from '../messenger-bots/messenger-bridge.service';
+import {
+  loadCallNotifySettings,
+  shouldSendTelegramOnPublish,
+} from '../telegram-bots/call-notify';
 
 type DirectorSlotRef = { projectSlug: string; sceneId: number };
 type DirectorSlotRoleRehearsalPick = {
@@ -1635,7 +1639,23 @@ export class DirectorSessionsService {
       ).trim();
 
     let telegramSent = false;
+    let telegramDeferred = false;
+    const alreadySent = Boolean(
+      String((session as { telegramMessageId?: string | null }).telegramMessageId ?? '').trim(),
+    );
     if (secret && botIntegrationId) {
+      const settings = await loadCallNotifySettings(
+        this.prisma,
+        botIntegrationId,
+      );
+      const sendNow = shouldSendTelegramOnPublish(
+        settings,
+        alreadySent,
+        updated.startsAt,
+      );
+      if (!sendNow) {
+        telegramDeferred = true;
+      } else {
       try {
         console.log('[director-sessions] publish via bot', {
           projectId: directorProject.id,
@@ -1685,6 +1705,7 @@ export class DirectorSessionsService {
           e?.response?.data ?? e?.message ?? e,
         );
       }
+      }
     } else {
       console.warn('[director-sessions] publish skipped: missing secret or botIntegrationId', {
         hasSecret: Boolean(secret),
@@ -1693,13 +1714,15 @@ export class DirectorSessionsService {
     }
 
     try {
-      const title = String((updated as any)?.title ?? 'Сессия').trim();
-      const when = String((updated as any)?.startsAt ?? '').trim();
-      const announce = [`Orchestra: ${title}`, when ? `Когда: ${when}` : '']
-        .filter(Boolean)
-        .join('\n');
-      if (announce) {
-        await this.messengerBridge.publishText(userId, { text: announce });
+      if (!telegramDeferred) {
+        const title = String((updated as any)?.title ?? 'Сессия').trim();
+        const when = String((updated as any)?.startsAt ?? '').trim();
+        const announce = [`Orchestra: ${title}`, when ? `Когда: ${when}` : '']
+          .filter(Boolean)
+          .join('\n');
+        if (announce) {
+          await this.messengerBridge.publishText(userId, { text: announce });
+        }
       }
     } catch (e: any) {
       console.warn(
@@ -1708,7 +1731,7 @@ export class DirectorSessionsService {
       );
     }
 
-    return { ok: true, telegramSent, session: updated };
+    return { ok: true, telegramSent, telegramDeferred, session: updated };
   }
 
   /** Для бота: получить сессию с участниками и резолвом слотов */

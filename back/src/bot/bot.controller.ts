@@ -38,6 +38,16 @@ export class BotController {
     return this.botService.getIntegration(req.botIntegrationId);
   }
 
+  @Get('upcoming-calls')
+  listUpcomingCalls(@Req() req: any) {
+    return this.botService.listUpcomingCalls(req.botIntegrationId);
+  }
+
+  @Get('availability-gaps')
+  listAvailabilityGaps(@Req() req: any) {
+    return this.botService.listAvailabilityGaps(req.botIntegrationId);
+  }
+
   @Post('profiles/resolve')
   resolveProfiles(@Body() body: { emails: string[] }) {
     return this.botService.resolveProfiles(body?.emails ?? []);

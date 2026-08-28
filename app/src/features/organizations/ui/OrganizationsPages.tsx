@@ -73,9 +73,9 @@ function parseOrganizationFilter(value: string | null): OrganizationFilter {
 }
 
 function studioRoleLabel(role: StudioSummary["myRole"]): string {
-  if (role === "owner") return "Владелец";
   if (role === "teacher") return "Преподаватель";
-  return "Ученик";
+  if (role === "student") return "Ученик";
+  return "";
 }
 
 function buildOrganizationItems(
@@ -92,13 +92,21 @@ function buildOrganizationItems(
     theaterPoster: readTheaterPoster(theater.id),
   }));
 
-  const troupeItems: OrganizationListItem[] = troupes.map((troupe) => ({
-    id: troupe.id,
-    kind: "troupe",
-    title: troupe.title,
-    meta: troupe.theater?.title ?? "Независимый коллектив",
-    path: troupeOrganizationPath(troupe.id),
-  }));
+  const troupeItems: OrganizationListItem[] = troupes.map((troupe) => {
+    const theaterTitle = troupe.theater?.title?.trim() ?? "";
+    const sameAsTitle =
+      theaterTitle.length > 0 &&
+      theaterTitle.localeCompare(troupe.title, "ru", { sensitivity: "accent" }) ===
+        0;
+
+    return {
+      id: troupe.id,
+      kind: "troupe",
+      title: troupe.title,
+      meta: theaterTitle && !sameAsTitle ? theaterTitle : "",
+      path: troupeOrganizationPath(troupe.id),
+    };
+  });
 
   const studioItems: OrganizationListItem[] = studios.map((studio) => ({
     id: studio.id,
@@ -189,9 +197,7 @@ function OrganizationPoster({
             src={posterSrc!}
             alt=""
           />
-        ) : (
-          <span className="organizations-page__theater-poster-hint">Театр</span>
-        )}
+        ) : null}
       </span>
     );
   }
@@ -220,17 +226,13 @@ function OrganizationPoster({
             size="tile"
             className="organizations-page__theater-poster-image"
           />
-        ) : (
-          <span className="organizations-page__theater-poster-hint">Студия</span>
-        )}
+        ) : null}
       </span>
     );
   }
 
   return (
-    <span className="organizations-page__theater-poster-frame organizations-page__theater-poster-frame--placeholder">
-      <span className="organizations-page__theater-poster-hint">Коллектив</span>
-    </span>
+    <span className="organizations-page__theater-poster-frame organizations-page__theater-poster-frame--placeholder" />
   );
 }
 

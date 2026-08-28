@@ -143,7 +143,8 @@ class BotRunner {
           if (
             url !== "/internal/publish-rehearsal" &&
             url !== "/internal/publish-director-session" &&
-            url !== "/internal/remind-director-session-availability"
+            url !== "/internal/remind-director-session-availability" &&
+            url !== "/internal/remind-month-availability"
           ) {
             res.writeHead(404);
             res.end();
@@ -228,6 +229,17 @@ class BotRunner {
             });
             res.writeHead(200, { "Content-Type": "application/json" });
             res.end(JSON.stringify({ ok: true, result: out || null }));
+            return;
+          }
+
+          if (url === "/internal/remind-month-availability") {
+            const recipients = Array.isArray(body?.recipients) ? body.recipients : [];
+            const out = await this.callChild(integrationId, {
+              type: "remindMonthAvailability",
+              recipients,
+            });
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: true, result: out || null, sentCount: Number(out?.sentCount || 0) }));
             return;
           }
 

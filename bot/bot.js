@@ -42,6 +42,7 @@ function startHttpServer({
   onPublishRehearsal,
   onPublishDirectorSession,
   onRemindDirectorSessionAvailability,
+  onRemindMonthAvailability,
 }) {
   if (String(process.env.DISABLE_INTERNAL_HTTP || "").trim() === "1") {
     return;
@@ -180,6 +181,39 @@ function startHttpServer({
           return;
         }
 
+        if (url === "/internal/remind-month-availability" && method === "POST") {
+          const secret = process.env.INTERNAL_API_SECRET;
+          const got = req.headers["x-internal-secret"];
+          if (!secret || String(got || "") !== String(secret)) {
+            res.writeHead(401, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: "unauthorized" }));
+            return;
+          }
+
+          const body = await readJson(req);
+          const recipients = Array.isArray(body?.recipients) ? body.recipients : [];
+          try {
+            if (!onRemindMonthAvailability) {
+              throw new Error("month availability reminders are not configured");
+            }
+            const result = await onRemindMonthAvailability(recipients);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                ok: true,
+                sentCount: Number(result?.sentCount || 0),
+                failedCount: Number(result?.failedCount || 0),
+              }),
+            );
+          } catch (e) {
+            const msg = String(e?.message || e || "remind_failed");
+            console.error("remind-month-availability failed:", msg);
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: msg }));
+          }
+          return;
+        }
+
         res.writeHead(404);
         res.end();
       } catch (e) {
@@ -243,6 +277,9 @@ class BotManager {
           recipients,
         );
       },
+      onRemindMonthAvailability: async (recipients) => {
+        return this.attendance.remindMonthAvailabilityFromBackend(recipients);
+      },
     });
     this._setupStartCommand();
     this._setupMenuHandler();
@@ -289,6 +326,14 @@ class BotManager {
                 sessionId,
                 recipients,
               );
+            process.send?.({ requestId, ok: true, result: out || null });
+            return;
+          }
+          if (msg.type === "remindMonthAvailability") {
+            const recipients = Array.isArray(msg.recipients) ? msg.recipients : [];
+            const out = await this.attendance.remindMonthAvailabilityFromBackend(
+              recipients,
+            );
             process.send?.({ requestId, ok: true, result: out || null });
             return;
           }

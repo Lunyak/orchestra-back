@@ -1,4 +1,5 @@
 import { TheaterSectionNav } from "./TheaterSectionNav";
+import { CallBotSettingsTrigger } from "../../call-bot/ui/CallBotSettingsTrigger";
 
 type TheaterRehearsalsHeadProps = {
   theaterId: string;
@@ -14,6 +15,7 @@ export function TheaterRehearsalsHead({ theaterId }: TheaterRehearsalsHeadProps)
           variant="inline"
         />
         <h1 className="rehearsals-title">Репетиции</h1>
+        <CallBotSettingsTrigger className="theater-rehearsals-page__bot-btn" />
       </div>
     </div>
   );

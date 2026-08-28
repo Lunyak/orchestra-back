@@ -1,0 +1,77 @@
+.sessions-bot-settings-modal {
+  width: min(28rem, 100%);
+  max-height: min(86vh, 900px);
+  overflow: hidden;
+}
+
+.sessions-bot-settings-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  max-height: inherit;
+  padding: 18px 20px 20px;
+  box-sizing: border-box;
+}
+
+.sessions-bot-settings-modal__content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.sessions-bot-settings-modal__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--sessions-text-strong);
+}
+
+.sessions-bot-settings-modal__hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sessions-text-muted);
+}
+
+.sessions-bot-settings-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sessions-bot-settings-modal__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted);
+}
+
+.sessions-bot-settings-modal__error {
+  margin: 0;
+  color: #f66;
+  font-size: 13px;
+}
+
+.sessions-bot-settings-modal__message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--sessions-text);
+}
+
+.sessions-bot-settings-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.sessions-bot-settings-trigger {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 10px;
+}

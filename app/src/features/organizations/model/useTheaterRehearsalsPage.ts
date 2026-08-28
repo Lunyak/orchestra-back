@@ -434,7 +434,9 @@ export function useTheaterRehearsalsPage() {
           };
         });
       }
-      if (response.telegramSent === false) {
+      if (response.telegramDeferred) {
+        setPublishError("");
+      } else if (response.telegramSent === false) {
         setPublishError(
           "Сессия сохранена, но сообщение в Telegram не отправилось. Проверьте бота и настройки группы.",
         );

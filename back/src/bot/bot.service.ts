@@ -6,6 +6,14 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RehearsalPlanRequestDto } from './dto/rehearsal-plan.dto';
 import { BotProfilesUpsertDto } from './dto/bot-profiles.dto';
+import {
+  collectMonthAvailabilityGaps,
+  callNotifyApiFields,
+  isScheduledCallDue,
+  moscowDateKey,
+  parseCallNotifySettings,
+  shiftDateKey,
+} from '../telegram-bots/call-notify';
 
 function uniq<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
@@ -91,6 +99,11 @@ export class BotService {
         "defaultProjectSlug",
         "quizGroupChatId",
         "quizThreadId",
+        "callNotifyMode",
+        "callNotifyAdvanceDays",
+        "callNotifyHour",
+        "availabilityRemindEnabled",
+        "ownerUserId",
         "createdAt",
         "updatedAt"
       FROM "TelegramBotIntegration"
@@ -117,7 +130,10 @@ export class BotService {
     }>;
 
     return {
-      integration: rows[0],
+      integration: {
+        ...rows[0],
+        ...callNotifyApiFields(rows[0]),
+      } as Record<string, any>,
       variables: vars,
     };
   }
@@ -336,6 +352,127 @@ export class BotService {
     return {
       project: { id: project.id, slug: project.slug, name: project.name },
       presentRoles: Array.from(presentNorm),
+      items,
+    };
+  }
+
+  async listUpcomingCalls(botIntegrationId: string) {
+    const id = String(botIntegrationId ?? '').trim();
+    if (!id) throw new BadRequestException('botIntegrationId is required');
+    const info = await this.getIntegration(id);
+    const ownerUserId = String(info.integration?.ownerUserId ?? '').trim();
+    const settings = parseCallNotifySettings(info.integration);
+    if (!ownerUserId || settings.mode === 'on_publish') {
+      return { items: [] as Array<Record<string, string>> };
+    }
+
+    const today = moscowDateKey();
+    const horizonDays = settings.mode === 'advance' ? settings.advanceDays : 0;
+    const from = new Date(`${today}T00:00:00+03:00`);
+    const toKey = shiftDateKey(today, Math.max(horizonDays, 1) + 1);
+    const to = new Date(`${toKey}T23:59:59+03:00`);
+
+    const sessions = await this.prisma.directorSession.findMany({
+      where: {
+        userId: ownerUserId,
+        startsAt: { gte: from, lte: to },
+      },
+      select: {
+        id: true,
+        projectId: true,
+        startsAt: true,
+        title: true,
+        payload: true,
+      },
+      orderBy: { startsAt: 'asc' },
+      take: 200,
+    });
+
+    const sessionIds = new Set<string>();
+    const items: Array<{
+      kind: 'director-session' | 'rehearsal';
+      id: string;
+      projectId: string;
+      startsAt: string;
+      title: string;
+    }> = [];
+
+    for (const row of sessions) {
+      const payload = (row.payload ?? {}) as Record<string, unknown>;
+      const publishedAt = String(payload.publishedAt ?? '').trim();
+      const telegramMessageId = String(payload.telegramMessageId ?? '').trim();
+      if (!publishedAt || telegramMessageId) continue;
+      if (!isScheduledCallDue(row.startsAt, settings)) continue;
+      sessionIds.add(row.id);
+      items.push({
+        kind: 'director-session',
+        id: row.id,
+        projectId: row.projectId,
+        startsAt: row.startsAt.toISOString(),
+        title: String(row.title ?? payload.title ?? 'Сессия'),
+      });
+    }
+
+    const prefs = await this.prisma.projectTelegramBotPreference.findMany({
+      where: { botIntegrationId: id },
+      select: { projectId: true },
+    });
+    const projectIds = Array.from(
+      new Set(prefs.map((pref) => String(pref.projectId ?? '').trim()).filter(Boolean)),
+    );
+    const rehearsalWhere =
+      projectIds.length > 0
+        ? {
+            publishedAt: { not: null },
+            startsAt: { gte: from, lte: to },
+            OR: [{ projectId: { in: projectIds } }, { createdBy: ownerUserId }],
+          }
+        : {
+            publishedAt: { not: null },
+            startsAt: { gte: from, lte: to },
+            createdBy: ownerUserId,
+          };
+
+    const rehearsals = await this.prisma.rehearsal.findMany({
+      where: rehearsalWhere,
+      select: {
+        id: true,
+        projectId: true,
+        startsAt: true,
+        title: true,
+        telegramMessageId: true,
+        directorSession: { select: { id: true } },
+      },
+      orderBy: { startsAt: 'asc' },
+      take: 200,
+    });
+
+    for (const rehearsal of rehearsals) {
+      if (sessionIds.has(rehearsal.id) || rehearsal.directorSession) continue;
+      if (String(rehearsal.telegramMessageId ?? '').trim()) continue;
+      if (!isScheduledCallDue(rehearsal.startsAt, settings)) continue;
+      items.push({
+        kind: 'rehearsal',
+        id: rehearsal.id,
+        projectId: rehearsal.projectId,
+        startsAt: rehearsal.startsAt.toISOString(),
+        title: rehearsal.title,
+      });
+    }
+
+    return { items };
+  }
+
+  async listAvailabilityGaps(botIntegrationId: string) {
+    const id = String(botIntegrationId ?? '').trim();
+    if (!id) throw new BadRequestException('botIntegrationId is required');
+    const info = await this.getIntegration(id);
+    const ownerUserId = String(info.integration?.ownerUserId ?? '').trim();
+    const settings = parseCallNotifySettings(info.integration);
+    if (!ownerUserId) return { items: [] };
+    const items = await collectMonthAvailabilityGaps(this.prisma, ownerUserId);
+    return {
+      enabled: settings.availabilityRemindEnabled,
       items,
     };
   }

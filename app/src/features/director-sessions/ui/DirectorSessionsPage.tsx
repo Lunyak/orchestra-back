@@ -14,6 +14,7 @@ import { DirectorSessionsCalendarStage } from "./DirectorSessionsCalendarStage";
 import { DirectorSessionsDayStage } from "./DirectorSessionsDayStage";
 import { DirectorSessionsSessionStage } from "./DirectorSessionsSessionStage";
 import type { SessionsBrowseStage } from "./DirectorSessionsShared";
+import { CallBotSettingsTrigger } from "../../call-bot/ui/CallBotSettingsTrigger";
 
 export type { DirectorSessionsPageViewModel } from "../model/useDirectorSessionsPage";
 export { useDirectorSessionsPage } from "../model/useDirectorSessionsPage";
@@ -121,6 +122,11 @@ export function DirectorSessionsPageView({
     <div className="rehearsals-page sessions-page">
       <RehearsalPlanSectionChrome activeTab="sessions">
         <div className="sessions-flow">
+          {browseStage === "calendar" || browseStage === "day" ? (
+            <div className="sessions-bot-settings-trigger">
+              <CallBotSettingsTrigger />
+            </div>
+          ) : null}
           {browseStage === "calendar" ? (
             <DirectorSessionsCalendarStage
               dotsByDate={dotsByDate}

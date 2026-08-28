@@ -62,7 +62,7 @@ export async function publishDirectorSession(
   accessToken: string,
   sessionId: string,
   body?: { comment?: string | null; includeUnavailable?: boolean },
-): Promise<{ ok: boolean; telegramSent?: boolean; session?: DirectorSession }> {
+): Promise<{ ok: boolean; telegramSent?: boolean; telegramDeferred?: boolean; session?: DirectorSession }> {
   const { data } = await api.post(
     `/director-sessions/${encodeURIComponent(sessionId)}/publish`,
     body ?? null,

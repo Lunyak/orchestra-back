@@ -245,7 +245,9 @@ export function useDirectorSessionsActions({
           ),
         );
       }
-      if (pub?.telegramSent === false) {
+      if (pub?.telegramDeferred) {
+        setPublishError(null);
+      } else if (pub?.telegramSent === false) {
         setPublishError(
           "Сессия сохранена, но сообщение в Telegram не отправилось. Проверьте бота и настройки группы.",
         );

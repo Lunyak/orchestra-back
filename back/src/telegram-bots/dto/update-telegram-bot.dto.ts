@@ -1,4 +1,14 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class UpdateTelegramBotDto {
   @IsOptional()
@@ -50,4 +60,27 @@ export class UpdateTelegramBotDto {
   @IsString()
   @MaxLength(50)
   quizThreadId?: string | null;
+
+  @IsOptional()
+  @IsIn(['on_publish', 'same_day', 'advance'])
+  callNotifyMode?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(14)
+  callNotifyAdvanceDays?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(23)
+  callNotifyHour?: number;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  availabilityRemindEnabled?: boolean;
 }

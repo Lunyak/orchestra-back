@@ -31,8 +31,8 @@ export function TheaterRehearsalsCallFooter({
   onOpen,
 }: TheaterRehearsalsCallFooterProps) {
   const publishTitle = selectedPublished
-    ? "Пересобрать список участников по календарю; при подключённом боте — обновить или отправить сообщение в Telegram"
-    : "Помечает репетицию опубликованной; при подключённом боте — дублирует вызов в Telegram";
+    ? "Пересобрать список участников. Telegram обновит уже отправленное сообщение или уйдёт по расписанию бота"
+    : "Собирает вызов в приложении. Telegram — сразу или по расписанию бота, смотрите кнопку «Бот» в списке";
   const publishLabel = publishing
     ? "Публикую…"
     : selectedPublished

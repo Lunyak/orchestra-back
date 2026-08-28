@@ -18,6 +18,10 @@ import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/ru';
 import axios from 'axios';
+import {
+  loadCallNotifySettings,
+  shouldSendTelegramOnPublish,
+} from '../telegram-bots/call-notify';
 
 dayjs.extend(customParseFormat);
 dayjs.locale('ru');
@@ -1156,6 +1160,23 @@ export class RehearsalsService {
       throw new BadRequestException(
         'No connected Telegram bot. Connect a bot and select it in Project settings.',
       );
+    }
+
+    const alreadySent = Boolean(String(reh.telegramMessageId ?? '').trim());
+    const settings = await loadCallNotifySettings(this.prisma, botIntegrationId);
+    const sendNow = shouldSendTelegramOnPublish(
+      settings,
+      alreadySent,
+      reh.startsAt,
+    );
+
+    if (!sendNow) {
+      await this.prisma.rehearsal.update({
+        where: { id: rehearsalId },
+        data: { publishedAt: reh.publishedAt ?? new Date() },
+      });
+      await touchProjectActivity(this.prisma, reh.projectId);
+      return { ok: true, telegramDeferred: true };
     }
 
     try {

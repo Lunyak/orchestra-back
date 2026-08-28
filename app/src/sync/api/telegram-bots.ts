@@ -14,6 +14,10 @@ export interface TelegramBotIntegrationSummary {
   defaultProjectSlug?: string | null;
   quizGroupChatId?: string | null;
   quizThreadId?: string | null;
+  callNotifyMode?: "on_publish" | "same_day" | "advance";
+  callNotifyAdvanceDays?: number;
+  callNotifyHour?: number;
+  availabilityRemindEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +68,10 @@ export async function updateTelegramBot(
       | "defaultProjectSlug"
       | "quizGroupChatId"
       | "quizThreadId"
+      | "callNotifyMode"
+      | "callNotifyAdvanceDays"
+      | "callNotifyHour"
+      | "availabilityRemindEnabled"
     >
   >,
 ): Promise<{ ok: boolean }> {
@@ -135,6 +143,23 @@ export async function sendTelegramBotTestMessage(
   const { data } = await api.post<{ ok: boolean }>(
     `/telegram-bots/${encodeURIComponent(botId)}/test-message`,
     body,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
+export async function remindMonthAvailability(
+  accessToken: string,
+  botId: string,
+): Promise<{
+  ok: boolean;
+  sentCount: number;
+  skippedCount: number;
+  totalWithoutAvailability: number;
+}> {
+  const { data } = await api.post(
+    `/telegram-bots/${encodeURIComponent(botId)}/remind-month-availability`,
+    {},
     { headers: { Authorization: `Bearer ${accessToken}` } },
   );
   return data;

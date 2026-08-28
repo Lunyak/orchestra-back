@@ -63,7 +63,7 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
     }),
 
     publishDirectorSession: build.mutation<
-      { ok: boolean; telegramSent?: boolean; session?: DirectorSession },
+      { ok: boolean; telegramSent?: boolean; telegramDeferred?: boolean; session?: DirectorSession },
       {
         sessionId: string;
         comment?: string | null;

@@ -3009,7 +3009,8 @@
 
   .app-shell-with-menubar:has(.spectacle-run--compact-assembly) .app-editor-menubar__end,
   .app-shell-with-menubar:has(.spectacle-run--compact-strip) .app-editor-menubar__end {
-    display: contents;
+    flex: 0 0 auto;
+    margin-left: auto;
   }
 
   .app-shell-with-menubar:has(.spectacle-run--compact-assembly) .app-editor-menubar__mini-player,

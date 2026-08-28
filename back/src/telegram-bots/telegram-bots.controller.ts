@@ -82,4 +82,9 @@ export class TelegramBotsController {
   ) {
     return this.telegramBots.sendTestMessage(req.user.userId, id, body);
   }
+
+  @Post(':id/remind-month-availability')
+  remindMonthAvailability(@Req() req: any, @Param('id') id: string) {
+    return this.telegramBots.remindMonthAvailability(req.user.userId, id);
+  }
 }

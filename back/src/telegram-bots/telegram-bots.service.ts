@@ -14,6 +14,10 @@ import { ConnectTelegramBotDto } from './dto/connect-telegram-bot.dto';
 import { UpdateTelegramBotDto } from './dto/update-telegram-bot.dto';
 import { TelegramBotTestMessageDto } from './dto/test-message.dto';
 import { UpsertBotVariableDto } from './dto/upsert-variable.dto';
+import {
+  collectMonthAvailabilityGaps,
+  callNotifyApiFields,
+} from './call-notify';
 
 type TelegramBotRow = {
   id: string;
@@ -31,6 +35,10 @@ type TelegramBotRow = {
   defaultProjectSlug: string | null;
   quizGroupChatId: string | null;
   quizThreadId: string | null;
+  callNotifyMode: string;
+  callNotifyAdvanceDays: number;
+  callNotifyHour: number;
+  availabilityRemindEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -117,6 +125,10 @@ export class TelegramBotsService {
         "defaultProjectSlug",
         "quizGroupChatId",
         "quizThreadId",
+        "callNotifyMode",
+        "callNotifyAdvanceDays",
+        "callNotifyHour",
+        "availabilityRemindEnabled",
         "createdAt",
         "updatedAt"
       FROM "TelegramBotIntegration"
@@ -150,6 +162,7 @@ export class TelegramBotsService {
         defaultProjectSlug: b.defaultProjectSlug,
         quizGroupChatId: b.quizGroupChatId,
         quizThreadId: b.quizThreadId,
+        ...callNotifyApiFields(b),
         createdAt: b.createdAt,
         updatedAt: b.updatedAt,
       };
@@ -231,6 +244,7 @@ export class TelegramBotsService {
         "ownerTelegramId","adminTelegramId",
         "groupChatId","attendanceThreadId","announcementsThreadId","defaultProjectSlug",
         "quizGroupChatId","quizThreadId",
+        "callNotifyMode","callNotifyAdvanceDays","callNotifyHour","availabilityRemindEnabled",
         "createdAt","updatedAt"
       FROM "TelegramBotIntegration"
       WHERE "ownerUserId" = $1
@@ -253,6 +267,7 @@ export class TelegramBotsService {
         defaultProjectSlug: b.defaultProjectSlug,
         quizGroupChatId: b.quizGroupChatId,
         quizThreadId: b.quizThreadId,
+        ...callNotifyApiFields(b),
         createdAt: b.createdAt,
         updatedAt: b.updatedAt,
       })),
@@ -413,6 +428,13 @@ export class TelegramBotsService {
       patch.quizThreadId = dto.quizThreadId
         ? String(dto.quizThreadId).trim()
         : null;
+    if (dto.callNotifyMode !== undefined)
+      patch.callNotifyMode = String(dto.callNotifyMode ?? '').trim();
+    if (dto.callNotifyAdvanceDays !== undefined)
+      patch.callNotifyAdvanceDays = dto.callNotifyAdvanceDays;
+    if (dto.callNotifyHour !== undefined) patch.callNotifyHour = dto.callNotifyHour;
+    if (dto.availabilityRemindEnabled !== undefined)
+      patch.availabilityRemindEnabled = Boolean(dto.availabilityRemindEnabled);
 
     const keys = Object.keys(patch);
     if (keys.length === 0) return { ok: true };
@@ -570,6 +592,47 @@ export class TelegramBotsService {
         e?.response?.data?.description ||
         e?.message ||
         'Telegram sendMessage failed';
+      throw new BadRequestException(msg);
+    }
+  }
+
+  async remindMonthAvailability(userId: string, botId: string) {
+    await this.assertOwner(userId, botId);
+    const recipients = await collectMonthAvailabilityGaps(this.prisma, userId);
+    if (recipients.length === 0) {
+      return {
+        ok: true,
+        sentCount: 0,
+        skippedCount: 0,
+        totalWithoutAvailability: 0,
+      };
+    }
+
+    const botUrl =
+      this.config.get<string>('BOT_INTERNAL_URL') || 'http://bot:3001';
+    const secret = String(
+      this.config.get<string>('INTERNAL_API_SECRET') ?? '',
+    ).trim();
+    if (!secret) {
+      throw new BadRequestException('INTERNAL_API_SECRET is not configured');
+    }
+
+    const url = `${botUrl.replace(/\/$/, '')}/internal/remind-month-availability`;
+    try {
+      const res = await axios.post(
+        url,
+        { botIntegrationId: botId, recipients },
+        { headers: { 'X-Internal-Secret': secret } },
+      );
+      const sentCount = Number(res?.data?.sentCount ?? res?.data?.result?.sentCount ?? 0) || 0;
+      return {
+        ok: true,
+        sentCount,
+        skippedCount: Math.max(0, recipients.length - sentCount),
+        totalWithoutAvailability: recipients.length,
+      };
+    } catch (e: any) {
+      const msg = String(e?.message ?? 'Failed to send reminders');
       throw new BadRequestException(msg);
     }
   }

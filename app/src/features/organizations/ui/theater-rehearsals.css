@@ -50,6 +50,14 @@
   text-align: center;
 }
 
+.theater-rehearsals-page__bot-btn {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+}
+
 .theater-rehearsals-page__head .rehearsals-muted {
   margin: 6px 0 0;
   text-align: center;

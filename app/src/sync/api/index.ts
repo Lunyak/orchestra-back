@@ -130,6 +130,7 @@ export {
   sendTelegramBotTestMessage,
   updateTelegramBot,
   upsertBotVariable,
+  remindMonthAvailability,
   type BotVariableItem,
   type TelegramBotIntegrationSummary,
 } from "./telegram-bots";

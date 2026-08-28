@@ -70,6 +70,18 @@ async function getDirectorSession(projectId, sessionId) {
   return data;
 }
 
+async function listUpcomingCalls() {
+  const c = client();
+  const { data } = await c.get("/bot/upcoming-calls");
+  return data;
+}
+
+async function listAvailabilityGaps() {
+  const c = client();
+  const { data } = await c.get("/bot/availability-gaps");
+  return data;
+}
+
 async function markDirectorSessionPublished(projectId, sessionId, payload) {
   const c = client();
   const { data } = await c.post(
@@ -94,6 +106,8 @@ module.exports = {
   markRehearsalPublished,
   setRehearsalAttendance,
   getDirectorSession,
+  listUpcomingCalls,
+  listAvailabilityGaps,
   markDirectorSessionPublished,
   setDirectorSessionAttendance,
 };
