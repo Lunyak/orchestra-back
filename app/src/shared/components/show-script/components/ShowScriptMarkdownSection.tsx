@@ -28,13 +28,10 @@ import { useShowScriptMarkdownAnnotations } from "../hooks/useShowScriptMarkdown
 import { useShowScriptMarkdownInsert } from "../hooks/useShowScriptMarkdownInsert";
 import { useShowScriptSceneComment } from "../hooks/useShowScriptSceneComment";
 import { AppEditorScriptAnnotationsToggle, AppEditorScriptModeToggle, AppEditorScriptPlayOriginalToggle, AppEditorScriptSceneTitle } from "../../app-editor-menubar";
-import { useAppEditorMenubarEndToolsRender } from "../../app-editor-menubar/AppEditorMenubarContext";
 import {
   SpectacleTechChromePortal,
   useSpectacleTechChromeCenterTarget,
 } from "../../../../features/spectacle/ui/spectacle-tech-chrome-slots";
-import { ScriptSceneChromeMenu } from "./ScriptSceneChromeMenu";
-import type { ShowScriptMarkdownMode } from "../../../../features/show-script-markdown/model/show-script-markdown-slice";
 
 const ScriptMarkdownCodemirrorLazy = lazy(() =>
   import("./ScriptMarkdownCodemirror").then((m) => ({ default: m.ScriptMarkdownCodemirror })),
@@ -59,7 +56,7 @@ interface IProps {
   onCreateSceneFromSelection?: (
     sourceSceneId: number,
     selectedText: string,
-    trimmedSourceText: string,
+    remainderText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => void;
   renderBody?: (args: {
@@ -215,29 +212,6 @@ export function ShowScriptMarkdownSection({
     }
   }, [annotationsMode, dispatch, isEditing, markdownMode, projectSlug, sceneName]);
 
-  const handleSetMarkdownMode = useCallback(
-    (mode: ShowScriptMarkdownMode) => {
-      try {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            `showScript:markdownMode:${projectSlug}:${sceneName}`,
-            mode,
-          );
-        }
-      } catch {
-        // ignore
-      }
-      dispatch(
-        showScriptMarkdownActions.setMarkdownMode({
-          projectSlug,
-          sceneName,
-          mode,
-        }),
-      );
-    },
-    [dispatch, projectSlug, sceneName],
-  );
-
   const handleSceneTitleChange = useCallback(
     (title: string) => {
       if (!currentScene) return;
@@ -331,41 +305,7 @@ export function ShowScriptMarkdownSection({
         {annotationsToggle}
         {playOriginalToggle}
       </div>
-    ) : null;
-
-  const sceneChromeMenu =
-    compactStrip && titleInDirectionSwitch && currentScene ? (
-      <ScriptSceneChromeMenu
-        variant="menubar"
-        markdownMode={markdownMode}
-        onSetMarkdownMode={handleSetMarkdownMode}
-        isModeEditing={isEditing}
-        onToggleModeEditing={toggleEditing}
-        showEditToggle={markdownMode !== "comments"}
-        annotationsMode={annotationsMode}
-        onToggleAnnotations={toggleAnnotationsMode}
-        annotationsDisabled={isEditing}
-        showAnnotations={markdownMode !== "comments"}
-        playOriginalMode={ui.playOriginalMode}
-        onTogglePlayOriginal={togglePlayOriginalMode}
-        showPlayOriginal={markdownMode === "play"}
-      />
-    ) : null;
-
-  useAppEditorMenubarEndToolsRender(
-    "script-scene-chrome-menu",
-    10,
-    () => sceneChromeMenu,
-    [
-      compactStrip,
-      titleInDirectionSwitch,
-      currentScene?.id,
-      markdownMode,
-      isEditing,
-      annotationsMode,
-      ui.playOriginalMode,
-    ],
-  );
+    )     : null;
 
   const showSceneTitleInChrome =
     Boolean(currentScene) &&

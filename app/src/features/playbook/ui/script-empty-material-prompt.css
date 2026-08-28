@@ -17,7 +17,9 @@
 .script-empty-material__card {
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
   width: min(720px, 100%);
+  min-width: 0;
   padding: 22px 24px 20px;
   border: 1px solid var(--stage-brutal-border);
   border-top: 2px solid var(--color-active-ascent);
@@ -61,11 +63,18 @@
   opacity: 0.85;
 }
 
-.script-empty-material__label {
+.script-empty-material__label-row {
   position: relative;
   z-index: 1;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 8px;
+}
+
+.script-empty-material__label {
+  margin-bottom: 0;
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -74,9 +83,72 @@
   opacity: 0.8;
 }
 
-.script-empty-material__textarea {
+.script-empty-material__paste-btn {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-active-ascent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.script-empty-material__paste-btn:hover:not(:disabled),
+.script-empty-material__paste-btn:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+
+.script-empty-material__paste-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.script-empty-material__paste {
   position: relative;
   z-index: 1;
+}
+
+.script-empty-material__paste-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  pointer-events: none;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.script-empty-material__kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 14%, transparent);
+  color: var(--color-active-ascent);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.script-empty-material__textarea {
+  position: relative;
+  z-index: 0;
   width: 100%;
   min-height: 220px;
   resize: vertical;
@@ -84,6 +156,11 @@
   color: var(--field-control-text);
   border-left: 2px solid var(--color-active-ascent);
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.18);
+}
+
+.script-empty-material__paste:not(.script-empty-material__paste--filled)
+  .script-empty-material__textarea {
+  caret-color: var(--field-control-text);
 }
 
 .script-empty-material__textarea:focus-visible {
@@ -157,4 +234,98 @@
   text-transform: uppercase;
   color: color-mix(in srgb, var(--color-active-ascent) 55%, var(--color-text-muted));
   opacity: 0.75;
+}
+
+@media (max-width: 979px) {
+  .script-empty-material {
+    align-items: stretch;
+    justify-content: flex-start;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .script-empty-material__card {
+    width: 100%;
+    padding: 16px 14px 14px;
+    box-shadow: none;
+  }
+
+  .script-empty-material__title {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 560px) {
+  .script-empty-material {
+    padding: 8px;
+  }
+
+  .script-empty-material__card {
+    padding: 14px 12px 12px;
+  }
+
+  .script-empty-material__title {
+    font-size: 16px;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+  }
+
+  .script-empty-material__lead {
+    margin-bottom: 14px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .script-empty-material__label-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .script-empty-material__paste-btn {
+    min-height: 36px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-active-ascent);
+    text-align: center;
+  }
+
+  .script-empty-material__kbd {
+    display: none;
+  }
+
+  .script-empty-material__paste-hint {
+    padding: 12px;
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .script-empty-material__textarea {
+    min-height: 140px;
+  }
+
+  .script-empty-material__actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .script-empty-material__actions .button {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 40px;
+    text-align: center;
+  }
+
+  .script-empty-material__or {
+    text-align: center;
+  }
+
+  .script-empty-material__hint {
+    margin-top: 10px;
+    font-size: 10px;
+  }
 }

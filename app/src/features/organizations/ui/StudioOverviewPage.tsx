@@ -1,4 +1,5 @@
 import { Link, Navigate, useParams } from "react-router-dom";
+import { PageBootLoader } from "@shared/components/page-loader/page-boot";
 import { globalPaths, studioOrganizationPath } from "../../../app/router/paths";
 import { useAuth } from "../../auth/model/auth-context";
 import { useGetStudioQuery } from "../../studio";
@@ -17,11 +18,15 @@ export function StudioOverviewPage() {
     return <Navigate to={studioOrganizationPath()} replace />;
   }
 
-  if (!isLoading && (isError || !studio)) {
+  if (isLoading) {
+    return <PageBootLoader label="Загрузка студии…" />;
+  }
+
+  if (isError || !studio) {
     return <Navigate to={studioOrganizationPath()} replace />;
   }
 
-  const displayTitle = studio?.title || "Студия";
+  const displayTitle = studio.title || "Студия";
 
   return (
     <main className="studio-overview">
@@ -34,23 +39,18 @@ export function StudioOverviewPage() {
             ← Организации
           </Link>
           <p className="studio-overview__eyebrow">Студия</p>
-          <h1 className="studio-overview__title">
-            {isLoading ? "Загрузка…" : displayTitle}
-          </h1>
         </header>
 
-        {!isLoading && studio ? (
-          <section
-            className="studio-overview__map"
-            aria-labelledby="studio-nav-map-title"
-          >
-            <StudioNavMindmap
-              studioId={studioId}
-              rootLabel={displayTitle}
-              imageUrl={studio.imageUrl}
-            />
-          </section>
-        ) : null}
+        <section
+          className="studio-overview__map"
+          aria-labelledby="studio-nav-map-title"
+        >
+          <StudioNavMindmap
+            studioId={studioId}
+            rootLabel={displayTitle}
+            imageUrl={studio.imageUrl}
+          />
+        </section>
       </div>
     </main>
   );

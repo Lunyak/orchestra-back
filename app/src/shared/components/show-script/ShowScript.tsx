@@ -24,7 +24,7 @@ export const ShowScript: React.FC = () => {
     scenes,
     currentPage,
     updateScene,
-    splitSceneFromSelection,
+    createSceneFromSelection,
     handleTrackLinkClick,
     handleSoundLinkClick,
     hasLocalEdits,
@@ -68,17 +68,17 @@ export const ShowScript: React.FC = () => {
     updateScene(id, { [field]: value } as Partial<ScriptScene>);
   };
 
-  const createSceneFromSelection = (
+  const handleCreateSceneFromSelection = (
     sourceSceneId: number,
     selectedText: string,
-    trimmedSourceText: string,
+    remainderText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => {
-    splitSceneFromSelection({
+    createSceneFromSelection({
       sourceSceneId,
       targetField,
       selectedText,
-      trimmedSourceText,
+      remainderText,
     });
   };
 
@@ -122,7 +122,7 @@ export const ShowScript: React.FC = () => {
           updateSceneField={updateSceneField}
           onTrackLinkClick={handleTrackLinkClick}
           onSoundLinkClick={handleSoundLinkClick}
-          onCreateSceneFromSelection={createSceneFromSelection}
+          onCreateSceneFromSelection={handleCreateSceneFromSelection}
           renderBody={({ markdownPane }) =>
             currentScene ? (
               <div className="script-scene-editor">

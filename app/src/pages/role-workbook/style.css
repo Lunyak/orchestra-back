@@ -1,7 +1,46 @@
 .rolewb-layout .main-content {
-  padding: 16px;
+  padding: 0;
   color: var(--color-text-primary);
-  background-color: var(--color-bg-secondary);
+  background-color: transparent;
+  min-height: 100%;
+}
+
+.rolewb-page {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  padding: 18px 18px 28px;
+  box-sizing: border-box;
+  background: var(--sessions-bg);
+  color: var(--sessions-text);
+}
+
+.app-content:has(> .main-content) .rolewb-page,
+.app-shell-body .rolewb-page {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.rolewb-page__message {
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  min-height: 100%;
+  padding: 18px;
+  box-sizing: border-box;
+  background: var(--sessions-bg, #111);
+  color: var(--sessions-text, #888);
 }
 
 .rolewb-view {
@@ -569,6 +608,18 @@
   margin-top: 8px;
 }
 
+.rolewb-reference-columns--cols-2 {
+  --rolewb-ref-cols: 2;
+}
+
+.rolewb-reference-columns--cols-3 {
+  --rolewb-ref-cols: 3;
+}
+
+.rolewb-reference-columns--cols-4 {
+  --rolewb-ref-cols: 4;
+}
+
 .rolewb-reference-column {
   display: grid;
   gap: 12px;
@@ -685,8 +736,8 @@
 }
 
 @media (max-width: 720px) {
-  .rolewb-layout .main-content {
-    padding: 12px;
+  .rolewb-page {
+    padding: 12px 12px 20px;
   }
 
   .rolewb-transform-grid,

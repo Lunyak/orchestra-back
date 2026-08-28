@@ -479,14 +479,27 @@ a.tasks-page__item-title:hover {
   }
 }
 
+@media (max-width: 720px) {
+  .tasks-page:has(> .admin-chrome-layout) {
+    padding-top: 6px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+
 @media (max-width: 640px) {
+  .tasks-page:has(> .admin-chrome-layout) {
+    padding-top: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
   .tasks-page {
-    padding: 0;
     max-width: none;
   }
 
   .tasks-page__content {
-    padding: 0 4px;
+    padding: 0;
   }
 
   .tasks-page__item-actions {

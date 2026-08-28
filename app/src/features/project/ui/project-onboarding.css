@@ -1,0 +1,203 @@
+.project-onboarding {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-index-modal);
+  pointer-events: none;
+}
+
+.project-onboarding__veil,
+.project-onboarding__ring {
+  position: fixed;
+  pointer-events: none;
+}
+
+.project-onboarding__veil {
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.project-onboarding__ring {
+  top: var(--onboarding-top);
+  left: var(--onboarding-left);
+  width: var(--onboarding-width);
+  height: var(--onboarding-height);
+  border: 2px solid var(--color-active-ascent);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.62);
+  animation: project-onboarding-pulse 1.8s ease-in-out infinite;
+}
+
+.project-onboarding__arrow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.project-onboarding__arrow path {
+  fill: none;
+  stroke: var(--color-active-ascent);
+  stroke-width: 2.25;
+  stroke-linecap: square;
+  stroke-linejoin: miter;
+  vector-effect: non-scaling-stroke;
+}
+
+.project-onboarding__arrow polygon {
+  fill: var(--color-active-ascent);
+}
+
+.project-onboarding__card {
+  position: fixed;
+  top: var(--onboarding-top, 24px);
+  left: var(--onboarding-left, 24px);
+  z-index: 2;
+  width: min(340px, calc(100vw - 32px));
+  padding: 18px 18px 16px;
+  box-sizing: border-box;
+  pointer-events: auto;
+  opacity: 0;
+  border: 1px solid var(--sessions-border);
+  border-top: 2px solid var(--color-active-ascent);
+  background:
+    radial-gradient(
+      circle at 100% 0%,
+      color-mix(in srgb, var(--color-active-ascent) 16%, transparent),
+      transparent 46%
+    ),
+    var(--sessions-panel);
+  color: var(--sessions-text);
+}
+
+.project-onboarding__card--placed {
+  opacity: 1;
+}
+
+.project-onboarding__kicker {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-active-ascent);
+}
+
+.project-onboarding__title {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  color: var(--sessions-text-strong);
+}
+
+.project-onboarding__copy {
+  margin: 0 0 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sessions-text-muted);
+}
+
+.project-onboarding__text-link {
+  color: var(--color-active-ascent);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.project-onboarding__text-link:hover,
+.project-onboarding__text-link:focus-visible {
+  color: var(--color-active-ascent);
+  outline: none;
+}
+
+.project-onboarding__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.project-onboarding__skip,
+.project-onboarding__next {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--sessions-border);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.project-onboarding__skip {
+  background: transparent;
+  color: var(--sessions-text-muted);
+}
+
+.project-onboarding__skip:hover,
+.project-onboarding__skip:focus-visible {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+  outline: none;
+}
+
+.project-onboarding__next {
+  background: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+  color: var(--sessions-bg);
+}
+
+.project-onboarding__next:hover,
+.project-onboarding__next:focus-visible {
+  filter: brightness(1.06);
+  outline: none;
+}
+
+@keyframes project-onboarding-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.62),
+      0 0 0 0 color-mix(in srgb, var(--color-active-ascent) 0%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.62),
+      0 0 0 8px color-mix(in srgb, var(--color-active-ascent) 28%, transparent);
+  }
+}
+
+@media (max-width: 720px) {
+  .project-onboarding__card {
+    width: min(300px, calc(100vw - 24px));
+    padding: 14px 14px 12px;
+  }
+
+  .project-onboarding__title {
+    font-size: 16px;
+  }
+
+  .project-onboarding__copy {
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+
+  .project-onboarding__skip,
+  .project-onboarding__next {
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+}

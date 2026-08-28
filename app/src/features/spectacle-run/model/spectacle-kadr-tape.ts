@@ -1,21 +1,13 @@
-import type { MarkdownKadrSection } from "../../theater/model/light-kadrs";
-import { insertKadrInSceneData } from "../../theater/model/kadr-store";
 import {
   buildSceneKadrTape,
   type SceneKadrTapeItem,
 } from "../../theater/model/scene-kadr-tape";
-import type { ScriptScene, SceneLightKadrsDataV1 } from "../../../shared/types/script";
+import type { ScriptScene } from "../../../shared/types/script";
 
-export type SpectacleTapeItem = SceneKadrTapeItem & {
-  /** @deprecated markdown-секции больше не SoT; всегда null для JSON-ленты */
-  section: MarkdownKadrSection | null;
-};
+export type SpectacleTapeItem = SceneKadrTapeItem;
 
 export function buildSpectacleKadrTape(scenes: ScriptScene[]): SpectacleTapeItem[] {
-  return buildSceneKadrTape(scenes).map((item) => ({
-    ...item,
-    section: null,
-  }));
+  return buildSceneKadrTape(scenes);
 }
 
 export type SpectacleTapeSceneGroup = {
@@ -66,34 +58,6 @@ export type InsertKadrAfterTarget = {
   id?: string | null;
   kadrNo?: number;
 };
-
-/** @deprecated используйте insertKadrInSceneData из kadr-store */
-export function insertKadrAfterInScene(args: {
-  scene: ScriptScene;
-  after?: InsertKadrAfterTarget | null;
-  kadrId?: string;
-}): { nextMarkdown: string; nextKadrs: SceneLightKadrsDataV1; kadrId: string; kadrNo: number } {
-  const result = insertKadrInSceneData({
-    scene: args.scene,
-    afterKadrId: args.after?.id ?? null,
-    kadrId: args.kadrId,
-  });
-  return {
-    nextMarkdown: String(args.scene.markdown ?? ""),
-    nextKadrs: result.nextKadrs,
-    kadrId: result.kadrId,
-    kadrNo: result.kadrNo,
-  };
-}
-
-/** @deprecated */
-export function appendKadrToScene(args: {
-  scene: ScriptScene;
-  kadrNo?: number;
-  kadrId?: string;
-}): { nextMarkdown: string; nextKadrs: SceneLightKadrsDataV1; kadrId: string; kadrNo: number } {
-  return insertKadrAfterInScene({ scene: args.scene, after: null, kadrId: args.kadrId });
-}
 
 export function findTapeIndexForSceneKadr(
   tape: SpectacleTapeItem[],

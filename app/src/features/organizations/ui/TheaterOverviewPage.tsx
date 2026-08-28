@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
+import { PageBootLoader } from "@shared/components/page-loader/page-boot";
 import { globalPaths, theaterOrganizationPath } from "../../../app/router/paths";
 import { fetchTheaters } from "../../../sync/api/workspaces";
 import { useAuth } from "../../auth/model/auth-context";
@@ -55,7 +56,11 @@ export function TheaterOverviewPage() {
     return <Navigate to={theaterOrganizationPath()} replace />;
   }
 
-  if (!loading && missing) {
+  if (loading) {
+    return <PageBootLoader label="Загрузка театра…" />;
+  }
+
+  if (missing) {
     return <Navigate to={theaterOrganizationPath()} replace />;
   }
 
@@ -74,17 +79,15 @@ export function TheaterOverviewPage() {
           <p className="theater-overview__eyebrow">Театр</p>
         </header>
 
-        {!loading ? (
-          <section
-            className="theater-overview__map"
-            aria-labelledby="theater-nav-map-title"
-          >
-            <TheaterNavMindmap
-              theaterId={theaterId}
-              rootLabel={displayTitle}
-            />
-          </section>
-        ) : null}
+        <section
+          className="theater-overview__map"
+          aria-labelledby="theater-nav-map-title"
+        >
+          <TheaterNavMindmap
+            theaterId={theaterId}
+            rootLabel={displayTitle}
+          />
+        </section>
       </div>
     </main>
   );

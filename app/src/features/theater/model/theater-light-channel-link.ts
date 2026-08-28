@@ -289,17 +289,6 @@ export function buildLightPlotFromSpotlights(
     });
 }
 
-/** @deprecated use buildLightPlotFromSpotlights — existing plot is ignored */
-export function mergeLightPlotFromSpotlights(
-  spotlights: TheaterSpotlight[],
-  _existing: LightFixture[],
-  layout: TheaterLayout,
-  gridCols = 12,
-  gridRows = 20,
-): LightFixture[] {
-  return buildLightPlotFromSpotlights(spotlights, layout, gridCols, gridRows);
-}
-
 export function applyLightPlotChannelsToSpotlights(
   spotlights: TheaterSpotlight[],
   lightPlot: LightFixture[] | undefined,

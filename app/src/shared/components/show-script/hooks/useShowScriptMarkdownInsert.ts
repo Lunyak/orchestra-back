@@ -40,7 +40,7 @@ type UseShowScriptMarkdownInsertArgs = {
   onCreateSceneFromSelection?: (
     sourceSceneId: number,
     selectedText: string,
-    trimmedSourceText: string,
+    remainderText: string,
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown",
   ) => void;
 };
@@ -285,7 +285,7 @@ export function useShowScriptMarkdownInsert(args: UseShowScriptMarkdownInsertArg
         const currentValue = ed.getDoc();
         const selectedText = currentValue.slice(selectionFrom, selectionTo);
         if (!selectedText || !onCreateSceneFromSelection) return;
-        const { value: trimmedSourceText } = insertAtSelection({
+        const { value: remainderText } = insertAtSelection({
           value: currentValue,
           insert: "",
           selectionStart: selectionFrom,
@@ -294,7 +294,7 @@ export function useShowScriptMarkdownInsert(args: UseShowScriptMarkdownInsertArg
         onCreateSceneFromSelection(
           currentScene.id,
           selectedText,
-          trimmedSourceText,
+          remainderText,
           activeMarkdownField as "markdown" | "playMarkdown" | "explicationMarkdown",
         );
         return;

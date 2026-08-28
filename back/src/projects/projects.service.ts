@@ -349,7 +349,7 @@ export class ProjectsService {
     const { project } = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'write',
+      'owner',
     );
 
     const data: Prisma.ProjectUpdateInput = {};
@@ -512,7 +512,7 @@ export class ProjectsService {
     const { project } = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'admin',
+      'owner',
     );
     const theater = await this.prisma.theater.findFirst({
       where: {
@@ -575,7 +575,7 @@ export class ProjectsService {
     const { project } = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'admin',
+      'owner',
     );
     const result = await this.prisma.projectTheater.deleteMany({
       where: { projectId: project.id, theaterId },
@@ -590,7 +590,7 @@ export class ProjectsService {
     const { project } = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'admin',
+      'owner',
     );
     const rawToken = crypto.randomBytes(32).toString('base64url');
     const tokenHash = sha256Base64Url(rawToken);
@@ -615,7 +615,7 @@ export class ProjectsService {
     const { project } = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'admin',
+      'owner',
     );
     return this.prisma.projectTheaterInvite.findMany({
       where: {
@@ -637,7 +637,7 @@ export class ProjectsService {
     const { project } = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'admin',
+      'owner',
     );
     const result = await this.prisma.projectTheaterInvite.updateMany({
       where: {

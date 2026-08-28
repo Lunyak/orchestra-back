@@ -28,33 +28,21 @@ export type RecordLightKadrInput = {
   /** Активный K на пульте при записи. */
   liveConsoleChannel?: number;
   lightChannelRoles?: PlaybookLightChannelRolesV1 | null;
-  /** @deprecated markdown больше не пишется */
-  markdown?: string;
-  /** @deprecated */
-  section?: { id?: string | null; kadrNo?: number; headingTitle?: string } | null;
-  /** @deprecated */
-  existingKadrId?: string | null;
 };
 
 export type RecordLightKadrResult = {
   kadrId: string;
   nextKadrs: SceneLightKadrsDataV1;
-  /** @deprecated всегда исходный markdown / пустая строка */
-  nextMarkdown: string;
   summary: string;
 };
 
 export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLightKadrResult | null {
   const faders = resolveLightFaders(input.lightFaders ?? undefined);
-  const kadrId =
-    input.kadrId ??
-    input.existingKadrId ??
-    input.section?.id ??
-    createLightKadrId();
+  const kadrId = input.kadrId ?? createLightKadrId();
   const existing = findKadrById(input.kadrs, kadrId);
   const kadrNo =
     existing?.kadrNo ??
-    Math.max(1, Math.trunc(input.kadrNo ?? input.section?.kadrNo ?? 1) || 1);
+    Math.max(1, Math.trunc(input.kadrNo ?? 1) || 1);
   const programId = Math.max(1, Math.trunc(input.programId) || 1);
 
   const roles = resolveLightChannelRoles(
@@ -67,7 +55,7 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
   const kadr = buildKadrFromConsole({
     id: kadrId,
     kadrNo,
-    title: input.title ?? existing?.title ?? input.section?.headingTitle,
+    title: input.title ?? existing?.title,
     programId,
     faders,
     spotlights: input.spotlights ?? [],
@@ -119,7 +107,6 @@ export function recordLightKadrForSection(input: RecordLightKadrInput): RecordLi
   return {
     kadrId,
     nextKadrs,
-    nextMarkdown: String(input.markdown ?? ""),
     summary,
   };
 }

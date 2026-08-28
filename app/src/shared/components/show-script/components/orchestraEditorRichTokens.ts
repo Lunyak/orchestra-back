@@ -131,14 +131,28 @@ const TRACK_OR_PLAYLIST_LINK_RE =
 
 const PARENTHETICAL_RE = /\([^()\n]+\)/g;
 
-/** Каретка строго внутри токена (не на границе) — иначе «мигают» соседние лейблы. */
+/** Каретка/выделение строго внутри токена. Пересечение с большим range чипы не снимает. */
 function selectionInsideToken(
   sel: SelectionRange,
   from: number,
   to: number,
 ): boolean {
-  if (!sel.empty) return sel.from < to && sel.to > from;
+  if (!sel.empty) return sel.from > from && sel.to < to;
   return sel.from > from && sel.from < to;
+}
+
+function revealSignature(state: EditorState): string {
+  const sel = state.selection.main;
+  if (!sel.empty) {
+    const fromLine = state.doc.lineAt(sel.from);
+    if (fromLine.number !== state.doc.lineAt(sel.to).number) return "";
+  }
+  for (const token of collectEditableTokensOnLine(state, sel.from)) {
+    if (selectionInsideToken(sel, token.from, token.to)) {
+      return `${token.from}:${token.to}`;
+    }
+  }
+  return "";
 }
 
 type EditableTokenRange = { from: number; to: number; text: string };
@@ -913,10 +927,12 @@ export function orchestraEditorRichTokens(
       lastChannelStamp = "";
       lastImageCtxStamp = "";
       lastPlayTextMode = getPlayTextMode();
+      lastRevealSignature = "";
       constructor(readonly view: EditorView) {
         const ch = getLightChannels();
         this.lastChannelStamp = ch.join("\n");
         this.lastImageCtxStamp = editorImageCtxStamp(getImageCtx());
+        this.lastRevealSignature = revealSignature(view.state);
         this.applyBuild(view.state, ch);
       }
       applyBuild(state: EditorState, ch: string[]) {
@@ -937,17 +953,19 @@ export function orchestraEditorRichTokens(
         const stamp = ch.join("\n");
         const iStamp = editorImageCtxStamp(getImageCtx());
         const playTextMode = getPlayTextMode();
+        const reveal = revealSignature(u.state);
         if (
           u.docChanged ||
-          u.selectionSet ||
           u.viewportChanged ||
           stamp !== this.lastChannelStamp ||
           iStamp !== this.lastImageCtxStamp ||
-          playTextMode !== this.lastPlayTextMode
+          playTextMode !== this.lastPlayTextMode ||
+          reveal !== this.lastRevealSignature
         ) {
           this.lastChannelStamp = stamp;
           this.lastImageCtxStamp = iStamp;
           this.lastPlayTextMode = playTextMode;
+          this.lastRevealSignature = reveal;
           this.applyBuild(u.state, ch);
         }
         if (

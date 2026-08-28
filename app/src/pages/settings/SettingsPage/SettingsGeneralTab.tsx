@@ -30,7 +30,8 @@ export function SettingsGeneralTab() {
     updateProjectDisplayName,
     updateProjectSlug,
   } = useProject();
-  const { canWriteProject } = useTeam();
+  const { isProjectOwner } = useTeam();
+  const canManageProjectSettings = isProjectOwner === true;
 
   const [projectNameDraft, setProjectNameDraft] = useState("");
   const [projectNameSaving, setProjectNameSaving] = useState(false);
@@ -58,7 +59,7 @@ export function SettingsGeneralTab() {
 
   const handleRenameProject = async () => {
     const value = projectNameDraft.trim();
-    if (!projectName || !value) return;
+    if (!projectName || !value || !canManageProjectSettings) return;
     setProjectNameSaving(true);
     setProjectNameError(null);
     try {
@@ -80,7 +81,7 @@ export function SettingsGeneralTab() {
 
   const handleRenameSlug = async () => {
     const value = projectSlugDraft.trim();
-    if (!projectName || !value) return;
+    if (!projectName || !value || !canManageProjectSettings) return;
     setProjectSlugSaving(true);
     setProjectSlugError(null);
     try {
@@ -145,7 +146,9 @@ export function SettingsGeneralTab() {
                 }}
                 placeholder="Название проекта"
                 disabled={
-                  !projectName || projectNameSaving || canWriteProject === false
+                  !projectName ||
+                  projectNameSaving ||
+                  !canManageProjectSettings
                 }
               />
               <Button
@@ -157,7 +160,7 @@ export function SettingsGeneralTab() {
                   projectNameSaving ||
                   !projectNameDraft.trim() ||
                   projectNameDraft.trim() === currentProjectDisplayName.trim() ||
-                  canWriteProject === false
+                  !canManageProjectSettings
                 }
               >
                 {projectNameSaving ? "Сохранение…" : "Сохранить"}
@@ -187,7 +190,9 @@ export function SettingsGeneralTab() {
                 autoCapitalize="off"
                 autoCorrect="off"
                 disabled={
-                  !projectName || projectSlugSaving || canWriteProject === false
+                  !projectName ||
+                  projectSlugSaving ||
+                  !canManageProjectSettings
                 }
               />
               <Button
@@ -199,7 +204,7 @@ export function SettingsGeneralTab() {
                   projectSlugSaving ||
                   !projectSlugDraft.trim() ||
                   projectSlugDraft.trim() === projectName ||
-                  canWriteProject === false
+                  !canManageProjectSettings
                 }
               >
                 {projectSlugSaving ? "Сохранение…" : "Сохранить"}
@@ -214,9 +219,9 @@ export function SettingsGeneralTab() {
           </div>
         </div>
 
-        {canWriteProject === false ? (
+        {isProjectOwner === false ? (
           <div className="settings-invite-forbidden">
-            У вас нет права изменять проект.
+            Изменять название и slug проекта может только владелец.
           </div>
         ) : null}
       </section>

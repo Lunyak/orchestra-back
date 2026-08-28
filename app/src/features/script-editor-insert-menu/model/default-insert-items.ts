@@ -33,7 +33,7 @@ export const defaultScriptEditorInsertDefinitions: ScriptEditorInsertItemDefinit
   },
   {
     id: "selection-to-scene",
-    label: "Выделение в новую сцену",
+    label: "Создать из выделенного сцену",
     group: "Буфер",
     resolve: (ctx): ScriptEditorInsertResolveResult => {
       if (!ctx.canCopySelection) {

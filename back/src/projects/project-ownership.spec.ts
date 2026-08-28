@@ -18,6 +18,74 @@ function createService(prisma: unknown, projectAccess: unknown) {
   );
 }
 
+describe('updateProject', () => {
+  it('requires owner access', async () => {
+    const projectAccess = {
+      assertBySlug: jest
+        .fn()
+        .mockRejectedValue(new ForbiddenException('No owner access')),
+    };
+    const prisma = {
+      project: { update: jest.fn(), findUnique: jest.fn() },
+    };
+    const service = createService(prisma, projectAccess);
+
+    await expect(
+      service.updateProject('editor-1', 'show', { name: 'New name' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(projectAccess.assertBySlug).toHaveBeenCalledWith(
+      'editor-1',
+      'show',
+      'owner',
+    );
+    expect(prisma.project.update).not.toHaveBeenCalled();
+  });
+
+  it('updates name for the project owner', async () => {
+    const projectUpdate = jest.fn().mockResolvedValue({
+      id: 'project-1',
+      slug: 'show',
+      name: 'New name',
+      description: null,
+    });
+    const prisma = {
+      project: { update: projectUpdate, findUnique: jest.fn() },
+    };
+    const projectAccess = {
+      assertBySlug: jest.fn().mockResolvedValue({
+        project: { id: 'project-1', slug: 'show', ownerId: 'owner-1' },
+      }),
+    };
+    const service = createService(prisma, projectAccess);
+
+    const result = await service.updateProject('owner-1', 'show', {
+      name: 'New name',
+    });
+
+    expect(projectAccess.assertBySlug).toHaveBeenCalledWith(
+      'owner-1',
+      'show',
+      'owner',
+    );
+    expect(projectUpdate).toHaveBeenCalledWith({
+      where: { id: 'project-1' },
+      data: { name: 'New name' },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        description: true,
+      },
+    });
+    expect(result).toEqual({
+      id: 'project-1',
+      slug: 'show',
+      name: 'New name',
+      description: null,
+    });
+  });
+});
+
 describe('transferOwnership', () => {
   it('updates Project.ownerId for an eligible member', async () => {
     const projectUpdate = jest.fn().mockResolvedValue({});
@@ -98,6 +166,12 @@ describe('project theater invites', () => {
     const service = createService(prisma, projectAccess);
 
     const result = await service.createTheaterInvite('owner-1', 'show');
+
+    expect(projectAccess.assertBySlug).toHaveBeenCalledWith(
+      'owner-1',
+      'show',
+      'owner',
+    );
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -85,16 +85,30 @@ export function getLeadingSoundPayload(children: React.ReactNode): SoundLinkPayl
 export function flattenInertSpans(nodes: React.ReactNode[]): React.ReactNode[] {
   const out: React.ReactNode[] = [];
   for (const n of nodes) {
-    if (
-      React.isValidElement(n) &&
-      (n.type === "span" || n.type === React.Fragment) &&
-      n.props &&
-      (n.props as any).className == null &&
-      (n.props as any).style == null &&
-      (n.props as any).title == null &&
-      (n.props as any).id == null
-    ) {
-      out.push(...flattenInertSpans(React.Children.toArray((n.props as any).children)));
+    if (!React.isValidElement(n) || !n.props) {
+      out.push(n);
+      continue;
+    }
+    const props = n.props as Record<string, unknown>;
+    const hasHostProps =
+      props.className != null ||
+      props.style != null ||
+      props.title != null ||
+      props.id != null ||
+      props.role != null ||
+      props["data-lk-id"] != null ||
+      props["data-track-id"] != null ||
+      props["data-sound-id"] != null ||
+      props["data-video-id"] != null ||
+      props["data-hold-id"] != null;
+    const canUnwrap =
+      !hasHostProps &&
+      (n.type === "span" ||
+        n.type === React.Fragment ||
+        // custom react-markdown `span` — type не строка "span"
+        typeof n.type === "function");
+    if (canUnwrap) {
+      out.push(...flattenInertSpans(React.Children.toArray(props.children as React.ReactNode)));
       continue;
     }
     out.push(n);

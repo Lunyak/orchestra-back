@@ -8,6 +8,7 @@ import { AppEditorChatToggle } from "./AppEditorChatToggle";
 import { AppEditorHomeLink } from "./AppEditorHomeLink";
 import { AppEditorMenubarMiniPlayer } from "./AppEditorMenubarMiniPlayer";
 import { AppEditorMenubarProjectSelect } from "./AppEditorMenubarProjectSelect";
+import { AppEditorMobilePanelsMenu } from "./AppEditorMobilePanelsMenu";
 import { AppEditorUserMenu } from "./AppEditorUserMenu";
 import {
   useAppEditorMenubarCenter,
@@ -98,10 +99,10 @@ export function AppEditorMenubar() {
           ) : null}
           {!compactMenubar ? (
             <div className="app-editor-menubar__actions">{menubarToolbarSlot}</div>
-          ) : null}
-          <AppEditorUserMenu
-            menubarActions={compactMenubar ? menubarToolbarSlot : null}
-          />
+          ) : (
+            <AppEditorMobilePanelsMenu>{menubarToolbarSlot}</AppEditorMobilePanelsMenu>
+          )}
+          <AppEditorUserMenu />
         </div>
       </div>
     </header>

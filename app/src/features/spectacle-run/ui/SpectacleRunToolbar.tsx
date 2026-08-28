@@ -3,9 +3,10 @@ import { useState } from "react";
 import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";
 import { useAppSelector } from "../../../shared/store/hooks";
 import {
-  formatKadrTransitionForDisplay,
-  parseKadrTransitionRawInSection,
-} from "../model/kadr-section-transition";
+  findKadrById,
+  readSceneLightKadrs,
+} from "../../theater/model/light-kadrs";
+import { formatKadrTransitionForDisplay } from "../model/kadr-section-transition";
 import { useSpectacleRunContext } from "../model/spectacle-run-context";
 import {
   ProgRunStripModesButton,
@@ -27,15 +28,13 @@ export function SpectacleRunMeta() {
 
   if (tape.length === 0 || !isProgRun || compactStrip) return null;
 
-  const transitionLine =
-    currentItem?.section && currentScene && !currentItem.isPlaceholder
-      ? formatKadrTransitionForDisplay(
-          parseKadrTransitionRawInSection(
-            String(currentScene.markdown ?? ""),
-            currentItem.section,
-          ),
-        )
-      : "";
+  const currentKadr =
+    currentItem?.kadrId && currentScene && !currentItem.isPlaceholder
+      ? findKadrById(readSceneLightKadrs(currentScene), currentItem.kadrId)
+      : undefined;
+  const transitionLine = currentKadr?.transitionText
+    ? formatKadrTransitionForDisplay(currentKadr.transitionText)
+    : "";
 
   if (!transitionLine) return null;
 

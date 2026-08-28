@@ -60,11 +60,11 @@ export interface PlaybookContextValue {
   clearRealtimePullDeferred: () => void;
   addScene: (atPage?: number) => void;
   seedScenarioFromPlayText: (text: string) => void;
-  splitSceneFromSelection: (args: {
+  createSceneFromSelection: (args: {
     sourceSceneId: number;
     targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
     selectedText: string;
-    trimmedSourceText: string;
+    remainderText: string;
   }) => void;
   deleteScene: (id: number) => void;
   reorderScenes: (fromIndex: number, toIndex: number) => void;
@@ -203,14 +203,14 @@ export function usePlaybookActions() {
     (text: string) => dispatch(playbookActions.seedScenarioFromPlayText({ text })),
     [dispatch],
   );
-  const splitSceneFromSelection = useCallback(
+  const createSceneFromSelection = useCallback(
     (args: {
       sourceSceneId: number;
       targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
       selectedText: string;
-      trimmedSourceText: string;
+      remainderText: string;
     }) => {
-      dispatch(playbookActions.splitSceneFromSelection(args));
+      dispatch(playbookActions.createSceneFromSelection(args));
     },
     [dispatch],
   );
@@ -253,7 +253,7 @@ export function usePlaybookActions() {
     setCurrentPage,
     addScene,
     seedScenarioFromPlayText,
-    splitSceneFromSelection,
+    createSceneFromSelection,
     deleteScene,
     reorderScenes,
     saveScenesForLightPlot,

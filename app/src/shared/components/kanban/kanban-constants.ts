@@ -6,15 +6,25 @@ export type KanbanStatusConfig = {
   id: KanbanStatus;
   label: string;
   hint: string;
-  /** Фон шапки колонки (любой валидный CSS color). */
-  headerBg: string;
+  /** CSS-модификатор акцента колонки/карточки. */
+  statusClass: string;
 };
 
 export const STATUSES: KanbanStatusConfig[] = [
-  { id: "raw", label: "Черновик", hint: "", headerBg: "var(--kanban-col-raw)" },
-  { id: "text-learned", label: "Нужно взять", hint: "", headerBg: "var(--kanban-col-text-learned)" },
-  { id: "almost-ready", label: "Репетируем", hint: "", headerBg: "var(--kanban-col-almost-ready)" },
-  { id: "ready", label: "Готова", hint: "", headerBg: "var(--kanban-col-ready)" },
+  { id: "raw", label: "Черновик", hint: "", statusClass: "kanban-status--raw" },
+  {
+    id: "text-learned",
+    label: "Нужно взять",
+    hint: "",
+    statusClass: "kanban-status--text-learned",
+  },
+  {
+    id: "almost-ready",
+    label: "Репетируем",
+    hint: "",
+    statusClass: "kanban-status--almost-ready",
+  },
+  { id: "ready", label: "Готова", hint: "", statusClass: "kanban-status--ready" },
 ];
 
 export function statusOf(scene: ScriptScene): KanbanStatus {

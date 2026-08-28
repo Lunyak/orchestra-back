@@ -24,6 +24,10 @@ export type FormatPlayTextOptions = {
   formatCastList?: boolean;
   /** Не ставить метки на титуле до списка персонажей / первого акта. */
   protectTitlePage?: boolean;
+  /** Убрать ведущие/лишние пробелы в строках, чтобы лейблы встали в одну линию. */
+  trimExtraSpaces?: boolean;
+  /** Убрать точки сразу после лейблов (`[[РОЛЬ]].` / `[[РОЛЬ]] .`). */
+  stripLabelDots?: boolean;
 };
 
 export type DetectRoleNamesOptions = {
@@ -47,6 +51,8 @@ export type FormatPlayTextResult = {
     castLinesFormatted: number;
     castRolesFound: number;
     castSplitLines: number;
+    trimmedLines: number;
+    labelDotsStripped: number;
     warnings: FormatWarning[];
   };
 };
@@ -704,6 +710,26 @@ function labelRoleLines(text: string): { text: string; labeledCount: number } {
   return { text: out.join("\n"), labeledCount };
 }
 
+function trimExtraLineSpaces(text: string): { text: string; trimmedCount: number } {
+  let trimmedCount = 0;
+  const out = text.split("\n").map((line) => {
+    if (!line) return line;
+    const next = line.trim().replace(/\s+/g, " ");
+    if (next !== line) trimmedCount += 1;
+    return next;
+  });
+  return { text: out.join("\n"), trimmedCount };
+}
+
+function stripDotsAfterLabels(text: string): { text: string; strippedCount: number } {
+  let strippedCount = 0;
+  const next = text.replace(/(\[\[[^\]]+\]\])\s*\.+/g, (_match, label: string) => {
+    strippedCount += 1;
+    return label;
+  });
+  return { text: next, strippedCount };
+}
+
 export function formatPlayText(
   source: string,
   options: FormatPlayTextOptions = {},
@@ -714,6 +740,8 @@ export function formatPlayText(
   const removeOcrNoise = options.removeOcrNoise === true;
   const formatCast = options.formatCastList !== false;
   const protectTitle = options.protectTitlePage !== false;
+  const trimSpaces = options.trimExtraSpaces !== false;
+  const stripDots = options.stripLabelDots !== false;
   const roleSpecs = resolveRoleMarkerSpecs(options);
 
   const original = normalizeLineBreaks(source);
@@ -728,6 +756,8 @@ export function formatPlayText(
   let castLinesFormatted = 0;
   let castRolesFound = 0;
   let castSplitLines = 0;
+  let trimmedLines = 0;
+  let labelDotsStripped = 0;
 
   if (cleanOcr) {
     const ocr = cleanOcrText(text, { removeNoiseLines: removeOcrNoise });
@@ -815,6 +845,16 @@ export function formatPlayText(
   }
 
   text = joinPlayTextZones({ prefix, castContent, body });
+  if (trimSpaces) {
+    const trimmed = trimExtraLineSpaces(text);
+    text = trimmed.text;
+    trimmedLines = trimmed.trimmedCount;
+  }
+  if (stripDots) {
+    const stripped = stripDotsAfterLabels(text);
+    text = stripped.text;
+    labelDotsStripped = stripped.strippedCount;
+  }
   // Пробел перед ремаркой даёт «дырку» у лейбла; `]](…)` в превью защищается отдельно.
   text = text.replace(/\]\]\s+\(/g, "]](");
 
@@ -837,6 +877,8 @@ export function formatPlayText(
       castLinesFormatted,
       castRolesFound,
       castSplitLines,
+      trimmedLines,
+      labelDotsStripped,
       warnings,
     },
   };

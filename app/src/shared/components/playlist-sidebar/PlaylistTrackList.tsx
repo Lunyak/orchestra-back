@@ -5,6 +5,7 @@ import type { PlaylistTrack } from "../../types/playlist";
 import { Buttons } from "../buttons/Buttons";
 import { ListItem } from "../list-item/ListItem";
 import { PLAYLIST_REORDER_MIME } from "./usePlaylistTrackActions";
+import { PROJECT_ONBOARDING_PLAYLIST_ADD_ATTR } from "../../../features/project/model/project-onboarding";
 
 type PlaylistTrackListProps = {
   playlist: PlaylistTrack[];
@@ -243,6 +244,7 @@ export function PlaylistTrackList({
         title={addButtonTitle}
         aria-disabled={!desktopAvailable || playlistUploading}
         aria-label={addButtonTitle}
+        data-onboarding={PROJECT_ONBOARDING_PLAYLIST_ADD_ATTR}
       />
     </div>
   );

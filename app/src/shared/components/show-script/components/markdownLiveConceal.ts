@@ -33,6 +33,10 @@ function shouldRevealMark(
   markTo: number,
   sel: SelectionRange,
 ): boolean {
+  if (!sel.empty) {
+    const fromLine = state.doc.lineAt(sel.from);
+    if (fromLine.number !== state.doc.lineAt(sel.to).number) return false;
+  }
   if (cursorInside(sel, markFrom, markTo)) return true;
   if (!sel.empty) return intersectsRange(sel, markFrom, markTo);
 

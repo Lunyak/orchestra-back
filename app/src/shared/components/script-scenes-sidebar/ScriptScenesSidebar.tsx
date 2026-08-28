@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { ScriptScene } from "../../types/script";
 import { Buttons } from "../buttons/Buttons";
 import { ListItem } from "../list-item/ListItem";
+import { PROJECT_ONBOARDING_SCENES_ATTR } from "../../../features/project/model/project-onboarding";
 import "./style.css";
 
 export interface ScriptScenesSidebarProps {
@@ -86,7 +87,7 @@ export const ScriptScenesSidebar = ({
   };
 
   return (
-    <aside className="script-sidebar">
+    <aside className="script-sidebar" data-onboarding={PROJECT_ONBOARDING_SCENES_ATTR}>
       <div className="scenes-mini-list">
         {scenes.length === 0 ? (
           <p className="script-sidebar-empty">Добавьте материал в сценарий</p>

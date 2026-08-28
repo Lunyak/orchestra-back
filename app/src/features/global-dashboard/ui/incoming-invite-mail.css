@@ -1,0 +1,121 @@
+.incoming-invite-mail {
+  position: fixed;
+  top: calc(var(--app-menubar-height, 36px) + 16px);
+  left: 50%;
+  z-index: 11000;
+  display: flex;
+  justify-content: center;
+  width: min(100%, calc(100vw - 24px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.incoming-invite-mail__list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: auto;
+}
+
+.incoming-invite-mail__item {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: 148px;
+  margin: 0;
+  padding: 10px 8px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
+  box-sizing: border-box;
+  color: var(--sessions-text);
+  font: inherit;
+  cursor: pointer;
+  animation: incoming-invite-mail-fly 0.55s ease both;
+}
+
+.incoming-invite-mail__list > li:nth-child(2) .incoming-invite-mail__item {
+  animation-delay: 0.08s;
+}
+
+.incoming-invite-mail__list > li:nth-child(3) .incoming-invite-mail__item {
+  animation-delay: 0.16s;
+}
+
+.incoming-invite-mail__list > li:nth-child(4) .incoming-invite-mail__item {
+  animation-delay: 0.24s;
+}
+
+.incoming-invite-mail__list > li:nth-child(5) .incoming-invite-mail__item {
+  animation-delay: 0.32s;
+}
+
+.incoming-invite-mail__item:hover .incoming-invite-mail__subject,
+.incoming-invite-mail__item:focus-visible .incoming-invite-mail__subject {
+  color: var(--color-active-ascent);
+}
+
+.incoming-invite-mail__item:focus-visible {
+  border-color: var(--color-active-ascent);
+  outline: none;
+}
+
+.incoming-invite-mail__icon {
+  display: block;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.incoming-invite-mail__subject {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--sessions-text-strong);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+@keyframes incoming-invite-mail-fly {
+  from {
+    opacity: 0;
+    transform: translateY(-36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 560px) {
+  .incoming-invite-mail {
+    top: calc(var(--app-menubar-height, 36px) + 10px);
+  }
+
+  .incoming-invite-mail__list {
+    gap: 10px;
+  }
+
+  .incoming-invite-mail__item {
+    width: 120px;
+    padding: 8px 6px;
+  }
+
+  .incoming-invite-mail__icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .incoming-invite-mail__subject {
+    font-size: 11px;
+  }
+}

@@ -1,3 +1,4 @@
+import { projectPath } from "../../../app/router/paths";
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Modal } from "@shared/core/modal/Modal";
 import cn from "classnames";
@@ -10,12 +11,17 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   fetchWorkspaces,
   type WorkspaceSummary,
 } from "../../../sync/api/workspaces";
 import { useAuth } from "../../auth/model/auth-context";
 import { useProject } from "../model/project-context";
+import {
+  hasSeenProjectOnboarding,
+  projectOnboardingHref,
+} from "../model/project-onboarding";
 import { readProjectPoster } from "../model/project-poster-storage";
 import posterPlaceholderUrl from "../assets/project-poster-placeholder.png";
 import "./project-workspace.css";
@@ -74,6 +80,7 @@ function ProjectPosterTile({
 }
 
 export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
+  const navigate = useNavigate();
   const { accessToken } = useAuth();
   const {
     createProject,
@@ -160,9 +167,20 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
       if (workspaces.length === 0) {
         workspaceForCreate = (await loadWorkspaces()) || workspaceId;
       }
-      await createProject(title, workspaceForCreate || undefined);
+      const createdSlug = await createProject(
+        title,
+        workspaceForCreate || undefined,
+      );
+      if (!createdSlug) {
+        setCreateError("Не удалось создать проект");
+        return;
+      }
       setProjectTitle("");
       setIsCreateOpen(false);
+      const href = hasSeenProjectOnboarding()
+        ? projectPath(createdSlug)
+        : projectOnboardingHref(createdSlug);
+      navigate(href);
     } catch {
       setCreateError("Не удалось создать проект");
     } finally {
@@ -191,9 +209,7 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
         <div className="project-workspace__title-row">
           <div className="project-workspace__intro">
             <h1 id="project-workspace-title">Мои проекты</h1>
-            <p className="project-workspace__description">
-              Найдите проект по названию или создайте новый.
-            </p>
+  
           </div>
           <button
             type="button"
@@ -209,7 +225,6 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
 
         <div className="project-workspace__toolbar">
           <label className="project-workspace__search" htmlFor="project-workspace-search">
-            <span className="project-workspace__search-label">Поиск</span>
             <input
               id="project-workspace-search"
               className="project-workspace__input"

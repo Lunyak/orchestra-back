@@ -83,20 +83,14 @@ function buildOrganizationItems(
   troupes: TroupeSummary[],
   studios: StudioSummary[],
 ): OrganizationListItem[] {
-  const theaterItems: OrganizationListItem[] = theaters.map((theater) => {
-    const premisesCount = theater.premises.length;
-    const premisesLabel =
-      premisesCount === 0 ? "Без площадок" : `${premisesCount} площадок`;
-
-    return {
-      id: theater.id,
-      kind: "theater",
-      title: theater.title,
-      meta: premisesLabel,
-      path: theaterOverviewPath(theater.id),
-      theaterPoster: readTheaterPoster(theater.id),
-    };
-  });
+  const theaterItems: OrganizationListItem[] = theaters.map((theater) => ({
+    id: theater.id,
+    kind: "theater",
+    title: theater.title,
+    meta: "",
+    path: theaterOverviewPath(theater.id),
+    theaterPoster: readTheaterPoster(theater.id),
+  }));
 
   const troupeItems: OrganizationListItem[] = troupes.map((troupe) => ({
     id: troupe.id,
@@ -525,9 +519,11 @@ export function OrganizationsPage() {
                       <span className="organizations-page__theater-poster-name">
                         {item.title}
                       </span>
-                      <span className="organizations-page__theater-poster-meta">
-                        {item.meta}
-                      </span>
+                      {item.meta ? (
+                        <span className="organizations-page__theater-poster-meta">
+                          {item.meta}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 ))}

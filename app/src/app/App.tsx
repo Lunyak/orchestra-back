@@ -17,6 +17,7 @@ import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
 import { Route, Routes } from "react-router-dom";
 import { ChatDock } from "../features/chat";
+import { IncomingInviteMail } from "../features/global-dashboard";
 import { isProjectorOutputWindow } from "../features/projector/model/projector-playback-bridge";
 
 bootstrapTheme();
@@ -57,7 +58,12 @@ function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => 
         <>
           <ScriptUiBootstrap />
           <AppRoutes />
-          {!isProjectorOutput ? <ChatDock /> : null}
+          {!isProjectorOutput ? (
+            <>
+              <ChatDock />
+              <IncomingInviteMail />
+            </>
+          ) : null}
         </>
       </PlaybookSyncRunner>
     </ProjectProvider>

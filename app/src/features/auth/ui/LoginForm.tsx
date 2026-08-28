@@ -1,8 +1,6 @@
-import cn from "classnames";
 import "./login.css";
 import { isAxiosError } from "axios";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
-import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getApiBaseUrl } from "../../../sync/api/client";
@@ -69,10 +67,7 @@ export function LoginForm({
   };
 
   return (
-    <div
-      className="app-layout login-layout"
-      style={loginLayoutBackgroundStyle}
-    >
+    <div className="app-layout login-layout">
       <form className="login-form" onSubmit={handleSubmit}>
         <h1 className="login-form__title">
           {isResetMode
@@ -82,8 +77,9 @@ export function LoginForm({
               : "Вход"}
         </h1>
         <p className="login-form-subtitle">
-          Войди в аккаунт, чтобы работать с проектами и сценарием на этом
-          устройстве.
+          {isResetMode
+            ? "Укажи email аккаунта — пришлём ссылку для смены пароля."
+            : "Войди в аккаунт, чтобы работать с проектами и сценарием на этом устройстве."}
           {isDesktop ? (
             <>
               {" "}
@@ -104,53 +100,47 @@ export function LoginForm({
         </label>
         {isResetMode ? (
           <>
-            <p className={cn("login-form-subtitle", "login-form-subtitle--tight-top")}>
-              Мы отправим письмо со ссылкой для смены пароля (если такой аккаунт
-              есть).
-            </p>
-            <div>
-              <button
-                type="button"
-                className="login-form__btn login-form__btn--secondary"
-                disabled={!email.trim() || resetLoading}
-                onClick={async () => {
-                  setError(null);
-                  setMessage(null);
-                  const emailNorm = email.trim().toLowerCase();
-                  if (!emailNorm) return;
-                  setResetLoading(true);
-                  try {
-                    const res = await forgotPassword(emailNorm);
-                    if (res?.token) {
-                      navigate(
-                        `/reset-password?token=${encodeURIComponent(res.token)}`,
-                      );
-                      return;
-                    }
-                    setMessage(
-                      "Если такой email зарегистрирован, на почту ушло письмо со ссылкой. Проверьте папку «Спам».",
+            <button
+              type="button"
+              className="login-form__btn login-form__btn--submit"
+              disabled={!email.trim() || resetLoading}
+              onClick={async () => {
+                setError(null);
+                setMessage(null);
+                const emailNorm = email.trim().toLowerCase();
+                if (!emailNorm) return;
+                setResetLoading(true);
+                try {
+                  const res = await forgotPassword(emailNorm);
+                  if (res?.token) {
+                    navigate(
+                      `/reset-password?token=${encodeURIComponent(res.token)}`,
                     );
-                  } catch (err: unknown) {
-                    setError(formatAuthError(err));
-                  } finally {
-                    setResetLoading(false);
+                    return;
                   }
-                }}
-              >
-                {resetLoading ? "…" : "Отправить ссылку"}
-              </button>
-              <button
-                type="button"
-                className="login-form__btn login-form__btn--secondary"
-                onClick={() => {
-                  setIsResetMode(false);
-                  setError(null);
-                  setMessage(null);
-                }}
-              >
-                Назад к входу
-              </button>
-            </div>
+                  setMessage(
+                    "Если такой email зарегистрирован, на почту ушло письмо со ссылкой. Проверьте папку «Спам».",
+                  );
+                } catch (err: unknown) {
+                  setError(formatAuthError(err));
+                } finally {
+                  setResetLoading(false);
+                }
+              }}
+            >
+              {resetLoading ? "…" : "Отправить ссылку"}
+            </button>
+            <button
+              type="button"
+              className="login-form__btn login-form__btn--secondary"
+              onClick={() => {
+                setIsResetMode(false);
+                setError(null);
+                setMessage(null);
+              }}
+            >
+              Назад к входу
+            </button>
           </>
         ) : (
           <>
@@ -219,8 +209,8 @@ export function LoginForm({
             ) : null}
           </>
         )}
-        {error && <div className="login-error">{error}</div>}
-        {message && <div className="login-form-footer">{message}</div>}
+        {error ? <div className="login-error">{error}</div> : null}
+        {message ? <div className="login-ok">{message}</div> : null}
       </form>
     </div>
   );

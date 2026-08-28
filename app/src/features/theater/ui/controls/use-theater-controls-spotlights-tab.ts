@@ -4,7 +4,7 @@ import {
   buildCompleteLightFaders,
   resolveLightProgramMinCount,
   resolveLightPrograms,
-  upsertProgramChannelSnapshot,
+  upsertChannelMemorySnapshot,
 } from "../../../../shared/components/light-console/light-console-data";
 import type { TheaterSceneViewModel } from "../../model/use-theater-scene";
 import { useTheaterControlsLightChannels } from "./use-theater-controls-light-channels";
@@ -61,7 +61,7 @@ export function useTheaterControlsSpotlightsTab(vm: TheaterSceneViewModel) {
         return {
           ...(prev ?? {}),
           lightFaders: nextFaders,
-          lightPrograms: upsertProgramChannelSnapshot(programs, ch, nextFaders),
+          lightPrograms: upsertChannelMemorySnapshot(programs, ch, nextFaders),
         };
       });
       saveSpotlightFaderBinding();

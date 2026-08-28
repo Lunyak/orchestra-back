@@ -1,4 +1,5 @@
-import { useId, useRef, useState } from "react";
+import cn from "classnames";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../../shared/core/button/Button";
 import { readPlayTextFromFile } from "../model/read-play-text-file";
 import "./script-empty-material-prompt.css";
@@ -10,9 +11,15 @@ export type ScriptEmptyMaterialPromptProps = {
 export function ScriptEmptyMaterialPrompt({ onImport }: ScriptEmptyMaterialPromptProps) {
   const textareaId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const hasDraft = Boolean(draft);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   const submitText = (text: string) => {
     const trimmed = text.trim();
@@ -22,6 +29,25 @@ export function ScriptEmptyMaterialPrompt({ onImport }: ScriptEmptyMaterialPromp
     }
     setError(null);
     onImport(trimmed);
+  };
+
+  const applyPastedText = (text: string) => {
+    if (!text.trim()) {
+      setError("В буфере нет текста. Скопируйте пьесу и нажмите Ctrl+V");
+      return;
+    }
+    setDraft(text);
+    setError(null);
+  };
+
+  const handlePasteFromClipboard = async () => {
+    textareaRef.current?.focus();
+    try {
+      const text = await navigator.clipboard.readText();
+      applyPastedText(text);
+    } catch {
+      setError("Вставьте вручную: кликните в поле и нажмите Ctrl+V");
+    }
   };
 
   const handleFile = async (file: File | null | undefined) => {
@@ -43,27 +69,54 @@ export function ScriptEmptyMaterialPrompt({ onImport }: ScriptEmptyMaterialPromp
   return (
     <div className="script-empty-material">
       <div className="script-empty-material__card">
-        <h2 className="script-empty-material__title">Добавьте материал</h2>
+        <h2 className="script-empty-material__title">Вставьте пьесу</h2>
         <p className="script-empty-material__lead">
-          Сценарий пока пустой. Вставьте текст пьесы целиком в первую сцену — потом его можно
+          Скопируйте текст пьесы и вставьте сюда копипастом. Потом его можно
           отформатировать и нарезать на сцены.
         </p>
 
-        <label className="script-empty-material__label" htmlFor={textareaId}>
-          Текст пьесы
-        </label>
-        <textarea
-          id={textareaId}
-          className="script-empty-material__textarea native-text-input"
-          value={draft}
-          placeholder="Вставьте сюда текст пьесы (Ctrl+V)…"
-          rows={12}
-          disabled={busy}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            if (error) setError(null);
-          }}
-        />
+        <div className="script-empty-material__label-row">
+          <label className="script-empty-material__label" htmlFor={textareaId}>
+            Текст пьесы
+          </label>
+          <button
+            type="button"
+            className="script-empty-material__paste-btn"
+            onClick={() => {
+              void handlePasteFromClipboard();
+            }}
+            disabled={busy}
+          >
+            Вставить из буфера
+          </button>
+        </div>
+
+        <div
+          className={cn(
+            "script-empty-material__paste",
+            hasDraft && "script-empty-material__paste--filled",
+          )}
+        >
+          <textarea
+            ref={textareaRef}
+            id={textareaId}
+            className="script-empty-material__textarea native-text-input"
+            value={draft}
+            placeholder=" "
+            rows={12}
+            disabled={busy}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              if (error) setError(null);
+            }}
+          />
+          {hasDraft ? null : (
+            <p className="script-empty-material__paste-hint">
+              <span className="script-empty-material__kbd">Ctrl+V</span>
+              Вставьте скопированный текст пьесы
+            </p>
+          )}
+        </div>
 
         {error ? <p className="script-empty-material__error">{error}</p> : null}
 
@@ -92,7 +145,7 @@ export function ScriptEmptyMaterialPrompt({ onImport }: ScriptEmptyMaterialPromp
           />
         </div>
 
-        <p className="script-empty-material__hint">Форматы: .txt, .docx</p>
+        <p className="script-empty-material__hint">Форматы файла: .txt, .docx</p>
       </div>
     </div>
   );

@@ -37,4 +37,4 @@ export { DirectorSessionSlotsPanel } from "./ui/DirectorSessionSlotsPanel";
 export { SlotRoleRehearsalPicker } from "./ui/SlotRoleRehearsalPicker";
 export { TroupeSchedulePreview } from "./ui/TroupeSchedulePreview";
 
-export { DirectorSessionSlotPage } from "./ui/DirectorSessionSlotPage";
+export { DirectorSessionSlotPage } from "./ui/DirectorSessionSlotPage/DirectorSessionSlotPage";

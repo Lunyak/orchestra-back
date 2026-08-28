@@ -11,7 +11,21 @@
   padding: 20px 16px;
   box-sizing: border-box;
   color: var(--color-text-lighter);
-  background: var(--login-photo, none) center / cover no-repeat;
+  background-color: #0a0a0a;
+  background-image:
+    radial-gradient(
+      ellipse 90% 50% at 50% -10%,
+      color-mix(in srgb, var(--login-accent) 16%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(ellipse 80% 45% at 50% 110%, rgba(0, 0, 0, 0.9), transparent 55%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.018) 0 1px,
+      transparent 1px 22px
+    ),
+    linear-gradient(180deg, #141414 0%, #0a0a0a 42%, #070707 100%);
+  background-repeat: no-repeat;
 }
 
 .login-form {
@@ -66,7 +80,7 @@
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-script-accent);
+  color: var(--color-active-ascent, var(--color-script-accent));
   text-shadow: var(--stage-brutal-type-shadow);
 }
 
@@ -175,6 +189,21 @@
   box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.22);
 }
 
+.login-ok {
+  position: relative;
+  z-index: 1;
+  margin: 8px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--login-accent) 45%, var(--stage-brutal-border));
+  border-left: 3px solid var(--login-accent);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--color-text-lighter);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.22);
+}
+
 .login-form__btn {
   position: relative;
   z-index: 1;
@@ -252,15 +281,15 @@
 }
 
 .login-form__link {
-  color: var(--color-script-accent);
+  color: var(--color-active-ascent);
   font-weight: 700;
   text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-script-accent) 45%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-active-ascent) 45%, transparent);
 }
 
 .login-form__link:hover {
   color: var(--color-text-lighter);
-  border-bottom-color: var(--color-script-accent);
+  border-bottom-color: var(--color-active-ascent);
 }
 
 .login__assign-policy {

@@ -17,12 +17,16 @@ import {
 import { useProject } from "../../../features/project";
 import { useScriptUI } from "../../../features/script-ui";
 import { useIsMobile } from "../../hooks/useIsMobile";
+import { useAppSelector } from "../../store/hooks";
 
 export function AppEditorMenubarMiniPlayer() {
   const { pathname } = useLocation();
   const { projectName } = useProject();
   const isMobile = useIsMobile();
   const { showPlaylistSidebar, mobilePlaylistOpen } = useScriptUI();
+  const hasPlaylistTracks = useAppSelector(
+    (state) => (state.playbook.playbookData?.playlist?.length ?? 0) > 0,
+  );
   const isProjectRoute = isProjectPath(pathname);
   const isPlaylistVisible = isMobile ? mobilePlaylistOpen : showPlaylistSidebar;
 
@@ -50,7 +54,8 @@ export function AppEditorMenubarMiniPlayer() {
   const shouldShow =
     Boolean(projectName) &&
     isProjectRoute &&
-    !isPlaylistVisible;
+    !isPlaylistVisible &&
+    hasPlaylistTracks;
 
   if (!shouldShow) return null;
 

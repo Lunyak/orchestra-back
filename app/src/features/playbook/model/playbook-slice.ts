@@ -245,21 +245,22 @@ export const playbookSlice = createSlice({
       state.currentPage = insertIndex;
       state.scenesRevision += 1;
     },
-    splitSceneFromSelection(
+    createSceneFromSelection(
       state,
       action: PayloadAction<{
         sourceSceneId: number;
         targetField: "markdown" | "playMarkdown" | "explicationMarkdown";
         selectedText: string;
-        trimmedSourceText: string;
+        remainderText: string;
       }>,
     ) {
-      const { sourceSceneId, targetField, selectedText, trimmedSourceText } = action.payload;
+      const { sourceSceneId, targetField, selectedText, remainderText } =
+        action.payload;
       const sourceIdx = state.scenes.findIndex((s) => s.id === sourceSceneId);
       if (sourceIdx === -1) return;
 
       const sourceScene = state.scenes[sourceIdx];
-      state.scenes[sourceIdx] = { ...sourceScene, [targetField]: trimmedSourceText };
+      state.scenes[sourceIdx] = { ...sourceScene, [targetField]: selectedText };
 
       const nextId = state.scenes.reduce((acc, scene) => Math.max(acc, scene.id), 0) + 1;
       const nextRequisites = sourceScene.requisites
@@ -270,17 +271,11 @@ export const playbookSlice = createSlice({
         title: `Сцена ${nextId}`,
         markdown: "",
         requisites: nextRequisites,
+        [targetField]: remainderText,
       };
-      if (targetField === "markdown") {
-        nextItem.markdown = selectedText;
-      } else if (targetField === "playMarkdown") {
-        nextItem.playMarkdown = selectedText;
-      } else {
-        nextItem.explicationMarkdown = selectedText;
-      }
 
-      state.scenes.push(nextItem);
-      state.currentPage = state.scenes.length - 1;
+      state.scenes.splice(sourceIdx + 1, 0, nextItem);
+      state.currentPage = sourceIdx + 1;
       state.hasLocalEdits = true;
       state.scenesRevision += 1;
     },

@@ -291,12 +291,3 @@ export async function resolveProjectorVideoFramePickerCandidates(
 
   return out;
 }
-
-/** @deprecated используйте resolveProjectorVideoFramePickerCandidates */
-export async function resolveProjectorVideoFramePickerSrc(
-  ctx: ProjectorMediaContext,
-  videoId: number,
-): Promise<ProjectorVideoFramePickerCandidate | null> {
-  const list = await resolveProjectorVideoFramePickerCandidates(ctx, videoId);
-  return list[0] ?? null;
-}

@@ -54,8 +54,9 @@
 }
 
 .header-player-settings-toggle[aria-pressed="true"] {
-  border-color: var(--color-header-accent-border);
-  box-shadow: 0 0 0 3px var(--color-header-accent-ring);
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-active-ascent) 35%, transparent);
 }
 
 .header-player-settings-icon {

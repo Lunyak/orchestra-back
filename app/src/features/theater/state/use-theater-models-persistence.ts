@@ -1,0 +1,165 @@
+import { useCallback } from "react";
+import type {
+  ScriptScene,
+  TheaterLayout,
+  TheaterModel,
+  TheaterSpotlight,
+} from "../../../shared/types/script";
+import { syncSubscribedTheaterRequisites } from "../model/theater-decor-inventory";
+import { buildLightPlotFromSpotlights } from "../model/theater-light-channel-link";
+import { resolveTheaterModelFileUrlSync } from "../model/theater-model-asset-url";
+import { normalizeTheaterModels } from "../model/theater-model-normalize";
+import {
+  readSceneTheaterModels,
+  writeSceneTheaterModels,
+} from "../model/theater-scene-models";
+import { syncMountedSpotlights } from "../model/theater-truss-mounts";
+import { cloneTheaterModels } from "../model/theater-model-clone";
+
+type UseTheaterModelsPersistenceArgs = {
+  projectName: string;
+  currentPage: number;
+  currentScene: ScriptScene | undefined;
+  scenes: ScriptScene[];
+  updateCurrentScene: (patch: Partial<ScriptScene>) => void;
+  recordTheaterHistory: () => void;
+  layout: TheaterLayout;
+  displaySpotlights: TheaterSpotlight[];
+  models: TheaterModel[];
+};
+
+export function useTheaterModelsPersistence({
+  projectName,
+  currentPage,
+  currentScene,
+  scenes,
+  updateCurrentScene,
+  recordTheaterHistory,
+  layout,
+  displaySpotlights,
+  models,
+}: UseTheaterModelsPersistenceArgs) {
+  const normalizeModels = useCallback(
+    (items: TheaterModel[]) => normalizeTheaterModels(items),
+    [],
+  );
+
+  const updateModels = useCallback(
+    (next: TheaterModel[]) => {
+      recordTheaterHistory();
+      const normalizedModels = normalizeModels(next);
+      const sourceSpotlights =
+        currentScene?.theaterSpotlights ?? displaySpotlights;
+      const nextSpotlights = syncMountedSpotlights(
+        sourceSpotlights,
+        normalizedModels,
+      );
+      const spotlightsChanged = nextSpotlights.some(
+        (spotlight, index) => spotlight !== sourceSpotlights[index],
+      );
+      const prevRequisites = currentScene?.requisites ?? [];
+      const nextRequisites = syncSubscribedTheaterRequisites(
+        prevRequisites,
+        normalizedModels,
+      );
+      const requisitesChanged = nextRequisites !== prevRequisites;
+      updateCurrentScene({
+        ...writeSceneTheaterModels(normalizedModels),
+        ...(spotlightsChanged
+          ? {
+              theaterSpotlights: nextSpotlights,
+              lightPlot: buildLightPlotFromSpotlights(nextSpotlights, layout),
+            }
+          : {}),
+        ...(requisitesChanged ? { requisites: nextRequisites } : {}),
+      });
+    },
+    [
+      currentScene?.requisites,
+      currentScene?.theaterSpotlights,
+      displaySpotlights,
+      layout,
+      normalizeModels,
+      recordTheaterHistory,
+      updateCurrentScene,
+    ],
+  );
+
+  const syncSpotlightsForModels = useCallback(
+    (nextModels: TheaterModel[], mountModelId?: number) => {
+      const sourceSpotlights =
+        currentScene?.theaterSpotlights ?? displaySpotlights;
+      const nextSpotlights = syncMountedSpotlights(
+        sourceSpotlights,
+        nextModels,
+        mountModelId,
+      );
+      const hasChanges = nextSpotlights.some(
+        (spotlight, index) => spotlight !== sourceSpotlights[index],
+      );
+      if (!hasChanges) return;
+      updateCurrentScene({
+        theaterSpotlights: nextSpotlights,
+        lightPlot: buildLightPlotFromSpotlights(nextSpotlights, layout),
+      });
+    },
+    [
+      currentScene?.theaterSpotlights,
+      displaySpotlights,
+      layout,
+      updateCurrentScene,
+    ],
+  );
+
+  const updateModel = useCallback(
+    (id: number, patch: Partial<TheaterModel>) => {
+      const nextModels = models.map((item) =>
+        item.id === id ? { ...item, ...patch } : item,
+      );
+      updateModels(nextModels);
+    },
+    [models, updateModels],
+  );
+
+  const resolveModelSrc = useCallback(
+    (file: string) => resolveTheaterModelFileUrlSync(projectName, file) ?? "",
+    [projectName],
+  );
+
+  const previewModel = useCallback(
+    (id: number, patch: Partial<TheaterModel>) => {
+      if (!currentScene) return;
+      updateCurrentScene(
+        writeSceneTheaterModels(
+          normalizeModels(
+            models.map((item) =>
+              item.id === id ? { ...item, ...patch } : item,
+            ),
+          ),
+        ),
+      );
+    },
+    [currentScene, models, normalizeModels, updateCurrentScene],
+  );
+
+  const copyModelsFromPreviousScene = () => {
+    if (!currentScene || currentPage <= 0) return;
+    const previous = scenes[currentPage - 1];
+    const source = readSceneTheaterModels(previous);
+    const cloned = cloneTheaterModels(source);
+    updateModels(cloned);
+    if (cloned.length > 0) {
+      updateCurrentScene({ theaterActiveModelId: cloned[0].id });
+    }
+  };
+
+  return {
+    normalizeModels,
+    updateModels,
+    updateModel,
+    syncSpotlightsForModels,
+    resolveModelSrc,
+    previewModel,
+    copyModelsFromPreviousScene,
+  };
+}

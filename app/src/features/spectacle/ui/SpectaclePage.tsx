@@ -8,6 +8,7 @@ import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/Pla
 import { ScriptScenesSidebar } from "../../../shared/components/script-scenes-sidebar/ScriptScenesSidebar";
 import { OfflinePackStatus } from "../../../shared/components/offline/OfflinePackStatus";
 import { ProjectWorkspace } from "../../project/ui/ProjectWorkspace";
+import { ProjectOnboardingScriptTour } from "../../project/ui/ProjectOnboardingScriptTour";
 import { MAIN_CONTENT_VIEW_MODIFIERS } from "../model/spectacle-page-types";
 import {
   useSpectaclePage,
@@ -388,6 +389,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
           }}
         />
       )}
+      <ProjectOnboardingScriptTour ready={!pageBooting} />
     </div>
   );
 }

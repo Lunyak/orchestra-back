@@ -27,6 +27,12 @@
   min-width: 0;
 }
 
+.script-tools-dock__end {
+  display: flex;
+  align-items: stretch;
+  margin-left: auto;
+}
+
 .script-tools-dock__chip {
   position: relative;
   flex: 0 0 auto;
@@ -80,6 +86,67 @@
   border: 1px solid var(--color-border-faint);
   background: var(--color-bg-secondary);
   box-shadow: none;
+}
+
+.script-tools-dock__chip--icons {
+  width: 32px;
+}
+
+.script-tools-dock__chip--icons .script-tools-dock__chip-btn {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+.script-tools-dock__chip--icons .script-tools-dock__chip-panel {
+  left: 0;
+  right: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border-left: 0;
+  border-right: 0;
+}
+
+.script-tools-dock__icon-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.script-tools-dock__icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-medium);
+  cursor: pointer;
+}
+
+.script-tools-dock__icon-btn svg {
+  display: block;
+}
+
+.script-tools-dock__icon-btn:hover:not(:disabled) {
+  color: var(--color-text-ui-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.script-tools-dock__icon-btn--active,
+.script-tools-dock__icon-btn[aria-pressed="true"] {
+  color: var(--color-active-ascent);
+}
+
+.script-tools-dock__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .script-tools-dock__chip-panel:has(.app-editor-script-styles-menu) {

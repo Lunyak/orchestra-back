@@ -1,16 +1,12 @@
-import { loginLayoutBackgroundStyle } from "@shared/assets/loginLayoutBackground";
 import "../../features/auth/ui/login.css";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getApiBaseUrl } from "../../sync/api/client";
 import { resetPassword } from "../../sync/auth";
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
-  const token = useMemo(
-    () => String(searchParams.get("token") ?? "").trim(),
-    [searchParams],
-  );
+  const token = String(searchParams.get("token") ?? "").trim();
 
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +14,9 @@ export function ResetPasswordPage() {
   const [done, setDone] = useState(false);
 
   const apiBase = getApiBaseUrl();
+  const isDesktop = import.meta.env.MODE === "desktop";
   const isLocal = apiBase.includes("localhost") || apiBase.includes("127.0.0.1");
+  const hasToken = Boolean(token);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,17 +48,17 @@ export function ResetPasswordPage() {
 
   if (done) {
     return (
-      <div
-        className="app-layout login-layout"
-        style={loginLayoutBackgroundStyle}
-      >
+      <div className="app-layout login-layout">
         <div className="login-form">
-          <h1>Пароль обновлён</h1>
+          <h1 className="login-form__title">Пароль обновлён</h1>
           <p className="login-form-subtitle">
             Теперь можно войти с новым паролем.
           </p>
+          <div className="login-ok">Готово. Ссылка из письма больше не нужна.</div>
           <p className="login-form-footer">
-            <Link to="/">На страницу входа</Link>
+            <Link className="login-form__link" to="/">
+              На страницу входа
+            </Link>
           </p>
         </div>
       </div>
@@ -68,24 +66,23 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div
-      className="app-layout login-layout"
-      style={loginLayoutBackgroundStyle}
-    >
+    <div className="app-layout login-layout">
       <form className="login-form" onSubmit={handleSubmit}>
-        <h1>Новый пароль</h1>
+        <h1 className="login-form__title">Новый пароль</h1>
         <p className="login-form-subtitle">
           Вы перешли по ссылке из письма. Придумайте новый пароль для аккаунта.
         </p>
-        <p className="login-api-hint" title={apiBase}>
-          {isLocal ? "Подключение: локальный сервер" : "Подключение: сервер"}
-          <span className="login-api-url"> {apiBase}</span>
-        </p>
-        {!token ? (
-          <p className="login-error">
+        {isDesktop ? (
+          <p className="login-api-hint" title={apiBase}>
+            {isLocal ? "Подключение: локальный сервер" : "Подключение: сервер"}
+            <span className="login-api-url">{apiBase}</span>
+          </p>
+        ) : null}
+        {!hasToken ? (
+          <div className="login-error">
             Ссылка неполная или устарела. Запросите письмо ещё раз на странице
             входа.
-          </p>
+          </div>
         ) : null}
         <label className="login-form__label">
           Новый пароль
@@ -96,14 +93,22 @@ export function ResetPasswordPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="минимум 6 символов"
             autoComplete="new-password"
-            disabled={!token}
+            disabled={!hasToken}
+            required={hasToken}
+            minLength={6}
           />
         </label>
-        <button type="submit" disabled={loading || !token}>
+        <button
+          type="submit"
+          className="login-form__btn login-form__btn--submit"
+          disabled={loading || !hasToken}
+        >
           {loading ? "…" : "Сохранить пароль"}
         </button>
         <p className="login-form-footer">
-          <Link to="/">Назад к входу</Link>
+          <Link className="login-form__link" to="/">
+            Назад к входу
+          </Link>
         </p>
         {error ? <div className="login-error">{error}</div> : null}
       </form>

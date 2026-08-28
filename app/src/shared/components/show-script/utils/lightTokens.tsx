@@ -147,6 +147,18 @@ function renderParentheticalRemarks(text: string, keyPrefix: string): React.Reac
   return result;
 }
 
+function reactChildrenToPlainText(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(reactChildrenToPlainText).join("");
+  if (React.isValidElement(node)) {
+    return reactChildrenToPlainText(
+      (node.props as { children?: React.ReactNode }).children,
+    );
+  }
+  return "";
+}
+
 export type LightTokenRenderOptions = {
   renderLightPanel?: (kadrId: string) => React.ReactNode;
 };
@@ -309,8 +321,20 @@ export function createRenderLightTokens(
       return node.flatMap((child, index) => renderLightTokens(child, `${keyPrefix}-${index}`));
     }
     if (React.isValidElement(node)) {
-      if (node.type === "code" || node.type === "pre") return node;
-      if (node.type === "em") return node;
+      if (node.type === "code" || node.type === "pre") {
+        const codeText = reactChildrenToPlainText((node.props as { children?: React.ReactNode }).children);
+        if (/\[\[[^\]]+\]\]/.test(codeText) || /\{\{[^}]+\}\}/.test(codeText)) {
+          return renderLightTokens(codeText, `${keyPrefix}-code`);
+        }
+        return node;
+      }
+      if (node.type === "em") {
+        const className = (node.props as { className?: string }).className;
+        const isParenthetical =
+          typeof className === "string" &&
+          className.split(/\s+/).includes("markdown-parenthetical-remark");
+        if (isParenthetical) return node;
+      }
       if (node.props?.children == null) return node;
       return React.cloneElement(
         node,
@@ -349,6 +373,10 @@ export function createRehypeScriptTokens(
       if (node.type === "text") {
         const value = String((node as any).value ?? "");
         if (!value) return node;
+
+        // Важно: pattern с /g/ — lastIndex общий на всё дерево. Без сброса
+        // следующие text-узлы ищутся не с начала и теряют `[[РОЛЬ]]`.
+        pattern.lastIndex = 0;
 
         const out: HastNode[] = [];
         let lastIndex = 0;

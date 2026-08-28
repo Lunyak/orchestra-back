@@ -1,6 +1,5 @@
 import { PageBootLoader } from "@shared/components/page-loader/page-boot";
 import { Button } from "@shared/core/button/Button";
-import { Modal } from "@shared/core/modal/Modal";
 import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
@@ -31,37 +30,38 @@ import {
   useAnswerDashboardRehearsalMutation,
   useGlobalDashboardQuery,
 } from "../api/dashboard-api";
+import {
+  isIncomingMailAction,
+  isInviteAction,
+  inviteActionKey,
+} from "../model/dashboard-invite";
 import { resolveDashboardViewState } from "../model/dashboard-view-state";
 import { readRecentOrganizations } from "../model/recent-organizations-storage";
+import { rememberSeenInviteMailKeys } from "../model/seen-invite-mail-storage";
 import iconAlert from "../assets/icon-alert.png";
-import iconBriefcase from "../assets/icon-briefcase.png";
 import iconBuilding from "../assets/icon-building.png";
 import iconCalendar from "../assets/icon-calendar.png";
-import iconCheck from "../assets/icon-check.png";
 import iconMail from "../assets/icon-mail.png";
 import iconSquare from "../assets/icon-square.png";
+import { DashboardInviteModal } from "./DashboardInviteModal";
 import "../../director-sessions/ui/director-sessions.css";
 import "./global-dashboard.css";
 
 dayjs.locale("ru");
 
 type DashboardIconName =
-  | "briefcase"
   | "calendar"
-  | "check"
   | "alert"
-  | "mail"
   | "square"
-  | "building";
+  | "building"
+  | "mail";
 
 const DASHBOARD_ICON_SRC: Record<DashboardIconName, string> = {
-  briefcase: iconBriefcase,
   calendar: iconCalendar,
-  check: iconCheck,
   alert: iconAlert,
-  mail: iconMail,
   square: iconSquare,
   building: iconBuilding,
+  mail: iconMail,
 };
 
 function DashboardIcon({
@@ -81,18 +81,6 @@ function DashboardIcon({
   );
 }
 
-const SUMMARY_ITEMS: Array<{
-  key: "projects" | "upcomingRehearsals" | "openTasks" | "actions" | "unreadChat";
-  label: string;
-  icon: DashboardIconName;
-}> = [
-  { key: "projects", label: "Проекты", icon: "briefcase" },
-  { key: "upcomingRehearsals", label: "Репетиции", icon: "calendar" },
-  { key: "openTasks", label: "Мои задачи", icon: "check" },
-  { key: "actions", label: "Требуют внимания", icon: "alert" },
-  { key: "unreadChat", label: "Сообщения", icon: "mail" },
-];
-
 function formatDate(value: string | null) {
   if (!value) return "Без срока";
   const date = dayjs(value);
@@ -108,22 +96,6 @@ function formatUpdatedAt(value: string | undefined) {
 function formatOpenedAt(value: number) {
   const date = dayjs(value);
   return date.isValid() ? date.format("D MMMM, HH:mm") : "Дата неизвестна";
-}
-
-function isInviteAction(action: DashboardAction): action is DashboardInviteAction {
-  return (
-    action.kind === "studio_invite" ||
-    action.kind === "project_invite" ||
-    action.kind === "troupe_invite"
-  );
-}
-
-function inviteDetailLines(action: DashboardInviteAction): string[] {
-  const lines = [action.description, `От: ${action.invitedByEmail}`];
-  if (action.dueAt) {
-    lines.push(`Действует до: ${formatDate(action.dueAt)}`);
-  }
-  return lines;
 }
 
 function taskStatusLabel(status: DashboardTask["status"]) {
@@ -333,7 +305,12 @@ export function GlobalDashboardPage() {
     hasData: data !== undefined,
     isEmpty,
   });
-  const inviteDetails = openedInvite ? inviteDetailLines(openedInvite) : [];
+
+  const openInvite = (action: DashboardInviteAction) => {
+    setActionError(null);
+    rememberSeenInviteMailKeys([inviteActionKey(action)]);
+    setOpenedInvite(action);
+  };
 
   const runAction = async (request: Promise<unknown>) => {
     setActionError(null);
@@ -352,7 +329,6 @@ export function GlobalDashboardPage() {
   if (viewState === "error" || !data) {
     return (
       <main className="global-dashboard global-dashboard--state">
-        <h1 className="global-dashboard__title">Обзор</h1>
         <p className="global-dashboard__muted">Не удалось загрузить данные.</p>
         <Button variant="secondary" onClick={() => void dashboard.refetch()}>
           Повторить
@@ -363,23 +339,6 @@ export function GlobalDashboardPage() {
 
   return (
     <main className="global-dashboard">
-      <header className="global-dashboard__header">
-        <h1 className="global-dashboard__title">Обзор</h1>
-      </header>
-
-      <section className="global-dashboard__summary" aria-label="Сводка">
-        {SUMMARY_ITEMS.map((item) => (
-          <article className="global-dashboard__counter" key={item.key}>
-            <span className="global-dashboard__counter-icon">
-              <DashboardIcon name={item.icon} />
-            </span>
-            <div>
-              <strong>{data.summary[item.key]}</strong>
-              <span>{item.label}</span>
-            </div>
-          </article>
-        ))}
-      </section>
 
       <div className="global-dashboard__grid">
         <section className="global-dashboard__panel">
@@ -556,29 +515,39 @@ export function GlobalDashboardPage() {
           ) : null}
           {data.actions.length ? (
             <ul className="global-dashboard__actions">
-              {data.actions.map((action) => (
-                <li key={`${action.kind}:${action.id}`}>
-                  <div>
-                    <strong>{action.title}</strong>
-                    <span>{formatDate(action.dueAt)}</span>
-                  </div>
-                  <ActionControls
-                    action={action}
-                    busy={actionBusy}
-                    onOpenInvite={setOpenedInvite}
-                    onAnswerRehearsal={(rehearsalId, status) =>
-                      void runAction(
-                        answerRehearsal({ rehearsalId, status }).unwrap(),
-                      )
-                    }
-                    onAnswerSession={(sessionId, response) =>
-                      void runAction(
-                        answerSession({ sessionId, response }).unwrap(),
-                      )
-                    }
-                  />
-                </li>
-              ))}
+              {data.actions.map((action) => {
+                const showMailIcon = isIncomingMailAction(action);
+                return (
+                  <li key={`${action.kind}:${action.id}`}>
+                    <div className="global-dashboard__action-main">
+                      {showMailIcon ? (
+                        <span className="global-dashboard__row-icon">
+                          <DashboardIcon name="mail" />
+                        </span>
+                      ) : null}
+                      <div className="global-dashboard__action-copy">
+                        <strong>{action.title}</strong>
+                        <span>{formatDate(action.dueAt)}</span>
+                      </div>
+                    </div>
+                    <ActionControls
+                      action={action}
+                      busy={actionBusy}
+                      onOpenInvite={openInvite}
+                      onAnswerRehearsal={(rehearsalId, status) =>
+                        void runAction(
+                          answerRehearsal({ rehearsalId, status }).unwrap(),
+                        )
+                      }
+                      onAnswerSession={(sessionId, response) =>
+                        void runAction(
+                          answerSession({ sessionId, response }).unwrap(),
+                        )
+                      }
+                    />
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <EmptyState icon="alert">
@@ -588,60 +557,34 @@ export function GlobalDashboardPage() {
         </section>
       </div>
 
-      <Modal
-        isOpen={openedInvite != null}
+      <DashboardInviteModal
+        invite={openedInvite}
+        busy={actionBusy}
+        error={actionError}
         onClose={() => setOpenedInvite(null)}
-        ariaLabelledBy="dashboard-invite-title"
-        panelClassName="global-dashboard__invite-modal"
-      >
-        {openedInvite ? (
-          <div className="global-dashboard__invite-body">
-            <h2 id="dashboard-invite-title">{openedInvite.title}</h2>
-            <ul className="global-dashboard__invite-meta">
-              {inviteDetails.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <div
-              className={cn(
-                "global-dashboard__action-buttons",
-                "global-dashboard__invite-actions",
-              )}
-            >
-              <Button
-                variant="secondary"
-                disabled={actionBusy}
-                onClick={() =>
-                  void runAction(
-                    answerInvite({
-                      kind: openedInvite.kind,
-                      inviteId: openedInvite.id,
-                      response: "accept",
-                    }).unwrap(),
-                  )
-                }
-              >
-                Принять
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={actionBusy}
-                onClick={() =>
-                  void runAction(
-                    answerInvite({
-                      kind: openedInvite.kind,
-                      inviteId: openedInvite.id,
-                      response: "decline",
-                    }).unwrap(),
-                  )
-                }
-              >
-                Отклонить
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+        onAccept={() =>
+          openedInvite
+            ? void runAction(
+                answerInvite({
+                  kind: openedInvite.kind,
+                  inviteId: openedInvite.id,
+                  response: "accept",
+                }).unwrap(),
+              )
+            : undefined
+        }
+        onDecline={() =>
+          openedInvite
+            ? void runAction(
+                answerInvite({
+                  kind: openedInvite.kind,
+                  inviteId: openedInvite.id,
+                  response: "decline",
+                }).unwrap(),
+              )
+            : undefined
+        }
+      />
     </main>
   );
 }

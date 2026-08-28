@@ -1,23 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
-import { showScriptMarkdownActions } from "../../show-script-markdown/model/show-script-markdown-slice";
 import { usePlaybook } from "../../playbook";
-import { playbookActions, type PlaybookLightChannelRolesV1 } from "../../playbook/model/playbook-slice";
-import {
-  deleteKadrFromSceneData,
-  findKadrById,
-  formatDeleteKadrConfirmMessage,
-  readSceneLightKadrs,
-} from "../../theater/model/light-kadrs";
-import { applyKadrLook, copyKadrLookToTarget } from "../../theater/model/kadr-store";
-import { invokePlaylistPause } from "../../playbook/model/playbook-playback-bridge";
-import { resolveKadrProjectorVideoOptions } from "../../theater/model/kadr-projector";
-import { applyKadrProjector } from "./apply-kadr-projector";
-import { pauseProjectorVideo } from "../../projector/model/projector-playback-bridge";
-import { applyKadrSound } from "./apply-kadr-sound";
-import { useSpectacleRunProjector } from "./useSpectacleRunProjector";
-import { recordLightKadrForSection } from "../../../shared/components/light-console/light-kadr-record";
-import { migrateSceneLightKadrsFromMarkdown } from "./migrate-kadrs-from-markdown";
+import { type PlaybookLightChannelRolesV1 } from "../../playbook/model/playbook-slice";
 import {
   resolveLightFaders,
   resolveLightProgramMinCount,
@@ -25,54 +9,23 @@ import {
 } from "../../../shared/components/light-console/light-console-data";
 import { useLightConsoleLayoutSettings } from "../../../shared/components/light-console/useLightConsoleLayoutSettings";
 import { useLightConsoleState } from "../../../shared/components/light-console/useLightConsoleState";
-import type { ScriptScene } from "../../../shared/types/script";
-import {
-  buildSpectacleKadrTape,
-  findTapeIndexForSceneKadr,
-  isLastTapeItemInScene,
-  type SpectacleTapeItem,
-} from "./spectacle-kadr-tape";
-import {
-  createKadrFromDraft,
-  updateKadrFromDraft,
-  type CreateKadrDraft,
-  type KadrModalMode,
-} from "./create-kadr-from-draft";
-import {
-  persistProgRunKadrStripLayout,
-  persistProgRunKadrStripNotesOverlay,
-  persistProgRunKadrStripPlainCover,
-  persistProgRunLightConsoleOpen,
-  persistProgRunPaused,
-  persistProgRunWideLayout,
-  readProgRunKadrStripLayout,
-  readProgRunKadrStripNotesOverlay,
-  readProgRunKadrStripPlainCover,
-  readProgRunLightConsoleOpen,
-  readProgRunPaused,
-  readProgRunWideLayout,
-  type ProgRunKadrStripLayout,
-} from "./prog-run-prefs-storage";
-import {
-  buildCopySceneTheaterLayoutPatchFromScene,
-  sceneHasTheaterLayoutContent,
-} from "../../theater/model/copy-scene-theater-layout";
+import { migrateSceneLightKadrsFromMarkdown } from "./migrate-kadrs-from-markdown";
+import { buildSpectacleKadrTape } from "./spectacle-kadr-tape";
+import { type KadrModalMode } from "./create-kadr-from-draft";
+import { useSpectacleRunProjector } from "./useSpectacleRunProjector";
+import { useSpectacleRunProgPrefs } from "./useSpectacleRunProgPrefs";
+import { useSpectacleRunLiveSave } from "./useSpectacleRunLiveSave";
+import { useSpectacleRunTapeNav } from "./useSpectacleRunTapeNav";
+import { useSpectacleRunKadrActions } from "./useSpectacleRunKadrActions";
+import type { UseSpectacleRunArgs } from "./spectacle-run-types";
 
-function isKeyboardTypingTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
-}
-
-export type UseSpectacleRunArgs = {
-  projectName: string;
-  scenes: ScriptScene[];
-  lightChannels: string[];
-};
+export type { UseSpectacleRunArgs } from "./spectacle-run-types";
 
 export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpectacleRunArgs) {
   const dispatch = useAppDispatch();
   const { playbookData, setPlaybookData, updateScene, setCurrentPage, currentPage, saveScenesForLightPlot } =
     usePlaybook();
+
   const tape = useMemo(() => {
     const scenesForTape = scenes.map((scene) => ({
       ...scene,
@@ -80,140 +33,46 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     }));
     return buildSpectacleKadrTape(scenesForTape);
   }, [scenes]);
+
   const [tapeIndex, setTapeIndex] = useState(0);
   const [kadrModalOpen, setKadrModalOpen] = useState(false);
-  const kadrModalOpenRef = useRef(false);
   const [kadrModalMode, setKadrModalMode] = useState<KadrModalMode>("create");
+  const [liveStatus, setLiveStatus] = useState<string | null>(null);
+
   const textHidden = useAppSelector((state) => state.scriptUi.spectacleRunTextHidden);
   const lightPlotMode = useAppSelector((state) => state.scriptUi.lightPlotMode);
   const isProgRun = lightPlotMode === "prog-run";
+
+  const kadrModalOpenRef = useRef(false);
   const isProgRunRef = useRef(isProgRun);
   isProgRunRef.current = isProgRun;
-  const [progRunPaused, setProgRunPaused] = useState(() =>
-    readProgRunPaused(projectName),
-  );
-  const [progRunKadrStripLayout, setProgRunKadrStripLayoutState] =
-    useState<ProgRunKadrStripLayout>(() => readProgRunKadrStripLayout(projectName));
-  const [progRunKadrStripNotesOverlay, setProgRunKadrStripNotesOverlayState] = useState(
-    () => readProgRunKadrStripNotesOverlay(projectName),
-  );
-  const [progRunLightConsoleOpen, setProgRunLightConsoleOpenState] = useState(
-    () => readProgRunLightConsoleOpen(projectName),
-  );
-  const [progRunKadrStripPlainCover, setProgRunKadrStripPlainCoverState] = useState(
-    () => readProgRunKadrStripPlainCover(projectName),
-  );
-  const [progRunWideLayout, setProgRunWideLayoutState] = useState(() =>
-    readProgRunWideLayout(projectName),
-  );
-  const progRunPausedRef = useRef(false);
-  progRunPausedRef.current = progRunPaused;
-  const progRunPlaybackEnabled = isProgRun && !progRunPaused;
+  const applyingTapeRef = useRef(false);
+  const liveSaveTimerRef = useRef<number | null>(null);
+  const tapeIndexRef = useRef(0);
+  const pendingTapeKadrIdRef = useRef<string | null>(null);
+  const pendingTapeIndexAfterDeleteRef = useRef<number | null>(null);
+  const scenesRef = useRef(scenes);
+  const tapeRef = useRef(tape);
+  scenesRef.current = scenes;
+  tapeRef.current = tape;
+
+  const clampedIndex = tape.length === 0 ? 0 : Math.min(tapeIndex, tape.length - 1);
+  const currentItem = tape[clampedIndex] ?? null;
+  const currentScene = currentItem ? scenes[currentItem.sceneIndex] : null;
+  tapeIndexRef.current = clampedIndex;
 
   useEffect(() => {
-    setProgRunKadrStripLayoutState(readProgRunKadrStripLayout(projectName));
-    setProgRunKadrStripNotesOverlayState(readProgRunKadrStripNotesOverlay(projectName));
-    setProgRunLightConsoleOpenState(readProgRunLightConsoleOpen(projectName));
-    setProgRunKadrStripPlainCoverState(readProgRunKadrStripPlainCover(projectName));
-    setProgRunWideLayoutState(readProgRunWideLayout(projectName));
-  }, [projectName]);
+    kadrModalOpenRef.current = kadrModalOpen;
+  }, [kadrModalOpen]);
 
-  const setProgRunKadrStripLayout = useCallback(
-    (layout: ProgRunKadrStripLayout) => {
-      setProgRunKadrStripLayoutState(layout);
-      persistProgRunKadrStripLayout(projectName, layout);
-    },
-    [projectName],
-  );
+  const progPrefs = useSpectacleRunProgPrefs({ projectName, isProgRun });
 
-  const setProgRunKadrStripNotesOverlay = useCallback(
-    (enabled: boolean) => {
-      setProgRunKadrStripNotesOverlayState(enabled);
-      persistProgRunKadrStripNotesOverlay(projectName, enabled);
-    },
-    [projectName],
-  );
-
-  const toggleProgRunKadrStripNotesOverlay = useCallback(() => {
-    setProgRunKadrStripNotesOverlay(!progRunKadrStripNotesOverlay);
-  }, [progRunKadrStripNotesOverlay, setProgRunKadrStripNotesOverlay]);
-
-  const setProgRunLightConsoleOpen = useCallback(
-    (open: boolean) => {
-      setProgRunLightConsoleOpenState(open);
-      persistProgRunLightConsoleOpen(projectName, open);
-    },
-    [projectName],
-  );
-
-  const toggleProgRunLightConsoleOpen = useCallback(() => {
-    setProgRunLightConsoleOpen(!progRunLightConsoleOpen);
-  }, [progRunLightConsoleOpen, setProgRunLightConsoleOpen]);
-
-  const setProgRunKadrStripPlainCover = useCallback(
-    (enabled: boolean) => {
-      setProgRunKadrStripPlainCoverState(enabled);
-      persistProgRunKadrStripPlainCover(projectName, enabled);
-    },
-    [projectName],
-  );
-
-  const toggleProgRunKadrStripPlainCover = useCallback(() => {
-    setProgRunKadrStripPlainCover(!progRunKadrStripPlainCover);
-  }, [progRunKadrStripPlainCover, setProgRunKadrStripPlainCover]);
-
-  const setProgRunWideLayout = useCallback(
-    (enabled: boolean) => {
-      setProgRunWideLayoutState(enabled);
-      persistProgRunWideLayout(projectName, enabled);
-    },
-    [projectName],
-  );
-
-  const toggleProgRunWideLayout = useCallback(() => {
-    setProgRunWideLayout(!progRunWideLayout);
-  }, [progRunWideLayout, setProgRunWideLayout]);
-  const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const projector = useSpectacleRunProjector({
     projectName,
     playbookData,
     dispatch,
     setLiveStatus,
   });
-  const {
-    projectorDraft,
-    setProjectorDraft,
-    projectorMediaCtx,
-    videos,
-    holdImages,
-    isProjectorOpen,
-    openProjector,
-    closeProjector,
-    ensureProjectorOpen,
-    resolveProjectorVideoMuted,
-    resolveProjectorVideoVolume,
-    playProjectorCue,
-    playProjectorVideo,
-    toggleProjectorVideo,
-    toggleProjectorVideoMute,
-    setProjectorVideoVolumeLevel,
-    seekProjectorVideoTime,
-    removeProjectorVideo,
-    removeProjectorHold,
-    projectorPlayback,
-  } = projector;
-  const applyingTapeRef = useRef(false);
-  const liveSaveTimerRef = useRef<number | null>(null);
-  const tapeIndexRef = useRef(0);
-  const tapeInitRef = useRef(false);
-  const pendingTapeKadrIdRef = useRef<string | null>(null);
-  const pendingTapeIndexAfterDeleteRef = useRef<number | null>(null);
-  const skipTapeApplyEffectRef = useRef(false);
-  const skipKadrFadersOnceRef = useRef(false);
-  const scenesRef = useRef(scenes);
-  const tapeRef = useRef(tape);
-  scenesRef.current = scenes;
-  tapeRef.current = tape;
 
   const lightFaders = useMemo(
     () => resolveLightFaders(playbookData?.lightFaders ?? undefined),
@@ -228,652 +87,98 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     [lightChannels.length, playbookData?.lightPrograms],
   );
 
-  const clampedIndex = tape.length === 0 ? 0 : Math.min(tapeIndex, tape.length - 1);
-  const currentItem = tape[clampedIndex] ?? null;
-  const currentScene = currentItem ? scenes[currentItem.sceneIndex] : null;
-  const nextKadrNo =
-    !currentScene || !currentItem || currentItem.isPlaceholder ? 1 : currentItem.kadrNo + 1;
-
-  tapeIndexRef.current = clampedIndex;
-
-  useEffect(() => {
-    kadrModalOpenRef.current = kadrModalOpen;
-  }, [kadrModalOpen]);
-
-  const cancelPendingLiveSave = useCallback(() => {
-    if (liveSaveTimerRef.current != null) {
-      window.clearTimeout(liveSaveTimerRef.current);
-      liveSaveTimerRef.current = null;
-    }
-  }, []);
-
   const liveConsole = useLightConsoleState({
     projectName,
     spotlights: currentScene?.theaterSpotlights ?? [],
   });
   const consoleLayoutSettings = useLightConsoleLayoutSettings(projectName);
 
-  const flushLiveSaveAtIndex = useCallback(
-    (
-      index: number,
-      snapshot?: {
-        faders: typeof liveConsole.faders;
-        programs: typeof liveConsole.programs;
-      },
-    ) => {
-      if (kadrModalOpenRef.current) return;
-      // Прогон только применяет look с ленты — пульт туда не пишет.
-      if (isProgRunRef.current) return;
-
-      const item = tapeRef.current[index];
-      const scene = item ? scenesRef.current[item.sceneIndex] : null;
-      if (!item || !scene || item.isPlaceholder || !item.kadrId) return;
-
-      const kadrs = readSceneLightKadrs(scene);
-      const existingKadr = findKadrById(kadrs, item.kadrId);
-      const isBlackoutKadr =
-        existingKadr?.blackout === true ||
-        (existingKadr != null && existingKadr.programId <= 0);
-      if (isBlackoutKadr) return;
-
-      const faders = snapshot?.faders ?? liveConsole.faders;
-      const programs = snapshot?.programs ?? liveConsole.programs;
-
-      const programId = Math.max(
-        1,
-        Math.trunc(programs.activeProgramId ?? programs.programs[0]?.id ?? 1) || 1,
-      );
-
-      const roles =
-        playbookData?.lightChannelRoles && playbookData.lightChannelRoles.v === 1
-          ? playbookData.lightChannelRoles
-          : null;
-
-      const result = recordLightKadrForSection({
-        kadrId: item.kadrId,
-        kadrNo: item.kadrNo,
-        title: item.headingTitle,
-        kadrs,
-        lightChannels,
-        lightFaders: faders,
-        lightPrograms: programs,
-        programId,
-        spotlights: scene.theaterSpotlights ?? [],
-        liveConsoleChannel: liveConsole.selectedLightSlot,
-        lightChannelRoles: roles,
-      });
-      if (!result) {
-        setLiveStatus(`Картина ${item.kadrNo}: не удалось записать свет`);
-        return;
-      }
-
-      updateScene(scene.id, {
-        lightKadrs: result.nextKadrs,
-      } as Partial<ScriptScene>);
-      setLiveStatus(result.summary);
-      void saveScenesForLightPlot({ force: true });
+  const liveSave = useSpectacleRunLiveSave({
+    lightChannels,
+    liveConsole: {
+      faders: liveConsole.faders,
+      programs: liveConsole.programs,
+      selectedLightSlot: liveConsole.selectedLightSlot,
     },
-    [
-      lightChannels,
-      liveConsole.faders,
-      liveConsole.programs,
-      liveConsole.selectedLightSlot,
-      playbookData?.lightChannelRoles,
-      saveScenesForLightPlot,
-      updateScene,
-    ],
-  );
-
-  const flushLiveSave = useCallback(() => {
-    flushLiveSaveAtIndex(tapeIndexRef.current);
-  }, [flushLiveSaveAtIndex]);
-
-  const scheduleLiveSave = useCallback(() => {
-    if (applyingTapeRef.current) return;
-    if (kadrModalOpenRef.current) return;
-    if (isProgRunRef.current) return;
-    const item = tapeRef.current[tapeIndexRef.current];
-    if (!item || item.isPlaceholder || !item.kadrId) return;
-    const scene = scenesRef.current[item.sceneIndex];
-    if (!scene) {
-      return;
-    }
-    if (liveSaveTimerRef.current != null) {
-      window.clearTimeout(liveSaveTimerRef.current);
-    }
-    liveSaveTimerRef.current = window.setTimeout(() => {
-      liveSaveTimerRef.current = null;
-      flushLiveSave();
-    }, 550);
-  }, [flushLiveSave]);
-
-  const applyTapeItem = useCallback(
-    (item: SpectacleTapeItem, options?: { applyFaders?: boolean; applyPlayback?: boolean }) => {
-      applyingTapeRef.current = true;
-      setCurrentPage(item.sceneIndex);
-
-      const scene = scenesRef.current[item.sceneIndex];
-      if (!scene || item.isPlaceholder) {
-        applyingTapeRef.current = false;
-        return;
-      }
-
-      const applyPlayback =
-        options?.applyPlayback ??
-        (lightPlotMode === "prog-run" && !progRunPausedRef.current);
-
-      const kadrs = readSceneLightKadrs(scene);
-      const kadr = item.kadrId ? findKadrById(kadrs, item.kadrId) : undefined;
-      const projectorCue = kadr?.projector ?? null;
-
-      if (projectorCue) setProjectorDraft(projectorCue);
-      if (applyPlayback) {
-        applyKadrSound(kadr?.sound);
-        void (async () => {
-          if (projectorCue) {
-            await ensureProjectorOpen();
-          }
-          await applyKadrProjector(
-            projectorCue,
-            projectorMediaCtx,
-            projectorCue
-              ? resolveKadrProjectorVideoOptions(projectorCue, {
-                  resolveMuted: resolveProjectorVideoMuted,
-                  resolveVolume: resolveProjectorVideoVolume,
-                })
-              : undefined,
-          );
-        })();
-      }
-
-      const applyFaders = options?.applyFaders !== false;
-      if (kadr && applyFaders) {
-        const look = applyKadrLook(kadr, liveConsole.faders);
-        liveConsole.persistFaders(look.faders);
-        if (look.programId != null) {
-          liveConsole.persistPrograms({
-            ...liveConsole.programs,
-            activeProgramId: look.programId,
-          });
-        }
-      } else if (kadr && kadr.programId > 0) {
-        liveConsole.persistPrograms({
-          ...liveConsole.programs,
-          activeProgramId: kadr.programId,
-        });
-      }
-
-      applyingTapeRef.current = false;
-    },
-    [
-      ensureProjectorOpen,
-      lightPlotMode,
-      liveConsole,
-      projectorMediaCtx,
-      resolveProjectorVideoMuted,
-      resolveProjectorVideoVolume,
-      setCurrentPage,
-    ],
-  );
-
-  useEffect(() => {
-    setProgRunPaused(readProgRunPaused(projectName));
-  }, [projectName]);
-
-  useEffect(() => {
-    if (!isProgRun) return;
-    setProgRunPaused(readProgRunPaused(projectName));
-  }, [isProgRun, projectName]);
-
-  const toggleProgRunPause = useCallback(() => {
-    if (progRunPausedRef.current) {
-      setProgRunPaused(false);
-      persistProgRunPaused(projectName, false);
-      const item = tapeRef.current[tapeIndexRef.current];
-      if (item) {
-        applyTapeItem(item, { applyFaders: false, applyPlayback: true });
-      }
-      return;
-    }
-
-    setProgRunPaused(true);
-    persistProgRunPaused(projectName, true);
-    invokePlaylistPause();
-    pauseProjectorVideo();
-  }, [applyTapeItem, projectName]);
-
-  useEffect(() => {
-    if (tape.length === 0 || tapeInitRef.current) return;
-    tapeInitRef.current = true;
-    const tapeIndexForCurrentScene = tape.findIndex((item) => item.sceneIndex === currentPage);
-    if (tapeIndexForCurrentScene >= 0) setTapeIndex(tapeIndexForCurrentScene);
-  }, [currentPage, tape]);
-
-  useEffect(() => {
-    if (skipTapeApplyEffectRef.current) {
-      skipTapeApplyEffectRef.current = false;
-      return;
-    }
-    const item = tape[clampedIndex];
-    if (!item) return;
-    if (liveSaveTimerRef.current != null) {
-      window.clearTimeout(liveSaveTimerRef.current);
-      liveSaveTimerRef.current = null;
-      flushLiveSaveAtIndex(tapeIndexRef.current);
-    }
-    const skipFaders = skipKadrFadersOnceRef.current;
-    if (skipKadrFadersOnceRef.current) {
-      skipKadrFadersOnceRef.current = false;
-    }
-    applyTapeItem(item, { applyFaders: !skipFaders });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- только смена позиции в ленте
-  }, [clampedIndex]);
-
-  const prevLightPlotModeRef = useRef(lightPlotMode);
-  useEffect(() => {
-    const prevMode = prevLightPlotModeRef.current;
-    prevLightPlotModeRef.current = lightPlotMode;
-    if (prevMode === lightPlotMode || lightPlotMode !== "prog-run") return;
-    if (progRunPausedRef.current) return;
-    const item = tape[clampedIndex];
-    if (!item) return;
-    applyTapeItem(item, { applyFaders: false, applyPlayback: true });
-  }, [applyTapeItem, clampedIndex, lightPlotMode, tape]);
-
-  const consoleSnapshotKey = useMemo(
-    () =>
-      JSON.stringify({
-        faders: liveConsole.faders.faders.map((f) => ({
-          id: f.id,
-          intensity: f.intensity,
-          enabled: f.enabled,
-          color: f.color,
-        })),
-        programId: liveConsole.programs.activeProgramId,
-      }),
-    [liveConsole.faders.faders, liveConsole.programs.activeProgramId],
-  );
-
-  const flushPendingLiveSave = useCallback(() => {
-    if (liveSaveTimerRef.current != null) {
-      window.clearTimeout(liveSaveTimerRef.current);
-      liveSaveTimerRef.current = null;
-      flushLiveSaveAtIndex(tapeIndexRef.current);
-    }
-  }, [flushLiveSaveAtIndex]);
-
-  useEffect(() => {
-    if (isProgRun) {
-      cancelPendingLiveSave();
-      return;
-    }
-    if (applyingTapeRef.current) return;
-    scheduleLiveSave();
-    return () => {
-      flushPendingLiveSave();
-    };
-  }, [
-    cancelPendingLiveSave,
-    consoleSnapshotKey,
-    flushPendingLiveSave,
-    isProgRun,
-    scheduleLiveSave,
-  ]);
-
-  useEffect(() => {
-    const onPageHide = () => {
-      flushPendingLiveSave();
-      void saveScenesForLightPlot({ force: true });
-    };
-    window.addEventListener("pagehide", onPageHide);
-    return () => window.removeEventListener("pagehide", onPageHide);
-  }, [flushPendingLiveSave, saveScenesForLightPlot]);
-
-  useEffect(() => {
-    if (tape.length === 0) return;
-    if (tapeIndex > tape.length - 1) {
-      setTapeIndex(Math.max(0, tape.length - 1));
-    }
-  }, [tape.length, tapeIndex]);
-
-  const previousScene =
-    currentItem && currentItem.sceneIndex > 0 ? scenes[currentItem.sceneIndex - 1] : null;
-  const currentSceneTheaterEmpty = currentScene ? !sceneHasTheaterLayoutContent(currentScene) : false;
-  const canCopyTheaterFromPreviousScene = Boolean(
-    previousScene && sceneHasTheaterLayoutContent(previousScene),
-  );
-
-  const copyTheaterFromPreviousScene = useCallback(() => {
-    if (!currentScene || !previousScene) return;
-    if (!sceneHasTheaterLayoutContent(previousScene)) {
-      setLiveStatus("На предыдущей сцене нет расстановки для копирования");
-      return;
-    }
-    updateScene(currentScene.id, buildCopySceneTheaterLayoutPatchFromScene(previousScene));
-    setLiveStatus(`Расстановка скопирована со сцены «${previousScene.title}»`);
-    void saveScenesForLightPlot({ force: true });
-  }, [currentScene, previousScene, saveScenesForLightPlot, updateScene]);
-
-  const nextTapeItem = tape[tapeIndex + 1] ?? null;
-  const canCopyKadrToNext = Boolean(
-    currentItem &&
-      !currentItem.isPlaceholder &&
-      currentItem.kadrId &&
-      nextTapeItem &&
-      !nextTapeItem.isPlaceholder &&
-      nextTapeItem.kadrId &&
-      nextTapeItem.sceneIndex === currentItem.sceneIndex,
-  );
-
-  const copyCurrentKadrToNext = useCallback(() => {
-    flushLiveSave();
-    const sourceItem = tape[tapeIndex];
-    const targetItem = tape[tapeIndex + 1];
-    if (
-      !sourceItem ||
-      !targetItem ||
-      sourceItem.isPlaceholder ||
-      targetItem.isPlaceholder ||
-      !sourceItem.kadrId ||
-      !targetItem.kadrId ||
-      sourceItem.sceneIndex !== targetItem.sceneIndex
-    ) {
-      setLiveStatus(
-        targetItem && sourceItem && targetItem.sceneIndex !== sourceItem.sceneIndex
-          ? "Следующая карточка — другая сцена. Добавьте картину в этой сцене"
-          : "Нет следующей картины в этой сцене",
-      );
-      return;
-    }
-    const scene = scenes[sourceItem.sceneIndex];
-    if (!scene) return;
-    const nextKadrs = copyKadrLookToTarget({
-      kadrs: readSceneLightKadrs(scene),
-      sourceKadrId: sourceItem.kadrId,
-      targetKadrId: targetItem.kadrId,
-    });
-    if (!nextKadrs) {
-      setLiveStatus("У текущей картины ещё нет записанного света");
-      return;
-    }
-    updateScene(scene.id, { lightKadrs: nextKadrs });
-    setLiveStatus(`Свет скопирован на картину ${targetItem.kadrNo}`);
-    void saveScenesForLightPlot({ force: true });
-  }, [flushLiveSave, saveScenesForLightPlot, scenes, tape, tapeIndex, updateScene]);
-
-  const addKadrToCurrentScene = useCallback(() => {
-    if (!currentScene) return;
-
-    if (currentSceneTheaterEmpty && previousScene && sceneHasTheaterLayoutContent(previousScene)) {
-      const shouldCopy = window.confirm(
-        `Расстановка в сцене «${currentScene.title}» пуста.\n\nСкопировать расстановку (мебель, декор, софиты, реквизит) со сцены «${previousScene.title}»?`,
-      );
-      if (shouldCopy) {
-        updateScene(currentScene.id, buildCopySceneTheaterLayoutPatchFromScene(previousScene));
-        void saveScenesForLightPlot({ force: true });
-        setLiveStatus(`Расстановка скопирована со сцены «${previousScene.title}»`);
-      }
-    }
-
-    setKadrModalMode("create");
-    cancelPendingLiveSave();
-    setKadrModalOpen(true);
-  }, [
-    currentScene,
-    currentSceneTheaterEmpty,
-    previousScene,
-    cancelPendingLiveSave,
-    saveScenesForLightPlot,
+    lightChannelRoles: playbookData?.lightChannelRoles,
     updateScene,
-  ]);
+    saveScenesForLightPlot,
+    setLiveStatus,
+    isProgRun,
+    applyingTapeRef,
+    kadrModalOpenRef,
+    isProgRunRef,
+    tapeIndexRef,
+    liveSaveTimerRef,
+    tapeRef,
+    scenesRef,
+  });
 
-  const editCurrentKadr = useCallback(() => {
-    const item = tape[clampedIndex];
-    if (!item || item.isPlaceholder || !currentScene) return;
-    cancelPendingLiveSave();
-    setKadrModalMode("edit");
-    setKadrModalOpen(true);
-  }, [cancelPendingLiveSave, clampedIndex, currentScene, tape]);
-
-  const closeKadrModal = useCallback(() => {
-    setKadrModalOpen(false);
-  }, []);
-
-  const submitKadrModal = useCallback(
-    (draft: CreateKadrDraft) => {
-      cancelPendingLiveSave();
-
-      const item = tape[clampedIndex];
-      if (!item) return;
-      const scene = scenes[item.sceneIndex];
-      if (!scene) return;
-
-      const mediaArgs = {
-        lightChannels,
-        lightFaders: liveConsole.faders,
-        lightPrograms: liveConsole.programs,
-        spotlights: scene.theaterSpotlights ?? [],
-        liveConsoleChannel: liveConsole.selectedLightSlot,
-        liveFaders: liveConsole.faders,
-        playlist: (playbookData?.playlist ?? []).map((track) => ({
-          id: track.id,
-          title: track.title ?? "",
-        })),
-        sounds: (playbookData?.sounds ?? []).map((sound) => ({
-          id: sound.id,
-          title: sound.title ?? "",
-        })),
-        videos: videos.map((video) => ({ id: video.id, title: video.title ?? "" })),
-        holdImages: holdImages.map((hold) => ({ id: hold.id, title: hold.title ?? "" })),
-      };
-
-      const insertAfter =
-        kadrModalMode === "create" && !item.isPlaceholder
-          ? { id: item.kadrId, kadrNo: item.kadrNo }
-          : null;
-
-      const result =
-        kadrModalMode === "edit"
-          ? updateKadrFromDraft({ scene, item, draft, ...mediaArgs })
-          : createKadrFromDraft({ scene, draft, insertAfter, ...mediaArgs });
-
-      if (!result) {
-        setLiveStatus(
-          kadrModalMode === "edit" ? "Не удалось обновить картину" : "Не удалось создать картину",
-        );
-        return;
-      }
-
-      if (kadrModalMode === "create") {
-        pendingTapeKadrIdRef.current = result.kadrId;
-      }
-      updateScene(scene.id, {
-        lightKadrs: result.nextKadrs,
-      } as Partial<ScriptScene>);
-
-      const savedKadr = findKadrById(result.nextKadrs, result.kadrId);
-      if (savedKadr && !savedKadr.blackout && savedKadr.programId > 0) {
-        applyingTapeRef.current = true;
-        try {
-          const look = applyKadrLook(savedKadr, liveConsole.faders);
-          liveConsole.persistFaders(look.faders);
-          if (look.programId != null) {
-            liveConsole.persistPrograms({
-              ...liveConsole.programs,
-              activeProgramId: look.programId,
-            });
-          }
-        } finally {
-          applyingTapeRef.current = false;
-        }
-      }
-
-      setKadrModalOpen(false);
-      setLiveStatus(result.summary);
-      void saveScenesForLightPlot({ force: true });
+  const tapeNav = useSpectacleRunTapeNav({
+    projectName,
+    scenes,
+    tape,
+    tapeIndex,
+    setTapeIndex,
+    clampedIndex,
+    currentItem,
+    currentScene,
+    currentPage,
+    setCurrentPage,
+    lightPlotMode,
+    isProgRun,
+    kadrModalOpen,
+    liveConsole,
+    projector: {
+      setProjectorDraft: projector.setProjectorDraft,
+      ensureProjectorOpen: projector.ensureProjectorOpen,
+      projectorMediaCtx: projector.projectorMediaCtx,
+      resolveProjectorVideoMuted: projector.resolveProjectorVideoMuted,
+      resolveProjectorVideoVolume: projector.resolveProjectorVideoVolume,
     },
-    [
-      clampedIndex,
-      cancelPendingLiveSave,
-      holdImages,
-      kadrModalMode,
-      lightChannels,
-      liveConsole.faders,
-      liveConsole.programs,
-      liveConsole.selectedLightSlot,
-      saveScenesForLightPlot,
-      playbookData?.playlist,
-      playbookData?.sounds,
-      scenes,
-      tape,
-      updateScene,
-      videos,
-    ],
-  );
+    progRunPausedRef: progPrefs.progRunPausedRef,
+    setProgRunPaused: progPrefs.setProgRunPaused,
+    persistPaused: progPrefs.persistPaused,
+    flushLiveSaveAtIndex: liveSave.flushLiveSaveAtIndex,
+    liveSaveTimerRef,
+    applyingTapeRef,
+    tapeIndexRef,
+    scenesRef,
+    tapeRef,
+    pendingTapeKadrIdRef,
+    pendingTapeIndexAfterDeleteRef,
+  });
 
-  const deleteCurrentKadr = useCallback(() => {
-    const item = tape[clampedIndex];
-    if (!item || item.isPlaceholder) return;
-    const scene = scenes[item.sceneIndex];
-    if (!scene) return;
+  const kadrActions = useSpectacleRunKadrActions({
+    scenes,
+    tape,
+    clampedIndex,
+    currentScene,
+    currentItem,
+    lightChannels,
+    liveConsole,
+    playlist: playbookData?.playlist,
+    sounds: playbookData?.sounds,
+    videos: projector.videos,
+    holdImages: projector.holdImages,
+    kadrModalMode,
+    setKadrModalMode,
+    setKadrModalOpen,
+    cancelPendingLiveSave: liveSave.cancelPendingLiveSave,
+    flushLiveSave: liveSave.flushLiveSave,
+    updateScene,
+    saveScenesForLightPlot,
+    setLiveStatus,
+    applyingTapeRef,
+    liveSaveTimerRef,
+    pendingTapeKadrIdRef,
+    pendingTapeIndexAfterDeleteRef,
+  });
 
-    const confirmMessage = formatDeleteKadrConfirmMessage(item.headingTitle);
-    if (!window.confirm(confirmMessage)) return;
-
-    if (liveSaveTimerRef.current != null) {
-      window.clearTimeout(liveSaveTimerRef.current);
-      liveSaveTimerRef.current = null;
-    }
-
-    const lightKadrs = deleteKadrFromSceneData(scene, {
-      id: item.kadrId,
-      kadrNo: item.kadrNo,
-    });
-
-    pendingTapeIndexAfterDeleteRef.current = clampedIndex;
-    updateScene(scene.id, { lightKadrs } as Partial<ScriptScene>);
-    void saveScenesForLightPlot({ force: true });
-    setLiveStatus(`«${item.headingTitle}» удалена`);
-  }, [clampedIndex, saveScenesForLightPlot, scenes, tape, updateScene]);
-
-  const goToTapeIndex = useCallback(
-    (nextIndex: number) => {
-      if (tape.length === 0) return;
-      const clamped = Math.max(0, Math.min(tape.length - 1, nextIndex));
-      if (clamped === tapeIndexRef.current) return;
-
-      if (liveSaveTimerRef.current != null) {
-        window.clearTimeout(liveSaveTimerRef.current);
-        liveSaveTimerRef.current = null;
-      }
-
-      const leavingIndex = tapeIndexRef.current;
-      const leavingSnapshot =
-        leavingIndex !== clamped
-          ? {
-              faders: liveConsole.faders,
-              programs: liveConsole.programs,
-            }
-          : null;
-
-      if (leavingSnapshot) {
-        flushLiveSaveAtIndex(leavingIndex, leavingSnapshot);
-      }
-
-      const target = tape[clamped];
-      if (target) {
-        applyingTapeRef.current = true;
-        applyTapeItem(
-          target,
-          isProgRun ? { applyPlayback: true } : undefined,
-        );
-      }
-
-      skipTapeApplyEffectRef.current = true;
-      tapeIndexRef.current = clamped;
-      setTapeIndex(clamped);
-    },
-    [
-      applyTapeItem,
-      flushLiveSaveAtIndex,
-      isProgRun,
-      liveConsole.faders,
-      liveConsole.programs,
-      tape,
-    ],
-  );
-
-  useEffect(() => {
-    const pendingId = pendingTapeKadrIdRef.current;
-    if (!pendingId || tape.length === 0) return;
-    const idx = findTapeIndexForSceneKadr(tape, -1, pendingId);
-    if (idx < 0) return;
-    pendingTapeKadrIdRef.current = null;
-    goToTapeIndex(idx);
-  }, [tape, scenes, goToTapeIndex]);
-
-  useEffect(() => {
-    const pendingIndex = pendingTapeIndexAfterDeleteRef.current;
-    if (pendingIndex == null || tape.length === 0) return;
-    pendingTapeIndexAfterDeleteRef.current = null;
-    const nextIndex = Math.min(pendingIndex, tape.length - 1);
-    goToTapeIndex(Math.max(0, nextIndex));
-  }, [tape, scenes, goToTapeIndex]);
-
-  const goPrev = useCallback(() => goToTapeIndex(clampedIndex - 1), [clampedIndex, goToTapeIndex]);
-  const goNext = useCallback(() => goToTapeIndex(clampedIndex + 1), [clampedIndex, goToTapeIndex]);
-
-  useEffect(() => {
-    if (!isProgRun || tape.length === 0 || kadrModalOpen) return;
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-      if (isKeyboardTypingTarget(event.target)) return;
-
-      event.preventDefault();
-      if (event.key === "ArrowLeft") {
-        goToTapeIndex(tapeIndexRef.current - 1);
-        return;
-      }
-      goToTapeIndex(tapeIndexRef.current + 1);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goToTapeIndex, isProgRun, kadrModalOpen, tape.length]);
-
-  const goNextScene = useCallback(() => {
-    if (!currentItem) return;
-    const nextInTape = tape.findIndex(
-      (item, index) => index > clampedIndex && item.sceneIndex > currentItem.sceneIndex,
-    );
-    if (nextInTape >= 0) goToTapeIndex(nextInTape);
-  }, [clampedIndex, currentItem, goToTapeIndex, tape]);
-
-  const startProgRun = useCallback(() => {
-    if (tape.length === 0) return;
-
-    if (progRunPausedRef.current) {
-      setProgRunPaused(false);
-      persistProgRunPaused(projectName, false);
-    }
-
-    const firstItem = tape[0];
-    if (!firstItem) return;
-
-    if (tapeIndexRef.current === 0) {
-      applyTapeItem(firstItem, { applyPlayback: true });
-      return;
-    }
-
-    goToTapeIndex(0);
-  }, [applyTapeItem, goToTapeIndex, projectName, tape]);
-
-  const isLastInSpectacle = clampedIndex >= tape.length - 1;
-  const isLastInScene = isLastTapeItemInScene(tape, clampedIndex);
-  const canGoNext = !isLastInSpectacle;
-  const nextLabel = isLastInScene ? "Следующая сцена" : "Далее";
+  const lightChannelRoles =
+    playbookData?.lightChannelRoles && playbookData.lightChannelRoles.v === 1
+      ? playbookData.lightChannelRoles
+      : null;
 
   return {
     tape,
@@ -886,81 +191,78 @@ export function useSpectacleRun({ projectName, scenes, lightChannels }: UseSpect
     liveConsole,
     lightFaders,
     lightPrograms,
-    lightChannelRoles:
-      playbookData?.lightChannelRoles && playbookData.lightChannelRoles.v === 1
-        ? playbookData.lightChannelRoles
-        : null,
+    lightChannelRoles,
     setLightChannelRoles: (next: PlaybookLightChannelRolesV1) => {
       setPlaybookData((prev) => ({ ...(prev ?? {}), lightChannelRoles: next }));
     },
-    goPrev,
-    goNext,
-    goNextScene,
-    goToTapeIndex,
-    startProgRun,
-    progRunPaused,
-    progRunPlaybackEnabled,
-    toggleProgRunPause,
-    progRunKadrStripLayout,
-    setProgRunKadrStripLayout,
-    progRunKadrStripNotesOverlay,
-    setProgRunKadrStripNotesOverlay,
-    toggleProgRunKadrStripNotesOverlay,
-    progRunLightConsoleOpen,
-    setProgRunLightConsoleOpen,
-    toggleProgRunLightConsoleOpen,
-    progRunKadrStripPlainCover,
-    setProgRunKadrStripPlainCover,
-    toggleProgRunKadrStripPlainCover,
-    progRunWideLayout,
-    setProgRunWideLayout,
-    toggleProgRunWideLayout,
-    canGoPrev: clampedIndex > 0,
-    canGoNext,
-    isLastInScene,
-    isLastInSpectacle,
-    nextLabel,
-    flushLiveSave,
-    addKadrToCurrentScene,
-    editCurrentKadr,
-    deleteCurrentKadr,
-    canEditKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentScene),
-    canDeleteKadr: Boolean(currentItem && !currentItem.isPlaceholder && currentScene),
-    nextKadrNo,
-    canAddKadr: Boolean(currentScene),
-    canCopyTheaterFromPreviousScene,
-    currentSceneTheaterEmpty,
-    copyTheaterFromPreviousScene,
-    canCopyKadrToNext,
-    copyCurrentKadrToNext,
+    goPrev: tapeNav.goPrev,
+    goNext: tapeNav.goNext,
+    goNextScene: tapeNav.goNextScene,
+    goToTapeIndex: tapeNav.goToTapeIndex,
+    startProgRun: tapeNav.startProgRun,
+    progRunPaused: progPrefs.progRunPaused,
+    progRunPlaybackEnabled: progPrefs.progRunPlaybackEnabled,
+    toggleProgRunPause: tapeNav.toggleProgRunPause,
+    progRunKadrStripLayout: progPrefs.progRunKadrStripLayout,
+    setProgRunKadrStripLayout: progPrefs.setProgRunKadrStripLayout,
+    progRunKadrStripNotesOverlay: progPrefs.progRunKadrStripNotesOverlay,
+    setProgRunKadrStripNotesOverlay: progPrefs.setProgRunKadrStripNotesOverlay,
+    toggleProgRunKadrStripNotesOverlay: progPrefs.toggleProgRunKadrStripNotesOverlay,
+    progRunLightConsoleOpen: progPrefs.progRunLightConsoleOpen,
+    setProgRunLightConsoleOpen: progPrefs.setProgRunLightConsoleOpen,
+    toggleProgRunLightConsoleOpen: progPrefs.toggleProgRunLightConsoleOpen,
+    progRunKadrStripPlainCover: progPrefs.progRunKadrStripPlainCover,
+    setProgRunKadrStripPlainCover: progPrefs.setProgRunKadrStripPlainCover,
+    toggleProgRunKadrStripPlainCover: progPrefs.toggleProgRunKadrStripPlainCover,
+    progRunWideLayout: progPrefs.progRunWideLayout,
+    setProgRunWideLayout: progPrefs.setProgRunWideLayout,
+    toggleProgRunWideLayout: progPrefs.toggleProgRunWideLayout,
+    canGoPrev: tapeNav.canGoPrev,
+    canGoNext: tapeNav.canGoNext,
+    isLastInScene: tapeNav.isLastInScene,
+    isLastInSpectacle: tapeNav.isLastInSpectacle,
+    nextLabel: tapeNav.nextLabel,
+    flushLiveSave: liveSave.flushLiveSave,
+    addKadrToCurrentScene: kadrActions.addKadrToCurrentScene,
+    editCurrentKadr: kadrActions.editCurrentKadr,
+    deleteCurrentKadr: kadrActions.deleteCurrentKadr,
+    canEditKadr: kadrActions.canEditKadr,
+    canDeleteKadr: kadrActions.canDeleteKadr,
+    nextKadrNo: tapeNav.nextKadrNo,
+    canAddKadr: kadrActions.canAddKadr,
+    canCopyTheaterFromPreviousScene: kadrActions.canCopyTheaterFromPreviousScene,
+    currentSceneTheaterEmpty: kadrActions.currentSceneTheaterEmpty,
+    copyTheaterFromPreviousScene: kadrActions.copyTheaterFromPreviousScene,
+    canCopyKadrToNext: kadrActions.canCopyKadrToNext,
+    copyCurrentKadrToNext: kadrActions.copyCurrentKadrToNext,
     kadrModalOpen,
     kadrModalMode,
-    closeKadrModal,
-    submitKadrModal,
-    videos,
-    holdImages,
-    projectorMediaCtx,
-    isProjectorOpen,
-    openProjector,
-    closeProjector,
+    closeKadrModal: kadrActions.closeKadrModal,
+    submitKadrModal: kadrActions.submitKadrModal,
+    videos: projector.videos,
+    holdImages: projector.holdImages,
+    projectorMediaCtx: projector.projectorMediaCtx,
+    isProjectorOpen: projector.isProjectorOpen,
+    openProjector: projector.openProjector,
+    closeProjector: projector.closeProjector,
     showProjectorHold: (holdId?: number) => {
-      const hold = holdId != null ? holdImages.find((h) => Number(h.id) === holdId) : null;
+      const hold = holdId != null ? projector.holdImages.find((h) => Number(h.id) === holdId) : null;
       const label = hold?.title?.trim() || (holdId != null ? `заставка ${holdId}` : "заставка");
-      void playProjectorCue(
+      void projector.playProjectorCue(
         holdId != null ? { mode: "hold", holdId } : { mode: "hold" },
         `Проектор: ${label}`,
       );
     },
-    playProjectorVideo,
-    toggleProjectorVideo,
-    isProjectorVideoMuted: resolveProjectorVideoMuted,
-    toggleProjectorVideoMute,
-    resolveProjectorVideoVolume,
-    setProjectorVideoVolumeLevel,
-    seekProjectorVideoTime,
-    removeProjectorVideo,
-    removeProjectorHold,
-    projectorPlayback,
+    playProjectorVideo: projector.playProjectorVideo,
+    toggleProjectorVideo: projector.toggleProjectorVideo,
+    isProjectorVideoMuted: projector.resolveProjectorVideoMuted,
+    toggleProjectorVideoMute: projector.toggleProjectorVideoMute,
+    resolveProjectorVideoVolume: projector.resolveProjectorVideoVolume,
+    setProjectorVideoVolumeLevel: projector.setProjectorVideoVolumeLevel,
+    seekProjectorVideoTime: projector.seekProjectorVideoTime,
+    removeProjectorVideo: projector.removeProjectorVideo,
+    removeProjectorHold: projector.removeProjectorHold,
+    projectorPlayback: projector.projectorPlayback,
     projectName,
     consoleLayoutSettings,
   };

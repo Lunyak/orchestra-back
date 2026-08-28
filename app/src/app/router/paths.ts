@@ -331,3 +331,30 @@ export function getProjectSectionFromPath(pathname: string) {
   const match = pathname.match(/^\/projects\/[^/]+\/([^/]+)/);
   return (match?.[1] as ProjectSection | undefined) ?? null;
 }
+
+/** Родительский экран проекта: раздел → обзор, обзор → список проектов. */
+export function resolveProjectScopedBackPath(pathname: string): string | null {
+  const slug = getProjectSlugFromPath(pathname);
+  if (!slug) return null;
+
+  const parts = pathname.split("/").filter(Boolean);
+  const section = parts[2];
+  const rest = parts.slice(3);
+
+  if (!section || section === "overview") return globalPaths.projects;
+
+  if (section === "sessions") {
+    if (rest[1] === "slots" && rest[0] && rest[2]) {
+      return projectSessionPath(slug, rest[0]);
+    }
+    if (rest[0]) return projectPath(slug, "sessions");
+  }
+
+  if (section === "tasks" && rest[0]) return projectPath(slug, "tasks");
+  if (section === "team" && rest[0] === "roles") return projectPath(slug, "team");
+  if (section === "settings" && rest[0] === "bot") {
+    return projectPath(slug, "settings");
+  }
+
+  return projectPath(slug, "overview");
+}

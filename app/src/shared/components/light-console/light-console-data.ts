@@ -371,15 +371,6 @@ export function upsertChannelMemorySnapshot(
   };
 }
 
-/** @deprecated используйте upsertChannelMemorySnapshot */
-export function upsertProgramChannelSnapshot(
-  programs: PlaybookLightProgramsDataV1,
-  channelId: number,
-  faders: PlaybookLightFadersDataV1,
-): PlaybookLightProgramsDataV1 {
-  return upsertChannelMemorySnapshot(programs, channelId, faders);
-}
-
 export function upsertActiveProgramSnapshotFromAllChannels(
   programs: PlaybookLightProgramsDataV1,
   activeProgramId: number,
@@ -418,14 +409,6 @@ export function readChannelMemoryFaderStates(
     Math.max(id, programs.channels?.length ?? 1),
   );
   return channels.find((bank) => bank.channel === id)?.faders ?? [];
-}
-
-/** @deprecated используйте readChannelMemoryFaderStates */
-export function readProgramChannelFaderStates(
-  programs: PlaybookLightProgramsDataV1,
-  channelId: number,
-): FaderStateRow[] {
-  return readChannelMemoryFaderStates(programs, channelId);
 }
 
 export function resolveLightProgramMinCount(

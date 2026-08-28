@@ -1,5 +1,6 @@
 import type { DirectorSessionParticipant } from "../../../sync/api/director-sessions";
 import type { TeamProfile } from "../../../sync/api/profile";
+import type { TroupeMemberItem } from "../../../sync/api/troupe";
 import { getEmailsPlannedForDirectorSlot } from "./session-slot-planned";
 import type {
   DirectorRehearsalSession,
@@ -26,6 +27,16 @@ export const SLOT_SCENE_PICKER_CUSTOM_SLUG = "__custom__";
 
 export function isSlotScenePickerCustomSlug(slug: string): boolean {
   return String(slug ?? "").trim() === SLOT_SCENE_PICKER_CUSTOM_SLUG;
+}
+
+export function getTroupeMemberLabel(member: TroupeMemberItem): string {
+  const profileName =
+    String(member.profile?.displayName ?? "").trim() ||
+    [member.profile?.firstName, member.profile?.lastName]
+      .map((part) => String(part ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+  return profileName || member.email;
 }
 
 export function parseTimeHHMM(src: string): number | null {

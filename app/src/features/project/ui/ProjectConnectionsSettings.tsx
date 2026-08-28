@@ -19,12 +19,15 @@ import {
 } from "../../../sync/api/workspaces";
 import { useAuth } from "../../auth/model/auth-context";
 import { readTheaterPoster } from "../../organizations/model/theater-poster-storage";
+import { useTeam } from "../../team";
 import { useProject } from "../model/project-context";
 import "./project-connections-settings.css";
 
 export function ProjectConnectionsSettings() {
   const { accessToken } = useAuth();
   const { projectName } = useProject();
+  const { isProjectOwner } = useTeam();
+  const canManageProjectLinks = isProjectOwner === true;
   const [theaters, setTheaters] = useState<TheaterSummary[]>([]);
   const [links, setLinks] = useState<ProjectLinks | null>(null);
   const [pendingInvites, setPendingInvites] = useState<
@@ -36,16 +39,25 @@ export function ProjectConnectionsSettings() {
 
   const loadConnections = useCallback(async () => {
     if (!accessToken || !projectName) return;
+    const emptyInvites: Array<{
+      id: string;
+      expiresAt: string | null;
+      createdAt: string;
+    }> = [];
     const [theaterItems, projectLinks, invites] = await Promise.all([
-      fetchTheaters(accessToken),
+      canManageProjectLinks ? fetchTheaters(accessToken) : Promise.resolve([]),
       fetchProjectLinks(accessToken, projectName),
-      listProjectTheaterInvites(accessToken, projectName).catch(() => []),
+      canManageProjectLinks
+        ? listProjectTheaterInvites(accessToken, projectName).catch(
+            () => emptyInvites,
+          )
+        : Promise.resolve(emptyInvites),
     ]);
     setTheaters(theaterItems);
     setLinks(projectLinks);
     setPendingInvites(invites);
     setTheaterId((current) => current || theaterItems[0]?.id || "");
-  }, [accessToken, projectName]);
+  }, [accessToken, canManageProjectLinks, projectName]);
 
   useEffect(() => {
     setActionStatus("");
@@ -120,6 +132,8 @@ export function ProjectConnectionsSettings() {
     ? readTheaterPoster(linkedPartner.theater.id)
     : null;
 
+  if (!hasPartner && !canManageProjectLinks && !actionStatus) return null;
+
   return (
     <section className="settings-card settings-invite project-connections-settings">
       {hasPartner && linkedPartner ? (
@@ -140,20 +154,22 @@ export function ProjectConnectionsSettings() {
                 <span>{linkedPartner.theater.title}</span>
               </span>
             </Link>
-            <div className="settings-member-actions">
-              <Buttons.DeleteButton
-                type="button"
-                className="settings-member-remove"
-                onClick={() => {
-                  void handleUnlinkTheater(linkedPartner.theater.id);
-                }}
-                aria-label={`Отключить ${linkedPartner.theater.title}`}
-                title="Отключить"
-              />
-            </div>
+            {canManageProjectLinks ? (
+              <div className="settings-member-actions">
+                <Buttons.DeleteButton
+                  type="button"
+                  className="settings-member-remove"
+                  onClick={() => {
+                    void handleUnlinkTheater(linkedPartner.theater.id);
+                  }}
+                  aria-label={`Отключить ${linkedPartner.theater.title}`}
+                  title="Отключить"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
-      ) : (
+      ) : canManageProjectLinks ? (
         <>
           <h3 className="settings-card__title">Театр</h3>
           <div className="settings-invite-row">
@@ -227,7 +243,7 @@ export function ProjectConnectionsSettings() {
             </div>
           ) : null}
         </>
-      )}
+      ) : null}
 
       {actionStatus ? (
         <p className="settings-sync-hint" role="status">

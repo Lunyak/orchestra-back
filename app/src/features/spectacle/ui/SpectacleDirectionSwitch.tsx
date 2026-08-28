@@ -271,13 +271,13 @@ export function SpectacleDirectionSwitch() {
     >
       <div className="spectacle-direction-switch__left">
         {showTechChrome ? <SpectacleTechChromeLeftSlot /> : null}
-        {showTasksModes ? <SpectacleTasksModeSwitchList /> : null}
+        {showPlanModes ? <SpectaclePlanModeSwitchList /> : null}
       </div>
       {showCenterChrome ? <SpectacleTechChromeCenterSlot /> : null}
       <div className="spectacle-direction-switch__right">
         {showScriptModes ? <SpectacleScriptModeSwitchList /> : null}
         {showTechModes && !compactStrip ? <SpectacleTechModeSwitchList /> : null}
-        {showPlanModes ? <SpectaclePlanModeSwitchList /> : null}
+        {showTasksModes ? <SpectacleTasksModeSwitchList /> : null}
       </div>
     </nav>
   );

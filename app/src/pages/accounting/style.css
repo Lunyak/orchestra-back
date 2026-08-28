@@ -1,11 +1,42 @@
 .accounting-layout .main-content {
-  padding: 10px 12px 24px;
+  padding: 0;
+  min-height: 100%;
+}
+
+.accounting-page {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  min-height: 100%;
+  height: auto;
+  box-sizing: border-box;
+  background: var(--sessions-bg);
+  color: var(--sessions-text);
+}
+
+.app-content:has(> .main-content) .accounting-page,
+.app-shell-body .accounting-page {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 100%;
 }
 
 .accounting-page__hint {
   margin: 0 0 16px;
-  font-size: 0.9rem;
-  color: var(--color-text-muted, #888);
+  font-size: 13px;
+  color: var(--sessions-text-muted);
+}
+
+.accounting-page__hint a {
+  color: var(--color-active-ascent);
 }
 
 .accounting-empty {
@@ -30,13 +61,6 @@
   line-height: 1.45;
 }
 
-.accounting-page {
-  max-width: var(--width-content-page);
-  width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-}
-
 .accounting-page__header {
   display: flex;
   align-items: flex-start;
@@ -49,11 +73,12 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
+  color: var(--sessions-text-strong);
 }
 
 .accounting-page__subtitle {
   margin: 6px 0 0;
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
   font-size: 0.9rem;
 }
 
@@ -67,9 +92,8 @@
   line-height: 1.4;
 }
 
-
 .accounting-page__back {
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
   text-decoration: none;
   font-size: 0.9rem;
 }
@@ -87,7 +111,7 @@
   display: flex;
   gap: 0;
   margin: 0 0 16px;
-  border-bottom: 1px solid var(--color-border, #333);
+  border-bottom: 1px solid var(--sessions-border);
 }
 
 .accounting-tabs__item {
@@ -95,7 +119,7 @@
   background: transparent;
   border: 0;
   border-bottom: 2px solid transparent;
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
   cursor: pointer;
   font: inherit;
   margin-bottom: -1px;
@@ -121,27 +145,29 @@
   gap: 6px;
   min-width: 180px;
   font-size: 0.85rem;
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
 }
 
 .accounting-scope-row__field select {
   min-height: 36px;
   padding: 6px 10px;
-  border: 1px solid var(--color-border, #333);
-  background: var(--color-surface, transparent);
-  color: inherit;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-bg-deep);
+  color: var(--sessions-text-strong);
   font: inherit;
 }
 
 .accounting-progress {
   height: 6px;
-  background: var(--color-border, #333);
+  background: var(--sessions-border);
   margin-top: 8px;
 }
 
 .accounting-progress__fill {
   height: 100%;
-  width: var(--accounting-progress, 0%);
+  width: 100%;
+  transform: scaleX(var(--accounting-progress-ratio, 0));
+  transform-origin: left center;
   background: var(--color-active-ascent);
 }
 
@@ -157,7 +183,8 @@
 .accounting-list-item {
   display: block;
   padding: 14px 16px;
-  border: 1px solid var(--color-border, #333);
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
   text-decoration: none;
   color: inherit;
 }
@@ -175,17 +202,19 @@
 
 .accounting-list-item__title {
   font-weight: 600;
+  color: var(--sessions-text-strong);
 }
 
 .accounting-list-item__meta {
   margin-top: 4px;
   font-size: 0.85rem;
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
 }
 
 .accounting-list-item__amount {
   font-weight: 600;
   white-space: nowrap;
+  color: var(--sessions-text-strong);
 }
 
 .accounting-status {
@@ -199,19 +228,20 @@
 }
 
 .accounting-status--closed {
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
 }
 
 .accounting-form-section {
   margin-top: 24px;
   padding-top: 24px;
-  border-top: 1px solid var(--color-border, #333);
+  border-top: 1px solid var(--sessions-border);
 }
 
 .accounting-form-section__title {
   margin: 0 0 12px;
   font-size: 1.1rem;
   font-weight: 600;
+  color: var(--sessions-text-strong);
 }
 
 .accounting-form-row {
@@ -255,13 +285,13 @@
 .accounting-table th,
 .accounting-table td {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border, #333);
+  border-bottom: 1px solid var(--sessions-border);
   text-align: left;
 }
 
 .accounting-table th {
   font-weight: 600;
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -285,11 +315,12 @@
 .accounting-detail-summary__value {
   font-size: 1.25rem;
   font-weight: 600;
+  color: var(--sessions-text-strong);
 }
 
 .accounting-detail-summary__label {
   font-size: 0.8rem;
-  color: var(--color-text-muted, #888);
+  color: var(--sessions-text-muted);
   margin-top: 2px;
 }
 
@@ -301,6 +332,7 @@
   margin: 0 0 12px;
   font-size: 1rem;
   font-weight: 600;
+  color: var(--sessions-text-strong);
 }
 
 .accounting-contribution-row {
@@ -309,14 +341,15 @@
   justify-content: space-between;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--color-border, #333);
+  border-bottom: 1px solid var(--sessions-border);
   font-size: 0.9rem;
 }
 
 .accounting-my-status {
   margin: 16px 0;
   padding: 14px 16px;
-  border: 1px solid var(--color-border, #333);
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
 }
 
 .accounting-my-status--paid {
@@ -331,10 +364,6 @@
 }
 
 @media (max-width: 979px) {
-  .accounting-layout .main-content {
-    padding: 8px 10px 20px;
-  }
-
   .accounting-page__header {
     flex-direction: column;
     align-items: stretch;
@@ -378,10 +407,6 @@
 }
 
 @media (max-width: 560px) {
-  .accounting-layout .main-content {
-    padding: 6px 8px calc(16px + env(safe-area-inset-bottom, 0px));
-  }
-
   .accounting-page__hint {
     margin: 0 0 10px;
     font-size: 0.8rem;

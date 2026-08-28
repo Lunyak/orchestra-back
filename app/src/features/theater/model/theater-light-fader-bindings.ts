@@ -8,7 +8,6 @@ import {
   applyProgramFaderStatesToBoard,
   buildCompleteLightFaders,
   buildFaderBoardForConsoleChannel,
-  readProgramChannelFaderStates,
   resolveLightPrograms,
 } from "../../../shared/components/light-console/light-console-data";
 import { normalizeSelectedRecordChannels } from "../../../shared/components/light-console/light-channel-roles";

@@ -1,5 +1,6 @@
 import type { HeaderScriptStateProps } from "../header/HeaderScriptStateNav";
 import { MenubarPanelIcon } from "./MenubarPanelIcon";
+import { PROJECT_ONBOARDING_PANELS_ATTR } from "../../../features/project/model/project-onboarding";
 
 const icons = {
   scenes: (
@@ -52,7 +53,11 @@ export function AppEditorScriptPanelsNav({
   const navLabel = showSpectacleRunTextToggle ? "Панели спектакля" : "Панели сценария";
 
   return (
-    <nav className="app-editor-menubar__panels-nav" aria-label={navLabel}>
+    <nav
+      className="app-editor-menubar__panels-nav"
+      aria-label={navLabel}
+      data-onboarding={PROJECT_ONBOARDING_PANELS_ATTR}
+    >
       {showScenesToggle ? (
         <button
           type="button"

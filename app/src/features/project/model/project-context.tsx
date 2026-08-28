@@ -25,7 +25,7 @@ export interface ProjectContextValue {
   /** true пока идёт загрузка списка проектов. */
   projectsLoading: boolean;
   onProjectChange: (name: string) => void;
-  createProject: (name: string, workspaceId?: string) => Promise<void>;
+  createProject: (name: string, workspaceId?: string) => Promise<string | null>;
   updateProjectDisplayName: (name: string) => Promise<void>;
   updateProjectSlug: (slug: string) => Promise<string>;
   deleteProject: (name: string) => Promise<void>;
@@ -376,20 +376,20 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const createProject = useCallback(
     async (name: string, workspaceId?: string) => {
       const value = name.trim();
-      if (!value) return;
+      if (!value) return null;
       const slug = makeUniqueProjectSlug(value, projects);
       const desktopApi = getDesktopApi();
       if (desktopApi) {
         const result = await desktopApi.createProject(slug);
         if (!result?.ok || !result.name) {
           console.error("createProject failed:", result?.error);
-          return;
+          return null;
         }
         storeProjectDisplayName(result.name, value);
         await loadProjects(result.name);
-        return;
+        return result.name;
       }
-      if (!accessToken) return;
+      if (!accessToken) return null;
       try {
         const project = await ensureProject(
           accessToken,
@@ -398,8 +398,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
           workspaceId,
         );
         await loadProjects(project.slug);
+        return project.slug;
       } catch (error) {
         console.error("createProject failed:", error);
+        return null;
       }
     },
     [accessToken, getDesktopApi, loadProjects, projects],

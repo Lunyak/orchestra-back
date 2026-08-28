@@ -33,9 +33,6 @@ export type HeaderNavItem = {
 /** Идентификатор пункта «Администрирование»; фактический URL — resolveAdminEntryPath(). */
 export const ADMIN_NAV_PATH = "/admin";
 
-/** @deprecated Используйте ADMIN_NAV_PATH */
-export const REHEARSAL_PLAN_NAV_PATH = ADMIN_NAV_PATH;
-
 export const ADMIN_NAV_CHILDREN: HeaderNavSubItem[] = [
   {
     id: "plan",

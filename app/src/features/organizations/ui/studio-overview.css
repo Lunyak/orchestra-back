@@ -1,4 +1,8 @@
 .studio-overview {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
   margin: 0 auto;
   max-width: var(--width-content-page);
   width: 100%;
@@ -11,10 +15,13 @@
     sans-serif;
 }
 
-.app-shell-body > .studio-overview {
+.app-shell-body > .studio-overview,
+.app-content > .studio-overview {
   flex: 1 1 auto;
-  align-self: stretch;
-  min-height: 0;
+  align-self: center;
+  width: 100%;
+  max-width: var(--width-content-page);
+  min-height: 100%;
   height: auto;
   overflow: auto;
 }
@@ -23,17 +30,26 @@
   width: 100%;
   max-width: none;
   min-width: 0;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
   gap: 28px;
 }
 
 .studio-overview__header {
+  position: relative;
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .studio-overview__back {
-  display: inline-block;
-  margin: 0 0 10px;
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--color-active-ascent);
   text-decoration: none;
   font-size: 13px;
@@ -53,57 +69,37 @@
   text-transform: uppercase;
 }
 
-.studio-overview__title {
-  margin: 8px 0 0;
-  color: var(--sessions-text-strong);
-  font-size: 22px;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.studio-overview__section-title {
-  margin: 0 0 12px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--sessions-text-muted);
-}
-
 .studio-overview__map {
-  display: grid;
-  gap: 12px;
+  display: block;
+  width: 100%;
   min-width: 0;
 }
 
 @media (max-width: 720px) {
   .studio-overview {
-    padding: 12px 12px 20px;
+    padding: 0 0 16px;
+    justify-content: flex-start;
   }
 
   .studio-overview__content {
-    gap: 16px;
+    gap: 0;
+    justify-content: flex-start;
   }
 
   .studio-overview__header {
     display: none;
   }
 
-  .studio-overview__section-title {
-    margin-bottom: 8px;
+  .studio-overview__map {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
   }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 560px) {
   .studio-overview {
-    padding: 10px 8px 16px;
-  }
-
-  .studio-overview__content {
-    gap: 12px;
-  }
-
-  .studio-overview__title {
-    font-size: 16px;
+    padding-bottom: 12px;
   }
 }

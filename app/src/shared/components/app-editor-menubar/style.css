@@ -503,6 +503,94 @@
   border-right: 1px solid #222;
 }
 
+.app-editor-mobile-panels {
+  width: 36px;
+  border-right: 1px solid #222;
+}
+
+.app-editor-mobile-panels__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+}
+
+.app-editor-mobile-panels.theater-editor-menubar__menu--open .app-editor-mobile-panels__trigger,
+.app-editor-mobile-panels__trigger[aria-expanded="true"] {
+  color: var(--color-active-ascent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-editor-mobile-panels .app-editor-mobile-panels__options {
+  left: 0;
+  right: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+  border-left: 0;
+  border-right: 0;
+  box-sizing: border-box;
+  box-shadow: none;
+  z-index: 1200;
+}
+
+.app-editor-mobile-panels.theater-editor-menubar__menu:hover .app-editor-mobile-panels__options,
+.app-editor-mobile-panels.theater-editor-menubar__menu:focus-within .app-editor-mobile-panels__options {
+  display: none;
+}
+
+.app-editor-mobile-panels.theater-editor-menubar__menu--open .app-editor-mobile-panels__options,
+.app-editor-mobile-panels.theater-editor-menubar__menu--open:hover .app-editor-mobile-panels__options,
+.app-editor-mobile-panels.theater-editor-menubar__menu--open:focus-within .app-editor-mobile-panels__options {
+  display: block;
+}
+
+.app-editor-mobile-panels__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 0;
+}
+
+.app-editor-mobile-panels__actions .app-editor-menubar__panels-nav,
+.app-editor-mobile-panels__actions .app-editor-menubar__mode-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.app-editor-mobile-panels__actions .app-editor-menubar__panel-btn {
+  width: 100%;
+  height: 36px;
+  min-width: 0;
+}
+
+.app-editor-mobile-panels__actions .theater-panels-menubar-btn.app-editor-menubar__panel-btn {
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-editor-mobile-panels__actions .app-editor-menubar__panels-nav + .app-editor-menubar__panel-btn--chat,
+.app-editor-mobile-panels__actions .app-editor-menubar__panel-btn--chat {
+  margin-left: 0;
+}
+
 .app-editor-user-menu {
   border-right: 0;
   border-left: 0;
@@ -1034,27 +1122,5 @@
 
   .app-editor-menubar__actions {
     display: none;
-  }
-
-  .app-editor-user-menu__toolbar-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 10px;
-    box-sizing: border-box;
-  }
-
-  .app-editor-user-menu__toolbar-actions .app-editor-menubar__panels-nav,
-  .app-editor-user-menu__toolbar-actions .app-editor-menubar__mode-nav {
-    height: auto;
-    margin: 0;
-    padding: 0;
-    border: 0;
-  }
-
-  .app-editor-user-menu__toolbar-actions .app-editor-menubar__panel-btn {
-    width: 36px;
-    height: 36px;
   }
 }

@@ -122,6 +122,26 @@
   border-color: var(--color-active-ascent);
 }
 
+.project-nav-mindmap__poster--onboarding .project-nav-mindmap__poster-link {
+  border-color: var(--color-active-ascent);
+}
+
+.project-nav-mindmap--onboarding-nav .project-nav-mindmap__canvas {
+  outline: 2px solid var(--color-active-ascent);
+  outline-offset: 8px;
+}
+
+.project-nav-mindmap__poster--onboarding .project-nav-mindmap__poster-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.project-nav-mindmap__node--onboarding {
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 16%, var(--sessions-bg-deep));
+}
+
 .project-nav-mindmap__poster-image {
   display: block;
   width: 100%;
@@ -540,17 +560,7 @@ a.project-nav-mindmap__node:focus-visible {
 .project-nav-mindmap--stack .project-nav-mindmap__poster-frame {
   width: 100%;
   aspect-ratio: 2 / 3;
-  max-height: min(78vh, 720px);
-}
-
-.project-nav-mindmap--stack .project-nav-mindmap__poster-link--tap {
-  cursor: pointer;
-  font: inherit;
-  padding: 0;
-}
-
-.project-nav-mindmap--stack .project-nav-mindmap__poster--menu-open .project-nav-mindmap__poster-link--tap {
-  pointer-events: none;
+  max-height: min(42vh, 320px);
 }
 
 .project-nav-mindmap--stack .project-nav-mindmap__poster-actions--icons {
@@ -597,30 +607,15 @@ a.project-nav-mindmap__node:focus-visible {
 }
 
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 8px 8px;
-  background: rgba(8, 8, 8, 0.94);
-  border: 1px solid var(--sessions-border);
+  padding: 12px 12px 16px;
+  background: var(--sessions-bg);
+  border-top: 1px solid var(--sessions-border);
   box-sizing: border-box;
-  overflow: auto;
-  animation: project-nav-mindmap-menu-in 0.24s ease;
-}
-
-@keyframes project-nav-mindmap-menu-in {
-  from {
-    opacity: 0;
-    transform: scale(0.98);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-title {
@@ -673,15 +668,15 @@ a.project-nav-mindmap__node:focus-visible {
   width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--sessions-border);
-  background: var(--sessions-bg-deep);
-  color: var(--sessions-text-strong);
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sessions-text-muted);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  text-transform: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   text-align: left;
   cursor: pointer;
 }
@@ -700,7 +695,6 @@ a.project-nav-mindmap__node:focus-visible {
 
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-drill:hover,
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-drill:focus-visible {
-  border-color: var(--color-active-ascent);
   color: var(--color-active-ascent);
   outline: none;
 }
@@ -846,12 +840,13 @@ a.project-nav-mindmap__node:focus-visible {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 8px;
-  border: 1px solid transparent;
-  background: transparent;
+  padding: 8px 10px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-bg-deep);
   color: var(--sessions-text-strong);
   font: inherit;
   font-size: 12px;
+  font-weight: 600;
   line-height: 1.25;
   text-align: left;
   text-decoration: none;
@@ -865,14 +860,20 @@ a.project-nav-mindmap__node:focus-visible {
   outline: none;
 }
 
+.project-nav-mindmap--stack .project-nav-mindmap__poster-menu-link--onboarding {
+  color: var(--color-active-ascent);
+  border-color: var(--color-active-ascent);
+}
+
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-item--lit > .project-nav-mindmap__poster-menu-link,
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-item--lit > .project-nav-mindmap__poster-menu-drill,
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-item--lit > .project-nav-mindmap__poster-menu-label {
   color: var(--color-active-ascent);
 }
 
-.project-nav-mindmap--stack .project-nav-mindmap__poster-menu-item--lit > .project-nav-mindmap__poster-menu-drill {
-  border-color: color-mix(in srgb, var(--color-active-ascent) 55%, var(--sessions-border));
+.project-nav-mindmap--stack .project-nav-mindmap__poster-menu-item--lit > .project-nav-mindmap__poster-menu-link {
+  border-color: var(--color-active-ascent);
+  background: color-mix(in srgb, var(--color-active-ascent) 10%, var(--sessions-bg-deep));
 }
 
 .project-nav-mindmap--stack .project-nav-mindmap__poster-menu-label {
@@ -880,26 +881,9 @@ a.project-nav-mindmap__node:focus-visible {
   font-size: 11px;
   font-weight: 600;
   color: var(--sessions-text-muted);
+  border-color: transparent;
+  background: transparent;
   padding-left: 4px;
-}
-
-.project-nav-mindmap--stack .project-nav-mindmap__poster-menu-close {
-  width: 100%;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--sessions-border);
-  background: var(--sessions-bg-deep);
-  color: var(--sessions-text-ui);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.project-nav-mindmap--stack .project-nav-mindmap__poster-menu-close:hover,
-.project-nav-mindmap--stack .project-nav-mindmap__poster-menu-close:focus-visible {
-  border-color: var(--color-active-ascent);
-  color: var(--color-active-ascent);
-  outline: none;
 }
 
 .project-nav-mindmap--stack .project-nav-mindmap__mobile-reset {
@@ -1110,7 +1094,7 @@ a.project-nav-mindmap__node:focus-visible {
 
 @media (max-width: 420px) {
   .project-nav-mindmap--stack .project-nav-mindmap__poster-frame {
-    max-height: min(82vh, 680px);
+    max-height: min(38vh, 280px);
   }
 
   .project-nav-mindmap--stack .project-nav-mindmap__poster-icon-btn {

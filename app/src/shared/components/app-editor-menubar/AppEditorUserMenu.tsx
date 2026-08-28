@@ -1,5 +1,5 @@
 import cn from "classnames";
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { globalPaths } from "../../../app/router/paths";
 import { useAuth } from "../../../features/auth";
@@ -25,11 +25,7 @@ function resolveProfileLabel(profile: {
   return "Профиль";
 }
 
-type AppEditorUserMenuProps = {
-  menubarActions?: ReactNode;
-};
-
-export function AppEditorUserMenu({ menubarActions = null }: AppEditorUserMenuProps) {
+export function AppEditorUserMenu() {
   const { pathname } = useLocation();
   const { accessToken, logout } = useAuth();
   const { data: profile } = useMyProfileQuery(undefined, { skip: !accessToken });
@@ -43,13 +39,6 @@ export function AppEditorUserMenu({ menubarActions = null }: AppEditorUserMenuPr
     pathname.startsWith(`${globalPaths.profile}/`);
 
   const closeMenu = () => setIsOpen(false);
-
-  const handleToolbarActionsClick = (event: MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("button")) {
-      closeMenu();
-    }
-  };
 
   return (
     <div
@@ -84,22 +73,6 @@ export function AppEditorUserMenu({ menubarActions = null }: AppEditorUserMenuPr
             <span className="app-editor-user-menu__meta-email">{profileEmail}</span>
           ) : null}
         </div>
-        {menubarActions ? (
-          <>
-            <div
-              className="theater-editor-menubar__option theater-editor-menubar__option--separator"
-              role="separator"
-            />
-            <div
-              className="app-editor-user-menu__toolbar-actions"
-              role="group"
-              aria-label="Панели и инструменты"
-              onClick={handleToolbarActionsClick}
-            >
-              {menubarActions}
-            </div>
-          </>
-        ) : null}
         <div
           className="theater-editor-menubar__option theater-editor-menubar__option--separator"
           role="separator"

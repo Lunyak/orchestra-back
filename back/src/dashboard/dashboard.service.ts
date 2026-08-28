@@ -64,6 +64,15 @@ function isUnknownDirectorInvitation(
   );
 }
 
+function isMailActionKind(kind: string): boolean {
+  return (
+    kind === 'studio_invite' ||
+    kind === 'project_invite' ||
+    kind === 'troupe_invite' ||
+    kind === 'director_session_invitation'
+  );
+}
+
 @Injectable()
 export class DashboardService {
   constructor(
@@ -342,6 +351,9 @@ export class DashboardService {
       })),
     ]
       .sort((left, right) => {
+        const leftMail = isMailActionKind(left.kind) ? 0 : 1;
+        const rightMail = isMailActionKind(right.kind) ? 0 : 1;
+        if (leftMail !== rightMail) return leftMail - rightMail;
         const leftTime = left.dueAt ? new Date(left.dueAt).getTime() : Infinity;
         const rightTime = right.dueAt
           ? new Date(right.dueAt).getTime()
