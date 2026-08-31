@@ -41,23 +41,22 @@ api.interceptors.request.use(
 );
 
 let globalLogoutHandler: (() => void) | null = null;
-let unauthorizedInterceptorId: number | null = null;
 
 export function setupApiInterceptors(logout: () => void) {
   globalLogoutHandler = logout;
+}
 
-  if (unauthorizedInterceptorId !== null) return;
-
-  unauthorizedInterceptorId = api.interceptors.response.use(
-    (response) => response,
-    (error: AxiosError) => {
-      if (error.response?.status === 401 && globalLogoutHandler) {
-        console.warn("[api] Unauthorized (401) — logging out");
-        globalLogoutHandler();
-      }
-      return Promise.reject(error);
-    },
-  );
+function invalidateClientSession() {
+  localStorage.removeItem("accessToken");
+  localStorage.removeItem("refreshToken");
+  localStorage.removeItem("lastSyncAt");
+  notifyAccessTokenStorageChanged();
+  if (typeof window === "undefined") return;
+  if (globalLogoutHandler) {
+    globalLogoutHandler();
+  } else {
+    window.location.reload();
+  }
 }
 
 let isRefreshing = false;
@@ -130,6 +129,7 @@ api.interceptors.response.use(
       const oldRefresh = localStorage.getItem("refreshToken");
       if (!oldRefresh) {
         notifyTokenRefreshed(null);
+        invalidateClientSession();
         return Promise.reject(error);
       }
 
@@ -147,17 +147,7 @@ api.interceptors.response.use(
       notifyTokenRefreshed(null);
       const invalidate = shouldInvalidateSessionOnRefreshError(e);
       if (invalidate) {
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("lastSyncAt");
-        notifyAccessTokenStorageChanged();
-        if (typeof window !== "undefined") {
-          if (globalLogoutHandler) {
-            globalLogoutHandler();
-          } else {
-            window.location.reload();
-          }
-        }
+        invalidateClientSession();
       } else if (typeof console !== "undefined" && console.warn) {
         console.warn(
           "[api] Refresh token request failed (session kept); will retry on next request",

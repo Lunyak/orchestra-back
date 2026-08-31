@@ -34,6 +34,14 @@ function originFromWebDomain(raw: string): string {
   return `${scheme}://${s}`.replace(/\/+$/, '');
 }
 
+/** Прод: /orkestr. Локальный Vite: APP_BASE_PATH=/ → без префикса. */
+function normalizeAppBasePath(raw: string): string {
+  const s = String(raw ?? '').trim();
+  if (!s || s === '/') return '';
+  const withLead = s.startsWith('/') ? s : `/${s}`;
+  return withLead.replace(/\/+$/, '');
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -50,12 +58,23 @@ export class AuthService {
     const webDomain = String(
       this.configService.get<string>('WEB_DOMAIN') ?? '',
     ).trim();
-    if (webDomain) return originFromWebDomain(webDomain);
-    const legacy =
-      this.configService.get<string>('PASSWORD_RESET_APP_URL') ??
-      this.configService.get<string>('APP_FRONTEND_URL') ??
-      '';
-    return String(legacy ?? '').trim().replace(/\/+$/, '');
+    const origin = webDomain
+      ? originFromWebDomain(webDomain)
+      : String(
+          this.configService.get<string>('PASSWORD_RESET_APP_URL') ??
+            this.configService.get<string>('APP_FRONTEND_URL') ??
+            '',
+        )
+          .trim()
+          .replace(/\/+$/, '');
+    if (!origin) return '';
+
+    const configured = this.configService.get<string>('APP_BASE_PATH');
+    const rawPath =
+      configured !== undefined && String(configured).trim() !== ''
+        ? String(configured)
+        : '/orkestr';
+    return `${origin}${normalizeAppBasePath(rawPath)}`;
   }
 
   async register(email: string, password: string) {
@@ -139,7 +158,8 @@ export class AuthService {
   /**
    * Запрос на сброс пароля.
    * Важно: всегда отвечаем одинаково, чтобы не раскрывать существование email.
-   * Если заданы WEB_DOMAIN (как в корневом деплое) и SMTP_*, на почту уходит ссылка на /reset-password?token=...
+   * Если заданы WEB_DOMAIN (как в корневом деплое) и SMTP_*, на почту уходит ссылка
+   * на {origin}{APP_BASE_PATH}/reset-password?token=... (прод: /orkestr/reset-password).
    * (хост без схемы → https://..., localhost/127.0.0.1/… → http://). Fallback: PASSWORD_RESET_APP_URL / APP_FRONTEND_URL.
    * В не-production (или при PASSWORD_RESET_RETURN_TOKEN=true) в ответе может вернуться token для отладки.
    */

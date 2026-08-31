@@ -26,6 +26,7 @@ services:
     environment:
       DATABASE_URL: postgresql://orkestr:orkestr_secret@postgres:5432/dophamin_orkestr
       WEB_DOMAIN: ${WEB_DOMAIN:-}
+      APP_BASE_PATH: ${APP_BASE_PATH:-/orkestr}
       PORT: 3000
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       ADMIN_SECRET: ${ADMIN_SECRET:-change-admin-secret}
@@ -36,6 +37,10 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      YOOKASSA_SHOP_ID: ${YOOKASSA_SHOP_ID:-}
+      YOOKASSA_SECRET_KEY: ${YOOKASSA_SECRET_KEY:-}
+      BILLING_STANDARD_PRICE_RUB: ${BILLING_STANDARD_PRICE_RUB:-990}
+      BILLING_PREMIUM_PRICE_RUB: ${BILLING_PREMIUM_PRICE_RUB:-2990}
       # Telegram Bot
       BOT_TOKEN: ${BOT_TOKEN}
       OWNER_TELEGRAM_ID: ${OWNER_TELEGRAM_ID}

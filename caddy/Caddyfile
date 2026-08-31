@@ -18,6 +18,10 @@
 		reverse_proxy minio:9000
 	}
 
+	# Ссылки без префикса приложения (письма, закладки) → SPA под /orkestr.
+	redir /login /orkestr/login 308
+	redir /reset-password /orkestr/reset-password 308
+
 	# Orchestra app is hosted under /orkestr (safe ASCII path).
 	redir /orkestr /orkestr/ 308
 	handle_path /orkestr/* {
