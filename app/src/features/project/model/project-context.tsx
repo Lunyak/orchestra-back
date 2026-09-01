@@ -7,6 +7,7 @@ import {
 } from "../../../sync/api/projects";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
 import { desktopSaveProjectPlaybook } from "../../../shared/platform/desktop-methods";
+import type { PlatformApi } from "../../../shared/platform/platform-api";
 import demoPlaybook from "./demo-playbook.json";
 
 const DEMO_PROJECT_NAME = "Демо: Дураки";
@@ -245,7 +246,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     if (
       typeof api.listProjects !== "function" ||
       typeof api.createProject !== "function" ||
-      typeof api.deleteProject !== "function"
+      typeof api.deleteProject !== "function" ||
+      typeof api.readProjectPlaybook !== "function" ||
+      typeof api.saveProjectPlaybook !== "function"
     ) {
       return null;
     }
@@ -255,6 +258,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         name: string,
       ) => Promise<{ ok: boolean; name?: string; error?: string }>;
       deleteProject: (name: string) => Promise<{ ok: boolean; error?: string }>;
+      readProjectPlaybook: PlatformApi["readProjectPlaybook"];
+      saveProjectPlaybook: NonNullable<PlatformApi["saveProjectPlaybook"]>;
     };
   }, []);
 
