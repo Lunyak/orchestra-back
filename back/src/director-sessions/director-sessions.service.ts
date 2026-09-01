@@ -653,7 +653,7 @@ export class DirectorSessionsService {
   async list(userId: string) {
     const directorProject = await this.getDirectorProjectForUser(userId);
     const rows = await this.prisma.directorSession.findMany({
-      where: { projectId: directorProject.id, userId },
+      where: { userId },
       select: { id: true, payload: true },
       orderBy: [{ order: 'asc' }, { startsAt: 'asc' }],
     });
@@ -733,9 +733,8 @@ export class DirectorSessionsService {
     const sid = String(sessionId ?? '').trim();
     if (!sid) throw new BadRequestException('session id is required');
 
-    const directorProject = await this.getDirectorProjectForUser(userId);
     const owned = await this.prisma.directorSession.findFirst({
-      where: { projectId: directorProject.id, userId, id: sid },
+      where: { userId, id: sid },
       select: { payload: true },
     });
     if (owned)
@@ -894,6 +893,53 @@ export class DirectorSessionsService {
     return { comment };
   }
 
+  async deleteOne(userId: string, sessionId: string) {
+    const sid = String(sessionId ?? '').trim();
+    if (!sid) throw new BadRequestException('session id is required');
+    await this.assertCanDeleteSession(userId, sid);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.directorSession.deleteMany({ where: { id: sid } });
+      await tx.rehearsal.deleteMany({ where: { id: sid } });
+    });
+    return { ok: true };
+  }
+
+  private async assertCanDeleteSession(userId: string, sessionId: string) {
+    const owned = await this.prisma.directorSession.findFirst({
+      where: { id: sessionId, userId },
+      select: { id: true },
+    });
+    if (owned) return;
+
+    const rehearsal = await this.prisma.rehearsal.findFirst({
+      where: { id: sessionId },
+      select: {
+        createdBy: true,
+        workspaces: { select: { workspaceId: true } },
+      },
+    });
+    if (!rehearsal) throw new NotFoundException('Session not found');
+    if (rehearsal.createdBy === userId) return;
+
+    const workspaceIds = rehearsal.workspaces.map(
+      (item) => item.workspaceId,
+    );
+    if (!workspaceIds.length) {
+      throw new ForbiddenException('Cannot manage this session');
+    }
+    const membership = await this.prisma.workspaceMember.findFirst({
+      where: {
+        userId,
+        workspaceId: { in: workspaceIds },
+        role: { in: ['OWNER', 'ADMIN'] },
+      },
+      select: { id: true },
+    });
+    if (!membership) {
+      throw new ForbiddenException('Cannot manage this session');
+    }
+  }
+
   async replaceAll(userId: string, body: { sessions?: any[] }) {
     const directorProject = await this.getDirectorProjectForUser(userId);
     const sessionsIn = Array.isArray(body?.sessions) ? body.sessions : [];
@@ -911,6 +957,7 @@ export class DirectorSessionsService {
         },
         select: { id: true },
       });
+      const removedIds = removedSessions.map(({ id }) => id);
       await tx.directorSession.deleteMany({
         where: {
           projectId: directorProject.id,
@@ -918,12 +965,9 @@ export class DirectorSessionsService {
           ...(ids.length ? { id: { notIn: ids } } : {}),
         },
       });
-      if (removedSessions.length) {
+      if (removedIds.length) {
         await tx.rehearsal.deleteMany({
-          where: {
-            id: { in: removedSessions.map(({ id }) => id) },
-            createdVia: 'director-session',
-          },
+          where: { id: { in: removedIds } },
         });
       }
       for (let i = 0; i < sessions.length; i += 1) {

@@ -84,6 +84,7 @@ export {
 export {
   confirmMyDirectorSessionAttendance,
   declineMyDirectorSessionAttendance,
+  deleteDirectorSession,
   getDirectorSession,
   getDirectorSessionInvitations,
   getDirectorSessions,

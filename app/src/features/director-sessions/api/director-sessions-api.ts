@@ -60,6 +60,18 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
         method: "PUT",
         data: { sessions },
       }),
+      invalidatesTags: [{ type: "DirectorSessions", id: "BUNDLE" }],
+    }),
+
+    deleteDirectorSession: build.mutation<{ ok: boolean }, string>({
+      query: (sessionId) => ({
+        url: `/director-sessions/${encodeURIComponent(sessionId)}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (_r, _e, sessionId) => [
+        { type: "DirectorSessions", id: sessionId },
+        { type: "DirectorSessions", id: "BUNDLE" },
+      ],
     }),
 
     publishDirectorSession: build.mutation<
@@ -171,7 +183,9 @@ export const directorSessionsApi = orchestraApi.injectEndpoints({
 export const {
   useDirectorSessionsBundleQuery,
   useDirectorSessionQuery,
+  useLazyDirectorSessionQuery,
   useReplaceDirectorSessionsMutation,
+  useDeleteDirectorSessionMutation,
   usePublishDirectorSessionMutation,
   useRemindDirectorSessionMissingAvailabilityMutation,
   useProjectMaterialQuery,

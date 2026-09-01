@@ -26,9 +26,11 @@ export {
   directorSessionsApi,
   useDirectorSessionsBundleQuery,
   useDirectorSessionQuery,
+  useLazyDirectorSessionQuery,
   useLazyProjectMaterialQuery,
   useProjectMaterialQuery,
   usePublishDirectorSessionMutation,
+  useDeleteDirectorSessionMutation,
   useReplaceDirectorSessionsMutation,
 } from "./api/director-sessions-api";
 

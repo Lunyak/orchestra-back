@@ -10,6 +10,7 @@ import {
   formatDirectorSessionBusyConflictMessage,
 } from "./session-page-utils";
 import {
+  useDeleteDirectorSessionMutation,
   usePublishDirectorSessionMutation,
   useRemindDirectorSessionMissingAvailabilityMutation,
   useReplaceDirectorSessionsMutation,
@@ -52,6 +53,7 @@ export function useDirectorSessionsActions({
   refetchSessionsBundle,
 }: UseDirectorSessionsActionsParams) {
   const [replaceDirectorSessionsMut] = useReplaceDirectorSessionsMutation();
+  const [deleteDirectorSessionMut] = useDeleteDirectorSessionMutation();
   const [publishDirectorSessionMut] = usePublishDirectorSessionMutation();
   const [remindAvailabilityMut] =
     useRemindDirectorSessionMissingAvailabilityMutation();
@@ -132,7 +134,17 @@ export function useDirectorSessionsActions({
         : activeSessionId;
     setActiveSessionId(nextActive);
     publishedAtBySessionIdRef.current.delete(sessionId);
-    await persist(next);
+    const previous = sessions;
+    setSessions(next);
+    setSaveError(null);
+    try {
+      await deleteDirectorSessionMut(sessionId).unwrap();
+      await refetchSessionsBundle().unwrap();
+    } catch (e) {
+      setSessions(previous);
+      setActiveSessionId(activeSessionId);
+      setSaveError(extractPersistErrorMessage(e));
+    }
   };
 
   const createSessionAtDate = async (dateKey: string, timeLocal = "20:00") => {

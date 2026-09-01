@@ -35,6 +35,15 @@ export type TroupeSummary = {
   theater?: { id: string; title: string } | null;
 };
 
+export type TheaterRehearsalSlot = {
+  id: string;
+  offsetMin: number;
+  durationMin: number;
+  title?: string;
+  isProgRun?: boolean;
+  ref?: { projectSlug?: string; sceneId?: number };
+};
+
 export type TheaterRehearsal = {
   id: string;
   source: "rehearsal" | "director-session";
@@ -53,6 +62,7 @@ export type TheaterRehearsal = {
     slug: string;
     name: string;
   }>;
+  slots?: TheaterRehearsalSlot[];
 };
 
 export type TheaterRehearsalsResponse = {

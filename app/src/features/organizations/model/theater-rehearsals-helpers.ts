@@ -10,7 +10,6 @@ import {
   formatTimeHHMM,
   getSessionStartLocalMinutes,
   type DirectorRehearsalSession,
-  type DirectorSessionSlot,
 } from "../../director-sessions";
 
 export const REHEARSAL_HISTORY_DAYS = 30;
@@ -212,7 +211,11 @@ export function rehearsalProjectsLabel(rehearsal: TheaterRehearsal) {
     .join(" · ");
 }
 
-function slotPreviewLabel(slot: DirectorSessionSlot): string {
+function slotPreviewLabel(slot: {
+  title?: string;
+  isProgRun?: boolean;
+  ref?: { projectSlug?: string; sceneId?: number };
+}): string {
   if (slot.isProgRun) return "ПРОГОН";
   const customTitle = String(slot.title ?? "").trim();
   if (customTitle) return customTitle;
@@ -231,9 +234,12 @@ export function rehearsalSlotPreviews(
 ): RehearsalSlotPreview[] {
   if (rehearsal.source !== "director-session") return [];
   const session = bundleSessions.find((item) => item.id === rehearsal.id);
-  if (!session) return [];
-  const baseMin = getSessionStartLocalMinutes(session.startsAt);
-  return [...(session.slots ?? [])]
+  const slots = session?.slots ?? rehearsal.slots;
+  if (!slots?.length) return [];
+  const baseMin = getSessionStartLocalMinutes(
+    session?.startsAt ?? rehearsal.startsAt,
+  );
+  return [...slots]
     .sort(
       (a, b) =>
         Math.floor(Number(a.offsetMin) || 0) -

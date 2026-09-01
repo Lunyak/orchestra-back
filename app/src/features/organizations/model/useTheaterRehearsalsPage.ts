@@ -10,6 +10,7 @@ import {
   fetchTheaterRehearsals,
   type TheaterRehearsalsResponse,
 } from "../../../sync/api/workspaces";
+import { getDirectorSession } from "../../../sync/api/director-sessions";
 import { useAuth } from "../../auth/model/auth-context";
 import {
   directorSessionsApi,
@@ -18,6 +19,7 @@ import {
   formatTimeHHMM,
   getSessionStartLocalMinutes,
   type DirectorRehearsalSession,
+  useDeleteDirectorSessionMutation,
   useDirectorSessionsBundleQuery,
   usePublishDirectorSessionMutation,
   useReplaceDirectorSessionsMutation,
@@ -68,6 +70,7 @@ export function useTheaterRehearsalsPage() {
     skip: !accessToken,
   });
   const [replaceSessions] = useReplaceDirectorSessionsMutation();
+  const [deleteDirectorSession] = useDeleteDirectorSessionMutation();
   const [publishSession] = usePublishDirectorSessionMutation();
 
   const loadRehearsals = useCallback(async () => {
@@ -257,12 +260,30 @@ export function useTheaterRehearsalsPage() {
   };
 
   const handleUpdateRehearsal = async () => {
-    if (!selectedCanManage || creating || !theaterId || !selectedRehearsal)
+    if (
+      !selectedCanManage ||
+      creating ||
+      !theaterId ||
+      !selectedRehearsal ||
+      !accessToken
+    )
       return;
-    const base = selectedDirectorSession;
+    let base = selectedDirectorSession;
     if (!base) {
-      setCreateError("Сессия репетиции не найдена");
-      return;
+      try {
+        const fetched = await getDirectorSession(
+          accessToken,
+          selectedRehearsal.id,
+        );
+        base = {
+          ...fetched,
+          slots: Array.isArray(fetched.slots) ? fetched.slots : [],
+          updatedAt: fetched.updatedAt ?? new Date().toISOString(),
+        };
+      } catch {
+        setCreateError("Сессия репетиции не найдена");
+        return;
+      }
     }
     const nextTitle = editTitle.trim();
     if (!nextTitle) {
@@ -294,6 +315,9 @@ export function useTheaterRehearsalsPage() {
     };
     try {
       const existingSessions = sessionsBundle?.sessions ?? [];
+      const hasSession = existingSessions.some(
+        (session) => session.id === nextSession.id,
+      );
       const conflict = findDirectorSessionBusyConflict(
         nextSession,
         existingSessions,
@@ -303,9 +327,11 @@ export function useTheaterRehearsalsPage() {
         return;
       }
       await replaceSessions({
-        sessions: existingSessions.map((session) =>
-          session.id === nextSession.id ? nextSession : session,
-        ),
+        sessions: hasSession
+          ? existingSessions.map((session) =>
+              session.id === nextSession.id ? nextSession : session,
+            )
+          : [nextSession, ...existingSessions],
       }).unwrap();
       dispatch(
         directorSessionsApi.util.invalidateTags([
@@ -343,17 +369,7 @@ export function useTheaterRehearsalsPage() {
     setCreating(true);
     setPublishError("");
     try {
-      const existingSessions = sessionsBundle?.sessions ?? [];
-      await replaceSessions({
-        sessions: existingSessions.filter(
-          (session) => session.id !== selectedRehearsal.id,
-        ),
-      }).unwrap();
-      dispatch(
-        directorSessionsApi.util.invalidateTags([
-          { type: "DirectorSessions", id: "BUNDLE" },
-        ]),
-      );
+      await deleteDirectorSession(selectedRehearsal.id).unwrap();
       setSelectedRehearsalId(null);
       setData((current) => {
         if (!current) return current;

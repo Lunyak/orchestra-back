@@ -310,6 +310,21 @@ export class WorkspacesService {
       },
       orderBy: { startsAt: 'asc' },
     });
+    const sessionRows = rehearsals.length
+      ? await this.prisma.directorSession.findMany({
+          where: { id: { in: rehearsals.map((item) => item.id) } },
+          select: { id: true, payload: true },
+        })
+      : [];
+    const slotsBySessionId = new Map(
+      sessionRows.map((row) => {
+        const payload = row.payload as { slots?: unknown } | null;
+        return [
+          row.id,
+          Array.isArray(payload?.slots) ? payload.slots : [],
+        ];
+      }),
+    );
     const calendarItems = rehearsals.map(
       ({ createdVia, projects, ...rehearsal }) => ({
         ...rehearsal,
@@ -318,6 +333,7 @@ export class WorkspacesService {
             ? ('director-session' as const)
             : ('rehearsal' as const),
         projects: projects.map(({ project }) => project),
+        slots: slotsBySessionId.get(rehearsal.id),
       }),
     );
 

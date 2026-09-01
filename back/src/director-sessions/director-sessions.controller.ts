@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -48,6 +49,11 @@ export class DirectorSessionsController {
   @Put()
   replaceAll(@Req() req: any, @Body() body: UpsertDirectorSessionsDto) {
     return this.sessions.replaceAll(req.user.userId, body);
+  }
+
+  @Delete(':id')
+  deleteOne(@Req() req: any, @Param('id') id: string) {
+    return this.sessions.deleteOne(req.user.userId, id);
   }
 
   /** Публикация сборной сессии в Telegram (через bot-сервис) */

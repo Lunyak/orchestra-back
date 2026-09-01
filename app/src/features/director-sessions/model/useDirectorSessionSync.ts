@@ -6,6 +6,7 @@ import type {
 } from "../directorSessionsSync";
 import {
   useDirectorSessionsBundleQuery,
+  useDirectorSessionQuery,
   useReplaceDirectorSessionsMutation,
 } from "../api/director-sessions-api";
 import {
@@ -36,11 +37,17 @@ export function useDirectorSessionSync(args: {
   } = useDirectorSessionsBundleQuery(undefined, {
     skip: !accessToken || !sid,
   });
+  const {
+    data: sessionById,
+    isLoading: sessionByIdLoading,
+  } = useDirectorSessionQuery(sid, {
+    skip: !accessToken || !sid,
+  });
   const [replaceSessions] = useReplaceDirectorSessionsMutation();
 
   useEffect(() => {
     if (!accessToken || !sid) return;
-    if (bundleLoading) return;
+    if (bundleLoading || sessionByIdLoading) return;
     if (!sessionsBundle) {
       const msg =
         (bundleQueryError as { message?: string } | undefined)?.message ??
@@ -49,17 +56,30 @@ export function useDirectorSessionSync(args: {
       return;
     }
     const list = sessionsBundle.sessions ?? [];
-    setSessions(list);
-    const s = list.find((x) => x.id === sid) ?? null;
-    if (!s) {
+    const fromBundle = list.find((x) => x.id === sid) ?? null;
+    const raw = fromBundle ?? sessionById ?? null;
+    if (!raw) {
       setSession(null);
       setSlot(null);
       setError("Сессия не найдена");
       return;
     }
+    const s: DirectorRehearsalSession = {
+      ...raw,
+      slots: Array.isArray(raw.slots) ? raw.slots : [],
+    };
+    setSessions(fromBundle ? list : [s, ...list]);
     setSession(s);
     setError(null);
-  }, [accessToken, sid, sessionsBundle, bundleLoading, bundleQueryError]);
+  }, [
+    accessToken,
+    sid,
+    sessionsBundle,
+    bundleLoading,
+    bundleQueryError,
+    sessionById,
+    sessionByIdLoading,
+  ]);
 
   useEffect(() => {
     if (!session) {
@@ -180,7 +200,7 @@ export function useDirectorSessionSync(args: {
     session,
     slot,
     error,
-    loading: bundleLoading,
+    loading: bundleLoading || sessionByIdLoading,
     busyConflictError,
     setBusyConflictError,
     dismissBusyConflictError,

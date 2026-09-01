@@ -179,3 +179,14 @@ export async function replaceDirectorSessions(
   );
   return data as any;
 }
+
+export async function deleteDirectorSession(
+  accessToken: string,
+  sessionId: string,
+): Promise<{ ok: boolean }> {
+  const { data } = await api.delete(
+    `/director-sessions/${encodeURIComponent(sessionId)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data as any;
+}
