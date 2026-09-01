@@ -9,6 +9,7 @@ type TheaterRehearsalsCalendarColumnProps = {
   theaterId: string;
   dotsByDate: Record<string, number>;
   eventsByDate: Record<string, MonthCalendarEvent[]>;
+  selectedDate?: string;
   onStateChange: (state: CalendarSectionState) => void;
 };
 
@@ -16,6 +17,7 @@ export function TheaterRehearsalsCalendarColumn({
   theaterId,
   dotsByDate,
   eventsByDate,
+  selectedDate,
   onStateChange,
 }: TheaterRehearsalsCalendarColumnProps) {
   const storageMonthKey = `theater-${theaterId}-rehearsals-month`;
@@ -26,6 +28,7 @@ export function TheaterRehearsalsCalendarColumn({
         <CalendarSection
           className="sessions-calendar"
           storageMonthKey={storageMonthKey}
+          selectedDate={selectedDate}
           onStateChange={onStateChange}
           dotsByDate={dotsByDate}
           eventsByDate={eventsByDate}

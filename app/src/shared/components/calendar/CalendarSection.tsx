@@ -46,6 +46,7 @@ export function CalendarSection({
   onDayClick,
   onDayDoubleClick,
   initialSelectedDate,
+  selectedDate: selectedDateProp,
   onStateChange,
   weekDayLabels,
   className,
@@ -61,6 +62,7 @@ export function CalendarSection({
   onDayClick?: (isoYmd: string) => void;
   onDayDoubleClick?: (isoYmd: string) => void;
   initialSelectedDate?: string;
+  selectedDate?: string;
   onStateChange?: (state: CalendarSectionState) => void;
   weekDayLabels?: string[];
   showStatusMarks?: boolean;
@@ -81,13 +83,19 @@ export function CalendarSection({
   });
 
   const [selectedDate, setSelectedDate] = useState(() => {
-    const v = String(initialSelectedDate ?? "").trim();
+    const v = String(selectedDateProp ?? initialSelectedDate ?? "").trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : isoDate(new Date());
   });
 
   const [viewMode, setViewMode] = useState<CalendarViewMode>(() =>
     parseViewMode(sessionStorage.getItem(storageViewKey)),
   );
+
+  useEffect(() => {
+    const next = String(selectedDateProp ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(next)) return;
+    setSelectedDate((prev) => (prev === next ? prev : next));
+  }, [selectedDateProp]);
 
   useEffect(() => {
     sessionStorage.setItem(storageMonthKey, currentMonth.toISOString());

@@ -738,6 +738,68 @@
   opacity: 1;
 }
 
+.troupe-schedule--has-row-selection .troupe-actor-cell:not(.selected) {
+  opacity: 0.45;
+}
+
+.troupe-schedule--has-row-selection .troupe-day-cell:not(.selected) {
+  opacity: 0.28;
+}
+
+.troupe-schedule--has-row-selection .troupe-day-cell--peek:not(.selected) {
+  opacity: 0.16;
+}
+
+.troupe-schedule--compact {
+  margin-top: 8px;
+  max-height: 240px;
+}
+
+.troupe-schedule--compact .troupe-grid {
+  --troupe-label-w: 132px;
+  --troupe-day-w: 16px;
+  --troupe-actor-text-max: 88px;
+  --troupe-actor-gap: 6px;
+}
+
+.troupe-schedule--compact .troupe-cell {
+  min-height: 16px;
+  padding: 0;
+}
+
+.troupe-schedule--compact .troupe-header-cell {
+  min-height: 28px;
+  padding: 1px 0;
+}
+
+.troupe-schedule--compact .troupe-header-day-num {
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.troupe-schedule--compact .troupe-header-day-wd {
+  font-size: 8px;
+  line-height: 10px;
+}
+
+.troupe-schedule--compact .troupe-actor-cell {
+  min-height: 18px;
+  padding-left: 6px;
+}
+
+.troupe-schedule--compact .troupe-actor-name {
+  font-size: 11px;
+  line-height: 13px;
+}
+
+.troupe-schedule--compact .troupe-day-cell {
+  min-height: 16px;
+}
+
+.troupe-schedule--readonly .troupe-day-cell {
+  cursor: default;
+}
+
 .troupe-card--page-head .troupe-actions {
   margin-top: 0;
   padding-top: 0;

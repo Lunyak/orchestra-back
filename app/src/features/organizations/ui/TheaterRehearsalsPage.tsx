@@ -34,6 +34,7 @@ export function TheaterRehearsalsPage() {
               theaterId={vm.theaterId}
               dotsByDate={vm.dotsByDate}
               eventsByDate={vm.eventsByDate}
+              selectedDate={vm.selectedDate}
               onStateChange={vm.setCalendarState}
             />
 
@@ -60,6 +61,9 @@ export function TheaterRehearsalsPage() {
               onEdit={vm.openEditModal}
               onDelete={() => void vm.handleDeleteRehearsal()}
               onPublish={() => void vm.publishSelectedRehearsal()}
+              monthDate={vm.calendarState?.currentMonth ?? null}
+              selectedDateIso={vm.selectedDate}
+              onSelectDate={vm.selectDate}
             />
           </div>
         </main>

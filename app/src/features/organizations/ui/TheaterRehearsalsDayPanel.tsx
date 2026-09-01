@@ -3,6 +3,7 @@ import { Button } from "@shared/core/button/Button";
 import type { TheaterRehearsal } from "../../../sync/api/workspaces";
 import type { DirectorRehearsalSession } from "../../director-sessions";
 import { RehearsalsCard } from "../../rehearsals-card/RehearsalsCard";
+import { TroupeAvailabilityMini } from "../../troupe/ui/TroupeAvailabilityMini";
 import { TheaterRehearsalsCallFooter } from "./TheaterRehearsalsCallFooter";
 import { TheaterRehearsalsDayItem } from "./TheaterRehearsalsDayItem";
 
@@ -29,6 +30,9 @@ type TheaterRehearsalsDayPanelProps = {
   onEdit: () => void;
   onDelete: () => void;
   onPublish: () => void;
+  monthDate?: Date | null;
+  selectedDateIso?: string | null;
+  onSelectDate?: (dayIso: string) => void;
 };
 
 export function TheaterRehearsalsDayPanel({
@@ -54,6 +58,9 @@ export function TheaterRehearsalsDayPanel({
   onEdit,
   onDelete,
   onPublish,
+  monthDate,
+  selectedDateIso,
+  onSelectDate,
 }: TheaterRehearsalsDayPanelProps) {
   const createTitle = `Создать репетицию на ${selectedDateLabel}`;
   const showEmptyDay = !loading && dayRehearsals.length === 0;
@@ -114,6 +121,12 @@ export function TheaterRehearsalsDayPanel({
           onOpen={() => onOpenRehearsal(selectedRehearsal.id)}
         />
       ) : null}
+
+      <TroupeAvailabilityMini
+        monthDate={monthDate}
+        selectedDateIso={selectedDateIso}
+        onSelectDate={onSelectDate}
+      />
     </RehearsalsCard>
   );
 }

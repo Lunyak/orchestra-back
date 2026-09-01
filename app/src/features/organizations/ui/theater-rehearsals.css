@@ -69,9 +69,100 @@
   max-width: 1214px;
 }
 
+.theater-rehearsals-page__availability {
+  --troupe-bg: var(--sessions-bg);
+  --troupe-bg-deep: var(--sessions-bg-deep);
+  --troupe-panel: var(--sessions-panel);
+  --troupe-panel-hover: var(--sessions-panel-hover);
+  --troupe-border: var(--sessions-border);
+  --troupe-border-strong: var(--sessions-border);
+  --troupe-text: var(--sessions-text);
+  --troupe-text-muted: var(--sessions-text-muted);
+  --troupe-text-strong: var(--sessions-text-strong);
+  --troupe-accent: var(--color-active-ascent);
+  --troupe-accent-bg: color-mix(in srgb, var(--color-active-ascent) 16%, transparent);
+  --troupe-focus-ring: color-mix(in srgb, var(--color-active-ascent) 35%, transparent);
+  margin-top: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule {
+  margin-top: 0;
+  max-height: 240px;
+  width: 100%;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-grid {
+  --troupe-label-w: 132px;
+  --troupe-day-w: 20px;
+  --troupe-actor-text-max: 88px;
+  --troupe-actor-gap: 6px;
+  width: max-content;
+  min-width: 100%;
+  grid-template-columns: var(--troupe-label-w) repeat(var(--troupe-day-count), minmax(var(--troupe-day-w), 1fr));
+}
+
+.theater-rehearsals-page__availability .troupe-header-cell--day-head {
+  touch-action: pan-x;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-header-cell {
+  overflow: hidden;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-header-day-num,
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-header-day-wd {
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-cell {
+  min-height: 16px;
+  padding: 0;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-header-cell {
+  min-height: 28px;
+  padding: 1px 0;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-actor-cell {
+  min-height: 18px;
+  padding-left: 6px;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-actor-name {
+  font-size: 11px;
+  line-height: 13px;
+  max-width: 88px;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-day-cell {
+  padding: 0;
+  min-height: 16px;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-header-cell--day-head,
+.theater-rehearsals-page__availability .troupe-schedule--compact .troupe-day-cell--pick {
+  cursor: pointer;
+}
+
+.theater-rehearsals-page__availability .troupe-schedule--readonly .troupe-day-cell--pick {
+  cursor: pointer;
+}
+
+.theater-rehearsals-page__availability .troupe-error {
+  margin-top: 8px;
+}
+
 .theater-rehearsals-page__layout.sessions-layout {
-  grid-template-columns: minmax(280px, 400px) minmax(0, 600px);
-  justify-content: center;
+  grid-template-columns: minmax(280px, 400px) minmax(0, 1fr);
+  justify-content: stretch;
   justify-items: stretch;
 }
 
@@ -82,8 +173,9 @@
 }
 
 .theater-rehearsals-page .sessions-day-stage {
-  max-width: 600px;
+  max-width: none;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -137,7 +229,16 @@
   }
 
   .theater-rehearsals-page__layout.sessions-layout {
-    grid-template-columns: minmax(0, 600px);
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .theater-rehearsals-page__availability .troupe-schedule--compact .troupe-grid {
+    --troupe-label-w: 108px;
+    --troupe-day-w: 22px;
+    --troupe-actor-text-max: 70px;
+    width: max-content;
+    min-width: max-content;
+    grid-template-columns: var(--troupe-label-w) repeat(var(--troupe-day-count), var(--troupe-day-w));
   }
 }
 

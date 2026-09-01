@@ -1,32 +1,26 @@
 import { Button } from "@shared/core/button/Button";
 import { PageBootLoader } from "@shared/components/page-loader/page-boot";
-import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
-import { Fragment, useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import {
-  getAvailabilityDayVisual,
   sortMineFirst,
   type AvailabilityStatus,
 } from "../../profile/model/availability-calendar";
 import { useScheduleAvailability } from "../../profile/model/useScheduleAvailability";
 import { AvailabilityDayModal } from "../../profile/ui/AvailabilityDayModal";
 import { AvailabilityRangeTimeModal } from "../../profile/ui/AvailabilityRangeTimeModal";
-import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
-import { profileListAvatarSrc } from "../../../sync/api/profile";
-import type { TroupeMemberItem } from "../api/troupe-api";
 import {
   countDaysInIsoRange,
   formatIsoDayRangeLabel,
   isoDate,
-  isIsoInDayRange,
-  memberLabel,
   monthKey,
   monthLabel,
   ruDayCountLabel,
 } from "../model/troupe-page-utils";
 import { useTroupePage } from "../model/useTroupePage";
 import { useTroupeScheduleRange } from "../model/useTroupeScheduleRange";
+import { TroupeAvailabilityScheduleGrid } from "./TroupeAvailabilityScheduleGrid";
 import "../../../features/director-sessions/ui/director-sessions.css";
 import "../../../pages/troupe/style.css";
 
@@ -43,7 +37,9 @@ export function TroupeAvailabilityView() {
     members,
     regularTroupeMembers,
     scheduleRefreshing,
+    selectedMemberId,
     setCurrentMonth,
+    setSelectedMemberId,
     todayIso,
   } = useTroupePage();
   const availability = useScheduleAvailability(accessToken);
@@ -86,192 +82,8 @@ export function TroupeAvailabilityView() {
   );
   const gridDays = [...days, ...peekDays];
   const peekStartIso = peekDays[0] ? isoDate(peekDays[0]) : null;
-
-  const renderScheduleGrid = (
-    scheduleMembers: TroupeMemberItem[],
-    emptyText: string,
-    ariaLabel: string,
-  ) => (
-    <div
-      className={cn(
-        "troupe-schedule",
-        scheduleRefreshing && "troupe-schedule--refreshing",
-      )}
-      role="region"
-      aria-label={ariaLabel}
-      aria-busy={scheduleRefreshing}
-    >
-      <div
-        className="troupe-grid"
-        style={
-          {
-            ["--troupe-day-count" as string]: String(gridDays.length),
-            ["--troupe-grid-span" as string]: String(gridDays.length + 1),
-          } as CSSProperties
-        }
-      >
-        <div className="troupe-cell troupe-sticky troupe-header-cell" />
-        {gridDays.map((d) => {
-          const n = dayjs(d).date();
-          const wd = dayjs(d).format("dd");
-          const dayIso = isoDate(d);
-          const isTodayCol = dayIso === todayIso;
-          const isPeek = monthKey(d) !== currentMonthKey;
-          const isPeekStart = isPeek && dayIso === peekStartIso;
-          const isHeaderDayInRange = isIsoInDayRange(dayIso, visibleRange);
-          return (
-            <div
-              key={dayIso}
-              data-troupe-day={dayIso}
-              role="button"
-              tabIndex={0}
-              aria-pressed={isHeaderDayInRange}
-              className={cn(
-                "troupe-cell troupe-header-cell troupe-header-cell--day-head",
-                isTodayCol && "troupe-header-cell--today",
-                isPeek && "troupe-header-cell--peek",
-                isPeekStart && "troupe-header-cell--peek-start",
-              )}
-              title={dayIso}
-              onPointerDown={(e) => {
-                if (e.button !== 0) return;
-                beginDayPointer(dayIso, e.currentTarget, e.pointerId, "header");
-              }}
-              onPointerMove={(e) => moveDayPointer(e.clientX, e.clientY)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  activateHeaderDay(dayIso);
-                }
-              }}
-            >
-              <div className="troupe-header-day-num">{n}</div>
-              <div className="troupe-header-day-wd">{wd}</div>
-            </div>
-          );
-        })}
-
-        {scheduleMembers.length === 0 ? (
-          <div className="troupe-cell troupe-empty">{emptyText}</div>
-        ) : (
-          scheduleMembers.map((m) => {
-            const label = memberLabel(m);
-            const mine = availability.isMine(m.email);
-            const dayAvailability = availability.resolveDayAvailability(
-              m.email,
-              m.profile?.availabilityCalendar,
-              m.profile?.availabilityTimeRanges,
-            );
-            return (
-              <Fragment key={m.id}>
-                <div
-                  className={cn(
-                    "troupe-cell troupe-sticky troupe-actor-cell",
-                    mine && "troupe-actor-cell--mine",
-                    "troupe-actor-cell--readonly",
-                  )}
-                  title={`${label} • ${m.email}`}
-                >
-                  <div className="troupe-actor-row">
-                    <MiniAvatar
-                      src={profileListAvatarSrc(m.profile)}
-                      label={label || m.email}
-                      size={22}
-                    />
-                    <div className="troupe-actor-meta">
-                      <div className="troupe-actor-name" title={label}>
-                        {label}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {gridDays.map((d) => {
-                  const day = isoDate(d);
-                  const visual = getAvailabilityDayVisual(
-                    dayAvailability.calendar,
-                    dayAvailability.ranges,
-                    day,
-                  );
-                  const isTodayCol = day === todayIso;
-                  const isPeek = monthKey(d) !== currentMonthKey;
-                  const isPeekStart = isPeek && day === peekStartIso;
-                  const isMineRangeCell =
-                    mine && isIsoInDayRange(day, visibleRange);
-                  const isMineRangeStart =
-                    isMineRangeCell && visibleRange?.from === day;
-                  const isMineRangeEnd =
-                    isMineRangeCell && visibleRange?.to === day;
-                  const cellTitle = `${day} • ${visual.tooltip}`;
-
-                  return (
-                    <div
-                      key={`${m.id}:${day}`}
-                      data-troupe-day={day}
-                      role={mine ? "button" : undefined}
-                      tabIndex={mine ? 0 : undefined}
-                      className={cn(
-                        "troupe-cell troupe-day-cell",
-                        visual.cls,
-                        isMineRangeCell && "day-col-selected",
-                        isMineRangeCell && "selected",
-                        isMineRangeStart && "troupe-day-cell--range-start",
-                        isMineRangeEnd && "troupe-day-cell--range-end",
-                        isTodayCol && "troupe-day-cell--today",
-                        mine && "troupe-day-cell--mine",
-                        isPeek && "troupe-day-cell--peek",
-                        isPeekStart && "troupe-day-cell--peek-start",
-                      )}
-                      title={
-                        mine
-                          ? `${cellTitle}. Протяните, чтобы выбрать дни. Клик — интервалы времени`
-                          : cellTitle
-                      }
-                      onPointerDown={
-                        mine
-                          ? (e) => {
-                              if (e.button !== 0) return;
-                              beginDayPointer(
-                                day,
-                                e.currentTarget,
-                                e.pointerId,
-                                "mine",
-                              );
-                            }
-                          : undefined
-                      }
-                      onPointerMove={
-                        mine
-                          ? (e) => moveDayPointer(e.clientX, e.clientY)
-                          : undefined
-                      }
-                      onClick={
-                        mine
-                          ? () => {
-                              if (shouldIgnoreMineClick()) return;
-                              availability.openDayEditor(day);
-                            }
-                          : undefined
-                      }
-                      onKeyDown={
-                        mine
-                          ? (e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                availability.openDayEditor(day);
-                              }
-                            }
-                          : undefined
-                      }
-                    />
-                  );
-                })}
-              </Fragment>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
+  const toggleMemberId = (id: string) =>
+    setSelectedMemberId((prev) => (prev === id ? null : id));
 
   if (!accessToken) {
     return <div>Нужно войти, чтобы открыть занятость.</div>;
@@ -391,11 +203,30 @@ export function TroupeAvailabilityView() {
           Листайте таблицу вправо, чтобы увидеть все дни месяца.
         </p>
 
-        {renderScheduleGrid(
-          regularSorted,
-          "В основном составе пока никого нет.",
-          "Занятость основного состава",
-        )}
+        <TroupeAvailabilityScheduleGrid
+          members={regularSorted}
+          emptyText="В основном составе пока никого нет."
+          ariaLabel="Занятость основного состава"
+          gridDays={gridDays}
+          currentMonthKey={currentMonthKey}
+          peekStartIso={peekStartIso}
+          todayIso={todayIso}
+          selectedMemberId={selectedMemberId}
+          onToggleMemberId={toggleMemberId}
+          availability={availability}
+          scheduleRefreshing={scheduleRefreshing}
+          visibleRange={visibleRange}
+          onHeaderPointerDown={(dayIso, target, pointerId) =>
+            beginDayPointer(dayIso, target, pointerId, "header")
+          }
+          onDayPointerDown={(dayIso, target, pointerId) =>
+            beginDayPointer(dayIso, target, pointerId, "mine")
+          }
+          onDayPointerMove={moveDayPointer}
+          onHeaderActivate={activateHeaderDay}
+          onMineDayClick={availability.openDayEditor}
+          shouldIgnoreMineClick={shouldIgnoreMineClick}
+        />
       </div>
 
       <div className="troupe-card troupe-schedule-card troupe-schedule-card--guest">
@@ -407,11 +238,30 @@ export function TroupeAvailabilityView() {
             </div>
           </div>
         </div>
-        {renderScheduleGrid(
-          guestSorted,
-          "Приглашённых пока нет.",
-          "Занятость приглашённых",
-        )}
+        <TroupeAvailabilityScheduleGrid
+          members={guestSorted}
+          emptyText="Приглашённых пока нет."
+          ariaLabel="Занятость приглашённых"
+          gridDays={gridDays}
+          currentMonthKey={currentMonthKey}
+          peekStartIso={peekStartIso}
+          todayIso={todayIso}
+          selectedMemberId={selectedMemberId}
+          onToggleMemberId={toggleMemberId}
+          availability={availability}
+          scheduleRefreshing={scheduleRefreshing}
+          visibleRange={visibleRange}
+          onHeaderPointerDown={(dayIso, target, pointerId) =>
+            beginDayPointer(dayIso, target, pointerId, "header")
+          }
+          onDayPointerDown={(dayIso, target, pointerId) =>
+            beginDayPointer(dayIso, target, pointerId, "mine")
+          }
+          onDayPointerMove={moveDayPointer}
+          onHeaderActivate={activateHeaderDay}
+          onMineDayClick={availability.openDayEditor}
+          shouldIgnoreMineClick={shouldIgnoreMineClick}
+        />
       </div>
 
       {error ? <div className="troupe-error">{error}</div> : null}

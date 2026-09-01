@@ -120,6 +120,13 @@ export function useTheaterRehearsalsPage() {
   const selectedDateLabel = dayjs(selectedDate).format("D MMMM YYYY");
   const dayRehearsals = rehearsalsByDate.get(selectedDate) ?? [];
 
+  const selectDate = useCallback((iso: string) => {
+    setCalendarState((prev) => {
+      if (!prev || prev.selectedDate === iso) return prev;
+      return { ...prev, selectedDate: iso };
+    });
+  }, []);
+
   useEffect(() => {
     if (!selectedRehearsalId) return;
     const stillOnDay = dayRehearsals.some(
@@ -502,6 +509,9 @@ export function useTheaterRehearsalsPage() {
     dotsByDate,
     eventsByDate,
     setCalendarState,
+    calendarState,
+    selectedDate,
+    selectDate,
     selectedDateLabel,
     dayMetaLabel,
     dayRehearsals,
