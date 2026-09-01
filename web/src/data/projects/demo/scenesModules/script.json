@@ -1,0 +1,111 @@
+{
+  "name": "Сценарий спектакля",
+  "playlist": [],
+  "sounds": [],
+  "scenes": [
+    {
+      "id": 1,
+      "title": "Зачин",
+      "markdown": "СВЕТ — {{blackout}}\n\nСнецкий под одеялом. Просыпается. Ловит шмеля.\n\nСВЕТ — {{light:2}}\n\nРаботает дым-машина.\n\nХЛОПОК. Смена света — {{light:3}}\n\nВыбегают люди. Начинается хаос.\n\nМолния. СВЕТ — {{light:2}}\n\nЛюди замирают.\n\nУхает сова. Снецкий прячется под одеяло.\n\nСВЕТ — {{blackout}}\n",
+      "playMarkdown": "Ночь. Деревня ещё спит.\nСнецкий ворочается под одеялом и вдруг замирает: в темноте гудит шмель.\nОн ловит его — и мир срывается с места.",
+      "requisites": [
+        { "id": 1, "label": "Одеяло", "checked": false },
+        { "id": 2, "label": "Шмель", "checked": false }
+      ],
+      "lightPlot": []
+    },
+    {
+      "id": 2,
+      "title": "Деревня",
+      "markdown": "Ждём, пока уйдут жители деревни, и включаем свет.\n\nСВЕТ — {{light:3}}\n\nЛошадь сидит за Снецким. Снецкий прячется под одеялом.\n\n{{blackout}} Ждём 5 секунд.\n",
+      "playMarkdown": "Жители уходят. Остаётся только Снецкий и то, что стоит у него за спиной.",
+      "requisites": [
+        { "id": 1, "label": "Одеяло", "checked": false }
+      ],
+      "lightPlot": []
+    },
+    {
+      "id": 3,
+      "title": "Лошадь",
+      "markdown": "СВЕТ — {{light:3}}\n\nЛошадь стоит около Снецкого, поднимает руку под звук шкатулки и бьёт по голове.\n\n{{blackout}} Пока не уйдут со сцены.\n",
+      "playMarkdown": "Шкатулка. Удар. Темнота.\nСнецкий больше не один на площадке.",
+      "requisites": [
+        { "id": 1, "label": "Шкатулка", "checked": false }
+      ],
+      "lightPlot": []
+    }
+  ],
+  "lightChannels": [
+    "1 | green",
+    "2 | blue",
+    "3 | red",
+    "4 | pink",
+    "5 | white",
+    "6 | yellow",
+    "7 | pink",
+    "",
+    "0 | black"
+  ],
+  "lightFaders": {
+    "v": 1,
+    "count": 6,
+    "faders": [
+      { "id": 1, "label": "Залив", "channel": 5, "intensity": 0.4, "enabled": true, "links": [{ "channel": 5 }] },
+      { "id": 2, "label": "Синий", "channel": 2, "intensity": 0.7, "enabled": true, "links": [{ "channel": 2 }] },
+      { "id": 3, "label": "Красный", "channel": 3, "intensity": 0.6, "enabled": true, "links": [{ "channel": 3 }] }
+    ]
+  },
+  "lightPrograms": {
+    "v": 1,
+    "programs": [
+      {
+        "id": 1,
+        "label": "Ночь",
+        "faders": [
+          { "faderId": 1, "intensity": 0.15, "enabled": true },
+          { "faderId": 2, "intensity": 0.8, "enabled": true },
+          { "faderId": 3, "intensity": 0, "enabled": false }
+        ]
+      },
+      {
+        "id": 2,
+        "label": "Хаос",
+        "faders": [
+          { "faderId": 1, "intensity": 0.5, "enabled": true },
+          { "faderId": 2, "intensity": 0.2, "enabled": true },
+          { "faderId": 3, "intensity": 0.9, "enabled": true }
+        ]
+      },
+      {
+        "id": 3,
+        "label": "Blackout",
+        "faders": [
+          { "faderId": 1, "intensity": 0, "enabled": false },
+          { "faderId": 2, "intensity": 0, "enabled": false },
+          { "faderId": 3, "intensity": 0, "enabled": false }
+        ]
+      }
+    ]
+  },
+  "lightPlot": [],
+  "theaterLayout": {
+    "hallWidth": 20,
+    "hallDepth": 31,
+    "wallHeight": 6,
+    "stageWidth": 6,
+    "stageDepth": 3,
+    "stageHeight": 1,
+    "stageZ": 4,
+    "audienceStartZ": 3,
+    "seatRows": 12,
+    "seatsPerRow": 10,
+    "seatSpacing": 1.1,
+    "rowSpacing": 0.8,
+    "aisleWidth": 3.2,
+    "aisleCenterX": 0.4,
+    "doorWidth": 1.2,
+    "doorHeight": 2.2,
+    "doorZ": -13.5,
+    "rowRise": 0.3
+  }
+}

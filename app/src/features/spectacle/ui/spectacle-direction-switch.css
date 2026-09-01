@@ -215,6 +215,15 @@
   background: var(--color-surface-5);
 }
 
+.spectacle-direction-switch__item--static {
+  cursor: default;
+}
+
+.spectacle-direction-switch__item--static:hover {
+  color: var(--color-text-muted);
+  background: transparent;
+}
+
 .spectacle-direction-switch__item--active {
   color: var(--color-active-ascent);
 }

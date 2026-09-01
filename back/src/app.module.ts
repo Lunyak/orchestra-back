@@ -29,6 +29,7 @@ import { StudioModule } from './studio/studio.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 import { ProjectAccessModule } from './project-access/project-access.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { BillingModule } from './billing/billing.module';
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WorkspacesModule,
     ProjectAccessModule,
     DashboardModule,
+    BillingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

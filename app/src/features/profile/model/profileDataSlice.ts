@@ -365,6 +365,48 @@ export const profileDataSlice = createSlice({
       (state.form as any).availabilityTimeRanges = nextRanges;
       (state.form as any).availabilityCalendar = nextCalendar;
     },
+    setTimeRangesForDateRange(
+      state,
+      action: PayloadAction<{
+        fromDate: string;
+        toDate: string;
+        range: AvailabilityTimeRange;
+      }>,
+    ) {
+      const dates = listIsoDatesInRange(action.payload.fromDate, action.payload.toDate);
+      if (dates.length === 0) return;
+      const fromMin = toMinutesHHMM(action.payload.range.from);
+      const toMin = toMinutesHHMM(action.payload.range.to);
+      if (fromMin == null || toMin == null || fromMin >= toMin) return;
+
+      const window = {
+        from: minutesToHHMM(fromMin),
+        to: minutesToHHMM(toMin),
+      };
+      const availabilityTimeRanges =
+        (((state.form as any).availabilityTimeRanges ?? {}) as Record<string, AvailabilityTimeRange[]>) ?? {};
+      const availabilityCalendar =
+        (((state.form as any).availabilityCalendar ?? {}) as Record<string, AvailabilityStatus>) ?? {};
+
+      const nextRanges = { ...availabilityTimeRanges };
+      const nextCalendar = { ...availabilityCalendar };
+
+      for (const date of dates) {
+        nextCalendar[date] = "present";
+        const existing = nextRanges[date] ?? [];
+        const alreadyHasWindow = existing.some(
+          (item) => item.from === window.from && item.to === window.to,
+        );
+        if (alreadyHasWindow) {
+          nextRanges[date] = existing;
+          continue;
+        }
+        nextRanges[date] = [...existing, { from: window.from, to: window.to }];
+      }
+
+      (state.form as any).availabilityTimeRanges = nextRanges;
+      (state.form as any).availabilityCalendar = nextCalendar;
+    },
   },
   extraReducers: (b) => {
     b.addCase(fetchMyProfileThunk.pending, (state) => {

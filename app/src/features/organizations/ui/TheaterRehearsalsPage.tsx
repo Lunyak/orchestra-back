@@ -21,7 +21,7 @@ export function TheaterRehearsalsPage() {
     <div className="app-layout">
       <div className="app-content">
         <main className="sessions-page rehearsals-page theater-rehearsals-page">
-          <TheaterRehearsalsHead theaterId={vm.theaterId} />
+          <TheaterRehearsalsHead />
 
           {vm.error ? (
             <div className="rehearsals-error" role="alert">

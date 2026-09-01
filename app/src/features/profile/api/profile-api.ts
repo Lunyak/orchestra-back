@@ -19,7 +19,11 @@ export const profileApi = orchestraApi.injectEndpoints({
     }),
     updateMyProfile: build.mutation<MyProfile, Partial<MyProfile>>({
       query: (patch) => ({ url: "/profile", method: "PATCH", data: patch }),
-      invalidatesTags: [{ type: "Profile", id: "ME" }],
+      invalidatesTags: [
+        { type: "Profile", id: "ME" },
+        { type: "ProfileBatch" },
+        { type: "Troupe" },
+      ],
     }),
     uploadMyAvatar: build.mutation<MyProfile, { file: File; variant?: "full" | "small" }>({
       query: ({ file, variant = "full" }) => {

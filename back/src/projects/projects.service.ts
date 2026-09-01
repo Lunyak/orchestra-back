@@ -15,6 +15,14 @@ import { extractReferencedImageKeysFromProjectorMedia } from './projector-media-
 import { ProjectAccessService } from '../project-access/project-access.service';
 import { TroupeService } from '../troupe/troupe.service';
 import { touchProjectActivity } from './project-activity';
+import {
+  DEMO_LIGHT_CHANNELS,
+  DEMO_LIGHT_FADERS,
+  DEMO_LIGHT_PROGRAMS,
+  DEMO_PROJECT_NAME,
+  DEMO_SCENES,
+  DEMO_THEATER_LAYOUT,
+} from './demo-playbook.seed';
 
 export interface CreateProjectDto {
   slug: string;
@@ -1595,5 +1603,60 @@ export class ProjectsService {
     if (res.count === 0) throw new NotFoundException('Assignment not found');
     await touchProjectActivity(this.prisma, project.id);
     return this.getProjectTeamRole(userId, slug, role.id);
+  }
+
+  async createDemoProject(ownerId: string) {
+    const existing = await this.prisma.project.findFirst({
+      where: { ownerId, deletedAt: null, name: DEMO_PROJECT_NAME },
+    });
+    if (existing) return existing;
+
+    const project = await this.createProject(ownerId, {
+      slug: await this.nextDemoSlug(),
+      name: DEMO_PROJECT_NAME,
+      description: 'Готовый спектакль: сценарий, свет и 3D площадка.',
+    });
+
+    await this.prisma.playbook.create({
+      data: {
+        projectId: project.id,
+        name: 'script',
+        lightFaders: DEMO_LIGHT_FADERS,
+        lightPrograms: DEMO_LIGHT_PROGRAMS,
+        lightChannels: {
+          create: DEMO_LIGHT_CHANNELS.map((raw, index) => ({ raw, index })),
+        },
+        theaterLayout: { create: DEMO_THEATER_LAYOUT },
+        scenes: {
+          create: DEMO_SCENES.map((scene, order) => ({
+            sourceId: scene.sourceId,
+            title: scene.title,
+            markdown: scene.markdown,
+            playMarkdown: scene.playMarkdown,
+            order,
+            requisites: {
+              create: scene.requisites.map((item) => ({
+                sourceId: item.sourceId,
+                label: item.label,
+              })),
+            },
+          })),
+        },
+      },
+    });
+
+    return project;
+  }
+
+  private async nextDemoSlug() {
+    const taken = await this.prisma.project.findMany({
+      where: { slug: { startsWith: 'demo' } },
+      select: { slug: true },
+    });
+    const slugs = new Set(taken.map((row) => row.slug));
+    if (!slugs.has('demo')) return 'demo';
+    let index = 2;
+    while (slugs.has(`demo-${index}`)) index += 1;
+    return `demo-${index}`;
   }
 }

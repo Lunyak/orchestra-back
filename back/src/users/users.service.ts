@@ -20,33 +20,54 @@ export class UsersService implements OnModuleInit {
   private async ensureSubscriptionPlans() {
     await this.prisma.subscriptionPlan.upsert({
       where: { name: 'free' },
-      update: { maxProjects: 3, maxCollaboratorsPerProject: 0 },
+      update: {
+        maxProjects: 3,
+        maxCollaboratorsPerProject: 0,
+        features: { collaboration: false, advancedLight: true, priceRub: 0 },
+      },
       create: {
         name: 'free',
         maxProjects: 3,
         maxCollaboratorsPerProject: 0,
-        features: { collaboration: false, advancedLight: true },
+        features: { collaboration: false, advancedLight: true, priceRub: 0 },
       },
     });
     await this.prisma.subscriptionPlan.upsert({
       where: { name: 'standard' },
-      update: { maxProjects: 10, maxCollaboratorsPerProject: 5 },
+      update: {
+        maxProjects: 10,
+        maxCollaboratorsPerProject: 5,
+        features: { collaboration: true, advancedLight: true, priceRub: 990 },
+      },
       create: {
         name: 'standard',
         maxProjects: 10,
         maxCollaboratorsPerProject: 5,
-        features: { collaboration: true, advancedLight: true },
+        features: { collaboration: true, advancedLight: true, priceRub: 990 },
       },
     });
     await this.prisma.subscriptionPlan.upsert({
       where: { name: 'premium' },
-      // null = unlimited (UI already shows ∞ for null)
-      update: { maxProjects: null, maxCollaboratorsPerProject: null },
+      update: {
+        maxProjects: null,
+        maxCollaboratorsPerProject: null,
+        features: {
+          collaboration: true,
+          advancedLight: true,
+          premium: true,
+          priceRub: 2990,
+        },
+      },
       create: {
         name: 'premium',
         maxProjects: null,
         maxCollaboratorsPerProject: null,
-        features: { collaboration: true, advancedLight: true, premium: true },
+        features: {
+          collaboration: true,
+          advancedLight: true,
+          premium: true,
+          priceRub: 2990,
+        },
       },
     });
   }

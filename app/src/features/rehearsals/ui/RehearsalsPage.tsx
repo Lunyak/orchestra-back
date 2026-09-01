@@ -345,7 +345,7 @@ export function RehearsalsPageView(vm: RehearsalsPageViewModel) {
                       <div className="rehearsals-section-title">Публикация в чат</div>
                       <div className="rehearsals-form-grid">
                         <div className="rehearsals-muted rehearsals-muted--sm">
-                          Сначала выбери сцены для репетиции. В опрос попадут только те актёры, которые нужны по выбранным сценам и отметили «свободен» в профиле.
+                          Сначала выбери сцены для репетиции. В опрос попадут только те актёры, которые нужны по выбранным сценам и отметили «свободен» в графике коллектива.
                         </div>
                         <button
                           type="button"

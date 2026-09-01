@@ -7,6 +7,7 @@ import { ProjectProvider } from "../features/project";
 import { PlaybookSyncRunner } from "../features/playbook";
 import { migratePlaybookLegacyBrowserStorage } from "../features/playbook/model/playbook-legacy-migration";
 import { ScriptUiBootstrap } from "../features/script-ui";
+import { LandingPage } from "../pages/landing/LandingPage";
 import { LoginPage } from "../pages/login/LoginPage";
 import { ResetPasswordPage } from "../pages/login/ResetPasswordPage";
 import { PrivacyPage } from "../pages/legal/PrivacyPage";
@@ -15,7 +16,8 @@ import { SpectaclePageLockGuard } from "./SpectaclePageLockGuard";
 import { AppRoutes } from "./router/AppRoutes";
 import { PlatformProvider } from "./providers/platform";
 import { StoreProvider } from "./providers/StoreProvider";
-import { Route, Routes } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
 import { ChatDock } from "../features/chat";
 import { IncomingInviteMail } from "../features/global-dashboard";
 import { isProjectorOutputWindow } from "../features/projector/model/projector-playback-bridge";
@@ -37,15 +39,29 @@ export interface AppProps {
 
 function AuthenticatedApp({ onAfterLogin }: { onAfterLogin?: (token: string) => Promise<void> }) {
   useAuthBootstrap();
-  const { accessToken } = useAuth();
+  const { accessToken, offlineMode } = useAuth();
+  const navigate = useNavigate();
+  const canEnterApp = Boolean(accessToken) || offlineMode;
+  const wasInsideAppRef = useRef(canEnterApp);
 
-  if (!accessToken) {
+  useEffect(() => {
+    const wasInsideApp = wasInsideAppRef.current;
+    wasInsideAppRef.current = canEnterApp;
+    if (!wasInsideApp || canEnterApp) return;
+    const path = window.location.pathname;
+    if (path.includes("/reset-password")) return;
+    navigate("/login", { replace: true });
+  }, [canEnterApp, navigate]);
+
+  if (!canEnterApp) {
     return (
       <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage onAfterLogin={onAfterLogin} />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="*" element={<LoginPage onAfterLogin={onAfterLogin} />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }

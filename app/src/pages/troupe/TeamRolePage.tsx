@@ -146,7 +146,7 @@ export function TeamRolePage() {
           <TheaterSectionNav theaterId={theaterId} active="team" />
           <main className="organizations-page organizations-page--detail">
             <Link className="theater-team-page__back" to={teamPath}>
-              ← Команда
+              ← Должности
             </Link>
             <p role="alert">Должность не найдена</p>
           </main>
@@ -161,12 +161,12 @@ export function TeamRolePage() {
         <TheaterSectionNav theaterId={theaterId} active="team" />
         <main className="organizations-page organizations-page--detail">
           <Link className="theater-team-page__back" to={teamPath}>
-            ← Команда
+            ← Должности
           </Link>
           <header className="theater-team-page__header">
             <p className="organizations-page__eyebrow">Должность</p>
             <h1>{role.title}</h1>
-            <span>Карточка должности театральной команды.</span>
+            <span>Карточка должности театра.</span>
           </header>
 
           <section className="theater-team-page__section">

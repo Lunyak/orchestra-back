@@ -48,6 +48,7 @@ model User {
   studioLessonProgressReviewed  StudioLessonProgress[]         @relation("StudioLessonProgressReviewer")
   personalWorkspace             Workspace?                     @relation("PersonalWorkspaceOwner")
   workspaceMemberships          WorkspaceMember[]
+  billingPayments               BillingPayment[]
 }
 
 enum WorkspaceType {
@@ -144,6 +145,22 @@ model SubscriptionPlan {
   features                   Json
 
   users User[]
+}
+
+model BillingPayment {
+  id               String   @id
+  userId           String
+  planName         String
+  amountRub        Int
+  status           String
+  confirmationUrl  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Project {

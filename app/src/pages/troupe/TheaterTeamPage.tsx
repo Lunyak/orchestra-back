@@ -56,7 +56,7 @@ export function TheaterTeamPage() {
       <div className="app-layout">
         <div className="app-content">
           <main className="organizations-page organizations-page--detail">
-            <p>Нужно войти, чтобы открыть команду театра.</p>
+            <p>Нужно войти, чтобы открыть должности театра.</p>
           </main>
         </div>
       </div>
@@ -70,7 +70,7 @@ export function TheaterTeamPage() {
         <main className="organizations-page organizations-page--detail">
           <header className="theater-team-page__header">
             <p className="organizations-page__eyebrow">Штат театра</p>
-            <h1>Команда</h1>
+            <h1>Должности</h1>
             <span>
               Дерево должностей. Откройте карточку, чтобы назначить людей и
               заполнить инструкцию.
@@ -85,7 +85,7 @@ export function TheaterTeamPage() {
               <p>Загружаем дерево должностей…</p>
             ) : (
               <TeamRoleMindmap
-                rootLabel="Команда"
+                rootLabel="Должности"
                 roles={mindmapRoles}
                 accessToken={accessToken}
                 onAddClick={() => setCreateOpen(true)}

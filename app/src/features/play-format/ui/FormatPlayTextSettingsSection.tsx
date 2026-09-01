@@ -63,7 +63,7 @@ export function FormatPlayTextSettingsSection({
           Склеить разорванные строки
         </LabeledToggle>
         <LabeledToggle checked={wrapRoleLabels} onChange={setWrapRoleLabels}>
-          Расставить лейблы в строке (ЕЛЕНА: …)
+          Лейблы в начале строки (ЕЛЕНА: …)
         </LabeledToggle>
         <LabeledToggle checked={trimExtraSpaces} onChange={setTrimExtraSpaces}>
           Убрать лишние пробелы в строках

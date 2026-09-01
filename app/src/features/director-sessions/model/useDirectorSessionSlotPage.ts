@@ -7,7 +7,14 @@ import { projectSessionPath } from "../../../app/router/paths";
 import type { ScriptScene } from "../../../shared/types/script";
 import { markdownToPlainText } from "../../../shared/utils/textPreview";
 import { useAuth } from "../../auth";
-import { useProfilesBatchQuery } from "../../profile/api/profile-api";
+import {
+  useMyProfileQuery,
+  useProfilesBatchQuery,
+} from "../../profile/api/profile-api";
+import {
+  mergeSelfEmail,
+  mergeSelfIntoProfiles,
+} from "../../profile/model/availability-calendar";
 import { useProject } from "../../project";
 import {
   useProjectMembersQuery,
@@ -324,6 +331,10 @@ export function useDirectorSessionSlotPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesSlug, projectFilter]);
 
+  const { data: myProfile } = useMyProfileQuery(undefined, {
+    skip: !accessToken,
+  });
+
   const {
     data: membersRes,
     isLoading: membersLoading,
@@ -341,8 +352,12 @@ export function useDirectorSessionSlotPage() {
   });
 
   const projectMemberEmails = useMemo(
-    () => memberEmailsFromProjectMembers(membersRes),
-    [membersRes],
+    () =>
+      mergeSelfEmail(
+        memberEmailsFromProjectMembers(membersRes),
+        myProfile?.email,
+      ),
+    [membersRes, myProfile?.email],
   );
 
   const { roleEmailsByKey, roleTitleByKey } = useMemo(
@@ -350,10 +365,14 @@ export function useDirectorSessionSlotPage() {
     [rolesRes?.roles],
   );
 
-  const { data: teamProfiles = [], error: profilesQueryError } =
+  const { data: teamProfilesRaw = [], error: profilesQueryError } =
     useProfilesBatchQuery(projectMemberEmails, {
       skip: !accessToken || projectMemberEmails.length === 0,
     });
+  const teamProfiles = useMemo(
+    () => mergeSelfIntoProfiles(teamProfilesRaw, myProfile),
+    [myProfile, teamProfilesRaw],
+  );
 
   const availabilityError = useMemo(() => {
     const pick = (e: unknown, fallback: string) => {

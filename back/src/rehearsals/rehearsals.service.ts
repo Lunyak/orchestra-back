@@ -1117,7 +1117,7 @@ export class RehearsalsService {
 
     if (present.length === 0) {
       throw new BadRequestException(
-        `Нельзя опубликовать репетицию: среди нужных по сценам никто не отметил присутствие в профиле на ${rehearsalDateKey}`,
+        `Нельзя опубликовать репетицию: среди нужных по сценам никто не отметил присутствие в графике на ${rehearsalDateKey}`,
       );
     }
 

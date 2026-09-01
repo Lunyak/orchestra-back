@@ -1,0 +1,116 @@
+.plan-page {
+  --sessions-bg: #111;
+  --sessions-bg-deep: #0a0a0a;
+  --sessions-panel: #1b1b1b;
+  --sessions-panel-hover: #222;
+  --sessions-border: #222;
+  --sessions-text: #888;
+  --sessions-text-muted: #666;
+  --sessions-text-strong: #ccc;
+  margin: 0 auto;
+  max-width: var(--width-content-page);
+  width: 100%;
+  min-height: 100%;
+  padding: 18px 18px 28px;
+  box-sizing: border-box;
+  background: var(--sessions-bg);
+  color: var(--sessions-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+.app-content:has(> .plan-page) > .plan-page,
+.app-shell-body > .plan-page {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.plan-page__header {
+  margin: 0 0 20px;
+}
+
+.plan-page__eyebrow {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sessions-text-muted);
+}
+
+.plan-page h1 {
+  margin: 8px 0;
+  color: var(--sessions-text-strong);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.plan-page__lead,
+.plan-page__hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.plan-page__list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-page__card {
+  padding: 14px;
+  border: 1px solid var(--sessions-border);
+  background: var(--sessions-panel);
+}
+
+.plan-page__card--current {
+  border-color: var(--color-active-ascent);
+}
+
+.plan-page__card h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--sessions-text-strong);
+}
+
+.plan-page__card p {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.plan-page__price {
+  color: var(--sessions-text-strong);
+  font-weight: 600;
+}
+
+.plan-page__current {
+  margin-top: 10px;
+  color: var(--color-active-ascent);
+  font-weight: 600;
+}
+
+.plan-page__notice {
+  margin: 16px 0 0;
+  color: var(--sessions-text-strong);
+  font-size: 13px;
+}
+
+.plan-page__error {
+  margin: 16px 0 0;
+  color: var(--color-status-error-text, #f66);
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  .plan-page {
+    padding: 12px 12px 20px;
+  }
+
+  .plan-page__list {
+    grid-template-columns: 1fr;
+  }
+}

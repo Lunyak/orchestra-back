@@ -14,6 +14,7 @@ import {
 import crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProjectAccessService } from '../project-access/project-access.service';
+import { ensureTroupeOwnerMember } from './ensure-troupe-owner-member';
 
 function normalizeEmail(v: unknown): string {
   const email = String(v ?? '')
@@ -169,7 +170,10 @@ export class TroupeService {
       where: { ownerUserId: userId },
       orderBy: { createdAt: 'asc' },
     });
-    if (existing) return existing;
+    if (existing) {
+      await ensureTroupeOwnerMember(this.prisma, existing.id, userId);
+      return existing;
+    }
 
     const theater = await this.prisma.theater.findFirst({
       where: {
@@ -210,6 +214,7 @@ export class TroupeService {
           participationType: 'HOME',
         },
       });
+      await ensureTroupeOwnerMember(tx, troupe.id, userId);
       return troupe;
     });
   }
@@ -721,7 +726,13 @@ export class TroupeService {
     const troupe = await this.prisma.troupe.findFirst({
       where: { ownerUserId: userId },
       orderBy: { createdAt: 'asc' },
-      select: { id: true, title: true, createdAt: true, updatedAt: true },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        ownerUserId: true,
+      },
     });
     return this.buildTroupeMembersPayload(userId, troupe, month);
   }
@@ -746,7 +757,13 @@ export class TroupeService {
       select: {
         id: true,
         homeTroupes: {
-          select: { id: true, title: true, createdAt: true, updatedAt: true },
+          select: {
+            id: true,
+            title: true,
+            createdAt: true,
+            updatedAt: true,
+            ownerUserId: true,
+          },
           orderBy: { createdAt: 'asc' },
           take: 1,
         },
@@ -765,9 +782,17 @@ export class TroupeService {
       title: string;
       createdAt: Date;
       updatedAt: Date;
+      ownerUserId: string;
     } | null,
     month?: unknown,
   ) {
+    if (troupe) {
+      await ensureTroupeOwnerMember(
+        this.prisma,
+        troupe.id,
+        troupe.ownerUserId,
+      );
+    }
     const troupeRows = troupe
       ? await this.prisma.troupeMember.findMany({
           where: { troupeId: troupe.id },

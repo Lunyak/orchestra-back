@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Orchestra">
+  <rect width="256" height="256" fill="#111111"/>
+  <rect x="56" y="56" width="144" height="144" fill="none" stroke="#e78a4e" stroke-width="10"/>
+  <rect x="96" y="96" width="64" height="64" fill="#e78a4e"/>
+</svg>

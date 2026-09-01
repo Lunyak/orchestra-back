@@ -1,10 +1,31 @@
+.legal-layout {
+  min-height: 100%;
+  background: var(--sessions-bg, #111);
+}
+
 .legal-view {
-  color: var(--color-text-lighter);
+  color: var(--sessions-text-strong, var(--color-text-lighter));
   padding: 20px;
   margin: 0 auto;
   width: 100%;
   max-width: var(--width-content-page);
+  min-height: 100%;
   box-sizing: border-box;
+}
+
+.legal-view__nav {
+  margin: 0 0 16px;
+}
+
+.legal-view__back {
+  color: var(--color-active-ascent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.legal-view__back:hover {
+  text-decoration: underline;
 }
 
 .legal-view h1 {
@@ -23,7 +44,7 @@
 }
 
 .legal-view a {
-  color: inherit;
+  color: var(--color-active-ascent);
   text-decoration: underline;
 }
 

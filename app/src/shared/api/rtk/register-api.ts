@@ -14,4 +14,5 @@ import "../../../features/chat/api/chat-api";
 import "../../../features/accounting/api/accounting-api";
 import "../../../features/studio/api/studio-api";
 import "../../../features/global-dashboard/api/dashboard-api";
+import "../../../features/billing/api/billing-api";
 import "./sync-api";

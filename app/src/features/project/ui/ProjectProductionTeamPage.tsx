@@ -59,7 +59,7 @@ export function ProjectProductionTeamPage() {
   }));
 
   if (!accessToken) {
-    return <div>Нужно войти, чтобы открыть команду постановки.</div>;
+    return <div>Нужно войти, чтобы открыть должности постановки.</div>;
   }
 
   return (
@@ -68,7 +68,7 @@ export function ProjectProductionTeamPage() {
         <div className="troupe-card troupe-team-card troupe-role-tree-card">
           <div className="troupe-team-head">
             <div>
-              <div className="troupe-team-title">Команда постановки</div>
+              <div className="troupe-team-title">Должности постановки</div>
               <div className="troupe-team-subtitle">
                 Штат привязанного театра плюс роли только этой постановки.
               </div>
@@ -76,10 +76,10 @@ export function ProjectProductionTeamPage() {
           </div>
 
           {error ? (
-            <div className="troupe-error">Не удалось загрузить команду</div>
+            <div className="troupe-error">Не удалось загрузить должности</div>
           ) : null}
           {isLoading ? (
-            <PageLoader variant="view" label="Загружаем команду…" />
+            <PageLoader variant="view" label="Загружаем должности…" />
           ) : (
             <>
               <section
@@ -118,7 +118,7 @@ export function ProjectProductionTeamPage() {
                     <p className="project-production-team__hint">
                       Штат театра только для просмотра. Править состав — в{" "}
                       <Link to={theaterTeamPath(theater.id)}>
-                        команде театра
+                        должностях театра
                       </Link>
                       .
                     </p>

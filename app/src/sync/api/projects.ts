@@ -69,6 +69,17 @@ export async function ensureProject(
   }
 }
 
+export async function createDemoProject(
+  accessToken: string,
+): Promise<ProjectSummary> {
+  const { data } = await api.post<ProjectSummary>(
+    "/projects/from-demo",
+    {},
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+  return data;
+}
+
 export async function updateProject(
   accessToken: string,
   slug: string,

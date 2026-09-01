@@ -58,6 +58,18 @@
   grid-column: 1 / -1;
 }
 
+.global-dashboard__start {
+  margin-bottom: 12px;
+}
+
+.global-dashboard__start-list {
+  margin: 10px 0 12px;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sessions-text);
+}
+
 .global-dashboard__panel-heading {
   display: flex;
   align-items: center;

@@ -6,6 +6,7 @@ export const globalPaths = {
   accounting: "/accounting",
   studios: "/studios",
   profile: "/profile",
+  billing: "/billing",
 } as const;
 
 export const DEFAULT_APP_PATH = globalPaths.dashboard;
@@ -78,6 +79,12 @@ export function theaterTroupePath(theaterId: string) {
 
 export function theaterRehearsalsPath(theaterId: string) {
   return `${theaterOrganizationPath(theaterId)}/rehearsals`;
+}
+
+export function theaterAvailabilityPath(theaterId: string) {
+  const id = theaterId.trim();
+  if (!id) return globalPaths.organizations;
+  return `${theaterOrganizationPath(id)}/availability`;
 }
 
 export function theaterRehearsalSessionPath(
@@ -226,6 +233,12 @@ export function isTheaterTeamPath(pathname: string) {
 
 export function isTheaterTroupePath(pathname: string) {
   return /^\/organizations\/theaters\/[^/]+\/troupe(?:\/|$)/.test(pathname);
+}
+
+export function isTheaterAvailabilityPath(pathname: string) {
+  return /^\/organizations\/theaters\/[^/]+\/availability(?:\/|$)/.test(
+    pathname,
+  );
 }
 
 export function studioPath(studioId?: string) {

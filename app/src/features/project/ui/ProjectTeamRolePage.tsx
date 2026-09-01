@@ -133,7 +133,7 @@ export function ProjectTeamRolePage() {
     return (
       <div className="troupe-team-empty">
         Должность не найдена.{" "}
-        <Link to={teamPath}>К команде постановки</Link>
+        <Link to={teamPath}>К должностям постановки</Link>
       </div>
     );
   }
@@ -145,7 +145,7 @@ export function ProjectTeamRolePage() {
           <div className="troupe-team-head">
             <div>
               <Link to={teamPath} className="project-production-team__hint">
-                ← Команда постановки
+                ← Должности постановки
               </Link>
               <div className="troupe-team-title">{role.title}</div>
               <div className="troupe-team-subtitle">

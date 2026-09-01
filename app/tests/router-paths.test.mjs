@@ -22,7 +22,10 @@ import {
   theaterTroupePath,
   theaterOrganizationPath,
   theaterOverviewPath,
+  theaterAvailabilityPath,
+  isTheaterAvailabilityPath,
   isTheaterTroupePath,
+  resolveTheaterScopedBackPath,
   projectTheaterInvitePath,
   projectTeamRolePath,
 } from "../src/app/router/paths.ts";
@@ -50,7 +53,7 @@ test("builds canonical project detail paths", () => {
 });
 
 test("builds theater troupe and team paths", () => {
-  assert.equal(theaterOrganizationPath(), "/organizations/theaters");
+  assert.equal(theaterOrganizationPath(), "/organizations");
   assert.equal(
     theaterOverviewPath("theater 1"),
     "/organizations/theaters/theater%201/overview",
@@ -62,6 +65,17 @@ test("builds theater troupe and team paths", () => {
   assert.equal(
     theaterRehearsalsPath("theater 1"),
     "/organizations/theaters/theater%201/rehearsals",
+  );
+  assert.equal(
+    theaterAvailabilityPath("theater 1"),
+    "/organizations/theaters/theater%201/availability",
+  );
+  assert.equal(theaterAvailabilityPath("  "), "/organizations");
+  assert.equal(
+    isTheaterAvailabilityPath(
+      "/organizations/theaters/theater%201/availability",
+    ),
+    true,
   );
   assert.equal(
     theaterTeamPath("theater 1"),
@@ -95,6 +109,32 @@ test("builds theater troupe and team paths", () => {
     true,
   );
   assert.equal(isTheaterTeamPath("/organizations/theaters/abc"), false);
+});
+
+test("theater scoped back goes one level up", () => {
+  assert.equal(
+    resolveTheaterScopedBackPath("/organizations/theaters/theater%201/overview"),
+    "/organizations",
+  );
+  assert.equal(
+    resolveTheaterScopedBackPath(
+      "/organizations/theaters/theater%201/availability",
+    ),
+    "/organizations/theaters/theater%201/overview",
+  );
+  assert.equal(
+    resolveTheaterScopedBackPath(
+      "/organizations/theaters/theater%201/rehearsals/s1",
+    ),
+    "/organizations/theaters/theater%201/rehearsals",
+  );
+  assert.equal(
+    resolveTheaterScopedBackPath(
+      "/organizations/theaters/theater%201/team/roles/r1",
+    ),
+    "/organizations/theaters/theater%201/team",
+  );
+  assert.equal(resolveTheaterScopedBackPath("/organizations"), null);
 });
 
 test("encodes studio route parameters", () => {

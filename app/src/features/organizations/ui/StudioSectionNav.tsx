@@ -4,7 +4,6 @@ import {
   studioInvitesPath,
   studioMembersPath,
   studioOrgPremisesPath,
-  studioOverviewPath,
   studioProgramSectionPath,
   studioVideosSectionPath,
 } from "../../../app/router/paths";
@@ -47,7 +46,6 @@ export function StudioSectionNav({
   const { data: studio } = useGetStudioQuery(studioId, {
     skip: !accessToken || !studioId,
   });
-  const backLabel = studio?.title || "Студия";
   const canManage = studio?.canManage ?? false;
 
   const items = useMemo<WorkspaceSectionItem[]>(() => {
@@ -64,8 +62,6 @@ export function StudioSectionNav({
   return (
     <WorkspaceSectionSwitch
       ariaLabel="Разделы студии"
-      backTo={studioOverviewPath(studioId)}
-      backLabel={backLabel}
       items={items}
       activeId={active}
     />

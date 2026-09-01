@@ -127,6 +127,27 @@
   cursor: not-allowed;
 }
 
+.project-workspace__demo-button {
+  margin-top: 14px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-active-ascent);
+  background: transparent;
+  color: var(--color-active-ascent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-workspace__demo-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-active-ascent) 16%, transparent);
+}
+
+.project-workspace__demo-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .project-workspace__error {
   margin: 0;
   color: #f66;

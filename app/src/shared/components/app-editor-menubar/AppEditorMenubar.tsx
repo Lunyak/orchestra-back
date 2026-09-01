@@ -2,6 +2,7 @@ import cn from "classnames";
 import { useState, type MouseEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { isProjectPath, isScopedWorkspacePath } from "../../../app/router/paths";
+import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";
 import { AppEditorChatToggle } from "./AppEditorChatToggle";
@@ -25,6 +26,8 @@ export function AppEditorMenubar() {
   const toolbarActions = useAppEditorMenubarToolbarActions();
   const compactMenubar = useCompactKadrStrip();
   const { projectName } = useProject();
+  const { offlineMode, accessToken } = useAuth();
+  const showOfflineBanner = offlineMode && !accessToken;
   const { pathname } = useLocation();
   const isProjectRoute = isProjectPath(pathname);
   const mobileBackOnly = isScopedWorkspacePath(pathname) && !viewMenu;
@@ -105,6 +108,11 @@ export function AppEditorMenubar() {
           <AppEditorUserMenu />
         </div>
       </div>
+      {showOfflineBanner ? (
+        <p className="app-editor-menubar__offline" role="status">
+          Офлайн. Войдите, чтобы синхронизировать проекты с сервером.
+        </p>
+      ) : null}
     </header>
   );
 }

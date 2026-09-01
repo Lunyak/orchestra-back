@@ -56,7 +56,7 @@ const WORK_CHILDREN: ReadonlyArray<NavNodeDef> = [
 ];
 
 const PEOPLE_BRANCH_DEFS: ReadonlyArray<NavNodeDef> = [
-  { id: "team", label: "Команда", section: "team" },
+  { id: "team", label: "Должности", section: "team" },
   { id: "roles", label: "Роли", section: "roles" },
   { id: "cast", label: "Каст", section: "cast" },
 ];

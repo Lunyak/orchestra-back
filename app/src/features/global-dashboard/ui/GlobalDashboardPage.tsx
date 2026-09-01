@@ -322,6 +322,26 @@ export function GlobalDashboardPage() {
     }
   };
 
+  if (!accessToken) {
+    return (
+      <main className="global-dashboard">
+        <section className="global-dashboard__panel global-dashboard__panel--wide global-dashboard__start">
+          <h2>Как начать</h2>
+          <ol className="global-dashboard__start-list">
+            <li>Создай проект или открой демо-спектакль</li>
+            <li>Открой сценарий и разбей на сцены</li>
+            <li>Собери свет и прогон</li>
+            <li>Расставь площадку в 3D</li>
+            <li>Поставь репетицию, когда войдёшь в аккаунт</li>
+          </ol>
+          <Link className="global-dashboard__text-link" to={globalPaths.projects}>
+            К проектам
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
   if (viewState === "loading" || organizationsLoading || projectsLoading) {
     return <PageBootLoader label="Загрузка обзора…" />;
   }
@@ -337,8 +357,25 @@ export function GlobalDashboardPage() {
     );
   }
 
+  const showStartGuide = projectItems.length === 0;
+
   return (
     <main className="global-dashboard">
+      {showStartGuide ? (
+        <section className="global-dashboard__panel global-dashboard__panel--wide global-dashboard__start">
+          <h2>Как начать</h2>
+          <ol className="global-dashboard__start-list">
+            <li>Создай проект или открой демо-спектакль</li>
+            <li>Открой сценарий и разбей на сцены</li>
+            <li>Собери свет и прогон</li>
+            <li>Расставь площадку в 3D</li>
+            <li>Поставь репетицию</li>
+          </ol>
+          <Link className="global-dashboard__text-link" to={globalPaths.projects}>
+            К проектам
+          </Link>
+        </section>
+      ) : null}
 
       <div className="global-dashboard__grid">
         <section className="global-dashboard__panel">

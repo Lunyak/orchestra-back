@@ -37,6 +37,16 @@ export function profileListAvatarSrc(
   return full || null;
 }
 
+/** Для карточек-плиток: полный аватар, иначе маленький. */
+export function profilePosterAvatarSrc(
+  profile?: { avatarUrl?: string | null; avatarSmallUrl?: string | null } | null,
+): string | null {
+  const full = String(profile?.avatarUrl ?? "").trim();
+  if (full) return full;
+  const small = String(profile?.avatarSmallUrl ?? "").trim();
+  return small || null;
+}
+
 export async function getMyProfile(accessToken: string): Promise<MyProfile> {
   const { data } = await api.get<MyProfile>("/profile", {
     headers: { Authorization: `Bearer ${accessToken}` },

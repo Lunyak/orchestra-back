@@ -1,0 +1,195 @@
+.availability-day-modal {
+  max-width: min(480px, calc(100vw - 20px));
+  background: var(--color-bg-modal);
+  border: 1px solid var(--color-border-visible);
+  color: var(--color-text-ui);
+}
+
+.availability-day-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-visible);
+  flex-shrink: 0;
+}
+
+.availability-day-modal__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-almost-white);
+}
+
+.availability-day-modal__close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border-visible);
+  background: var(--color-surface-5);
+  color: var(--color-text-almost-white);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.availability-day-modal__close:hover {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.availability-day-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.availability-day-modal__foot {
+  flex-shrink: 0;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--color-border-visible);
+}
+
+.availability-day-modal__foot .button {
+  width: 100%;
+}
+
+.availability-day-modal .availability-day-modal__status-row .button {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  padding: 8px 6px;
+}
+
+.availability-day-modal .button.secondary {
+  background: var(--color-surface-5);
+  color: var(--color-text-muted);
+}
+
+.availability-day-modal .button--active {
+  border-color: var(--color-active-ascent);
+  color: var(--color-active-ascent);
+}
+
+.availability-day-modal__label {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--color-text-almost-white);
+}
+
+.availability-day-modal__status-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.availability-day-modal__hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.availability-day-modal__time-block {
+  margin-top: 12px;
+}
+
+.availability-day-modal__time-ranges {
+  display: grid;
+  gap: 6px;
+}
+
+.availability-day-modal__time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.availability-day-modal__time-sep {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.availability-day-modal__time-input {
+  width: 7.5em;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-visible);
+  background: var(--color-surface-5);
+  color: var(--color-text-almost-white);
+  font-size: 12px;
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+
+.availability-day-modal__time-input:focus-visible {
+  border-color: var(--color-active-ascent);
+  box-shadow: none;
+  outline: none;
+}
+
+.availability-day-modal__time-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.availability-day-modal__sessions-title {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.availability-day-modal__sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: min(180px, 32vh);
+  overflow: auto;
+}
+
+.availability-day-modal__session {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-visible);
+  background: var(--color-bg-dark);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.availability-day-modal__session:hover {
+  border-color: var(--color-active-ascent);
+}
+
+.availability-day-modal__session-time {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-almost-white);
+}
+
+.availability-day-modal__session-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-almost-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

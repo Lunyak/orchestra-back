@@ -14,18 +14,14 @@ export type WorkspaceSectionItem = {
 
 type WorkspaceSectionSwitchProps = {
   ariaLabel: string;
-  backTo: string;
-  backLabel: string;
   items: ReadonlyArray<WorkspaceSectionItem>;
   activeId: string;
-  /** bar — верхняя полоса; inline — только ссылка назад */
+  /** bar — верхняя полоса; inline — ничего (назад в шапке приложения) */
   variant?: "bar" | "inline";
 };
 
 export function WorkspaceSectionSwitch({
   ariaLabel,
-  backTo,
-  backLabel,
   items,
   activeId,
   variant = "bar",
@@ -34,38 +30,11 @@ export function WorkspaceSectionSwitch({
   const navigate = useNavigate();
   const [modalOpen, setModalOpen] = useState(false);
   const titleId = useId();
-  const isInline = variant === "inline";
+
+  if (variant === "inline") return null;
 
   const activeLabel =
     items.find((item) => item.id === activeId)?.label ?? "Раздел";
-
-  const backLink = (
-    <Link to={backTo} className="spectacle-direction-switch__item">
-      ← {backLabel}
-    </Link>
-  );
-
-  const compactBackLink = (
-    <Link
-      to={backTo}
-      className="spectacle-direction-switch__item"
-      aria-label={`К обзору: ${backLabel}`}
-      title={backLabel}
-    >
-      ←
-    </Link>
-  );
-
-  if (isInline) {
-    return (
-      <nav
-        className="workspace-section-switch workspace-section-switch--inline"
-        aria-label={ariaLabel}
-      >
-        {backLink}
-      </nav>
-    );
-  }
 
   const modeLinks = items.map((item) => {
     const isActive = item.id === activeId;
@@ -96,22 +65,20 @@ export function WorkspaceSectionSwitch({
         )}
         aria-label={ariaLabel}
       >
-        <div className="spectacle-direction-switch__left">{compactBackLink}</div>
-        <div className="spectacle-direction-switch__tech-center">
-          <span className="workspace-section-switch__title">{backLabel}</span>
-        </div>
-        <div className="spectacle-direction-switch__right">
-          <button
-            type="button"
-            className="workspace-section-switch__nav-btn"
-            title={`Раздел: ${activeLabel}`}
-            aria-label={`Раздел: ${activeLabel}`}
-            aria-haspopup="dialog"
-            aria-expanded={modalOpen}
-            onClick={() => setModalOpen(true)}
-          >
-            {activeLabel}
-          </button>
+        <div className="workspace-section-switch__track">
+          <div className="spectacle-direction-switch__right">
+            <button
+              type="button"
+              className="workspace-section-switch__nav-btn"
+              title={`Раздел: ${activeLabel}`}
+              aria-label={`Раздел: ${activeLabel}`}
+              aria-haspopup="dialog"
+              aria-expanded={modalOpen}
+              onClick={() => setModalOpen(true)}
+            >
+              {activeLabel}
+            </button>
+          </div>
         </div>
         <Modal
           isOpen={modalOpen}
@@ -132,7 +99,8 @@ export function WorkspaceSectionSwitch({
                       type="button"
                       className={cn(
                         "workspace-section-switch__modal-item",
-                        isActive && "workspace-section-switch__modal-item--active",
+                        isActive &&
+                          "workspace-section-switch__modal-item--active",
                       )}
                       aria-pressed={isActive}
                       onClick={() => {
@@ -153,15 +121,19 @@ export function WorkspaceSectionSwitch({
   }
 
   return (
-    <nav className="spectacle-direction-switch" aria-label={ariaLabel}>
-      <div className="spectacle-direction-switch__left">{backLink}</div>
-      <div className="spectacle-direction-switch__right">
-        <ul
-          className="spectacle-direction-switch__modes"
-          aria-label="Разделы"
-        >
-          {modeLinks}
-        </ul>
+    <nav
+      className="spectacle-direction-switch workspace-section-switch"
+      aria-label={ariaLabel}
+    >
+      <div className="workspace-section-switch__track">
+        <div className="spectacle-direction-switch__right">
+          <ul
+            className="spectacle-direction-switch__modes"
+            aria-label="Разделы"
+          >
+            {modeLinks}
+          </ul>
+        </div>
       </div>
     </nav>
   );

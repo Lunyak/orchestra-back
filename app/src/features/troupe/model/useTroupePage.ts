@@ -6,6 +6,9 @@ import { useProject } from "../../project";
 import { useTeam } from "../../team";
 import { useAuth } from "../../auth/model/auth-context";
 import type { OrchestraQueryError } from "../../../shared/api/rtk/axios-base-query";
+import { teamProfileFromMyProfile } from "../../profile/model/availability-calendar";
+import { selectMyProfile } from "../../profile/model/profileDataSlice";
+import { useAppSelector } from "../../../shared/store/hooks";
 import {
   useAddTeamMemberMutation,
   useAddTroupeMemberMutation,
@@ -79,6 +82,7 @@ export function useTroupePage() {
   const location = useLocation();
   const { theaterId = "" } = useParams();
   const { accessToken } = useAuth();
+  const myProfile = useAppSelector(selectMyProfile);
   const {
     onProjectChange,
     projectName,
@@ -109,7 +113,6 @@ export function useTroupePage() {
     setActiveTab((prev) => (prev === nextTab ? prev : nextTab));
   }, [location.key, location.state]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
-  const [selectedDayIso, setSelectedDayIso] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState<Date>(() =>
     currentMonthStart(),
   );
@@ -159,14 +162,29 @@ export function useTroupePage() {
   );
 
   const troupe = data?.troupe ?? null;
-  const troupeMembers = useMemo<TroupeMemberItem[]>(
-    () =>
-      (data?.members ?? []).map((member) => ({
-        ...member,
-        kind: normalizeTroupeMemberKind(member.kind),
-      })),
-    [data?.members],
-  );
+  const troupeMembers = useMemo<TroupeMemberItem[]>(() => {
+    const list = (data?.members ?? []).map((member) => ({
+      ...member,
+      kind: normalizeTroupeMemberKind(member.kind),
+    }));
+    const selfProfile = teamProfileFromMyProfile(myProfile);
+    if (!selfProfile) return list;
+    if (list.some((member) => normalizeEmail(member.email) === selfProfile.email)) {
+      return list;
+    }
+    return [
+      {
+        id: `self:${selfProfile.email}`,
+        troupeId: data?.troupe?.id ?? "",
+        email: selfProfile.email,
+        kind: "regular",
+        createdAt: new Date(0).toISOString(),
+        profile: selfProfile,
+        troupeMemberId: null,
+      },
+      ...list,
+    ];
+  }, [data?.members, data?.troupe?.id, myProfile]);
   const teamMembers = useMemo<TeamMemberItem[]>(
     () => data?.teamMembers ?? [],
     [data?.teamMembers],
@@ -212,15 +230,6 @@ export function useTroupePage() {
   }, [currentMonth]);
 
   const todayIso = dayjs().format("YYYY-MM-DD");
-
-  useEffect(() => {
-    setSelectedDayIso((prev) => {
-      if (!prev) return null;
-      return days.some((d) => dayjs(d).format("YYYY-MM-DD") === prev)
-        ? prev
-        : null;
-    });
-  }, [currentMonth, days]);
 
   const selectedMember = useMemo(
     () =>
@@ -441,14 +450,12 @@ export function useTroupePage() {
     removingIds,
     saveTitle,
     scheduleRefreshing,
-    selectedDayIso,
     selectedMember,
     selectedMemberId,
     selectedMemberInProject,
     setCurrentMonth,
     setEmail,
     setActiveTab,
-    setSelectedDayIso,
     setSelectedMemberId,
     setTeamEmail,
     setTitleDraft,

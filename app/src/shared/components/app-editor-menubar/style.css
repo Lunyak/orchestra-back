@@ -67,6 +67,16 @@
   overflow: visible;
 }
 
+.app-editor-menubar__offline {
+  margin: 0;
+  padding: 6px 16px;
+  border-top: 1px solid var(--sessions-border, #222);
+  background: var(--sessions-bg, #111);
+  color: var(--color-active-ascent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .theater-editor-menubar.app-editor-menubar {
   overflow: visible;
 }

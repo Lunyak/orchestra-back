@@ -278,13 +278,12 @@ function useMediaSizes(items: MediaFileListItem[], projectName: string | null) {
   return sizeById;
 }
 
-type MediaTabId = "playlist" | "sounds" | "video" | "images";
+type MediaTabId = "playlist" | "sounds" | "video";
 
 const MEDIA_TABS: Array<{ id: MediaTabId; label: string }> = [
   { id: "playlist", label: "Плейлист" },
   { id: "sounds", label: "Звуки" },
   { id: "video", label: "Видео" },
-  { id: "images", label: "Картинки" },
 ];
 
 type MediaSectionProps = {
@@ -663,15 +662,6 @@ export function ProjectMediaFileList({
               void uploadVideoMaterials(files);
             }}
           />
-        ) : null}
-        {activeTab === "images" ? (
-          <div className="project-media-file-section project-media-file-section--future">
-            <p className="project-media-file-section__hint">
-              Скоро: все картинки проекта в одном месте — заставки, иконки звуков
-              и прочие изображения.
-            </p>
-            <p className="project-media-file-list__empty">Раздел в разработке.</p>
-          </div>
         ) : null}
       </div>
     </div>

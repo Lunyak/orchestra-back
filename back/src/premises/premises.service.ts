@@ -18,6 +18,7 @@ import {
   WorkspaceType,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensureTroupeOwnerMember } from '../troupe/ensure-troupe-owner-member';
 import { AddPremiseMemberDto } from './dto/add-premise-member.dto';
 import { CreatePremiseDto } from './dto/create-premise.dto';
 import {
@@ -576,6 +577,7 @@ export class PremisesService {
           participationType: 'HOME',
         },
       });
+      await ensureTroupeOwnerMember(tx, troupe.id, userId);
       return troupe;
     });
   }

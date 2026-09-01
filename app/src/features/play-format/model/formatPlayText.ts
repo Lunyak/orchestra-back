@@ -402,75 +402,6 @@ function resolveRoleMarkerSpecs(options: FormatPlayTextOptions): RoleMarkerSpec[
     .filter((spec) => spec.name);
 }
 
-/** «Второй патриций. реплика…» внутри абзаца → отдельные строки с [[РОЛЬ]]. */
-function formatInlineRoles(
-  text: string,
-  roleSpecs: RoleMarkerSpec[],
-): { text: string; splitCount: number } {
-  const lookup = buildRoleMarkerLookup(roleSpecs);
-  const matchNames = expandRoleMarkersForMatch(roleSpecs);
-  if (!matchNames.length) return { text, splitCount: 0 };
-
-  const roleAlt = matchNames.map(escapeRegExp).join("|");
-  const headerRe = new RegExp(
-    `${CYR_BOUNDARY}(${roleAlt})\\s*(\\([^)]*\\))?\\s*\\.`,
-    "gi",
-  );
-
-  const outLines: string[] = [];
-  let splitCount = 0;
-
-  for (const rawLine of text.split("\n")) {
-    if (!rawLine.trim()) {
-      outLines.push(rawLine);
-      continue;
-    }
-
-    const matches: Array<{
-      role: string;
-      remark: string;
-      start: number;
-      contentStart: number;
-    }> = [];
-
-    headerRe.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = headerRe.exec(rawLine))) {
-      if (!match[1]) continue;
-      matches.push({
-        role: canonicalRoleFromLookup(lookup, match[1]),
-        remark: String(match[2] ?? "").trim(),
-        start: match.index,
-        contentStart: match.index + match[0].length,
-      });
-    }
-
-    if (!matches.length) {
-      outLines.push(rawLine);
-      continue;
-    }
-
-    for (let i = 0; i < matches.length; i += 1) {
-      const current = matches[i];
-      const next = matches[i + 1];
-      const dialogueEnd = next ? next.start : rawLine.length;
-      const dialogue = rawLine
-        .slice(current.contentStart, dialogueEnd)
-        .replace(/\s+/g, " ")
-        .trim();
-      const remarkPart = current.remark ? ` ${current.remark}.` : "";
-      if (dialogue) {
-        outLines.push(`[[${current.role}]]${remarkPart} ${dialogue}`);
-      } else {
-        outLines.push(`[[${current.role}]]${remarkPart}`);
-      }
-      splitCount += 1;
-    }
-  }
-
-  return { text: outLines.join("\n"), splitCount };
-}
-
 const CYR_BOUNDARY = "(?<![А-ЯЁа-яёA-Za-z])";
 const ORDINAL_PATRICIAN_RE =
   /(?<![А-ЯЁа-яё])((?:Первый|Второй|Третий|Четвёртый|Четвертый|Пятый|Шестой|Старый)\s+патриций)\s*(?:\([^)]*\))?\s*\./gi;
@@ -800,32 +731,18 @@ export function formatPlayText(
   const roleTarget = protectTitle ? body : [prefix, castContent, body].filter(Boolean).join("\n");
 
   if (roleSpecs.length > 0 && roleTarget) {
-    const inline = formatInlineRoles(roleTarget, roleSpecs);
-    if (inline.splitCount > 0) {
-      if (protectTitle) {
-        body = inline.text;
-      } else {
-        text = inline.text;
-        const nextZones = splitPlayTextZones(text);
-        prefix = nextZones.prefix;
-        castContent = nextZones.castContent;
-        body = nextZones.body;
-      }
-      inlineSplits = inline.splitCount;
+    const propagated = applyRoleMarkerLines(roleTarget, roleSpecs);
+    if (protectTitle) {
+      body = propagated.text;
     } else {
-      const propagated = applyRoleMarkerLines(roleTarget, roleSpecs);
-      if (protectTitle) {
-        body = propagated.text;
-      } else {
-        text = propagated.text;
-        const nextZones = splitPlayTextZones(text);
-        prefix = nextZones.prefix;
-        castContent = nextZones.castContent;
-        body = nextZones.body;
-      }
-      propagatedLines = propagated.propagatedLines;
-      matchedMarkers = propagated.matchedMarkers;
+      text = propagated.text;
+      const nextZones = splitPlayTextZones(text);
+      prefix = nextZones.prefix;
+      castContent = nextZones.castContent;
+      body = nextZones.body;
     }
+    propagatedLines = propagated.propagatedLines;
+    matchedMarkers = propagated.matchedMarkers;
   }
 
   if (wrapLabels) {

@@ -1,25 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import cn from "classnames";
-import { isTrainerInDevelopment } from "../../features/trainers/trainerAvailability";
+import { READY_TRAINERS } from "../../features/trainers/trainerAvailability";
 import "./style.css";
-
-const TRAINERS = [
-  {
-    title: "Учить текст роли",
-    description: "Тренажёр по репликам выбранной роли (диалог, карточки, голос).",
-    path: "/actor",
-  },
-  {
-    title: "Речь",
-    description: "Дыхание + чтение с темпом (метроном). Помогает держать опору и ровную подачу.",
-    path: "/trainers/speech",
-  },
-  {
-    title: "Дикция",
-    description: "Скороговорки + замеры попыток. Можно фиксировать длительность и заметки.",
-    path: "/trainers/diction",
-  },
-] as const;
 
 export function TrainersPage() {
   const navigate = useNavigate();
@@ -32,43 +13,26 @@ export function TrainersPage() {
             <header className="trainers-index__header">
               <h1 className="trainers-page-title">Тренажёры</h1>
               <p className="trainers-lead">
-                Короткие упражнения для ежедневной практики. «Речь» и «Дикция» пока в разработке.
+                Упражнения для ежедневной практики.
               </p>
             </header>
 
             <section className="trainers-panel trainers-index__panel">
               <div className="trainers-card-list">
-                {TRAINERS.map((item) => {
-                  const inDev = isTrainerInDevelopment(item.path);
-                  const cardClassName = cn(
-                    "trainer-index-card",
-                    inDev && "trainer-index-card--disabled",
-                  );
-
-                  return (
-                    <button
-                      key={item.path}
-                      type="button"
-                      className={cardClassName}
-                      disabled={inDev}
-                      onClick={() => {
-                        if (inDev) return;
-                        navigate(item.path);
-                      }}
-                    >
-                      <div className="trainer-index-card__header">
-                        <h2 className="trainer-index-card__title">{item.title}</h2>
-                        {inDev ? (
-                          <span className="trainer-index-card__badge">В разработке</span>
-                        ) : null}
-                      </div>
-                      <p className="trainer-index-card__desc">{item.description}</p>
-                      <span className="trainer-index-card__cta">
-                        {inDev ? "Скоро" : "Открыть"}
-                      </span>
-                    </button>
-                  );
-                })}
+                {READY_TRAINERS.map((item) => (
+                  <button
+                    key={item.path}
+                    type="button"
+                    className="trainer-index-card"
+                    onClick={() => navigate(item.path)}
+                  >
+                    <div className="trainer-index-card__header">
+                      <h2 className="trainer-index-card__title">{item.title}</h2>
+                    </div>
+                    <p className="trainer-index-card__desc">{item.description}</p>
+                    <span className="trainer-index-card__cta">Открыть</span>
+                  </button>
+                ))}
               </div>
             </section>
           </div>

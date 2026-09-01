@@ -1,5 +1,12 @@
 import { useMemo } from "react";
-import { useProfilesBatchQuery } from "../../profile/api/profile-api";
+import {
+  useMyProfileQuery,
+  useProfilesBatchQuery,
+} from "../../profile/api/profile-api";
+import {
+  mergeSelfEmail,
+  mergeSelfIntoProfiles,
+} from "../../profile/model/availability-calendar";
 import {
   useProjectMembersQuery,
   useProjectRolesQuery,
@@ -19,6 +26,10 @@ export function useDirectorSessionMembers(args: {
   rolesSlug: string;
 }) {
   const { accessToken, theaterId, isTheaterContext, rolesSlug } = args;
+
+  const { data: myProfile } = useMyProfileQuery(undefined, {
+    skip: !accessToken,
+  });
 
   const { data: theaterTroupe } = useTheaterHomeTroupeQuery(
     { theaterId },
@@ -41,8 +52,12 @@ export function useDirectorSessionMembers(args: {
   );
 
   const projectMemberEmails = useMemo(
-    () => memberEmailsFromProjectMembers(membersRes),
-    [membersRes],
+    () =>
+      mergeSelfEmail(
+        memberEmailsFromProjectMembers(membersRes),
+        myProfile?.email,
+      ),
+    [membersRes, myProfile?.email],
   );
 
   const { roleEmailsByKey, roleTitleByKey } = useMemo(
@@ -59,10 +74,13 @@ export function useDirectorSessionMembers(args: {
 
   const theaterMemberEmails = useMemo(
     () =>
-      (theaterTroupe?.members ?? [])
-        .map((member) => normalizeEmail(String(member.email ?? "")))
-        .filter(Boolean),
-    [theaterTroupe?.members],
+      mergeSelfEmail(
+        (theaterTroupe?.members ?? [])
+          .map((member) => normalizeEmail(String(member.email ?? "")))
+          .filter(Boolean),
+        myProfile?.email,
+      ),
+    [myProfile?.email, theaterTroupe?.members],
   );
 
   const {
@@ -99,13 +117,22 @@ export function useDirectorSessionMembers(args: {
     [theaterTroupe?.members],
   );
 
+  const teamProfilesWithMe = useMemo(
+    () => mergeSelfIntoProfiles(teamProfiles, myProfile),
+    [myProfile, teamProfiles],
+  );
+  const theaterScheduleProfilesWithMe = useMemo(
+    () => mergeSelfIntoProfiles(theaterScheduleProfiles, myProfile),
+    [myProfile, theaterScheduleProfiles],
+  );
+
   return {
     membersLoading,
     roleEmailsByKey,
     roleTitleByKey,
-    teamProfiles,
+    teamProfiles: teamProfilesWithMe,
     theaterMembers,
-    theaterScheduleProfiles,
+    theaterScheduleProfiles: theaterScheduleProfilesWithMe,
     theaterScheduleProfilesLoading,
     availabilityError,
   };

@@ -1,10 +1,15 @@
 import React, { createContext, useCallback, useEffect, useState } from "react";
 import {
+  createDemoProject as createRemoteDemoProject,
   ensureProject,
   fetchProjects,
   updateProject,
 } from "../../../sync/api/projects";
 import { getDesktopApi as getPlatformDesktopApi } from "../../../shared/platform/desktop-api";
+import { desktopSaveProjectPlaybook } from "../../../shared/platform/desktop-methods";
+import demoPlaybook from "./demo-playbook.json";
+
+const DEMO_PROJECT_NAME = "Демо: Дураки";
 import { syncApi } from "../../../shared/api/rtk/sync-api";
 import { store } from "../../../shared/store/store";
 import { createId } from "../../../shared/utils/createId";
@@ -26,6 +31,7 @@ export interface ProjectContextValue {
   projectsLoading: boolean;
   onProjectChange: (name: string) => void;
   createProject: (name: string, workspaceId?: string) => Promise<string | null>;
+  createDemoProject: () => Promise<string | null>;
   updateProjectDisplayName: (name: string) => Promise<void>;
   updateProjectSlug: (slug: string) => Promise<string>;
   deleteProject: (name: string) => Promise<void>;
@@ -407,6 +413,45 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     [accessToken, getDesktopApi, loadProjects, projects],
   );
 
+  const createDemoProject = useCallback(async () => {
+    const byName = projectItems.find(
+      (project) => String(project.name ?? "") === DEMO_PROJECT_NAME,
+    );
+    const byDemoSlug = projectItems.find(
+      (project) => String(project.slug ?? "").toLowerCase() === "demo",
+    );
+    const byFoolsSlug = projectItems.find(
+      (project) => String(project.slug ?? "").toLowerCase() === "fools",
+    );
+    const existing = byName ?? byDemoSlug ?? byFoolsSlug;
+    if (existing) return existing.slug;
+
+    const desktopApi = getDesktopApi();
+    if (desktopApi) {
+      const slug = makeUniqueProjectSlug(DEMO_PROJECT_NAME, projects);
+      const result = await desktopApi.createProject(slug);
+      if (!result?.ok || !result.name) return null;
+      await desktopSaveProjectPlaybook(
+        desktopApi,
+        result.name,
+        "script",
+        demoPlaybook,
+      );
+      storeProjectDisplayName(result.name, DEMO_PROJECT_NAME);
+      await loadProjects(result.name);
+      return result.name;
+    }
+    if (!accessToken) return null;
+    try {
+      const project = await createRemoteDemoProject(accessToken);
+      await loadProjects(project.slug);
+      return project.slug;
+    } catch (error) {
+      console.error("createDemoProject failed:", error);
+      return null;
+    }
+  }, [accessToken, getDesktopApi, loadProjects, projectItems, projects]);
+
   const updateProjectDisplayName = useCallback(
     async (name: string) => {
       const value = name.trim();
@@ -586,6 +631,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     projectsLoading,
     onProjectChange,
     createProject,
+    createDemoProject,
     updateProjectDisplayName,
     updateProjectSlug,
     deleteProject,

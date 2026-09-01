@@ -27,7 +27,7 @@ function resolveProfileLabel(profile: {
 
 export function AppEditorUserMenu() {
   const { pathname } = useLocation();
-  const { accessToken, logout } = useAuth();
+  const { accessToken, offlineMode, logout } = useAuth();
   const { data: profile } = useMyProfileQuery(undefined, { skip: !accessToken });
   const [isOpen, setIsOpen] = useState(false);
 
@@ -77,17 +77,29 @@ export function AppEditorUserMenu() {
           className="theater-editor-menubar__option theater-editor-menubar__option--separator"
           role="separator"
         />
-        <Link
-          to={globalPaths.profile}
-          role="menuitem"
-          className={cn(
-            "theater-editor-menubar__option",
-            isProfileActive && "theater-editor-menubar__option--active",
-          )}
-          onClick={closeMenu}
-        >
-          Профиль
-        </Link>
+        {accessToken ? (
+          <>
+            <Link
+              to={globalPaths.profile}
+              role="menuitem"
+              className={cn(
+                "theater-editor-menubar__option",
+                isProfileActive && "theater-editor-menubar__option--active",
+              )}
+              onClick={closeMenu}
+            >
+              Профиль
+            </Link>
+            <Link
+              to={globalPaths.billing}
+              role="menuitem"
+              className="theater-editor-menubar__option"
+              onClick={closeMenu}
+            >
+              Тариф
+            </Link>
+          </>
+        ) : null}
         <div
           className="theater-editor-menubar__option theater-editor-menubar__option--separator"
           role="separator"
@@ -101,7 +113,7 @@ export function AppEditorUserMenu() {
             logout();
           }}
         >
-          Выйти
+          {offlineMode && !accessToken ? "К входу" : "Выйти"}
         </button>
       </div>
     </div>

@@ -2,6 +2,16 @@ import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import { Fragment, useMemo } from "react";
+import { useAuth } from "../../auth/model/auth-context";
+import {
+  getAvailabilityDayVisual,
+  mergeSelfIntoProfiles,
+  sortMineFirst,
+} from "../../profile/model/availability-calendar";
+import { selectMyProfile } from "../../profile/model/profileDataSlice";
+import { useScheduleAvailability } from "../../profile/model/useScheduleAvailability";
+import { useAppSelector } from "../../../shared/store/hooks";
+import { AvailabilityDayModal } from "../../profile/ui/AvailabilityDayModal";
 import { MiniAvatar } from "../../../shared/components/mini-avatar/MiniAvatar";
 import type { TeamProfile } from "../../../sync/api/profile";
 import "./TroupeSchedulePreview.css";
@@ -21,6 +31,12 @@ function normalizeEmail(v: string): string {
     .toLowerCase();
 }
 
+function actorSortName(profile: TeamProfile): string {
+  return String(profile.displayName ?? profile.email ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 const ACTOR_COL_PX = 200;
 const DAY_COL_PX = 18;
 const ACTOR_COL_VAR = `var(--troupe-schedule-actor-col, ${ACTOR_COL_PX}px)`;
@@ -31,7 +47,7 @@ export type TroupeSchedulePreviewProps = {
   sessionDateKey: string | null;
   profiles: TeamProfile[];
   membersLoading?: boolean;
-  /** Если задан — в таблице только эти email; пустой Set — компонент не рендерится. */
+  /** Если задан — в таблице эти email плюс текущий пользователь; пустой Set без «меня» скрывает график. */
   participantEmailSet?: Set<string> | undefined;
 };
 
@@ -41,6 +57,10 @@ export function TroupeSchedulePreview({
   membersLoading,
   participantEmailSet,
 }: TroupeSchedulePreviewProps) {
+  const { accessToken } = useAuth();
+  const availability = useScheduleAvailability(accessToken);
+  const myProfile = useAppSelector(selectMyProfile);
+
   const scheduleDays = useMemo(() => {
     if (!sessionDateKey) return [];
     const anchor = dayjs(sessionDateKey, "YYYY-MM-DD", true);
@@ -61,27 +81,29 @@ export function TroupeSchedulePreview({
   );
 
   const actorsSorted = useMemo(() => {
-    const list = [...(profiles ?? [])];
+    const list = mergeSelfIntoProfiles([...(profiles ?? [])], myProfile);
     const filtered =
       participantEmailSet != null
-        ? list.filter((p) =>
-            participantEmailSet.has(normalizeEmail(String(p.email ?? ""))),
+        ? list.filter(
+            (p) =>
+              participantEmailSet.has(normalizeEmail(String(p.email ?? ""))) ||
+              availability.isMine(p.email),
           )
         : list;
-    filtered.sort((a, b) => {
-      const na = String((a as any)?.displayName ?? (a as any)?.email ?? "")
-        .trim()
-        .toLowerCase();
-      const nb = String((b as any)?.displayName ?? (b as any)?.email ?? "")
-        .trim()
-        .toLowerCase();
-      return na.localeCompare(nb, "ru");
-    });
-    return filtered;
-  }, [participantEmailSet, profiles]);
+    filtered.sort((a, b) =>
+      actorSortName(a).localeCompare(actorSortName(b), "ru"),
+    );
+    return sortMineFirst(filtered, availability.myEmail);
+  }, [availability.isMine, availability.myEmail, myProfile, participantEmailSet, profiles]);
+
+  const iAmInSchedule = actorsSorted.some((profile) =>
+    availability.isMine(profile.email),
+  );
 
   const noParticipantsForFilteredChart =
-    participantEmailSet != null && participantEmailSet.size === 0;
+    participantEmailSet != null &&
+    participantEmailSet.size === 0 &&
+    !availability.myEmail;
 
   if (noParticipantsForFilteredChart) {
     return null;
@@ -104,6 +126,12 @@ export function TroupeSchedulePreview({
           {membersLoading ? (
             <div className="rehearsals-muted troupe-schedule-preview__loading">
               Загружаю участников…
+            </div>
+          ) : null}
+
+          {iAmInSchedule ? (
+            <div className="troupe-schedule-preview__hint">
+              Кликните по своему дню, чтобы отметить занятость.
             </div>
           ) : null}
 
@@ -155,14 +183,20 @@ export function TroupeSchedulePreview({
                 actorsSorted.slice(0, 200).map((prof) => {
                   const email = String(prof.email ?? "").trim();
                   const displayName = String(prof.displayName ?? "").trim();
-                  const actorTitle =
-                    displayName || "Без имени";
-                  const cal = prof.availabilityCalendar ?? {};
-                  const rangesByDay = prof.availabilityTimeRanges ?? {};
+                  const actorTitle = displayName || "Без имени";
+                  const mine = availability.isMine(email);
+                  const dayAvailability = availability.resolveDayAvailability(
+                    email,
+                    prof.availabilityCalendar,
+                    prof.availabilityTimeRanges,
+                  );
                   return (
                     <Fragment key={email || actorTitle}>
                       <div
-                        className="troupe-cell troupe-sticky troupe-actor-cell"
+                        className={cn(
+                          "troupe-cell troupe-sticky troupe-actor-cell",
+                          mine && "troupe-actor-cell--mine",
+                        )}
                         title={actorTitle}
                       >
                         <div className="troupe-actor-row">
@@ -178,49 +212,52 @@ export function TroupeSchedulePreview({
                             >
                               {actorTitle}
                             </div>
+                            {mine ? (
+                              <div className="troupe-actor-you">Вы</div>
+                            ) : null}
                           </div>
                         </div>
                       </div>
                       {scheduleDays.map((d) => {
                         const dayKey = toDateKey(d);
-                        const ranges = rangesByDay[dayKey] ?? [];
-                        const st =
-                          cal?.[dayKey] === "present"
-                            ? "present"
-                            : cal?.[dayKey] === "absent"
-                              ? "absent"
-                              : "unknown";
-                        const cls =
-                          st === "absent"
-                            ? "busy"
-                            : Array.isArray(ranges) && ranges.length > 0
-                              ? "partial"
-                              : st === "present"
-                                ? "free"
-                                : "unknown";
-                        const tooltip =
-                          st === "absent"
-                            ? "Занят"
-                            : Array.isArray(ranges) && ranges.length > 0
-                              ? `Свободен: ${ranges
-                                  .map(
-                                    (r: { from?: string; to?: string }) =>
-                                      `${String(r?.from ?? "")}–${String(r?.to ?? "")}`,
-                                  )
-                                  .join(", ")}`
-                              : st === "present"
-                                ? "Свободен"
-                                : "Не отмечено";
+                        const visual = getAvailabilityDayVisual(
+                          dayAvailability.calendar,
+                          dayAvailability.ranges,
+                          dayKey,
+                        );
                         const isFocus = dayKey === sessionDateKey;
+                        const cellTitle = `${dayKey} · ${visual.tooltip}`;
                         return (
                           <div
                             key={`${email}:${dayKey}`}
+                            role={mine ? "button" : undefined}
+                            tabIndex={mine ? 0 : undefined}
                             className={cn(
                               "troupe-cell troupe-day-cell",
-                              cls,
+                              visual.cls,
                               isFocus && "focus",
+                              mine && "troupe-day-cell--mine",
                             )}
-                            title={`${dayKey} · ${tooltip}`}
+                            title={
+                              mine
+                                ? `${cellTitle}. Нажмите, чтобы изменить`
+                                : cellTitle
+                            }
+                            onClick={
+                              mine
+                                ? () => availability.openDayEditor(dayKey)
+                                : undefined
+                            }
+                            onKeyDown={
+                              mine
+                                ? (e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      availability.openDayEditor(dayKey);
+                                    }
+                                  }
+                                : undefined
+                            }
                           />
                         );
                       })}
@@ -230,6 +267,11 @@ export function TroupeSchedulePreview({
               )}
             </div>
           </div>
+          <AvailabilityDayModal
+            isOpen={Boolean(availability.editingDateIso)}
+            dateIso={availability.editingDateIso}
+            onClose={availability.closeDayEditor}
+          />
         </>
       )}
     </div>

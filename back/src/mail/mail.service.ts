@@ -134,4 +134,51 @@ export class MailService {
 
     this.logger.log(`Collection reminder sent to ${to}`);
   }
+
+  async sendUpgradeRequest(params: {
+    fromEmail: string;
+    planName: string;
+    message?: string;
+  }): Promise<boolean> {
+    const host = String(this.config.get('SMTP_HOST') ?? '').trim();
+    const to =
+      String(this.config.get('MAIL_ADMIN') ?? '').trim() ||
+      'sergey@lunyak.ru';
+    const text = [
+      `Запрос тарифа: ${params.planName}`,
+      `Пользователь: ${params.fromEmail}`,
+      params.message ? `Комментарий: ${params.message}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    this.logger.log(`Upgrade request: ${params.fromEmail} → ${params.planName}`);
+    if (!host) return false;
+
+    const port = Number(this.config.get('SMTP_PORT') ?? 587);
+    const secureRaw = String(this.config.get('SMTP_SECURE') ?? '').toLowerCase();
+    const secure =
+      secureRaw === 'true' || secureRaw === '1' || port === 465;
+    const user = String(this.config.get('SMTP_USER') ?? '').trim();
+    const pass = String(this.config.get('SMTP_PASS') ?? '');
+    const fromRaw =
+      String(this.config.get('MAIL_FROM') ?? '').trim() ||
+      user ||
+      'Orchestra <noreply@localhost>';
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      ...(user ? { auth: { user, pass } } : {}),
+    });
+
+    await transporter.sendMail({
+      from: fromRaw,
+      to,
+      subject: `Orchestra: запрос тарифа ${params.planName}`,
+      text,
+    });
+    return true;
+  }
 }

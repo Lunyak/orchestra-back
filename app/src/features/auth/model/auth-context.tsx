@@ -11,7 +11,9 @@ import {
 
 export interface AuthContextValue {
   accessToken: string | null;
+  offlineMode: boolean;
   setAccessToken: (token: string | null) => void;
+  enterDesktopOffline: () => void;
   login: (
     email: string,
     password: string,
@@ -66,6 +68,7 @@ export function useAuthBootstrap() {
 export function useAuth(): AuthContextValue {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector((s) => s.auth.accessToken);
+  const offlineMode = useAppSelector((s) => s.auth.offlineMode);
 
   const setAccessToken = useCallback(
     (token: string | null) => {
@@ -98,9 +101,15 @@ export function useAuth(): AuthContextValue {
     void dispatch(authLogout());
   }, [dispatch]);
 
+  const enterDesktopOffline = useCallback(() => {
+    dispatch(authActions.enterDesktopOffline());
+  }, [dispatch]);
+
   return {
     accessToken: accessToken ?? null,
+    offlineMode: Boolean(offlineMode),
     setAccessToken,
+    enterDesktopOffline,
     login: doLogin,
     signUp: doSignUp,
     logout,

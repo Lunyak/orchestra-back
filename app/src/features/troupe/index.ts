@@ -7,4 +7,7 @@ export {
   monthLabel,
   getTroupeNarrowLayoutSnapshot,
   subscribeTroupeNarrowLayout,
+  readTroupePeopleView,
+  writeTroupePeopleView,
 } from "./model/troupe-page-utils";
+export type { TroupePeopleView } from "./model/troupe-page-utils";

@@ -1,3 +1,33 @@
+.workspace-section-switch.spectacle-direction-switch {
+  display: block;
+  width: min(100%, var(--app-shell-rail-max, var(--width-content-page)));
+  max-width: 100%;
+  margin-inline: auto;
+  padding: 0;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.workspace-section-switch__track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  min-height: 32px;
+  width: 100%;
+  padding: 0 8px;
+  box-sizing: border-box;
+}
+
+.workspace-section-switch--compact .workspace-section-switch__track {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px 12px;
+}
+
 .workspace-section-switch--inline {
   display: flex;
   flex-wrap: wrap;
@@ -102,11 +132,30 @@
   color: var(--color-active-ascent);
 }
 
+@media (max-width: 1366px) {
+  .workspace-section-switch__track {
+    gap: 2px 8px;
+    padding: 0 6px;
+    min-height: 28px;
+  }
+}
+
 @media (max-width: 720px) {
-  .workspace-section-switch--compact {
+  .workspace-section-switch.spectacle-direction-switch {
+    padding: 0;
+  }
+
+  .workspace-section-switch__track {
+    justify-content: flex-start;
+    align-items: center;
+    gap: 0 6px;
+    padding: 2px 6px;
+    min-height: 0;
+  }
+
+  .workspace-section-switch--compact .workspace-section-switch__track {
     display: flex;
     flex-wrap: nowrap;
-    align-items: center;
     gap: 6px;
     padding: 0 8px;
   }

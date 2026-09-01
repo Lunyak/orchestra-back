@@ -30,4 +30,5 @@ export const orchestraApiTagTypes = [
   "StudioAssignments",
   "StudioLessons",
   "StudioVideos",
+  "Billing",
 ] as const;

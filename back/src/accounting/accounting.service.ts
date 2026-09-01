@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensureTroupeOwnerMember } from '../troupe/ensure-troupe-owner-member';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { CreateContributionDto } from './dto/create-contribution.dto';
 import { SetCollectionParticipantsDto } from './dto/set-collection-participants.dto';
@@ -462,6 +463,7 @@ export class AccountingService {
           participationType: 'HOME',
         },
       });
+      await ensureTroupeOwnerMember(tx, troupe.id, userId);
       return troupe;
     });
   }

@@ -2,7 +2,7 @@ import "./login.css";
 import { isAxiosError } from "axios";
 import { LabeledCheckbox } from "@shared/core/labeled-checkbox/LabeledCheckbox";
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { getApiBaseUrl } from "../../../sync/api/client";
 import { forgotPassword } from "../../../sync/auth";
 import { useAuth } from "../model/auth-context";
@@ -13,18 +13,22 @@ export function LoginForm({
   onAfterLogin?: (token: string) => Promise<void>;
 }) {
   const navigate = useNavigate();
-  const { login: doLogin, signUp } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { login: doLogin, signUp, enterDesktopOffline } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(
+    searchParams.get("register") === "1",
+  );
   const [acceptLegal, setAcceptLegal] = useState(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
   const apiBase = getApiBaseUrl();
   const isDesktop = import.meta.env.MODE === "desktop";
+  const passwordAutoComplete = isRegisterMode ? "new-password" : "current-password";
 
   const formatAuthError = (err: unknown): string => {
     if (isAxiosError(err) && !err.response) {
@@ -69,6 +73,11 @@ export function LoginForm({
   return (
     <div className="app-layout login-layout">
       <form className="login-form" onSubmit={handleSubmit}>
+        <p className="login-form__brand">
+          <Link className="login-form__link" to="/">
+            Orchestra
+          </Link>
+        </p>
         <h1 className="login-form__title">
           {isResetMode
             ? "Сброс пароля"
@@ -79,20 +88,24 @@ export function LoginForm({
         <p className="login-form-subtitle">
           {isResetMode
             ? "Укажи email аккаунта — пришлём ссылку для смены пароля."
-            : "Войди в аккаунт, чтобы работать с проектами и сценарием на этом устройстве."}
-          {isDesktop ? (
-            <>
-              {" "}
-              API: <code>{apiBase}</code>
-            </>
-          ) : null}
+            : isRegisterMode
+              ? "Создай аккаунт, чтобы работать с проектами и сценарием на этом устройстве."
+              : "Войди в аккаунт, чтобы работать с проектами и сценарием на этом устройстве."}
         </p>
+        {isDesktop ? (
+          <p className="login-api-hint">
+            API
+            <span className="login-api-url">{apiBase}</span>
+          </p>
+        ) : null}
 
         <label className="login-form__label">
           Email
           <input
             className="login-form__input"
             type="email"
+            name="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -149,6 +162,8 @@ export function LoginForm({
               <input
                 className="login-form__input"
                 type="password"
+                name="password"
+                autoComplete={passwordAutoComplete}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -205,6 +220,17 @@ export function LoginForm({
                 }}
               >
                 Забыли пароль?
+              </button>
+            ) : null}
+            {isDesktop && !isResetMode ? (
+              <button
+                type="button"
+                className="login-form__btn login-form__btn--secondary"
+                onClick={() => {
+                  enterDesktopOffline();
+                }}
+              >
+                Работать офлайн
               </button>
             ) : null}
           </>

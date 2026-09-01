@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { WorkspaceRole, WorkspaceType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ensureTroupeOwnerMember } from '../troupe/ensure-troupe-owner-member';
 
 @Injectable()
 export class WorkspacesService {
@@ -86,6 +87,7 @@ export class WorkspacesService {
           participationType: 'HOME',
         },
       });
+      await ensureTroupeOwnerMember(tx, troupe.id, userId);
 
       return { ...theater, troupes: [troupe] };
     });
@@ -139,6 +141,7 @@ export class WorkspacesService {
           },
         });
       }
+      await ensureTroupeOwnerMember(tx, troupe.id, userId);
 
       return troupe;
     });

@@ -950,6 +950,11 @@
 .markdown-preview.markdown-preview--play-inline-labels p {
   font-size: inherit;
   line-height: inherit;
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .markdown-preview.markdown-preview--play-inline-labels p + p {
@@ -965,6 +970,8 @@
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role {
   display: block;
   gap: 0;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-dialog-label {
@@ -980,6 +987,9 @@
 .markdown-preview.markdown-preview--play-inline-labels .markdown-dialog-line--label-role .markdown-dialog-text {
   display: inline;
   vertical-align: baseline;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
 }
 
 .markdown-preview.markdown-preview--play-inline-labels .markdown-speaker-label,
@@ -2495,6 +2505,8 @@
 
 .script-markdown-editor-main--play .script-markdown-cm .cm-line {
   line-height: inherit;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .script-markdown-editor-main--play .script-markdown-cm .cm-md-parenthetical-remark {

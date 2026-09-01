@@ -84,6 +84,7 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
   const { accessToken } = useAuth();
   const {
     createProject,
+    createDemoProject,
     onProjectChange,
     projectItems,
     projectName,
@@ -96,6 +97,7 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
   const [projectTitle, setProjectTitle] = useState("");
   const [createError, setCreateError] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingDemo, setIsCreatingDemo] = useState(false);
   const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
   const hasProjects = projectItems.length > 0;
@@ -193,12 +195,33 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
     onProjectOpen?.(slug);
   };
 
+  const handleOpenDemo = async () => {
+    setIsCreatingDemo(true);
+    setCreateError("");
+    try {
+      const slug = await createDemoProject();
+      if (!slug) {
+        setCreateError("Не удалось открыть демо");
+        return;
+      }
+      const href = hasSeenProjectOnboarding()
+        ? projectPath(slug)
+        : projectOnboardingHref(slug);
+      onProjectChange(slug);
+      navigate(href);
+    } catch {
+      setCreateError("Не удалось открыть демо");
+    } finally {
+      setIsCreatingDemo(false);
+    }
+  };
+
   const emptyMessage = hasProjects
     ? "Ничего не найдено по запросу."
     : "Здесь пока нет проектов.";
   const emptyHint = hasProjects
     ? "Измените поиск или сбросьте фильтр."
-    : "Нажмите «Создать», чтобы добавить первый.";
+    : "Создайте проект или откройте демо-спектакль.";
 
   return (
     <section
@@ -262,6 +285,23 @@ export function ProjectWorkspace({ onProjectOpen }: ProjectWorkspaceProps) {
         <div className="project-workspace__empty">
           <h2>{emptyMessage}</h2>
           <p>{emptyHint}</p>
+          {!hasProjects ? (
+            <button
+              type="button"
+              className="project-workspace__demo-button"
+              disabled={isCreatingDemo}
+              onClick={() => {
+                void handleOpenDemo();
+              }}
+            >
+              {isCreatingDemo ? "Открываю…" : "Открыть демо-спектакль"}
+            </button>
+          ) : null}
+          {createError && !isCreateOpen ? (
+            <p className="project-workspace__error" role="alert">
+              {createError}
+            </p>
+          ) : null}
         </div>
       )}
 

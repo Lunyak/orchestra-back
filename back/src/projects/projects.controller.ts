@@ -266,6 +266,11 @@ export class ProjectsController {
     );
   }
 
+  @Post('from-demo')
+  createDemoProject(@Req() req: any) {
+    return this.projectsService.createDemoProject(req.user.userId);
+  }
+
   @Post()
   createProject(@Req() req: any, @Body() body: any) {
     return this.projectsService.createProject(req.user.userId, body);

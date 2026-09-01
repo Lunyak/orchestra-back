@@ -1,6 +1,6 @@
 import { UnderDevelopmentPage } from "@shared/components/under-development-page/UnderDevelopmentPage";
 import { lazy } from "react";
-import { Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useParams } from "react-router-dom";
 import {
   ENABLE_ACTOR_PAGE,
   ENABLE_ACCOUNTING,
@@ -209,11 +209,20 @@ const ProfilePage = lazy(() =>
     default: m.ProfilePage,
   })),
 );
+const PlanPage = lazy(() =>
+  import("../../pages/billing/PlanPage").then((m) => ({
+    default: m.PlanPage,
+  })),
+);
 
 const TroupePage = lazy(() =>
   import("../../pages/troupe/TroupePage").then((m) => ({
     default: m.TroupePage,
   })),
+);
+
+const TheaterAvailabilityPage = lazy(
+  () => import("../../pages/troupe/TheaterAvailabilityPage"),
 );
 
 const TheaterTeamPage = lazy(() =>
@@ -415,44 +424,26 @@ export function AppRouteDeclarations() {
       />
       <Route
         path={`${globalPaths.organizations}/theaters/:theaterId`}
-        element={<TheaterOrganizationPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/overview`}
-        element={<TheaterOverviewPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/troupe`}
-        element={<TroupePage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/rehearsals`}
-        element={<TheaterRehearsalsPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/rehearsals/:sessionId/slots/:slotId`}
-        element={<DirectorSessionPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/rehearsals/:sessionId`}
-        element={<DirectorSessionPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/team`}
-        element={<TheaterTeamPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/team/roles/:roleId`}
-        element={<TeamRolePage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/premises`}
-        element={<PremisesPage />}
-      />
-      <Route
-        path={`${globalPaths.organizations}/theaters/:theaterId/premises/:premiseId`}
-        element={<PremiseDetailPage />}
-      />
+        element={<Outlet />}
+      >
+        <Route index element={<TheaterOrganizationPage />} />
+        <Route path="overview" element={<TheaterOverviewPage />} />
+        <Route path="troupe" element={<TroupePage />} />
+        <Route path="availability" element={<TheaterAvailabilityPage />} />
+        <Route path="rehearsals" element={<TheaterRehearsalsPage />} />
+        <Route
+          path="rehearsals/:sessionId/slots/:slotId"
+          element={<DirectorSessionPage />}
+        />
+        <Route
+          path="rehearsals/:sessionId"
+          element={<DirectorSessionPage />}
+        />
+        <Route path="team" element={<TheaterTeamPage />} />
+        <Route path="team/roles/:roleId" element={<TeamRolePage />} />
+        <Route path="premises" element={<PremisesPage />} />
+        <Route path="premises/:premiseId" element={<PremiseDetailPage />} />
+      </Route>
       <Route
         path={`${globalPaths.organizations}/troupes`}
         element={<TroupesIndexPage />}
@@ -601,6 +592,7 @@ export function AppRouteDeclarations() {
         element={roleWorkbookPageElement}
       />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path={globalPaths.billing} element={<PlanPage />} />
       <Route path="/" element={<Navigate to={DEFAULT_APP_PATH} replace />} />
       <Route path="/spectacle/*" element={<LegacyProjectRedirect />} />
       <Route path="/light-plot/*" element={<LegacyProjectRedirect />} />

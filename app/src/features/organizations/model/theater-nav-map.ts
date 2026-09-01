@@ -1,4 +1,5 @@
 import {
+  theaterAvailabilityPath,
   theaterOverviewPath,
   theaterPremisesPath,
   theaterRehearsalsPath,
@@ -27,12 +28,13 @@ type NavNodeDef = {
 
 const WORK_CHILDREN: ReadonlyArray<NavNodeDef> = [
   { id: "rehearsals", label: "Репетиции", href: theaterRehearsalsPath },
+  { id: "availability", label: "Занятость", href: theaterAvailabilityPath },
   { id: "premises", label: "Помещения", href: theaterPremisesPath },
 ];
 
 const PEOPLE_CHILDREN: ReadonlyArray<NavNodeDef> = [
   { id: "troupe", label: "Коллектив", href: theaterTroupePath },
-  { id: "team", label: "Команда", href: theaterTeamPath },
+  { id: "team", label: "Должности", href: theaterTeamPath },
 ];
 
 const NAV_BRANCH_DEFS: ReadonlyArray<NavNodeDef> = [

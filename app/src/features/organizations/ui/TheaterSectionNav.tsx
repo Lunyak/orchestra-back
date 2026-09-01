@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
-  theaterOverviewPath,
+  theaterAvailabilityPath,
   theaterPremisesPath,
   theaterRehearsalsPath,
   theaterTeamPath,
   theaterTroupePath,
 } from "../../../app/router/paths";
-import { fetchTheaters } from "../../../sync/api/workspaces";
-import { useAuth } from "../../auth/model/auth-context";
 import {
   WorkspaceSectionSwitch,
   type WorkspaceSectionItem,
@@ -15,8 +13,7 @@ import {
 
 type TheaterSectionNavProps = {
   theaterId: string;
-  active: "rehearsals" | "troupe" | "team" | "premises";
-  /** bar — верхняя полоса; inline — внутри шапки страницы */
+  active: "rehearsals" | "availability" | "troupe" | "team" | "premises";
   variant?: "bar" | "inline";
 };
 
@@ -26,8 +23,9 @@ const ITEMS: ReadonlyArray<{
   path: (theaterId: string) => string;
 }> = [
   { id: "rehearsals", label: "Репетиции", path: theaterRehearsalsPath },
+  { id: "availability", label: "Занятость", path: theaterAvailabilityPath },
   { id: "troupe", label: "Коллектив", path: theaterTroupePath },
-  { id: "team", label: "Команда", path: theaterTeamPath },
+  { id: "team", label: "Должности", path: theaterTeamPath },
   { id: "premises", label: "Помещения", path: theaterPremisesPath },
 ];
 
@@ -36,26 +34,6 @@ export function TheaterSectionNav({
   active,
   variant = "bar",
 }: TheaterSectionNavProps) {
-  const { accessToken } = useAuth();
-  const [theaterTitle, setTheaterTitle] = useState("");
-
-  useEffect(() => {
-    if (!accessToken || !theaterId) return;
-    let cancelled = false;
-    fetchTheaters(accessToken)
-      .then((theaters) => {
-        if (cancelled) return;
-        const theater = theaters.find((item) => item.id === theaterId);
-        setTheaterTitle(theater?.title ?? "");
-      })
-      .catch(() => {
-        if (!cancelled) setTheaterTitle("");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, theaterId]);
-
   const items = useMemo<WorkspaceSectionItem[]>(
     () =>
       ITEMS.map((item) => ({
@@ -69,8 +47,6 @@ export function TheaterSectionNav({
   return (
     <WorkspaceSectionSwitch
       ariaLabel="Разделы театра"
-      backTo={theaterOverviewPath(theaterId)}
-      backLabel={theaterTitle || "Театр"}
       items={items}
       activeId={active}
       variant={variant}
