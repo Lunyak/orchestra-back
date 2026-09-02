@@ -1,8 +1,9 @@
 import type { CalendarSectionState } from "@shared/components/calendar/CalendarSection";
 import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import {
   globalPaths,
+  studioOrgPremisesPath,
   studioPremisesPath,
   theaterPremisesPath,
 } from "../../../app/router/paths";
@@ -40,6 +41,20 @@ import {
 } from "./premise-detail-helpers";
 import { isoDate } from "./premise-utils";
 
+function resolvePremisesListPath(
+  theaterId: string,
+  studioId: string,
+  pathname: string,
+) {
+  if (theaterId) return theaterPremisesPath(theaterId);
+  if (!studioId) return globalPaths.premises;
+  const isStudioOrgRoute = pathname.startsWith(
+    `${globalPaths.organizations}/studios/`,
+  );
+  if (isStudioOrgRoute) return studioOrgPremisesPath(studioId);
+  return studioPremisesPath(studioId);
+}
+
 export function usePremiseDetailData() {
   const {
     premiseId = "",
@@ -50,11 +65,8 @@ export function usePremiseDetailData() {
     theaterId?: string;
     studioId?: string;
   }>();
-  const premisesPath = theaterId
-    ? theaterPremisesPath(theaterId)
-    : studioId
-      ? studioPremisesPath(studioId)
-      : globalPaths.premises;
+  const { pathname } = useLocation();
+  const premisesPath = resolvePremisesListPath(theaterId, studioId, pathname);
   const { accessToken } = useAuth();
   const { data: myProfile } = useMyProfileQuery(undefined, {
     skip: !accessToken,

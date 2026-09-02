@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test:routes": "node --test tests/router-paths.test.mjs tests/dashboard.test.mjs",
+    "test:routes": "node --import ./tests/register-relative-ts.mjs --test tests/router-paths.test.mjs tests/dashboard.test.mjs",
     "test:projector": "node --test tests/projector-cross-window-media.test.mjs",
-    "test": "node --test tests/router-paths.test.mjs tests/dashboard.test.mjs tests/projector-cross-window-media.test.mjs"
+    "test": "node --import ./tests/register-relative-ts.mjs --test tests/router-paths.test.mjs tests/dashboard.test.mjs tests/projector-cross-window-media.test.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

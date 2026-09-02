@@ -2,11 +2,11 @@ import cn from "classnames";
 import { useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  getStudioIdFromPath,
   globalPaths,
+  isProjectPath,
   isTheaterOrganizationPath,
-  resolveProjectScopedBackPath,
 } from "../../../app/router/paths";
+import { resolveScopedBackPath } from "../../../app/router/route-nav";
 import { ENABLE_ACCOUNTING } from "../../../shared/build-features";
 
 const globalNavigation = [
@@ -61,37 +61,50 @@ function isEditableKeyboardTarget(target: EventTarget | null): boolean {
   return true;
 }
 
+function scopedBackLink(
+  to: string,
+  exitTo: string,
+  exitAria: string,
+  exitNav: string,
+): ScopedBackLink {
+  const isExit = to === exitTo;
+  const label = isExit ? exitAria : "Назад";
+  return {
+    to,
+    ariaLabel: label,
+    title: label,
+    navLabel: isExit ? exitNav : "Назад",
+  };
+}
+
 function resolveScopedBackLink(pathname: string): ScopedBackLink | null {
-  const projectBack = resolveProjectScopedBackPath(pathname);
-  if (projectBack) {
-    const toProjects = projectBack === globalPaths.projects;
-    return {
-      to: projectBack,
-      ariaLabel: toProjects ? "К проектам" : "Назад",
-      title: toProjects ? "К проектам" : "Назад",
-      navLabel: toProjects ? "Выход из проекта" : "Назад",
-    };
+  const back = resolveScopedBackPath(pathname);
+  if (!back) return null;
+
+  if (isProjectPath(pathname)) {
+    return scopedBackLink(
+      back,
+      globalPaths.projects,
+      "К проектам",
+      "Выход из проекта",
+    );
   }
 
   if (isTheaterOrganizationPath(pathname)) {
-    return {
-      to: globalPaths.organizations,
-      ariaLabel: "К организациям",
-      title: "К организациям",
-      navLabel: "Выход из театра",
-    };
+    return scopedBackLink(
+      back,
+      globalPaths.organizations,
+      "К организациям",
+      "Выход из театра",
+    );
   }
 
-  if (getStudioIdFromPath(pathname)) {
-    return {
-      to: globalPaths.organizations,
-      ariaLabel: "К организациям",
-      title: "К организациям",
-      navLabel: "Выход из студии",
-    };
-  }
-
-  return null;
+  return scopedBackLink(
+    back,
+    globalPaths.organizations,
+    "К организациям",
+    "Выход из студии",
+  );
 }
 
 export function AppEditorHomeLink() {

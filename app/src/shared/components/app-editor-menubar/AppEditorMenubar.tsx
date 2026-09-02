@@ -1,7 +1,8 @@
 import cn from "classnames";
 import { useState, type MouseEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { isProjectPath, isScopedWorkspacePath } from "../../../app/router/paths";
+import { isProjectPath } from "../../../app/router/paths";
+import { isScopedWorkspacePath } from "../../../app/router/route-nav";
 import { useAuth } from "../../../features/auth";
 import { useProject } from "../../../features/project";
 import { useCompactKadrStrip } from "@shared/hooks/useCompactKadrStrip";

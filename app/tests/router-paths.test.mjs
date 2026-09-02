@@ -6,12 +6,10 @@ import {
   getStudioIdFromPath,
   getTheaterIdFromPath,
   isTheaterTeamPath,
-  projectAccountingPath,
+  accountingPath,
   projectPath,
   projectSessionPath,
   projectTaskPath,
-  resolveLegacyProjectPath,
-  resolveLegacyStudioPath,
   studioLessonPath,
   studioOrganizationPath,
   studioPremisesPath,
@@ -25,10 +23,18 @@ import {
   theaterAvailabilityPath,
   isTheaterAvailabilityPath,
   isTheaterTroupePath,
-  resolveTheaterScopedBackPath,
   projectTheaterInvitePath,
   projectTeamRolePath,
 } from "../src/app/router/paths.ts";
+import {
+  resolveLegacyProjectPath,
+  resolveLegacyStudioPath,
+} from "../src/app/router/route-legacy.ts";
+import {
+  resolveScopedBackPath,
+  resolveStudioScopedBackPath,
+  resolveTheaterScopedBackPath,
+} from "../src/app/router/route-nav.ts";
 
 test("builds canonical project detail paths", () => {
   assert.equal(projectPath("hamlet"), "/projects/hamlet/overview");
@@ -38,8 +44,8 @@ test("builds canonical project detail paths", () => {
     "/projects/hamlet/sessions/session%201/slots/slot%2F2",
   );
   assert.equal(
-    projectAccountingPath("hamlet", "collection-1"),
-    "/projects/hamlet/accounting/collection-1",
+    accountingPath("collection-1"),
+    "/accounting/collection-1",
   );
   assert.equal(
     projectTheaterInvitePath("tok/en"),
@@ -135,6 +141,42 @@ test("theater scoped back goes one level up", () => {
     "/organizations/theaters/theater%201/team",
   );
   assert.equal(resolveTheaterScopedBackPath("/organizations"), null);
+});
+
+test("studio scoped back goes one level up", () => {
+  assert.equal(
+    resolveStudioScopedBackPath("/organizations/studios/studio%201/overview"),
+    "/organizations",
+  );
+  assert.equal(
+    resolveStudioScopedBackPath("/organizations/studios/studio%201/members"),
+    "/organizations/studios/studio%201/overview",
+  );
+  assert.equal(
+    resolveStudioScopedBackPath(
+      "/organizations/studios/studio%201/premises/hall-1",
+    ),
+    "/organizations/studios/studio%201/premises",
+  );
+  assert.equal(
+    resolveStudioScopedBackPath("/studios/studio%201"),
+    "/organizations",
+  );
+  assert.equal(
+    resolveStudioScopedBackPath("/studios/studio%201/programs/program-1"),
+    "/studios/studio%201",
+  );
+  assert.equal(
+    resolveStudioScopedBackPath(
+      "/studios/studio%201/programs/program-1/lessons/lesson-2",
+    ),
+    "/studios/studio%201/programs/program-1",
+  );
+  assert.equal(resolveStudioScopedBackPath("/organizations"), null);
+  assert.equal(
+    resolveScopedBackPath("/studios/studio%201/videos/video-1"),
+    "/studios/studio%201",
+  );
 });
 
 test("encodes studio route parameters", () => {

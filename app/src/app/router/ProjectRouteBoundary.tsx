@@ -2,12 +2,11 @@ import { PageBootLoader } from "@shared/components/page-loader/page-boot";
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { useProject } from "../../features/project";
+import { globalPaths, projectPath } from "./paths";
 import {
-  globalPaths,
-  projectPath,
   resolveLegacyProjectPath,
   resolveLegacyStudioPath,
-} from "./paths";
+} from "./route-legacy";
 
 export function ProjectRouteBoundary() {
   const { projectSlug = "" } = useParams();
