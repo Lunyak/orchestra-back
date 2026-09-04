@@ -1,16 +1,9 @@
-import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn } from "../../theater-controls-ui";
 import type { SpotlightsSectionProps } from "./types";
 
-export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: SpotlightsSectionProps) {
-  const { spotlightCountBadge } = spot;
+export function TheaterControlsSpotlightsLightplotSection({ vm }: SpotlightsSectionProps) {
   return (
-    <TheaterCollapsibleSection
-      sectionId="spotlights-lightplot"
-      title="Управление"
-      badge={spotlightCountBadge}
-      defaultOpen
-    >
+    <div className="theater-spotlight-nav-panel theater-spotlight-nav-panel--control">
       <div className="theater-btn-row">
         <TheaterBtn
           disabled={!vm.currentScene}
@@ -53,6 +46,6 @@ export function TheaterControlsSpotlightsLightplotSection({ vm, spot }: Spotligh
           Блекаут
         </TheaterBtn>
       </div>
-    </TheaterCollapsibleSection>
+    </div>
   );
 }

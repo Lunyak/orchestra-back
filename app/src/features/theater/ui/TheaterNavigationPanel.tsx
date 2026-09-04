@@ -1,30 +1,30 @@
-import { useState } from "react";
-import cn from "classnames";
 import type { TheaterSceneViewModel } from "../model/use-theater-scene";
 import { TheaterControlsOutlinerSection } from "./controls/TheaterControlsOutlinerSection";
 import { TheaterControlsViewSection } from "./controls/TheaterControlsViewSection";
 import { TheaterKeyboardShortcuts } from "./TheaterKeyboardShortcuts";
-import { TheaterKadrTape } from "./TheaterKadrTape";
+import cn from "classnames";
 
-type NavigationPanelTab = "scene" | "kadrs" | "view" | "help";
+export type TheaterNavigationSection = "scene" | "view" | "help";
 
 export type TheaterNavigationPanelProps = {
   vm: TheaterSceneViewModel;
   /** Внутри правого сайдбара (без отдельной колонки у viewport). */
   embedded?: boolean;
+  section: TheaterNavigationSection;
 };
 
-/** Outliner, картины, вид и справка — отдельно от настроек инструментов. */
-export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelProps) {
-  const [tab, setTab] = useState<NavigationPanelTab>("scene");
+/** Outliner, вид и справка — отдельно от настроек инструментов. */
+export function TheaterNavigationPanel({
+  vm,
+  embedded,
+  section,
+}: TheaterNavigationPanelProps) {
   const activePanelLabel =
-    tab === "scene"
-      ? "Сцена"
-      : tab === "kadrs"
-        ? "Сцены / картины"
-        : tab === "view"
-          ? "Вид"
-          : "Справка";
+    section === "scene"
+      ? "Список элементов"
+      : section === "view"
+        ? "Вид"
+        : "Справка";
 
   return (
     <div
@@ -32,71 +32,12 @@ export function TheaterNavigationPanel({ vm, embedded }: TheaterNavigationPanelP
         "theater-navigation-panel",
         embedded && "theater-navigation-panel--embedded",
       )}
-      aria-label="Навигация по сцене"
+      aria-label={activePanelLabel}
     >
-      <div
-        className="theater-navigation-panel-tabs"
-        role="tablist"
-        aria-label="Сцена, сцены и картины, вид и справка"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "scene"}
-          className={cn(
-            "theater-navigation-panel-tab",
-            tab === "scene" && "theater-navigation-panel-tab--selected",
-          )}
-          onClick={() => setTab("scene")}
-        >
-          Сцена
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "kadrs"}
-          className={cn(
-            "theater-navigation-panel-tab",
-            tab === "kadrs" && "theater-navigation-panel-tab--selected",
-          )}
-          onClick={() => setTab("kadrs")}
-        >
-          Сцены / картины
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "view"}
-          className={cn(
-            "theater-navigation-panel-tab",
-            tab === "view" && "theater-navigation-panel-tab--selected",
-          )}
-          onClick={() => setTab("view")}
-        >
-          Вид
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "help"}
-          className={cn(
-            "theater-navigation-panel-tab",
-            tab === "help" && "theater-navigation-panel-tab--selected",
-          )}
-          onClick={() => setTab("help")}
-        >
-          Справка
-        </button>
-      </div>
-      <div
-        className="theater-navigation-panel-body"
-        role="tabpanel"
-        aria-label={activePanelLabel}
-      >
-        {tab === "scene" ? <TheaterControlsOutlinerSection vm={vm} /> : null}
-        {tab === "kadrs" ? <TheaterKadrTape vm={vm} /> : null}
-        {tab === "view" ? <TheaterControlsViewSection vm={vm} /> : null}
-        {tab === "help" ? <TheaterKeyboardShortcuts /> : null}
+      <div className="theater-navigation-panel-body" aria-label={activePanelLabel}>
+        {section === "scene" ? <TheaterControlsOutlinerSection vm={vm} /> : null}
+        {section === "view" ? <TheaterControlsViewSection vm={vm} /> : null}
+        {section === "help" ? <TheaterKeyboardShortcuts /> : null}
       </div>
     </div>
   );

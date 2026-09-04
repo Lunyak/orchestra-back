@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import cn from "classnames";
 import type { TheaterSpotlight } from "../../../../../shared/types/script";
 
 type SpotlightListNameInputProps = {
@@ -39,13 +40,11 @@ export function SpotlightListNameInput({
   return (
     <input
       type="text"
-      className={[
+      className={cn(
         "native-text-input",
         "theater-spotlight-name-input",
-        active ? "theater-spotlight-name-input--active" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
+        active && "theater-spotlight-name-input--active",
+      )}
       value={draft}
       disabled={disabled}
       placeholder={placeholder}

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import cn from "classnames";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import type { TheaterModel } from "../../../../../shared/types/script";
-import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn, TheaterSelect } from "../../theater-controls-ui";
 import type { SpotlightsSectionProps } from "./types";
 
@@ -87,40 +86,33 @@ export function TheaterControlsSpotlightsTrussSection({
     trusses.length > 0 && trusses.every((item) => !item.hidden);
 
   return (
-    <TheaterCollapsibleSection
-      sectionId="spotlights-trusses"
-      title="Световые фермы"
-      badge={trusses.length > 0 ? String(trusses.length) : undefined}
-      defaultOpen
-      headerActions={
-        <>
-          <TheaterBtn
-            onClick={() => vm.addBuiltinModelAt("lightTruss6m")}
-            disabled={!vm.currentScene}
-            title="Добавить ферму 6 м"
-          >
-            +
-          </TheaterBtn>
-          <TheaterBtn
-            className="theater-btn--visibility"
-            active={allVisible}
-            disabled={!vm.currentScene || trusses.length === 0}
-            title={allVisible ? "Скрыть все" : "Показать все"}
-            onClick={() => {
-              const nextHidden = allVisible;
-              for (const truss of trusses) {
-                if (Boolean(truss.hidden) !== nextHidden) {
-                  vm.updateModel(truss.id, { hidden: nextHidden });
-                }
+    <div className="theater-spotlight-nav-panel">
+      <div className="theater-spotlight-nav-toolbar">
+        <TheaterBtn
+          onClick={() => vm.addBuiltinModelAt("lightTruss6m")}
+          disabled={!vm.currentScene}
+          title="Добавить ферму 6 м"
+        >
+          +
+        </TheaterBtn>
+        <TheaterBtn
+          className="theater-btn--visibility"
+          active={allVisible}
+          disabled={!vm.currentScene || trusses.length === 0}
+          title={allVisible ? "Скрыть все" : "Показать все"}
+          onClick={() => {
+            const nextHidden = allVisible;
+            for (const truss of trusses) {
+              if (Boolean(truss.hidden) !== nextHidden) {
+                vm.updateModel(truss.id, { hidden: nextHidden });
               }
-            }}
-          >
-            <span className="theater-spotlight-power-dot" />
-          </TheaterBtn>
-        </>
-      }
-    >
-      <div className="theater-spotlight-list theater-spotlight-list--scroll">
+            }
+          }}
+        >
+          <span className="theater-spotlight-power-dot" />
+        </TheaterBtn>
+      </div>
+      <div className="theater-sidebar-home theater-spotlight-nav-list">
         {trusses.map((truss) => {
           const isSelected =
             truss.id === activeTruss?.id ||
@@ -132,10 +124,30 @@ export function TheaterControlsSpotlightsTrussSection({
             <div
               key={truss.id}
               className={cn(
-                "theater-spotlight-tab",
-                "theater-spotlight-tab--truss",
+                "theater-sidebar-home__item",
+                "theater-spotlight-nav-row",
+                "theater-spotlight-nav-row--truss",
+                isSelected && "theater-spotlight-nav-row--active",
               )}
+              onClick={(event) => {
+                const target = event.target as HTMLElement;
+                if (target.closest("button, input, select, label")) return;
+                vm.selectTheaterModel(truss.id, event.shiftKey);
+                vm.setEditMode("models");
+              }}
             >
+              <svg
+                className="theater-sidebar-home__icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <path d="M3 8h18M3 16h18M6 8v8M12 8v8M18 8v8" />
+              </svg>
               <TrussListNameInput
                 item={truss}
                 active={isSelected}
@@ -175,7 +187,7 @@ export function TheaterControlsSpotlightsTrussSection({
       </div>
 
       {activeTruss ? (
-        <>
+        <div className="theater-spotlight-nav-footer">
           <div className="theater-btn-row">
             <TheaterBtn
               active={vm.editMode === "models"}
@@ -211,8 +223,8 @@ export function TheaterControlsSpotlightsTrussSection({
             Наведите курсор на точку фермы и нажмите, чтобы установить выбранный
             софит.
           </span>
-        </>
+        </div>
       ) : null}
-    </TheaterCollapsibleSection>
+    </div>
   );
 }
