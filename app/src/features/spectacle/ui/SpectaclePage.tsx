@@ -1,7 +1,7 @@
 import { usePageBootBlock } from "@shared/components/page-loader/page-boot";
 import cn from "classnames";
 import React, { Suspense, useLayoutEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { projectPath } from "../../../app/router/paths";
 import "./style.css";
 import { PlaylistSidebar } from "../../../shared/components/playlist-sidebar/PlaylistSidebar";
@@ -63,7 +63,6 @@ const LAZY_BOOT_LABELS: Record<string, string> = {
   media: "Загрузка медиа…",
   script: "Загрузка сценария…",
   board: "Загрузка репетиций…",
-  tasks: "Загрузка задач…",
 };
 
 export type { SpectaclePageViewModel } from "../model/useSpectaclePage";
@@ -115,7 +114,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
   const [lazyViewReady, setLazyViewReady] = useState(false);
   const lazyViewKey = `${projectName}:${activeView}`;
   const lazyPreloader = LAZY_VIEW_PRELOADERS[activeView];
-  const lazyViewNeedsBoot = Boolean(lazyPreloader) || activeView === "tasks";
+  const lazyViewNeedsBoot = Boolean(lazyPreloader);
 
   useLayoutEffect(() => {
     if (!projectName || !lazyViewNeedsBoot) {
@@ -270,9 +269,7 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
     activeView === "script" ||
     activeView === "light-plot" ||
     activeView === "sufer" ||
-    activeView === "board" ||
-    activeView === "sessions" ||
-    activeView === "tasks";
+    activeView === "board";
 
   const stepsSidebarNode = stepsSidebarVisible ? (
       <div
@@ -363,13 +360,6 @@ export function SpectaclePageView({ vm }: { vm: SpectaclePageViewModel }) {
               <KanbanBoardPage members={kanbanMembers} />
             </Suspense>
           )}
-          {activeView === "tasks" && (
-            <Suspense fallback={null}>
-              <Outlet />
-            </Suspense>
-          )}
-          {activeView === "sessions" && <Outlet />}
-          {activeView === "team" && <Outlet />}
         </main>
         </SpectacleTechChromeSlotsProvider>
       </div>

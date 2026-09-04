@@ -1,8 +1,10 @@
 import { resolveRehearsalPlanEntryPath } from "./rehearsalPlanTab";
+import { readSelectedProjectSlug } from "./selectedProject";
 import {
   getProjectSectionFromPath,
   globalPaths,
   isTheaterTeamPath,
+  projectPath,
 } from "../../app/router/paths";
 
 export type AdminSection =
@@ -60,17 +62,25 @@ export function adminSectionFromPath(pathname: string): AdminSection | null {
   return null;
 }
 
-export function resolveAdminPlanEntryPath(): string {
-  return resolveRehearsalPlanEntryPath({ excludeTasks: true });
+export function resolveAdminPlanEntryPath(projectSlug?: string | null): string {
+  return resolveRehearsalPlanEntryPath({
+    projectSlug,
+    excludeTasks: true,
+  });
 }
 
-export function resolveAdminEntryPath(): string {
+export function resolveAdminEntryPath(projectSlug?: string | null): string {
+  const slug = projectSlug ?? readSelectedProjectSlug();
   const section = readAdminSection();
+
   if (section === "team") return globalPaths.organizations;
-  if (section === "tasks") return "/tasks";
-  if (section === "accounting") return "/accounting";
-  if (section === "premises") return "/premises";
-  return resolveAdminPlanEntryPath();
+  if (section === "accounting") return globalPaths.accounting;
+  if (section === "premises") return globalPaths.premises;
+  if (section === "tasks") {
+    return slug ? projectPath(slug, "tasks") : globalPaths.projects;
+  }
+
+  return resolveAdminPlanEntryPath(slug);
 }
 
 export function isAdminPlanPath(pathname: string): boolean {
@@ -79,7 +89,7 @@ export function isAdminPlanPath(pathname: string): boolean {
 }
 
 export function isAdminTeamPath(pathname: string): boolean {
-  return isTheaterTeamPath(pathname);
+  return isTheaterTeamPath(pathname) || getProjectSectionFromPath(pathname) === "team";
 }
 
 export function isAdminTasksPath(pathname: string): boolean {

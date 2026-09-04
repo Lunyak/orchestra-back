@@ -1,3 +1,4 @@
+import { AdminSectionChrome } from "@shared/components/admin/AdminSectionChrome";
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { Button } from "@shared/core/button/Button";
 import { CustomSelect } from "@shared/core/custom-select/CustomSelect";
@@ -139,6 +140,7 @@ export function ProjectTeamRolePage() {
   }
 
   return (
+    <AdminSectionChrome activeSection="team">
     <div className="project-production-team">
       <div className="troupe-view">
         <div className="troupe-card troupe-team-card">
@@ -305,5 +307,6 @@ export function ProjectTeamRolePage() {
         </div>
       </div>
     </div>
+    </AdminSectionChrome>
   );
 }

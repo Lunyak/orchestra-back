@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import type { TheaterModel } from "../../../../shared/types/script";
 import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
+import { GltfGuard } from "./GltfGuard";
 
 type HumanBuiltin = Extract<
   TheaterModel["builtin"],
@@ -124,7 +125,7 @@ function applyHumanMaterials(
   });
 }
 
-export function HumanModel({
+function HumanModelInner({
   model,
   tone,
 }: {
@@ -147,5 +148,16 @@ export function HumanModel({
   return <primitive object={scene} />;
 }
 
-useGLTF.preload(HUMAN_MODEL_URLS.humanStanding);
-useGLTF.preload(HUMAN_MODEL_URLS.humanSitting);
+export function HumanModel({
+  model,
+  tone,
+}: {
+  model: TheaterModel & { builtin: HumanBuiltin };
+  tone?: string | null;
+}) {
+  return (
+    <GltfGuard resetKey={model.builtin}>
+      <HumanModelInner model={model} tone={tone} />
+    </GltfGuard>
+  );
+}

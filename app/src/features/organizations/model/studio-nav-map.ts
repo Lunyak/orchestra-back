@@ -1,5 +1,6 @@
 import {
   studioAssignmentsPath,
+  studioAvailabilityPath,
   studioInvitesPath,
   studioMembersPath,
   studioOrgPremisesPath,
@@ -35,6 +36,7 @@ const WORK_CHILDREN: ReadonlyArray<NavNodeDef> = [
 ];
 
 const PEOPLE_CHILDREN: ReadonlyArray<NavNodeDef> = [
+  { id: "availability", label: "Занятость", href: studioAvailabilityPath },
   { id: "members", label: "Участники", href: studioMembersPath },
   { id: "invites", label: "Приглашения", href: studioInvitesPath },
 ];

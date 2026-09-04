@@ -1,3 +1,4 @@
+import { AdminSectionChrome } from "@shared/components/admin/AdminSectionChrome";
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -63,6 +64,7 @@ export function ProjectProductionTeamPage() {
   }
 
   return (
+    <AdminSectionChrome activeSection="team">
     <div className="project-production-team">
       <div className="troupe-view">
         <div className="troupe-card troupe-team-card troupe-role-tree-card">
@@ -163,5 +165,6 @@ export function ProjectProductionTeamPage() {
         }}
       />
     </div>
+    </AdminSectionChrome>
   );
 }

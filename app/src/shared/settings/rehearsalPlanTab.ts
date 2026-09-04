@@ -1,16 +1,15 @@
-import { getProjectSectionFromPath } from "../../app/router/paths";
+import {
+  getProjectSectionFromPath,
+  globalPaths,
+  projectPath,
+} from "../../app/router/paths";
+import { readSelectedProjectSlug } from "./selectedProject";
 
 export type RehearsalPlanTab = "sessions" | "board" | "tasks";
 
 const KEY = "orchestra:rehearsal-plan-tab";
 
 const DEFAULT_TAB: RehearsalPlanTab = "sessions";
-
-const TAB_PATH: Record<RehearsalPlanTab, string> = {
-  sessions: "/sessions",
-  board: "/board",
-  tasks: "/tasks",
-};
 
 export function readRehearsalPlanTab(): RehearsalPlanTab {
   if (typeof window === "undefined") return DEFAULT_TAB;
@@ -43,11 +42,14 @@ export function rehearsalPlanTabFromPath(pathname: string): RehearsalPlanTab | n
 }
 
 export function resolveRehearsalPlanEntryPath(options?: {
+  projectSlug?: string | null;
   excludeTasks?: boolean;
 }): string {
+  const projectSlug = options?.projectSlug ?? readSelectedProjectSlug();
   const tab = readRehearsalPlanTab();
-  if (options?.excludeTasks && tab === "tasks") {
-    return TAB_PATH.sessions;
-  }
-  return TAB_PATH[tab];
+  const resolvedTab =
+    options?.excludeTasks && tab === "tasks" ? "sessions" : tab;
+
+  if (!projectSlug) return globalPaths.projects;
+  return projectPath(projectSlug, resolvedTab);
 }

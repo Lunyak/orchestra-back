@@ -1,5 +1,6 @@
 import cn from "classnames";
 import { Button } from "@shared/core/button/Button";
+import { THEME_SWITCHING_ENABLED } from "../../../shared/settings/themePreferences";
 import { readCurrentThemeTokenValues } from "../../../shared/styles/theme/apply-theme";
 import { useTheme } from "../../../shared/styles/theme/ThemeProvider";
 import { BUILT_IN_THEMES, THEME_EDITOR_TOKENS } from "../../../shared/styles/theme/types";
@@ -90,6 +91,8 @@ export function ThemeSettingsSection() {
   const [editingTheme, setEditingTheme] = useState<CustomTheme | null>(null);
   const [draftName, setDraftName] = useState("Моя тема");
   const [draftVariables, setDraftVariables] = useState<Record<string, string>>({});
+
+  if (!THEME_SWITCHING_ENABLED) return null;
 
   const openCreateEditor = () => {
     setEditingTheme(null);

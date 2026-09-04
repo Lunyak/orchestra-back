@@ -4,6 +4,10 @@ import {
   globalPaths,
   isProjectPath,
 } from "./paths";
+import {
+  isSpectacleLayoutSection,
+  shouldShowScriptStateForSection,
+} from "./route-section-meta";
 
 export const SUFER_ROUTE_PATH = "/sufer";
 export const PROJECT_MEDIA_ROUTE_PATH = "/media";
@@ -35,7 +39,8 @@ export function isSpectacleCreativePath(pathname: string) {
 
 function isScriptStateRoute(pathname: string) {
   if (!isProjectPath(pathname)) return false;
-  return getProjectSectionFromPath(pathname) !== "overview";
+  const section = getProjectSectionFromPath(pathname);
+  return shouldShowScriptStateForSection(section);
 }
 
 /** Главная страница сценария (markdown). */
@@ -46,17 +51,7 @@ export function isScriptMarkdownRoute(pathname: string) {
 export function isSpectacleRoute(pathname: string) {
   if (!isProjectPath(pathname)) return false;
   const section = getProjectSectionFromPath(pathname);
-  return (
-    section === "script" ||
-    section === "light-plot" ||
-    section === "sufer" ||
-    section === "media" ||
-    section === "board" ||
-    section === "sessions" ||
-    section === "tasks" ||
-    section === "team" ||
-    isTheaterRoute(pathname)
-  );
+  return isSpectacleLayoutSection(section) || isTheaterRoute(pathname);
 }
 
 export function getRouteMeta(pathname: string) {

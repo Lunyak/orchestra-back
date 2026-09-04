@@ -4,12 +4,16 @@ import type {
   DirectorSessionSlot,
 } from "../directorSessionsSync";
 import {
+  annotateIdleOrderBusyConflicts,
+  collectIdleOrderBusyConflicts,
+  type IdleOrderBusyConflict,
+} from "./session-idle-order-busy";
+import {
   packedOffsetsForOrder,
   suggestIdleMinimizingSlotOrder,
   type IdleOrderSuggestion,
 } from "./session-slot-idle-order";
 import {
-  classifyActorSlotAvailability,
   durationMinFromParts,
   durationPartsFromMin,
   formatSlotTime,
@@ -106,7 +110,9 @@ export function useDirectorSessionSlotsPanel({
     useState<DragSceneRefPayload | null>(null);
   const [idleOrderPreview, setIdleOrderPreview] =
     useState<IdleOrderSuggestion | null>(null);
-  const [idleOrderBusyEmails, setIdleOrderBusyEmails] = useState<string[]>([]);
+  const [idleOrderBusyConflicts, setIdleOrderBusyConflicts] = useState<
+    IdleOrderBusyConflict[]
+  >([]);
 
   const [slotDraft, setSlotDraft] = useState<Record<string, SlotDraftEntry>>(
     {},
@@ -220,39 +226,49 @@ export function useDirectorSessionSlotsPanel({
     );
     if (!suggestion) return;
 
+    const sessionBaseMin = getSessionStartLocalMinutes(session.startsAt);
     const offsets = packedOffsetsForOrder(
       suggestion.order,
       durationBySlotId,
     );
-    const sessionBase = getSessionStartLocalMinutes(session.startsAt);
-    const busy = new Set<string>();
-    if (sessionDateKey && profilesByEmail) {
-      for (const id of suggestion.order) {
-        const startMin =
-          sessionBase + Math.max(0, Math.floor(offsets[id] ?? 0));
-        const endMin = startMin + durationBySlotId[id]!;
-        for (const email of actorsBySlotId[id] ?? []) {
-          const prof = profilesByEmail.get(email);
-          if (
-            classifyActorSlotAvailability(
-              prof,
-              sessionDateKey,
-              startMin,
-              endMin,
-            ) === "busy"
-          ) {
-            busy.add(email);
-          }
-        }
-      }
+    const currentOffsets: Record<string, number> = {};
+    const sceneTitleBySlotId: Record<string, string> = {};
+    for (const sl of slotsWithScenes) {
+      currentOffsets[sl.id] = Math.max(0, Math.floor(sl.offsetMin ?? 0));
+      sceneTitleBySlotId[sl.id] = getSlotDisplay(sl).projectLabel;
     }
-    setIdleOrderBusyEmails(Array.from(busy).sort());
+    const nextConflicts =
+      sessionDateKey && profilesByEmail
+        ? annotateIdleOrderBusyConflicts(
+            collectIdleOrderBusyConflicts({
+              order: suggestion.order,
+              actorsBySlotId,
+              durationBySlotId,
+              offsets,
+              sessionBaseMin,
+              sessionDateKey,
+              profilesByEmail,
+              sceneTitleBySlotId,
+            }),
+            collectIdleOrderBusyConflicts({
+              order: currentOrder,
+              actorsBySlotId,
+              durationBySlotId,
+              offsets: currentOffsets,
+              sessionBaseMin,
+              sessionDateKey,
+              profilesByEmail,
+              sceneTitleBySlotId,
+            }),
+          )
+        : [];
+    setIdleOrderBusyConflicts(nextConflicts);
     setIdleOrderPreview(suggestion);
   };
 
   const closeIdleOrderPreview = () => {
     setIdleOrderPreview(null);
-    setIdleOrderBusyEmails([]);
+    setIdleOrderBusyConflicts([]);
   };
 
   const applyIdleOrderPreview = async () => {
@@ -659,7 +675,7 @@ export function useDirectorSessionSlotsPanel({
     touchDragPreviewRef,
     materialDragPayload,
     idleOrderPreview,
-    idleOrderBusyEmails,
+    idleOrderBusyConflicts,
     idleOrderPreviewItems,
     slotDraft,
     sortedSlots,

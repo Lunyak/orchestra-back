@@ -675,8 +675,12 @@ export function applyTheaterHallTemplate(
 ): TheaterLayout {
   const template = THEATER_HALL_TEMPLATES.find((item) => item.id === templateId);
   const base = template?.patch ?? DEFAULT_THEATER_LAYOUT;
+  const patch =
+    template && template.patch.stageFrontZ == null
+      ? { ...base, stageFrontZ: undefined }
+      : base;
   if (resolveStageShape(current) === "custom") {
-    return applyHallResizeWithCustomOutline(current, base);
+    return applyHallResizeWithCustomOutline(current, patch);
   }
-  return normalizeTheaterLayout({ ...current, ...base });
+  return normalizeTheaterLayout({ ...current, ...patch });
 }

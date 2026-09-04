@@ -157,6 +157,34 @@ class AttendanceService {
     return String(n);
   }
 
+  _isMissingForumThreadError(error) {
+    const desc = String(error?.response?.description || error?.message || "");
+    return /message thread not found|topic not found|THREAD_DELETED|topic closed/i.test(
+      desc,
+    );
+  }
+
+  async _sendGroupMessage(chatId, text, extra = {}) {
+    try {
+      return await this.bot.telegram.sendMessage(chatId, text, extra);
+    } catch (error) {
+      const threadId = extra?.message_thread_id;
+      if (threadId == null || !this._isMissingForumThreadError(error)) {
+        throw error;
+      }
+      console.warn(
+        "[telegram] forum thread missing, sending without message_thread_id",
+        "chatId=",
+        chatId,
+        "threadId=",
+        threadId,
+      );
+      const retryExtra = { ...extra };
+      delete retryExtra.message_thread_id;
+      return await this.bot.telegram.sendMessage(chatId, text, retryExtra);
+    }
+  }
+
   isOwner(userId) {
     return this.ownerId && String(userId) === String(this.ownerId);
   }
@@ -1116,7 +1144,7 @@ class AttendanceService {
       }
     }
 
-    const sent = await this.bot.telegram.sendMessage(
+    const sent = await this._sendGroupMessage(
       groupChatId,
       text,
       Object.assign({}, opts, this._backendKeyboard(rehearsalId)),
@@ -1125,7 +1153,10 @@ class AttendanceService {
     await orchestraBotApi.markRehearsalPublished(rehearsalId, {
       chatId: String(sent.chat?.id),
       messageId: String(sent.message_id),
-      threadId: opts.message_thread_id != null ? String(opts.message_thread_id) : undefined,
+      threadId:
+        sent.message_thread_id != null
+          ? String(sent.message_thread_id)
+          : undefined,
     });
 
     return sent;
@@ -1256,7 +1287,7 @@ class AttendanceService {
 
     let sent;
     try {
-      sent = await this.bot.telegram.sendMessage(
+      sent = await this._sendGroupMessage(
         groupChatId,
         text,
         Object.assign({}, opts, this._directorKeyboard(projectId, sessionId)),
@@ -1277,7 +1308,9 @@ class AttendanceService {
       chatId: String(sent.chat?.id),
       messageId: String(sent.message_id),
       threadId:
-        opts.message_thread_id != null ? String(opts.message_thread_id) : undefined,
+        sent.message_thread_id != null
+          ? String(sent.message_thread_id)
+          : undefined,
     });
 
     if (prevChatId && prevMessageId) {

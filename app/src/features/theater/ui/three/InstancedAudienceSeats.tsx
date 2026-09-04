@@ -42,15 +42,35 @@ export function InstancedAudienceSeats({ layout }: { layout: TheaterLayout }) {
   if (transforms.length === 0) return null;
 
   const seatColor = tc("--color-border-lighter");
+  const backColor = tc("--color-surface-4");
   const limit = Math.max(transforms.length, 1);
+  const backOffsetZ = chair.depth / 2 - 0.05;
+  const backY = chair.seatThickness / 2 + chair.backHeight / 2;
 
   return (
-    <Instances limit={limit}>
-      <boxGeometry args={[chair.width, chair.seatThickness, chair.depth]} />
-      <meshStandardMaterial color={seatColor} />
-      {transforms.map((item, index) => (
-        <Instance key={index} position={item.position} rotation={item.rotation} />
-      ))}
-    </Instances>
+    <>
+      <Instances limit={limit}>
+        <boxGeometry args={[chair.width, chair.seatThickness, chair.depth]} />
+        <meshStandardMaterial color={seatColor} />
+        {transforms.map((item, index) => (
+          <Instance key={`seat-${index}`} position={item.position} rotation={item.rotation} />
+        ))}
+      </Instances>
+      <Instances limit={limit}>
+        <boxGeometry args={[chair.width, chair.backHeight, 0.08]} />
+        <meshStandardMaterial color={backColor} />
+        {transforms.map((item, index) => (
+          <Instance
+            key={`back-${index}`}
+            position={[
+              item.position[0],
+              item.position[1] + backY,
+              item.position[2] + backOffsetZ,
+            ]}
+            rotation={item.rotation}
+          />
+        ))}
+      </Instances>
+    </>
   );
 }

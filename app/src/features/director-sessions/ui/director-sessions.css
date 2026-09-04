@@ -1629,7 +1629,7 @@
 }
 
 .director-session-idle-order-modal {
-  width: min(32rem, 100%);
+  width: min(40rem, 100%);
   max-height: min(86vh, 900px);
   overflow: hidden;
 }
@@ -2449,9 +2449,79 @@
 }
 
 .director-session-idle-order-modal {
-  width: min(32rem, 100%);
+  width: min(40rem, 100%);
   max-height: min(86vh, 900px);
   overflow: hidden;
+}
+
+.director-session-idle-order-modal__item--busy {
+  padding: 6px 8px;
+  border: 1px solid var(--color-status-error-border);
+  background: var(--color-status-error-bg-medium);
+}
+
+.director-session-idle-order-modal__item-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--color-status-error-text);
+}
+
+.director-session-idle-order-modal__item-people {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.director-session-idle-order-modal__person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.director-session-idle-order-modal__person-name {
+  min-width: 0;
+  font-weight: 600;
+}
+
+.director-session-idle-order-modal__warn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.director-session-idle-order-modal__warn-lead {
+  margin: 0;
+}
+
+.director-session-idle-order-modal__warn-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.director-session-idle-order-modal__warn-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.director-session-idle-order-modal__warn-reason,
+.director-session-idle-order-modal__warn-slots,
+.director-session-idle-order-modal__warn-hint {
+  display: block;
+  margin-top: 2px;
+}
+
+.director-session-idle-order-modal__warn-hint {
+  margin: 4px 0 0;
 }
 
 .director-session-idle-order-modal__body {

@@ -37,38 +37,6 @@
   gap: 28px;
 }
 
-.theater-overview__header {
-  position: relative;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.theater-overview__back {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--color-active-ascent);
-  text-decoration: none;
-  font-size: 13px;
-}
-
-.theater-overview__back:hover,
-.theater-overview__back:focus-visible {
-  text-decoration: underline;
-  outline: none;
-}
-
-.theater-overview__eyebrow {
-  margin: 0;
-  color: var(--sessions-text-muted);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .theater-overview__map {
   display: block;
   width: 100%;
@@ -84,10 +52,6 @@
   .theater-overview__content {
     gap: 0;
     justify-content: flex-start;
-  }
-
-  .theater-overview__header {
-    display: none;
   }
 
   .theater-overview__map {

@@ -4,10 +4,7 @@ export type SpectacleActiveView =
   | "sufer"
   | "media"
   | "board"
-  | "script"
-  | "sessions"
-  | "tasks"
-  | "team";
+  | "script";
 
 export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   SpectacleActiveView,
@@ -19,7 +16,4 @@ export const MAIN_CONTENT_VIEW_MODIFIERS: Record<
   media: "main-content-project-media",
   board: "main-content-kanban",
   script: "show-script",
-  sessions: "main-content-sessions",
-  tasks: "main-content-sessions",
-  team: "main-content-sessions",
 };

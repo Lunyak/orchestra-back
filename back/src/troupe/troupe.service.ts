@@ -748,11 +748,15 @@ export class TroupeService {
     const theater = await this.prisma.theater.findFirst({
       where: {
         id: theaterId,
-        workspace: {
-          memberships: {
-            some: { userId, role: { in: ['OWNER', 'ADMIN', 'MEMBER'] } },
+        OR: [
+          { workspace: { memberships: { some: { userId } } } },
+          {
+            troupes: {
+              some: { troupe: { members: { some: { userId } } } },
+            },
           },
-        },
+          { homeTroupes: { some: { members: { some: { userId } } } } },
+        ],
       },
       select: {
         id: true,
@@ -786,6 +790,7 @@ export class TroupeService {
     } | null,
     month?: unknown,
   ) {
+    const teamOwnerUserId = troupe?.ownerUserId ?? userId;
     if (troupe) {
       await ensureTroupeOwnerMember(
         this.prisma,
@@ -809,14 +814,14 @@ export class TroupeService {
       : [];
     for (const member of troupeRows) {
       await this.ensureTeamMemberWithRoles(
-        userId,
+        teamOwnerUserId,
         member.email.trim().toLowerCase(),
         ['actor'],
         member.userId,
       );
     }
     const teamRows = await this.prisma.teamMember.findMany({
-      where: { ownerUserId: userId },
+      where: { ownerUserId: teamOwnerUserId },
       orderBy: { createdAt: 'asc' },
     });
     const emails = [

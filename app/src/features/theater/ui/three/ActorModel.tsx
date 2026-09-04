@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import type { TheaterModel } from "../../../../shared/types/script";
 import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
+import { GltfGuard } from "./GltfGuard";
 
 const ACTOR_MODEL_URL = resolvePublicAssetUrl("theater/humans/theater-actor-black.glb");
 
@@ -36,7 +37,7 @@ function cloneActorScene(source: THREE.Object3D) {
   return scene;
 }
 
-export function ActorModel({
+function ActorModelInner({
   pose,
   tone,
 }: {
@@ -90,4 +91,16 @@ export function ActorModel({
   );
 }
 
-useGLTF.preload(ACTOR_MODEL_URL);
+export function ActorModel({
+  pose,
+  tone,
+}: {
+  pose: NonNullable<TheaterModel["actorPose"]>;
+  tone?: string | null;
+}) {
+  return (
+    <GltfGuard resetKey={pose}>
+      <ActorModelInner pose={pose} tone={tone} />
+    </GltfGuard>
+  );
+}

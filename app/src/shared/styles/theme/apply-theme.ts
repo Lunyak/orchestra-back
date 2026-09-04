@@ -1,4 +1,5 @@
 import {
+  THEME_SWITCHING_ENABLED,
   getActiveThemeId,
   getCustomThemeById,
   setActiveThemeId as persistActiveThemeId,
@@ -45,7 +46,7 @@ export function applyTheme(themeId: ThemeId): void {
 }
 
 export function bootstrapTheme(): ThemeId {
-  const id = getActiveThemeId();
+  const id = THEME_SWITCHING_ENABLED ? getActiveThemeId() : "orchestra";
   applyTheme(id);
   if (typeof document !== "undefined" && !document.documentElement.dataset.theme) {
     document.documentElement.dataset.theme = "orchestra";

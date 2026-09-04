@@ -21,7 +21,8 @@ export const METRIC = {
   backClearance: 0.8,
   chairSeatHeight: 0.45,
   chairWidthRatio: 0.88,
-  chairDepthRatio: 0.58,
+  chairWidthMax: 0.6,
+  chairDepth: 0.45,
 } as const;
 
 export type ChairMetrics = {
@@ -52,11 +53,10 @@ function clampInt(value: number, min: number, max: number) {
 
 export function getChairMetrics(seatSpacing: number): ChairMetrics {
   const pitch = clamp(seatSpacing, 0.45, 1.2);
-  const width = roundM(pitch * METRIC.chairWidthRatio);
-  const depth = roundM(pitch * METRIC.chairDepthRatio);
+  const width = roundM(Math.min(METRIC.chairWidthMax, pitch * METRIC.chairWidthRatio));
   return {
     width,
-    depth,
+    depth: METRIC.chairDepth,
     seatThickness: 0.08,
     backHeight: roundM(width * 0.86),
     leg: roundM(width * 0.11),
@@ -64,13 +64,13 @@ export function getChairMetrics(seatSpacing: number): ChairMetrics {
   };
 }
 
-/** Шаг мест по ширине зала (центры кресел). */
+/** Шаг центров кресел: 0.55 м, сжимается только если ряд не влезает. */
 export function computeSeatSpacing(layout: Pick<TheaterLayout, "hallWidth" | "seatsPerRow">) {
   const seats = clampInt(layout.seatsPerRow, 1, 200);
   if (seats <= 1) return METRIC.seatPitch;
   const usable = layout.hallWidth - 2 * METRIC.sideClearance;
-  const pitch = usable / (seats - 1);
-  return roundM(clamp(pitch, 0.45, 1.2));
+  const fitPitch = usable / Math.max(seats - 1, 1);
+  return roundM(clamp(Math.min(METRIC.seatPitch, fitPitch), 0.45, METRIC.seatPitch));
 }
 
 export function getAudienceStartZBounds(
@@ -111,18 +111,13 @@ export function getStageFrontZ(
   return layout.audienceStartZ;
 }
 
-/** Первая линия рядов: по умолчанию блок кресел по центру зала по Z. */
+/** Первая линия рядов: блок кресел у стены зала (+Z), сцена занимает остаток. */
 export function computeAudienceStartZ(
   layout: Pick<TheaterLayout, "hallDepth" | "seatRows" | "rowSpacing">,
 ) {
   const { min, max } = getAudienceStartZBounds(layout);
   if (layout.seatRows <= 0) return roundM(min);
-  const blockDepth = (layout.seatRows - 1) * layout.rowSpacing;
-  const halfD = layout.hallDepth / 2;
-  const hallMin = -halfD + METRIC.backClearance;
-  const hallMax = halfD - METRIC.stageClearance;
-  const centered = hallMin + (hallMax - hallMin - blockDepth) / 2;
-  return roundM(clamp(centered, min, max));
+  return roundM(max);
 }
 
 /** Нормализация сохранённого плана (не пересчитывать Z кресел). */
@@ -183,7 +178,7 @@ export function normalizeTheaterLayout(
   if (layout.stageFrontZ != null && Number.isFinite(layout.stageFrontZ)) {
     stageFrontZ = roundM(clamp(layout.stageFrontZ, minStageFrontZ, maxStageFrontZ));
   } else {
-    stageFrontZ = roundM(clamp(layout.audienceStartZ, minStageFrontZ, maxStageFrontZ));
+    stageFrontZ = roundM(clamp(audienceStartZ, minStageFrontZ, maxStageFrontZ));
   }
 
   const aisleWidth = roundM(clamp(layout.aisleWidth, 0.6, hallWidth * 0.45));

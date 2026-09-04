@@ -24,6 +24,13 @@
   --app-shell-rail-max: var(--width-content-page);
 }
 
+.app-shell-with-menubar:has(.app-layout--docks-cluster > .theater-settings-sidebar--right)[data-dock-playlist="false"][data-dock-scenes="false"],
+.app-shell-with-menubar:has(.app-layout--docks-cluster > .theater-settings-sidebar--right)[data-dock-playlist="false"][data-dock-scenes="true"],
+.app-shell-with-menubar:has(.app-layout--docks-cluster > .theater-settings-sidebar--right)[data-dock-playlist="true"][data-dock-scenes="false"],
+.app-shell-with-menubar:has(.app-layout--docks-cluster > .theater-settings-sidebar--right)[data-dock-playlist="true"][data-dock-scenes="true"] {
+  --app-shell-rail-max: calc(400px + var(--width-content-page));
+}
+
 .app-shell-with-menubar:has(.app-layout--docks-cluster[data-prog-run-wide="true"]) {
   --app-shell-rail-max: 100%;
 }

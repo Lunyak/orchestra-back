@@ -26,7 +26,7 @@ export function DirectorSessionSlotsPanel(props: DirectorSessionSlotsPanelProps)
     applyIdleOrderPreview,
     idleOrderPreview,
     idleOrderPreviewItems,
-    idleOrderBusyEmails,
+    idleOrderBusyConflicts,
     addSlot,
     selectedSlotForModal,
     slotDraft,
@@ -87,7 +87,7 @@ export function DirectorSessionSlotsPanel(props: DirectorSessionSlotsPanelProps)
         <DirectorSessionIdleOrderModal
           preview={idleOrderPreview}
           items={idleOrderPreviewItems}
-          busyEmails={idleOrderBusyEmails}
+          busyConflicts={idleOrderBusyConflicts}
           onClose={closeIdleOrderPreview}
           onApply={() => void applyIdleOrderPreview()}
         />

@@ -7,7 +7,6 @@ const RAW_DEFAULT_LAYOUT: TheaterLayout = {
   hallWidth: 12,
   hallDepth: 10,
   wallHeight: METRIC.wallHeight,
-  stageFrontZ: -1.5,
   audienceStartZ: -3,
   seatRows: 5,
   seatsPerRow: 10,

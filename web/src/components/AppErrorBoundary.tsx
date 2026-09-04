@@ -34,6 +34,21 @@ function isBenignNetworkRejection(error: unknown): boolean {
   );
 }
 
+/** HTML вместо GLB (SPA fallback / 404) не должен валить всё приложение. */
+function isBenignGltfAssetError(error: unknown, message?: string): boolean {
+  const text = [
+    error instanceof Error ? error.message : "",
+    typeof message === "string" ? message : "",
+    typeof error === "string" ? error : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return (
+    /could not load/i.test(text) ||
+    (/unexpected token\s+'<'/.test(text) && /doctype|is not valid json/.test(text))
+  );
+}
+
 export class AppErrorBoundary extends React.Component<
   React.PropsWithChildren,
   AppErrorBoundaryState
@@ -53,7 +68,7 @@ export class AppErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error): AppErrorBoundaryState {
-    if (isBenignResizeObserverError(error)) {
+    if (isBenignResizeObserverError(error) || isBenignGltfAssetError(error)) {
       return { error: null };
     }
     return { error };
@@ -66,6 +81,11 @@ export class AppErrorBoundary extends React.Component<
   private handleGlobalError = (event: ErrorEvent) => {
     if (isBenignResizeObserverError(event.error, event.message)) {
       event.preventDefault();
+      return;
+    }
+    if (isBenignGltfAssetError(event.error, event.message)) {
+      event.preventDefault();
+      console.warn("[web] Ignored missing theater asset", event.error || event.message);
       return;
     }
     const nextError =
@@ -85,6 +105,11 @@ export class AppErrorBoundary extends React.Component<
     if (isBenignNetworkRejection(reason)) {
       event.preventDefault();
       console.warn("[web] Ignored network rejection", reason);
+      return;
+    }
+    if (isBenignGltfAssetError(reason)) {
+      event.preventDefault();
+      console.warn("[web] Ignored missing theater asset", reason);
       return;
     }
     const nextError =

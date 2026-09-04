@@ -21,6 +21,7 @@ export type ProjectSection =
   | "theater"
   | "board"
   | "sessions"
+  | "availability"
   | "tasks"
   | "team"
   | "roles"
@@ -28,6 +29,30 @@ export type ProjectSection =
   | "premises"
   | "accounting"
   | "settings";
+
+const PROJECT_SECTIONS: ReadonlySet<string> = new Set<ProjectSection>([
+  "overview",
+  "spectacle",
+  "script",
+  "light-plot",
+  "sufer",
+  "media",
+  "theater",
+  "board",
+  "sessions",
+  "availability",
+  "tasks",
+  "team",
+  "roles",
+  "cast",
+  "premises",
+  "accounting",
+  "settings",
+]);
+
+function isProjectSection(value: string): value is ProjectSection {
+  return PROJECT_SECTIONS.has(value);
+}
 
 function encodeSegment(value: string) {
   return encodeURIComponent(value.trim());
@@ -75,6 +100,10 @@ export function projectSessionPath(
   const session = `${sessions}/${encodeSegment(sessionId)}`;
   if (!slotId) return session;
   return `${session}/slots/${encodeSegment(slotId)}`;
+}
+
+export function projectAvailabilityPath(projectSlug: string) {
+  return projectPath(projectSlug, "availability");
 }
 
 export function projectTeamRolePath(projectSlug: string, roleId?: string) {
@@ -190,6 +219,10 @@ export function studioVideosSectionPath(studioId: string) {
   return studioOrgPage(studioId, "videos");
 }
 
+export function studioAvailabilityPath(studioId: string) {
+  return studioOrgPage(studioId, "availability");
+}
+
 export function studioOrgPremisesPath(studioId: string, premiseId?: string) {
   return withChild(studioOrgPage(studioId, "premises"), premiseId);
 }
@@ -230,8 +263,8 @@ export function getProjectSlugFromPath(pathname: string) {
 
 export function getProjectSectionFromPath(pathname: string) {
   const [root, , section] = pathSegments(pathname);
-  if (root !== "projects" || !section) return null;
-  return section as ProjectSection;
+  if (root !== "projects" || !section || !isProjectSection(section)) return null;
+  return section;
 }
 
 export function isProjectPath(pathname: string) {

@@ -22,6 +22,8 @@ import {
   theaterOverviewPath,
   theaterAvailabilityPath,
   isTheaterAvailabilityPath,
+  projectAvailabilityPath,
+  studioAvailabilityPath,
   isTheaterTroupePath,
   projectTheaterInvitePath,
   projectTeamRolePath,
@@ -31,10 +33,22 @@ import {
   resolveLegacyStudioPath,
 } from "../src/app/router/route-legacy.ts";
 import {
+  resolveAdminEntryPath,
+  resolveAdminPlanEntryPath,
+} from "../src/shared/settings/adminSection.ts";
+import {
+  resolveRehearsalPlanEntryPath,
+} from "../src/shared/settings/rehearsalPlanTab.ts";
+import {
+  resolveProjectScopedBackPath,
   resolveScopedBackPath,
   resolveStudioScopedBackPath,
   resolveTheaterScopedBackPath,
 } from "../src/app/router/route-nav.ts";
+import {
+  isSpectacleLayoutSection,
+  shouldShowScriptStateForSection,
+} from "../src/app/router/route-section-meta.ts";
 
 test("builds canonical project detail paths", () => {
   assert.equal(projectPath("hamlet"), "/projects/hamlet/overview");
@@ -55,6 +69,10 @@ test("builds canonical project detail paths", () => {
   assert.equal(
     projectTeamRolePath("hamlet", "role/2"),
     "/projects/hamlet/team/roles/role%2F2",
+  );
+  assert.equal(
+    projectAvailabilityPath("hamlet"),
+    "/projects/hamlet/availability",
   );
 });
 
@@ -154,6 +172,12 @@ test("studio scoped back goes one level up", () => {
   );
   assert.equal(
     resolveStudioScopedBackPath(
+      "/organizations/studios/studio%201/availability",
+    ),
+    "/organizations/studios/studio%201/overview",
+  );
+  assert.equal(
+    resolveStudioScopedBackPath(
       "/organizations/studios/studio%201/premises/hall-1",
     ),
     "/organizations/studios/studio%201/premises",
@@ -192,6 +216,10 @@ test("encodes studio route parameters", () => {
     studioPremisesPath("studio 1", "hall/2"),
     "/studios/studio%201/premises/hall%2F2",
   );
+  assert.equal(
+    studioAvailabilityPath("studio 1"),
+    "/organizations/studios/studio%201/availability",
+  );
   assert.equal(resolveLegacyStudioPath("/studio"), "/studios");
   assert.equal(
     resolveLegacyStudioPath("/studio/studio-1/videos/video-2"),
@@ -203,7 +231,58 @@ test("reads project context from canonical paths", () => {
   const pathname = "/projects/my%20show/sessions/session-1";
   assert.equal(getProjectSlugFromPath(pathname), "my show");
   assert.equal(getProjectSectionFromPath(pathname), "sessions");
+  assert.equal(
+    getProjectSectionFromPath("/projects/hamlet/availability"),
+    "availability",
+  );
+  assert.equal(getProjectSectionFromPath("/projects/my-show/unknown"), null);
   assert.equal(getProjectSlugFromPath("/organizations"), null);
+});
+
+test("project scoped back goes one level up", () => {
+  assert.equal(
+    resolveProjectScopedBackPath("/projects/hamlet/overview"),
+    "/projects",
+  );
+  assert.equal(
+    resolveProjectScopedBackPath("/projects/hamlet/tasks/task-1"),
+    "/projects/hamlet/tasks",
+  );
+  assert.equal(
+    resolveProjectScopedBackPath("/projects/hamlet/sessions/session-1"),
+    "/projects/hamlet/sessions",
+  );
+  assert.equal(
+    resolveProjectScopedBackPath(
+      "/projects/hamlet/sessions/session-1/slots/slot-1",
+    ),
+    "/projects/hamlet/sessions/session-1",
+  );
+  assert.equal(
+    resolveProjectScopedBackPath("/projects/hamlet/team/roles/role-1"),
+    "/projects/hamlet/team",
+  );
+  assert.equal(
+    resolveProjectScopedBackPath("/projects/hamlet/availability"),
+    "/projects/hamlet/overview",
+  );
+  assert.equal(
+    resolveProjectScopedBackPath("/projects/hamlet/settings/bot"),
+    "/projects/hamlet/settings",
+  );
+  assert.equal(resolveProjectScopedBackPath("/projects"), null);
+});
+
+test("separates project operations from spectacle chrome", () => {
+  assert.equal(shouldShowScriptStateForSection("tasks"), false);
+  assert.equal(shouldShowScriptStateForSection("sessions"), false);
+  assert.equal(shouldShowScriptStateForSection("availability"), false);
+  assert.equal(shouldShowScriptStateForSection("team"), false);
+  assert.equal(shouldShowScriptStateForSection("board"), true);
+  assert.equal(isSpectacleLayoutSection("tasks"), false);
+  assert.equal(isSpectacleLayoutSection("sessions"), false);
+  assert.equal(isSpectacleLayoutSection("team"), false);
+  assert.equal(isSpectacleLayoutSection("board"), true);
 });
 
 test("redirects flat project routes with detail suffixes", () => {
@@ -232,4 +311,28 @@ test("redirects flat project routes with detail suffixes", () => {
 test("falls back to projects when no project is selected", () => {
   assert.equal(resolveLegacyProjectPath("/tasks/task-1", ""), "/projects");
   assert.equal(resolveLegacyProjectPath("/theater", null), "/projects");
+});
+
+test("builds canonical admin and rehearsal plan entry paths", () => {
+  assert.equal(
+    resolveRehearsalPlanEntryPath({ projectSlug: "hamlet" }),
+    "/projects/hamlet/sessions",
+  );
+  assert.equal(
+    resolveRehearsalPlanEntryPath({
+      projectSlug: "hamlet",
+      excludeTasks: true,
+    }),
+    "/projects/hamlet/sessions",
+  );
+  assert.equal(
+    resolveAdminPlanEntryPath("hamlet"),
+    "/projects/hamlet/sessions",
+  );
+  assert.equal(
+    resolveAdminEntryPath("hamlet"),
+    "/projects/hamlet/sessions",
+  );
+  assert.equal(resolveRehearsalPlanEntryPath(), "/projects");
+  assert.equal(resolveAdminEntryPath(), "/projects");
 });

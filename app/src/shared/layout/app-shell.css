@@ -106,6 +106,35 @@
     minmax(0, var(--width-sidebar-max));
 }
 
+.app-layout--docks-cluster > .theater-settings-sidebar--right {
+  grid-column: 2;
+  width: 100%;
+  min-width: 400px;
+  max-width: none;
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="true"]
+  .app-layout--docks-cluster:has(> .theater-settings-sidebar--right),
+.app-shell-with-menubar[data-dock-playlist="true"][data-dock-scenes="false"]
+  .app-layout--docks-cluster:has(> .theater-settings-sidebar--right),
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="true"]
+  .app-layout--docks-cluster:has(> .theater-settings-sidebar--right),
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="false"]
+  .app-layout--docks-cluster:has(> .theater-settings-sidebar--right) {
+  grid-template-columns:
+    minmax(0, var(--width-content-page))
+    minmax(400px, 400px);
+}
+
+.app-shell-with-menubar[data-dock-playlist="true"]
+  .app-layout--docks-cluster:has(> .theater-settings-sidebar--right)
+  > .app-content,
+.app-shell-with-menubar[data-dock-playlist="false"][data-dock-scenes="true"]
+  .app-layout--docks-cluster:has(> .theater-settings-sidebar--right)
+  > .app-content {
+  grid-column: 1;
+}
+
 .app-content {
   flex: 1;
   display: flex;

@@ -33,6 +33,7 @@ export function TroupeAvailabilityView() {
     days,
     error,
     guestTroupeMembers,
+    isProjectSchedule,
     loading,
     members,
     regularTroupeMembers,
@@ -95,7 +96,9 @@ export function TroupeAvailabilityView() {
       <div className="troupe-card troupe-schedule-card">
         <div className="troupe-scale-head">
           <div className="troupe-scale-head__titleblock">
-            <div className="troupe-scale-head__title">Основной состав</div>
+            <div className="troupe-scale-head__title">
+              {isProjectSchedule ? "Участники проекта" : "Основной состав"}
+            </div>
             <div className="troupe-scale-head__subtitle">
               Месяц: <b>{monthLabel(currentMonth)}</b>
               {iAmInSchedule
@@ -229,6 +232,7 @@ export function TroupeAvailabilityView() {
         />
       </div>
 
+      {isProjectSchedule && guestSorted.length === 0 ? null : (
       <div className="troupe-card troupe-schedule-card troupe-schedule-card--guest">
         <div className="troupe-scale-head">
           <div className="troupe-scale-head__titleblock">
@@ -263,6 +267,7 @@ export function TroupeAvailabilityView() {
           shouldIgnoreMineClick={shouldIgnoreMineClick}
         />
       </div>
+      )}
 
       {error ? <div className="troupe-error">{error}</div> : null}
 

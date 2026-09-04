@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useParams } from "react-router-dom";
+import { getProjectSectionFromPath } from "../../../app/router/paths";
 import { useInviteProjectMemberMutation } from "../../project/api/project-api";
 import { useProject } from "../../project";
 import { useTeam } from "../../team";
@@ -127,10 +128,12 @@ export function useTroupePage() {
   const month = monthKey(currentMonth);
   const skipFetch = !accessToken;
   const hasTheaterContext = Boolean(theaterId);
+  const isProjectSchedule =
+    getProjectSectionFromPath(location.pathname) === "availability";
 
   const myTroupeQuery = useMyTroupeQuery(
     { month },
-    { skip: skipFetch || hasTheaterContext },
+    { skip: skipFetch || hasTheaterContext || isProjectSchedule },
   );
   const theaterTroupeQuery = useTheaterHomeTroupeQuery(
     { theaterId, month },
@@ -140,7 +143,7 @@ export function useTroupePage() {
   const fetchError = hasTheaterContext
     ? theaterTroupeQuery.error
     : myTroupeQuery.error;
-  const loading = hasTheaterContext
+  const troupeLoading = hasTheaterContext
     ? theaterTroupeQuery.isLoading
     : myTroupeQuery.isLoading;
   const isFetching = hasTheaterContext
@@ -152,6 +155,8 @@ export function useTroupePage() {
   const {
     data: projectParticipantsData,
     isLoading: projectParticipantsLoading,
+    isFetching: projectParticipantsFetching,
+    error: projectParticipantsError,
     refetch: refetchProjectParticipants,
   } = useProjectParticipantsQuery(
     { project: projectName, month },
@@ -189,23 +194,57 @@ export function useTroupePage() {
     () => data?.teamMembers ?? [],
     [data?.teamMembers],
   );
-  const projectCastMembers = useMemo<ProjectCastMemberItem[]>(
-    () => projectParticipantsData?.members ?? [],
-    [projectParticipantsData?.members],
-  );
-  const members = troupeMembers;
+  const projectCastMembers = useMemo<ProjectCastMemberItem[]>(() => {
+    const list = projectParticipantsData?.members ?? [];
+    if (!isProjectSchedule) return list;
+    const selfProfile = teamProfileFromMyProfile(myProfile);
+    if (!selfProfile) return list;
+    if (list.some((member) => normalizeEmail(member.email) === selfProfile.email)) {
+      return list;
+    }
+    return [
+      {
+        id: `self:${selfProfile.email}`,
+        troupeId: "",
+        email: selfProfile.email,
+        kind: "regular",
+        createdAt: new Date(0).toISOString(),
+        profile: selfProfile,
+        troupeMemberId: null,
+        projectMemberId: null,
+        projectRole: "",
+        isProjectOwner: false,
+        inTroupe: false,
+      },
+      ...list,
+    ];
+  }, [isProjectSchedule, myProfile, projectParticipantsData?.members]);
+  const scheduleMembers = isProjectSchedule ? projectCastMembers : troupeMembers;
+  const members = scheduleMembers;
   const regularTroupeMembers = useMemo(
-    () => troupeMembers.filter((member) => member.kind !== "guest"),
-    [troupeMembers],
+    () => scheduleMembers.filter((member) => member.kind !== "guest"),
+    [scheduleMembers],
   );
   const guestTroupeMembers = useMemo(
-    () => troupeMembers.filter((member) => member.kind === "guest"),
-    [troupeMembers],
+    () => scheduleMembers.filter((member) => member.kind === "guest"),
+    [scheduleMembers],
   );
-  const scheduleRefreshing = isFetching && !loading && troupe != null;
-  const error = fetchError
-    ? queryErrorMessage(fetchError, "Не удалось загрузить труппу")
-    : null;
+  const loading = isProjectSchedule
+    ? projectParticipantsLoading || projectsLoading || !isProjectsLoaded
+    : troupeLoading;
+  const scheduleRefreshing = isProjectSchedule
+    ? projectParticipantsFetching && !projectParticipantsLoading
+    : isFetching && !troupeLoading && troupe != null;
+  const error = isProjectSchedule
+    ? projectParticipantsError
+      ? queryErrorMessage(
+          projectParticipantsError,
+          "Не удалось загрузить участников проекта",
+        )
+      : null
+    : fetchError
+      ? queryErrorMessage(fetchError, "Не удалось загрузить труппу")
+      : null;
 
   const [addTroupeMemberMut, { isLoading: adding }] =
     useAddTroupeMemberMutation();
@@ -234,9 +273,9 @@ export function useTroupePage() {
   const selectedMember = useMemo(
     () =>
       selectedMemberId
-        ? (troupeMembers.find((m) => m.id === selectedMemberId) ?? null)
+        ? (scheduleMembers.find((m) => m.id === selectedMemberId) ?? null)
         : null,
-    [selectedMemberId, troupeMembers],
+    [scheduleMembers, selectedMemberId],
   );
 
   const selectedMemberInProject = useMemo(() => {
@@ -250,10 +289,10 @@ export function useTroupePage() {
 
   useEffect(() => {
     if (!selectedMemberId) return;
-    if (!troupeMembers.some((m) => m.id === selectedMemberId)) {
+    if (!scheduleMembers.some((m) => m.id === selectedMemberId)) {
       setSelectedMemberId(null);
     }
-  }, [selectedMemberId, troupeMembers]);
+  }, [scheduleMembers, selectedMemberId]);
 
   const canManageTroupe = Boolean(accessToken);
   const canManageProjectTroupe = canManageProjectMembers === true;
@@ -433,6 +472,7 @@ export function useTroupePage() {
     inviteErrorByMemberId,
     inviteSelectedToProject,
     invitingIds,
+    isProjectSchedule,
     loading,
     members,
     onProjectChange,

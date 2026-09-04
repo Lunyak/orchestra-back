@@ -3,6 +3,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
+import { GltfGuard } from "./GltfGuard";
 
 const SPOTLIGHT_MODEL_URLS = {
   fresnel: {
@@ -35,7 +36,7 @@ function cloneSpotlightScene(source: THREE.Object3D) {
   return scene;
 }
 
-export function StageSpotlightModel({
+function StageSpotlightModelInner({
   lowDetail,
   tone,
   variant = "fresnel",
@@ -70,4 +71,25 @@ export function StageSpotlightModel({
   }, [scene, tone]);
 
   return <primitive object={scene} />;
+}
+
+export function StageSpotlightModel({
+  lowDetail,
+  tone,
+  variant = "fresnel",
+}: {
+  lowDetail: boolean;
+  tone?: string | null;
+  variant?: keyof typeof SPOTLIGHT_MODEL_URLS;
+}) {
+  const detailKey = lowDetail ? "low" : "high";
+  return (
+    <GltfGuard resetKey={`${variant}-${detailKey}`}>
+      <StageSpotlightModelInner
+        lowDetail={lowDetail}
+        tone={tone}
+        variant={variant}
+      />
+    </GltfGuard>
+  );
 }

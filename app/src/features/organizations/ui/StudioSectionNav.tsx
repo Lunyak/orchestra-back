@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import {
   studioAssignmentsPath,
+  studioAvailabilityPath,
   studioInvitesPath,
   studioMembersPath,
   studioOrgPremisesPath,
@@ -22,7 +23,8 @@ type StudioSectionNavProps = {
     | "program"
     | "assignments"
     | "videos"
-    | "premises";
+    | "premises"
+    | "availability";
 };
 
 const ITEMS: ReadonlyArray<{
@@ -30,6 +32,7 @@ const ITEMS: ReadonlyArray<{
   label: string;
   path: (studioId: string) => string;
 }> = [
+  { id: "availability", label: "Занятость", path: studioAvailabilityPath },
   { id: "members", label: "Участники", path: studioMembersPath },
   { id: "invites", label: "Приглашения", path: studioInvitesPath },
   { id: "program", label: "Обучение", path: studioProgramSectionPath },

@@ -1,5 +1,8 @@
 import type { CustomTheme, ThemeId } from "../styles/theme/types";
 
+/** Смена темы скрыта в UI, пока палитры не доработаны. */
+export const THEME_SWITCHING_ENABLED: boolean = false;
+
 const ACTIVE_THEME_KEY = "orchestra:theme.activeId";
 const CUSTOM_THEMES_KEY = "orchestra:theme.custom";
 

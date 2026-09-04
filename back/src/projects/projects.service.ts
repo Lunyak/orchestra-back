@@ -1076,7 +1076,7 @@ export class ProjectsService {
     const access = await this.projectAccess.assertBySlug(
       userId,
       slug,
-      'manageMembers',
+      'read',
     );
     const project = await this.prisma.project.findUnique({
       where: { id: access.project.id },

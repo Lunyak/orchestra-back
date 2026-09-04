@@ -107,7 +107,7 @@ export function TheaterControlsLayoutHallSizeSection({ vm, layout }: LayoutSecti
               step={0.05}
               value={vm.layout.seatSpacing}
               readOnly
-              title="Вычисляется по ширине зала и числу мест в ряду"
+              title="Шаг центров 0.55 м, ширина сиденья не больше 0.6 м"
             />
           </TheaterField>
           <TheaterField label={labelM("Проход")}>

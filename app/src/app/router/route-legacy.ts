@@ -4,7 +4,7 @@ import {
   type ProjectSection,
 } from "./paths";
 
-const LEGACY_PROJECT_SECTIONS: ReadonlyArray<{
+export const LEGACY_PROJECT_ROUTES: ReadonlyArray<{
   path: string;
   section: ProjectSection;
 }> = [
@@ -39,7 +39,7 @@ export function resolveLegacyProjectPath(
   if (!projectSlug) return globalPaths.projects;
   if (pathname === "/") return projectPath(projectSlug, "script");
 
-  const legacy = LEGACY_PROJECT_SECTIONS.find(
+  const legacy = LEGACY_PROJECT_ROUTES.find(
     ({ path }) => pathname === path || pathname.startsWith(`${path}/`),
   );
   if (!legacy) return globalPaths.projects;

@@ -10,10 +10,24 @@ import { ENABLE_3D_THEATER } from "../../../shared/build-features";
 import { useIsMobile } from "../../../shared/hooks/useIsMobile";
 import { patchTheaterViewPrefs, readTheaterViewPrefs } from "../../theater/model/theater-view-prefs-storage";
 import { writeRehearsalPlanTab } from "../../../shared/settings/rehearsalPlanTab";
-import { getProjectSectionFromPath } from "../../../app/router/paths";
+import {
+  getProjectSectionFromPath,
+  type ProjectSection,
+} from "../../../app/router/paths";
 import type { SpectacleActiveView } from "./spectacle-page-types";
 
 export type SpectaclePageViewModel = ReturnType<typeof useSpectaclePage>;
+
+function resolveActiveView(
+  projectSection: ProjectSection | null,
+): SpectacleActiveView {
+  if (projectSection === "theater" && ENABLE_3D_THEATER) return "theater";
+  if (projectSection === "light-plot") return "light-plot";
+  if (projectSection === "sufer") return "sufer";
+  if (projectSection === "media") return "media";
+  if (projectSection === "board") return "board";
+  return "script";
+}
 
 export function useSpectaclePage() {
   const location = useLocation();
@@ -97,24 +111,7 @@ export function useSpectaclePage() {
   const isMobile = useIsMobile();
 
   const projectSection = getProjectSectionFromPath(location.pathname);
-  const activeView: SpectacleActiveView =
-    ENABLE_3D_THEATER && projectSection === "theater"
-      ? "theater"
-      : projectSection === "light-plot"
-        ? "light-plot"
-        : projectSection === "sufer"
-          ? "sufer"
-          : projectSection === "media"
-            ? "media"
-            : projectSection === "board"
-            ? "board"
-            : projectSection === "tasks"
-              ? "tasks"
-              : projectSection === "sessions"
-                ? "sessions"
-                : projectSection === "team"
-                  ? "team"
-                  : "script";
+  const activeView = resolveActiveView(projectSection);
   const isTheaterView = activeView === "theater";
 
   const [theaterImmersiveMode, setTheaterImmersiveModeState] = useState(false);
@@ -197,22 +194,14 @@ export function useSpectaclePage() {
   }, [activeView]);
 
   useEffect(() => {
-    if (
-      activeView === "board" ||
-      activeView === "sessions" ||
-      activeView === "tasks"
-    ) {
-      writeRehearsalPlanTab(activeView);
-    }
+    if (activeView !== "board") return;
+    writeRehearsalPlanTab(activeView);
   }, [activeView]);
 
   const shouldShowScenesSidebar =
     activeView === "script" ||
     activeView === "theater" ||
-    activeView === "board" ||
-    activeView === "sessions" ||
-    activeView === "tasks" ||
-    activeView === "team";
+    activeView === "board";
   const usePlaybookDocksLayout =
     shouldShowScenesSidebar || activeView === "light-plot";
   const compactMainChrome = activeView === "media";

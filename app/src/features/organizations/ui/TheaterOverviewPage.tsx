@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { PageBootLoader } from "@shared/components/page-loader/page-boot";
-import { globalPaths, theaterOrganizationPath } from "../../../app/router/paths";
+import { theaterOrganizationPath } from "../../../app/router/paths";
 import { fetchTheaters } from "../../../sync/api/workspaces";
 import { useAuth } from "../../auth/model/auth-context";
 import "../../director-sessions/ui/director-sessions.css";
@@ -69,16 +69,6 @@ export function TheaterOverviewPage() {
   return (
     <main className="theater-overview">
       <div className="theater-overview__content">
-        <header className="theater-overview__header">
-          <Link
-            to={globalPaths.organizations}
-            className="theater-overview__back"
-          >
-            ← Организации
-          </Link>
-          <p className="theater-overview__eyebrow">Театр</p>
-        </header>
-
         <section
           className="theater-overview__map"
           aria-labelledby="theater-nav-map-title"

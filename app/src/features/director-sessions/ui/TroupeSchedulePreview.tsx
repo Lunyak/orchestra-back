@@ -129,12 +129,6 @@ export function TroupeSchedulePreview({
             </div>
           ) : null}
 
-          {iAmInSchedule ? (
-            <div className="troupe-schedule-preview__hint">
-              Кликните по своему дню, чтобы отметить занятость.
-            </div>
-          ) : null}
-
           <div
             className="troupe-schedule"
             role="region"

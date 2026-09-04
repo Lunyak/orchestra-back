@@ -1,113 +1,154 @@
+import cn from "classnames";
 import dayjs from "dayjs";
 import "dayjs/locale/ru";
 import isoWeek from "dayjs/plugin/isoWeek";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { PageLoader } from "@shared/components/page-loader/PageLoader";
-import { Button } from "@shared/core/button/Button";
 import { InlineTextField } from "@shared/core/inline-text-field/InlineTextField";
-import { CalendarSection } from "../../../shared/components/calendar/CalendarSection";
+import {
+  CalendarSection,
+  type CalendarSectionState,
+} from "../../../shared/components/calendar/CalendarSection";
 import type { MonthCalendarEvent } from "../../../shared/components/calendar/MonthCalendar";
 import {
   formatTimeHHMM,
   getSessionStartLocalMinutes,
 } from "../../../features/director-sessions/model/session-page-utils";
-import { useAuth } from "../../../features/auth";
-import { useAppDispatch, useAppSelector } from "../../../shared/store/hooks";
-import type { AvailabilityStatus } from "../../../features/profile/model/availability-calendar";
-import { useAvailabilityAutoSave } from "../../../features/profile/model/useAvailabilityAutoSave";
-import {
-  fetchMyProfileThunk,
-  profileDataActions,
-} from "../../../features/profile/model/profileDataSlice";
-import {
-  loadSessionsForRangeThunk,
-  profileAvailabilityActions,
-  selectAvailabilityFlags,
-  selectAvailabilitySessionsForActiveRange,
-  selectProfileCalendarState,
-} from "../../../features/profile/model/profileAvailabilitySlice";
-import type { DirectorSession } from "../../../sync/api/director-sessions";
 import { DirectorSessionDetailModal } from "../../../features/director-session-detail/DirectorSessionDetailModal";
-import { AvailabilityDayModal } from "../../../features/profile/ui/AvailabilityDayModal";
+import { readTheaterPoster } from "../../../features/organizations/model/theater-poster-storage";
+import { readStudioPoster } from "../../../features/organizations/model/studio-poster-storage";
+import { readProjectPoster } from "../../../features/project/model/project-poster-storage";
+import projectPosterPlaceholder from "../../../features/project/assets/project-poster-placeholder.png";
+import { StudioLogo } from "../../../pages/studio/StudioLogo";
+import {
+  dayStatusLabel,
+  matchesOccupancyContextQuery,
+  OCCUPANCY_KIND_LABEL,
+  type OccupancyContextCard,
+} from "../../../features/profile/model/availability-overview";
+import { getAvailabilityDayVisual } from "../../../features/profile/model/availability-calendar";
+import { profileAvailabilityActions } from "../../../features/profile/model/profileAvailabilitySlice";
+import { useProfileAvailabilityOverview } from "../../../features/profile/model/useProfileAvailabilityOverview";
+import type { DirectorSession } from "../../../sync/api/director-sessions";
 
 dayjs.extend(isoWeek);
 dayjs.locale("ru");
 
-function isoDate(d: Date): string {
-  return dayjs(d).format("YYYY-MM-DD");
+function isoDate(value: Date): string {
+  return dayjs(value).format("YYYY-MM-DD");
 }
 
-const MAX_AVAILABILITY_RANGE_DAYS = 366;
+function ruCountLabel(count: number, one: string, few: string, many: string) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return one;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
+  return many;
+}
 
-function countIsoDatesInRange(fromIso: string, toIso: string): number {
-  const from = fromIso.trim();
-  const to = toIso.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return 0;
-  if (from > to) return 0;
+function fillPercent(ratio: number) {
+  return `${Math.round(ratio * 100)}%`;
+}
 
-  const start = dayjs(from, "YYYY-MM-DD", true);
-  const end = dayjs(to, "YYYY-MM-DD", true);
-  if (!start.isValid() || !end.isValid()) return 0;
+function contextPosterSrc(context: OccupancyContextCard): string | null {
+  if (context.kind === "project") {
+    return readProjectPoster(context.id) ?? projectPosterPlaceholder;
+  }
+  if (context.kind === "theater") {
+    return readTheaterPoster(context.id);
+  }
+  if (context.kind === "studio") {
+    return readStudioPoster(context.id);
+  }
+  return null;
+}
 
-  const dayCount = end.diff(start, "day") + 1;
-  if (dayCount <= 0 || dayCount > MAX_AVAILABILITY_RANGE_DAYS) return 0;
-  return dayCount;
+function OccupancyContextPoster({ context }: { context: OccupancyContextCard }) {
+  const posterSrc = contextPosterSrc(context);
+  const initial = context.title.trim().slice(0, 1).toUpperCase() || "?";
+
+  if (posterSrc) {
+    return (
+      <span className="profile-occupancy__context-poster">
+        <img
+          className="profile-occupancy__context-image"
+          src={posterSrc}
+          alt=""
+        />
+      </span>
+    );
+  }
+
+  if (context.kind === "studio" && context.studioImageUrl) {
+    return (
+      <span className="profile-occupancy__context-poster">
+        <StudioLogo
+          className="profile-occupancy__context-image"
+          imageUrl={context.studioImageUrl}
+          title={context.title}
+          size="tile"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "profile-occupancy__context-poster",
+        "profile-occupancy__context-poster--empty",
+      )}
+    >
+      {initial}
+    </span>
+  );
 }
 
 export function ProfileAvailabilityTab() {
-  const { accessToken } = useAuth();
-  const dispatch = useAppDispatch();
-  const { availabilityCalendar, saving, error: saveError, ok } =
-    useAvailabilityAutoSave(accessToken);
-
-  const calendarState = useAppSelector(selectProfileCalendarState);
-  const sessions = useAppSelector(selectAvailabilitySessionsForActiveRange);
-  const flags = useAppSelector(selectAvailabilityFlags);
-
-  const selectedDate = calendarState.selectedDate;
-  const [dayModalOpen, setDayModalOpen] = useState(false);
-  const [sessionDetailModalId, setSessionDetailModalId] = useState<string | null>(null);
-  const [rangeFromDate, setRangeFromDate] = useState(selectedDate);
-  const [rangeToDate, setRangeToDate] = useState(selectedDate);
-  const [rangeError, setRangeError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setRangeFromDate(selectedDate);
-    setRangeToDate(selectedDate);
-  }, [selectedDate]);
-
-  useEffect(() => {
-    if (!accessToken) return;
-    dispatch(fetchMyProfileThunk({ accessToken }));
-  }, [accessToken, dispatch]);
-
-  useEffect(() => {
-    if (!accessToken) return;
-    dispatch(profileAvailabilityActions.clearAvailabilityError());
-    dispatch(
-      loadSessionsForRangeThunk({
-        accessToken,
-        fromIso: calendarState.fromIso,
-        toIso: calendarState.toIso,
-      }),
-    );
-  }, [accessToken, calendarState.fromIso, calendarState.toIso, dispatch]);
+  const {
+    accessToken,
+    availabilityCalendar,
+    availabilityTimeRanges,
+    calendarState,
+    contexts,
+    contextsError,
+    contextsLoading,
+    dispatch,
+    flags,
+    pulse,
+    sessions,
+  } = useProfileAvailabilityOverview();
+  const [sessionDetailModalId, setSessionDetailModalId] = useState<string | null>(
+    null,
+  );
+  const [contextQuery, setContextQuery] = useState("");
 
   const sessionsByDate = useMemo(() => {
     const grouped = new Map<string, DirectorSession[]>();
-    for (const s of sessions) {
-      const date = isoDate(new Date(s.startsAt));
-      const arr = grouped.get(date);
-      if (arr) arr.push(s);
-      else grouped.set(date, [s]);
+    for (const session of sessions) {
+      const date = isoDate(new Date(session.startsAt));
+      const list = grouped.get(date);
+      if (list) list.push(session);
+      else grouped.set(date, [session]);
     }
     for (const list of grouped.values()) {
-      list.sort((a, b) => +new Date(a.startsAt) - +new Date(b.startsAt));
+      list.sort((left, right) => +new Date(left.startsAt) - +new Date(right.startsAt));
     }
     return grouped;
   }, [sessions]);
 
-  const selectedDaySessionsAll = sessionsByDate.get(calendarState.selectedDate) ?? [];
+  const selectedDaySessions = sessionsByDate.get(calendarState.selectedDate) ?? [];
+  const selectedVisual = getAvailabilityDayVisual(
+    availabilityCalendar,
+    availabilityTimeRanges,
+    calendarState.selectedDate,
+  );
+  const selectedStatusLabel = dayStatusLabel(
+    availabilityCalendar,
+    availabilityTimeRanges,
+    calendarState.selectedDate,
+  );
 
   const dotsByDate = useMemo(() => {
     const out: Record<string, number> = {};
@@ -120,180 +161,226 @@ export function ProfileAvailabilityTab() {
   const eventsByDate = useMemo(() => {
     const out: Record<string, MonthCalendarEvent[]> = {};
     for (const [date, list] of sessionsByDate.entries()) {
-      out[date] = list.map((s) => ({
-        id: s.id,
-        time: formatTimeHHMM(getSessionStartLocalMinutes(s.startsAt)),
-        title: String(s.title ?? "Сессия").trim() || "Сессия",
+      out[date] = list.map((session) => ({
+        id: session.id,
+        time: formatTimeHHMM(getSessionStartLocalMinutes(session.startsAt)),
+        title: String(session.title ?? "Сессия").trim() || "Сессия",
       }));
     }
     return out;
   }, [sessionsByDate]);
 
-  const dayModalSessions = useMemo(
-    () =>
-      selectedDaySessionsAll.map((s) => ({
-        id: s.id,
-        timeLabel: formatTimeHHMM(getSessionStartLocalMinutes(s.startsAt)),
-        title: String(s.title ?? "Сессия").trim() || "Сессия",
-      })),
-    [selectedDaySessionsAll],
-  );
-
   const onCalendarStateChange = useCallback(
-    (next: any) => {
+    (next: CalendarSectionState) => {
       dispatch(profileAvailabilityActions.setProfileCalendarState({ value: next }));
     },
     [dispatch],
   );
 
-  const onCalendarDayClick = useCallback(() => {
-    setDayModalOpen(true);
-  }, []);
-
-  const rangeDayCount = useMemo(
-    () => countIsoDatesInRange(rangeFromDate, rangeToDate),
-    [rangeFromDate, rangeToDate],
+  const selectedDateLabel = dayjs(calendarState.selectedDate).format("D MMMM");
+  const monthLabel = dayjs(calendarState.monthStartIso).format("MMMM YYYY");
+  const hasContexts = contexts.length > 0;
+  const showContextSearch = contexts.length > 2;
+  const visibleContexts = useMemo(
+    () =>
+      showContextSearch
+        ? contexts.filter((context) =>
+            matchesOccupancyContextQuery(context, contextQuery),
+          )
+        : contexts,
+    [contextQuery, contexts, showContextSearch],
   );
-
-  const rangeIsValid = rangeDayCount > 0;
-
-  const applyRangeStatus = useCallback(
-    (status: AvailabilityStatus | null) => {
-      if (!rangeIsValid) {
-        setRangeError("Укажите корректный диапазон: дата «С» не позже «По», не больше года.");
-        return;
-      }
-
-      setRangeError(null);
-      dispatch(
-        profileDataActions.setAvailabilityRangeStatus({
-          fromDate: rangeFromDate,
-          toDate: rangeToDate,
-          status,
-        }),
-      );
-    },
-    [dispatch, rangeFromDate, rangeIsValid, rangeToDate],
-  );
+  const firstContext = visibleContexts[0] ?? contexts[0] ?? null;
+  const hasVisibleContexts = visibleContexts.length > 0;
 
   if (!accessToken) {
-    return <div className="profile-tab-page profile-hint">Нужно войти, чтобы управлять занятостью.</div>;
+    return (
+      <div className="profile-tab-page profile-hint">
+        Нужно войти, чтобы открыть занятость.
+      </div>
+    );
   }
 
   return (
-    <div className="profile-tab-page profile-availability-page">
-      <div className="profile-tab-head">
-        <div className="profile-tab-title">Календарь занятости</div>
-        {saving ? (
-          <div className="profile-save-hint">Автосохранение…</div>
-        ) : saveError ? (
-          <div className="settings-invite-error settings-invite-error--flush">
-            {saveError}
-          </div>
-        ) : ok ? (
-          <div className="profile-save-hint profile-save-hint--ok">{ok}</div>
-        ) : null}
+    <div className="profile-tab-page profile-occupancy">
+      <header className="profile-occupancy__hero">
+        <div className="profile-occupancy__hero-copy">
+          <p className="profile-occupancy__eyebrow">Все площадки</p>
+          <h2 className="profile-occupancy__title">Занятость</h2>
+          <p className="profile-occupancy__lead">
+            Сводка по театрам, проектам и студиям. Отметки ставятся там, куда вас
+            добавили.
+          </p>
+        </div>
+        <div className="profile-occupancy__pulse" aria-label={`Месяц ${monthLabel}`}>
+          <div className="profile-occupancy__pulse-month">{monthLabel}</div>
+          <div className="profile-occupancy__pulse-fill">{fillPercent(pulse.fillRatio)}</div>
+          <div className="profile-occupancy__pulse-caption">месяца отмечено</div>
+        </div>
+      </header>
+
+      <div className="profile-occupancy__stats" role="list">
+        <div className="profile-occupancy__stat" role="listitem">
+          <span className="profile-occupancy__stat-value">{pulse.free}</span>
+          <span className="profile-occupancy__stat-label">свободен</span>
+        </div>
+        <div
+          className={cn(
+            "profile-occupancy__stat",
+            "profile-occupancy__stat--partial",
+          )}
+          role="listitem"
+        >
+          <span className="profile-occupancy__stat-value">{pulse.partial}</span>
+          <span className="profile-occupancy__stat-label">по времени</span>
+        </div>
+        <div
+          className={cn("profile-occupancy__stat", "profile-occupancy__stat--busy")}
+          role="listitem"
+        >
+          <span className="profile-occupancy__stat-value">{pulse.busy}</span>
+          <span className="profile-occupancy__stat-label">занят</span>
+        </div>
+        <div className="profile-occupancy__stat" role="listitem">
+          <span className="profile-occupancy__stat-value">{pulse.unknown}</span>
+          <span className="profile-occupancy__stat-label">пусто</span>
+        </div>
+        <div className="profile-occupancy__stat" role="listitem">
+          <span className="profile-occupancy__stat-value">{sessions.length}</span>
+          <span className="profile-occupancy__stat-label">
+            {ruCountLabel(sessions.length, "сессия", "сессии", "сессий")}
+          </span>
+        </div>
       </div>
-      <p className="profile-availability-hint">
-        Основное место — занятость театра или проекта, куда вас добавили.
-        Здесь тот же календарь, если нужно отметить диапазон дней сразу.
-      </p>
+
+      <section className="profile-occupancy__contexts" aria-label="Где отметить">
+        <div className="profile-occupancy__section-head">
+          <h3 className="profile-occupancy__section-title">Где отметить</h3>
+          {showContextSearch ? (
+            <label className="profile-occupancy__search">
+              <InlineTextField
+                className="profile-occupancy__search-input"
+                type="search"
+                value={contextQuery}
+                onChange={(event) => setContextQuery(event.target.value)}
+                placeholder="Найти по названию"
+              />
+            </label>
+          ) : null}
+          {firstContext ? (
+            <Link className="profile-occupancy__jump" to={firstContext.href}>
+              Открыть график
+            </Link>
+          ) : null}
+        </div>
+        {contextsError ? (
+          <div className="settings-invite-error">{contextsError}</div>
+        ) : null}
+        {contextsLoading ? (
+          <PageLoader variant="view" label="Загрузка площадок…" />
+        ) : hasContexts ? (
+          hasVisibleContexts ? (
+            <ul className="profile-occupancy__context-list">
+              {visibleContexts.map((context) => (
+                <li key={`${context.kind}:${context.id}`}>
+                  <Link className="profile-occupancy__context" to={context.href}>
+                    <OccupancyContextPoster context={context} />
+                    <span className="profile-occupancy__context-body">
+                      <span className="profile-occupancy__context-kind">
+                        {OCCUPANCY_KIND_LABEL[context.kind]}
+                      </span>
+                      <span className="profile-occupancy__context-title">
+                        {context.title}
+                      </span>
+                      <span className="profile-occupancy__context-meta">
+                        {context.sessionCount > 0
+                          ? `${context.sessionCount} ${ruCountLabel(
+                              context.sessionCount,
+                              "сессия",
+                              "сессии",
+                              "сессий",
+                            )}`
+                          : "Отметить"}
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="profile-occupancy__empty">Ничего не нашлось.</p>
+          )
+        ) : (
+          <p className="profile-occupancy__empty">
+            Вас ещё не добавили в театр, проект или студию. Когда добавят —
+            занятость отмечается там, а здесь появится сводка.
+          </p>
+        )}
+      </section>
 
       {flags.error ? (
-        <div className="settings-invite-error profile-availability-load-error">{flags.error}</div>
+        <div className="settings-invite-error">{flags.error}</div>
       ) : null}
       {flags.loading ? (
         <PageLoader variant="view" label="Загрузка сессий…" />
       ) : null}
 
-      <section className="profile-availability-range">
-        <div className="profile-availability-section-label">Диапазон дней</div>
-        <div className="profile-availability-range__fields">
-          <label className="profile-field profile-availability-range__field">
-          
-            <InlineTextField
-              className="profile-availability-date-input"
-              type="date"
-              value={rangeFromDate}
-              onChange={(e) => {
-                setRangeFromDate(e.target.value);
-                setRangeError(null);
-              }}
-            />
-          </label>
-          <span className="profile-availability-range__sep">—</span>
-          <label className="profile-field profile-availability-range__field">
-          
-            <InlineTextField
-              className="profile-availability-date-input"
-              type="date"
-              value={rangeToDate}
-              onChange={(e) => {
-                setRangeToDate(e.target.value);
-                setRangeError(null);
-              }}
-            />
-          </label>
+      <div className="profile-occupancy__board">
+        <div className="profile-occupancy__calendar">
+          <CalendarSection
+            className="profile-availability-calendar"
+            storageMonthKey="profile-calendar-month"
+            initialSelectedDate={calendarState.selectedDate}
+            onStateChange={onCalendarStateChange}
+            statusByDate={availabilityCalendar}
+            dotsByDate={dotsByDate}
+            eventsByDate={eventsByDate}
+            showStatusMarks
+            title="Сводка месяца"
+            subtitle="Календарь только для просмотра"
+          />
         </div>
-        {rangeIsValid ? (
-          <div className="profile-availability-hint profile-availability-range__hint">
-            Будет затронуто {rangeDayCount}{" "}
-            {rangeDayCount === 1 ? "день" : rangeDayCount < 5 ? "дня" : "дней"}.
+
+        <aside className="profile-occupancy__day" aria-live="polite">
+          <div className="profile-occupancy__day-date">{selectedDateLabel}</div>
+          <div
+            className={cn(
+              "profile-occupancy__day-status",
+              `profile-occupancy__day-status--${selectedVisual.cls}`,
+            )}
+          >
+            {selectedStatusLabel}
           </div>
-        ) : null}
-        {rangeError ? (
-          <div className="settings-invite-error profile-availability-range__error">{rangeError}</div>
-        ) : null}
-        <div className="profile-availability-status-row profile-availability-range__actions">
-          <Button
-            className="secondary"
-            type="button"
-            disabled={!rangeIsValid}
-            onClick={() => applyRangeStatus(null)}
-          >
-            Сбросить
-          </Button>
-          <Button
-            type="button"
-            disabled={!rangeIsValid}
-            onClick={() => applyRangeStatus("present")}
-          >
-            Свободен
-          </Button>
-          <Button
-            className="danger"
-            type="button"
-            disabled={!rangeIsValid}
-            onClick={() => applyRangeStatus("absent")}
-          >
-            Занят
-          </Button>
-        </div>
-      </section>
-
-      <div className="profile-availability-calendar-wrap">
-        <CalendarSection
-          className="profile-availability-calendar"
-          storageMonthKey="profile-calendar-month"
-          initialSelectedDate={calendarState.selectedDate}
-          onStateChange={onCalendarStateChange}
-          onDayClick={onCalendarDayClick}
-          statusByDate={availabilityCalendar}
-          dotsByDate={dotsByDate}
-          eventsByDate={eventsByDate}
-          showStatusMarks={false}
-          title="Занятость и сессии"
-          subtitle="Клик по дню — отметить занятость"
-        />
+          <div className="profile-occupancy__day-sessions-title">Сессии</div>
+          {selectedDaySessions.length === 0 ? (
+            <p className="profile-occupancy__empty">В этот день сессий нет.</p>
+          ) : (
+            <ul className="profile-occupancy__session-list">
+              {selectedDaySessions.map((session) => (
+                <li key={session.id}>
+                  <button
+                    type="button"
+                    className="profile-occupancy__session"
+                    onClick={() => setSessionDetailModalId(session.id)}
+                  >
+                    <span className="profile-occupancy__session-time">
+                      {formatTimeHHMM(getSessionStartLocalMinutes(session.startsAt))}
+                    </span>
+                    <span className="profile-occupancy__session-title">
+                      {String(session.title ?? "Сессия").trim() || "Сессия"}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {hasContexts ? (
+            <p className="profile-occupancy__day-hint">
+              Чтобы поставить отметку, откройте график театра, проекта или студии.
+            </p>
+          ) : null}
+        </aside>
       </div>
-
-      <AvailabilityDayModal
-        isOpen={dayModalOpen}
-        dateIso={selectedDate}
-        onClose={() => setDayModalOpen(false)}
-        sessions={dayModalSessions}
-        onSessionClick={setSessionDetailModalId}
-      />
 
       <DirectorSessionDetailModal
         isOpen={!!sessionDetailModalId}

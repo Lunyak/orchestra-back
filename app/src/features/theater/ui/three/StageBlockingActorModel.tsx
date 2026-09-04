@@ -2,6 +2,7 @@ import { useGLTF } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
+import { GltfGuard } from "./GltfGuard";
 
 const STAGE_BLOCKING_ACTOR_URL = resolvePublicAssetUrl(
   "theater/humans/stage-blocking-actor.glb",
@@ -21,7 +22,7 @@ function cloneStageActor(source: THREE.Object3D) {
   return scene;
 }
 
-export function StageBlockingActorModel({ tone }: { tone?: string | null }) {
+function StageBlockingActorModelInner({ tone }: { tone?: string | null }) {
   const gltf = useGLTF(STAGE_BLOCKING_ACTOR_URL);
   const scene = useMemo(() => cloneStageActor(gltf.scene), [gltf.scene]);
 
@@ -50,4 +51,10 @@ export function StageBlockingActorModel({ tone }: { tone?: string | null }) {
   return <primitive object={scene} />;
 }
 
-useGLTF.preload(STAGE_BLOCKING_ACTOR_URL);
+export function StageBlockingActorModel({ tone }: { tone?: string | null }) {
+  return (
+    <GltfGuard>
+      <StageBlockingActorModelInner tone={tone} />
+    </GltfGuard>
+  );
+}

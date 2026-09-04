@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { SkeletonUtils } from "three-stdlib";
 import type { TheaterModel } from "../../../../shared/types/script";
 import { resolvePublicAssetUrl } from "../../../../shared/utils/public-asset-url";
+import { GltfGuard } from "./GltfGuard";
 import { resolveDecorMaterialSide } from "../../model/theater-decor-material";
 import {
   createDecorPresetCanvas,
@@ -109,7 +110,7 @@ function applyAssetAppearance(
   });
 }
 
-export function TheaterAssetLibraryModel({
+function TheaterAssetLibraryModelInner({
   assetKey,
   lowDetail,
   model,
@@ -173,4 +174,28 @@ export function TheaterAssetLibraryModel({
   ]);
 
   return <primitive object={scene} />;
+}
+
+export function TheaterAssetLibraryModel({
+  assetKey,
+  lowDetail,
+  model,
+  projectName,
+}: {
+  assetKey: string;
+  lowDetail: boolean;
+  model: TheaterModel;
+  projectName: string;
+}) {
+  const detailKey = lowDetail ? "low" : "high";
+  return (
+    <GltfGuard resetKey={`${assetKey}-${detailKey}`}>
+      <TheaterAssetLibraryModelInner
+        assetKey={assetKey}
+        lowDetail={lowDetail}
+        model={model}
+        projectName={projectName}
+      />
+    </GltfGuard>
+  );
 }

@@ -1,0 +1,40 @@
+.route-not-found-page {
+  --sessions-bg: var(--color-surface-3);
+  --sessions-panel: var(--color-surface-1);
+  --sessions-border: var(--color-border-visible);
+  --sessions-text: var(--color-text-primary);
+  --sessions-text-strong: var(--color-text-bright);
+  --sessions-text-muted: var(--color-text-muted);
+
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--width-content-page);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 18px;
+  background: var(--sessions-bg);
+  color: var(--sessions-text);
+}
+
+.route-not-found-page__panel {
+  padding: 24px;
+  border: 1px dashed var(--sessions-border);
+  background: var(--sessions-panel);
+}
+
+.route-not-found-page__title {
+  margin: 0;
+  color: var(--sessions-text-strong);
+  font-size: 24px;
+}
+
+.route-not-found-page__description {
+  margin: 10px 0 20px;
+  color: var(--sessions-text-muted);
+  font-size: 14px;
+}
+
+.app-shell-body > .app-shell-boot-mount > .route-not-found-page {
+  flex: 1 1 auto;
+  align-self: stretch;
+}
