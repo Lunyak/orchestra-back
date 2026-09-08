@@ -125,6 +125,7 @@ export function useDirectorSessionPage() {
     assignSceneToSlot,
     assignProgRunToSlot,
     assignCustomSlotTitle,
+    clearSlotProgRun,
     onRoleRehearsalPicksChange,
   } = editors;
 
@@ -224,6 +225,7 @@ export function useDirectorSessionPage() {
     assignSceneToSlot,
     assignProgRunToSlot,
     assignCustomSlotTitle,
+    clearSlotProgRun,
     selectedScene,
     selectedSceneLabel,
     selectedSceneProjectLabel,

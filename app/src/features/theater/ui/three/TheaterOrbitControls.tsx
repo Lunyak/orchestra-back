@@ -8,6 +8,12 @@ import {
   type TheaterCameraFocusRequest,
 } from "../../model/theater-camera-focus";
 import {
+  THEATER_CAMERA_NAV_EVENT,
+  type TheaterCameraNavDirection,
+  type TheaterCameraNavMode,
+  type TheaterCameraNavRequest,
+} from "../../model/theater-camera-nav";
+import {
   isTheaterEditableTarget,
   isTheaterPageActive,
 } from "../../model/theater-keyboard-shortcuts";
@@ -26,6 +32,9 @@ type TheaterOrbitControlsProps = {
 const FOCUS_MS = 650;
 const MOVE_SPEED = 9;
 const MOVE_SPEED_FAST = 24;
+const NAV_PAN_PX_PER_SEC = 240;
+const NAV_ORBIT_RAD_PER_SEC = 1.05;
+const NAV_MAX_POLAR = Math.PI / 2 + 0.25;
 
 type MoveKeys = {
   forward: boolean;
@@ -80,9 +89,16 @@ export function TheaterOrbitControls({
   const persistTimerRef = useRef<number | null>(null);
   const focusAnimRef = useRef<number | null>(null);
   const keysRef = useRef<MoveKeys>({ ...EMPTY_MOVE_KEYS });
+  const navHoldRef = useRef<{
+    mode: TheaterCameraNavMode;
+    direction: TheaterCameraNavDirection;
+  } | null>(null);
   const forwardRef = useRef(new THREE.Vector3());
   const rightRef = useRef(new THREE.Vector3());
   const moveRef = useRef(new THREE.Vector3());
+  const offsetRef = useRef(new THREE.Vector3());
+  const sphericalRef = useRef(new THREE.Spherical());
+  const panAxisRef = useRef(new THREE.Vector3());
   const worldUp = useRef(new THREE.Vector3(0, 1, 0)).current;
 
   useEffect(() => {
@@ -231,6 +247,34 @@ export function TheaterOrbitControls({
   }, [animateTo]);
 
   useEffect(() => {
+    const onNav = (event: Event) => {
+      const detail = (event as CustomEvent<TheaterCameraNavRequest>).detail;
+      if (!detail) return;
+      if (detail.action === "stop") {
+        navHoldRef.current = null;
+        persist();
+        return;
+      }
+      if (!detail.mode || !detail.direction) return;
+      cancelFocusAnim();
+      navHoldRef.current = {
+        mode: detail.mode,
+        direction: detail.direction,
+      };
+    };
+    const onBlur = () => {
+      navHoldRef.current = null;
+    };
+    window.addEventListener(THEATER_CAMERA_NAV_EVENT, onNav);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener(THEATER_CAMERA_NAV_EVENT, onNav);
+      window.removeEventListener("blur", onBlur);
+      navHoldRef.current = null;
+    };
+  }, [cancelFocusAnim, persist]);
+
+  useEffect(() => {
     const applyMoveKey = (code: string, pressed: boolean) => {
       const keys = keysRef.current;
       switch (code) {
@@ -310,6 +354,7 @@ export function TheaterOrbitControls({
     if (!controls || !enabled) return;
 
     const keys = keysRef.current;
+    const navHold = navHoldRef.current;
     const hasMove =
       keys.forward ||
       keys.back ||
@@ -317,34 +362,79 @@ export function TheaterOrbitControls({
       keys.right ||
       keys.up ||
       keys.down;
-    if (!hasMove) return;
+    if (!hasMove && !navHold) return;
 
     cancelFocusAnim();
 
-    const forward = forwardRef.current;
-    const right = rightRef.current;
-    const move = moveRef.current;
-    move.set(0, 0, 0);
+    if (hasMove) {
+      const forward = forwardRef.current;
+      const right = rightRef.current;
+      const move = moveRef.current;
+      move.set(0, 0, 0);
 
-    camera.getWorldDirection(forward);
-    forward.y = 0;
-    if (forward.lengthSq() < 1e-6) {
-      forward.set(0, 0, -1);
-    } else {
-      forward.normalize();
+      camera.getWorldDirection(forward);
+      forward.y = 0;
+      if (forward.lengthSq() < 1e-6) {
+        forward.set(0, 0, -1);
+      } else {
+        forward.normalize();
+      }
+      right.crossVectors(forward, worldUp).normalize();
+
+      const speed = (keys.fast ? MOVE_SPEED_FAST : MOVE_SPEED) * delta;
+      if (keys.forward) move.addScaledVector(forward, speed);
+      if (keys.back) move.addScaledVector(forward, -speed);
+      if (keys.right) move.addScaledVector(right, speed);
+      if (keys.left) move.addScaledVector(right, -speed);
+      if (keys.up) move.y += speed;
+      if (keys.down) move.y -= speed;
+
+      camera.position.add(move);
+      controls.target.add(move);
     }
-    right.crossVectors(forward, worldUp).normalize();
 
-    const speed = (keys.fast ? MOVE_SPEED_FAST : MOVE_SPEED) * delta;
-    if (keys.forward) move.addScaledVector(forward, speed);
-    if (keys.back) move.addScaledVector(forward, -speed);
-    if (keys.right) move.addScaledVector(right, speed);
-    if (keys.left) move.addScaledVector(right, -speed);
-    if (keys.up) move.y += speed;
-    if (keys.down) move.y -= speed;
+    if (navHold && camera instanceof THREE.PerspectiveCamera) {
+      const direction = navHold.direction;
+      const signX = direction === "right" ? 1 : direction === "left" ? -1 : 0;
+      const signY = direction === "up" ? 1 : direction === "down" ? -1 : 0;
+      if (navHold.mode === "pan") {
+        const offset = offsetRef.current;
+        const panAxis = panAxisRef.current;
+        offset.copy(camera.position).sub(controls.target);
+        const targetDistance =
+          offset.length() * Math.tan((camera.fov / 2) * Math.PI / 180);
+        const panPixels = NAV_PAN_PX_PER_SEC * delta;
+        const viewportH = Math.max(1, gl.domElement.clientHeight);
+        const panScale = (2 * targetDistance) / viewportH;
+        if (signX !== 0) {
+          panAxis.setFromMatrixColumn(camera.matrix, 0);
+          panAxis.multiplyScalar(signX * panPixels * panScale);
+          camera.position.add(panAxis);
+          controls.target.add(panAxis);
+        }
+        if (signY !== 0) {
+          panAxis.setFromMatrixColumn(camera.matrix, 1);
+          panAxis.multiplyScalar(signY * panPixels * panScale);
+          camera.position.add(panAxis);
+          controls.target.add(panAxis);
+        }
+      } else {
+        const offset = offsetRef.current;
+        const spherical = sphericalRef.current;
+        offset.copy(camera.position).sub(controls.target);
+        spherical.setFromVector3(offset);
+        const step = NAV_ORBIT_RAD_PER_SEC * delta;
+        spherical.theta += signX * step;
+        spherical.phi = THREE.MathUtils.clamp(
+          spherical.phi - signY * step,
+          0.08,
+          NAV_MAX_POLAR,
+        );
+        offset.setFromSpherical(spherical);
+        camera.position.copy(controls.target).add(offset);
+      }
+    }
 
-    camera.position.add(move);
-    controls.target.add(move);
     controls.update();
     schedulePersist();
   });

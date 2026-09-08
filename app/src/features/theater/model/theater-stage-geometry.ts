@@ -1,10 +1,13 @@
 import type {
   TheaterDoor,
+  TheaterDoorWall,
   TheaterLayout,
   TheaterStageShape,
+  TheaterWallOpening,
   TheaterWallRecess,
 } from "../../../shared/types/script";
-import { getStageFrontZ } from "./theater-metrics";
+import { getStageBackZ, getStageFrontZ } from "./theater-metrics";
+import { resolveLayoutWallOpenings } from "./theater-wall-openings";
 import { resolveLayoutWallRecesses } from "./theater-wall-recesses";
 import {
   buildCustomStageWallEdgeChains,
@@ -52,12 +55,39 @@ export type StageWallMeshes = {
   back: WallSegment3D[];
   left: WallSegment3D[];
   right: WallSegment3D[];
+  front: WallSegment3D[];
   /** Стены произвольного контура (stageShape = custom) */
   custom: WallSegment3D[];
   lintel: WallSegment3D | null;
   leftPillar: WallSegment3D | null;
   rightPillar: WallSegment3D | null;
 };
+
+export const STAGE_RISE_LIMITS = { min: 0, max: 2 } as const;
+export const CIRCLE_STAGE_SEGMENTS = 36;
+const WALL_SIDES: TheaterDoorWall[] = ["left", "right", "back", "front"];
+
+export function resolveStageRise(layout: Pick<TheaterLayout, "stageRise">) {
+  return clamp(layout.stageRise ?? 0, STAGE_RISE_LIMITS.min, STAGE_RISE_LIMITS.max);
+}
+
+export function normalizeHiddenWalls(
+  layout: Pick<TheaterLayout, "hiddenWalls">,
+): TheaterDoorWall[] | undefined {
+  if (!Array.isArray(layout.hiddenWalls)) return undefined;
+  return WALL_SIDES.filter((side) => layout.hiddenWalls?.includes(side));
+}
+
+export function resolveHiddenWalls(layout: Pick<TheaterLayout, "hiddenWalls">) {
+  return normalizeHiddenWalls(layout) ?? (["front"] as TheaterDoorWall[]);
+}
+
+export function isWallHidden(
+  layout: Pick<TheaterLayout, "hiddenWalls">,
+  side: TheaterDoorWall,
+) {
+  return resolveHiddenWalls(layout).includes(side);
+}
 
 function clamp(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
@@ -66,6 +96,80 @@ function clamp(value: number, min: number, max: number) {
 
 export function resolveStageShape(layout: TheaterLayout): TheaterStageShape {
   return layout.stageShape ?? "rectangle";
+}
+
+export function stageUsesAudienceWidth(shape: TheaterStageShape): boolean {
+  return shape === "trapezoid" || shape === "t-shape";
+}
+
+const TAPER_EPS = 0.05;
+const TRAPEZOID_FRONT_RATIO = 0.72;
+const T_SHAPE_STEM_RATIO = 0.55;
+
+function resolveLayoutBackWidth(
+  layout: Pick<TheaterLayout, "hallWidth" | "stageBackWidth" | "prosceniumWidth">,
+) {
+  return layout.stageBackWidth ?? layout.prosceniumWidth ?? layout.hallWidth;
+}
+
+export function patchForStageShape(
+  layout: TheaterLayout,
+  shape: TheaterStageShape,
+): Partial<TheaterLayout> {
+  const back = resolveLayoutBackWidth(layout);
+  const front = layout.prosceniumWidth ?? layout.hallWidth;
+  const hasTaper = Math.abs(back - front) >= TAPER_EPS;
+
+  const wasOpenDeck =
+    layout.stageShape === "circle" || layout.stageShape === "semicircle";
+  const wallsAfterOpen = wasOpenDeck ? (["front"] as TheaterDoorWall[]) : layout.hiddenWalls;
+
+  if (shape === "trapezoid") {
+    return {
+      stageShape: shape,
+      prosceniumEnabled: true,
+      stageBackWidth: back,
+      prosceniumWidth: hasTaper ? front : Math.max(2, back * TRAPEZOID_FRONT_RATIO),
+      hiddenWalls: wallsAfterOpen,
+    };
+  }
+  if (shape === "t-shape") {
+    return {
+      stageShape: shape,
+      stageBackWidth: back,
+      prosceniumWidth: hasTaper ? front : Math.max(2, back * T_SHAPE_STEM_RATIO),
+      hiddenWalls: wallsAfterOpen,
+    };
+  }
+  if (shape === "circle") {
+    return {
+      stageShape: shape,
+      stageBackWidth: back,
+      prosceniumWidth: back,
+      hiddenWalls: ["left", "right", "back", "front"],
+    };
+  }
+  if (shape === "semicircle") {
+    return {
+      stageShape: shape,
+      stageBackWidth: back,
+      prosceniumWidth: back,
+      hiddenWalls: ["left", "right", "front"],
+      audienceLayout: "arc",
+    };
+  }
+  if (shape === "rectangle") {
+    return {
+      stageShape: shape,
+      stageBackWidth: back,
+      prosceniumWidth: back,
+      hiddenWalls: wallsAfterOpen,
+    };
+  }
+  return {
+    stageShape: shape,
+    hiddenWalls: wallsAfterOpen,
+  };
 }
 
 export function resolveProsceniumEnabled(layout: TheaterLayout): boolean {
@@ -78,7 +182,7 @@ export function resolveProsceniumEnabled(layout: TheaterLayout): boolean {
 export function resolveStageGeometry(layout: TheaterLayout): StageGeometry {
   const halfW = layout.hallWidth / 2;
   const halfD = layout.hallDepth / 2;
-  const backZ = -halfD;
+  const backZ = getStageBackZ(layout);
   const prosceniumZ = getStageFrontZ(layout);
   const stageShape = resolveStageShape(layout);
   const prosceniumEnabled = resolveProsceniumEnabled(layout);
@@ -119,6 +223,84 @@ export function resolveStageGeometry(layout: TheaterLayout): StageGeometry {
   };
 }
 
+function circleStageRadii(geom: StageGeometry) {
+  const radiusX = geom.stageBackWidth / 2;
+  const radiusZ = Math.max(0.5, (geom.prosceniumZ - geom.backZ) / 2);
+  const centerZ = (geom.backZ + geom.prosceniumZ) / 2;
+  return { radiusX, radiusZ, centerZ };
+}
+
+function semicircleStageRadii(geom: StageGeometry) {
+  const radiusX = geom.stageBackWidth / 2;
+  const radiusZ = Math.max(0.5, geom.prosceniumZ - geom.backZ);
+  return { radiusX, radiusZ, centerZ: geom.backZ };
+}
+
+export function semicircleStagePoint(geom: StageGeometry, t: number) {
+  const { radiusX, radiusZ, centerZ } = semicircleStageRadii(geom);
+  const theta = (t * Math.PI) / 2;
+  return {
+    x: radiusX * Math.sin(theta),
+    z: centerZ + radiusZ * Math.cos(theta),
+  };
+}
+
+export function buildSemicircleStageOutline(geom: StageGeometry): StagePoint[] {
+  const count = Math.round(CIRCLE_STAGE_SEGMENTS / 2);
+  const points: StagePoint[] = [];
+  for (let i = 0; i <= count; i += 1) {
+    points.push(semicircleStagePoint(geom, -1 + (2 * i) / count));
+  }
+  return points;
+}
+
+export function circleStagePoint(geom: StageGeometry, index: number, count = CIRCLE_STAGE_SEGMENTS) {
+  const { radiusX, radiusZ, centerZ } = circleStageRadii(geom);
+  const theta = -Math.PI + (2 * Math.PI * index) / count;
+  return {
+    x: radiusX * Math.sin(theta),
+    z: centerZ - radiusZ * Math.cos(theta),
+  };
+}
+
+export function buildCircleStageOutline(geom: StageGeometry): StagePoint[] {
+  const points: StagePoint[] = [];
+  for (let i = 0; i < CIRCLE_STAGE_SEGMENTS; i += 1) {
+    points.push(circleStagePoint(geom, i));
+  }
+  return points;
+}
+
+function chainFromCircleIndices(id: string, geom: StageGeometry, from: number, to: number) {
+  const points: StagePoint[] = [];
+  for (let i = from; i <= to; i += 1) {
+    points.push(circleStagePoint(geom, i));
+  }
+  return { id, points };
+}
+
+function buildCircleStageWallChains(geom: StageGeometry): StageWallChain[] {
+  const n = CIRCLE_STAGE_SEGMENTS;
+  const gap = 2;
+  const leftEnd = Math.round(n / 3);
+  const rightStart = Math.round((2 * n) / 3);
+  return [
+    chainFromCircleIndices("left", geom, gap, leftEnd),
+    chainFromCircleIndices("back", geom, leftEnd, rightStart),
+    chainFromCircleIndices("right", geom, rightStart, n - gap),
+    {
+      id: "front",
+      points: [
+        circleStagePoint(geom, n - gap),
+        ...Array.from({ length: gap * 2 - 1 }, (_, i) =>
+          circleStagePoint(geom, (n - gap + 1 + i) % n),
+        ),
+        circleStagePoint(geom, gap),
+      ],
+    },
+  ];
+}
+
 export function resolveBaseStageWallChains(layout: TheaterLayout): StageWallChain[] {
   if (resolveStageShape(layout) === "custom") {
     return buildCustomStageWallEdgeChains(layout);
@@ -150,14 +332,30 @@ export function resolveBaseStageWallChains(layout: TheaterLayout): StageWallChai
           geom.backLeft,
         ],
       },
+      { id: "front", points: [geom.proscRight, geom.proscLeft] },
     ];
   }
 
-  if (geom.stageShape === "trapezoid" && geom.prosceniumEnabled) {
+  if (geom.stageShape === "trapezoid") {
     return [
       { id: "back", points: [geom.backLeft, geom.backRight] },
       { id: "right", points: [geom.backRight, geom.proscRight] },
       { id: "left", points: [geom.proscLeft, geom.backLeft] },
+      { id: "front", points: [geom.proscRight, geom.proscLeft] },
+    ];
+  }
+
+  if (geom.stageShape === "circle") {
+    return buildCircleStageWallChains(geom);
+  }
+
+  if (geom.stageShape === "semicircle") {
+    const outline = buildSemicircleStageOutline(geom);
+    const left = outline[0];
+    const right = outline[outline.length - 1];
+    return [
+      { id: "back", points: [left, right] },
+      { id: "front", points: outline },
     ];
   }
 
@@ -170,6 +368,7 @@ export function resolveBaseStageWallChains(layout: TheaterLayout): StageWallChai
     { id: "back", points: [rectLeft, rectRight] },
     { id: "right", points: [rectRight, rectProscRight] },
     { id: "left", points: [rectProscLeft, rectLeft] },
+    { id: "front", points: [rectProscRight, rectProscLeft] },
   ];
 }
 
@@ -223,6 +422,7 @@ function distanceToPointOnChain(points: StagePoint[], target: StagePoint): numbe
 
 function inwardOffsetForWall(wall: string): StagePoint {
   if (wall === "back") return { x: 0, z: 1 };
+  if (wall === "front") return { x: 0, z: -1 };
   if (wall === "left") return { x: 1, z: 0 };
   if (wall === "right") return { x: -1, z: 0 };
   return { x: 0, z: 0 };
@@ -241,7 +441,7 @@ function wallOpeningTarget(
   points: StagePoint[],
   pos: number,
 ): StagePoint {
-  if (chainId === "back") {
+  if (chainId === "back" || chainId === "front") {
     return { x: pos, z: points[0].z };
   }
   return { x: points[0].x, z: pos };
@@ -334,6 +534,14 @@ export function buildStageOutline(layout: TheaterLayout): StagePoint[] {
     return resolveStageOutlinePoints(layout);
   }
 
+  const geom = resolveStageGeometry(layout);
+  if (geom.stageShape === "circle") {
+    return buildCircleStageOutline(geom);
+  }
+  if (geom.stageShape === "semicircle") {
+    return buildSemicircleStageOutline(geom);
+  }
+
   const chains = resolveStageWallChains(layout);
   const back = chains.find((item) => item.id === "back");
   const right = chains.find((item) => item.id === "right");
@@ -342,16 +550,39 @@ export function buildStageOutline(layout: TheaterLayout): StagePoint[] {
   return [...back.points, ...right.points.slice(1), ...left.points];
 }
 
+export function circleStageXAtZ(geom: StageGeometry, z: number) {
+  const { radiusX, radiusZ, centerZ } = circleStageRadii(geom);
+  const dz = (z - centerZ) / radiusZ;
+  if (Math.abs(dz) >= 1) return 0;
+  return radiusX * Math.sqrt(1 - dz * dz);
+}
+
+export function semicircleStageXAtZ(geom: StageGeometry, z: number) {
+  const { radiusX, radiusZ, centerZ } = semicircleStageRadii(geom);
+  const dz = (z - centerZ) / radiusZ;
+  if (dz < 0 || dz > 1) return 0;
+  return radiusX * Math.sqrt(1 - dz * dz);
+}
+
 export function getStageSideWallX(
   wall: "left" | "right",
   z: number,
   geom: StageGeometry,
 ): number {
+  if (geom.stageShape === "circle") {
+    const x = circleStageXAtZ(geom, z);
+    return wall === "left" ? -x : x;
+  }
+  if (geom.stageShape === "semicircle") {
+    const x = semicircleStageXAtZ(geom, z);
+    return wall === "left" ? -x : x;
+  }
   const layout = {
     hallWidth: geom.halfW * 2,
     hallDepth: geom.halfD * 2,
     wallHeight: geom.wallHeight,
     audienceStartZ: geom.prosceniumZ,
+    stageBackZ: geom.backZ,
     stageBackWidth: geom.stageBackWidth,
     prosceniumWidth: geom.prosceniumWidth,
     prosceniumHeight: geom.prosceniumHeight,
@@ -411,7 +642,7 @@ function wallTangentRotation(start: StagePoint, end: StagePoint): number {
   return Math.atan2(-dx, dz) - Math.PI / 2;
 }
 
-type WallOpening = { center: number; halfWidth: number; height: number };
+type WallOpening = { center: number; halfWidth: number; height: number; sill: number };
 
 function buildWallSegmentsWithOpenings(
   start: StagePoint,
@@ -421,12 +652,13 @@ function buildWallSegmentsWithOpenings(
   rotationOverride?: number,
   chainId?: string,
   hideGroup?: WallHideGroup,
+  deckY = 0,
 ): WallSegment3D[] {
   const length = wallLength(start, end);
   if (length < 0.02) return [];
 
   const rotationY = rotationOverride ?? wallTangentRotation(start, end);
-  const yCenter = wallHeight / 2;
+  const yCenter = deckY + wallHeight / 2;
   const sorted = [...openings]
     .filter((item) => item.halfWidth > 0)
     .sort((a, b) => a.center - b.center);
@@ -448,17 +680,16 @@ function buildWallSegmentsWithOpenings(
     });
   };
 
-  const pushLintel = (s0: number, s1: number, doorHeight: number) => {
+  const pushBand = (s0: number, s1: number, y0: number, y1: number) => {
     const segLen = s1 - s0;
-    const clampedDoorHeight = Math.min(doorHeight, wallHeight - 0.05);
-    const lintelHeight = wallHeight - clampedDoorHeight;
-    if (segLen < 0.02 || lintelHeight < 0.02) return;
+    const bandHeight = y1 - y0;
+    if (segLen < 0.02 || bandHeight < 0.02) return;
     const mid = (s0 + s1) / 2;
     const midPoint = pointAlongWall(start, end, mid);
     segments.push({
-      position: [midPoint.x, clampedDoorHeight + lintelHeight / 2, midPoint.z],
+      position: [midPoint.x, deckY + y0 + bandHeight / 2, midPoint.z],
       rotation: [0, rotationY, 0],
-      size: [segLen, lintelHeight],
+      size: [segLen, bandHeight],
       chainId,
       hideGroup,
     });
@@ -467,8 +698,11 @@ function buildWallSegmentsWithOpenings(
   for (const opening of sorted) {
     const o0 = Math.max(0, opening.center - opening.halfWidth);
     const o1 = Math.min(length, opening.center + opening.halfWidth);
+    const sill = Math.max(0, opening.sill);
+    const openingTop = Math.min(wallHeight, sill + opening.height);
     if (o0 > cursor + 0.01) pushSegment(cursor, o0);
-    pushLintel(o0, o1, opening.height);
+    pushBand(o0, o1, 0, sill);
+    pushBand(o0, o1, openingTop, wallHeight);
     cursor = Math.max(cursor, o1);
   }
   if (cursor < length - 0.01) pushSegment(cursor, length);
@@ -480,6 +714,7 @@ function openingsAlongChain(
   chain: StageWallChain,
   doors: TheaterDoor[],
   recesses: TheaterWallRecess[],
+  wallOpenings: TheaterWallOpening[],
   wallHeight: number,
 ): WallOpening[] {
   const doorOpenings = doors
@@ -491,6 +726,7 @@ function openingsAlongChain(
       ),
       halfWidth: door.width / 2,
       height: door.height,
+      sill: 0,
     }));
 
   const recessOpenings = recesses
@@ -501,11 +737,23 @@ function openingsAlongChain(
         wallOpeningTarget(chain.id, chain.points, recess.pos),
       ),
       halfWidth: recess.width / 2,
-      // Full-height mouth; cavity walls are added separately.
       height: wallHeight,
+      sill: 0,
     }));
 
-  return [...doorOpenings, ...recessOpenings];
+  const cutOpenings = wallOpenings
+    .filter((item) => item.wall === chain.id)
+    .map((opening) => ({
+      center: distanceToPointOnChain(
+        chain.points,
+        wallOpeningTarget(chain.id, chain.points, opening.pos),
+      ),
+      halfWidth: opening.width / 2,
+      height: opening.height,
+      sill: opening.sill ?? 0,
+    }));
+
+  return [...doorOpenings, ...recessOpenings, ...cutOpenings];
 }
 
 function buildRecessCavitySegments(
@@ -513,6 +761,7 @@ function buildRecessCavitySegments(
   recesses: TheaterWallRecess[],
   wallHeight: number,
   hideGroup: WallHideGroup,
+  deckY = 0,
 ): WallSegment3D[] {
   const inward = inwardOffsetForWall(chain.id);
   const segments: WallSegment3D[] = [];
@@ -553,6 +802,7 @@ function buildRecessCavitySegments(
           undefined,
           chain.id,
           hideGroup,
+          deckY,
         ),
       );
     }
@@ -566,9 +816,11 @@ function buildChainWallSegments(
   wallHeight: number,
   doors: TheaterDoor[],
   recesses: TheaterWallRecess[],
+  wallOpenings: TheaterWallOpening[],
   hideGroup: WallHideGroup,
+  deckY = 0,
 ): WallSegment3D[] {
-  const openings = openingsAlongChain(chain, doors, recesses, wallHeight);
+  const openings = openingsAlongChain(chain, doors, recesses, wallOpenings, wallHeight);
   const segments: WallSegment3D[] = [];
   let edgeStart = 0;
 
@@ -582,6 +834,7 @@ function buildChainWallSegments(
         center: item.center - edgeStart,
         halfWidth: item.halfWidth,
         height: item.height,
+        sill: item.sill,
       }));
     segments.push(
       ...buildWallSegmentsWithOpenings(
@@ -592,12 +845,13 @@ function buildChainWallSegments(
         chain.id === "back" ? Math.PI : undefined,
         chain.id,
         hideGroup,
+        deckY,
       ),
     );
     edgeStart += len;
   }
 
-  segments.push(...buildRecessCavitySegments(chain, recesses, wallHeight, hideGroup));
+  segments.push(...buildRecessCavitySegments(chain, recesses, wallHeight, hideGroup, deckY));
   return segments;
 }
 
@@ -607,9 +861,10 @@ function buildPillarSegment(
   rotationY: number,
   chainId: string,
   hideGroup: WallHideGroup,
+  deckY = 0,
 ): WallSegment3D {
   return {
-    position: [point.x, height / 2, point.z],
+    position: [point.x, deckY + height / 2, point.z],
     rotation: [0, rotationY, 0],
     size: [0.12, height],
     chainId,
@@ -654,6 +909,7 @@ export function resolveWallHideGroup(
   if (chain.id === "left") return "left";
   if (chain.id === "right") return "right";
   if (chain.id === "back") return "back";
+  if (chain.id === "front") return "front";
   return classifyChainHideGroupByNormal(chain, stageCenter);
 }
 
@@ -662,26 +918,50 @@ export function buildStageWallMeshes(
   doors: TheaterDoor[],
 ): StageWallMeshes {
   const geom = resolveStageGeometry(layout);
+  if (geom.stageShape === "circle") {
+    return {
+      back: [],
+      left: [],
+      right: [],
+      front: [],
+      custom: [],
+      lintel: null,
+      leftPillar: null,
+      rightPillar: null,
+    };
+  }
+  const deckY = resolveStageRise(layout);
+  const hidden = new Set(resolveHiddenWalls(layout));
   // Outer walls use the base outline; recesses are mouth-cut + cavity panels.
   // Building from the recessed polyline broke door openings and "ate" wall spans.
-  const chains = resolveBaseStageWallChains(layout);
+  const chains = resolveBaseStageWallChains(layout).filter((chain) => {
+    const group = resolveWallHideGroup(chain, getStageCenterXZ(geom));
+    return !hidden.has(group as TheaterDoorWall);
+  });
   const recesses = resolveLayoutWallRecesses(layout);
+  const wallOpenings = resolveLayoutWallOpenings(layout);
   const stageCenter = getStageCenterXZ(geom);
+  const visibleDoors = doors.filter((door) => !hidden.has(door.wall));
+  const visibleRecesses = recesses.filter((recess) => !hidden.has(recess.wall));
+  const visibleOpenings = wallOpenings.filter((opening) => !hidden.has(opening.wall));
 
   if (geom.stageShape === "custom") {
     const custom = chains.flatMap((chain) =>
       buildChainWallSegments(
         chain,
         geom.wallHeight,
-        doors,
-        recesses,
+        visibleDoors,
+        visibleRecesses,
+        visibleOpenings,
         resolveWallHideGroup(chain, stageCenter),
+        deckY,
       ),
     );
     return {
       back: [],
       left: [],
       right: [],
+      front: [],
       custom,
       lintel: null,
       leftPillar: null,
@@ -692,15 +972,19 @@ export function buildStageWallMeshes(
   const backChain = chains.find((item) => item.id === "back");
   const leftChain = chains.find((item) => item.id === "left");
   const rightChain = chains.find((item) => item.id === "right");
+  const frontChain = chains.find((item) => item.id === "front");
 
   const back = backChain
-    ? buildChainWallSegments(backChain, geom.wallHeight, doors, recesses, "back")
+    ? buildChainWallSegments(backChain, geom.wallHeight, visibleDoors, visibleRecesses, visibleOpenings, "back", deckY)
     : [];
   const left = leftChain
-    ? buildChainWallSegments(leftChain, geom.wallHeight, doors, recesses, "left")
+    ? buildChainWallSegments(leftChain, geom.wallHeight, visibleDoors, visibleRecesses, visibleOpenings, "left", deckY)
     : [];
   const right = rightChain
-    ? buildChainWallSegments(rightChain, geom.wallHeight, doors, recesses, "right")
+    ? buildChainWallSegments(rightChain, geom.wallHeight, visibleDoors, visibleRecesses, visibleOpenings, "right", deckY)
+    : [];
+  const front = frontChain
+    ? buildChainWallSegments(frontChain, geom.wallHeight, visibleDoors, visibleRecesses, visibleOpenings, "front", deckY)
     : [];
 
   let lintel: WallSegment3D | null = null;
@@ -710,12 +994,13 @@ export function buildStageWallMeshes(
   const showArchFrame =
     geom.prosceniumEnabled &&
     geom.stageShape === "trapezoid" &&
-    geom.prosceniumHeight < geom.wallHeight - 0.05;
+    geom.prosceniumHeight < geom.wallHeight - 0.05 &&
+    !hidden.has("front");
 
   if (showArchFrame) {
     const lintelHeight = geom.wallHeight - geom.prosceniumHeight;
     lintel = {
-      position: [0, geom.prosceniumHeight + lintelHeight / 2, geom.prosceniumZ],
+      position: [0, deckY + geom.prosceniumHeight + lintelHeight / 2, geom.prosceniumZ],
       rotation: [0, 0, 0],
       size: [geom.prosceniumWidth, lintelHeight],
       chainId: "lintel",
@@ -723,20 +1008,34 @@ export function buildStageWallMeshes(
     };
     const baseLeft = resolveBaseStageWallChains(layout).find((item) => item.id === "left");
     const baseRight = resolveBaseStageWallChains(layout).find((item) => item.id === "right");
-    if (baseLeft && baseLeft.points.length >= 2) {
+    if (baseLeft && baseLeft.points.length >= 2 && !hidden.has("left")) {
       const rot = wallTangentRotation(
         baseLeft.points[baseLeft.points.length - 2],
         baseLeft.points[baseLeft.points.length - 1],
       );
-      leftPillar = buildPillarSegment(geom.proscLeft, geom.prosceniumHeight, rot, "left-pillar", "left");
+      leftPillar = buildPillarSegment(
+        geom.proscLeft,
+        geom.prosceniumHeight,
+        rot,
+        "left-pillar",
+        "left",
+        deckY,
+      );
     }
-    if (baseRight && baseRight.points.length >= 2) {
+    if (baseRight && baseRight.points.length >= 2 && !hidden.has("right")) {
       const rot = wallTangentRotation(baseRight.points[0], baseRight.points[1]);
-      rightPillar = buildPillarSegment(geom.proscRight, geom.prosceniumHeight, rot, "right-pillar", "right");
+      rightPillar = buildPillarSegment(
+        geom.proscRight,
+        geom.prosceniumHeight,
+        rot,
+        "right-pillar",
+        "right",
+        deckY,
+      );
     }
   }
 
-  return { back, left, right, custom: [], lintel, leftPillar, rightPillar };
+  return { back, left, right, front, custom: [], lintel, leftPillar, rightPillar };
 }
 
 function exteriorEdgeNormal(
@@ -840,6 +1139,36 @@ export function distancePointToSegment(
   return Math.hypot(px - cx, pz - cz);
 }
 
+export function placeOpeningOnWall(
+  wall: TheaterDoor["wall"] | TheaterWallRecess["wall"],
+  center: StagePoint,
+  inset: number,
+): { x: number; z: number; rotationY: number } {
+  let x = center.x;
+  let z = center.z;
+  let rotationY = 0;
+  if (wall === "left") {
+    x += inset;
+    rotationY = Math.PI / 2;
+  } else if (wall === "right") {
+    x -= inset;
+    rotationY = -Math.PI / 2;
+  } else if (wall === "back") {
+    z += inset;
+    rotationY = Math.PI;
+  } else {
+    z -= inset;
+  }
+  return { x, z, rotationY };
+}
+
+export function doorWallNormal(wall: TheaterDoorWall): [number, number, number] {
+  if (wall === "left") return [1, 0, 0];
+  if (wall === "right") return [-1, 0, 0];
+  if (wall === "back") return [0, 0, 1];
+  return [0, 0, -1];
+}
+
 export function getDoorCenterOnWall(
   door: TheaterDoor,
   layout: TheaterLayout,
@@ -876,7 +1205,25 @@ export function distancePointToWallChain(
 
 export const STAGE_SHAPE_LABELS: Record<TheaterStageShape, string> = {
   rectangle: "Прямоугольник",
-  trapezoid: "Трапеция (портал)",
+  trapezoid: "Трапеция",
+  circle: "Круг",
+  semicircle: "Полукруг",
   "t-shape": "Т-образная",
   custom: "Свой контур",
+};
+
+export const STAGE_SHAPE_HINTS: Record<TheaterStageShape, string> = {
+  rectangle: "Стены параллельны. Коробка зала и сцена одной ширины.",
+  trapezoid: "Стены сужаются к зрителям. Коробка зала с креслами остаётся прямоугольной.",
+  circle: "Открытый круглый планшет. Стен нет — как у арены.",
+  semicircle: "Орхестра амфитеатра: полукруг к залу, сзади может быть стена скены.",
+  "t-shape": "Широкие крылья у задней стены и узкая «ножка» к залу.",
+  custom: "Контур стен задаёте вершинами на плане.",
+};
+
+export const STAGE_WALL_SIDE_LABELS: Record<TheaterDoorWall, string> = {
+  back: "Задняя",
+  left: "Левая",
+  right: "Правая",
+  front: "У зрителей",
 };

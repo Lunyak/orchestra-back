@@ -36,6 +36,7 @@ export type SlotScenePickerModalProps = {
   slotsBySceneRefInSession: Map<string, DirectorSessionSlot[]>;
   onSelectScene: (scene: ScriptScene) => void;
   onSelectProgRun?: () => void;
+  onClearProgRun?: () => void;
   initialCustomTitle?: string;
   onSelectCustom: (title: string) => void;
 };
@@ -57,6 +58,7 @@ export function SlotScenePickerModal({
   slotsBySceneRefInSession,
   onSelectScene,
   onSelectProgRun,
+  onClearProgRun,
   initialCustomTitle = "",
   onSelectCustom,
 }: SlotScenePickerModalProps) {
@@ -132,9 +134,13 @@ export function SlotScenePickerModal({
             <LabeledCheckbox
               checked={isProgRunSelected}
               onChange={(checked) => {
-                if (!checked || !onSelectProgRun) return;
-                onSelectProgRun();
-                onClose();
+                if (checked) {
+                  if (!onSelectProgRun) return;
+                  onSelectProgRun();
+                  onClose();
+                  return;
+                }
+                onClearProgRun?.();
               }}
             >
               Прогон
@@ -207,8 +213,8 @@ export function SlotScenePickerModal({
                 <p className="slot-scene-picker-modal__empty">
                   Все сцены проекта
                   {scenesCount > 0 ? ` (${scenesCount})` : ""}. Актёры — все, с
-                  возможностью открепить в слоте. Выберите сцену ниже, чтобы
-                  снять прогон.
+                  возможностью открепить в слоте. Снимите «Прогон» или выберите
+                  сцену ниже.
                 </p>
               </div>
             ) : null}

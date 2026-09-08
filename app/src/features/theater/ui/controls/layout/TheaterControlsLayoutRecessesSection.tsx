@@ -3,10 +3,12 @@ import { THEATER_RECESS_WALL_LABELS } from "../../../model/theater-wall-recesses
 import { TheaterCollapsibleSection } from "../../TheaterCollapsibleSection";
 import { TheaterBtn, TheaterField } from "../../theater-controls-ui";
 import { labelM } from "../../../model/theater-metrics";
+import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import type { LayoutSectionProps } from "./types";
 
 export function TheaterControlsLayoutRecessesSection({ vm }: LayoutSectionProps) {
-  if ((vm.layout.stageShape ?? "rectangle") === "custom") return null;
+  const stageShape = vm.layout.stageShape ?? "rectangle";
+  if (stageShape === "custom" || stageShape === "circle") return null;
 
   const activeRecess = vm.layoutRecesses.find(
     (item) => item.id === vm.activeRecessId,
@@ -15,7 +17,7 @@ export function TheaterControlsLayoutRecessesSection({ vm }: LayoutSectionProps)
   return (
     <TheaterCollapsibleSection
       sectionId="layout-recesses"
-      title="Углубления в стенах"
+      title="Ниши"
       badge={
         vm.layoutRecesses.length > 0 ? String(vm.layoutRecesses.length) : undefined
       }
@@ -23,7 +25,7 @@ export function TheaterControlsLayoutRecessesSection({ vm }: LayoutSectionProps)
       headerActions={
         <TheaterBtn
           onClick={() => vm.addWallRecess("left")}
-          title="Добавить углубление слева"
+          title="Добавить нишу"
         >
           +
         </TheaterBtn>
@@ -51,7 +53,7 @@ export function TheaterControlsLayoutRecessesSection({ vm }: LayoutSectionProps)
               </button>
               <TheaterBtn
                 className="theater-btn--danger"
-                title="Удалить углубление"
+                title="Удалить нишу"
                 onClick={() => vm.removeActiveWallRecess(recess.id)}
               >
                 ×
@@ -60,15 +62,13 @@ export function TheaterControlsLayoutRecessesSection({ vm }: LayoutSectionProps)
           );
         })}
         {vm.layoutRecesses.length === 0 ? (
-          <span className="theater-spotlight-empty">Углублений нет</span>
+          <span className="theater-spotlight-empty">Ниш нет</span>
         ) : null}
       </div>
 
-      <div className="theater-btn-row theater-btn-row--3">
-        <TheaterBtn onClick={() => vm.addWallRecess("left")}>+ Левая</TheaterBtn>
-        <TheaterBtn onClick={() => vm.addWallRecess("right")}>+ Правая</TheaterBtn>
-        <TheaterBtn onClick={() => vm.addWallRecess("back")}>+ Задняя</TheaterBtn>
-      </div>
+      <p className="theater-layout-hint">
+        Ниша — выемка в стене внутрь зала.
+      </p>
 
       {activeRecess ? (
         <div className="theater-layout-grid">
@@ -136,6 +136,12 @@ export function TheaterControlsLayoutRecessesSection({ vm }: LayoutSectionProps)
               }
             />
           </TheaterField>
+          <LabeledCheckbox
+            checked={Boolean(activeRecess.filled)}
+            onChange={(filled) => vm.updateActiveWallRecess({ filled })}
+          >
+            Заполнить пол и потолок
+          </LabeledCheckbox>
         </div>
       ) : null}
     </TheaterCollapsibleSection>

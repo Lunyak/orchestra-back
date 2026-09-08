@@ -2,8 +2,15 @@ import { useEffect, useState } from "react";
 import cn from "classnames";
 import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/LabeledCheckbox";
 import type { TheaterModel } from "../../../../../shared/types/script";
-import { TheaterBtn, TheaterSelect } from "../../theater-controls-ui";
+import { TheaterBtn, TheaterRangeField, TheaterSelect } from "../../theater-controls-ui";
+import { TheaterSpotlightNavEmpty } from "./TheaterSpotlightNavEmpty";
 import type { SpotlightsSectionProps } from "./types";
+import {
+  LIGHT_RIG_HEIGHT_LIMITS,
+  resolveLightRigHeight,
+  setLightTrussHeight,
+} from "../../../model/theater-light-rig";
+import { labelM, roundM } from "../../../model/theater-metrics";
 
 const TRUSS_FIXTURE_OPTIONS = [
   { value: "regular", label: "Обычный софит" },
@@ -82,8 +89,25 @@ export function TheaterControlsSpotlightsTrussSection({
   );
   const activeTruss =
     vm.activeModel?.builtin === "lightTruss6m" ? vm.activeModel : null;
+  const isEmpty = trusses.length === 0;
   const allVisible =
     trusses.length > 0 && trusses.every((item) => !item.hidden);
+  const rigHeight = resolveLightRigHeight(trusses);
+
+  if (isEmpty) {
+    return (
+      <div className="theater-spotlight-nav-panel">
+        <TheaterSpotlightNavEmpty
+          title="Ферм нет"
+          hint="Добавьте первую ферму на сцену"
+          actionLabel="Добавить ферму"
+          disabled={!vm.currentScene}
+          onAdd={() => vm.addBuiltinModelAt("lightTruss6m")}
+          icon={<path d="M3 8h18M3 16h18M6 8v8M12 8v8M18 8v8" />}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="theater-spotlight-nav-panel">
@@ -112,7 +136,46 @@ export function TheaterControlsSpotlightsTrussSection({
           <span className="theater-spotlight-power-dot" />
         </TheaterBtn>
       </div>
+      <TheaterRangeField
+        label={labelM("Высота яруса")}
+        min={LIGHT_RIG_HEIGHT_LIMITS.min}
+        max={LIGHT_RIG_HEIGHT_LIMITS.max}
+        step={0.1}
+        value={rigHeight}
+        formatValue={(value) => String(roundM(value))}
+        disabled={!vm.currentScene}
+        onChange={(height) =>
+          vm.updateModels(setLightTrussHeight(vm.models, height))
+        }
+        onInteractStart={vm.beginTheaterHistoryTransaction}
+        onInteractEnd={vm.endTheaterHistoryTransaction}
+      />
       <div className="theater-sidebar-home theater-spotlight-nav-list">
+        {trusses.length > 1 ? (
+          <div
+            className={cn(
+              "theater-sidebar-home__item",
+              "theater-spotlight-nav-row",
+              "theater-spotlight-nav-row--truss",
+              vm.lightRigFocused && "theater-spotlight-nav-row--active",
+            )}
+            onClick={() => vm.focusLightRig()}
+          >
+            <svg
+              className="theater-sidebar-home__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+            <span className="theater-sidebar-home__label">Ярус</span>
+          </div>
+        ) : null}
         {trusses.map((truss) => {
           const isSelected =
             truss.id === activeTruss?.id ||
@@ -132,6 +195,7 @@ export function TheaterControlsSpotlightsTrussSection({
               onClick={(event) => {
                 const target = event.target as HTMLElement;
                 if (target.closest("button, input, select, label")) return;
+                vm.setLightRigFocused(false);
                 vm.selectTheaterModel(truss.id, event.shiftKey);
                 vm.setEditMode("models");
               }}
@@ -154,6 +218,7 @@ export function TheaterControlsSpotlightsTrussSection({
                 disabled={!vm.currentScene}
                 placeholder={placeholder}
                 onSelect={(shiftKey) => {
+                  vm.setLightRigFocused(false);
                   vm.selectTheaterModel(truss.id, shiftKey);
                   vm.setEditMode("models");
                 }}
@@ -181,9 +246,6 @@ export function TheaterControlsSpotlightsTrussSection({
             </div>
           );
         })}
-        {trusses.length === 0 ? (
-          <span className="theater-spotlight-empty">Ферм нет</span>
-        ) : null}
       </div>
 
       {activeTruss ? (

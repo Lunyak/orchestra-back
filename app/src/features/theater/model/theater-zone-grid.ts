@@ -8,6 +8,7 @@ import { getStageFrontZ, roundM } from "./theater-metrics";
 import {
   getStageSideWallX,
   resolveStageGeometry,
+  resolveStageRise,
 } from "./theater-stage-geometry";
 
 /** Ray-casting: точка [x,z] внутри полигона */
@@ -270,7 +271,7 @@ export function findSubZoneAtPoint(
 export function buildStageGridLinePositions(layout: TheaterLayout): Float32Array {
   const grid = resolveZoneGrid(layout);
   const { frontZ, backZ } = getStageGridFrame(layout);
-  const y = 0.012;
+  const y = resolveStageRise(layout) + 0.012;
   const positions: number[] = [];
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 

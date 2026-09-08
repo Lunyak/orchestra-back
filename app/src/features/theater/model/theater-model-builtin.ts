@@ -5,6 +5,7 @@ import {
   THEATER_ASSET_LIBRARY,
 } from "./theater-asset-library";
 import { getDecorCatalogEntryByBuiltin } from "./theater-decor-catalog";
+import { DEFAULT_LIGHT_RIG_HEIGHT } from "./theater-light-rig";
 
 /** Builtin-шаблоны, доступные во вкладке «3D модели» (порядок = порядок в пикере). */
 export const THEATER_BUILTIN_TEMPLATE_KEYS = [
@@ -130,7 +131,7 @@ export function createBuiltinTheaterModel(
   const libraryItem = getTheaterAssetLibraryItem(builtinModelKey);
   const isLibraryAsset = isTheaterAssetLibraryBuiltin(builtinModelKey);
   const decorPreset = getDecorCatalogEntryByBuiltin(builtinModelKey);
-  const initialY = isLightTruss ? 6 : isHumanModel ? 0.02 : 0;
+  const initialY = isLightTruss ? DEFAULT_LIGHT_RIG_HEIGHT : isHumanModel ? 0.02 : 0;
   const baseName =
     libraryItem?.label ??
     THEATER_BUILTIN_MODEL_NAMES[builtinModelKey ?? "table"] ??

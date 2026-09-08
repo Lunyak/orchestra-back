@@ -1,6 +1,6 @@
 import { tc } from "../../../../shared/styles/theme-color";
 import type { TheaterLayout } from "../../../../shared/types/script";
-import { getChairMetrics } from "../../model/theater-metrics";
+import { buildSeatRowXs, getChairMetrics } from "../../model/theater-metrics";
 
 export const TheaterChair = ({
   position,
@@ -51,26 +51,20 @@ export const SeatRow = ({
   row: number;
   layout: TheaterLayout;
 }) => {
-  const offset = (layout.seatsPerRow - 1) * layout.seatSpacing * 0.5;
-  const aisleLeft = layout.aisleCenterX - layout.aisleWidth / 2;
-  const aisleRight = layout.aisleCenterX + layout.aisleWidth / 2;
+  const seatXs = buildSeatRowXs(layout);
   const z = layout.audienceStartZ + row * layout.rowSpacing;
   const chair = getChairMetrics(layout.seatSpacing);
   const y = chair.floorY + row * layout.rowRise;
 
   return (
     <>
-      {Array.from({ length: layout.seatsPerRow }).map((_, index) => {
-        const x = index * layout.seatSpacing - offset;
-        if (x >= aisleLeft && x <= aisleRight) return null;
-        return (
-          <TheaterChair
-            key={`${row}-${index}`}
-            position={[x, y, z]}
-            seatSpacing={layout.seatSpacing}
-          />
-        );
-      })}
+      {seatXs.map((x, index) => (
+        <TheaterChair
+          key={`${row}-${index}`}
+          position={[x, y, z]}
+          seatSpacing={layout.seatSpacing}
+        />
+      ))}
     </>
   );
 };

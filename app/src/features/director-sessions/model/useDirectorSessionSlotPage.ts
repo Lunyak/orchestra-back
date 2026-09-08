@@ -37,7 +37,6 @@ import {
   formatTimeHHMM,
   getRangesForDateMinutes,
   getSessionStartLocalMinutes,
-  isReadyScene,
   isSlotInsideRanges,
   looksLikeEmail,
   memberEmailsFromProjectMembers,
@@ -454,10 +453,9 @@ export function useDirectorSessionSlotPage() {
 
   const filteredScenes = useMemo(() => {
     const src = projectFilter ? (dataCache[projectFilter]?.scenes ?? []) : [];
-    const base = src.filter((scene) => !isReadyScene(scene));
     const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) return base;
-    return base.filter((scene) => {
+    if (!normalizedQuery) return src;
+    return src.filter((scene) => {
       const inTitle = String(scene.title ?? "")
         .toLowerCase()
         .includes(normalizedQuery);
@@ -548,7 +546,9 @@ export function useDirectorSessionSlotPage() {
 
   const clearSlotMaterial = useCallback(() => {
     void updateSlot({
+      title: "",
       ref: undefined,
+      isProgRun: false,
       roleRehearsalPicks: undefined,
     });
   }, [updateSlot]);
@@ -567,6 +567,7 @@ export function useDirectorSessionSlotPage() {
         title: String(scene.title ?? "").trim() || `Сцена #${scene.id}`,
         ref: { projectSlug: projectFilter, sceneId: scene.id },
         durationMin: nextDuration,
+        isProgRun: false,
         roleRehearsalPicks: undefined,
       });
     },

@@ -19,6 +19,8 @@ export type TheaterCollapsibleSectionProps = {
   /** Одна строка, видна когда секция свёрнута */
   summary?: string;
   defaultOpen?: boolean;
+  /** Без шапки и тоггла — контент всегда открыт */
+  static?: boolean;
   badge?: string;
   headerActions?: ReactNode;
   children: ReactNode;
@@ -30,13 +32,16 @@ export function TheaterCollapsibleSection({
   title,
   summary,
   defaultOpen = false,
+  static: isStatic = false,
   badge,
   headerActions,
   children,
   className,
 }: TheaterCollapsibleSectionProps) {
   const storageKey = `orchestra-theater-section:${sectionId}`;
-  const [open, setOpen] = useState(() => readSectionOpen(storageKey, defaultOpen));
+  const [open, setOpen] = useState(() =>
+    isStatic ? true : readSectionOpen(storageKey, defaultOpen),
+  );
 
   const toggle = useCallback(() => {
     setOpen((prev) => {
@@ -49,6 +54,21 @@ export function TheaterCollapsibleSection({
       return next;
     });
   }, [storageKey]);
+
+  if (isStatic) {
+    return (
+      <section
+        className={cn(
+          "theater-panel-section",
+          "theater-panel-section--open",
+          "theater-panel-section--static",
+          className,
+        )}
+      >
+        <div className="theater-panel-section__body">{children}</div>
+      </section>
+    );
+  }
 
   return (
     <section

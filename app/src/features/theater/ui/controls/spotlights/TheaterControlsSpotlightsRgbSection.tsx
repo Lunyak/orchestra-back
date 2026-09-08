@@ -3,14 +3,36 @@ import { LabeledCheckbox } from "../../../../../shared/core/labeled-checkbox/Lab
 import { tc, themeColorToHex } from "../../../../../shared/styles/theme-color";
 import { THEATER_RGB_COLOR_PRESETS } from "../../../model/theater-rgb-color-presets";
 import { TheaterBtn } from "../../theater-controls-ui";
+import { TheaterSpotlightNavEmpty } from "./TheaterSpotlightNavEmpty";
 import { TheaterSpotlightNavRow } from "./TheaterSpotlightNavRow";
 import type { SpotlightsSectionProps } from "./types";
 
 export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSectionProps) {
   const activeRgbSpotlight = vm.activeSpotlight?.isRgb ? vm.activeSpotlight : null;
   const { rgbSpotlights } = spot;
+  const isEmpty = rgbSpotlights.length === 0;
   const allEnabled =
     rgbSpotlights.length > 0 && rgbSpotlights.every((item) => item.enabled !== false);
+
+  if (isEmpty) {
+    return (
+      <div className="theater-spotlight-nav-panel">
+        <TheaterSpotlightNavEmpty
+          title="RGB нет"
+          hint="Добавьте первый RGB на сцену"
+          actionLabel="Добавить RGB"
+          disabled={!vm.currentScene}
+          onAdd={vm.addRgbSpotlight}
+          icon={
+            <>
+              <path d="M12 3v4M9 7h6l5 13H4L9 7Z" />
+              <path d="M8 16h8" />
+            </>
+          }
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="theater-spotlight-nav-panel">
@@ -46,9 +68,6 @@ export function TheaterControlsSpotlightsRgbSection({ vm, spot }: SpotlightsSect
             deleteTitle="Удалить RGB"
           />
         ))}
-        {vm.spotlightsConfigured && rgbSpotlights.length === 0 ? (
-          <span className="theater-spotlight-empty">RGB нет</span>
-        ) : null}
       </div>
       <div className="theater-spotlight-nav-footer">
         <LabeledCheckbox

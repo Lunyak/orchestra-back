@@ -60,6 +60,7 @@ export type TheaterModelFocusPanelProps = {
   modelId: number;
   onNameChange?: (name: string) => void;
   size?: TheaterModelWorldSize | null;
+  sizeAxisLabels?: Record<keyof TheaterModelWorldSize, string>;
   onSizeCommit?: (next: Partial<TheaterModelWorldSize>) => void;
   transformMode: TheaterModelTransformMode;
   showDecorActions: boolean;
@@ -81,6 +82,7 @@ export function TheaterModelFocusPanel({
   modelId,
   onNameChange,
   size,
+  sizeAxisLabels,
   onSizeCommit,
   transformMode,
   showDecorActions,
@@ -179,6 +181,7 @@ export function TheaterModelFocusPanel({
       {size && onSizeCommit ? (
         <TheaterModelSizeFields
           size={size}
+          labels={sizeAxisLabels}
           className="theater-focus-panel__size-fields"
           onCommit={onSizeCommit}
         />

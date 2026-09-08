@@ -44,6 +44,7 @@ export function DirectorSessionPage() {
     assignSceneToSlot,
     assignProgRunToSlot,
     assignCustomSlotTitle,
+    clearSlotProgRun,
     selectedScene,
     selectedSceneLabel,
     selectedSceneProjectLabel,
@@ -132,6 +133,7 @@ export function DirectorSessionPage() {
                   slotsBySceneRefInSession={slotsBySceneRefInSession}
                   onSelectScene={assignSceneToSlot}
                   onSelectProgRun={assignProgRunToSlot}
+                  onClearProgRun={clearSlotProgRun}
                   onSelectCustom={assignCustomSlotTitle}
                   sessionDateKey={sessionDateKey}
                   scheduleProfiles={scheduleProfiles}

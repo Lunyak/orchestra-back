@@ -5,6 +5,7 @@ import {
   resolveDecorSize,
 } from "./theater-decor-catalog";
 import { snapTheaterHallPoint } from "./theater-hall-grid";
+import { followFloorY } from "./theater-stage-floor";
 import {
   getGridCellCenter,
   type TheaterGridCell,
@@ -44,6 +45,23 @@ function maybeSnapPosition(
   );
 }
 
+function withFloorY(
+  model: TheaterModel,
+  layout: TheaterLayout,
+  x: number,
+  z: number,
+): [number, number, number] {
+  const y = followFloorY(
+    layout,
+    model.position[0],
+    model.position[2],
+    x,
+    z,
+    model.position[1],
+  );
+  return [x, y, z];
+}
+
 export function positionAtBackWall(
   model: TheaterModel,
   layout: TheaterLayout,
@@ -58,7 +76,7 @@ export function positionAtBackWall(
     snapEnabled,
     gridStep,
   );
-  return [x, model.position[1], z];
+  return withFloorY(model, layout, x, z);
 }
 
 export function positionAtAudienceBoundary(
@@ -75,7 +93,7 @@ export function positionAtAudienceBoundary(
     snapEnabled,
     gridStep,
   );
-  return [x, model.position[1], z];
+  return withFloorY(model, layout, x, z);
 }
 
 export function positionAtHallCenter(
@@ -85,7 +103,7 @@ export function positionAtHallCenter(
   gridStep: number,
 ): [number, number, number] {
   const [x, z] = maybeSnapPosition(0, 0, layout, snapEnabled, gridStep);
-  return [x, model.position[1], z];
+  return withFloorY(model, layout, x, z);
 }
 
 export function positionAtLeftWall(
@@ -102,7 +120,7 @@ export function positionAtLeftWall(
     snapEnabled,
     gridStep,
   );
-  return [x, model.position[1], z];
+  return withFloorY(model, layout, x, z);
 }
 
 export function positionAtRightWall(
@@ -119,7 +137,7 @@ export function positionAtRightWall(
     snapEnabled,
     gridStep,
   );
-  return [x, model.position[1], z];
+  return withFloorY(model, layout, x, z);
 }
 
 export function rotateModelByQuarterTurn(
@@ -138,5 +156,6 @@ export function resolveModelPlacementPosition(
   model: TheaterModel,
   layout: TheaterLayout,
 ): [number, number, number] {
-  return getGridCellCenter(layout, preset.col, preset.row, model.position[1]);
+  const [x, , z] = getGridCellCenter(layout, preset.col, preset.row);
+  return withFloorY(model, layout, x, z);
 }

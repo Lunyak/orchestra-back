@@ -18,7 +18,7 @@ export const LIGHT_TRUSS_6M_MOUNT_POINTS: TheaterTrussMountPoint[] = Array.from(
 
 export function isLightTrussModel(
   model: TheaterModel | undefined,
-): model is TheaterModel {
+): model is TheaterModel & { builtin: "lightTruss6m" } {
   return model?.builtin === "lightTruss6m";
 }
 

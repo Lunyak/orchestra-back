@@ -13,7 +13,8 @@ import {
   readSceneTheaterModels,
   writeSceneTheaterModels,
 } from "../model/theater-scene-models";
-import { syncMountedSpotlights } from "../model/theater-truss-mounts";
+import { isLightTrussModel, syncMountedSpotlights } from "../model/theater-truss-mounts";
+import { setLightTrussHeight } from "../model/theater-light-rig";
 import { cloneTheaterModels } from "../model/theater-model-clone";
 
 type UseTheaterModelsPersistenceArgs = {
@@ -113,6 +114,20 @@ export function useTheaterModelsPersistence({
 
   const updateModel = useCallback(
     (id: number, patch: Partial<TheaterModel>) => {
+      const current = models.find((item) => item.id === id);
+      const nextY = patch.position?.[1];
+      const shouldSyncRigHeight =
+        current != null &&
+        isLightTrussModel(current) &&
+        nextY != null &&
+        Math.abs(nextY - current.position[1]) > 1e-4;
+      if (shouldSyncRigHeight) {
+        const withPatch = models.map((item) =>
+          item.id === id ? { ...item, ...patch } : item,
+        );
+        updateModels(setLightTrussHeight(withPatch, nextY));
+        return;
+      }
       const nextModels = models.map((item) =>
         item.id === id ? { ...item, ...patch } : item,
       );

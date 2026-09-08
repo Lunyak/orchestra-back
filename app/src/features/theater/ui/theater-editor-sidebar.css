@@ -408,6 +408,10 @@
   color: var(--color-active-ascent);
 }
 
+.theater-spotlight-nav-row .theater-sidebar-home__label {
+  flex: 1 1 auto;
+}
+
 .theater-spotlight-nav-row--slot-active {
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }

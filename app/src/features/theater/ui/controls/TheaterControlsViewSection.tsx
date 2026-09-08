@@ -15,6 +15,9 @@ export function TheaterControlsViewSection({ vm }: TheaterControlsViewSectionPro
       <div className="theater-editor-view-panel__group">
         <span className="theater-editor-view-panel__title">ТЕАТР</span>
         <div className="theater-editor-view-panel__list" role="group" aria-label="Театр">
+          <LabeledToggle checked={vm.showFloorPlan} onChange={vm.setShowFloorPlan}>
+            2D карта
+          </LabeledToggle>
           <LabeledToggle checked={vm.showGrid} onChange={vm.setShowGrid}>
             Сетка зала
           </LabeledToggle>
@@ -35,9 +38,6 @@ export function TheaterControlsViewSection({ vm }: TheaterControlsViewSectionPro
             onChange={vm.setShowSpotlightGuideLines}
           >
             Линии софитов
-          </LabeledToggle>
-          <LabeledToggle checked={vm.showFloorPlan} onChange={vm.setShowFloorPlan}>
-            План сверху
           </LabeledToggle>
           <LabeledToggle
             checked={vm.spectaclePreviewMode}

@@ -2,17 +2,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { tc } from "../../../../shared/styles/theme-color";
+import type { TheaterLayout } from "../../../../shared/types/script";
 import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
 import {
   isTheaterBuiltinTemplateDrag,
   readTheaterBuiltinTemplateDrag,
 } from "../../model/theater-builtin-template-dnd";
 import type { TheaterBuiltinTemplateKey } from "../../model/theater-model-builtin";
+import {
+  buildStageFloorShape,
+  intersectTheaterFloor,
+  resolveFloorYAt,
+} from "../../model/theater-stage-floor";
+import { resolveStageRise } from "../../model/theater-stage-geometry";
 
 type BuiltinTemplateFloorDropProps = {
   enabled: boolean;
-  hallWidth: number;
-  hallDepth: number;
+  layout: TheaterLayout;
   hallOffsetX?: number;
   hallOffsetZ?: number;
   snapEnabled: boolean;
@@ -25,8 +31,7 @@ type BuiltinTemplateFloorDropProps = {
 
 export function BuiltinTemplateFloorDrop({
   enabled,
-  hallWidth,
-  hallDepth,
+  layout,
   hallOffsetX = 0,
   hallOffsetZ = 0,
   snapEnabled,
@@ -38,10 +43,8 @@ export function BuiltinTemplateFloorDrop({
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const pointerNdc = useMemo(() => new THREE.Vector2(), []);
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
-  const floorPlane = useMemo(
-    () => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0),
-    [],
-  );
+  const stageShape = useMemo(() => buildStageFloorShape(layout), [layout]);
+  const deckY = resolveStageRise(layout);
 
   useEffect(() => {
     if (!enabled) {
@@ -57,12 +60,12 @@ export function BuiltinTemplateFloorDrop({
       const [nextX, nextZ] = snapTheaterHallPoint(
         localX,
         localZ,
-        hallWidth,
-        hallDepth,
+        layout.hallWidth,
+        layout.hallDepth,
         snapStep,
         snapEnabled,
       );
-      return [nextX, 0, nextZ];
+      return [nextX, resolveFloorYAt(layout, nextX, nextZ), nextZ];
     };
 
     const hitFloor = (clientX: number, clientY: number) => {
@@ -71,7 +74,9 @@ export function BuiltinTemplateFloorDrop({
       pointerNdc.x = ((clientX - rect.left) / rect.width) * 2 - 1;
       pointerNdc.y = -((clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointerNdc, camera);
-      if (!raycaster.ray.intersectPlane(floorPlane, hitPoint)) return null;
+      if (!intersectTheaterFloor(raycaster.ray, layout, hallOffsetX, hallOffsetZ, hitPoint)) {
+        return null;
+      }
       return snapPoint(hitPoint.x, hitPoint.z);
     };
 
@@ -115,13 +120,11 @@ export function BuiltinTemplateFloorDrop({
   }, [
     camera,
     enabled,
-    floorPlane,
     gl.domElement,
-    hallDepth,
     hallOffsetX,
     hallOffsetZ,
-    hallWidth,
     hitPoint,
+    layout,
     onDropTemplate,
     pointerNdc,
     raycaster,
@@ -132,20 +135,40 @@ export function BuiltinTemplateFloorDrop({
   if (!enabled || !hovering) return null;
 
   const accent = tc("--color-active-ascent");
+  const hallHighlightY = 0.02;
+  const stageHighlightY = deckY + 0.02;
 
   return (
-    <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0.02, 0]}
-      raycast={() => null}
-    >
-      <planeGeometry args={[hallWidth, hallDepth]} />
-      <meshBasicMaterial
-        color={accent}
-        transparent
-        opacity={0.12}
-        depthWrite={false}
-      />
-    </mesh>
+    <>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, hallHighlightY, 0]}
+        raycast={() => null}
+      >
+        <planeGeometry args={[layout.hallWidth, layout.hallDepth]} />
+        <meshBasicMaterial
+          color={accent}
+          transparent
+          opacity={0.08}
+          depthWrite={false}
+        />
+      </mesh>
+      {stageShape && deckY > 0.02 ? (
+        <mesh
+          rotation={[Math.PI / 2, 0, 0]}
+          position={[0, stageHighlightY, 0]}
+          raycast={() => null}
+        >
+          <shapeGeometry args={[stageShape]} />
+          <meshBasicMaterial
+            color={accent}
+            transparent
+            opacity={0.16}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ) : null}
+    </>
   );
 }

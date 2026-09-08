@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useRef } from "react";
 import type { ThreeEvent } from "@react-three/fiber";
+import * as THREE from "three";
+import type { TheaterLayout } from "../../../../shared/types/script";
 import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
 import {
   beginScreenPointerGesture,
   updateScreenPointerGesture,
   type ScreenPointerGesture,
 } from "../../model/pointer-click-gesture";
+import {
+  buildStageFloorShape,
+  resolveFloorYAt,
+} from "../../model/theater-stage-floor";
+import { resolveStageRise } from "../../model/theater-stage-geometry";
 
 type DecorFloorPlacerProps = {
   enabled: boolean;
-  hallWidth: number;
-  hallDepth: number;
+  layout: TheaterLayout;
   hallOffsetX?: number;
   hallOffsetZ?: number;
   snapEnabled: boolean;
@@ -20,8 +26,7 @@ type DecorFloorPlacerProps = {
 
 export function DecorFloorPlacer({
   enabled,
-  hallWidth,
-  hallDepth,
+  layout,
   hallOffsetX = 0,
   hallOffsetZ = 0,
   snapEnabled,
@@ -33,10 +38,11 @@ export function DecorFloorPlacer({
     position: [number, number, number];
     cleanup: () => void;
   } | null>(null);
-
-  const size = useMemo(
-    () => [hallWidth, hallDepth] as [number, number],
-    [hallWidth, hallDepth],
+  const stageShape = useMemo(() => buildStageFloorShape(layout), [layout]);
+  const deckY = resolveStageRise(layout);
+  const hallSize = useMemo(
+    () => [layout.hallWidth, layout.hallDepth] as [number, number],
+    [layout.hallDepth, layout.hallWidth],
   );
 
   useEffect(() => {
@@ -52,12 +58,12 @@ export function DecorFloorPlacer({
     const [nextX, nextZ] = snapTheaterHallPoint(
       x,
       z,
-      hallWidth,
-      hallDepth,
+      layout.hallWidth,
+      layout.hallDepth,
       snapStep,
       snapEnabled,
     );
-    return [nextX, 0, nextZ];
+    return [nextX, resolveFloorYAt(layout, nextX, nextZ), nextZ];
   };
 
   const handlePointerDown = (event: ThreeEvent<PointerEvent>) => {
@@ -107,14 +113,32 @@ export function DecorFloorPlacer({
   };
 
   return (
-    <mesh
-      rotation={[-Math.PI / 2, 0, 0]}
-      position={[0, 0.03, 0]}
-      renderOrder={-1}
-      onPointerDown={handlePointerDown}
-    >
-      <planeGeometry args={size} />
-      <meshBasicMaterial visible={false} />
-    </mesh>
+    <>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.03, 0]}
+        renderOrder={-1}
+        onPointerDown={handlePointerDown}
+      >
+        <planeGeometry args={hallSize} />
+        <meshBasicMaterial visible={false} />
+      </mesh>
+      {stageShape && deckY > 0.02 ? (
+        <mesh
+          rotation={[Math.PI / 2, 0, 0]}
+          position={[0, deckY + 0.03, 0]}
+          renderOrder={5}
+          onPointerDown={handlePointerDown}
+        >
+          <shapeGeometry args={[stageShape]} />
+          <meshBasicMaterial
+            visible={false}
+            depthWrite={false}
+            depthTest={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      ) : null}
+    </>
   );
-};
+}

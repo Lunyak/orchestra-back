@@ -128,8 +128,8 @@ function PresetSurfaceMaterial({
     <meshStandardMaterial
       map={texture}
       color={material?.color ?? fallbackColor}
-      roughness={0.86}
-      metalness={0.04}
+      roughness={presetId.startsWith("velvet") ? 0.94 : 0.86}
+      metalness={0}
       transparent={transparent || (opacity ?? 1) < 1}
       opacity={opacity ?? 1}
       side={side}

@@ -6,8 +6,10 @@ import * as THREE from "three";
 import type { TheaterLayout, TheaterModel } from "../../../../shared/types/script";
 import { snapTheaterHallPoint } from "../../model/theater-hall-grid";
 import { roundM } from "../../model/theater-metrics";
+import { followFloorY } from "../../model/theater-stage-floor";
 import {
   measureObjectWorldBox,
+  measureObjectWorldSize,
   resolveTheaterModelWorldSize,
   type TheaterModelWorldSize,
 } from "../../model/theater-model-world-size";
@@ -25,6 +27,7 @@ type ModelFloorMoveHandlesProps = {
   layout: TheaterLayout;
   snapEnabled: boolean;
   snapStep: number;
+  lockY?: boolean;
   onPreview: (position: [number, number, number]) => void;
   onCommit: (position: [number, number, number]) => void;
   onDraggingChange: (dragging: boolean) => void;
@@ -36,7 +39,11 @@ function resolveFootprint(
   model: TheaterModel,
   object: THREE.Object3D | null,
 ): TheaterModelWorldSize {
-  const measured = resolveTheaterModelWorldSize(model, object);
+  if (object) {
+    const worldSize = measureObjectWorldSize(object);
+    if (worldSize) return worldSize;
+  }
+  const measured = resolveTheaterModelWorldSize(model);
   if (measured) return measured;
   return {
     width: Math.max(0.4, Math.abs(model.scale[0])),
@@ -69,6 +76,7 @@ export function ModelFloorMoveHandles({
   layout,
   snapEnabled,
   snapStep,
+  lockY = false,
   onPreview,
   onCommit,
   onDraggingChange,
@@ -113,7 +121,17 @@ export function ModelFloorMoveHandles({
       snapStep,
       snapEnabled,
     );
-    return [roundM(nextX), position[1], roundM(nextZ)];
+    const nextY = lockY
+      ? position[1]
+      : followFloorY(
+          layout,
+          position[0],
+          position[2],
+          nextX,
+          nextZ,
+          position[1],
+        );
+    return [roundM(nextX), roundM(nextY), roundM(nextZ)];
   };
 
   const applyDrag = (clientX: number, clientY: number, camera: THREE.Camera) => {

@@ -10,7 +10,6 @@ import {
   formatDurationMinLabel,
   formatSlotTime,
   getSessionStartLocalMinutes,
-  isReadyScene,
   looksLikeEmail,
   normalizeEmail,
   toDateKey,
@@ -461,8 +460,7 @@ export function filterProjectScenesForPicker(
   isCustomSlug: boolean,
 ): ScriptScene[] {
   if (!projectFilter || isCustomSlug) return [];
-  const src = dataCache[projectFilter]?.scenes ?? [];
-  return src.filter((s) => !isReadyScene(s));
+  return dataCache[projectFilter]?.scenes ?? [];
 }
 
 export function formatSlotTimeLabel(

@@ -52,6 +52,8 @@ export type UseTheaterSceneOutlinerArgs = {
   audienceSeatsFocused: boolean;
   setStageGridFocused: (value: boolean) => void;
   stageGridFocused: boolean;
+  setLightRigFocused: (value: boolean) => void;
+  lightRigFocused: boolean;
   decorPlaceMode: boolean;
   setDecorPlaceMode: (value: boolean) => void;
   exitDecorPlaceMode: () => void;
@@ -92,6 +94,8 @@ export function useTheaterSceneOutliner({
   audienceSeatsFocused,
   setStageGridFocused,
   stageGridFocused,
+  setLightRigFocused,
+  lightRigFocused,
   decorPlaceMode,
   setDecorPlaceMode,
   exitDecorPlaceMode,
@@ -239,6 +243,7 @@ export function useTheaterSceneOutliner({
       setActiveDoorId(undefined);
       setAudienceSeatsFocused(false);
       setStageGridFocused(false);
+      setLightRigFocused(false);
       setLayoutOutlineFocused(true);
       if (switchTab) setActiveTab("layout");
     },
@@ -249,6 +254,7 @@ export function useTheaterSceneOutliner({
       setAudienceSeatsFocused,
       setDecorPlaceMode,
       setLayoutOutlineFocused,
+      setLightRigFocused,
       setMultiSelectedModelIds,
       setMultiSelectedSpotlightIds,
       setStageGridFocused,
@@ -268,6 +274,7 @@ export function useTheaterSceneOutliner({
       setActiveDoorId(undefined);
       setLayoutOutlineFocused(false);
       setStageGridFocused(false);
+      setLightRigFocused(false);
       setAudienceSeatsFocused(true);
       if (switchTab) setActiveTab("layout");
     },
@@ -278,6 +285,7 @@ export function useTheaterSceneOutliner({
       setAudienceSeatsFocused,
       setDecorPlaceMode,
       setLayoutOutlineFocused,
+      setLightRigFocused,
       setMultiSelectedModelIds,
       setMultiSelectedSpotlightIds,
       setStageGridFocused,
@@ -297,6 +305,7 @@ export function useTheaterSceneOutliner({
       setActiveDoorId(undefined);
       setLayoutOutlineFocused(false);
       setAudienceSeatsFocused(false);
+      setLightRigFocused(false);
       setStageGridFocused(true);
       if (switchTab) setActiveTab("layout");
     },
@@ -307,6 +316,38 @@ export function useTheaterSceneOutliner({
       setAudienceSeatsFocused,
       setDecorPlaceMode,
       setLayoutOutlineFocused,
+      setLightRigFocused,
+      setMultiSelectedModelIds,
+      setMultiSelectedSpotlightIds,
+      setStageGridFocused,
+      updateCurrentScene,
+    ],
+  );
+
+  const focusLightRig = useCallback(
+    (switchTab = true) => {
+      setMultiSelectedSpotlightIds([]);
+      setMultiSelectedModelIds([]);
+      updateCurrentScene({
+        theaterActiveSpotlightId: undefined,
+        theaterActiveModelId: undefined,
+      });
+      if (decorPlaceMode) setDecorPlaceMode(false);
+      setActiveDoorId(undefined);
+      setLayoutOutlineFocused(false);
+      setAudienceSeatsFocused(false);
+      setStageGridFocused(false);
+      setLightRigFocused(true);
+      if (switchTab) setActiveTab("spotlights");
+    },
+    [
+      decorPlaceMode,
+      setActiveDoorId,
+      setActiveTab,
+      setAudienceSeatsFocused,
+      setDecorPlaceMode,
+      setLayoutOutlineFocused,
+      setLightRigFocused,
       setMultiSelectedModelIds,
       setMultiSelectedSpotlightIds,
       setStageGridFocused,
@@ -340,12 +381,14 @@ export function useTheaterSceneOutliner({
           setLayoutOutlineFocused(false);
           setAudienceSeatsFocused(false);
           setStageGridFocused(false);
+          setLightRigFocused(false);
           selectTheaterSpotlight(item.id, additive, { switchTab: false });
           return;
         case "model":
           setLayoutOutlineFocused(false);
           setAudienceSeatsFocused(false);
           setStageGridFocused(false);
+          setLightRigFocused(false);
           setEditMode("models");
           selectTheaterModel(item.id, additive);
           return;
@@ -353,6 +396,7 @@ export function useTheaterSceneOutliner({
           setLayoutOutlineFocused(false);
           setAudienceSeatsFocused(false);
           setStageGridFocused(false);
+          setLightRigFocused(false);
           setEditMode("decor");
           exitDecorPlaceMode();
           selectTheaterModel(item.id, additive);
@@ -361,6 +405,7 @@ export function useTheaterSceneOutliner({
           setLayoutOutlineFocused(false);
           setAudienceSeatsFocused(false);
           setStageGridFocused(false);
+          setLightRigFocused(false);
           setActiveDoorId(item.id);
           return;
         case "layout":
@@ -387,6 +432,7 @@ export function useTheaterSceneOutliner({
       setAudienceSeatsFocused,
       setEditMode,
       setLayoutOutlineFocused,
+      setLightRigFocused,
       setStageGridFocused,
     ],
   );
@@ -409,19 +455,24 @@ export function useTheaterSceneOutliner({
     if (layoutOutlineFocused) setLayoutOutlineFocused(false);
     if (audienceSeatsFocused) setAudienceSeatsFocused(false);
     if (stageGridFocused) setStageGridFocused(false);
+    if (lightRigFocused) setLightRigFocused(false);
+    setActiveDoorId(undefined);
   }, [
     activeModelId,
     activeSpotlightId,
     audienceSeatsFocused,
     decorPlaceMode,
     layoutOutlineFocused,
+    lightRigFocused,
     multiSelectedModelIds.length,
     multiSelectedSpotlightIds.length,
     setActiveAlignGuides,
+    setActiveDoorId,
     setAudienceSeatsFocused,
     setDecorPlaceMode,
     setIsDragging,
     setLayoutOutlineFocused,
+    setLightRigFocused,
     setMultiSelectedModelIds,
     setMultiSelectedSpotlightIds,
     setStageGridFocused,
@@ -548,6 +599,7 @@ export function useTheaterSceneOutliner({
     focusLayoutHall,
     focusAudienceSeats,
     focusStageGrid,
+    focusLightRig,
     clearSceneSelection,
     toggleSceneOutlinerVisibility,
     setSceneOutlinerGroupVisibility,

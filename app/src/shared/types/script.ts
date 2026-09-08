@@ -227,7 +227,7 @@ export interface TheaterModel {
   /** Размеры параметрического декора в метрах: ширина, высота, глубина */
   decorSize?: [number, number, number];
   decorColor?: string;
-  /** preset:velvet-crimson или file:images/photo.jpg */
+  /** preset:velvet или file:images/photo.jpg */
   decorTexture?: string;
   /** Плиток текстуры на 1 метр (режим «Плитка») */
   decorTextureRepeat?: number;
@@ -266,7 +266,22 @@ export type TheaterDoorWall = "left" | "right" | "back" | "front";
 
 /** Форма сцены в плане (контур стен) */
 export type TheaterStageShape =
-  "rectangle" | "trapezoid" | "t-shape" | "custom";
+  | "rectangle"
+  | "trapezoid"
+  | "t-shape"
+  | "circle"
+  | "semicircle"
+  | "custom";
+
+/** Рассадка зрительских мест */
+export type TheaterAudienceLayout = "rows" | "arc" | "surround";
+
+/** Центральный проход в зрительном зале */
+export interface TheaterAisle {
+  id: number;
+  width: number;
+  centerX: number;
+}
 
 /** Углубление / ниша в стене сцены */
 export type TheaterWallRecessWall = "left" | "right" | "back";
@@ -280,6 +295,20 @@ export interface TheaterWallRecess {
   width: number;
   /** Глубина углубления внутрь сцены, м */
   depth: number;
+  /** Пол и потолок в нише */
+  filled?: boolean;
+}
+
+/** Сквозной проём в стене (без двери) */
+export interface TheaterWallOpening {
+  id: number;
+  wall: TheaterDoorWall;
+  /** Позиция вдоль стены: Z для left/right, X для back/front */
+  pos: number;
+  width: number;
+  height: number;
+  /** Высота подоконника от пола, м */
+  sill?: number;
 }
 
 export type TheaterDoorStyle = "wood" | "metal";
@@ -313,8 +342,12 @@ export interface TheaterLayout {
   /** Смещение центра зала по Z, м (для одностороннего расширения) */
   hallOffsetZ?: number;
   audienceStartZ: number;
+  /** Прямые ряды, полукруг или места вокруг орхестры */
+  audienceLayout?: TheaterAudienceLayout;
   /** Z передней линии сцены (сторона к залу); не зависит от кресел */
   stageFrontZ?: number;
+  /** Z заднего края сцены; по умолчанию задняя стена зала */
+  stageBackZ?: number;
   seatRows: number;
   seatsPerRow: number;
   seatSpacing: number;
@@ -322,6 +355,8 @@ export interface TheaterLayout {
   rowRise: number;
   aisleWidth: number;
   aisleCenterX: number;
+  /** Дополнительные проходы; если пусто — aisleWidth/aisleCenterX */
+  aisles?: TheaterAisle[];
   doorWidth: number;
   doorHeight: number;
   doorZ: number;
@@ -329,18 +364,26 @@ export interface TheaterLayout {
   doors?: TheaterDoor[];
   /** Ширина сцены у задней стены, м (по умолчанию = hallWidth) */
   stageBackWidth?: number;
+  /** Сколько м сцены «съело» сужение зала — вернуть при расширении */
+  stageHallFollowDebt?: number;
   /** Ширина у линии зала / «ножки» Т-сцены, м (по умолчанию = hallWidth) */
   prosceniumWidth?: number;
   /** Высота проёма арки, м (по умолчанию = wallHeight) */
   prosceniumHeight?: number;
-  /** Включить портал (сужение к залу); если false — прямоугольные боковые стены */
+  /** Арка-портал у зрителей (перемычка). На сужение стен не влияет. */
   prosceniumEnabled?: boolean;
   /** Форма контура сцены */
   stageShape?: TheaterStageShape;
+  /** Стены, которых нет. По умолчанию нет передней — открыто к залу. */
+  hiddenWalls?: TheaterDoorWall[];
+  /** Высота планшета сцены над полом зала, м */
+  stageRise?: number;
   /** Z-координата «перелома» Т-сцены (где сужается к залу) */
   tJunctionZ?: number;
   /** Углубления в стенах сцены */
   wallRecesses?: TheaterWallRecess[];
+  /** Сквозные проёмы в стенах (без двери) */
+  wallOpenings?: TheaterWallOpening[];
   /** Вершины контура сцены [x, z] в метрах (для stageShape = custom) */
   stageOutline?: [number, number][];
   /** Индексы рёбер без стены (обычно сторона к залу) */

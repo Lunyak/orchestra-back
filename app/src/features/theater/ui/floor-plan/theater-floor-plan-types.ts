@@ -20,6 +20,7 @@ export type TheaterFloorPlanProps = {
   selectedSpotlightIds?: number[];
   activeDoorId?: number;
   activeRecessId?: number;
+  activeOpeningId?: number;
   hoveredModelId: number | null;
   snapToGrid: boolean;
   gridStep: number;
@@ -33,6 +34,7 @@ export type TheaterFloorPlanProps = {
   ) => void;
   onSelectDoor?: (id: number) => void;
   onSelectRecess?: (id: number) => void;
+  onSelectOpening?: (id: number) => void;
   onPlaceDecor: (position: [number, number, number]) => void;
   onPreviewModel: (id: number, position: [number, number, number]) => void;
   onCommitModel: (id: number, position: [number, number, number]) => void;
@@ -64,6 +66,9 @@ export type DragState =
   | { kind: "recess-move"; recessId: number }
   | { kind: "recess-width-start"; recessId: number }
   | { kind: "recess-width-end"; recessId: number }
+  | { kind: "opening-move"; openingId: number }
+  | { kind: "opening-width-start"; openingId: number }
+  | { kind: "opening-width-end"; openingId: number }
   | { kind: "outline-vertex"; index: number };
 
 export const FLOOR_PLAN_DEFAULT_MAX_SIDE = 196;

@@ -23,13 +23,13 @@ export const BUILT_IN_THEMES: ThemeDefinition[] = [
     id: "orchestra",
     name: "Orchestra",
     description: "Тёплая тёмная тема по умолчанию",
-    preview: ["#282828", "#e78a4e", "#a9b664"],
+    preview: ["#282828", "#e78a4e", "#888888"],
   },
   {
     id: "light",
     name: "Светлая",
     description: "Светлый интерфейс для дневной работы",
-    preview: ["#f4f4f5", "#ea580c", "#3f6212"],
+    preview: ["#f4f4f5", "#ea580c", "#52525b"],
   },
   {
     id: "midnight",

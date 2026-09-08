@@ -37,12 +37,14 @@ import {
 import { buildLightPlotFromSpotlights } from "../model/theater-light-channel-link";
 import {
   buildTheaterModelSizePatch,
+  getTheaterModelSizeAxisLabels,
   type TheaterModelWorldSize,
 } from "../model/theater-model-world-size";
 import { writeSceneTheaterModels } from "../model/theater-scene-models";
 import type { TheaterModel, TheaterSpotlight } from "../../../shared/types/script";
 import { TheaterControls } from "./TheaterControls";
 import { isTheaterDecorModel } from "../model/theater-decor-catalog";
+import { isLightTrussModel } from "../model/theater-truss-mounts";
 import { resolveSmokePosition } from "../model/theater-smoke-settings";
 import { useMobileTheaterLayout } from "../model/theater-mobile-layout";
 import { TheaterSceneLayout } from "./TheaterSceneLayout";
@@ -249,6 +251,7 @@ export const TheaterScene = ({
       vm.setLayoutOutlineFocused(false);
       vm.setAudienceSeatsFocused(false);
       vm.setStageGridFocused(false);
+      vm.setLightRigFocused(false);
       vm.selectTheaterSpotlight(id, additive);
       vm.setEditMode("spotlights");
     },
@@ -257,6 +260,7 @@ export const TheaterScene = ({
       vm.setAudienceSeatsFocused,
       vm.setEditMode,
       vm.setLayoutOutlineFocused,
+      vm.setLightRigFocused,
       vm.setStageGridFocused,
     ],
   );
@@ -266,6 +270,7 @@ export const TheaterScene = ({
       vm.setLayoutOutlineFocused(false);
       vm.setAudienceSeatsFocused(false);
       vm.setStageGridFocused(false);
+      vm.setLightRigFocused(false);
       const model = vm.models.find((entry) => entry.id === id);
       const isDecor = model != null && isTheaterDecorModel(model);
 
@@ -283,6 +288,7 @@ export const TheaterScene = ({
       vm.setAudienceSeatsFocused,
       vm.setEditMode,
       vm.setLayoutOutlineFocused,
+      vm.setLightRigFocused,
       vm.setSpectaclePreviewMode,
       vm.setStageGridFocused,
       vm.spectaclePreviewMode,
@@ -423,6 +429,7 @@ export const TheaterScene = ({
       modelId,
       onNameChange: (name: string) => vm.updateModel(modelId, { name }),
       size: vm.activeModelWorldSize,
+      sizeAxisLabels: getTheaterModelSizeAxisLabels(activeModel.builtin),
       onSizeCommit: (next: Partial<TheaterModelWorldSize>) => {
         const current = vm.activeModelWorldSize;
         if (!current) return;
@@ -454,7 +461,9 @@ export const TheaterScene = ({
         ? (preset: ModelPlacementPreset) => vm.placeActiveModel(preset)
         : undefined,
       onResetTransform: () => {
-        const resetY = activeModel.builtin === "lightTruss6m" ? 6 : 0;
+        const resetY = isLightTrussModel(activeModel)
+          ? activeModel.position[1]
+          : 0;
         vm.updateModel(modelId, {
           position: [0, resetY, 0],
           rotation: [0, 0, 0],

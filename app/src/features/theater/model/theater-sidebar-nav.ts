@@ -7,7 +7,36 @@ export type TheaterSidebarPanelId =
   | "spotlights"
   | "models"
   | "decor"
+  | "room"
   | "layout";
+
+export type TheaterLayoutSectionId = "room" | "openings";
+
+export type TheaterRoomSectionId =
+  | "hall"
+  | "audience"
+  | "stage"
+  | "grid"
+  | "materials"
+  | "export";
+
+export type TheaterRoomNavItem = {
+  id: TheaterRoomSectionId;
+  label: string;
+};
+
+export const THEATER_ROOM_NAV: TheaterRoomNavItem[] = [
+  { id: "hall", label: "Габариты" },
+  { id: "audience", label: "Кресла" },
+  { id: "stage", label: "Форма стен" },
+  { id: "grid", label: "Сетка сцены" },
+  { id: "materials", label: "Материалы" },
+  { id: "export", label: "Экспорт" },
+];
+
+export function getTheaterRoomSectionLabel(sectionId: TheaterRoomSectionId): string {
+  return THEATER_ROOM_NAV.find((item) => item.id === sectionId)?.label ?? sectionId;
+}
 
 export type TheaterSidebarGroupId = "overview" | "tools" | "help";
 
@@ -38,6 +67,7 @@ export const THEATER_SIDEBAR_GROUPS: TheaterSidebarNavGroup[] = [
       { id: "spotlights", label: "Софиты" },
       { id: "models", label: "Модели" },
       { id: "decor", label: "Декор" },
+      { id: "room", label: "Помещение" },
       { id: "layout", label: "План" },
     ],
   },
@@ -108,7 +138,7 @@ export function applyTheaterSidebarPanel(
     vm.setEditMode("decor");
     return;
   }
-  if (panelId === "layout") {
+  if (panelId === "room" || panelId === "layout") {
     vm.setActiveTab("layout");
     return;
   }

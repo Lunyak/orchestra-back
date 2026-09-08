@@ -17,6 +17,11 @@ import {
   type DoorPlanHit,
 } from "../../model/theater-doors";
 import {
+  applyOpeningDragPreview,
+  hitTestOpeningsOnPlan,
+  type OpeningPlanHit,
+} from "../../model/theater-wall-openings";
+import {
   applyRecessDragPreview,
   hitTestRecessesOnPlan,
   type RecessPlanHit,
@@ -27,6 +32,8 @@ import {
   moveStageOutlineVertex,
 } from "../../model/theater-custom-outline";
 import { pointToGridCell } from "../../model/theater-zone-grid";
+import { resolveFloorYAt } from "../../model/theater-stage-floor";
+import { resolveModelKeepHeightY } from "../../model/theater-light-rig";
 import type { DragState, TheaterFloorPlanProps } from "./theater-floor-plan-types";
 import type { TheaterFloorPlanGeometry } from "./use-theater-floor-plan-geometry";
 
@@ -49,6 +56,7 @@ export function useTheaterFloorPlanInteraction(
     onSelectSpotlight,
     onSelectDoor,
     onSelectRecess,
+    onSelectOpening,
     onPlaceDecor,
     onPreviewModel,
     onCommitModel,
@@ -87,8 +95,10 @@ export function useTheaterFloorPlanInteraction(
   const [planPan, setPlanPan] = useState({ x: 0, y: 0 });
   const [doorHover, setDoorHover] = useState<DoorPlanHit | null>(null);
   const [recessHover, setRecessHover] = useState<RecessPlanHit | null>(null);
+  const [openingHover, setOpeningHover] = useState<OpeningPlanHit | null>(null);
   const [doorDragging, setDoorDragging] = useState(false);
   const [recessDragging, setRecessDragging] = useState(false);
+  const [openingDragging, setOpeningDragging] = useState(false);
   const [outlineVertexHover, setOutlineVertexHover] = useState<number | null>(null);
 
   useEffect(() => {
@@ -120,7 +130,7 @@ export function useTheaterFloorPlanInteraction(
 
   const updatePlanLayoutHover = useCallback(
     (clientX: number, clientY: number) => {
-      if (canEditOutline && !doorDragging && !recessDragging) {
+      if (canEditOutline && !doorDragging && !recessDragging && !openingDragging) {
         const world = clientToWorld(clientX, clientY);
         if (world) {
           setOutlineVertexHover(hitTestStageOutlineVertex(world[0], world[1], layout));
@@ -131,24 +141,35 @@ export function useTheaterFloorPlanInteraction(
         setOutlineVertexHover(null);
       }
 
-      if (!canEditDoor || doorDragging || recessDragging) {
+      if (!canEditDoor || doorDragging || recessDragging || openingDragging) {
         setDoorHover(null);
         setRecessHover(null);
+        setOpeningHover(null);
         return;
       }
       const world = clientToWorld(clientX, clientY);
       if (!world) {
         setDoorHover(null);
         setRecessHover(null);
+        setOpeningHover(null);
+        return;
+      }
+      const openingHit = hitTestOpeningsOnPlan(world[0], world[1], layout);
+      if (openingHit) {
+        setOpeningHover(openingHit);
+        setRecessHover(null);
+        setDoorHover(null);
         return;
       }
       const recessHit = hitTestRecessesOnPlan(world[0], world[1], layout);
       if (recessHit) {
         setRecessHover(recessHit);
+        setOpeningHover(null);
         setDoorHover(null);
         return;
       }
       setRecessHover(null);
+      setOpeningHover(null);
       setDoorHover(hitTestDoorsOnPlan(world[0], world[1], layout));
     },
     [
@@ -157,6 +178,7 @@ export function useTheaterFloorPlanInteraction(
       clientToWorld,
       doorDragging,
       layout,
+      openingDragging,
       recessDragging,
     ],
   );
@@ -243,6 +265,27 @@ export function useTheaterFloorPlanInteraction(
     }
 
     if (canEditDoor) {
+      const openingHit = hitTestOpeningsOnPlan(worldX, worldZ, layout);
+      if (openingHit) {
+        onSelectOpening?.(openingHit.openingId);
+        dragRef.current = {
+          kind:
+            openingHit.part === "move"
+              ? "opening-move"
+              : openingHit.part === "width-start"
+                ? "opening-width-start"
+                : "opening-width-end",
+          openingId: openingHit.openingId,
+        };
+        setOpeningDragging(true);
+        setOpeningHover(openingHit);
+        onLayoutInteractStart?.();
+        onDragStart();
+        svgRef.current?.setPointerCapture(event.pointerId);
+        event.preventDefault();
+        return;
+      }
+
       const recessHit = hitTestRecessesOnPlan(worldX, worldZ, layout);
       if (recessHit) {
         onSelectRecess?.(recessHit.recessId);
@@ -331,7 +374,7 @@ export function useTheaterFloorPlanInteraction(
         event.clientX,
         event.clientY,
       );
-      pendingPlaceRef.current = [x, 0, z];
+      pendingPlaceRef.current = [x, resolveFloorYAt(layout, x, z), z];
       svgRef.current?.setPointerCapture(event.pointerId);
       event.preventDefault();
       return;
@@ -415,6 +458,30 @@ export function useTheaterFloorPlanInteraction(
     }
 
     if (
+      drag.kind === "opening-move" ||
+      drag.kind === "opening-width-start" ||
+      drag.kind === "opening-width-end"
+    ) {
+      const part =
+        drag.kind === "opening-move"
+          ? "move"
+          : drag.kind === "opening-width-start"
+            ? "width-start"
+            : "width-end";
+      const nextOpenings = applyOpeningDragPreview(
+        layout,
+        drag.openingId,
+        part,
+        worldX,
+        worldZ,
+      );
+      if (nextOpenings) {
+        onPreviewLayout?.({ wallOpenings: nextOpenings });
+      }
+      return;
+    }
+
+    if (
       drag.kind === "recess-move" ||
       drag.kind === "recess-width-start" ||
       drag.kind === "recess-width-end"
@@ -441,7 +508,8 @@ export function useTheaterFloorPlanInteraction(
     if (drag.kind === "model") {
       const model = models.find((item) => item.id === drag.id);
       if (!model) return;
-      onPreviewModel(drag.id, [x, model.position[1], z]);
+      const nextY = resolveModelKeepHeightY(model, layout, x, z);
+      onPreviewModel(drag.id, [x, nextY, z]);
       return;
     }
 
@@ -536,6 +604,44 @@ export function useTheaterFloorPlanInteraction(
     }
 
     if (
+      drag?.kind === "opening-move" ||
+      drag?.kind === "opening-width-start" ||
+      drag?.kind === "opening-width-end"
+    ) {
+      const world = clientToWorld(event.clientX, event.clientY);
+      if (world) {
+        const [worldX, worldZ] = world;
+        const part =
+          drag.kind === "opening-move"
+            ? "move"
+            : drag.kind === "opening-width-start"
+              ? "width-start"
+              : "width-end";
+        const nextOpenings = applyOpeningDragPreview(
+          layout,
+          drag.openingId,
+          part,
+          worldX,
+          worldZ,
+        );
+        if (nextOpenings) {
+          onCommitLayout?.({ wallOpenings: nextOpenings });
+        }
+      }
+      dragRef.current = null;
+      setOpeningDragging(false);
+      onLayoutInteractEnd?.();
+      onDragEnd();
+      updatePlanLayoutHover(event.clientX, event.clientY);
+      try {
+        svgRef.current?.releasePointerCapture(event.pointerId);
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    if (
       drag?.kind === "recess-move" ||
       drag?.kind === "recess-width-start" ||
       drag?.kind === "recess-width-end"
@@ -618,7 +724,8 @@ export function useTheaterFloorPlanInteraction(
         const [x, z] = applySnap(worldX, worldZ);
         const model = models.find((item) => item.id === drag.id);
         if (model) {
-          onCommitModel(drag.id, [x, model.position[1], z]);
+          const nextY = resolveModelKeepHeightY(model, layout, x, z);
+          onCommitModel(drag.id, [x, nextY, z]);
         }
       }
       dragRef.current = null;
@@ -644,6 +751,7 @@ export function useTheaterFloorPlanInteraction(
   const handlePointerLeave = () => {
     setDoorHover(null);
     setRecessHover(null);
+    setOpeningHover(null);
     setOutlineVertexHover(null);
   };
 
@@ -657,8 +765,10 @@ export function useTheaterFloorPlanInteraction(
     planContentTransform,
     doorHover,
     recessHover,
+    openingHover,
     doorDragging,
     recessDragging,
+    openingDragging,
     outlineVertexHover,
   };
 }

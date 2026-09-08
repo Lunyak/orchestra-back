@@ -19,6 +19,7 @@ export function cloneTheaterLayout(layout: TheaterLayout): TheaterLayout {
     ...layout,
     doors: layout.doors?.map((door) => ({ ...door })),
     wallRecesses: layout.wallRecesses?.map((recess) => ({ ...recess })),
+    wallOpenings: layout.wallOpenings?.map((opening) => ({ ...opening })),
     stageOutline: layout.stageOutline?.map(([x, z]) => [x, z] as [number, number]),
     stageOutlineOpenEdges: layout.stageOutlineOpenEdges
       ? [...layout.stageOutlineOpenEdges]

@@ -18,6 +18,12 @@ export function TheaterEditorViewMenu({ vm }: TheaterEditorViewMenuProps) {
             ТЕАТР
           </span>
           <div className="theater-editor-menubar__submenu" role="group" aria-label="Театр">
+            <TheaterEditorMenubarToggle
+              checked={vm.showFloorPlan}
+              onChange={vm.setShowFloorPlan}
+            >
+              2D карта
+            </TheaterEditorMenubarToggle>
             <TheaterEditorMenubarToggle checked={vm.showGrid} onChange={vm.setShowGrid}>
               Сетка зала
             </TheaterEditorMenubarToggle>
@@ -41,12 +47,6 @@ export function TheaterEditorViewMenu({ vm }: TheaterEditorViewMenuProps) {
               onChange={vm.setShowSpotlightGuideLines}
             >
               Линии софитов
-            </TheaterEditorMenubarToggle>
-            <TheaterEditorMenubarToggle
-              checked={vm.showFloorPlan}
-              onChange={vm.setShowFloorPlan}
-            >
-              План сверху
             </TheaterEditorMenubarToggle>
             <TheaterEditorMenubarToggle
               checked={vm.spectaclePreviewMode}

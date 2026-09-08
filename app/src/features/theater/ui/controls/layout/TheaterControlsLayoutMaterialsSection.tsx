@@ -9,6 +9,7 @@ import type {
 import {
   DECOR_TEXTURE_MODES,
   DECOR_TEXTURE_PRESETS,
+  getDecorTexturePresetId,
   toDecorTextureFileRef,
   toDecorTexturePresetRef,
   type DecorTexturePresetId,
@@ -42,6 +43,7 @@ export function TheaterControlsLayoutMaterialsSection({ vm }: LayoutSectionProps
     surfaceKey,
     vm.layout[surfaceKey],
   );
+  const texturePresetId = getDecorTexturePresetId(material.texture);
 
   const updateSurfaceMaterial = (patch: Partial<TheaterSurfaceMaterial>) => {
     vm.updateLayout({
@@ -88,6 +90,7 @@ export function TheaterControlsLayoutMaterialsSection({ vm }: LayoutSectionProps
     <TheaterCollapsibleSection
       sectionId="layout-surface-materials"
       title="Материалы пола и стен"
+      static
     >
       <div className="theater-layout-grid">
         <TheaterField label="Поверхность">
@@ -119,12 +122,12 @@ export function TheaterControlsLayoutMaterialsSection({ vm }: LayoutSectionProps
         <TheaterField label="Пресет материала">
           <select
             className="native-text-input"
-            value={material.texture?.startsWith("preset:") ? material.texture : ""}
+            value={texturePresetId ? toDecorTexturePresetRef(texturePresetId) : ""}
             onChange={(event) => {
               const next = event.target.value;
               updateSurfaceMaterial({
                 texture: next || undefined,
-                textureMode: next ? material.textureMode : "repeat",
+                textureMode: next ? "cover" : "repeat",
               });
             }}
           >

@@ -9,6 +9,7 @@ export function TheaterControlsLayoutExportSection({
     <TheaterCollapsibleSection
       sectionId="layout-export"
       title="Экспорт плана"
+      static
     >
       <div className="theater-btn-row theater-btn-row--3">
         <TheaterBtn

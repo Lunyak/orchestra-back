@@ -4,13 +4,24 @@ import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { TheaterLayout } from "../../../../shared/types/script";
-import { getAudienceStartZBounds, roundM } from "../../model/theater-metrics";
+import { getAudienceSeatBlockMetrics } from "../../model/theater-audience-arc";
+import { resolveHallOffsetX } from "../../model/theater-hall-expand";
+import {
+  getAudienceStartZBounds,
+  resolveAudienceStartZ,
+  roundM,
+} from "../../model/theater-metrics";
+import {
+  THEATER_PICK_AUDIENCE,
+  type TheaterAudienceContextHit,
+} from "../../model/theater-object-context";
 import {
   beginScreenPointerGesture,
   isScreenPointerClick,
   updateScreenPointerGesture,
   type ScreenPointerGesture,
 } from "../../model/pointer-click-gesture";
+import { useTheaterObjectContextGesture } from "./use-theater-object-context-gesture";
 
 type SeatMoveSide = "front" | "back";
 
@@ -20,20 +31,6 @@ const HANDLE_DEPTH = 0.12;
 function snapValue(value: number, step: number, enabled: boolean, origin = 0) {
   if (!enabled || step <= 0) return value;
   return origin + Math.round((value - origin) / step) * step;
-}
-
-function seatBlockMetrics(layout: TheaterLayout) {
-  const blockDepth =
-    layout.seatRows > 0 ? (layout.seatRows - 1) * layout.rowSpacing : 0;
-  const startZ = layout.audienceStartZ;
-  const endZ = startZ + blockDepth;
-  const centerZ = startZ + blockDepth / 2;
-  const width = Math.max(
-    1,
-    (layout.seatsPerRow - 1) * layout.seatSpacing + layout.aisleWidth,
-  );
-  const boxDepth = Math.max(0.35, blockDepth + 0.35);
-  return { blockDepth, startZ, endZ, centerZ, width, boxDepth };
 }
 
 type AudienceSeatsHandleProps = {
@@ -49,6 +46,7 @@ type AudienceSeatsHandleProps = {
   onDraggingChange: (value: boolean) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
+  onAudienceContextMenu?: (hit: TheaterAudienceContextHit) => void;
 };
 
 export function AudienceSeatsHandle({
@@ -64,6 +62,7 @@ export function AudienceSeatsHandle({
   onDraggingChange,
   onDragStart,
   onDragEnd,
+  onAudienceContextMenu,
 }: AudienceSeatsHandleProps) {
   const { gl } = useThree();
   const dragRef = useRef<{
@@ -83,7 +82,20 @@ export function AudienceSeatsHandle({
   const hitPoint = useMemo(() => new THREE.Vector3(), []);
 
   const { min: minZ, max: maxStartZ } = getAudienceStartZBounds(layout);
-  const metrics = seatBlockMetrics(layout);
+  const metrics = getAudienceSeatBlockMetrics(layout);
+  const contextEnabled = Boolean(onAudienceContextMenu);
+  const contextHandlers = useTheaterObjectContextGesture(
+    contextEnabled,
+    (event) => {
+      onAudienceContextMenu?.({
+        kind: "audience",
+        x: event.point.x - resolveHallOffsetX(layout),
+        z: event.point.z,
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+    },
+  );
   const accent = tc("--color-active-ascent");
 
   useEffect(() => {
@@ -102,7 +114,12 @@ export function AudienceSeatsHandle({
     };
   }, [draggingSide, gl.domElement]);
 
-  if ((!selectable && !focused && !highlighted) || layout.seatRows <= 0) return null;
+  if (
+    (!selectable && !focused && !highlighted && !contextEnabled) ||
+    layout.seatRows <= 0
+  ) {
+    return null;
+  }
 
   const clampAudienceZ = (value: number) =>
     THREE.MathUtils.clamp(
@@ -171,7 +188,7 @@ export function AudienceSeatsHandle({
 
     dragRef.current = {
       side,
-      startAudienceZ: layout.audienceStartZ,
+      startAudienceZ: resolveAudienceStartZ(layout),
       startEdge: event.point.z,
       plane,
       lastZ: null,
@@ -203,16 +220,24 @@ export function AudienceSeatsHandle({
 
   const frontHandlePos: [number, number, number] = [0, 0.45, metrics.endZ];
   const backHandlePos: [number, number, number] = [0, 0.45, metrics.startZ];
-  const label = String(roundM(layout.audienceStartZ));
+  const label = String(roundM(resolveAudienceStartZ(layout)));
 
   return (
     <group>
-      {selectable ? (
+      {selectable || contextEnabled ? (
         <mesh
-          position={[0, 0.2, metrics.centerZ]}
-          onPointerDown={beginSelectGesture}
+          position={[0, 0.35, metrics.centerZ]}
+          userData={{ theaterPick: THEATER_PICK_AUDIENCE }}
+          onPointerDown={(event) => {
+            contextHandlers.onPointerDown?.(event);
+            if (selectable) beginSelectGesture(event);
+          }}
+          onPointerMove={contextHandlers.onPointerMove}
+          onPointerUp={contextHandlers.onPointerUp}
+          onPointerCancel={contextHandlers.onPointerCancel}
+          onContextMenu={contextHandlers.onContextMenu}
         >
-          <boxGeometry args={[metrics.width, 0.35, metrics.boxDepth]} />
+          <boxGeometry args={[metrics.width, 0.7, metrics.boxDepth]} />
           <meshBasicMaterial visible={false} />
         </mesh>
       ) : null}

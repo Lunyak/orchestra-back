@@ -5,12 +5,16 @@ import {
 } from "./theater-decor-asset-url";
 
 export type DecorTexturePresetId =
-  | "velvet-crimson"
-  | "velvet-navy"
-  | "velvet-gold"
+  | "velvet"
   | "canvas-beige"
   | "wood-oak"
   | "concrete-gray";
+
+const LEGACY_VELVET_PRESET_IDS = new Set([
+  "velvet-crimson",
+  "velvet-navy",
+  "velvet-gold",
+]);
 
 export type DecorTextureMode = "repeat" | "cover" | "contain" | "once";
 
@@ -78,33 +82,34 @@ export type DecorTextureMapping = {
 export type DecorTexturePreset = {
   id: DecorTexturePresetId;
   label: string;
-  /** Базовый цвет подложки под узор */
-  tint: string;
 };
 
 export const DECOR_TEXTURE_PRESETS: DecorTexturePreset[] = [
-  { id: "velvet-crimson", label: "Бархат", tint: "#8b1538" },
-  { id: "velvet-navy", label: "Бархат синий", tint: "#1e3a5f" },
-  { id: "velvet-gold", label: "Бархат золото", tint: "#9a7b2e" },
-  { id: "canvas-beige", label: "Холст", tint: "#c4b59a" },
-  { id: "wood-oak", label: "Дерево", tint: "#8b6914" },
-  { id: "concrete-gray", label: "Бетон", tint: "#7a7a7a" },
+  { id: "velvet", label: "Бархат" },
+  { id: "canvas-beige", label: "Холст" },
+  { id: "wood-oak", label: "Дерево" },
+  { id: "concrete-gray", label: "Бетон" },
 ];
 
 export const DECOR_TEXTURE_PRESET_PREFIX = "preset:" as const;
 export const DECOR_TEXTURE_FILE_PREFIX = "file:" as const;
 
-export function isDecorTexturePreset(
-  value: string | undefined,
-): value is `${typeof DECOR_TEXTURE_PRESET_PREFIX}${DecorTexturePresetId}` {
-  return Boolean(value?.startsWith(DECOR_TEXTURE_PRESET_PREFIX));
-}
-
 export function getDecorTexturePresetId(
   value: string | undefined,
 ): DecorTexturePresetId | null {
-  if (!isDecorTexturePreset(value)) return null;
-  return value.slice(DECOR_TEXTURE_PRESET_PREFIX.length) as DecorTexturePresetId;
+  if (!value?.startsWith(DECOR_TEXTURE_PRESET_PREFIX)) return null;
+  const raw = value.slice(DECOR_TEXTURE_PRESET_PREFIX.length);
+  if (raw === "velvet" || LEGACY_VELVET_PRESET_IDS.has(raw)) return "velvet";
+  if (raw === "canvas-beige" || raw === "wood-oak" || raw === "concrete-gray") {
+    return raw;
+  }
+  return null;
+}
+
+export function isDecorTexturePreset(
+  value: string | undefined,
+): value is `${typeof DECOR_TEXTURE_PRESET_PREFIX}${DecorTexturePresetId}` {
+  return getDecorTexturePresetId(value) != null;
 }
 
 export function toDecorTexturePresetRef(id: DecorTexturePresetId): string {
@@ -155,30 +160,33 @@ export function resolveDecorTextureSrc(
   return buildProjectAssetUrl("project-models", projectName, relative);
 }
 
-function drawVelvet(ctx: CanvasRenderingContext2D, size: number, tint: string) {
-  ctx.fillStyle = tint;
+function drawVelvet(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.fillStyle = "#f3eef1";
   ctx.fillRect(0, 0, size, size);
-  for (let y = 0; y < size; y += 2) {
-    for (let x = 0; x < size; x += 2) {
-      const n = ((x * 17 + y * 31) % 100) / 100;
-      ctx.fillStyle = `rgba(255,255,255,${0.03 + n * 0.07})`;
-      ctx.fillRect(x, y, 1, 1);
-    }
+  for (let x = 0; x < size; x += 5) {
+    const n = ((x * 17) % 100) / 100;
+    ctx.fillStyle = `rgba(0,0,0,${0.1 + n * 0.22})`;
+    ctx.fillRect(x, 0, 3, size);
   }
-  const grad = ctx.createLinearGradient(0, 0, size, size);
-  grad.addColorStop(0, "rgba(255,255,255,0.12)");
-  grad.addColorStop(0.5, "rgba(0,0,0,0)");
-  grad.addColorStop(1, "rgba(0,0,0,0.18)");
+  for (let y = 0; y < size; y += 10) {
+    const n = ((y * 13) % 100) / 100;
+    ctx.fillStyle = `rgba(0,0,0,${0.05 + n * 0.12})`;
+    ctx.fillRect(0, y, size, 4);
+  }
+  const grad = ctx.createLinearGradient(0, 0, size * 0.75, size);
+  grad.addColorStop(0, "rgba(255,255,255,0.38)");
+  grad.addColorStop(0.4, "rgba(255,255,255,0.06)");
+  grad.addColorStop(1, "rgba(0,0,0,0.24)");
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 }
 
-function drawCanvas(ctx: CanvasRenderingContext2D, size: number, tint: string) {
-  ctx.fillStyle = tint;
+function drawCanvas(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.fillStyle = "#f4efe6";
   ctx.fillRect(0, 0, size, size);
-  ctx.strokeStyle = "rgba(60,45,30,0.18)";
-  ctx.lineWidth = 1;
-  for (let i = -size; i < size * 2; i += 8) {
+  ctx.strokeStyle = "rgba(0,0,0,0.16)";
+  ctx.lineWidth = 2;
+  for (let i = -size; i < size * 2; i += 10) {
     ctx.beginPath();
     ctx.moveTo(i, 0);
     ctx.lineTo(i + size, size);
@@ -190,50 +198,48 @@ function drawCanvas(ctx: CanvasRenderingContext2D, size: number, tint: string) {
   }
 }
 
-function drawWood(ctx: CanvasRenderingContext2D, size: number, tint: string) {
-  ctx.fillStyle = tint;
+function drawWood(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.fillStyle = "#f0e6d4";
   ctx.fillRect(0, 0, size, size);
-  for (let y = 0; y < size; y += 6) {
-    const shade = 0.85 + ((y * 13) % 20) / 100;
-    ctx.fillStyle = `rgba(0,0,0,${0.08 * (1 - shade + 0.85)})`;
-    ctx.fillRect(0, y, size, 2);
+  for (let y = 0; y < size; y += 8) {
+    const shade = ((y * 13) % 20) / 100;
+    ctx.fillStyle = `rgba(0,0,0,${0.08 + shade})`;
+    ctx.fillRect(0, y, size, 3);
   }
-  for (let x = 0; x < size; x += 24) {
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.fillRect(x, 0, 3, size);
+  for (let x = 0; x < size; x += 28) {
+    ctx.fillStyle = "rgba(255,255,255,0.14)";
+    ctx.fillRect(x, 0, 4, size);
   }
 }
 
-function drawConcrete(ctx: CanvasRenderingContext2D, size: number, tint: string) {
-  ctx.fillStyle = tint;
+function drawConcrete(ctx: CanvasRenderingContext2D, size: number) {
+  ctx.fillStyle = "#ececec";
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 120; i += 1) {
+  for (let i = 0; i < 160; i += 1) {
     const x = (i * 47) % size;
     const y = (i * 83) % size;
-    const r = 1 + (i % 3);
-    ctx.fillStyle = `rgba(255,255,255,${0.04 + (i % 5) * 0.02})`;
+    const r = 3 + (i % 5);
+    ctx.fillStyle = `rgba(0,0,0,${0.06 + (i % 5) * 0.03})`;
     ctx.fillRect(x, y, r, r);
   }
 }
 
 export function createDecorPresetCanvas(presetId: DecorTexturePresetId): HTMLCanvasElement {
-  const preset = DECOR_TEXTURE_PRESETS.find((item) => item.id === presetId);
-  const tint = preset?.tint ?? "#888888";
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
-  if (presetId.startsWith("velvet-")) {
-    drawVelvet(ctx, size, tint);
+  if (presetId.startsWith("velvet")) {
+    drawVelvet(ctx, size);
   } else if (presetId === "canvas-beige") {
-    drawCanvas(ctx, size, tint);
+    drawCanvas(ctx, size);
   } else if (presetId === "wood-oak") {
-    drawWood(ctx, size, tint);
+    drawWood(ctx, size);
   } else {
-    drawConcrete(ctx, size, tint);
+    drawConcrete(ctx, size);
   }
   return canvas;
 }

@@ -54,7 +54,7 @@ html:not([data-theme]) {
   --field-control-inset: none;
   --field-control-text: var(--color-text-lighter);
   /* стрелка в цвете подписей/лейблов как на остальных UI */
-  --field-control-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23a9b664' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  --field-control-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23888' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 
   /* Синие цвета (primary) */
   --color-primary: #2563eb;
@@ -205,7 +205,7 @@ html:not([data-theme]) {
   /* --color-text-primary: #e2e8f0; */
   --color-text-tertiary: #e78a4e;
   --color-text-secondary: #0b1220;
-  --color-text-label: #a9b664;
+  --color-text-label: #888;
   --color-text-bright: #f8fafc;
   --color-text-light: #cbd5f5;
   --color-text-medium: #d1d5db;

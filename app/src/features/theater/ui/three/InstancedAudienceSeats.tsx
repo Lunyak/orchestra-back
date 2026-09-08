@@ -2,7 +2,10 @@ import { tc } from "../../../../shared/styles/theme-color";
 import { Instances, Instance } from "@react-three/drei";
 import { useMemo } from "react";
 import type { TheaterLayout } from "../../../../shared/types/script";
+import { enumerateAudienceSeats } from "../../model/theater-audience-arc";
 import { getChairMetrics } from "../../model/theater-metrics";
+
+const AUDIENCE_SEAT_INSTANCE_LIMIT = 80 * 200;
 
 type SeatTransform = {
   position: [number, number, number];
@@ -10,26 +13,14 @@ type SeatTransform = {
 };
 
 function buildAudienceSeatTransforms(layout: TheaterLayout): SeatTransform[] {
-  const transforms: SeatTransform[] = [];
-  const offset = (layout.seatsPerRow - 1) * layout.seatSpacing * 0.5;
-  const aisleLeft = layout.aisleCenterX - layout.aisleWidth / 2;
-  const aisleRight = layout.aisleCenterX + layout.aisleWidth / 2;
   const chair = getChairMetrics(layout.seatSpacing);
-
-  for (let row = 0; row < layout.seatRows; row += 1) {
-    const z = layout.audienceStartZ + row * layout.rowSpacing;
-    const y = chair.floorY + row * layout.rowRise;
-    for (let index = 0; index < layout.seatsPerRow; index += 1) {
-      const x = index * layout.seatSpacing - offset;
-      if (x >= aisleLeft && x <= aisleRight) continue;
-      transforms.push({
-        position: [x, y + chair.seatThickness / 2, z],
-        rotation: [0, Math.PI, 0],
-      });
-    }
-  }
-
-  return transforms;
+  return enumerateAudienceSeats(layout).map((seat) => {
+    const y = chair.floorY + seat.row * layout.rowRise + chair.seatThickness / 2;
+    return {
+      position: [seat.x, y, seat.z],
+      rotation: [0, seat.yaw, 0],
+    };
+  });
 }
 
 export function InstancedAudienceSeats({ layout }: { layout: TheaterLayout }) {
@@ -43,33 +34,46 @@ export function InstancedAudienceSeats({ layout }: { layout: TheaterLayout }) {
 
   const seatColor = tc("--color-border-lighter");
   const backColor = tc("--color-surface-4");
-  const limit = Math.max(transforms.length, 1);
+  const drawn = Math.min(transforms.length, AUDIENCE_SEAT_INSTANCE_LIMIT);
   const backOffsetZ = chair.depth / 2 - 0.05;
   const backY = chair.seatThickness / 2 + chair.backHeight / 2;
 
   return (
     <>
-      <Instances limit={limit}>
+      <Instances
+        limit={AUDIENCE_SEAT_INSTANCE_LIMIT}
+        range={drawn}
+        frustumCulled={false}
+        raycast={() => null}
+      >
         <boxGeometry args={[chair.width, chair.seatThickness, chair.depth]} />
         <meshStandardMaterial color={seatColor} />
-        {transforms.map((item, index) => (
+        {transforms.slice(0, drawn).map((item, index) => (
           <Instance key={`seat-${index}`} position={item.position} rotation={item.rotation} />
         ))}
       </Instances>
-      <Instances limit={limit}>
+      <Instances
+        limit={AUDIENCE_SEAT_INSTANCE_LIMIT}
+        range={drawn}
+        frustumCulled={false}
+        raycast={() => null}
+      >
         <boxGeometry args={[chair.width, chair.backHeight, 0.08]} />
         <meshStandardMaterial color={backColor} />
-        {transforms.map((item, index) => (
-          <Instance
-            key={`back-${index}`}
-            position={[
-              item.position[0],
-              item.position[1] + backY,
-              item.position[2] + backOffsetZ,
-            ]}
-            rotation={item.rotation}
-          />
-        ))}
+        {transforms.slice(0, drawn).map((item, index) => {
+          const yaw = item.rotation[1];
+          return (
+            <Instance
+              key={`back-${index}`}
+              position={[
+                item.position[0] - Math.sin(yaw) * backOffsetZ,
+                item.position[1] + backY,
+                item.position[2] - Math.cos(yaw) * backOffsetZ,
+              ]}
+              rotation={item.rotation}
+            />
+          );
+        })}
       </Instances>
     </>
   );

@@ -10,7 +10,8 @@ import type { TheaterDoorStyle } from "../../../../../shared/types/script";
 import type { LayoutSectionProps } from "./types";
 
 export function TheaterControlsLayoutDoorsSection({ vm }: LayoutSectionProps) {
-  if ((vm.layout.stageShape ?? "rectangle") === "custom") return null;
+  const stageShape = vm.layout.stageShape ?? "rectangle";
+  if (stageShape === "custom" || stageShape === "circle") return null;
 
   const activeDoor = vm.layoutDoors.find((door) => door.id === vm.activeDoorId);
   const canRemove = vm.layoutDoors.length > 1;
@@ -68,12 +69,6 @@ export function TheaterControlsLayoutDoorsSection({ vm }: LayoutSectionProps) {
         {vm.layoutDoors.length === 0 ? (
           <span className="theater-spotlight-empty">Дверей нет</span>
         ) : null}
-      </div>
-
-      <div className="theater-btn-row theater-btn-row--3">
-        <TheaterBtn onClick={() => vm.addDoor("left")}>+ Левая</TheaterBtn>
-        <TheaterBtn onClick={() => vm.addDoor("right")}>+ Правая</TheaterBtn>
-        <TheaterBtn onClick={() => vm.addDoor("back")}>+ Задняя</TheaterBtn>
       </div>
 
       {activeDoor ? (

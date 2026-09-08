@@ -4,7 +4,12 @@ import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import type { TheaterLayout } from "../../../../shared/types/script";
+import {
+  THEATER_PICK_FLOOR,
+  type TheaterFloorContextHit,
+} from "../../model/theater-object-context";
 import { buildStageFloorShape } from "../../model/theater-stage-floor";
+import { useTheaterObjectContextGesture } from "./use-theater-object-context-gesture";
 import {
   getStageGridHandleBounds,
   stageGridExpandDeltaFromPointer,
@@ -35,6 +40,7 @@ type StageGridHandlesProps = {
   onDraggingChange: (dragging: boolean) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
+  onFloorContextMenu?: (hit: TheaterFloorContextHit) => void;
 };
 
 export function StageGridHandles({
@@ -47,6 +53,7 @@ export function StageGridHandles({
   onDraggingChange,
   onDragStart,
   onDragEnd,
+  onFloorContextMenu,
 }: StageGridHandlesProps) {
   const { gl } = useThree();
   const dragRef = useRef<{
@@ -67,6 +74,18 @@ export function StageGridHandles({
 
   const bounds = useMemo(() => getStageGridHandleBounds(layout), [layout]);
   const floorShape = useMemo(() => buildStageFloorShape(layout), [layout]);
+  const contextEnabled = Boolean(onFloorContextMenu);
+  const contextHandlers = useTheaterObjectContextGesture(
+    contextEnabled,
+    (event) => {
+      onFloorContextMenu?.({
+        kind: "floor",
+        surface: "stage",
+        clientX: event.clientX,
+        clientY: event.clientY,
+      });
+    },
+  );
   const accent = tc("--color-active-ascent");
 
   useEffect(() => {
@@ -85,7 +104,7 @@ export function StageGridHandles({
     };
   }, [draggingSide, gl.domElement]);
 
-  if ((!selectable && !focused) || !floorShape) return null;
+  if ((!selectable && !focused && !contextEnabled) || !floorShape) return null;
 
   const beginSelectGesture = (event: ThreeEvent<PointerEvent>) => {
     if (event.button !== 0) return;
@@ -189,12 +208,20 @@ export function StageGridHandles({
 
   return (
     <group>
-      {selectable ? (
+      {selectable || contextEnabled ? (
         <mesh
           rotation={[Math.PI / 2, 0, 0]}
           position={[0, 0.09, 0]}
           renderOrder={3}
-          onPointerDown={beginSelectGesture}
+          userData={{ theaterPick: THEATER_PICK_FLOOR }}
+          onPointerDown={(event) => {
+            contextHandlers.onPointerDown?.(event);
+            if (selectable) beginSelectGesture(event);
+          }}
+          onPointerMove={contextHandlers.onPointerMove}
+          onPointerUp={contextHandlers.onPointerUp}
+          onPointerCancel={contextHandlers.onPointerCancel}
+          onContextMenu={contextHandlers.onContextMenu}
         >
           <shapeGeometry args={[floorShape]} />
           <meshBasicMaterial visible={false} side={THREE.DoubleSide} />

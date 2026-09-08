@@ -17,6 +17,7 @@ import {
   rotateModelByQuarterTurn,
   type ModelPlacementPreset,
 } from "../model/theater-model-placement";
+import { resolveFloorYAt } from "../model/theater-stage-floor";
 import {
   applyActiveModelTransform as computeActiveModelTransform,
   liftModelObjectAboveFloor,
@@ -25,6 +26,7 @@ import {
 } from "../model/theater-model-transform";
 import { MODEL_TRANSFORM_HISTORY_GRACE_MS } from "../model/theater-model-helpers";
 import { isLightTrussModel } from "../model/theater-truss-mounts";
+import { setLightTrussHeight } from "../model/theater-light-rig";
 
 type ModelTransformMode = "translate" | "rotate" | "scale";
 
@@ -198,7 +200,19 @@ export function useTheaterModelsTransform({
           ] as [number, number, number],
         };
       });
-      updateModels(nextModels);
+      const synced =
+        activeModel && isLightTrussModel(activeModel)
+          ? setLightTrussHeight(nextModels, patch.position[1])
+          : nextModels;
+      updateModels(synced);
+      return;
+    }
+
+    if (activeModel && isLightTrussModel(activeModel)) {
+      const withPatch = models.map((model) =>
+        model.id === activeModelId ? { ...model, ...patch } : model,
+      );
+      updateModels(setLightTrussHeight(withPatch, patch.position[1]));
       return;
     }
 
@@ -210,6 +224,7 @@ export function useTheaterModelsTransform({
     models,
     updateModel,
     updateModels,
+    activeModel,
   ]);
 
   const handleModelTransformChange = useCallback(() => {
@@ -332,7 +347,14 @@ export function useTheaterModelsTransform({
     const snapId = pendingSnapModelId;
     setPendingSnapModelId(null);
 
-    const lifted = liftModelObjectAboveFloor(activeModelObject);
+    if (isLightTrussModel(models.find((item) => item.id === snapId))) return;
+
+    const floorY = resolveFloorYAt(
+      layout,
+      activeModelObject.position.x,
+      activeModelObject.position.z,
+    );
+    const lifted = liftModelObjectAboveFloor(activeModelObject, floorY);
     if (lifted <= 0) return;
 
     updateModel(snapId, {
@@ -346,6 +368,8 @@ export function useTheaterModelsTransform({
     activeModelId,
     activeModelObject,
     activeModelObjectId,
+    layout,
+    models,
     pendingSnapModelId,
     setPendingSnapModelId,
     updateModel,
@@ -359,7 +383,7 @@ export function useTheaterModelsTransform({
       updateModel(activeModelId, {
         position: resolveModelPlacementPosition(preset, model, layout),
       });
-      setPendingSnapModelId(activeModelId);
+      if (!isLightTrussModel(model)) setPendingSnapModelId(activeModelId);
     },
     [activeModelId, layout, models, setPendingSnapModelId, updateModel],
   );

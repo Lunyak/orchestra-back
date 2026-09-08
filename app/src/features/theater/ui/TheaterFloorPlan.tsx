@@ -22,6 +22,7 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
     showSpotlightGuideLines,
     activeDoorId,
     activeRecessId,
+    activeOpeningId,
     hoveredModelId,
     selectedModelIds = [],
     activeSpotlightId,
@@ -82,6 +83,7 @@ export function TheaterFloorPlan(props: TheaterFloorPlanProps) {
           showSpotlightGuideLines={showSpotlightGuideLines}
           activeDoorId={activeDoorId}
           activeRecessId={activeRecessId}
+          activeOpeningId={activeOpeningId}
           activeOutlineVertexIndex={activeOutlineVertexIndex}
           selectedModelIds={selectedModelIds}
           hoveredModelId={hoveredModelId}

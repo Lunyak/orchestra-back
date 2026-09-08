@@ -1,5 +1,5 @@
 /**
- * Нативные поля в палитре Orchestra (тёплый тёмный фон, акцент tertiary, лейбл-олива).
+ * Нативные поля в палитре Orchestra (тёплый тёмный фон, акцент tertiary).
  * Подключено из shared/styles/index.css — классы .native-select / .native-text-input.
  *
  * Про <option>: в Chrome/Edge/Firefox часть стилей применяется к списку; в Safari и

@@ -143,6 +143,16 @@ export function useDirectorSessionSlotEditors(args: {
     });
   };
 
+  const clearSlotProgRun = () => {
+    if (!slot) return;
+    void updateSlot({
+      title: "",
+      ref: undefined,
+      isProgRun: false,
+      roleRehearsalPicks: undefined,
+    });
+  };
+
   const openSceneModal = () => {
     if (!slot) return;
     if (slot.ref?.projectSlug) {
@@ -185,6 +195,7 @@ export function useDirectorSessionSlotEditors(args: {
     assignSceneToSlot,
     assignProgRunToSlot,
     assignCustomSlotTitle,
+    clearSlotProgRun,
     onRoleRehearsalPicksChange,
   };
 }

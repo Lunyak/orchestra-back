@@ -1,7 +1,6 @@
 import cn from "classnames";
 import type { TheaterLayout } from "../../../shared/types/script";
 import {
-  resolveProsceniumEnabled,
   resolveStageGeometry,
   resolveStageShape,
   STAGE_SHAPE_LABELS,
@@ -12,7 +11,7 @@ type TheaterStageLayoutGuideProps = {
   compact?: boolean;
 };
 
-function ShapePreview({ shape }: { shape: "rectangle" | "trapezoid" | "t-shape" | "custom" }) {
+function ShapePreview({ shape }: { shape: "rectangle" | "trapezoid" | "t-shape" | "circle" | "semicircle" | "custom" }) {
   const hall = "M 4 6 L 76 6 L 76 54 L 4 54 Z";
   if (shape === "custom") {
     return (
@@ -44,6 +43,27 @@ function ShapePreview({ shape }: { shape: "rectangle" | "trapezoid" | "t-shape" 
       </svg>
     );
   }
+  if (shape === "circle") {
+    return (
+      <svg viewBox="0 0 80 60" className="theater-shape-preview" aria-hidden>
+        <path d={hall} className="theater-shape-preview-hall" />
+        <ellipse cx="40" cy="30" rx="26" ry="16" className="theater-shape-preview-stage" />
+        <line x1="22" y1="46" x2="58" y2="46" className="theater-shape-preview-audience" />
+      </svg>
+    );
+  }
+  if (shape === "semicircle") {
+    return (
+      <svg viewBox="0 0 80 60" className="theater-shape-preview" aria-hidden>
+        <path d={hall} className="theater-shape-preview-hall" />
+        <path
+          d="M 16 16 A 24 30 0 0 0 64 16 L 16 16 Z"
+          className="theater-shape-preview-stage"
+        />
+        <path d="M 18 40 A 22 16 0 0 0 62 40" className="theater-shape-preview-audience" />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 80 60" className="theater-shape-preview" aria-hidden>
       <path d={hall} className="theater-shape-preview-hall" />
@@ -59,7 +79,6 @@ function ShapePreview({ shape }: { shape: "rectangle" | "trapezoid" | "t-shape" 
 export function TheaterStageLayoutGuide({ layout, compact = false }: TheaterStageLayoutGuideProps) {
   const shape = resolveStageShape(layout);
   const geom = resolveStageGeometry(layout);
-  const portalOn = resolveProsceniumEnabled(layout);
   const sameWidth = Math.abs(geom.stageBackWidth - geom.prosceniumWidth) < 0.05;
 
   return (
@@ -77,10 +96,12 @@ export function TheaterStageLayoutGuide({ layout, compact = false }: TheaterStag
             </span>
           ) : !compact && shape === "trapezoid" ? (
             <span>
-              {portalOn
-                ? `Зад: ${geom.stageBackWidth} → зал: ${geom.prosceniumWidth}`
-                : "Портал выключен — на плане как прямоугольник."}
+              Задняя стена {geom.stageBackWidth} м, у зрителей {geom.prosceniumWidth} м
             </span>
+          ) : !compact && shape === "circle" ? (
+            <span>Эллипс {geom.stageBackWidth} м в ширину</span>
+          ) : !compact && shape === "semicircle" ? (
+            <span>Орхестра {geom.stageBackWidth} м, полукруг к залу</span>
           ) : !compact ? (
             <span>
               Крылья {geom.stageBackWidth}, «ножка» {geom.prosceniumWidth}

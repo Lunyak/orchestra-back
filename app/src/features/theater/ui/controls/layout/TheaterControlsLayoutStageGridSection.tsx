@@ -8,7 +8,7 @@ export function TheaterControlsLayoutStageGridSection({ vm }: LayoutSectionProps
       sectionId="layout-stage-grid"
       title="Сетка сцены"
       badge={`${vm.stageGrid.cols}×${vm.stageGrid.rows}`}
-      defaultOpen={vm.stageGridFocused}
+      static
     >
       <div className="theater-stage-grid-fields">
         <TheaterField label="Столбцы" className="theater-field--stacked">

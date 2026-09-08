@@ -10,7 +10,11 @@ import { zoneOutlineFromBand } from "./theater-zone-grid";
 import { resolveLayoutZones } from "./theater-zones";
 import { resolveLayoutDoors } from "./theater-doors";
 import { getFurnitureBounds } from "./theater-furniture-metrics";
-import { getChairMetrics } from "./theater-metrics";
+import { enumerateAudienceSeats } from "./theater-audience-arc";
+import {
+  getChairMetrics,
+  resolveAudienceStartZ,
+} from "./theater-metrics";
 import { resolveSpotlightWashLineZ } from "./spotlight-batch-layout";
 import {
   isParametricDecorBuiltin,
@@ -28,6 +32,7 @@ import {
   resolveStageShape,
   resolveStageWallChains,
 } from "./theater-stage-geometry";
+import { resolveLayoutWallOpenings } from "./theater-wall-openings";
 import { resolveLayoutWallRecesses } from "./theater-wall-recesses";
 
 export type FloorPlanViewport = {
@@ -194,9 +199,12 @@ export function buildAudienceBoundaryPlanLine(
   viewport: FloorPlanViewport,
 ): { x1: number; y1: number; x2: number; y2: number } {
   const geom = resolveStageGeometry(layout);
-  const z = layout.audienceStartZ;
+  const z = resolveAudienceStartZ(layout);
   const spanHalf =
-    geom.stageShape === "t-shape" || (geom.stageShape === "trapezoid" && geom.prosceniumEnabled)
+    geom.stageShape === "t-shape" ||
+    geom.stageShape === "trapezoid" ||
+    geom.stageShape === "circle" ||
+    geom.stageShape === "semicircle"
       ? geom.prosceniumWidth / 2
       : geom.stageBackWidth / 2;
   const [x1, y1] = worldToPlanPoint(-spanHalf, z, layout, viewport);
@@ -310,6 +318,52 @@ function buildRecessOverlays(
   });
 }
 
+function buildOpeningOverlays(
+  layout: TheaterLayout,
+  viewport: FloorPlanViewport,
+): FloorPlanDoorOverlay[] {
+  const geom = resolveStageGeometry(layout);
+  const thicknessPx = Math.max(10, worldLengthToPlanPx(0.35, layout, viewport));
+  const halfD = layout.hallDepth / 2;
+  return resolveLayoutWallOpenings(layout).map((opening) => {
+    if (opening.wall === "back") {
+      const [cx, cy] = worldToPlanPoint(opening.pos, geom.backZ, layout, viewport);
+      return {
+        id: opening.id,
+        wall: opening.wall,
+        cx,
+        cy,
+        halfLenPx: Math.max(6, worldLengthToPlanPx(opening.width / 2, layout, viewport)),
+        thicknessPx,
+        horizontal: true,
+      };
+    }
+    if (opening.wall === "front") {
+      const [cx, cy] = worldToPlanPoint(opening.pos, halfD, layout, viewport);
+      return {
+        id: opening.id,
+        wall: opening.wall,
+        cx,
+        cy,
+        halfLenPx: Math.max(6, worldLengthToPlanPx(opening.width / 2, layout, viewport)),
+        thicknessPx,
+        horizontal: true,
+      };
+    }
+    const x = getStageSideWallX(opening.wall, opening.pos, geom);
+    const [cx, cy] = worldToPlanPoint(x, opening.pos, layout, viewport);
+    return {
+      id: opening.id,
+      wall: opening.wall,
+      cx,
+      cy,
+      halfLenPx: Math.max(6, worldLengthToPlanPx(opening.width / 2, layout, viewport)),
+      thicknessPx,
+      horizontal: false,
+    };
+  });
+}
+
 export function snapPlanWorldCoords(
   x: number,
   z: number,
@@ -328,20 +382,7 @@ export function snapPlanWorldCoords(
 }
 
 export function enumerateSeatPositions(layout: TheaterLayout): [number, number][] {
-  const positions: [number, number][] = [];
-  const offset = (layout.seatsPerRow - 1) * layout.seatSpacing * 0.5;
-  const aisleLeft = layout.aisleCenterX - layout.aisleWidth / 2;
-  const aisleRight = layout.aisleCenterX + layout.aisleWidth / 2;
-
-  for (let row = 0; row < layout.seatRows; row += 1) {
-    const z = layout.audienceStartZ + row * layout.rowSpacing;
-    for (let index = 0; index < layout.seatsPerRow; index += 1) {
-      const x = index * layout.seatSpacing - offset;
-      if (x >= aisleLeft && x <= aisleRight) continue;
-      positions.push([x, z]);
-    }
-  }
-  return positions;
+  return enumerateAudienceSeats(layout).map((seat) => [seat.x, seat.z]);
 }
 
 function resolveModelFootprint(model: TheaterModel): {
@@ -516,6 +557,7 @@ export type FloorPlanWallOverlay = {
   stageWalls: FloorPlanWallLine[];
   doors: FloorPlanDoorOverlay[];
   recesses: FloorPlanRecessOverlay[];
+  openings: FloorPlanDoorOverlay[];
 };
 
 function buildVerticalWallSegments(
@@ -615,6 +657,7 @@ export function buildFloorPlanWallOverlay(
       stageWalls,
       doors: [],
       recesses: [],
+      openings: [],
     };
   }
 
@@ -631,5 +674,6 @@ export function buildFloorPlanWallOverlay(
     stageWalls: [],
     doors: [...left.overlays, ...right.overlays, ...back.overlays, ...front.overlays],
     recesses: buildRecessOverlays(layout, viewport),
+    openings: buildOpeningOverlays(layout, viewport),
   };
 }

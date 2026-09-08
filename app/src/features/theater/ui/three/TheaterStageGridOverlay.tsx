@@ -6,8 +6,11 @@ import {
   buildGridCellOutline,
   buildStageGridLinePositions,
 } from "../../model/theater-zone-grid";
+import { resolveStageRise } from "../../model/theater-stage-geometry";
 
-const HIGHLIGHT_Y = 0.016;
+function highlightY(layout: TheaterLayout) {
+  return resolveStageRise(layout) + 0.016;
+}
 
 type TheaterStageGridOverlayProps = {
   layout: TheaterLayout;
@@ -24,10 +27,11 @@ function buildCellHighlightGeometry(
   if (outline.length < 3) return null;
   const positions: number[] = [];
   const [x0, z0] = outline[0];
+  const y = highlightY(layout);
   for (let i = 1; i < outline.length - 1; i += 1) {
     const [x1, z1] = outline[i];
     const [x2, z2] = outline[i + 1];
-    positions.push(x0, HIGHLIGHT_Y, z0, x1, HIGHLIGHT_Y, z1, x2, HIGHLIGHT_Y, z2);
+    positions.push(x0, y, z0, x1, y, z1, x2, y, z2);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute(

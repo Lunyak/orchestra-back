@@ -1,13 +1,30 @@
 import { TransformControls } from "@react-three/drei";
 import { Suspense } from "react";
 import type * as THREE from "three";
-import type { TheaterLayout, TheaterModel, TheaterSpotlight } from "../../../../shared/types/script";
+import type {
+  TheaterDoor,
+  TheaterLayout,
+  TheaterModel,
+  TheaterSpotlight,
+  TheaterWallOpening,
+  TheaterWallRecess,
+} from "../../../../shared/types/script";
+import {
+  canAddTheaterLayoutDoors,
+  type TheaterDoorContextHit,
+  type TheaterFloorContextHit,
+  type TheaterOpeningContextHit,
+  type TheaterRecessContextHit,
+  type TheaterWallContextHit,
+  type TheaterAudienceContextHit,
+} from "../../model/theater-object-context";
 import type { ActiveAlignGuide } from "../../model/theater-align-guides";
 import type { StageGridCell } from "../../playbook-stage/use-stage-grid-highlight";
 import { TheaterStage } from "../three/TheaterStage";
 import { DecorFloorPlacer } from "../three/DecorFloorPlacer";
 import { BuiltinTemplateFloorDrop } from "../three/BuiltinTemplateFloorDrop";
 import { ModelFloorMoveHandles } from "../three/ModelFloorMoveHandles";
+import { LightRigMoveHandle } from "../three/LightRigMoveHandle";
 import type { HallExpandResult } from "../../model/theater-hall-expand";
 import type { TheaterBuiltinTemplateKey } from "../../model/theater-model-builtin";
 import {
@@ -23,6 +40,8 @@ import { SpotlightItem } from "../three/SpotlightItem";
 import { InstancedFurnitureLayer } from "../three/InstancedFurnitureLayer";
 import { BuiltinModelInstance } from "../three/BuiltinModelInstance";
 import { FileModelInstanceLoader } from "../three/FileModelInstanceLoader";
+import { isTheaterRightClickNav } from "../../model/theater-right-click-nav";
+import { isLightTrussModel } from "../../model/theater-truss-mounts";
 import { TheaterOrbitControls } from "../three/TheaterOrbitControls";
 import { LightTrussMountPoints } from "../three/LightTrussMountPoints";
 import type { TheaterCameraState } from "../../model/theater-camera-storage";
@@ -45,6 +64,7 @@ export type TheaterCanvasContentProps = {
   showStageGrid: boolean;
   activeDoorId?: number;
   activeRecessId?: number;
+  activeOpeningId?: number;
   showSpotlights: boolean;
   showSpotlightGuideLines: boolean;
   wallsOpaque: boolean;
@@ -114,6 +134,12 @@ export type TheaterCanvasContentProps = {
   onModelFloorMoveCommit: (position: [number, number, number]) => void;
   onModelFloorMoveDragStart: () => void;
   onModelFloorMoveDragEnd: () => void;
+  onLightRigMovePreview: (deltaX: number, deltaZ: number) => void;
+  onLightRigMoveCommit: (deltaX: number, deltaZ: number) => void;
+  onLightRigMoveDragStart: () => void;
+  onLightRigMoveDragEnd: () => void;
+  lightRigFocused: boolean;
+  onSelectLightRig: () => void;
   onActiveObjectChange: (node: THREE.Object3D | null, id: number) => void;
   onObjectReady: (node: THREE.Object3D | null, id: number) => void;
   audienceSeatsHighlight: boolean;
@@ -135,6 +161,27 @@ export type TheaterCanvasContentProps = {
   onStageGridCommit: (patch: Partial<TheaterLayout>) => void;
   onStageGridDragStart: () => void;
   onStageGridDragEnd: () => void;
+  onWallContextMenu?: (hit: TheaterWallContextHit) => void;
+  onFloorContextMenu?: (hit: TheaterFloorContextHit) => void;
+  onSelectDoor?: (doorId: number) => void;
+  onDoorMovePreview?: (doors: TheaterDoor[]) => void;
+  onDoorMoveCommit?: (doors: TheaterDoor[]) => void;
+  onDoorDragStart?: () => void;
+  onDoorDragEnd?: () => void;
+  onDoorContextMenu?: (hit: TheaterDoorContextHit) => void;
+  onRecessContextMenu?: (hit: TheaterRecessContextHit) => void;
+  onSelectRecess?: (recessId: number) => void;
+  onRecessMovePreview?: (recesses: TheaterWallRecess[]) => void;
+  onRecessMoveCommit?: (recesses: TheaterWallRecess[]) => void;
+  onRecessDragStart?: () => void;
+  onRecessDragEnd?: () => void;
+  onSelectOpening?: (openingId: number) => void;
+  onOpeningMovePreview?: (openings: TheaterWallOpening[]) => void;
+  onOpeningMoveCommit?: (openings: TheaterWallOpening[]) => void;
+  onOpeningDragStart?: () => void;
+  onOpeningDragEnd?: () => void;
+  onOpeningContextMenu?: (hit: TheaterOpeningContextHit) => void;
+  onAudienceContextMenu?: (hit: TheaterAudienceContextHit) => void;
 };
 
 export function TheaterCanvasContent({
@@ -147,6 +194,7 @@ export function TheaterCanvasContent({
   showStageGrid,
   activeDoorId,
   activeRecessId,
+  activeOpeningId,
   showSpotlights,
   showSpotlightGuideLines,
   wallsOpaque,
@@ -207,6 +255,12 @@ export function TheaterCanvasContent({
   onModelFloorMoveCommit,
   onModelFloorMoveDragStart,
   onModelFloorMoveDragEnd,
+  onLightRigMovePreview,
+  onLightRigMoveCommit,
+  onLightRigMoveDragStart,
+  onLightRigMoveDragEnd,
+  lightRigFocused,
+  onSelectLightRig,
   onActiveObjectChange,
   onObjectReady,
   onDecorPlace,
@@ -230,6 +284,27 @@ export function TheaterCanvasContent({
   onStageGridCommit,
   onStageGridDragStart,
   onStageGridDragEnd,
+  onWallContextMenu,
+  onFloorContextMenu,
+  onSelectDoor,
+  onDoorMovePreview,
+  onDoorMoveCommit,
+  onDoorDragStart,
+  onDoorDragEnd,
+  onDoorContextMenu,
+  onRecessContextMenu,
+  onSelectRecess,
+  onRecessMovePreview,
+  onRecessMoveCommit,
+  onRecessDragStart,
+  onRecessDragEnd,
+  onSelectOpening,
+  onOpeningMovePreview,
+  onOpeningMoveCommit,
+  onOpeningDragStart,
+  onOpeningDragEnd,
+  onOpeningContextMenu,
+  onAudienceContextMenu,
 }: TheaterCanvasContentProps) {
   const pickingSpotlightGridCell =
     activeTab === "spotlights" && editMode === "spotlights" && spotlightAimMode === "cell";
@@ -238,6 +313,7 @@ export function TheaterCanvasContent({
     (model) =>
       model.id === hoveredModelId && model.builtin === "lightTruss6m",
   );
+  const lightTrusses = individualModels.filter(isLightTrussModel);
   const mountPointTruss =
     activeModel?.builtin === "lightTruss6m"
       ? activeModel
@@ -249,6 +325,14 @@ export function TheaterCanvasContent({
     modelTransformMode === "rotate";
   const hallOffsetX = resolveHallOffsetX(layout);
   const hallOffsetZ = resolveHallOffsetZ(layout);
+  const handleModelContextMenu = (id: number) => {
+    if (isTheaterRightClickNav()) return;
+    onModelContextMenu(id);
+  };
+  const handleSpotlightContextMenu = (id: number) => {
+    if (isTheaterRightClickNav()) return;
+    onSpotlightContextMenu(id);
+  };
 
   return (
     <>
@@ -270,9 +354,32 @@ export function TheaterCanvasContent({
         showStageGrid={showStageGrid}
         activeDoorId={activeDoorId}
         activeRecessId={activeRecessId}
+        activeOpeningId={activeOpeningId}
         highlightGridCell={highlightGridCell}
         spotlightAimMode={pickingSpotlightGridCell ? "cell" : "point"}
         onPickGridCell={onPickGridCell}
+        onWallContextMenu={onWallContextMenu}
+        onFloorContextMenu={onFloorContextMenu}
+        doorsInteractive={showEditorHelpers && canAddTheaterLayoutDoors(layout)}
+        onSelectDoor={onSelectDoor}
+        onDoorMovePreview={onDoorMovePreview}
+        onDoorMoveCommit={onDoorMoveCommit}
+        onDoorDragStart={onDoorDragStart}
+        onDoorDragEnd={onDoorDragEnd}
+        onDraggingChange={onDraggingChange}
+        onDoorContextMenu={onDoorContextMenu}
+        onRecessContextMenu={onRecessContextMenu}
+        onSelectRecess={onSelectRecess}
+        onRecessMovePreview={onRecessMovePreview}
+        onRecessMoveCommit={onRecessMoveCommit}
+        onRecessDragStart={onRecessDragStart}
+        onRecessDragEnd={onRecessDragEnd}
+        onSelectOpening={onSelectOpening}
+        onOpeningMovePreview={onOpeningMovePreview}
+        onOpeningMoveCommit={onOpeningMoveCommit}
+        onOpeningDragStart={onOpeningDragStart}
+        onOpeningDragEnd={onOpeningDragEnd}
+        onOpeningContextMenu={onOpeningContextMenu}
       />
       <TheaterSmokeMachine
         layout={layout}
@@ -293,8 +400,7 @@ export function TheaterCanvasContent({
           !isDragging &&
           activeModelId == null
         }
-        hallWidth={layout.hallWidth}
-        hallDepth={layout.hallDepth}
+        layout={layout}
         hallOffsetX={hallOffsetX}
         hallOffsetZ={hallOffsetZ}
         snapEnabled={snapToGrid}
@@ -303,8 +409,7 @@ export function TheaterCanvasContent({
       />
       <BuiltinTemplateFloorDrop
         enabled={showEditorHelpers && !isDragging}
-        hallWidth={layout.hallWidth}
-        hallDepth={layout.hallDepth}
+        layout={layout}
         hallOffsetX={hallOffsetX}
         hallOffsetZ={hallOffsetZ}
         snapEnabled={snapToGrid}
@@ -330,6 +435,7 @@ export function TheaterCanvasContent({
         }}
         onDragStart={onAudienceDragStart}
         onDragEnd={onAudienceDragEnd}
+        onAudienceContextMenu={onAudienceContextMenu}
       />
       <StageGridHandles
         layout={layout}
@@ -347,6 +453,7 @@ export function TheaterCanvasContent({
         onDraggingChange={onDraggingChange}
         onDragStart={onStageGridDragStart}
         onDragEnd={onStageGridDragEnd}
+        onFloorContextMenu={onFloorContextMenu}
       />
       <HallSizeHandles
         layout={layout}
@@ -404,7 +511,7 @@ export function TheaterCanvasContent({
           sceneDragging={isDragging}
           onDragStart={onSpotlightDragStart}
           onDragEnd={onSpotlightDragEnd}
-          onContextMenu={onSpotlightContextMenu}
+          onContextMenu={handleSpotlightContextMenu}
           onSelect={onSpotlightSelect}
         />
       ))}
@@ -415,7 +522,7 @@ export function TheaterCanvasContent({
           selectedModelIds={multiSelectedModelIds}
           hoveredModelId={hoveredModelId}
           onSelect={onModelSelect}
-          onContextMenu={onModelContextMenu}
+          onContextMenu={handleModelContextMenu}
           onHoverChange={onModelHoverChange}
           passThroughPointerEvents={passModelPointerEventsThrough}
         />
@@ -446,7 +553,7 @@ export function TheaterCanvasContent({
                 onObjectReady={onObjectReady}
                 onSelect={onSelect}
                 onActivate={onActivate}
-                onContextMenu={onModelContextMenu}
+                onContextMenu={handleModelContextMenu}
                 isSelected={multiSelectedModelIds.includes(model.id)}
                 isHovered={model.id === hoveredModelId}
                 onHoverChange={onHoverChange}
@@ -466,7 +573,7 @@ export function TheaterCanvasContent({
                 onObjectReady={onObjectReady}
                 onSelect={onSelect}
                 onActivate={onActivate}
-                onContextMenu={onModelContextMenu}
+                onContextMenu={handleModelContextMenu}
                 isSelected={multiSelectedModelIds.includes(model.id)}
                 isHovered={model.id === hoveredModelId}
                 onHoverChange={onHoverChange}
@@ -502,11 +609,31 @@ export function TheaterCanvasContent({
           layout={layout}
           snapEnabled={snapToGrid}
           snapStep={gridStep}
+          lockY={isLightTrussModel(activeModel)}
           onPreview={onModelFloorMovePreview}
           onCommit={onModelFloorMoveCommit}
           onDraggingChange={onDraggingChange}
           onDragStart={onModelFloorMoveDragStart}
           onDragEnd={onModelFloorMoveDragEnd}
+        />
+      ) : null}
+      {showEditorHelpers &&
+      !decorPlaceMode &&
+      !pickingSpotlightGridCell &&
+      lightTrusses.length > 1 ? (
+        <LightRigMoveHandle
+          trusses={lightTrusses}
+          layout={layout}
+          focused={lightRigFocused}
+          selectable={!isDragging}
+          snapEnabled={snapToGrid}
+          snapStep={gridStep}
+          onSelect={onSelectLightRig}
+          onPreview={onLightRigMovePreview}
+          onCommit={onLightRigMoveCommit}
+          onDraggingChange={onDraggingChange}
+          onDragStart={onLightRigMoveDragStart}
+          onDragEnd={onLightRigMoveDragEnd}
         />
       ) : null}
       {isModelEditMode &&

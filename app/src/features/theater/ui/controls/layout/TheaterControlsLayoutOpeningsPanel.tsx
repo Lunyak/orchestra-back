@@ -1,6 +1,7 @@
 import type { TheaterControlsTabProps } from "../types";
 import type { TheaterControlsLayoutTabModel } from "../use-theater-controls-layout-tab";
 import { TheaterControlsLayoutDoorsSection } from "./TheaterControlsLayoutDoorsSection";
+import { TheaterControlsLayoutOpeningsSection } from "./TheaterControlsLayoutOpeningsSection";
 import { TheaterControlsLayoutRecessesSection } from "./TheaterControlsLayoutRecessesSection";
 
 export type TheaterControlsLayoutOpeningsPanelProps = TheaterControlsTabProps & {
@@ -13,12 +14,15 @@ export function TheaterControlsLayoutOpeningsPanel({
   layout,
 }: TheaterControlsLayoutOpeningsPanelProps) {
   const isCustomStage = layout.isCustomStageOutline;
+  const isCircleStage = (vm.layout.stageShape ?? "rectangle") === "circle";
 
-  if (isCustomStage) {
+  if (isCustomStage || isCircleStage) {
     return (
       <div className="theater-layout-panel__body">
         <p className="theater-layout-hint theater-layout-panel__empty-hint">
-          Для произвольного контура сцены двери и ниши пока недоступны.
+          {isCircleStage
+            ? "Круглая сцена — открытый планшет без стен. Двери, ниши и проёмы не нужны."
+            : "Для произвольного контура сцены двери, ниши и проёмы пока недоступны."}
         </p>
       </div>
     );
@@ -27,6 +31,7 @@ export function TheaterControlsLayoutOpeningsPanel({
   return (
     <div className="theater-layout-panel__body">
       <TheaterControlsLayoutDoorsSection vm={vm} layout={layout} />
+      <TheaterControlsLayoutOpeningsSection vm={vm} layout={layout} />
       <TheaterControlsLayoutRecessesSection vm={vm} layout={layout} />
     </div>
   );

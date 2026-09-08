@@ -132,6 +132,7 @@ export function useTheaterModels({
     projectName,
     currentScene,
     models,
+    layout,
     updateModels,
     updateCurrentScene,
     activeModelId,

@@ -1,18 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import cn from "classnames";
-import type { TheaterModelWorldSize } from "../model/theater-model-world-size";
+import {
+  DEFAULT_MODEL_SIZE_AXIS_LABELS,
+  type TheaterModelWorldSize,
+} from "../model/theater-model-world-size";
 
 type SizeAxis = keyof TheaterModelWorldSize;
 
 const AXIS_ORDER: SizeAxis[] = ["width", "height", "depth"];
-const AXIS_LABEL: Record<SizeAxis, string> = {
-  width: "Ширина",
-  height: "Высота",
-  depth: "Длина",
-};
 
 type TheaterModelSizeFieldsProps = {
   size: TheaterModelWorldSize;
+  labels?: Record<SizeAxis, string>;
   disabled?: boolean;
   className?: string;
   onCommit: (next: Partial<TheaterModelWorldSize>) => void;
@@ -24,6 +23,7 @@ function formatSizeInput(value: number) {
 
 export function TheaterModelSizeFields({
   size,
+  labels = DEFAULT_MODEL_SIZE_AXIS_LABELS,
   disabled = false,
   className,
   onCommit,
@@ -62,15 +62,15 @@ export function TheaterModelSizeFields({
     <div className={cn("theater-model-size-fields", className)} title="Габариты в метрах">
       {AXIS_ORDER.map((axis) => (
         <label key={axis} className="theater-model-size-fields__item">
-          <span className="theater-model-size-fields__label">{AXIS_LABEL[axis]}</span>
+          <span className="theater-model-size-fields__label">{labels[axis]}</span>
           <input
             type="text"
             inputMode="decimal"
             className="native-text-input theater-model-size-fields__input"
             value={draft[axis]}
             disabled={disabled}
-            aria-label={AXIS_LABEL[axis]}
-            title={AXIS_LABEL[axis]}
+            aria-label={labels[axis]}
+            title={labels[axis]}
             onFocus={() => setFocusedAxis(axis)}
             onChange={(event) => {
               const nextValue = event.target.value;

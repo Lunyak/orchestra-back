@@ -6,6 +6,7 @@ import {
 } from "./theater-align-guides";
 import { snapModelZToAudienceLine } from "./theater-audience-snap";
 import { snapTheaterHallPoint } from "./theater-hall-grid";
+import { followFloorY, resolveFloorYAt } from "./theater-stage-floor";
 import { resolveModelHalfDepth } from "./theater-model-placement";
 import {
   canIgnoreSeatedHumanCollision,
@@ -67,7 +68,6 @@ export function applyActiveModelTransform(
   const prevModel = models.find((item) => item.id === activeModelId);
   const box = new THREE.Box3().setFromObject(obj);
   const allowBelowFloorAnchor = prevModel ? isSittingHumanTheaterModel(prevModel) : false;
-  const lift = !allowBelowFloorAnchor && box.min.y < 0 ? -box.min.y : 0;
   let nextX = obj.position.x;
   let nextZ = obj.position.z;
   const allowOut = activeModel?.allowOutOfBounds ?? false;
@@ -89,6 +89,9 @@ export function applyActiveModelTransform(
     }
   }
 
+  const floorY = resolveFloorYAt(layout, nextX, nextZ);
+  const lift =
+    !allowBelowFloorAnchor && box.min.y < floorY ? floorY - box.min.y : 0;
   const clampedY = obj.position.y + lift;
   obj.position.set(nextX, clampedY, nextZ);
 
@@ -246,17 +249,29 @@ export function nudgeModelPosition(args: NudgeModelPositionArgs): NudgeModelPosi
     layout.audienceStartZ,
   );
 
+  const nextY = followFloorY(
+    layout,
+    model.position[0],
+    model.position[2],
+    nextX,
+    nextZ,
+    model.position[1],
+  );
+
   return {
-    position: [nextX, model.position[1], nextZ],
+    position: [nextX, nextY, nextZ],
     alignGuides,
   };
 }
 
 const FLOOR_LIFT_EPSILON = 1e-6;
 
-export function liftModelObjectAboveFloor(obj: THREE.Object3D): number {
+export function liftModelObjectAboveFloor(
+  obj: THREE.Object3D,
+  floorY = 0,
+): number {
   const box = new THREE.Box3().setFromObject(obj);
-  const lift = box.min.y < 0 ? -box.min.y : 0;
+  const lift = box.min.y < floorY ? floorY - box.min.y : 0;
   if (lift <= FLOOR_LIFT_EPSILON) return 0;
   obj.position.y += lift;
   return lift;

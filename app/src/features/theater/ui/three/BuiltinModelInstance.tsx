@@ -8,6 +8,7 @@ import {
   isHumanTheaterBuiltin,
 } from "../../model/theater-furniture-metrics";
 import { getTheaterAssetLibraryItem } from "../../model/theater-asset-library";
+import { LIGHT_TRUSS_6M_BASE } from "../../model/theater-model-world-size";
 import { BuiltinModel } from "./BuiltinModel";
 
 const FURNITURE_SELECTION_BUILTINS = new Set<
@@ -60,7 +61,7 @@ function getBuiltinSelectionBox(
   }
 
   if (model.builtin === "lightTruss6m") {
-    return { size: [6.2, 0.9, 0.4], center: [0, 0, 0] };
+    return { size: LIGHT_TRUSS_6M_BASE, center: [0, 0, 0] };
   }
 
   if (isHumanTheaterBuiltin(model.builtin)) {

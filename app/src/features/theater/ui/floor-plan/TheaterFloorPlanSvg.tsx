@@ -8,6 +8,10 @@ import {
 } from "../../model/theater-doors";
 import { THEATER_RECESS_WALL_LABELS, type RecessPlanHit } from "../../model/theater-wall-recesses";
 import {
+  THEATER_OPENING_WALL_LABELS,
+  type OpeningPlanHit,
+} from "../../model/theater-wall-openings";
+import {
   doorHandlePoints,
   doorRectGeometry,
   footprintToRect,
@@ -20,8 +24,10 @@ export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
   planContentTransform: string | undefined;
   doorHover: DoorPlanHit | null;
   recessHover: RecessPlanHit | null;
+  openingHover: OpeningPlanHit | null;
   doorDragging: boolean;
   recessDragging: boolean;
+  openingDragging: boolean;
   outlineVertexHover: number | null;
   models: TheaterModel[];
   spotlights: TheaterSpotlight[];
@@ -29,6 +35,7 @@ export type TheaterFloorPlanSvgProps = TheaterFloorPlanGeometry & {
   showSpotlightGuideLines: boolean;
   activeDoorId?: number;
   activeRecessId?: number;
+  activeOpeningId?: number;
   activeOutlineVertexIndex?: number | null;
   selectedModelIds: number[];
   hoveredModelId: number | null;
@@ -76,6 +83,9 @@ export function TheaterFloorPlanSvg({
   activeRecessId,
   recessHover,
   recessDragging,
+  activeOpeningId,
+  openingHover,
+  openingDragging,
   gridLines,
   stageLabelPos,
   audienceLabelPos,
@@ -324,6 +334,47 @@ export function TheaterFloorPlanSvg({
                       ]
                         .filter(Boolean)
                         .join(" ")}
+                    />
+                  ))
+                : null}
+            </g>
+          );
+        })}
+        {wallOverlay.openings.map((openingOverlay) => {
+          const rect = doorRectGeometry(openingOverlay);
+          const isActive = activeOpeningId === openingOverlay.id;
+          const isHot =
+            openingHover?.openingId === openingOverlay.id ||
+            (openingDragging && isActive);
+          return (
+            <g key={`opening-${openingOverlay.id}`}>
+              <rect
+                {...rect}
+                className={cn(
+                  "theater-floor-plan-opening",
+                  canEditDoor && "theater-floor-plan-opening--editable",
+                  isHot && "theater-floor-plan-opening--hot",
+                  isActive && "theater-floor-plan-opening--active",
+                  openingDragging && isActive && "theater-floor-plan-opening--dragging",
+                )}
+              >
+                <title>
+                  {`${THEATER_OPENING_WALL_LABELS[openingOverlay.wall]} · проём ${openingOverlay.id}`}
+                </title>
+              </rect>
+              {canEditDoor
+                ? doorHandlePoints(openingOverlay).map((handle) => (
+                    <circle
+                      key={`opening-${openingOverlay.id}-${handle.part}`}
+                      cx={handle.cx}
+                      cy={handle.cy}
+                      r={6}
+                      className={cn(
+                        "theater-floor-plan-opening-handle",
+                        openingHover?.openingId === openingOverlay.id &&
+                          openingHover.part === handle.part &&
+                          "is-hot",
+                      )}
                     />
                   ))
                 : null}

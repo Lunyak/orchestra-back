@@ -3,7 +3,7 @@ import type {
   TheaterModel,
   TheaterSpotlight,
 } from "../../../shared/types/script";
-import { roundM } from "./theater-metrics";
+import { getStageBackZ, getStageFrontZ, roundM } from "./theater-metrics";
 
 export type HallExpandSide = "east" | "west" | "south" | "north" | "up";
 
@@ -12,6 +12,102 @@ export const HALL_SIZE_LIMITS = {
   hallDepth: { min: 4, max: 80 },
   wallHeight: { min: 2.5, max: 20 },
 } as const;
+
+export const STAGE_WIDTH_LIMITS = {
+  min: 2,
+} as const;
+
+function resolveStageWidthField(
+  value: number | undefined,
+  hallWidth: number,
+) {
+  return value ?? hallWidth;
+}
+
+function clampStageWidth(value: number, hallWidth: number) {
+  return roundM(Math.min(hallWidth, Math.max(STAGE_WIDTH_LIMITS.min, value)));
+}
+
+const STAGE_PIN_EPS = 0.05;
+
+/** Если сужение зала ужало сцену, расширение двигает её на ту же величину. */
+export function followStageWidthsWithHall(
+  layout: Pick<
+    TheaterLayout,
+    "hallWidth" | "stageBackWidth" | "prosceniumWidth" | "stageHallFollowDebt"
+  >,
+  nextHallWidth: number,
+): Pick<TheaterLayout, "stageBackWidth" | "prosceniumWidth" | "stageHallFollowDebt"> {
+  const oldHall = layout.hallWidth;
+  const delta = nextHallWidth - oldHall;
+  const oldBack = resolveStageWidthField(layout.stageBackWidth, oldHall);
+  const oldProsc = resolveStageWidthField(layout.prosceniumWidth, oldHall);
+  let debt = Math.max(0, layout.stageHallFollowDebt ?? 0);
+  const pinnedToHall =
+    oldBack >= oldHall - STAGE_PIN_EPS || oldProsc >= oldHall - STAGE_PIN_EPS;
+
+  if (delta < 0) {
+    const nextBack = clampStageWidth(oldBack, nextHallWidth);
+    const nextProsc = clampStageWidth(oldProsc, nextHallWidth);
+    debt += Math.max(oldBack - nextBack, oldProsc - nextProsc);
+    return {
+      stageBackWidth: nextBack,
+      prosceniumWidth: nextProsc,
+      stageHallFollowDebt: roundM(debt),
+    };
+  }
+
+  if (delta > 0 && (debt > 0 || pinnedToHall)) {
+    return {
+      stageBackWidth: clampStageWidth(oldBack + delta, nextHallWidth),
+      prosceniumWidth: clampStageWidth(oldProsc + delta, nextHallWidth),
+      stageHallFollowDebt: roundM(Math.max(0, debt - delta)),
+    };
+  }
+
+  return {
+    stageBackWidth: clampStageWidth(oldBack, nextHallWidth),
+    prosceniumWidth: clampStageWidth(oldProsc, nextHallWidth),
+    stageHallFollowDebt: roundM(debt),
+  };
+}
+
+export function resolveStageWidth(
+  layout: Pick<TheaterLayout, "hallWidth" | "stageBackWidth" | "prosceniumWidth">,
+) {
+  return roundM(
+    resolveStageWidthField(
+      layout.stageBackWidth ?? layout.prosceniumWidth,
+      layout.hallWidth,
+    ),
+  );
+}
+
+export function applyHallWidthStageFollow(
+  previous: TheaterLayout,
+  incoming: TheaterLayout,
+): TheaterLayout {
+  if (Math.abs(incoming.hallWidth - previous.hallWidth) < 1e-6) {
+    const stageChanged =
+      incoming.stageBackWidth !== previous.stageBackWidth ||
+      incoming.prosceniumWidth !== previous.prosceniumWidth;
+    if (!stageChanged) return incoming;
+    return { ...incoming, stageHallFollowDebt: 0 };
+  }
+
+  const followed = followStageWidthsWithHall(previous, incoming.hallWidth);
+  const oldBack = resolveStageWidthField(previous.stageBackWidth, previous.hallWidth);
+  const clampedBack = clampStageWidth(oldBack, incoming.hallWidth);
+  const incomingBack = resolveStageWidthField(incoming.stageBackWidth, incoming.hallWidth);
+  const incomingLooksUnfollowed =
+    Math.abs(incomingBack - followed.stageBackWidth) > STAGE_PIN_EPS &&
+    Math.abs(incomingBack - clampedBack) > STAGE_PIN_EPS;
+
+  if (incomingLooksUnfollowed) {
+    return { ...incoming, stageHallFollowDebt: 0 };
+  }
+  return { ...incoming, ...followed };
+}
 
 export type HallExpandResult = {
   patch: Partial<TheaterLayout>;
@@ -94,12 +190,16 @@ export function hallExpandLayoutPatch(
     return { patch: { hallDepth: nextDepth }, objectShift: [0, 0, 0] };
   }
   const offsetDelta = side === "south" ? applied / 2 : -applied / 2;
+  const shiftZ = -offsetDelta;
   return {
     patch: {
       hallDepth: nextDepth,
       hallOffsetZ: roundM(offsetZ + offsetDelta),
+      audienceStartZ: roundM(start.audienceStartZ + shiftZ),
+      stageFrontZ: roundM(getStageFrontZ(start) + shiftZ),
+      stageBackZ: roundM(getStageBackZ(start) + shiftZ),
     },
-    objectShift: [0, 0, -offsetDelta],
+    objectShift: [0, 0, shiftZ],
   };
 }
 

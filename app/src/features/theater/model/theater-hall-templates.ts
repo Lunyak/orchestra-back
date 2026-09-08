@@ -1,4 +1,4 @@
-import type { TheaterLayout, TheaterWallRecess } from "../../../shared/types/script";
+import type { TheaterLayout, TheaterWallOpening, TheaterWallRecess } from "../../../shared/types/script";
 import { DEFAULT_THEATER_LAYOUT } from "./theater-defaults";
 import { METRIC, computeAudienceStartZ, normalizeTheaterLayout, roundM } from "./theater-metrics";
 import { resolveStageShape } from "./theater-stage-geometry";
@@ -488,6 +488,21 @@ function scaleWallRecessesForHallResize(
   }));
 }
 
+function scaleWallOpeningsForHallResize(
+  layout: TheaterLayout,
+  newHallWidth: number,
+  newHallDepth: number,
+) {
+  if (!Array.isArray(layout.wallOpenings) || layout.wallOpenings.length === 0) return undefined;
+  if (layout.hallWidth <= 0 || layout.hallDepth <= 0) return layout.wallOpenings;
+  const scale = Math.min(newHallWidth / layout.hallWidth, newHallDepth / layout.hallDepth);
+  return layout.wallOpenings.map((opening) => ({
+    ...opening,
+    pos: roundM(opening.pos * scale),
+    width: roundM(opening.width * scale),
+  }));
+}
+
 function applyHallResizeWithCustomOutline(
   current: TheaterLayout,
   patch: Partial<TheaterLayout>,
@@ -495,11 +510,13 @@ function applyHallResizeWithCustomOutline(
   const newHallWidth = patch.hallWidth ?? current.hallWidth;
   const newHallDepth = patch.hallDepth ?? current.hallDepth;
   const scaledRecesses = scaleWallRecessesForHallResize(current, newHallWidth, newHallDepth);
+  const scaledOpenings = scaleWallOpeningsForHallResize(current, newHallWidth, newHallDepth);
 
   const merged = normalizeTheaterLayout({
     ...current,
     ...patch,
     ...(scaledRecesses ? { wallRecesses: scaledRecesses } : {}),
+    ...(scaledOpenings ? { wallOpenings: scaledOpenings } : {}),
   });
 
   const outline = current.stageOutline;
@@ -548,6 +565,20 @@ function shiftWallRecessesWithOutline(
       recess.wall === "back"
         ? roundM(recess.pos + deltaX)
         : roundM(recess.pos + deltaZ),
+  }));
+}
+
+function shiftWallOpeningsWithOutline(
+  openings: TheaterWallOpening[],
+  deltaX: number,
+  deltaZ: number,
+): TheaterWallOpening[] {
+  return openings.map((opening) => ({
+    ...opening,
+    pos:
+      opening.wall === "left" || opening.wall === "right"
+        ? roundM(opening.pos + deltaZ)
+        : roundM(opening.pos + deltaX),
   }));
 }
 
@@ -623,6 +654,11 @@ export function applyHallLayoutFromCustomOutline(
       ? shiftWallRecessesWithOutline(layout.wallRecesses, deltaX, deltaZ)
       : layout.wallRecesses;
 
+  const wallOpenings =
+    Array.isArray(layout.wallOpenings) && layout.wallOpenings.length > 0
+      ? shiftWallOpeningsWithOutline(layout.wallOpenings, deltaX, deltaZ)
+      : layout.wallOpenings;
+
   const currentSeats = (layout.seatRows ?? 0) * (layout.seatsPerRow ?? 0);
   const targetSeats =
     options?.targetSeats != null
@@ -634,6 +670,7 @@ export function applyHallLayoutFromCustomOutline(
     hallDepth,
     stageOutline,
     wallRecesses,
+    wallOpenings,
     stageBackWidth: roundM(hallWidth * 0.9),
     prosceniumWidth: roundM(hallWidth * 0.82),
   };

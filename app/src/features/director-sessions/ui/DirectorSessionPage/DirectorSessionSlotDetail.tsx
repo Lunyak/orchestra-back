@@ -42,6 +42,7 @@ export type DirectorSessionSlotDetailProps = {
   slotsBySceneRefInSession: Map<string, DirectorSessionSlot[]>;
   onSelectScene: (scene: ScriptScene) => void;
   onSelectProgRun: () => void;
+  onClearProgRun: () => void;
   onSelectCustom: (title: string) => void;
   sessionDateKey: string | null;
   scheduleProfiles: TeamProfile[];
@@ -79,6 +80,7 @@ export function DirectorSessionSlotDetail({
   slotsBySceneRefInSession,
   onSelectScene,
   onSelectProgRun,
+  onClearProgRun,
   onSelectCustom,
   sessionDateKey,
   scheduleProfiles,
@@ -172,6 +174,7 @@ export function DirectorSessionSlotDetail({
             slotsBySceneRefInSession={slotsBySceneRefInSession}
             onSelectScene={onSelectScene}
             onSelectProgRun={onSelectProgRun}
+            onClearProgRun={onClearProgRun}
             initialCustomTitle={initialCustomTitle}
             onSelectCustom={onSelectCustom}
           />

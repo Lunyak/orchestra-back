@@ -1,4 +1,5 @@
 import type {
+  TheaterDoorWall,
   TheaterLayout,
   TheaterSurfaceMaterial,
   TheaterSurfaceTextureMode,
@@ -35,6 +36,12 @@ export function isTheaterSurfaceMaterialKey(
   return SURFACE_KEYS.has(value);
 }
 
+export function surfaceMaterialKeyForWall(
+  wall: TheaterDoorWall,
+): TheaterSurfaceMaterialKey {
+  return wall === "back" ? "backWallMaterial" : "sideWallsMaterial";
+}
+
 export function getTheaterSurfaceMaterialConfig(
   key: TheaterSurfaceMaterialKey,
 ): TheaterSurfaceMaterialConfig {
@@ -43,6 +50,7 @@ export function getTheaterSurfaceMaterialConfig(
     THEATER_SURFACE_MATERIALS[0]
   );
 }
+
 
 function normalizeTextureMode(
   value: TheaterSurfaceMaterial["textureMode"],

@@ -1,17 +1,25 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { getDesktopApi } from "../../../shared/platform/desktop-api";
-import type { ScriptScene, TheaterModel } from "../../../shared/types/script";
+import type { ScriptScene, TheaterLayout, TheaterModel } from "../../../shared/types/script";
 import {
   createBuiltinTheaterModel,
   isTheaterBuiltinTemplateKey,
 } from "../model/theater-model-builtin";
 import { openTheaterModelWebUploadPicker } from "../model/theater-model-import";
+import {
+  getLightTrussModels,
+  LIGHT_TRUSS_SPACING,
+  resolveLightRigHeight,
+} from "../model/theater-light-rig";
+import { resolveFloorYAt } from "../model/theater-stage-floor";
+import { isLightTrussModel } from "../model/theater-truss-mounts";
 import type { TheaterEditMode } from "./use-theater-selection";
 
 type UseTheaterModelsSpawnArgs = {
   projectName: string;
   currentScene: ScriptScene | undefined;
   models: TheaterModel[];
+  layout: TheaterLayout;
   updateModels: (next: TheaterModel[]) => void;
   updateCurrentScene: (patch: Partial<ScriptScene>) => void;
   activeModelId: number | undefined;
@@ -28,6 +36,7 @@ export function useTheaterModelsSpawn({
   projectName,
   currentScene,
   models,
+  layout,
   updateModels,
   updateCurrentScene,
   activeModelId,
@@ -49,7 +58,7 @@ export function useTheaterModelsSpawn({
         type: "file",
         allowOutOfBounds: false,
         ignoreCollisions: false,
-        position: [0, 0, 0],
+        position: [0, resolveFloorYAt(layout, 0, 0), 0],
         rotation: [0, 0, 0],
         scale: [1, 1, 1],
       };
@@ -58,7 +67,7 @@ export function useTheaterModelsSpawn({
       setPendingSnapModelId(nextId);
       setEditMode("models");
     },
-    [models, setEditMode, setPendingSnapModelId, updateCurrentScene, updateModels],
+    [layout, models, setEditMode, setPendingSnapModelId, updateCurrentScene, updateModels],
   );
 
   const addModelFromWebUpload = useCallback(() => {
@@ -109,16 +118,23 @@ export function useTheaterModelsSpawn({
     if (!key) return;
     const nextId = models.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
     const nextItem = createBuiltinTheaterModel(nextId, key);
-    if (position) {
-      nextItem.position = [
-        position[0],
-        nextItem.position[1],
-        position[2],
-      ];
-    }
+    const keepHeight = key === "lightTruss6m";
+    const existingTrusses = getLightTrussModels(models);
+    const lastTruss = existingTrusses[existingTrusses.length - 1];
+    const spawnX = position?.[0] ?? nextItem.position[0];
+    const spawnZ =
+      position?.[2] ??
+      (lastTruss
+        ? lastTruss.position[2] + LIGHT_TRUSS_SPACING
+        : nextItem.position[2]);
+    const floorY = position?.[1] ?? resolveFloorYAt(layout, spawnX, spawnZ);
+    const spawnY = keepHeight
+      ? resolveLightRigHeight(models)
+      : floorY + nextItem.position[1];
+    nextItem.position = [spawnX, spawnY, spawnZ];
     updateModels([...models, nextItem]);
     updateCurrentScene({ theaterActiveModelId: nextId });
-    setPendingSnapModelId(nextId);
+    if (!keepHeight) setPendingSnapModelId(nextId);
     if (isTheaterBuiltinTemplateKey(key)) setBuiltinModelKey(key);
     setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
   };
@@ -212,7 +228,7 @@ export function useTheaterModelsSpawn({
     };
     updateModels([...models, nextItem]);
     updateCurrentScene({ theaterActiveModelId: nextId });
-    setPendingSnapModelId(nextId);
+    if (!isLightTrussModel(source)) setPendingSnapModelId(nextId);
     setEditMode((mode) => (mode === "decor" ? "decor" : "models"));
   };
 

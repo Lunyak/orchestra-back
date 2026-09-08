@@ -235,14 +235,19 @@ function suggestDoorPos(
 export function createLayoutDoor(
   layout: TheaterLayout,
   wall: TheaterDoorWall = "left",
+  pos?: number,
 ): TheaterDoor[] {
   const existing = resolveLayoutDoors(layout);
   const nextId = existing.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
+  const nextPos =
+    typeof pos === "number" && Number.isFinite(pos)
+      ? pos
+      : suggestDoorPos(wall, existing, layout);
   const door = clampDoor(
     {
       id: nextId,
       wall,
-      pos: suggestDoorPos(wall, existing, layout),
+      pos: nextPos,
       width: DEFAULT_DOOR_WIDTH,
       height: DEFAULT_DOOR_HEIGHT,
       style: DEFAULT_DOOR_STYLE,

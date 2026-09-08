@@ -1,5 +1,10 @@
 import { useState, type ReactNode } from "react";
 import cn from "classnames";
+import {
+  getTheaterRoomSectionLabel,
+  type TheaterLayoutSectionId,
+  type TheaterRoomSectionId,
+} from "../model/theater-sidebar-nav";
 import type { TheaterMobileSheet } from "../model/theater-mobile-layout";
 import {
   downloadTheaterMobileSnapshot,
@@ -21,6 +26,9 @@ export function TheaterMobileActionBar({
   isPanelsSwapped,
 }: TheaterMobileActionBarProps) {
   const [sheet, setSheet] = useState<TheaterMobileSheet | null>(null);
+  const [layoutSection, setLayoutSection] =
+    useState<TheaterLayoutSectionId>("room");
+  const [roomSection, setRoomSection] = useState<TheaterRoomSectionId | null>(null);
   const [saveMessage, setSaveMessage] = useState("Автосохранение активно");
 
   const selectedTitle = vm.activeModel
@@ -34,9 +42,11 @@ export function TheaterMobileActionBar({
       ? "Вид"
       : sheet === "objects"
         ? "Объекты"
-        : sheet === "scene"
-          ? "Сцена"
-          : "Сохранить театр";
+        : sheet === "scene" && layoutSection === "room" && roomSection
+          ? getTheaterRoomSectionLabel(roomSection)
+          : sheet === "scene"
+            ? "Сцена"
+            : "Сохранить театр";
 
   const isLayoutSheet = sheet === "scene" && vm.activeTab === "layout";
 
@@ -87,9 +97,15 @@ export function TheaterMobileActionBar({
         >
           <header className="theater-mobile-sheet__header">
             <strong>{sheetTitle}</strong>
-            <button type="button" onClick={() => setSheet(null)}>
-              Закрыть
-            </button>
+            {sheet === "scene" && roomSection ? (
+              <button type="button" onClick={() => setRoomSection(null)}>
+                Назад
+              </button>
+            ) : (
+              <button type="button" onClick={() => setSheet(null)}>
+                Закрыть
+              </button>
+            )}
           </header>
           {sheet === "view" ? (
             <div className="theater-mobile-sheet__grid">
@@ -97,7 +113,7 @@ export function TheaterMobileActionBar({
                 active={vm.showFloorPlan}
                 onClick={() => vm.setShowFloorPlan(!vm.showFloorPlan)}
               >
-                2D план
+                2D карта
               </MobileActionButton>
               <MobileActionButton
                 active={vm.showSeats}
@@ -172,10 +188,24 @@ export function TheaterMobileActionBar({
             <>
               <div className="theater-mobile-sheet__grid">
                 <MobileActionButton
-                  active={vm.activeTab === "layout"}
-                  onClick={() => vm.setActiveTab("layout")}
+                  active={vm.activeTab === "layout" && layoutSection === "room"}
+                  onClick={() => {
+                    setLayoutSection("room");
+                    setRoomSection(null);
+                    vm.setActiveTab("layout");
+                  }}
                 >
-                  План зала
+                  Помещение
+                </MobileActionButton>
+                <MobileActionButton
+                  active={vm.activeTab === "layout" && layoutSection === "openings"}
+                  onClick={() => {
+                    setLayoutSection("openings");
+                    setRoomSection(null);
+                    vm.setActiveTab("layout");
+                  }}
+                >
+                  План
                 </MobileActionButton>
                 <MobileActionButton
                   active={vm.lightConsoleExpanded}
@@ -221,7 +251,12 @@ export function TheaterMobileActionBar({
               </div>
               {vm.activeTab === "layout" ? (
                 <div className="theater-mobile-layout-settings">
-                  <TheaterControlsLayoutTab vm={vm} />
+                  <TheaterControlsLayoutTab
+                    vm={vm}
+                    section={layoutSection}
+                    roomSection={roomSection}
+                    onOpenRoomSection={setRoomSection}
+                  />
                 </div>
               ) : null}
             </>

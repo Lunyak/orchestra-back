@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { ScriptScene, TheaterLayout } from "../../../shared/types/script";
 import type { PlaylistTrack } from "../../../shared/types/playlist";
 import { sceneHasMaterial } from "./scenario-material";
+import { applyHallWidthStageFollow } from "../../theater/model/theater-hall-expand";
 import { normalizePersistedTheaterLayout } from "../../theater/model/theater-metrics";
 import { attachPlaybookThunkExtraReducers } from "./playbook-slice-extra-reducers";
 import {
@@ -168,11 +169,14 @@ export const playbookSlice = createSlice({
       state.scenesRevision += 1;
     },
     setTheaterLayout(state, action: PayloadAction<TheaterLayoutUpdater>) {
+      const previous = state.theaterLayout;
       const resolved =
         typeof action.payload === "function"
-          ? action.payload(state.theaterLayout)
+          ? action.payload(previous)
           : action.payload;
-      state.theaterLayout = normalizePersistedTheaterLayout(resolved);
+      state.theaterLayout = normalizePersistedTheaterLayout(
+        applyHallWidthStageFollow(previous, resolved),
+      );
       state.hasLocalEdits = true;
     },
     setCurrentPage(state, action: PayloadAction<number>) {

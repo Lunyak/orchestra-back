@@ -1,65 +1,52 @@
-import { useEffect, useState } from "react";
-import cn from "classnames";
+import type {
+  TheaterLayoutSectionId,
+  TheaterRoomSectionId,
+} from "../../model/theater-sidebar-nav";
+import { getTheaterRoomSectionLabel } from "../../model/theater-sidebar-nav";
 import type { TheaterControlsTabProps } from "./types";
 import { useTheaterControlsLayoutTab } from "./use-theater-controls-layout-tab";
-import { TheaterControlsLayoutRoomPanel } from "./layout/TheaterControlsLayoutRoomPanel";
 import { TheaterControlsLayoutOpeningsPanel } from "./layout/TheaterControlsLayoutOpeningsPanel";
+import { TheaterControlsLayoutRoomPanel } from "./layout/TheaterControlsLayoutRoomPanel";
+import { TheaterRoomHome } from "./layout/TheaterRoomHome";
 
-type LayoutInnerTab = "room" | "openings";
+export type TheaterControlsLayoutTabProps = TheaterControlsTabProps & {
+  section: TheaterLayoutSectionId;
+  roomSection?: TheaterRoomSectionId | null;
+  onOpenRoomSection?: (sectionId: TheaterRoomSectionId) => void;
+};
 
-export function TheaterControlsLayoutTab({ vm }: TheaterControlsTabProps) {
+export function TheaterControlsLayoutTab({
+  vm,
+  section,
+  roomSection = null,
+  onOpenRoomSection,
+}: TheaterControlsLayoutTabProps) {
   const layout = useTheaterControlsLayoutTab(vm);
-  const [innerTab, setInnerTab] = useState<LayoutInnerTab>("room");
+  const isRoomHome = section === "room" && roomSection == null;
+  const panelLabel =
+    section === "openings"
+      ? "Проёмы"
+      : roomSection
+        ? getTheaterRoomSectionLabel(roomSection)
+        : "Помещение";
 
-  useEffect(() => {
-    if (vm.activeDoorId != null || vm.activeRecessId != null) {
-      setInnerTab("openings");
-    }
-  }, [vm.activeDoorId, vm.activeRecessId]);
+  if (isRoomHome) {
+    return (
+      <TheaterRoomHome
+        vm={vm}
+        layout={layout}
+        onOpen={onOpenRoomSection ?? (() => undefined)}
+      />
+    );
+  }
 
   return (
-    <div className="theater-layout-panel theater-layout-panel--organized">
-      <div
-        className="theater-layout-panel__tabs"
-        role="tablist"
-        aria-label="План зала"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={innerTab === "room"}
-          className={cn(
-            "theater-layout-panel__tab",
-            innerTab === "room" && "theater-layout-panel__tab--selected",
-          )}
-          onClick={() => setInnerTab("room")}
-        >
-          Помещение
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={innerTab === "openings"}
-          className={cn(
-            "theater-layout-panel__tab",
-            innerTab === "openings" && "theater-layout-panel__tab--selected",
-          )}
-          onClick={() => setInnerTab("openings")}
-        >
-          Проёмы
-        </button>
-      </div>
-      <div
-        className="theater-layout-panel__tabpanel"
-        role="tabpanel"
-        aria-label={innerTab === "room" ? "Помещение" : "Проёмы"}
-      >
-        {innerTab === "room" ? (
-          <TheaterControlsLayoutRoomPanel vm={vm} layout={layout} />
-        ) : (
-          <TheaterControlsLayoutOpeningsPanel vm={vm} layout={layout} />
-        )}
-      </div>
+    <div className="theater-layout-panel" aria-label={panelLabel}>
+      {section === "room" && roomSection ? (
+        <TheaterControlsLayoutRoomPanel vm={vm} layout={layout} section={roomSection} />
+      ) : (
+        <TheaterControlsLayoutOpeningsPanel vm={vm} layout={layout} />
+      )}
     </div>
   );
 }

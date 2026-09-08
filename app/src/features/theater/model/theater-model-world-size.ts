@@ -25,10 +25,32 @@ export type TheaterModelWorldSize = {
 const CABINET_BASE: [number, number, number] = [0.9, 1.0, 0.42];
 const FENCE_BASE: [number, number, number] = [2.2, 1.3, 0.14];
 const STAGE_SPOTLIGHT_BASE: [number, number, number] = [1.5, 1.5, 1.5];
-const LIGHT_TRUSS_6M_BASE: [number, number, number] = [6.2, 0.9, 0.4];
+export const LIGHT_TRUSS_6M_BASE: [number, number, number] = [6.2, 0.9, 0.4];
 const STRAW_GRID_BASE: [number, number, number] = [2, 2, 0.05];
 const DANCER_BASE: [number, number, number] = [0.7, 1.8, 0.7];
 const STAGE_ACTOR_BASE: [number, number, number] = [0.75, 1.8, 0.7];
+
+export const DEFAULT_MODEL_SIZE_AXIS_LABELS: Record<
+  keyof TheaterModelWorldSize,
+  string
+> = {
+  width: "Ширина",
+  height: "Высота",
+  depth: "Длина",
+};
+
+export function getTheaterModelSizeAxisLabels(
+  builtin: TheaterModel["builtin"],
+): Record<keyof TheaterModelWorldSize, string> {
+  if (builtin === "lightTruss6m") {
+    return {
+      width: "Длина",
+      height: "Высота",
+      depth: "Толщина",
+    };
+  }
+  return DEFAULT_MODEL_SIZE_AXIS_LABELS;
+}
 
 function actorBaseSize(
   pose: TheaterModel["actorPose"],
@@ -97,6 +119,61 @@ function scaleTuple(
     width: roundM(Math.abs(base[0] * scale[0])),
     height: roundM(Math.abs(base[1] * scale[1])),
     depth: roundM(Math.abs(base[2] * scale[2])),
+  };
+}
+
+function readLiveScale(
+  model: TheaterModel,
+  object?: THREE.Object3D | null,
+): [number, number, number] {
+  if (object) {
+    return [object.scale.x, object.scale.y, object.scale.z];
+  }
+  return [model.scale[0], model.scale[1], model.scale[2]];
+}
+
+/** Габариты вдоль локальных осей объекта (не мировой AABB). */
+export function measureObjectLocalSize(
+  root: THREE.Object3D,
+): TheaterModelWorldSize | null {
+  root.updateWorldMatrix(true, true);
+  const position = new THREE.Vector3();
+  const quaternion = new THREE.Quaternion();
+  root.matrixWorld.decompose(position, quaternion, new THREE.Vector3());
+  const invAligned = new THREE.Matrix4()
+    .compose(position, quaternion, new THREE.Vector3(1, 1, 1))
+    .invert();
+  const box = new THREE.Box3();
+  const temp = new THREE.Box3();
+  let hasMesh = false;
+
+  root.traverse((node) => {
+    const mesh = node as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    if (isHelperMesh(mesh)) return;
+    const geometry = mesh.geometry;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    if (!geometry.boundingBox) return;
+    hasMesh = true;
+    temp.copy(geometry.boundingBox);
+    temp.applyMatrix4(mesh.matrixWorld);
+    temp.applyMatrix4(invAligned);
+    box.union(temp);
+  });
+
+  if (!hasMesh || box.isEmpty()) return null;
+  const size = box.getSize(new THREE.Vector3());
+  if (
+    !Number.isFinite(size.x) ||
+    !Number.isFinite(size.y) ||
+    !Number.isFinite(size.z)
+  ) {
+    return null;
+  }
+  return {
+    width: roundM(Math.max(0, size.x)),
+    height: roundM(Math.max(0, size.y)),
+    depth: roundM(Math.max(0, size.z)),
   };
 }
 
@@ -169,13 +246,13 @@ export function resolveTheaterModelWorldSize(
   model: TheaterModel,
   object?: THREE.Object3D | null,
 ): TheaterModelWorldSize | null {
-  if (object) {
-    const measured = measureObjectWorldSize(object);
-    if (measured) return measured;
-  }
-
   const knownBase = getTheaterModelBaseSize(model);
-  if (knownBase) return scaleTuple(knownBase, model.scale);
+  if (knownBase) return scaleTuple(knownBase, readLiveScale(model, object));
+
+  if (object) {
+    const local = measureObjectLocalSize(object);
+    if (local) return local;
+  }
 
   return null;
 }
@@ -203,22 +280,24 @@ export function buildTheaterModelSizePatch(
   current: TheaterModelWorldSize,
   next: Partial<TheaterModelWorldSize>,
 ): Partial<TheaterModel> | null {
+  const knownBase = getTheaterModelBaseSize(model);
+  const source = knownBase ? scaleTuple(knownBase, model.scale) : current;
   const width =
     next.width != null
       ? clampTheaterModelSizeMeters(next.width)
-      : current.width;
+      : source.width;
   const height =
     next.height != null
       ? clampTheaterModelSizeMeters(next.height)
-      : current.height;
+      : source.height;
   const depth =
     next.depth != null
       ? clampTheaterModelSizeMeters(next.depth)
-      : current.depth;
+      : source.depth;
 
-  const widthChanged = width !== current.width;
-  const heightChanged = height !== current.height;
-  const depthChanged = depth !== current.depth;
+  const widthChanged = width !== source.width;
+  const heightChanged = height !== source.height;
+  const depthChanged = depth !== source.depth;
   if (!widthChanged && !heightChanged && !depthChanged) return null;
 
   if (isParametricDecorBuiltin(model.builtin)) {
@@ -235,9 +314,9 @@ export function buildTheaterModelSizePatch(
     };
   }
 
-  const safeCurrentW = Math.max(current.width, 1e-4);
-  const safeCurrentH = Math.max(current.height, 1e-4);
-  const safeCurrentD = Math.max(current.depth, 1e-4);
+  const safeCurrentW = Math.max(source.width, 1e-4);
+  const safeCurrentH = Math.max(source.height, 1e-4);
+  const safeCurrentD = Math.max(source.depth, 1e-4);
   const scaleX = (model.scale[0] || 1) * (width / safeCurrentW);
   const scaleY = (model.scale[1] || 1) * (height / safeCurrentH);
   const scaleZ = (model.scale[2] || 1) * (depth / safeCurrentD);

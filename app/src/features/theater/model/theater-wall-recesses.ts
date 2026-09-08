@@ -8,6 +8,7 @@ import {
   getStageBackWallSpanX,
   getStageSideWallX,
   getStageWallSpanZ,
+  placeOpeningOnWall,
   resolveStageGeometry,
   resolveStageWallChains,
   type StagePoint,
@@ -23,6 +24,12 @@ export const THEATER_RECESS_WALL_LABELS: Record<TheaterWallRecessWall, string> =
   right: "Правая",
   back: "Задняя",
 };
+
+export function isTheaterWallRecessWall(
+  wall: string,
+): wall is TheaterWallRecessWall {
+  return wall === "left" || wall === "right" || wall === "back";
+}
 
 const DEFAULT_RECESS_WIDTH = 1.5;
 const DEFAULT_RECESS_DEPTH = 0.8;
@@ -73,7 +80,32 @@ export function clampWallRecess(
     pos,
     width,
     depth,
+    filled: Boolean(recess.filled),
   };
+}
+
+export function getRecessPosBounds(
+  recess: Pick<TheaterWallRecess, "wall" | "width">,
+  layout: TheaterLayout,
+): { min: number; max: number } {
+  const geom = resolveStageGeometry(layout);
+  const half = clamp(recess.width, 0.6, 4) / 2;
+  const margin = 0.3;
+  const span =
+    recess.wall === "left" || recess.wall === "right"
+      ? getStageWallSpanZ(geom)
+      : getStageBackWallSpanX(geom);
+  return {
+    min: roundM(span.min + half + margin),
+    max: roundM(span.max - half - margin),
+  };
+}
+
+export function findLayoutWallRecess(
+  layout: TheaterLayout,
+  recessId: number,
+): TheaterWallRecess | undefined {
+  return resolveLayoutWallRecesses(layout).find((item) => item.id === recessId);
 }
 
 export function resolveLayoutWallRecesses(layout: TheaterLayout): TheaterWallRecess[] {
@@ -98,6 +130,15 @@ export function getRecessCenterOnWall(
   return null;
 }
 
+export function getRecessFillPose(
+  recess: TheaterWallRecess,
+  layout: TheaterLayout,
+): { x: number; z: number; rotationY: number } | null {
+  const mouth = getRecessCenterOnWall(recess, layout);
+  if (!mouth) return null;
+  return placeOpeningOnWall(recess.wall, mouth, recess.depth / 2);
+}
+
 export function normalizeWallRecesses(
   recesses: TheaterWallRecess[],
   layout: TheaterLayout,
@@ -110,6 +151,7 @@ export function normalizeWallRecesses(
         pos: Number.isFinite(recess.pos) ? recess.pos : 0,
         width: Number.isFinite(recess.width) ? recess.width : DEFAULT_RECESS_WIDTH,
         depth: Number.isFinite(recess.depth) ? recess.depth : DEFAULT_RECESS_DEPTH,
+        filled: Boolean(recess.filled),
       },
       layout,
     ),
@@ -148,14 +190,17 @@ export function normalizeLayoutWallRecessFields(
 export function createLayoutWallRecess(
   layout: TheaterLayout,
   wall: TheaterWallRecessWall = "left",
+  pos?: number,
 ): TheaterWallRecess[] {
   const existing = resolveLayoutWallRecesses(layout);
   const nextId = existing.reduce((acc, item) => Math.max(acc, item.id), 0) + 1;
   const geom = resolveStageGeometry(layout);
   const defaultPos =
-    wall === "back"
-      ? 0
-      : roundM((geom.backZ + geom.prosceniumZ) / 2);
+    typeof pos === "number" && Number.isFinite(pos)
+      ? pos
+      : wall === "back"
+        ? 0
+        : roundM((geom.backZ + geom.prosceniumZ) / 2);
   const recess = clampWallRecess(
     {
       id: nextId,
@@ -182,7 +227,7 @@ export function removeLayoutWallRecess(
 export function patchLayoutWallRecess(
   layout: TheaterLayout,
   recessId: number,
-  patch: Partial<Pick<TheaterWallRecess, "pos" | "width" | "depth" | "wall">>,
+  patch: Partial<Pick<TheaterWallRecess, "pos" | "width" | "depth" | "wall" | "filled">>,
 ): TheaterWallRecess[] {
   return normalizeWallRecesses(
     resolveLayoutWallRecesses(layout).map((item) =>
