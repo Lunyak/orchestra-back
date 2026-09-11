@@ -67,6 +67,20 @@ export function dateFromMonthKey(key: string): Date | null {
   return new Date(y, mo, 1);
 }
 
+export function nextScheduleRowSelection(
+  selectedIds: readonly string[],
+  memberId: string,
+  shiftKey: boolean,
+): string[] {
+  const isSelected = selectedIds.includes(memberId);
+  if (shiftKey) {
+    if (isSelected) return selectedIds.filter((id) => id !== memberId);
+    return [...selectedIds, memberId];
+  }
+  if (isSelected && selectedIds.length === 1) return [];
+  return [memberId];
+}
+
 export function memberLabel(m: {
   email: string;
   profile: {

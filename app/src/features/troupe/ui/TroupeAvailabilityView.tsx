@@ -18,6 +18,7 @@ import {
   monthLabel,
   ruDayCountLabel,
 } from "../model/troupe-page-utils";
+import { useScheduleRowSelection } from "../model/useScheduleRowSelection";
 import { useTroupePage } from "../model/useTroupePage";
 import { useTroupeScheduleRange } from "../model/useTroupeScheduleRange";
 import { TroupeAvailabilityScheduleGrid } from "./TroupeAvailabilityScheduleGrid";
@@ -38,9 +39,7 @@ export function TroupeAvailabilityView() {
     members,
     regularTroupeMembers,
     scheduleRefreshing,
-    selectedMemberId,
     setCurrentMonth,
-    setSelectedMemberId,
     todayIso,
   } = useTroupePage();
   const availability = useScheduleAvailability(accessToken);
@@ -52,6 +51,8 @@ export function TroupeAvailabilityView() {
     shouldIgnoreMineClick,
     visibleRange,
   } = useTroupeScheduleRange(monthKey(currentMonth));
+  const { selectedMemberIds, toggleMemberId, clearMemberSelection } =
+    useScheduleRowSelection(members);
   const [rangeTimeModalOpen, setRangeTimeModalOpen] = useState(false);
   const iAmInSchedule = members.some((member) =>
     availability.isMine(member.email),
@@ -83,8 +84,6 @@ export function TroupeAvailabilityView() {
   );
   const gridDays = [...days, ...peekDays];
   const peekStartIso = peekDays[0] ? isoDate(peekDays[0]) : null;
-  const toggleMemberId = (id: string) =>
-    setSelectedMemberId((prev) => (prev === id ? null : id));
 
   if (!accessToken) {
     return <div>Нужно войти, чтобы открыть занятость.</div>;
@@ -214,8 +213,9 @@ export function TroupeAvailabilityView() {
           currentMonthKey={currentMonthKey}
           peekStartIso={peekStartIso}
           todayIso={todayIso}
-          selectedMemberId={selectedMemberId}
+          selectedMemberIds={selectedMemberIds}
           onToggleMemberId={toggleMemberId}
+          onClearMemberSelection={clearMemberSelection}
           availability={availability}
           scheduleRefreshing={scheduleRefreshing}
           visibleRange={visibleRange}
@@ -250,8 +250,9 @@ export function TroupeAvailabilityView() {
           currentMonthKey={currentMonthKey}
           peekStartIso={peekStartIso}
           todayIso={todayIso}
-          selectedMemberId={selectedMemberId}
+          selectedMemberIds={selectedMemberIds}
           onToggleMemberId={toggleMemberId}
+          onClearMemberSelection={clearMemberSelection}
           availability={availability}
           scheduleRefreshing={scheduleRefreshing}
           visibleRange={visibleRange}

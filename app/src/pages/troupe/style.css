@@ -718,6 +718,15 @@
   user-select: none;
 }
 
+.troupe-header-cell--clear-selection {
+  cursor: pointer;
+}
+
+.troupe-day-cell--row-pick {
+  cursor: pointer;
+  user-select: none;
+}
+
 .troupe-actor-cell--readonly {
   cursor: default;
 }

@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import { sortMineFirst } from "../../profile/model/availability-calendar";
 import { useScheduleAvailability } from "../../profile/model/useScheduleAvailability";
 import { monthKey } from "../model/troupe-page-utils";
+import { useScheduleRowSelection } from "../model/useScheduleRowSelection";
 import { useTroupePage } from "../model/useTroupePage";
 import { TroupeAvailabilityScheduleGrid } from "./TroupeAvailabilityScheduleGrid";
 import "../../../pages/troupe/style.css";
@@ -31,9 +32,7 @@ export function TroupeAvailabilityMini({
     loading,
     regularTroupeMembers,
     scheduleRefreshing,
-    selectedMemberId,
     setCurrentMonth,
-    setSelectedMemberId,
     todayIso,
   } = useTroupePage();
   const availability = useScheduleAvailability(accessToken);
@@ -54,6 +53,8 @@ export function TroupeAvailabilityMini({
     ],
     [availability.myEmail, guestTroupeMembers, regularTroupeMembers],
   );
+  const { selectedMemberIds, toggleMemberId, clearMemberSelection } =
+    useScheduleRowSelection(members);
   const currentMonthKey = monthKey(currentMonth);
 
   if (!accessToken) return null;
@@ -71,10 +72,9 @@ export function TroupeAvailabilityMini({
           currentMonthKey={currentMonthKey}
           peekStartIso={null}
           todayIso={todayIso}
-          selectedMemberId={selectedMemberId}
-          onToggleMemberId={(id) =>
-            setSelectedMemberId((prev) => (prev === id ? null : id))
-          }
+          selectedMemberIds={selectedMemberIds}
+          onToggleMemberId={toggleMemberId}
+          onClearMemberSelection={clearMemberSelection}
           availability={availability}
           scheduleRefreshing={scheduleRefreshing}
           compact

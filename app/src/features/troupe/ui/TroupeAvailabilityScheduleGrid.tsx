@@ -22,8 +22,9 @@ type TroupeAvailabilityScheduleGridProps = {
   currentMonthKey: string;
   peekStartIso: string | null;
   todayIso: string;
-  selectedMemberId: string | null;
-  onToggleMemberId: (id: string) => void;
+  selectedMemberIds: string[];
+  onToggleMemberId: (id: string, shiftKey?: boolean) => void;
+  onClearMemberSelection: () => void;
   availability: ReturnType<typeof useScheduleAvailability>;
   scheduleRefreshing?: boolean;
   compact?: boolean;
@@ -55,8 +56,9 @@ export function TroupeAvailabilityScheduleGrid({
   currentMonthKey,
   peekStartIso,
   todayIso,
-  selectedMemberId,
+  selectedMemberIds,
   onToggleMemberId,
+  onClearMemberSelection,
   availability,
   scheduleRefreshing,
   compact,
@@ -73,13 +75,14 @@ export function TroupeAvailabilityScheduleGrid({
 }: TroupeAvailabilityScheduleGridProps) {
   const avatarSize = compact ? 16 : 22;
   const canPickDate = Boolean(onSelectDate);
+  const hasRowSelection = selectedMemberIds.length > 0;
 
   return (
     <div
       className={cn(
         "troupe-schedule",
         scheduleRefreshing && "troupe-schedule--refreshing",
-        selectedMemberId && "troupe-schedule--has-row-selection",
+        hasRowSelection && "troupe-schedule--has-row-selection",
         compact && "troupe-schedule--compact",
         readOnly && "troupe-schedule--readonly",
       )}
@@ -96,7 +99,26 @@ export function TroupeAvailabilityScheduleGrid({
           } as CSSProperties
         }
       >
-        <div className="troupe-cell troupe-sticky troupe-header-cell" />
+        <div
+          className={cn(
+            "troupe-cell troupe-sticky troupe-header-cell",
+            hasRowSelection && "troupe-header-cell--clear-selection",
+          )}
+          role={hasRowSelection ? "button" : undefined}
+          tabIndex={hasRowSelection ? 0 : undefined}
+          title={hasRowSelection ? "Снять выделение" : undefined}
+          onClick={hasRowSelection ? onClearMemberSelection : undefined}
+          onKeyDown={
+            hasRowSelection
+              ? (e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onClearMemberSelection();
+                  }
+                }
+              : undefined
+          }
+        />
         {gridDays.map((d) => {
           const n = dayjs(d).date();
           const wd = dayjs(d).format("dd");
@@ -179,13 +201,14 @@ export function TroupeAvailabilityScheduleGrid({
           members.map((m) => {
             const label = memberLabel(m);
             const mine = availability.isMine(m.email);
-            const isPersonSelected = m.id === selectedMemberId;
+            const isPersonSelected = selectedMemberIds.includes(m.id);
             const dayAvailability = availability.resolveDayAvailability(
               m.email,
               m.profile?.availabilityCalendar,
               m.profile?.availabilityTimeRanges,
             );
-            const togglePersonSelected = () => onToggleMemberId(m.id);
+            const togglePersonSelected = (shiftKey = false) =>
+              onToggleMemberId(m.id, shiftKey);
             return (
               <Fragment key={m.id}>
                 <div
@@ -197,12 +220,15 @@ export function TroupeAvailabilityScheduleGrid({
                     mine && "troupe-actor-cell--mine",
                     isPersonSelected && "selected",
                   )}
-                  title={`${label} • ${m.email}. Нажмите, чтобы подсветить занятость`}
-                  onClick={togglePersonSelected}
+                  title={`${label} • ${m.email}. Клик — подсветить, повторный клик — снять. Shift+клик — несколько человек`}
+                  onMouseDown={(e) => {
+                    if (e.shiftKey) e.preventDefault();
+                  }}
+                  onClick={(e) => togglePersonSelected(e.shiftKey)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      togglePersonSelected();
+                      togglePersonSelected(e.shiftKey);
                     }
                   }}
                 >
@@ -241,12 +267,20 @@ export function TroupeAvailabilityScheduleGrid({
                   const cellTitle = `${day} • ${visual.tooltip}`;
                   const canEditDay = !readOnly && mine;
                   const canPickDay = canPickDate && !canEditDay;
+                  const canPickRow = !canEditDay && !canPickDay;
+                  const cellRole =
+                    canEditDay || canPickDay ? "button" : undefined;
+                  const dayCellTitle = canEditDay
+                    ? `${cellTitle}. Протяните, чтобы выбрать дни. Клик — интервалы времени`
+                    : canPickDay
+                      ? `${cellTitle}. Нажмите, чтобы открыть день`
+                      : `${cellTitle}. Клик — подсветить строку. Shift+клик — несколько человек`;
 
                   return (
                     <div
                       key={`${m.id}:${day}`}
                       data-troupe-day={day}
-                      role={canEditDay || canPickDay ? "button" : undefined}
+                      role={cellRole}
                       tabIndex={canEditDay || canPickDay ? 0 : undefined}
                       className={cn(
                         "troupe-cell troupe-day-cell",
@@ -258,17 +292,12 @@ export function TroupeAvailabilityScheduleGrid({
                         isTodayCol && "troupe-day-cell--today",
                         canEditDay && "troupe-day-cell--mine",
                         canPickDay && "troupe-day-cell--pick",
+                        canPickRow && "troupe-day-cell--row-pick",
                         isPeek && "troupe-day-cell--peek",
                         isPeekStart && "troupe-day-cell--peek-start",
                         isFocusDate && "focus",
                       )}
-                      title={
-                        canEditDay
-                          ? `${cellTitle}. Протяните, чтобы выбрать дни. Клик — интервалы времени`
-                          : canPickDay
-                            ? `${cellTitle}. Нажмите, чтобы открыть день`
-                            : cellTitle
-                      }
+                      title={dayCellTitle}
                       onPointerDown={
                         canEditDay && onDayPointerDown
                           ? (e) => {
@@ -294,7 +323,7 @@ export function TroupeAvailabilityScheduleGrid({
                             }
                           : canPickDay
                             ? () => onSelectDate?.(day)
-                            : undefined
+                            : (e) => togglePersonSelected(e.shiftKey)
                       }
                       onKeyDown={
                         canEditDay && onMineDayClick
