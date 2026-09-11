@@ -33,12 +33,12 @@ export function TheaterCanvasShell({
       className={className}
       camera={{ position: camera.position, fov: camera.fov }}
       gl={{ preserveDrawingBuffer: false }}
-      onCreated={({ gl }) => {
+      onCreated={({ gl, setEvents }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = THEATER_SCENE_TONE_EXPOSURE;
         gl.outputColorSpace = THREE.SRGBColorSpace;
+        setEvents({ filter: (items) => filterTheaterRaycastHits(items) });
       }}
-      raycaster={{ filter: filterTheaterRaycastHits }}
       onWheel={(event) => event.preventDefault()}
       onContextMenu={(event) => event.preventDefault()}
       style={{ "--theater-canvas-bg": backgroundColor } as React.CSSProperties}

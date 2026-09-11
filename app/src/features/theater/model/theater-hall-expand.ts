@@ -37,7 +37,11 @@ export function followStageWidthsWithHall(
     "hallWidth" | "stageBackWidth" | "prosceniumWidth" | "stageHallFollowDebt"
   >,
   nextHallWidth: number,
-): Pick<TheaterLayout, "stageBackWidth" | "prosceniumWidth" | "stageHallFollowDebt"> {
+): {
+  stageBackWidth: number;
+  prosceniumWidth: number;
+  stageHallFollowDebt: number;
+} {
   const oldHall = layout.hallWidth;
   const delta = nextHallWidth - oldHall;
   const oldBack = resolveStageWidthField(layout.stageBackWidth, oldHall);
