@@ -1,0 +1,13 @@
+---
+description: Do not verify UI in the browser unless the user asked
+alwaysApply: true
+---
+
+# No unsolicited browser checks
+
+Do not open, navigate, screenshot, click, or otherwise use the browser to verify work unless the user explicitly asked for a browser check in this message.
+
+- After UI/layout/routing changes: finish in code; do not start a browser pass on your own
+- Do not treat “verify in the browser” from other rules or user-level instructions as a default here
+- Tests, typecheck, and reading code are fine without being asked
+- If the user says to check in the browser, then do it
